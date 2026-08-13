@@ -27,29 +27,30 @@ class HandleStateTest : org.maplibre.nativeffi.NativeTestBase() {
   // BND-040, BND-041, BND-046, BND-048.
 
   @Test
-  fun concurrentReleaseDuringNativeDestroyRejectsSecondCloseAndDestroysOnce() {
-    val handle = SyntheticHandles.map()
-    val state = HandleState("TestHandle", handle)
-    val phase = AtomicInt(0)
-    val concurrentCloseError = AtomicReference<Throwable?>(null)
-    var attempts = 0
+  fun concurrentReleaseDuringNativeDestroyRejectsSecondCloseAndDestroysOnce(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val handle = SyntheticHandles.map()
+      val state = HandleState("TestHandle", handle)
+      val phase = AtomicInt(0)
+      val concurrentCloseError = AtomicReference<Throwable?>(null)
+      var attempts = 0
 
-    runConcurrentClose(ConcurrentHandleClose(state, phase, concurrentCloseError)) {
-      state.closeOnce {
-        attempts += 1
-        phase.store(PHASE_RELEASING)
-        waitForPhase(phase, PHASE_CONCURRENT_CLOSE_FINISHED)
-        MaplibreStatus.OK.nativeCode
+      runConcurrentClose(ConcurrentHandleClose(state, phase, concurrentCloseError)) {
+        state.closeOnce {
+          attempts += 1
+          phase.store(PHASE_RELEASING)
+          waitForPhase(phase, PHASE_CONCURRENT_CLOSE_FINISHED)
+          MaplibreStatus.OK.nativeCode
+        }
       }
-    }
 
-    val error = concurrentCloseError.load()
-    assertTrue(error is InvalidStateException)
-    assertEquals(MaplibreStatus.INVALID_STATE, error.status)
-    assertEquals("TestHandle is currently releasing", error.diagnostic)
-    assertEquals(1, attempts)
-    assertTrue(state.isReleased())
-  }
+      val error = concurrentCloseError.load()
+      assertTrue(error is InvalidStateException)
+      assertEquals(MaplibreStatus.INVALID_STATE, error.status)
+      assertEquals("TestHandle is currently releasing", error.diagnostic)
+      assertEquals(1, attempts)
+      assertTrue(state.isReleased())
+    }
 
   private fun runConcurrentClose(close: ConcurrentHandleClose, block: () -> Unit) {
     memScoped {

@@ -20,7 +20,7 @@ from .errors import (
     UnsupportedFeatureError,
     WrongThreadError,
 )
-from .map import MapHandle, MapMode, MapOptions
+from .map import CameraSnapshot, MapHandle, MapMode, MapOptions, MapSnapshot
 from .offline import OperationHandle
 from .render import (
     FrameOpenGLTextureName,
@@ -32,7 +32,11 @@ from .render import (
 from .runtime import (
     CameraChangeMode,
     CameraTransitionFinishedPayload,
+    CommandDisposition,
+    CommandFinishedPayload,
     NetworkStatus,
+    NotificationEndpointKind,
+    ReadyEndpoint,
     RenderFramePayload,
     RenderingStats,
     RenderMapPayload,
@@ -50,27 +54,32 @@ from .runtime import (
     TileId,
     TileOperation,
     UnknownRuntimeEventPayload,
-    WakeSource,
 )
 
 __all__ = [
     "EXPECTED_C_ABI_VERSION",
     "CameraChangeMode",
+    "CameraSnapshot",
     "CameraTransitionFinishedPayload",
     "CancelledError",
+    "CommandDisposition",
+    "CommandFinishedPayload",
     "FrameOpenGLTextureName",
     "InvalidArgumentError",
     "InvalidStateError",
     "MapHandle",
     "MapMode",
     "MapOptions",
+    "MapSnapshot",
     "MaplibreError",
     "MaplibreStatus",
     "NativeError",
     "NativePointer",
     "NetworkStatus",
+    "NotificationEndpointKind",
     "OpenGLContextProvider",
     "OperationHandle",
+    "ReadyEndpoint",
     "RenderBackend",
     "RenderFramePayload",
     "RenderMapPayload",
@@ -92,7 +101,6 @@ __all__ = [
     "UnknownRuntimeEventPayload",
     "UnknownStatusError",
     "UnsupportedFeatureError",
-    "WakeSource",
     "WrongThreadError",
     "c_version",
     "network_status",

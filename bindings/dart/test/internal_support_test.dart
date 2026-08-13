@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:ffi';
-import 'dart:isolate';
 
 import 'package:maplibre_native_ffi/src/error/maplibre_exception.dart';
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.dart';
@@ -67,7 +66,6 @@ void main() {
       final cases = <(int, Type)>[
         (nativeStatusInvalidArgument, InvalidArgumentException),
         (nativeStatusInvalidState, InvalidStateException),
-        (nativeStatusWrongThread, WrongThreadException),
         (nativeStatusUnsupported, UnsupportedFeatureException),
         (nativeStatusNativeError, NativeErrorException),
       ];
@@ -204,49 +202,6 @@ void main() {
       expect(state.isClosed, isTrue);
     });
 
-    test('owner isolate mismatch rejects use before native calls', () {
-      final state = NativeHandleState<_FakeNativeHandle>(
-        _fakeHandle,
-        'fake_handle',
-        ownerIsolateHash: Isolate.current.hashCode + 1,
-        leakReporting: false,
-      );
-
-      expect(() => state.handle, throwsA(isA<WrongThreadException>()));
-      expect(
-        () => state.close((_) => nativeStatusOk, () => 'unused'),
-        throwsA(isA<WrongThreadException>()),
-      );
-    });
-
-    test('owner native thread mismatch reports the isolate moved', () {
-      // The isolate check still passes when the VM moves an isolate off its
-      // original native thread, so the thread check has to catch it.
-      final state = NativeHandleState<_FakeNativeHandle>(
-        _fakeHandle,
-        'fake_handle',
-        ownerThreadToken: -1,
-        leakReporting: false,
-      );
-
-      expect(
-        () => state.handle,
-        throwsA(
-          isA<WrongThreadException>().having(
-            (error) => error.diagnostic,
-            'diagnostic',
-            allOf(
-              contains('native thread its isolate has since left'),
-              contains('awaited I/O'),
-            ),
-          ),
-        ),
-      );
-      expect(
-        () => state.close((_) => nativeStatusOk, () => 'unused'),
-        throwsA(isA<WrongThreadException>()),
-      );
-    });
 
     test('failed close leaves handle live for retry', () {
       final state = NativeHandleState<_FakeNativeHandle>(
@@ -295,8 +250,8 @@ void main() {
     });
   });
 
-  test('a drained batch is indexed by its stride and copied field by field', () {
-    final runtime = RuntimeHandle.create();
+  test('a drained batch is indexed by its stride and copied field by field', () async {
+    final runtime = await RuntimeHandle.create();
     // A stride wider than this binding's own record is what a C API version
     // that added a payload member reports, so the decoder indexes by it.
     final eventSize = sizeOf<raw.mln_runtime_event>() + 8;
@@ -432,7 +387,7 @@ void main() {
       calloc.free(batch);
       calloc.free(messages);
       calloc.free(events);
-      runtime.close();
+      await runtime.close();
     }
   });
 }

@@ -13,7 +13,7 @@ public sealed class RuntimeOfflineOperationTests
     [Fact]
     public void AmbientCacheOperationCanBeStartedAndReleased()
     {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
 
         using var operation = runtime.StartAmbientCacheOperation(AmbientCacheOperation.Invalidate);
 
@@ -28,7 +28,9 @@ public sealed class RuntimeOfflineOperationTests
     [Fact]
     public void SetMaximumAmbientCacheSizeCanBeStartedAndReleased()
     {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions { CachePath = ":memory:" });
+        using var runtime = TestHandles.CreateRuntime(
+            new RuntimeOptions { CachePath = ":memory:" }
+        );
 
         using var operation = runtime.StartSetMaximumAmbientCacheSize(8UL << 20);
 
@@ -39,15 +41,15 @@ public sealed class RuntimeOfflineOperationTests
     [Fact]
     public void RuntimeCloseFailsWhileOperationIsLiveAndCanRetryAfterOperationClose()
     {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
         using var operation = runtime.StartAmbientCacheOperation(AmbientCacheOperation.Invalidate);
 
-        var error = Assert.Throws<InvalidStateException>(runtime.Close);
+        var error = Assert.Throws<InvalidStateException>(() => TestHandles.Close(runtime));
         Assert.Equal(MaplibreStatus.InvalidState, error.Status);
         Assert.False(runtime.IsClosed);
 
         operation.Close();
-        runtime.Close();
+        TestHandles.Close(runtime);
         Assert.True(runtime.IsClosed);
     }
 
@@ -82,7 +84,7 @@ public sealed class RuntimeOfflineOperationTests
                 return mln_status.MLN_STATUS_OK;
             }
         );
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
         using var operation = new OperationHandle(
             runtime,
             new MlnOperation(77),
@@ -110,7 +112,9 @@ public sealed class RuntimeOfflineOperationTests
     [Fact]
     public void OfflineRegionsAreCreatedListedAndDeletedThroughOperationHandles()
     {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions { CachePath = ":memory:" });
+        using var runtime = TestHandles.CreateRuntime(
+            new RuntimeOptions { CachePath = ":memory:" }
+        );
         var definition = new OfflineRegionDefinition.TilePyramid(
             "custom://offline-style.json",
             new LatLngBounds(new LatLng(0, 0), new LatLng(1, 1)),
@@ -143,27 +147,11 @@ public sealed class RuntimeOfflineOperationTests
         );
     }
 
-    // The runtime pump advances offline work until the common handle reaches a terminal state.
     private static void CompleteOperation(RuntimeHandle runtime, OperationHandle operation)
     {
-        for (var attempt = 0; attempt < 1000; attempt++)
-        {
-            runtime.Pump(TimeSpan.FromMilliseconds(1));
-            if (operation.Poll())
-            {
-                Assert.Contains(
-                    runtime.DrainReadyEndpoints(),
-                    endpoint =>
-                        endpoint.Kind == NotificationEndpointKind.Operation
-                        && endpoint.Id == operation.NativeId
-                );
-                var completion = operation.GetCompletion();
-                Assert.Equal(MaplibreStatus.Ok, completion.Status);
-                Assert.Equal((int)MaplibreStatus.Ok, completion.RawStatus);
-                return;
-            }
-        }
-
-        throw new TimeoutException("Operation never completed.");
+        operation.WaitAsync(TestContext.Current.CancellationToken).GetAwaiter().GetResult();
+        var completion = operation.GetCompletion();
+        Assert.Equal(MaplibreStatus.Ok, completion.Status);
+        Assert.Equal((int)MaplibreStatus.Ok, completion.RawStatus);
     }
 }

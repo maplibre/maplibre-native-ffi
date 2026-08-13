@@ -279,7 +279,13 @@ func (operation *OperationHandle[T]) Take() (T, error) {
 	if consumed {
 		return zero, newBindingError(ErrInvalidState, "operation result was already consumed")
 	}
-	result, transferred, err := takeOfflineOperationResult[T](C.mln_operation(id), kind, resultKind)
+	var result T
+	var transferred bool
+	if operation.takeResult != nil {
+		result, transferred, err = operation.takeResult(id)
+	} else {
+		result, transferred, err = takeOfflineOperationResult[T](C.mln_operation(id), kind, resultKind)
+	}
 	operation.endResultUse(transferred)
 	if err != nil {
 		return zero, err
@@ -373,6 +379,24 @@ func takeOfflineOperationResult[T any](id C.mln_operation, kind operationKind, r
 			return result, true, nil
 		}
 		return zero, true, newBindingError(ErrInvalidState, "offline operation result type mismatch")
+	case operationResultCamera:
+		if kind != operationCameraQuery {
+			return zero, false, newBindingError(ErrInvalidState, "camera operation result kind mismatch")
+		}
+		raw := C.mln_camera_query_result{size: C.uint32_t(unsafe.Sizeof(C.mln_camera_query_result{}))}
+		if err := checkNative(func() int32 {
+			return int32(C.mln_map_camera_query_take_result(id, &raw))
+		}); err != nil {
+			return zero, false, err
+		}
+		snapshot := CameraSnapshot{
+			Generation: uint64(raw.generation),
+			Camera:     goCameraOptions(raw.camera),
+		}
+		if result, ok := any(snapshot).(T); ok {
+			return result, true, nil
+		}
+		return zero, true, newBindingError(ErrInvalidState, "camera operation result type mismatch")
 	default:
 		return zero, false, newBindingError(ErrInvalidState, "unknown offline operation result kind")
 	}

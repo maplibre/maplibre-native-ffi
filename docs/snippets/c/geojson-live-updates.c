@@ -18,9 +18,11 @@ mln_status add_vehicle_source(mln_map map) {
   // #endregion options
 
   // #region add
+  uint64_t command_id = 0;
   return mln_map_add_geojson_source_data(
     map, view("vehicles"),
-    view("{\"type\":\"FeatureCollection\",\"features\":[]}"), &options
+    view("{\"type\":\"FeatureCollection\",\"features\":[]}"), &options,
+    &command_id
   );
   // #endregion add
 }
@@ -57,6 +59,9 @@ mln_status publish_vehicles(
   // #endregion features
 
   // #region publish
-  return mln_map_set_geojson_source_data(map, view("vehicles"), view(json));
+  uint64_t command_id = 0;
+  return mln_map_set_geojson_source_data(
+    map, view("vehicles"), view(json), &command_id
+  );
   // #endregion publish
 }

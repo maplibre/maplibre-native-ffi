@@ -1824,6 +1824,7 @@ dependencies = [
  "glow",
  "glutin",
  "glutin-winit",
+ "libc",
  "maplibre-native-ffi",
  "objc2 0.5.2",
  "objc2-app-kit 0.2.2",

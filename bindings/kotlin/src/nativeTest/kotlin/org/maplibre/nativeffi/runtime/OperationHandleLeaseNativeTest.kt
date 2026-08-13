@@ -22,50 +22,51 @@ import platform.posix.usleep
 @OptIn(ExperimentalAtomicApi::class, ExperimentalForeignApi::class)
 class OperationHandleLeaseNativeTest {
   @Test
-  fun closeWaitsForStartedNativeUse() {
-    val runtime = Any()
-    val phase = AtomicInt(0)
-    val retentionReleases = AtomicInt(0)
-    val core =
-      OperationHandleCore(runtime, 7L, OperationKind.REGION_CREATE, OperationResultKind.REGION) {
-        retentionReleases.addAndFetch(1)
+  fun closeWaitsForStartedNativeUse(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val runtime = Any()
+      val phase = AtomicInt(0)
+      val retentionReleases = AtomicInt(0)
+      val core =
+        OperationHandleCore(runtime, 7L, OperationKind.REGION_CREATE, OperationResultKind.REGION) {
+          retentionReleases.addAndFetch(1)
+        }
+
+      memScoped {
+        val worker = StableRef.create(OperationUse(core, runtime, phase))
+        val thread = alloc<pthread_tVar>()
+        val status =
+          pthread_create(thread.ptr, null, staticCFunction(::useOperation), worker.asCPointer())
+        if (status != 0) {
+          worker.dispose()
+          error("pthread_create failed with status $status")
+        }
+        waitForPhase(phase, PHASE_USING)
+        phase.store(PHASE_CLOSE_STARTED)
+        val closer = StableRef.create(OperationClose(core, phase))
+        val closeThread = alloc<pthread_tVar>()
+        val closeStatus =
+          pthread_create(
+            closeThread.ptr,
+            null,
+            staticCFunction(::closeOperation),
+            closer.asCPointer(),
+          )
+        if (closeStatus != 0) {
+          closer.dispose()
+          error("pthread_create failed with status $closeStatus")
+        }
+        usleep(10_000U)
+        assertEquals(PHASE_CLOSE_STARTED, phase.load())
+        phase.store(PHASE_RELEASE_USE)
+        pthread_join(thread.ptr[0], null)
+        pthread_join(closeThread.ptr[0], null)
       }
 
-    memScoped {
-      val worker = StableRef.create(OperationUse(core, runtime, phase))
-      val thread = alloc<pthread_tVar>()
-      val status =
-        pthread_create(thread.ptr, null, staticCFunction(::useOperation), worker.asCPointer())
-      if (status != 0) {
-        worker.dispose()
-        error("pthread_create failed with status $status")
-      }
-      waitForPhase(phase, PHASE_USING)
-      phase.store(PHASE_CLOSE_STARTED)
-      val closer = StableRef.create(OperationClose(core, phase))
-      val closeThread = alloc<pthread_tVar>()
-      val closeStatus =
-        pthread_create(
-          closeThread.ptr,
-          null,
-          staticCFunction(::closeOperation),
-          closer.asCPointer(),
-        )
-      if (closeStatus != 0) {
-        closer.dispose()
-        error("pthread_create failed with status $closeStatus")
-      }
-      usleep(10_000U)
-      assertEquals(PHASE_CLOSE_STARTED, phase.load())
-      phase.store(PHASE_RELEASE_USE)
-      pthread_join(thread.ptr[0], null)
-      pthread_join(closeThread.ptr[0], null)
+      assertEquals(PHASE_CLOSED, phase.load())
+      assertEquals(1, retentionReleases.load())
+      assertTrue(core.isClosed)
     }
-
-    assertEquals(PHASE_CLOSED, phase.load())
-    assertEquals(1, retentionReleases.load())
-    assertTrue(core.isClosed)
-  }
 }
 
 @OptIn(ExperimentalAtomicApi::class)

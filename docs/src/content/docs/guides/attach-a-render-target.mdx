@@ -15,8 +15,8 @@ live render session. Its style, sources, layers, and camera exist independently
 of that session and remain after the session is released.
 
 The thread that attaches a session becomes its owner thread for the session's
-lifetime. Attach on the thread that will draw the frames. Another thread can own
-the runtime and map.
+lifetime. Attach on the thread that will draw frames. Runtime and map work
+continues independently on the native scheduler thread.
 
 ## Choose the kind of target
 
@@ -65,7 +65,9 @@ texture to prevent clipped or corrupt output.
 ## Resize, replace, and release
 
 Resize surface and session-owned texture targets in place on the session's owner
-thread. This preserves the target and session.
+thread. Submit the same logical extent through the map resize command. This
+preserves the target and session while making map resize the sole authority for
+logical width, height, and scale factor.
 
 <Code code={region(renderTarget, "resize")} lang="c" title="render-target.c" />
 
@@ -83,11 +85,8 @@ allocating a replacement borrowed texture.
 Changing the scale factor recreates the session's rendering resources because
 its shaders use a fixed pixel ratio. Feature state then starts empty.
 
-Release the session before the map. Destroying a map while a session is attached
-reports an invalid-state status.
-
-When the session and map have different owner threads, send the release request
-to the session's owner thread. Use a bounded wait. Teardown can then recover if
-that thread has failed.
+Close the session before the map. A map close preflight reports invalid state
+and leaves the map open while a session is attached. Close the session on its
+owner thread, then start and await map close.
 
 <Code code={region(renderTarget, "teardown")} lang="c" title="render-target.c" />

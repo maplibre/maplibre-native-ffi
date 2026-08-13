@@ -7,16 +7,22 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <type_traits>
 #include <utility>
 
 #include "maplibre_native_c/operation.h"
 #include "notification/notification.hpp"
 
 namespace mln::core {
+struct OperationResultTransfer {
+  mln_status status;
+  bool consume;
+};
 
 class OperationObject final {
  public:
   using CancelCallback = std::function<void()>;
+  using TerminalCallback = std::function<void()>;
 
   OperationObject(std::uint32_t kind, bool cancellable, CancelCallback cancel);
   OperationObject(const OperationObject&) = delete;
@@ -28,6 +34,7 @@ class OperationObject final {
   auto publish(
     mln_operation self, std::shared_ptr<NotificationEndpoint> endpoint
   ) noexcept -> void;
+  auto set_terminal_callback(TerminalCallback callback) noexcept -> void;
   auto complete(
     mln_status status, std::string diagnostic, std::any result
   ) noexcept -> void;
@@ -72,8 +79,23 @@ class OperationObject final {
       set_operation_error("operation result storage has the wrong type");
       return MLN_STATUS_INVALID_STATE;
     }
-    const auto transfer_status = std::forward<Transfer>(transfer)(*result);
-    if (transfer_status != MLN_STATUS_OK) {
+    const auto transfer_result = std::forward<Transfer>(transfer)(*result);
+    auto transfer_status = MLN_STATUS_OK;
+    auto consume = true;
+    if constexpr (
+      std::is_same_v<
+        std::remove_cvref_t<decltype(transfer_result)>, OperationResultTransfer>
+    ) {
+      transfer_status = transfer_result.status;
+      consume = transfer_result.consume;
+    } else {
+      static_assert(
+        std::is_same_v<
+          std::remove_cvref_t<decltype(transfer_result)>, mln_status>
+      );
+      transfer_status = transfer_result;
+    }
+    if (transfer_status != MLN_STATUS_OK || !consume) {
       return transfer_status;
     }
     result_.reset();
@@ -85,7 +107,7 @@ class OperationObject final {
   static auto set_operation_error(const char* message) noexcept -> void;
   auto finish_cancelled_locked(
     std::shared_ptr<NotificationEndpoint>& out_endpoint,
-    CancelCallback& out_cancel
+    CancelCallback& out_cancel, TerminalCallback& out_terminal
   ) noexcept -> void;
 
   std::mutex mutex_;
@@ -101,6 +123,7 @@ class OperationObject final {
   std::any result_;
   CancelCallback cancel_callback_;
   std::shared_ptr<NotificationEndpoint> endpoint_;
+  TerminalCallback terminal_callback_;
 };
 
 [[nodiscard]] auto lease_operation(mln_operation operation)

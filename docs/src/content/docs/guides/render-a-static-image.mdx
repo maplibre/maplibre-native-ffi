@@ -21,9 +21,9 @@ target and can copy its contents into host memory.
 
 ## Request one image
 
-Create the map at the render target's size. Attaching a session with a different
-size queues a map-size update on the map's owner thread. Pump before requesting
-an image. The map then uses the new size.
+Create the map at the render target's size. If the attached session uses a
+different extent, submit a map resize command before starting the still-image
+operation.
 
 <Code code={region(stillImage, "create")} lang="c" title="still-image.c" />
 
@@ -33,10 +33,10 @@ this snippet uses OpenGL through EGL.
 
 <Code code={region(stillImage, "attach")} lang="c" title="still-image.c" />
 
-Render on every turn of the loop. A static map advances loading through the
-render calls. The still-image-finished event can arrive before or after the
-render call that produced the pixels. The image is ready after both the event
-and a successfully rendered frame.
+Render on every turn while the still-image operation is pending. A static map
+advances loading through render calls. Completion can arrive before or after
+the render call that produced the pixels. Read pixels only after the operation
+completed successfully and a frame rendered.
 
 <Code code={region(stillImage, "await")} lang="c" title="still-image.c" />
 

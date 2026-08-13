@@ -1,7 +1,17 @@
-// Creating a runtime and a map on one thread, choosing the options that are
-// fixed for the map's life, and releasing the two in order.
+// Creating a runtime and a map, choosing the options that are fixed for the
+// map's life, and closing the two in order.
 
 #include <maplibre_native_c.h>
+
+static mln_status wait_ok(mln_operation operation) {
+  bool completed = false;
+  mln_status status = mln_operation_wait(operation, -1, &completed);
+  if (status != MLN_STATUS_OK || !completed) return status;
+  if (mln_operation_get_status(operation, &status) != MLN_STATUS_OK) {
+    return MLN_STATUS_NATIVE_ERROR;
+  }
+  return status;
+}
 
 mln_status open_runtime(
   const char* cache_path, mln_runtime* out_runtime,
@@ -10,21 +20,23 @@ mln_status open_runtime(
   // #region runtime
   mln_status status = mln_notification_source_create(out_notifications);
   if (status != MLN_STATUS_OK) return status;
-
   mln_runtime_options options = mln_runtime_options_default();
-
-  // A filesystem path keeps cached tiles across runs of the host. The default,
-  // ":memory:", discards them when the runtime is destroyed.
   options.cache_path = cache_path;
   options.notification_source = *out_notifications;
 
-  status = mln_runtime_create(&options, out_runtime);
+  mln_operation operation = MLN_HANDLE_NULL;
+  status = mln_runtime_create_start(&options, &operation);
+  if (status == MLN_STATUS_OK) status = wait_ok(operation);
+  if (status == MLN_STATUS_OK) {
+    status = mln_runtime_create_take_result(operation, out_runtime);
+  }
+  mln_operation_release(operation);
+  // #endregion runtime
   if (status != MLN_STATUS_OK) {
     mln_notification_source_close(*out_notifications);
     *out_notifications = MLN_HANDLE_NULL;
   }
   return status;
-  // #endregion runtime
 }
 
 mln_status open_map(
@@ -33,16 +45,18 @@ mln_status open_map(
 ) {
   // #region map
   mln_map_options options = mln_map_options_default();
+  options.initial_extent = (mln_logical_extent){
+    .width = width, .height = height, .scale_factor = scale_factor
+  };
 
-  // Replaced by the render target's extent at the first attach. Until then it
-  // is the viewport that camera and projection queries answer against.
-  options.width = width;
-  options.height = height;
-
-  // Fixed for the map's life. It selects sprites, glyphs, and raster tiles.
-  options.scale_factor = scale_factor;
-
-  return mln_map_create(runtime, &options, out_map);
+  mln_operation operation = MLN_HANDLE_NULL;
+  mln_status status = mln_map_create_start(runtime, &options, &operation);
+  if (status == MLN_STATUS_OK) status = wait_ok(operation);
+  if (status == MLN_STATUS_OK) {
+    status = mln_map_create_take_result(operation, out_map);
+  }
+  mln_operation_release(operation);
+  return status;
   // #endregion map
 }
 
@@ -51,12 +65,18 @@ mln_status open_static_map(
 ) {
   // #region mode
   mln_map_options options = mln_map_options_default();
-  options.width = width;
-  options.height = height;
-  options.scale_factor = 1.0;
+  options.initial_extent =
+    (mln_logical_extent){.width = width, .height = height, .scale_factor = 1.0};
   options.map_mode = MLN_MAP_MODE_STATIC;
 
-  return mln_map_create(runtime, &options, out_map);
+  mln_operation operation = MLN_HANDLE_NULL;
+  mln_status status = mln_map_create_start(runtime, &options, &operation);
+  if (status == MLN_STATUS_OK) status = wait_ok(operation);
+  if (status == MLN_STATUS_OK) {
+    status = mln_map_create_take_result(operation, out_map);
+  }
+  mln_operation_release(operation);
+  return status;
   // #endregion mode
 }
 
@@ -64,8 +84,16 @@ void close_map(
   mln_runtime runtime, mln_map map, mln_notification_source notifications
 ) {
   // #region release
-  mln_map_destroy(map);
-  mln_runtime_destroy(runtime);
+  mln_operation operation = MLN_HANDLE_NULL;
+  if (mln_map_close_start(map, &operation) == MLN_STATUS_OK) {
+    (void)wait_ok(operation);
+    mln_operation_release(operation);
+  }
+  operation = MLN_HANDLE_NULL;
+  if (mln_runtime_close_start(runtime, &operation) == MLN_STATUS_OK) {
+    (void)wait_ok(operation);
+    mln_operation_release(operation);
+  }
   mln_notification_source_close(notifications);
   // #endregion release
 }

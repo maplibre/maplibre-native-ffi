@@ -10,6 +10,7 @@ pub const NativeStatusError = error{
     InvalidState,
     WrongThread,
     Unsupported,
+    Cancelled,
     NativeError,
     UnknownStatus,
 };
@@ -80,6 +81,7 @@ fn nativeStatusError(raw_status: i32) NativeStatusError {
         c.MLN_STATUS_WRONG_THREAD => error.WrongThread,
         c.MLN_STATUS_UNSUPPORTED => error.Unsupported,
         c.MLN_STATUS_NATIVE_ERROR => error.NativeError,
+        c.MLN_STATUS_CANCELLED => error.Cancelled,
         else => error.UnknownStatus,
     };
 }
@@ -89,6 +91,7 @@ test "native status values map to stable Zig errors" {
     try std.testing.expectError(error.InvalidState, checkStatus(c.MLN_STATUS_INVALID_STATE, null));
     try std.testing.expectError(error.WrongThread, checkStatus(c.MLN_STATUS_WRONG_THREAD, null));
     try std.testing.expectError(error.Unsupported, checkStatus(c.MLN_STATUS_UNSUPPORTED, null));
+    try std.testing.expectError(error.Cancelled, checkStatus(c.MLN_STATUS_CANCELLED, null));
     try std.testing.expectError(error.NativeError, checkStatus(c.MLN_STATUS_NATIVE_ERROR, null));
     try checkStatus(c.MLN_STATUS_OK, null);
 }
@@ -97,7 +100,8 @@ test "diagnostic store copies thread-local native message" {
     var store = diagnostics.DiagnosticStore.init(std.testing.allocator);
     defer store.deinit();
 
-    try std.testing.expectError(error.InvalidArgument, checkStatus(c.mln_runtime_destroy(0), &store));
+    var invalid_operation: c.mln_operation = 0;
+    try std.testing.expectError(error.InvalidArgument, checkStatus(c.mln_runtime_close_start(0, &invalid_operation), &store));
     const first = store.get().?;
     try std.testing.expectEqual(@as(?i32, c.MLN_STATUS_INVALID_ARGUMENT), first.raw_status);
     try std.testing.expect(first.message.len > 0);
@@ -108,11 +112,19 @@ test "diagnostic store copies thread-local native message" {
     try checkStatus(c.mln_notification_source_create(&source), null);
     defer checkStatus(c.mln_notification_source_close(source), null) catch
         @panic("notification source close failed");
-    var runtime: c.mln_runtime = 0;
     var options = c.mln_runtime_options_default();
     options.notification_source = source;
-    try checkStatus(c.mln_runtime_create(&options, &runtime), null);
-    defer checkStatus(c.mln_runtime_destroy(runtime), null) catch @panic("runtime destroy failed");
+    var create_operation: c.mln_operation = 0;
+    try checkStatus(c.mln_runtime_create_start(&options, &create_operation), null);
+    defer c.mln_operation_release(create_operation);
+    var completed = false;
+    try checkStatus(c.mln_operation_wait(create_operation, -1, &completed), null);
+    var runtime: c.mln_runtime = 0;
+    try checkStatus(c.mln_runtime_create_take_result(create_operation, &runtime), null);
+    var close_operation: c.mln_operation = 0;
+    try checkStatus(c.mln_runtime_close_start(runtime, &close_operation), null);
+    defer c.mln_operation_release(close_operation);
+    try checkStatus(c.mln_operation_wait(close_operation, -1, &completed), null);
 
     try std.testing.expectEqualStrings(copied, store.get().?.message);
 }

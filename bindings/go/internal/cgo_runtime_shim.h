@@ -52,6 +52,11 @@ mln_go_runtime_event_camera_transition_finished(
   return event->payload.camera_transition_finished;
 }
 
+static inline mln_runtime_event_command_finished
+mln_go_runtime_event_command_finished(const mln_runtime_event* event) {
+  return event->payload.command_finished;
+}
+
 static inline mln_runtime_event mln_go_runtime_event_with_render_frame(
   mln_runtime_event event, mln_runtime_event_render_frame payload
 ) {
@@ -111,6 +116,14 @@ mln_go_runtime_event_with_camera_transition_finished(
 ) {
   event.payload_type = MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED;
   event.payload.camera_transition_finished = payload;
+  return event;
+}
+
+static inline mln_runtime_event mln_go_runtime_event_with_command_finished(
+  mln_runtime_event event, mln_runtime_event_command_finished payload
+) {
+  event.payload_type = MLN_RUNTIME_EVENT_PAYLOAD_COMMAND_FINISHED;
+  event.payload.command_finished = payload;
   return event;
 }
 

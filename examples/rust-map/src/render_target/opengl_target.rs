@@ -1,7 +1,7 @@
 use std::error::Error as StdError;
 
 use maplibre_native_ffi::{
-    Error, MapAttachRef, OpenGLBorrowedTextureDescriptor, OpenGLOwnedTextureDescriptor,
+    Error, MapHandle, OpenGLBorrowedTextureDescriptor, OpenGLOwnedTextureDescriptor,
     OpenGLSurfaceDescriptor, RenderResult, RenderSessionHandle,
 };
 
@@ -28,7 +28,7 @@ pub enum RenderTarget {
 impl RenderTarget {
     pub fn attach(
         mode: Mode,
-        map: &MapAttachRef,
+        map: &MapHandle,
         graphics: &GraphicsContext,
         viewport: Viewport,
     ) -> maplibre_native_ffi::Result<Self> {
@@ -41,7 +41,7 @@ impl RenderTarget {
     }
 
     pub fn attach_owned_texture(
-        map: &MapAttachRef,
+        map: &MapHandle,
         opengl: &OpenGLContext,
         viewport: Viewport,
     ) -> maplibre_native_ffi::Result<Self> {
@@ -67,7 +67,7 @@ impl RenderTarget {
     }
 
     pub fn attach_borrowed_texture(
-        map: &MapAttachRef,
+        map: &MapHandle,
         opengl: &OpenGLContext,
         viewport: Viewport,
     ) -> maplibre_native_ffi::Result<Self> {
@@ -111,7 +111,7 @@ impl RenderTarget {
     }
 
     pub fn attach_surface(
-        map: &MapAttachRef,
+        map: &MapHandle,
         opengl: &OpenGLContext,
         viewport: Viewport,
     ) -> maplibre_native_ffi::Result<Self> {

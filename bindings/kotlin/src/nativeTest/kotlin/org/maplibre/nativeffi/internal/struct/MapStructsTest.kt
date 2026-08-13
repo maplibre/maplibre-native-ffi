@@ -44,143 +44,150 @@ class MapStructsTest : org.maplibre.nativeffi.NativeTestBase() {
   // BND-060, BND-061.
 
   @Test
-  fun cameraAndAnimationOptionsInitializeDefaultsAndPresentZeroMasks() {
-    memScoped {
-      val absentCamera = MapStructs.cameraOptions(CameraOptions(), this).pointed
-      assertEquals(sizeOf<mln_camera_options>().toUInt(), absentCamera.size)
-      assertEquals(0U, absentCamera.fields)
+  fun cameraAndAnimationOptionsInitializeDefaultsAndPresentZeroMasks(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      memScoped {
+        val absentCamera = MapStructs.cameraOptions(CameraOptions(), this).pointed
+        assertEquals(sizeOf<mln_camera_options>().toUInt(), absentCamera.size)
+        assertEquals(0U, absentCamera.fields)
 
-      val camera =
-        MapStructs.cameraOptions(
-            CameraOptions().apply {
-              center = LatLng(0.0, 0.0)
-              zoom = 0.0
-              anchor = ScreenPoint(0.0, 0.0)
-            },
-            this,
-          )
-          .pointed
+        val camera =
+          MapStructs.cameraOptions(
+              CameraOptions().apply {
+                center = LatLng(0.0, 0.0)
+                zoom = 0.0
+                anchor = ScreenPoint(0.0, 0.0)
+              },
+              this,
+            )
+            .pointed
 
-      assertEquals(sizeOf<mln_camera_options>().toUInt(), camera.size)
-      assertEquals(
-        MLN_CAMERA_OPTION_CENTER or MLN_CAMERA_OPTION_ANCHOR or MLN_CAMERA_OPTION_ZOOM,
-        camera.fields,
-      )
-      assertEquals(0.0, camera.latitude)
-      assertEquals(0.0, camera.longitude)
-      assertEquals(0.0, camera.zoom)
-      assertEquals(0.0, camera.anchor.x)
-      assertEquals(0.0, camera.anchor.y)
+        assertEquals(sizeOf<mln_camera_options>().toUInt(), camera.size)
+        assertEquals(
+          MLN_CAMERA_OPTION_CENTER or MLN_CAMERA_OPTION_ANCHOR or MLN_CAMERA_OPTION_ZOOM,
+          camera.fields,
+        )
+        assertEquals(0.0, camera.latitude)
+        assertEquals(0.0, camera.longitude)
+        assertEquals(0.0, camera.zoom)
+        assertEquals(0.0, camera.anchor.x)
+        assertEquals(0.0, camera.anchor.y)
 
-      val animation =
-        MapStructs.animationOptions(
-            AnimationOptions().apply {
-              durationMs = 0.0
-              easing = UnitBezier(0.0, 0.0, 1.0, 1.0)
-              transitionId = 0L
-            },
-            this,
-          )
-          .pointed
+        val animation =
+          MapStructs.animationOptions(
+              AnimationOptions().apply {
+                durationMs = 0.0
+                easing = UnitBezier(0.0, 0.0, 1.0, 1.0)
+                transitionId = 0L
+              },
+              this,
+            )
+            .pointed
 
-      assertEquals(sizeOf<mln_animation_options>().toUInt(), animation.size)
-      assertEquals(
-        MLN_ANIMATION_OPTION_DURATION or
-          MLN_ANIMATION_OPTION_EASING or
-          MLN_ANIMATION_OPTION_TRANSITION_ID,
-        animation.fields,
-      )
-      assertEquals(0.0, animation.duration_ms)
-      assertEquals(0.0, animation.easing.x1)
-      assertEquals(1.0, animation.easing.x2)
-      assertEquals(0UL, animation.transition_id)
+        assertEquals(sizeOf<mln_animation_options>().toUInt(), animation.size)
+        assertEquals(
+          MLN_ANIMATION_OPTION_DURATION or
+            MLN_ANIMATION_OPTION_EASING or
+            MLN_ANIMATION_OPTION_TRANSITION_ID,
+          animation.fields,
+        )
+        assertEquals(0.0, animation.duration_ms)
+        assertEquals(0.0, animation.easing.x1)
+        assertEquals(1.0, animation.easing.x2)
+        assertEquals(0UL, animation.transition_id)
+      }
     }
-  }
 
   @Test
-  fun cameraOptionsRoundTripOnlyPresentFields() {
-    val camera =
-      CameraOptions().apply {
-        center = LatLng(12.0, 34.0)
-        zoom = 5.0
-        padding = EdgeInsets(1.0, 2.0, 3.0, 4.0)
-        anchor = ScreenPoint(8.0, 9.0)
+  fun cameraOptionsRoundTripOnlyPresentFields(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val camera =
+        CameraOptions().apply {
+          center = LatLng(12.0, 34.0)
+          zoom = 5.0
+          padding = EdgeInsets(1.0, 2.0, 3.0, 4.0)
+          anchor = ScreenPoint(8.0, 9.0)
+        }
+
+      val copy = memScoped {
+        MapStructs.cameraOptions(MapStructs.cameraOptions(camera, this).pointed)
       }
 
-    val copy = memScoped {
-      MapStructs.cameraOptions(MapStructs.cameraOptions(camera, this).pointed)
+      assertNotNull(copy.center)
+      assertEquals(12.0, copy.center?.latitude)
+      assertEquals(34.0, copy.center?.longitude)
+      assertNotNull(copy.zoom)
+      assertEquals(5.0, copy.zoom)
+      assertNotNull(copy.padding)
+      assertEquals(EdgeInsets(1.0, 2.0, 3.0, 4.0), copy.padding)
+      assertNotNull(copy.anchor)
+      assertEquals(ScreenPoint(8.0, 9.0), copy.anchor)
+      assertFalse(copy.bearing != null)
     }
-
-    assertNotNull(copy.center)
-    assertEquals(12.0, copy.center?.latitude)
-    assertEquals(34.0, copy.center?.longitude)
-    assertNotNull(copy.zoom)
-    assertEquals(5.0, copy.zoom)
-    assertNotNull(copy.padding)
-    assertEquals(EdgeInsets(1.0, 2.0, 3.0, 4.0), copy.padding)
-    assertNotNull(copy.anchor)
-    assertEquals(ScreenPoint(8.0, 9.0), copy.anchor)
-    assertFalse(copy.bearing != null)
-  }
 
   @Test
-  fun viewportAndTileOptionSnapshotsPreserveUnknownEnumRawValues() {
-    memScoped {
-      val viewport = alloc<mln_map_viewport_options>()
-      viewport.size = sizeOf<mln_map_viewport_options>().toUInt()
-      viewport.fields =
-        MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION or
-          MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE or
-          MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE
-      viewport.north_orientation = 900U
-      viewport.constrain_mode = 901U
-      viewport.viewport_mode = 902U
-      val tile = alloc<mln_map_tile_options>()
-      tile.size = sizeOf<mln_map_tile_options>().toUInt()
-      tile.fields = MLN_MAP_TILE_OPTION_LOD_MODE
-      tile.lod_mode = 903U
+  fun viewportAndTileOptionSnapshotsPreserveUnknownEnumRawValues(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      memScoped {
+        val viewport = alloc<mln_map_viewport_options>()
+        viewport.size = sizeOf<mln_map_viewport_options>().toUInt()
+        viewport.fields =
+          MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION or
+            MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE or
+            MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE
+        viewport.north_orientation = 900U
+        viewport.constrain_mode = 901U
+        viewport.viewport_mode = 902U
+        val tile = alloc<mln_map_tile_options>()
+        tile.size = sizeOf<mln_map_tile_options>().toUInt()
+        tile.fields = MLN_MAP_TILE_OPTION_LOD_MODE
+        tile.lod_mode = 903U
 
-      val viewportCopy = MapStructs.viewportOptions(viewport)
-      val tileCopy = MapStructs.tileOptions(tile)
+        val viewportCopy = MapStructs.viewportOptions(viewport)
+        val tileCopy = MapStructs.tileOptions(tile)
 
-      assertEquals(NorthOrientation(900), viewportCopy.northOrientation)
-      assertEquals(ConstrainMode(901), viewportCopy.constrainMode)
-      assertEquals(ViewportMode(902), viewportCopy.viewportMode)
-      assertEquals(TileLodMode(903), tileCopy.lodMode)
+        assertEquals(NorthOrientation(900), viewportCopy.northOrientation)
+        assertEquals(ConstrainMode(901), viewportCopy.constrainMode)
+        assertEquals(ViewportMode(902), viewportCopy.viewportMode)
+        assertEquals(TileLodMode(903), tileCopy.lodMode)
+      }
     }
-  }
 
   @Test
-  fun projectionModeOptionsInitializeDefaultsAndPresentZeroMasks() {
-    memScoped {
-      val absentProjection = MapStructs.projectionModeOptions(ProjectionModeOptions(), this).pointed
-      assertEquals(sizeOf<mln_projection_mode>().toUInt(), absentProjection.size)
-      assertEquals(0U, absentProjection.fields)
+  fun projectionModeOptionsInitializeDefaultsAndPresentZeroMasks(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      memScoped {
+        val absentProjection =
+          MapStructs.projectionModeOptions(ProjectionModeOptions(), this).pointed
+        assertEquals(sizeOf<mln_projection_mode>().toUInt(), absentProjection.size)
+        assertEquals(0U, absentProjection.fields)
 
-      val projection =
-        MapStructs.projectionModeOptions(
-            ProjectionModeOptions().apply {
-              axonometric = false
-              xSkew = 0.0
-              ySkew = 0.0
-            },
-            this,
-          )
-          .pointed
+        val projection =
+          MapStructs.projectionModeOptions(
+              ProjectionModeOptions().apply {
+                axonometric = false
+                xSkew = 0.0
+                ySkew = 0.0
+              },
+              this,
+            )
+            .pointed
 
-      assertEquals(sizeOf<mln_projection_mode>().toUInt(), projection.size)
-      assertEquals(
-        MLN_PROJECTION_MODE_AXONOMETRIC or MLN_PROJECTION_MODE_X_SKEW or MLN_PROJECTION_MODE_Y_SKEW,
-        projection.fields,
-      )
-      assertEquals(false, projection.axonometric)
-      assertEquals(0.0, projection.x_skew)
-      assertEquals(0.0, projection.y_skew)
+        assertEquals(sizeOf<mln_projection_mode>().toUInt(), projection.size)
+        assertEquals(
+          MLN_PROJECTION_MODE_AXONOMETRIC or
+            MLN_PROJECTION_MODE_X_SKEW or
+            MLN_PROJECTION_MODE_Y_SKEW,
+          projection.fields,
+        )
+        assertEquals(false, projection.axonometric)
+        assertEquals(0.0, projection.x_skew)
+        assertEquals(0.0, projection.y_skew)
 
-      val copy = MapStructs.projectionModeOptions(projection)
-      assertEquals(false, copy.axonometric)
-      assertEquals(0.0, copy.xSkew)
-      assertEquals(0.0, copy.ySkew)
+        val copy = MapStructs.projectionModeOptions(projection)
+        assertEquals(false, copy.axonometric)
+        assertEquals(0.0, copy.xSkew)
+        assertEquals(0.0, copy.ySkew)
+      }
     }
-  }
 }

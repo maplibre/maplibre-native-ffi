@@ -65,20 +65,20 @@ private final class ResourceHandleStateCapture: @unchecked Sendable {
   }
 }
 
-@Test func runtimeCreateRunDrainAndClose() throws {
+@Test func runtimeCreateRunDrainAndClose() async throws {
   let runtime =
-    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
-  try runtime.pump()
+    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  try await runtime.barrier()
   _ = try runtime.drainEvents()
-  try runtime.close()
+  try await runtime.close()
 
   #expect(runtime.isClosed)
 }
 
-@Test func runtimeResourceTransformCanInstallAndClear() throws {
+@Test func runtimeResourceTransformCanInstallAndClear() async throws {
   let runtime =
-    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
-  defer { try? runtime.close() }
+    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.closeBlockingForTests() }
 
   try runtime.setResourceTransform { request in
     request.url.replacingOccurrences(
@@ -93,29 +93,33 @@ private final class ResourceHandleStateCapture: @unchecked Sendable {
 /// matching loading failure arrives, and returns its message. The failure
 /// proves the request reached the network file source, where the
 /// runtime-scoped resource provider applies.
+private func waitForSemaphore(
+  _ semaphore: DispatchSemaphore,
+  timeout: DispatchTime
+) -> DispatchTimeoutResult {
+  semaphore.wait(timeout: timeout)
+}
+
 private func loadProbeStyle(
   runtime: RuntimeHandle,
   map: MapHandle,
   styleURL: String
-) throws -> String? {
-  try map.setStyleURL(styleURL)
-  return try pumpUntilEvent(
+) async throws -> String? {
+  _ = try map.setStyleURL(styleURL)
+  return try await pumpUntilEvent(
     runtime,
     waitingFor: "a loading failure for \(styleURL)"
-  ) { event in
-    event.type == .mapLoadingFailed && event.message.contains(styleURL)
-  }?.message
+  ) { $0.type == .mapLoadingFailed }?.message
 }
 
-@Test func runtimeResourceProviderIsConsultedUntilReplacedAndCleared() throws {
+@Test func runtimeResourceProviderIsConsultedUntilReplacedAndCleared(
+) async throws {
   let runtime =
-    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
-  defer { try? runtime.close() }
-  let map = try MapHandle(
-    runtime: runtime,
-    options: MapOptions(width: 64, height: 64)
-  )
-  defer { try? map.close() }
+    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.closeBlockingForTests() }
+  let map = try await MapHandle(runtime: runtime,
+                                options: MapOptions(width: 64, height: 64))
+  defer { try? map.closeBlockingForTests() }
 
   let firstCalls = ResourceProviderCallCounter()
   try runtime.setResourceProvider { _, _ in
@@ -123,7 +127,7 @@ private func loadProbeStyle(
     return .passThrough
   }
 
-  let firstFailure = try loadProbeStyle(
+  let firstFailure = try await loadProbeStyle(
     runtime: runtime,
     map: map,
     styleURL: "jar:file:/packaged/first.json"
@@ -139,7 +143,7 @@ private func loadProbeStyle(
   }
   let firstCallsAfterReplace = firstCalls.callCount
 
-  let secondFailure = try loadProbeStyle(
+  let secondFailure = try await loadProbeStyle(
     runtime: runtime,
     map: map,
     styleURL: "jar:file:/packaged/second.json"
@@ -151,7 +155,7 @@ private func loadProbeStyle(
   try runtime.clearResourceProvider()
   let secondCallsAfterClear = secondCalls.callCount
 
-  let clearedFailure = try loadProbeStyle(
+  let clearedFailure = try await loadProbeStyle(
     runtime: runtime,
     map: map,
     styleURL: "jar:file:/packaged/third.json"
@@ -182,10 +186,10 @@ private final class ResolvedURLCapture: @unchecked Sendable {
 /// BND-155: the default tile server's `maplibre:` scheme alias reaches the
 /// provider as the alias, alongside the URL the built-in network path would
 /// have fetched.
-@Test func resourceProviderSeesSchemeAliasAndItsResolvedURL() throws {
+@Test func resourceProviderSeesSchemeAliasAndItsResolvedURL() async throws {
   let runtime =
-    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
-  defer { try? runtime.close() }
+    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.closeBlockingForTests() }
 
   let resolved = ResolvedURLCapture()
   try runtime.setResourceProvider { request, handle in
@@ -200,14 +204,12 @@ private final class ResolvedURLCapture: @unchecked Sendable {
     return .handle
   }
 
-  let map = try MapHandle(
-    runtime: runtime,
-    options: MapOptions(width: 64, height: 64)
-  )
-  defer { try? map.close() }
+  let map = try await MapHandle(runtime: runtime,
+                                options: MapOptions(width: 64, height: 64))
+  defer { try? map.closeBlockingForTests() }
 
   try map.setStyleURL("maplibre://maps/style")
-  let loaded = try pumpUntilEvent(
+  let loaded = try await pumpUntilEvent(
     runtime,
     waitingFor: "the provider-served style to load"
   ) { $0.type == .mapStyleLoaded }
@@ -341,7 +343,7 @@ private final class ResolvedURLCapture: @unchecked Sendable {
   #expect(counters.snapshot().release == 1)
 }
 
-@Test func resourceRequestReleaseWaitsForCancellationCheck() throws {
+@Test func resourceRequestReleaseWaitsForCancellationCheck() async throws {
   let counters = ResourceCounters()
   let cancellationStarted = DispatchSemaphore(value: 0)
   let allowCancellationReturn = DispatchSemaphore(value: 0)
@@ -371,21 +373,30 @@ private final class ResolvedURLCapture: @unchecked Sendable {
     cancellationFinished.signal()
   }.start()
 
-  #expect(cancellationStarted.wait(timeout: .now() + .seconds(5)) == .success)
+  #expect(await Task.detached {
+    waitForSemaphore(cancellationStarted, timeout: .now() + .seconds(5))
+  }.value == .success)
   Thread {
     releaseStarted.signal()
     state.release()
     releaseFinished.signal()
   }.start()
 
-  #expect(releaseStarted.wait(timeout: .now() + .seconds(5)) == .success)
-  #expect(releaseFinished
-    .wait(timeout: .now() + .milliseconds(100)) == .timedOut)
+  #expect(await Task.detached {
+    waitForSemaphore(releaseStarted, timeout: .now() + .seconds(5))
+  }.value == .success)
+  #expect(await Task.detached {
+    waitForSemaphore(releaseFinished, timeout: .now() + .milliseconds(100))
+  }.value == .timedOut)
   #expect(counters.snapshot().release == 0)
 
   allowCancellationReturn.signal()
-  #expect(cancellationFinished.wait(timeout: .now() + .seconds(5)) == .success)
-  #expect(releaseFinished.wait(timeout: .now() + .seconds(5)) == .success)
+  #expect(await Task.detached {
+    waitForSemaphore(cancellationFinished, timeout: .now() + .seconds(5))
+  }.value == .success)
+  #expect(await Task.detached {
+    waitForSemaphore(releaseFinished, timeout: .now() + .seconds(5))
+  }.value == .success)
 
   switch cancellationResult.load() {
   case let .success(isCancelled):

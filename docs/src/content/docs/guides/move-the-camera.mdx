@@ -13,11 +13,10 @@ import cameraSnippet from "../../../../snippets/c/camera.c?raw";
 import fitBoundsSnippet from "../../../../snippets/c/camera-fit-bounds.c?raw";
 import gestureSnippet from "../../../../snippets/c/camera-gesture.c?raw";
 
-The camera belongs to the map. A camera call needs a live map and the map's
-owner thread, and it works before any render session exists.
-
-Every command takes the same camera options. Set the fields that you want to
-change, and MapLibre leaves every other field at its current value.
+The camera belongs to the map. Any host thread can submit a camera command while
+the map is live, including before a render session exists. Every command copies
+one atomic camera update: set the fields to change, and MapLibre leaves every
+other field at its committed value.
 
 <Code code={region(cameraSnippet, "camera")} lang="c" title="camera.c" />
 
@@ -45,10 +44,8 @@ velocity of 1.2 screenfuls per second.
 
 <CameraPaths />
 
-An animated transition advances while the host pumps the runtime and draws
-frames. Its duration uses wall-clock time, but pausing the pump also pauses the
-transition. A host that pumps on demand continues until the transition ends.
-The repaint flag in
+An animated transition advances on the native scheduler while the host draws
+frames. Its duration uses wall-clock time. The repaint flag in
 [Run the render loop](/maplibre-native-ffi/guides/run-the-render-loop/)
 signals that more frames are required.
 
@@ -81,9 +78,9 @@ continue the gesture's momentum and take the same animation options as an ease.
 
 <Code code={region(gestureSnippet, "release")} lang="c" title="camera-gesture.c" />
 
-Call each camera operation on the map's owner thread. When another thread reads
-gestures, send relative deltas to the owner thread. An absolute camera computed
-from an earlier frame can be stale when the owner thread applies it.
+Submit relative gesture deltas instead of a camera computed from an earlier
+snapshot. The scheduler applies each command atomically to the committed camera
+state in runtime submission order.
 
 ## Fit the camera to bounds
 

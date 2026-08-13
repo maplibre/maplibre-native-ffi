@@ -17,10 +17,14 @@ public sealed class PublicApiSurfaceTests
             "Maplibre.NativeFfi.Camera.BoundsConstraint+Bounded",
             "Maplibre.NativeFfi.Camera.BoundsConstraint+Unbounded",
             "Maplibre.NativeFfi.Camera.CameraChangeMode",
+            "Maplibre.NativeFfi.Camera.CameraSnapshot",
+            "Maplibre.NativeFfi.Camera.CameraUpdate",
+            "Maplibre.NativeFfi.Camera.CameraUpdateMode",
             "Maplibre.NativeFfi.Camera.CameraFitOptions",
             "Maplibre.NativeFfi.Camera.CameraOptions",
             "Maplibre.NativeFfi.Camera.EdgeInsets",
             "Maplibre.NativeFfi.Camera.FreeCameraOptions",
+            "Maplibre.NativeFfi.Camera.GesturePhase",
             "Maplibre.NativeFfi.Camera.UnitBezier",
             "Maplibre.NativeFfi.Error.InvalidArgumentException",
             "Maplibre.NativeFfi.Error.InvalidStateException",
@@ -45,9 +49,11 @@ public sealed class PublicApiSurfaceTests
             "Maplibre.NativeFfi.Log.LogSeverityMask",
             "Maplibre.NativeFfi.Map.ConstrainMode",
             "Maplibre.NativeFfi.Map.DebugOptions",
+            "Maplibre.NativeFfi.Map.LogicalExtent",
             "Maplibre.NativeFfi.Map.MapHandle",
             "Maplibre.NativeFfi.Map.MapMode",
             "Maplibre.NativeFfi.Map.MapOptions",
+            "Maplibre.NativeFfi.Map.MapSnapshot",
             "Maplibre.NativeFfi.Map.MapProjectionHandle",
             "Maplibre.NativeFfi.Map.NorthOrientation",
             "Maplibre.NativeFfi.Map.ProjectionModeOptions",
@@ -123,15 +129,16 @@ public sealed class PublicApiSurfaceTests
             "Maplibre.NativeFfi.Resource.ResourceTransformRequest",
             "Maplibre.NativeFfi.Resource.ResourceUsage",
             "Maplibre.NativeFfi.Runtime.AmbientCacheOperation",
+            "Maplibre.NativeFfi.Runtime.CommandDisposition",
             "Maplibre.NativeFfi.Runtime.NotificationEndpointKind",
             "Maplibre.NativeFfi.Runtime.OperationCompletion",
             "Maplibre.NativeFfi.Runtime.OperationHandle",
-            "Maplibre.NativeFfi.Runtime.OwnerThread",
             "Maplibre.NativeFfi.Runtime.RuntimeEvent",
             "Maplibre.NativeFfi.Runtime.RuntimeEventBatch",
             "Maplibre.NativeFfi.Runtime.RuntimeEventMask",
             "Maplibre.NativeFfi.Runtime.RuntimeEventPayload",
             "Maplibre.NativeFfi.Runtime.RuntimeEventPayload+CameraTransitionFinished",
+            "Maplibre.NativeFfi.Runtime.RuntimeEventPayload+CommandFinished",
             "Maplibre.NativeFfi.Runtime.RuntimeEventPayload+None",
             "Maplibre.NativeFfi.Runtime.RuntimeEventPayload+OfflineRegionResponseError",
             "Maplibre.NativeFfi.Runtime.RuntimeEventPayload+OfflineRegionStatusChanged",
@@ -145,7 +152,6 @@ public sealed class PublicApiSurfaceTests
             "Maplibre.NativeFfi.Runtime.ReadyEndpoint",
             "Maplibre.NativeFfi.Runtime.RuntimeHandle",
             "Maplibre.NativeFfi.Runtime.RuntimeOptions",
-            "Maplibre.NativeFfi.Runtime.WakeSource",
             "Maplibre.NativeFfi.Style.CustomGeometrySourceCallback",
             "Maplibre.NativeFfi.Style.CustomGeometrySourceOptions",
             "Maplibre.NativeFfi.Style.GeoJsonSourceOptions",
@@ -265,9 +271,10 @@ public sealed class PublicApiSurfaceTests
         );
     }
 
-    // Default parameter values would create shortcut workflows outside the C API shape.
+    // Optional cancellation tokens follow the .NET asynchronous API convention. Other default
+    // parameter values would create shortcut workflows outside the C API shape.
     [Fact]
-    public void PublicSurfaceDoesNotUseDefaultParameterValues()
+    public void PublicSurfaceUsesDefaultsOnlyForCancellationTokens()
     {
         var violations = new List<string>();
         foreach (var type in typeof(Maplibre).Assembly.GetExportedTypes())
@@ -345,7 +352,10 @@ public sealed class PublicApiSurfaceTests
     {
         foreach (var parameter in parameters)
         {
-            if (parameter.HasDefaultValue || parameter.IsOptional)
+            if (
+                (parameter.HasDefaultValue || parameter.IsOptional)
+                && parameter.ParameterType != typeof(CancellationToken)
+            )
             {
                 violations.Add(
                     $"{member.DeclaringType?.FullName}.{member.Name} has default parameter {parameter.Name}."

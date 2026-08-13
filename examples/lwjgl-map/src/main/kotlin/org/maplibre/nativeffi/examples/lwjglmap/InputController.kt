@@ -28,14 +28,10 @@ import org.lwjgl.glfw.GLFW.glfwSetMouseButtonCallback
 import org.lwjgl.glfw.GLFW.glfwSetScrollCallback
 import org.maplibre.nativeffi.geo.ScreenPoint
 
-/**
- * Decodes GLFW input into camera commands. GLFW delivers these callbacks on the render loop thread,
- * which does not own the map, so this only produces commands; the runtime loop applies them on the
- * map's thread.
- */
+/** Decodes GLFW input and submits camera commands directly from the GLFW thread. */
 internal class InputController(
   private val window: Long,
-  private val commands: CommandQueue,
+  private val submit: (CameraCommand) -> Unit,
   private val renderRequest: RenderRequest,
   private val viewport: () -> Viewport,
 ) : AutoCloseable {
@@ -65,10 +61,10 @@ internal class InputController(
       return
     }
     if (rightDown || (leftDown && ctrlDown)) {
-      commands.push(CameraCommand.AdjustBearing(dx * DRAG_ROTATE_FACTOR))
-      commands.push(CameraCommand.PitchBy(dy * DRAG_PITCH_FACTOR))
+      submit(CameraCommand.AdjustBearing(dx * DRAG_ROTATE_FACTOR))
+      submit(CameraCommand.PitchBy(dy * DRAG_PITCH_FACTOR))
     } else if (leftDown) {
-      commands.push(CameraCommand.MoveBy(dx, dy))
+      submit(CameraCommand.MoveBy(dx, dy))
     } else {
       return
     }
@@ -88,11 +84,10 @@ internal class InputController(
           if (action == GLFW_PRESS) true else if (action == GLFW_RELEASE) false else rightDown
     }
     if (action == GLFW_PRESS) {
-      // Queued ahead of the drag's own commands, so the transition stops before the first delta.
-      commands.push(CameraCommand.CancelTransitions)
+      submit(CameraCommand.CancelTransitions)
     }
     if (dragging != wasDragging) {
-      commands.push(CameraCommand.SetGestureInProgress(dragging))
+      submit(CameraCommand.SetGestureInProgress(dragging))
     }
   }
 
@@ -102,7 +97,7 @@ internal class InputController(
   private fun onScroll(yOffset: Double) {
     // GLFW reports OS-adjusted scroll deltas, so natural scrolling needs no correction here.
     val scale = 2.0.pow(yOffset * 0.25)
-    commands.push(CameraCommand.ScaleBy(scale, ScreenPoint(cursorX, cursorY)))
+    submit(CameraCommand.ScaleBy(scale, ScreenPoint(cursorX, cursorY)))
     renderRequest.set()
   }
 
@@ -148,7 +143,7 @@ internal class InputController(
         else -> null
       }
     if (command != null) {
-      commands.push(command)
+      submit(command)
       renderRequest.set()
     }
   }

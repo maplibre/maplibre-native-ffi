@@ -14,7 +14,7 @@ test "map debug options round trip and diagnostics toggles" {
         .collision = true,
         .depth_buffer = true,
     };
-    try map.setDebugOptions(debug);
+    _ = try map.setDebugOptions(debug);
 
     const snapshot = try map.getDebugOptions();
     try testing.expect(snapshot.tile_borders);
@@ -23,11 +23,11 @@ test "map debug options round trip and diagnostics toggles" {
     try testing.expect(!snapshot.overdraw);
 
     try testing.expect(!try map.getRenderingStatsViewEnabled());
-    try map.setRenderingStatsViewEnabled(true);
+    _ = try map.setRenderingStatsViewEnabled(true);
     try testing.expect(try map.getRenderingStatsViewEnabled());
 
     _ = try map.isFullyLoaded();
-    try map.dumpDebugLogs();
+    _ = try map.dumpDebugLogs();
 }
 
 test "map viewport options update selected fields through public descriptors" {
@@ -36,7 +36,7 @@ test "map viewport options update selected fields through public descriptors" {
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
 
-    try map.setViewportOptions(.{
+    _ = try map.setViewportOptions(.{
         .north_orientation = .right,
         .constrain_mode = .width_and_height,
         .viewport_mode = .flipped_y,
@@ -52,7 +52,7 @@ test "map viewport options update selected fields through public descriptors" {
     try testing.expectApproxEqAbs(@as(f64, 3.0), snapshot.frustum_offset.?.bottom, 0.000001);
     try testing.expectApproxEqAbs(@as(f64, 4.0), snapshot.frustum_offset.?.right, 0.000001);
 
-    try map.setViewportOptions(.{ .north_orientation = .down });
+    _ = try map.setViewportOptions(.{ .north_orientation = .down });
     snapshot = try map.getViewportOptions();
     try testing.expectEqual(maplibre.NorthOrientation.down, snapshot.north_orientation.?);
     try testing.expectEqual(maplibre.ConstrainMode.width_and_height, snapshot.constrain_mode.?);
@@ -64,7 +64,7 @@ test "map tile options update selected fields through public descriptors" {
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
 
-    try map.setTileOptions(.{
+    _ = try map.setTileOptions(.{
         .prefetch_zoom_delta = 2,
         .lod_min_radius = 1.5,
         .lod_scale = 2.5,
@@ -81,7 +81,7 @@ test "map tile options update selected fields through public descriptors" {
     try testing.expectApproxEqAbs(@as(f64, -1.0), snapshot.lod_zoom_shift.?, 0.000001);
     try testing.expectEqual(maplibre.TileLodMode.distance, snapshot.lod_mode.?);
 
-    try map.setTileOptions(.{ .prefetch_zoom_delta = 7 });
+    _ = try map.setTileOptions(.{ .prefetch_zoom_delta = 7 });
     snapshot = try map.getTileOptions();
     try testing.expectEqual(@as(u32, 7), snapshot.prefetch_zoom_delta.?);
     try testing.expectEqual(maplibre.TileLodMode.distance, snapshot.lod_mode.?);

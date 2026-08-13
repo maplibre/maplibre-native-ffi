@@ -6,9 +6,10 @@ use maplibre_native_ffi_sys as sys;
 
 use crate::{Error, Result};
 pub use maplibre_core::events::{
-    CameraTransitionFinishedEvent, OfflineRegionResponseErrorEvent, OfflineRegionStatus,
-    OfflineRegionStatusEvent, OfflineRegionTileCountLimitEvent, RenderFrameEvent, RenderMapEvent,
-    RenderingStats, RuntimeEventPayload, TileActionEvent, TileId, UnknownRuntimeEventPayload,
+    CameraTransitionFinishedEvent, CommandDisposition, CommandFinishedEvent,
+    OfflineRegionResponseErrorEvent, OfflineRegionStatus, OfflineRegionStatusEvent,
+    OfflineRegionTileCountLimitEvent, RenderFrameEvent, RenderMapEvent, RenderingStats,
+    RuntimeEventPayload, TileActionEvent, TileId, UnknownRuntimeEventPayload,
 };
 pub(crate) use maplibre_core::{OfflineRegionDownloadState, RuntimeEventType};
 

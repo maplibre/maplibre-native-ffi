@@ -57,5 +57,5 @@ point geometry. Other shapes report an invalid-argument status.
 
 <Code code={region(geojsonDataset, "inline-data")} lang="c" title="geojson-dataset.c" />
 
-MapLibre tiles both data forms on worker threads. A host that pumps the runtime
-and renders on update draws the new features after tiling finishes.
+MapLibre tiles both data forms on worker threads. A host that drains render
+events and renders on update draws the new features after tiling finishes.

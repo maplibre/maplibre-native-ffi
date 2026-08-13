@@ -92,7 +92,7 @@ private fun Modifier.mapGestures(renderer: MapLibreSurfaceRenderer, scaleFactor:
             val current = change?.takeIf { it.pressed }
             if (current == null) {
               if (previous != null) {
-                renderer.setGestureInProgress(false)
+                renderer.setGestureActive(false)
               }
               previous = null
               continue
@@ -100,23 +100,23 @@ private fun Modifier.mapGestures(renderer: MapLibreSurfaceRenderer, scaleFactor:
             val last = previous
             previous = current
             if (last == null) {
-              renderer.cancelTransitions()
-              renderer.setGestureInProgress(true)
+              renderer.stopCameraAnimation()
+              renderer.setGestureActive(true)
               continue
             }
 
             val delta = current.position - last.position
             val rotate = event.buttons.isSecondaryPressed || event.keyboardModifiers.isCtrlPressed
             if (rotate) {
-              renderer.rotateAndPitchBy(delta.x.toDouble() / scale, delta.y.toDouble() / scale)
+              renderer.rotateAndPitch(delta.x.toDouble() / scale, delta.y.toDouble() / scale)
             } else {
-              renderer.moveBy(delta.x.toDouble() / scale, delta.y.toDouble() / scale)
+              renderer.pan(delta.x.toDouble() / scale, delta.y.toDouble() / scale)
             }
             current.consume()
           }
         } finally {
           if (previous != null) {
-            renderer.setGestureInProgress(false)
+            renderer.setGestureActive(false)
           }
         }
       }
@@ -131,7 +131,7 @@ private fun Modifier.mapGestures(renderer: MapLibreSurfaceRenderer, scaleFactor:
       change.consume()
       val coordinateScale = scaleFactor.takeIf { it > 0.0 && it.isFinite() } ?: 1.0
       val scale = 2.0.pow(-scrollY.toDouble() * SCROLL_ZOOM_FACTOR)
-      renderer.scaleBy(
+      renderer.zoom(
         scale,
         change.position.x.toDouble() / coordinateScale,
         change.position.y.toDouble() / coordinateScale,
@@ -145,23 +145,23 @@ private fun Modifier.mapKeyboard(renderer: MapLibreSurfaceRenderer): Modifier =
     }
     when (event.key) {
       Key.DirectionLeft,
-      Key.A -> renderer.moveByAnimated(KEYBOARD_PAN, 0.0)
+      Key.A -> renderer.animatePan(KEYBOARD_PAN, 0.0)
       Key.DirectionRight,
-      Key.D -> renderer.moveByAnimated(-KEYBOARD_PAN, 0.0)
+      Key.D -> renderer.animatePan(-KEYBOARD_PAN, 0.0)
       Key.DirectionUp,
-      Key.W -> renderer.moveByAnimated(0.0, KEYBOARD_PAN)
+      Key.W -> renderer.animatePan(0.0, KEYBOARD_PAN)
       Key.DirectionDown,
-      Key.S -> renderer.moveByAnimated(0.0, -KEYBOARD_PAN)
+      Key.S -> renderer.animatePan(0.0, -KEYBOARD_PAN)
       Key.Equals,
-      Key.NumPadAdd -> renderer.scaleByAnimated(KEYBOARD_ZOOM)
+      Key.NumPadAdd -> renderer.animateZoom(KEYBOARD_ZOOM)
       Key.Minus,
-      Key.NumPadSubtract -> renderer.scaleByAnimated(1.0 / KEYBOARD_ZOOM)
-      Key.Q -> renderer.rotateBy(-KEYBOARD_BEARING)
-      Key.E -> renderer.rotateBy(KEYBOARD_BEARING)
-      Key.RightBracket -> renderer.pitchBy(KEYBOARD_PITCH)
-      Key.LeftBracket -> renderer.pitchBy(-KEYBOARD_PITCH)
+      Key.NumPadSubtract -> renderer.animateZoom(1.0 / KEYBOARD_ZOOM)
+      Key.Q -> renderer.animateBearing(-KEYBOARD_BEARING)
+      Key.E -> renderer.animateBearing(KEYBOARD_BEARING)
+      Key.RightBracket -> renderer.animatePitch(KEYBOARD_PITCH)
+      Key.LeftBracket -> renderer.animatePitch(-KEYBOARD_PITCH)
       Key.Zero,
-      Key.NumPad0 -> renderer.resetPitchAndBearing()
+      Key.NumPad0 -> renderer.resetOrientation()
       else -> return@onPreviewKeyEvent false
     }
     true

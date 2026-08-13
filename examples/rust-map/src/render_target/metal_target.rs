@@ -1,6 +1,6 @@
 use std::error::Error as StdError;
 
-use maplibre_native_ffi::{Error, ErrorKind, MapAttachRef, RenderResult, RenderSessionHandle};
+use maplibre_native_ffi::{Error, ErrorKind, MapHandle, RenderResult, RenderSessionHandle};
 
 use crate::graphics::GraphicsContext;
 use crate::metal::{MetalBorrowedTexture, MetalContext, MetalTextureCompositor};
@@ -25,7 +25,7 @@ pub enum RenderTarget {
 impl RenderTarget {
     pub fn attach(
         mode: Mode,
-        map: &MapAttachRef,
+        map: &MapHandle,
         graphics: &GraphicsContext,
         viewport: Viewport,
     ) -> maplibre_native_ffi::Result<Self> {
@@ -144,7 +144,7 @@ impl RenderTarget {
 }
 
 fn attach_owned_texture(
-    map: &MapAttachRef,
+    map: &MapHandle,
     metal: &MetalContext,
     viewport: Viewport,
 ) -> maplibre_native_ffi::Result<RenderTarget> {
@@ -170,7 +170,7 @@ fn attach_owned_texture(
 }
 
 fn attach_borrowed_texture(
-    map: &MapAttachRef,
+    map: &MapHandle,
     metal: &MetalContext,
     viewport: Viewport,
 ) -> maplibre_native_ffi::Result<RenderTarget> {
@@ -200,7 +200,7 @@ fn attach_borrowed_texture(
 }
 
 fn attach_surface(
-    map: &MapAttachRef,
+    map: &MapHandle,
     metal: &MetalContext,
     viewport: Viewport,
 ) -> maplibre_native_ffi::Result<RenderTarget> {

@@ -2,7 +2,6 @@
 #include <array>
 #include <atomic>
 #include <cassert>
-#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -87,27 +86,6 @@ struct HandleTraits<EventBatchObject> {
 
 }  // namespace mln::core
 
-namespace mln::core {
-
-// Holds its own reference to the wake state, so the state stays readable for a
-// signal that races runtime teardown. Hosts destroy the two in either order.
-struct WakeSourceObject {
-  explicit WakeSourceObject(std::shared_ptr<WakeState> state_)
-      : state(std::move(state_)) {}
-
-  std::shared_ptr<WakeState> state;
-};
-
-// Signalling is an any-thread call that can race a destroy, so a lease keeps
-// the wake state readable for the duration of the call.
-template <>
-struct HandleTraits<WakeSourceObject> {
-  static constexpr auto kind = HandleKind::WakeSource;
-  static constexpr auto leasable = true;
-};
-
-}  // namespace mln::core
-
 namespace {
 enum : std::uint32_t {
   MLN_OFFLINE_OPERATION_AMBIENT_CACHE = 1,
@@ -123,6 +101,10 @@ enum : std::uint32_t {
   MLN_OFFLINE_OPERATION_REGION_DELETE = 11,
   MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE = 12,
 };
+
+constexpr auto MLN_RUNTIME_OPERATION_CREATE = UINT32_C(0x10000);
+constexpr auto MLN_RUNTIME_OPERATION_BARRIER = UINT32_C(0x10001);
+constexpr auto MLN_RUNTIME_OPERATION_CLOSE = UINT32_C(0x10002);
 
 enum : std::uint32_t {
   MLN_OFFLINE_OPERATION_RESULT_NONE = 0,
@@ -160,6 +142,7 @@ MLN_ASSERT_EVENT_MASK_BIT(MAP_RENDER_MAP_FINISHED);
 MLN_ASSERT_EVENT_MASK_BIT(MAP_STYLE_IMAGE_MISSING);
 MLN_ASSERT_EVENT_MASK_BIT(MAP_TILE_ACTION);
 MLN_ASSERT_EVENT_MASK_BIT(MAP_CAMERA_TRANSITION_FINISHED);
+MLN_ASSERT_EVENT_MASK_BIT(COMMAND_FINISHED);
 MLN_ASSERT_EVENT_MASK_BIT(OFFLINE_REGION_STATUS_CHANGED);
 MLN_ASSERT_EVENT_MASK_BIT(OFFLINE_REGION_RESPONSE_ERROR);
 MLN_ASSERT_EVENT_MASK_BIT(OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED);
@@ -219,23 +202,6 @@ auto runtime_from_platform_context(void* platform_context) noexcept
   const auto found =
     registry.find(reinterpret_cast<std::uintptr_t>(platform_context));
   return found == registry.end() ? MLN_HANDLE_NULL : found->second;
-}
-
-auto live_runtime_threads_mutex() -> std::mutex& {
-  static std::mutex value;
-  return value;
-}
-
-// Mirrors the owner thread of every live runtime, so runtime creation can
-// reject a thread that already owns one. The handle table does not iterate.
-auto live_runtime_threads() -> std::unordered_set<std::thread::id>& {
-  static std::unordered_set<std::thread::id> value;
-  return value;
-}
-
-auto owner_thread_has_live_runtime(std::thread::id owner_thread) -> bool {
-  const std::scoped_lock lock(live_runtime_threads_mutex());
-  return live_runtime_threads().contains(owner_thread);
 }
 
 // Leases the resource transform registration for a MapLibre-owned thread. Only
@@ -682,9 +648,6 @@ auto push_offline_region_event(
     }
     runtime->event_queue->events.push_back(std::move(event));
   }
-  // The offline region observer runs off the owner-thread run loop, so this
-  // signal releases a parked owner thread.
-  mln::core::signal_wake(runtime->wake_state);
   runtime->event_queue->notification_endpoint->mark_ready();
 }
 
@@ -823,10 +786,9 @@ auto exception_message(std::exception_ptr exception, const char* fallback)
 
 template <typename Schedule>
 auto schedule_registered_offline_operation(
-  mln::core::RuntimeObject* runtime, uint32_t kind, uint32_t result_kind,
+  mln::core::RuntimeObject* runtime, uint32_t kind,
   mln_operation* out_operation_id, Schedule&& schedule
 ) -> mln_status {
-  static_cast<void>(result_kind);
   auto state = std::shared_ptr<mln::core::OperationObject>{};
   const auto status = mln::core::register_operation(
     runtime->event_queue->notification_source, kind, false, {},
@@ -835,10 +797,22 @@ auto schedule_registered_offline_operation(
   if (status != MLN_STATUS_OK) {
     return status;
   }
+  static_cast<void>(
+    mln::core::associate_runtime_operation_with_current_submission(
+      runtime, state
+    )
+  );
   const auto operation_id = *out_operation_id;
   try {
     std::forward<Schedule>(schedule)(state, operation_id);
   } catch (...) {
+    state->complete(
+      MLN_STATUS_NATIVE_ERROR,
+      exception_message(
+        std::current_exception(), "offline operation submission failed"
+      ),
+      std::any{std::monostate{}}
+    );
     mln::core::abandon_operation(operation_id);
     *out_operation_id = MLN_HANDLE_NULL;
     throw;
@@ -947,39 +921,250 @@ auto database_source_for_runtime(RuntimeObject* runtime)
 
 }  // namespace
 
-// Only the owner thread destroys a runtime, so the borrowed object stays alive
-// for as long as the calling thread can use it.
 auto validate_runtime(mln_runtime runtime, RuntimeObject*& out_runtime)
   -> mln_status {
   out_runtime = handle_table<RuntimeObject>().resolve(runtime);
-  if (out_runtime == nullptr) {
+  return out_runtime == nullptr ? MLN_STATUS_INVALID_ARGUMENT : MLN_STATUS_OK;
+}
+
+auto lease_runtime(mln_runtime runtime) -> std::shared_ptr<RuntimeObject> {
+  return handle_table<RuntimeObject>().lease(runtime);
+}
+
+namespace {
+
+struct CurrentRuntimeSubmission {
+  RuntimeObject* runtime;
+  std::shared_ptr<RuntimeObject> retained_runtime;
+  uint64_t sequence;
+  bool claimed_by_operation = false;
+};
+
+auto current_runtime_submission() noexcept -> CurrentRuntimeSubmission*& {
+  static thread_local auto* submission =
+    static_cast<CurrentRuntimeSubmission*>(nullptr);
+  return submission;
+}
+
+auto finish_tracked_submission(
+  const std::shared_ptr<RuntimeObject>& runtime, uint64_t sequence
+) noexcept -> void {
+  {
+    const std::scoped_lock lock(runtime->terminal_mutex);
+    runtime->pending_submissions.erase(sequence);
+  }
+  runtime->terminal_condition.notify_all();
+}
+
+}  // namespace
+
+auto dispatch_runtime_sync(
+  mln_runtime runtime, std::function<mln_status()> function
+) -> mln_status {
+  auto live = lease_runtime(runtime);
+  if (live == nullptr) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-
-  if (out_runtime->owner_thread != std::this_thread::get_id()) {
-    set_thread_error("runtime call must be made on its owner thread");
-    return MLN_STATUS_WRONG_THREAD;
+  const std::scoped_lock commit_lock(live->submission_mutex);
+  if (!live->control.acquire()) {
+    return MLN_STATUS_INVALID_STATE;
   }
+  auto lease = ControlLease{&live->control};
+  const auto sequence = live->next_submission_sequence++;
+  {
+    const std::scoped_lock terminal_lock(live->terminal_mutex);
+    live->pending_submissions.insert(sequence);
+  }
+  auto context = CurrentRuntimeSubmission{
+    .runtime = live.get(),
+    .retained_runtime = live,
+    .sequence = sequence,
+  };
+  try {
+    const auto status = live->executor.invoke_sync(
+      [lease = std::move(lease), &context,
+       function = std::move(function)]() mutable -> mln_status {
+        static_cast<void>(lease);
+        auto* previous = current_runtime_submission();
+        current_runtime_submission() = &context;
+        try {
+          const auto result = std::invoke(std::move(function));
+          current_runtime_submission() = previous;
+          return result;
+        } catch (...) {
+          current_runtime_submission() = previous;
+          throw;
+        }
+      }
+    );
+    if (!context.claimed_by_operation) {
+      finish_tracked_submission(live, sequence);
+    }
+    return status;
+  } catch (...) {
+    if (!context.claimed_by_operation) {
+      finish_tracked_submission(live, sequence);
+    }
+    throw;
+  }
+}
 
+auto associate_runtime_operation_with_current_submission(
+  RuntimeObject* runtime, const std::shared_ptr<OperationObject>& operation
+) noexcept -> bool {
+  auto* context = current_runtime_submission();
+  if (
+    context == nullptr || context->runtime != runtime ||
+    context->claimed_by_operation || operation == nullptr
+  ) {
+    return false;
+  }
+  context->claimed_by_operation = true;
+  operation->set_terminal_callback(
+    [retained = context->retained_runtime,
+     sequence = context->sequence]() noexcept -> void {
+      finish_tracked_submission(retained, sequence);
+    }
+  );
+  return true;
+}
+
+namespace {
+
+auto mark_runtime_submission_terminal(
+  const std::shared_ptr<RuntimeObject>& runtime, uint64_t sequence
+) noexcept -> void {
+  finish_tracked_submission(runtime, sequence);
+}
+
+}  // namespace
+
+auto submit_runtime_command(
+  const std::shared_ptr<RuntimeObject>& runtime,
+  std::function<void(uint64_t)> function, uint64_t* out_command_id,
+  std::atomic<uint64_t>* latest_command_id
+) -> mln_status {
+  if (runtime == nullptr || out_command_id == nullptr) {
+    set_thread_error("runtime and out_command_id must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const std::scoped_lock commit_lock(runtime->submission_mutex);
+  if (!runtime->control.acquire()) {
+    return MLN_STATUS_INVALID_STATE;
+  }
+  auto lease = ControlLease{&runtime->control};
+  const auto command_id = runtime->next_command_id++;
+  const auto sequence = runtime->next_submission_sequence++;
+  if (latest_command_id != nullptr) {
+    latest_command_id->store(command_id);
+  }
+  {
+    const std::scoped_lock terminal_lock(runtime->terminal_mutex);
+    runtime->pending_submissions.insert(sequence);
+  }
+  try {
+    runtime->executor.invoke(
+      [runtime, lease = std::move(lease), command_id, sequence,
+       function = std::move(function)]() mutable -> void {
+        static_cast<void>(lease);
+        try {
+          std::invoke(std::move(function), command_id);
+        } catch (...) {
+          // The command implementation reports its own terminal failure event.
+          static_cast<void>(0);
+        }
+        mark_runtime_submission_terminal(runtime, sequence);
+      }
+    );
+  } catch (...) {
+    mark_runtime_submission_terminal(runtime, sequence);
+    set_thread_error("runtime command submission failed");
+    return MLN_STATUS_NATIVE_ERROR;
+  }
+  *out_command_id = command_id;
   return MLN_STATUS_OK;
 }
 
-auto create_runtime(
-  const mln_runtime_options* options, mln_runtime* out_runtime
+auto submit_runtime_operation(
+  const std::shared_ptr<RuntimeObject>& runtime,
+  const std::shared_ptr<OperationObject>& operation,
+  std::function<void()> function
+) -> mln_status {
+  if (runtime == nullptr || operation == nullptr) {
+    set_thread_error("runtime and operation must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const std::scoped_lock commit_lock(runtime->submission_mutex);
+  if (!runtime->control.acquire()) {
+    return MLN_STATUS_INVALID_STATE;
+  }
+  auto lease = ControlLease{&runtime->control};
+  const auto sequence = runtime->next_submission_sequence++;
+  {
+    const std::scoped_lock terminal_lock(runtime->terminal_mutex);
+    runtime->pending_submissions.insert(sequence);
+  }
+  operation->set_terminal_callback([runtime, sequence]() noexcept -> void {
+    mark_runtime_submission_terminal(runtime, sequence);
+  });
+  try {
+    runtime->executor.invoke(
+      [operation, lease = std::move(lease),
+       function = std::move(function)]() mutable -> void {
+        static_cast<void>(lease);
+        try {
+          std::invoke(std::move(function));
+        } catch (...) {
+          operation->complete(
+            MLN_STATUS_NATIVE_ERROR, "runtime operation submission failed",
+            std::any{std::monostate{}}
+          );
+        }
+      }
+    );
+  } catch (...) {
+    operation->complete(
+      MLN_STATUS_NATIVE_ERROR, "runtime operation submission failed",
+      std::any{std::monostate{}}
+    );
+    set_thread_error("runtime operation submission failed");
+    return MLN_STATUS_NATIVE_ERROR;
+  }
+  return MLN_STATUS_OK;
+}
+
+namespace {
+
+struct RuntimeCreationResult {
+  RuntimeCreationResult() = default;
+  RuntimeCreationResult(const RuntimeCreationResult&) = delete;
+  RuntimeCreationResult(RuntimeCreationResult&&) = delete;
+  auto operator=(const RuntimeCreationResult&)
+    -> RuntimeCreationResult& = delete;
+  auto operator=(RuntimeCreationResult&&) -> RuntimeCreationResult& = delete;
+
+  ~RuntimeCreationResult() {
+    if (!published && runtime != nullptr) {
+      runtime->executor.stop();
+      if (runtime->platform_context != nullptr) {
+        unregister_platform_context(runtime->platform_context);
+      }
+      runtime.reset();
+    }
+  }
+
+  std::shared_ptr<RuntimeObject> runtime;
+  bool published = false;
+};
+
+}  // namespace
+
+auto create_runtime_start(
+  const mln_runtime_options* options, mln_operation* out_operation
 ) -> mln_status {
   const auto options_status = validate_runtime_options(options);
   if (options_status != MLN_STATUS_OK) {
     return options_status;
-  }
-
-  if (out_runtime == nullptr) {
-    set_thread_error("out_runtime must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  if (*out_runtime != MLN_HANDLE_NULL) {
-    set_thread_error("out_runtime must point to the null handle");
-    return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto notification_source =
     notification_source_from_handle(options->notification_source);
@@ -987,102 +1172,157 @@ auto create_runtime(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  const auto owner_thread = std::this_thread::get_id();
-  if (owner_thread_has_live_runtime(owner_thread)) {
-    set_thread_error("owner thread already has a live runtime");
-    return MLN_STATUS_INVALID_STATE;
-  }
-  if (mbgl::Scheduler::GetCurrent(false) != nullptr) {
-    set_thread_error("owner thread already has an active MapLibre scheduler");
-    return MLN_STATUS_INVALID_STATE;
+  auto result = std::make_shared<RuntimeCreationResult>();
+  result->runtime = std::make_shared<RuntimeObject>();
+  auto asset_path = options->asset_path == nullptr
+                      ? std::string{}
+                      : std::string{options->asset_path};
+  auto cache_path = options->cache_path == nullptr
+                      ? std::string{}
+                      : std::string{options->cache_path};
+  const auto event_mask = options->event_mask;
+
+  auto state = std::shared_ptr<OperationObject>{};
+  const auto register_status = register_operation(
+    notification_source, MLN_RUNTIME_OPERATION_CREATE, false, {}, out_operation,
+    state
+  );
+  if (register_status != MLN_STATUS_OK) {
+    return register_status;
   }
 
-  auto owned_runtime = std::make_shared<RuntimeObject>();
-  owned_runtime->owner_thread = owner_thread;
-  owned_runtime->wake_state = std::make_shared<WakeState>();
-  // The mask cell exists before the run loop, so every producer this runtime
-  // can reach reads a live cell.
-  owned_runtime->event_state = std::make_shared<RuntimeEventState>();
-  owned_runtime->event_state->mask.store(
-    options->event_mask, std::memory_order_relaxed
-  );
-  owned_runtime->event_queue = std::make_shared<RuntimeEventQueueState>();
-  owned_runtime->event_queue->notification_source = notification_source;
-  owned_runtime->run_loop =
-    std::make_unique<mbgl::util::RunLoop>(mbgl::util::RunLoop::Type::New);
-  // `setPlatformCallback` is an unlocked assignment, so it happens while the
-  // run loop is reachable only from this thread.
-  owned_runtime->run_loop->setPlatformCallback(
-    [state = owned_runtime->wake_state]() -> void { signal_wake(state); }
-  );
-  owned_runtime->asset_path = options->asset_path == nullptr
-                                ? std::string{}
-                                : std::string{options->asset_path};
-  owned_runtime->cache_path = options->cache_path == nullptr
-                                ? std::string{}
-                                : std::string{options->cache_path};
-  owned_runtime->offline_event_state =
-    std::make_shared<OfflineRegionEventState>();
-  owned_runtime->offline_event_state->runtime = owned_runtime.get();
-  owned_runtime->offline_event_state->alive = true;
-  owned_runtime->resource_transform_state =
-    std::make_shared<ResourceTransformState>();
-  owned_runtime->http_header_transform_state =
-    std::make_shared<HttpHeaderTransformState>();
-  owned_runtime->resource_provider_state =
-    std::make_shared<ResourceProviderState>();
-  auto* published = owned_runtime.get();
-  // Reserving the token allocates, so it happens before this thread is marked
-  // as owning a runtime. The failure path below reads the local, not the
-  // object: the insert takes the shared_ptr by value, so a throw there destroys
-  // the runtime while unwinding.
-  auto* const platform_context = reserve_platform_context();
-  published->platform_context = platform_context;
-  {
-    const std::scoped_lock lock(live_runtime_threads_mutex());
-    live_runtime_threads().insert(owner_thread);
-  }
-  try {
-    *out_runtime =
-      handle_table<RuntimeObject>().insert(std::move(owned_runtime));
-    published->self = *out_runtime;
-    published->event_queue->notification_endpoint =
-      notification_source->associate(
-        *out_runtime, MLN_NOTIFICATION_ENDPOINT_RUNTIME_EVENTS, true
+  auto creation_work =
+    [state, result, notification_source, asset_path = std::move(asset_path),
+     cache_path = std::move(cache_path), event_mask]() mutable -> void {
+    try {
+      auto runtime = result->runtime;
+      runtime->executor.start(
+        [runtime, notification_source, asset_path = std::move(asset_path),
+         cache_path = std::move(cache_path), event_mask]() mutable -> void {
+          runtime->event_state = std::make_shared<RuntimeEventState>();
+          runtime->event_state->mask.store(
+            event_mask, std::memory_order_relaxed
+          );
+          runtime->event_queue = std::make_shared<RuntimeEventQueueState>();
+          runtime->event_queue->notification_source = notification_source;
+          runtime->asset_path = std::move(asset_path);
+          runtime->cache_path = std::move(cache_path);
+          runtime->offline_event_state =
+            std::make_shared<OfflineRegionEventState>();
+          runtime->offline_event_state->runtime = runtime.get();
+          runtime->offline_event_state->alive = true;
+          runtime->resource_transform_state =
+            std::make_shared<ResourceTransformState>();
+          runtime->http_header_transform_state =
+            std::make_shared<HttpHeaderTransformState>();
+          runtime->resource_provider_state =
+            std::make_shared<ResourceProviderState>();
+          runtime->platform_context = reserve_platform_context();
+        }
       );
-    if (published->event_queue->notification_endpoint == nullptr) {
-      static_cast<void>(handle_table<RuntimeObject>().remove(*out_runtime));
-      *out_runtime = MLN_HANDLE_NULL;
-      {
-        const std::scoped_lock lock(live_runtime_threads_mutex());
-        live_runtime_threads().erase(owner_thread);
-      }
-      unregister_platform_context(platform_context);
-      return MLN_STATUS_INVALID_STATE;
+      state->complete(MLN_STATUS_OK, {}, std::any{std::move(result)});
+    } catch (...) {
+      state->complete(
+        MLN_STATUS_NATIVE_ERROR,
+        exception_message(std::current_exception(), "runtime creation failed"),
+        std::any{std::monostate{}}
+      );
     }
+  };
+  try {
+    std::thread(creation_work).detach();
   } catch (...) {
-    if (*out_runtime != MLN_HANDLE_NULL) {
-      static_cast<void>(handle_table<RuntimeObject>().remove(*out_runtime));
-      *out_runtime = MLN_HANDLE_NULL;
-    }
-    {
-      const std::scoped_lock lock(live_runtime_threads_mutex());
-      live_runtime_threads().erase(owner_thread);
-    }
-    unregister_platform_context(platform_context);
-    throw;
+    creation_work();
   }
-  bind_platform_context(platform_context, *out_runtime);
   return MLN_STATUS_OK;
 }
 
-auto set_resource_transform(
-  mln_runtime runtime, const mln_resource_transform* transform
+auto create_runtime_take_result(
+  mln_operation operation, mln_runtime* out_runtime
 ) -> mln_status {
-  mln::core::RuntimeObject* live = nullptr;
-  const auto status = validate_runtime(runtime, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
+  if (out_runtime == nullptr || *out_runtime != MLN_HANDLE_NULL) {
+    set_thread_error("out_runtime must point to the null handle");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return take_operation_result<std::shared_ptr<RuntimeCreationResult>>(
+    operation, MLN_RUNTIME_OPERATION_CREATE,
+    [out_runtime](std::shared_ptr<RuntimeCreationResult>& result)
+      -> mln_status {
+      auto runtime = result->runtime;
+      const auto handle = handle_table<RuntimeObject>().insert(runtime);
+      runtime->self = handle;
+      try {
+        runtime->event_queue->notification_endpoint =
+          runtime->event_queue->notification_source->associate(
+            handle, MLN_NOTIFICATION_ENDPOINT_RUNTIME_EVENTS, true
+          );
+        if (runtime->event_queue->notification_endpoint == nullptr) {
+          static_cast<void>(handle_table<RuntimeObject>().remove(handle));
+          runtime->self = MLN_HANDLE_NULL;
+          return MLN_STATUS_INVALID_STATE;
+        }
+      } catch (...) {
+        static_cast<void>(handle_table<RuntimeObject>().remove(handle));
+        runtime->self = MLN_HANDLE_NULL;
+        throw;
+      }
+      bind_platform_context(runtime->platform_context, handle);
+      result->published = true;
+      *out_runtime = handle;
+      return MLN_STATUS_OK;
+    }
+  );
+}
+
+namespace {
+
+template <typename Mutation>
+auto execute_resource_configuration_command(
+  const std::shared_ptr<mln::core::RuntimeObject>& runtime,
+  std::uint64_t command_id, Mutation&& mutation
+) noexcept -> void {
+  try {
+    std::invoke(std::forward<Mutation>(mutation));
+    push_runtime_command_finished(
+      runtime->self, MLN_RUNTIME_EVENT_SOURCE_RUNTIME, runtime->self,
+      command_id, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, 0
+    );
+  } catch (const std::exception& exception) {
+    push_runtime_command_finished(
+      runtime->self, MLN_RUNTIME_EVENT_SOURCE_RUNTIME, runtime->self,
+      command_id, MLN_COMMAND_DISPOSITION_FAILED, MLN_STATUS_NATIVE_ERROR, 0,
+      exception.what()
+    );
+  } catch (...) {
+    push_runtime_command_finished(
+      runtime->self, MLN_RUNTIME_EVENT_SOURCE_RUNTIME, runtime->self,
+      command_id, MLN_COMMAND_DISPOSITION_FAILED, MLN_STATUS_NATIVE_ERROR, 0,
+      "resource configuration command failed"
+    );
+  }
+}
+
+auto validate_command_output(const std::uint64_t* out_command_id)
+  -> mln_status {
+  if (out_command_id == nullptr || *out_command_id != 0) {
+    set_thread_error("out_command_id must point to zero");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
+}  // namespace
+
+auto set_resource_transform(
+  mln_runtime runtime, const mln_resource_transform* transform,
+  std::uint64_t* out_command_id
+) -> mln_status {
+  auto live = lease_runtime(runtime);
+  if (live == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (validate_command_output(out_command_id) != MLN_STATUS_OK) {
+    return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (transform == nullptr) {
     set_thread_error("resource transform must not be null");
@@ -1097,11 +1337,21 @@ auto set_resource_transform(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto& state = *live->resource_transform_state;
-  const std::unique_lock lock(state.mutex);
-  state.callback = transform->callback;
-  state.user_data = transform->user_data;
-  return MLN_STATUS_OK;
+  const auto copied = *transform;
+  const auto state = live->resource_transform_state;
+  return submit_runtime_command(
+    live,
+    [live, state, copied](std::uint64_t command_id) -> void {
+      execute_resource_configuration_command(
+        live, command_id, [state, copied]() -> void {
+          const std::unique_lock lock(state->mutex);
+          state->callback = copied.callback;
+          state->user_data = copied.user_data;
+        }
+      );
+    },
+    out_command_id
+  );
 }
 
 auto resource_transform_response_set_url(
@@ -1142,27 +1392,43 @@ auto resource_transform_response_set_url(
   return MLN_STATUS_OK;
 }
 
-auto clear_resource_transform(mln_runtime runtime) -> mln_status {
-  mln::core::RuntimeObject* live = nullptr;
-  const auto status = validate_runtime(runtime, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
+auto clear_resource_transform(
+  mln_runtime runtime, std::uint64_t* out_command_id
+) -> mln_status {
+  auto live = lease_runtime(runtime);
+  if (live == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (validate_command_output(out_command_id) != MLN_STATUS_OK) {
+    return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto& state = *live->resource_transform_state;
-  const std::unique_lock lock(state.mutex);
-  state.callback = nullptr;
-  state.user_data = nullptr;
-  return MLN_STATUS_OK;
+  const auto state = live->resource_transform_state;
+  return submit_runtime_command(
+    live,
+    [live, state](std::uint64_t command_id) -> void {
+      execute_resource_configuration_command(
+        live, command_id, [state]() -> void {
+          const std::unique_lock lock(state->mutex);
+          state->callback = nullptr;
+          state->user_data = nullptr;
+        }
+      );
+    },
+    out_command_id
+  );
 }
 
 auto set_http_header_transform(
-  mln_runtime runtime, const mln_http_header_transform* transform
+  mln_runtime runtime, const mln_http_header_transform* transform,
+  std::uint64_t* out_command_id
 ) -> mln_status {
-  RuntimeObject* live = nullptr;
-  const auto status = validate_runtime(runtime, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
+  auto live = lease_runtime(runtime);
+  if (live == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (validate_command_output(out_command_id) != MLN_STATUS_OK) {
+    return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (transform == nullptr) {
     set_thread_error("HTTP header transform must not be null");
@@ -1184,8 +1450,6 @@ auto set_http_header_transform(
   );
   return MLN_STATUS_UNSUPPORTED;
 #elif defined(__EMSCRIPTEN__)
-  // fetch() with redirect: "manual" is no help either: a cross-origin manual
-  // redirect is an opaque response whose Location cannot be read.
   set_thread_error(
     "HTTP header transforms are unsupported in the browser because "
     "emscripten_fetch follows redirects itself and cannot drop transformed "
@@ -1195,11 +1459,21 @@ auto set_http_header_transform(
   return MLN_STATUS_UNSUPPORTED;
 #endif
 
-  auto& state = *live->http_header_transform_state;
-  const std::unique_lock lock(state.mutex);
-  state.callback = transform->callback;
-  state.user_data = transform->user_data;
-  return MLN_STATUS_OK;
+  const auto copied = *transform;
+  const auto state = live->http_header_transform_state;
+  return submit_runtime_command(
+    live,
+    [live, state, copied](std::uint64_t command_id) -> void {
+      execute_resource_configuration_command(
+        live, command_id, [state, copied]() -> void {
+          const std::unique_lock lock(state->mutex);
+          state->callback = copied.callback;
+          state->user_data = copied.user_data;
+        }
+      );
+    },
+    out_command_id
+  );
 }
 
 namespace {
@@ -1409,18 +1683,31 @@ auto http_header_transform_response_set(
   return MLN_STATUS_OK;
 }
 
-auto clear_http_header_transform(mln_runtime runtime) -> mln_status {
-  RuntimeObject* live = nullptr;
-  const auto status = validate_runtime(runtime, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
+auto clear_http_header_transform(
+  mln_runtime runtime, std::uint64_t* out_command_id
+) -> mln_status {
+  auto live = lease_runtime(runtime);
+  if (live == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (validate_command_output(out_command_id) != MLN_STATUS_OK) {
+    return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto& state = *live->http_header_transform_state;
-  const std::unique_lock lock(state.mutex);
-  state.callback = nullptr;
-  state.user_data = nullptr;
-  return MLN_STATUS_OK;
+  const auto state = live->http_header_transform_state;
+  return submit_runtime_command(
+    live,
+    [live, state](std::uint64_t command_id) -> void {
+      execute_resource_configuration_command(
+        live, command_id, [state]() -> void {
+          const std::unique_lock lock(state->mutex);
+          state->callback = nullptr;
+          state->user_data = nullptr;
+        }
+      );
+    },
+    out_command_id
+  );
 }
 
 auto run_ambient_cache_operation_start(
@@ -1452,8 +1739,7 @@ auto run_ambient_cache_operation_start(
   }
 
   return schedule_registered_offline_operation(
-    live, MLN_OFFLINE_OPERATION_AMBIENT_CACHE,
-    MLN_OFFLINE_OPERATION_RESULT_NONE, out_operation_id,
+    live, MLN_OFFLINE_OPERATION_AMBIENT_CACHE, out_operation_id,
     [&](auto state, auto operation_id) -> void {
       auto callback = [state,
                        operation_id](std::exception_ptr exception) -> void {
@@ -1504,8 +1790,7 @@ auto set_maximum_ambient_cache_size_start(
 
   return schedule_registered_offline_operation(
     live, MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE,
-    MLN_OFFLINE_OPERATION_RESULT_NONE, out_operation_id,
-    [&](auto state, auto operation_id) -> void {
+    out_operation_id, [&](auto state, auto operation_id) -> void {
       database->setMaximumAmbientCacheSize(
         size, [state, operation_id](std::exception_ptr exception) -> void {
           complete_from_exception(
@@ -1554,8 +1839,7 @@ auto offline_region_create_start(
     std::memcpy(native_metadata.data(), metadata, metadata_size);
   }
   return schedule_registered_offline_operation(
-    live, MLN_OFFLINE_OPERATION_REGION_CREATE,
-    MLN_OFFLINE_OPERATION_RESULT_REGION, out_operation_id,
+    live, MLN_OFFLINE_OPERATION_REGION_CREATE, out_operation_id,
     [&](auto state, auto operation_id) -> void {
       database->createOfflineRegion(
         native_definition, native_metadata,
@@ -1609,8 +1893,7 @@ auto offline_region_get_start(
   }
 
   return schedule_registered_offline_operation(
-    live, MLN_OFFLINE_OPERATION_REGION_GET,
-    MLN_OFFLINE_OPERATION_RESULT_OPTIONAL_REGION, out_operation_id,
+    live, MLN_OFFLINE_OPERATION_REGION_GET, out_operation_id,
     [&](auto state, auto operation_id) -> void {
       database->getOfflineRegion(
         region_id,
@@ -1670,8 +1953,7 @@ auto offline_regions_list_start(
   }
 
   return schedule_registered_offline_operation(
-    live, MLN_OFFLINE_OPERATION_REGIONS_LIST,
-    MLN_OFFLINE_OPERATION_RESULT_REGION_LIST, out_operation_id,
+    live, MLN_OFFLINE_OPERATION_REGIONS_LIST, out_operation_id,
     [&](auto state, auto operation_id) -> void {
       database->listOfflineRegions(
         [state, operation_id](
@@ -1727,8 +2009,7 @@ auto offline_regions_merge_database_start(
 
   const auto path = std::string{side_database_path};
   return schedule_registered_offline_operation(
-    live, MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE,
-    MLN_OFFLINE_OPERATION_RESULT_REGION_LIST, out_operation_id,
+    live, MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE, out_operation_id,
     [&](auto state, auto operation_id) -> void {
       database->mergeOfflineRegions(
         path,
@@ -1791,8 +2072,7 @@ auto offline_region_update_metadata_start(
     std::memcpy(native_metadata.data(), metadata, metadata_size);
   }
   return schedule_registered_offline_operation(
-    live, MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA,
-    MLN_OFFLINE_OPERATION_RESULT_REGION, out_operation_id,
+    live, MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA, out_operation_id,
     [&](auto state, auto operation_id) -> void {
       database->updateOfflineMetadata(
         region_id, native_metadata,
@@ -1870,8 +2150,7 @@ auto offline_region_get_status_start(
   }
 
   return schedule_registered_offline_operation(
-    live, MLN_OFFLINE_OPERATION_REGION_GET_STATUS,
-    MLN_OFFLINE_OPERATION_RESULT_REGION_STATUS, out_operation_id,
+    live, MLN_OFFLINE_OPERATION_REGION_GET_STATUS, out_operation_id,
     [&](auto state, auto operation_id) -> void {
       database->getOfflineRegion(
         region_id,
@@ -1943,8 +2222,7 @@ auto offline_region_set_observed_start(
   auto offline_event_state = live->offline_event_state;
 
   return schedule_registered_offline_operation(
-    live, MLN_OFFLINE_OPERATION_REGION_SET_OBSERVED,
-    MLN_OFFLINE_OPERATION_RESULT_NONE, out_operation_id,
+    live, MLN_OFFLINE_OPERATION_REGION_SET_OBSERVED, out_operation_id,
     [&, offline_event_state](auto state, auto operation_id) -> void {
       database->getOfflineRegion(
         region_id,
@@ -2026,8 +2304,7 @@ auto offline_region_set_download_state_start(
   }
 
   return schedule_registered_offline_operation(
-    live, MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE,
-    MLN_OFFLINE_OPERATION_RESULT_NONE, out_operation_id,
+    live, MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE, out_operation_id,
     [&](auto state, auto operation_id) -> void {
       database->getOfflineRegion(
         request.region_id,
@@ -2083,8 +2360,7 @@ auto offline_region_invalidate_start(
   }
 
   return schedule_registered_offline_operation(
-    live, MLN_OFFLINE_OPERATION_REGION_INVALIDATE,
-    MLN_OFFLINE_OPERATION_RESULT_NONE, out_operation_id,
+    live, MLN_OFFLINE_OPERATION_REGION_INVALIDATE, out_operation_id,
     [&](auto state, auto operation_id) -> void {
       database->getOfflineRegion(
         region_id,
@@ -2144,8 +2420,7 @@ auto offline_region_delete_start(
   auto offline_event_state = live->offline_event_state;
 
   return schedule_registered_offline_operation(
-    live, MLN_OFFLINE_OPERATION_REGION_DELETE,
-    MLN_OFFLINE_OPERATION_RESULT_NONE, out_operation_id,
+    live, MLN_OFFLINE_OPERATION_REGION_DELETE, out_operation_id,
     [&, offline_event_state](auto state, auto operation_id) -> void {
       database->getOfflineRegion(
         region_id,
@@ -2388,12 +2663,15 @@ auto offline_region_list_destroy(mln_offline_region_list list) noexcept
 }
 
 auto set_resource_provider(
-  mln_runtime runtime, const mln_resource_provider* provider
+  mln_runtime runtime, const mln_resource_provider* provider,
+  std::uint64_t* out_command_id
 ) -> mln_status {
-  mln::core::RuntimeObject* live = nullptr;
-  const auto status = validate_runtime(runtime, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
+  auto live = lease_runtime(runtime);
+  if (live == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (validate_command_output(out_command_id) != MLN_STATUS_OK) {
+    return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (provider == nullptr) {
     set_thread_error("provider must not be null");
@@ -2408,226 +2686,232 @@ auto set_resource_provider(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  // The exclusive provider lock waits for every callback that leased the
-  // previous provider, so that callback and its `user_data` are unreferenced
-  // once this returns.
-  auto& state = *live->resource_provider_state;
-  const std::unique_lock lock(state.mutex);
-  state.registered = true;
-  state.provider = ResourceProvider{
+  const auto copied = ResourceProvider{
     .callback = provider->callback,
     .user_data = provider->user_data,
   };
-  return MLN_STATUS_OK;
+  const auto state = live->resource_provider_state;
+  return submit_runtime_command(
+    live,
+    [live, state, copied](std::uint64_t command_id) -> void {
+      execute_resource_configuration_command(
+        live, command_id, [state, copied]() -> void {
+          const std::unique_lock lock(state->mutex);
+          state->registered = true;
+          state->provider = copied;
+        }
+      );
+    },
+    out_command_id
+  );
 }
 
-auto clear_resource_provider(mln_runtime runtime) -> mln_status {
-  mln::core::RuntimeObject* live = nullptr;
-  const auto status = validate_runtime(runtime, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
+auto clear_resource_provider(mln_runtime runtime, std::uint64_t* out_command_id)
+  -> mln_status {
+  auto live = lease_runtime(runtime);
+  if (live == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (validate_command_output(out_command_id) != MLN_STATUS_OK) {
+    return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto& state = *live->resource_provider_state;
-  const std::unique_lock lock(state.mutex);
-  state.registered = false;
-  state.provider = ResourceProvider{};
-  return MLN_STATUS_OK;
+  const auto state = live->resource_provider_state;
+  return submit_runtime_command(
+    live,
+    [live, state](std::uint64_t command_id) -> void {
+      execute_resource_configuration_command(
+        live, command_id, [state]() -> void {
+          const std::unique_lock lock(state->mutex);
+          state->registered = false;
+          state->provider = ResourceProvider{};
+        }
+      );
+    },
+    out_command_id
+  );
 }
 
-auto destroy_runtime(mln_runtime runtime) -> mln_status {
-  // Take ownership of the runtime out of the table, then release the
-  // process-global table lock before any teardown step that can block on a
-  // native callback. The waits below then stall this runtime alone.
-  std::shared_ptr<RuntimeObject> owned_runtime;
-  auto owner_thread = std::thread::id{};
+namespace {
+
+auto prior_runtime_submissions_terminal(
+  const RuntimeObject& runtime, uint64_t sequence
+) noexcept -> bool {
+  return runtime.pending_submissions.empty() ||
+         *runtime.pending_submissions.begin() >= sequence;
+}
+
+auto wait_for_prior_runtime_submissions(
+  const std::shared_ptr<RuntimeObject>& runtime, uint64_t sequence
+) noexcept -> void {
+  auto lock = std::unique_lock{runtime->terminal_mutex};
+  runtime->terminal_condition.wait(lock, [&]() noexcept -> bool {
+    return prior_runtime_submissions_terminal(*runtime, sequence);
+  });
+}
+
+auto release_runtime_reachable_state(
+  const std::shared_ptr<RuntimeObject>& runtime
+) -> void {
   {
-    auto& table = handle_table<RuntimeObject>();
-    const std::scoped_lock lock(table.mutex());
-    auto* live = table.resolve_locked(runtime);
-    if (live == nullptr) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-
-    if (live->owner_thread != std::this_thread::get_id()) {
-      set_thread_error("runtime must be destroyed on its owner thread");
-      return MLN_STATUS_WRONG_THREAD;
-    }
-
-    if (live->live_maps != 0) {
-      set_thread_error("runtime still owns live maps");
-      return MLN_STATUS_INVALID_STATE;
-    }
-
-    owner_thread = live->owner_thread;
-    owned_runtime = table.remove_locked(runtime);
-  }
-  {
-    const std::scoped_lock lock(live_runtime_threads_mutex());
-    live_runtime_threads().erase(owner_thread);
-  }
-  unregister_platform_context(owned_runtime->platform_context);
-
-  // A resource transform callback that entered `invoke_resource_transform()`
-  // before the erase above holds a shared transform lock, so this wait covers
-  // every callback that can still observe the runtime. A lease that reaches the
-  // shared lock afterwards reads the cleared registration and calls nothing.
-  {
-    auto& transform_state = *owned_runtime->resource_transform_state;
+    auto& transform_state = *runtime->resource_transform_state;
     const std::unique_lock transform_lock(transform_state.mutex);
     transform_state.callback = nullptr;
     transform_state.user_data = nullptr;
   }
-
   {
-    auto& transform_state = *owned_runtime->http_header_transform_state;
+    auto& transform_state = *runtime->http_header_transform_state;
     const std::unique_lock transform_lock(transform_state.mutex);
     transform_state.callback = nullptr;
     transform_state.user_data = nullptr;
   }
-
-  // Same wait for a resource provider callback that leased the provider before
-  // the erase above.
   {
-    auto& provider_state = *owned_runtime->resource_provider_state;
+    auto& provider_state = *runtime->resource_provider_state;
     const std::unique_lock provider_lock(provider_state.mutex);
     provider_state.registered = false;
     provider_state.provider = ResourceProvider{};
   }
-
   {
-    const std::scoped_lock state_lock(
-      owned_runtime->offline_event_state->mutex
-    );
-    owned_runtime->offline_event_state->alive = false;
-    owned_runtime->offline_event_state->runtime = nullptr;
-    const std::scoped_lock event_lock(owned_runtime->event_queue->mutex);
-    owned_runtime->event_queue->observed_offline_regions.clear();
-    std::erase_if(
-      owned_runtime->event_queue->events,
-      [](const auto& event) -> bool { return event.has_offline_region; }
-    );
+    const std::scoped_lock state_lock(runtime->offline_event_state->mutex);
+    runtime->offline_event_state->alive = false;
+    runtime->offline_event_state->runtime = nullptr;
+    const std::scoped_lock event_lock(runtime->event_queue->mutex);
+    runtime->event_queue->observed_offline_regions.clear();
+    std::erase_if(runtime->event_queue->events, [](const auto& event) -> bool {
+      return event.has_offline_region;
+    });
   }
 
   auto event_endpoint = std::shared_ptr<NotificationEndpoint>{};
   {
-    auto event_lock = std::unique_lock{owned_runtime->event_queue->mutex};
-    owned_runtime->event_queue->drain_condition.wait(
-      event_lock, [&]() noexcept -> bool {
-        return !owned_runtime->event_queue->drain_active;
-      }
+    auto event_lock = std::unique_lock{runtime->event_queue->mutex};
+    runtime->event_queue->drain_condition.wait(
+      event_lock,
+      [&]() noexcept -> bool { return !runtime->event_queue->drain_active; }
     );
-    owned_runtime->event_queue->alive = false;
-    owned_runtime->event_queue->events.clear();
-    owned_runtime->event_queue->event_maps.clear();
-    owned_runtime->event_queue->observed_offline_regions.clear();
-    event_endpoint =
-      std::move(owned_runtime->event_queue->notification_endpoint);
+    runtime->event_queue->alive = false;
+    runtime->event_queue->events.clear();
+    runtime->event_queue->event_maps.clear();
+    runtime->event_queue->observed_offline_regions.clear();
+    event_endpoint = std::move(runtime->event_queue->notification_endpoint);
   }
   event_endpoint.reset();
-  owned_runtime->event_queue->notification_source.reset();
-
-  // Retiring the wake state before the run loop is released covers a late
-  // `mln_wake_source_signal()` and the run loop teardown's final iteration.
-  {
-    const std::scoped_lock wake_lock(owned_runtime->wake_state->mutex);
-    owned_runtime->wake_state->alive = false;
-    owned_runtime->wake_state->signaled = false;
-  }
-
-  // Releasing the run loop and the database file source can join native
-  // threads, so it happens with the registry lock released.
-  owned_runtime.reset();
-  return MLN_STATUS_OK;
+  runtime->event_queue->notification_source.reset();
+  runtime->database_source.reset();
 }
 
-auto signal_wake(const std::shared_ptr<WakeState>& state) noexcept -> void {
-  if (!state) {
-    return;
-  }
-  {
-    const std::scoped_lock lock(state->mutex);
-    if (!state->alive) {
-      return;
-    }
-    state->signaled = true;
-  }
-  // MapLibre calls this while holding the `RunLoop` mutex, so the notify
-  // happens outside the wake lock to keep that path short.
-  state->condition.notify_all();
-}
+}  // namespace
 
-auto pump_runtime(mln_runtime runtime, int64_t timeout_ms) -> mln_status {
-  mln::core::RuntimeObject* live = nullptr;
-  const auto status = validate_runtime(runtime, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-
-  // Queued unread events return the call without parking, so a host that
-  // stopped polling before the queue emptied keeps making progress.
-  auto queued_events = false;
-  {
-    const std::scoped_lock event_lock(live->event_queue->mutex);
-    queued_events = !live->event_queue->events.empty();
-  }
-
-  {
-    auto& wake = *live->wake_state;
-    std::unique_lock lock(wake.mutex);
-    if (!queued_events && timeout_ms != 0 && !wake.signaled) {
-      if (timeout_ms < 0) {
-        wake.condition.wait(lock, [&wake]() -> bool { return wake.signaled; });
-      } else {
-        wake.condition.wait_for(
-          lock, std::chrono::milliseconds{timeout_ms},
-          [&wake]() -> bool { return wake.signaled; }
-        );
-      }
-    }
-    // The flag is cleared before the drain, so work arriving during the drain
-    // leaves it set for the next pump.
-    wake.signaled = false;
-  }
-
-  live->run_loop->runOnce();
-  return MLN_STATUS_OK;
-}
-
-auto acquire_wake_source(mln_runtime runtime, mln_wake_source* out_source)
+auto runtime_barrier_start(mln_runtime runtime, mln_operation* out_operation)
   -> mln_status {
-  mln::core::RuntimeObject* live = nullptr;
-  const auto status = validate_runtime(runtime, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (out_source == nullptr) {
-    set_thread_error("out_source must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (*out_source != MLN_HANDLE_NULL) {
-    set_thread_error("out_source must point to the null handle");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  *out_source = handle_table<WakeSourceObject>().insert(
-    std::make_shared<WakeSourceObject>(live->wake_state)
-  );
-  return MLN_STATUS_OK;
-}
-
-auto signal_wake_source(mln_wake_source source) -> mln_status {
-  const auto live = handle_table<WakeSourceObject>().lease(source);
+  auto live = lease_runtime(runtime);
   if (live == nullptr) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  auto state = std::shared_ptr<OperationObject>{};
+  const auto register_status = register_operation(
+    live->event_queue->notification_source, MLN_RUNTIME_OPERATION_BARRIER,
+    false, {}, out_operation, state
+  );
+  if (register_status != MLN_STATUS_OK) {
+    return register_status;
+  }
 
-  signal_wake(live->state);
+  auto sequence = uint64_t{0};
+  {
+    const std::scoped_lock commit_lock(live->submission_mutex);
+    if (!live->control.acquire()) {
+      abandon_operation(*out_operation);
+      *out_operation = MLN_HANDLE_NULL;
+      return MLN_STATUS_INVALID_STATE;
+    }
+    auto lease = ControlLease{&live->control};
+    sequence = live->next_submission_sequence++;
+    {
+      const std::scoped_lock terminal_lock(live->terminal_mutex);
+      live->pending_submissions.insert(sequence);
+    }
+    state->set_terminal_callback([live, sequence]() noexcept -> void {
+      mark_runtime_submission_terminal(live, sequence);
+    });
+    live->executor.invoke([lease = std::move(lease)]() mutable -> void {
+      static_cast<void>(lease);
+    });
+  }
+  try {
+    std::thread([live, state, sequence]() -> void {
+      wait_for_prior_runtime_submissions(live, sequence);
+      state->complete(MLN_STATUS_OK, {}, std::any{std::monostate{}});
+    }).detach();
+  } catch (...) {
+    state->complete(
+      MLN_STATUS_NATIVE_ERROR,
+      exception_message(std::current_exception(), "runtime barrier failed"),
+      std::any{std::monostate{}}
+    );
+  }
   return MLN_STATUS_OK;
 }
 
-auto destroy_wake_source(mln_wake_source source) noexcept -> void {
-  static_cast<void>(handle_table<WakeSourceObject>().remove(source));
+auto close_runtime_start(mln_runtime runtime, mln_operation* out_operation)
+  -> mln_status {
+  auto live = lease_runtime(runtime);
+  if (live == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto state = std::shared_ptr<OperationObject>{};
+  const auto register_status = register_operation(
+    live->event_queue->notification_source, MLN_RUNTIME_OPERATION_CLOSE, false,
+    {}, out_operation, state
+  );
+  if (register_status != MLN_STATUS_OK) {
+    return register_status;
+  }
+
+  auto sequence = uint64_t{0};
+  {
+    const std::scoped_lock commit_lock(live->submission_mutex);
+    const auto close_status = live->control.begin_close();
+    if (close_status != MLN_STATUS_OK) {
+      abandon_operation(*out_operation);
+      *out_operation = MLN_HANDLE_NULL;
+      return close_status;
+    }
+    sequence = live->next_submission_sequence++;
+    {
+      const std::scoped_lock terminal_lock(live->terminal_mutex);
+      live->pending_submissions.insert(sequence);
+    }
+    state->set_terminal_callback([live, sequence]() noexcept -> void {
+      mark_runtime_submission_terminal(live, sequence);
+    });
+  }
+
+  auto close_work = [runtime, live, state, sequence]() -> void {
+    auto status = MLN_STATUS_OK;
+    auto diagnostic = std::string{};
+    wait_for_prior_runtime_submissions(live, sequence);
+    live->control.wait_for_submissions();
+    static_cast<void>(handle_table<RuntimeObject>().remove(runtime));
+    unregister_platform_context(live->platform_context);
+    try {
+      live->executor.invoke_sync([live]() -> void {
+        release_runtime_reachable_state(live);
+      });
+    } catch (...) {
+      status = MLN_STATUS_NATIVE_ERROR;
+      diagnostic =
+        exception_message(std::current_exception(), "runtime close failed");
+    }
+    live->executor.stop();
+    state->complete(status, std::move(diagnostic), std::any{std::monostate{}});
+  };
+  try {
+    std::thread(close_work).detach();
+  } catch (...) {
+    close_work();
+  }
+  return MLN_STATUS_OK;
 }
 
 auto drain_runtime_events(
@@ -2638,15 +2922,16 @@ auto drain_runtime_events(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto queue = std::shared_ptr<RuntimeEventQueueState>{};
+  const auto live = lease_runtime(runtime);
+  if (live == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (!live->control.acquire()) {
+    return MLN_STATUS_INVALID_STATE;
+  }
+  auto control_lease = ControlLease{&live->control};
+  auto queue = live->event_queue;
   {
-    auto& table = handle_table<RuntimeObject>();
-    const std::scoped_lock table_lock(table.mutex());
-    auto* live = table.resolve_locked(runtime);
-    if (live == nullptr) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    queue = live->event_queue;
     const std::scoped_lock queue_lock(queue->mutex);
     if (queue->drain_active) {
       set_thread_error("runtime event queue already has an active drain");
@@ -2656,7 +2941,12 @@ auto drain_runtime_events(
   }
 
   struct DrainLease {
-    std::shared_ptr<RuntimeEventQueueState> queue;
+    explicit DrainLease(std::shared_ptr<RuntimeEventQueueState> value)
+        : queue(std::move(value)) {}
+    DrainLease(const DrainLease&) = delete;
+    DrainLease(DrainLease&&) = delete;
+    auto operator=(const DrainLease&) -> DrainLease& = delete;
+    auto operator=(DrainLease&&) -> DrainLease& = delete;
     ~DrainLease() {
       {
         const std::scoped_lock lock(queue->mutex);
@@ -2664,8 +2954,10 @@ auto drain_runtime_events(
       }
       queue->drain_condition.notify_all();
     }
+
+    std::shared_ptr<RuntimeEventQueueState> queue;
   };
-  auto lease = DrainLease{.queue = queue};
+  auto lease = DrainLease{queue};
   auto owned = std::make_shared<EventBatchObject>();
   const auto batch_handle = handle_table<EventBatchObject>().insert(owned);
   try {
@@ -2795,11 +3087,14 @@ auto release_event_batch(mln_event_batch batch) noexcept -> void {
 }
 
 auto set_runtime_event_mask(mln_runtime runtime, uint64_t mask) -> mln_status {
-  mln::core::RuntimeObject* live = nullptr;
-  const auto status = validate_runtime(runtime, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
+  const auto live = lease_runtime(runtime);
+  if (live == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
   }
+  if (!live->control.acquire()) {
+    return MLN_STATUS_INVALID_STATE;
+  }
+  auto control_lease = ControlLease{&live->control};
   if ((mask & ~static_cast<uint64_t>(MLN_RUNTIME_EVENT_MASK_ALL)) != 0U) {
     set_thread_error("mask contains unknown bits");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -2812,11 +3107,14 @@ auto set_runtime_event_mask(mln_runtime runtime, uint64_t mask) -> mln_status {
 
 auto get_runtime_event_mask(mln_runtime runtime, uint64_t* out_mask)
   -> mln_status {
-  mln::core::RuntimeObject* live = nullptr;
-  const auto status = validate_runtime(runtime, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
+  const auto live = lease_runtime(runtime);
+  if (live == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
   }
+  if (!live->control.acquire()) {
+    return MLN_STATUS_INVALID_STATE;
+  }
+  auto control_lease = ControlLease{&live->control};
   if (out_mask == nullptr) {
     set_thread_error("out_mask must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -2826,27 +3124,26 @@ auto get_runtime_event_mask(mln_runtime runtime, uint64_t* out_mask)
 }
 
 auto retain_runtime_map(mln_runtime runtime) -> mln_status {
-  mln::core::RuntimeObject* live = nullptr;
-  const auto status = validate_runtime(runtime, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
+  const auto live = lease_runtime(runtime);
+  if (live == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
   }
-
-  ++live->live_maps;
+  if (!live->control.reserve_child()) {
+    return MLN_STATUS_INVALID_STATE;
+  }
+  live->control.commit_child();
   return MLN_STATUS_OK;
 }
 
 auto release_runtime_map(mln_runtime runtime) noexcept -> void {
-  auto& table = handle_table<RuntimeObject>();
-  const std::scoped_lock lock(table.mutex());
-  auto* live = table.try_resolve_locked(runtime);
-  if (live != nullptr && live->live_maps != 0) {
-    --live->live_maps;
+  const auto live = handle_table<RuntimeObject>().try_lease(runtime);
+  if (live != nullptr) {
+    live->control.release_child();
   }
 }
 
 auto runtime_run_loop(RuntimeObject* runtime) -> mbgl::util::RunLoop& {
-  return *runtime->run_loop;
+  return *runtime->executor.run_loop();
 }
 
 auto resource_options_for_runtime(mln_runtime runtime)
@@ -2876,8 +3173,8 @@ auto acquire_resource_provider_for_platform_context(
 
   // The lease keeps this state readable, so the shared lock is taken with the
   // registry lock released. A callback that reaches the shared lock before
-  // `destroy_runtime()` holds teardown until it returns; one that arrives later
-  // finds an empty registration.
+  // committed close clears the registration holds teardown until it returns;
+  // one that arrives later finds an empty registration.
   std::shared_lock provider_lock(state->mutex);
   if (!state->registered) {
     return std::nullopt;
@@ -2979,9 +3276,9 @@ auto push_runtime_map_event_payload(
   mln_runtime runtime, mln_map map, uint32_t type, uint32_t payload_type,
   const mln_runtime_event_payload& payload, int32_t code, std::string message
 ) -> void {
-  // try_resolve, not resolve: this runs from map observer callbacks under a
-  // pump, where writing a diagnostic would clobber the pump's own.
-  auto* live = handle_table<RuntimeObject>().try_resolve(runtime);
+  // Observer callbacks may race close; the lease keeps the queue reachable
+  // through the copied event and readiness notification.
+  auto live = lease_runtime(runtime);
   if (live == nullptr) {
     return;
   }
@@ -3016,22 +3313,73 @@ auto push_runtime_map_event_payload(
     }
     live->event_queue->events.push_back(std::move(event));
   }
-  signal_wake(live->wake_state);
   live->event_queue->notification_endpoint->mark_ready();
 }
 
-auto register_runtime_map_events(mln_runtime runtime, mln_map map) -> void {
-  auto* live = handle_table<RuntimeObject>().try_resolve(runtime);
-  if (live == nullptr || map == MLN_HANDLE_NULL) {
+auto push_runtime_command_finished(
+  mln_runtime runtime, uint32_t source_type, uint64_t source,
+  uint64_t command_id, uint32_t disposition, mln_status status,
+  uint64_t generation, const char* message
+) -> void {
+  auto live = lease_runtime(runtime);
+  if (live == nullptr) {
+    return;
+  }
+  if (
+    source_type != MLN_RUNTIME_EVENT_SOURCE_MAP &&
+    !event_selected(live->event_state->mask, MLN_RUNTIME_EVENT_COMMAND_FINISHED)
+  ) {
+    return;
+  }
+
+  auto payload = zeroed_event_payload();
+  payload.command_finished = mln_runtime_event_command_finished{
+    .command_id = command_id,
+    .disposition = disposition,
+    .reserved = 0,
+    .generation = generation,
+  };
+  auto event = QueuedRuntimeEvent{
+    .type = MLN_RUNTIME_EVENT_COMMAND_FINISHED,
+    .source_type = source_type,
+    .source = source,
+    .code = static_cast<int32_t>(status),
+    .payload_type = MLN_RUNTIME_EVENT_PAYLOAD_COMMAND_FINISHED,
+    .payload = payload,
+    .message = truncated_event_message(
+      message == nullptr ? std::string{} : std::string{message}
+    )
+  };
+  {
+    const std::scoped_lock lock(live->event_queue->mutex);
+    if (source_type == MLN_RUNTIME_EVENT_SOURCE_MAP) {
+      const auto found = live->event_queue->event_maps.find(source);
+      if (
+        found == live->event_queue->event_maps.end() ||
+        !event_selected(found->second->mask, MLN_RUNTIME_EVENT_COMMAND_FINISHED)
+      ) {
+        return;
+      }
+    }
+    live->event_queue->events.push_back(std::move(event));
+  }
+  live->event_queue->notification_endpoint->mark_ready();
+}
+
+auto register_runtime_map_events(
+  mln_runtime runtime, mln_map map, std::shared_ptr<MapEventState> event_state
+) -> void {
+  auto live = lease_runtime(runtime);
+  if (live == nullptr || map == MLN_HANDLE_NULL || event_state == nullptr) {
     return;
   }
 
   const std::scoped_lock lock(live->event_queue->mutex);
-  live->event_queue->event_maps.insert(map);
+  live->event_queue->event_maps.insert_or_assign(map, std::move(event_state));
 }
 
 auto discard_runtime_map_events(mln_runtime runtime, mln_map map) -> void {
-  auto* live = handle_table<RuntimeObject>().try_resolve(runtime);
+  auto live = lease_runtime(runtime);
   if (live == nullptr || map == MLN_HANDLE_NULL) {
     return;
   }

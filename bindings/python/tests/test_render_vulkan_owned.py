@@ -56,7 +56,12 @@ class VulkanOwnedSession:
         runtime = mln.RuntimeHandle()
         try:
             map_handle = runtime.create_map(
-                mln.MapOptions(width=64, height=64, mode=mln.MapMode.STATIC)
+                mln.MapOptions(
+                    width=width,
+                    height=height,
+                    scale_factor=scale_factor,
+                    mode=mln.MapMode.STATIC,
+                )
             )
             try:
                 session = map_handle.attach_vulkan_owned_texture(
@@ -83,6 +88,7 @@ class VulkanOwnedSession:
 
     def render_once(self) -> None:
         self.map.set_style_json(EMPTY_STYLE_JSON.encode())
+        self.runtime.barrier()
         frame = wait_for_vulkan_frame(self, lambda _: True)
         frame.close()
 
@@ -96,12 +102,8 @@ def vulkan_owned_session() -> VulkanOwnedSession:
         fixture.close()
 
 
-def request_still_image_if_needed(map_handle: mln.MapHandle) -> None:
-    try:
-        map_handle.request_still_image()
-    except mln.InvalidStateError as error:
-        if "pending still-image request" not in error.diagnostic:
-            raise
+def request_still_image(map_handle: mln.MapHandle) -> mln.OperationHandle[None]:
+    return map_handle.request_still_image()
 
 
 def wait_for_texture_info(
@@ -110,19 +112,25 @@ def wait_for_texture_info(
     iterations: int = 5000,
 ) -> render.TextureImageInfo:
     fixture.map.set_style_json(EMPTY_STYLE_JSON.encode())
-    request_still_image_if_needed(fixture.map)
+    fixture.runtime.barrier()
+    operation = request_still_image(fixture.map)
     for _ in range(iterations):
-        fixture.runtime.pump()
-        for event in fixture.runtime.drain_events().events:
-            if event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE:
-                try:
-                    fixture.session.render_update()
-                except mln.InvalidStateError:
-                    pass
+        time.sleep(0.001)
+        fixture.runtime.drain_events()
         try:
-            return fixture.session.texture_image_info()
+            fixture.session.render_update()
         except mln.InvalidStateError:
-            time.sleep(0.001)
+            pass
+        try:
+            info = fixture.session.texture_image_info()
+            if operation.poll():
+                operation.raise_for_status()
+                operation.close()
+                return info
+        except mln.InvalidStateError:
+            pass
+        time.sleep(0.001)
+    operation.close()
     raise AssertionError("texture readback metadata was not observed")
 
 
@@ -132,26 +140,28 @@ def wait_for_vulkan_frame(
     *,
     iterations: int = 5000,
 ) -> render.VulkanOwnedTextureFrameHandle:
-    request_still_image_if_needed(fixture.map)
+    operation = request_still_image(fixture.map)
     last_frame: render.VulkanOwnedTextureFrame | None = None
     for _ in range(iterations):
-        fixture.runtime.pump()
-        for event in fixture.runtime.drain_events().events:
-            if event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE:
-                try:
-                    fixture.session.render_update()
-                except mln.InvalidStateError:
-                    pass
+        time.sleep(0.001)
+        fixture.runtime.drain_events()
+        try:
+            fixture.session.render_update()
+        except mln.InvalidStateError:
+            pass
         try:
             frame = fixture.session.acquire_vulkan_owned_texture_frame()
         except mln.InvalidStateError:
             time.sleep(0.001)
             continue
         last_frame = frame.frame
-        if predicate(last_frame):
+        if predicate(last_frame) and operation.poll():
+            operation.raise_for_status()
+            operation.close()
             return frame
         frame.close()
         time.sleep(0.001)
+    operation.close()
     raise AssertionError(f"matching Vulkan frame was not observed; last={last_frame!r}")
 
 
@@ -207,43 +217,51 @@ def test_resize_updates_vulkan_owned_texture_frame_extent(
 ) -> None:
     vulkan_owned_session.render_once()
 
-    vulkan_owned_session.session.resize(16, 8, 2.0)
-    # The map applies the new logical size on its next pump, and a static map
-    # renders only on request, so pump the resize through before requesting the
-    # still image. A render before that pump reports the pending size.
-    assert (
-        vulkan_owned_session.session.render_update() == render.RenderResult.SIZE_PENDING
+    vulkan_owned_session.session.resize(48, 24, 2.0)
+    # The autonomous map worker may commit before this thread renders.
+    assert vulkan_owned_session.session.render_update() in (
+        render.RenderResult.SIZE_PENDING,
+        render.RenderResult.RENDERED,
     )
-    vulkan_owned_session.runtime.pump()
+    vulkan_owned_session.runtime.barrier()
+    assert vulkan_owned_session.map.get_size() == (
+        48,
+        24,
+        pytest.approx(2.0),
+    )
+    time.sleep(0.001)
     frame = wait_for_vulkan_frame(
         vulkan_owned_session,
         lambda info: (
-            info.width == 32 and info.height == 16 and info.scale_factor == 2.0
+            info.width == 96 and info.height == 48 and info.scale_factor == 2.0
         ),
     )
     try:
         info = frame.frame
-        assert info.width == 32
-        assert info.height == 16
+        assert info.width == 96
+        assert info.height == 48
         assert info.scale_factor == pytest.approx(2.0)
         assert info.generation >= 2
     finally:
         frame.close()
 
 
-def test_map_size_follows_attach_and_resize_and_keeps_the_creation_scale_factor(
+def test_map_size_starts_at_creation_extent_and_follows_session_resize(
     vulkan_owned_session: VulkanOwnedSession,
 ) -> None:
-    # A session enqueues the map size for the map's owner thread rather than
-    # setting it in place, so the map keeps its previous size until pumped.
-    assert vulkan_owned_session.map.get_size() == (64, 64, pytest.approx(1.0))
-    vulkan_owned_session.runtime.pump()
-    assert vulkan_owned_session.map.get_size() == (32, 16, pytest.approx(1.0))
+    assert vulkan_owned_session.map.get_size() == (
+        32,
+        16,
+        pytest.approx(1.0),
+    )
 
-    # Resizing at a different scale factor leaves the map's own pixel ratio.
     vulkan_owned_session.session.resize(48, 24, 2.0)
-    vulkan_owned_session.runtime.pump()
-    assert vulkan_owned_session.map.get_size() == (48, 24, pytest.approx(1.0))
+    vulkan_owned_session.runtime.barrier()
+    assert vulkan_owned_session.map.get_size() == (
+        48,
+        24,
+        pytest.approx(2.0),
+    )
 
 
 def test_a_worker_thread_attaches_its_own_session_and_renders() -> None:
@@ -271,9 +289,8 @@ def test_a_worker_thread_attaches_its_own_session_and_renders() -> None:
                 context.owned_texture_descriptor(32, 16, 1.0)
             )
             try:
-                # The map applies its logical size on its own thread, so the
-                # first renders report a pending size until the main thread
-                # pumps.
+                # Initial rendering can briefly report no update while the
+                # autonomous map worker loads the style.
                 deadline = time.monotonic() + 5.0
                 while time.monotonic() < deadline:
                     if session.render_update() == render.RenderResult.RENDERED:
@@ -288,7 +305,7 @@ def test_a_worker_thread_attaches_its_own_session_and_renders() -> None:
             failure.append(error)
 
     try:
-        map_handle = runtime.create_map(mln.MapOptions(width=64, height=64))
+        map_handle = runtime.create_map(mln.MapOptions(width=32, height=16))
         try:
             map_handle.set_style_json(EMPTY_STYLE_JSON.encode())
             worker = threading.Thread(target=attach_render_close, args=(map_handle,))
@@ -296,7 +313,7 @@ def test_a_worker_thread_attaches_its_own_session_and_renders() -> None:
             while worker.is_alive():
                 # A short park rather than zero: this waits on the worker, so
                 # spinning would burn the deadline before it made progress.
-                runtime.pump(0.002)
+                time.sleep(0.001)
                 runtime.drain_events()
             worker.join()
             assert not failure, failure

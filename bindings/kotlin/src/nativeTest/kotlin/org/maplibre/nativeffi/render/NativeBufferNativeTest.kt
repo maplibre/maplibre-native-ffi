@@ -9,23 +9,25 @@ import org.maplibre.nativeffi.error.InvalidArgumentException
 @OptIn(ExperimentalForeignApi::class)
 class NativeBufferNativeTest {
   @Test
-  fun capacityValidationUsesTheNativeAllocationLength() {
-    NativeBuffer.allocate(4L).use { buffer ->
-      buffer.ensureCapacity(4UL)
-      assertFailsWith<InvalidArgumentException> { buffer.ensureCapacity(5UL) }
+  fun capacityValidationUsesTheNativeAllocationLength(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      NativeBuffer.allocate(4L).use { buffer ->
+        buffer.ensureCapacity(4UL)
+        assertFailsWith<InvalidArgumentException> { buffer.ensureCapacity(5UL) }
+      }
     }
-  }
 
   @Test
-  fun closeDuringPointerBorrowDefersReleaseUntilBorrowReturns() {
-    val buffer = NativeBuffer.allocate(4L)
+  fun closeDuringPointerBorrowDefersReleaseUntilBorrowReturns(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val buffer = NativeBuffer.allocate(4L)
 
-    buffer.borrow { _, length ->
-      assertEquals(4L, length)
-      buffer.close()
-      assertFailsWith<IllegalStateException> { buffer.byteLength() }
+      buffer.borrow { _, length ->
+        assertEquals(4L, length)
+        buffer.close()
+        assertFailsWith<IllegalStateException> { buffer.byteLength() }
+      }
+
+      assertFailsWith<IllegalStateException> { buffer.toByteArray() }
     }
-
-    assertFailsWith<IllegalStateException> { buffer.toByteArray() }
-  }
 }

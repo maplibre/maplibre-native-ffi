@@ -1,177 +1,121 @@
 #include "map_state.h"
 
 #include "diagnostics.h"
-#include "util.h"
 
-static double clamp(double value, double min, double max) {
-  if (value < min) {
-    return min;
+static app_error await_operation(
+  mln_operation operation, app_error error, const char* message
+) {
+  bool completed = false;
+  mln_status status = mln_operation_wait(operation, -1, &completed);
+  if (status == MLN_STATUS_OK && completed) {
+    status = mln_operation_get_status(operation, &status) == MLN_STATUS_OK
+               ? status
+               : MLN_STATUS_NATIVE_ERROR;
   }
-  if (value > max) {
-    return max;
-  }
-  return value;
-}
-
-static app_error expect_camera_status(mln_status status, const char* message) {
-  if (status != MLN_STATUS_OK) {
+  if (status != MLN_STATUS_OK || !completed) {
     diagnostics_log_status(message, status);
-    return APP_ERROR_CAMERA_COMMAND_FAILED;
+    return error;
   }
   return APP_OK;
 }
 
-static app_error current_camera(mln_map map, mln_camera_options* out_camera) {
-  *out_camera = mln_camera_options_default();
-  const mln_status status = mln_map_get_camera(map, out_camera);
+static app_error create_runtime(
+  map_state* state, mln_notification_callback callback, void* user_data
+) {
+  mln_status status =
+    mln_notification_source_create(&state->notification_source);
   if (status != MLN_STATUS_OK) {
-    diagnostics_log_status("camera snapshot failed", status);
-    return APP_ERROR_CAMERA_COMMAND_FAILED;
+    diagnostics_log_status("notification source create failed", status);
+    return APP_ERROR_RUNTIME_CREATE_FAILED;
+  }
+  status = mln_notification_source_set_callback(
+    state->notification_source, callback, user_data
+  );
+  if (status != MLN_STATUS_OK) {
+    diagnostics_log_status("notification callback install failed", status);
+    mln_notification_source_close(state->notification_source);
+    state->notification_source = MLN_HANDLE_NULL;
+    return APP_ERROR_RUNTIME_CREATE_FAILED;
+  }
+
+  mln_runtime_options options = mln_runtime_options_default();
+  options.notification_source = state->notification_source;
+  options.cache_path = ":memory:";
+  mln_operation operation = MLN_HANDLE_NULL;
+  status = mln_runtime_create_start(&options, &operation);
+  if (status != MLN_STATUS_OK) {
+    diagnostics_log_status("runtime create start failed", status);
+    return APP_ERROR_RUNTIME_CREATE_FAILED;
+  }
+  const app_error waited = await_operation(
+    operation, APP_ERROR_RUNTIME_CREATE_FAILED, "runtime create failed"
+  );
+  if (waited == APP_OK) {
+    status = mln_runtime_create_take_result(operation, &state->runtime);
+  }
+  mln_operation_release(operation);
+  if (waited != APP_OK || status != MLN_STATUS_OK) {
+    if (status != MLN_STATUS_OK) {
+      diagnostics_log_status("runtime create result failed", status);
+    }
+    return APP_ERROR_RUNTIME_CREATE_FAILED;
   }
   return APP_OK;
 }
 
-static mln_animation_options animation(double duration_ms) {
-  mln_animation_options options = mln_animation_options_default();
-  options.fields = MLN_ANIMATION_OPTION_DURATION;
-  options.duration_ms = duration_ms;
-  return options;
-}
+static app_error create_map(map_state* state, viewport initial_viewport) {
+  mln_map_options options = mln_map_options_default();
+  options.initial_extent = (mln_logical_extent){
+    .width = initial_viewport.logical_width,
+    .height = initial_viewport.logical_height,
+    .scale_factor = initial_viewport.scale_factor,
+  };
+  options.map_mode = MLN_MAP_MODE_CONTINUOUS;
 
-/// Applies one decoded camera command. Runs on the map's owner thread, so the
-/// read-modify-write commands read the current camera here.
-static app_error apply_camera_command(mln_map map, camera_command command) {
-  switch (command.kind) {
-    case CAMERA_COMMAND_CANCEL_TRANSITIONS:
-      return expect_camera_status(
-        mln_map_cancel_transitions(map), "cancel camera transitions failed"
-      );
-    case CAMERA_COMMAND_SET_GESTURE_IN_PROGRESS:
-      return expect_camera_status(
-        mln_map_set_gesture_in_progress(
-          map, command.as.set_gesture_in_progress.in_progress
-        ),
-        "set gesture in progress failed"
-      );
-    case CAMERA_COMMAND_MOVE_BY:
-      return expect_camera_status(
-        mln_map_move_by(map, command.as.move_by.dx, command.as.move_by.dy),
-        "camera pan failed"
-      );
-    case CAMERA_COMMAND_MOVE_BY_ANIMATED: {
-      const mln_animation_options options =
-        animation(command.as.move_by_animated.duration_ms);
-      return expect_camera_status(
-        mln_map_move_by_animated(
-          map, command.as.move_by_animated.dx, command.as.move_by_animated.dy,
-          &options
-        ),
-        "keyboard pan failed"
-      );
-    }
-    case CAMERA_COMMAND_SCALE_BY:
-      return expect_camera_status(
-        mln_map_scale_by(
-          map, command.as.scale_by.scale, &command.as.scale_by.anchor
-        ),
-        "camera zoom failed"
-      );
-    case CAMERA_COMMAND_SCALE_BY_ANIMATED: {
-      const mln_animation_options options =
-        animation(command.as.scale_by_animated.duration_ms);
-      return expect_camera_status(
-        mln_map_scale_by_animated(
-          map, command.as.scale_by_animated.scale,
-          &command.as.scale_by_animated.anchor, &options
-        ),
-        "keyboard zoom failed"
-      );
-    }
-    case CAMERA_COMMAND_PITCH_BY:
-      return expect_camera_status(
-        mln_map_pitch_by(map, command.as.delta.delta), "camera pitch failed"
-      );
-    case CAMERA_COMMAND_ADJUST_BEARING: {
-      mln_camera_options camera;
-      MAP_TRY(current_camera(map, &camera));
-      const double bearing =
-        (camera.fields & MLN_CAMERA_OPTION_BEARING) != 0 ? camera.bearing : 0;
-      mln_camera_options target = mln_camera_options_default();
-      target.fields = MLN_CAMERA_OPTION_BEARING;
-      target.bearing = bearing + command.as.delta.delta;
-      return expect_camera_status(
-        mln_map_jump_to(map, &target), "camera rotate failed"
-      );
-    }
-    case CAMERA_COMMAND_ADJUST_BEARING_ANIMATED: {
-      mln_camera_options camera;
-      MAP_TRY(current_camera(map, &camera));
-      const double bearing =
-        (camera.fields & MLN_CAMERA_OPTION_BEARING) != 0 ? camera.bearing : 0;
-      mln_camera_options target = mln_camera_options_default();
-      target.fields = MLN_CAMERA_OPTION_BEARING;
-      target.bearing = bearing + command.as.animated_delta.delta;
-      const mln_animation_options options =
-        animation(command.as.animated_delta.duration_ms);
-      return expect_camera_status(
-        mln_map_ease_to(map, &target, &options), "keyboard rotate failed"
-      );
-    }
-    case CAMERA_COMMAND_ADJUST_PITCH_ANIMATED: {
-      mln_camera_options camera;
-      MAP_TRY(current_camera(map, &camera));
-      const double pitch =
-        (camera.fields & MLN_CAMERA_OPTION_PITCH) != 0 ? camera.pitch : 0;
-      mln_camera_options target = mln_camera_options_default();
-      target.fields = MLN_CAMERA_OPTION_PITCH;
-      target.pitch = clamp(pitch + command.as.animated_delta.delta, 0.0, 60.0);
-      const mln_animation_options options =
-        animation(command.as.animated_delta.duration_ms);
-      return expect_camera_status(
-        mln_map_ease_to(map, &target, &options), "keyboard pitch failed"
-      );
-    }
-    case CAMERA_COMMAND_RESET_ORIENTATION: {
-      mln_camera_options target = mln_camera_options_default();
-      target.fields = MLN_CAMERA_OPTION_BEARING | MLN_CAMERA_OPTION_PITCH;
-      target.bearing = 0;
-      target.pitch = 0;
-      const mln_animation_options options =
-        animation(command.as.reset_orientation.duration_ms);
-      return expect_camera_status(
-        mln_map_ease_to(map, &target, &options), "camera reset failed"
-      );
-    }
+  mln_operation operation = MLN_HANDLE_NULL;
+  mln_status status =
+    mln_map_create_start(state->runtime, &options, &operation);
+  if (status != MLN_STATUS_OK) {
+    diagnostics_log_status("map create start failed", status);
+    return APP_ERROR_MAP_CREATE_FAILED;
   }
-  return APP_ERROR_CAMERA_COMMAND_FAILED;
+  const app_error waited = await_operation(
+    operation, APP_ERROR_MAP_CREATE_FAILED, "map create failed"
+  );
+  if (waited == APP_OK) {
+    status = mln_map_create_take_result(operation, &state->map);
+  }
+  mln_operation_release(operation);
+  if (waited != APP_OK || status != MLN_STATUS_OK) {
+    if (status != MLN_STATUS_OK) {
+      diagnostics_log_status("map create result failed", status);
+    }
+    return APP_ERROR_MAP_CREATE_FAILED;
+  }
+  return APP_OK;
 }
 
-/// Selects the two event types the runtime loop reads. The map queues no other
-/// type once this returns, and it runs before the style load, because a map
-/// keeps the events it has already queued.
-static app_error select_events(mln_map map) {
-  const mln_status status = mln_map_set_event_mask(
-    map, MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE |
-           MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED
+static app_error configure_map(map_state* state) {
+  uint64_t command_id = 0;
+  mln_status status = mln_map_set_event_mask(
+    state->map,
+    MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE |
+      MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED,
+    &command_id
   );
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status("event mask select failed", status);
     return APP_ERROR_EVENT_MASK_FAILED;
   }
-  return APP_OK;
-}
 
-static app_error load_style(mln_map map) {
-  const mln_status status =
-    mln_map_set_style_url(map, "https://tiles.openfreemap.org/styles/bright");
+  status = mln_map_set_style_url(
+    state->map, "https://tiles.openfreemap.org/styles/bright", &command_id
+  );
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status("style load failed", status);
     return APP_ERROR_STYLE_LOAD_FAILED;
   }
-  return APP_OK;
-}
 
-static app_error set_camera(mln_map map) {
   mln_camera_options camera = mln_camera_options_default();
   camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM |
                   MLN_CAMERA_OPTION_BEARING | MLN_CAMERA_OPTION_PITCH;
@@ -180,112 +124,152 @@ static app_error set_camera(mln_map map) {
   camera.zoom = 13.0;
   camera.bearing = 12.0;
   camera.pitch = 30.0;
-  const mln_status status = mln_map_jump_to(map, &camera);
-  if (status != MLN_STATUS_OK) {
-    diagnostics_log_status("camera jump failed", status);
-    return APP_ERROR_CAMERA_JUMP_FAILED;
-  }
-  return APP_OK;
+  return map_state_update_camera(
+    state, &camera, MLN_CAMERA_UPDATE_MODE_JUMP, NULL, MLN_GESTURE_PHASE_NONE, 0
+  );
 }
 
-app_error map_state_init(map_state* out_state, viewport initial_viewport) {
-  *out_state = (map_state){
-    .runtime = MLN_HANDLE_NULL,
-    .notification_source = MLN_HANDLE_NULL,
-    .map = MLN_HANDLE_NULL,
-  };
-
-  mln_runtime_options runtime_options = mln_runtime_options_default();
-  mln_status status =
-    mln_notification_source_create(&out_state->notification_source);
-  if (status != MLN_STATUS_OK) {
-    diagnostics_log_status("notification source create failed", status);
-    return APP_ERROR_RUNTIME_CREATE_FAILED;
-  }
-  runtime_options.notification_source = out_state->notification_source;
-  runtime_options.cache_path = ":memory:";
-  status = mln_runtime_create(&runtime_options, &out_state->runtime);
-  if (status != MLN_STATUS_OK) {
-    diagnostics_log_status("runtime create failed", status);
-    mln_notification_source_close(out_state->notification_source);
-    out_state->notification_source = MLN_HANDLE_NULL;
-    return APP_ERROR_RUNTIME_CREATE_FAILED;
-  }
-
-  mln_map_options map_options = mln_map_options_default();
-  map_options.width = initial_viewport.logical_width;
-  map_options.height = initial_viewport.logical_height;
-  map_options.scale_factor = initial_viewport.scale_factor;
-  map_options.map_mode = MLN_MAP_MODE_CONTINUOUS;
-  status = mln_map_create(out_state->runtime, &map_options, &out_state->map);
-  if (status != MLN_STATUS_OK) {
-    diagnostics_log_status("map create failed", status);
-    map_state_deinit(out_state);
-    return APP_ERROR_MAP_CREATE_FAILED;
-  }
-
-  app_error error = select_events(out_state->map);
+app_error map_state_init(
+  map_state* out_state, viewport initial_viewport,
+  mln_notification_callback notification_callback, void* notification_user_data
+) {
+  *out_state = (map_state){};
+  app_error error =
+    create_runtime(out_state, notification_callback, notification_user_data);
   if (error == APP_OK) {
-    error = load_style(out_state->map);
+    error = create_map(out_state, initial_viewport);
   }
   if (error == APP_OK) {
-    error = set_camera(out_state->map);
+    error = configure_map(out_state);
   }
   if (error != APP_OK) {
     map_state_deinit(out_state);
-    return error;
   }
-  return APP_OK;
+  return error;
+}
+
+static void close_handle(
+  mln_status (*start)(uint64_t, mln_operation*), uint64_t handle,
+  const char* message
+) {
+  mln_operation operation = MLN_HANDLE_NULL;
+  const mln_status status = start(handle, &operation);
+  if (status != MLN_STATUS_OK) {
+    diagnostics_log_status(message, status);
+    return;
+  }
+  (void)await_operation(operation, APP_ERROR_MAP_CREATE_FAILED, message);
+  mln_operation_release(operation);
 }
 
 void map_state_deinit(map_state* state) {
-  // Children first: a runtime cannot be destroyed while its maps are live.
   if (state->map != MLN_HANDLE_NULL) {
-    mln_map_destroy(state->map);
+    close_handle(mln_map_close_start, state->map, "map close failed");
     state->map = MLN_HANDLE_NULL;
   }
   if (state->runtime != MLN_HANDLE_NULL) {
-    mln_runtime_destroy(state->runtime);
+    close_handle(
+      mln_runtime_close_start, state->runtime, "runtime close failed"
+    );
     state->runtime = MLN_HANDLE_NULL;
   }
   if (state->notification_source != MLN_HANDLE_NULL) {
-    mln_notification_source_close(state->notification_source);
+    mln_notification_source_clear_callback(state->notification_source);
+    const mln_status status =
+      mln_notification_source_close(state->notification_source);
+    if (status != MLN_STATUS_OK) {
+      diagnostics_log_status("notification source close failed", status);
+    }
     state->notification_source = MLN_HANDLE_NULL;
   }
 }
 
-app_error map_state_apply_commands(
-  map_state* state, command_queue* commands, command_list* batch
+app_error map_state_camera_query(
+  map_state* state, mln_camera_options* out_camera
 ) {
-  command_queue_drain_into(commands, batch);
-  for (size_t i = 0; i < batch->len; i += 1) {
-    const app_error error = apply_camera_command(state->map, batch->items[i]);
-    if (error != APP_OK) {
-      return error;
+  mln_operation operation = MLN_HANDLE_NULL;
+  mln_status status = mln_map_camera_query_start(state->map, &operation);
+  if (status != MLN_STATUS_OK) {
+    diagnostics_log_status("camera query start failed", status);
+    return APP_ERROR_CAMERA_COMMAND_FAILED;
+  }
+  const app_error waited = await_operation(
+    operation, APP_ERROR_CAMERA_COMMAND_FAILED, "camera query failed"
+  );
+  mln_camera_query_result result = {
+    .size = sizeof(mln_camera_query_result),
+  };
+  if (waited == APP_OK) {
+    status = mln_map_camera_query_take_result(operation, &result);
+    *out_camera = result.camera;
+  }
+  mln_operation_release(operation);
+  if (waited != APP_OK || status != MLN_STATUS_OK) {
+    if (status != MLN_STATUS_OK) {
+      diagnostics_log_status("camera query result failed", status);
     }
+    return APP_ERROR_CAMERA_COMMAND_FAILED;
   }
   return APP_OK;
 }
 
-app_error map_state_drain_events(map_state* state, bool* out_render_update) {
-  *out_render_update = false;
+app_error map_state_update_camera(
+  map_state* state, const mln_camera_options* camera, uint32_t mode,
+  const mln_animation_options* animation, uint32_t gesture_phase,
+  uint64_t gesture_id
+) {
+  mln_camera_update update = mln_camera_update_default();
+  update.mode = mode;
+  update.camera = *camera;
+  if (animation != NULL) {
+    update.animation = *animation;
+  }
+  update.gesture_phase = gesture_phase;
+  update.gesture_id = gesture_id;
+  uint64_t command_id = 0;
+  const mln_status status =
+    mln_map_update_camera(state->map, &update, &command_id);
+  if (status != MLN_STATUS_OK) {
+    diagnostics_log_status("camera command failed", status);
+    return APP_ERROR_CAMERA_COMMAND_FAILED;
+  }
+  return APP_OK;
+}
+
+app_error map_state_resize(map_state* state, viewport value) {
+  const mln_logical_extent extent = {
+    .width = value.logical_width,
+    .height = value.logical_height,
+    .scale_factor = value.scale_factor,
+  };
+  uint64_t command_id = 0;
+  const mln_status status = mln_map_resize(state->map, extent, &command_id);
+  if (status != MLN_STATUS_OK) {
+    diagnostics_log_status("map resize failed", status);
+    return APP_ERROR_MAP_RESIZE_FAILED;
+  }
+  return APP_OK;
+}
+
+static app_error drain_runtime_events(
+  map_state* state, bool* out_render_update
+) {
   mln_event_batch batch = MLN_HANDLE_NULL;
-  const mln_status status = mln_runtime_drain_events(state->runtime, 0, &batch);
+  mln_status status = mln_runtime_drain_events(state->runtime, 0, &batch);
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status("event drain failed", status);
     return APP_ERROR_EVENT_DRAIN_FAILED;
   }
   mln_runtime_event_batch_view view = {
-    .size = sizeof(mln_runtime_event_batch_view)
+    .size = sizeof(mln_runtime_event_batch_view),
   };
-  const mln_status view_status = mln_event_batch_get(batch, &view);
-  if (view_status != MLN_STATUS_OK) {
+  status = mln_event_batch_get(batch, &view);
+  if (status != MLN_STATUS_OK) {
     mln_event_batch_release(batch);
-    diagnostics_log_status("event batch read failed", view_status);
+    diagnostics_log_status("event batch read failed", status);
     return APP_ERROR_EVENT_DRAIN_FAILED;
   }
   for (size_t index = 0; index < view.event_count; index += 1) {
-    // Step by the batch's stride: a newer runtime reports a wider event.
     const char* bytes = (const char*)view.events + index * view.event_size;
     const mln_runtime_event* event = (const mln_runtime_event*)bytes;
     if (
@@ -294,19 +278,51 @@ app_error map_state_drain_events(map_state* state, bool* out_render_update) {
     ) {
       continue;
     }
-    switch (event->type) {
-      case MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE:
-        *out_render_update = true;
-        break;
-      case MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED:
-        if (event->payload.render_frame.needs_repaint) {
-          *out_render_update = true;
-        }
-        break;
-      default:
-        break;
+    if (
+      event->type == MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE ||
+      (event->type == MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED &&
+       event->payload.render_frame.needs_repaint)
+    ) {
+      *out_render_update = true;
     }
   }
   mln_event_batch_release(batch);
   return APP_OK;
+}
+
+app_error map_state_drain_notifications(
+  map_state* state, bool* out_render_update
+) {
+  *out_render_update = false;
+  mln_ready_batch batch = MLN_HANDLE_NULL;
+  mln_status status =
+    mln_notification_source_drain_ready(state->notification_source, &batch);
+  if (status != MLN_STATUS_OK) {
+    diagnostics_log_status("notification drain failed", status);
+    return APP_ERROR_EVENT_DRAIN_FAILED;
+  }
+  mln_ready_batch_view view = {.size = sizeof(mln_ready_batch_view)};
+  status = mln_ready_batch_get(batch, &view);
+  if (status != MLN_STATUS_OK) {
+    mln_ready_batch_release(batch);
+    diagnostics_log_status("notification batch read failed", status);
+    return APP_ERROR_EVENT_DRAIN_FAILED;
+  }
+  app_error error = APP_OK;
+  for (size_t index = 0; index < view.endpoint_count; index += 1) {
+    const char* bytes =
+      (const char*)view.endpoints + index * view.endpoint_size;
+    const mln_ready_endpoint* endpoint = (const mln_ready_endpoint*)bytes;
+    if (
+      endpoint->kind == MLN_NOTIFICATION_ENDPOINT_RUNTIME_EVENTS &&
+      endpoint->id == state->runtime
+    ) {
+      error = drain_runtime_events(state, out_render_update);
+      if (error != APP_OK) {
+        break;
+      }
+    }
+  }
+  mln_ready_batch_release(batch);
+  return error;
 }

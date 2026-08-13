@@ -8,6 +8,20 @@ using Maplibre.NativeFfi.Runtime;
 
 namespace Maplibre.NativeFfi.Tests;
 
+internal static class TestHandles
+{
+    internal static RuntimeHandle CreateRuntime(RuntimeOptions options) =>
+        RuntimeHandle.CreateAsync(options).GetAwaiter().GetResult();
+
+    internal static MapHandle CreateMap(RuntimeHandle runtime, MapOptions options) =>
+        MapHandle.CreateAsync(runtime, options).GetAwaiter().GetResult();
+
+    internal static void Close(RuntimeHandle runtime) =>
+        runtime.CloseAsync().GetAwaiter().GetResult();
+
+    internal static void Close(MapHandle map) => map.CloseAsync().GetAwaiter().GetResult();
+}
+
 internal static unsafe class RuntimeEventTestHelpers
 {
     /// <summary>The event stride this binding compiled against.</summary>
@@ -21,7 +35,7 @@ internal static unsafe class RuntimeEventTestHelpers
     {
         for (var attempt = 0; attempt < 1000; attempt++)
         {
-            runtime.Pump(TimeSpan.Zero);
+            Thread.Sleep(1);
             foreach (var runtimeEvent in runtime.DrainEvents().Events)
             {
                 if (
@@ -40,13 +54,32 @@ internal static unsafe class RuntimeEventTestHelpers
         throw new TimeoutException($"Timed out waiting for map event {eventType}.");
     }
 
-    /// <summary>Pumps and drains until one batch reports no events.</summary>
+    internal static RuntimeEvent WaitForCommand(RuntimeHandle runtime, ulong commandId)
+    {
+        for (var attempt = 0; attempt < 5000; attempt++)
+        {
+            foreach (var runtimeEvent in runtime.DrainEvents().Events)
+            {
+                if (
+                    runtimeEvent.Payload is RuntimeEventPayload.CommandFinished command
+                    && command.CommandId == commandId
+                )
+                {
+                    return runtimeEvent;
+                }
+            }
+            Thread.Sleep(1);
+        }
+        throw new TimeoutException($"Timed out waiting for command {commandId}.");
+    }
+
+    /// <summary>Drains until one batch reports no events.</summary>
     internal static List<RuntimeEvent> DrainUntilIdle(RuntimeHandle runtime)
     {
         var events = new List<RuntimeEvent>();
         for (var attempt = 0; attempt < 100; attempt++)
         {
-            runtime.Pump(TimeSpan.Zero);
+            Thread.Sleep(1);
             var batch = runtime.DrainEvents();
             if (batch.Events.Count == 0)
             {

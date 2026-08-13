@@ -26,10 +26,13 @@ public sealed class StyleImageTests
 
     [BindingSpecTest("BND-105")]
     [Fact]
-    public void ImageSourceApisAdaptCoordinatesAndImagesThroughNativeMap()
+    public async Task ImageSourceApisAdaptCoordinatesAndImagesThroughNativeMap()
     {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
         map.SetStyleJson("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
         var coordinates = new[]
         {
@@ -53,26 +56,29 @@ public sealed class StyleImageTests
         map.AddImageSourceImage("image-inline", coordinates, image);
         map.SetImageSourceImage("image-inline", image);
 
-        Assert.Equal(SourceType.Image, map.StyleSourceType("image-url"));
-        Assert.Equal(SourceType.Image, map.StyleSourceType("image-inline"));
-        Assert.Equal(updatedCoordinates, map.GetImageSourceCoordinates("image-url"));
-        Assert.Equal(coordinates, map.GetImageSourceCoordinates("image-inline"));
+        Assert.Equal(SourceType.Image, await map.StyleSourceTypeAsync("image-url"));
+        Assert.Equal(SourceType.Image, await map.StyleSourceTypeAsync("image-inline"));
+        Assert.Equal(updatedCoordinates, await map.GetImageSourceCoordinatesAsync("image-url"));
+        Assert.Equal(coordinates, await map.GetImageSourceCoordinatesAsync("image-inline"));
     }
 
     [BindingSpecTest("BND-105")]
     [Fact]
-    public void StyleImageRoundTripsMetadataAndPixelsThroughNativeMap()
+    public async Task StyleImageRoundTripsMetadataAndPixelsThroughNativeMap()
     {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
         map.SetStyleJson("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
         var image = new PremultipliedRgba8Image([255, 0, 0, 255], new TextureImageInfo(1, 1, 4, 4));
         var options = new StyleImageOptions { PixelRatio = 2, Sdf = true };
 
-        map.SetStyleImage("dot", image, options);
+        Assert.NotEqual(0ul, map.SetStyleImage("dot", image, options));
 
-        Assert.True(map.StyleImageExists("dot"));
-        var info = map.StyleImageInfo("dot");
+        Assert.True(await map.StyleImageExistsAsync("dot"));
+        var info = await map.StyleImageInfoAsync("dot");
         Assert.NotNull(info);
         Assert.Equal(1u, info.Width);
         Assert.Equal(1u, info.Height);
@@ -81,25 +87,25 @@ public sealed class StyleImageTests
         Assert.Equal(2, info.PixelRatio);
         Assert.True(info.Sdf);
 
-        var copied = map.CopyStyleImagePremultipliedRgba8("dot");
+        var copied = await map.CopyStyleImagePremultipliedRgba8Async("dot");
         Assert.NotNull(copied);
         Assert.Equal([255, 0, 0, 255], copied.Image.Bytes);
         Assert.Equal(new TextureImageInfo(1, 1, 4, 4), copied.Image.Info);
         Assert.Equal(2, copied.Options.PixelRatio);
         Assert.True(copied.Options.Sdf);
 
-        Assert.True(map.RemoveStyleImage("dot"));
-        Assert.False(map.StyleImageExists("dot"));
-        Assert.Null(map.StyleImageInfo("dot"));
-        Assert.Null(map.CopyStyleImagePremultipliedRgba8("dot"));
+        Assert.True(await map.RemoveStyleImageAsync("dot"));
+        Assert.False(await map.StyleImageExistsAsync("dot"));
+        Assert.Null(await map.StyleImageInfoAsync("dot"));
+        Assert.Null(await map.CopyStyleImagePremultipliedRgba8Async("dot"));
     }
 
     [BindingSpecTest("BND-105")]
     [Fact]
-    public void NinePatchStyleImageRoundTripsStretchContentAndTextFit()
+    public async Task NinePatchStyleImageRoundTripsStretchContentAndTextFit()
     {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 64, Height = 64 });
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(runtime, new MapOptions { Width = 64, Height = 64 });
         map.SetStyleJson("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
 
         var image = new PremultipliedRgba8Image(new byte[16], new TextureImageInfo(2, 2, 8, 16));
@@ -110,9 +116,9 @@ public sealed class StyleImageTests
             Content = new ImageContent(0.5f, 0.5f, 1.5f, 1.5f),
             TextFitHeight = StyleImageTextFit.Proportional,
         };
-        map.SetStyleImage("patch", image, options);
+        Assert.NotEqual(0ul, map.SetStyleImage("patch", image, options));
 
-        var info = map.StyleImageInfo("patch");
+        var info = await map.StyleImageInfoAsync("patch");
         Assert.NotNull(info);
         Assert.Equal(1UL, info.StretchXCount);
         Assert.Equal(2UL, info.StretchYCount);
@@ -121,13 +127,13 @@ public sealed class StyleImageTests
         Assert.Null(info.TextFitWidth);
         Assert.Equal(StyleImageTextFit.Proportional, info.TextFitHeight);
 
-        var stretches = map.StyleImageStretches("patch");
+        var stretches = await map.StyleImageStretchesAsync("patch");
         Assert.NotNull(stretches);
         Assert.Equal([new ImageStretch(0, 1)], stretches.Value.StretchX);
         Assert.Equal([new ImageStretch(0, 1), new ImageStretch(1, 2)], stretches.Value.StretchY);
-        Assert.Null(map.StyleImageStretches("missing"));
+        Assert.Null(await map.StyleImageStretchesAsync("missing"));
 
-        var copied = map.CopyStyleImagePremultipliedRgba8("patch");
+        var copied = await map.CopyStyleImagePremultipliedRgba8Async("patch");
         Assert.NotNull(copied);
         Assert.Equal([new ImageStretch(0, 1)], copied.Options.StretchX);
         Assert.Equal([new ImageStretch(0, 1), new ImageStretch(1, 2)], copied.Options.StretchY);

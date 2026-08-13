@@ -16,7 +16,7 @@ drains that queue from any thread.
 
 A host decides which event types it reads. A map and a runtime each carry a
 subscription, and an event of an unselected type is never built, never queued,
-and never wakes a parked pump.
+and never makes the notification source readable.
 
 ## Select the event types you read
 
@@ -34,7 +34,7 @@ keeps that default.
 
 One drain creates an owned batch that contains every queued event in queue order,
 together with the message text that those events carry. The batch remains
-readable across later drains and runtime destruction.
+readable across later drains and runtime close.
 
 <Code code={region(handleEvents, "drain")} lang="c" title="handle-events.c" />
 
@@ -80,9 +80,12 @@ render-frame-finished event carries a repaint flag. Draw another frame when the
 flag is set. Additional frames advance camera animations and label placement.
 
 A loading-failed event carries the failure text for a style or resource request.
+A command-finished event carries the command ID, terminal disposition, final
+status, committed generation when present, and copied diagnostic.
 
-Calls report synchronous failures through the binding's error idiom. Events
-report failures from work that completes later.
+Immediate calls report validation and inspection failures through the binding's
+error idiom. Commands report acceptance synchronously and application failures
+through terminal events. Operations store their own final status and diagnostic.
 
-Destroying a map discards that map's queued events immediately. Read any mirrored
-state that teardown needs while the map is live.
+Closing a map discards that map's queued events. Read teardown state from an
+owned batch or published snapshot.

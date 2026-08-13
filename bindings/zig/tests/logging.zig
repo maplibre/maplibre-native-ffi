@@ -36,7 +36,10 @@ test "log callback receives and consumes native logs" {
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
 
-    try testing.expectError(error.NativeError, map.setStyleJson(testing.allocator, "{"));
+    _ = try map.setStyleJson(testing.allocator, "{");
+    const barrier = try runtime.barrierStart();
+    defer barrier.release();
+    try testing.expect(try barrier.wait(-1));
     try testing.expect(state.count > 0);
     try testing.expect(state.saw_parse_style);
     try testing.expect(state.saw_message);
@@ -63,7 +66,10 @@ test "log callback can be cleared" {
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
 
-    try testing.expectError(error.NativeError, map.setStyleJson(testing.allocator, "{"));
+    _ = try map.setStyleJson(testing.allocator, "{");
+    const barrier = try runtime.barrierStart();
+    defer barrier.release();
+    try testing.expect(try barrier.wait(-1));
     try testing.expectEqual(@as(usize, 0), state.count);
 }
 
@@ -84,7 +90,10 @@ test "log callback replacement invokes only the replacement" {
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
 
-    try testing.expectError(error.NativeError, map.setStyleJson(testing.allocator, "{"));
+    _ = try map.setStyleJson(testing.allocator, "{");
+    const barrier = try runtime.barrierStart();
+    defer barrier.release();
+    try testing.expect(try barrier.wait(-1));
     try testing.expectEqual(@as(usize, 0), first_state.count);
     try testing.expect(replacement_state.count > 0);
     try testing.expect(replacement_state.saw_parse_style);

@@ -17,6 +17,6 @@ export 'src/runtime/runtime.dart'
         CustomGeometryCallbackLifecycleProbe,
         customGeometryCallbackProbeForTesting,
         decodeRuntimeEventBatchForTesting,
-        mapAttachRefIdForTesting,
+        mapHandleIdForTesting,
         runtimeHandleIdForTesting;
 export 'src/style/style.dart';

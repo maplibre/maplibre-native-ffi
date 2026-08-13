@@ -162,8 +162,8 @@ auto NotificationSourceObject::mark_ready(
     if (found == endpoints_.end() || found->second.owner != owner || closing_) {
       return;
     }
-    found->second.ready = true;
-    if (!signaled_) {
+    if (!found->second.ready) {
+      found->second.ready = true;
       signaled_ = true;
       invocation = prepare_callback_locked();
     }

@@ -17,9 +17,7 @@ static const char background_style_json[] =
   "{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"background\",\"type\":"
   "\"background\",\"paint\":{\"background-color\":\"#102030\"}}]}";
 static const uint64_t unknown_mask_bit = UINT64_C(1) << 63U;
-static const size_t style_pump_attempts = 200;
-static const int64_t park_timeout_milliseconds = 200;
-static const uint64_t park_floor_milliseconds = 100;
+static const size_t style_barrier_attempts = 200;
 static const char missing_database_path[] = "does-not-exist.db";
 static const size_t take_result_attempts = 5000;
 
@@ -44,6 +42,10 @@ static_assert(
 static_assert(
   sizeof(mln_runtime_event_camera_transition_finished) == 8,
   "mln_runtime_event_camera_transition_finished is 8 bytes wide"
+);
+static_assert(
+  sizeof(mln_runtime_event_command_finished) == 24,
+  "mln_runtime_event_command_finished is 24 bytes wide"
 );
 static_assert(
   sizeof(mln_offline_region_status) == 64,
@@ -119,16 +121,16 @@ static_assert(
   "mln_runtime_options.flags sits at offset 4"
 );
 static_assert(
-  MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS == UINT64_C(0x87FFFE),
-  "MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS is 0x87FFFE"
+  MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS == UINT64_C(0x187FFFE),
+  "MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS is 0x187FFFE"
 );
 static_assert(
-  MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS == UINT64_C(0x380000),
-  "MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS is 0x380000"
+  MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS == UINT64_C(0x1380000),
+  "MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS is 0x1380000"
 );
 static_assert(
-  MLN_RUNTIME_EVENT_MASK_ALL == UINT64_C(0xBFFFFE),
-  "MLN_RUNTIME_EVENT_MASK_ALL is 0xBFFFFE"
+  MLN_RUNTIME_EVENT_MASK_ALL == UINT64_C(0x1BFFFFE),
+  "MLN_RUNTIME_EVENT_MASK_ALL is 0x1BFFFFE"
 );
 
 // These structs carry pointers or size_t, so their extents follow the target's
@@ -158,15 +160,15 @@ static const mln_runtime_event* batch_event(
                                     (index * batch->event_size));
 }
 
-// Loads an inline style and pumps until its events are queued, so a test that
+// Loads an inline style and waits until its events are queued, so a test that
 // needs a populated queue does not depend on the network.
-static void load_style_and_pump(mln_runtime runtime, mln_map map) {
+static void load_style_and_wait(mln_runtime runtime, mln_map map) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_map_set_style_json(map, MLN_BUFFER_LITERAL(background_style_json))
+    mln_test_map_set_style_json(map, MLN_BUFFER_LITERAL(background_style_json))
   );
-  for (size_t attempt = 0; attempt < style_pump_attempts; attempt += 1) {
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 2));
+  for (size_t attempt = 0; attempt < style_barrier_attempts; attempt += 1) {
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
   }
 }
 
@@ -215,11 +217,11 @@ static void call_event_api_from_a_foreign_thread(void* argument) {
   probe->runtime_mask_status =
     mln_runtime_set_event_mask(probe->runtime, MLN_RUNTIME_EVENT_MASK_ALL);
   probe->map_mask_status =
-    mln_map_set_event_mask(probe->map, MLN_RUNTIME_EVENT_MASK_ALL);
+    mln_test_map_set_event_mask(probe->map, MLN_RUNTIME_EVENT_MASK_ALL);
   atomic_store(&probe->finished, true);
 }
 
-static void event_drain_is_any_thread_while_mask_setters_stay_affine(void) {
+static void event_drain_and_mask_changes_are_any_thread(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
 
@@ -230,8 +232,8 @@ static void event_drain_is_any_thread_while_mask_setters_stay_affine(void) {
   mln_test_thread_join(thread);
 
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.drain_status);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_WRONG_THREAD, probe.runtime_mask_status);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_WRONG_THREAD, probe.map_mask_status);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.runtime_mask_status);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.map_mask_status);
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -248,7 +250,8 @@ static void both_mask_setters_reject_unknown_bits_and_keep_foreign_ones(void) {
     mln_runtime_set_event_mask(runtime, unknown_mask_bit)
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_set_event_mask(map, unknown_mask_bit)
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_test_map_set_event_mask(map, unknown_mask_bit)
   );
 
   TEST_ASSERT_EQUAL_INT(
@@ -256,7 +259,7 @@ static void both_mask_setters_reject_unknown_bits_and_keep_foreign_ones(void) {
     mln_runtime_set_event_mask(runtime, MLN_RUNTIME_EVENT_MASK_ALL)
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_event_mask(map, MLN_RUNTIME_EVENT_MASK_ALL)
+    MLN_STATUS_OK, mln_test_map_set_event_mask(map, MLN_RUNTIME_EVENT_MASK_ALL)
   );
 
   uint64_t runtime_mask = 0;
@@ -265,7 +268,9 @@ static void both_mask_setters_reject_unknown_bits_and_keep_foreign_ones(void) {
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_RUNTIME_EVENT_MASK_ALL, runtime_mask);
   uint64_t map_mask = 0;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_get_event_mask(map, &map_mask));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_map_get_event_mask(map, &map_mask)
+  );
   TEST_ASSERT_EQUAL_UINT64(MLN_RUNTIME_EVENT_MASK_ALL, map_mask);
 
   // One in-group bit for the other source kind, which each setter accepts and
@@ -285,7 +290,7 @@ static void both_mask_setters_reject_unknown_bits_and_keep_foreign_ones(void) {
     MLN_STATUS_INVALID_ARGUMENT, mln_runtime_get_event_mask(runtime, NULL)
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_get_event_mask(map, NULL)
+    MLN_STATUS_INVALID_ARGUMENT, mln_test_map_get_event_mask(map, NULL)
   );
 
   mln_test_destroy_map(map);
@@ -302,10 +307,12 @@ static void a_fresh_map_and_runtime_select_every_event_type(void) {
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_RUNTIME_EVENT_MASK_ALL, runtime_mask);
   uint64_t map_mask = 0;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_get_event_mask(map, &map_mask));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_map_get_event_mask(map, &map_mask)
+  );
   TEST_ASSERT_EQUAL_UINT64(MLN_RUNTIME_EVENT_MASK_ALL, map_mask);
 
-  load_style_and_pump(runtime, map);
+  load_style_and_wait(runtime, map);
   TEST_ASSERT_GREATER_THAN_size_t(
     0, mln_test_drain_counting(runtime, MLN_RUNTIME_EVENT_MAP_STYLE_LOADED)
   );
@@ -320,7 +327,7 @@ static void runtime_options_reject_unknown_flags(void) {
   mln_runtime bad_runtime = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_create(&runtime_options, &bad_runtime)
+    mln_test_runtime_create(&runtime_options, &bad_runtime)
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, bad_runtime);
 }
@@ -335,7 +342,7 @@ static void options_reject_unknown_event_mask_bits(void) {
   mln_runtime bad_runtime = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_create(&runtime_options, &bad_runtime)
+    mln_test_runtime_create(&runtime_options, &bad_runtime)
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, bad_runtime);
 
@@ -344,7 +351,8 @@ static void options_reject_unknown_event_mask_bits(void) {
   map_options.event_mask = MLN_RUNTIME_EVENT_MASK_ALL | unknown;
   mln_map bad_map = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_create(runtime, &map_options, &bad_map)
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_test_map_create_status(runtime, &map_options, &bad_map)
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, bad_map);
 
@@ -352,7 +360,7 @@ static void options_reject_unknown_event_mask_bits(void) {
   mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_event_mask(map, MLN_RUNTIME_EVENT_MASK_ALL | unknown)
+    mln_test_map_set_event_mask(map, MLN_RUNTIME_EVENT_MASK_ALL | unknown)
   );
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -366,7 +374,9 @@ static void a_creation_mask_applies_during_construction(void) {
   mln_map map = mln_test_create_map_with_options(runtime, &options);
 
   uint64_t map_mask = MLN_RUNTIME_EVENT_MASK_ALL;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_get_event_mask(map, &map_mask));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_map_get_event_mask(map, &map_mask)
+  );
   TEST_ASSERT_EQUAL_UINT64(MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED, map_mask);
 
   mln_test_event_batch batch = mln_test_event_batch_default();
@@ -375,7 +385,7 @@ static void a_creation_mask_applies_during_construction(void) {
   );
   TEST_ASSERT_EQUAL_size_t(0, batch.event_count);
 
-  load_style_and_pump(runtime, map);
+  load_style_and_wait(runtime, map);
   TEST_ASSERT_EQUAL_size_t(
     0, mln_test_drain_counting(
          runtime, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
@@ -393,14 +403,14 @@ static void clearing_one_type_leaves_the_others_arriving(void) {
   mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_map_set_event_mask(
+    mln_test_map_set_event_mask(
       map, MLN_RUNTIME_EVENT_MASK_ALL &
              ~(uint64_t)MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE
     )
   );
   mln_test_drain_all(runtime);
 
-  load_style_and_pump(runtime, map);
+  load_style_and_wait(runtime, map);
   TEST_ASSERT_EQUAL_size_t(
     0, mln_test_drain_counting(
          runtime, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
@@ -408,9 +418,10 @@ static void clearing_one_type_leaves_the_others_arriving(void) {
   );
 
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_event_mask(map, MLN_RUNTIME_EVENT_MASK_ALL)
+    MLN_STATUS_OK, mln_test_map_set_event_mask(map, MLN_RUNTIME_EVENT_MASK_ALL)
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_request_repaint(map));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_map_request_repaint(map));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
   TEST_ASSERT_GREATER_THAN_size_t(
     0, mln_test_drain_counting(
          runtime, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
@@ -421,9 +432,9 @@ static void clearing_one_type_leaves_the_others_arriving(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Suppression happens at push time, so a cleared type raises no wake flag and a
-// parking pump waits out its timeout where it previously returned immediately.
-static void a_suppressed_producer_leaves_a_pump_parked(void) {
+// Suppression happens at push time, so a cleared type produces no queue record
+// even though the runtime worker continues to process the command.
+static void a_suppressed_producer_leaves_the_queue_empty(void) {
   mln_runtime runtime = mln_test_create_runtime();
   const mln_map_options options =
     map_options_with_event_mask(MLN_RUNTIME_EVENT_MASK_NONE);
@@ -432,22 +443,11 @@ static void a_suppressed_producer_leaves_a_pump_parked(void) {
     MLN_STATUS_OK,
     mln_runtime_set_event_mask(runtime, MLN_RUNTIME_EVENT_MASK_NONE)
   );
-  // Two zero pumps and a drain leave the wake flag clear and the queue empty.
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0));
-  TEST_ASSERT_EQUAL_size_t(0, mln_test_drain_all(runtime));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
   TEST_ASSERT_EQUAL_size_t(0, mln_test_drain_all(runtime));
 
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_request_repaint(map));
-  const uint64_t started = mln_test_monotonic_milliseconds();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_pump(runtime, park_timeout_milliseconds)
-  );
-  const uint64_t elapsed = mln_test_monotonic_milliseconds() - started;
-  TEST_ASSERT_TRUE_MESSAGE(
-    elapsed >= park_floor_milliseconds,
-    "A repaint whose event type is cleared still released a parked pump."
-  );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_map_request_repaint(map));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
   TEST_ASSERT_EQUAL_size_t(0, mln_test_drain_all(runtime));
 
   mln_test_destroy_map(map);
@@ -457,7 +457,7 @@ static void a_suppressed_producer_leaves_a_pump_parked(void) {
 static void an_owned_batch_remains_stable_across_later_drains(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  load_style_and_pump(runtime, map);
+  load_style_and_wait(runtime, map);
 
   mln_event_batch first = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
@@ -495,7 +495,7 @@ static void an_owned_batch_remains_stable_across_later_drains(void) {
 static void a_bounded_drain_reports_what_stayed_queued(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  load_style_and_pump(runtime, map);
+  load_style_and_wait(runtime, map);
 
   mln_test_event_batch batch = mln_test_event_batch_default();
   TEST_ASSERT_EQUAL_INT(
@@ -519,7 +519,7 @@ static void a_bounded_drain_reports_what_stayed_queued(void) {
 static void an_owned_batch_outlives_the_map_that_produced_it(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  load_style_and_pump(runtime, map);
+  load_style_and_wait(runtime, map);
 
   mln_event_batch batch = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
@@ -565,9 +565,15 @@ static void one_batch_reports_events_in_queue_order(void) {
   mln_animation_options animation = mln_animation_options_default();
   animation.fields = MLN_ANIMATION_OPTION_TRANSITION_ID;
   animation.transition_id = 77;
+  mln_camera_update update = mln_camera_update_default();
+  update.mode = MLN_CAMERA_UPDATE_MODE_EASE;
+  update.camera = camera;
+  update.animation = animation;
+  uint64_t command_id = 0;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_ease_to(map, &camera, &animation)
+    MLN_STATUS_OK, mln_map_update_camera(map, &update, &command_id)
   );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
 
   mln_test_event_batch batch = mln_test_event_batch_default();
   TEST_ASSERT_EQUAL_INT(
@@ -604,13 +610,14 @@ static void the_message_arena_carries_one_range_per_event(void) {
   mln_test_drain_all(runtime);
 
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_NATIVE_ERROR,
-    mln_map_set_style_json(first, MLN_BUFFER_LITERAL("{\"version\":"))
+    MLN_STATUS_OK,
+    mln_test_map_set_style_json(first, MLN_BUFFER_LITERAL("{\"version\":"))
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_NATIVE_ERROR,
-    mln_map_set_style_json(second, MLN_BUFFER_LITERAL("not json at all"))
+    MLN_STATUS_OK,
+    mln_test_map_set_style_json(second, MLN_BUFFER_LITERAL("not json at all"))
   );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
 
   mln_test_event_batch batch = mln_test_event_batch_default();
   TEST_ASSERT_EQUAL_INT(
@@ -685,7 +692,7 @@ static void copied_operation_diagnostics_are_stable_across_threads(void) {
   bool completed = false;
   for (size_t attempt = 0; attempt < take_result_attempts && !completed;
        attempt += 1) {
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 2));
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK, mln_operation_poll(operation, &completed)
     );
@@ -709,7 +716,7 @@ static void copied_operation_diagnostics_are_stable_across_threads(void) {
   TEST_ASSERT_GREATER_THAN_size_t(0, probe.size);
 
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_request_repaint(MLN_HANDLE_NULL)
+    MLN_STATUS_INVALID_ARGUMENT, mln_test_map_request_repaint(MLN_HANDLE_NULL)
   );
   char owner_copy[512] = {0};
   size_t owner_size = 0;
@@ -773,14 +780,14 @@ static void a_second_concurrent_event_drain_is_rejected(void) {
 void run_runtime_events_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(a_drain_rejects_a_nonnull_output_or_a_stale_runtime);
-  RUN_TEST(event_drain_is_any_thread_while_mask_setters_stay_affine);
+  RUN_TEST(event_drain_and_mask_changes_are_any_thread);
   RUN_TEST(both_mask_setters_reject_unknown_bits_and_keep_foreign_ones);
   RUN_TEST(a_fresh_map_and_runtime_select_every_event_type);
   RUN_TEST(runtime_options_reject_unknown_flags);
   RUN_TEST(options_reject_unknown_event_mask_bits);
   RUN_TEST(a_creation_mask_applies_during_construction);
   RUN_TEST(clearing_one_type_leaves_the_others_arriving);
-  RUN_TEST(a_suppressed_producer_leaves_a_pump_parked);
+  RUN_TEST(a_suppressed_producer_leaves_the_queue_empty);
   RUN_TEST(an_owned_batch_remains_stable_across_later_drains);
   RUN_TEST(a_bounded_drain_reports_what_stayed_queued);
   RUN_TEST(an_owned_batch_outlives_the_map_that_produced_it);

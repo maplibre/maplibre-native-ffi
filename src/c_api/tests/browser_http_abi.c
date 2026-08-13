@@ -28,7 +28,7 @@ static bool wait_for_style_loaded(
 ) {
   out_message[0] = '\0';
   for (unsigned int attempt = 0; attempt < 600; attempt += 1) {
-    if (mln_runtime_pump(runtime, 10) != MLN_STATUS_OK) {
+    if (mln_test_runtime_barrier(runtime) != MLN_STATUS_OK) {
       return false;
     }
     while (true) {
@@ -85,7 +85,7 @@ static void style_loads_over_http_from_the_runner_origin(void) {
 
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_set_style_url(map, url));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_map_set_style_url(map, url));
 
   char failure[512];
   const bool loaded =
@@ -99,10 +99,16 @@ static void style_loads_over_http_from_the_runner_origin(void) {
 
   // Checks which document loaded: a response from anywhere else carries a
   // different layer.
+  mln_operation operation = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_list_style_layer_ids_start(map, &operation)
+  );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
   mln_style_id_list layers = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_list_style_layer_ids(map, &layers)
+    MLN_STATUS_OK, mln_map_list_style_layer_ids_take_result(operation, &layers)
   );
+  mln_operation_release(operation);
   size_t count = 0;
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_style_id_list_count(layers, &count));
 
@@ -123,7 +129,7 @@ static void style_loads_over_http_from_the_runner_origin(void) {
     const size_t used = strlen(seen);
     (void)snprintf(
       seen + used, sizeof(seen) - used, "%s%.*s", used == 0 ? "" : ", ",
-      (int)id.size, id.data
+      (int)id.size, (const char*)id.data
     );
   }
   mln_style_id_list_destroy(layers);

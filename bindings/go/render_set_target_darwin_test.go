@@ -15,8 +15,6 @@ func TestSetTargetRejectsOtherTargetKindsDarwin(t *testing.T) {
 		t.Skip("Metal texture sessions are not supported by this build")
 	}
 
-	lockOSThreadForTest(t)
-
 	device := defaultMetalDeviceForTest()
 	if device == 0 {
 		t.Skip("Metal system default device is unavailable")
@@ -67,13 +65,10 @@ func TestSetTargetRejectsOtherTargetKindsDarwin(t *testing.T) {
 		t.Fatalf("SetMetalBorrowedTextureTarget() on a session-owned texture session error = %v, want ErrUnsupported", err)
 	}
 
-	// Both rejections leave the session rendering into the target it has, which
-	// holds no style yet.
-	result, err := session.RenderUpdate()
-	if err != nil {
+	// Both rejections leave the original target usable. Autonomous map work may
+	// already have produced a render update, so only the successful call is
+	// invariant here.
+	if _, err := session.RenderUpdate(); err != nil {
 		t.Fatalf("RenderUpdate() after rejected target replacement: %v", err)
-	}
-	if result != RenderResultNoUpdate {
-		t.Fatalf("RenderUpdate() after rejected target replacement = %v, want RenderResultNoUpdate", result)
 	}
 }

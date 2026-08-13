@@ -4,14 +4,6 @@ const testing = std.testing;
 const maplibre = @import("maplibre_native_ffi");
 const support = @import("support.zig");
 
-fn runRuntimeOnThread(runtime: *maplibre.RuntimeHandle, out_error: *?anyerror) void {
-    runtime.pump(0) catch |err| {
-        out_error.* = err;
-        return;
-    };
-    out_error.* = null;
-}
-
 fn drainRuntimeOnThread(runtime: *maplibre.RuntimeHandle, out_error: *?anyerror) void {
     var batch = runtime.drainEvents(testing.allocator, 0) catch |err| {
         out_error.* = err;
@@ -30,7 +22,7 @@ fn setRuntimeEventMaskOnThread(runtime: *maplibre.RuntimeHandle, out_error: *?an
 }
 
 fn setMapEventMaskOnThread(map: *maplibre.MapHandle, out_error: *?anyerror) void {
-    map.setEventMask(maplibre.RuntimeEventMask.all) catch |err| {
+    _ = map.setEventMask(maplibre.RuntimeEventMask.all) catch |err| {
         out_error.* = err;
         return;
     };
@@ -75,15 +67,13 @@ fn expectOnlySelectedTypes(
     rejected: maplibre.RuntimeEventType,
 ) !void {
     // Narrowing gates later events and keeps queued ones, so start empty.
-    try runtime.pump(0);
     _ = try support.drainEvents(runtime);
 
-    try map.setStyleJson(testing.allocator, support.style_json);
-    try map.requestRepaint();
+    _ = try map.setStyleJson(testing.allocator, support.style_json);
+    _ = try map.requestRepaint();
 
     var saw_style_loaded = false;
     for (0..1000) |_| {
-        try runtime.pump(0);
         var batch = try runtime.drainEvents(testing.allocator, 0);
         defer batch.deinit();
         for (0..batch.len()) |index| {
@@ -99,11 +89,12 @@ fn expectOnlySelectedTypes(
     try testing.expect(saw_style_loaded);
 }
 
-test "runtime rejects second runtime on same owner and permits distinct owner" {
+test "runtimes can be created on the current thread or another thread" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
 
-    try testing.expectError(error.InvalidState, maplibre.RuntimeHandle.create(testing.allocator, .{}, null));
+    var second = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer second.close() catch @panic("runtime close failed");
 
     var thread_error: ?anyerror = error.InvalidState;
     const thread = try std.Thread.spawn(.{}, createRuntimeOnThread, .{&thread_error});
@@ -111,19 +102,8 @@ test "runtime rejects second runtime on same owner and permits distinct owner" {
     try testing.expect(thread_error == null);
 }
 
-test "runtime calls enforce their documented thread policies" {
-    var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
-    defer diagnostics.deinit();
-
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, &diagnostics);
-    var runtime_open = true;
-    defer if (runtime_open) runtime.close() catch @panic("runtime close failed");
-
-    var run_once_error: ?anyerror = null;
-    const run_once_thread = try std.Thread.spawn(.{}, runRuntimeOnThread, .{ &runtime, &run_once_error });
-    run_once_thread.join();
-    try testing.expectEqual(error.WrongThread, run_once_error.?);
-    try testing.expect(diagnostics.get().?.message.len > 0);
+test "runtime drain and close are callable from another thread" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
 
     var drain_error: ?anyerror = null;
     const drain_thread = try std.Thread.spawn(.{}, drainRuntimeOnThread, .{ &runtime, &drain_error });
@@ -133,15 +113,10 @@ test "runtime calls enforce their documented thread policies" {
     var close_error: ?anyerror = null;
     const close_thread = try std.Thread.spawn(.{}, closeRuntimeOnThread, .{ &runtime, &close_error });
     close_thread.join();
-    try testing.expectEqual(error.WrongThread, close_error.?);
-    try testing.expect(diagnostics.get().?.message.len > 0);
-
-    try runtime.pump(0);
-    try runtime.close();
-    runtime_open = false;
+    try testing.expect(close_error == null);
 }
 
-test "event mask setters report wrong thread" {
+test "event mask setters accept calls from another thread" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
 
@@ -151,16 +126,12 @@ test "event mask setters report wrong thread" {
     var runtime_mask_error: ?anyerror = null;
     const runtime_mask_thread = try std.Thread.spawn(.{}, setRuntimeEventMaskOnThread, .{ &runtime, &runtime_mask_error });
     runtime_mask_thread.join();
-    try testing.expectEqual(error.WrongThread, runtime_mask_error.?);
+    try testing.expect(runtime_mask_error == null);
 
     var map_mask_error: ?anyerror = null;
     const map_mask_thread = try std.Thread.spawn(.{}, setMapEventMaskOnThread, .{ &map, &map_mask_error });
     map_mask_thread.join();
-    try testing.expectEqual(error.WrongThread, map_mask_error.?);
-
-    // The owner thread still installs both masks.
-    try runtime.setEventMask(maplibre.RuntimeEventMask.all);
-    try map.setEventMask(maplibre.RuntimeEventMask.all);
+    try testing.expect(map_mask_error == null);
 }
 
 test "runtime option strings reject embedded NUL before C calls" {
@@ -185,12 +156,11 @@ test "one drain reports the events a style load queued together" {
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
 
-    try map.setStyleJson(testing.allocator, support.style_json);
+    _ = try map.setStyleJson(testing.allocator, support.style_json);
 
     var largest_batch: usize = 0;
     var saw_style_loaded = false;
     for (0..1000) |_| {
-        try runtime.pump(0);
         var batch = try runtime.drainEvents(testing.allocator, 0);
         defer batch.deinit();
         // An unbounded drain takes the whole queue.
@@ -215,8 +185,7 @@ test "notification ready batches are copied before native release" {
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
 
-    try map.setStyleJson(testing.allocator, support.style_json);
-    try runtime.pump(0);
+    _ = try map.setStyleJson(testing.allocator, support.style_json);
 
     var ready = try runtime.drainReady(testing.allocator);
     defer ready.deinit();
@@ -245,15 +214,17 @@ test "a bounded drain reports one event at a time in queue order" {
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
 
-    // A malformed inline style is reported twice: as the error here and as a
-    // queued loading-failed event carrying the same text.
-    try testing.expectError(error.NativeError, map.setStyleJson(testing.allocator, "{"));
-    try map.requestRepaint();
+    // A malformed inline style is accepted as a command and later reports a
+    // queued loading-failed event carrying native diagnostics.
+    _ = try map.setStyleJson(testing.allocator, "{");
+    const repaint_command = try map.requestRepaint();
+    try support.waitForBarrier(&runtime);
 
     var message_length: usize = 0;
     var count: usize = 0;
     var saw_remaining = false;
     var last = maplibre.RuntimeEventType.map_idle;
+    var last_command_id: ?u64 = null;
     while (true) {
         var batch = try runtime.drainEvents(testing.allocator, 1);
         defer batch.deinit();
@@ -269,14 +240,19 @@ test "a bounded drain reports one event at a time in queue order" {
             message_length = event.message.len;
         }
         last = event.event_type;
+        switch (event.payload) {
+            .command_finished => |payload| last_command_id = payload.command_id,
+            else => {},
+        }
         count += 1;
     }
     try testing.expect(count > 1);
     try testing.expect(saw_remaining);
     // The loading failure carries native's own text.
     try testing.expect(message_length > 0);
-    // The repaint queued its invalidation behind the load failure.
-    try testing.expect(std.meta.eql(last, maplibre.RuntimeEventType.map_render_update_available));
+    // The repaint's terminal event follows its invalidation.
+    try testing.expect(std.meta.eql(last, maplibre.RuntimeEventType.command_finished));
+    try testing.expectEqual(repaint_command, last_command_id.?);
 }
 
 test "a drained batch outlives its runtime" {
@@ -289,13 +265,12 @@ test "a drained batch outlives its runtime" {
     defer if (map_open) map.close() catch @panic("map close failed");
     const map_id = try map.id();
 
-    try map.setStyleUrl(testing.allocator, "unsupported://style.json");
+    _ = try map.setStyleUrl(testing.allocator, "unsupported://style.json");
 
     var kept: maplibre.EventBatch = undefined;
     var kept_index: usize = 0;
     var found = false;
     for (0..1000) |_| {
-        try runtime.pump(0);
         var batch = try runtime.drainEvents(testing.allocator, 0);
         for (0..batch.len()) |index| {
             const event = try batch.at(index);
@@ -332,7 +307,8 @@ test "closing a map discards its queued runtime events" {
     defer runtime.close() catch @panic("runtime close failed");
 
     var map = try maplibre.MapHandle.create(&runtime, .{});
-    try testing.expectError(error.NativeError, map.setStyleJson(testing.allocator, "{"));
+    _ = try map.setStyleJson(testing.allocator, "{");
+    try support.waitForBarrier(&runtime);
     try map.close();
 
     try testing.expectEqual(@as(usize, 0), try support.drainEvents(&runtime));
@@ -355,7 +331,8 @@ test "event masks round-trip through both handles" {
 
     var map_mask = try map.eventMask();
     map_mask.map_tile_action = false;
-    try map.setEventMask(map_mask);
+    _ = try map.setEventMask(map_mask);
+    try support.waitForBarrier(&runtime);
     const read_map_mask = try map.eventMask();
     try testing.expectEqual(map_mask, read_map_mask);
     try testing.expect(read_map_mask.offline_region_status_changed);
@@ -376,14 +353,16 @@ test "a narrowed map mask drops the type it clears and keeps the rest" {
     defer map.close() catch @panic("map close failed");
 
     const narrowed = maskWithout("map_render_update_available");
-    try map.setEventMask(narrowed);
+    _ = try map.setEventMask(narrowed);
+    try support.waitForBarrier(&runtime);
     try testing.expectEqual(narrowed, try map.eventMask());
 
     try expectOnlySelectedTypes(&runtime, &map, .map_render_update_available);
 
     // Restoring the bit lets the map's only invalidation report arrive again.
-    try map.setEventMask(maplibre.RuntimeEventMask.all);
-    try map.requestRepaint();
+    _ = try map.setEventMask(maplibre.RuntimeEventMask.all);
+    try support.waitForBarrier(&runtime);
+    _ = try map.requestRepaint();
     try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
 }
 
@@ -403,117 +382,4 @@ test "masks passed as create options narrow both handles" {
     try testing.expectEqual(narrowed_map_mask, try map.eventMask());
 
     try expectOnlySelectedTypes(&runtime, &map, .map_render_update_available);
-}
-
-// Pumps until the runtime is idle, so a park that follows is released by the
-// signal the test raises.
-fn quiesce(runtime: *maplibre.RuntimeHandle) !void {
-    for (0..100) |_| {
-        try runtime.pump(0);
-        if ((try support.drainEvents(runtime)) == 0) return;
-    }
-    return error.RuntimeKeptProducingEvents;
-}
-
-fn elapsedMilliseconds(started: std.Io.Timestamp) u64 {
-    const elapsed = started.durationTo(std.Io.Clock.awake.now(testing.io));
-    return @intCast(@divTrunc(elapsed.toNanoseconds(), std.time.ns_per_ms));
-}
-
-fn signalWakeSourceOnThread(source: maplibre.WakeSourceHandle, out_error: *?anyerror) void {
-    testing.io.sleep(.fromMilliseconds(20), .awake) catch |err| {
-        out_error.* = err;
-        return;
-    };
-    source.signal() catch |err| {
-        out_error.* = err;
-        return;
-    };
-    out_error.* = null;
-}
-
-test "a parked owner thread wakes for native work and for a wake source" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    var runtime_open = true;
-    defer if (runtime_open) runtime.close() catch @panic("runtime close failed");
-
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    var map_open = true;
-    defer if (map_open) map.close() catch @panic("map close failed");
-    try quiesce(&runtime);
-
-    // A malformed style is reported from native's own threads, so the failure
-    // reaches the parked owner thread.
-    try map.setStyleUrl(testing.allocator, "unsupported://style.json");
-    var loading_failed = false;
-    const load_started = std.Io.Clock.awake.now(testing.io);
-    for (0..20) |_| {
-        try runtime.pump(10_000);
-        if (elapsedMilliseconds(load_started) > 5_000) return error.ParkTimedOut;
-        var batch = try runtime.drainEvents(testing.allocator, 0);
-        defer batch.deinit();
-        for (0..batch.len()) |index| {
-            const event = try batch.at(index);
-            if (std.meta.eql(event.event_type, maplibre.RuntimeEventType.map_loading_failed)) {
-                loading_failed = true;
-            }
-        }
-        if (loading_failed) break;
-    }
-    try testing.expect(loading_failed);
-
-    // The park this signal releases has no other work to end it.
-    const source = try runtime.wakeSource();
-    try quiesce(&runtime);
-    var thread_error: ?anyerror = error.Unexpected;
-    const thread = try std.Thread.spawn(.{}, signalWakeSourceOnThread, .{ source, &thread_error });
-    const park_started = std.Io.Clock.awake.now(testing.io);
-    try runtime.pump(10_000);
-    try testing.expect(elapsedMilliseconds(park_started) < 5_000);
-    thread.join();
-    try testing.expect(thread_error == null);
-
-    // A wake source stays usable after its runtime closes.
-    try map.close();
-    map_open = false;
-    try runtime.close();
-    runtime_open = false;
-    try source.signal();
-    source.release();
-    try testing.expectError(error.ClosedHandle, source.signal());
-}
-
-test "a pump clears the wake flag it returns on" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-
-    const source = try runtime.wakeSource();
-    defer source.release();
-    try quiesce(&runtime);
-
-    try source.signal();
-    const signalled_started = std.Io.Clock.awake.now(testing.io);
-    try runtime.pump(10_000);
-    try testing.expect(elapsedMilliseconds(signalled_started) < 5_000);
-
-    // The pump above cleared the wake flag, so this one waits its full timeout.
-    const idle_started = std.Io.Clock.awake.now(testing.io);
-    try runtime.pump(200);
-    try testing.expect(elapsedMilliseconds(idle_started) >= 100);
-}
-
-test "an idle map drains empty batches" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
-
-    try quiesce(&runtime);
-    var batch = try runtime.drainEvents(testing.allocator, 0);
-    defer batch.deinit();
-    try testing.expectEqual(@as(usize, 0), batch.len());
-    try testing.expectEqual(@as(usize, 0), batch.remaining());
-    // An empty batch has no event to report at any index.
-    try testing.expectError(error.InvalidArgument, batch.at(0));
 }

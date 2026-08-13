@@ -68,8 +68,8 @@ PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CO
 
 [tasks.test]
 extends = "ffi:preset"
-# The preset selects the runner: Android and OpenHarmony x64 presets push to an
-# emulator, and host presets run in process.
+# The preset selects the runner: Android presets and OpenHarmony x64 presets
+# push to an emulator, and host presets run in process.
 run = '''
 case "$usage_preset" in
   android-* | ohos-*)

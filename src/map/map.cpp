@@ -1,9 +1,11 @@
 #include <algorithm>
+#include <any>
 #include <array>
 #include <atomic>
 #include <cassert>
 #include <chrono>
 #include <cmath>
+#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -14,12 +16,14 @@
 #include <optional>
 #include <ratio>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <thread>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <mbgl/actor/actor_ref.hpp>
@@ -82,72 +86,19 @@
 #include "diagnostics/diagnostics.hpp"
 #include "geojson/geojson.hpp"
 #include "handles/handle_table.hpp"
+#include "map/map_internal.hpp"
 #include "maplibre_native_c.h"
+#include "operation/operation.hpp"
 #include "runtime/runtime.hpp"
 #include "style/style_value.hpp"
 
-namespace mln::core {
-
-struct StyleIdListObject {
-  std::vector<std::string> ids;
-};
-
-template <>
-struct HandleTraits<StyleIdListObject> {
-  static constexpr auto kind = HandleKind::StyleIdList;
-  static constexpr auto leasable = false;
-};
-
-struct StyleStringListObject {
-  std::vector<std::string> values;
-};
-
-template <>
-struct HandleTraits<StyleStringListObject> {
-  static constexpr auto kind = HandleKind::StyleStringList;
-  static constexpr auto leasable = false;
-};
-
-}  // namespace mln::core
-
 namespace {
-
-auto buffer_view_from_string(const std::string& value) -> mln_buffer_view {
-  return {
-    .data = value.data(),
-    .size = value.size(),
-  };
-}
 
 enum class TileSourceOptionKind : uint8_t { Vector, Raster, RasterDEM };
 
 constexpr auto default_map_width = uint32_t{256};
 constexpr auto default_map_height = uint32_t{256};
 constexpr double default_scale_factor = 1.0;
-
-auto validate_string_view(mln_buffer_view string, const char* name) -> bool {
-  if (string.size > 0 && string.data == nullptr) {
-    auto message = std::string{name} + " data must not be null";
-    mln::core::set_thread_error(message.c_str());
-    return false;
-  }
-  return true;
-}
-
-auto string_from_view(mln_buffer_view string) -> std::string {
-  if (string.size == 0) {
-    return {};
-  }
-  return std::string{static_cast<const char*>(string.data), string.size};
-}
-
-auto string_view_from_string(const std::string& string) -> mln_buffer_view {
-  return mln_buffer_view{.data = string.data(), .size = string.size()};
-}
-
-auto string_view_from_literal(const char* string) -> mln_buffer_view {
-  return mln_buffer_view{.data = string, .size = std::strlen(string)};
-}
 
 auto validate_lat_lng_bounds(mln_lat_lng_bounds bounds) -> mln_status;
 auto validate_lat_lng_array(
@@ -159,925 +110,15 @@ auto to_native_lat_lng_bounds(mln_lat_lng_bounds bounds) -> mbgl::LatLngBounds;
 auto from_native_lat_lng_bounds(const mbgl::LatLngBounds& bounds)
   -> mln_lat_lng_bounds;
 
-auto to_c_source_type(mbgl::style::SourceType type) -> uint32_t {
-  switch (type) {
-    case mbgl::style::SourceType::Vector:
-      return MLN_STYLE_SOURCE_TYPE_VECTOR;
-    case mbgl::style::SourceType::Raster:
-      return MLN_STYLE_SOURCE_TYPE_RASTER;
-    case mbgl::style::SourceType::RasterDEM:
-      return MLN_STYLE_SOURCE_TYPE_RASTER_DEM;
-    case mbgl::style::SourceType::GeoJSON:
-      return MLN_STYLE_SOURCE_TYPE_GEOJSON;
-    case mbgl::style::SourceType::Video:
-      return MLN_STYLE_SOURCE_TYPE_VIDEO;
-    case mbgl::style::SourceType::Annotations:
-      return MLN_STYLE_SOURCE_TYPE_ANNOTATIONS;
-    case mbgl::style::SourceType::Image:
-      return MLN_STYLE_SOURCE_TYPE_IMAGE;
-    case mbgl::style::SourceType::CustomVector:
-      return MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR;
-    case mbgl::style::SourceType::CustomMVTVector:
-      return MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR;
-  }
-  assert(false);
-  return MLN_STYLE_SOURCE_TYPE_UNKNOWN;
-}
+}  // namespace
 
-auto to_c_tile_scheme(mbgl::Tileset::Scheme scheme) -> uint32_t {
-  switch (scheme) {
-    case mbgl::Tileset::Scheme::XYZ:
-      return MLN_STYLE_TILE_SCHEME_XYZ;
-    case mbgl::Tileset::Scheme::TMS:
-      return MLN_STYLE_TILE_SCHEME_TMS;
-  }
-  assert(false);
-  return MLN_STYLE_TILE_SCHEME_XYZ;
-}
-
-auto to_c_vector_encoding(mbgl::Tileset::VectorEncoding encoding) -> uint32_t {
-  switch (encoding) {
-    case mbgl::Tileset::VectorEncoding::Mapbox:
-      return MLN_STYLE_VECTOR_TILE_ENCODING_MVT;
-    case mbgl::Tileset::VectorEncoding::MLT:
-      return MLN_STYLE_VECTOR_TILE_ENCODING_MLT;
-  }
-  assert(false);
-  return MLN_STYLE_VECTOR_TILE_ENCODING_MVT;
-}
-
-auto to_c_raster_encoding(mbgl::Tileset::RasterEncoding encoding) -> uint32_t {
-  switch (encoding) {
-    case mbgl::Tileset::RasterEncoding::Mapbox:
-      return MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX;
-    case mbgl::Tileset::RasterEncoding::Terrarium:
-      return MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM;
-  }
-  assert(false);
-  return MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX;
-}
-
-auto tile_source_from_source(const mbgl::style::Source& source)
-  -> const mbgl::style::TileSource* {
-  switch (source.getType()) {
-    case mbgl::style::SourceType::Vector:
-      return source.as<mbgl::style::VectorSource>();
-    case mbgl::style::SourceType::Raster:
-      return source.as<mbgl::style::RasterSource>();
-    case mbgl::style::SourceType::RasterDEM:
-      return source.as<mbgl::style::RasterDEMSource>();
-    default:
-      return nullptr;
-  }
-}
-
-auto inline_tileset(const mbgl::style::TileSource& source)
-  -> const mbgl::Tileset* {
-  const auto& url_or_tileset = source.getURLOrTileset();
-  return url_or_tileset.is<mbgl::Tileset>()
-           ? &url_or_tileset.get<mbgl::Tileset>()
-           : nullptr;
-}
-
-auto source_url(const mbgl::style::Source& source)
-  -> std::optional<std::string> {
-  if (const auto* tile_source = tile_source_from_source(source)) {
-    return tile_source->getURL();
-  }
-  if (const auto* geojson = source.as<mbgl::style::GeoJSONSource>()) {
-    return geojson->getURL();
-  }
-  if (const auto* image = source.as<mbgl::style::ImageSource>()) {
-    return image->getURL();
-  }
-  return std::nullopt;
-}
-
-auto has_tile_source_option(
-  const mln_style_tile_source_options& options, uint32_t field
-) -> bool {
-  return (options.fields & field) != 0U;
-}
-
-auto validate_zoom_option(double zoom, const char* name) -> mln_status {
-  if (!std::isfinite(zoom) || zoom < 0.0 || zoom > 255.0) {
-    auto message = std::string{name} + " must be finite and within [0, 255]";
-    mln::core::set_thread_error(message.c_str());
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
-}
-
-auto validate_tile_source_option_header(
-  const mln_style_tile_source_options& options
-) -> mln_status {
-  if (options.size < sizeof(mln_style_tile_source_options)) {
-    mln::core::set_thread_error(
-      "mln_style_tile_source_options.size is too small"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  constexpr auto known_fields =
-    static_cast<uint32_t>(MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM) |
-    MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM |
-    MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION |
-    MLN_STYLE_TILE_SOURCE_OPTION_SCHEME | MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS |
-    MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE |
-    MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING |
-    MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING;
-  if ((options.fields & ~known_fields) != 0U) {
-    mln::core::set_thread_error(
-      "mln_style_tile_source_options.fields contains unknown bits"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
-}
-
-auto validate_tile_source_zoom_options(
-  const mln_style_tile_source_options& options
-) -> mln_status {
-  if (has_tile_source_option(options, MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM)) {
-    const auto status = validate_zoom_option(options.min_zoom, "min_zoom");
-    if (status != MLN_STATUS_OK) {
-      return status;
-    }
-  }
-  if (has_tile_source_option(options, MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM)) {
-    const auto status = validate_zoom_option(options.max_zoom, "max_zoom");
-    if (status != MLN_STATUS_OK) {
-      return status;
-    }
-  }
-  if (
-    has_tile_source_option(options, MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM) &&
-    has_tile_source_option(options, MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM) &&
-    options.min_zoom > options.max_zoom
-  ) {
-    mln::core::set_thread_error(
-      "min_zoom must be less than or equal to max_zoom"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
-}
-
-auto validate_tile_source_attribution_option(
-  const mln_style_tile_source_options& options
-) -> mln_status {
-  if (!has_tile_source_option(
-        options, MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION
-      )) {
-    return MLN_STATUS_OK;
-  }
-  return validate_string_view(options.attribution, "attribution")
-           ? MLN_STATUS_OK
-           : MLN_STATUS_INVALID_ARGUMENT;
-}
-
-auto validate_tile_source_scheme_option(
-  const mln_style_tile_source_options& options
-) -> mln_status {
-  if (!has_tile_source_option(options, MLN_STYLE_TILE_SOURCE_OPTION_SCHEME)) {
-    return MLN_STATUS_OK;
-  }
-  switch (options.scheme) {
-    case MLN_STYLE_TILE_SCHEME_XYZ:
-    case MLN_STYLE_TILE_SCHEME_TMS:
-      return MLN_STATUS_OK;
-    default:
-      mln::core::set_thread_error("scheme is invalid");
-      return MLN_STATUS_INVALID_ARGUMENT;
-  }
-}
-
-auto validate_tile_source_bounds_option(
-  const mln_style_tile_source_options& options
-) -> mln_status {
-  if (!has_tile_source_option(options, MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS)) {
-    return MLN_STATUS_OK;
-  }
-  return validate_lat_lng_bounds(options.bounds);
-}
-
-auto validate_tile_source_tile_size_option(
-  const mln_style_tile_source_options& options
-) -> mln_status {
-  if (!has_tile_source_option(
-        options, MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE
-      )) {
-    return MLN_STATUS_OK;
-  }
-  if (options.tile_size == 0 || options.tile_size > 65535U) {
-    mln::core::set_thread_error("tile_size must be within [1, 65535]");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
-}
-
-auto validate_tile_source_vector_encoding_option(
-  const mln_style_tile_source_options& options
-) -> mln_status {
-  if (!has_tile_source_option(
-        options, MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING
-      )) {
-    return MLN_STATUS_OK;
-  }
-  switch (options.vector_encoding) {
-    case MLN_STYLE_VECTOR_TILE_ENCODING_MVT:
-    case MLN_STYLE_VECTOR_TILE_ENCODING_MLT:
-      return MLN_STATUS_OK;
-    default:
-      mln::core::set_thread_error("vector_encoding is invalid");
-      return MLN_STATUS_INVALID_ARGUMENT;
-  }
-}
-
-auto validate_tile_source_raster_encoding_option(
-  const mln_style_tile_source_options& options
-) -> mln_status {
-  if (!has_tile_source_option(
-        options, MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING
-      )) {
-    return MLN_STATUS_OK;
-  }
-  switch (options.raster_encoding) {
-    case MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX:
-    case MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM:
-      return MLN_STATUS_OK;
-    default:
-      mln::core::set_thread_error("raster_encoding is invalid");
-      return MLN_STATUS_INVALID_ARGUMENT;
-  }
-}
-
-auto validate_tile_source_option_kind(
-  const mln_style_tile_source_options& options, TileSourceOptionKind kind
-) -> mln_status {
-  if (
-    kind != TileSourceOptionKind::Vector &&
-    has_tile_source_option(
-      options, MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING
-    )
-  ) {
-    mln::core::set_thread_error(
-      "vector_encoding is only valid for vector sources"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (
-    kind != TileSourceOptionKind::RasterDEM &&
-    has_tile_source_option(
-      options, MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING
-    )
-  ) {
-    mln::core::set_thread_error(
-      "raster_encoding is only valid for raster DEM sources"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
-}
-
-auto validate_tile_source_options(
-  const mln_style_tile_source_options* options, TileSourceOptionKind kind
-) -> mln_status {
-  if (options == nullptr) {
-    return MLN_STATUS_OK;
-  }
-  for (const auto validator : {
-         validate_tile_source_option_header,
-         validate_tile_source_zoom_options,
-         validate_tile_source_attribution_option,
-         validate_tile_source_scheme_option,
-         validate_tile_source_bounds_option,
-         validate_tile_source_tile_size_option,
-         validate_tile_source_vector_encoding_option,
-         validate_tile_source_raster_encoding_option,
-       }) {
-    const auto status = validator(*options);
-    if (status != MLN_STATUS_OK) {
-      return status;
-    }
-  }
-  return validate_tile_source_option_kind(*options, kind);
-}
-
-auto effective_tile_source_options(const mln_style_tile_source_options* options)
-  -> mln_style_tile_source_options {
-  auto result = mln::core::style_tile_source_options_default();
-  if (options == nullptr) {
-    return result;
-  }
-
-  result.fields = options->fields;
-  if (has_tile_source_option(*options, MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM)) {
-    result.min_zoom = options->min_zoom;
-  }
-  if (has_tile_source_option(*options, MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM)) {
-    result.max_zoom = options->max_zoom;
-  }
-  if (
-    has_tile_source_option(*options, MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION)
-  ) {
-    result.attribution = options->attribution;
-  }
-  if (has_tile_source_option(*options, MLN_STYLE_TILE_SOURCE_OPTION_SCHEME)) {
-    result.scheme = options->scheme;
-  }
-  if (has_tile_source_option(*options, MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS)) {
-    result.bounds = options->bounds;
-  }
-  if (
-    has_tile_source_option(*options, MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE)
-  ) {
-    result.tile_size = options->tile_size;
-  }
-  if (
-    has_tile_source_option(
-      *options, MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING
-    )
-  ) {
-    result.vector_encoding = options->vector_encoding;
-  }
-  if (
-    has_tile_source_option(
-      *options, MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING
-    )
-  ) {
-    result.raster_encoding = options->raster_encoding;
-  }
-  return result;
-}
-
-auto to_native_tile_scheme(uint32_t scheme) -> mbgl::Tileset::Scheme {
-  return scheme == MLN_STYLE_TILE_SCHEME_TMS ? mbgl::Tileset::Scheme::TMS
-                                             : mbgl::Tileset::Scheme::XYZ;
-}
-
-auto to_native_vector_encoding(uint32_t encoding)
-  -> mbgl::Tileset::VectorEncoding {
-  return encoding == MLN_STYLE_VECTOR_TILE_ENCODING_MLT
-           ? mbgl::Tileset::VectorEncoding::MLT
-           : mbgl::Tileset::VectorEncoding::Mapbox;
-}
-
-auto to_native_raster_encoding(uint32_t encoding)
-  -> mbgl::Tileset::RasterEncoding {
-  return encoding == MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM
-           ? mbgl::Tileset::RasterEncoding::Terrarium
-           : mbgl::Tileset::RasterEncoding::Mapbox;
-}
-
-auto validate_tile_urls(const mln_buffer_view* tiles, size_t tile_count)
-  -> mln_status {
-  if (tile_count == 0) {
-    mln::core::set_thread_error("tile_count must be greater than 0");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (tiles == nullptr) {
-    mln::core::set_thread_error("tiles must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  for (const auto tile : std::span<const mln_buffer_view>{tiles, tile_count}) {
-    if (!validate_string_view(tile, "tile URL")) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    if (tile.size == 0) {
-      mln::core::set_thread_error("tile URLs must not be empty");
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-  }
-  return MLN_STATUS_OK;
-}
-
-auto to_native_tile_urls(const mln_buffer_view* tiles, size_t tile_count)
-  -> std::vector<std::string> {
-  auto result = std::vector<std::string>{};
-  result.reserve(tile_count);
-  for (const auto tile : std::span<const mln_buffer_view>{tiles, tile_count}) {
-    result.push_back(string_from_view(tile));
-  }
-  return result;
-}
-
-auto to_native_tileset(
-  const mln_buffer_view* tiles, size_t tile_count,
-  const mln_style_tile_source_options& options, bool vector_source
-) -> std::optional<mbgl::Tileset> {
-  if (options.min_zoom > options.max_zoom) {
-    mln::core::set_thread_error(
-      "effective min_zoom must be less than or equal to max_zoom"
-    );
-    return std::nullopt;
-  }
-
-  auto tileset = mbgl::Tileset{
-    to_native_tile_urls(tiles, tile_count),
-    mbgl::Range<uint8_t>{
-      static_cast<uint8_t>(options.min_zoom),
-      static_cast<uint8_t>(options.max_zoom)
-    },
-    string_from_view(options.attribution),
-    to_native_tile_scheme(options.scheme),
-    std::nullopt,
-    vector_source
-      ? std::optional<mbgl::Tileset::VectorEncoding>{to_native_vector_encoding(
-          options.vector_encoding
-        )}
-      : std::nullopt
-  };
-  if (has_tile_source_option(options, MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS)) {
-    tileset.bounds = to_native_lat_lng_bounds(options.bounds);
-  }
-  return tileset;
-}
-
-auto has_geojson_source_option(
-  const mln_geojson_source_options& options, uint32_t field
-) -> bool {
-  return (options.fields & field) != 0U;
-}
-
-auto effective_geojson_source_options(const mln_geojson_source_options* options)
-  -> mln_geojson_source_options {
-  auto result = mln::core::geojson_source_options_default();
-  if (options == nullptr) {
-    return result;
-  }
-
-  result.fields = options->fields;
-  if (has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM)) {
-    result.min_zoom = options->min_zoom;
-  }
-  if (has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM)) {
-    result.max_zoom = options->max_zoom;
-  }
-  if (
-    has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_TOLERANCE)
-  ) {
-    result.tolerance = options->tolerance;
-  }
-  if (
-    has_geojson_source_option(
-      *options, MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM
-    )
-  ) {
-    result.cluster_max_zoom = options->cluster_max_zoom;
-  }
-  if (
-    has_geojson_source_option(
-      *options, MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES
-    )
-  ) {
-    result.cluster_properties = options->cluster_properties;
-  }
-  if (
-    has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE)
-  ) {
-    result.tile_size = options->tile_size;
-  }
-  if (has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_BUFFER)) {
-    result.buffer = options->buffer;
-  }
-  if (
-    has_geojson_source_option(
-      *options, MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS
-    )
-  ) {
-    result.cluster_radius = options->cluster_radius;
-  }
-  if (
-    has_geojson_source_option(
-      *options, MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS
-    )
-  ) {
-    result.cluster_min_points = options->cluster_min_points;
-  }
-  if (
-    has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS)
-  ) {
-    result.line_metrics = options->line_metrics;
-  }
-  if (has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_CLUSTER)) {
-    result.cluster = options->cluster;
-  }
-  if (
-    has_geojson_source_option(
-      *options, MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE
-    )
-  ) {
-    result.synchronous_update = options->synchronous_update;
-  }
-  return result;
-}
-
-auto validate_geojson_source_options(const mln_geojson_source_options* options)
-  -> mln_status {
-  if (options == nullptr) {
-    return MLN_STATUS_OK;
-  }
-  if (options->size < sizeof(mln_geojson_source_options)) {
-    mln::core::set_thread_error("mln_geojson_source_options.size is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  constexpr auto known_fields =
-    static_cast<uint32_t>(MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM) |
-    MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM | MLN_GEOJSON_SOURCE_OPTION_TOLERANCE |
-    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM |
-    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES |
-    MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE | MLN_GEOJSON_SOURCE_OPTION_BUFFER |
-    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS |
-    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS |
-    MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS | MLN_GEOJSON_SOURCE_OPTION_CLUSTER |
-    MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE;
-  if ((options->fields & ~known_fields) != 0U) {
-    mln::core::set_thread_error(
-      "mln_geojson_source_options.fields contains unknown bits"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  const auto effective = effective_geojson_source_options(options);
-  for (const auto& [zoom, name] : {
-         std::pair{effective.min_zoom, "min_zoom"},
-         std::pair{effective.max_zoom, "max_zoom"},
-         std::pair{effective.cluster_max_zoom, "cluster_max_zoom"},
-       }) {
-    if (
-      !std::isfinite(zoom) || zoom < 0.0 || zoom > 255.0 ||
-      std::floor(zoom) != zoom
-    ) {
-      auto message = std::string{name} + " must be an integer within [0, 255]";
-      mln::core::set_thread_error(message.c_str());
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-  }
-  if (effective.min_zoom > effective.max_zoom) {
-    mln::core::set_thread_error(
-      "min_zoom must be less than or equal to max_zoom"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (!std::isfinite(effective.tolerance) || effective.tolerance < 0.0) {
-    mln::core::set_thread_error("tolerance must be finite and non-negative");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (effective.tile_size == 0 || effective.tile_size > 65535U) {
-    mln::core::set_thread_error("tile_size must be within [1, 65535]");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (effective.buffer > 65535U) {
-    mln::core::set_thread_error("buffer must be at most 65535");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (effective.cluster_radius > 65535U) {
-    mln::core::set_thread_error("cluster_radius must be at most 65535");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (
-    has_geojson_source_option(
-      *options, MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES
-    ) &&
-    effective.cluster_properties.size == 0
-  ) {
-    mln::core::set_thread_error(
-      "cluster_properties must not be empty when its field is present"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
-}
-
-// Cluster properties reach Converter<GeoJSONOptions> as a one-member object,
-// which is what parses the aggregation expressions.
-auto to_native_geojson_source_options(const mln_geojson_source_options& options)
-  -> std::optional<mbgl::Immutable<mbgl::style::GeoJSONOptions>> {
-  auto native = mbgl::style::GeoJSONOptions{};
-  native.minzoom = static_cast<uint8_t>(options.min_zoom);
-  native.maxzoom = static_cast<uint8_t>(options.max_zoom);
-  native.tileSize = static_cast<uint16_t>(options.tile_size);
-  native.buffer = static_cast<uint16_t>(options.buffer);
-  native.tolerance = options.tolerance;
-  native.lineMetrics = options.line_metrics;
-  native.cluster = options.cluster;
-  native.clusterRadius = static_cast<uint16_t>(options.cluster_radius);
-  native.clusterMaxZoom = static_cast<uint8_t>(options.cluster_max_zoom);
-  native.clusterMinPoints = options.cluster_min_points;
-  native.synchronousUpdate = options.synchronous_update;
-
-  if (options.cluster_properties.size != 0) {
-    auto document = mbgl::JSDocument{};
-    if (!mln::core::parse_json_document(
-          options.cluster_properties, "cluster_properties", document
-        )) {
-      return std::nullopt;
-    }
-    if (!document.IsObject()) {
-      mln::core::set_thread_error(
-        "cluster_properties must contain a JSON object"
-      );
-      return std::nullopt;
-    }
-    auto wrapper = std::string{"{\"clusterProperties\":"};
-    wrapper.append(
-      static_cast<const char*>(options.cluster_properties.data),
-      options.cluster_properties.size
-    );
-    wrapper.push_back('}');
-    auto error = mbgl::style::conversion::Error{};
-    auto converted =
-      mbgl::style::conversion::convertJSON<mbgl::style::GeoJSONOptions>(
-        wrapper, error
-      );
-    if (!converted) {
-      mln::core::set_style_conversion_error("GeoJSON source options", error);
-      return std::nullopt;
-    }
-    native.clusterProperties = std::move(converted->clusterProperties);
-  }
-
-  return mbgl::makeMutable<mbgl::style::GeoJSONOptions>(std::move(native));
-}
-
-auto geojson_geometry_type_name(const mbgl::Geometry<double>& geometry)
-  -> std::string_view {
-  return geometry.match(
-    [](const mbgl::EmptyGeometry&) -> std::string_view { return "empty"; },
-    [](const mbgl::Point<double>&) -> std::string_view { return "point"; },
-    [](const mbgl::LineString<double>&) -> std::string_view {
-      return "line string";
-    },
-    [](const mbgl::Polygon<double>&) -> std::string_view { return "polygon"; },
-    [](const mbgl::MultiPoint<double>&) -> std::string_view {
-      return "multi-point";
-    },
-    [](const mbgl::MultiLineString<double>&) -> std::string_view {
-      return "multi-line string";
-    },
-    [](const mbgl::MultiPolygon<double>&) -> std::string_view {
-      return "multi-polygon";
-    },
-    [](const mapbox::geometry::geometry_collection<double>&)
-      -> std::string_view { return "geometry collection"; }
-  );
-}
-
-auto geojson_alternative_name(const mbgl::GeoJSON& geojson)
-  -> std::string_view {
-  return geojson.match(
-    [](const mbgl::Geometry<double>&) -> std::string_view {
-      return "a bare geometry";
-    },
-    [](const mbgl::GeoJSONFeature&) -> std::string_view {
-      return "a single feature";
-    },
-    [](const mbgl::FeatureCollection&) -> std::string_view {
-      return "a feature collection";
-    }
-  );
-}
-
-// Clustering requires a feature collection whose every feature has point
-// geometry; anything else raises a variant access error inside supercluster
-// while the index is built. An empty collection is accepted.
-auto validate_clustered_geojson(
-  const std::string& source_id, const mbgl::GeoJSON& geojson
-) -> bool {
-  if (!geojson.is<mbgl::FeatureCollection>()) {
-    const auto message = "clustered GeoJSON source \"" + source_id +
-                         "\" requires a feature collection; the data is " +
-                         std::string{geojson_alternative_name(geojson)};
-    mln::core::set_thread_error(message.c_str());
-    return false;
-  }
-
-  const auto& features = geojson.get<mbgl::FeatureCollection>();
-  for (std::size_t index = 0; index < features.size(); ++index) {
-    const auto& geometry = features.at(index).geometry;
-    if (geometry.is<mbgl::Point<double>>()) {
-      continue;
-    }
-    const auto message =
-      "clustered GeoJSON source \"" + source_id +
-      "\" requires point geometry on every feature; feature " +
-      std::to_string(index) + " has " +
-      std::string{geojson_geometry_type_name(geometry)} + " geometry";
-    mln::core::set_thread_error(message.c_str());
-    return false;
-  }
-  return true;
-}
-
-auto has_custom_geometry_source_option(
-  const mln_custom_geometry_source_options& options, uint32_t field
-) -> bool {
-  return (options.fields & field) != 0U;
-}
-
-auto validate_custom_geometry_zoom(double zoom, const char* name)
-  -> mln_status {
-  if (
-    !std::isfinite(zoom) || zoom < 0.0 || zoom > 32.0 ||
-    std::floor(zoom) != zoom
-  ) {
-    auto message = std::string{name} + " must be an integer within [0, 32]";
-    mln::core::set_thread_error(message.c_str());
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
-}
-
-auto effective_custom_geometry_source_options(
-  const mln_custom_geometry_source_options& options
-) -> mln_custom_geometry_source_options;
-
-auto validate_custom_geometry_source_options(
-  const mln_custom_geometry_source_options* options
-) -> mln_status {
-  if (options == nullptr) {
-    mln::core::set_thread_error("options must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (options->size < sizeof(mln_custom_geometry_source_options)) {
-    mln::core::set_thread_error(
-      "mln_custom_geometry_source_options.size is too small"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  constexpr auto known_fields =
-    static_cast<uint32_t>(MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM) |
-    MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM |
-    MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE |
-    MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE |
-    MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER |
-    MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP |
-    MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP;
-  if ((options->fields & ~known_fields) != 0U) {
-    mln::core::set_thread_error(
-      "mln_custom_geometry_source_options.fields contains unknown bits"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (options->fetch_tile == nullptr) {
-    mln::core::set_thread_error("fetch_tile must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (
-    has_custom_geometry_source_option(
-      *options, MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM
-    )
-  ) {
-    const auto status =
-      validate_custom_geometry_zoom(options->min_zoom, "min_zoom");
-    if (status != MLN_STATUS_OK) {
-      return status;
-    }
-  }
-  if (
-    has_custom_geometry_source_option(
-      *options, MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM
-    )
-  ) {
-    const auto status =
-      validate_custom_geometry_zoom(options->max_zoom, "max_zoom");
-    if (status != MLN_STATUS_OK) {
-      return status;
-    }
-  }
-  const auto effective = effective_custom_geometry_source_options(*options);
-  if (effective.min_zoom > effective.max_zoom) {
-    mln::core::set_thread_error(
-      "min_zoom must be less than or equal to max_zoom"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (!std::isfinite(effective.tolerance) || effective.tolerance < 0.0) {
-    mln::core::set_thread_error("tolerance must be finite and non-negative");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (effective.tile_size == 0 || effective.tile_size > 65535U) {
-    mln::core::set_thread_error("tile_size must be within [1, 65535]");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (effective.buffer > 65535U) {
-    mln::core::set_thread_error("buffer must be at most 65535");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
-}
-
-auto effective_custom_geometry_source_options(
-  const mln_custom_geometry_source_options& options
-) -> mln_custom_geometry_source_options {
-  auto result = mln::core::custom_geometry_source_options_default();
-  result.fields = options.fields;
-  result.fetch_tile = options.fetch_tile;
-  result.cancel_tile = options.cancel_tile;
-  result.user_data = options.user_data;
-  result.release_user_data = options.release_user_data;
-  if (
-    has_custom_geometry_source_option(
-      options, MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM
-    )
-  ) {
-    result.min_zoom = options.min_zoom;
-  }
-  if (
-    has_custom_geometry_source_option(
-      options, MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM
-    )
-  ) {
-    result.max_zoom = options.max_zoom;
-  }
-  if (
-    has_custom_geometry_source_option(
-      options, MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE
-    )
-  ) {
-    result.tolerance = options.tolerance;
-  }
-  if (
-    has_custom_geometry_source_option(
-      options, MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE
-    )
-  ) {
-    result.tile_size = options.tile_size;
-  }
-  if (
-    has_custom_geometry_source_option(
-      options, MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER
-    )
-  ) {
-    result.buffer = options.buffer;
-  }
-  if (
-    has_custom_geometry_source_option(
-      options, MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP
-    )
-  ) {
-    result.clip = options.clip;
-  }
-  if (
-    has_custom_geometry_source_option(
-      options, MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP
-    )
-  ) {
-    result.wrap = options.wrap;
-  }
-  return result;
-}
-
-auto to_c_canonical_tile_id(const mbgl::CanonicalTileID& tile_id)
-  -> mln_canonical_tile_id {
-  return mln_canonical_tile_id{.z = tile_id.z, .x = tile_id.x, .y = tile_id.y};
-}
-
-auto to_native_tile_function(
-  mln_custom_geometry_source_tile_callback callback, void* user_data
-) -> mbgl::style::TileFunction {
-  if (callback == nullptr) {
-    return nullptr;
-  }
-  return [callback, user_data](const mbgl::CanonicalTileID& tile_id) -> void {
-    try {
-      callback(user_data, to_c_canonical_tile_id(tile_id));
-    } catch (const std::exception& exception) {
-      mln::core::set_thread_error(exception);
-    } catch (...) {
-      mln::core::set_thread_error("custom geometry source callback threw");
-    }
-  };
-}
-
-auto to_native_custom_geometry_source_options(
-  const mln_custom_geometry_source_options& options
-) -> mbgl::style::CustomGeometrySource::Options {
-  auto result = mbgl::style::CustomGeometrySource::Options{};
-  result.fetchTileFunction =
-    to_native_tile_function(options.fetch_tile, options.user_data);
-  result.cancelTileFunction =
-    to_native_tile_function(options.cancel_tile, options.user_data);
-  result.zoomRange = mbgl::Range<uint8_t>{
-    static_cast<uint8_t>(options.min_zoom),
-    static_cast<uint8_t>(options.max_zoom)
-  };
-  result.tileOptions = mbgl::style::CustomGeometrySource::TileOptions{
-    .tolerance = options.tolerance,
-    .tileSize = static_cast<uint16_t>(options.tile_size),
-    .buffer = static_cast<uint16_t>(options.buffer),
-    .clip = options.clip,
-    .wrap = options.wrap
-  };
-  return result;
-}
+namespace mln::core {
 
 // Holds the release callback owed for each tracked custom geometry source. A
 // host cannot see when a style load drops a source, so this layer tracks it.
 //
-// Every mutation runs on the map owner thread, which is the only thread that
-// adds or removes sources and the only thread mbgl reports style loads on.
+// Every mutation runs on the runtime worker, which is the only thread that
+// adds or removes sources and receives MapLibre style-load callbacks.
 class CustomGeometrySourceRegistry final {
  public:
   CustomGeometrySourceRegistry() = default;
@@ -1098,15 +139,8 @@ class CustomGeometrySourceRegistry final {
     const std::string& source_id,
     mln_custom_geometry_source_release_callback release, void* user_data
   ) -> void {
-    // An entry already under this ID belongs to a source that the style dropped
-    // before reconciliation ran, so it still owes its release. Invoke it here
-    // rather than letting the assignment below drop it, which keeps
-    // exactly-once independent of when the style-loaded observer reconciles.
-    if (const auto stale = entries_.find(source_id); stale != entries_.end()) {
-      const auto owed = stale->second;
-      entries_.erase(stale);
-      invoke(owed);
-    }
+    // The style validates duplicate IDs before this registry mutates. Replacing
+    // a tracked entry here would release state for a source that remains live.
     if (release == nullptr) {
       return;
     }
@@ -1123,8 +157,7 @@ class CustomGeometrySourceRegistry final {
   }
 
   // The observer that reports style loads has no route to a style, so the
-  // registry keeps the map it belongs to. destroy_map() clears it before the
-  // map is destroyed.
+  // registry keeps the map that it belongs to until close detaches it.
   auto attach(mbgl::Map& map) noexcept -> void { map_ = &map; }
 
   auto detach() noexcept -> void { map_ = nullptr; }
@@ -1193,446 +226,30 @@ class CustomGeometrySourceRegistry final {
   mbgl::Map* map_ = nullptr;
 };
 
-auto validate_canonical_tile_id(mln_canonical_tile_id tile_id) -> mln_status {
-  if (tile_id.z > 32U) {
-    mln::core::set_thread_error("tile_id.z must be within [0, 32]");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto coordinate_limit = uint64_t{1} << tile_id.z;
-  if (tile_id.x >= coordinate_limit || tile_id.y >= coordinate_limit) {
-    mln::core::set_thread_error("tile_id x and y must be within zoom bounds");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
+auto track_custom_geometry_source(
+  MapObject& map, const std::string& source_id,
+  mln_custom_geometry_source_release_callback release, void* user_data
+) -> void {
+  map.custom_geometry_sources->add(source_id, release, user_data);
 }
 
-auto to_native_canonical_tile_id(mln_canonical_tile_id tile_id)
-  -> mbgl::CanonicalTileID {
-  return mbgl::CanonicalTileID{
-    static_cast<uint8_t>(tile_id.z), tile_id.x, tile_id.y
-  };
+auto untrack_custom_geometry_source(
+  MapObject& map, const std::string& source_id
+) noexcept -> void {
+  map.custom_geometry_sources->untrack(source_id);
 }
 
-auto validate_source_id(mln_buffer_view source_id) -> mln_status {
-  if (!validate_string_view(source_id, "source_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (source_id.size == 0) {
-    mln::core::set_thread_error("source_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
+auto release_custom_geometry_source(
+  MapObject& map, const std::string& source_id
+) -> void {
+  map.custom_geometry_sources->release(source_id);
 }
 
-auto validate_source_can_be_added(
-  mbgl::style::Style& style, const std::string& source_id
-) -> mln_status {
-  if (style.getSource(source_id) != nullptr) {
-    mln::core::set_thread_error("source already exists");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
-}
+}  // namespace mln::core
 
-auto has_style_image_option(
-  const mln_style_image_options& options, uint32_t field
-) -> bool {
-  return (options.fields & field) != 0U;
-}
+namespace {
 
-auto validate_style_image_options(const mln_style_image_options* options)
-  -> mln_status {
-  if (options == nullptr) {
-    return MLN_STATUS_OK;
-  }
-  if (options->size < sizeof(mln_style_image_options)) {
-    mln::core::set_thread_error("mln_style_image_options.size is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  constexpr auto known_fields =
-    static_cast<uint32_t>(MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO) |
-    MLN_STYLE_IMAGE_OPTION_SDF | MLN_STYLE_IMAGE_OPTION_STRETCH_X |
-    MLN_STYLE_IMAGE_OPTION_STRETCH_Y | MLN_STYLE_IMAGE_OPTION_CONTENT |
-    MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH |
-    MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT;
-  if ((options->fields & ~known_fields) != 0U) {
-    mln::core::set_thread_error(
-      "mln_style_image_options.fields contains unknown bits"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (
-    has_style_image_option(*options, MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO) &&
-    (!std::isfinite(options->pixel_ratio) || options->pixel_ratio <= 0.0F)
-  ) {
-    mln::core::set_thread_error("pixel_ratio must be finite and positive");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  for (const auto& [field, stretches, count, name] : {
-         std::tuple{
-           uint32_t{MLN_STYLE_IMAGE_OPTION_STRETCH_X}, options->stretch_x,
-           options->stretch_x_count, "stretch_x"
-         },
-         std::tuple{
-           uint32_t{MLN_STYLE_IMAGE_OPTION_STRETCH_Y}, options->stretch_y,
-           options->stretch_y_count, "stretch_y"
-         },
-       }) {
-    if (!has_style_image_option(*options, field)) {
-      continue;
-    }
-    if (stretches == nullptr && count != 0) {
-      auto message =
-        std::string{name} + " must not be null when its count is non-zero";
-      mln::core::set_thread_error(message.c_str());
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    for (size_t index = 0; index < count; index += 1) {
-      const auto& stretch = stretches[index];
-      if (!std::isfinite(stretch.from) || !std::isfinite(stretch.to)) {
-        auto message = std::string{name} + " intervals must be finite";
-        mln::core::set_thread_error(message.c_str());
-        return MLN_STATUS_INVALID_ARGUMENT;
-      }
-      // MapLibre divides by the summed interval width, so an axis whose
-      // intervals are all zero-width would divide by zero.
-      if (stretch.from >= stretch.to) {
-        auto message =
-          std::string{name} + " intervals must have a positive width";
-        mln::core::set_thread_error(message.c_str());
-        return MLN_STATUS_INVALID_ARGUMENT;
-      }
-      if (index != 0 && stretch.from < stretches[index - 1].to) {
-        auto message =
-          std::string{name} + " intervals must increase and must not overlap";
-        mln::core::set_thread_error(message.c_str());
-        return MLN_STATUS_INVALID_ARGUMENT;
-      }
-    }
-  }
-  if (has_style_image_option(*options, MLN_STYLE_IMAGE_OPTION_CONTENT)) {
-    const auto& content = options->content;
-    if (
-      !std::isfinite(content.left) || !std::isfinite(content.top) ||
-      !std::isfinite(content.right) || !std::isfinite(content.bottom)
-    ) {
-      mln::core::set_thread_error("content insets must be finite");
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    if (content.left > content.right || content.top > content.bottom) {
-      mln::core::set_thread_error("content insets must not run backwards");
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-  }
-  for (const auto& [field, value, name] : {
-         std::tuple{
-           uint32_t{MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH},
-           options->text_fit_width, "text_fit_width"
-         },
-         std::tuple{
-           uint32_t{MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT},
-           options->text_fit_height, "text_fit_height"
-         },
-       }) {
-    if (!has_style_image_option(*options, field)) {
-      continue;
-    }
-    switch (value) {
-      case MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK:
-      case MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY:
-      case MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL:
-        break;
-      default: {
-        auto message = std::string{name} + " is invalid";
-        mln::core::set_thread_error(message.c_str());
-        return MLN_STATUS_INVALID_ARGUMENT;
-      }
-    }
-  }
-  return MLN_STATUS_OK;
-}
-
-auto effective_style_image_options(const mln_style_image_options* options)
-  -> mln_style_image_options {
-  auto result = mln::core::style_image_options_default();
-  if (options == nullptr) {
-    return result;
-  }
-  result.fields = options->fields;
-  if (has_style_image_option(*options, MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO)) {
-    result.pixel_ratio = options->pixel_ratio;
-  }
-  if (has_style_image_option(*options, MLN_STYLE_IMAGE_OPTION_SDF)) {
-    result.sdf = options->sdf;
-  }
-  if (has_style_image_option(*options, MLN_STYLE_IMAGE_OPTION_STRETCH_X)) {
-    result.stretch_x = options->stretch_x;
-    result.stretch_x_count = options->stretch_x_count;
-  }
-  if (has_style_image_option(*options, MLN_STYLE_IMAGE_OPTION_STRETCH_Y)) {
-    result.stretch_y = options->stretch_y;
-    result.stretch_y_count = options->stretch_y_count;
-  }
-  if (has_style_image_option(*options, MLN_STYLE_IMAGE_OPTION_CONTENT)) {
-    result.content = options->content;
-  }
-  if (has_style_image_option(*options, MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH)) {
-    result.text_fit_width = options->text_fit_width;
-  }
-  if (
-    has_style_image_option(*options, MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT)
-  ) {
-    result.text_fit_height = options->text_fit_height;
-  }
-  return result;
-}
-
-auto to_native_image_stretches(const mln_image_stretch* stretches, size_t count)
-  -> mbgl::style::ImageStretches {
-  auto native = mbgl::style::ImageStretches{};
-  native.reserve(count);
-  for (size_t index = 0; index < count; index += 1) {
-    native.emplace_back(stretches[index].from, stretches[index].to);
-  }
-  return native;
-}
-
-auto to_native_text_fit(uint32_t value) -> mbgl::style::TextFit {
-  switch (value) {
-    case MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY:
-      return mbgl::style::TextFit::stretchOnly;
-    case MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL:
-      return mbgl::style::TextFit::proportional;
-    default:
-      return mbgl::style::TextFit::stretchOrShrink;
-  }
-}
-
-auto from_native_text_fit(mbgl::style::TextFit value) -> uint32_t {
-  switch (value) {
-    case mbgl::style::TextFit::stretchOnly:
-      return MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY;
-    case mbgl::style::TextFit::proportional:
-      return MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL;
-    default:
-      return MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK;
-  }
-}
-
-auto required_premultiplied_rgba8_bytes(
-  uint32_t width, uint32_t height, uint32_t stride
-) -> std::optional<size_t> {
-  constexpr auto channels = size_t{4};
-  const auto row_bytes = static_cast<size_t>(width) * channels;
-  if (height == 0) {
-    return std::nullopt;
-  }
-  if (height == 1) {
-    return row_bytes;
-  }
-  const auto trailing_rows = static_cast<size_t>(height - 1U);
-  const auto row_stride = static_cast<size_t>(stride);
-  if (
-    trailing_rows >
-    (std::numeric_limits<size_t>::max() - row_bytes) / row_stride
-  ) {
-    return std::nullopt;
-  }
-  return (trailing_rows * row_stride) + row_bytes;
-}
-
-auto validate_premultiplied_rgba8_image(
-  const mln_premultiplied_rgba8_image* image
-) -> mln_status {
-  if (image == nullptr) {
-    mln::core::set_thread_error("image must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (image->size < sizeof(mln_premultiplied_rgba8_image)) {
-    mln::core::set_thread_error(
-      "mln_premultiplied_rgba8_image.size is too small"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (image->width == 0 || image->height == 0) {
-    mln::core::set_thread_error("image dimensions must be positive");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  constexpr auto channels = uint32_t{4};
-  if (image->width > std::numeric_limits<uint32_t>::max() / channels) {
-    mln::core::set_thread_error("image row byte length overflows");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto row_bytes = image->width * channels;
-  if (image->stride < row_bytes) {
-    mln::core::set_thread_error("image stride must be at least width * 4");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (image->pixels == nullptr) {
-    mln::core::set_thread_error("image pixels must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto required = required_premultiplied_rgba8_bytes(
-    image->width, image->height, image->stride
-  );
-  if (!required || image->byte_length < *required) {
-    mln::core::set_thread_error("image byte_length is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
-}
-
-auto to_native_premultiplied_rgba8_image(
-  const mln_premultiplied_rgba8_image& image
-) -> mbgl::PremultipliedImage {
-  auto result = mbgl::PremultipliedImage{mbgl::Size{image.width, image.height}};
-  const auto output_stride = result.stride();
-  const auto row_bytes = static_cast<size_t>(image.width) * 4U;
-  const auto input = std::span<const uint8_t>{image.pixels, image.byte_length};
-  const auto output = std::span<uint8_t>{result.data.get(), result.bytes()};
-  for (auto row = uint32_t{0}; row < image.height; ++row) {
-    const auto input_offset = static_cast<size_t>(row) * image.stride;
-    const auto output_offset = static_cast<size_t>(row) * output_stride;
-    std::copy_n(
-      input.subspan(input_offset, row_bytes).begin(), row_bytes,
-      output.subspan(output_offset, row_bytes).begin()
-    );
-  }
-  return result;
-}
-
-auto validate_image_id(mln_buffer_view image_id) -> mln_status {
-  if (!validate_string_view(image_id, "image_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (image_id.size == 0) {
-    mln::core::set_thread_error("image_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
-}
-
-auto style_image_info_from_native(const mbgl::style::Image& image)
-  -> mln_style_image_info {
-  const auto& pixels = image.getImage();
-  return mln_style_image_info{
-    .size = sizeof(mln_style_image_info),
-    .width = pixels.size.width,
-    .height = pixels.size.height,
-    .stride = static_cast<uint32_t>(pixels.stride()),
-    .byte_length = pixels.bytes(),
-    .stretch_x_count = image.getStretchX().size(),
-    .stretch_y_count = image.getStretchY().size(),
-    .content =
-      image.getContent().has_value()
-        ? mln_image_content{
-            .left = image.getContent()->left,
-            .top = image.getContent()->top,
-            .right = image.getContent()->right,
-            .bottom = image.getContent()->bottom
-          }
-        : mln_image_content{.left = 0, .top = 0, .right = 0, .bottom = 0},
-    .text_fit_width =
-      image.getTextFitWidth().has_value()
-        ? from_native_text_fit(*image.getTextFitWidth())
-        : static_cast<uint32_t>(MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK),
-    .text_fit_height =
-      image.getTextFitHeight().has_value()
-        ? from_native_text_fit(*image.getTextFitHeight())
-        : static_cast<uint32_t>(MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK),
-    .pixel_ratio = image.getPixelRatio(),
-    .sdf = image.isSdf(),
-    .has_content = image.getContent().has_value(),
-    .has_text_fit_width = image.getTextFitWidth().has_value(),
-    .has_text_fit_height = image.getTextFitHeight().has_value()
-  };
-}
-
-auto validate_image_source_coordinates(
-  const mln_lat_lng* coordinates, size_t coordinate_count
-) -> mln_status {
-  if (coordinate_count != 4) {
-    mln::core::set_thread_error("image source coordinate_count must be 4");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto status =
-    validate_lat_lng_array(coordinates, coordinate_count, false);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-
-  const auto coordinate_span = std::span<const mln_lat_lng>{coordinates, 4};
-  const auto first = coordinate_span.front();
-  const auto all_same =
-    std::ranges::all_of(coordinate_span, [first](mln_lat_lng value) -> bool {
-      return value.latitude == first.latitude &&
-             value.longitude == first.longitude;
-    });
-  if (all_same) {
-    mln::core::set_thread_error("image source coordinates must not all match");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
-}
-
-auto to_native_image_source_coordinates(const mln_lat_lng* coordinates)
-  -> std::array<mbgl::LatLng, 4> {
-  auto result = std::array<mbgl::LatLng, 4>{};
-  const auto coordinate_span = std::span<const mln_lat_lng>{coordinates, 4};
-  auto index = size_t{0};
-  for (const auto coordinate : coordinate_span) {
-    result.at(index) = to_native_lat_lng(coordinate);
-    ++index;
-  }
-  return result;
-}
-
-auto from_native_image_source_coordinates(
-  const std::array<mbgl::LatLng, 4>& coordinates
-) -> std::array<mln_lat_lng, 4> {
-  auto result = std::array<mln_lat_lng, 4>{};
-  for (auto index = size_t{0}; index < result.size(); ++index) {
-    result.at(index) = from_native_lat_lng(coordinates.at(index));
-  }
-  return result;
-}
-
-auto create_style_id_list(
-  std::vector<std::string> ids, mln_style_id_list* out_list
-) -> mln_status {
-  if (out_list == nullptr || *out_list != MLN_HANDLE_NULL) {
-    mln::core::set_thread_error(
-      "out_list must not be null and *out_list must be the null handle"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto list = std::make_shared<mln::core::StyleIdListObject>();
-  list->ids = std::move(ids);
-  *out_list = mln::core::handle_table<mln::core::StyleIdListObject>().insert(
-    std::move(list)
-  );
-  return MLN_STATUS_OK;
-}
-
-auto create_style_string_list(
-  std::vector<std::string> values, mln_style_string_list* out_list
-) -> mln_status {
-  if (out_list == nullptr || *out_list != MLN_HANDLE_NULL) {
-    mln::core::set_thread_error(
-      "out_list must not be null and *out_list must be the null handle"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto list = std::make_shared<mln::core::StyleStringListObject>();
-  list->values = std::move(values);
-  *out_list =
-    mln::core::handle_table<mln::core::StyleStringListObject>().insert(
-      std::move(list)
-    );
-  return MLN_STATUS_OK;
-}
+using mln::core::CustomGeometrySourceRegistry;
 
 auto to_c_camera_change_mode(mbgl::MapObserver::CameraChangeMode mode)
   -> int32_t {
@@ -1732,6 +349,10 @@ auto tile_action_payload(
   };
   return payload;
 }
+
+}  // namespace
+
+namespace mln::core {
 
 // Every callback tests the map's subscription mask before it builds anything,
 // so an unselected event allocates no payload, message, or queue node.
@@ -1925,12 +546,17 @@ class HeadlessObserver final : public mbgl::MapObserver {
   std::shared_ptr<CustomGeometrySourceRegistry> custom_geometry_sources_;
 };
 
+}  // namespace mln::core
+
+namespace {
+
+using mln::core::HeadlessObserver;
+
 // Delivers mbgl::RendererObserver callbacks on the map's run loop instead of on
 // whichever thread rendered. The delegate is mbgl::Map::Impl, whose handlers
-// touch map-thread state, so every callback becomes a mailbox message that runs
-// during the host's next mln_runtime_pump(). Forwarding is unconditional, so
-// delivery order is the same whether or not the session shares the map's owner
-// thread.
+// must not run concurrently. Every callback therefore becomes a mailbox message
+// submitted to the runtime worker. Forwarding is unconditional, preserving
+// delivery order independently of the callback's native thread.
 class ForwardingRendererObserver final : public mbgl::RendererObserver {
  public:
   ForwardingRendererObserver(
@@ -2060,22 +686,9 @@ class ForwardingRendererObserver final : public mbgl::RendererObserver {
   mbgl::ActorRef<mbgl::RendererObserver> delegate_;
 };
 
-// Map mutations a render session reaches for from its own owner thread. The
-// mailbox on the map's run loop keeps mbgl::Map single-threaded, and closing it
-// during map teardown turns late messages into no-ops.
-class MapCommands {
- public:
-  explicit MapCommands(mbgl::Map& map) : map_(map) {}
+}  // namespace
 
-  auto set_size(uint32_t width, uint32_t height) -> void {
-    map_.setSize(mbgl::Size{width, height});
-  }
-
-  auto trigger_repaint() -> void { map_.triggerRepaint(); }
-
- private:
-  mbgl::Map& map_;
-};
+namespace mln::core {
 
 class HeadlessFrontend final : public mbgl::RendererFrontend {
  public:
@@ -2099,37 +712,57 @@ class HeadlessFrontend final : public mbgl::RendererFrontend {
   void reset() override {
     const std::scoped_lock lock(latest_update_mutex_);
     latest_update_.reset();
+    repaint_demand_ = false;
   }
 
-  // mbgl::Map calls this once, from its constructor, on the map owner thread.
+  // mbgl::Map calls this once from its constructor on the runtime worker.
   void setObserver(mbgl::RendererObserver& observer) override {
     observer_ =
       std::make_unique<ForwardingRendererObserver>(run_loop_, observer);
   }
 
-  // The latest update is render state that a session reads whatever the mask
-  // selects, so it is stored first. Pushing outside the update lock keeps
-  // `latest_update_mutex_` off the handle table and `event_mutex`; only the map
-  // owner thread reaches this, so nothing can interleave in between.
+  // Store render state before publishing it to sessions and event consumers.
   void update(std::shared_ptr<mbgl::UpdateParameters> update) override {
+    std::function<void()> publish;
     {
       const std::scoped_lock lock(latest_update_mutex_);
       latest_update_ = std::move(update);
+      ++latest_update_generation_;
+      repaint_demand_ = true;
+      publish = publish_;
     }
-    if (!mln::core::event_selected(
-          event_state_->mask, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
-        )) {
-      return;
+    if (publish) {
+      publish();
     }
-    mln::core::push_runtime_map_event(
-      runtime_, map_, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
-    );
+    if (
+      mln::core::event_selected(
+        event_state_->mask, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
+      )
+    ) {
+      mln::core::push_runtime_map_event(
+        runtime_, map_, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
+      );
+    }
   }
 
   [[nodiscard]] auto latest_update() const
     -> std::shared_ptr<mbgl::UpdateParameters> {
     const std::scoped_lock lock(latest_update_mutex_);
     return latest_update_;
+  }
+  auto set_publish_callback(std::function<void()> publish) -> void {
+    const std::scoped_lock lock(latest_update_mutex_);
+    publish_ = std::move(publish);
+  }
+
+  [[nodiscard]] auto latest_update_generation() const -> uint64_t {
+    const std::scoped_lock lock(latest_update_mutex_);
+    return latest_update_generation_;
+  }
+
+  [[nodiscard]] auto repaint_demand() const -> bool {
+    const std::scoped_lock lock(latest_update_mutex_);
+    return repaint_demand_;
   }
 
   auto run_render_jobs() -> void { thread_pool_.runRenderJobs(); }
@@ -2167,7 +800,16 @@ class HeadlessFrontend final : public mbgl::RendererFrontend {
   mbgl::TaggedScheduler thread_pool_;
   mutable std::mutex latest_update_mutex_;
   std::shared_ptr<mbgl::UpdateParameters> latest_update_;
+  std::function<void()> publish_;
+  uint64_t latest_update_generation_ = 0;
+  bool repaint_demand_ = false;
 };
+
+}  // namespace mln::core
+
+namespace {
+
+using mln::core::HeadlessFrontend;
 
 auto validate_map_options(const mln_map_options* options) -> mln_status {
   if (options == nullptr) {
@@ -2191,11 +833,12 @@ auto validate_map_options(const mln_map_options* options) -> mln_status {
   }
 
   if (
-    options->width == 0 || options->height == 0 ||
-    !std::isfinite(options->scale_factor) || options->scale_factor <= 0
+    options->initial_extent.width == 0 || options->initial_extent.height == 0 ||
+    !std::isfinite(options->initial_extent.scale_factor) ||
+    options->initial_extent.scale_factor <= 0
   ) {
     mln::core::set_thread_error(
-      "map dimensions and scale_factor must be positive"
+      "initial extent dimensions and scale factor must be positive"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -2323,10 +966,6 @@ auto duration_from_milliseconds(double milliseconds) -> mbgl::Duration {
   return std::chrono::duration_cast<mbgl::Duration>(
     DoubleMilliseconds{milliseconds}
   );
-}
-
-auto milliseconds_from_duration(mbgl::Duration duration) -> double {
-  return std::chrono::duration_cast<DoubleMilliseconds>(duration).count();
 }
 
 // The accepted bound is exclusive because mbgl::Duration::max() has no exact
@@ -2578,41 +1217,6 @@ auto validate_free_camera_options(const mln_free_camera_options* options)
       return status;
     }
   }
-  return MLN_STATUS_OK;
-}
-
-auto validate_projection_mode_options(const mln_projection_mode* mode)
-  -> mln_status {
-  if (mode == nullptr) {
-    mln::core::set_thread_error("projection mode must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  if (mode->size < sizeof(mln_projection_mode)) {
-    mln::core::set_thread_error("mln_projection_mode.size is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  constexpr auto known_fields =
-    static_cast<uint32_t>(MLN_PROJECTION_MODE_AXONOMETRIC) |
-    MLN_PROJECTION_MODE_X_SKEW | MLN_PROJECTION_MODE_Y_SKEW;
-  if ((mode->fields & ~known_fields) != 0U) {
-    mln::core::set_thread_error(
-      "mln_projection_mode.fields contains unknown bits"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  if (
-    ((mode->fields & MLN_PROJECTION_MODE_X_SKEW) != 0U &&
-     !std::isfinite(mode->x_skew)) ||
-    ((mode->fields & MLN_PROJECTION_MODE_Y_SKEW) != 0U &&
-     !std::isfinite(mode->y_skew))
-  ) {
-    mln::core::set_thread_error("projection skew values must be finite");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
   return MLN_STATUS_OK;
 }
 
@@ -2972,11 +1576,10 @@ auto camera_transition_finished_payload(uint64_t transition_id)
   return payload;
 }
 
-// MapLibre Native owns the returned AnimationOptions for the lifetime of the
-// transition, and invokes transitionFinishFn on the map owner thread. The push
-// discards events for a destroyed map, so a transition outliving the map
-// enqueues nothing. The lambda holds the event state by value, so it reads a
-// live mask cell at completion time even for a map that is already gone.
+// MapLibre Native owns the returned AnimationOptions for the transition
+// lifetime and invokes transitionFinishFn on the runtime worker. Event
+// publication discards events for a closed map. The lambda holds event state by
+// value, so it can still inspect the selected mask after map close.
 auto to_native_animation(
   mln_runtime runtime, mln_map map,
   const std::shared_ptr<mln::core::MapEventState>& event_state,
@@ -3047,21 +1650,6 @@ auto camera_fit_pitch(const mln_camera_fit_options* options)
     return std::nullopt;
   }
   return options->pitch;
-}
-
-auto to_native_projection_mode(const mln_projection_mode& mode)
-  -> mbgl::ProjectionMode {
-  auto result = mbgl::ProjectionMode{};
-  if ((mode.fields & MLN_PROJECTION_MODE_AXONOMETRIC) != 0U) {
-    result.withAxonometric(mode.axonometric);
-  }
-  if ((mode.fields & MLN_PROJECTION_MODE_X_SKEW) != 0U) {
-    result.withXSkew(mode.x_skew);
-  }
-  if ((mode.fields & MLN_PROJECTION_MODE_Y_SKEW) != 0U) {
-    result.withYSkew(mode.y_skew);
-  }
-  return result;
 }
 
 auto to_native_debug_options(uint32_t options) -> mbgl::MapDebugOptions {
@@ -3383,53 +1971,119 @@ auto from_native_free_camera(const mbgl::FreeCameraOptions& options)
   return result;
 }
 
-auto screen_point(mln_screen_point point) -> mbgl::ScreenCoordinate {
-  return mbgl::ScreenCoordinate{point.x, point.y};
-}
 }  // namespace
 
 namespace mln::core {
+auto validate_debug_options_input(uint32_t options) -> mln_status {
+  return validate_debug_options(options);
+}
 
-struct MapObject {
-  mln_runtime runtime = MLN_HANDLE_NULL;
-  std::thread::id owner_thread;
-  uint32_t map_mode = MLN_MAP_MODE_CONTINUOUS;
-  double scale_factor = default_scale_factor;
-  bool still_image_request_pending = false;
-  // Declared first so reverse-order destruction runs the release callbacks it
-  // still owes after the mbgl::Map that could still reach a source is gone.
-  std::shared_ptr<CustomGeometrySourceRegistry> custom_geometry_sources;
-  // Declared before `observer` so reverse-order destruction retires the
-  // observer, which holds its own reference, before this member is destroyed.
-  std::shared_ptr<MapEventState> event_state;
-  std::unique_ptr<HeadlessObserver> observer;
-  std::unique_ptr<HeadlessFrontend> frontend;
-  std::unique_ptr<mbgl::Map> map;
-  // Declared after `map` so reverse-order destruction retires the command
-  // channel before the mbgl::Map it targets.
-  std::unique_ptr<MapCommands> commands;
-  std::shared_ptr<mbgl::Mailbox> command_mailbox;
-  std::optional<mbgl::ActorRef<MapCommands>> command_ref;
-  // Guarded by the map handle table's mutex; a render session on another thread
-  // clears it from map_detach_render_target_session().
-  void* render_target_session = nullptr;
+auto validate_viewport_options_input(const mln_map_viewport_options* options)
+  -> mln_status {
+  return validate_viewport_options(options);
+}
+
+auto validate_tile_options_input(const mln_map_tile_options* options)
+  -> mln_status {
+  return validate_tile_options(options);
+}
+
+auto validate_bound_options_input(const mln_bound_options* options)
+  -> mln_status {
+  return validate_bound_options(options);
+}
+
+auto validate_free_camera_options_input(const mln_free_camera_options* options)
+  -> mln_status {
+  return validate_free_camera_options(options);
+}
+
+MapObject::~MapObject() = default;
+
+MapProjectionObject::~MapProjectionObject() = default;
+
+class PendingMapResult final {
+ public:
+  explicit PendingMapResult(mln_map value) : value_(value) {}
+  ~PendingMapResult();
+  PendingMapResult(const PendingMapResult&) = delete;
+  PendingMapResult(PendingMapResult&&) = delete;
+  auto operator=(const PendingMapResult&) -> PendingMapResult& = delete;
+  auto operator=(PendingMapResult&&) -> PendingMapResult& = delete;
+
+  [[nodiscard]] auto value() const noexcept -> mln_map { return value_; }
+  auto transfer() noexcept -> void { value_ = MLN_HANDLE_NULL; }
+
+ private:
+  mln_map value_ = MLN_HANDLE_NULL;
 };
 
-template <>
-struct HandleTraits<MapObject> {
-  static constexpr auto kind = HandleKind::Map;
-  static constexpr auto leasable = false;
+class PendingProjectionResult final {
+ public:
+  explicit PendingProjectionResult(std::shared_ptr<MapProjectionObject> value)
+      : value_(new std::shared_ptr<MapProjectionObject>{std::move(value)}) {}
+
+  PendingProjectionResult(const PendingProjectionResult&) = delete;
+  PendingProjectionResult(PendingProjectionResult&&) = delete;
+  auto operator=(const PendingProjectionResult&)
+    -> PendingProjectionResult& = delete;
+  auto operator=(PendingProjectionResult&&)
+    -> PendingProjectionResult& = delete;
+
+  ~PendingProjectionResult() {
+    if (value_ == nullptr) {
+      return;
+    }
+    auto runtime = (*value_)->runtime_state;
+    auto* value = std::exchange(value_, nullptr);
+    auto cleanup = [value]() mutable -> void {
+      (*value)->projection.reset();
+      (*value)->parent->control.release_child();
+      (*value)->parent.reset();
+      delete value;
+    };
+    if (runtime->executor.is_worker_thread()) {
+      cleanup();
+      return;
+    }
+    try {
+      runtime->executor.invoke(std::move(cleanup));
+    } catch (...) {
+      // A stopped runtime cannot safely destroy MapLibre state. Process
+      // teardown reclaims this unreachable allocation.
+    }
+  }
+
+  [[nodiscard]] auto value() const
+    -> const std::shared_ptr<MapProjectionObject>& {
+    return *value_;
+  }
+
+  auto transfer() noexcept -> void { delete std::exchange(value_, nullptr); }
+
+ private:
+  std::shared_ptr<MapProjectionObject>* value_;
 };
 
-struct MapProjectionObject {
-  std::thread::id owner_thread;
-  std::unique_ptr<mbgl::MapProjection> projection;
-};
+class ChildReservationGuard final {
+ public:
+  explicit ChildReservationGuard(ControlState& state) noexcept
+      : state_(&state) {}
+  ChildReservationGuard(const ChildReservationGuard&) = delete;
+  ChildReservationGuard(ChildReservationGuard&&) = delete;
+  auto operator=(const ChildReservationGuard&)
+    -> ChildReservationGuard& = delete;
+  auto operator=(ChildReservationGuard&&) -> ChildReservationGuard& = delete;
+  ~ChildReservationGuard() {
+    if (state_ != nullptr) {
+      state_->abandon_child_reservation();
+    }
+  }
 
-template <>
-struct HandleTraits<MapProjectionObject> {
-  static constexpr auto kind = HandleKind::MapProjection;
-  static constexpr auto leasable = false;
+  auto dismiss() noexcept -> void { state_ = nullptr; }
+
+ private:
+  ControlState* state_;
 };
 
 }  // namespace mln::core
@@ -3457,40 +2111,46 @@ class RuntimeMapRetainGuard final {
   mln_runtime runtime_ = MLN_HANDLE_NULL;
 };
 
-// Runs on the map thread from mbgl's still-image continuation. It takes the
-// handle rather than the object because the map can be destroyed between the
-// request and the callback, and try_resolve leaves the thread-local diagnostic
-// to the pump this fires under.
+// Runs on the runtime worker from MapLibre's still-image continuation and
+// resolves the handle that identifies the pending request.
 auto finish_still_image_request(mln_map map, std::exception_ptr error) -> void {
   auto* live = handle_table<MapObject>().try_resolve(map);
   if (live == nullptr) {
     return;
   }
-  // Clearing the pending flag is map state that the next request reads, so it
-  // happens whatever the mask selects.
   live->still_image_request_pending = false;
+  auto operation = std::exchange(live->still_image_operation, {});
   if (error) {
-    if (!event_selected(
-          live->event_state->mask, MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED
-        )) {
-      return;
-    }
     const auto message = exception_message(error);
+    if (operation) {
+      operation->complete(
+        MLN_STATUS_NATIVE_ERROR, message, std::any{std::monostate{}}
+      );
+    }
+    if (
+      event_selected(
+        live->event_state->mask, MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED
+      )
+    ) {
+      push_runtime_map_event(
+        live->runtime, map, MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED, 0,
+        message.c_str()
+      );
+    }
+    return;
+  }
+  if (operation) {
+    operation->complete(MLN_STATUS_OK, {}, std::any{std::monostate{}});
+  }
+  if (
+    event_selected(
+      live->event_state->mask, MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED
+    )
+  ) {
     push_runtime_map_event(
-      live->runtime, map, MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED, 0,
-      message.c_str()
+      live->runtime, map, MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED
     );
-    return;
   }
-
-  if (!event_selected(
-        live->event_state->mask, MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED
-      )) {
-    return;
-  }
-  push_runtime_map_event(
-    live->runtime, map, MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED
-  );
 }
 
 // The caller holds the map handle table's mutex, so it can act on the result
@@ -3502,47 +2162,51 @@ auto validate_map_live_locked(mln_map map, MapObject*& out_map) -> mln_status {
 
 // Same locking contract as validate_map_live_locked().
 auto validate_map_locked(mln_map map, MapObject*& out_map) -> mln_status {
-  const auto status = validate_map_live_locked(map, out_map);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (out_map->owner_thread != std::this_thread::get_id()) {
-    set_thread_error("map call must be made on its owner thread");
-    return MLN_STATUS_WRONG_THREAD;
-  }
-  return MLN_STATUS_OK;
+  return validate_map_live_locked(map, out_map);
 }
 
-auto copy_text(
-  const std::string& text, char* out_text, size_t text_capacity,
-  size_t* out_text_size, const char* capacity_name
-) -> mln_status {
-  if (out_text == nullptr && text_capacity > 0) {
-    set_thread_error(
-      "output buffer must not be null when capacity is non-zero"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_text_size == nullptr) {
-    set_thread_error("output size pointer must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+constexpr uint32_t map_create_operation_kind = UINT32_C(0x4D01);
+constexpr uint32_t map_close_operation_kind = UINT32_C(0x4D02);
+constexpr uint32_t map_camera_query_operation_kind = UINT32_C(0x4D03);
+constexpr uint32_t map_still_image_operation_kind = UINT32_C(0x4D04);
+constexpr uint32_t map_loaded_style_json_operation_kind = UINT32_C(0x4D05);
+constexpr uint32_t map_style_url_operation_kind = UINT32_C(0x4D06);
 
-  *out_text_size = text.size();
-  // A null buffer with zero capacity is a size probe, so it succeeds rather
-  // than sharing a status with a missing object.
-  if (out_text == nullptr) {
-    return MLN_STATUS_OK;
+auto publish_map_snapshot(MapObject& live) -> uint64_t {
+  const auto options = live.map->getMapOptions();
+  auto snapshot = mln_map_snapshot{
+    .size = sizeof(mln_map_snapshot),
+    .reserved = 0,
+    .generation = live.next_snapshot_generation++,
+    .camera = from_native_camera(live.map->getCameraOptions()),
+    .logical_extent = live.logical_extent,
+    .projection_mode =
+      from_native_projection_mode(live.map->getProjectionMode()),
+    .viewport =
+      {.size = sizeof(mln_map_viewport_options),
+       .fields =
+         static_cast<uint32_t>(MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION) |
+         MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE |
+         MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE |
+         MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET,
+       .north_orientation =
+         from_native_north_orientation(options.northOrientation()),
+       .constrain_mode = from_native_constrain_mode(options.constrainMode()),
+       .viewport_mode = from_native_viewport_mode(options.viewportMode()),
+       .frustum_offset = from_native_edge_insets(live.map->getFrustumOffset())},
+    .loading = !live.map->isFullyLoaded(),
+    .fully_rendered = live.map->isFullyLoaded(),
+    .repaint_demand = live.frontend->repaint_demand(),
+    .reserved_flags = 0,
+    .event_mask = live.event_state->mask.load(std::memory_order_relaxed),
+    .latest_render_update_generation = live.frontend->latest_update_generation()
+  };
+  const auto generation = snapshot.generation;
+  {
+    const std::scoped_lock lock(live.snapshot_mutex);
+    live.snapshot = snapshot;
   }
-  if (text_capacity < text.size()) {
-    auto message = std::string{capacity_name} + " is too small";
-    set_thread_error(message.c_str());
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (!text.empty()) {
-    std::copy(text.begin(), text.end(), out_text);
-  }
-  return MLN_STATUS_OK;
+  return generation;
 }
 
 }  // namespace
@@ -3550,9 +2214,10 @@ auto copy_text(
 auto map_options_default() noexcept -> mln_map_options {
   return mln_map_options{
     .size = sizeof(mln_map_options),
-    .width = default_map_width,
-    .height = default_map_height,
-    .scale_factor = default_scale_factor,
+    .initial_extent =
+      {.width = default_map_width,
+       .height = default_map_height,
+       .scale_factor = default_scale_factor},
     .map_mode = MLN_MAP_MODE_CONTINUOUS,
     .fast_pfor_enabled = false,
     .event_mask = MLN_RUNTIME_EVENT_MASK_ALL
@@ -3585,6 +2250,18 @@ auto animation_options_default() noexcept -> mln_animation_options {
     .min_zoom = 0,
     .easing = {.x1 = 0, .y1 = 0, .x2 = 0.25, .y2 = 1},
     .transition_id = 0
+  };
+}
+auto camera_update_default() noexcept -> mln_camera_update {
+  return mln_camera_update{
+    .size = sizeof(mln_camera_update),
+    .mode = MLN_CAMERA_UPDATE_MODE_JUMP,
+    .camera = camera_options_default(),
+    .animation = animation_options_default(),
+    .gesture_phase = MLN_GESTURE_PHASE_NONE,
+    .reserved = 0,
+    .gesture_id = 0,
+    .animation_id = 0
   };
 }
 
@@ -3655,149 +2332,324 @@ auto map_tile_options_default() noexcept -> mln_map_tile_options {
   };
 }
 
-auto style_tile_source_options_default() noexcept
-  -> mln_style_tile_source_options {
-  return mln_style_tile_source_options{
-    .size = sizeof(mln_style_tile_source_options),
-    .fields = 0,
-    .min_zoom = 0,
-    .max_zoom = mbgl::util::DEFAULT_MAX_ZOOM,
-    .attribution = {.data = nullptr, .size = 0},
-    .scheme = MLN_STYLE_TILE_SCHEME_XYZ,
-    .bounds =
-      {.southwest = {.latitude = 0, .longitude = 0},
-       .northeast = {.latitude = 0, .longitude = 0}},
-    .tile_size = mbgl::util::tileSize_I,
-    .vector_encoding = MLN_STYLE_VECTOR_TILE_ENCODING_MVT,
-    .raster_encoding = MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX
-  };
-}
-
-auto geojson_source_options_default() noexcept -> mln_geojson_source_options {
-  const auto defaults = mbgl::style::GeoJSONOptions{};
-  return mln_geojson_source_options{
-    .size = sizeof(mln_geojson_source_options),
-    .fields = 0,
-    .min_zoom = static_cast<double>(defaults.minzoom),
-    .max_zoom = static_cast<double>(defaults.maxzoom),
-    .tolerance = defaults.tolerance,
-    .cluster_max_zoom = static_cast<double>(defaults.clusterMaxZoom),
-    .cluster_properties = {},
-    .tile_size = defaults.tileSize,
-    .buffer = defaults.buffer,
-    .cluster_radius = defaults.clusterRadius,
-    .cluster_min_points = static_cast<uint32_t>(defaults.clusterMinPoints),
-    .line_metrics = defaults.lineMetrics,
-    .cluster = defaults.cluster,
-    .synchronous_update = defaults.synchronousUpdate
-  };
-}
-
-auto custom_geometry_source_options_default() noexcept
-  -> mln_custom_geometry_source_options {
-  return mln_custom_geometry_source_options{
-    .size = sizeof(mln_custom_geometry_source_options),
-    .fields = 0,
-    .fetch_tile = nullptr,
-    .cancel_tile = nullptr,
-    .user_data = nullptr,
-    .min_zoom = 0,
-    .max_zoom = 18,
-    .tolerance = 0.375,
-    .tile_size = mbgl::util::tileSize_I,
-    .buffer = 128,
-    .clip = false,
-    .wrap = false,
-    .release_user_data = nullptr
-  };
-}
-
-auto premultiplied_rgba8_image_default() noexcept
-  -> mln_premultiplied_rgba8_image {
-  return mln_premultiplied_rgba8_image{
-    .size = sizeof(mln_premultiplied_rgba8_image),
-    .width = 0,
-    .height = 0,
-    .stride = 0,
-    .pixels = nullptr,
-    .byte_length = 0
-  };
-}
-
-auto style_image_options_default() noexcept -> mln_style_image_options {
-  return mln_style_image_options{
-    .size = sizeof(mln_style_image_options),
-    .fields = 0,
-    .stretch_x = nullptr,
-    .stretch_x_count = 0,
-    .stretch_y = nullptr,
-    .stretch_y_count = 0,
-    .content = {.left = 0, .top = 0, .right = 0, .bottom = 0},
-    .text_fit_width = MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK,
-    .text_fit_height = MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK,
-    .pixel_ratio = 1.0F,
-    .sdf = false
-  };
-}
-
-auto style_image_info_default() noexcept -> mln_style_image_info {
-  return mln_style_image_info{
-    .size = sizeof(mln_style_image_info),
-    .width = 0,
-    .height = 0,
-    .stride = 0,
-    .byte_length = 0,
-    .stretch_x_count = 0,
-    .stretch_y_count = 0,
-    .content = {.left = 0, .top = 0, .right = 0, .bottom = 0},
-    .text_fit_width = MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK,
-    .text_fit_height = MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK,
-    .pixel_ratio = 1.0F,
-    .sdf = false,
-    .has_content = false,
-    .has_text_fit_width = false,
-    .has_text_fit_height = false
-  };
-}
-
-auto style_transition_options_default() noexcept
-  -> mln_style_transition_options {
-  return mln_style_transition_options{
-    .size = sizeof(mln_style_transition_options),
-    .fields = 0,
-    .duration_ms = 0.0,
-    .delay_ms = 0.0,
-    .enable_placement_transitions = true
-  };
-}
-
 auto validate_map_live(mln_map map, MapObject*& out_map) -> mln_status {
   const std::scoped_lock lock(handle_table<MapObject>().mutex());
   return validate_map_live_locked(map, out_map);
 }
 
-// Only the owner thread destroys a map, so the borrowed object stays alive for
-// as long as the calling thread can use it.
 auto validate_map(mln_map map, MapObject*& out_map) -> mln_status {
   const std::scoped_lock lock(handle_table<MapObject>().mutex());
   return validate_map_locked(map, out_map);
 }
 
-// Only the owner thread destroys a projection, so the borrowed object stays
-// alive for as long as the calling thread can use it.
-auto validate_map_projection(
-  mln_map_projection handle, MapProjectionObject*& out_projection
-) -> mln_status {
-  out_projection = handle_table<MapProjectionObject>().resolve(handle);
-  if (out_projection == nullptr) {
+namespace {
+
+struct MapSubmissionContext {
+  std::shared_ptr<MapObject> map;
+  std::shared_ptr<ControlLease> control;
+  std::shared_ptr<RuntimeObject> runtime;
+};
+
+auto acquire_map_submission(mln_map map, MapSubmissionContext& out_context)
+  -> mln_status {
+  auto live = handle_table<MapObject>().lease(map);
+  if (live == nullptr) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (out_projection->owner_thread != std::this_thread::get_id()) {
-    set_thread_error("projection call must be made on its owner thread");
-    return MLN_STATUS_WRONG_THREAD;
+  if (!live->control.acquire()) {
+    return MLN_STATUS_INVALID_STATE;
   }
+  auto guard = ControlLease{&live->control};
+  auto control = std::make_shared<ControlLease>(std::move(guard));
+  auto runtime = lease_runtime(live->runtime);
+  if (runtime == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  out_context = MapSubmissionContext{
+    .map = std::move(live),
+    .control = std::move(control),
+    .runtime = std::move(runtime),
+  };
   return MLN_STATUS_OK;
 }
+
+template <typename Work>
+auto submit_registered_map_operation(
+  mln_map map, uint32_t kind, Work work, mln_operation* out_operation
+) -> mln_status {
+  auto context = MapSubmissionContext{};
+  const auto acquire_status = acquire_map_submission(map, context);
+  if (acquire_status != MLN_STATUS_OK) {
+    return acquire_status;
+  }
+  auto state = std::shared_ptr<OperationObject>{};
+  const auto registration = register_operation(
+    context.runtime->event_queue->notification_source, kind, false, {},
+    out_operation, state
+  );
+  if (registration != MLN_STATUS_OK) {
+    return registration;
+  }
+
+  const auto operation = *out_operation;
+  const auto submission = submit_runtime_operation(
+    context.runtime, state,
+    [map = std::move(context.map), control = std::move(context.control), state,
+     work = std::move(work)]() mutable -> void {
+      // The captured map and lease keep the target alive through completion.
+      static_cast<void>(map);
+      static_cast<void>(control);
+      std::invoke(std::move(work), state);
+    }
+  );
+  if (submission != MLN_STATUS_OK) {
+    abandon_operation(operation);
+    *out_operation = MLN_HANDLE_NULL;
+  }
+  return submission;
+}
+
+}  // namespace
+
+auto submit_map_command(
+  mln_map map, std::function<mln_status()> work, uint64_t* out_command_id
+) -> mln_status {
+  if (out_command_id == nullptr || *out_command_id != 0) {
+    set_thread_error("out_command_id must point to zero");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto context = MapSubmissionContext{};
+  const auto acquire_status = acquire_map_submission(map, context);
+  if (acquire_status != MLN_STATUS_OK) {
+    return acquire_status;
+  }
+  auto live = std::move(context.map);
+  auto map_lease = std::move(context.control);
+  auto runtime = std::move(context.runtime);
+  return submit_runtime_command(
+    runtime,
+    [map, live = std::move(live), map_lease = std::move(map_lease), runtime,
+     work = std::move(work)](uint64_t command_id) mutable -> void {
+      clear_thread_error();
+      auto status = MLN_STATUS_NATIVE_ERROR;
+      auto message = std::string{};
+      try {
+        status = std::invoke(std::move(work));
+        message = thread_last_error_message();
+      } catch (const std::exception& exception) {
+        message = exception.what();
+      } catch (...) {
+        message = "map command failed";
+      }
+      push_runtime_command_finished(
+        runtime->self, MLN_RUNTIME_EVENT_SOURCE_MAP, map, command_id,
+        status == MLN_STATUS_OK ? MLN_COMMAND_DISPOSITION_COMMITTED
+                                : MLN_COMMAND_DISPOSITION_FAILED,
+        status, status == MLN_STATUS_OK ? live->next_style_generation++ : 0,
+        message.empty() ? nullptr : message.c_str()
+      );
+    },
+    out_command_id
+  );
+}
+
+auto start_style_operation(
+  mln_map map, StyleOperationKind kind, StyleWork work,
+  mln_operation* out_operation
+) -> mln_status {
+  return submit_registered_map_operation(
+    map, static_cast<uint32_t>(kind),
+    [work = std::move(work)](
+      const std::shared_ptr<OperationObject>& state
+    ) mutable -> void {
+      auto result = std::make_shared<StyleOperationResult>();
+      clear_thread_error();
+      try {
+        const auto status = std::invoke(std::move(work), *result);
+        state->complete(status, thread_last_error_message(), std::any{result});
+      } catch (const std::exception& exception) {
+        state->complete(MLN_STATUS_NATIVE_ERROR, exception.what(), result);
+      } catch (...) {
+        state->complete(
+          MLN_STATUS_NATIVE_ERROR, "style operation failed", result
+        );
+      }
+    },
+    out_operation
+  );
+}
+
+auto take_style_operation(
+  mln_operation operation, StyleOperationKind kind,
+  std::function<mln_status(StyleOperationResult&)> transfer
+) -> mln_status {
+  return take_operation_result<std::shared_ptr<StyleOperationResult>>(
+    operation, static_cast<uint32_t>(kind),
+    [transfer = std::move(transfer)](
+      std::shared_ptr<StyleOperationResult>& result
+    ) mutable -> mln_status {
+      return std::invoke(std::move(transfer), *result);
+    }
+  );
+}
+
+auto start_geometry_operation(
+  mln_map map, GeometryOperationKind kind, GeometryWork work,
+  mln_operation* out_operation
+) -> mln_status {
+  return submit_registered_map_operation(
+    map, static_cast<uint32_t>(kind),
+    [work = std::move(work)](
+      const std::shared_ptr<OperationObject>& state
+    ) mutable -> void {
+      auto result = GeometryOperationResult{};
+      clear_thread_error();
+      try {
+        const auto status = std::invoke(std::move(work), result);
+        state->complete(
+          status, thread_last_error_message(), std::any{std::move(result)}
+        );
+      } catch (const std::exception& exception) {
+        state->complete(
+          MLN_STATUS_NATIVE_ERROR, exception.what(), std::any{std::move(result)}
+        );
+      } catch (...) {
+        state->complete(
+          MLN_STATUS_NATIVE_ERROR, "geometry operation failed",
+          std::any{std::move(result)}
+        );
+      }
+    },
+    out_operation
+  );
+}
+
+auto take_geometry_operation(
+  mln_operation operation, GeometryOperationKind kind,
+  std::function<mln_status(GeometryOperationResult&)> transfer
+) -> mln_status {
+  return take_operation_result<GeometryOperationResult>(
+    operation, static_cast<uint32_t>(kind), std::move(transfer)
+  );
+}
+
+namespace {
+
+enum : uint32_t {
+  projection_operation_create = 0x50520001U,
+  projection_operation_close = 0x50520002U,
+  projection_operation_get_camera = 0x50520003U,
+  projection_operation_pixel_for_lat_lng = 0x50520004U,
+  projection_operation_lat_lng_for_pixel = 0x50520005U,
+};
+
+template <typename Result, typename Work>
+auto start_projection_result_operation(
+  mln_map_projection projection, uint32_t kind, mln_operation* out_operation,
+  Work work
+) -> mln_status {
+  auto& table = handle_table<MapProjectionObject>();
+  const std::scoped_lock lock(table.mutex());
+  auto live = table.lease_locked(projection);
+  if (live == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (!live->control.acquire()) {
+    return MLN_STATUS_INVALID_STATE;
+  }
+  auto submission = std::shared_ptr<ControlLease>{};
+  try {
+    submission = std::make_shared<ControlLease>(&live->control);
+  } catch (...) {
+    live->control.release();
+    throw;
+  }
+  auto state = std::shared_ptr<OperationObject>{};
+  const auto register_status = register_operation(
+    live->runtime_state->event_queue->notification_source, kind, false, {},
+    out_operation, state
+  );
+  if (register_status != MLN_STATUS_OK) {
+    return register_status;
+  }
+  const auto operation = *out_operation;
+  const auto submit_status = submit_runtime_operation(
+    live->runtime_state, state,
+    [live = std::move(live), state, submission = std::move(submission),
+     work = std::move(work)]() mutable -> void {
+      try {
+        state->complete(
+          MLN_STATUS_OK, {}, std::any{Result{work(*live->projection)}}
+        );
+      } catch (...) {
+        state->complete(
+          MLN_STATUS_NATIVE_ERROR, exception_message(std::current_exception()),
+          {}
+        );
+      }
+    }
+  );
+  if (submit_status != MLN_STATUS_OK) {
+    abandon_operation(operation);
+    *out_operation = MLN_HANDLE_NULL;
+  }
+  return submit_status;
+}
+
+template <typename Work>
+auto submit_projection_command(
+  mln_map_projection projection, uint64_t* out_command_id, Work work
+) -> mln_status {
+  if (out_command_id == nullptr || *out_command_id != 0) {
+    set_thread_error("out_command_id must point to zero");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto& table = handle_table<MapProjectionObject>();
+  const std::scoped_lock lock(table.mutex());
+  auto live = table.lease_locked(projection);
+  if (live == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (live->control.is_closing()) {
+    return MLN_STATUS_INVALID_STATE;
+  }
+  if (!live->control.acquire()) {
+    return MLN_STATUS_INVALID_STATE;
+  }
+  auto submission = std::shared_ptr<ControlLease>{};
+  try {
+    submission = std::make_shared<ControlLease>(&live->control);
+  } catch (...) {
+    live->control.release();
+    throw;
+  }
+  const auto runtime_handle = live->runtime;
+  auto runtime = live->runtime_state;
+  return submit_runtime_command(
+    runtime,
+    [projection, runtime_handle, live = std::move(live),
+     submission = std::move(submission),
+     work = std::move(work)](uint64_t command_id) mutable -> void {
+      try {
+        work(*live->projection);
+        push_runtime_command_finished(
+          runtime_handle, MLN_RUNTIME_EVENT_SOURCE_PROJECTION, projection,
+          command_id, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, 0
+        );
+      } catch (...) {
+        const auto diagnostic = exception_message(std::current_exception());
+        push_runtime_command_finished(
+          runtime_handle, MLN_RUNTIME_EVENT_SOURCE_PROJECTION, projection,
+          command_id, MLN_COMMAND_DISPOSITION_FAILED, MLN_STATUS_NATIVE_ERROR,
+          0, diagnostic.c_str()
+        );
+      }
+    },
+    out_command_id
+  );
+}
+
+}  // namespace
 
 auto create_map(
   mln_runtime runtime, const mln_map_options* options, mln_map* out_map
@@ -3838,9 +2690,9 @@ auto create_map(
   // already resolves.
   const auto handle = handle_table<MapObject>().insert(owned_map);
   owned_map->runtime = runtime;
-  owned_map->owner_thread = std::this_thread::get_id();
+  owned_map->runtime_state = lease_runtime(runtime);
   owned_map->map_mode = effective.map_mode;
-  owned_map->scale_factor = effective.scale_factor;
+  owned_map->logical_extent = effective.initial_extent;
   owned_map->event_state = std::move(event_state);
   owned_map->custom_geometry_sources = std::move(source_registry);
   owned_map->event_state->mask.store(
@@ -3850,7 +2702,7 @@ auto create_map(
     // Registering allocates, so it belongs inside the scope that unpublishes
     // the handle on failure. Nothing before this point queues an event, and the
     // observer and frontend below are the first producers that need it.
-    register_runtime_map_events(runtime, handle);
+    register_runtime_map_events(runtime, handle, owned_map->event_state);
     owned_map->observer = std::make_unique<HeadlessObserver>(
       runtime, handle, owned_map->event_state,
       owned_map->custom_geometry_sources
@@ -3861,21 +2713,26 @@ auto create_map(
 
     auto map_options = mbgl::MapOptions{};
     map_options.withMapMode(to_native_map_mode(effective.map_mode))
-      .withSize(mbgl::Size{effective.width, effective.height})
-      .withPixelRatio(static_cast<float>(effective.scale_factor))
+      .withSize(
+        mbgl::Size{
+          effective.initial_extent.width, effective.initial_extent.height
+        }
+      )
+      .withPixelRatio(static_cast<float>(effective.initial_extent.scale_factor))
       .withFastPFOREnabled(effective.fast_pfor_enabled);
     owned_map->map = std::make_unique<mbgl::Map>(
       *owned_map->frontend, *owned_map->observer, map_options,
       resource_options_for_runtime(runtime)
     );
     owned_map->custom_geometry_sources->attach(*owned_map->map);
-
-    owned_map->commands = std::make_unique<MapCommands>(*owned_map->map);
-    owned_map->command_mailbox =
-      std::make_shared<mbgl::Mailbox>(runtime_run_loop(live_runtime));
-    owned_map->command_ref.emplace(
-      *owned_map->commands, owned_map->command_mailbox
+    owned_map->frontend->set_publish_callback(
+      [weak = std::weak_ptr<MapObject>{owned_map}]() -> void {
+        if (const auto locked = weak.lock(); locked && locked->map) {
+          publish_map_snapshot(*locked);
+        }
+      }
     );
+    publish_map_snapshot(*owned_map);
 
   } catch (...) {
     static_cast<void>(handle_table<MapObject>().remove(handle));
@@ -3886,120 +2743,457 @@ auto create_map(
   retain_guard.dismiss();
   return MLN_STATUS_OK;
 }
+auto create_map_start(
+  mln_runtime runtime, const mln_map_options* options,
+  mln_operation* out_operation
+) -> mln_status {
+  const auto options_status = validate_map_options(options);
+  if (options_status != MLN_STATUS_OK) {
+    return options_status;
+  }
+  auto runtime_state = lease_runtime(runtime);
+  if (runtime_state == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto reserve_status = retain_runtime_map(runtime);
+  if (reserve_status != MLN_STATUS_OK) {
+    return reserve_status;
+  }
+  const auto effective = options == nullptr ? map_options_default() : *options;
+  auto state = std::shared_ptr<OperationObject>{};
+  const auto register_status = register_operation(
+    runtime_state->event_queue->notification_source, map_create_operation_kind,
+    false, {}, out_operation, state
+  );
+  if (register_status != MLN_STATUS_OK) {
+    release_runtime_map(runtime);
+    return register_status;
+  }
+  const auto operation = *out_operation;
+  const auto submit_status = submit_runtime_operation(
+    runtime_state, state, [runtime, effective, state]() mutable -> void {
+      auto pending_reservation = RuntimeMapRetainGuard{runtime};
+      auto result = mln_map{MLN_HANDLE_NULL};
+      try {
+        const auto status = create_map(runtime, &effective, &result);
+        if (status == MLN_STATUS_OK) {
+          state->complete(
+            status, {}, std::any{std::make_shared<PendingMapResult>(result)}
+          );
+        } else {
+          state->complete(status, "map creation failed", {});
+        }
+      } catch (...) {
+        state->complete(
+          MLN_STATUS_NATIVE_ERROR, exception_message(std::current_exception()),
+          {}
+        );
+      }
+    }
+  );
+  if (submit_status != MLN_STATUS_OK) {
+    abandon_operation(operation);
+    *out_operation = MLN_HANDLE_NULL;
+    release_runtime_map(runtime);
+  }
+  return submit_status;
+}
 
-auto destroy_map(mln_map map) -> mln_status {
-  auto runtime = mln_runtime{MLN_HANDLE_NULL};
-  auto owned_map = std::shared_ptr<MapObject>{};
+auto create_map_take_result(mln_operation operation, mln_map* out_map)
+  -> mln_status {
+  if (out_map == nullptr || *out_map != MLN_HANDLE_NULL) {
+    set_thread_error("out_map must point to the null handle");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return take_operation_result<std::shared_ptr<PendingMapResult>>(
+    operation, map_create_operation_kind,
+    [out_map](std::shared_ptr<PendingMapResult>& result) -> mln_status {
+      *out_map = result->value();
+      result->transfer();
+      return MLN_STATUS_OK;
+    }
+  );
+}
+
+auto map_snapshot_get(mln_map map, mln_map_snapshot* out_snapshot)
+  -> mln_status {
+  if (
+    out_snapshot == nullptr || out_snapshot->size < sizeof(mln_map_snapshot)
+  ) {
+    set_thread_error(
+      "out_snapshot must not be null and must have a valid size"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto live = handle_table<MapObject>().lease(map);
+  if (live == nullptr || live->control.is_closing()) {
+    return live == nullptr ? MLN_STATUS_INVALID_ARGUMENT
+                           : MLN_STATUS_INVALID_STATE;
+  }
+  const std::scoped_lock lock(live->snapshot_mutex);
+  *out_snapshot = live->snapshot;
+  return MLN_STATUS_OK;
+}
+
+auto map_resize(
+  mln_map map, mln_logical_extent extent, uint64_t* out_command_id
+) -> mln_status {
+  if (
+    out_command_id == nullptr || *out_command_id != 0 || extent.width == 0 ||
+    extent.height == 0 || !std::isfinite(extent.scale_factor) ||
+    extent.scale_factor <= 0
+  ) {
+    set_thread_error("extent and out_command_id must be valid");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto live = handle_table<MapObject>().lease(map);
+  if (live == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (!live->control.acquire()) {
+    return MLN_STATUS_INVALID_STATE;
+  }
+  auto submission = std::make_shared<ControlLease>(&live->control);
+  const auto status = submit_runtime_command(
+    live->runtime_state,
+    [map, live, submission = std::move(submission),
+     extent](uint64_t command_id) mutable -> void {
+      if (command_id != live->latest_resize_command_id.load()) {
+        push_runtime_command_finished(
+          live->runtime, MLN_RUNTIME_EVENT_SOURCE_MAP, map, command_id,
+          MLN_COMMAND_DISPOSITION_SUPERSEDED, MLN_STATUS_OK, 0
+        );
+        return;
+      }
+      try {
+        live->logical_extent = extent;
+        live->map->setSize(mbgl::Size{extent.width, extent.height});
+        const auto generation = publish_map_snapshot(*live);
+        push_runtime_command_finished(
+          live->runtime, MLN_RUNTIME_EVENT_SOURCE_MAP, map, command_id,
+          MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, generation
+        );
+      } catch (...) {
+        const auto diagnostic = exception_message(std::current_exception());
+        push_runtime_command_finished(
+          live->runtime, MLN_RUNTIME_EVENT_SOURCE_MAP, map, command_id,
+          MLN_COMMAND_DISPOSITION_FAILED, MLN_STATUS_NATIVE_ERROR, 0,
+          diagnostic.c_str()
+        );
+      }
+    },
+    out_command_id, &live->latest_resize_command_id
+  );
+  return status;
+}
+
+auto map_close_start(mln_map map, mln_operation* out_operation) -> mln_status {
+  auto owned_map = handle_table<MapObject>().lease(map);
+  if (owned_map == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto state = std::shared_ptr<OperationObject>{};
+  const auto register_status = register_operation(
+    owned_map->runtime_state->event_queue->notification_source,
+    map_close_operation_kind, false, {}, out_operation, state
+  );
+  if (register_status != MLN_STATUS_OK) {
+    return register_status;
+  }
+  const auto operation = *out_operation;
+  struct CloseGate {
+    std::mutex mutex;
+    std::condition_variable condition;
+    bool committed = false;
+    bool aborted = false;
+    mln_map map = MLN_HANDLE_NULL;
+    mln_runtime runtime = MLN_HANDLE_NULL;
+    std::shared_ptr<MapObject> owned_map;
+    std::shared_ptr<OperationObject> state;
+  };
+  auto gate = std::shared_ptr<CloseGate>{};
+  try {
+    gate = std::make_shared<CloseGate>();
+  } catch (...) {
+    abandon_operation(operation);
+    *out_operation = MLN_HANDLE_NULL;
+    set_thread_error("map close could not allocate its teardown gate");
+    return MLN_STATUS_NATIVE_ERROR;
+  }
+  gate->map = map;
+  gate->runtime = owned_map->runtime;
+  gate->owned_map = owned_map;
+  gate->state = state;
+  auto signal_abort = [gate]() noexcept -> void {
+    {
+      const std::scoped_lock lock(gate->mutex);
+      gate->aborted = true;
+    }
+    gate->condition.notify_one();
+  };
+  auto waiter = std::thread{};
+  try {
+    waiter = std::thread([gate]() mutable -> void {
+      {
+        auto lock = std::unique_lock{gate->mutex};
+        gate->condition.wait(lock, [&]() noexcept -> bool {
+          return gate->committed || gate->aborted;
+        });
+        if (gate->aborted) {
+          return;
+        }
+      }
+      auto owned_map = std::move(gate->owned_map);
+      auto status = MLN_STATUS_OK;
+      auto diagnostic = std::string{};
+      auto retired = false;
+      auto cleanup_error = std::exception_ptr{};
+      try {
+        owned_map->runtime_state->executor.invoke_sync([&]() -> void {
+          if (owned_map->still_image_operation != nullptr) {
+            static_cast<void>(owned_map->still_image_operation->cancel());
+          }
+        });
+        owned_map->control.wait_for_submissions();
+        owned_map->runtime_state->executor.invoke_sync([&]() mutable -> void {
+          retired = handle_table<MapObject>().remove(gate->map) != nullptr;
+          if (!retired) {
+            throw std::runtime_error("map close lost its live handle");
+          }
+          try {
+            owned_map->custom_geometry_sources->detach();
+            owned_map->frontend->close_renderer_observer();
+            owned_map->frontend->shutdown_thread_pool();
+            discard_runtime_map_events(gate->runtime, gate->map);
+          } catch (...) {
+            cleanup_error = std::current_exception();
+          }
+          owned_map.reset();
+        });
+        if (cleanup_error) {
+          std::rethrow_exception(cleanup_error);
+        }
+      } catch (...) {
+        status = MLN_STATUS_NATIVE_ERROR;
+        diagnostic = exception_message(std::current_exception());
+      }
+      if (retired) {
+        release_runtime_map(gate->runtime);
+      } else {
+        owned_map->control.abort_close();
+      }
+      gate->state->complete(
+        status, std::move(diagnostic), std::any{std::monostate{}}
+      );
+    });
+  } catch (...) {
+    signal_abort();
+    abandon_operation(operation);
+    *out_operation = MLN_HANDLE_NULL;
+    set_thread_error("map close could not start its teardown waiter");
+    return MLN_STATUS_NATIVE_ERROR;
+  }
+  try {
+    waiter.detach();
+  } catch (...) {
+    signal_abort();
+    if (waiter.joinable()) {
+      waiter.join();
+    }
+    abandon_operation(operation);
+    *out_operation = MLN_HANDLE_NULL;
+    set_thread_error("map close could not detach its teardown waiter");
+    return MLN_STATUS_NATIVE_ERROR;
+  }
   {
-    // One critical section covers validation, the render-session check, and
-    // taking ownership, because a render session on another thread detaches
-    // under this same lock.
-    auto& table = handle_table<MapObject>();
-    const std::scoped_lock lock(table.mutex());
-    MapObject* live = nullptr;
-    const auto status = validate_map_locked(map, live);
-    if (status != MLN_STATUS_OK) {
-      return status;
+    const std::scoped_lock lock(handle_table<MapObject>().mutex());
+    auto* live = handle_table<MapObject>().resolve_locked(map);
+    if (live == nullptr || live != owned_map.get()) {
+      signal_abort();
+      abandon_operation(operation);
+      *out_operation = MLN_HANDLE_NULL;
+      return MLN_STATUS_INVALID_ARGUMENT;
     }
     if (live->render_target_session != nullptr) {
+      signal_abort();
+      abandon_operation(operation);
+      *out_operation = MLN_HANDLE_NULL;
       set_thread_error("map still has an attached render session");
       return MLN_STATUS_INVALID_STATE;
     }
-    runtime = live->runtime;
-    owned_map = table.remove_locked(map);
+    const auto close_status = live->control.begin_close();
+    if (close_status != MLN_STATUS_OK) {
+      signal_abort();
+      abandon_operation(operation);
+      *out_operation = MLN_HANDLE_NULL;
+      return close_status;
+    }
   }
-  // Both cross-thread channels close before the map is destroyed. The registry
-  // clears its map at the same point, so nothing reconciles against a map
-  // that is being destroyed; the releases it still owes run from its own
-  // destructor once the map is gone.
-  owned_map->custom_geometry_sources->detach();
-  owned_map->frontend->close_renderer_observer();
-  owned_map->command_mailbox->close();
-  // Runs outside the registry lock: it can block on in-flight background work.
-  owned_map->frontend->shutdown_thread_pool();
-  discard_runtime_map_events(runtime, map);
-  owned_map.reset();
-  release_runtime_map(runtime);
-  return MLN_STATUS_OK;
+  const auto submit_status = submit_runtime_operation(
+    owned_map->runtime_state, state, [gate]() mutable -> void {
+      {
+        const std::scoped_lock lock(gate->mutex);
+        gate->committed = true;
+      }
+      gate->condition.notify_one();
+    }
+  );
+  if (submit_status != MLN_STATUS_OK) {
+    owned_map->control.abort_close();
+    signal_abort();
+    abandon_operation(operation);
+    *out_operation = MLN_HANDLE_NULL;
+  }
+  return submit_status;
+}
+PendingMapResult::~PendingMapResult() {
+  if (value_ == MLN_HANDLE_NULL) {
+    return;
+  }
+  try {
+    auto operation = mln_operation{MLN_HANDLE_NULL};
+    if (map_close_start(value_, &operation) == MLN_STATUS_OK) {
+      release_operation(operation);
+    }
+  } catch (...) {
+  }
 }
 
-auto map_request_repaint(mln_map map) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
+auto map_request_repaint(mln_map map, uint64_t* out_command_id) -> mln_status {
+  if (out_command_id == nullptr || *out_command_id != 0) {
+    set_thread_error("out_command_id must point to zero");
+    return MLN_STATUS_INVALID_ARGUMENT;
   }
-
-  if (live->map_mode != MLN_MAP_MODE_CONTINUOUS) {
-    set_thread_error("map is not in continuous mode");
+  auto live = handle_table<MapObject>().lease(map);
+  if (live == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (!live->control.acquire()) {
     return MLN_STATUS_INVALID_STATE;
   }
-
-  live->map->triggerRepaint();
-  return MLN_STATUS_OK;
+  auto submission = std::make_shared<ControlLease>(&live->control);
+  return submit_runtime_command(
+    live->runtime_state,
+    [map, live,
+     submission = std::move(submission)](uint64_t command_id) mutable -> void {
+      if (live->map_mode != MLN_MAP_MODE_CONTINUOUS) {
+        push_runtime_command_finished(
+          live->runtime, MLN_RUNTIME_EVENT_SOURCE_MAP, map, command_id,
+          MLN_COMMAND_DISPOSITION_FAILED, MLN_STATUS_INVALID_STATE, 0,
+          "map is not in continuous mode"
+        );
+        return;
+      }
+      try {
+        live->map->triggerRepaint();
+        const auto generation = publish_map_snapshot(*live);
+        push_runtime_command_finished(
+          live->runtime, MLN_RUNTIME_EVENT_SOURCE_MAP, map, command_id,
+          MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, generation
+        );
+      } catch (...) {
+        const auto diagnostic = exception_message(std::current_exception());
+        push_runtime_command_finished(
+          live->runtime, MLN_RUNTIME_EVENT_SOURCE_MAP, map, command_id,
+          MLN_COMMAND_DISPOSITION_FAILED, MLN_STATUS_NATIVE_ERROR, 0,
+          diagnostic.c_str()
+        );
+      }
+    },
+    out_command_id
+  );
 }
 
-auto map_request_still_image(mln_map map) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
+auto map_request_still_image_start(mln_map map, mln_operation* out_operation)
+  -> mln_status {
+  auto live = handle_table<MapObject>().lease(map);
+  if (live == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
   }
-
   if (!is_still_map_mode(live->map_mode)) {
     set_thread_error("map is not in static or tile mode");
     return MLN_STATUS_INVALID_STATE;
   }
-
-  if (live->still_image_request_pending) {
-    set_thread_error("map already has a pending still-image request");
+  if (!live->control.acquire()) {
     return MLN_STATUS_INVALID_STATE;
   }
-
-  live->still_image_request_pending = true;
-  live->map->renderStill([map](std::exception_ptr error) -> void {
-    finish_still_image_request(map, error);
-  });
-  return MLN_STATUS_OK;
+  auto control_lease = ControlLease{&live->control};
+  auto submission = std::make_shared<ControlLease>(std::move(control_lease));
+  auto submission_released = std::make_shared<std::atomic_bool>(false);
+  auto release_submission = [submission,
+                             submission_released]() noexcept -> void {
+    if (!submission_released->exchange(true)) {
+      submission->reset();
+    }
+  };
+  auto state = std::shared_ptr<OperationObject>{};
+  const auto register_status = register_operation(
+    live->runtime_state->event_queue->notification_source,
+    map_still_image_operation_kind, true, release_submission, out_operation,
+    state
+  );
+  if (register_status != MLN_STATUS_OK) {
+    return register_status;
+  }
+  const auto operation = *out_operation;
+  const auto submit_status = submit_runtime_operation(
+    live->runtime_state, state,
+    [map, live = std::move(live), state, release_submission]() mutable -> void {
+      if (live->still_image_request_pending) {
+        state->complete(
+          MLN_STATUS_INVALID_STATE,
+          "map already has a pending still-image request", {}
+        );
+        return;
+      }
+      try {
+        live->still_image_request_pending = true;
+        live->still_image_operation = state;
+        live->map->renderStill(
+          [map, release_submission](std::exception_ptr error) mutable -> void {
+            finish_still_image_request(map, error);
+            release_submission();
+          }
+        );
+      } catch (...) {
+        live->still_image_request_pending = false;
+        live->still_image_operation.reset();
+        state->complete(
+          MLN_STATUS_NATIVE_ERROR, exception_message(std::current_exception()),
+          {}
+        );
+      }
+    }
+  );
+  if (submit_status != MLN_STATUS_OK) {
+    abandon_operation(operation);
+    *out_operation = MLN_HANDLE_NULL;
+  }
+  return submit_status;
 }
 
-// The render-facing helpers below run on the session's thread while the map
-// lives on its own. They are reachable only through an attached session, and
-// destroy_map() returns MLN_STATUS_INVALID_STATE while a session is attached,
-// so the map cannot be retired underneath them.
+// Render-facing helpers hold an attached-session child relationship, so
+// asynchronous map close cannot retire their state.
 auto map_scale_factor(mln_map map) -> double {
   const auto* live = handle_table<MapObject>().try_resolve(map);
-  return live == nullptr ? default_scale_factor : live->scale_factor;
+  return live == nullptr ? default_scale_factor
+                         : live->logical_extent.scale_factor;
 }
 
-// Map-thread only. The render path posts through map_post_set_size() and
-// map_post_trigger_repaint() instead.
+// Returns worker-owned native state. Callers must already run on the runtime
+// worker or use the posting helpers below.
 auto map_native(MapObject* map) -> mbgl::Map* { return map->map.get(); }
 
-// Both posting helpers hold the map table's mutex across the liveness check and
-// the send, so the map cannot be retired in between. Mailbox::push takes only
-// its own mutex and the run loop's, so there is no path back to this lock.
-auto map_post_set_size(mln_map map, uint32_t width, uint32_t height)
-  -> mln_status {
-  const std::scoped_lock lock(handle_table<MapObject>().mutex());
-  MapObject* live = nullptr;
-  const auto status = validate_map_live_locked(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  live->command_ref->invoke(&MapCommands::set_size, width, height);
-  return MLN_STATUS_OK;
+// Render-session resize enters the same ordered extent command as public
+// resize, so one path owns logical extent and scale after map creation.
+auto map_post_resize(mln_map map, mln_logical_extent extent) -> mln_status {
+  auto command_id = uint64_t{0};
+  return map_resize(map, extent, &command_id);
 }
 
 auto map_post_trigger_repaint(mln_map map) -> mln_status {
-  const std::scoped_lock lock(handle_table<MapObject>().mutex());
-  MapObject* live = nullptr;
-  const auto status = validate_map_live_locked(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  live->command_ref->invoke(&MapCommands::trigger_repaint);
-  return MLN_STATUS_OK;
+  auto command_id = uint64_t{0};
+  return map_request_repaint(map, &command_id);
 }
 
 auto map_latest_update(mln_map map) -> std::shared_ptr<mbgl::UpdateParameters> {
@@ -4020,9 +3214,7 @@ auto map_run_render_jobs(mln_map map) -> void {
   }
 }
 
-// Claims the map's single render-session slot. Runs on the render session's own
-// thread, so it validates liveness only, and holds the map handle table's mutex
-// across the check and the claim to stay race-free against destroy_map().
+// The handle-table lock keeps the map live across the attached-session claim.
 auto map_attach_render_target_session(mln_map map, void* session)
   -> mln_status {
   const std::scoped_lock lock(handle_table<MapObject>().mutex());
@@ -4043,9 +3235,7 @@ auto map_attach_render_target_session(mln_map map, void* session)
   return MLN_STATUS_OK;
 }
 
-// Runs on the render session's owner thread, so it validates liveness only, and
-// holds the map handle table's mutex across the check and the clear to stay
-// race-free against destroy_map().
+// The handle-table lock keeps the map live across the attached-session clear.
 auto map_detach_render_target_session(mln_map map, void* session)
   -> mln_status {
   const std::scoped_lock lock(handle_table<MapObject>().mutex());
@@ -4076,9 +3266,8 @@ auto map_set_style_url(mln_map map, const char* url) -> mln_status {
     set_thread_error("url must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  // A style that fails to parse inside this call reaches
-  // HeadlessObserver::onDidFailLoadingMap on this stack, so the flag below is
-  // owner-thread state that needs no lock and no queued event.
+  // Parse failures reported on this stack use runtime-worker state, so no
+  // additional lock or queued diagnostic is needed.
   live->event_state->style_load_failed = false;
   live->event_state->style_load_failure.clear();
   live->map->getStyle().loadURL(url);
@@ -4127,2874 +3316,321 @@ auto map_set_style_json(mln_map map, mln_buffer_view json) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-// Reports the document the style loader last parsed, not the live style, so
-// runtime style mutations never reach it.
-auto map_copy_loaded_style_json(
-  mln_map map, uint8_t* out_json, size_t json_capacity, size_t* out_json_size
+auto start_map_string_operation(
+  mln_map map, uint32_t kind, mln_operation* out_operation,
+  std::function<std::string(MapObject&)> read
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  return copy_text(
-    live->map->getStyle().getJSON(), reinterpret_cast<char*>(out_json),
-    json_capacity, out_json_size, "json_capacity"
-  );
-}
-
-// Reports live state: MapLibre records the style URL when the request is made
-// and clears it when a JSON style replaces it.
-auto map_copy_style_url(
-  mln_map map, char* out_url, size_t url_capacity, size_t* out_url_size
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  return copy_text(
-    live->map->getStyle().getURL(), out_url, url_capacity, out_url_size,
-    "url_capacity"
-  );
-}
-
-auto map_set_event_mask(mln_map map, uint64_t mask) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if ((mask & ~static_cast<uint64_t>(MLN_RUNTIME_EVENT_MASK_ALL)) != 0U) {
-    set_thread_error("mask contains unknown bits");
+  auto live = handle_table<MapObject>().lease(map);
+  if (live == nullptr) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  // The whole value is stored, including the runtime-event bits this map's
-  // producers never test, so a getter reports what a host wrote.
-  live->event_state->mask.store(mask, std::memory_order_relaxed);
-  return MLN_STATUS_OK;
-}
-
-auto map_get_event_mask(mln_map map, uint64_t* out_mask) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (out_mask == nullptr) {
-    set_thread_error("out_mask must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  *out_mask = live->event_state->mask.load(std::memory_order_relaxed);
-  return MLN_STATUS_OK;
-}
-
-auto style_id_list_count(mln_style_id_list list, size_t* out_count)
-  -> mln_status {
-  if (out_count == nullptr) {
-    set_thread_error("out_count must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  // A style ID list carries no thread affinity, so another thread may destroy
-  // it mid-read; the lock spans the read.
-  auto& table = handle_table<StyleIdListObject>();
-  const std::scoped_lock lock(table.mutex());
-  const auto* live_list = table.resolve_locked(list);
-  if (live_list == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  *out_count = live_list->ids.size();
-  return MLN_STATUS_OK;
-}
-
-auto style_id_list_get(
-  mln_style_id_list list, size_t index, mln_buffer_view* out_id
-) -> mln_status {
-  if (out_id == nullptr) {
-    set_thread_error("out_id must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto& table = handle_table<StyleIdListObject>();
-  const std::scoped_lock lock(table.mutex());
-  const auto* live_list = table.resolve_locked(list);
-  if (live_list == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (index >= live_list->ids.size()) {
-    set_thread_error("index is out of range");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  *out_id = string_view_from_string(live_list->ids.at(index));
-  return MLN_STATUS_OK;
-}
-
-auto style_id_list_destroy(mln_style_id_list list) -> void {
-  static_cast<void>(handle_table<StyleIdListObject>().remove(list));
-}
-
-auto style_string_list_count(mln_style_string_list list, size_t* out_count)
-  -> mln_status {
-  if (out_count == nullptr) {
-    set_thread_error("out_count must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto& table = handle_table<StyleStringListObject>();
-  const std::scoped_lock lock(table.mutex());
-  const auto* live_list = table.resolve_locked(list);
-  if (live_list == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  *out_count = live_list->values.size();
-  return MLN_STATUS_OK;
-}
-
-auto style_string_list_get(
-  mln_style_string_list list, size_t index, mln_buffer_view* out_value
-) -> mln_status {
-  if (out_value == nullptr) {
-    set_thread_error("out_value must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto& table = handle_table<StyleStringListObject>();
-  const std::scoped_lock lock(table.mutex());
-  const auto* live_list = table.resolve_locked(list);
-  if (live_list == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (index >= live_list->values.size()) {
-    set_thread_error("index is out of range");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  *out_value = string_view_from_string(live_list->values.at(index));
-  return MLN_STATUS_OK;
-}
-
-auto style_string_list_destroy(mln_style_string_list list) -> void {
-  static_cast<void>(handle_table<StyleStringListObject>().remove(list));
-}
-
-auto map_add_style_source_json(
-  mln_map map, mln_buffer_view source_id, mln_buffer_view source_json
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (!validate_string_view(source_id, "source_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (source_id.size == 0) {
-    set_thread_error("source_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (!validate_bytes(source_json, "style source")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto& style = live->map->getStyle();
-  const auto id = string_from_view(source_id);
-  if (style.getSource(id) != nullptr) {
-    set_thread_error("source already exists");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto error = mbgl::style::conversion::Error{};
-  auto source =
-    mbgl::style::conversion::convertJSON<std::unique_ptr<mbgl::style::Source>>(
-      string_from_view(source_json), error, id
-    );
-  if (!source) {
-    set_style_conversion_error("style source", error);
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  style.addSource(std::move(*source));
-  return MLN_STATUS_OK;
-}
-
-auto map_remove_style_source(
-  mln_map map, mln_buffer_view source_id, bool* out_removed
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (!validate_string_view(source_id, "source_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (source_id.size == 0) {
-    set_thread_error("source_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_removed == nullptr) {
-    set_thread_error("out_removed must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto& style = live->map->getStyle();
-  const auto id = string_from_view(source_id);
-  if (style.getSource(id) == nullptr) {
-    *out_removed = false;
-    return MLN_STATUS_OK;
-  }
-
-  auto removed = style.removeSource(id);
-  if (!removed) {
-    set_thread_error("source is used by a layer");
+  if (!live->control.acquire()) {
     return MLN_STATUS_INVALID_STATE;
   }
-  // The detached source is dropped before the release runs, so the style no
-  // longer holds the callbacks that read the host's state.
-  removed.reset();
-  live->custom_geometry_sources->release(id);
-  *out_removed = true;
-  return MLN_STATUS_OK;
-}
-
-auto map_style_source_exists(
-  mln_map map, mln_buffer_view source_id, bool* out_exists
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (!validate_string_view(source_id, "source_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (source_id.size == 0) {
-    set_thread_error("source_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_exists == nullptr) {
-    set_thread_error("out_exists must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  *out_exists =
-    live->map->getStyle().getSource(string_from_view(source_id)) != nullptr;
-  return MLN_STATUS_OK;
-}
-
-auto map_get_style_source_type(
-  mln_map map, mln_buffer_view source_id, uint32_t* out_source_type,
-  bool* out_found
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (!validate_string_view(source_id, "source_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (source_id.size == 0) {
-    set_thread_error("source_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_source_type == nullptr || out_found == nullptr) {
-    set_thread_error("out_source_type and out_found must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  const auto* source =
-    live->map->getStyle().getSource(string_from_view(source_id));
-  *out_found = source != nullptr;
-  *out_source_type = MLN_STYLE_SOURCE_TYPE_UNKNOWN;
-  if (source != nullptr) {
-    *out_source_type = to_c_source_type(source->getType());
-  }
-  return MLN_STATUS_OK;
-}
-
-auto map_get_style_source_info(
-  mln_map map, mln_buffer_view source_id, mln_style_source_info* out_info,
-  bool* out_found
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (!validate_string_view(source_id, "source_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (source_id.size == 0) {
-    set_thread_error("source_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_info == nullptr || out_info->size < sizeof(mln_style_source_info)) {
-    set_thread_error("out_info must not be null and must have a valid size");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_found == nullptr) {
-    set_thread_error("out_found must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  const auto* source =
-    live->map->getStyle().getSource(string_from_view(source_id));
-  *out_found = source != nullptr;
-  *out_info = mln_style_source_info{};
-  out_info->size = sizeof(mln_style_source_info);
-  out_info->type = MLN_STYLE_SOURCE_TYPE_UNKNOWN;
-  if (source == nullptr) {
-    return MLN_STATUS_OK;
-  }
-
-  const auto attribution = source->getAttribution();
-  out_info->type = to_c_source_type(source->getType());
-  out_info->id_size = source->getID().size();
-  out_info->is_volatile = source->isVolatile();
-  out_info->has_attribution = attribution.has_value();
-  out_info->attribution_size = attribution ? attribution->size() : 0;
-
-  const auto url = source_url(*source);
-  if (url) {
-    out_info->fields |= MLN_STYLE_SOURCE_INFO_URL;
-    out_info->url_size = url->size();
-  }
-
-  const auto* tile_source = tile_source_from_source(*source);
-  if (tile_source == nullptr) {
-    return MLN_STATUS_OK;
-  }
-
-  out_info->fields |= MLN_STYLE_SOURCE_INFO_TILE_SIZE;
-  out_info->tile_size = tile_source->getTileSize();
-  if (const auto* vector_source = source->as<mbgl::style::VectorSource>()) {
-    out_info->fields |= MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING;
-    out_info->vector_encoding =
-      to_c_vector_encoding(vector_source->getEncoding());
-  }
-
-  const auto* tileset = inline_tileset(*tile_source);
-  if (tileset == nullptr) {
-    return MLN_STATUS_OK;
-  }
-
-  out_info->fields |= MLN_STYLE_SOURCE_INFO_TILEJSON;
-  out_info->tile_count = tileset->tiles.size();
-  out_info->min_zoom = tileset->zoomRange.min;
-  out_info->max_zoom = tileset->zoomRange.max;
-  out_info->scheme = to_c_tile_scheme(tileset->scheme);
-  if (tileset->bounds) {
-    out_info->fields |= MLN_STYLE_SOURCE_INFO_BOUNDS;
-    out_info->bounds = from_native_lat_lng_bounds(*tileset->bounds);
-  }
-  if (tileset->vectorEncoding) {
-    out_info->fields |= MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING;
-    out_info->vector_encoding = to_c_vector_encoding(*tileset->vectorEncoding);
-  }
-  if (tileset->rasterEncoding) {
-    out_info->fields |= MLN_STYLE_SOURCE_INFO_RASTER_ENCODING;
-    out_info->raster_encoding = to_c_raster_encoding(*tileset->rasterEncoding);
-  }
-  return MLN_STATUS_OK;
-}
-
-auto map_copy_style_source_attribution(
-  mln_map map, mln_buffer_view source_id, char* out_attribution,
-  size_t attribution_capacity, size_t* out_attribution_size, bool* out_found
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (!validate_string_view(source_id, "source_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (source_id.size == 0) {
-    set_thread_error("source_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_attribution == nullptr && attribution_capacity > 0) {
-    set_thread_error(
-      "out_attribution must not be null when capacity is non-zero"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_attribution_size == nullptr || out_found == nullptr) {
-    set_thread_error("out_attribution_size and out_found must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  const auto* source =
-    live->map->getStyle().getSource(string_from_view(source_id));
-  *out_found = source != nullptr;
-  *out_attribution_size = 0;
-  if (source == nullptr) {
-    return MLN_STATUS_OK;
-  }
-
-  const auto attribution = source->getAttribution();
-  if (!attribution) {
-    return MLN_STATUS_OK;
-  }
-  *out_attribution_size = attribution->size();
-  // A null buffer with zero capacity is a size probe, so it reports the length
-  // and succeeds rather than sharing a status with a missing source.
-  if (out_attribution == nullptr) {
-    return MLN_STATUS_OK;
-  }
-  if (attribution_capacity < attribution->size()) {
-    set_thread_error("attribution_capacity is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (!attribution->empty()) {
-    std::copy(attribution->begin(), attribution->end(), out_attribution);
-  }
-  return MLN_STATUS_OK;
-}
-
-auto map_copy_style_source_url(
-  mln_map map, mln_buffer_view source_id, char* out_url, size_t url_capacity,
-  size_t* out_url_size, bool* out_found
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (!validate_string_view(source_id, "source_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (source_id.size == 0) {
-    set_thread_error("source_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_url == nullptr && url_capacity > 0) {
-    set_thread_error("out_url must not be null when capacity is non-zero");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_url_size == nullptr || out_found == nullptr) {
-    set_thread_error("out_url_size and out_found must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  const auto* source =
-    live->map->getStyle().getSource(string_from_view(source_id));
-  *out_found = source != nullptr;
-  if (source == nullptr) {
-    *out_url_size = 0;
-    return MLN_STATUS_OK;
-  }
-
-  return copy_text(
-    source_url(*source).value_or(std::string{}), out_url, url_capacity,
-    out_url_size, "url_capacity"
+  auto submission = std::make_shared<ControlLease>(&live->control);
+  auto state = std::shared_ptr<OperationObject>{};
+  const auto register_status = register_operation(
+    live->runtime_state->event_queue->notification_source, kind, false, {},
+    out_operation, state
   );
-}
-
-auto map_get_style_source_tile_urls(
-  mln_map map, mln_buffer_view source_id, mln_style_string_list* out_tile_urls,
-  bool* out_found
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
+  if (register_status != MLN_STATUS_OK) {
+    return register_status;
   }
-  if (!validate_string_view(source_id, "source_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (source_id.size == 0) {
-    set_thread_error("source_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (
-    out_tile_urls == nullptr || *out_tile_urls != MLN_HANDLE_NULL ||
-    out_found == nullptr
-  ) {
-    set_thread_error(
-      "out_tile_urls must not be null, *out_tile_urls must be the null handle, "
-      "and out_found must not be null"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  const auto* source =
-    live->map->getStyle().getSource(string_from_view(source_id));
-  *out_found = source != nullptr;
-  if (source == nullptr) {
-    return MLN_STATUS_OK;
-  }
-
-  auto tile_urls = std::vector<std::string>{};
-  if (const auto* tile_source = tile_source_from_source(*source)) {
-    if (const auto* tileset = inline_tileset(*tile_source)) {
-      tile_urls = tileset->tiles;
+  const auto operation = *out_operation;
+  const auto submit_status = submit_runtime_operation(
+    live->runtime_state, state,
+    [live = std::move(live), state, read = std::move(read),
+     submission = std::move(submission)]() mutable -> void {
+      try {
+        state->complete(MLN_STATUS_OK, {}, std::any{read(*live)});
+      } catch (...) {
+        state->complete(
+          MLN_STATUS_NATIVE_ERROR, exception_message(std::current_exception()),
+          {}
+        );
+      }
     }
+  );
+  if (submit_status != MLN_STATUS_OK) {
+    abandon_operation(operation);
+    *out_operation = MLN_HANDLE_NULL;
   }
-  return create_style_string_list(std::move(tile_urls), out_tile_urls);
+  return submit_status;
 }
 
-auto map_list_style_source_ids(mln_map map, mln_style_id_list* out_source_ids)
+auto map_loaded_style_json_start(mln_map map, mln_operation* out_operation)
   -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-
-  auto ids = std::vector<std::string>{};
-  for (const auto* source : live->map->getStyle().getSources()) {
-    ids.push_back(source->getID());
-  }
-  return create_style_id_list(std::move(ids), out_source_ids);
-}
-
-auto map_add_geojson_source_url(
-  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
-  const mln_geojson_source_options* options
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-  if (!validate_string_view(url, "url")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (url.size == 0) {
-    set_thread_error("url must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto options_status = validate_geojson_source_options(options);
-  if (options_status != MLN_STATUS_OK) {
-    return options_status;
-  }
-
-  auto& style = live->map->getStyle();
-  const auto id = string_from_view(source_id);
-  const auto add_status = validate_source_can_be_added(style, id);
-  if (add_status != MLN_STATUS_OK) {
-    return add_status;
-  }
-
-  auto native_options =
-    to_native_geojson_source_options(effective_geojson_source_options(options));
-  if (!native_options) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto source = std::make_unique<mbgl::style::GeoJSONSource>(
-    id, std::move(*native_options)
-  );
-  source->setURL(string_from_view(url));
-  style.addSource(std::move(source));
-  return MLN_STATUS_OK;
-}
-
-auto map_add_geojson_source_data(
-  mln_map map, mln_buffer_view source_id, mln_buffer_view data,
-  const mln_geojson_source_options* options
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-
-  auto geojson = to_native_geojson(data);
-  if (!geojson) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto options_status = validate_geojson_source_options(options);
-  if (options_status != MLN_STATUS_OK) {
-    return options_status;
-  }
-
-  auto& style = live->map->getStyle();
-  const auto id = string_from_view(source_id);
-  const auto add_status = validate_source_can_be_added(style, id);
-  if (add_status != MLN_STATUS_OK) {
-    return add_status;
-  }
-
-  const auto effective = effective_geojson_source_options(options);
-  if (effective.cluster && !validate_clustered_geojson(id, *geojson)) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto native_options = to_native_geojson_source_options(effective);
-  if (!native_options) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto source = std::make_unique<mbgl::style::GeoJSONSource>(
-    id, std::move(*native_options)
-  );
-  source->setGeoJSON(*geojson);
-  style.addSource(std::move(source));
-  return MLN_STATUS_OK;
-}
-
-auto map_set_geojson_source_url(
-  mln_map map, mln_buffer_view source_id, mln_buffer_view url
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-  if (!validate_string_view(url, "url")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (url.size == 0) {
-    set_thread_error("url must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto* source = live->map->getStyle().getSource(string_from_view(source_id));
-  if (source == nullptr) {
-    set_thread_error("source does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  auto* geojson_source = source->as<mbgl::style::GeoJSONSource>();
-  if (geojson_source == nullptr) {
-    set_thread_error("source is not a GeoJSON source");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  geojson_source->setURL(string_from_view(url));
-  return MLN_STATUS_OK;
-}
-
-auto map_set_geojson_source_data(
-  mln_map map, mln_buffer_view source_id, mln_buffer_view data
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-
-  auto geojson = to_native_geojson(data);
-  if (!geojson) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto* source = live->map->getStyle().getSource(string_from_view(source_id));
-  if (source == nullptr) {
-    set_thread_error("source does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  auto* geojson_source = source->as<mbgl::style::GeoJSONSource>();
-  if (geojson_source == nullptr) {
-    set_thread_error("source is not a GeoJSON source");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (
-    geojson_source->getOptions().cluster &&
-    !validate_clustered_geojson(string_from_view(source_id), *geojson)
-  ) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  geojson_source->setGeoJSON(*geojson);
-  return MLN_STATUS_OK;
-}
-
-auto map_add_vector_source_url(
-  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
-  const mln_style_tile_source_options* options
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-  if (!validate_string_view(url, "url")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (url.size == 0) {
-    set_thread_error("url must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto options_status =
-    validate_tile_source_options(options, TileSourceOptionKind::Vector);
-  if (options_status != MLN_STATUS_OK) {
-    return options_status;
-  }
-
-  auto& style = live->map->getStyle();
-  const auto id = string_from_view(source_id);
-  const auto add_status = validate_source_can_be_added(style, id);
-  if (add_status != MLN_STATUS_OK) {
-    return add_status;
-  }
-
-  const auto effective = effective_tile_source_options(options);
-  auto min_zoom = std::optional<float>{};
-  if (
-    has_tile_source_option(effective, MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM)
-  ) {
-    min_zoom = static_cast<float>(effective.min_zoom);
-  }
-  auto max_zoom = std::optional<float>{};
-  if (
-    has_tile_source_option(effective, MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM)
-  ) {
-    max_zoom = static_cast<float>(effective.max_zoom);
-  }
-
-  if (
-    has_tile_source_option(
-      effective, MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING
-    )
-  ) {
-    style.addSource(
-      std::make_unique<mbgl::style::VectorSource>(
-        id, string_from_view(url), max_zoom, min_zoom,
-        to_native_vector_encoding(effective.vector_encoding)
-      )
-    );
-  } else {
-    style.addSource(
-      std::make_unique<mbgl::style::VectorSource>(
-        id, string_from_view(url), max_zoom, min_zoom
-      )
-    );
-  }
-  return MLN_STATUS_OK;
-}
-
-auto map_add_vector_source_tiles(
-  mln_map map, mln_buffer_view source_id, const mln_buffer_view* tiles,
-  size_t tile_count, const mln_style_tile_source_options* options
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-  const auto tiles_status = validate_tile_urls(tiles, tile_count);
-  if (tiles_status != MLN_STATUS_OK) {
-    return tiles_status;
-  }
-  const auto options_status =
-    validate_tile_source_options(options, TileSourceOptionKind::Vector);
-  if (options_status != MLN_STATUS_OK) {
-    return options_status;
-  }
-
-  auto& style = live->map->getStyle();
-  const auto id = string_from_view(source_id);
-  const auto add_status = validate_source_can_be_added(style, id);
-  if (add_status != MLN_STATUS_OK) {
-    return add_status;
-  }
-
-  const auto effective = effective_tile_source_options(options);
-  auto tileset = to_native_tileset(tiles, tile_count, effective, true);
-  if (!tileset) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  style.addSource(
-    std::make_unique<mbgl::style::VectorSource>(
-      id, *tileset, std::nullopt, std::nullopt,
-      to_native_vector_encoding(effective.vector_encoding)
-    )
-  );
-  return MLN_STATUS_OK;
-}
-
-auto map_add_raster_source_url(
-  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
-  const mln_style_tile_source_options* options
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-  if (!validate_string_view(url, "url")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (url.size == 0) {
-    set_thread_error("url must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto options_status =
-    validate_tile_source_options(options, TileSourceOptionKind::Raster);
-  if (options_status != MLN_STATUS_OK) {
-    return options_status;
-  }
-
-  auto& style = live->map->getStyle();
-  const auto id = string_from_view(source_id);
-  const auto add_status = validate_source_can_be_added(style, id);
-  if (add_status != MLN_STATUS_OK) {
-    return add_status;
-  }
-
-  const auto effective = effective_tile_source_options(options);
-  style.addSource(
-    std::make_unique<mbgl::style::RasterSource>(
-      id, string_from_view(url), static_cast<uint16_t>(effective.tile_size)
-    )
-  );
-  return MLN_STATUS_OK;
-}
-
-auto map_add_raster_source_tiles(
-  mln_map map, mln_buffer_view source_id, const mln_buffer_view* tiles,
-  size_t tile_count, const mln_style_tile_source_options* options
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-  const auto tiles_status = validate_tile_urls(tiles, tile_count);
-  if (tiles_status != MLN_STATUS_OK) {
-    return tiles_status;
-  }
-  const auto options_status =
-    validate_tile_source_options(options, TileSourceOptionKind::Raster);
-  if (options_status != MLN_STATUS_OK) {
-    return options_status;
-  }
-
-  auto& style = live->map->getStyle();
-  const auto id = string_from_view(source_id);
-  const auto add_status = validate_source_can_be_added(style, id);
-  if (add_status != MLN_STATUS_OK) {
-    return add_status;
-  }
-
-  const auto effective = effective_tile_source_options(options);
-  auto tileset = to_native_tileset(tiles, tile_count, effective, false);
-  if (!tileset) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  style.addSource(
-    std::make_unique<mbgl::style::RasterSource>(
-      id, *tileset, static_cast<uint16_t>(effective.tile_size)
-    )
-  );
-  return MLN_STATUS_OK;
-}
-
-auto map_add_raster_dem_source_url(
-  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
-  const mln_style_tile_source_options* options
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-  if (!validate_string_view(url, "url")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (url.size == 0) {
-    set_thread_error("url must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto options_status =
-    validate_tile_source_options(options, TileSourceOptionKind::RasterDEM);
-  if (options_status != MLN_STATUS_OK) {
-    return options_status;
-  }
-
-  auto& style = live->map->getStyle();
-  const auto id = string_from_view(source_id);
-  const auto add_status = validate_source_can_be_added(style, id);
-  if (add_status != MLN_STATUS_OK) {
-    return add_status;
-  }
-
-  const auto effective = effective_tile_source_options(options);
-  auto source_options = std::optional<mbgl::style::SourceOptions>{};
-  if (
-    has_tile_source_option(
-      effective, MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING
-    )
-  ) {
-    source_options = mbgl::style::SourceOptions{
-      .rasterEncoding = to_native_raster_encoding(effective.raster_encoding)
-    };
-  }
-  style.addSource(
-    std::make_unique<mbgl::style::RasterDEMSource>(
-      id, string_from_view(url), static_cast<uint16_t>(effective.tile_size),
-      source_options
-    )
-  );
-  return MLN_STATUS_OK;
-}
-
-auto map_add_raster_dem_source_tiles(
-  mln_map map, mln_buffer_view source_id, const mln_buffer_view* tiles,
-  size_t tile_count, const mln_style_tile_source_options* options
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-  const auto tiles_status = validate_tile_urls(tiles, tile_count);
-  if (tiles_status != MLN_STATUS_OK) {
-    return tiles_status;
-  }
-  const auto options_status =
-    validate_tile_source_options(options, TileSourceOptionKind::RasterDEM);
-  if (options_status != MLN_STATUS_OK) {
-    return options_status;
-  }
-
-  auto& style = live->map->getStyle();
-  const auto id = string_from_view(source_id);
-  const auto add_status = validate_source_can_be_added(style, id);
-  if (add_status != MLN_STATUS_OK) {
-    return add_status;
-  }
-
-  const auto effective = effective_tile_source_options(options);
-  auto tileset = to_native_tileset(tiles, tile_count, effective, false);
-  if (!tileset) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (
-    has_tile_source_option(
-      effective, MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING
-    )
-  ) {
-    tileset->rasterEncoding =
-      to_native_raster_encoding(effective.raster_encoding);
-  }
-  style.addSource(
-    std::make_unique<mbgl::style::RasterDEMSource>(
-      id, *tileset, static_cast<uint16_t>(effective.tile_size)
-    )
-  );
-  return MLN_STATUS_OK;
-}
-
-auto map_add_custom_geometry_source(
-  mln_map map, mln_buffer_view source_id,
-  const mln_custom_geometry_source_options* options
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-  const auto options_status = validate_custom_geometry_source_options(options);
-  if (options_status != MLN_STATUS_OK) {
-    return options_status;
-  }
-
-  auto& style = live->map->getStyle();
-  const auto id = string_from_view(source_id);
-  const auto add_status = validate_source_can_be_added(style, id);
-  if (add_status != MLN_STATUS_OK) {
-    return add_status;
-  }
-
-  const auto effective = effective_custom_geometry_source_options(*options);
-  // Tracked before the style takes the source, so the two cannot disagree. A
-  // throw while tracking leaves no source in the style, and a style that
-  // rejects the source untracks it again; either way the add failed and the
-  // caller still owns user_data. Tracking afterwards would leave a live source
-  // whose release never runs.
-  live->custom_geometry_sources->add(
-    id, effective.release_user_data, effective.user_data
-  );
-  try {
-    style.addSource(
-      std::make_unique<mbgl::style::CustomGeometrySource>(
-        id, to_native_custom_geometry_source_options(effective)
-      )
-    );
-  } catch (...) {
-    // Mirrors add()'s own early return: a source with no release callback was
-    // never tracked, so there is nothing to untrack and no entry of another
-    // source's to erase.
-    if (effective.release_user_data != nullptr) {
-      live->custom_geometry_sources->untrack(id);
+  return start_map_string_operation(
+    map, map_loaded_style_json_operation_kind, out_operation,
+    [](MapObject& live) -> std::string {
+      return live.map->getStyle().getJSON();
     }
-    throw;
-  }
-  return MLN_STATUS_OK;
-}
-
-auto map_set_custom_geometry_source_tile_data(
-  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
-  mln_buffer_view data
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-  const auto tile_status = validate_canonical_tile_id(tile_id);
-  if (tile_status != MLN_STATUS_OK) {
-    return tile_status;
-  }
-  auto geojson = to_native_geojson(data);
-  if (!geojson) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto* source = live->map->getStyle().getSource(string_from_view(source_id));
-  if (source == nullptr) {
-    set_thread_error("source does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  auto* custom_source = source->as<mbgl::style::CustomGeometrySource>();
-  if (custom_source == nullptr) {
-    set_thread_error("source is not a custom geometry source");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  custom_source->setTileData(to_native_canonical_tile_id(tile_id), *geojson);
-  return MLN_STATUS_OK;
-}
-
-auto map_invalidate_custom_geometry_source_tile(
-  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-  const auto tile_status = validate_canonical_tile_id(tile_id);
-  if (tile_status != MLN_STATUS_OK) {
-    return tile_status;
-  }
-
-  auto* source = live->map->getStyle().getSource(string_from_view(source_id));
-  if (source == nullptr) {
-    set_thread_error("source does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  auto* custom_source = source->as<mbgl::style::CustomGeometrySource>();
-  if (custom_source == nullptr) {
-    set_thread_error("source is not a custom geometry source");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  custom_source->invalidateTile(to_native_canonical_tile_id(tile_id));
-  return MLN_STATUS_OK;
-}
-
-auto map_invalidate_custom_geometry_source_region(
-  mln_map map, mln_buffer_view source_id, mln_lat_lng_bounds bounds
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-  const auto bounds_status = validate_lat_lng_bounds(bounds);
-  if (bounds_status != MLN_STATUS_OK) {
-    return bounds_status;
-  }
-
-  auto* source = live->map->getStyle().getSource(string_from_view(source_id));
-  if (source == nullptr) {
-    set_thread_error("source does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  auto* custom_source = source->as<mbgl::style::CustomGeometrySource>();
-  if (custom_source == nullptr) {
-    set_thread_error("source is not a custom geometry source");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  custom_source->invalidateRegion(to_native_lat_lng_bounds(bounds));
-  return MLN_STATUS_OK;
-}
-
-auto map_set_style_image(
-  mln_map map, mln_buffer_view image_id,
-  const mln_premultiplied_rgba8_image* image,
-  const mln_style_image_options* options
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto image_id_status = validate_image_id(image_id);
-  if (image_id_status != MLN_STATUS_OK) {
-    return image_id_status;
-  }
-  const auto image_status = validate_premultiplied_rgba8_image(image);
-  if (image_status != MLN_STATUS_OK) {
-    return image_status;
-  }
-  const auto options_status = validate_style_image_options(options);
-  if (options_status != MLN_STATUS_OK) {
-    return options_status;
-  }
-
-  const auto effective = effective_style_image_options(options);
-  auto content = std::optional<mbgl::style::ImageContent>{};
-  if (
-    options != nullptr &&
-    has_style_image_option(*options, MLN_STYLE_IMAGE_OPTION_CONTENT)
-  ) {
-    content = mbgl::style::ImageContent{
-      .left = effective.content.left,
-      .top = effective.content.top,
-      .right = effective.content.right,
-      .bottom = effective.content.bottom
-    };
-  }
-  auto text_fit_width = std::optional<mbgl::style::TextFit>{};
-  if (
-    options != nullptr &&
-    has_style_image_option(*options, MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH)
-  ) {
-    text_fit_width = to_native_text_fit(effective.text_fit_width);
-  }
-  auto text_fit_height = std::optional<mbgl::style::TextFit>{};
-  if (
-    options != nullptr &&
-    has_style_image_option(*options, MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT)
-  ) {
-    text_fit_height = to_native_text_fit(effective.text_fit_height);
-  }
-
-  auto style_image = std::make_unique<mbgl::style::Image>(
-    string_from_view(image_id), to_native_premultiplied_rgba8_image(*image),
-    effective.pixel_ratio, effective.sdf,
-    to_native_image_stretches(effective.stretch_x, effective.stretch_x_count),
-    to_native_image_stretches(effective.stretch_y, effective.stretch_y_count),
-    content, text_fit_width, text_fit_height
   );
-  live->map->getStyle().addImage(std::move(style_image));
-  return MLN_STATUS_OK;
 }
 
-auto map_remove_style_image(
-  mln_map map, mln_buffer_view image_id, bool* out_removed
+auto map_loaded_style_json_take_result(
+  mln_operation operation, mln_buffer* out_json
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto image_id_status = validate_image_id(image_id);
-  if (image_id_status != MLN_STATUS_OK) {
-    return image_id_status;
-  }
-  if (out_removed == nullptr) {
-    set_thread_error("out_removed must not be null");
+  if (out_json == nullptr || *out_json != MLN_HANDLE_NULL) {
+    set_thread_error("out_json must point to the null handle");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-
-  auto& style = live->map->getStyle();
-  const auto id = string_from_view(image_id);
-  *out_removed = style.getImage(id).has_value();
-  if (*out_removed) {
-    style.removeImage(id);
-  }
-  return MLN_STATUS_OK;
-}
-
-auto map_style_image_exists(
-  mln_map map, mln_buffer_view image_id, bool* out_exists
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto image_id_status = validate_image_id(image_id);
-  if (image_id_status != MLN_STATUS_OK) {
-    return image_id_status;
-  }
-  if (out_exists == nullptr) {
-    set_thread_error("out_exists must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  *out_exists =
-    live->map->getStyle().getImage(string_from_view(image_id)).has_value();
-  return MLN_STATUS_OK;
-}
-
-auto map_get_style_image_info(
-  mln_map map, mln_buffer_view image_id, mln_style_image_info* out_info,
-  bool* out_found
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto image_id_status = validate_image_id(image_id);
-  if (image_id_status != MLN_STATUS_OK) {
-    return image_id_status;
-  }
-  if (out_info == nullptr || out_info->size < sizeof(mln_style_image_info)) {
-    set_thread_error("out_info must not be null and must have a valid size");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_found == nullptr) {
-    set_thread_error("out_found must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  const auto image = live->map->getStyle().getImage(string_from_view(image_id));
-  *out_found = image.has_value();
-  *out_info =
-    image ? style_image_info_from_native(*image) : style_image_info_default();
-  return MLN_STATUS_OK;
-}
-
-auto map_copy_style_image_stretches(
-  mln_map map, mln_buffer_view image_id, mln_image_stretch* out_stretch_x,
-  size_t stretch_x_capacity, size_t* out_stretch_x_count,
-  mln_image_stretch* out_stretch_y, size_t stretch_y_capacity,
-  size_t* out_stretch_y_count, bool* out_found
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto image_id_status = validate_image_id(image_id);
-  if (image_id_status != MLN_STATUS_OK) {
-    return image_id_status;
-  }
-  if (
-    (out_stretch_x == nullptr && stretch_x_capacity > 0) ||
-    (out_stretch_y == nullptr && stretch_y_capacity > 0)
-  ) {
-    set_thread_error(
-      "stretch output arrays must not be null when their capacity is non-zero"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (
-    out_stretch_x_count == nullptr || out_stretch_y_count == nullptr ||
-    out_found == nullptr
-  ) {
-    set_thread_error("stretch output counts and out_found must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  const auto image = live->map->getStyle().getImage(string_from_view(image_id));
-  *out_found = image.has_value();
-  *out_stretch_x_count = 0;
-  *out_stretch_y_count = 0;
-  if (!image) {
-    return MLN_STATUS_OK;
-  }
-
-  const auto& stretch_x = image->getStretchX();
-  const auto& stretch_y = image->getStretchY();
-  *out_stretch_x_count = stretch_x.size();
-  *out_stretch_y_count = stretch_y.size();
-
-  // A null array with zero capacity is a size probe, so it reports the counts
-  // and succeeds rather than sharing a status with a missing image.
-  for (const auto& [out, capacity, stretches, name] : {
-         std::tuple{
-           out_stretch_x, stretch_x_capacity, &stretch_x, "stretch_x_capacity"
-         },
-         std::tuple{
-           out_stretch_y, stretch_y_capacity, &stretch_y, "stretch_y_capacity"
-         },
-       }) {
-    if (out == nullptr) {
-      continue;
+  return take_operation_result<std::string>(
+    operation, map_loaded_style_json_operation_kind,
+    [out_json](std::string& result) -> mln_status {
+      return create_buffer(std::move(result), out_json);
     }
-    if (capacity < stretches->size()) {
-      auto message = std::string{name} + " is too small";
-      set_thread_error(message.c_str());
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-  }
-  for (const auto& [out, stretches] : {
-         std::pair{out_stretch_x, &stretch_x},
-         std::pair{out_stretch_y, &stretch_y},
-       }) {
-    if (out == nullptr) {
-      continue;
-    }
-    for (size_t index = 0; index < stretches->size(); index += 1) {
-      out[index] = mln_image_stretch{
-        .from = (*stretches)[index].first, .to = (*stretches)[index].second
-      };
-    }
-  }
-  return MLN_STATUS_OK;
-}
-
-auto map_copy_style_image_premultiplied_rgba8(
-  mln_map map, mln_buffer_view image_id, uint8_t* out_pixels,
-  size_t pixel_capacity, size_t* out_byte_length, bool* out_found
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto image_id_status = validate_image_id(image_id);
-  if (image_id_status != MLN_STATUS_OK) {
-    return image_id_status;
-  }
-  if (out_pixels == nullptr && pixel_capacity > 0) {
-    set_thread_error("out_pixels must not be null when capacity is non-zero");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_byte_length == nullptr || out_found == nullptr) {
-    set_thread_error("out_byte_length and out_found must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  const auto image = live->map->getStyle().getImage(string_from_view(image_id));
-  *out_found = image.has_value();
-  *out_byte_length = 0;
-  if (!image) {
-    return MLN_STATUS_OK;
-  }
-
-  const auto& pixels = image->getImage();
-  *out_byte_length = pixels.bytes();
-  // A null buffer with zero capacity is a size probe, so it reports the length
-  // and succeeds rather than sharing a status with a missing image.
-  if (out_pixels == nullptr) {
-    return MLN_STATUS_OK;
-  }
-  if (pixel_capacity < pixels.bytes()) {
-    set_thread_error("pixel_capacity is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (pixels.bytes() > 0) {
-    std::copy_n(pixels.data.get(), pixels.bytes(), out_pixels);
-  }
-  return MLN_STATUS_OK;
-}
-
-auto map_add_image_source_url(
-  mln_map map, mln_buffer_view source_id, const mln_lat_lng* coordinates,
-  size_t coordinate_count, mln_buffer_view url
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-  const auto coordinate_status =
-    validate_image_source_coordinates(coordinates, coordinate_count);
-  if (coordinate_status != MLN_STATUS_OK) {
-    return coordinate_status;
-  }
-  if (!validate_string_view(url, "url")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (url.size == 0) {
-    set_thread_error("url must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto& style = live->map->getStyle();
-  const auto id = string_from_view(source_id);
-  const auto add_status = validate_source_can_be_added(style, id);
-  if (add_status != MLN_STATUS_OK) {
-    return add_status;
-  }
-
-  auto source = std::make_unique<mbgl::style::ImageSource>(
-    id, to_native_image_source_coordinates(coordinates)
   );
-  source->setURL(string_from_view(url));
-  style.addSource(std::move(source));
-  return MLN_STATUS_OK;
 }
 
-auto map_add_image_source_image(
-  mln_map map, mln_buffer_view source_id, const mln_lat_lng* coordinates,
-  size_t coordinate_count, const mln_premultiplied_rgba8_image* image
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-  const auto coordinate_status =
-    validate_image_source_coordinates(coordinates, coordinate_count);
-  if (coordinate_status != MLN_STATUS_OK) {
-    return coordinate_status;
-  }
-  const auto image_status = validate_premultiplied_rgba8_image(image);
-  if (image_status != MLN_STATUS_OK) {
-    return image_status;
-  }
-
-  auto& style = live->map->getStyle();
-  const auto id = string_from_view(source_id);
-  const auto add_status = validate_source_can_be_added(style, id);
-  if (add_status != MLN_STATUS_OK) {
-    return add_status;
-  }
-
-  auto native_image = to_native_premultiplied_rgba8_image(*image);
-  style.addSource(
-    std::make_unique<mbgl::style::ImageSource>(
-      id, to_native_image_source_coordinates(coordinates)
-    )
-  );
-  auto* added_source = style.getSource(id);
-  auto* image_source = added_source == nullptr
-                         ? nullptr
-                         : added_source->as<mbgl::style::ImageSource>();
-  if (image_source == nullptr) {
-    set_thread_error("added source is not an image source");
-    return MLN_STATUS_NATIVE_ERROR;
-  }
-  image_source->setImage(std::move(native_image));
-  return MLN_STATUS_OK;
-}
-
-auto map_set_image_source_url(
-  mln_map map, mln_buffer_view source_id, mln_buffer_view url
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-  if (!validate_string_view(url, "url")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (url.size == 0) {
-    set_thread_error("url must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto* source = live->map->getStyle().getSource(string_from_view(source_id));
-  if (source == nullptr) {
-    set_thread_error("source does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  auto* image_source = source->as<mbgl::style::ImageSource>();
-  if (image_source == nullptr) {
-    set_thread_error("source is not an image source");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  image_source->setURL(string_from_view(url));
-  return MLN_STATUS_OK;
-}
-
-auto map_set_image_source_image(
-  mln_map map, mln_buffer_view source_id,
-  const mln_premultiplied_rgba8_image* image
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-  const auto image_status = validate_premultiplied_rgba8_image(image);
-  if (image_status != MLN_STATUS_OK) {
-    return image_status;
-  }
-
-  auto* source = live->map->getStyle().getSource(string_from_view(source_id));
-  if (source == nullptr) {
-    set_thread_error("source does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  auto* image_source = source->as<mbgl::style::ImageSource>();
-  if (image_source == nullptr) {
-    set_thread_error("source is not an image source");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  image_source->setImage(to_native_premultiplied_rgba8_image(*image));
-  return MLN_STATUS_OK;
-}
-
-auto map_set_image_source_coordinates(
-  mln_map map, mln_buffer_view source_id, const mln_lat_lng* coordinates,
-  size_t coordinate_count
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-  const auto coordinate_status =
-    validate_image_source_coordinates(coordinates, coordinate_count);
-  if (coordinate_status != MLN_STATUS_OK) {
-    return coordinate_status;
-  }
-
-  auto* source = live->map->getStyle().getSource(string_from_view(source_id));
-  if (source == nullptr) {
-    set_thread_error("source does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  auto* image_source = source->as<mbgl::style::ImageSource>();
-  if (image_source == nullptr) {
-    set_thread_error("source is not an image source");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  image_source->setCoordinates(to_native_image_source_coordinates(coordinates));
-  return MLN_STATUS_OK;
-}
-
-auto map_get_image_source_coordinates(
-  mln_map map, mln_buffer_view source_id, mln_lat_lng* out_coordinates,
-  size_t coordinate_capacity, size_t* out_coordinate_count, bool* out_found
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-  if (out_coordinates == nullptr && coordinate_capacity > 0) {
-    set_thread_error(
-      "out_coordinates must not be null when capacity is non-zero"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_coordinate_count == nullptr || out_found == nullptr) {
-    set_thread_error("out_coordinate_count and out_found must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto* source = live->map->getStyle().getSource(string_from_view(source_id));
-  *out_found = source != nullptr;
-  *out_coordinate_count = 0;
-  if (source == nullptr) {
-    return MLN_STATUS_OK;
-  }
-  auto* image_source = source->as<mbgl::style::ImageSource>();
-  if (image_source == nullptr) {
-    set_thread_error("source is not an image source");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  constexpr auto image_source_coordinate_count = size_t{4};
-  *out_coordinate_count = image_source_coordinate_count;
-  if (coordinate_capacity < image_source_coordinate_count) {
-    set_thread_error("coordinate_capacity is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto coordinates =
-    from_native_image_source_coordinates(image_source->getCoordinates());
-  auto output = std::span<mln_lat_lng>{out_coordinates, coordinate_capacity};
-  std::ranges::copy(coordinates, output.begin());
-  return MLN_STATUS_OK;
-}
-
-auto map_add_hillshade_layer(
-  mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id,
-  mln_buffer_view before_layer_id
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (
-    !validate_string_view(layer_id, "layer_id") ||
-    !validate_string_view(source_id, "source_id") ||
-    !validate_string_view(before_layer_id, "before_layer_id")
-  ) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (layer_id.size == 0 || source_id.size == 0) {
-    set_thread_error("layer_id and source_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto& style = live->map->getStyle();
-  const auto layer = string_from_view(layer_id);
-  const auto source = string_from_view(source_id);
-  if (style.getLayer(layer) != nullptr) {
-    set_thread_error("layer already exists");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  auto* source_ptr = style.getSource(source);
-  if (source_ptr == nullptr) {
-    set_thread_error("source does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (!source_ptr->is<mbgl::style::RasterDEMSource>()) {
-    set_thread_error("source is not a raster DEM source");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto before = std::optional<std::string>{};
-  if (before_layer_id.size > 0) {
-    before = string_from_view(before_layer_id);
-    if (style.getLayer(*before) == nullptr) {
-      set_thread_error("before_layer_id does not exist");
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-  }
-  style.addLayer(
-    std::make_unique<mbgl::style::HillshadeLayer>(layer, source), before
-  );
-  return MLN_STATUS_OK;
-}
-
-auto map_add_color_relief_layer(
-  mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id,
-  mln_buffer_view before_layer_id
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (
-    !validate_string_view(layer_id, "layer_id") ||
-    !validate_string_view(source_id, "source_id") ||
-    !validate_string_view(before_layer_id, "before_layer_id")
-  ) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (layer_id.size == 0 || source_id.size == 0) {
-    set_thread_error("layer_id and source_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto& style = live->map->getStyle();
-  const auto layer = string_from_view(layer_id);
-  const auto source = string_from_view(source_id);
-  if (style.getLayer(layer) != nullptr) {
-    set_thread_error("layer already exists");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  auto* source_ptr = style.getSource(source);
-  if (source_ptr == nullptr) {
-    set_thread_error("source does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (!source_ptr->is<mbgl::style::RasterDEMSource>()) {
-    set_thread_error("source is not a raster DEM source");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto before = std::optional<std::string>{};
-  if (before_layer_id.size > 0) {
-    before = string_from_view(before_layer_id);
-    if (style.getLayer(*before) == nullptr) {
-      set_thread_error("before_layer_id does not exist");
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-  }
-  style.addLayer(
-    std::make_unique<mbgl::style::ColorReliefLayer>(layer, source), before
-  );
-  return MLN_STATUS_OK;
-}
-
-auto map_add_location_indicator_layer(
-  mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (
-    !validate_string_view(layer_id, "layer_id") ||
-    !validate_string_view(before_layer_id, "before_layer_id")
-  ) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (layer_id.size == 0) {
-    set_thread_error("layer_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto& style = live->map->getStyle();
-  const auto layer = string_from_view(layer_id);
-  if (style.getLayer(layer) != nullptr) {
-    set_thread_error("layer already exists");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  auto before = std::optional<std::string>{};
-  if (before_layer_id.size > 0) {
-    before = string_from_view(before_layer_id);
-    if (style.getLayer(*before) == nullptr) {
-      set_thread_error("before_layer_id does not exist");
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-  }
-  style.addLayer(
-    std::make_unique<mbgl::style::LocationIndicatorLayer>(layer), before
-  );
-  return MLN_STATUS_OK;
-}
-
-auto validate_location_indicator_layer(MapObject* map, mln_buffer_view layer_id)
+auto map_style_url_start(mln_map map, mln_operation* out_operation)
   -> mln_status {
-  if (!validate_string_view(layer_id, "layer_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (layer_id.size == 0) {
-    set_thread_error("layer_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto* layer = map->map->getStyle().getLayer(string_from_view(layer_id));
-  if (layer == nullptr) {
-    set_thread_error("layer does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (std::strcmp(layer->getTypeInfo()->type, "location-indicator") != 0) {
-    set_thread_error("layer is not a location indicator layer");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
-}
-
-auto validate_float64_to_float32(double value, const char* name) -> mln_status {
-  if (
-    !std::isfinite(value) || value < -std::numeric_limits<float>::max() ||
-    value > std::numeric_limits<float>::max()
-  ) {
-    const auto message = std::string{name} + " must fit in finite float32";
-    set_thread_error(message.c_str());
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
-}
-
-auto map_set_location_indicator_location(
-  mln_map map, mln_buffer_view layer_id, mln_lat_lng coordinate, double altitude
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto layer_status = validate_location_indicator_layer(live, layer_id);
-  if (layer_status != MLN_STATUS_OK) {
-    return layer_status;
-  }
-  const auto coordinate_status = validate_lat_lng(coordinate);
-  if (coordinate_status != MLN_STATUS_OK) {
-    return coordinate_status;
-  }
-  if (!std::isfinite(altitude)) {
-    set_thread_error("altitude must be finite");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  // The style property is [latitude, longitude, altitude]; the renderer reads
-  // it back as LatLng{values[0], values[1]}.
-  const auto location = serialize_json_value(
-    mbgl::Value{mapbox::base::ValueArray{
-      mbgl::Value{coordinate.latitude}, mbgl::Value{coordinate.longitude},
-      mbgl::Value{altitude}
-    }}
-  );
-  return map_set_layer_property(
-    map, layer_id, string_view_from_literal("location"),
-    buffer_view_from_string(location)
+  return start_map_string_operation(
+    map, map_style_url_operation_kind, out_operation,
+    [](MapObject& live) -> std::string { return live.map->getStyle().getURL(); }
   );
 }
 
-auto map_set_location_indicator_bearing(
-  mln_map map, mln_buffer_view layer_id, double bearing
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto layer_status = validate_location_indicator_layer(live, layer_id);
-  if (layer_status != MLN_STATUS_OK) {
-    return layer_status;
-  }
-  const auto bearing_status = validate_float64_to_float32(bearing, "bearing");
-  if (bearing_status != MLN_STATUS_OK) {
-    return bearing_status;
-  }
-  const auto value = serialize_json_value(mbgl::Value{bearing});
-  return map_set_layer_property(
-    map, layer_id, string_view_from_literal("bearing"),
-    buffer_view_from_string(value)
-  );
-}
-
-auto map_set_location_indicator_accuracy_radius(
-  mln_map map, mln_buffer_view layer_id, double radius
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto layer_status = validate_location_indicator_layer(live, layer_id);
-  if (layer_status != MLN_STATUS_OK) {
-    return layer_status;
-  }
-  const auto radius_status = validate_float64_to_float32(radius, "radius");
-  if (radius_status != MLN_STATUS_OK) {
-    return radius_status;
-  }
-  if (radius < 0.0) {
-    set_thread_error("radius must be non-negative");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto value = serialize_json_value(mbgl::Value{radius});
-  return map_set_layer_property(
-    map, layer_id, string_view_from_literal("accuracy-radius"),
-    buffer_view_from_string(value)
-  );
-}
-
-auto location_indicator_image_property(uint32_t image_kind)
-  -> std::optional<mln_buffer_view> {
-  switch (image_kind) {
-    case MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP:
-      return string_view_from_literal("top-image");
-    case MLN_LOCATION_INDICATOR_IMAGE_KIND_BEARING:
-      return string_view_from_literal("bearing-image");
-    case MLN_LOCATION_INDICATOR_IMAGE_KIND_SHADOW:
-      return string_view_from_literal("shadow-image");
-    default:
-      return std::nullopt;
-  }
-}
-
-auto map_set_location_indicator_image_name(
-  mln_map map, mln_buffer_view layer_id, uint32_t image_kind,
-  mln_buffer_view image_id
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto layer_status = validate_location_indicator_layer(live, layer_id);
-  if (layer_status != MLN_STATUS_OK) {
-    return layer_status;
-  }
-  if (!validate_string_view(image_id, "image_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (image_id.size == 0) {
-    set_thread_error("image_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto property = location_indicator_image_property(image_kind);
-  if (!property) {
-    set_thread_error("image_kind is invalid");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto value =
-    serialize_json_value(mbgl::Value{string_from_view(image_id)});
-  return map_set_layer_property(
-    map, layer_id, *property, buffer_view_from_string(value)
-  );
-}
-
-auto map_add_style_layer_json(
-  mln_map map, mln_buffer_view layer_json, mln_buffer_view before_layer_id
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (!validate_string_view(before_layer_id, "before_layer_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (!validate_bytes(layer_json, "style layer")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto& style = live->map->getStyle();
-  auto before = std::optional<std::string>{};
-  if (before_layer_id.size > 0) {
-    before = string_from_view(before_layer_id);
-    if (style.getLayer(*before) == nullptr) {
-      set_thread_error("before_layer_id does not exist");
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-  }
-
-  auto error = mbgl::style::conversion::Error{};
-  auto layer =
-    mbgl::style::conversion::convertJSON<std::unique_ptr<mbgl::style::Layer>>(
-      string_from_view(layer_json), error
-    );
-  if (!layer) {
-    set_style_conversion_error("style layer", error);
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  const auto id = (*layer)->getID();
-  if (style.getLayer(id) != nullptr) {
-    set_thread_error("layer already exists");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (
-    (*layer)->getTypeInfo()->source ==
-      mbgl::style::LayerTypeInfo::Source::Required &&
-    style.getSource((*layer)->getSourceID()) == nullptr
-  ) {
-    set_thread_error("layer source does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  style.addLayer(std::move(*layer), before);
-  return MLN_STATUS_OK;
-}
-
-auto map_remove_style_layer(
-  mln_map map, mln_buffer_view layer_id, bool* out_removed
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (!validate_string_view(layer_id, "layer_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (layer_id.size == 0) {
-    set_thread_error("layer_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_removed == nullptr) {
-    set_thread_error("out_removed must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto removed = live->map->getStyle().removeLayer(string_from_view(layer_id));
-  *out_removed = removed != nullptr;
-  return MLN_STATUS_OK;
-}
-
-auto map_style_layer_exists(
-  mln_map map, mln_buffer_view layer_id, bool* out_exists
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (!validate_string_view(layer_id, "layer_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (layer_id.size == 0) {
-    set_thread_error("layer_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_exists == nullptr) {
-    set_thread_error("out_exists must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  *out_exists =
-    live->map->getStyle().getLayer(string_from_view(layer_id)) != nullptr;
-  return MLN_STATUS_OK;
-}
-
-auto map_get_style_layer_type(
-  mln_map map, mln_buffer_view layer_id, mln_buffer_view* out_layer_type,
-  bool* out_found
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (!validate_string_view(layer_id, "layer_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (layer_id.size == 0) {
-    set_thread_error("layer_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_layer_type == nullptr || out_found == nullptr) {
-    set_thread_error("out_layer_type and out_found must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  const auto* layer =
-    live->map->getStyle().getLayer(string_from_view(layer_id));
-  *out_found = layer != nullptr;
-  *out_layer_type = {};
-  if (layer != nullptr) {
-    *out_layer_type = string_view_from_literal(layer->getTypeInfo()->type);
-  }
-  return MLN_STATUS_OK;
-}
-
-auto map_list_style_layer_ids(mln_map map, mln_style_id_list* out_layer_ids)
+auto map_style_url_take_result(mln_operation operation, mln_buffer* out_url)
   -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
+  if (out_url == nullptr || *out_url != MLN_HANDLE_NULL) {
+    set_thread_error("out_url must point to the null handle");
+    return MLN_STATUS_INVALID_ARGUMENT;
   }
-
-  auto ids = std::vector<std::string>{};
-  for (const auto* layer : live->map->getStyle().getLayers()) {
-    ids.push_back(layer->getID());
-  }
-  return create_style_id_list(std::move(ids), out_layer_ids);
+  return take_operation_result<std::string>(
+    operation, map_style_url_operation_kind,
+    [out_url](std::string& result) -> mln_status {
+      return create_buffer(std::move(result), out_url);
+    }
+  );
 }
 
-auto map_move_style_layer(
-  mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id
+auto map_set_event_mask(mln_map map, uint64_t mask, uint64_t* out_command_id)
+  -> mln_status {
+  if (
+    out_command_id == nullptr || *out_command_id != 0 ||
+    (mask & ~static_cast<uint64_t>(MLN_RUNTIME_EVENT_MASK_ALL)) != 0U
+  ) {
+    set_thread_error("mask and out_command_id must be valid");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto live = handle_table<MapObject>().lease(map);
+  if (live == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (!live->control.acquire()) {
+    return MLN_STATUS_INVALID_STATE;
+  }
+  auto submission = std::make_shared<ControlLease>(&live->control);
+  return submit_runtime_command(
+    live->runtime_state,
+    [map, live, mask,
+     submission = std::move(submission)](uint64_t command_id) mutable -> void {
+      try {
+        live->event_state->mask.store(mask, std::memory_order_relaxed);
+        const auto generation = publish_map_snapshot(*live);
+        push_runtime_command_finished(
+          live->runtime, MLN_RUNTIME_EVENT_SOURCE_MAP, map, command_id,
+          MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, generation
+        );
+      } catch (...) {
+        const auto diagnostic = exception_message(std::current_exception());
+        push_runtime_command_finished(
+          live->runtime, MLN_RUNTIME_EVENT_SOURCE_MAP, map, command_id,
+          MLN_COMMAND_DISPOSITION_FAILED, MLN_STATUS_NATIVE_ERROR, 0,
+          diagnostic.c_str()
+        );
+      }
+    },
+    out_command_id
+  );
+}
+
+auto map_camera_snapshot_get(
+  mln_map map, mln_camera_options* out_camera, uint64_t* out_generation
 ) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
+  if (
+    out_camera == nullptr || out_camera->size < sizeof(mln_camera_options) ||
+    out_generation == nullptr
+  ) {
+    set_thread_error("camera output and generation must be valid");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto snapshot = mln_map_snapshot{};
+  snapshot.size = sizeof(mln_map_snapshot);
+  const auto status = map_snapshot_get(map, &snapshot);
   if (status != MLN_STATUS_OK) {
     return status;
   }
+  *out_camera = snapshot.camera;
+  *out_generation = snapshot.generation;
+  return MLN_STATUS_OK;
+}
+
+auto map_update_camera(
+  mln_map map, const mln_camera_update* update, uint64_t* out_command_id
+) -> mln_status {
   if (
-    !validate_string_view(layer_id, "layer_id") ||
-    !validate_string_view(before_layer_id, "before_layer_id")
+    update == nullptr || update->size < sizeof(mln_camera_update) ||
+    out_command_id == nullptr || *out_command_id != 0
   ) {
+    set_thread_error("camera update and out_command_id must be valid");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (layer_id.size == 0) {
-    set_thread_error("layer_id must not be empty");
+  if (
+    update->mode > MLN_CAMERA_UPDATE_MODE_FLY ||
+    update->gesture_phase > MLN_GESTURE_PHASE_CANCEL
+  ) {
+    set_thread_error("camera update mode or gesture phase is invalid");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  const auto camera_status = validate_camera_options(&update->camera);
+  if (camera_status != MLN_STATUS_OK) {
+    return camera_status;
+  }
+  const auto animation_status = validate_animation_options(&update->animation);
+  if (animation_status != MLN_STATUS_OK) {
+    return animation_status;
+  }
+  auto copied = *update;
+  if (copied.animation_id != 0) {
+    copied.animation.fields |= MLN_ANIMATION_OPTION_TRANSITION_ID;
+    copied.animation.transition_id = copied.animation_id;
+  }
+  auto live = handle_table<MapObject>().lease(map);
+  if (live == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (!live->control.acquire()) {
+    return MLN_STATUS_INVALID_STATE;
+  }
+  auto submission = std::make_shared<ControlLease>(&live->control);
+  return submit_runtime_command(
+    live->runtime_state,
+    [map, live, copied,
+     submission = std::move(submission)](uint64_t command_id) mutable -> void {
+      try {
+        if (
+          copied.gesture_phase == MLN_GESTURE_PHASE_BEGIN ||
+          copied.gesture_phase == MLN_GESTURE_PHASE_UPDATE
+        ) {
+          live->map->setGestureInProgress(true);
+        }
+        switch (copied.mode) {
+          case MLN_CAMERA_UPDATE_MODE_JUMP:
+            live->map->jumpTo(to_native_camera(copied.camera));
+            break;
+          case MLN_CAMERA_UPDATE_MODE_EASE:
+            live->map->easeTo(
+              to_native_camera(copied.camera),
+              to_native_animation(
+                live->runtime, map, live->event_state, &copied.animation
+              )
+            );
+            break;
+          case MLN_CAMERA_UPDATE_MODE_FLY:
+            live->map->flyTo(
+              to_native_camera(copied.camera),
+              to_native_animation(
+                live->runtime, map, live->event_state, &copied.animation
+              )
+            );
+            break;
+          default:
+            break;
+        }
+        if (copied.gesture_phase == MLN_GESTURE_PHASE_CANCEL) {
+          live->map->cancelTransitions();
+        }
+        if (
+          copied.gesture_phase == MLN_GESTURE_PHASE_END ||
+          copied.gesture_phase == MLN_GESTURE_PHASE_CANCEL
+        ) {
+          live->map->setGestureInProgress(false);
+        }
+        const auto generation = publish_map_snapshot(*live);
+        push_runtime_command_finished(
+          live->runtime, MLN_RUNTIME_EVENT_SOURCE_MAP, map, command_id,
+          MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, generation
+        );
+      } catch (...) {
+        const auto diagnostic = exception_message(std::current_exception());
+        push_runtime_command_finished(
+          live->runtime, MLN_RUNTIME_EVENT_SOURCE_MAP, map, command_id,
+          MLN_COMMAND_DISPOSITION_FAILED, MLN_STATUS_NATIVE_ERROR, 0,
+          diagnostic.c_str()
+        );
+      }
+    },
+    out_command_id
+  );
+}
 
-  auto& style = live->map->getStyle();
-  const auto id = string_from_view(layer_id);
-  if (style.getLayer(id) == nullptr) {
-    set_thread_error("layer does not exist");
+auto map_camera_query_start(mln_map map, mln_operation* out_operation)
+  -> mln_status {
+  auto live = handle_table<MapObject>().lease(map);
+  if (live == nullptr) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  if (!live->control.acquire()) {
+    return MLN_STATUS_INVALID_STATE;
+  }
+  auto submission = std::make_shared<ControlLease>(&live->control);
+  auto state = std::shared_ptr<OperationObject>{};
+  const auto register_status = register_operation(
+    live->runtime_state->event_queue->notification_source,
+    map_camera_query_operation_kind, false, {}, out_operation, state
+  );
+  if (register_status != MLN_STATUS_OK) {
+    return register_status;
+  }
+  const auto operation = *out_operation;
+  const auto submit_status = submit_runtime_operation(
+    live->runtime_state, state,
+    [live = std::move(live), state,
+     submission = std::move(submission)]() mutable -> void {
+      try {
+        const auto generation = publish_map_snapshot(*live);
+        state->complete(
+          MLN_STATUS_OK, {},
+          std::any{mln_camera_query_result{
+            .size = sizeof(mln_camera_query_result),
+            .reserved = 0,
+            .generation = generation,
+            .camera = from_native_camera(live->map->getCameraOptions())
+          }}
+        );
+      } catch (...) {
+        state->complete(
+          MLN_STATUS_NATIVE_ERROR, exception_message(std::current_exception()),
+          {}
+        );
+      }
+    }
+  );
+  if (submit_status != MLN_STATUS_OK) {
+    abandon_operation(operation);
+    *out_operation = MLN_HANDLE_NULL;
+  }
+  return submit_status;
+}
 
-  auto before = std::optional<std::string>{};
-  if (before_layer_id.size > 0) {
-    before = string_from_view(before_layer_id);
-    if (*before == id) {
+auto map_camera_query_take_result(
+  mln_operation operation, mln_camera_query_result* out_result
+) -> mln_status {
+  if (
+    out_result == nullptr || out_result->size < sizeof(mln_camera_query_result)
+  ) {
+    set_thread_error("out_result must not be null and must have a valid size");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return take_operation_result<mln_camera_query_result>(
+    operation, map_camera_query_operation_kind,
+    [out_result](mln_camera_query_result& result) -> mln_status {
+      *out_result = result;
       return MLN_STATUS_OK;
     }
-    if (style.getLayer(*before) == nullptr) {
-      set_thread_error("before_layer_id does not exist");
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-  }
-
-  auto layer = style.removeLayer(id);
-  style.addLayer(std::move(layer), before);
-  return MLN_STATUS_OK;
-}
-
-auto map_get_style_layer_json(
-  mln_map map, mln_buffer_view layer_id, mln_buffer* out_layer, bool* out_found
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (!validate_string_view(layer_id, "layer_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (layer_id.size == 0) {
-    set_thread_error("layer_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (
-    out_layer == nullptr || *out_layer != MLN_HANDLE_NULL ||
-    out_found == nullptr
-  ) {
-    set_thread_error(
-      "out_layer must not be null, *out_layer must be the null handle, and "
-      "out_found must not be null"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  const auto* layer =
-    live->map->getStyle().getLayer(string_from_view(layer_id));
-  *out_found = layer != nullptr;
-  if (layer == nullptr) {
-    return MLN_STATUS_OK;
-  }
-  return create_buffer(serialize_json_value(layer->serialize()), out_layer);
-}
-
-auto map_set_style_light_json(mln_map map, mln_buffer_view light_json)
-  -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (!validate_bytes(light_json, "style light")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto error = mbgl::style::conversion::Error{};
-  auto light = mbgl::style::conversion::convertJSON<mbgl::style::Light>(
-    string_from_view(light_json), error
   );
-  if (!light) {
-    set_style_conversion_error("style light", error);
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  live->map->getStyle().setLight(std::make_unique<mbgl::style::Light>(*light));
-  return MLN_STATUS_OK;
-}
-
-auto map_set_style_light_property(
-  mln_map map, mln_buffer_view property_name, mln_buffer_view value
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (!validate_string_view(property_name, "property_name")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (property_name.size == 0) {
-    set_thread_error("property_name must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  auto document = mbgl::JSDocument{};
-  if (!parse_json_document(value, "style light property", document)) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto* light = live->map->getStyle().getLight();
-  if (light == nullptr) {
-    set_thread_error("style light does not exist");
-    return MLN_STATUS_INVALID_STATE;
-  }
-
-  auto error = light->setProperty(
-    string_from_view(property_name),
-    mbgl::style::conversion::Convertible{
-      static_cast<const mbgl::JSValue*>(&document)
-    }
-  );
-  if (error) {
-    set_style_conversion_error("style light property", *error);
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
-}
-
-auto map_get_style_light_property(
-  mln_map map, mln_buffer_view property_name, mln_buffer* out_value
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (!validate_string_view(property_name, "property_name")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (property_name.size == 0) {
-    set_thread_error("property_name must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_value == nullptr || *out_value != MLN_HANDLE_NULL) {
-    set_thread_error(
-      "out_value must not be null and *out_value must be the null handle"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto* light = live->map->getStyle().getLight();
-  if (light == nullptr) {
-    set_thread_error("style light does not exist");
-    return MLN_STATUS_INVALID_STATE;
-  }
-
-  const auto property = light->getProperty(string_from_view(property_name));
-  if (property.getKind() == mbgl::style::StyleProperty::Kind::Undefined) {
-    return MLN_STATUS_OK;
-  }
-  return create_buffer(serialize_json_value(property.getValue()), out_value);
-}
-
-auto map_set_style_transition_options(
-  mln_map map, const mln_style_transition_options* options
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (
-    options == nullptr || options->size < sizeof(mln_style_transition_options)
-  ) {
-    set_thread_error("options must not be null and must have a valid size");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  constexpr auto known_fields =
-    static_cast<uint32_t>(MLN_STYLE_TRANSITION_OPTION_DURATION) |
-    MLN_STYLE_TRANSITION_OPTION_DELAY |
-    MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS;
-  if ((options->fields & ~known_fields) != 0U) {
-    set_thread_error(
-      "mln_style_transition_options.fields contains unknown bits"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  // The native default is already on, so an omitted field leaves it alone.
-  auto native = mbgl::style::TransitionOptions{};
-  if (
-    (options->fields &
-     MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS) != 0U
-  ) {
-    native.enablePlacementTransitions = options->enable_placement_transitions;
-  }
-  if ((options->fields & MLN_STYLE_TRANSITION_OPTION_DURATION) != 0U) {
-    if (!is_native_duration_ms(options->duration_ms)) {
-      set_thread_error(
-        "transition duration_ms must fit the native duration range"
-      );
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    native.duration = duration_from_milliseconds(options->duration_ms);
-  }
-  if ((options->fields & MLN_STYLE_TRANSITION_OPTION_DELAY) != 0U) {
-    if (!is_native_duration_ms(options->delay_ms)) {
-      set_thread_error(
-        "transition delay_ms must fit the native duration range"
-      );
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    native.delay = duration_from_milliseconds(options->delay_ms);
-  }
-
-  live->map->getStyle().setTransitionOptions(native);
-  return MLN_STATUS_OK;
-}
-
-auto map_get_style_transition_options(
-  mln_map map, mln_style_transition_options* out_options
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (
-    out_options == nullptr ||
-    out_options->size < sizeof(mln_style_transition_options)
-  ) {
-    set_thread_error("out_options must not be null and must have a valid size");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  const auto native = live->map->getStyle().getTransitionOptions();
-  auto result = style_transition_options_default();
-  // MapLibre Native always holds this one, so it always reports as present.
-  result.fields |= MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS;
-  result.enable_placement_transitions = native.enablePlacementTransitions;
-  if (native.duration) {
-    result.fields |= MLN_STYLE_TRANSITION_OPTION_DURATION;
-    result.duration_ms = milliseconds_from_duration(*native.duration);
-  }
-  if (native.delay) {
-    result.fields |= MLN_STYLE_TRANSITION_OPTION_DELAY;
-    result.delay_ms = milliseconds_from_duration(*native.delay);
-  }
-  *out_options = result;
-  return MLN_STATUS_OK;
-}
-
-auto map_set_layer_property(
-  mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name,
-  mln_buffer_view value
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (
-    !validate_string_view(layer_id, "layer_id") ||
-    !validate_string_view(property_name, "property_name")
-  ) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (layer_id.size == 0 || property_name.size == 0) {
-    set_thread_error("layer_id and property_name must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto document = mbgl::JSDocument{};
-  if (!parse_json_document(value, "layer property", document)) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto* layer = live->map->getStyle().getLayer(string_from_view(layer_id));
-  if (layer == nullptr) {
-    set_thread_error("layer does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto error = layer->setProperty(
-    string_from_view(property_name),
-    mbgl::style::conversion::Convertible{
-      static_cast<const mbgl::JSValue*>(&document)
-    }
-  );
-  if (error) {
-    set_style_conversion_error("layer property", *error);
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  return MLN_STATUS_OK;
-}
-
-auto map_get_layer_property(
-  mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name,
-  mln_buffer* out_value
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (
-    !validate_string_view(layer_id, "layer_id") ||
-    !validate_string_view(property_name, "property_name")
-  ) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (layer_id.size == 0 || property_name.size == 0) {
-    set_thread_error("layer_id and property_name must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_value == nullptr || *out_value != MLN_HANDLE_NULL) {
-    set_thread_error(
-      "out_value must not be null and *out_value must be the null handle"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto* layer = live->map->getStyle().getLayer(string_from_view(layer_id));
-  if (layer == nullptr) {
-    set_thread_error("layer does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  const auto property = layer->getProperty(string_from_view(property_name));
-  if (property.getKind() == mbgl::style::StyleProperty::Kind::Undefined) {
-    return MLN_STATUS_OK;
-  }
-  return create_buffer(serialize_json_value(property.getValue()), out_value);
-}
-
-auto map_set_layer_filter(
-  mln_map map, mln_buffer_view layer_id, const mln_buffer_view* filter
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (!validate_string_view(layer_id, "layer_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (layer_id.size == 0) {
-    set_thread_error("layer_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto* layer = live->map->getStyle().getLayer(string_from_view(layer_id));
-  if (layer == nullptr) {
-    set_thread_error("layer does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  if (filter == nullptr) {
-    layer->setFilter(mbgl::style::Filter{});
-    return MLN_STATUS_OK;
-  }
-
-  auto native_filter = to_native_style_filter(filter);
-  if (!native_filter) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  layer->setFilter(*native_filter);
-  return MLN_STATUS_OK;
-}
-
-auto map_get_layer_filter(
-  mln_map map, mln_buffer_view layer_id, mln_buffer* out_filter
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (!validate_string_view(layer_id, "layer_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (layer_id.size == 0) {
-    set_thread_error("layer_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_filter == nullptr || *out_filter != MLN_HANDLE_NULL) {
-    set_thread_error(
-      "out_filter must not be null and *out_filter must be the null handle"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto* layer = live->map->getStyle().getLayer(string_from_view(layer_id));
-  if (layer == nullptr) {
-    set_thread_error("layer does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  const auto filter = layer->getFilter().serialize();
-  if (filter.is<mbgl::NullValue>()) {
-    return MLN_STATUS_OK;
-  }
-  return create_buffer(serialize_json_value(filter), out_filter);
-}
-
-namespace {
-
-auto resolve_layer_for_access(
-  mln_map map, mln_buffer_view layer_id, mbgl::style::Layer*& out_layer
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (!validate_string_view(layer_id, "layer_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (layer_id.size == 0) {
-    set_thread_error("layer_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  auto* layer = live->map->getStyle().getLayer(string_from_view(layer_id));
-  if (layer == nullptr) {
-    set_thread_error("layer does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  out_layer = layer;
-  return MLN_STATUS_OK;
-}
-
-// MapLibre's setProperty path logs a warning and does nothing when a layer type
-// takes no source, so the typed setters reject that case instead.
-auto require_layer_takes_source(
-  const mbgl::style::Layer& layer, const char* field
-) -> bool {
-  if (
-    layer.getTypeInfo()->source == mbgl::style::LayerTypeInfo::Source::Required
-  ) {
-    return true;
-  }
-  auto message = std::string{"layer type does not take a "} + field +
-                 "; layer id is " + layer.getID();
-  set_thread_error(message.c_str());
-  return false;
-}
-
-// MapLibre stores the layer zoom range as floats, and infinities survive the
-// narrowing that bounds a layer to one end of the range.
-auto validate_layer_zoom(double zoom, const char* field) -> bool {
-  if (!std::isnan(zoom)) {
-    return true;
-  }
-  auto message = std::string{field} + " must not be NaN";
-  set_thread_error(message.c_str());
-  return false;
-}
-
-}  // namespace
-
-auto map_set_layer_source_layer(
-  mln_map map, mln_buffer_view layer_id, mln_buffer_view source_layer
-) -> mln_status {
-  mbgl::style::Layer* layer = nullptr;
-  const auto status = resolve_layer_for_access(map, layer_id, layer);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (!validate_string_view(source_layer, "source_layer")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (!require_layer_takes_source(*layer, "source-layer")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  layer->setSourceLayer(string_from_view(source_layer));
-  return MLN_STATUS_OK;
-}
-
-auto map_copy_layer_source_layer(
-  mln_map map, mln_buffer_view layer_id, char* out_source_layer,
-  size_t source_layer_capacity, size_t* out_source_layer_size
-) -> mln_status {
-  mbgl::style::Layer* layer = nullptr;
-  const auto status = resolve_layer_for_access(map, layer_id, layer);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  return copy_text(
-    layer->getSourceLayer(), out_source_layer, source_layer_capacity,
-    out_source_layer_size, "source_layer_capacity"
-  );
-}
-
-auto map_set_layer_source_id(
-  mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id
-) -> mln_status {
-  mbgl::style::Layer* layer = nullptr;
-  const auto status = resolve_layer_for_access(map, layer_id, layer);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (!validate_string_view(source_id, "source_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (source_id.size == 0) {
-    set_thread_error("source_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (!require_layer_takes_source(*layer, "source")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  layer->setSourceID(string_from_view(source_id));
-  return MLN_STATUS_OK;
-}
-
-auto map_copy_layer_source_id(
-  mln_map map, mln_buffer_view layer_id, char* out_source_id,
-  size_t source_id_capacity, size_t* out_source_id_size
-) -> mln_status {
-  mbgl::style::Layer* layer = nullptr;
-  const auto status = resolve_layer_for_access(map, layer_id, layer);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  return copy_text(
-    layer->getSourceID(), out_source_id, source_id_capacity, out_source_id_size,
-    "source_id_capacity"
-  );
-}
-
-auto map_set_layer_min_zoom(
-  mln_map map, mln_buffer_view layer_id, double min_zoom
-) -> mln_status {
-  mbgl::style::Layer* layer = nullptr;
-  const auto status = resolve_layer_for_access(map, layer_id, layer);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (!validate_layer_zoom(min_zoom, "min_zoom")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  layer->setMinZoom(static_cast<float>(min_zoom));
-  return MLN_STATUS_OK;
-}
-
-auto map_get_layer_min_zoom(
-  mln_map map, mln_buffer_view layer_id, double* out_min_zoom
-) -> mln_status {
-  mbgl::style::Layer* layer = nullptr;
-  const auto status = resolve_layer_for_access(map, layer_id, layer);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (out_min_zoom == nullptr) {
-    set_thread_error("out_min_zoom must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  *out_min_zoom = static_cast<double>(layer->getMinZoom());
-  return MLN_STATUS_OK;
-}
-
-auto map_set_layer_max_zoom(
-  mln_map map, mln_buffer_view layer_id, double max_zoom
-) -> mln_status {
-  mbgl::style::Layer* layer = nullptr;
-  const auto status = resolve_layer_for_access(map, layer_id, layer);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (!validate_layer_zoom(max_zoom, "max_zoom")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  layer->setMaxZoom(static_cast<float>(max_zoom));
-  return MLN_STATUS_OK;
-}
-
-auto map_get_layer_max_zoom(
-  mln_map map, mln_buffer_view layer_id, double* out_max_zoom
-) -> mln_status {
-  mbgl::style::Layer* layer = nullptr;
-  const auto status = resolve_layer_for_access(map, layer_id, layer);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (out_max_zoom == nullptr) {
-    set_thread_error("out_max_zoom must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  *out_max_zoom = static_cast<double>(layer->getMaxZoom());
-  return MLN_STATUS_OK;
-}
-
-auto map_set_layer_visibility(
-  mln_map map, mln_buffer_view layer_id, uint32_t visibility
-) -> mln_status {
-  mbgl::style::Layer* layer = nullptr;
-  const auto status = resolve_layer_for_access(map, layer_id, layer);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  auto native_visibility = mbgl::style::VisibilityType::Visible;
-  switch (visibility) {
-    case MLN_STYLE_LAYER_VISIBILITY_VISIBLE:
-      native_visibility = mbgl::style::VisibilityType::Visible;
-      break;
-    case MLN_STYLE_LAYER_VISIBILITY_NONE:
-      native_visibility = mbgl::style::VisibilityType::None;
-      break;
-    default:
-      set_thread_error("visibility is invalid");
-      return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  layer->setVisibility(native_visibility);
-  return MLN_STATUS_OK;
-}
-
-auto map_get_layer_visibility(
-  mln_map map, mln_buffer_view layer_id, uint32_t* out_visibility
-) -> mln_status {
-  mbgl::style::Layer* layer = nullptr;
-  const auto status = resolve_layer_for_access(map, layer_id, layer);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (out_visibility == nullptr) {
-    set_thread_error("out_visibility must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  *out_visibility = layer->getVisibility() == mbgl::style::VisibilityType::None
-                      ? MLN_STYLE_LAYER_VISIBILITY_NONE
-                      : MLN_STYLE_LAYER_VISIBILITY_VISIBLE;
-  return MLN_STATUS_OK;
-}
-
-auto map_get_camera(mln_map map, mln_camera_options* out_camera) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (out_camera == nullptr || out_camera->size < sizeof(mln_camera_options)) {
-    set_thread_error("out_camera must not be null and must have a valid size");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  *out_camera = from_native_camera(live->map->getCameraOptions());
-  return MLN_STATUS_OK;
-}
-
-auto map_jump_to(mln_map map, const mln_camera_options* camera) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto camera_status = validate_camera_options(camera);
-  if (camera_status != MLN_STATUS_OK) {
-    return camera_status;
-  }
-  live->map->jumpTo(to_native_camera(*camera));
-  return MLN_STATUS_OK;
-}
-
-auto map_ease_to(
-  mln_map map, const mln_camera_options* camera,
-  const mln_animation_options* animation
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto camera_status = validate_camera_options(camera);
-  if (camera_status != MLN_STATUS_OK) {
-    return camera_status;
-  }
-  const auto animation_status = validate_animation_options(animation);
-  if (animation_status != MLN_STATUS_OK) {
-    return animation_status;
-  }
-
-  live->map->easeTo(
-    to_native_camera(*camera),
-    to_native_animation(live->runtime, map, live->event_state, animation)
-  );
-  return MLN_STATUS_OK;
-}
-
-auto map_fly_to(
-  mln_map map, const mln_camera_options* camera,
-  const mln_animation_options* animation
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto camera_status = validate_camera_options(camera);
-  if (camera_status != MLN_STATUS_OK) {
-    return camera_status;
-  }
-  const auto animation_status = validate_animation_options(animation);
-  if (animation_status != MLN_STATUS_OK) {
-    return animation_status;
-  }
-
-  live->map->flyTo(
-    to_native_camera(*camera),
-    to_native_animation(live->runtime, map, live->event_state, animation)
-  );
-  return MLN_STATUS_OK;
-}
-
-auto map_get_projection_mode(mln_map map, mln_projection_mode* out_mode)
-  -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (out_mode == nullptr || out_mode->size < sizeof(mln_projection_mode)) {
-    set_thread_error("out_mode must not be null and must have a valid size");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  *out_mode = from_native_projection_mode(live->map->getProjectionMode());
-  return MLN_STATUS_OK;
-}
-
-auto map_set_projection_mode(mln_map map, const mln_projection_mode* mode)
-  -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto mode_status = validate_projection_mode_options(mode);
-  if (mode_status != MLN_STATUS_OK) {
-    return mode_status;
-  }
-
-  live->map->setProjectionMode(to_native_projection_mode(*mode));
-  return MLN_STATUS_OK;
 }
 
 auto map_set_debug_options(mln_map map, uint32_t options) -> mln_status {
@@ -7093,11 +3729,9 @@ auto map_get_size(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  const auto options = live->map->getMapOptions();
-  const auto size = options.size();
-  *out_width = size.width;
-  *out_height = size.height;
-  *out_scale_factor = live->scale_factor;
+  *out_width = live->logical_extent.width;
+  *out_height = live->logical_extent.height;
+  *out_scale_factor = live->logical_extent.scale_factor;
   return MLN_STATUS_OK;
 }
 
@@ -7347,85 +3981,369 @@ auto map_lat_lngs_for_pixels(
   return MLN_STATUS_OK;
 }
 
-auto map_projection_create(mln_map map, mln_map_projection* out_projection)
-  -> mln_status {
-  if (out_projection == nullptr) {
-    set_thread_error("out_projection must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (*out_projection != MLN_HANDLE_NULL) {
-    set_thread_error("out_projection must point to the null handle");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-
-  auto owned_projection = std::make_shared<MapProjectionObject>();
-  owned_projection->owner_thread = std::this_thread::get_id();
-  owned_projection->projection =
-    std::make_unique<mbgl::MapProjection>(*live->map);
-
-  *out_projection =
-    handle_table<MapProjectionObject>().insert(std::move(owned_projection));
-  return MLN_STATUS_OK;
-}
-
-auto map_projection_destroy(mln_map_projection projection) -> mln_status {
-  MapProjectionObject* live = nullptr;
-  const auto status = validate_map_projection(projection, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  static_cast<void>(handle_table<MapProjectionObject>().remove(projection));
-  return MLN_STATUS_OK;
-}
-
-auto map_projection_get_camera(
-  mln_map_projection projection, mln_camera_options* out_camera
+auto map_pixel_for_lat_lng_start(
+  mln_map map, mln_lat_lng coordinate, mln_operation* out_operation
 ) -> mln_status {
-  MapProjectionObject* live = nullptr;
-  const auto status = validate_map_projection(projection, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
+  if (validate_lat_lng(coordinate) != MLN_STATUS_OK) {
+    return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (out_camera == nullptr || out_camera->size < sizeof(mln_camera_options)) {
-    set_thread_error("out_camera must not be null and must have a valid size");
+  return start_geometry_operation(
+    map, GeometryOperationKind::PixelForCoordinate,
+    [map, coordinate](GeometryOperationResult& result) {
+      return map_pixel_for_lat_lng(map, coordinate, &result.point);
+    },
+    out_operation
+  );
+}
+
+auto map_pixel_for_lat_lng_take_result(
+  mln_operation operation, mln_screen_point* out_point
+) -> mln_status {
+  if (out_point == nullptr) {
+    set_thread_error("out_point must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return take_geometry_operation(
+    operation, GeometryOperationKind::PixelForCoordinate,
+    [out_point](GeometryOperationResult& result) {
+      *out_point = result.point;
+      return MLN_STATUS_OK;
+    }
+  );
+}
+
+auto map_lat_lng_for_pixel_start(
+  mln_map map, mln_screen_point point, mln_operation* out_operation
+) -> mln_status {
+  if (validate_screen_point(point) != MLN_STATUS_OK) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return start_geometry_operation(
+    map, GeometryOperationKind::CoordinateForPixel,
+    [map, point](GeometryOperationResult& result) {
+      return map_lat_lng_for_pixel(map, point, &result.coordinate);
+    },
+    out_operation
+  );
+}
+
+auto map_lat_lng_for_pixel_take_result(
+  mln_operation operation, mln_lat_lng* out_coordinate
+) -> mln_status {
+  if (out_coordinate == nullptr) {
+    set_thread_error("out_coordinate must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return take_geometry_operation(
+    operation, GeometryOperationKind::CoordinateForPixel,
+    [out_coordinate](GeometryOperationResult& result) {
+      *out_coordinate = result.coordinate;
+      return MLN_STATUS_OK;
+    }
+  );
+}
+
+auto map_pixels_for_lat_lngs_start(
+  mln_map map, const mln_lat_lng* coordinates, size_t coordinate_count,
+  mln_operation* out_operation
+) -> mln_status {
+  if (
+    validate_lat_lng_array(coordinates, coordinate_count, true) != MLN_STATUS_OK
+  ) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto copied = std::vector<mln_lat_lng>{};
+  if (coordinate_count != 0) {
+    copied.assign(coordinates, coordinates + coordinate_count);
+  }
+  return start_geometry_operation(
+    map, GeometryOperationKind::PixelsForCoordinates,
+    [map, copied = std::move(copied)](GeometryOperationResult& result) {
+      result.points.resize(copied.size());
+      return map_pixels_for_lat_lngs(
+        map, copied.data(), copied.size(), result.points.data()
+      );
+    },
+    out_operation
+  );
+}
+
+auto map_pixels_for_lat_lngs_take_result(
+  mln_operation operation, mln_screen_point* out_points, size_t point_capacity,
+  size_t* out_point_count
+) -> mln_status {
+  if (out_point_count == nullptr) {
+    set_thread_error("out_point_count must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return take_geometry_operation(
+    operation, GeometryOperationKind::PixelsForCoordinates,
+    [out_points, point_capacity,
+     out_point_count](GeometryOperationResult& result) {
+      *out_point_count = result.points.size();
+      if (
+        point_capacity < result.points.size() ||
+        (!result.points.empty() && out_points == nullptr)
+      ) {
+        set_thread_error("out_points capacity is too small");
+        return MLN_STATUS_INVALID_ARGUMENT;
+      }
+      std::copy(result.points.begin(), result.points.end(), out_points);
+      return MLN_STATUS_OK;
+    }
+  );
+}
+
+auto map_lat_lngs_for_pixels_start(
+  mln_map map, const mln_screen_point* points, size_t point_count,
+  mln_operation* out_operation
+) -> mln_status {
+  if (validate_screen_point_array(points, point_count) != MLN_STATUS_OK) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto copied = std::vector<mln_screen_point>{};
+  if (point_count != 0) {
+    copied.assign(points, points + point_count);
+  }
+  return start_geometry_operation(
+    map, GeometryOperationKind::CoordinatesForPixels,
+    [map, copied = std::move(copied)](GeometryOperationResult& result) {
+      result.coordinates.resize(copied.size());
+      return map_lat_lngs_for_pixels(
+        map, copied.data(), copied.size(), result.coordinates.data()
+      );
+    },
+    out_operation
+  );
+}
+
+auto map_lat_lngs_for_pixels_take_result(
+  mln_operation operation, mln_lat_lng* out_coordinates,
+  size_t coordinate_capacity, size_t* out_coordinate_count
+) -> mln_status {
+  if (out_coordinate_count == nullptr) {
+    set_thread_error("out_coordinate_count must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return take_geometry_operation(
+    operation, GeometryOperationKind::CoordinatesForPixels,
+    [out_coordinates, coordinate_capacity,
+     out_coordinate_count](GeometryOperationResult& result) {
+      *out_coordinate_count = result.coordinates.size();
+      if (
+        coordinate_capacity < result.coordinates.size() ||
+        (!result.coordinates.empty() && out_coordinates == nullptr)
+      ) {
+        set_thread_error("out_coordinates capacity is too small");
+        return MLN_STATUS_INVALID_ARGUMENT;
+      }
+      std::copy(
+        result.coordinates.begin(), result.coordinates.end(), out_coordinates
+      );
+      return MLN_STATUS_OK;
+    }
+  );
+}
+
+auto map_projection_create_start(mln_map map, mln_operation* out_operation)
+  -> mln_status {
+  if (out_operation == nullptr) {
+    set_thread_error("out_operation must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (*out_operation != MLN_HANDLE_NULL) {
+    set_thread_error("out_operation must point to the null handle");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  *out_camera = from_native_camera(live->projection->getCamera());
-  return MLN_STATUS_OK;
+  auto& table = handle_table<MapObject>();
+  const std::scoped_lock lock(table.mutex());
+  auto parent = table.lease_locked(map);
+  if (parent == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (!parent->control.reserve_child()) {
+    return MLN_STATUS_INVALID_STATE;
+  }
+  auto reservation = ChildReservationGuard{parent->control};
+  auto runtime = lease_runtime(parent->runtime);
+  if (runtime == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto state = std::shared_ptr<OperationObject>{};
+  const auto register_status = register_operation(
+    runtime->event_queue->notification_source, projection_operation_create,
+    false, {}, out_operation, state
+  );
+  if (register_status != MLN_STATUS_OK) {
+    return register_status;
+  }
+  const auto operation = *out_operation;
+  const auto runtime_handle = parent->runtime;
+  const auto submit_status = submit_runtime_operation(
+    runtime, state,
+    [map, runtime_handle, parent, runtime, state]() mutable -> void {
+      try {
+        auto projection = std::make_shared<MapProjectionObject>();
+        projection->map = map;
+        projection->runtime = runtime_handle;
+        projection->parent = parent;
+        projection->runtime_state = runtime;
+        projection->projection =
+          std::make_unique<mbgl::MapProjection>(*parent->map);
+        parent->control.commit_child();
+        state->complete(
+          MLN_STATUS_OK, {},
+          std::any{
+            std::make_shared<PendingProjectionResult>(std::move(projection))
+          }
+        );
+      } catch (...) {
+        parent->control.abandon_child_reservation();
+        state->complete(
+          MLN_STATUS_NATIVE_ERROR, exception_message(std::current_exception()),
+          {}
+        );
+      }
+    }
+  );
+  if (submit_status != MLN_STATUS_OK) {
+    abandon_operation(operation);
+    *out_operation = MLN_HANDLE_NULL;
+  }
+  if (submit_status == MLN_STATUS_OK) {
+    reservation.dismiss();
+  }
+  return submit_status;
+}
+
+auto map_projection_create_take_result(
+  mln_operation operation, mln_map_projection* out_projection
+) -> mln_status {
+  return take_operation_result<std::shared_ptr<PendingProjectionResult>>(
+    operation, projection_operation_create,
+    [out_projection](std::shared_ptr<PendingProjectionResult>& result)
+      -> mln_status {
+      if (out_projection == nullptr) {
+        set_thread_error("out_projection must not be null");
+        return MLN_STATUS_INVALID_ARGUMENT;
+      }
+      if (*out_projection != MLN_HANDLE_NULL) {
+        set_thread_error("out_projection must point to the null handle");
+        return MLN_STATUS_INVALID_ARGUMENT;
+      }
+      *out_projection =
+        handle_table<MapProjectionObject>().insert(result->value());
+      result->transfer();
+      return MLN_STATUS_OK;
+    }
+  );
+}
+
+auto map_projection_close_start(
+  mln_map_projection projection, mln_operation* out_operation
+) -> mln_status {
+  if (out_operation == nullptr) {
+    set_thread_error("out_operation must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (*out_operation != MLN_HANDLE_NULL) {
+    set_thread_error("out_operation must point to the null handle");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  auto& table = handle_table<MapProjectionObject>();
+  const std::scoped_lock lock(table.mutex());
+  auto owned = table.lease_locked(projection);
+  if (owned == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto state = std::shared_ptr<OperationObject>{};
+  const auto register_status = register_operation(
+    owned->runtime_state->event_queue->notification_source,
+    projection_operation_close, false, {}, out_operation, state
+  );
+  if (register_status != MLN_STATUS_OK) {
+    return register_status;
+  }
+  const auto close_status = owned->control.begin_close();
+  if (close_status != MLN_STATUS_OK) {
+    abandon_operation(*out_operation);
+    *out_operation = MLN_HANDLE_NULL;
+    return close_status;
+  }
+  const auto operation = *out_operation;
+  const auto close_control = owned;
+  const auto submit_status = submit_runtime_operation(
+    owned->runtime_state, state,
+    [projection, owned = std::move(owned), state]() mutable -> void {
+      static_cast<void>(handle_table<MapProjectionObject>().remove(projection));
+      owned->projection.reset();
+      owned->parent->control.release_child();
+      owned->parent.reset();
+      owned.reset();
+      state->complete(MLN_STATUS_OK, {}, std::any{false});
+    }
+  );
+  if (submit_status != MLN_STATUS_OK) {
+    close_control->control.abort_close();
+    abandon_operation(operation);
+    *out_operation = MLN_HANDLE_NULL;
+  }
+  return submit_status;
+}
+
+auto map_projection_get_camera_start(
+  mln_map_projection projection, mln_operation* out_operation
+) -> mln_status {
+  return start_projection_result_operation<mln_camera_options>(
+    projection, projection_operation_get_camera, out_operation,
+    [](mbgl::MapProjection& value) -> mln_camera_options {
+      return from_native_camera(value.getCamera());
+    }
+  );
+}
+
+auto map_projection_get_camera_take_result(
+  mln_operation operation, mln_camera_options* out_camera
+) -> mln_status {
+  return take_operation_result<mln_camera_options>(
+    operation, projection_operation_get_camera,
+    [out_camera](mln_camera_options& result) -> mln_status {
+      if (
+        out_camera == nullptr || out_camera->size < sizeof(mln_camera_options)
+      ) {
+        set_thread_error(
+          "out_camera must not be null and must have a valid size"
+        );
+        return MLN_STATUS_INVALID_ARGUMENT;
+      }
+      *out_camera = result;
+      return MLN_STATUS_OK;
+    }
+  );
 }
 
 auto map_projection_set_camera(
-  mln_map_projection projection, const mln_camera_options* camera
+  mln_map_projection projection, const mln_camera_options* camera,
+  uint64_t* out_command_id
 ) -> mln_status {
-  MapProjectionObject* live = nullptr;
-  const auto status = validate_map_projection(projection, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto camera_status = validate_camera_options(camera);
   if (camera_status != MLN_STATUS_OK) {
     return camera_status;
   }
-
-  live->projection->setCamera(to_native_camera(*camera));
-  return MLN_STATUS_OK;
+  const auto copied_camera = to_native_camera(*camera);
+  return submit_projection_command(
+    projection, out_command_id, [copied_camera](mbgl::MapProjection& value) {
+      value.setCamera(copied_camera);
+    }
+  );
 }
 
 auto map_projection_set_visible_coordinates(
   mln_map_projection projection, const mln_lat_lng* coordinates,
-  size_t coordinate_count, mln_edge_insets padding
+  size_t coordinate_count, mln_edge_insets padding, uint64_t* out_command_id
 ) -> mln_status {
-  MapProjectionObject* live = nullptr;
-  const auto status = validate_map_projection(projection, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto coordinates_status =
     validate_lat_lng_array(coordinates, coordinate_count, false);
   if (coordinates_status != MLN_STATUS_OK) {
@@ -7435,23 +4353,21 @@ auto map_projection_set_visible_coordinates(
   if (padding_status != MLN_STATUS_OK) {
     return padding_status;
   }
-
-  live->projection->setVisibleCoordinates(
-    to_native_lat_lngs(coordinates, coordinate_count),
-    to_native_edge_insets(padding)
+  auto copied_coordinates = to_native_lat_lngs(coordinates, coordinate_count);
+  const auto copied_padding = to_native_edge_insets(padding);
+  return submit_projection_command(
+    projection, out_command_id,
+    [coordinates = std::move(copied_coordinates),
+     copied_padding](mbgl::MapProjection& value) {
+      value.setVisibleCoordinates(coordinates, copied_padding);
+    }
   );
-  return MLN_STATUS_OK;
 }
 
 auto map_projection_set_visible_geometry(
   mln_map_projection projection, mln_buffer_view geometry,
-  mln_edge_insets padding
+  mln_edge_insets padding, uint64_t* out_command_id
 ) -> mln_status {
-  MapProjectionObject* live = nullptr;
-  const auto status = validate_map_projection(projection, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto padding_status = validate_edge_insets(padding);
   if (padding_status != MLN_STATUS_OK) {
     return padding_status;
@@ -7465,59 +4381,80 @@ auto map_projection_set_visible_geometry(
     set_thread_error("geometry must contain at least one coordinate");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-
-  live->projection->setVisibleCoordinates(
-    coordinates, to_native_edge_insets(padding)
+  const auto copied_padding = to_native_edge_insets(padding);
+  return submit_projection_command(
+    projection, out_command_id,
+    [coordinates = std::move(coordinates),
+     copied_padding](mbgl::MapProjection& value) {
+      value.setVisibleCoordinates(coordinates, copied_padding);
+    }
   );
-  return MLN_STATUS_OK;
 }
 
-auto map_projection_pixel_for_lat_lng(
+auto map_projection_pixel_for_lat_lng_start(
   mln_map_projection projection, mln_lat_lng coordinate,
-  mln_screen_point* out_point
+  mln_operation* out_operation
 ) -> mln_status {
-  MapProjectionObject* live = nullptr;
-  const auto status = validate_map_projection(projection, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (out_point == nullptr) {
-    set_thread_error("out_point must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   const auto coordinate_status = validate_lat_lng(coordinate);
   if (coordinate_status != MLN_STATUS_OK) {
     return coordinate_status;
   }
-
-  *out_point = from_native_screen_point(
-    live->projection->pixelForLatLng(to_native_lat_lng(coordinate))
+  const auto copied_coordinate = to_native_lat_lng(coordinate);
+  return start_projection_result_operation<mln_screen_point>(
+    projection, projection_operation_pixel_for_lat_lng, out_operation,
+    [copied_coordinate](mbgl::MapProjection& value) -> mln_screen_point {
+      return from_native_screen_point(value.pixelForLatLng(copied_coordinate));
+    }
   );
-  return MLN_STATUS_OK;
 }
 
-auto map_projection_lat_lng_for_pixel(
-  mln_map_projection projection, mln_screen_point point,
-  mln_lat_lng* out_coordinate
+auto map_projection_pixel_for_lat_lng_take_result(
+  mln_operation operation, mln_screen_point* out_point
 ) -> mln_status {
-  MapProjectionObject* live = nullptr;
-  const auto status = validate_map_projection(projection, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (out_coordinate == nullptr) {
-    set_thread_error("out_coordinate must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  return take_operation_result<mln_screen_point>(
+    operation, projection_operation_pixel_for_lat_lng,
+    [out_point](mln_screen_point& result) -> mln_status {
+      if (out_point == nullptr) {
+        set_thread_error("out_point must not be null");
+        return MLN_STATUS_INVALID_ARGUMENT;
+      }
+      *out_point = result;
+      return MLN_STATUS_OK;
+    }
+  );
+}
+
+auto map_projection_lat_lng_for_pixel_start(
+  mln_map_projection projection, mln_screen_point point,
+  mln_operation* out_operation
+) -> mln_status {
   const auto point_status = validate_screen_point(point);
   if (point_status != MLN_STATUS_OK) {
     return point_status;
   }
-
-  *out_coordinate = from_native_lat_lng(
-    live->projection->latLngForPixel(to_native_screen_point(point))
+  const auto copied_point = to_native_screen_point(point);
+  return start_projection_result_operation<mln_lat_lng>(
+    projection, projection_operation_lat_lng_for_pixel, out_operation,
+    [copied_point](mbgl::MapProjection& value) -> mln_lat_lng {
+      return from_native_lat_lng(value.latLngForPixel(copied_point));
+    }
   );
-  return MLN_STATUS_OK;
+}
+
+auto map_projection_lat_lng_for_pixel_take_result(
+  mln_operation operation, mln_lat_lng* out_coordinate
+) -> mln_status {
+  return take_operation_result<mln_lat_lng>(
+    operation, projection_operation_lat_lng_for_pixel,
+    [out_coordinate](mln_lat_lng& result) -> mln_status {
+      if (out_coordinate == nullptr) {
+        set_thread_error("out_coordinate must not be null");
+        return MLN_STATUS_INVALID_ARGUMENT;
+      }
+      *out_coordinate = result;
+      return MLN_STATUS_OK;
+    }
+  );
 }
 
 auto projected_meters_for_lat_lng(
@@ -7557,169 +4494,6 @@ auto lat_lng_for_projected_meters(
       mbgl::ProjectedMeters{meters.northing, meters.easting}
     )
   );
-  return MLN_STATUS_OK;
-}
-
-auto map_move_by(mln_map map, double delta_x, double delta_y) -> mln_status {
-  return map_move_by_animated(map, delta_x, delta_y, nullptr);
-}
-
-auto map_move_by_animated(
-  mln_map map, double delta_x, double delta_y,
-  const mln_animation_options* animation
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (!std::isfinite(delta_x) || !std::isfinite(delta_y)) {
-    set_thread_error("move deltas must be finite");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto animation_status = validate_animation_options(animation);
-  if (animation_status != MLN_STATUS_OK) {
-    return animation_status;
-  }
-
-  live->map->moveBy(
-    mbgl::ScreenCoordinate{delta_x, delta_y},
-    to_native_animation(live->runtime, map, live->event_state, animation)
-  );
-  return MLN_STATUS_OK;
-}
-
-auto map_scale_by(mln_map map, double scale, const mln_screen_point* anchor)
-  -> mln_status {
-  return map_scale_by_animated(map, scale, anchor, nullptr);
-}
-
-auto map_scale_by_animated(
-  mln_map map, double scale, const mln_screen_point* anchor,
-  const mln_animation_options* animation
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (!std::isfinite(scale) || scale <= 0.0) {
-    set_thread_error("scale must be positive and finite");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  auto native_anchor = std::optional<mbgl::ScreenCoordinate>{};
-  if (anchor != nullptr) {
-    const auto anchor_status = validate_screen_point(*anchor);
-    if (anchor_status != MLN_STATUS_OK) {
-      return anchor_status;
-    }
-    native_anchor = screen_point(*anchor);
-  }
-  const auto animation_status = validate_animation_options(animation);
-  if (animation_status != MLN_STATUS_OK) {
-    return animation_status;
-  }
-
-  live->map->scaleBy(
-    scale, native_anchor,
-    to_native_animation(live->runtime, map, live->event_state, animation)
-  );
-  return MLN_STATUS_OK;
-}
-
-auto map_rotate_by(mln_map map, mln_screen_point first, mln_screen_point second)
-  -> mln_status {
-  return map_rotate_by_animated(map, first, second, nullptr);
-}
-
-auto map_rotate_by_animated(
-  mln_map map, mln_screen_point first, mln_screen_point second,
-  const mln_animation_options* animation
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto first_status = validate_screen_point(first);
-  if (first_status != MLN_STATUS_OK) {
-    return first_status;
-  }
-  const auto second_status = validate_screen_point(second);
-  if (second_status != MLN_STATUS_OK) {
-    return second_status;
-  }
-  const auto animation_status = validate_animation_options(animation);
-  if (animation_status != MLN_STATUS_OK) {
-    return animation_status;
-  }
-
-  live->map->rotateBy(
-    screen_point(first), screen_point(second),
-    to_native_animation(live->runtime, map, live->event_state, animation)
-  );
-  return MLN_STATUS_OK;
-}
-
-auto map_pitch_by(mln_map map, double pitch) -> mln_status {
-  return map_pitch_by_animated(map, pitch, nullptr);
-}
-
-auto map_pitch_by_animated(
-  mln_map map, double pitch, const mln_animation_options* animation
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (!std::isfinite(pitch)) {
-    set_thread_error("pitch must be finite");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto animation_status = validate_animation_options(animation);
-  if (animation_status != MLN_STATUS_OK) {
-    return animation_status;
-  }
-
-  live->map->pitchBy(
-    pitch, to_native_animation(live->runtime, map, live->event_state, animation)
-  );
-  return MLN_STATUS_OK;
-}
-
-auto map_cancel_transitions(mln_map map) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  live->map->cancelTransitions();
-  return MLN_STATUS_OK;
-}
-
-auto map_set_gesture_in_progress(mln_map map, bool in_progress) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  live->map->setGestureInProgress(in_progress);
-  return MLN_STATUS_OK;
-}
-
-auto map_is_gesture_in_progress(mln_map map, bool* out_in_progress)
-  -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (out_in_progress == nullptr) {
-    set_thread_error("out_in_progress must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  *out_in_progress = live->map->isGestureInProgress();
   return MLN_STATUS_OK;
 }
 
@@ -7870,6 +4644,202 @@ auto map_lat_lng_bounds_for_camera_unwrapped(
   return MLN_STATUS_OK;
 }
 
+auto map_camera_for_lat_lng_bounds_start(
+  mln_map map, mln_lat_lng_bounds bounds,
+  const mln_camera_fit_options* fit_options, mln_operation* out_operation
+) -> mln_status {
+  if (
+    validate_lat_lng_bounds(bounds) != MLN_STATUS_OK ||
+    validate_camera_fit_options(fit_options) != MLN_STATUS_OK
+  ) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto fit =
+    fit_options == nullptr ? camera_fit_options_default() : *fit_options;
+  const auto has_fit = fit_options != nullptr;
+  return start_geometry_operation(
+    map, GeometryOperationKind::CameraForBounds,
+    [map, bounds, fit, has_fit](GeometryOperationResult& result) {
+      result.camera = camera_options_default();
+      return map_camera_for_lat_lng_bounds(
+        map, bounds, has_fit ? &fit : nullptr, &result.camera
+      );
+    },
+    out_operation
+  );
+}
+
+auto take_camera_result(
+  mln_operation operation, GeometryOperationKind kind,
+  mln_camera_options* out_camera
+) -> mln_status {
+  if (validate_camera_output(out_camera) != MLN_STATUS_OK) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return take_geometry_operation(
+    operation, kind, [out_camera](GeometryOperationResult& result) {
+      *out_camera = result.camera;
+      return MLN_STATUS_OK;
+    }
+  );
+}
+
+auto map_camera_for_lat_lng_bounds_take_result(
+  mln_operation operation, mln_camera_options* out_camera
+) -> mln_status {
+  return take_camera_result(
+    operation, GeometryOperationKind::CameraForBounds, out_camera
+  );
+}
+
+auto map_camera_for_lat_lngs_start(
+  mln_map map, const mln_lat_lng* coordinates, size_t coordinate_count,
+  const mln_camera_fit_options* fit_options, mln_operation* out_operation
+) -> mln_status {
+  if (
+    validate_lat_lng_array(coordinates, coordinate_count, false) !=
+      MLN_STATUS_OK ||
+    validate_camera_fit_options(fit_options) != MLN_STATUS_OK
+  ) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto copied =
+    std::vector<mln_lat_lng>{coordinates, coordinates + coordinate_count};
+  const auto fit =
+    fit_options == nullptr ? camera_fit_options_default() : *fit_options;
+  const auto has_fit = fit_options != nullptr;
+  return start_geometry_operation(
+    map, GeometryOperationKind::CameraForCoordinates,
+    [map, copied = std::move(copied), fit,
+     has_fit](GeometryOperationResult& result) {
+      result.camera = camera_options_default();
+      return map_camera_for_lat_lngs(
+        map, copied.data(), copied.size(), has_fit ? &fit : nullptr,
+        &result.camera
+      );
+    },
+    out_operation
+  );
+}
+
+auto map_camera_for_lat_lngs_take_result(
+  mln_operation operation, mln_camera_options* out_camera
+) -> mln_status {
+  return take_camera_result(
+    operation, GeometryOperationKind::CameraForCoordinates, out_camera
+  );
+}
+
+auto map_camera_for_geometry_start(
+  mln_map map, mln_buffer_view geometry,
+  const mln_camera_fit_options* fit_options, mln_operation* out_operation
+) -> mln_status {
+  const auto parsed = to_native_geometry(geometry);
+  if (!parsed || geometry_lat_lngs(*parsed).empty()) {
+    if (parsed) {
+      set_thread_error("geometry must contain at least one coordinate");
+    }
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (validate_camera_fit_options(fit_options) != MLN_STATUS_OK) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto* geometry_bytes = static_cast<const uint8_t*>(geometry.data);
+  auto bytes =
+    std::vector<uint8_t>{geometry_bytes, geometry_bytes + geometry.size};
+  const auto fit =
+    fit_options == nullptr ? camera_fit_options_default() : *fit_options;
+  const auto has_fit = fit_options != nullptr;
+  return start_geometry_operation(
+    map, GeometryOperationKind::CameraForGeometry,
+    [map, bytes = std::move(bytes), fit,
+     has_fit](GeometryOperationResult& result) -> mln_status {
+      result.camera = camera_options_default();
+      const auto view =
+        mln_buffer_view{.data = bytes.data(), .size = bytes.size()};
+      return map_camera_for_geometry(
+        map, view, has_fit ? &fit : nullptr, &result.camera
+      );
+    },
+    out_operation
+  );
+}
+
+auto map_camera_for_geometry_take_result(
+  mln_operation operation, mln_camera_options* out_camera
+) -> mln_status {
+  return take_camera_result(
+    operation, GeometryOperationKind::CameraForGeometry, out_camera
+  );
+}
+
+auto start_bounds_for_camera(
+  mln_map map, const mln_camera_options* camera, bool unwrapped,
+  mln_operation* out_operation
+) -> mln_status {
+  if (validate_camera_options(camera) != MLN_STATUS_OK) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto copied = *camera;
+  const auto kind = unwrapped ? GeometryOperationKind::UnwrappedBoundsForCamera
+                              : GeometryOperationKind::BoundsForCamera;
+  return start_geometry_operation(
+    map, kind,
+    [map, copied, unwrapped](GeometryOperationResult& result) {
+      return unwrapped
+               ? map_lat_lng_bounds_for_camera_unwrapped(
+                   map, &copied, &result.bounds
+                 )
+               : map_lat_lng_bounds_for_camera(map, &copied, &result.bounds);
+    },
+    out_operation
+  );
+}
+
+auto map_lat_lng_bounds_for_camera_start(
+  mln_map map, const mln_camera_options* camera, mln_operation* out_operation
+) -> mln_status {
+  return start_bounds_for_camera(map, camera, false, out_operation);
+}
+
+auto take_bounds_result(
+  mln_operation operation, GeometryOperationKind kind,
+  mln_lat_lng_bounds* out_bounds
+) -> mln_status {
+  if (out_bounds == nullptr) {
+    set_thread_error("out_bounds must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return take_geometry_operation(
+    operation, kind, [out_bounds](GeometryOperationResult& result) {
+      *out_bounds = result.bounds;
+      return MLN_STATUS_OK;
+    }
+  );
+}
+
+auto map_lat_lng_bounds_for_camera_take_result(
+  mln_operation operation, mln_lat_lng_bounds* out_bounds
+) -> mln_status {
+  return take_bounds_result(
+    operation, GeometryOperationKind::BoundsForCamera, out_bounds
+  );
+}
+
+auto map_lat_lng_bounds_for_camera_unwrapped_start(
+  mln_map map, const mln_camera_options* camera, mln_operation* out_operation
+) -> mln_status {
+  return start_bounds_for_camera(map, camera, true, out_operation);
+}
+
+auto map_lat_lng_bounds_for_camera_unwrapped_take_result(
+  mln_operation operation, mln_lat_lng_bounds* out_bounds
+) -> mln_status {
+  return take_bounds_result(
+    operation, GeometryOperationKind::UnwrappedBoundsForCamera, out_bounds
+  );
+}
+
 auto map_get_bounds(mln_map map, mln_bound_options* out_options) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -7940,4 +4910,142 @@ auto map_set_free_camera_options(
   return MLN_STATUS_OK;
 }
 
+auto map_set_projection_mode(
+  mln_map map, const mln_projection_mode* mode, uint64_t* out_command_id
+) -> mln_status {
+  if (mode == nullptr || mode->size < sizeof(mln_projection_mode)) {
+    set_thread_error("mode must not be null and must have a valid size");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  constexpr auto known_fields =
+    static_cast<uint32_t>(MLN_PROJECTION_MODE_AXONOMETRIC) |
+    MLN_PROJECTION_MODE_X_SKEW | MLN_PROJECTION_MODE_Y_SKEW;
+  if ((mode->fields & ~known_fields) != 0U) {
+    set_thread_error("mode fields contain unknown bits");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (
+    ((mode->fields & MLN_PROJECTION_MODE_X_SKEW) != 0U &&
+     !std::isfinite(mode->x_skew)) ||
+    ((mode->fields & MLN_PROJECTION_MODE_Y_SKEW) != 0U &&
+     !std::isfinite(mode->y_skew))
+  ) {
+    set_thread_error("projection skew values must be finite");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  auto copied = mbgl::ProjectionMode{};
+  if ((mode->fields & MLN_PROJECTION_MODE_AXONOMETRIC) != 0U) {
+    copied.withAxonometric(mode->axonometric);
+  }
+  if ((mode->fields & MLN_PROJECTION_MODE_X_SKEW) != 0U) {
+    copied.withXSkew(mode->x_skew);
+  }
+  if ((mode->fields & MLN_PROJECTION_MODE_Y_SKEW) != 0U) {
+    copied.withYSkew(mode->y_skew);
+  }
+  return submit_map_command(
+    map,
+    [map, copied = std::move(copied)]() mutable -> mln_status {
+      MapObject* live = nullptr;
+      const auto status = validate_map(map, live);
+      if (status != MLN_STATUS_OK) {
+        return status;
+      }
+      live->map->setProjectionMode(std::move(copied));
+      return MLN_STATUS_OK;
+    },
+    out_command_id
+  );
+}
+
+auto start_simple_map_read(
+  mln_map map, GeometryOperationKind kind, GeometryWork work,
+  mln_operation* out_operation
+) -> mln_status {
+  return start_geometry_operation(map, kind, std::move(work), out_operation);
+}
+
+auto map_get_debug_options_start(mln_map map, mln_operation* out_operation)
+  -> mln_status {
+  return start_simple_map_read(
+    map, GeometryOperationKind::DebugOptions,
+    [map](GeometryOperationResult& result) {
+      return map_get_debug_options(map, &result.value_u32);
+    },
+    out_operation
+  );
+}
+
+auto map_get_rendering_stats_view_enabled_start(
+  mln_map map, mln_operation* out_operation
+) -> mln_status {
+  return start_simple_map_read(
+    map, GeometryOperationKind::RenderingStats,
+    [map](GeometryOperationResult& result) {
+      return map_get_rendering_stats_view_enabled(map, &result.flag);
+    },
+    out_operation
+  );
+}
+
+auto map_is_fully_loaded_start(mln_map map, mln_operation* out_operation)
+  -> mln_status {
+  return start_simple_map_read(
+    map, GeometryOperationKind::FullyLoaded,
+    [map](GeometryOperationResult& result) {
+      return map_is_fully_loaded(map, &result.flag);
+    },
+    out_operation
+  );
+}
+
+auto map_get_viewport_options_start(mln_map map, mln_operation* out_operation)
+  -> mln_status {
+  return start_simple_map_read(
+    map, GeometryOperationKind::ViewportOptions,
+    [map](GeometryOperationResult& result) {
+      result.viewport = map_viewport_options_default();
+      return map_get_viewport_options(map, &result.viewport);
+    },
+    out_operation
+  );
+}
+
+auto map_get_tile_options_start(mln_map map, mln_operation* out_operation)
+  -> mln_status {
+  return start_simple_map_read(
+    map, GeometryOperationKind::TileOptions,
+    [map](GeometryOperationResult& result) {
+      result.tile = map_tile_options_default();
+      return map_get_tile_options(map, &result.tile);
+    },
+    out_operation
+  );
+}
+
+auto map_get_bounds_start(mln_map map, mln_operation* out_operation)
+  -> mln_status {
+  return start_simple_map_read(
+    map, GeometryOperationKind::Bounds,
+    [map](GeometryOperationResult& result) {
+      result.bound = bound_options_default();
+      return map_get_bounds(map, &result.bound);
+    },
+    out_operation
+  );
+}
+
+auto map_get_free_camera_options_start(
+  mln_map map, mln_operation* out_operation
+) -> mln_status {
+  return start_simple_map_read(
+    map, GeometryOperationKind::FreeCamera,
+    [map](GeometryOperationResult& result) {
+      result.free_camera = free_camera_options_default();
+      return map_get_free_camera_options(map, &result.free_camera);
+    },
+    out_operation
+  );
+}
 }  // namespace mln::core

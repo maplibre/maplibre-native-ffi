@@ -24,9 +24,9 @@ exec cargo build \
 [tasks.test]
 extends = "ffi:preset"
 dir = "../.."
-# The preset selects the runner: Android and OpenHarmony x64 presets push to an
-# emulator, Emscripten presets run as a page in headless Chromium, and host
-# presets run in process.
+# The preset selects the runner: Android presets and OpenHarmony x64 presets
+# push to an emulator, Emscripten presets run as a page in headless Chromium,
+# and host presets run in process.
 run = '''
 case "$usage_preset" in
   android-* | ohos-*)
@@ -36,7 +36,7 @@ case "$usage_preset" in
     exec "$MISE_MONOREPO_ROOT/scripts/test-rust-browser.sh" "$usage_preset"
     ;;
   ios-*)
-    echo "The Rust binding has no iOS target; test a host, Android x64, OpenHarmony x64, or Emscripten preset." >&2
+    echo "The Rust binding has no iOS target; test a host, Android, OpenHarmony x64, or Emscripten preset." >&2
     exit 2
     ;;
 esac

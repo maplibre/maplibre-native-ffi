@@ -423,16 +423,16 @@ static void dedicated_egl_surface_renders_and_keeps_its_context_current(void) {
   TEST_ASSERT_EQUAL_INT(MLN_TEST_FIXTURE_OK, fixture_result);
 
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_style_json(
+    MLN_STATUS_OK, mln_test_map_set_style_json(
                      map, MLN_BUFFER_LITERAL(dedicated_background_style_json)
                    )
   );
   mln_render_result result = MLN_RENDER_RESULT_NO_UPDATE;
-  // The session owns this thread, which is also the map's, so the map only
-  // reaches the style and the extent when this loop pumps the runtime.
+  // The render session owns this thread while the map advances independently
+  // on the runtime worker.
   for (unsigned int attempt = 0;
        attempt < 500 && result != MLN_RENDER_RESULT_RENDERED; attempt += 1) {
-    mln_runtime_pump(runtime, 0);
+    mln_test_runtime_barrier(runtime);
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK, mln_render_session_render_update(fixture.session, &result)
     );

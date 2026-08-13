@@ -57,29 +57,29 @@ enum MetalRenderTarget {
   )
   case nativeSurface(session: RenderSessionHandle)
 
-  /// Attaches a session against the map the runtime loop published.
+  /// Attaches a session against the map the map task published.
   static func attach(
     mode: RenderTargetMode,
-    attachRef: MapAttachRef,
+    map: MapHandle,
     graphics: MetalGraphicsContext,
     viewport: Viewport
   ) throws -> MetalRenderTarget {
     switch mode {
     case .ownedTexture:
       return try attachOwnedTexture(
-        attachRef: attachRef,
+        map: map,
         graphics: graphics,
         viewport: viewport
       )
     case .borrowedTexture:
       return try attachBorrowedTexture(
-        attachRef: attachRef,
+        map: map,
         graphics: graphics,
         viewport: viewport
       )
     case .nativeSurface:
       return try attachNativeSurface(
-        attachRef: attachRef,
+        map: map,
         graphics: graphics,
         viewport: viewport
       )
@@ -136,8 +136,8 @@ enum MetalRenderTarget {
 
   /// Renders the latest map update, reporting whether a frame was presented.
   /// For a few iterations after attach or resize the session reports a pending
-  /// size, because the map applies a new logical size on the runtime loop's
-  /// next pump.
+  /// size, because the map applies a new logical size on the scheduler's next
+  /// turn.
   func renderUpdate() throws -> Bool {
     switch self {
     case let .ownedTexture(session, compositor):
@@ -183,12 +183,12 @@ enum MetalRenderTarget {
   }
 
   private static func attachOwnedTexture(
-    attachRef: MapAttachRef,
+    map: MapHandle,
     graphics: MetalGraphicsContext,
     viewport: Viewport
   ) throws -> MetalRenderTarget {
     let session =
-      try attachRef.attachMetalOwnedTexture(MetalOwnedTextureDescriptor(
+      try map.attachMetalOwnedTexture(MetalOwnedTextureDescriptor(
         extent: viewport.extent,
         context: graphics.contextDescriptor
       ))
@@ -202,7 +202,7 @@ enum MetalRenderTarget {
   }
 
   private static func attachBorrowedTexture(
-    attachRef: MapAttachRef,
+    map: MapHandle,
     graphics: MetalGraphicsContext,
     viewport: Viewport
   ) throws -> MetalRenderTarget {
@@ -210,7 +210,7 @@ enum MetalRenderTarget {
       graphics: graphics,
       viewport: viewport
     )
-    let session = try attachRef
+    let session = try map
       .attachMetalBorrowedTexture(MetalBorrowedTextureDescriptor(
         extent: viewport.extent,
         physicalWidth: viewport.physicalWidth,
@@ -231,11 +231,11 @@ enum MetalRenderTarget {
   }
 
   private static func attachNativeSurface(
-    attachRef: MapAttachRef,
+    map: MapHandle,
     graphics: MetalGraphicsContext,
     viewport: Viewport
   ) throws -> MetalRenderTarget {
-    let session = try attachRef.attachMetalSurface(MetalSurfaceDescriptor(
+    let session = try map.attachMetalSurface(MetalSurfaceDescriptor(
       extent: viewport.extent,
       context: graphics.contextDescriptor,
       layer: graphics.layerPointer

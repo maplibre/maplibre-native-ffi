@@ -64,23 +64,15 @@ public sealed unsafe class OperationHandle : IDisposable
         }
     }
 
-    /// <summary>Reports whether the operation has reached a terminal disposition.</summary>
-    public bool Poll()
+    /// <summary>Completes when notification readiness reports the terminal operation.</summary>
+    public Task WaitAsync(CancellationToken cancellationToken = default)
     {
-        using var use = AcquireUse();
-        bool completed = false;
-        NativeStatus.Check(NativeMethods.mln_operation_poll(use.Handle, &completed));
-        return completed;
-    }
-
-    /// <summary>Waits for the operation to complete or for the timeout to expire.</summary>
-    public bool Wait(TimeSpan timeout)
-    {
-        var milliseconds = timeout < TimeSpan.Zero ? -1L : checked((long)timeout.TotalMilliseconds);
-        using var use = AcquireUse();
-        bool completed = false;
-        NativeStatus.Check(NativeMethods.mln_operation_wait(use.Handle, milliseconds, &completed));
-        return completed;
+        var use = AcquireUse();
+        return OperationAwaiter.WaitThen(
+            runtime.WaitForOperationAsync(use.Handle, cancellationToken),
+            static () => { },
+            use.Dispose
+        );
     }
 
     /// <summary>Requests cancellation of a pending operation.</summary>

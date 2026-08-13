@@ -1,6 +1,6 @@
 ---
 title: Create a map
-description: Create a runtime and map with their fixed options, then release both in order.
+description: Create a runtime and map through lifecycle operations, then close both in order.
 sidebar:
   order: 1
 ---
@@ -10,12 +10,10 @@ import { region } from "../../../snippets";
 
 import createMap from "../../../../snippets/c/create-map.c?raw";
 
-A map belongs to a runtime. The thread that creates the runtime becomes the
-owner thread for the runtime and every map under it. Create both on the thread
-that will pump them.
-
-One runtime serves any number of maps and holds the shared work: the scheduler,
-the event queue, the network stack, and one cache database.
+A map belongs to a runtime. Runtime creation starts the native scheduler thread,
+and any host thread can submit later runtime or map work. One runtime serves any
+number of maps and holds their shared scheduler, event queue, network stack, and
+cache database.
 
 Create one notification source for each host receiver and pass it in the runtime
 options. Runtime events and operations publish readiness through that source.
@@ -24,21 +22,23 @@ ready drain returns an owned batch; release it after reading its endpoint view.
 
 <Code code={region(createMap, "runtime")} lang="c" title="create-map.c" />
 
-## Choose the options that outlive the call
+Runtime creation returns an operation, not a runtime handle. Wait for terminal
+success, take the runtime result once, and release the operation observer. Map
+creation follows the same pattern and reserves its runtime dependency as soon as
+the request is accepted.
 
-Three map options are fixed at creation: the scale factor, the map mode, and
-FastPFOR decoding.
+## Choose the initial map state
 
-The scale factor selects the sprites, glyphs, and raster tiles that the map
-downloads. Set it to the display density that the map will use. A render target
-has its own scale factor for geometry. Attaching a target with a different value
-logs a warning and continues to load imagery at the map's density.
+Map options include the initial logical extent, map mode, and FastPFOR decoding.
+The extent contains width, height, and scale factor. It initializes camera and
+projection state before a render target exists.
+
+After creation, resize is the only command that changes width, height, or scale
+factor. The scale factor selects sprites, glyphs, raster tiles, and
+pixel-ratio-dependent renderer state, so send the display density with every
+extent change.
 
 <Code code={region(createMap, "map")} lang="c" title="create-map.c" />
-
-The width and height set the viewport until the first render target attaches.
-That target's extent then replaces them. Before the first attach, camera and
-projection queries use the initial width and height.
 
 A continuous map redraws as data arrives and the camera moves. Use this mode for
 an on-screen map. A static map produces one image per request, and a tile map
@@ -49,10 +49,11 @@ produces one image for a single tile.
 FastPFOR decoding applies to every MapLibre Tiles source that the map loads.
 Enable it at creation when your tile sets use that encoding.
 
-## Release in order
+## Close in order
 
-Destroy a map before the runtime that owns it. Destroy the runtime before
-closing its notification source. A runtime with live maps reports an
-invalid-state status.
+Start and await map close before starting runtime close. Start and await runtime
+close before closing its notification source. A close preflight reports
+invalid state and leaves the handle open while a live child or pending child
+creation prevents close.
 
 <Code code={region(createMap, "release")} lang="c" title="create-map.c" />

@@ -26,14 +26,13 @@ typedef struct mln_test_render_fixture {
   void* backend_state;
 } mln_test_render_fixture;
 
-// Opaque host thread used by tests that need a second owner thread.
+// Opaque host thread used by tests that need a second native thread.
 typedef struct mln_test_thread mln_test_thread;
 
 mln_test_thread* mln_test_thread_start(void (*entry)(void*), void* argument);
 void mln_test_thread_join(mln_test_thread* thread);
 void mln_test_sleep_milliseconds(unsigned int milliseconds);
-// Monotonic milliseconds, for tests that assert a pump returned promptly rather
-// than sat out its timeout.
+// Monotonic milliseconds for bounded concurrency assertions.
 uint64_t mln_test_monotonic_milliseconds(void);
 // Synthetic operation and endpoint controls exercise completion and
 // notification races without depending on one MapLibre file-source schedule.
@@ -44,6 +43,12 @@ mln_status mln_test_operation_create(
   mln_notification_source source, bool cancellable,
   mln_operation* out_operation, mln_test_operation_control** out_control
 );
+mln_status mln_test_runtime_pending_operation_create(
+  mln_runtime runtime, mln_operation* out_operation,
+  mln_test_operation_control** out_control
+);
+mln_status mln_test_runtime_reserve_child(mln_runtime runtime);
+void mln_test_runtime_abandon_child(mln_runtime runtime);
 void mln_test_operation_complete(
   mln_test_operation_control* control, mln_status status, const char* diagnostic
 );
@@ -73,9 +78,34 @@ void mln_test_hold_notification_ready_drain(
 // These helpers track what they create per calling thread so the suite can
 // reclaim handles a test left behind. The matching destroy helpers untrack.
 mln_runtime mln_test_create_runtime(void);
+mln_status mln_test_runtime_barrier(mln_runtime runtime);
+mln_status mln_test_runtime_create(
+  const mln_runtime_options* options, mln_runtime* out_runtime
+);
+mln_status mln_test_runtime_close(mln_runtime runtime);
 mln_map mln_test_create_map(mln_runtime runtime);
 mln_map mln_test_create_map_with_options(
   mln_runtime runtime, const mln_map_options* options
+);
+mln_status mln_test_map_create_status(
+  mln_runtime runtime, const mln_map_options* options, mln_map* out_map
+);
+mln_status mln_test_map_close(mln_map map);
+mln_status mln_test_map_get_size(
+  mln_map map, uint32_t* out_width, uint32_t* out_height,
+  double* out_scale_factor
+);
+mln_status mln_test_map_get_event_mask(mln_map map, uint64_t* out_mask);
+mln_status mln_test_map_get_camera(mln_map map, mln_camera_options* out_camera);
+mln_status mln_test_map_request_repaint(mln_map map);
+mln_status mln_test_map_set_event_mask(mln_map map, uint64_t mask);
+mln_status mln_test_map_set_style_json(mln_map map, mln_buffer_view json);
+mln_status mln_test_map_set_style_url(mln_map map, const char* url);
+mln_status mln_test_map_copy_loaded_style_json(
+  mln_map map, char* out, size_t capacity, size_t* out_size
+);
+mln_status mln_test_map_copy_style_url(
+  mln_map map, char* out, size_t capacity, size_t* out_size
 );
 void mln_test_destroy_runtime(mln_runtime runtime);
 void mln_test_destroy_map(mln_map map);
@@ -105,13 +135,10 @@ mln_test_fixture_result mln_test_dedicated_egl_surface_create(
   mln_map map, mln_test_render_fixture* fixture
 );
 void mln_test_dedicated_egl_surface_destroy(mln_test_render_fixture* fixture);
-// Whether an EGL context is current on the calling thread. A dedicated session
-// leaves its own current between renders; a shared one leaves none.
 bool mln_test_egl_context_is_current(void);
-
-// Pumps the runtime until `flag` is set or the deadline passes. Returns whether
-// the flag was observed.
-bool mln_test_pump_until(mln_runtime runtime, atomic_bool* flag);
+// Waits until `flag` is set while draining runtime events. Returns whether the
+// flag was observed before the bounded deadline.
+bool mln_test_wait_until(mln_runtime runtime, atomic_bool* flag);
 
 typedef struct mln_test_event_batch {
   uint32_t size;

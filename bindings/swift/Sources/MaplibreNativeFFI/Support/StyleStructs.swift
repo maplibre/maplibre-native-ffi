@@ -436,9 +436,9 @@ private final class NativeCustomGeometrySourceCallbackBox: @unchecked Sendable {
 /// API as `user_data`.
 ///
 /// The C API owns the retain once it accepts the source, and gives it back by
-/// invoking the release callback exactly once, on the map owner thread, when it
-/// stops referencing the pointer. A rejected add is the one case that never
-/// releases, so the caller releases it with ``release()`` there.
+/// invoking the release callback exactly once when it stops referencing the
+/// pointer. A rejected add is the one case that never releases, so the caller
+/// releases it with ``release()`` there.
 struct NativeCustomGeometrySourceCallbacks: @unchecked Sendable {
   typealias TileCallback = @Sendable (NativeCanonicalTileID) -> Void
 

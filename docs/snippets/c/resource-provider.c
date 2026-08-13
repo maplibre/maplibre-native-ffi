@@ -50,6 +50,7 @@ void install_provider(mln_runtime runtime, asset_store* store) {
     .callback = serve_bundled_asset,
     .user_data = store,
   };
-  mln_runtime_set_resource_provider(runtime, &provider);
+  uint64_t command_id = 0;
+  mln_runtime_set_resource_provider(runtime, &provider, &command_id);
 }
 // #endregion install

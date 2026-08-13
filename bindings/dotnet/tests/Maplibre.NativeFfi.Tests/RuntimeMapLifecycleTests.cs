@@ -11,8 +11,8 @@ public sealed class RuntimeMapLifecycleTests
     [Fact]
     public void DefaultMapOptionsPreserveNativeCreationDefaults()
     {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions());
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(runtime, new MapOptions());
 
         Assert.False(map.IsClosed);
     }
@@ -29,8 +29,8 @@ public sealed class RuntimeMapLifecycleTests
                 .fast_pfor_enabled
         );
 
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { FastPforEnabled = true });
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(runtime, new MapOptions { FastPforEnabled = true });
 
         Assert.False(map.IsClosed);
     }
@@ -39,14 +39,17 @@ public sealed class RuntimeMapLifecycleTests
     [Fact]
     public void RuntimeAndMapCloseDeterministically()
     {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
 
         Assert.False(runtime.IsClosed);
         Assert.False(map.IsClosed);
 
-        map.Close();
-        runtime.Close();
+        TestHandles.Close(map);
+        TestHandles.Close(runtime);
 
         Assert.True(map.IsClosed);
         Assert.True(runtime.IsClosed);
@@ -56,44 +59,59 @@ public sealed class RuntimeMapLifecycleTests
     [Fact]
     public void RuntimeCloseFailsWhileMapIsLiveAndCanRetryAfterMapClose()
     {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
 
-        var error = Assert.Throws<InvalidStateException>(runtime.Close);
+        var error = Assert.Throws<InvalidStateException>(() => TestHandles.Close(runtime));
 
         Assert.Equal(MaplibreStatus.InvalidState, error.Status);
         Assert.Equal((int)MaplibreStatus.InvalidState, error.RawStatus);
         Assert.False(runtime.IsClosed);
-        Assert.Contains("live maps", error.Diagnostic, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "live or pending children",
+            error.Diagnostic,
+            StringComparison.OrdinalIgnoreCase
+        );
 
-        map.Close();
-        runtime.Close();
+        TestHandles.Close(map);
+        TestHandles.Close(runtime);
 
         Assert.True(runtime.IsClosed);
     }
 
     [BindingSpecTest("BND-100")]
     [Fact]
-    public void MapDebugSettingsRoundTripThroughNativeMap()
+    public async Task MapDebugSettingsRoundTripThroughNativeMap()
     {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
 
         var options = DebugOptions.TileBorders | DebugOptions.ParseStatus;
         map.SetDebugOptions(options);
         map.SetRenderingStatsViewEnabled(true);
 
-        Assert.Equal(options, map.GetDebugOptions());
-        Assert.True(map.GetRenderingStatsViewEnabled());
-        _ = map.IsFullyLoaded();
+        Assert.Equal(
+            options,
+            await map.GetDebugOptionsAsync(TestContext.Current.CancellationToken)
+        );
+        Assert.True(
+            await map.GetRenderingStatsViewEnabledAsync(TestContext.Current.CancellationToken)
+        );
+        _ = await map.IsFullyLoadedAsync(TestContext.Current.CancellationToken);
         map.DumpDebugLogs();
     }
 
     [Fact]
     public void MapSizeReportsCreationExtentAndPixelRatio()
     {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(
             runtime,
             new MapOptions
             {
@@ -103,133 +121,44 @@ public sealed class RuntimeMapLifecycleTests
             }
         );
 
-        Assert.Equal((512u, 256u, 2d), map.GetSize());
+        Assert.Equal(new LogicalExtent(512, 256, 2), map.GetSnapshot().LogicalExtent);
     }
 
-    [BindingSpecTest("BND-190", "BND-191")]
+    [BindingSpecTest("BND-190", "BND-191", "BND-192")]
     [Fact]
-    public void OwnerThreadViolationMapsToWrongThreadException()
+    public async Task RuntimeAndMapWorkAcrossManagedThreads()
     {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-        Exception? thrown = null;
-
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                map.RequestRepaint();
-            }
-            catch (Exception error)
-            {
-                thrown = error;
-            }
-        });
-        thread.Start();
-        thread.Join();
-
-        var wrongThread = Assert.IsType<WrongThreadException>(thrown);
-        Assert.Equal(MaplibreStatus.WrongThread, wrongThread.Status);
-        Assert.Equal((int)MaplibreStatus.WrongThread, wrongThread.RawStatus);
-    }
-
-    [BindingSpecTest("BND-192")]
-    [Fact]
-    public async Task OwnerThreadHelperConfinesRuntimeMapWorkToOneThread()
-    {
-        using var ownerThread = new OwnerThread();
-        RuntimeHandle? runtime = null;
-        MapHandle? map = null;
-
-        var createThreadId = ownerThread.Invoke(() =>
-        {
-            runtime = RuntimeHandle.Create(new RuntimeOptions());
-            map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-            return Environment.CurrentManagedThreadId;
-        });
-
-        var task = Task.Run(() =>
-            ownerThread.Invoke(() =>
-            {
-                Assert.Equal(createThreadId, Environment.CurrentManagedThreadId);
-                map!.RequestRepaint();
-                runtime!.Pump(TimeSpan.Zero);
-                _ = runtime.DrainEvents();
-                return Environment.CurrentManagedThreadId;
-            })
+        using var runtime = await RuntimeHandle.CreateAsync(
+            new RuntimeOptions(),
+            TestContext.Current.CancellationToken
+        );
+        using var map = await MapHandle.CreateAsync(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 },
+            TestContext.Current.CancellationToken
         );
 
-        Assert.Equal(createThreadId, await task);
-        ownerThread.Invoke(() =>
-        {
-            map!.Close();
-            runtime!.Close();
-        });
-    }
+        var commandId = await Task.Run(map.RequestRepaint);
+        var snapshot = await Task.Run(map.GetSnapshot);
+        await Task.Run(() => runtime.BarrierAsync(TestContext.Current.CancellationToken));
 
-    [BindingSpecTest("BND-192")]
-    [Fact]
-    public void OwnerThreadHelperPropagatesOrdinaryBindingErrors()
-    {
-        using var ownerThread = new OwnerThread();
-        RuntimeHandle? runtime = null;
-        MapHandle? map = null;
-        ownerThread.Invoke(() =>
-        {
-            runtime = RuntimeHandle.Create(new RuntimeOptions());
-            map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-            map.Close();
-            runtime.Close();
-        });
-
-        var error = Assert.Throws<InvalidStateException>(() =>
-            ownerThread.Invoke(() => map!.RequestRepaint())
-        );
-
-        Assert.Equal(MaplibreStatus.InvalidState, error.Status);
-        Assert.Null(error.RawStatus);
-    }
-
-    [BindingSpecTest("BND-192")]
-    [Fact]
-    public void OwnerThreadHelperRejectsSubmissionsAfterClose()
-    {
-        var ownerThread = new OwnerThread();
-        ownerThread.Close();
-
-        var error = Assert.Throws<InvalidStateException>(() => ownerThread.Invoke(() => { }));
-
-        Assert.Equal(MaplibreStatus.InvalidState, error.Status);
-        Assert.Null(error.RawStatus);
-    }
-
-    [BindingSpecTest("BND-192")]
-    [Fact]
-    public void OwnerThreadHelperRejectsNestedSubmissionsAfterOwnerThreadClose()
-    {
-        using var ownerThread = new OwnerThread();
-
-        ownerThread.Invoke(() =>
-        {
-            ownerThread.Close();
-
-            var error = Assert.Throws<InvalidStateException>(() => ownerThread.Invoke(() => { }));
-
-            Assert.Equal(MaplibreStatus.InvalidState, error.Status);
-            Assert.Null(error.RawStatus);
-        });
+        Assert.NotEqual(0ul, commandId);
+        Assert.Equal(new LogicalExtent(512, 512, 1), snapshot.LogicalExtent);
     }
 
     [BindingSpecTest("BND-023")]
     [Fact]
     public void MethodsRejectClosedMapBeforeNativeCall()
     {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-        map.Close();
-        runtime.Close();
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        var map = TestHandles.CreateMap(runtime, new MapOptions { Width = 512, Height = 512 });
+        TestHandles.Close(map);
+        TestHandles.Close(runtime);
 
-        var error = Assert.Throws<InvalidStateException>(map.RequestRepaint);
+        var error = Assert.Throws<InvalidStateException>(() =>
+        {
+            _ = map.RequestRepaint();
+        });
 
         Assert.Equal(MaplibreStatus.InvalidState, error.Status);
         Assert.Null(error.RawStatus);

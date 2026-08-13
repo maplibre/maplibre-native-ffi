@@ -2,9 +2,9 @@
 //!
 //! glow supports Emscripten in its source, but its manifest declares js-sys and
 //! wasm-bindgen for every `wasm32` target, and those do not build there. The
-//! fixtures need ten entry points, which Emscripten links into the module
-//! directly, so this binds them under the names and shapes glow uses and the
-//! call sites stay identical on every target. The surface readback the Windows
+//! fixtures need a small set of entry points, which Emscripten links into the
+//! module directly. This module preserves the names and shapes that the shared
+//! fixture call sites use on every target. The surface readback the Windows
 //! fixture performs has no browser counterpart and is absent here.
 
 #![allow(non_snake_case)]
@@ -45,6 +45,7 @@ pub enum PixelUnpackData<'a> {
 
 unsafe extern "C" {
     fn glGetError() -> u32;
+    fn glFinish();
     fn glGenTextures(count: i32, textures: *mut u32);
     fn glBindTexture(target: u32, texture: u32);
     fn glTexParameteri(target: u32, name: u32, parameter: i32);
@@ -108,6 +109,12 @@ impl Context {
     /// glow's `HasContext` does.
     pub unsafe fn get_error(&self) -> u32 {
         unsafe { glGetError() }
+    }
+
+    /// # Safety
+    /// See [`Context::get_error`].
+    pub unsafe fn finish(&self) {
+        unsafe { glFinish() };
     }
 
     /// # Safety

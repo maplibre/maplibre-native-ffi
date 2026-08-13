@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"runtime"
+	stdruntime "runtime"
 	"strings"
 
 	"github.com/jfreymuth/go-sdl3/sdl"
@@ -13,8 +13,9 @@ import (
 )
 
 func main() {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
+	// SDL and OpenGL keep the render-session graphics calls on this thread.
+	stdruntime.LockOSThread()
+	defer stdruntime.UnlockOSThread()
 
 	mode, ok := parseArgs(os.Args[1:])
 	if !ok {
@@ -105,40 +106,38 @@ func run(mode renderTargetMode) (result error) {
 	_ = sdl.GL_SetSwapInterval(1)
 
 	shared := newSharedState()
-	commands := &commandQueue{}
-	published := make(chan runtimeLoopHandles, 1)
-	runtimeDone := make(chan struct{})
-	go func() {
-		defer close(runtimeDone)
-		runRuntimeLoop(view, commands, published, shared)
-	}()
-	handles, ok := <-published
-	if !ok {
-		<-runtimeDone
-		_ = graphics.Close()
-		if failure := shared.firstFailure(); failure != nil {
-			return fmt.Errorf("runtime loop startup failed: %w", failure)
-		}
-		return errors.New("runtime loop stopped before publishing the map")
-	}
-
-	state, err := newRenderMapState(graphics, handles.mapRef, view, mode)
+	mapState, err := newRuntimeMapState(view)
 	if err != nil {
-		shared.requestShutdown()
-		_ = handles.wake.Signal()
-		<-runtimeDone
+		_ = graphics.Close()
+		return err
+	}
+	ready := make(chan struct{}, 1)
+	if err := mapState.runtime.SetNotificationCallback(func() {
+		select {
+		case ready <- struct{}{}:
+		default:
+		}
+	}); err != nil {
+		return errors.Join(err, mapState.Close(), graphics.Close())
+	}
+	commands := &cameraController{state: mapState, shared: shared}
+	state, err := newRenderMapState(graphics, mapState.mapRef, view, mode)
+	if err != nil {
 		return errors.Join(
 			fmt.Errorf("render target attach failed: %w", err),
-			shared.firstFailure(),
+			mapState.Close(),
 			graphics.Close(),
 		)
 	}
 	defer func() {
-		result = errors.Join(result, state.finishFrame(), state.closeTarget())
-		shared.requestShutdown()
-		_ = handles.wake.Signal()
-		<-runtimeDone
-		result = errors.Join(result, shared.firstFailure(), graphics.Close())
+		result = errors.Join(
+			result,
+			state.finishFrame(),
+			state.closeTarget(),
+			mapState.Close(),
+			shared.firstFailure(),
+			graphics.Close(),
+		)
 	}()
 
 	fmt.Printf("render target: %s\n", mode)
@@ -160,15 +159,21 @@ func run(mode renderTargetMode) (result error) {
 			if err := state.resize(view); err != nil {
 				return err
 			}
+			commandID, err := mapState.mapRef.Resize(maplibre.LogicalExtent{
+				Width:       view.logicalWidth,
+				Height:      view.logicalHeight,
+				ScaleFactor: view.scaleFactor,
+			})
+			if err != nil {
+				return err
+			}
+			mapState.commandID = commandID
 			shared.requestRender()
 		default:
 			if view.empty() {
 				return nil
 			}
 			if input.handleEvent(event, commands, view) {
-				if err := handles.wake.Signal(); err != nil {
-					return fmt.Errorf("wake runtime loop failed: %w", err)
-				}
 				shared.requestRender()
 			}
 		}
@@ -176,7 +181,7 @@ func run(mode renderTargetMode) (result error) {
 	}
 	for running {
 		if failure := shared.firstFailure(); failure != nil {
-			return fmt.Errorf("runtime loop failed: %w", failure)
+			return fmt.Errorf("map update failed: %w", failure)
 		}
 		didWork := false
 		var event sdl.Event
@@ -185,6 +190,21 @@ func run(mode renderTargetMode) (result error) {
 			if err := handleEvent(&event); err != nil {
 				return err
 			}
+		}
+		select {
+		case <-ready:
+			if _, err := mapState.runtime.DrainReady(); err != nil {
+				return err
+			}
+			renderRequested, err := drainEvents(mapState.runtime, mapState.mapID)
+			if err != nil {
+				return err
+			}
+			if renderRequested {
+				shared.requestRender()
+				didWork = true
+			}
+		default:
 		}
 
 		if shared.consumeRenderRequest() && !view.empty() && running {
@@ -244,7 +264,7 @@ func validateNativeRenderBackend() error {
 	}
 	providers := maplibre.SupportedOpenGLContextProviders()
 	required := maplibre.OpenGLContextProviderEGL
-	if runtime.GOOS == "windows" {
+	if stdruntime.GOOS == "windows" {
 		required = maplibre.OpenGLContextProviderWGL
 	}
 	if !providers.Has(required) {

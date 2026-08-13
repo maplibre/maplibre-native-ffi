@@ -87,9 +87,14 @@ public sealed class ResourceTransformTests
         var failInstall = false;
         ResourceTransformState? failedReplacement = null;
         using var install = RuntimeHandle.UseResourceCallbackInstallMethodsForTest(
-            (_, _) => mln_status.MLN_STATUS_OK,
-            (_, transform) =>
+            (_, _, commandId) =>
             {
+                *commandId = 1;
+                return mln_status.MLN_STATUS_OK;
+            },
+            (_, transform, commandId) =>
+            {
+                *commandId = 1;
                 if (!failInstall)
                 {
                     return mln_status.MLN_STATUS_OK;
@@ -100,7 +105,7 @@ public sealed class ResourceTransformTests
                 return mln_status.MLN_STATUS_INVALID_STATE;
             }
         );
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
         runtime.SetResourceTransform(request => request.Url + "?first");
         var previous = Assert.IsType<ResourceTransformState>(runtime.ResourceTransformStateForTest);
 
@@ -119,7 +124,7 @@ public sealed class ResourceTransformTests
     [Fact]
     public void CanInstallReplaceAndClearResourceTransform()
     {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
 
         runtime.SetResourceTransform(request => request.Url + "?first");
         runtime.SetResourceTransform(request => request.Url + "?second");

@@ -42,280 +42,292 @@ import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 @OptIn(ExperimentalForeignApi::class)
 class RuntimeOfflineStructsTest : org.maplibre.nativeffi.NativeTestBase() {
   @Test
-  fun offlineRegionDefinitionMaterializesTilePyramidAndGeometryVariants() {
-    memScoped {
-      val tilePyramid =
-        RuntimeStructs.offlineRegionDefinition(
-            OfflineRegionDefinition.TilePyramid(
-              "asset://style.json",
-              LatLngBounds(LatLng(1.0, 2.0), LatLng(3.0, 4.0)),
-              1.0,
-              5.0,
-              2.0f,
-              true,
-            ),
-            this,
+  fun offlineRegionDefinitionMaterializesTilePyramidAndGeometryVariants(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      memScoped {
+        val tilePyramid =
+          RuntimeStructs.offlineRegionDefinition(
+              OfflineRegionDefinition.TilePyramid(
+                "asset://style.json",
+                LatLngBounds(LatLng(1.0, 2.0), LatLng(3.0, 4.0)),
+                1.0,
+                5.0,
+                2.0f,
+                true,
+              ),
+              this,
+            )
+            .pointed
+        assertEquals(MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID, tilePyramid.type)
+        assertEquals(1.0, tilePyramid.data.tile_pyramid.bounds.southwest.latitude)
+        assertEquals(4.0, tilePyramid.data.tile_pyramid.bounds.northeast.longitude)
+        assertEquals(2.0f, tilePyramid.data.tile_pyramid.pixel_ratio)
+
+        val geometry =
+          RuntimeStructs.offlineRegionDefinition(
+              OfflineRegionDefinition.GeometryRegion(
+                "asset://style.json",
+                "{\"type\":\"Point\",\"coordinates\":[6,5]}".encodeToByteArray(),
+                2.0,
+                6.0,
+                1.0f,
+                false,
+              ),
+              this,
+            )
+            .pointed
+        assertEquals(MLN_OFFLINE_REGION_DEFINITION_GEOMETRY, geometry.type)
+        assertEquals(36UL, geometry.data.geometry.geometry.size)
+      }
+    }
+
+  @Test
+  fun offlineMetadataUsesNullPointerOnlyForEmptyMetadata(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      memScoped {
+        assertEquals(null, RuntimeStructs.metadata(ByteArray(0), this))
+        assertNotNull(RuntimeStructs.metadata(byteArrayOf(1, 2, 3), this))
+      }
+    }
+
+  @Test
+  fun offlineRegionInfoPreservesUnknownDefinitionDiscriminator(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      memScoped {
+        val info = alloc<mln_offline_region_info>()
+        info.size = sizeOf<mln_offline_region_info>().toUInt()
+        info.id = 7
+        info.definition.size = sizeOf<mln_offline_region_definition>().toUInt()
+        info.definition.type = 999U
+        info.metadata = null
+        info.metadata_size = 0UL
+
+        val definition = RuntimeStructs.offlineRegionInfo(info).definition
+
+        assertEquals(
+          OfflineRegionDefinition.Unknown(999, sizeOf<mln_offline_region_definition>().toInt()),
+          definition,
+        )
+      }
+    }
+
+  @Test
+  fun unknownOfflineRegionDefinitionIsOutputOnly(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      memScoped {
+        assertFailsWith<InvalidArgumentException> {
+          RuntimeStructs.offlineRegionDefinition(OfflineRegionDefinition.Unknown(999, 8), this)
+        }
+      }
+    }
+
+  @Test
+  fun offlineRegionSnapshotCopiesInfoAndDestroysNativeHandle(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      memScoped {
+        var destroys = 0
+        val metadata = allocArray<UByteVar>(2)
+        metadata[0] = 4U
+        metadata[1] = 5U
+        val snapshot = SyntheticHandles.offlineRegionSnapshot()
+        val styleUrl = "asset://offline-style.json".cstr.getPointer(this)
+
+        val info =
+          RuntimeStructs.offlineRegionSnapshot(
+            snapshot,
+            getter = { _, outInfo ->
+              fillValidOfflineRegionInfo(outInfo.pointed, styleUrl, metadata, 2UL)
+              MaplibreStatus.OK.nativeCode
+            },
+            destroyer = { destroys++ },
           )
-          .pointed
-      assertEquals(MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID, tilePyramid.type)
-      assertEquals(1.0, tilePyramid.data.tile_pyramid.bounds.southwest.latitude)
-      assertEquals(4.0, tilePyramid.data.tile_pyramid.bounds.northeast.longitude)
-      assertEquals(2.0f, tilePyramid.data.tile_pyramid.pixel_ratio)
 
-      val geometry =
-        RuntimeStructs.offlineRegionDefinition(
-            OfflineRegionDefinition.GeometryRegion(
-              "asset://style.json",
-              "{\"type\":\"Point\",\"coordinates\":[6,5]}".encodeToByteArray(),
-              2.0,
-              6.0,
-              1.0f,
-              false,
-            ),
-            this,
+        assertEquals(7, info.id)
+        assertEquals(validTilePyramidDefinition(), info.definition)
+        assertContentEquals(byteArrayOf(4, 5), info.metadata)
+        assertEquals(1, destroys)
+      }
+    }
+
+  @Test
+  fun offlineRegionSnapshotDestroysNativeHandleWhenCopyFails(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      memScoped {
+        var destroys = 0
+        val metadata = alloc<UByteVar>()
+        val snapshot = SyntheticHandles.offlineRegionSnapshot()
+
+        assertFailsWith<IllegalArgumentException> {
+          RuntimeStructs.offlineRegionSnapshot(
+            snapshot,
+            getter = { _, outInfo ->
+              fillOfflineRegionInfoWithOversizedMetadata(outInfo.pointed, metadata.ptr)
+              MaplibreStatus.OK.nativeCode
+            },
+            destroyer = { destroys++ },
           )
-          .pointed
-      assertEquals(MLN_OFFLINE_REGION_DEFINITION_GEOMETRY, geometry.type)
-      assertEquals(36UL, geometry.data.geometry.geometry.size)
-    }
-  }
+        }
 
-  @Test
-  fun offlineMetadataUsesNullPointerOnlyForEmptyMetadata() {
-    memScoped {
-      assertEquals(null, RuntimeStructs.metadata(ByteArray(0), this))
-      assertNotNull(RuntimeStructs.metadata(byteArrayOf(1, 2, 3), this))
-    }
-  }
-
-  @Test
-  fun offlineRegionInfoPreservesUnknownDefinitionDiscriminator() {
-    memScoped {
-      val info = alloc<mln_offline_region_info>()
-      info.size = sizeOf<mln_offline_region_info>().toUInt()
-      info.id = 7
-      info.definition.size = sizeOf<mln_offline_region_definition>().toUInt()
-      info.definition.type = 999U
-      info.metadata = null
-      info.metadata_size = 0UL
-
-      val definition = RuntimeStructs.offlineRegionInfo(info).definition
-
-      assertEquals(
-        OfflineRegionDefinition.Unknown(999, sizeOf<mln_offline_region_definition>().toInt()),
-        definition,
-      )
-    }
-  }
-
-  @Test
-  fun unknownOfflineRegionDefinitionIsOutputOnly() {
-    memScoped {
-      assertFailsWith<InvalidArgumentException> {
-        RuntimeStructs.offlineRegionDefinition(OfflineRegionDefinition.Unknown(999, 8), this)
+        assertEquals(1, destroys)
       }
     }
-  }
 
   @Test
-  fun offlineRegionSnapshotCopiesInfoAndDestroysNativeHandle() {
-    memScoped {
-      var destroys = 0
-      val metadata = allocArray<UByteVar>(2)
-      metadata[0] = 4U
-      metadata[1] = 5U
-      val snapshot = SyntheticHandles.offlineRegionSnapshot()
-      val styleUrl = "asset://offline-style.json".cstr.getPointer(this)
+  fun offlineRegionListCopiesInfoAndDestroysNativeHandle(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      memScoped {
+        var destroys = 0
+        val metadata = allocArray<UByteVar>(1)
+        metadata[0] = 6U
+        val list = SyntheticHandles.offlineRegionList()
+        val styleUrl = "asset://offline-style.json".cstr.getPointer(this)
 
-      val info =
-        RuntimeStructs.offlineRegionSnapshot(
-          snapshot,
-          getter = { _, outInfo ->
-            fillValidOfflineRegionInfo(outInfo.pointed, styleUrl, metadata, 2UL)
-            MaplibreStatus.OK.nativeCode
-          },
-          destroyer = { destroys++ },
-        )
+        val regions =
+          RuntimeStructs.offlineRegionList(
+            list,
+            counter = { _, outCount ->
+              outCount[0] = 1UL
+              MaplibreStatus.OK.nativeCode
+            },
+            getter = { _, _, outInfo ->
+              fillValidOfflineRegionInfo(outInfo.pointed, styleUrl, metadata, 1UL)
+              MaplibreStatus.OK.nativeCode
+            },
+            destroyer = { destroys++ },
+          )
 
-      assertEquals(7, info.id)
-      assertEquals(validTilePyramidDefinition(), info.definition)
-      assertContentEquals(byteArrayOf(4, 5), info.metadata)
-      assertEquals(1, destroys)
-    }
-  }
-
-  @Test
-  fun offlineRegionSnapshotDestroysNativeHandleWhenCopyFails() {
-    memScoped {
-      var destroys = 0
-      val metadata = alloc<UByteVar>()
-      val snapshot = SyntheticHandles.offlineRegionSnapshot()
-
-      assertFailsWith<IllegalArgumentException> {
-        RuntimeStructs.offlineRegionSnapshot(
-          snapshot,
-          getter = { _, outInfo ->
-            fillOfflineRegionInfoWithOversizedMetadata(outInfo.pointed, metadata.ptr)
-            MaplibreStatus.OK.nativeCode
-          },
-          destroyer = { destroys++ },
-        )
+        assertEquals(1, regions.size)
+        assertEquals(7, regions.single().id)
+        assertEquals(validTilePyramidDefinition(), regions.single().definition)
+        assertContentEquals(byteArrayOf(6), regions.single().metadata)
+        assertEquals(1, destroys)
       }
-
-      assertEquals(1, destroys)
     }
-  }
 
   @Test
-  fun offlineRegionListCopiesInfoAndDestroysNativeHandle() {
-    memScoped {
-      var destroys = 0
-      val metadata = allocArray<UByteVar>(1)
-      metadata[0] = 6U
-      val list = SyntheticHandles.offlineRegionList()
-      val styleUrl = "asset://offline-style.json".cstr.getPointer(this)
+  fun offlineRegionListDestroysNativeHandleWhenCopyFails(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      memScoped {
+        var destroys = 0
+        val metadata = alloc<UByteVar>()
+        val list = SyntheticHandles.offlineRegionList()
 
-      val regions =
-        RuntimeStructs.offlineRegionList(
-          list,
-          counter = { _, outCount ->
-            outCount[0] = 1UL
-            MaplibreStatus.OK.nativeCode
-          },
-          getter = { _, _, outInfo ->
-            fillValidOfflineRegionInfo(outInfo.pointed, styleUrl, metadata, 1UL)
-            MaplibreStatus.OK.nativeCode
-          },
-          destroyer = { destroys++ },
-        )
+        assertFailsWith<IllegalArgumentException> {
+          RuntimeStructs.offlineRegionList(
+            list,
+            counter = { _, outCount ->
+              outCount[0] = 1UL
+              MaplibreStatus.OK.nativeCode
+            },
+            getter = { _, _, outInfo ->
+              fillOfflineRegionInfoWithOversizedMetadata(outInfo.pointed, metadata.ptr)
+              MaplibreStatus.OK.nativeCode
+            },
+            destroyer = { destroys++ },
+          )
+        }
 
-      assertEquals(1, regions.size)
-      assertEquals(7, regions.single().id)
-      assertEquals(validTilePyramidDefinition(), regions.single().definition)
-      assertContentEquals(byteArrayOf(6), regions.single().metadata)
-      assertEquals(1, destroys)
-    }
-  }
-
-  @Test
-  fun offlineRegionListDestroysNativeHandleWhenCopyFails() {
-    memScoped {
-      var destroys = 0
-      val metadata = alloc<UByteVar>()
-      val list = SyntheticHandles.offlineRegionList()
-
-      assertFailsWith<IllegalArgumentException> {
-        RuntimeStructs.offlineRegionList(
-          list,
-          counter = { _, outCount ->
-            outCount[0] = 1UL
-            MaplibreStatus.OK.nativeCode
-          },
-          getter = { _, _, outInfo ->
-            fillOfflineRegionInfoWithOversizedMetadata(outInfo.pointed, metadata.ptr)
-            MaplibreStatus.OK.nativeCode
-          },
-          destroyer = { destroys++ },
-        )
+        assertEquals(1, destroys)
       }
-
-      assertEquals(1, destroys)
     }
-  }
 
   @Test
-  fun unknownRuntimePayloadCopiesTheWholeUnionWindow() {
-    memScoped {
-      val event = alloc<mln_runtime_event>()
-      event.payload_type = 999U
-      val payload = event.payload.ptr.reinterpret<ByteVar>()
-      for (index in 0 until payloadWindowSize) {
-        payload[index] = 0
+  fun unknownRuntimePayloadCopiesTheWholeUnionWindow(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      memScoped {
+        val event = alloc<mln_runtime_event>()
+        event.payload_type = 999U
+        val payload = event.payload.ptr.reinterpret<ByteVar>()
+        for (index in 0 until payloadWindowSize) {
+          payload[index] = 0
+        }
+        payload[0] = 1
+        payload[1] = 2
+        payload[2] = 3
+
+        val result = RuntimeStructs.payload(event, eventSize) as RuntimeEventPayload.Unknown
+
+        assertEquals(999, result.rawPayloadType)
+        assertEquals(payloadWindowSize, result.payloadBytes.size)
+        assertContentEquals(byteArrayOf(1, 2, 3), result.payloadBytes.take(3).toByteArray())
+
+        // The copy survives both a write through the source and a write into a
+        // previously returned array.
+        payload[0] = 9
+        val firstCopy = result.payloadBytes
+        firstCopy[1] = 9
+        assertContentEquals(byteArrayOf(1, 2, 3), result.payloadBytes.take(3).toByteArray())
       }
-      payload[0] = 1
-      payload[1] = 2
-      payload[2] = 3
-
-      val result = RuntimeStructs.payload(event, eventSize) as RuntimeEventPayload.Unknown
-
-      assertEquals(999, result.rawPayloadType)
-      assertEquals(payloadWindowSize, result.payloadBytes.size)
-      assertContentEquals(byteArrayOf(1, 2, 3), result.payloadBytes.take(3).toByteArray())
-
-      // The copy survives both a write through the source and a write into a
-      // previously returned array.
-      payload[0] = 9
-      val firstCopy = result.payloadBytes
-      firstCopy[1] = 9
-      assertContentEquals(byteArrayOf(1, 2, 3), result.payloadBytes.take(3).toByteArray())
     }
-  }
 
   @Test
-  fun payloadTypeSelectsWhichUnionMemberOneWindowDecodesAs() {
-    memScoped {
-      val event = alloc<mln_runtime_event>()
-      event.payload.camera_transition_finished.transition_id = 0x0000_0007_0000_0384UL
+  fun payloadTypeSelectsWhichUnionMemberOneWindowDecodesAs(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      memScoped {
+        val event = alloc<mln_runtime_event>()
+        event.payload.camera_transition_finished.transition_id = 0x0000_0007_0000_0384UL
 
-      event.payload_type = MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED
-      val transition =
-        RuntimeStructs.payload(event, eventSize) as RuntimeEventPayload.CameraTransitionFinished
-      assertEquals(0x0000_0007_0000_0384UL.toLong(), transition.transitionId)
+        event.payload_type = MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED
+        val transition =
+          RuntimeStructs.payload(event, eventSize) as RuntimeEventPayload.CameraTransitionFinished
+        assertEquals(0x0000_0007_0000_0384UL.toLong(), transition.transitionId)
 
-      // The same window read as another member takes that member's own field.
-      event.payload_type = MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP
-      val renderMap = RuntimeStructs.payload(event, eventSize) as RuntimeEventPayload.RenderMap
-      assertEquals(RenderMode(900), renderMap.mode)
+        // The same window read as another member takes that member's own field.
+        event.payload_type = MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP
+        val renderMap = RuntimeStructs.payload(event, eventSize) as RuntimeEventPayload.RenderMap
+        assertEquals(RenderMode(900), renderMap.mode)
+      }
     }
-  }
 
   @Test
-  fun typedRuntimePayloadsPreserveUnknownRawEnums() {
-    memScoped {
-      val renderMapEvent = alloc<mln_runtime_event>()
-      renderMapEvent.payload_type = MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP
-      renderMapEvent.payload.render_map.mode = 900U
+  fun typedRuntimePayloadsPreserveUnknownRawEnums(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      memScoped {
+        val renderMapEvent = alloc<mln_runtime_event>()
+        renderMapEvent.payload_type = MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP
+        renderMapEvent.payload.render_map.mode = 900U
 
-      val renderMapResult =
-        RuntimeStructs.payload(renderMapEvent, eventSize) as RuntimeEventPayload.RenderMap
-      assertEquals(RenderMode(900), renderMapResult.mode)
-      assertEquals(900, renderMapResult.mode.nativeValue)
+        val renderMapResult =
+          RuntimeStructs.payload(renderMapEvent, eventSize) as RuntimeEventPayload.RenderMap
+        assertEquals(RenderMode(900), renderMapResult.mode)
+        assertEquals(900, renderMapResult.mode.nativeValue)
 
-      val tileActionEvent = alloc<mln_runtime_event>()
-      tileActionEvent.payload_type = MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION
-      tileActionEvent.payload.tile_action.operation = 901U
-      tileActionEvent.payload.tile_action.tile_id.overscaled_z = 1U
-      tileActionEvent.payload.tile_action.tile_id.wrap = -1
-      tileActionEvent.payload.tile_action.tile_id.canonical_z = 2U
-      tileActionEvent.payload.tile_action.tile_id.canonical_x = 3U
-      tileActionEvent.payload.tile_action.tile_id.canonical_y = 4U
+        val tileActionEvent = alloc<mln_runtime_event>()
+        tileActionEvent.payload_type = MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION
+        tileActionEvent.payload.tile_action.operation = 901U
+        tileActionEvent.payload.tile_action.tile_id.overscaled_z = 1U
+        tileActionEvent.payload.tile_action.tile_id.wrap = -1
+        tileActionEvent.payload.tile_action.tile_id.canonical_z = 2U
+        tileActionEvent.payload.tile_action.tile_id.canonical_x = 3U
+        tileActionEvent.payload.tile_action.tile_id.canonical_y = 4U
 
-      val tilePayload =
-        RuntimeStructs.payload(tileActionEvent, eventSize) as RuntimeEventPayload.TileAction
-      assertEquals(TileOperation(901), tilePayload.operation)
-      assertEquals(901, tilePayload.operation.nativeValue)
-      assertEquals(1L, tilePayload.tileId.overscaledZ)
-      assertEquals(-1, tilePayload.tileId.wrap)
-      assertEquals(2L, tilePayload.tileId.canonicalZ)
-      assertEquals(3L, tilePayload.tileId.canonicalX)
-      assertEquals(4L, tilePayload.tileId.canonicalY)
+        val tilePayload =
+          RuntimeStructs.payload(tileActionEvent, eventSize) as RuntimeEventPayload.TileAction
+        assertEquals(TileOperation(901), tilePayload.operation)
+        assertEquals(901, tilePayload.operation.nativeValue)
+        assertEquals(1L, tilePayload.tileId.overscaledZ)
+        assertEquals(-1, tilePayload.tileId.wrap)
+        assertEquals(2L, tilePayload.tileId.canonicalZ)
+        assertEquals(3L, tilePayload.tileId.canonicalX)
+        assertEquals(4L, tilePayload.tileId.canonicalY)
+      }
     }
-  }
 
   @Test
-  fun runtimeEventMessageComesFromItsOffsetInTheBatchArena() {
-    memScoped {
-      val arena = "firstsecond".encodeToByteArray().toCValues().getPointer(this)
-      val event = alloc<mln_runtime_event>()
-      event.message_offset = 5U
-      event.message_size = 6U
+  fun runtimeEventMessageComesFromItsOffsetInTheBatchArena(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      memScoped {
+        val arena = "firstsecond".encodeToByteArray().toCValues().getPointer(this)
+        val event = alloc<mln_runtime_event>()
+        event.message_offset = 5U
+        event.message_size = 6U
 
-      assertEquals("second", RuntimeStructs.message(event, arena))
+        assertEquals("second", RuntimeStructs.message(event, arena))
 
-      event.message_size = 0U
-      assertEquals("", RuntimeStructs.message(event, arena))
+        event.message_size = 0U
+        assertEquals("", RuntimeStructs.message(event, arena))
+      }
     }
-  }
 
   private fun fillOfflineRegionInfoWithOversizedMetadata(
     info: mln_offline_region_info,

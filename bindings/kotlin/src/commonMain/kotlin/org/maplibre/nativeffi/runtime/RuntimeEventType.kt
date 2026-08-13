@@ -53,6 +53,9 @@ public value class RuntimeEventType(public val nativeValue: Int) {
     /** [RuntimeEvent.payload] carries [RuntimeEventPayload.CameraTransitionFinished]. */
     public val MAP_CAMERA_TRANSITION_FINISHED: RuntimeEventType = RuntimeEventType(23)
 
+    /** [RuntimeEvent.payload] carries [RuntimeEventPayload.CommandFinished]. */
+    public val COMMAND_FINISHED: RuntimeEventType = RuntimeEventType(24)
+
     internal fun fromNative(nativeValue: UInt): RuntimeEventType = fromNative(nativeValue.toInt())
 
     internal fun fromNative(nativeValue: Int): RuntimeEventType = RuntimeEventType(nativeValue)

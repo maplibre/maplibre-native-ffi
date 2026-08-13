@@ -53,10 +53,6 @@ struct NativeStyleStringListHandle: NativeHandle {
   let raw: UInt64
 }
 
-struct NativeWakeSourceHandle: NativeHandle {
-  let raw: UInt64
-}
-
 struct NativeResourceRequestHandle: NativeHandle {
   let raw: UInt64
 }

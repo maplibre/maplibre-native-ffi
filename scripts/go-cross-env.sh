@@ -17,7 +17,21 @@ case "$1" in
       goarch=amd64
       compiler_prefix=x86_64-linux-android
     fi
-    ndk_bin="$ANDROID_HOME/ndk/$MLN_FFI_ANDROID_NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/bin"
+    ndk_prebuilt_root="$ANDROID_HOME/ndk/$MLN_FFI_ANDROID_NDK_VERSION/toolchains/llvm/prebuilt"
+    ndk_bin=
+    for host_prebuilt in "$ndk_prebuilt_root"/*; do
+      if [[ -d "$host_prebuilt/bin" ]]; then
+        if [[ -n "$ndk_bin" ]]; then
+          echo "The pinned Android NDK has multiple host prebuilts under $ndk_prebuilt_root." >&2
+          return 2
+        fi
+        ndk_bin="$host_prebuilt/bin"
+      fi
+    done
+    if [[ -z "$ndk_bin" ]]; then
+      echo "The pinned Android NDK has no host prebuilt under $ndk_prebuilt_root." >&2
+      return 2
+    fi
     export GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=1
     export CC="$ndk_bin/${compiler_prefix}24-clang"
     export CXX="$ndk_bin/${compiler_prefix}24-clang++"
@@ -36,5 +50,8 @@ case "$1" in
     export GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=1
     export CC="$OHOS_SDK_NATIVE/llvm/bin/clang $target_flags"
     export CXX="$OHOS_SDK_NATIVE/llvm/bin/clang++ $target_flags"
+    # The OHOS loader leaves Go's internal function-pointer relocations
+    # unresolved in PIE executables. Link device binaries as ET_EXEC instead.
+    export CGO_LDFLAGS="${CGO_LDFLAGS:-} -no-pie"
     ;;
 esac

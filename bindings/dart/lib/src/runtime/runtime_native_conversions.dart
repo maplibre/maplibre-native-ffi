@@ -195,13 +195,12 @@ final class _CustomGeometryCallbackState extends RetainedCallbackState {
     CustomGeometrySourceOptions options,
     void Function() onReleased,
   ) {
-    // The C API invokes this once on the map owner thread, which is this
-    // isolate's thread, from inside whichever call stopped referencing the
-    // source: a removal, a style load, or the map's destruction.
+    // The C API invokes this once when a removal, style load, or map close
+    // stops referencing the source.
     releaseUserData =
         NativeCallable<
           raw.mln_custom_geometry_source_release_callbackFunction
-        >.isolateLocal((Pointer<Void> _) {
+        >.listener((Pointer<Void> _) {
           onReleased();
           _retire();
         });
@@ -1006,145 +1005,6 @@ Pointer<raw.mln_animation_options> _nativeAnimation(
     raw.mln_animation_options_default(),
   );
   return nativeAnimation;
-}
-
-Pointer<raw.mln_screen_point> _nativeScreenPoint(
-  ScreenPoint? point,
-  Allocator allocator,
-) {
-  if (point == null) {
-    return nullptr.cast<raw.mln_screen_point>();
-  }
-  final nativePoint = allocator<raw.mln_screen_point>();
-  nativePoint.ref = native_struct.screenPointToNative(point);
-  return nativePoint;
-}
-
-/// Probes the required length, then copies. A null buffer with zero capacity is
-/// a size probe the C API answers with OK.
-String _copyMapText(
-  NativeMap map,
-  int Function(int, Pointer<Char>, int, Pointer<Size>) copy,
-) {
-  return withNativeArena((arena) {
-    final outSize = arena<Size>();
-    _check(copy(map.raw, nullptr.cast<Char>(), 0, outSize));
-    final required = outSize.value;
-    if (required == 0) {
-      return '';
-    }
-
-    final buffer = arena<Char>(required);
-    final outCopied = arena<Size>();
-    _check(copy(map.raw, buffer, required, outCopied));
-    return buffer.cast<Utf8>().toDartString(length: outCopied.value);
-  });
-}
-
-Uint8List _copyMapData(
-  NativeMap map,
-  int Function(int, Pointer<Uint8>, int, Pointer<Size>) copy,
-) {
-  return withNativeArena((arena) {
-    final outSize = arena<Size>();
-    _check(copy(map.raw, nullptr.cast<Uint8>(), 0, outSize));
-    final required = outSize.value;
-    if (required == 0) return Uint8List(0);
-    final buffer = arena<Uint8>(required);
-    final outCopied = arena<Size>();
-    _check(copy(map.raw, buffer, required, outCopied));
-    return Uint8List.fromList(buffer.asTypedList(outCopied.value));
-  });
-}
-
-String _copyLayerText(
-  NativeMap map,
-  String layerId,
-  int Function(int, raw.mln_buffer_view, Pointer<Char>, int, Pointer<Size>)
-  copy,
-) {
-  return withNativeArena((arena) {
-    final nativeLayerId = nativeStringView(layerId, arena);
-    final outSize = arena<Size>();
-    _check(
-      copy(map.raw, nativeLayerId.value, nullptr.cast<Char>(), 0, outSize),
-    );
-    final required = outSize.value;
-    if (required == 0) {
-      return '';
-    }
-
-    final buffer = arena<Char>(required);
-    final outCopied = arena<Size>();
-    _check(copy(map.raw, nativeLayerId.value, buffer, required, outCopied));
-    return buffer.cast<Utf8>().toDartString(length: outCopied.value);
-  });
-}
-
-String? _copyStyleSourceAttribution(
-  NativeMap map,
-  raw.mln_buffer_view sourceId,
-  bool hasAttribution,
-  int attributionSize,
-  Allocator allocator,
-) {
-  if (!hasAttribution) {
-    return null;
-  }
-  final buffer = attributionSize == 0
-      ? nullptr.cast<Char>()
-      : allocator<Char>(attributionSize);
-  final outSize = allocator<Size>();
-  final outFound = allocator<Bool>();
-  _check(
-    raw.mln_map_copy_style_source_attribution(
-      map.raw,
-      sourceId,
-      buffer,
-      attributionSize,
-      outSize,
-      outFound,
-    ),
-  );
-  if (!outFound.value) {
-    return null;
-  }
-  if (outSize.value == 0) {
-    return '';
-  }
-  return buffer.cast<Utf8>().toDartString(length: outSize.value);
-}
-
-String? _copyStyleSourceUrl(
-  NativeMap map,
-  raw.mln_buffer_view sourceId,
-  bool hasUrl,
-  int urlSize,
-  Allocator allocator,
-) {
-  if (!hasUrl) {
-    return null;
-  }
-  final buffer = urlSize == 0 ? nullptr.cast<Char>() : allocator<Char>(urlSize);
-  final outSize = allocator<Size>();
-  final outFound = allocator<Bool>();
-  _check(
-    raw.mln_map_copy_style_source_url(
-      map.raw,
-      sourceId,
-      buffer,
-      urlSize,
-      outSize,
-      outFound,
-    ),
-  );
-  if (!outFound.value) {
-    return null;
-  }
-  if (outSize.value == 0) {
-    return '';
-  }
-  return buffer.cast<Utf8>().toDartString(length: outSize.value);
 }
 
 List<String> _copyStyleIdList(NativeStyleIdList list) {

@@ -1,11 +1,10 @@
 import Foundation
 import MaplibreNativeFFI
 
-/// A camera change decoded on the render loop and applied on the map's owner
-/// thread. Commands carry deltas wherever the current camera is an input,
-/// because the read and write have to happen together on the owner thread.
+/// A camera change decoded on the main render receiver and submitted by an
+/// asynchronous map task.
 enum CameraCommand {
-  case cancelTransitions
+  case resize(MapLogicalExtent)
   case setGestureInProgress(Bool)
   case moveBy(dx: Double, dy: Double)
   case moveByAnimated(dx: Double, dy: Double, animation: AnimationOptions)
@@ -22,51 +21,32 @@ enum CameraCommand {
   case resetOrientation(animation: AnimationOptions)
 }
 
-/// The cross-thread surface between the render loop, which owns the view, the
-/// Metal objects, and the render session, and the runtime loop, which owns the
-/// runtime and the map.
-///
-/// The runtime loop that reads these channels MUST be a dedicated `Thread`.
-/// Native owner-thread checks are keyed on the OS thread, and a serial
-/// `DispatchQueue`, an `actor`, or a `Task` may run successive blocks on
-/// different threads, producing `MLN_STATUS_WRONG_THREAD` failures.
+/// Thread-safe coordination between the main render receiver and async map
+/// tasks.
 final class Channels: @unchecked Sendable {
   private let condition = NSCondition()
-  private var commands: [CameraCommand] = []
+  private let commandStream: AsyncStream<CameraCommand>
+  private let commandContinuation: AsyncStream<CameraCommand>.Continuation
   private var renderRequested = true
-  private var publishedAttachRef: MapAttachRef?
-  /// Releases the runtime loop's parked pump. Set once the loop has published.
-  private var wake: WakeSource?
+  private var publishedMap: MapHandle?
   private var shutdown = false
   private var failure: String?
-  private var runtimeLoopFinished = false
+  private var mapTaskFinished = false
 
-  // MARK: - Camera commands (render loop to runtime loop)
+  init() {
+    (commandStream, commandContinuation) = AsyncStream.makeStream()
+  }
 
-  /// Render loop: queues a decoded camera change and wakes the runtime loop.
-  /// The buffer grows rather than dropping, because deltas and gesture brackets
-  /// are not recoverable once discarded.
+  var cameraCommands: AsyncStream<CameraCommand> {
+    commandStream
+  }
+
+  /// Queues a decoded camera change without polling or a custom command buffer.
   func push(_ command: CameraCommand) {
-    condition.lock()
-    commands.append(command)
-    let source = wake
-    condition.unlock()
-    // The runtime loop parks inside the native pump, not on this condition.
-    // Signal outside the lock so a native call never runs under it.
-    try? source?.signal()
+    commandContinuation.yield(command)
   }
 
-  /// Runtime loop: swaps `batch` in for the pending commands, keeping the
-  /// locked section to the swap alone.
-  func drainCommands(into batch: inout [CameraCommand]) {
-    // Clearing releases the elements just applied, so do it outside the lock.
-    batch.removeAll(keepingCapacity: true)
-    condition.lock()
-    defer { condition.unlock() }
-    swap(&commands, &batch)
-  }
-
-  // MARK: - Render request (runtime loop to render loop)
+  // MARK: - Render request (map task to render loop)
 
   func setRenderRequest() {
     condition.lock()
@@ -83,39 +63,35 @@ final class Channels: @unchecked Sendable {
     return wasRequested
   }
 
-  // MARK: - Attach reference (runtime loop to render loop)
+  // MARK: - Map publication (map task to render loop)
 
-  /// Runtime loop: announces the map it just created.
-  func publish(attachRef: MapAttachRef, wake: WakeSource) {
+  /// Announces the map after the map task creates it.
+  func publish(map: MapHandle) {
     condition.lock()
     defer { condition.unlock() }
-    self.wake = wake
-    publishedAttachRef = attachRef
+    publishedMap = map
   }
 
-  /// Render loop: the reference to attach against, once the runtime loop has a
-  /// map.
-  func attachRef() -> MapAttachRef? {
+  /// Returns the map once the map task has created it.
+  func map() -> MapHandle? {
     condition.lock()
     defer { condition.unlock() }
-    return publishedAttachRef
+    return publishedMap
   }
 
   // MARK: - Shutdown and failure
 
-  /// Render loop: asks the runtime loop to stop. Called only after the render
+  /// Render loop: asks the map task to stop. Called only after the render
   /// session is closed, because the map cannot be destroyed before then.
   func requestShutdown() {
     condition.lock()
     shutdown = true
     condition.broadcast()
-    let source = wake
     condition.unlock()
-    // Release the pump so shutdown is observed now.
-    try? source?.signal()
+    commandContinuation.finish()
   }
 
-  /// Runtime loop: blocks until the render loop has closed its session. The map
+  /// Map task: blocks until the render loop has closed its session. The map
   /// cannot be destroyed before then. Bounded so a render loop that died
   /// without signalling cannot wedge teardown.
   func waitForShutdown(timeout: TimeInterval) {
@@ -127,21 +103,16 @@ final class Channels: @unchecked Sendable {
     }
   }
 
-  var isShutdownRequested: Bool {
-    condition.lock()
-    defer { condition.unlock() }
-    return shutdown
-  }
-
   /// Records the first failure from either loop. It crosses as text because
   /// `any Error` carries no `Sendable` guarantee.
   func fail(_ error: Error) {
     condition.lock()
-    defer { condition.unlock() }
     if failure == nil {
       failure = String(describing: error)
     }
     condition.broadcast()
+    condition.unlock()
+    commandContinuation.finish()
   }
 
   var failureMessage: String? {
@@ -150,34 +121,24 @@ final class Channels: @unchecked Sendable {
     return failure
   }
 
-  /// Runtime loop: reports that it has closed the map and the runtime and is
-  /// about to exit.
-  func markRuntimeLoopFinished() {
+  /// Reports that the map task has closed the map and runtime.
+  func markMapTaskFinished() {
     condition.lock()
     defer { condition.unlock() }
-    runtimeLoopFinished = true
+    mapTaskFinished = true
     condition.broadcast()
   }
 
-  /// Render loop: waits for the runtime loop to finish. Returns false when the
-  /// deadline passed first.
-  func waitForRuntimeLoopExit(timeout: TimeInterval) -> Bool {
+  /// Waits for the map task to finish, up to the supplied deadline.
+  func waitForMapTaskExit(timeout: TimeInterval) -> Bool {
     let deadline = Date(timeIntervalSinceNow: timeout)
     condition.lock()
     defer { condition.unlock() }
-    while !runtimeLoopFinished {
+    while !mapTaskFinished {
       if !condition.wait(until: deadline) {
-        return runtimeLoopFinished
+        return mapTaskFinished
       }
     }
     return true
-  }
-
-  /// Render loop: releases the runtime loop's parked pump.
-  func wakeRuntimeLoop() {
-    condition.lock()
-    let source = wake
-    condition.unlock()
-    try? source?.signal()
   }
 }

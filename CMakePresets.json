@@ -501,6 +501,11 @@
       "inherits": "_test-base"
     },
     {
+      "name": "ohos-x64-egl",
+      "configurePreset": "ohos-x64-egl",
+      "inherits": "_test-base"
+    },
+    {
       "name": "windows-x64-wgl",
       "configurePreset": "windows-x64-wgl",
       "configuration": "Release",

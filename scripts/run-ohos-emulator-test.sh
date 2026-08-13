@@ -27,7 +27,7 @@ if (($# == 0)); then
 fi
 test_executables=("$@")
 
-connect_key=127.0.0.1:55555
+connect_key=${MLN_FFI_OHOS_EMULATOR_CONNECT_KEY:-127.0.0.1:55555}
 remote_dir=/data/local/tmp/maplibre-native-ffi
 fixture_dir=${MLN_FFI_TEST_FIXTURE_DIR:-}
 
@@ -65,12 +65,16 @@ if [[ -n "$fixture_dir" ]]; then
   done < <(find "$fixture_dir" -type f -print0)
   fixture_environment="MLN_FFI_TEST_FIXTURE_DIR='$remote_dir/fixtures' "
 fi
+# The Oniro guest's virtio GPU does not expose a reliable accelerated EGL
+# screen under QEMU. Mesa's surfaceless llvmpipe path provides deterministic
+# offscreen rendering for the test executables.
+graphics_environment="EGL_PLATFORM=surfaceless LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe LIBGL_DRIVERS_PATH=/vendor/lib64/chipsetsdk "
 
 for test_executable in "${test_executables[@]}"; do
   echo "Running $(basename "$test_executable") in the OpenHarmony emulator."
   hdc -t "$connect_key" file send "$test_executable" "$remote_dir/test-executable"
 
-  remote_command="cd '$remote_dir' && chmod 755 test-executable && ${fixture_environment}LD_LIBRARY_PATH='$remote_dir' ./test-executable"
+  remote_command="cd '$remote_dir' && chmod 755 test-executable && ${fixture_environment}${graphics_environment}LD_LIBRARY_PATH='$remote_dir' ./test-executable"
   for argument in ${test_arguments[@]+"${test_arguments[@]}"}; do
     printf -v quoted_argument '%q' "$argument"
     remote_command+=" $quoted_argument"

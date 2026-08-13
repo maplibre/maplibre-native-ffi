@@ -13,26 +13,20 @@ import org.maplibre.nativeffi.render.RenderResult
 import org.maplibre.nativeffi.render.RenderSessionHandle
 
 /**
- * The render loop.
+ * The native-surface render loop.
  *
- * [render] runs on the bridge's producer thread, which owns the host graphics context and the
- * borrowed texture, so that thread attaches the render session, renders through it, and closes it.
- * It touches the map only to attach, which native serves from any thread.
- *
- * Input decoding runs on the Compose thread and only enqueues camera commands; [MapRuntimeLoop]
- * applies them on the thread that owns the map.
+ * [render] runs on the bridge's producer thread, which owns the graphics context, borrowed texture,
+ * and render session. Runtime and map commands are submitted directly to the core-owned worker.
  */
 internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
   override val backend: ProducerBackend = MapLibreNativeSurfaceAdapter.backend
 
-  private val commands = CameraCommandQueue()
   private val renderRequest = RenderRequest()
   private val closed = AtomicBoolean(false)
-  private val failureReported = AtomicBoolean(false)
 
   @Volatile private var surfaceSession: NativeSurfaceSession? = null
   @Volatile private var ownerSession: NativeSurfaceSession? = null
-  @Volatile private var runtimeLoop: MapRuntimeLoop? = null
+  @Volatile private var mapState: MapState? = null
   @Volatile private var renderSession: AttachedRenderSession? = null
   @Volatile private var currentExtent = SurfaceExtent.Empty
 
@@ -55,22 +49,13 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
       return NativeSurfaceRenderResult.Skipped
     }
 
-    val loop = ensureRuntimeLoop(frame.extent)
-    loop.failure?.let { error ->
-      if (failureReported.compareAndSet(false, true)) {
-        // The caller stops driving frames after this, so nothing else would close the session the
-        // runtime loop is waiting on before it can destroy the map.
-        close()
-        throw IllegalStateException("map runtime loop failed", error)
-      }
-      return NativeSurfaceRenderResult.Skipped
-    }
-    val map = loop.map ?: return NativeSurfaceRenderResult.Skipped
+    val state = ensureMapState(frame.extent)
+    state.resize(frame.extent)
+    state.drainNotifications()
     return try {
-      renderAttached(map, frame)
+      renderAttached(state.map, frame)
     } catch (error: Throwable) {
-      // The caller stops driving frames after this, so nothing else would close the session the
-      // runtime loop is waiting on before it can destroy the map.
+      // The caller stops driving frames after this, so close the render session before the map.
       close()
       throw error
     }
@@ -85,8 +70,7 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
     if (attached.session.renderUpdate() == RenderResult.RENDERED) {
       return NativeSurfaceRenderResult.Rendered
     }
-    // The map applies a new logical size on the runtime loop's next pump, so an attach or resize
-    // is followed by frames with nothing to render.
+    // A newly accepted map or target update may not have reached the render session yet.
     requestRender()
     return NativeSurfaceRenderResult.Skipped
   }
@@ -107,10 +91,10 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
     if (renderSession != null && owner != null) {
       owner.withRendererAccess {
         closeRenderSession()
-        stopRuntimeLoop()
+        stopMapState()
       }
     } else {
-      stopRuntimeLoop()
+      stopMapState()
     }
   }
 
@@ -119,70 +103,70 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
     surfaceSession?.requestFrame()
   }
 
-  fun moveBy(deltaX: Double, deltaY: Double) {
+  private fun scheduleNotificationDrain() {
+    surfaceSession?.requestFrame()
+  }
+
+  fun pan(deltaX: Double, deltaY: Double) {
     enqueue(CameraCommand.MoveBy(deltaX, deltaY))
   }
 
-  fun scaleBy(scale: Double, anchorX: Double, anchorY: Double) {
+  fun zoom(scale: Double, anchorX: Double, anchorY: Double) {
     enqueue(CameraCommand.ScaleBy(scale, ScreenPoint(anchorX, anchorY)))
   }
 
-  fun moveByAnimated(deltaX: Double, deltaY: Double) {
+  fun animatePan(deltaX: Double, deltaY: Double) {
     enqueue(CameraCommand.MoveByAnimated(deltaX, deltaY))
   }
 
-  fun scaleByAnimated(scale: Double) {
+  fun animateZoom(scale: Double) {
     enqueue(CameraCommand.ScaleByAnimated(scale, viewportCenter()))
   }
 
-  fun rotateAndPitchBy(deltaX: Double, deltaY: Double) {
+  fun rotateAndPitch(deltaX: Double, deltaY: Double) {
     enqueue(
       CameraCommand.AdjustBearingAndPitch(deltaX * DRAG_ROTATE_FACTOR, -deltaY * DRAG_PITCH_FACTOR)
     )
   }
 
-  fun rotateBy(deltaDegrees: Double) {
+  fun animateBearing(deltaDegrees: Double) {
     enqueue(CameraCommand.AdjustBearingAnimated(deltaDegrees))
   }
 
-  fun pitchBy(deltaDegrees: Double) {
+  fun animatePitch(deltaDegrees: Double) {
     enqueue(CameraCommand.AdjustPitchAnimated(deltaDegrees))
   }
 
-  fun resetPitchAndBearing() {
+  fun resetOrientation() {
     enqueue(CameraCommand.ResetOrientation)
   }
 
-  fun cancelTransitions() {
+  fun stopCameraAnimation() {
     enqueue(CameraCommand.CancelTransitions)
   }
 
-  fun setGestureInProgress(inProgress: Boolean) {
+  fun setGestureActive(inProgress: Boolean) {
     enqueue(CameraCommand.SetGestureInProgress(inProgress))
   }
 
   private fun enqueue(command: CameraCommand) {
-    commands.enqueue(command)
+    mapState?.submit(command)
     requestRender()
   }
 
   private fun <T> withRendererAccess(action: () -> T): T =
     ownerSession?.withRendererAccess(action) ?: action()
 
-  private fun ensureRuntimeLoop(extent: SurfaceExtent): MapRuntimeLoop {
-    runtimeLoop?.let { existing ->
-      if (existing.scaleFactor == extent.scaleFactor) {
-        return existing
-      }
-      closeRenderSession()
-      stopRuntimeLoop()
+  private fun ensureMapState(extent: SurfaceExtent): MapState {
+    mapState?.let {
+      return it
     }
-    return MapRuntimeLoop(extent, commands, ::requestRender).also { runtimeLoop = it }
+    return MapState(extent, ::scheduleNotificationDrain, ::requestRender).also { mapState = it }
   }
 
-  private fun stopRuntimeLoop() {
-    val stopping = runtimeLoop
-    runtimeLoop = null
+  private fun stopMapState() {
+    val stopping = mapState
+    mapState = null
     stopping?.close()
   }
 

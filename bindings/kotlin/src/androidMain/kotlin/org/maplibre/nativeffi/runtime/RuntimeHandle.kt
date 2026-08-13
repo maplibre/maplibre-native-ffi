@@ -14,6 +14,7 @@ import org.maplibre.nativeffi.NativeAccess
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.TileId
+import org.maplibre.nativeffi.internal.callback.CallbackCommandRegistry
 import org.maplibre.nativeffi.internal.callback.HttpHeaderTransformState
 import org.maplibre.nativeffi.internal.callback.ResourceProviderState
 import org.maplibre.nativeffi.internal.callback.ResourceTransformState
@@ -38,36 +39,64 @@ import org.maplibre.nativeffi.resource.ResourceTransformCallback
 
 /** Owned runtime handle backed by the Android JNI bridge. */
 public actual class RuntimeHandle
-private constructor(private val handleId: Long, private var notificationSource: Long) :
-  AutoCloseable {
+private constructor(
+  private val handleId: Long,
+  private var notificationSource: Long,
+  private val notifications: NotificationDispatcher,
+) {
   private val core = HandleStateCore("RuntimeHandle", handleId)
 
   init {
     HandleLeakCleaner.register(this, core.leakReport)
   }
 
-  private var resourceProviderState: ResourceProviderState? = null
-  private var resourceTransformState: ResourceTransformState? = null
-  private var httpHeaderTransformState: HttpHeaderTransformState? = null
+  private val resourceProviderCommands =
+    CallbackCommandRegistry<ResourceProviderState>(
+      HandleLeakCleaner::retainNativeCallbackRoot,
+      ::releaseCallbackRoot,
+    )
+  private val resourceTransformCommands =
+    CallbackCommandRegistry<ResourceTransformState>(
+      HandleLeakCleaner::retainNativeCallbackRoot,
+      ::releaseCallbackRoot,
+    )
+  private val httpHeaderTransformCommands =
+    CallbackCommandRegistry<HttpHeaderTransformState>(
+      HandleLeakCleaner::retainNativeCallbackRoot,
+      ::releaseCallbackRoot,
+    )
   private val liveMaps = mutableMapOf<Long, WeakReference<MapHandle>>()
 
   public actual val isClosed: Boolean
     get() = core.isReleased()
 
-  public actual fun pump(timeoutMillis: Long) {
+  public actual fun setNotificationCallback(callback: () -> Unit) {
     NativeAccess.ensureLoaded()
-    Status.check(MaplibreNativeC.mln_runtime_pump(requireLiveHandle(), timeoutMillis))
+    core.requireLive()
+    notifications.setCallback(callback)
   }
 
-  public actual fun acquireWakeSource(): WakeSource {
+  public actual fun clearNotificationCallback() {
     NativeAccess.ensureLoaded()
-    val runtime = requireLiveHandle()
-    LongPointer(1).use { outSource ->
-      outSource.put(0, 0L)
-      Status.check(MaplibreNativeC.mln_runtime_wake_source_acquire(runtime, outSource))
-      val sourceId = outSource.get()
-      require(sourceId != 0L) { "mln_runtime_wake_source_acquire returned a null wake source" }
-      return WakeSource(sourceId)
+    core.requireLive()
+    notifications.clearCallback()
+  }
+
+  public actual fun drainReady(): List<ReadyEndpoint> {
+    NativeAccess.ensureLoaded()
+    core.requireLive()
+    return notifications.drainReady()
+  }
+
+  public actual suspend fun barrier() {
+    NativeAccess.ensureLoaded()
+    val operation = startOperation { outOperation ->
+      MaplibreNativeC.mln_runtime_barrier_start(requireLiveHandle(), outOperation)
+    }
+    try {
+      notifications.await(operation)
+    } finally {
+      MaplibreNativeC.mln_operation_release(operation)
     }
   }
 
@@ -329,92 +358,61 @@ private constructor(private val handleId: Long, private var notificationSource: 
       }
     }
 
-  public actual fun setResourceProvider(callback: ResourceProviderCallback) {
+  public actual fun setResourceProvider(callback: ResourceProviderCallback): ULong {
     val replacement = ResourceProviderState(callback)
-    val previous: ResourceProviderState?
-    try {
-      resourceProviderState?.checkCanClose()
-      Status.check(
+    return resourceProviderCommands.set(replacement) {
+      command { outCommandId ->
         MaplibreNativeC.mln_runtime_set_resource_provider(
           requireLiveHandle(),
           replacement.descriptor(),
+          outCommandId,
         )
-      )
-      previous = resourceProviderState
-      resourceProviderState = replacement
-      HandleLeakCleaner.retainNativeCallbackRoot(replacement)
-    } catch (error: Throwable) {
-      closeAndSuppress(error, replacement)
-      throw error
+      }
     }
-    releaseCallbackRoot(previous)
   }
 
-  public actual fun clearResourceProvider() {
-    resourceProviderState?.checkCanClose()
-    Status.check(MaplibreNativeC.mln_runtime_clear_resource_provider(requireLiveHandle()))
-    val previous = resourceProviderState
-    resourceProviderState = null
-    // The install path retained this as a strong leak-cleaner root, so closing
-    // alone would keep it and everything its callback captured reachable.
-    releaseCallbackRoot(previous)
+  public actual fun clearResourceProvider(): ULong = resourceProviderCommands.clear {
+    command { outCommandId ->
+      MaplibreNativeC.mln_runtime_clear_resource_provider(requireLiveHandle(), outCommandId)
+    }
   }
 
-  public actual fun setResourceTransform(callback: ResourceTransformCallback) {
+  public actual fun setResourceTransform(callback: ResourceTransformCallback): ULong {
     val replacement = ResourceTransformState(callback)
-    val previous: ResourceTransformState?
-    try {
-      resourceTransformState?.checkCanClose()
-      Status.check(
+    return resourceTransformCommands.set(replacement) {
+      command { outCommandId ->
         MaplibreNativeC.mln_runtime_set_resource_transform(
           requireLiveHandle(),
           replacement.descriptor(),
+          outCommandId,
         )
-      )
-      previous = resourceTransformState
-      resourceTransformState = replacement
-      HandleLeakCleaner.retainNativeCallbackRoot(replacement)
-    } catch (error: Throwable) {
-      closeAndSuppress(error, replacement)
-      throw error
+      }
     }
-    releaseCallbackRoot(previous)
   }
 
-  public actual fun clearResourceTransform() {
-    resourceTransformState?.checkCanClose()
-    Status.check(MaplibreNativeC.mln_runtime_clear_resource_transform(requireLiveHandle()))
-    val previous = resourceTransformState
-    resourceTransformState = null
-    releaseCallbackRoot(previous)
+  public actual fun clearResourceTransform(): ULong = resourceTransformCommands.clear {
+    command { outCommandId ->
+      MaplibreNativeC.mln_runtime_clear_resource_transform(requireLiveHandle(), outCommandId)
+    }
   }
 
-  public actual fun setHttpHeaderTransform(callback: HttpHeaderTransformCallback) {
+  public actual fun setHttpHeaderTransform(callback: HttpHeaderTransformCallback): ULong {
     val replacement = HttpHeaderTransformState(callback)
-    try {
-      httpHeaderTransformState?.checkCanClose()
-      Status.check(
+    return httpHeaderTransformCommands.set(replacement) {
+      command { outCommandId ->
         MaplibreNativeC.mln_runtime_set_http_header_transform(
           requireLiveHandle(),
           replacement.descriptor(),
+          outCommandId,
         )
-      )
-      val previous = httpHeaderTransformState
-      httpHeaderTransformState = replacement
-      HandleLeakCleaner.retainNativeCallbackRoot(replacement)
-      releaseCallbackRoot(previous)
-    } catch (error: Throwable) {
-      closeAndSuppress(error, replacement)
-      throw error
+      }
     }
   }
 
-  public actual fun clearHttpHeaderTransform() {
-    httpHeaderTransformState?.checkCanClose()
-    Status.check(MaplibreNativeC.mln_runtime_clear_http_header_transform(requireLiveHandle()))
-    val previous = httpHeaderTransformState
-    httpHeaderTransformState = null
-    releaseCallbackRoot(previous)
+  public actual fun clearHttpHeaderTransform(): ULong = httpHeaderTransformCommands.clear {
+    command { outCommandId ->
+      MaplibreNativeC.mln_runtime_clear_http_header_transform(requireLiveHandle(), outCommandId)
+    }
   }
 
   public actual fun drainEvents(maxEvents: Int): RuntimeEventBatch {
@@ -452,6 +450,7 @@ private constructor(private val handleId: Long, private var notificationSource: 
             List(eventCount) { index ->
               copiedEvent(events, index * eventSize, eventSize, messages).toRuntimeEvent()
             }
+          copied.forEach(::finishCallbackCommand)
           return RuntimeEventBatch(copied, remainingCount)
         }
       } finally {
@@ -474,22 +473,32 @@ private constructor(private val handleId: Long, private var notificationSource: 
       )
     }
 
-  public actual override fun close() {
-    resourceProviderState?.checkCanClose()
-    resourceTransformState?.checkCanClose()
-    httpHeaderTransformState?.checkCanClose()
-    core.closeOnce(
-      destroy = { MaplibreNativeC.mln_runtime_destroy(handleId) },
-      afterSuccess = {
-        releaseCallbackRoot(resourceProviderState)
-        resourceProviderState = null
-        releaseCallbackRoot(resourceTransformState)
-        resourceTransformState = null
-        releaseCallbackRoot(httpHeaderTransformState)
-        httpHeaderTransformState = null
-        liveMaps.clear()
-      },
-    )
+  public actual suspend fun close() {
+    if (!core.beginClose()) return
+    val operation =
+      try {
+        startOperation { outOperation ->
+          MaplibreNativeC.mln_runtime_close_start(handleId, outOperation)
+        }
+      } catch (error: Throwable) {
+        core.abortClose()
+        throw error
+      }
+    try {
+      notifications.await(operation)
+    } catch (error: Throwable) {
+      core.abortClose()
+      throw error
+    } finally {
+      MaplibreNativeC.mln_operation_release(operation)
+    }
+    core.completeClose {
+      resourceProviderCommands.close()
+      resourceTransformCommands.close()
+      httpHeaderTransformCommands.close()
+      liveMaps.clear()
+    }
+    notifications.close()
     val source = notificationSource
     if (source != 0L) {
       Status.check(MaplibreNativeC.mln_notification_source_close(source))
@@ -497,8 +506,15 @@ private constructor(private val handleId: Long, private var notificationSource: 
     }
   }
 
+  private fun finishCallbackCommand(event: RuntimeEvent) {
+    val payload = event.payload as? RuntimeEventPayload.CommandFinished ?: return
+    resourceProviderCommands.finish(payload.commandId, payload.disposition)
+    resourceTransformCommands.finish(payload.commandId, payload.disposition)
+    httpHeaderTransformCommands.finish(payload.commandId, payload.disposition)
+  }
+
   public actual companion object {
-    public actual fun create(options: RuntimeOptions): RuntimeHandle {
+    public actual suspend fun create(options: RuntimeOptions): RuntimeHandle {
       NativeAccess.ensureLoaded()
       RuntimeOptionsScope(options).use { nativeOptions ->
         LongPointer(1).use { outSource ->
@@ -509,17 +525,27 @@ private constructor(private val handleId: Long, private var notificationSource: 
             "mln_notification_source_create returned a null notification source"
           }
           nativeOptions.options.notification_source(source)
-          LongPointer(1).use { outRuntime ->
-            outRuntime.put(0, 0L)
-            try {
-              Status.check(MaplibreNativeC.mln_runtime_create(nativeOptions.options, outRuntime))
-              val runtime = outRuntime.get()
-              require(runtime != 0L) { "mln_runtime_create returned a null runtime" }
-              return RuntimeHandle(runtime, source)
-            } catch (error: Throwable) {
-              MaplibreNativeC.mln_notification_source_close(source)
-              throw error
+          val notifications = NotificationDispatcher(source)
+          try {
+            val operation = startOperation { outOperation ->
+              MaplibreNativeC.mln_runtime_create_start(nativeOptions.options, outOperation)
             }
+            try {
+              notifications.await(operation)
+              LongPointer(1).use { outRuntime ->
+                outRuntime.put(0, 0L)
+                Status.check(MaplibreNativeC.mln_runtime_create_take_result(operation, outRuntime))
+                val runtime = outRuntime.get()
+                require(runtime != 0L) { "mln_runtime_create_take_result returned a null runtime" }
+                return RuntimeHandle(runtime, source, notifications)
+              }
+            } finally {
+              MaplibreNativeC.mln_operation_release(operation)
+            }
+          } catch (error: Throwable) {
+            notifications.close()
+            MaplibreNativeC.mln_notification_source_close(source)
+            throw error
           }
         }
       }
@@ -548,6 +574,14 @@ private constructor(private val handleId: Long, private var notificationSource: 
     core.retainChild(childTypeName)
 
   internal fun nativeHandleId(): Long = requireLiveHandle()
+
+  internal suspend fun awaitOperation(operation: Long) {
+    notifications.await(operation)
+  }
+
+  internal fun forgetOperation(operation: Long) {
+    notifications.forget(operation)
+  }
 
   internal fun registerMap(map: MapHandle) {
     liveMaps[map.nativeHandleId()] = WeakReference(map)
@@ -646,6 +680,42 @@ private constructor(private val handleId: Long, private var notificationSource: 
     }
 }
 
+internal inline fun startOperation(call: (LongPointer) -> Int): Long =
+  LongPointer(1).use { outOperation ->
+    outOperation.put(0, 0L)
+    Status.check(call(outOperation))
+    outOperation.get()
+  }
+
+internal fun drainNativeReady(source: Long): List<ReadyEndpoint> {
+  LongPointer(1).use { outBatch ->
+    outBatch.put(0, 0L)
+    Status.check(MaplibreNativeC.mln_notification_source_drain_ready(source, outBatch))
+    val batch = outBatch.get()
+    try {
+      MaplibreNativeC.mln_ready_batch_view().use { view ->
+        view.size(view.sizeof())
+        Status.check(MaplibreNativeC.mln_ready_batch_get(batch, view))
+        val count = Math.toIntExact(view.endpoint_count())
+        val endpoints = view.endpoints()
+        return List(count) { index ->
+          val endpoint = endpoints.position(index.toLong())
+          ReadyEndpoint(ReadyEndpoint.Kind.fromNative(endpoint.kind()), endpoint.id())
+        }
+      }
+    } finally {
+      MaplibreNativeC.mln_ready_batch_release(batch)
+    }
+  }
+}
+
+private inline fun command(call: (LongPointer) -> Int): ULong =
+  LongPointer(1).use { outCommandId ->
+    outCommandId.put(0, 0L)
+    Status.check(call(outCommandId))
+    outCommandId.get().toULong()
+  }
+
 private fun releaseCallbackRoot(root: AutoCloseable?) {
   HandleLeakCleaner.releaseNativeCallbackRoot(root)
   closeQuietly(root)
@@ -739,6 +809,12 @@ private fun runtimeEventPayload(
       )
     MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED ->
       RuntimeEventPayload.CameraTransitionFinished(events.getLong(base + EventLayout.TRANSITION_ID))
+    MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_COMMAND_FINISHED ->
+      RuntimeEventPayload.CommandFinished(
+        events.getLong(base + EventLayout.COMMAND_ID).toULong(),
+        CommandDisposition.fromNative(events.getInt(base + EventLayout.COMMAND_DISPOSITION)),
+        events.getLong(base + EventLayout.COMMAND_GENERATION).toULong(),
+      )
     else -> unknownPayload(payloadType, events, base, eventSize)
   }
 
@@ -1047,6 +1123,14 @@ private object EventLayout {
     it.payload().camera_transition_finished().transition_id(LONG_SENTINEL)
   }
 
+  val COMMAND_ID: Int = probeLong { it.payload().command_finished().command_id(LONG_SENTINEL) }
+  val COMMAND_DISPOSITION: Int = probeInt {
+    it.payload().command_finished().disposition(INT_SENTINEL)
+  }
+  val COMMAND_GENERATION: Int = probeLong {
+    it.payload().command_finished().generation(LONG_SENTINEL)
+  }
+
   /**
    * Offset of the inline payload union, taken as the lowest offset any payload member landed on.
    * The payload is the last member of the record, so this bounds the window of a payload kind this
@@ -1061,6 +1145,7 @@ private object EventLayout {
       RESPONSE_ERROR_REGION_ID,
       TILE_COUNT_LIMIT_REGION_ID,
       TRANSITION_ID,
+      COMMAND_ID,
     )
 
   private val SENTINEL_DOUBLE: Double

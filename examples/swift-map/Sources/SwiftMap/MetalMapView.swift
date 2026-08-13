@@ -4,7 +4,7 @@ import QuartzCore
 
 /// The display-paced render loop. This view runs on the main thread and owns
 /// the window, input decoding, the Metal objects, and the render session. The
-/// runtime and the map live on the runtime loop thread it starts, reached
+/// runtime and the map live on the asynchronous runtime task it starts, reached
 /// through ``Channels``.
 @MainActor
 final class MetalMapView: NSView {
@@ -14,7 +14,7 @@ final class MetalMapView: NSView {
   private let channels = Channels()
   private var graphics: MetalGraphicsContext?
   private var renderTarget: MetalRenderTarget?
-  private var runtimeLoop: RuntimeLoopThread?
+  private var mapTask: MapTask?
   private var timer: Timer?
   private var currentViewport: Viewport?
   private var consecutiveRenderFailures = 0
@@ -68,7 +68,7 @@ final class MetalMapView: NSView {
     }
   }
 
-  /// Closes the session before the runtime loop closes the map; a map with an
+  /// Closes the session before the map task closes the map; a map with an
   /// attached session cannot be destroyed.
   @objc private func shutdown() {
     guard !isShutDown else { return }
@@ -81,12 +81,12 @@ final class MetalMapView: NSView {
       print(error)
     }
     renderTarget = nil
-    if runtimeLoop != nil {
+    if mapTask != nil {
       channels.requestShutdown()
-      if !channels.waitForRuntimeLoopExit(timeout: 5.0) {
-        print("runtime loop did not finish before the shutdown deadline")
+      if !channels.waitForMapTaskExit(timeout: 5.0) {
+        print("map task did not finish before the shutdown deadline")
       }
-      runtimeLoop = nil
+      mapTask = nil
     }
     NotificationCenter.default.removeObserver(self)
   }
@@ -159,13 +159,13 @@ final class MetalMapView: NSView {
     RunLoop.main.add(timer!, forMode: .common)
   }
 
-  /// Starts the runtime loop once a non-empty viewport is known, because the
-  /// map takes its initial extent from it.
-  private func startRuntimeLoopIfNeeded(viewport: Viewport) {
-    guard runtimeLoop == nil, !isShutDown else { return }
-    let loop = RuntimeLoopThread(channels: channels, viewport: viewport)
-    runtimeLoop = loop
-    loop.start()
+  /// Starts the map task once a non-empty viewport is known, because the map
+  /// takes its initial extent from it.
+  private func startMapTaskIfNeeded(viewport: Viewport) {
+    guard mapTask == nil, !isShutDown else { return }
+    let task = MapTask(channels: channels, viewport: viewport)
+    mapTask = task
+    task.start()
   }
 
   private func updateViewport() {
@@ -185,8 +185,15 @@ final class MetalMapView: NSView {
       graphics.resize(viewport)
       try renderTarget?.resize(graphics: graphics, viewport: viewport)
       currentViewport = viewport
+      if mapTask != nil {
+        channels.push(.resize(MapLogicalExtent(
+          width: viewport.logicalWidth,
+          height: viewport.logicalHeight,
+          scaleFactor: viewport.scaleFactor
+        )))
+      }
       channels.setRenderRequest()
-      startRuntimeLoopIfNeeded(viewport: viewport)
+      startMapTaskIfNeeded(viewport: viewport)
     } catch {
       // A failed resize leaves the render target detached, so stop the timer
       // rather than render through a detached session.
@@ -204,13 +211,13 @@ final class MetalMapView: NSView {
           let graphics,
           let viewport = currentViewport,
           !viewport.isEmpty,
-          let attachRef = channels.attachRef()
+          let renderMap = channels.map()
     else { return }
 
     do {
       renderTarget = try MetalRenderTarget.attach(
         mode: mode,
-        attachRef: attachRef,
+        map: renderMap,
         graphics: graphics,
         viewport: viewport
       )

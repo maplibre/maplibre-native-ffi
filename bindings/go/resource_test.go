@@ -21,13 +21,11 @@ func countingResourceProvider(calls *atomic.Int64) ResourceProviderCallback {
 // event naming that URL proves the request reached the network file source.
 func loadProbeStyle(t *testing.T, runtime *RuntimeHandle, m *MapHandle, styleURL string) {
 	t.Helper()
-	if err := m.SetStyleURL(styleURL); err != nil {
+	if _, err := m.SetStyleURL(styleURL); err != nil {
 		t.Fatalf("SetStyleURL(%q): %v", styleURL, err)
 	}
 	for range make([]struct{}, 5000) {
-		if err := runtime.Pump(0); err != nil {
-			t.Fatalf("Pump(): %v", err)
-		}
+		time.Sleep(time.Millisecond)
 		batch, err := runtime.DrainEvents(0)
 		if err != nil {
 			t.Fatalf("DrainEvents(): %v", err)
@@ -43,8 +41,6 @@ func loadProbeStyle(t *testing.T, runtime *RuntimeHandle, m *MapHandle, styleURL
 }
 
 func TestRuntimeResourceProviderInstallsReplacesAndClears(t *testing.T) {
-	lockOSThreadForTest(t)
-
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -64,7 +60,7 @@ func TestRuntimeResourceProviderInstallsReplacesAndClears(t *testing.T) {
 	}()
 
 	var firstCalls, secondCalls atomic.Int64
-	if err := runtime.SetResourceProvider(countingResourceProvider(&firstCalls)); err != nil {
+	if _, err := runtime.SetResourceProvider(countingResourceProvider(&firstCalls)); err != nil {
 		t.Fatalf("SetResourceProvider(): %v", err)
 	}
 	loadProbeStyle(t, runtime, m, "jar:file:/packaged/first.json")
@@ -72,7 +68,7 @@ func TestRuntimeResourceProviderInstallsReplacesAndClears(t *testing.T) {
 		t.Fatalf("installed provider calls = %d, want at least 1", got)
 	}
 
-	if err := runtime.SetResourceProvider(countingResourceProvider(&secondCalls)); err != nil {
+	if _, err := runtime.SetResourceProvider(countingResourceProvider(&secondCalls)); err != nil {
 		t.Fatalf("SetResourceProvider(replace): %v", err)
 	}
 	firstCallsAfterReplace := firstCalls.Load()
@@ -84,7 +80,7 @@ func TestRuntimeResourceProviderInstallsReplacesAndClears(t *testing.T) {
 		t.Fatalf("replaced provider calls = %d, want %d", got, firstCallsAfterReplace)
 	}
 
-	if err := runtime.ClearResourceProvider(); err != nil {
+	if _, err := runtime.ClearResourceProvider(); err != nil {
 		t.Fatalf("ClearResourceProvider(): %v", err)
 	}
 	secondCallsAfterClear := secondCalls.Load()
@@ -96,7 +92,7 @@ func TestRuntimeResourceProviderInstallsReplacesAndClears(t *testing.T) {
 		t.Fatalf("cleared provider calls = %d, want %d", got, secondCallsAfterClear)
 	}
 
-	if err := runtime.ClearResourceProvider(); err != nil {
+	if _, err := runtime.ClearResourceProvider(); err != nil {
 		t.Fatalf("second ClearResourceProvider(): %v", err)
 	}
 }
@@ -105,8 +101,6 @@ func TestRuntimeResourceProviderInstallsReplacesAndClears(t *testing.T) {
 // reaches the provider as the alias, alongside the HTTPS URL the built-in
 // network path would have fetched.
 func TestResourceProviderSeesSchemeAliasAndItsResolvedURL(t *testing.T) {
-	lockOSThreadForTest(t)
-
 	const emptyStyle = `{"version":8,"sources":{},"layers":[]}`
 	var resolvedURL atomic.Value
 
@@ -114,7 +108,7 @@ func TestResourceProviderSeesSchemeAliasAndItsResolvedURL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
-	if err := runtime.SetResourceProvider(func(request ResourceRequest, handle *ResourceRequestHandle) ResourceProviderDecision {
+	if _, err := runtime.SetResourceProvider(func(request ResourceRequest, handle *ResourceRequestHandle) ResourceProviderDecision {
 		if request.RequestedURL != "maplibre://maps/style" {
 			return ResourceProviderDecisionPassThrough
 		}
@@ -141,7 +135,7 @@ func TestResourceProviderSeesSchemeAliasAndItsResolvedURL(t *testing.T) {
 		}
 	}()
 
-	if err := m.SetStyleURL("maplibre://maps/style"); err != nil {
+	if _, err := m.SetStyleURL("maplibre://maps/style"); err != nil {
 		t.Fatalf("SetStyleURL(): %v", err)
 	}
 	waitForRuntimeEvent(t, runtime, RuntimeEventMapStyleLoaded)
@@ -197,8 +191,6 @@ func TestResourceResponseAcceptsKnownEnums(t *testing.T) {
 }
 
 func TestRuntimeResourceProviderRejectsNilCallback(t *testing.T) {
-	lockOSThreadForTest(t)
-
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -209,35 +201,33 @@ func TestRuntimeResourceProviderRejectsNilCallback(t *testing.T) {
 		}
 	}()
 
-	if err := runtime.SetResourceProvider(nil); !errors.Is(err, ErrInvalidArgument) {
+	if _, err := runtime.SetResourceProvider(nil); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("SetResourceProvider(nil) error = %v, want ErrInvalidArgument", err)
 	}
 }
 
 func TestRuntimeResourceTransformLifecycle(t *testing.T) {
-	lockOSThreadForTest(t)
-
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
-	if err := runtime.SetResourceTransform(func(request ResourceTransformRequest) (string, bool) {
+	if _, err := runtime.SetResourceTransform(func(request ResourceTransformRequest) (string, bool) {
 		return request.URL + "?first", true
 	}); err != nil {
 		_ = runtime.Close()
 		t.Fatalf("SetResourceTransform(): %v", err)
 	}
-	if err := runtime.SetResourceTransform(func(request ResourceTransformRequest) (string, bool) {
+	if _, err := runtime.SetResourceTransform(func(request ResourceTransformRequest) (string, bool) {
 		return "", false
 	}); err != nil {
 		_ = runtime.Close()
 		t.Fatalf("SetResourceTransform(replace): %v", err)
 	}
-	if err := runtime.ClearResourceTransform(); err != nil {
+	if _, err := runtime.ClearResourceTransform(); err != nil {
 		_ = runtime.Close()
 		t.Fatalf("ClearResourceTransform(): %v", err)
 	}
-	if err := runtime.ClearResourceTransform(); err != nil {
+	if _, err := runtime.ClearResourceTransform(); err != nil {
 		_ = runtime.Close()
 		t.Fatalf("second ClearResourceTransform(): %v", err)
 	}
@@ -247,8 +237,6 @@ func TestRuntimeResourceTransformLifecycle(t *testing.T) {
 }
 
 func TestRuntimeResourceTransformRejectsNilCallback(t *testing.T) {
-	lockOSThreadForTest(t)
-
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -259,7 +247,7 @@ func TestRuntimeResourceTransformRejectsNilCallback(t *testing.T) {
 		}
 	}()
 
-	if err := runtime.SetResourceTransform(nil); !errors.Is(err, ErrInvalidArgument) {
+	if _, err := runtime.SetResourceTransform(nil); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("SetResourceTransform(nil) error = %v, want ErrInvalidArgument", err)
 	}
 }

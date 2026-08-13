@@ -96,7 +96,7 @@ def wait_for_runtime_event(
     iterations: int = 5000,
 ) -> mln.RuntimeEvent:
     for _ in range(iterations):
-        runtime.pump()
+        time.sleep(0.001)
         for event in runtime.drain_events().events:
             if event.event_type == event_type:
                 return event
@@ -127,9 +127,9 @@ def render_until(
     *,
     iterations: int = 5000,
 ) -> None:
-    """Pump and render until `condition` holds, failing with `description`."""
+    """Render until `condition` holds, failing with `description`."""
     for _ in range(iterations):
-        runtime.pump()
+        time.sleep(0.001)
         for event in runtime.drain_events().events:
             if event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE:
                 session.render_update()
@@ -137,14 +137,6 @@ def render_until(
             return
         time.sleep(0.001)
     raise AssertionError(description)
-
-
-def request_still_image_if_needed(map_handle: mln.MapHandle) -> None:
-    try:
-        map_handle.request_still_image()
-    except mln.InvalidStateError as error:
-        if "pending still-image request" not in error.diagnostic:
-            raise
 
 
 def wait_for_rendered_layer_feature(
@@ -164,22 +156,24 @@ def wait_for_rendered_layer_feature(
         )
     )
     options = query.RenderedFeatureQueryOptions(layer_ids=(layer_id,))
+    operation = map_handle.request_still_image()
     for _ in range(iterations):
-        request_still_image_if_needed(map_handle)
-        runtime.pump()
-        for event in runtime.drain_events().events:
-            if event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE:
-                try:
-                    session.render_update()
-                except mln.InvalidStateError:
-                    pass
+        # Native execution advances independently; rendering remains host-driven.
+        time.sleep(0.001)
+        runtime.drain_events()
+        try:
+            session.render_update()
+        except mln.InvalidStateError:
+            pass
         try:
             features = json.loads(session.query_rendered_features(geometry, options))
         except mln.InvalidStateError:
             features = ()
         if features:
+            operation.close()
             return features[0]
         time.sleep(0.001)
+    operation.close()
     raise AssertionError(f"rendered feature query for {layer_id} returned no features")
 
 
@@ -193,6 +187,7 @@ def wait_for_rendered_cluster(
     """Load the cluster style and return the first rendered cluster feature."""
     map_handle.jump_to(camera.CameraOptions(center=geo.LatLng(0.0, 0.0), zoom=0.0))
     map_handle.set_style_json(CLUSTER_STYLE_JSON.encode())
+    runtime.barrier()
     return wait_for_rendered_layer_feature(
         runtime,
         map_handle,
@@ -250,6 +245,7 @@ def assert_geojson_cluster_source(
         b'"source":"typed-cluster-source","filter":["has","point_count"],'
         b'"paint":{"circle-color":"#2563eb","circle-radius":20}}'
     )
+    runtime.barrier()
 
     queried = wait_for_rendered_layer_feature(
         runtime, map_handle, session, "typed-cluster-circle"

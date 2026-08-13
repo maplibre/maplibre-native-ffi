@@ -76,9 +76,9 @@ func newCustomGeometrySourceState(options CustomGeometrySourceOptions) *CustomGe
 // AddCustomGeometrySource installs a custom geometry source callback descriptor.
 // The C API owns the state from a successful add onwards and releases it through
 // the release callback, so a caller keeps nothing.
-func AddCustomGeometrySource(m uint64, sourceID string, options CustomGeometrySourceOptions) int32 {
+func AddCustomGeometrySource(m uint64, sourceID string, options CustomGeometrySourceOptions) (uint64, int32) {
 	if options.FetchTile == nil {
-		return int32(C.MLN_STATUS_INVALID_ARGUMENT)
+		return 0, int32(C.MLN_STATUS_INVALID_ARGUMENT)
 	}
 	state := newCustomGeometrySourceState(options)
 
@@ -102,13 +102,14 @@ func AddCustomGeometrySource(m uint64, sourceID string, options CustomGeometrySo
 	raw.clip = C.bool(options.Clip)
 	raw.wrap = C.bool(options.Wrap)
 
-	status := int32(C.mln_map_add_custom_geometry_source(C.mln_map(m), sourceView, &raw))
+	var commandID C.uint64_t
+	status := int32(C.mln_map_add_custom_geometry_source(C.mln_map(m), sourceView, &raw, &commandID))
 	if status != int32(C.MLN_STATUS_OK) {
 		// A failed add owes no release callback, so this call frees the state.
 		state.release()
-		return status
+		return 0, status
 	}
-	return int32(C.MLN_STATUS_OK)
+	return uint64(commandID), int32(C.MLN_STATUS_OK)
 }
 
 // release frees callback state after native no longer references it.

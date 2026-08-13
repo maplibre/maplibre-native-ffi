@@ -23,6 +23,8 @@ MLN_API mln_camera_options mln_camera_options_default(void) MLN_NOEXCEPT;
 
 /** Returns empty animation options initialized for this C API version. */
 MLN_API mln_animation_options mln_animation_options_default(void) MLN_NOEXCEPT;
+/** Returns an empty atomic camera update initialized for this API version. */
+MLN_API mln_camera_update mln_camera_update_default(void) MLN_NOEXCEPT;
 
 /** Returns empty camera fitting options initialized for this C API version. */
 MLN_API mln_camera_fit_options
@@ -48,746 +50,265 @@ mln_map_viewport_options_default(void) MLN_NOEXCEPT;
 /** Returns empty tile tuning options initialized for this C API version. */
 MLN_API mln_map_tile_options mln_map_tile_options_default(void) MLN_NOEXCEPT;
 
-/**
- * Applies MapLibre debug overlay mask bits to a map.
- *
- * Pass 0 to disable all debug overlays.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or options
- *   contains unknown bits.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status
-mln_map_set_debug_options(mln_map map, uint32_t options) MLN_NOEXCEPT;
-
-/**
- * Copies the current MapLibre debug overlay mask bits.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or out_options is
- *   null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status
-mln_map_get_debug_options(mln_map map, uint32_t* out_options) MLN_NOEXCEPT;
-
-/**
- * Enables or disables MapLibre's rendering stats overlay view.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
+/** Submits a debug-overlay command. */
+MLN_API mln_status mln_map_set_debug_options(
+  mln_map map, uint32_t options, uint64_t* out_command_id
+) MLN_NOEXCEPT;
+/** Starts an ordered debug-overlay query. */
+MLN_API mln_status mln_map_get_debug_options_start(
+  mln_map map, mln_operation* out_operation
+) MLN_NOEXCEPT;
+/** Takes the debug-overlay mask exactly once. */
+MLN_API mln_status mln_map_get_debug_options_take_result(
+  mln_operation operation, uint32_t* out_options
+) MLN_NOEXCEPT;
+/** Submits a rendering-stats visibility command. */
 MLN_API mln_status mln_map_set_rendering_stats_view_enabled(
-  mln_map map, bool enabled
+  mln_map map, bool enabled, uint64_t* out_command_id
 ) MLN_NOEXCEPT;
-
-/**
- * Copies whether MapLibre's rendering stats overlay view is enabled.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or out_enabled is
- *   null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_map_get_rendering_stats_view_enabled(
-  mln_map map, bool* out_enabled
+/** Starts an ordered rendering-stats visibility query. */
+MLN_API mln_status mln_map_get_rendering_stats_view_enabled_start(
+  mln_map map, mln_operation* out_operation
 ) MLN_NOEXCEPT;
-
-/**
- * Copies whether MapLibre currently considers the map fully loaded.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or out_loaded is
- *   null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
+/** Takes the rendering-stats visibility exactly once. */
+MLN_API mln_status mln_map_get_rendering_stats_view_enabled_take_result(
+  mln_operation operation, bool* out_enabled
+) MLN_NOEXCEPT;
+/** Starts an ordered fully-loaded query. */
+MLN_API mln_status mln_map_is_fully_loaded_start(
+  mln_map map, mln_operation* out_operation
+) MLN_NOEXCEPT;
+/** Takes the fully-loaded result exactly once. */
+MLN_API mln_status mln_map_is_fully_loaded_take_result(
+  mln_operation operation, bool* out_loaded
+) MLN_NOEXCEPT;
+/** Submits an ordered debug-log command. */
 MLN_API mln_status
-mln_map_is_fully_loaded(mln_map map, bool* out_loaded) MLN_NOEXCEPT;
-
-/**
- * Dumps map debug logs through MapLibre Native logging.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_map_dump_debug_logs(mln_map map) MLN_NOEXCEPT;
-
-/**
- * Copies live map viewport and render-transform controls.
- *
- * On success, *out_options is overwritten and all known fields are marked.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, out_options is
- *   null, or out_options->size is too small.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_map_get_viewport_options(
-  mln_map map, mln_map_viewport_options* out_options
+mln_map_dump_debug_logs(mln_map map, uint64_t* out_command_id) MLN_NOEXCEPT;
+/** Starts an ordered viewport-options query. */
+MLN_API mln_status mln_map_get_viewport_options_start(
+  mln_map map, mln_operation* out_operation
 ) MLN_NOEXCEPT;
-
-/**
- * Applies selected live map viewport and render-transform controls.
- *
- * Only fields indicated by options->fields affect the map.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, options is null,
- *   options->size is too small, options->fields contains unknown bits, an enum
- *   value is unknown, or an enabled frustum offset value is invalid.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
+/** Takes viewport options exactly once. */
+MLN_API mln_status mln_map_get_viewport_options_take_result(
+  mln_operation operation, mln_map_viewport_options* out_options
+) MLN_NOEXCEPT;
+/** Submits a copied viewport-options command. */
 MLN_API mln_status mln_map_set_viewport_options(
-  mln_map map, const mln_map_viewport_options* options
+  mln_map map, const mln_map_viewport_options* options, uint64_t* out_command_id
 ) MLN_NOEXCEPT;
-
-/**
- * Copies tile prefetch and LOD tuning controls.
- *
- * On success, *out_options is overwritten and all known fields are marked.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, out_options is
- *   null, or out_options->size is too small.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_map_get_tile_options(
-  mln_map map, mln_map_tile_options* out_options
+/** Starts an ordered tile-options query. */
+MLN_API mln_status mln_map_get_tile_options_start(
+  mln_map map, mln_operation* out_operation
 ) MLN_NOEXCEPT;
-
-/**
- * Applies selected tile prefetch and LOD tuning controls.
- *
- * Only fields indicated by options->fields affect the map.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, options is null,
- *   options->size is too small, options->fields contains unknown bits,
- *   prefetch_zoom_delta is greater than 255, a double field is non-finite, or
- *   lod_mode is unknown.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
+/** Takes tile options exactly once. */
+MLN_API mln_status mln_map_get_tile_options_take_result(
+  mln_operation operation, mln_map_tile_options* out_options
+) MLN_NOEXCEPT;
+/** Submits a copied tile-options command. */
 MLN_API mln_status mln_map_set_tile_options(
-  mln_map map, const mln_map_tile_options* options
+  mln_map map, const mln_map_tile_options* options, uint64_t* out_command_id
 ) MLN_NOEXCEPT;
 
 /**
- * Copies the current camera snapshot.
+ * Copies the camera from the latest immutable map snapshot.
  *
- * On success, *out_camera is overwritten. MapLibre Native reports no anchor in
- * a camera snapshot, so out_camera->fields leaves MLN_CAMERA_OPTION_ANCHOR
- * clear; anchor is input-only, as documented on mln_camera_options.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, out_camera is
- *   null, or out_camera->size is too small.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * The returned generation identifies the complete map snapshot that supplied
+ * the camera. This function never reads mutable MapLibre state.
  */
-MLN_API mln_status
-mln_map_get_camera(mln_map map, mln_camera_options* out_camera) MLN_NOEXCEPT;
-
-/**
- * Applies a camera jump command.
- *
- * Only fields indicated by camera->fields affect the map.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, camera is null,
- *   camera->size is too small, camera->fields contains unknown bits, or an
- *   enabled camera field is invalid.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status
-mln_map_jump_to(mln_map map, const mln_camera_options* camera) MLN_NOEXCEPT;
-
-/**
- * Applies a camera ease transition command.
- *
- * Only fields indicated by camera->fields affect the map.
- *
- * MapLibre Native's default ease duration is zero, so a null animation, or one
- * that omits MLN_ANIMATION_OPTION_DURATION, moves the camera to the target
- * immediately and reports it on the next snapshot without any pumping. Set
- * MLN_ANIMATION_OPTION_DURATION to animate.
- *
- * Set MLN_ANIMATION_OPTION_TRANSITION_ID to have this transition report its end
- * once through MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED, as described
- * on mln_animation_options.transition_id. A zero-duration ease reports its end
- * during this call, so the event is already queued when the call returns.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, camera is null,
- *   camera->size is too small, camera->fields contains unknown bits, an enabled
- *   camera field is invalid, animation->size is too small, animation->fields
- *   contains unknown bits, or an enabled animation field is invalid.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_map_ease_to(
-  mln_map map, const mln_camera_options* camera,
-  const mln_animation_options* animation
+MLN_API mln_status mln_map_camera_snapshot_get(
+  mln_map map, mln_camera_options* out_camera, uint64_t* out_generation
 ) MLN_NOEXCEPT;
 
 /**
- * Applies a camera fly transition command.
+ * Submits one atomic camera update.
  *
- * Only fields indicated by camera->fields affect the map.
- *
- * This is the one camera command that animates by default. When the animation
- * is null or omits MLN_ANIMATION_OPTION_DURATION, MapLibre Native derives a
- * duration from the flight distance and the velocity, which defaults to 1.2
- * screenfuls per second, so the camera reaches the target over several pumped
- * frames.
- *
- * Set MLN_ANIMATION_OPTION_TRANSITION_ID to have this transition report its end
- * once through MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED, as described
- * on mln_animation_options.transition_id.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, camera is null,
- *   camera->size is too small, camera->fields contains unknown bits, an enabled
- *   camera field is invalid, animation->size is too small, animation->fields
- *   contains unknown bits, or an enabled animation field is invalid.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * The update is copied before return, and out_command_id must point to zero.
+ * An accepted command receives a runtime-wide monotonic ID. Its terminal
+ * disposition is reported by MLN_RUNTIME_EVENT_COMMAND_FINISHED.
  */
-MLN_API mln_status mln_map_fly_to(
-  mln_map map, const mln_camera_options* camera,
-  const mln_animation_options* animation
+MLN_API mln_status mln_map_update_camera(
+  mln_map map, const mln_camera_update* update, uint64_t* out_command_id
 ) MLN_NOEXCEPT;
 
 /**
- * Applies a screen-space pan command.
+ * Starts an ordered camera read.
  *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or a delta value
- *   is non-finite.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * The result observes every command committed before this operation.
  */
-MLN_API mln_status
-mln_map_move_by(mln_map map, double delta_x, double delta_y) MLN_NOEXCEPT;
+MLN_API mln_status mln_map_camera_query_start(
+  mln_map map, mln_operation* out_operation
+) MLN_NOEXCEPT;
 
-/**
- * Applies an animated screen-space pan command.
- *
- * This command eases, so it inherits the zero default duration described on
- * mln_map_ease_to(). Set MLN_ANIMATION_OPTION_DURATION to animate.
- *
- * Set MLN_ANIMATION_OPTION_TRANSITION_ID to have this transition report its end
- * once through MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED, as described
- * on mln_animation_options.transition_id.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, a delta value is
- *   non-finite, animation->size is too small, animation->fields contains
- *   unknown bits, or an enabled animation field is invalid.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_map_move_by_animated(
-  mln_map map, double delta_x, double delta_y,
-  const mln_animation_options* animation
+/** Takes the result from a completed ordered camera query exactly once. */
+MLN_API mln_status mln_map_camera_query_take_result(
+  mln_operation operation, mln_camera_query_result* out_result
 ) MLN_NOEXCEPT;
 
 /**
- * Applies a screen-space zoom command.
+ * Starts an ordered query for a camera that fits geographic bounds.
  *
- * Passing a null anchor uses MapLibre Native's default zoom anchor.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, scale is
- *   non-positive or non-finite, or anchor contains non-finite values.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * Inputs are copied before this function returns. The operation observes every
+ * map command accepted before it. Pass null fit_options for default fitting
+ * controls.
  */
-MLN_API mln_status mln_map_scale_by(
-  mln_map map, double scale, const mln_screen_point* anchor
-) MLN_NOEXCEPT;
-
-/**
- * Applies an animated screen-space zoom command.
- *
- * Passing a null anchor uses MapLibre Native's default zoom anchor. This
- * command eases, so it inherits the zero default duration described on
- * mln_map_ease_to(). Set MLN_ANIMATION_OPTION_DURATION to animate.
- *
- * Set MLN_ANIMATION_OPTION_TRANSITION_ID to have this transition report its end
- * once through MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED, as described
- * on mln_animation_options.transition_id.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, scale is
- *   non-positive or non-finite, anchor contains non-finite values,
- *   animation->size is too small, animation->fields contains unknown bits, or
- *   an enabled animation field is invalid.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_map_scale_by_animated(
-  mln_map map, double scale, const mln_screen_point* anchor,
-  const mln_animation_options* animation
-) MLN_NOEXCEPT;
-
-/**
- * Applies a screen-space rotate command.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or a point
- *   contains non-finite values.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_map_rotate_by(
-  mln_map map, mln_screen_point first, mln_screen_point second
-) MLN_NOEXCEPT;
-
-/**
- * Applies an animated screen-space rotate command.
- *
- * This command eases, so it inherits the zero default duration described on
- * mln_map_ease_to(). Set MLN_ANIMATION_OPTION_DURATION to animate.
- *
- * Set MLN_ANIMATION_OPTION_TRANSITION_ID to have this transition report its end
- * once through MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED, as described
- * on mln_animation_options.transition_id.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, a point contains
- *   non-finite values, animation->size is too small, animation->fields contains
- *   unknown bits, or an enabled animation field is invalid.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_map_rotate_by_animated(
-  mln_map map, mln_screen_point first, mln_screen_point second,
-  const mln_animation_options* animation
-) MLN_NOEXCEPT;
-
-/**
- * Applies a pitch delta command.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or pitch is
- *   non-finite.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_map_pitch_by(mln_map map, double pitch) MLN_NOEXCEPT;
-
-/**
- * Applies an animated pitch delta command.
- *
- * This command eases, so it inherits the zero default duration described on
- * mln_map_ease_to(). Set MLN_ANIMATION_OPTION_DURATION to animate.
- *
- * Set MLN_ANIMATION_OPTION_TRANSITION_ID to have this transition report its end
- * once through MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED, as described
- * on mln_animation_options.transition_id.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, pitch is
- *   non-finite, animation->size is too small, animation->fields contains
- *   unknown bits, or an enabled animation field is invalid.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_map_pitch_by_animated(
-  mln_map map, double pitch, const mln_animation_options* animation
-) MLN_NOEXCEPT;
-
-/**
- * Cancels active camera transitions.
- *
- * A cancelled transition that carried MLN_ANIMATION_OPTION_TRANSITION_ID
- * reports its end through MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED, the
- * same way a completed one does.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_map_cancel_transitions(mln_map map) MLN_NOEXCEPT;
-
-/**
- * Marks whether a host-driven gesture is in progress.
- *
- * A host that decodes its own pointer gestures sets this to true when a gesture
- * starts and back to false when it ends, so the camera commands issued in
- * between belong to one live gesture. MapLibre folds the flag into the
- * transform's changing state.
- *
- * The flag stays set until the host clears it, so pair every true with a false,
- * including on a cancelled gesture.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status
-mln_map_set_gesture_in_progress(mln_map map, bool in_progress) MLN_NOEXCEPT;
-
-/**
- * Copies whether a host-driven gesture is currently in progress.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or
- *   out_in_progress is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status
-mln_map_is_gesture_in_progress(mln_map map, bool* out_in_progress) MLN_NOEXCEPT;
-
-/**
- * Computes a camera that fits geographic bounds in the current viewport.
- *
- * Passing null fit_options uses zero padding with no bearing or pitch override.
- * On success, *out_camera is overwritten.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, bounds are
- *   invalid, fit_options is invalid, out_camera is null, or out_camera->size is
- *   too small.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_map_camera_for_lat_lng_bounds(
+MLN_API mln_status mln_map_camera_for_lat_lng_bounds_start(
   mln_map map, mln_lat_lng_bounds bounds,
-  const mln_camera_fit_options* fit_options, mln_camera_options* out_camera
+  const mln_camera_fit_options* fit_options, mln_operation* out_operation
+) MLN_NOEXCEPT;
+
+/** Takes the fitted camera from a completed operation exactly once. */
+MLN_API mln_status mln_map_camera_for_lat_lng_bounds_take_result(
+  mln_operation operation, mln_camera_options* out_camera
 ) MLN_NOEXCEPT;
 
 /**
- * Computes a camera that fits geographic coordinates in the current viewport.
+ * Starts an ordered query for a camera that fits geographic coordinates.
  *
- * The coordinates array is borrowed for the duration of this call and is not
- * retained. Passing null fit_options uses zero padding with no bearing or pitch
- * override. On success, *out_camera is overwritten.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, coordinates is
- *   null, coordinate_count is 0, any coordinate is invalid, fit_options is
- *   invalid, out_camera is null, or out_camera->size is too small.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * The operation owns a copy of coordinates and fit_options.
  */
-MLN_API mln_status mln_map_camera_for_lat_lngs(
+MLN_API mln_status mln_map_camera_for_lat_lngs_start(
   mln_map map, const mln_lat_lng* coordinates, size_t coordinate_count,
-  const mln_camera_fit_options* fit_options, mln_camera_options* out_camera
+  const mln_camera_fit_options* fit_options, mln_operation* out_operation
+) MLN_NOEXCEPT;
+
+/** Takes the fitted camera from a completed operation exactly once. */
+MLN_API mln_status mln_map_camera_for_lat_lngs_take_result(
+  mln_operation operation, mln_camera_options* out_camera
 ) MLN_NOEXCEPT;
 
 /**
- * Computes a camera that fits a geometry in the current viewport.
+ * Starts an ordered query for a camera that fits a GeoJSON geometry.
  *
- * The UTF-8 GeoJSON Geometry bytes are borrowed for this call and are not
- * retained. Empty geometry objects and geometry collections with no
- * coordinates are invalid for camera fitting. Passing null fit_options uses
- * zero padding with no bearing or pitch override. On success, *out_camera is
- * overwritten.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, geometry is empty
- *   or invalid, geometry contains no coordinates, fit_options is invalid,
- *   out_camera is null, or out_camera->size is too small.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * The operation owns a copy of the geometry bytes and fit_options.
  */
-MLN_API mln_status mln_map_camera_for_geometry(
+MLN_API mln_status mln_map_camera_for_geometry_start(
   mln_map map, mln_buffer_view geometry,
-  const mln_camera_fit_options* fit_options, mln_camera_options* out_camera
+  const mln_camera_fit_options* fit_options, mln_operation* out_operation
 ) MLN_NOEXCEPT;
 
-/**
- * Computes wrapped geographic bounds for a camera in the current viewport.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, camera is null or
- *   invalid, or out_bounds is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_map_lat_lng_bounds_for_camera(
-  mln_map map, const mln_camera_options* camera, mln_lat_lng_bounds* out_bounds
+/** Takes the fitted camera from a completed operation exactly once. */
+MLN_API mln_status mln_map_camera_for_geometry_take_result(
+  mln_operation operation, mln_camera_options* out_camera
 ) MLN_NOEXCEPT;
 
-/**
- * Computes unwrapped geographic bounds for a camera in the current viewport.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, camera is null or
- *   invalid, or out_bounds is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_map_lat_lng_bounds_for_camera_unwrapped(
-  mln_map map, const mln_camera_options* camera, mln_lat_lng_bounds* out_bounds
+/** Starts an ordered wrapped-bounds query for a copied camera. */
+MLN_API mln_status mln_map_lat_lng_bounds_for_camera_start(
+  mln_map map, const mln_camera_options* camera, mln_operation* out_operation
 ) MLN_NOEXCEPT;
 
-/**
- * Copies map camera constraint options.
- *
- * On success, *out_options is overwritten and all known fields are marked.
- * The geographic constraint is reported as exactly one of
- * MLN_BOUND_OPTION_BOUNDS, which also fills out_options->bounds, or
- * MLN_BOUND_OPTION_UNBOUNDED, which leaves out_options->bounds at its default.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, out_options is
- *   null, or out_options->size is too small.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status
-mln_map_get_bounds(mln_map map, mln_bound_options* out_options) MLN_NOEXCEPT;
-
-/**
- * Applies selected map camera constraint options.
- *
- * Only fields indicated by options->fields affect the map. Set
- * MLN_BOUND_OPTION_BOUNDS to constrain the camera center to options->bounds,
- * or MLN_BOUND_OPTION_UNBOUNDED to release the geographic constraint entirely.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, options is null,
- *   options->size is too small, options->fields contains unknown bits,
- *   options->fields contains both MLN_BOUND_OPTION_BOUNDS and
- *   MLN_BOUND_OPTION_UNBOUNDED, bounds are invalid, a numeric field is
- *   non-finite, or paired min/max fields are inconsistent.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status
-mln_map_set_bounds(mln_map map, const mln_bound_options* options) MLN_NOEXCEPT;
-
-/**
- * Copies the current free camera position and orientation.
- *
- * On success, *out_options is overwritten.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, out_options is
- *   null, or out_options->size is too small.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_map_get_free_camera_options(
-  mln_map map, mln_free_camera_options* out_options
+/** Takes the wrapped bounds from a completed operation exactly once. */
+MLN_API mln_status mln_map_lat_lng_bounds_for_camera_take_result(
+  mln_operation operation, mln_lat_lng_bounds* out_bounds
 ) MLN_NOEXCEPT;
 
-/**
- * Applies selected free camera position and orientation fields.
- *
- * Position uses MapLibre Native's modified Web Mercator camera space.
- * Orientation is a quaternion stored as x, y, z, w. Only fields indicated by
- * options->fields affect the map.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, options is null,
- *   options->size is too small, options->fields contains unknown bits, position
- *   contains non-finite values, or orientation contains non-finite values or is
- *   zero length.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
+/** Starts an ordered unwrapped-bounds query for a copied camera. */
+MLN_API mln_status mln_map_lat_lng_bounds_for_camera_unwrapped_start(
+  mln_map map, const mln_camera_options* camera, mln_operation* out_operation
+) MLN_NOEXCEPT;
+
+/** Takes the unwrapped bounds from a completed operation exactly once. */
+MLN_API mln_status mln_map_lat_lng_bounds_for_camera_unwrapped_take_result(
+  mln_operation operation, mln_lat_lng_bounds* out_bounds
+) MLN_NOEXCEPT;
+
+/** Starts an ordered camera-constraint query. */
+MLN_API mln_status mln_map_get_bounds_start(
+  mln_map map, mln_operation* out_operation
+) MLN_NOEXCEPT;
+/** Takes camera constraints exactly once. */
+MLN_API mln_status mln_map_get_bounds_take_result(
+  mln_operation operation, mln_bound_options* out_options
+) MLN_NOEXCEPT;
+/** Submits a copied camera-constraint command. */
+MLN_API mln_status mln_map_set_bounds(
+  mln_map map, const mln_bound_options* options, uint64_t* out_command_id
+) MLN_NOEXCEPT;
+/** Starts an ordered free-camera query. */
+MLN_API mln_status mln_map_get_free_camera_options_start(
+  mln_map map, mln_operation* out_operation
+) MLN_NOEXCEPT;
+/** Takes free-camera options exactly once. */
+MLN_API mln_status mln_map_get_free_camera_options_take_result(
+  mln_operation operation, mln_free_camera_options* out_options
+) MLN_NOEXCEPT;
+/** Submits a copied free-camera command. */
 MLN_API mln_status mln_map_set_free_camera_options(
-  mln_map map, const mln_free_camera_options* options
+  mln_map map, const mln_free_camera_options* options, uint64_t* out_command_id
 ) MLN_NOEXCEPT;
 
 /**
- * Copies the current axonometric rendering options.
+ * Submits copied axonometric rendering option fields.
  *
- * On success, *out_mode is overwritten. MapLibre currently reports all fields.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, out_mode is null,
- *   or out_mode->size is too small.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_map_get_projection_mode(
-  mln_map map, mln_projection_mode* out_mode
-) MLN_NOEXCEPT;
-
-/**
- * Applies axonometric rendering option fields to a map.
- *
- * Only fields indicated by mode->fields affect the map. Unspecified fields keep
- * their current native values. These options mutate the live map render
- * transform and do not change coordinate conversion units or formulas.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, mode is null,
- *   mode->size is too small, mode->fields contains unknown bits, or an enabled
- *   skew value is non-finite.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * Only fields selected by mode->fields affect the map. Unspecified fields keep
+ * their current native values. out_command_id must point to zero. On success,
+ * it receives the command's monotonic runtime order. The terminal disposition
+ * arrives through the runtime event stream.
  */
 MLN_API mln_status mln_map_set_projection_mode(
-  mln_map map, const mln_projection_mode* mode
+  mln_map map, const mln_projection_mode* mode, uint64_t* out_command_id
 ) MLN_NOEXCEPT;
 
 /**
- * Converts a geographic world coordinate to a screen point for the current map.
- *
- * The output point uses logical map pixels with an origin at the top-left of
- * the map viewport.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, out_point is
- *   null, or coordinate contains invalid latitude or longitude values.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * Starts an ordered conversion from a geographic coordinate to a screen point.
  */
-MLN_API mln_status mln_map_pixel_for_lat_lng(
-  mln_map map, mln_lat_lng coordinate, mln_screen_point* out_point
+MLN_API mln_status mln_map_pixel_for_lat_lng_start(
+  mln_map map, mln_lat_lng coordinate, mln_operation* out_operation
+) MLN_NOEXCEPT;
+
+/** Takes the screen point from a completed operation exactly once. */
+MLN_API mln_status mln_map_pixel_for_lat_lng_take_result(
+  mln_operation operation, mln_screen_point* out_point
 ) MLN_NOEXCEPT;
 
 /**
- * Converts a screen point to a geographic world coordinate for the current map.
- *
- * The input point uses logical map pixels with an origin at the top-left of the
- * map viewport.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, out_coordinate is
- *   null, or point contains non-finite values.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * Starts an ordered conversion from a screen point to a geographic coordinate.
  */
-MLN_API mln_status mln_map_lat_lng_for_pixel(
-  mln_map map, mln_screen_point point, mln_lat_lng* out_coordinate
+MLN_API mln_status mln_map_lat_lng_for_pixel_start(
+  mln_map map, mln_screen_point point, mln_operation* out_operation
+) MLN_NOEXCEPT;
+
+/** Takes the coordinate from a completed operation exactly once. */
+MLN_API mln_status mln_map_lat_lng_for_pixel_take_result(
+  mln_operation operation, mln_lat_lng* out_coordinate
 ) MLN_NOEXCEPT;
 
 /**
- * Converts geographic world coordinates to screen points for the current map.
- *
- * The caller owns both arrays. On success, out_points receives coordinate_count
- * entries. coordinates and out_points may be null only when coordinate_count is
- * 0.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, a required array
- *   is null, or any coordinate contains invalid latitude or longitude values.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * Starts an ordered conversion of copied coordinates to screen points.
  */
-MLN_API mln_status mln_map_pixels_for_lat_lngs(
+MLN_API mln_status mln_map_pixels_for_lat_lngs_start(
   mln_map map, const mln_lat_lng* coordinates, size_t coordinate_count,
-  mln_screen_point* out_points
+  mln_operation* out_operation
 ) MLN_NOEXCEPT;
 
 /**
- * Converts screen points to geographic world coordinates for the current map.
+ * Copies converted points from a completed operation and consumes the result.
  *
- * The caller owns both arrays. On success, out_coordinates receives point_count
- * entries. points and out_coordinates may be null only when point_count is 0.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, a required array
- *   is null, or any point contains non-finite values.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * out_point_count receives the required count before capacity is checked. A
+ * capacity error leaves the result available for a retry.
  */
-MLN_API mln_status mln_map_lat_lngs_for_pixels(
+MLN_API mln_status mln_map_pixels_for_lat_lngs_take_result(
+  mln_operation operation, mln_screen_point* out_points, size_t point_capacity,
+  size_t* out_point_count
+) MLN_NOEXCEPT;
+
+/**
+ * Starts an ordered conversion of copied screen points to coordinates.
+ */
+MLN_API mln_status mln_map_lat_lngs_for_pixels_start(
   mln_map map, const mln_screen_point* points, size_t point_count,
-  mln_lat_lng* out_coordinates
+  mln_operation* out_operation
+) MLN_NOEXCEPT;
+
+/**
+ * Copies converted coordinates and consumes the completed operation result.
+ *
+ * out_coordinate_count receives the required count before capacity is checked.
+ * A capacity error leaves the result available for a retry.
+ */
+MLN_API mln_status mln_map_lat_lngs_for_pixels_take_result(
+  mln_operation operation, mln_lat_lng* out_coordinates,
+  size_t coordinate_capacity, size_t* out_coordinate_count
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

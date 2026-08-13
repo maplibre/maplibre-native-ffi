@@ -16,6 +16,9 @@ maplibre-native-ffi = { path = "../../bindings/rust/crates/maplibre-native-ffi" 
 raw-window-handle = "0.6.2"
 winit = { version = "0.30.13", features = ["rwh_06"] }
 
+[target.'cfg(unix)'.dependencies]
+libc = "0.2.180"
+
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.5.2"
 objc2-app-kit = { version = "0.2.2", features = ["NSResponder", "NSView", "objc2-quartz-core"] }

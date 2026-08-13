@@ -63,15 +63,15 @@ public sealed record MapOptions
         var options = NativeMethods.mln_map_options_default();
         if (Width is { } width)
         {
-            options.width = width;
+            options.initial_extent.width = width;
         }
         if (Height is { } height)
         {
-            options.height = height;
+            options.initial_extent.height = height;
         }
         if (ScaleFactor is { } scaleFactor)
         {
-            options.scale_factor = scaleFactor;
+            options.initial_extent.scale_factor = scaleFactor;
         }
         if (MapMode is { } mapMode)
         {

@@ -19,6 +19,7 @@ import org.maplibre.nativeffi.geo.TileId
 import org.maplibre.nativeffi.internal.c.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY
 import org.maplibre.nativeffi.internal.c.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED
+import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_COMMAND_FINISHED
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_NONE
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS
@@ -36,6 +37,7 @@ import org.maplibre.nativeffi.internal.c.mln_offline_region_snapshot_get
 import org.maplibre.nativeffi.internal.c.mln_offline_region_status
 import org.maplibre.nativeffi.internal.c.mln_runtime_event
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_camera_transition_finished
+import org.maplibre.nativeffi.internal.c.mln_runtime_event_command_finished
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_region_response_error
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_region_status
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_region_tile_count_limit
@@ -55,6 +57,7 @@ import org.maplibre.nativeffi.offline.OfflineRegionInfo
 import org.maplibre.nativeffi.offline.OfflineRegionStatus
 import org.maplibre.nativeffi.render.RenderMode
 import org.maplibre.nativeffi.resource.ResourceErrorReason
+import org.maplibre.nativeffi.runtime.CommandDisposition
 import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 
 /** Copies runtime event payloads out of native event storage. */
@@ -87,6 +90,7 @@ internal object RuntimeStructs {
         offlineRegionTileCountLimit(event.payload.offline_region_tile_count_limit)
       MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED ->
         cameraTransitionFinished(event.payload.camera_transition_finished)
+      MLN_RUNTIME_EVENT_PAYLOAD_COMMAND_FINISHED -> commandFinished(event.payload.command_finished)
       else -> unknownPayload(event, eventSize)
     }
 
@@ -165,6 +169,15 @@ internal object RuntimeStructs {
     value: mln_runtime_event_camera_transition_finished
   ): RuntimeEventPayload.CameraTransitionFinished =
     RuntimeEventPayload.CameraTransitionFinished(uint64BitsToLong(value.transition_id))
+
+  private fun commandFinished(
+    value: mln_runtime_event_command_finished
+  ): RuntimeEventPayload.CommandFinished =
+    RuntimeEventPayload.CommandFinished(
+      value.command_id,
+      CommandDisposition.fromNative(value.disposition),
+      value.generation,
+    )
 
   private fun checkedInt(value: ULong, name: String): Int {
     require(value <= Int.MAX_VALUE.toULong()) { "$name exceeds Int.MAX_VALUE" }

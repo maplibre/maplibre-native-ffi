@@ -120,8 +120,9 @@ is what rejects a mismatched handle, so document the handle type each parameter
 expects.
 
 Handle values are safe to copy, compare, hash, and move between threads, and
-carry no ownership on their own. Owner-thread rules govern which thread may call
-with a handle, not which thread may hold one.
+carry no ownership on their own. Runtime, map, projection, operation,
+notification-source, and event-batch handles are callable from any native
+thread. Render-driver comments name the calls that require a graphics thread.
 
 The bit layout is internal. Hosts pass handles back as issued, and decoding or
 synthesizing an id is unsupported.
@@ -151,28 +152,31 @@ to equal `MLN_HANDLE_NULL` on entry and preserve live host-owned handles on
 failure. Document when scoped resource ownership begins, when it ends, and
 whether completion may happen inline or later.
 
-The runtime and map use a host-pumped, owner-thread model. Runtime creation
-records the owner thread. Runtime, map, map-projection, and render session calls
-that touch thread-affine state validate the owner thread.
+The runtime owns a native scheduler thread and one continuously running MapLibre
+`RunLoop`. Runtime, map, and map-projection entry points resolve a handle,
+acquire its control-state lease, copy the submission, and commit work to that
+run loop. They never make a host thread own or pump MapLibre scheduler state.
 
-A map shares its runtime's owner thread. A render session records its own: the
-thread that attached it, fixed for the session's lifetime. Attach validates that
-the map is live rather than that the caller owns it, so a session may be
-attached, driven, and destroyed on a thread that never touches the map. Session
-calls from any other thread report the owner-thread status. The host may hand
-the map handle to the attaching thread by any means, because a handle is a plain
-value and attach resolves it under the C API's own lock, rejecting an id that
-names a released map.
+A render session may remain bound to a caller graphics thread. The thread that
+attaches such a session owns its graphics calls for the session's lifetime.
+Attach validates that the map is live rather than imposing map thread affinity,
+so a graphics thread may receive and use a map handle created elsewhere.
 
-Cross-thread dispatch belongs in public functions designed as enqueueing
-commands. Document that behavior on the function. Higher-level adapters build
-threaded models above the C API.
+Classify each public function as Immediate, Command, Published snapshot,
+Operation, Event batch, or Render-driver call. A binding maps that category to
+one target-language shape; it does not add another scheduler or asynchronous
+boundary.
 
-Map state a render session reaches for is enqueued to the map owner thread
-rather than mutated in place, so resizing a session applies the map's logical
-size on the map's next pump. Renderer observer callbacks are forwarded to the
-map's run loop for the same reason, so the events a frame produces are drained
-by a later `mln_runtime_pump()` rather than inside the render call.
+Commands validate and deep-copy every input before returning acceptance. The
+runtime assigns an order and command ID at commit. Each accepted command reaches
+a terminal disposition, and failures after acceptance carry copied diagnostics
+in command events. Operations retain their work independently from their public
+observer and expose a permanent terminal status, copied diagnostic, and typed
+result transfer.
+
+Published snapshots copy immutable committed state without entering mutable
+MapLibre state. Use an ordered operation instead when a query must observe every
+preceding command.
 
 Graphics contexts that bind to a thread, such as OpenGL, are made current for
 the duration of a session call and released before it returns, so a host keeps
@@ -185,36 +189,34 @@ behaves as it always has. Attach creates the session's graphics resources on the
 calling thread, which is why attach belongs on the thread that draws rather than
 on the map's.
 
-On Apple targets each entry point drains its own Objective-C autorelease pool,
-so a host may pump frames from a thread that never returns to a run loop.
-Objects that cross the C boundary are retained rather than autoreleased, which
-keeps them valid after the entry point that produced them returns.
+On Apple targets each entry point and queued runtime submission drains its own
+Objective-C autorelease pool, so a native worker or host render thread does not
+need a surrounding run loop. Objects that cross the C boundary are retained
+rather than autoreleased, which keeps them valid after the call that produced
+them returns.
 
-MapLibre's `RunLoop` is owner-thread scheduler state. Each owner thread may hold
-one live runtime. `mln_runtime_pump()` advances that runtime: it parks the owner
-thread when asked, then drains the queued tasks, expired timers, and ready I/O
-it finds, including work enqueued while it runs. Document pump entry points as
-draining rather than as a bounded per-call budget.
+The native `RunLoop` is the only runtime scheduler. It owns timers, I/O
+readiness, queued invocations, and wakeup behavior. Do not alternate a separate
+condition-variable queue with `RunLoop::runOnce()`; that queue cannot derive the
+next native timer deadline.
 
-One entry point carries both cadence sources: the timeout selects the cadence,
-with zero for hosts driven by a callback they do not own and a positive value
-for hosts that own their pump thread and take their cadence from the runtime's
-own work. Park-and-wake follows these rules:
+Runtime submissions follow these rules:
 
-- The C API owns the parking primitive. Wake signals reach the owner thread
-  through runtime state rather than through a host callback, because MapLibre
-  raises them from arbitrary threads while it holds locks that every thread
-  queueing owner-thread work needs.
-- Wake signals set a flag that the pump clears before it returns. Document a
-  pump as advancing the runtime, and require the event drain after every return.
-- Any-thread wake entry points take a handle that carries its own reference to
-  the wake state, never the thread-affine runtime handle.
-- Document each blocking entry point's deadlock risk, naming the host locks a
-  caller must not hold across it.
-- Queue one event per host-visible outcome. An event whose handling acts on the
-  latest state, such as a render update, coalesces against an unread one.
+- One runtime establishes a total commit order across commands, operations,
+  barriers, and close.
+- Committing eligible work invokes the run loop and wakes it when idle.
+- Registry locks protect lookup and state transitions only. Release them before
+  run-loop joins, callback quiescence, operation waits, or host notification.
+- A close preflight checks live children and pending child reservations before
+  committing an irreversible close.
+- A runtime barrier completes after every preceding submission reaches a
+  terminal disposition, not merely after its run-loop callback starts.
+- Queue one event per required host-visible outcome. State consumers may
+  coalesce only commands whose public contract permits replacement; every
+  replaced command reports `superseded`.
 - A subscription mask suppresses an event before its payload and message are
-  built. A suppressed event stays out of the queue and raises no wake flag.
+  built. A suppressed event stays out of the queue and does not make its
+  notification source readable.
 
 ## Status And Diagnostics
 
@@ -229,8 +231,8 @@ Use these categories consistently:
   initialized output handles;
 - `MLN_STATUS_INVALID_STATE` for otherwise valid objects in the wrong lifecycle
   state;
-- `MLN_STATUS_WRONG_THREAD` for thread-affine handles called from the wrong
-  owner thread;
+- `MLN_STATUS_WRONG_THREAD` for render-driver handles called from a thread other
+  than the required graphics thread;
 - `MLN_STATUS_UNSUPPORTED` for backends, platforms, entry points, or requested
   behavior unavailable in this build;
 - `MLN_STATUS_NATIVE_ERROR` for native MapLibre errors or C++ exceptions
@@ -240,8 +242,9 @@ Every exported `MLN_API` C++ definition must be `noexcept`. Status-returning
 entry points use the C API boundary helper to clear thread-local diagnostics on
 entry and convert exceptions to `MLN_STATUS_NATIVE_ERROR`.
 
-Set thread-local diagnostic strings for synchronous non-OK returns. Report
-asynchronous native failures through copied runtime events.
+Set thread-local diagnostic strings for synchronous non-OK returns. Store
+operation failures on the operation and report accepted command failures through
+copied terminal events.
 
 ## Events And Callbacks
 
@@ -262,16 +265,13 @@ its source kind and source handle. Queued events never outlive the source handle
 they reference: map teardown discards queued events for that map, and runtime
 teardown discards runtime-owned event streams before the runtime handle becomes
 invalid. A drain returns an owned batch of copies. The batch stays readable
-across later drains and runtime destruction until the caller releases it.
+across later drains and runtime close until the caller releases it.
 
-Classify each operation as one of:
-
-- immediate, where the return status is the final result;
-- a command, where return status means accepted and later effects arrive as
-  events;
-- a state snapshot, where the returned data is last-known state;
-- a blocking query, used rarely and documented with deadlock risks;
-- an event stream, where many events are expected over time.
+Use the six execution categories defined in Ownership And Execution. An
+Immediate return is final. A Command return reports copied acceptance. Published
+snapshots are immutable synchronous copies. Operations carry one terminal result
+and diagnostic. Event batches contain drainable observations. Render-driver
+calls execute on the graphics thread named by their target contract.
 
 Logging, resource transform, and resource provider callbacks may run on MapLibre
 worker, network, logging, or render-related threads.

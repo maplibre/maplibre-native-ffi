@@ -12,16 +12,18 @@ Events and bindings connect those objects to host code.
 
 ## Runtime
 
-The runtime owns scheduler state and event storage for one owner thread. The
-host creates the runtime on the thread that will pump it. Runtime work and
-events flow through that thread.
+The runtime owns one native scheduler thread and its event storage. Runtime
+creation starts that thread, which keeps MapLibre Native's run loop active until
+runtime close completes.
 
-Each owner thread has at most one live runtime. Pumping advances MapLibre Native
-and collects completed work.
+Any host thread can submit runtime and map work. Submissions wake the native run
+loop, so progress never depends on a display callback or a host pump. One
+runtime may own multiple maps; their commands, operations, barriers, and close
+requests share one ordered submission stream.
 
-The host sets the pace. A display-paced host pumps once per frame. A host with a
-dedicated pump thread parks that thread until the runtime has work. Other host
-threads wake it through a wake source.
+Use a runtime barrier when later work must wait for every preceding submission
+to reach a terminal disposition. Use the runtime's receiver-scoped notification
+source to wait for events and operation completions without polling.
 
 ## Map
 
@@ -35,6 +37,15 @@ Sources and layers use style-spec JSON. This representation keeps the API
 aligned with the style specification across every layer type. Typed entry points
 cover behavior beyond construction, such as source-type validation and per-frame
 property updates.
+
+Map mutations are commands. A command copies its input before returning
+acceptance, receives an ID, and later reports a terminal disposition through the
+runtime event queue. Ordered queries and lifecycle transitions are operations.
+Bindings expose those operations through their normal future, task, suspension,
+or explicit-wait idiom.
+
+Published snapshots provide synchronous copies of state needed by UI and display
+threads. Snapshot reads never call into mutable MapLibre map state.
 
 ## Render session
 
@@ -64,10 +75,10 @@ backend, or MoltenVK for the Vulkan backend. That implementation brings the
 headers to build against.
 
 The thread that attaches a render session becomes its owner thread for the
-session's lifetime. The attaching thread can differ from the map's owner thread.
-A host therefore attaches on the thread that owns its graphics context and draws
-frames, while another thread pumps the runtime and map. A session call from any
-other thread reports an owner-thread status.
+session's lifetime. A host attaches on the thread that owns its graphics context
+and draws frames. The runtime and map continue on the runtime's native worker,
+independently of that graphics thread. A session call from any other thread
+reports an owner-thread status.
 
 ### OpenGL context ownership
 
@@ -96,32 +107,32 @@ events from the runtime.
 Events report map lifecycle, rendering progress, resource activity, diagnostics,
 and asynchronous failures.
 
-Rendering observer events reach the runtime queue through the map's run loop. A
-pump after the render call makes those events available to drain.
+Rendering observer events reach the runtime queue asynchronously. A
+receiver-scoped notification source reports that the queue is ready to drain.
 
 Each map and each runtime carries a subscription: the set of event types it
 queues. Default options select every event type the library reports, and a host
 narrows a subscription by naming the types it reads. An unselected event is
-never built, never queued, and never raises the wake flag that releases a parked
-pump.
+never built, never queued, and never makes the notification source readable.
 
 One drain creates an owned batch: every queued event in order, plus the message
 text that those events carry. A batch remains readable across later drains and
-runtime destruction. Copy values that must outlive the batch, then release it.
+runtime close. Copy values that must outlive the batch, then release it.
 
-Queued events belong to their source. Destroying a map discards that map's
-queued events immediately. Read any state that teardown needs synchronously
-while the map is live.
+Queued events belong to their source. Closing a map discards that map's queued
+events. Read any teardown state from an owned batch or published snapshot.
 
 ## Failures
 
-Status-returning calls report synchronous failures. Each binding surfaces them
-in its own idiom: an exception, a result type, or an error return. Examples
-include a call from the wrong thread and an invalid argument.
+The status returned by an Immediate call reports validation or inspection
+failure. The status returned by a Command reports whether native code accepted
+and copied the submission; its terminal event reports an asynchronous
+application failure. An Operation stores its terminal status and a copied
+diagnostic for inspection from any thread.
 
-Events report asynchronous failures, such as a style load, resource request, or
-still-image request that failed. Drain events in addition to checking call
-results.
+Each binding surfaces these channels in its own idiom: an exception, a result
+type, an asynchronous result, or an event stream. Render-driver calls continue
+to report their graphics-thread failures directly.
 
 ## Language bindings
 

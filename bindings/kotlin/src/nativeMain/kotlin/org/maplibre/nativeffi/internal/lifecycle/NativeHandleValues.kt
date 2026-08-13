@@ -30,8 +30,6 @@ internal fun styleIdListHandle(value: ULong): NativeStyleIdList = NativeStyleIdL
 internal fun styleStringListHandle(value: ULong): NativeStyleStringList =
   NativeStyleStringList(value.toLong())
 
-internal fun wakeSourceHandle(value: ULong): NativeWakeSource = NativeWakeSource(value.toLong())
-
 internal fun resourceRequestHandle(value: ULong): NativeResourceRequest =
   NativeResourceRequest(value.toLong())
 

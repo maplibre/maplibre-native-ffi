@@ -22,6 +22,7 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  *     mln_runtime_event_offline_region_response_error offline_region_response_error;
  *     mln_runtime_event_offline_region_tile_count_limit offline_region_tile_count_limit;
  *     mln_runtime_event_camera_transition_finished camera_transition_finished;
+ *     mln_runtime_event_command_finished command_finished;
  * }
  * }
  */
@@ -38,7 +39,8 @@ public class mln_runtime_event_payload {
         mln_runtime_event_offline_region_status.layout().withName("offline_region_status"),
         mln_runtime_event_offline_region_response_error.layout().withName("offline_region_response_error"),
         mln_runtime_event_offline_region_tile_count_limit.layout().withName("offline_region_tile_count_limit"),
-        mln_runtime_event_camera_transition_finished.layout().withName("camera_transition_finished")
+        mln_runtime_event_camera_transition_finished.layout().withName("camera_transition_finished"),
+        mln_runtime_event_command_finished.layout().withName("command_finished")
     ).withName("mln_runtime_event_payload");
 
     /**
@@ -354,6 +356,50 @@ public class mln_runtime_event_payload {
      */
     public static void camera_transition_finished(MemorySegment union, MemorySegment fieldValue) {
         MemorySegment.copy(fieldValue, 0L, union, camera_transition_finished$OFFSET, camera_transition_finished$LAYOUT.byteSize());
+    }
+
+    private static final GroupLayout command_finished$LAYOUT = (GroupLayout)$LAYOUT.select(groupElement("command_finished"));
+
+    /**
+     * Layout for field:
+     * {@snippet lang=c :
+     * mln_runtime_event_command_finished command_finished
+     * }
+     */
+    public static final GroupLayout command_finished$layout() {
+        return command_finished$LAYOUT;
+    }
+
+    private static final long command_finished$OFFSET = $LAYOUT.byteOffset(groupElement("command_finished"));
+
+    /**
+     * Offset for field:
+     * {@snippet lang=c :
+     * mln_runtime_event_command_finished command_finished
+     * }
+     */
+    public static final long command_finished$offset() {
+        return command_finished$OFFSET;
+    }
+
+    /**
+     * Getter for field:
+     * {@snippet lang=c :
+     * mln_runtime_event_command_finished command_finished
+     * }
+     */
+    public static MemorySegment command_finished(MemorySegment union) {
+        return union.asSlice(command_finished$OFFSET, command_finished$LAYOUT.byteSize());
+    }
+
+    /**
+     * Setter for field:
+     * {@snippet lang=c :
+     * mln_runtime_event_command_finished command_finished
+     * }
+     */
+    public static void command_finished(MemorySegment union, MemorySegment fieldValue) {
+        MemorySegment.copy(fieldValue, 0L, union, command_finished$OFFSET, command_finished$LAYOUT.byteSize());
     }
 
     /**

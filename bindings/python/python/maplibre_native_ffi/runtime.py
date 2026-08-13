@@ -55,6 +55,7 @@ class RuntimeEventType(UnknownIntEnum):
     OFFLINE_REGION_RESPONSE_ERROR = 20
     OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 21
     MAP_CAMERA_TRANSITION_FINISHED = 23
+    COMMAND_FINISHED = 24
 
 
 class RuntimeEventMask(IntFlag):
@@ -62,8 +63,7 @@ class RuntimeEventMask(IntFlag):
 
     Each bit is ``1 << RuntimeEventType``, so a host derives a bit from a type
     it read from an event. A map or a runtime builds and queues only the types
-    its mask selects, so narrowing a mask also removes those events' wake
-    signals.
+    that its mask selects.
 
     :attr:`ALL_MAP_EVENTS` covers every map-originated type and
     :attr:`ALL_RUNTIME_EVENTS` every runtime-originated one.
@@ -94,6 +94,7 @@ class RuntimeEventMask(IntFlag):
     MAP_CAMERA_TRANSITION_FINISHED = (
         1 << RuntimeEventType.MAP_CAMERA_TRANSITION_FINISHED
     )
+    COMMAND_FINISHED = 1 << RuntimeEventType.COMMAND_FINISHED
     OFFLINE_REGION_STATUS_CHANGED = 1 << RuntimeEventType.OFFLINE_REGION_STATUS_CHANGED
     OFFLINE_REGION_RESPONSE_ERROR = 1 << RuntimeEventType.OFFLINE_REGION_RESPONSE_ERROR
     OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = (
@@ -119,11 +120,13 @@ class RuntimeEventMask(IntFlag):
         | MAP_STYLE_IMAGE_MISSING
         | MAP_TILE_ACTION
         | MAP_CAMERA_TRANSITION_FINISHED
+        | COMMAND_FINISHED
     )
     ALL_RUNTIME_EVENTS = (
         OFFLINE_REGION_STATUS_CHANGED
         | OFFLINE_REGION_RESPONSE_ERROR
         | OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED
+        | COMMAND_FINISHED
     )
     ALL = ALL_MAP_EVENTS | ALL_RUNTIME_EVENTS
 
@@ -147,11 +150,40 @@ class CameraChangeMode(UnknownIntEnum):
     ANIMATED = 1
 
 
+class CommandDisposition(UnknownIntEnum):
+    """Terminal disposition of an accepted command."""
+
+    COMMITTED = 0
+    SUPERSEDED = 1
+    FAILED = 2
+    CANCELLED = 3
+
+
 class RuntimeEventSourceType(UnknownIntEnum):
     """Runtime event source kind values reported by the C API."""
 
     RUNTIME = 0
     MAP = 1
+    PROJECTION = 2
+
+
+class NotificationEndpointKind(UnknownIntEnum):
+    """Kinds of service endpoint reported ready by a runtime receiver."""
+
+    RUNTIME_EVENTS = 1
+    OPERATION = 2
+    ADAPTER_RESOURCE_REQUESTS = 3
+    ADAPTER_LOG_RECORDS = 4
+    RENDER_FRAMES = 5
+    DRIVER_WORK = 6
+
+
+@dataclass(frozen=True, slots=True)
+class ReadyEndpoint:
+    """One copied endpoint reported by a runtime notification source."""
+
+    kind: NotificationEndpointKind
+    id: int
 
 
 class RenderMode(UnknownIntEnum):
@@ -267,11 +299,7 @@ class TileActionPayload:
 
 @dataclass(frozen=True, slots=True)
 class CameraTransitionFinishedPayload:
-    """Runtime camera transition-finished event payload.
-
-    A transition carrying a ``transition_id`` reports its end once for every
-    terminal outcome, without naming which outcome occurred.
-    """
+    """Runtime camera transition-finished event payload."""
 
     transition_id: int
 
@@ -280,6 +308,25 @@ class CameraTransitionFinishedPayload:
         cls, payload: dict[str, object]
     ) -> CameraTransitionFinishedPayload:
         return cls(transition_id=payload["transition_id"])
+
+
+@dataclass(frozen=True, slots=True)
+class CommandFinishedPayload:
+    """Terminal command result reported by a runtime event."""
+
+    command_id: int
+    disposition: CommandDisposition
+    generation: int
+
+    @classmethod
+    def _from_runtime_payload(
+        cls, payload: dict[str, object]
+    ) -> CommandFinishedPayload:
+        return cls(
+            command_id=payload["command_id"],
+            disposition=CommandDisposition(payload["disposition"]),
+            generation=payload["generation"],
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -419,39 +466,8 @@ class RuntimeOptions:
     """
 
 
-class WakeSource(NativeHandleMixin):
-    """Releases a runtime owner thread parked in :meth:`RuntimeHandle.pump`.
-
-    Usable from any thread. It stays usable after its runtime closes, and
-    signalling it then does nothing.
-    """
-
-    _handle_name = "WakeSource"
-
-    def __init__(self, native: Any, *, _create_key: object | None = None) -> None:
-        if _create_key is not _WAKE_SOURCE_CREATE_KEY:
-            msg = "WakeSource instances are created by RuntimeHandle.wake_source()"
-            raise TypeError(msg)
-        self._native = native
-
-    @classmethod
-    def _from_native(cls, native: Any) -> WakeSource:
-        return cls(native, _create_key=_WAKE_SOURCE_CREATE_KEY)
-
-    def signal(self) -> None:
-        """Set the runtime's wake flag and release the parked owner thread.
-
-        A signal raised while the owner thread runs makes the next
-        :meth:`RuntimeHandle.pump` return without parking.
-        """
-        self._native.signal()
-
-
-_WAKE_SOURCE_CREATE_KEY = object()
-
-
 class RuntimeHandle(NativeHandleMixin):
-    """Owner-thread runtime handle."""
+    """Any-thread runtime handle with autonomous native execution."""
 
     _handle_name = "RuntimeHandle"
 
@@ -472,6 +488,29 @@ class RuntimeHandle(NativeHandleMixin):
 
             raise InvalidStateError(None, "runtime has live operation handles")
         self._native.close()
+
+    def barrier(self) -> None:
+        """Block until every previously accepted runtime command is committed."""
+        self._native.barrier()
+
+    def set_notification_callback(self, callback: Callable[[], None]) -> None:
+        """Install the callback that schedules a later :meth:`drain_ready`.
+
+        Native code may invoke the callback from any thread. The callback must
+        only arrange receiver work and must not call this binding directly.
+        """
+        self._native.set_notification_callback(callback)
+
+    def clear_notification_callback(self) -> None:
+        """Clear the scheduling callback after in-flight entries return."""
+        self._native.clear_notification_callback()
+
+    def drain_ready(self) -> tuple[ReadyEndpoint, ...]:
+        """Drain and copy the receiver endpoints currently ready for service."""
+        return tuple(
+            ReadyEndpoint(NotificationEndpointKind(kind), endpoint_id)
+            for kind, endpoint_id in self._native.drain_ready()
+        )
 
     def _register_operation(self, operation: OperationHandle) -> None:
         self._operations.add(operation)
@@ -494,31 +533,6 @@ class RuntimeHandle(NativeHandleMixin):
             self._maps.pop(source_id, None)
             return None
         return map_handle
-
-    def pump(self, timeout: float | None = 0.0) -> None:
-        """Advance this runtime.
-
-        The call parks the owner thread when ``timeout`` allows it, then drains
-        the owner-thread task queues. Take the queued runtime events with
-        :meth:`drain_events` afterwards.
-
-        ``timeout`` is in seconds and bounds the park: zero drains and returns,
-        a positive value parks for up to that long, and ``None`` parks until a
-        wake arrives. Timers and ready file descriptors set the wake flag only
-        when they queue owner-thread work, so pass a bounded timeout to cap how
-        long a call waits.
-
-        A non-zero timeout releases the GIL while it parks. Call it outside any
-        lock that a signalling thread takes.
-        """
-        # A negative timeout collapses to no wait; ``None`` spells an unbounded
-        # park.
-        timeout_ms = -1 if timeout is None else max(0, int(timeout * 1000))
-        self._native.pump(timeout_ms)
-
-    def wake_source(self) -> WakeSource:
-        """Acquire a wake source for this runtime, usable from any thread."""
-        return WakeSource._from_native(self._native.wake_source())
 
     def _operation(
         self,
@@ -677,43 +691,43 @@ class RuntimeHandle(NativeHandleMixin):
         callback: ResourceTransformCallback,
         *,
         max_pending_callbacks: int = 64,
-    ) -> None:
+    ) -> int:
         """Install or replace the runtime-scoped network URL transform."""
         from .resource import _adapt_resource_transform_callback
 
-        self._native.set_resource_transform(
+        return self._native.set_resource_transform(
             _adapt_resource_transform_callback(callback),
             max_pending_callbacks,
         )
 
-    def clear_resource_transform(self) -> None:
+    def clear_resource_transform(self) -> int:
         """Clear the runtime-scoped network URL transform."""
-        self._native.clear_resource_transform()
+        return self._native.clear_resource_transform()
 
     def set_http_header_transform(
         self,
         callback: HttpHeaderTransformCallback,
         *,
         max_pending_callbacks: int = 64,
-    ) -> None:
+    ) -> int:
         """Install or replace the outgoing HTTP header transform."""
         from .resource import _adapt_http_header_transform_callback
 
-        self._native.set_http_header_transform(
+        return self._native.set_http_header_transform(
             _adapt_http_header_transform_callback(callback),
             max_pending_callbacks,
         )
 
-    def clear_http_header_transform(self) -> None:
+    def clear_http_header_transform(self) -> int:
         """Clear the outgoing HTTP header transform."""
-        self._native.clear_http_header_transform()
+        return self._native.clear_http_header_transform()
 
     def set_resource_provider(
         self,
         callback: ResourceProviderCallback,
         *,
         max_pending_callbacks: int = 64,
-    ) -> None:
+    ) -> int:
         """Install or replace the runtime-scoped network resource provider.
 
         Replacement is allowed while maps are live. When this call returns, the
@@ -722,19 +736,19 @@ class RuntimeHandle(NativeHandleMixin):
         """
         from .resource import _adapt_resource_provider_callback
 
-        self._native.set_resource_provider(
+        return self._native.set_resource_provider(
             _adapt_resource_provider_callback(callback),
             max_pending_callbacks,
         )
 
-    def clear_resource_provider(self) -> None:
+    def clear_resource_provider(self) -> int:
         """Clear the runtime-scoped network resource provider.
 
         Later requests go to MapLibre's online file source. Requests the
         previous callback already took a handle for keep that handle and are
         completed and released as usual.
         """
-        self._native.clear_resource_provider()
+        return self._native.clear_resource_provider()
 
     def drain_events(self, max_events: int = 0) -> RuntimeEventBatch:
         """Drain and copy this runtime's queued runtime events into one batch.
@@ -743,9 +757,7 @@ class RuntimeHandle(NativeHandleMixin):
         positive value takes at most that many and reports the rest as
         :attr:`RuntimeEventBatch.remaining_count`.
 
-        A drain is a queue operation: it never parks and runs no owner-thread
-        work. Call :meth:`pump` to advance the runtime, then drain what the pump
-        produced.
+        Draining never waits for worker progress; native execution is autonomous.
 
         `RuntimeEvent.source.map_handle` is None once the caller drops its last
         reference to the source map.
@@ -807,12 +819,16 @@ def _runtime_payload_from_native(payload: dict[str, object]) -> RuntimeEventPayl
         return OfflineRegionTileCountLimitExceeded._from_runtime_payload(payload)
     if kind == "camera_transition_finished":
         return CameraTransitionFinishedPayload._from_runtime_payload(payload)
+    if kind == "command_finished":
+        return CommandFinishedPayload._from_runtime_payload(payload)
     return UnknownRuntimeEventPayload._from_runtime_payload(payload)
 
 
 __all__ = [
     "CameraChangeMode",
     "CameraTransitionFinishedPayload",
+    "CommandDisposition",
+    "CommandFinishedPayload",
     "NetworkStatus",
     "RenderFramePayload",
     "RenderMapPayload",
@@ -859,5 +875,6 @@ RuntimeEventPayload = (
     | OfflineRegionResponseError
     | OfflineRegionTileCountLimitExceeded
     | CameraTransitionFinishedPayload
+    | CommandFinishedPayload
     | UnknownRuntimeEventPayload
 )

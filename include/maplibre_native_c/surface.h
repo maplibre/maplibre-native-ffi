@@ -105,12 +105,12 @@ mln_webgpu_surface_descriptor_default(void) MLN_NOEXCEPT;
  * The map may have at most one live render session. The calling thread becomes
  * the session's owner thread, and every surface-session call is affine to it.
  * The map need only be live, so a host may attach on the thread that drives its
- * render loop while the map stays on the runtime loop thread. Attach creates
- * the session's graphics resources on the calling thread, so the host resources
- * named by descriptor must be usable there. The session retains
- * descriptor->layer and optional descriptor->context.device, and renders into
- * and presents through the layer. On success, *out_session receives a handle
- * the caller destroys with mln_render_session_destroy().
+ * render loop while runtime and map operations continue on the runtime's native
+ * worker. Attach creates the session's graphics resources on the calling
+ * thread, so the host resources named by descriptor must be usable there. The
+ * session retains descriptor->layer and optional descriptor->context.device,
+ * and renders into and presents through the layer. On success, *out_session
+ * receives a handle the caller destroys with mln_render_session_destroy().
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -132,14 +132,15 @@ MLN_API mln_status mln_metal_surface_attach(
  * The map may have at most one live render session. The calling thread becomes
  * the session's owner thread, and every surface-session call is affine to it.
  * The map need only be live, so a host may attach on the thread that drives its
- * render loop while the map stays on the runtime loop thread. Attach creates
- * the session's graphics resources on the calling thread, so the host resources
- * named by descriptor must be usable there. The session renders to
- * descriptor->surface and presents through it. The Vulkan device must support
- * VK_KHR_swapchain, and the queue family must support graphics and presentation
- * to descriptor->surface. Vulkan handles are borrowed and must remain valid
- * until the session is detached or destroyed. On success, *out_session receives
- * a handle the caller destroys with mln_render_session_destroy().
+ * render loop while runtime and map operations continue on the runtime's native
+ * worker. Attach creates the session's graphics resources on the calling
+ * thread, so the host resources named by descriptor must be usable there. The
+ * session renders to descriptor->surface and presents through it. The Vulkan
+ * device must support VK_KHR_swapchain, and the queue family must support
+ * graphics and presentation to descriptor->surface. Vulkan handles are borrowed
+ * and must remain valid until the session is detached or destroyed. On success,
+ * *out_session receives a handle the caller destroys with
+ * mln_render_session_destroy().
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -161,9 +162,9 @@ MLN_API mln_status mln_vulkan_surface_attach(
  * The map may have at most one live render session. The calling thread becomes
  * the session's owner thread, and every surface-session call is affine to it.
  * The map need only be live, so a host may attach on the thread that drives its
- * render loop while the map stays on the runtime loop thread. Attach creates
- * the session's graphics resources on the calling thread, so the host resources
- * named by descriptor must be usable there.
+ * render loop while runtime and map operations continue on the runtime's native
+ * worker. Attach creates the session's graphics resources on the calling
+ * thread, so the host resources named by descriptor must be usable there.
  *
  * descriptor->context.ownership decides what the session does with the thread's
  * current context. A shared session builds its context in the share group of
@@ -201,14 +202,15 @@ MLN_API mln_status mln_opengl_surface_attach(
  * The map may have at most one live render session. The calling thread becomes
  * the session's owner thread, and every surface-session call is affine to it.
  * The map need only be live, so a host may attach on the thread that drives its
- * render loop while the map stays on the runtime loop thread. Attach creates
- * the session's graphics resources on the calling thread, so the host resources
- * named by descriptor must be usable there; a WebGPU object belongs to the
- * agent that created it. The session configures descriptor->surface for this
- * device and extent, takes its current texture each frame, and presents through
- * it. The surface, device, and instance are borrowed and must remain valid
- * until detach or destroy. On success, *out_session receives a handle the
- * caller destroys with mln_render_session_destroy().
+ * render loop while runtime and map operations continue on the runtime's native
+ * worker. Attach creates the session's graphics resources on the calling
+ * thread, so the host resources named by descriptor must be usable there; a
+ * WebGPU object belongs to the agent that created it. The session configures
+ * descriptor->surface for this device and extent, takes its current texture
+ * each frame, and presents through it. The surface, device, and instance are
+ * borrowed and must remain valid until detach or destroy. On success,
+ * *out_session receives a handle the caller destroys with
+ * mln_render_session_destroy().
  *
  * Returns:
  * - MLN_STATUS_OK on success.

@@ -90,8 +90,8 @@ typedef struct mln_adapter_resource_rewrite_rule {
 /**
  * A borrowed table of rewrite rules.
  *
- * The rules pointer is borrowed and must stay valid while the table is
- * registered as resource transform user data.
+ * The rules pointer and every rule string stay valid through the terminal event
+ * of the command that replaces or clears this transform.
  */
 typedef struct mln_adapter_resource_rewrite_rules {
   const mln_adapter_resource_rewrite_rule* rules;
@@ -112,8 +112,9 @@ typedef struct mln_adapter_http_header {
  * how url compares against the complete transformed URL. A null url or an
  * unknown flag bit makes the rule match nothing.
  *
- * The first matching rule supplies its complete header list. Every pointer is
- * borrowed and must outlive the registration.
+ * The first matching rule supplies its complete header list. Every pointer
+ * stays valid through the terminal event of the command that replaces or
+ * clears this transform.
  */
 typedef struct mln_adapter_http_header_transform_rule {
   uint32_t kind;
@@ -152,8 +153,8 @@ typedef struct mln_adapter_resource_provider_rule {
 /**
  * A borrowed table of provider rules.
  *
- * The rules pointer is borrowed and must stay valid while the table is
- * registered as resource provider user data.
+ * The rules pointer, response buffers, and rule strings stay valid through the
+ * terminal event of the command that replaces or clears this provider.
  */
 typedef struct mln_adapter_resource_provider_rules {
   const mln_adapter_resource_provider_rule* rules;
@@ -186,7 +187,7 @@ typedef enum mln_adapter_resource_route_flags : uint32_t {
  *
  * The url field is a comparison value, read literally or as a glob pattern
  * according to flags. A null url or an unknown flag bit makes the route match
- * nothing. The url pointer is borrowed and must outlive the provider.
+ * nothing. The url pointer has the lifetime of its queued provider.
  */
 typedef struct mln_adapter_queued_resource_provider_route {
   uint32_t kind;
@@ -197,8 +198,9 @@ typedef struct mln_adapter_queued_resource_provider_route {
 /**
  * A provider that copies matching requests into a native queue.
  *
- * The routes pointer is borrowed and must stay valid while the provider is
- * registered. queue identifies the queue that receives each copied request.
+ * The routes pointer and every route URL stay valid through the terminal event
+ * of the command that replaces or clears this provider. queue identifies the
+ * queue that receives each copied request.
  */
 typedef struct mln_adapter_queued_resource_provider {
   const mln_adapter_queued_resource_provider_route* routes;

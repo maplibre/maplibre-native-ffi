@@ -2,7 +2,6 @@ package maplibre
 
 import (
 	"errors"
-	stdruntime "runtime"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -41,8 +40,6 @@ func requireReleaseOperation[T any](t *testing.T, operation *OperationHandle[T])
 }
 
 func TestOfflineRegionStartOperationsReturnTypedHandles(t *testing.T) {
-	lockOSThreadForTest(t)
-
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -115,8 +112,6 @@ func TestOfflineRegionStartOperationsReturnTypedHandles(t *testing.T) {
 }
 
 func TestOfflineOperationResultDoesNotUseRuntimeEventQueue(t *testing.T) {
-	lockOSThreadForTest(t)
-
 	options := NewRuntimeOptions("", ":memory:")
 	options.EventMask = RuntimeEventMaskNone
 	runtime, err := NewRuntimeWithOptions(options)
@@ -150,9 +145,7 @@ func TestOfflineOperationResultDoesNotUseRuntimeEventQueue(t *testing.T) {
 func waitTakeOperation[T any](t *testing.T, runtime *RuntimeHandle, operation *OperationHandle[T]) T {
 	t.Helper()
 	for range make([]struct{}, 5000) {
-		if err := runtime.Pump(0); err != nil {
-			t.Fatalf("Pump(): %v", err)
-		}
+		time.Sleep(time.Millisecond)
 		result, err := operation.Take()
 		if err == nil {
 			return result
@@ -168,9 +161,6 @@ func waitTakeOperation[T any](t *testing.T, runtime *RuntimeHandle, operation *O
 }
 
 func TestOfflineCreateAndListTakeResultsCopyNativeData(t *testing.T) {
-	stdruntime.LockOSThread()
-	defer stdruntime.UnlockOSThread()
-
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -220,9 +210,6 @@ func TestOfflineCreateAndListTakeResultsCopyNativeData(t *testing.T) {
 }
 
 func TestOfflineOperationPollAndStatusReportCompletion(t *testing.T) {
-	stdruntime.LockOSThread()
-	defer stdruntime.UnlockOSThread()
-
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -239,9 +226,7 @@ func TestOfflineOperationPollAndStatusReportCompletion(t *testing.T) {
 	}
 	defer operation.Release()
 	for range make([]struct{}, 5000) {
-		if err := runtime.Pump(0); err != nil {
-			t.Fatalf("Pump(): %v", err)
-		}
+		time.Sleep(time.Millisecond)
 		completed, err := operation.Poll()
 		if err != nil {
 			t.Fatalf("Poll(): %v", err)
@@ -266,9 +251,6 @@ func TestOfflineOperationPollAndStatusReportCompletion(t *testing.T) {
 }
 
 func TestSetMaximumAmbientCacheSizeReportsCompletion(t *testing.T) {
-	stdruntime.LockOSThread()
-	defer stdruntime.UnlockOSThread()
-
 	runtime, err := NewRuntimeWithOptions(NewRuntimeOptions("", ":memory:"))
 	if err != nil {
 		t.Fatalf("NewRuntimeWithOptions(): %v", err)
@@ -285,9 +267,7 @@ func TestSetMaximumAmbientCacheSizeReportsCompletion(t *testing.T) {
 	}
 	defer operation.Release()
 	for range make([]struct{}, 5000) {
-		if err := runtime.Pump(0); err != nil {
-			t.Fatalf("Pump(): %v", err)
-		}
+		time.Sleep(time.Millisecond)
 		completed, err := operation.Poll()
 		if err != nil {
 			t.Fatalf("Poll(): %v", err)
@@ -308,8 +288,6 @@ func TestSetMaximumAmbientCacheSizeReportsCompletion(t *testing.T) {
 }
 
 func TestOfflineRegionStartOperationsValidateGoInputs(t *testing.T) {
-	lockOSThreadForTest(t)
-
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)

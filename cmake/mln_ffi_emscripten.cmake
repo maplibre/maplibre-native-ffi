@@ -16,10 +16,10 @@ set(MLN_FFI_EMSCRIPTEN_INITIAL_MEMORY "512MB"
 set(MLN_FFI_EMSCRIPTEN_STACK_SIZE "1MB"
     CACHE STRING "WASM stack size for native rendering code")
 
-# MapLibre runs its tile work on threads, and a browser host drives the map from
-# whichever pthread owns the runtime, so pthreads are not optional here. They
-# require the page to be cross-origin isolated (COOP/COEP), which is a
-# deployment constraint for anything embedding a browser build.
+# MapLibre runs tile work on threads, and every runtime owns a worker pthread,
+# so pthreads are not optional here. They require the page to be cross-origin
+# isolated (COOP/COEP), which is a deployment constraint for anything embedding
+# a browser build.
 add_compile_options(-pthread)
 
 # WebGPU is asynchronous in a browser and MapLibre calls it synchronously, so

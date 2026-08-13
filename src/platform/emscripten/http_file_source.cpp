@@ -646,8 +646,8 @@ void FetchRequestState::cancel() {
     }
     canceled_ = true;
     // Dropping the task also removes any delivery it already queued from the
-    // run loop, so a response cannot sit in the wasm heap awaiting a pump that
-    // will never come.
+    // run loop, so a response cannot remain in the wasm heap after
+    // cancellation.
     callback_ = nullptr;
     delivery = std::move(delivery_);
     if (transport_ == Transport::Callback) {

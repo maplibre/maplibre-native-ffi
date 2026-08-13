@@ -12,7 +12,8 @@ static mln_buffer_view view(const char* text) {
 static mln_status add_layer(mln_map map) {
   const char layer[] =
     "{\"id\":\"ortho\",\"type\":\"raster\",\"source\":\"ortho\"}";
-  return mln_map_add_style_layer_json(map, view(layer), view(""));
+  uint64_t command_id = 0;
+  return mln_map_add_style_layer_json(map, view(layer), view(""), &command_id);
 }
 
 mln_status add_orthophotos(mln_map map) {
@@ -42,10 +43,12 @@ mln_status add_orthophotos(mln_map map) {
   };
   options.attribution = view("Imagery: Example Survey");
   // #endregion bounds
+  uint64_t command_id = 0;
 
   // #region source
   const mln_status status = mln_map_add_raster_source_tiles(
-    map, view("ortho"), tiles, sizeof(tiles) / sizeof(tiles[0]), &options
+    map, view("ortho"), tiles, sizeof(tiles) / sizeof(tiles[0]), &options,
+    &command_id
   );
   if (status != MLN_STATUS_OK) {
     return status;

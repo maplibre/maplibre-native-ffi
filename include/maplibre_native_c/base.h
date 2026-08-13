@@ -93,7 +93,6 @@ typedef uint64_t mln_offline_region_list;
 typedef uint64_t mln_buffer;
 typedef uint64_t mln_resource_request_handle;
 typedef uint64_t mln_render_session;
-typedef uint64_t mln_wake_source;
 typedef uint64_t mln_operation;
 typedef uint64_t mln_notification_source;
 typedef uint64_t mln_event_batch;

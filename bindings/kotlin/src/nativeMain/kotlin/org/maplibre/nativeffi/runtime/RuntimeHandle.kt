@@ -21,11 +21,14 @@ import org.maplibre.nativeffi.internal.c.mln_event_batch_release
 import org.maplibre.nativeffi.internal.c.mln_notification_source_close
 import org.maplibre.nativeffi.internal.c.mln_notification_source_create
 import org.maplibre.nativeffi.internal.c.mln_offline_region_status
+import org.maplibre.nativeffi.internal.c.mln_operation_release
+import org.maplibre.nativeffi.internal.c.mln_runtime_barrier_start
 import org.maplibre.nativeffi.internal.c.mln_runtime_clear_http_header_transform
 import org.maplibre.nativeffi.internal.c.mln_runtime_clear_resource_provider
 import org.maplibre.nativeffi.internal.c.mln_runtime_clear_resource_transform
-import org.maplibre.nativeffi.internal.c.mln_runtime_create
-import org.maplibre.nativeffi.internal.c.mln_runtime_destroy
+import org.maplibre.nativeffi.internal.c.mln_runtime_close_start
+import org.maplibre.nativeffi.internal.c.mln_runtime_create_start
+import org.maplibre.nativeffi.internal.c.mln_runtime_create_take_result
 import org.maplibre.nativeffi.internal.c.mln_runtime_drain_events
 import org.maplibre.nativeffi.internal.c.mln_runtime_event
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_batch_view
@@ -48,14 +51,13 @@ import org.maplibre.nativeffi.internal.c.mln_runtime_offline_regions_merge_datab
 import org.maplibre.nativeffi.internal.c.mln_runtime_offline_regions_merge_database_take_result
 import org.maplibre.nativeffi.internal.c.mln_runtime_options
 import org.maplibre.nativeffi.internal.c.mln_runtime_options_default
-import org.maplibre.nativeffi.internal.c.mln_runtime_pump
 import org.maplibre.nativeffi.internal.c.mln_runtime_run_ambient_cache_operation_start
 import org.maplibre.nativeffi.internal.c.mln_runtime_set_event_mask
 import org.maplibre.nativeffi.internal.c.mln_runtime_set_http_header_transform
 import org.maplibre.nativeffi.internal.c.mln_runtime_set_maximum_ambient_cache_size_start
 import org.maplibre.nativeffi.internal.c.mln_runtime_set_resource_provider
 import org.maplibre.nativeffi.internal.c.mln_runtime_set_resource_transform
-import org.maplibre.nativeffi.internal.c.mln_runtime_wake_source_acquire
+import org.maplibre.nativeffi.internal.callback.CallbackCommandRegistry
 import org.maplibre.nativeffi.internal.callback.HttpHeaderTransformState
 import org.maplibre.nativeffi.internal.callback.ResourceProviderState
 import org.maplibre.nativeffi.internal.callback.ResourceTransformState
@@ -67,7 +69,6 @@ import org.maplibre.nativeffi.internal.lifecycle.offlineRegionListHandle
 import org.maplibre.nativeffi.internal.lifecycle.offlineRegionSnapshotHandle
 import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
 import org.maplibre.nativeffi.internal.lifecycle.runtimeHandle
-import org.maplibre.nativeffi.internal.lifecycle.wakeSourceHandle
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.struct.RuntimeStructs
@@ -80,29 +81,47 @@ import org.maplibre.nativeffi.resource.HttpHeaderTransformCallback
 import org.maplibre.nativeffi.resource.ResourceProviderCallback
 import org.maplibre.nativeffi.resource.ResourceTransformCallback
 
-/** Owned native runtime handle. Close it on the owner thread. */
+/** Owned native runtime handle. */
 @OptIn(ExperimentalForeignApi::class, ExperimentalNativeApi::class)
 public actual class RuntimeHandle
 internal constructor(
   handle: NativeRuntime,
   private var notificationSource: ULong,
-  private val destroyer: (ULong) -> Int = ::mln_runtime_destroy,
-) : AutoCloseable {
+  private val notifications: NotificationDispatcher,
+) {
   private val state = HandleState("RuntimeHandle", handle)
   private val liveMaps = mutableMapOf<Long, WeakReference<MapHandle>>()
-  private var resourceTransformState: ResourceTransformState? = null
-  private var httpHeaderTransformState: HttpHeaderTransformState? = null
-  private var resourceProviderState: ResourceProviderState? = null
+  private val resourceProviderCommands =
+    CallbackCommandRegistry<ResourceProviderState>({}, AutoCloseable::close)
+  private val resourceTransformCommands =
+    CallbackCommandRegistry<ResourceTransformState>({}, AutoCloseable::close)
+  private val httpHeaderTransformCommands =
+    CallbackCommandRegistry<HttpHeaderTransformState>({}, AutoCloseable::close)
 
-  public actual fun pump(timeoutMillis: Long) {
-    Status.check(mln_runtime_pump(state.requireLive().rawHandleValue, timeoutMillis))
+  public actual fun setNotificationCallback(callback: () -> Unit) {
+    state.requireLive()
+    notifications.setCallback(callback)
   }
 
-  public actual fun acquireWakeSource(): WakeSource = memScoped {
-    val outSource = alloc<ULongVar>()
-    outSource.value = 0uL
-    Status.check(mln_runtime_wake_source_acquire(state.requireLive().rawHandleValue, outSource.ptr))
-    WakeSource(outSource.value.asHandle("mln_runtime_wake_source_acquire", ::wakeSourceHandle))
+  public actual fun clearNotificationCallback() {
+    state.requireLive()
+    notifications.clearCallback()
+  }
+
+  public actual fun drainReady(): List<ReadyEndpoint> {
+    state.requireLive()
+    return notifications.drainReady()
+  }
+
+  public actual suspend fun barrier() {
+    val operation = startOperation { outOperation ->
+      mln_runtime_barrier_start(state.requireLive().rawHandleValue, outOperation)
+    }
+    try {
+      notifications.await(operation)
+    } finally {
+      mln_operation_release(operation)
+    }
   }
 
   public actual fun startAmbientCacheOperation(
@@ -420,12 +439,16 @@ internal constructor(
     resultKind: OperationResultKind,
   ): OperationHandle<T> = OperationHandle(this, operationId, kind, resultKind)
 
-  public actual fun setResourceProvider(callback: ResourceProviderCallback) {
-    setResourceProvider(callback) { replacement ->
-      mln_runtime_set_resource_provider(
-        state.requireLive().rawHandleValue,
-        replacement.descriptor(),
-      )
+  public actual fun setResourceProvider(callback: ResourceProviderCallback): ULong {
+    val replacement = ResourceProviderState(callback)
+    return resourceProviderCommands.set(replacement) {
+      command { outCommandId ->
+        mln_runtime_set_resource_provider(
+          state.requireLive().rawHandleValue,
+          replacement.descriptor(),
+          outCommandId,
+        )
+      }
     }
   }
 
@@ -433,41 +456,31 @@ internal constructor(
     callback: ResourceProviderCallback,
     install: (ResourceProviderState) -> Int,
   ) {
-    setResourceProvider(callback, install)
-  }
-
-  private fun setResourceProvider(
-    callback: ResourceProviderCallback,
-    install: (ResourceProviderState) -> Int,
-  ) {
-    resourceProviderState?.checkCanClose()
     val replacement = ResourceProviderState(callback)
-    val previous: ResourceProviderState?
-    try {
-      Status.check(install(replacement))
-      previous = resourceProviderState
-      resourceProviderState = replacement
-    } catch (error: Throwable) {
-      replacement.close()
-      throw error
+    val commandId =
+      resourceProviderCommands.set(replacement) {
+        Status.check(install(replacement))
+        1uL
+      }
+    resourceProviderCommands.finish(commandId, CommandDisposition.COMMITTED)
+  }
+
+  public actual fun clearResourceProvider(): ULong = resourceProviderCommands.clear {
+    command { outCommandId ->
+      mln_runtime_clear_resource_provider(state.requireLive().rawHandleValue, outCommandId)
     }
-    previous?.close()
   }
 
-  public actual fun clearResourceProvider() {
-    resourceProviderState?.checkCanClose()
-    Status.check(mln_runtime_clear_resource_provider(state.requireLive().rawHandleValue))
-    val previous = resourceProviderState
-    resourceProviderState = null
-    previous?.close()
-  }
-
-  public actual fun setResourceTransform(callback: ResourceTransformCallback) {
-    setResourceTransform(callback) { replacement ->
-      mln_runtime_set_resource_transform(
-        state.requireLive().rawHandleValue,
-        replacement.descriptor(),
-      )
+  public actual fun setResourceTransform(callback: ResourceTransformCallback): ULong {
+    val replacement = ResourceTransformState(callback)
+    return resourceTransformCommands.set(replacement) {
+      command { outCommandId ->
+        mln_runtime_set_resource_transform(
+          state.requireLive().rawHandleValue,
+          replacement.descriptor(),
+          outCommandId,
+        )
+      }
     }
   }
 
@@ -475,60 +488,38 @@ internal constructor(
     callback: ResourceTransformCallback,
     install: (ResourceTransformState) -> Int,
   ) {
-    setResourceTransform(callback, install)
-  }
-
-  private fun setResourceTransform(
-    callback: ResourceTransformCallback,
-    install: (ResourceTransformState) -> Int,
-  ) {
-    resourceTransformState?.checkCanClose()
     val replacement = ResourceTransformState(callback)
-    val previous: ResourceTransformState?
-    try {
-      Status.check(install(replacement))
-      previous = resourceTransformState
-      resourceTransformState = replacement
-    } catch (error: Throwable) {
-      replacement.close()
-      throw error
+    val commandId =
+      resourceTransformCommands.set(replacement) {
+        Status.check(install(replacement))
+        1uL
+      }
+    resourceTransformCommands.finish(commandId, CommandDisposition.COMMITTED)
+  }
+
+  public actual fun clearResourceTransform(): ULong = resourceTransformCommands.clear {
+    command { outCommandId ->
+      mln_runtime_clear_resource_transform(state.requireLive().rawHandleValue, outCommandId)
     }
-    previous?.close()
   }
 
-  public actual fun clearResourceTransform() {
-    resourceTransformState?.checkCanClose()
-    Status.check(mln_runtime_clear_resource_transform(state.requireLive().rawHandleValue))
-    val previous = resourceTransformState
-    resourceTransformState = null
-    previous?.close()
-  }
-
-  public actual fun setHttpHeaderTransform(callback: HttpHeaderTransformCallback) {
-    httpHeaderTransformState?.checkCanClose()
+  public actual fun setHttpHeaderTransform(callback: HttpHeaderTransformCallback): ULong {
     val replacement = HttpHeaderTransformState(callback)
-    try {
-      Status.check(
+    return httpHeaderTransformCommands.set(replacement) {
+      command { outCommandId ->
         mln_runtime_set_http_header_transform(
           state.requireLive().rawHandleValue,
           replacement.descriptor(),
+          outCommandId,
         )
-      )
-    } catch (error: Throwable) {
-      replacement.close()
-      throw error
+      }
     }
-    val previous = httpHeaderTransformState
-    httpHeaderTransformState = replacement
-    previous?.close()
   }
 
-  public actual fun clearHttpHeaderTransform() {
-    httpHeaderTransformState?.checkCanClose()
-    Status.check(mln_runtime_clear_http_header_transform(state.requireLive().rawHandleValue))
-    val previous = httpHeaderTransformState
-    httpHeaderTransformState = null
-    previous?.close()
+  public actual fun clearHttpHeaderTransform(): ULong = httpHeaderTransformCommands.clear {
+    command { outCommandId ->
+      mln_runtime_clear_http_header_transform(state.requireLive().rawHandleValue, outCommandId)
+    }
   }
 
   public actual fun drainEvents(maxEvents: Int): RuntimeEventBatch = memScoped {
@@ -566,6 +557,7 @@ internal constructor(
             copyEvent(event, messages, eventSize)
           }
         }
+      copied.forEach(::finishCallbackCommand)
       RuntimeEventBatch(copied, remainingCount.toLong())
     } finally {
       mln_event_batch_release(outBatch.value)
@@ -584,18 +576,31 @@ internal constructor(
       )
     }
 
-  public actual override fun close() {
-    resourceProviderState?.checkCanClose()
-    resourceTransformState?.checkCanClose()
-    httpHeaderTransformState?.checkCanClose()
-    state.closeOnce({ runtime -> destroyer(runtime.rawHandleValue) }) {
-      resourceProviderState?.close()
-      resourceTransformState?.close()
-      httpHeaderTransformState?.close()
-      resourceProviderState = null
-      resourceTransformState = null
-      httpHeaderTransformState = null
+  public actual suspend fun close() {
+    if (!state.beginClose()) return
+    val operation =
+      try {
+        startOperation { outOperation ->
+          mln_runtime_close_start(state.handleForClose().rawHandleValue, outOperation)
+        }
+      } catch (error: Throwable) {
+        state.abortClose()
+        throw error
+      }
+    try {
+      notifications.await(operation)
+    } catch (error: Throwable) {
+      state.abortClose()
+      throw error
+    } finally {
+      mln_operation_release(operation)
     }
+    state.completeClose {
+      resourceProviderCommands.close()
+      resourceTransformCommands.close()
+      httpHeaderTransformCommands.close()
+    }
+    notifications.close()
     if (notificationSource != 0uL) {
       Status.check(mln_notification_source_close(notificationSource))
       notificationSource = 0uL
@@ -609,12 +614,22 @@ internal constructor(
 
   internal fun nativeHandleId(): Long = state.handleId()
 
+  internal suspend fun awaitOperation(operation: ULong) {
+    notifications.await(operation)
+  }
+
+  internal fun forgetOperation(operation: ULong) {
+    notifications.forget(operation)
+  }
+
   internal fun retainChild(childTypeName: String): HandleStateCore.ChildRetention =
     state.retainChild(childTypeName)
 
-  internal fun resourceProviderStateForTesting(): ResourceProviderState? = resourceProviderState
+  internal fun resourceProviderStateForTesting(): ResourceProviderState? =
+    resourceProviderCommands.currentForTesting()
 
-  internal fun resourceTransformStateForTesting(): ResourceTransformState? = resourceTransformState
+  internal fun resourceTransformStateForTesting(): ResourceTransformState? =
+    resourceTransformCommands.currentForTesting()
 
   internal fun copyEventForTesting(
     event: mln_runtime_event,
@@ -642,6 +657,13 @@ internal constructor(
     )
   }
 
+  private fun finishCallbackCommand(event: RuntimeEvent) {
+    val payload = event.payload as? RuntimeEventPayload.CommandFinished ?: return
+    resourceProviderCommands.finish(payload.commandId, payload.disposition)
+    resourceTransformCommands.finish(payload.commandId, payload.disposition)
+    httpHeaderTransformCommands.finish(payload.commandId, payload.disposition)
+  }
+
   private fun mapFor(sourceType: RuntimeEventSourceType, sourceId: Long): MapHandle? =
     if (sourceType == RuntimeEventSourceType.MAP && sourceId != 0L) liveMaps[sourceId]?.value
     else null
@@ -657,16 +679,16 @@ internal constructor(
   }
 
   public actual companion object {
-    public actual fun create(options: RuntimeOptions): RuntimeHandle =
-      create(options, Maplibre.cVersion(), ::mln_runtime_create)
+    public actual suspend fun create(options: RuntimeOptions): RuntimeHandle =
+      create(options, Maplibre.cVersion(), ::mln_runtime_create_start)
 
-    internal fun createForTesting(
+    internal suspend fun createForTesting(
       options: RuntimeOptions = RuntimeOptions(),
       actualAbiVersion: Long = Maplibre.EXPECTED_C_ABI_VERSION,
       creator: (CPointer<mln_runtime_options>, CPointer<ULongVar>) -> Int,
     ): RuntimeHandle = create(options, actualAbiVersion, creator)
 
-    private fun create(
+    private suspend fun create(
       options: RuntimeOptions,
       actualAbiVersion: Long,
       creator: (CPointer<mln_runtime_options>, CPointer<ULongVar>) -> Int,
@@ -683,18 +705,43 @@ internal constructor(
       nativeOptions.event_mask = options.eventMask.nativeValue.toULong()
       nativeOptions.notification_source = source
 
-      val outRuntime = alloc<ULongVar>()
-      outRuntime.value = 0uL
+      val notifications = NotificationDispatcher(source)
       try {
-        Status.check(creator(nativeOptions.ptr, outRuntime.ptr))
-        RuntimeHandle(outRuntime.value.asHandle("mln_runtime_create", ::runtimeHandle), source)
-      } catch (error: Throwable) {
-        if (outRuntime.value != 0uL) {
-          mln_runtime_destroy(outRuntime.value)
+        val operation = startOperation { outOperation -> creator(nativeOptions.ptr, outOperation) }
+        try {
+          notifications.await(operation)
+          val outRuntime = alloc<ULongVar>()
+          outRuntime.value = 0uL
+          Status.check(mln_runtime_create_take_result(operation, outRuntime.ptr))
+          RuntimeHandle(
+            outRuntime.value.asHandle("mln_runtime_create_take_result", ::runtimeHandle),
+            source,
+            notifications,
+          )
+        } finally {
+          mln_operation_release(operation)
         }
+      } catch (error: Throwable) {
+        notifications.close()
         mln_notification_source_close(source)
         throw error
       }
     }
   }
+}
+
+@OptIn(ExperimentalForeignApi::class)
+private inline fun command(call: (CPointer<ULongVar>) -> Int): ULong = memScoped {
+  val outCommandId = alloc<ULongVar>()
+  outCommandId.value = 0uL
+  Status.check(call(outCommandId.ptr))
+  outCommandId.value
+}
+
+@OptIn(ExperimentalForeignApi::class)
+internal inline fun startOperation(call: (CPointer<ULongVar>) -> Int): ULong = memScoped {
+  val outOperation = alloc<ULongVar>()
+  outOperation.value = 0uL
+  Status.check(call(outOperation.ptr))
+  outOperation.value
 }

@@ -1,10 +1,9 @@
 // Package maplibre provides low-level Go bindings for the MapLibre Native C
 // API.
 //
-// Runtime, map, projection, render-session, and acquired-frame handles follow
-// the current C API owner-thread model. Call runtime.LockOSThread before
-// creating a RuntimeHandle and keep that runtime's lifecycle on the locked
-// goroutine. OperationHandle methods accept calls from any goroutine.
+// Runtime, map, and projection handles are usable from any goroutine.
+// Render-session and acquired-frame graphics calls retain their native thread
+// affinity. OperationHandle methods are usable from any goroutine.
 package maplibre
 
 /*

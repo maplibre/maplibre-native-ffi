@@ -69,7 +69,12 @@ class OpenGLOwnedSession:
         runtime = mln.RuntimeHandle()
         try:
             map_handle = runtime.create_map(
-                mln.MapOptions(width=64, height=64, mode=mln.MapMode.STATIC)
+                mln.MapOptions(
+                    width=width,
+                    height=height,
+                    scale_factor=scale_factor,
+                    mode=mln.MapMode.STATIC,
+                )
             )
             try:
                 session = map_handle.attach_opengl_owned_texture(
@@ -181,12 +186,8 @@ def _egl_borrowed_texture(
         texture.close()
 
 
-def request_still_image_if_needed(map_handle: mln.MapHandle) -> None:
-    try:
-        map_handle.request_still_image()
-    except mln.InvalidStateError as error:
-        if "pending still-image request" not in error.diagnostic:
-            raise
+def request_still_image(map_handle: mln.MapHandle) -> mln.OperationHandle[None]:
+    return map_handle.request_still_image()
 
 
 def wait_for_texture_info(
@@ -195,9 +196,9 @@ def wait_for_texture_info(
     iterations: int = 5000,
 ) -> render.TextureImageInfo:
     fixture.map.set_style_json(EMPTY_STYLE_JSON.encode())
-    request_still_image_if_needed(fixture.map)
+    operation = request_still_image(fixture.map)
     for _ in range(iterations):
-        fixture.runtime.pump()
+        time.sleep(0.001)
         for event in fixture.runtime.drain_events().events:
             if event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE:
                 try:
@@ -205,9 +206,12 @@ def wait_for_texture_info(
                 except mln.InvalidStateError:
                     pass
         try:
-            return fixture.session.texture_image_info()
+            info = fixture.session.texture_image_info()
+            operation.close()
+            return info
         except mln.InvalidStateError:
             time.sleep(0.001)
+    operation.close()
     raise AssertionError("OpenGL texture readback metadata was not observed")
 
 
@@ -217,10 +221,10 @@ def wait_for_opengl_frame(
     *,
     iterations: int = 5000,
 ) -> render.OpenGLOwnedTextureFrameHandle:
-    request_still_image_if_needed(fixture.map)
+    operation = request_still_image(fixture.map)
     last_frame: render.OpenGLOwnedTextureFrame | None = None
     for _ in range(iterations):
-        fixture.runtime.pump()
+        time.sleep(0.001)
         for event in fixture.runtime.drain_events().events:
             if event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE:
                 try:
@@ -234,9 +238,11 @@ def wait_for_opengl_frame(
             continue
         last_frame = frame.frame
         if predicate(last_frame):
+            operation.close()
             return frame
         frame.close()
         time.sleep(0.001)
+    operation.close()
     raise AssertionError(f"matching OpenGL frame was not observed; last={last_frame!r}")
 
 
@@ -373,10 +379,11 @@ def test_resize_updates_opengl_owned_texture_frame_extent(
     opengl_owned_session.render_once()
 
     opengl_owned_session.session.resize(16, 8, 2.0)
-    # The map applies the new logical size on its own thread, so a render
-    # before the next pump reports the pending size.
-    assert (
-        opengl_owned_session.session.render_update() == render.RenderResult.SIZE_PENDING
+    # The autonomous map worker applies the logical size asynchronously. It
+    # either commits before this call or reports that the new size is pending.
+    assert opengl_owned_session.session.render_update() in (
+        render.RenderResult.RENDERED,
+        render.RenderResult.SIZE_PENDING,
     )
     frame = wait_for_opengl_frame(
         opengl_owned_session,
@@ -668,10 +675,12 @@ def test_egl_borrowed_texture_set_target_hands_over_a_replacement() -> None:
                         )
                     finally:
                         context.clear_current()
+                    map_handle.resize(48, 24, 1.0)
+                    runtime.barrier()
 
                     # The session kept its renderer and paints the
                     # texture it was handed, at the extent handed with
-                    # it, once the map catches up.
+                    # it, once the map has caught up.
                     render_until(
                         runtime,
                         session,

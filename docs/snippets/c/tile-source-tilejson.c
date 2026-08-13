@@ -14,14 +14,16 @@ static mln_status add_layer(mln_map map) {
     "{\"id\":\"roads\",\"type\":\"line\",\"source\":\"basemap\","
     "\"source-layer\":\"transportation\"}";
   // #endregion layer
-  return mln_map_add_style_layer_json(map, view(layer), view(""));
+  uint64_t command_id = 0;
+  return mln_map_add_style_layer_json(map, view(layer), view(""), &command_id);
 }
 
 mln_status add_basemap(mln_map map) {
   // #region source
+  uint64_t command_id = 0;
   const mln_status status = mln_map_add_vector_source_url(
     map, view("basemap"), view("https://tiles.example.com/planet/tiles.json"),
-    NULL
+    NULL, &command_id
   );
   if (status != MLN_STATUS_OK) {
     return status;

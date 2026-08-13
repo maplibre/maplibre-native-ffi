@@ -26,8 +26,6 @@ internal object SyntheticHandles {
 
   fun styleIdList(ordinal: Long = 1): NativeStyleIdList = NativeStyleIdList(kind(0x08) or ordinal)
 
-  fun wakeSource(ordinal: Long = 1): NativeWakeSource = NativeWakeSource(kind(0x0B) or ordinal)
-
   fun resourceRequest(ordinal: Long = 1): NativeResourceRequest =
     NativeResourceRequest(kind(0x0C) or ordinal)
 

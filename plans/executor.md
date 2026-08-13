@@ -945,6 +945,30 @@ render barriers. Add the caller driver's typed work mailbox, receiver
 notification, driver-service call, normal detach, and irreversible target
 abandonment.
 
+Phase 3 keeps driver coordination in the C/C++ layer. The typed caller-driver
+mailbox, frame-demand state, frame queues, driver-work association, completion
+state, frame tokens and generations, acquired-frame leases, detach state,
+abandonment state, and target-loss completion are native state. Core-worker
+drivers are native-owned and native-scheduled. A caller driver is serviced
+explicitly by its host on the target's graphics thread; a binding adapts the
+typed service call without hiding it behind a binding-owned thread.
+
+Bindings reuse their existing operation primitive and receiver-scoped
+notification source. Driver and frame readiness add endpoint kinds to that
+source. A binding MUST NOT add another operation registry, mailbox, frame queue,
+runtime pump, per-session scheduler, driver thread, or notification mechanism.
+It exposes an asynchronous language API only for a C operation, without adding a
+paired blocking workflow unless the language's resource-management contract
+requires one.
+
+Implement and validate one core-worker backend contract and one caller-thread
+backend contract before expanding across every backend and binding. Freeze the
+driver structs, ownership rules, lifecycle transitions, and result dispositions
+before regenerating bindings. Generate repetitive binding adapters from compact
+descriptors where practical; keep language-owned safety and lifecycle policy
+handwritten. Correctness and maintainability come first, without a source-line
+cap. Contract remaining duplication after Phase 3 before starting Phase 4.
+
 Keep driver selection separate from OpenGL context ownership. Preserve the
 rendered, no-update, size-pending, and target-not-ready retry conditions across
 caller-driver results and core-worker frame dispositions.

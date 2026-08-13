@@ -6,38 +6,44 @@
 #include <cstdint>
 #include <cstring>
 #include <deque>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <shared_mutex>
 #include <string>
-#include <thread>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
 
-#include <mbgl/storage/resource_options.hpp>
-#include <mbgl/util/run_loop.hpp>
-
+#include "execution/control_state.hpp"
+#include "execution/runtime_executor.hpp"
 #include "handles/handle_table.hpp"
 #include "maplibre_native_c.h"
 
 namespace mbgl {
 class DatabaseFileSource;
+class ResourceOptions;
+namespace util {
+class RunLoop;
+}  // namespace util
 }  // namespace mbgl
 
 namespace mln::core {
 
 struct RuntimeObject;
 class NotificationEndpoint;
+class OperationObject;
 class NotificationSourceObject;
 
-// Read on the map owner thread by every map event producer, and on the mbgl
-// DatabaseFileSourceThread by every offline producer. Held by shared_ptr so a
-// camera transition that outlives its map still reads a live cell.
+// Read on the runtime worker by map event producers, and on the mbgl
+// DatabaseFileSourceThread by offline producers. Held by shared_ptr so a camera
+// transition that outlives its map still reads a live cell.
 struct MapEventState {
   std::atomic<uint64_t> mask;
-  // Owner-thread only. The style setters clear this before a load and read it
+  // Runtime-worker only. The style setters clear this before a load and read it
   // after, so a subscription mask can never change their return status.
   std::string style_load_failure;
   bool style_load_failed = false;
@@ -115,11 +121,10 @@ struct ResourceProviderState {
   ResourceProvider provider;
 };
 
-// Borrows the resource provider registered on a runtime for the duration of one
-// provider callback. `set_resource_provider()`, `clear_resource_provider()`,
-// and `destroy_runtime()` wait for every live lease before retiring a callback
-// and its `user_data`. The lease retains the state, so it stays readable after
-// the runtime is gone.
+// Borrows the resource provider registered on a runtime for one callback. A
+// replacement or clear command waits for every live lease on the runtime
+// executor before it emits its terminal event. The lease retains the state, so
+// it stays readable after the runtime handle is retired.
 class ResourceProviderLease {
  public:
   ResourceProviderLease(
@@ -145,19 +150,6 @@ struct OfflineRegionEventState {
   bool alive = false;
 };
 
-// Holds the wake flag and the condition variable a parked owner thread blocks
-// on. Reference-counted so a wake source keeps it readable after the runtime is
-// destroyed.
-//
-// `mutex` is a leaf lock: the `RunLoop` mutex and `event_mutex` both order
-// ahead of it.
-struct WakeState {
-  std::mutex mutex;
-  std::condition_variable condition;
-  bool signaled = false;
-  bool alive = true;
-};
-
 struct QueuedRuntimeEvent {
   uint32_t type;
   uint32_t source_type;
@@ -177,7 +169,7 @@ struct RuntimeEventQueueState {
   std::condition_variable drain_condition;
   bool alive = true;
   bool drain_active = false;
-  std::unordered_set<mln_map> event_maps;
+  std::unordered_map<mln_map, std::shared_ptr<MapEventState>> event_maps;
   std::deque<mln::core::QueuedRuntimeEvent> events;
   std::unordered_set<mln_offline_region_id> observed_offline_regions;
   std::shared_ptr<mln::core::NotificationSourceObject> notification_source;
@@ -194,8 +186,15 @@ struct RuntimeObject {
   mln_runtime self = MLN_HANDLE_NULL;
   // The token this runtime hands to mbgl as its opaque platform context.
   void* platform_context = nullptr;
-  std::thread::id owner_thread;
-  std::unique_ptr<mbgl::util::RunLoop> run_loop;
+  ControlState control;
+  RuntimeExecutor executor;
+  // The single commit point for commands, operations, barriers, and close.
+  std::mutex submission_mutex;
+  uint64_t next_command_id = 1;
+  std::mutex terminal_mutex;
+  std::condition_variable terminal_condition;
+  uint64_t next_submission_sequence = 1;
+  std::set<uint64_t> pending_submissions;
   std::string asset_path;
   std::string cache_path;
   std::shared_ptr<mbgl::DatabaseFileSource> database_source;
@@ -204,32 +203,26 @@ struct RuntimeObject {
   std::shared_ptr<mln::core::ResourceTransformState> resource_transform_state;
   std::shared_ptr<mln::core::HttpHeaderTransformState>
     http_header_transform_state;
-  std::shared_ptr<mln::core::WakeState> wake_state;
   std::shared_ptr<mln::core::RuntimeEventState> event_state;
   std::shared_ptr<mln::core::RuntimeEventQueueState> event_queue;
-  std::size_t live_maps = 0;
 };
 
 template <>
 struct HandleTraits<RuntimeObject> {
   static constexpr auto kind = HandleKind::Runtime;
-  // Run-loop join and file-source teardown are owner-thread work, so a lease
-  // must not let a foreign thread outlive destroy_runtime().
-  static constexpr auto leasable = false;
+  static constexpr auto leasable = true;
 };
 
-auto create_runtime(
-  const mln_runtime_options* options, mln_runtime* out_runtime
+auto create_runtime_start(
+  const mln_runtime_options* options, mln_operation* out_operation
 ) -> mln_status;
-auto destroy_runtime(mln_runtime runtime) -> mln_status;
-auto pump_runtime(mln_runtime runtime, int64_t timeout_ms) -> mln_status;
-auto acquire_wake_source(mln_runtime runtime, mln_wake_source* out_source)
+auto create_runtime_take_result(
+  mln_operation operation, mln_runtime* out_runtime
+) -> mln_status;
+auto runtime_barrier_start(mln_runtime runtime, mln_operation* out_operation)
   -> mln_status;
-auto signal_wake_source(mln_wake_source source) -> mln_status;
-auto destroy_wake_source(mln_wake_source source) noexcept -> void;
-// Sets the wake flag for the runtime owning `state` and releases any parked
-// owner thread.
-auto signal_wake(const std::shared_ptr<WakeState>& state) noexcept -> void;
+auto close_runtime_start(mln_runtime runtime, mln_operation* out_operation)
+  -> mln_status;
 auto drain_runtime_events(
   mln_runtime runtime, size_t max_events, mln_event_batch* out_batch
 ) -> mln_status;
@@ -241,18 +234,23 @@ auto set_runtime_event_mask(mln_runtime runtime, uint64_t mask) -> mln_status;
 auto get_runtime_event_mask(mln_runtime runtime, uint64_t* out_mask)
   -> mln_status;
 auto set_resource_provider(
-  mln_runtime runtime, const mln_resource_provider* provider
+  mln_runtime runtime, const mln_resource_provider* provider,
+  uint64_t* out_command_id
 ) -> mln_status;
-auto clear_resource_provider(mln_runtime runtime) -> mln_status;
+auto clear_resource_provider(mln_runtime runtime, uint64_t* out_command_id)
+  -> mln_status;
 auto set_resource_transform(
-  mln_runtime runtime, const mln_resource_transform* transform
+  mln_runtime runtime, const mln_resource_transform* transform,
+  uint64_t* out_command_id
 ) -> mln_status;
 auto resource_transform_response_set_url(
   mln_resource_transform_response* response, const char* url, size_t url_size
 ) -> mln_status;
-auto clear_resource_transform(mln_runtime runtime) -> mln_status;
+auto clear_resource_transform(mln_runtime runtime, uint64_t* out_command_id)
+  -> mln_status;
 auto set_http_header_transform(
-  mln_runtime runtime, const mln_http_header_transform* transform
+  mln_runtime runtime, const mln_http_header_transform* transform,
+  uint64_t* out_command_id
 ) -> mln_status;
 auto validate_http_header(
   const char* name, size_t name_size, const char* value, size_t value_size
@@ -261,7 +259,8 @@ auto http_header_transform_response_set(
   mln_http_header_transform_response* response, const char* name,
   size_t name_size, const char* value, size_t value_size
 ) -> mln_status;
-auto clear_http_header_transform(mln_runtime runtime) -> mln_status;
+auto clear_http_header_transform(mln_runtime runtime, uint64_t* out_command_id)
+  -> mln_status;
 auto invoke_http_header_transform(
   void* platform_context, uint32_t kind, const char* url
 ) noexcept -> HttpHeaders;
@@ -355,12 +354,26 @@ auto retain_runtime_map(mln_runtime runtime) -> mln_status;
 auto release_runtime_map(mln_runtime runtime) noexcept -> void;
 auto validate_runtime(mln_runtime runtime, RuntimeObject*& out_runtime)
   -> mln_status;
+[[nodiscard]] auto lease_runtime(mln_runtime runtime)
+  -> std::shared_ptr<RuntimeObject>;
+auto dispatch_runtime_sync(
+  mln_runtime runtime, std::function<mln_status()> function
+) -> mln_status;
+auto submit_runtime_command(
+  const std::shared_ptr<RuntimeObject>& runtime,
+  std::function<void(uint64_t)> function, uint64_t* out_command_id,
+  std::atomic<uint64_t>* latest_command_id = nullptr
+) -> mln_status;
+auto submit_runtime_operation(
+  const std::shared_ptr<RuntimeObject>& runtime,
+  const std::shared_ptr<OperationObject>& operation,
+  std::function<void()> function
+) -> mln_status;
+auto associate_runtime_operation_with_current_submission(
+  RuntimeObject* runtime, const std::shared_ptr<OperationObject>& operation
+) noexcept -> bool;
 
-// The run loop this runtime pumps from mln_runtime_pump(). Use it as the
-// mbgl::Scheduler backing a Mailbox, so work posted from a foreign thread is
-// delivered on the runtime owner thread. Prefer this over
-// mbgl::util::RunLoop::Get(), which reads the calling thread's ambient
-// scheduler.
+// The continuously running run loop owned by this runtime's executor.
 auto runtime_run_loop(RuntimeObject* runtime) -> mbgl::util::RunLoop&;
 
 auto resource_options_for_runtime(mln_runtime runtime) -> mbgl::ResourceOptions;
@@ -388,7 +401,14 @@ auto push_runtime_map_event_payload(
   const mln_runtime_event_payload& payload, int32_t code = 0,
   std::string message = {}
 ) -> void;
-auto register_runtime_map_events(mln_runtime runtime, mln_map map) -> void;
+auto push_runtime_command_finished(
+  mln_runtime runtime, uint32_t source_type, uint64_t source,
+  uint64_t command_id, uint32_t disposition, mln_status status,
+  uint64_t generation, const char* message = nullptr
+) -> void;
+auto register_runtime_map_events(
+  mln_runtime runtime, mln_map map, std::shared_ptr<MapEventState> event_state
+) -> void;
 auto discard_runtime_map_events(mln_runtime runtime, mln_map map) -> void;
 
 }  // namespace mln::core

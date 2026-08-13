@@ -3,32 +3,53 @@ import Foundation
 @testable import MaplibreNativeFFI
 import Testing
 
-/// Pumps and drains until an event `isMatch` accepts arrives, and returns it.
-/// Records an issue naming `subject` and returns `nil` when nothing matches
-/// before the deadline.
+/// Drains until an event `isMatch` accepts arrives, and returns it.
+/// Records an issue naming `subject` and returns `nil` at the deadline.
 func pumpUntilEvent(
   _ runtime: RuntimeHandle,
   waitingFor subject: String,
   timeout: TimeInterval = 10,
   where isMatch: (RuntimeEvent) -> Bool
-) throws -> RuntimeEvent? {
+) async throws -> RuntimeEvent? {
   let deadline = Date().addingTimeInterval(timeout)
   while Date() < deadline {
-    try runtime.pump()
+    try await runtime.barrier()
     for event in try runtime.drainEvents().events where isMatch(event) {
       return event
     }
-    Thread.sleep(forTimeInterval: 0.001)
+    try await Task<Never, Never>.sleep(nanoseconds: 1_000_000)
   }
   Issue.record("timed out waiting for \(subject)")
   return nil
 }
 
-/// Pumps and drains until the runtime stops producing events, so a park that
-/// follows is released by whatever the test raises next.
-func pumpUntilQuiet(_ runtime: RuntimeHandle, iterations: Int = 100) throws {
+func commandDisposition(
+  _ commandId: UInt64,
+  runtime: RuntimeHandle
+) async throws -> UInt32? {
+  try await pumpUntilEvent(
+    runtime,
+    waitingFor: "command \(commandId) to finish"
+  ) { event in
+    guard case let .commandFinished(finished) = event.payload else {
+      return false
+    }
+    return finished.commandId == commandId
+  }.flatMap { event in
+    guard case let .commandFinished(finished) = event.payload else {
+      return nil
+    }
+    return finished.disposition
+  }
+}
+
+/// Drains until autonomous execution stops producing events.
+func pumpUntilQuiet(
+  _ runtime: RuntimeHandle,
+  iterations: Int = 100
+) async throws {
   for _ in 0 ..< iterations {
-    try runtime.pump()
+    try await runtime.barrier()
     if try runtime.drainEvents().events.isEmpty { return }
   }
   Issue.record("the runtime kept producing events while idle")
@@ -51,9 +72,6 @@ private final class CapturedFailure: @unchecked Sendable {
 }
 
 /// Runs `body` on another thread and returns the native failure it threw.
-///
-/// The public handle types are deliberately not `Sendable`, so a test reaches
-/// the C API's owner-thread rule through the native handle a handle lends out.
 func failureFromAnotherThread(
   _ body: @escaping @Sendable () throws -> Void
 ) -> NativeStatusFailure? {

@@ -14,65 +14,68 @@ import org.maplibre.nativeffi.error.MaplibreStatus
 @OptIn(ExperimentalAtomicApi::class)
 class LogCallbackRegistryTest {
   @Test
-  fun firstSetInstallsNativeCallbackAndReplacementClosesPreviousState() {
-    val registry = LogCallbackRegistry<TestCallbackState>()
-    val first = TestCallbackState()
-    val second = TestCallbackState()
-    var installs = 0
+  fun firstSetInstallsNativeCallbackAndReplacementClosesPreviousState(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val registry = LogCallbackRegistry<TestCallbackState>()
+      val first = TestCallbackState()
+      val second = TestCallbackState()
+      var installs = 0
 
-    registry.set(first) {
-      installs++
-      MaplibreStatus.OK.nativeCode
-    }
-    registry.set(second) {
-      installs++
-      MaplibreStatus.OK.nativeCode
-    }
-
-    assertEquals(1, installs)
-    assertTrue(first.isClosed())
-    assertSame(second, registry.current())
-  }
-
-  @Test
-  fun failedInitialInstallClosesReplacementAndLeavesCurrentEmpty() {
-    val registry = LogCallbackRegistry<TestCallbackState>()
-    val replacement = TestCallbackState()
-
-    val error =
-      assertFailsWith<MaplibreException> {
-        registry.set(replacement) { MaplibreStatus.NATIVE_ERROR.nativeCode }
+      registry.set(first) {
+        installs++
+        MaplibreStatus.OK.nativeCode
+      }
+      registry.set(second) {
+        installs++
+        MaplibreStatus.OK.nativeCode
       }
 
-    assertEquals(MaplibreStatus.NATIVE_ERROR, error.status)
-    assertTrue(replacement.isClosed())
-    assertNull(registry.current())
-  }
+      assertEquals(1, installs)
+      assertTrue(first.isClosed())
+      assertSame(second, registry.current())
+    }
 
   @Test
-  fun clearOnlyCallsNativeClearWhenInstalledAndClosesCurrentState() {
-    val registry = LogCallbackRegistry<TestCallbackState>()
-    val state = TestCallbackState()
-    var clears = 0
+  fun failedInitialInstallClosesReplacementAndLeavesCurrentEmpty(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val registry = LogCallbackRegistry<TestCallbackState>()
+      val replacement = TestCallbackState()
 
-    registry.clear {
-      clears++
-      MaplibreStatus.OK.nativeCode
-    }
-    registry.set(state) { MaplibreStatus.OK.nativeCode }
-    registry.clear {
-      clears++
-      MaplibreStatus.OK.nativeCode
-    }
-    registry.clear {
-      clears++
-      MaplibreStatus.OK.nativeCode
+      val error =
+        assertFailsWith<MaplibreException> {
+          registry.set(replacement) { MaplibreStatus.NATIVE_ERROR.nativeCode }
+        }
+
+      assertEquals(MaplibreStatus.NATIVE_ERROR, error.status)
+      assertTrue(replacement.isClosed())
+      assertNull(registry.current())
     }
 
-    assertEquals(1, clears)
-    assertTrue(state.isClosed())
-    assertNull(registry.current())
-  }
+  @Test
+  fun clearOnlyCallsNativeClearWhenInstalledAndClosesCurrentState(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val registry = LogCallbackRegistry<TestCallbackState>()
+      val state = TestCallbackState()
+      var clears = 0
+
+      registry.clear {
+        clears++
+        MaplibreStatus.OK.nativeCode
+      }
+      registry.set(state) { MaplibreStatus.OK.nativeCode }
+      registry.clear {
+        clears++
+        MaplibreStatus.OK.nativeCode
+      }
+      registry.clear {
+        clears++
+        MaplibreStatus.OK.nativeCode
+      }
+
+      assertEquals(1, clears)
+      assertTrue(state.isClosed())
+      assertNull(registry.current())
+    }
 
   private class TestCallbackState : AutoCloseable {
     private val closed = AtomicInt(0)

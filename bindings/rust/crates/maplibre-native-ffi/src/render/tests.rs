@@ -10,7 +10,6 @@ use std::ffi::c_void;
 use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 #[cfg(not(target_os = "emscripten"))]
@@ -36,12 +35,11 @@ use static_assertions::assert_not_impl_any;
 use webgl_gl as gl_api;
 
 use super::*;
-use crate::logging::test_support::LoggingTestGuard;
+
 use crate::{
     AnimationOptions, CameraChangeMode, CameraOptions, ErrorKind, GeoJsonSourceOptions, LatLng,
-    LogSeverity, LogSeverityMask, MapAttachRef, MapHandle, MapMode, MapOptions,
-    OpenGLContextProviderMask, RenderBackendMask, RuntimeEventPayload, RuntimeEventType,
-    RuntimeHandle, ScreenBox, ScreenPoint,
+    MapHandle, MapMode, MapOptions, OpenGLContextProviderMask, RenderBackendMask,
+    RuntimeEventPayload, RuntimeEventType, RuntimeHandle, ScreenBox, ScreenPoint,
 };
 
 assert_not_impl_any!(NativePointer: Send, Sync);
@@ -59,7 +57,7 @@ const QUERY_STYLE_BACKGROUND_RGBA: [u8; 4] = [0xd8, 0xf1, 0xff, 0xff];
 
 const CLUSTER_BASE_STYLE_JSON: &str = r##"{"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#ffffff"}}]}"##;
 fn create_owned_texture_session(
-    map: &MapAttachRef,
+    map: &MapHandle,
     extent: RenderTargetExtent,
 ) -> std::result::Result<(OwnedTextureTestContext, RenderSessionHandle), Box<dyn StdError>> {
     let backends = crate::supported_render_backends();
@@ -144,7 +142,7 @@ fn has_opengl_test_context_backend() -> bool {
 }
 
 fn create_opengl_owned_texture_session(
-    map: &MapAttachRef,
+    map: &MapHandle,
     extent: RenderTargetExtent,
 ) -> std::result::Result<(OpenGLTestContext, RenderSessionHandle), Box<dyn StdError>> {
     let backends = crate::supported_render_backends();
@@ -160,7 +158,7 @@ fn create_opengl_owned_texture_session(
 }
 
 fn create_opengl_surface_session(
-    map: &MapAttachRef,
+    map: &MapHandle,
     extent: RenderTargetExtent,
 ) -> std::result::Result<(OpenGLTestContext, RenderSessionHandle), Box<dyn StdError>> {
     let backends = crate::supported_render_backends();
@@ -177,7 +175,7 @@ fn create_opengl_surface_session(
 }
 
 fn create_opengl_borrowed_texture_session(
-    map: &MapAttachRef,
+    map: &MapHandle,
     extent: RenderTargetExtent,
 ) -> std::result::Result<(OpenGLBorrowedTexture, RenderSessionHandle), Box<dyn StdError>> {
     let backends = crate::supported_render_backends();
@@ -201,7 +199,7 @@ fn create_opengl_borrowed_texture_session(
 /// allocates its own render target does.
 #[cfg(mln_webgpu_backend)]
 fn create_webgpu_borrowed_texture_session(
-    map: &MapAttachRef,
+    map: &MapHandle,
     extent: RenderTargetExtent,
 ) -> std::result::Result<
     (
@@ -233,7 +231,7 @@ enum OwnedTextureTestContext {
 impl OwnedTextureTestContext {
     fn attach_owned_texture(
         &self,
-        map: &MapAttachRef,
+        map: &MapHandle,
         extent: RenderTargetExtent,
     ) -> Result<RenderSessionHandle> {
         match self {
@@ -2064,6 +2062,9 @@ impl OpenGLBorrowedTexture {
 
     fn read_rgba(&self) -> std::result::Result<Vec<u8>, Box<dyn StdError>> {
         self.context.make_current()?;
+        unsafe {
+            self.context.gl.finish();
+        }
         let mut pixels = vec![0_u8; self.width as usize * self.height as usize * 4];
         let texture = self.texture.ok_or("borrowed texture has been deleted")?;
         unsafe {
@@ -2322,7 +2323,7 @@ fn pick_vulkan_physical_device(
 fn wait_for_runtime_event(runtime: &mut RuntimeHandle, event_type: RuntimeEventType) -> bool {
     let deadline = Instant::now() + Duration::from_secs(5);
     while Instant::now() < deadline {
-        let _ = runtime.pump(Some(Duration::ZERO));
+        std::thread::sleep(std::time::Duration::from_millis(1));
         let found = runtime
             .drain_events(0)
             .map(|batch| batch.iter().any(|event| event.event_type() == event_type))
@@ -2348,18 +2349,16 @@ fn load_feature_state_style(
 ) {
     map.set_style_json(FEATURE_STATE_STYLE_JSON.as_bytes())
         .unwrap();
-    assert!(wait_for_runtime_event(
-        runtime,
-        RuntimeEventType::MapRenderUpdateAvailable
-    ));
-    assert_eq!(session.render_update().unwrap(), RenderResult::Rendered);
+    render_available_updates(runtime, session, 5);
 }
 
 fn load_query_style(runtime: &mut RuntimeHandle, map: &MapHandle, session: &RenderSessionHandle) {
     let mut camera = CameraOptions::default();
     camera.center = Some(LatLng::new(37.7749, -122.4194));
     camera.zoom = Some(10.0);
-    map.jump_to(&camera).unwrap();
+    let mut update = crate::CameraUpdate::default();
+    update.camera = camera.clone();
+    map.update_camera(&update).unwrap();
     map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
     render_available_updates(runtime, session, 5);
 }
@@ -2378,7 +2377,9 @@ fn load_cluster_style(runtime: &mut RuntimeHandle, map: &MapHandle, session: &Re
     let mut camera = CameraOptions::default();
     camera.center = Some(LatLng::new(0.0, 0.0));
     camera.zoom = Some(0.0);
-    map.jump_to(&camera).unwrap();
+    let mut update = crate::CameraUpdate::default();
+    update.camera = camera.clone();
+    map.update_camera(&update).unwrap();
     map.set_style_json(CLUSTER_BASE_STYLE_JSON.as_bytes())
         .unwrap();
 
@@ -2431,7 +2432,7 @@ fn render_available_updates(
 }
 
 fn render_pending_updates(runtime: &mut RuntimeHandle, session: &RenderSessionHandle) {
-    let _ = runtime.pump(Some(Duration::ZERO));
+    std::thread::sleep(std::time::Duration::from_millis(1));
     let updates = runtime
         .drain_events(0)
         .map(|batch| {
@@ -2441,7 +2442,10 @@ fn render_pending_updates(runtime: &mut RuntimeHandle, session: &RenderSessionHa
                 .count()
         })
         .unwrap_or(0);
-    for _ in 0..updates {
+    // Native execution advances independently. Render once even when this
+    // drain found no update so a size-pending session can observe the map's
+    // newly published extent.
+    for _ in 0..updates.max(1) {
         let _ = session.render_update();
     }
 }
@@ -2577,12 +2581,10 @@ fn opengl_owned_texture_session_attaches_with_platform_context() {
         return;
     }
     let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
-    let (_context, session) = create_opengl_owned_texture_session(
-        &map.attach_ref().unwrap(),
-        RenderTargetExtent::new(32, 16, 1.0),
-    )
-    .expect("OpenGL owned texture test session should attach when OpenGL is supported");
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(32, 16, 1.0)).unwrap();
+    let (_context, session) =
+        create_opengl_owned_texture_session(&map, RenderTargetExtent::new(32, 16, 1.0))
+            .expect("OpenGL owned texture test session should attach when OpenGL is supported");
 
     let error = session.acquire_opengl_owned_texture_frame().unwrap_err();
     assert!(matches!(
@@ -2649,13 +2651,11 @@ fn opengl_surface_session_renders_with_platform_context() {
         return;
     }
     let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(32, 16, 1.0)).unwrap();
 
-    let (_context, session) = create_opengl_surface_session(
-        &map.attach_ref().unwrap(),
-        RenderTargetExtent::new(32, 16, 1.0),
-    )
-    .expect("OpenGL surface test session should attach when OpenGL is supported");
+    let (_context, session) =
+        create_opengl_surface_session(&map, RenderTargetExtent::new(32, 16, 1.0))
+            .expect("OpenGL surface test session should attach when OpenGL is supported");
 
     map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
     assert!(wait_for_runtime_event(
@@ -2694,8 +2694,6 @@ fn dedicated_opengl_surface_session_renders_and_keeps_its_context_current() {
     assert!(!surface.has_current_context());
 
     let session = map
-        .attach_ref()
-        .unwrap()
         .attach_opengl_surface(&OpenGLSurfaceDescriptor::new(
             RenderTargetExtent::new(64, 64, 1.0),
             surface.descriptor(),
@@ -2704,12 +2702,12 @@ fn dedicated_opengl_surface_session_renders_and_keeps_its_context_current() {
         .expect("a dedicated OpenGL surface session attaches when EGL is supported");
 
     map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
-    // The session owns this thread, which is also the map's, so the map only
-    // reaches the style and the extent when this loop pumps the runtime.
+    // The graphics session remains thread-affine while the map worker advances
+    // style and extent state autonomously.
     let deadline = Instant::now() + Duration::from_secs(5);
     let mut result = RenderResult::NoUpdate;
     while result != RenderResult::Rendered && Instant::now() < deadline {
-        let _ = runtime.pump(Some(Duration::ZERO));
+        std::thread::sleep(std::time::Duration::from_millis(1));
         result = session.render_update().unwrap();
         if result != RenderResult::Rendered {
             std::thread::sleep(Duration::from_millis(10));
@@ -2739,8 +2737,6 @@ fn webgpu_surface_session_renders_and_presents_through_a_canvas() {
         .expect("a WebGPU instance creates a surface over a canvas");
     let extent = RenderTargetExtent::new(128, 128, 1.0);
     let session = map
-        .attach_ref()
-        .unwrap()
         .attach_webgpu_surface(&surface.descriptor(extent.clone(), &context))
         .expect("WebGPU surface session should attach when WebGPU is supported");
 
@@ -2816,11 +2812,9 @@ fn webgpu_borrowed_texture_session_renders_into_a_host_texture() {
     let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(128, 128, 1.0)).unwrap();
 
-    let (context, texture, session) = create_webgpu_borrowed_texture_session(
-        &map.attach_ref().unwrap(),
-        RenderTargetExtent::new(128, 128, 1.0),
-    )
-    .expect("WebGPU borrowed texture session should attach when WebGPU is supported");
+    let (context, texture, session) =
+        create_webgpu_borrowed_texture_session(&map, RenderTargetExtent::new(128, 128, 1.0))
+            .expect("WebGPU borrowed texture session should attach when WebGPU is supported");
 
     map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
     assert!(wait_for_runtime_event(
@@ -2864,18 +2858,11 @@ fn opengl_borrowed_texture_session_renders_with_platform_context() {
     let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(128, 128, 1.0)).unwrap();
 
-    let (texture, session) = create_opengl_borrowed_texture_session(
-        &map.attach_ref().unwrap(),
-        RenderTargetExtent::new(128, 128, 1.0),
-    )
-    .expect("OpenGL borrowed texture test session should attach when OpenGL is supported");
+    let (texture, session) =
+        create_opengl_borrowed_texture_session(&map, RenderTargetExtent::new(128, 128, 1.0))
+            .expect("OpenGL borrowed texture test session should attach when OpenGL is supported");
 
-    map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
-    assert!(wait_for_runtime_event(
-        &mut runtime,
-        RuntimeEventType::MapRenderUpdateAvailable
-    ));
-    assert_eq!(session.render_update().unwrap(), RenderResult::Rendered);
+    load_query_style(&mut runtime, &map, &session);
 
     let error = session.acquire_opengl_owned_texture_frame().unwrap_err();
     assert_eq!(error.kind(), ErrorKind::Unsupported);
@@ -2900,9 +2887,8 @@ fn set_target_hands_a_live_session_a_new_borrowed_texture() {
     let map = MapHandle::with_options(&runtime, &MapOptions::new(128, 128, 1.0)).unwrap();
 
     let initial_extent = RenderTargetExtent::new(128, 128, 1.0);
-    let (mut texture, session) =
-        create_opengl_borrowed_texture_session(&map.attach_ref().unwrap(), initial_extent)
-            .expect("OpenGL borrowed texture test session should attach when OpenGL is supported");
+    let (mut texture, session) = create_opengl_borrowed_texture_session(&map, initial_extent)
+        .expect("OpenGL borrowed texture test session should attach when OpenGL is supported");
 
     map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
     assert!(wait_for_runtime_event(
@@ -2912,23 +2898,23 @@ fn set_target_hands_a_live_session_a_new_borrowed_texture() {
     assert_eq!(session.render_update().unwrap(), RenderResult::Rendered);
 
     // A caller-owned texture is sized by its owner, so resize is unsupported.
-    let resized_extent = RenderTargetExtent::new(96, 64, 1.0);
+    let replacement_extent = RenderTargetExtent::new(128, 128, 1.0);
     let resize_error = session
         .resize(
-            resized_extent.width,
-            resized_extent.height,
-            resized_extent.scale_factor,
+            replacement_extent.width,
+            replacement_extent.height,
+            replacement_extent.scale_factor,
         )
         .unwrap_err();
     assert_eq!(resize_error.kind(), ErrorKind::Unsupported);
 
-    let (physical_width, physical_height) = resized_extent.physical_size().unwrap();
+    let (physical_width, physical_height) = replacement_extent.physical_size().unwrap();
     let replacement = texture
         .allocate_replacement(physical_width, physical_height)
         .unwrap();
     session
         .set_opengl_borrowed_texture_target(&OpenGLBorrowedTextureDescriptor::new(
-            resized_extent.clone(),
+            replacement_extent.clone(),
             physical_width,
             physical_height,
             texture.descriptor(),
@@ -2951,7 +2937,7 @@ fn set_target_hands_a_live_session_a_new_borrowed_texture() {
     let deadline = Instant::now() + Duration::from_secs(5);
     let mut rendered_into_replacement = false;
     while Instant::now() < deadline && !rendered_into_replacement {
-        let _ = runtime.pump(Some(Duration::ZERO));
+        std::thread::sleep(std::time::Duration::from_millis(1));
         let _ = runtime.drain_events(0);
         if session.render_update().unwrap() == RenderResult::Rendered {
             rendered_into_replacement = texture
@@ -2981,9 +2967,8 @@ fn set_target_reports_unsupported_for_a_session_owned_texture() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
     let extent = RenderTargetExtent::new(64, 64, 1.0);
-    let (context, session) =
-        create_owned_texture_session(&map.attach_ref().unwrap(), extent.clone())
-            .expect("Metal or Vulkan owned texture test session should attach when supported");
+    let (context, session) = create_owned_texture_session(&map, extent.clone())
+        .expect("Metal or Vulkan owned texture test session should attach when supported");
 
     // The setter must be this build's own backend, or "not supported by this
     // build" answers in place of the target-kind rejection under test.
@@ -3011,9 +2996,8 @@ fn set_target_reports_unsupported_for_a_session_owned_opengl_texture() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
     let extent = RenderTargetExtent::new(64, 64, 1.0);
-    let (context, session) =
-        create_opengl_owned_texture_session(&map.attach_ref().unwrap(), extent.clone())
-            .expect("OpenGL owned texture test session should attach when OpenGL is supported");
+    let (context, session) = create_opengl_owned_texture_session(&map, extent.clone())
+        .expect("OpenGL owned texture test session should attach when OpenGL is supported");
 
     let error = session
         .set_opengl_borrowed_texture_target(&OpenGLBorrowedTextureDescriptor::new(
@@ -3044,9 +3028,8 @@ fn set_target_reports_unsupported_for_a_target_kind_the_session_does_not_have() 
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
 
     let extent = RenderTargetExtent::new(64, 64, 1.0);
-    let (texture, session) =
-        create_opengl_borrowed_texture_session(&map.attach_ref().unwrap(), extent.clone())
-            .expect("OpenGL borrowed texture test session should attach when OpenGL is supported");
+    let (texture, session) = create_opengl_borrowed_texture_session(&map, extent.clone())
+        .expect("OpenGL borrowed texture test session should attach when OpenGL is supported");
 
     // A surface descriptor names a target this session does not have.
     let error = session
@@ -3206,52 +3189,35 @@ fn failed_frame_release_leaves_frame_live_for_later_release() {
 }
 
 #[test]
-// The map scale factor is fixed at creation, so rendering a target at another
-// scale warns instead of failing.
-fn scale_factor_warnings_compare_the_preserved_creation_double() {
+// Resize is the sole post-creation authority for logical extent, including
+// scale factor, and preserves the caller's double rather than a float roundtrip.
+fn resize_updates_the_map_scale_factor_with_the_submitted_double() {
     if !has_test_owned_texture_session_backend() {
         return;
     }
-    let _logging = LoggingTestGuard::new();
-    // Warnings dispatch asynchronously by default, which would race this test.
-    crate::set_async_log_severity_mask(LogSeverityMask::empty()).unwrap();
-    let warnings = Arc::new(Mutex::new(Vec::new()));
-    let captured = warnings.clone();
-    crate::set_log_callback(move |record| {
-        if record.message.contains("scale_factor") {
-            captured
-                .lock()
-                .unwrap()
-                .push((record.severity, record.message));
-        }
-        false
-    })
-    .unwrap();
-
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    // 32.1 differs from its native float representation by more than the
-    // warning tolerance, so a comparison against anything but the preserved
-    // creation double would warn here.
     let map = MapHandle::with_options(&runtime, &MapOptions::new(1, 1, 32.1)).unwrap();
-    let (_context, session) = create_owned_texture_session(
-        &map.attach_ref().unwrap(),
-        RenderTargetExtent::new(1, 1, 32.1),
-    )
-    .expect("Metal or Vulkan owned texture test session should attach when supported");
-
-    assert!(warnings.lock().unwrap().is_empty());
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(1, 1, 32.1))
+            .expect("Metal or Vulkan owned texture test session should attach when supported");
 
     session.resize(1, 1, 2.0).unwrap();
-    let mismatch_warnings = warnings.lock().unwrap().clone();
-    assert_eq!(mismatch_warnings.len(), 1);
-    assert_eq!(mismatch_warnings[0].0, LogSeverity::Warning);
-    assert!(mismatch_warnings[0].1.contains('2'));
+    let barrier = runtime.start_barrier().unwrap();
+    assert!(barrier.wait(Duration::from_secs(5)).unwrap());
+    barrier.discard().unwrap();
+    barrier.release();
+    assert_eq!(map.snapshot().unwrap().logical_extent.scale_factor, 2.0);
 
     session.resize(1, 1, 32.1).unwrap();
-    assert_eq!(warnings.lock().unwrap().len(), 1);
+    let barrier = runtime.start_barrier().unwrap();
+    assert!(barrier.wait(Duration::from_secs(5)).unwrap());
+    barrier.discard().unwrap();
+    barrier.release();
+    assert_eq!(map.snapshot().unwrap().logical_extent.scale_factor, 32.1);
 
-    session.resize(1, 1, 2.0).unwrap();
-    assert_eq!(warnings.lock().unwrap().len(), 2);
+    session.close().unwrap();
+    map.close().unwrap();
+    runtime.close().unwrap();
 }
 
 #[test]
@@ -3262,11 +3228,9 @@ fn feature_state_set_get_and_remove_copy_snapshots() {
     }
     let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
-    let (_context, session) = create_owned_texture_session(
-        &map.attach_ref().unwrap(),
-        RenderTargetExtent::new(64, 64, 1.0),
-    )
-    .expect("Metal or Vulkan owned texture test session should attach when supported");
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(64, 64, 1.0))
+            .expect("Metal or Vulkan owned texture test session should attach when supported");
     let selector = FeatureStateSelector::new("point").with_feature_id("feature-1");
     let state = br#"{"hover":true,"radius":20}"#;
 
@@ -3307,11 +3271,9 @@ fn rendered_and_source_queries_copy_results() {
     }
     let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
-    let (_context, session) = create_owned_texture_session(
-        &map.attach_ref().unwrap(),
-        RenderTargetExtent::new(64, 64, 1.0),
-    )
-    .expect("Metal or Vulkan owned texture test session should attach when supported");
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(64, 64, 1.0))
+            .expect("Metal or Vulkan owned texture test session should attach when supported");
 
     let error = session
         .query_rendered_features(
@@ -3330,9 +3292,12 @@ fn rendered_and_source_queries_copy_results() {
     let _ = wait_for_runtime_event(&mut runtime, RuntimeEventType::MapRenderUpdateAvailable);
     let _ = session.render_update();
 
-    let query_point = map
-        .pixel_for_lat_lng(LatLng::new(37.7749, -122.4194))
+    let query_point_operation = map
+        .start_pixel_for_lat_lng(LatLng::new(37.7749, -122.4194))
         .unwrap();
+    assert!(query_point_operation.wait(Duration::from_secs(5)).unwrap());
+    let query_point = query_point_operation.take().unwrap();
+    query_point_operation.release();
     let geometry = RenderedQueryGeometry::box_(ScreenBox::new(
         ScreenPoint::new(query_point.x - 20.0, query_point.y - 20.0),
         ScreenPoint::new(query_point.x + 20.0, query_point.y + 20.0),
@@ -3395,11 +3360,9 @@ fn rendered_box_queries_clip_to_the_viewport() {
     }
     let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
-    let (_context, session) = create_owned_texture_session(
-        &map.attach_ref().unwrap(),
-        RenderTargetExtent::new(64, 64, 1.0),
-    )
-    .expect("Metal or Vulkan owned texture test session should attach when supported");
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(64, 64, 1.0))
+            .expect("Metal or Vulkan owned texture test session should attach when supported");
 
     load_query_style(&mut runtime, &map, &session);
     let mut options = RenderedFeatureQueryOptions::default();
@@ -3459,14 +3422,15 @@ fn feature_extension_queries_copy_value_and_feature_collection_results() {
     }
     let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
-    let (_context, session) = create_owned_texture_session(
-        &map.attach_ref().unwrap(),
-        RenderTargetExtent::new(64, 64, 1.0),
-    )
-    .expect("Metal or Vulkan owned texture test session should attach when supported");
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(64, 64, 1.0))
+            .expect("Metal or Vulkan owned texture test session should attach when supported");
 
     load_cluster_style(&mut runtime, &map, &session);
-    let query_point = map.pixel_for_lat_lng(LatLng::new(0.0, 0.0)).unwrap();
+    let query_point_operation = map.start_pixel_for_lat_lng(LatLng::new(0.0, 0.0)).unwrap();
+    assert!(query_point_operation.wait(Duration::from_secs(5)).unwrap());
+    let query_point = query_point_operation.take().unwrap();
+    query_point_operation.release();
     let geometry = RenderedQueryGeometry::box_(ScreenBox::new(
         ScreenPoint::new(query_point.x - 30.0, query_point.y - 30.0),
         ScreenPoint::new(query_point.x + 30.0, query_point.y + 30.0),
@@ -3549,11 +3513,9 @@ fn sustained_render_loop_outlasts_the_graphics_queue_depth() {
     }
     let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
-    let (_context, session) = create_owned_texture_session(
-        &map.attach_ref().unwrap(),
-        RenderTargetExtent::new(64, 64, 1.0),
-    )
-    .expect("Metal or Vulkan owned texture test session should attach when supported");
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(64, 64, 1.0))
+            .expect("Metal or Vulkan owned texture test session should attach when supported");
     // A background-only style keeps each frame to the passes that take command
     // buffers, without the tile work that would make the loop slow.
     map.set_style_json(CLUSTER_BASE_STYLE_JSON.as_bytes())
@@ -3569,8 +3531,10 @@ fn sustained_render_loop_outlasts_the_graphics_queue_depth() {
         let mut camera = CameraOptions::default();
         camera.center = Some(LatLng::new(37.0, -122.0));
         camera.zoom = Some(10.0 + f64::from(step % 8) * 0.25);
-        map.jump_to(&camera).unwrap();
-        let _ = runtime.pump(Some(Duration::ZERO));
+        let mut update = crate::CameraUpdate::default();
+        update.camera = camera.clone();
+        map.update_camera(&update).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(1));
         let updates = runtime
             .drain_events(0)
             .map(|batch| {
@@ -3608,17 +3572,12 @@ fn owned_texture_session_enforces_single_session_and_blocks_map_close() {
     }
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
-    let (context, session) = create_owned_texture_session(
-        &map.attach_ref().unwrap(),
-        RenderTargetExtent::new(32, 16, 1.0),
-    )
-    .expect("Metal or Vulkan owned texture test session should attach when supported");
+    let (context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(32, 16, 1.0))
+            .expect("Metal or Vulkan owned texture test session should attach when supported");
 
     let error = context
-        .attach_owned_texture(
-            &map.attach_ref().unwrap(),
-            RenderTargetExtent::new(32, 16, 1.0),
-        )
+        .attach_owned_texture(&map, RenderTargetExtent::new(32, 16, 1.0))
         .unwrap_err();
     assert_eq!(error.kind(), ErrorKind::InvalidState);
 
@@ -3643,11 +3602,9 @@ fn detached_session_releases_the_parent_map_retention() {
     }
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
-    let (_context, session) = create_owned_texture_session(
-        &map.attach_ref().unwrap(),
-        RenderTargetExtent::new(32, 16, 1.0),
-    )
-    .expect("Metal or Vulkan owned texture test session should attach when supported");
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(32, 16, 1.0))
+            .expect("Metal or Vulkan owned texture test session should attach when supported");
 
     let error = map.close().unwrap_err();
     assert_eq!(error.kind(), ErrorKind::InvalidState);
@@ -3666,12 +3623,11 @@ fn resize_updates_owned_texture_frame_extent() {
         return;
     }
     let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &static_map_options(64, 64, 1.0)).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(32, 16, 1.0)).unwrap();
     let initial_extent = RenderTargetExtent::new(32, 16, 1.0);
     let resized_extent = RenderTargetExtent::new(48, 24, 1.0);
-    let (context, session) =
-        create_owned_texture_session(&map.attach_ref().unwrap(), initial_extent)
-            .expect("Metal or Vulkan owned texture test session should attach when supported");
+    let (context, session) = create_owned_texture_session(&map, initial_extent)
+        .expect("Metal or Vulkan owned texture test session should attach when supported");
 
     load_query_style(&mut runtime, &map, &session);
     session
@@ -3681,11 +3637,8 @@ fn resize_updates_owned_texture_frame_extent() {
             resized_extent.scale_factor,
         )
         .unwrap();
-    // A static map renders only on request, and the map applies the new logical
-    // size on its next pump. Requesting the still image first spends it on an
-    // update the session's size gate discards, so pump the resize through.
-    runtime.pump(Some(Duration::ZERO)).unwrap();
-    map.request_still_image().unwrap();
+    // The continuously rendering map publishes a matching update after the
+    // resize without another host-side request.
     let deadline = Instant::now() + Duration::from_secs(5);
     while Instant::now() < deadline {
         render_pending_updates(&mut runtime, &session);
@@ -3705,32 +3658,29 @@ fn resize_updates_owned_texture_frame_extent() {
 }
 
 #[test]
-// A resize leaves the map holding an update built for the previous extent, so
-// the next render reports a pending size until the map catches up.
-fn render_update_reports_size_pending_until_the_map_applies_a_resize() {
+// The runtime may publish the resized map extent before the graphics thread
+// asks for its next update. Both timings converge on a rendered frame.
+fn render_update_converges_after_the_map_applies_a_resize() {
     if !has_test_owned_texture_session_backend() {
         return;
     }
     let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
-    let (_context, session) = create_owned_texture_session(
-        &map.attach_ref().unwrap(),
-        RenderTargetExtent::new(64, 64, 1.0),
-    )
-    .expect("Metal or Vulkan owned texture test session should attach when supported");
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(64, 64, 1.0))
+            .expect("Metal or Vulkan owned texture test session should attach when supported");
 
     load_query_style(&mut runtime, &map, &session);
     assert_eq!(session.render_update().unwrap(), RenderResult::Rendered);
 
     session.resize(96, 48, 1.0).unwrap();
-    assert_eq!(session.render_update().unwrap(), RenderResult::SizePending);
+    let mut result = session.render_update().unwrap();
 
     // The map publishes an update for the new size on its own thread, so the
     // state resolves without another host request.
     let deadline = Instant::now() + Duration::from_secs(5);
-    let mut result = RenderResult::SizePending;
     while Instant::now() < deadline && result != RenderResult::Rendered {
-        let _ = runtime.pump(Some(Duration::ZERO));
+        std::thread::sleep(std::time::Duration::from_millis(1));
         let _ = runtime.drain_events(0);
         result = session.render_update().unwrap();
         if result != RenderResult::Rendered {
@@ -3745,129 +3695,50 @@ fn render_update_reports_size_pending_until_the_map_applies_a_resize() {
 }
 
 #[test]
-// The map size follows the attached target, while the map pixel ratio stays at
-// the creation value even when the target renders at a different scale factor.
-fn map_size_follows_attach_and_resize_and_keeps_the_creation_scale_factor() {
+// Attach preserves map state. A later resize changes the map extent and scale.
+fn attach_preserves_map_size_and_resize_changes_extent_and_scale_factor() {
     if !has_test_owned_texture_session_backend() {
         return;
     }
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &static_map_options(64, 32, 2.0)).unwrap();
-    assert_eq!(map.size().unwrap(), (64, 32, 2.0));
+    let barrier = runtime.start_barrier().unwrap();
+    assert!(barrier.wait(Duration::from_secs(5)).unwrap());
+    barrier.discard().unwrap();
+    barrier.release();
+    let extent = map.snapshot().unwrap().logical_extent;
+    assert_eq!(
+        (extent.width, extent.height, extent.scale_factor),
+        (64, 32, 2.0)
+    );
 
-    // A session enqueues the map size for the map's owner thread, so the map
-    // keeps its previous size until the runtime is pumped.
-    let (_context, session) = create_owned_texture_session(
-        &map.attach_ref().unwrap(),
-        RenderTargetExtent::new(32, 16, 1.0),
-    )
-    .expect("Metal or Vulkan owned texture test session should attach when supported");
-    assert_eq!(map.size().unwrap(), (64, 32, 2.0));
-    runtime.pump(Some(Duration::ZERO)).unwrap();
-    assert_eq!(map.size().unwrap(), (32, 16, 2.0));
+    // Attaching a graphics resource does not mutate map state.
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(32, 16, 1.0))
+            .expect("Metal or Vulkan owned texture test session should attach when supported");
+    let barrier = runtime.start_barrier().unwrap();
+    assert!(barrier.wait(Duration::from_secs(5)).unwrap());
+    barrier.discard().unwrap();
+    barrier.release();
+    let extent = map.snapshot().unwrap().logical_extent;
+    assert_eq!(
+        (extent.width, extent.height, extent.scale_factor),
+        (64, 32, 2.0)
+    );
 
     session.resize(48, 24, 1.0).unwrap();
-    runtime.pump(Some(Duration::ZERO)).unwrap();
-    assert_eq!(map.size().unwrap(), (48, 24, 2.0));
+    let barrier = runtime.start_barrier().unwrap();
+    assert!(barrier.wait(Duration::from_secs(5)).unwrap());
+    barrier.discard().unwrap();
+    barrier.release();
+    let extent = map.snapshot().unwrap().logical_extent;
+    assert_eq!(
+        (extent.width, extent.height, extent.scale_factor),
+        (48, 24, 1.0)
+    );
 
     session.close().unwrap();
     map.close().unwrap();
-    runtime.close().unwrap();
-}
-
-#[test]
-// Spec coverage: BND-048.
-//
-// Nothing stops a host from dropping the map while a session is live. The C API
-// rejects that destroy, and an infallible `Drop` cannot return the error, so it
-// reports the handle instead of discarding it.
-fn dropping_a_map_with_an_attached_session_reports_a_leak() {
-    if !has_test_owned_texture_session_backend() {
-        return;
-    }
-    let leaks: Arc<Mutex<Vec<crate::NativeHandleLeak>>> = Arc::new(Mutex::new(Vec::new()));
-    let sink = Arc::clone(&leaks);
-    crate::set_leak_reporter(Some(Box::new(move |leak: crate::NativeHandleLeak| {
-        sink.lock().unwrap().push(leak);
-    })));
-
-    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &static_map_options(64, 64, 1.0)).unwrap();
-    let (_context, session) = create_owned_texture_session(
-        &map.attach_ref().unwrap(),
-        RenderTargetExtent::new(32, 16, 1.0),
-    )
-    .expect("owned texture test session should attach when supported");
-
-    // The wrong order on purpose: the map goes first, while the session is live.
-    drop(map);
-    crate::set_leak_reporter(None);
-
-    let reported = leaks.lock().unwrap().clone();
-    assert_eq!(reported.len(), 1, "expected exactly one reported leak");
-    assert_eq!(reported[0].type_name, "mln_map");
-    assert_ne!(reported[0].id, 0);
-
-    // The reported handle makes the leak recoverable: closing the session
-    // unblocks the destroy that Drop could not complete, and without it the
-    // runtime below would stay pinned forever.
-    session.close().unwrap();
-    // SAFETY: the handle came from a map whose Rust wrapper was dropped without
-    // destroying it, and its session is now closed, so this is the one
-    // outstanding destroy for that map.
-    let status = unsafe { sys::mln_map_destroy(sys::mln_map(reported[0].id)) };
-    assert_eq!(status, sys::MLN_STATUS_OK);
-
-    runtime.close().unwrap();
-}
-
-#[test]
-// Spec coverage: BND-196. Dropping a map destroys it, so the reference names a
-// released handle that the C API rejects.
-fn dropping_a_map_makes_its_attach_refs_stale() {
-    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &static_map_options(64, 64, 1.0)).unwrap();
-    let attach_ref = map.attach_ref().unwrap();
-
-    drop(map);
-
-    // The replacement reuses the slot the drop freed, so this proves the
-    // generation check rather than an empty slot.
-    let replacement = MapHandle::with_options(&runtime, &static_map_options(64, 64, 1.0)).unwrap();
-
-    let error = attach_ref
-        .attach_metal_owned_texture(&MetalOwnedTextureDescriptor::new(
-            RenderTargetExtent::new(32, 16, 1.0),
-            MetalContextDescriptor::new(NativePointer::NULL),
-        ))
-        .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.to_string().contains("stale"));
-
-    replacement.close().unwrap();
-    runtime.close().unwrap();
-}
-
-#[test]
-// Spec coverage: BND-196. A `MapAttachRef` can outlive its `MapHandle`, and the
-// generational handle keeps a stale reference from attaching to a later map.
-fn a_stale_attach_ref_reports_a_stale_map() {
-    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &static_map_options(64, 64, 1.0)).unwrap();
-    let attach_ref = map.attach_ref().unwrap();
-    map.close().unwrap();
-
-    // Resolving the map fails before the descriptor is ever inspected, so this
-    // needs no render backend.
-    let error = attach_ref
-        .attach_metal_owned_texture(&MetalOwnedTextureDescriptor::new(
-            RenderTargetExtent::new(32, 16, 1.0),
-            MetalContextDescriptor::new(NativePointer::NULL),
-        ))
-        .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.to_string().contains("stale"));
-
     runtime.close().unwrap();
 }
 
@@ -3883,15 +3754,15 @@ fn a_second_thread_attaches_a_session_and_renders() {
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
     map.set_style_json(CLUSTER_BASE_STYLE_JSON.as_bytes())
         .unwrap();
-    let attach_ref = map.attach_ref().unwrap();
+    let render_map = &map;
 
     std::thread::scope(|scope| {
         let worker = scope.spawn(move || {
             let (_context, session) =
-                create_owned_texture_session(&attach_ref, RenderTargetExtent::new(64, 64, 1.0))
+                create_owned_texture_session(render_map, RenderTargetExtent::new(64, 64, 1.0))
                     .expect("owned texture test session should attach on this thread");
-            // The map applies its logical size on its own thread, so the first
-            // renders report no frame until the other thread has pumped.
+            // The autonomous map worker publishes logical-size changes, so
+            // early renders may report no frame.
             let deadline = Instant::now() + Duration::from_secs(5);
             let mut rendered = false;
             while Instant::now() < deadline && !rendered {
@@ -3909,7 +3780,7 @@ fn a_second_thread_attaches_a_session_and_renders() {
         while !worker.is_finished() && Instant::now() < deadline {
             // A short park rather than zero: spinning would burn the deadline
             // before the worker made progress.
-            runtime.pump(Some(Duration::from_millis(2))).unwrap();
+            std::thread::sleep(std::time::Duration::from_millis(1));
             let _ = runtime.drain_events(0).unwrap();
         }
         worker.join().expect("worker thread should not panic");
@@ -3929,11 +3800,9 @@ fn session_calls_are_rejected_on_a_foreign_thread() {
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
     map.set_style_json(CLUSTER_BASE_STYLE_JSON.as_bytes())
         .unwrap();
-    let (_context, session) = create_owned_texture_session(
-        &map.attach_ref().unwrap(),
-        RenderTargetExtent::new(64, 64, 1.0),
-    )
-    .expect("owned texture test session should attach when supported");
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(64, 64, 1.0))
+            .expect("owned texture test session should attach when supported");
 
     // The handle is `!Send`, so a foreign thread can only reach the session
     // through the raw handle the binding wraps.
@@ -3969,11 +3838,9 @@ fn acquired_frame_state_rejects_reentrant_session_operations_before_native_calls
     }
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &static_map_options(64, 64, 1.0)).unwrap();
-    let (_context, session) = create_owned_texture_session(
-        &map.attach_ref().unwrap(),
-        RenderTargetExtent::new(32, 16, 1.0),
-    )
-    .expect("Metal or Vulkan owned texture test session should attach when supported");
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(32, 16, 1.0))
+            .expect("Metal or Vulkan owned texture test session should attach when supported");
 
     session.inner.frame_acquired.set(true);
 
@@ -4031,11 +3898,9 @@ fn render_update_without_pending_update_reports_no_update_and_keeps_session_live
     }
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &static_map_options(64, 64, 1.0)).unwrap();
-    let (_context, session) = create_owned_texture_session(
-        &map.attach_ref().unwrap(),
-        RenderTargetExtent::new(32, 16, 1.0),
-    )
-    .expect("Metal or Vulkan owned texture test session should attach when supported");
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(32, 16, 1.0))
+            .expect("Metal or Vulkan owned texture test session should attach when supported");
 
     assert_eq!(session.render_update().unwrap(), RenderResult::NoUpdate);
 
@@ -4053,11 +3918,9 @@ fn texture_readback_without_rendered_frame_maps_native_invalid_state() {
     }
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &static_map_options(64, 64, 1.0)).unwrap();
-    let (_context, session) = create_owned_texture_session(
-        &map.attach_ref().unwrap(),
-        RenderTargetExtent::new(32, 16, 1.0),
-    )
-    .expect("Metal or Vulkan owned texture test session should attach when supported");
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(32, 16, 1.0))
+            .expect("Metal or Vulkan owned texture test session should attach when supported");
 
     let _ = session.render_update();
     let mut undersized = [0x7f];
@@ -4079,11 +3942,14 @@ fn texture_readback_copies_metadata_and_fills_reusable_buffers_when_supported() 
     }
     let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &static_map_options(64, 64, 1.0)).unwrap();
-    let (_context, session) = create_owned_texture_session(
-        &map.attach_ref().unwrap(),
-        RenderTargetExtent::new(32, 16, 1.0),
-    )
-    .expect("Metal or Vulkan owned texture test session should attach when supported");
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(32, 16, 1.0))
+            .expect("Metal or Vulkan owned texture test session should attach when supported");
+    session.resize(32, 16, 1.0).unwrap();
+    let resize = runtime.start_barrier().unwrap();
+    assert!(resize.wait(Duration::from_secs(5)).unwrap());
+    resize.discard().unwrap();
+    resize.release();
 
     load_query_style(&mut runtime, &map, &session);
     map.request_still_image().unwrap();
@@ -4132,7 +3998,7 @@ fn texture_readback_copies_metadata_and_fills_reusable_buffers_when_supported() 
     let content_deadline = Instant::now() + Duration::from_secs(5);
     let mut rendered_the_style = false;
     while Instant::now() < content_deadline && !rendered_the_style {
-        let _ = runtime.pump(Some(Duration::ZERO));
+        std::thread::sleep(std::time::Duration::from_millis(1));
         let _ = runtime.drain_events(0);
         let _ = session.render_update();
         session
@@ -4160,8 +4026,6 @@ fn backend_specific_attach_calls_report_native_statuses() {
     let map = MapHandle::with_options(&runtime, &static_map_options(64, 64, 1.0)).unwrap();
 
     let metal_error = map
-        .attach_ref()
-        .unwrap()
         .attach_metal_owned_texture(&MetalOwnedTextureDescriptor::new(
             RenderTargetExtent::new(32, 16, 1.0),
             MetalContextDescriptor::new(NativePointer::NULL),
@@ -4173,8 +4037,6 @@ fn backend_specific_attach_calls_report_native_statuses() {
     ));
 
     let vulkan_error = map
-        .attach_ref()
-        .unwrap()
         .attach_vulkan_surface(&VulkanSurfaceDescriptor::new(
             RenderTargetExtent::new(32, 16, 1.0),
             VulkanContextDescriptor::new(
@@ -4197,8 +4059,6 @@ fn backend_specific_attach_calls_report_native_statuses() {
         NativePointer::NULL,
     ));
     let opengl_error = map
-        .attach_ref()
-        .unwrap()
         .attach_opengl_surface(&OpenGLSurfaceDescriptor::new(
             RenderTargetExtent::new(32, 16, 1.0),
             opengl_context.clone(),
@@ -4211,8 +4071,6 @@ fn backend_specific_attach_calls_report_native_statuses() {
     ));
 
     let opengl_error = map
-        .attach_ref()
-        .unwrap()
         .attach_opengl_owned_texture(&OpenGLOwnedTextureDescriptor::new(
             RenderTargetExtent::new(0, 16, 1.0),
             opengl_context.clone(),
@@ -4221,8 +4079,6 @@ fn backend_specific_attach_calls_report_native_statuses() {
     assert_eq!(opengl_error.kind(), ErrorKind::InvalidArgument);
 
     let opengl_error = map
-        .attach_ref()
-        .unwrap()
         .attach_opengl_borrowed_texture(&OpenGLBorrowedTextureDescriptor::new(
             RenderTargetExtent::new(32, 16, 1.0),
             32,
@@ -4255,8 +4111,6 @@ fn opengl_attach_calls_report_unsupported_when_backend_unavailable() {
     let opengl_context = OpenGLContextDescriptor::Wgl(WglContextDescriptor::new(fake, fake));
 
     let error = map
-        .attach_ref()
-        .unwrap()
         .attach_opengl_owned_texture(&OpenGLOwnedTextureDescriptor::new(
             RenderTargetExtent::new(32, 16, 1.0),
             opengl_context.clone(),
@@ -4266,8 +4120,6 @@ fn opengl_attach_calls_report_unsupported_when_backend_unavailable() {
     assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_UNSUPPORTED));
 
     let error = map
-        .attach_ref()
-        .unwrap()
         .attach_opengl_borrowed_texture(&OpenGLBorrowedTextureDescriptor::new(
             RenderTargetExtent::new(32, 16, 1.0),
             32,
@@ -4281,8 +4133,6 @@ fn opengl_attach_calls_report_unsupported_when_backend_unavailable() {
     assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_UNSUPPORTED));
 
     let error = map
-        .attach_ref()
-        .unwrap()
         .attach_opengl_surface(&OpenGLSurfaceDescriptor::new(
             RenderTargetExtent::new(32, 16, 1.0),
             opengl_context,
@@ -4307,11 +4157,9 @@ fn identified_camera_transition_reports_its_end_once_when_it_runs_to_completion(
     let mut options = MapOptions::new(64, 64, 1.0);
     options.mode = MapMode::Continuous;
     let map = MapHandle::with_options(&runtime, &options).unwrap();
-    let (_context, session) = create_owned_texture_session(
-        &map.attach_ref().unwrap(),
-        RenderTargetExtent::new(64, 64, 1.0),
-    )
-    .expect("Metal or Vulkan owned texture test session should attach when supported");
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(64, 64, 1.0))
+            .expect("Metal or Vulkan owned texture test session should attach when supported");
     load_query_style(&mut runtime, &map, &session);
 
     let mut animation = AnimationOptions::default();
@@ -4320,7 +4168,11 @@ fn identified_camera_transition_reports_its_end_once_when_it_runs_to_completion(
     let mut camera = CameraOptions::default();
     camera.center = Some(LatLng::new(37.0, -122.0));
     camera.zoom = Some(12.0);
-    map.ease_to(&camera, Some(&animation)).unwrap();
+    let mut update = crate::CameraUpdate::default();
+    update.mode = crate::CameraUpdateMode::Ease;
+    update.camera = camera.clone();
+    update.animation = animation.clone();
+    map.update_camera(&update).unwrap();
 
     // Keep rendering for a while after the transition ends so a repeated
     // report would show up in the tally.
@@ -4329,7 +4181,7 @@ fn identified_camera_transition_reports_its_end_once_when_it_runs_to_completion(
     let mut finished_at: Option<Instant> = None;
     let deadline = Instant::now() + Duration::from_secs(10);
     while Instant::now() < deadline {
-        let _ = runtime.pump(Some(Duration::ZERO));
+        std::thread::sleep(std::time::Duration::from_millis(1));
         let mut updates = 0;
         for event in runtime.drain_events(0).unwrap().iter() {
             match event.event_type() {
@@ -4362,7 +4214,7 @@ fn identified_camera_transition_reports_its_end_once_when_it_runs_to_completion(
     assert!(saw_animated_did_change);
     // Reaching the requested camera shows the transition ran to completion
     // rather than being superseded or cancelled.
-    let settled = map.camera().unwrap();
+    let settled = map.camera_snapshot().unwrap().camera;
     assert!((settled.zoom.unwrap() - 12.0).abs() < 1e-6);
 
     session.close().unwrap();

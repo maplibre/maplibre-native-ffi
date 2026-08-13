@@ -952,7 +952,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         return ValueStructs.ReadBuffer(result);
     }
 
-    /// <summary>Destroys the render session on the map owner thread.</summary>
+    /// <summary>Destroys the render session on the thread that attached it.</summary>
     public void Close()
     {
         ThrowIfTextureFrameActive(nameof(Close));

@@ -261,6 +261,8 @@ def test_metal_borrowed_texture_set_target_renders_into_the_replacement() -> Non
                     assert not any(replacement.read_rgba())
 
                     session.set_metal_borrowed_texture_target(replacement.descriptor())
+                    map_handle.resize(96, 48, 1.0)
+                    runtime.barrier()
 
                     # The session kept its renderer and paints the
                     # texture it was handed, at the extent handed with
@@ -303,6 +305,8 @@ def test_metal_surface_set_target_presents_through_a_new_surface() -> None:
 
             with _metal_surface(context, width=48, height=24) as replacement:
                 session.set_metal_surface_target(replacement.descriptor())
+                map_handle.resize(48, 24, 1.0)
+                runtime.barrier()
 
                 render_until(
                     runtime,

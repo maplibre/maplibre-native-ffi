@@ -68,9 +68,9 @@ The region ID is the part of the record that the remaining calls need.
 
 <Code code={region(offlineRegion, "region-id")} lang="c" title="offline-region.c" />
 
-Mark the region as observed to receive progress and error events. Then set its
-download state to active. MapLibre fetches the resources while the host pumps
-the runtime.
+Mark the region as observed to receive progress and error events. Then submit
+the active download-state command. MapLibre fetches resources on the native
+scheduler without a host pump.
 
 <Code code={region(offlineRegion, "download")} lang="c" title="offline-region.c" />
 

@@ -13,25 +13,27 @@ class CoreStructsTest : org.maplibre.nativeffi.NativeTestBase() {
   // BND-063.
 
   @Test
-  fun stringViewsPreserveEmbeddedNulWithExplicitLength() {
-    memScoped {
-      val native = alloc<mln_buffer_view>()
-      CoreStructs.stringView("a\u0000b", this).place(native.ptr)
+  fun stringViewsPreserveEmbeddedNulWithExplicitLength(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      memScoped {
+        val native = alloc<mln_buffer_view>()
+        CoreStructs.stringView("a\u0000b", this).place(native.ptr)
 
-      assertEquals(3UL, native.size)
-      assertEquals("a\u0000b", CoreStructs.stringView(native))
+        assertEquals(3UL, native.size)
+        assertEquals("a\u0000b", CoreStructs.stringView(native))
+      }
     }
-  }
 
   @Test
-  fun setStringViewPreservesEmbeddedNulWithExplicitLength() {
-    memScoped {
-      val native = alloc<mln_buffer_view>()
+  fun setStringViewPreservesEmbeddedNulWithExplicitLength(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      memScoped {
+        val native = alloc<mln_buffer_view>()
 
-      CoreStructs.setStringView(native, "a\u0000b", this)
+        CoreStructs.setStringView(native, "a\u0000b", this)
 
-      assertEquals(3UL, native.size)
-      assertEquals("a\u0000b", CoreStructs.stringView(native))
+        assertEquals(3UL, native.size)
+        assertEquals("a\u0000b", CoreStructs.stringView(native))
+      }
     }
-  }
 }

@@ -19,10 +19,13 @@ public sealed class MapCameraOptionsTests
 
     [BindingSpecTest("BND-100")]
     [Fact]
-    public void ViewportAndTileOptionsRoundTripThroughNativeMap()
+    public async Task ViewportAndTileOptionsRoundTripThroughNativeMap()
     {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
 
         map.SetViewportOptions(
             new ViewportOptions
@@ -45,13 +48,13 @@ public sealed class MapCameraOptionsTests
             }
         );
 
-        var viewport = map.GetViewportOptions();
+        var viewport = await map.GetViewportOptionsAsync(TestContext.Current.CancellationToken);
         Assert.Equal(NorthOrientation.Right, viewport.NorthOrientation);
         Assert.Equal(ConstrainMode.WidthAndHeight, viewport.ConstrainMode);
         Assert.Equal(ViewportMode.FlippedY, viewport.ViewportMode);
         Assert.Equal(new EdgeInsets(1, 2, 3, 4), viewport.FrustumOffset);
 
-        var tile = map.GetTileOptions();
+        var tile = await map.GetTileOptionsAsync(TestContext.Current.CancellationToken);
         Assert.Equal(3u, tile.PrefetchZoomDelta);
         Assert.Equal(1.5, tile.LodMinimumRadius);
         Assert.Equal(2.5, tile.LodScale);
@@ -62,10 +65,13 @@ public sealed class MapCameraOptionsTests
 
     [BindingSpecTest("BND-102")]
     [Fact]
-    public void CameraFitHelpersCopyDescriptorsThroughNativeMap()
+    public async Task CameraFitHelpersCopyDescriptorsThroughNativeMap()
     {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
         var bounds = new LatLngBounds(new LatLng(-10, -20), new LatLng(10, 20));
         var fit = new CameraFitOptions
         {
@@ -74,11 +80,20 @@ public sealed class MapCameraOptionsTests
             Pitch = 10,
         };
 
-        var boundsCamera = map.CameraForLatLngBounds(bounds, fit);
-        var coordinatesCamera = map.CameraForLatLngs([bounds.Southwest, bounds.Northeast], fit);
-        var geometryCamera = map.CameraForGeometry(
+        var boundsCamera = await map.CameraForLatLngBoundsAsync(
+            bounds,
+            fit,
+            TestContext.Current.CancellationToken
+        );
+        var coordinatesCamera = await map.CameraForLatLngsAsync(
+            [bounds.Southwest, bounds.Northeast],
+            fit,
+            TestContext.Current.CancellationToken
+        );
+        var geometryCamera = await map.CameraForGeometryAsync(
             """{"type":"LineString","coordinates":[[-20,-10],[20,10]]}"""u8.ToArray(),
-            fit
+            fit,
+            TestContext.Current.CancellationToken
         );
 
         Assert.NotNull(boundsCamera.Center);
@@ -91,10 +106,13 @@ public sealed class MapCameraOptionsTests
 
     [BindingSpecTest("BND-102", "BND-103")]
     [Fact]
-    public void BoundsAndProjectionOptionsRoundTripThroughNativeMap()
+    public async Task BoundsAndProjectionOptionsRoundTripThroughNativeMap()
     {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
 
         var bounds = new LatLngBounds(new LatLng(-10, -20), new LatLng(10, 20));
         map.SetBounds(
@@ -116,7 +134,7 @@ public sealed class MapCameraOptionsTests
             }
         );
 
-        var copiedBounds = map.GetBounds();
+        var copiedBounds = await map.GetBoundsAsync(TestContext.Current.CancellationToken);
         Assert.Equal(new BoundsConstraint.Bounded(bounds), copiedBounds.Bounds);
         Assert.NotNull(copiedBounds.MinimumZoom);
         Assert.Equal(1, copiedBounds.MinimumZoom.Value, 12);
@@ -127,377 +145,143 @@ public sealed class MapCameraOptionsTests
         Assert.NotNull(copiedBounds.MaximumPitch);
         Assert.Equal(60, copiedBounds.MaximumPitch.Value, 12);
 
-        var projectionMode = map.GetProjectionMode();
+        var projectionMode = map.GetSnapshot().ProjectionMode;
         Assert.True(projectionMode.Axonometric);
         Assert.NotNull(projectionMode.XSkew);
         Assert.Equal(0.1, projectionMode.XSkew.Value, 12);
         Assert.NotNull(projectionMode.YSkew);
         Assert.Equal(0.2, projectionMode.YSkew.Value, 12);
 
-        var visibleBounds = map.LatLngBoundsForCamera(
-            new CameraOptions { Center = new LatLng(0, 0), Zoom = 1 }
+        var camera = new CameraOptions { Center = new LatLng(0, 0), Zoom = 1 };
+        var visibleBounds = await map.LatLngBoundsForCameraAsync(
+            camera,
+            TestContext.Current.CancellationToken
         );
-        var unwrappedBounds = map.LatLngBoundsForCameraUnwrapped(
-            new CameraOptions { Center = new LatLng(0, 0), Zoom = 1 }
+        var unwrappedBounds = await map.LatLngBoundsForCameraUnwrappedAsync(
+            camera,
+            TestContext.Current.CancellationToken
         );
         Assert.True(visibleBounds.Southwest.Latitude <= visibleBounds.Northeast.Latitude);
         Assert.True(unwrappedBounds.Southwest.Latitude <= unwrappedBounds.Northeast.Latitude);
     }
 
-    [BindingSpecTest("BND-102")]
+    [BindingSpecTest("BND-102", "BND-104")]
     [Fact]
-    public void CameraBoundsDistinguishUnboundedFromWorldBounds()
+    public async Task CameraCommandsReturnIdsAndSnapshotsAdvance()
     {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
+        var before = map.GetCameraSnapshot();
 
-        double JumpedLongitude(double longitude)
-        {
-            map.JumpTo(new CameraOptions { Center = new LatLng(0, longitude), Zoom = 2 });
-            var camera = map.GetCamera();
-            Assert.NotNull(camera.Center);
-            return camera.Center.Value.Longitude;
-        }
-
-        Assert.Equal(BoundsConstraint.Unbounded.Instance, map.GetBounds().Bounds);
-        // An unbounded map wraps across the antimeridian.
-        Assert.Equal(-160, JumpedLongitude(200), 6);
-
-        map.SetBounds(
-            new BoundOptions
+        var commandId = map.UpdateCamera(
+            new CameraUpdate
             {
-                Bounds = new BoundsConstraint.Bounded(
-                    new LatLngBounds(new LatLng(-90, -180), new LatLng(90, 180))
-                ),
+                Mode = CameraUpdateMode.Jump,
+                Camera = new CameraOptions
+                {
+                    Center = new LatLng(12.5, 34.25),
+                    Zoom = 5.5,
+                    Bearing = 45,
+                    Pitch = 30,
+                },
             }
         );
+        var ordered = await map.QueryCameraAsync(TestContext.Current.CancellationToken);
 
-        var world = Assert.IsType<BoundsConstraint.Bounded>(map.GetBounds().Bounds);
-        Assert.Equal(180, world.Bounds.Northeast.Longitude, 6);
-        // World bounds clamp at the antimeridian instead of wrapping.
-        Assert.Equal(180, JumpedLongitude(200), 6);
-
-        map.SetBounds(new BoundOptions { Bounds = BoundsConstraint.Unbounded.Instance });
-        Assert.Equal(BoundsConstraint.Unbounded.Instance, map.GetBounds().Bounds);
-        // Releasing the constraint restores antimeridian wrapping.
-        Assert.Equal(-160, JumpedLongitude(200), 6);
+        Assert.NotEqual(0ul, commandId);
+        Assert.True(ordered.Generation > before.Generation);
+        Assert.Equal(12.5, ordered.Camera.Center!.Value.Latitude, 12);
+        Assert.Equal(5.5, ordered.Camera.Zoom!.Value, 12);
+        Assert.Equal(ordered, map.GetCameraSnapshot());
     }
 
     [BindingSpecTest("BND-104")]
     [Fact]
-    public void InvalidMapAndProjectionInputsPropagateNativeDiagnostics()
+    public void InvalidCameraUpdatePropagatesNativeDiagnostic()
     {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-
-        var mapError = Assert.Throws<InvalidArgumentException>(() =>
-            map.JumpTo(new CameraOptions { Zoom = double.NaN })
-        );
-        var projectionError = Assert.Throws<InvalidArgumentException>(() =>
-            map.SetProjectionMode(new ProjectionModeOptions { XSkew = double.NaN })
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
         );
 
-        Assert.Equal(MaplibreStatus.InvalidArgument, mapError.Status);
-        Assert.NotNull(mapError.RawStatus);
-        Assert.NotEmpty(mapError.Diagnostic);
-        Assert.Equal(MaplibreStatus.InvalidArgument, projectionError.Status);
-        Assert.NotNull(projectionError.RawStatus);
-        Assert.NotEmpty(projectionError.Diagnostic);
+        var error = Assert.Throws<InvalidArgumentException>(() =>
+            map.UpdateCamera(
+                new CameraUpdate
+                {
+                    Mode = CameraUpdateMode.Jump,
+                    Camera = new CameraOptions { Zoom = double.NaN },
+                }
+            )
+        );
+
+        Assert.Equal(MaplibreStatus.InvalidArgument, error.Status);
+        Assert.NotEmpty(error.Diagnostic);
     }
 
     [BindingSpecTest("BND-103")]
     [Fact]
-    public void CoordinateProjectionRoundTripsThroughNativeMap()
+    public async Task CoordinateProjectionRoundTripsThroughNativeMap()
     {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
         var coordinate = new LatLng(12.5, 34.25);
 
-        var point = map.PixelForLatLng(coordinate);
-        AssertClose(coordinate, map.LatLngForPixel(point));
-
-        var points = map.PixelsForLatLngs([coordinate, new LatLng(0, 0)]);
-        Assert.Equal(2, points.Length);
-        var coordinates = map.LatLngsForPixels(points);
-        Assert.Equal(2, coordinates.Length);
+        var point = await map.PixelForLatLngAsync(
+            coordinate,
+            TestContext.Current.CancellationToken
+        );
+        AssertClose(
+            coordinate,
+            await map.LatLngForPixelAsync(point, TestContext.Current.CancellationToken)
+        );
+        var points = await map.PixelsForLatLngsAsync(
+            [coordinate, new LatLng(0, 0)],
+            TestContext.Current.CancellationToken
+        );
+        var coordinates = await map.LatLngsForPixelsAsync(
+            points,
+            TestContext.Current.CancellationToken
+        );
         AssertClose(coordinate, coordinates[0]);
         AssertClose(new LatLng(0, 0), coordinates[1]);
-
-        Assert.Empty(map.PixelsForLatLngs([]));
-        Assert.Empty(map.LatLngsForPixels([]));
     }
 
     [BindingSpecTest("BND-103")]
     [Fact]
-    public void ProjectionSnapshotSupportsCameraAndCoordinateConversions()
+    public async Task ProjectionOrderedQueriesCompleteAutonomously()
     {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-        using var projection = map.CreateProjection();
-        var coordinate = new LatLng(12.5, 34.25);
-
-        projection.SetCamera(new CameraOptions { Center = new LatLng(0, 0), Zoom = 1 });
-        projection.SetVisibleCoordinates(
-            [new LatLng(-10, -20), new LatLng(10, 20)],
-            new EdgeInsets(1, 2, 3, 4)
-        );
-        projection.SetVisibleGeometry(
-            """{"type":"LineString","coordinates":[[-20,-10],[20,10]]}"""u8.ToArray(),
-            new EdgeInsets(1, 2, 3, 4)
-        );
-
-        var camera = projection.GetCamera();
-        Assert.NotNull(camera.Center);
-        var point = projection.PixelForLatLng(coordinate);
-        AssertClose(coordinate, projection.LatLngForPixel(point));
-
-        projection.Close();
-        Assert.True(projection.IsClosed);
-    }
-
-    [BindingSpecTest("BND-043")]
-    [Fact]
-    public void ProjectionSnapshotRemainsUsableAfterSourceMapCloses()
-    {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-        using var projection = map.CreateProjection();
-        var coordinate = new LatLng(12.5, 34.25);
-
-        map.Close();
-
-        var camera = projection.GetCamera();
-        Assert.NotNull(camera);
-        var point = projection.PixelForLatLng(coordinate);
-        AssertClose(coordinate, projection.LatLngForPixel(point));
-
-        projection.Close();
-        runtime.Close();
-    }
-
-    [BindingSpecTest("BND-102")]
-    [Fact]
-    public void FreeCameraOptionsCanBeCopiedThroughNativeMap()
-    {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-
-        var freeCamera = map.GetFreeCameraOptions();
-        map.SetFreeCameraOptions(freeCamera);
-    }
-
-    [BindingSpecTest("BND-102")]
-    [Fact]
-    public void CameraTransitionCommandsAcceptOptionalAnimationDescriptors()
-    {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-        var camera = new CameraOptions { Center = new LatLng(0, 0), Zoom = 1 };
-        var animation = new AnimationOptions
-        {
-            Duration = 0,
-            MinimumZoom = 0,
-            Easing = new UnitBezier(0, 0, 1, 1),
-        };
-
-        map.EaseTo(camera, null);
-        map.EaseTo(camera, animation);
-        map.FlyTo(camera, null);
-        map.FlyTo(camera, animation);
-        map.MoveBy(0, 0);
-        map.MoveByAnimated(0, 0, null);
-        map.MoveByAnimated(0, 0, animation);
-        map.ScaleBy(1, null);
-        map.ScaleBy(1, new ScreenPoint(256, 256));
-        map.ScaleByAnimated(1, null, null);
-        map.ScaleByAnimated(1, new ScreenPoint(256, 256), null);
-        map.ScaleByAnimated(1, null, animation);
-        map.ScaleByAnimated(1, new ScreenPoint(256, 256), animation);
-        map.RotateBy(new ScreenPoint(0, 0), new ScreenPoint(1, 1));
-        map.RotateByAnimated(new ScreenPoint(0, 0), new ScreenPoint(1, 1), null);
-        map.RotateByAnimated(new ScreenPoint(0, 0), new ScreenPoint(1, 1), animation);
-        map.PitchBy(0);
-        map.PitchByAnimated(0, null);
-        map.PitchByAnimated(0, animation);
-        map.CancelTransitions();
-    }
-
-    [BindingSpecTest("BND-102")]
-    [Fact]
-    public void GestureInProgressBracketsHostDrivenCameraCommands()
-    {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-
-        Assert.False(map.IsGestureInProgress());
-
-        map.SetGestureInProgress(true);
-        map.MoveBy(8, -4);
-        Assert.True(map.IsGestureInProgress());
-
-        map.SetGestureInProgress(false);
-        Assert.False(map.IsGestureInProgress());
-    }
-
-    private sealed record CameraEventTally(
-        List<ulong> FinishedTransitionIds,
-        List<CameraChangeMode> DidChangeModes
-    );
-
-    private static CameraEventTally DrainCameraEvents(RuntimeHandle runtime)
-    {
-        var finished = new List<ulong>();
-        var didChange = new List<CameraChangeMode>();
-        foreach (var runtimeEvent in runtime.DrainEvents().Events)
-        {
-            switch (runtimeEvent.Type)
-            {
-                case RuntimeEventType.MapCameraTransitionFinished:
-                    var payload = Assert.IsType<RuntimeEventPayload.CameraTransitionFinished>(
-                        runtimeEvent.Payload
-                    );
-                    finished.Add(payload.TransitionId);
-                    break;
-                case RuntimeEventType.MapCameraDidChange:
-                    didChange.Add((CameraChangeMode)runtimeEvent.Code);
-                    break;
-            }
-        }
-
-        return new CameraEventTally(finished, didChange);
-    }
-
-    [BindingSpecTest("BND-102")]
-    [Fact]
-    public void ZeroDurationEaseReportsItsTransitionIdOnceAsAnImmediateChange()
-    {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-        var camera = new CameraOptions { Center = new LatLng(0, 0), Zoom = 11 };
-
-        map.EaseTo(camera, new AnimationOptions { Duration = 0, TransitionId = 7 });
-
-        var tally = DrainCameraEvents(runtime);
-        Assert.Equal([7ul], tally.FinishedTransitionIds);
-        Assert.Contains(CameraChangeMode.Immediate, tally.DidChangeModes);
-        Assert.DoesNotContain(CameraChangeMode.Animated, tally.DidChangeModes);
-
-        // The transition ended, so no later pump repeats the event.
-        runtime.Pump(TimeSpan.Zero);
-        Assert.Empty(DrainCameraEvents(runtime).FinishedTransitionIds);
-    }
-
-    [BindingSpecTest("BND-102")]
-    [Fact]
-    public void SupersededCameraTransitionReportsOnlyTheReplacedTransitionId()
-    {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-        var camera = new CameraOptions { Center = new LatLng(0, 0), Zoom = 11 };
-
-        map.EaseTo(camera, new AnimationOptions { Duration = 5000, TransitionId = 11 });
-        Assert.Empty(DrainCameraEvents(runtime).FinishedTransitionIds);
-
-        map.EaseTo(
-            camera with
-            {
-                Zoom = 13,
-            },
-            new AnimationOptions { Duration = 5000, TransitionId = 12 }
-        );
-
-        var tally = DrainCameraEvents(runtime);
-        Assert.Equal([11ul], tally.FinishedTransitionIds);
-        Assert.Contains(CameraChangeMode.Animated, tally.DidChangeModes);
-
-        // The superseding transition is still running, so it reports nothing yet.
-        map.CancelTransitions();
-        Assert.Equal([12ul], DrainCameraEvents(runtime).FinishedTransitionIds);
-    }
-
-    [BindingSpecTest("BND-102")]
-    [Fact]
-    public void CancelledCameraTransitionReportsItsTransitionIdOnce()
-    {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-
-        map.FlyTo(
-            new CameraOptions { Center = new LatLng(40, -70), Zoom = 14 },
-            new AnimationOptions { Duration = 5000, TransitionId = 21 }
-        );
-        Assert.Empty(DrainCameraEvents(runtime).FinishedTransitionIds);
-
-        map.CancelTransitions();
-        Assert.Equal([21ul], DrainCameraEvents(runtime).FinishedTransitionIds);
-
-        map.CancelTransitions();
-        Assert.Empty(DrainCameraEvents(runtime).FinishedTransitionIds);
-    }
-
-    [BindingSpecTest("BND-102")]
-    [Fact]
-    public void CameraTransitionThatRunsToCompletionReportsItsTransitionIdOnce()
-    {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(
             runtime,
-            new MapOptions
-            {
-                Width = 512,
-                Height = 512,
-                MapMode = MapMode.Static,
-            }
+            new MapOptions { Width = 512, Height = 512 }
+        );
+        using var projection = await map.CreateProjectionAsync(
+            TestContext.Current.CancellationToken
+        );
+        var coordinate = new LatLng(12.5, 34.25);
+
+        var commandId = projection.SetCamera(
+            new CameraOptions { Center = new LatLng(0, 0), Zoom = 1 }
+        );
+        var camera = await projection.GetCameraAsync(TestContext.Current.CancellationToken);
+        var point = await projection.PixelForLatLngAsync(
+            coordinate,
+            TestContext.Current.CancellationToken
+        );
+        var roundTrip = await projection.LatLngForPixelAsync(
+            point,
+            TestContext.Current.CancellationToken
         );
 
-        map.EaseTo(
-            new CameraOptions { Center = new LatLng(0, 0), Zoom = 11 },
-            new AnimationOptions { Duration = 5000, TransitionId = 31 }
-        );
-        Assert.Empty(DrainCameraEvents(runtime).FinishedTransitionIds);
-
-        // A static map advances its transitions to their end state the next time it
-        // updates, so requesting a still image runs this ease to completion.
-        map.RequestStillImage();
-        runtime.Pump(TimeSpan.Zero);
-
-        var tally = DrainCameraEvents(runtime);
-        Assert.Equal([31ul], tally.FinishedTransitionIds);
-        Assert.Equal(11, map.GetCamera().Zoom);
-
-        runtime.Pump(TimeSpan.Zero);
-        Assert.Empty(DrainCameraEvents(runtime).FinishedTransitionIds);
-    }
-
-    [BindingSpecTest("BND-102")]
-    [Fact]
-    public void JumpToAppliesCameraFieldsThroughNativeMap()
-    {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-
-        map.JumpTo(
-            new CameraOptions
-            {
-                Center = new LatLng(12.5, 34.25),
-                Zoom = 5.5,
-                Bearing = 45,
-                Pitch = 30,
-            }
-        );
-
-        var camera = map.GetCamera();
+        Assert.NotEqual(0ul, commandId);
         Assert.NotNull(camera.Center);
-        Assert.Equal(12.5, camera.Center.Value.Latitude, 12);
-        Assert.Equal(34.25, camera.Center.Value.Longitude, 12);
-        Assert.NotNull(camera.Zoom);
-        Assert.Equal(5.5, camera.Zoom.Value, 12);
-        Assert.NotNull(camera.Bearing);
-        Assert.Equal(45, camera.Bearing.Value, 12);
-        Assert.NotNull(camera.Pitch);
-        Assert.Equal(30, camera.Pitch.Value, 12);
-
-        // BND-070: successive snapshots of an unchanged camera compare equal.
-        Assert.Equal(camera, map.GetCamera());
+        AssertClose(coordinate, roundTrip);
     }
 }

@@ -115,10 +115,10 @@ import Testing
   }
 }
 
-@Test func setMaximumAmbientCacheSizeReportsCompletion() throws {
+@Test func setMaximumAmbientCacheSizeReportsCompletion() async throws {
   let runtime =
-    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
-  defer { try? runtime.close() }
+    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.closeBlockingForTests() }
 
   let operation = try runtime.setMaximumAmbientCacheSizeStart(8 << 20)
   #expect(!operation.isClosed)
@@ -133,13 +133,13 @@ import Testing
   #expect(operation.isClosed)
 }
 
-@Test func runtimeCloseRequiresOperationObserverClose() throws {
+@Test func runtimeCloseRequiresOperationObserverClose() async throws {
   let runtime =
-    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   let operation = try runtime.setMaximumAmbientCacheSizeStart(8 << 20)
 
   do {
-    try runtime.close()
+    try await runtime.close()
     Issue.record("runtime close should reject a live operation")
   } catch let error as MaplibreError {
     #expect(error.kind == .invalidState)
@@ -150,13 +150,13 @@ import Testing
     try operation.discard()
   }
   try operation.close()
-  try runtime.close()
+  try await runtime.close()
 }
 
-@Test func typedTakeConsumesResultButKeepsObserverOpen() throws {
+@Test func typedTakeConsumesResultButKeepsObserverOpen() async throws {
   let runtime =
-    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
-  defer { try? runtime.close() }
+    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.closeBlockingForTests() }
   let operation = try runtime.offlineRegionsListStart()
 
   #expect(try operation.wait(timeoutMilliseconds: 10000))
@@ -175,10 +175,11 @@ import Testing
   try operation.close()
 }
 
-@Test func closedRuntimeRejectsOfflineCallsThroughSwiftHandleState() throws {
+@Test func closedRuntimeRejectsOfflineCallsThroughSwiftHandleState(
+) async throws {
   let runtime =
-    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
-  try runtime.close()
+    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  try await runtime.close()
 
   do {
     _ = try runtime.offlineRegionsListStart()

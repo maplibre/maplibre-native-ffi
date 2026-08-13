@@ -4,14 +4,15 @@
 # stops the batch.
 set -euo pipefail
 
-if [[ $# -lt 3 ]]; then
-  echo "usage: $0 <timeout-seconds> <native-library> [test-argument ...] -- <test-executable ...>" >&2
+if [[ $# -lt 4 ]]; then
+  echo "usage: $0 <timeout-seconds> <abi> <native-library> [test-argument ...] -- <test-executable ...>" >&2
   exit 2
 fi
 
 timeout_seconds=$1
-native_library=$2
-shift 2
+abi=$2
+native_library=$3
+shift 3
 test_arguments=()
 while (($#)) && [[ $1 != -- ]]; do
   test_arguments+=("$1")
@@ -25,6 +26,13 @@ if (($# == 0)); then
   exit 2
 fi
 test_executables=("$@")
+case "$abi" in
+  arm64-v8a | x86_64) ;;
+  *)
+    echo "Unsupported Android emulator ABI: $abi" >&2
+    exit 2
+    ;;
+esac
 
 serial=emulator-5554
 remote_dir=/data/local/tmp/maplibre-native-ffi
@@ -51,7 +59,7 @@ fi
 if [[ ! -x "$adb" ]] ||
   ! "$adb" -s "$serial" shell getprop sys.boot_completed 2>/dev/null |
   tr -d '\r' | grep -qx 1; then
-  mise run //:android-emulator:boot
+  mise run //:android-emulator:boot "$abi"
 fi
 
 # The shell user may execute what it owns under /data/local/tmp. The Android

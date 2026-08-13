@@ -16,48 +16,50 @@ import org.maplibre.nativeffi.resource.ResourceResponseStatus
 @OptIn(ExperimentalForeignApi::class)
 class NativeDescriptorValidationTest : org.maplibre.nativeffi.NativeTestBase() {
   @Test
-  fun enumInputsRejectUnknownSentinelsBeforeNativeCalls() {
-    assertFailsWith<InvalidArgumentException> {
-      MapHandle.mapOptionsForTesting(MapOptions().apply { mapMode = MapMode(900) }) {}
+  fun enumInputsRejectUnknownSentinelsBeforeNativeCalls(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      assertFailsWith<InvalidArgumentException> {
+        MapHandle.mapOptionsForTesting(MapOptions().apply { mapMode = MapMode(900) }) {}
+      }
+      memScoped {
+        assertFailsWith<InvalidArgumentException> {
+          MapStructs.tileOptions(TileOptions().apply { lodMode = TileLodMode(901) }, this)
+        }
+        assertFailsWith<InvalidArgumentException> {
+          MapStructs.viewportOptions(
+            ViewportOptions().apply { northOrientation = NorthOrientation(902) },
+            this,
+          )
+        }
+        assertFailsWith<InvalidArgumentException> {
+          MapStructs.viewportOptions(
+            ViewportOptions().apply { constrainMode = ConstrainMode(903) },
+            this,
+          )
+        }
+        assertFailsWith<InvalidArgumentException> {
+          MapStructs.viewportOptions(
+            ViewportOptions().apply { viewportMode = ViewportMode(904) },
+            this,
+          )
+        }
+        assertFailsWith<InvalidArgumentException> {
+          ResourceStructs.resourceResponse(
+            ResourceResponse(ResourceResponseStatus.ERROR).apply {
+              errorReason = ResourceErrorReason(905)
+              errorMessage = "bad"
+            },
+            this,
+          )
+        }
+      }
     }
-    memScoped {
-      assertFailsWith<InvalidArgumentException> {
-        MapStructs.tileOptions(TileOptions().apply { lodMode = TileLodMode(901) }, this)
-      }
-      assertFailsWith<InvalidArgumentException> {
-        MapStructs.viewportOptions(
-          ViewportOptions().apply { northOrientation = NorthOrientation(902) },
-          this,
-        )
-      }
-      assertFailsWith<InvalidArgumentException> {
-        MapStructs.viewportOptions(
-          ViewportOptions().apply { constrainMode = ConstrainMode(903) },
-          this,
-        )
-      }
-      assertFailsWith<InvalidArgumentException> {
-        MapStructs.viewportOptions(
-          ViewportOptions().apply { viewportMode = ViewportMode(904) },
-          this,
-        )
-      }
-      assertFailsWith<InvalidArgumentException> {
-        ResourceStructs.resourceResponse(
-          ResourceResponse(ResourceResponseStatus.ERROR).apply {
-            errorReason = ResourceErrorReason(905)
-            errorMessage = "bad"
-          },
-          this,
-        )
-      }
-    }
-  }
 
   @Test
-  fun canonicalTileMaterializationRejectsOverflow() {
-    assertFailsWith<InvalidArgumentException> {
-      StyleStructs.canonicalTileId(CanonicalTileId(0, UInt.MAX_VALUE.toLong() + 1, 0))
+  fun canonicalTileMaterializationRejectsOverflow(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      assertFailsWith<InvalidArgumentException> {
+        StyleStructs.canonicalTileId(CanonicalTileId(0, UInt.MAX_VALUE.toLong() + 1, 0))
+      }
     }
-  }
 }

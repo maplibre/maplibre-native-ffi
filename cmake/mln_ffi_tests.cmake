@@ -69,6 +69,19 @@ function(mln_ffi_configure_browser_c_api_test)
 endfunction()
 
 function(mln_ffi_add_c_api_test)
+  find_package(Python3 REQUIRED COMPONENTS Interpreter)
+  add_test(
+    NAME execution-manifest
+    COMMAND
+      ${Python3_EXECUTABLE}
+      ${PROJECT_SOURCE_DIR}/scripts/check-execution-manifest.py
+      ${PROJECT_SOURCE_DIR}/api/execution-manifest.json
+      ${PROJECT_SOURCE_DIR}/include/maplibre_native_c/runtime.h
+      ${PROJECT_SOURCE_DIR}/include/maplibre_native_c/map.h
+      ${PROJECT_SOURCE_DIR}/include/maplibre_native_c/camera.h
+      ${PROJECT_SOURCE_DIR}/include/maplibre_native_c/projection.h
+      ${PROJECT_SOURCE_DIR}/include/maplibre_native_c/style.h
+      ${PROJECT_SOURCE_DIR}/include/maplibre_native_c/query.h)
   get_target_property(test_supported mln_ffi_platform_dependencies
                       MLN_FFI_TEST_SUPPORTED)
   if(NOT test_supported)
@@ -190,6 +203,12 @@ function(mln_ffi_add_c_api_test)
     PRIVATE
       ${PROJECT_SOURCE_DIR}/src ${PROJECT_SOURCE_DIR}/src/c_api/tests
       ${dependency_include_dirs})
+  target_include_directories(
+    mln_ffi_c_api_tests
+    SYSTEM
+    PRIVATE
+      ${MLN_FFI_SOURCE_DIR}/include
+      ${MLN_FFI_SOURCE_DIR}/vendor/maplibre-native-base/include)
 
   # Enforce the registration contract at compile time. A test that no RUN_TEST
   # references is an unused static function, and dropping `static` to dodge that

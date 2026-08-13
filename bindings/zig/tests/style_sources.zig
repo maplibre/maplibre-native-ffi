@@ -10,11 +10,11 @@ test "style source JSON buffers expose type info and copied attribution" {
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
-    try map.addStyleSourceJson(testing.allocator, "empty-json", "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\",\"features\":[]}}");
+    _ = try map.addStyleSourceJson(testing.allocator, "empty-json", "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\",\"features\":[]}}");
 
-    try testing.expect(try map.styleSourceExists(testing.allocator, "empty-json"));
-    try testing.expectEqual(maplibre.StyleSourceType.geojson, (try map.getStyleSourceType(testing.allocator, "empty-json")).?);
-    var info = (try map.getStyleSourceInfo(testing.allocator, "empty-json")).?;
+    try testing.expect(try support.styleSourceExists(&map, "empty-json"));
+    try testing.expectEqual(maplibre.StyleSourceType.geojson, (try support.styleSourceType(&map, "empty-json")).?);
+    var info = (try support.styleSourceInfo(&map, "empty-json")).?;
     defer info.deinit();
     try testing.expectEqual(maplibre.StyleSourceType.geojson, info.source_type);
     try testing.expectEqual(@as(usize, "empty-json".len), info.id_size);
@@ -22,14 +22,14 @@ test "style source JSON buffers expose type info and copied attribution" {
     try testing.expect(info.url == null);
     try testing.expect(info.tile_json == null);
 
-    try map.addStyleSourceJson(testing.allocator, "vector-meta", "{\"type\":\"vector\",\"tiles\":[\"https://example.com/{z}/{x}/{y}.pbf\"],\"attribution\":\"Example attribution\"}");
+    _ = try map.addStyleSourceJson(testing.allocator, "vector-meta", "{\"type\":\"vector\",\"tiles\":[\"https://example.com/{z}/{x}/{y}.pbf\"],\"attribution\":\"Example attribution\"}");
 
-    var vector_info = (try map.getStyleSourceInfo(testing.allocator, "vector-meta")).?;
+    var vector_info = (try support.styleSourceInfo(&map, "vector-meta")).?;
     defer vector_info.deinit();
     try testing.expectEqual(maplibre.StyleSourceType.vector, vector_info.source_type);
     try testing.expectEqualStrings("Example attribution", vector_info.attribution.?);
 
-    var attribution = (try map.copyStyleSourceAttribution(testing.allocator, "vector-meta")).?;
+    var attribution = (try support.styleSourceAttribution(&map, "vector-meta")).?;
     defer attribution.deinit();
     try testing.expectEqualStrings("Example attribution", attribution.value);
 }
@@ -40,14 +40,14 @@ test "style source removal reports state and copies missing results" {
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
-    try map.addGeoJsonSourceData(testing.allocator, "remove-me", "{\"type\":\"FeatureCollection\",\"features\":[]}", null);
-    try testing.expect(try map.styleSourceExists(testing.allocator, "remove-me"));
-    try testing.expect(try map.removeStyleSource(testing.allocator, "remove-me"));
-    try testing.expect(!try map.styleSourceExists(testing.allocator, "remove-me"));
-    try testing.expect(!try map.removeStyleSource(testing.allocator, "remove-me"));
-    try testing.expect((try map.getStyleSourceInfo(testing.allocator, "remove-me")) == null);
-    try testing.expect((try map.copyStyleSourceAttribution(testing.allocator, "remove-me")) == null);
-    try testing.expect((try map.copyStyleSourceUrl(testing.allocator, "remove-me")) == null);
+    _ = try map.addGeoJsonSourceData(testing.allocator, "remove-me", "{\"type\":\"FeatureCollection\",\"features\":[]}", null);
+    try testing.expect(try support.styleSourceExists(&map, "remove-me"));
+    try testing.expect(try support.removeStyleSource(&map, "remove-me"));
+    try testing.expect(!try support.styleSourceExists(&map, "remove-me"));
+    try testing.expect(!try support.removeStyleSource(&map, "remove-me"));
+    try testing.expect((try support.styleSourceInfo(&map, "remove-me")) == null);
+    try testing.expect((try support.styleSourceAttribution(&map, "remove-me")) == null);
+    try testing.expect((try support.styleSourceUrl(&map, "remove-me")) == null);
 }
 
 test "tile source helpers expose copied reconstructible source information" {
@@ -60,7 +60,7 @@ test "tile source helpers expose copied reconstructible source information" {
         "https://a.example.com/vector/{z}/{x}/{y}.mvt",
         "https://b.example.com/vector/{z}/{x}/{y}.mvt",
     };
-    try map.addVectorSourceTiles(testing.allocator, "vector-helper", vector_tiles[0..], .{
+    _ = try map.addVectorSourceTiles(testing.allocator, "vector-helper", vector_tiles[0..], .{
         .min_zoom = 1.0,
         .max_zoom = 14.0,
         .attribution = "Helper attribution",
@@ -71,8 +71,8 @@ test "tile source helpers expose copied reconstructible source information" {
         },
         .vector_encoding = .mlt,
     });
-    try testing.expectEqual(maplibre.StyleSourceType.vector, (try map.getStyleSourceType(testing.allocator, "vector-helper")).?);
-    var vector_info = (try map.getStyleSourceInfo(testing.allocator, "vector-helper")).?;
+    try testing.expectEqual(maplibre.StyleSourceType.vector, (try support.styleSourceType(&map, "vector-helper")).?);
+    var vector_info = (try support.styleSourceInfo(&map, "vector-helper")).?;
     defer vector_info.deinit();
     try testing.expectEqualStrings("Helper attribution", vector_info.attribution.?);
     try testing.expect(vector_info.url == null);
@@ -88,60 +88,56 @@ test "tile source helpers expose copied reconstructible source information" {
     try testing.expectEqual(@as(f64, -45.0), vector_tile_json.bounds.?.southwest.latitude);
     try testing.expectEqual(@as(f64, 120.0), vector_tile_json.bounds.?.northeast.longitude);
 
-    try map.addVectorSourceUrl(testing.allocator, "vector-url-helper", "https://example.com/vector.json", null);
-    try testing.expectEqual(maplibre.StyleSourceType.vector, (try map.getStyleSourceType(testing.allocator, "vector-url-helper")).?);
-    var vector_url_info = (try map.getStyleSourceInfo(testing.allocator, "vector-url-helper")).?;
+    _ = try map.addVectorSourceUrl(testing.allocator, "vector-url-helper", "https://example.com/vector.json", null);
+    try testing.expectEqual(maplibre.StyleSourceType.vector, (try support.styleSourceType(&map, "vector-url-helper")).?);
+    var vector_url_info = (try support.styleSourceInfo(&map, "vector-url-helper")).?;
     defer vector_url_info.deinit();
     try testing.expectEqualStrings("https://example.com/vector.json", vector_url_info.url.?);
     try testing.expect(vector_url_info.tile_json == null);
 
-    var copied_url = (try map.copyStyleSourceUrl(testing.allocator, "vector-url-helper")).?;
+    var copied_url = (try support.styleSourceUrl(&map, "vector-url-helper")).?;
     defer copied_url.deinit();
     try testing.expectEqualStrings("https://example.com/vector.json", copied_url.value);
 
     const raster_tiles = [_][]const u8{"https://example.com/raster/{z}/{x}/{y}.png"};
-    try map.addRasterSourceTiles(testing.allocator, "raster-helper", raster_tiles[0..], .{ .tile_size = 256 });
-    try testing.expectEqual(maplibre.StyleSourceType.raster, (try map.getStyleSourceType(testing.allocator, "raster-helper")).?);
-    var raster_info = (try map.getStyleSourceInfo(testing.allocator, "raster-helper")).?;
+    _ = try map.addRasterSourceTiles(testing.allocator, "raster-helper", raster_tiles[0..], .{ .tile_size = 256 });
+    try testing.expectEqual(maplibre.StyleSourceType.raster, (try support.styleSourceType(&map, "raster-helper")).?);
+    var raster_info = (try support.styleSourceInfo(&map, "raster-helper")).?;
     defer raster_info.deinit();
     try testing.expectEqual(@as(?u32, 256), raster_info.tile_size);
     try testing.expect(raster_info.vector_encoding == null);
     try testing.expect(raster_info.raster_encoding == null);
-    try map.addRasterSourceUrl(testing.allocator, "raster-url-helper", "https://example.com/raster.json", .{ .tile_size = 256 });
+    _ = try map.addRasterSourceUrl(testing.allocator, "raster-url-helper", "https://example.com/raster.json", .{ .tile_size = 256 });
 
     const dem_tiles = [_][]const u8{"https://example.com/dem/{z}/{x}/{y}.png"};
-    try map.addRasterDemSourceTiles(testing.allocator, "dem", dem_tiles[0..], .{
+    _ = try map.addRasterDemSourceTiles(testing.allocator, "dem", dem_tiles[0..], .{
         .min_zoom = 0.0,
         .max_zoom = 14.0,
         .tile_size = 256,
         .raster_encoding = .terrarium,
     });
-    try map.addRasterDemSourceUrl(testing.allocator, "dem-url", "https://example.com/dem.json", .{ .tile_size = 256, .raster_encoding = .mapbox });
-    try testing.expectEqual(maplibre.StyleSourceType.raster_dem, (try map.getStyleSourceType(testing.allocator, "dem")).?);
-    var dem_info = (try map.getStyleSourceInfo(testing.allocator, "dem")).?;
+    _ = try map.addRasterDemSourceUrl(testing.allocator, "dem-url", "https://example.com/dem.json", .{ .tile_size = 256, .raster_encoding = .mapbox });
+    try testing.expectEqual(maplibre.StyleSourceType.raster_dem, (try support.styleSourceType(&map, "dem")).?);
+    var dem_info = (try support.styleSourceInfo(&map, "dem")).?;
     defer dem_info.deinit();
     try testing.expectEqual(@as(?u32, 256), dem_info.tile_size);
     try testing.expectEqual(maplibre.StyleRasterDemEncoding.terrarium, dem_info.raster_encoding.?);
 
-    try map.addHillshadeLayer(testing.allocator, "dem-hillshade", "dem", "point-circle");
-    try map.addColorReliefLayer(testing.allocator, "dem-relief", "dem", "");
-    var layer_type = (try map.getStyleLayerType(testing.allocator, "dem-hillshade")).?;
+    _ = try map.addHillshadeLayer(testing.allocator, "dem-hillshade", "dem", "point-circle");
+    _ = try map.addColorReliefLayer(testing.allocator, "dem-relief", "dem", "");
+    var layer_type = (try support.styleLayerType(&map, "dem-hillshade")).?;
     defer layer_type.deinit();
     try testing.expectEqualStrings("hillshade", layer_type.value);
-    var relief_type = (try map.getStyleLayerType(testing.allocator, "dem-relief")).?;
+    var relief_type = (try support.styleLayerType(&map, "dem-relief")).?;
     defer relief_type.deinit();
     try testing.expectEqualStrings("color-relief", relief_type.value);
 
-    try map.setLayerProperty(testing.allocator, "dem-relief", "color-relief-color", "[\"interpolate\",[\"linear\"],[\"elevation\"],0,\"black\",1000,\"white\"]");
-    try testing.expectError(
-        error.InvalidArgument,
-        map.setLayerProperty(testing.allocator, "dem-relief", "color-relief-color", "[\"interpolate\",[\"linear\"],[\"zoom\"],0,\"black\",1,\"white\"]"),
-    );
-
-    try testing.expectError(error.InvalidArgument, map.addHillshadeLayer(testing.allocator, "bad-hillshade", "point", ""));
+    _ = try map.setLayerProperty(testing.allocator, "dem-relief", "color-relief-color", "[\"interpolate\",[\"linear\"],[\"elevation\"],0,\"black\",1000,\"white\"]");
+    try testing.expect((try map.setLayerProperty(testing.allocator, "dem-relief", "color-relief-color", "[\"interpolate\",[\"linear\"],[\"zoom\"],0,\"black\",1,\"white\"]")) != 0);
+    try testing.expect((try map.addHillshadeLayer(testing.allocator, "bad-hillshade", "point", "")) != 0);
     try testing.expectError(error.InvalidArgument, map.addRasterSourceTiles(testing.allocator, "bad-raster", raster_tiles[0..], .{ .raster_encoding = .mapbox }));
 
-    try testing.expect(try map.removeStyleSource(testing.allocator, "vector-helper"));
+    try testing.expect(try support.removeStyleSource(&map, "vector-helper"));
     try map.close();
     try testing.expectEqualStrings(vector_tiles[0], vector_info.tile_json.?.tile_urls[0]);
     try testing.expectEqualStrings("https://example.com/vector.json", vector_url_info.url.?);
@@ -159,24 +155,24 @@ test "image source helpers add update and copy coordinates" {
         .{ .latitude = 37.0, .longitude = -122.0 },
         .{ .latitude = 37.0, .longitude = -123.0 },
     };
-    try map.addImageSourceUrl(testing.allocator, "image-url-source", coordinates, "https://example.com/image.png");
-    try testing.expectEqual(maplibre.StyleSourceType.image, (try map.getStyleSourceType(testing.allocator, "image-url-source")).?);
+    _ = try map.addImageSourceUrl(testing.allocator, "image-url-source", coordinates, "https://example.com/image.png");
+    try testing.expectEqual(maplibre.StyleSourceType.image, (try support.styleSourceType(&map, "image-url-source")).?);
 
-    const copied = (try map.getImageSourceCoordinates(testing.allocator, "image-url-source")).?;
+    const copied = (try support.imageSourceCoordinates(&map, "image-url-source")).?;
     try testing.expectApproxEqAbs(coordinates[0].latitude, copied[0].latitude, 0.000001);
     try testing.expectApproxEqAbs(coordinates[0].longitude, copied[0].longitude, 0.000001);
 
     var image_pixels = [_]u8{ 1, 2, 3, 4 };
-    try map.addImageSourceImage(testing.allocator, "image-inline-source", coordinates, .{
+    _ = try map.addImageSourceImage(testing.allocator, "image-inline-source", coordinates, .{
         .width = 1,
         .height = 1,
         .stride = 4,
         .pixels = image_pixels[0..],
     });
     image_pixels[0] = 9;
-    try map.setImageSourceUrl(testing.allocator, "image-inline-source", "https://example.com/replacement.png");
+    _ = try map.setImageSourceUrl(testing.allocator, "image-inline-source", "https://example.com/replacement.png");
     image_pixels[0] = 5;
-    try map.setImageSourceImage(testing.allocator, "image-inline-source", .{
+    _ = try map.setImageSourceImage(testing.allocator, "image-inline-source", .{
         .width = 1,
         .height = 1,
         .stride = 4,
@@ -189,14 +185,14 @@ test "image source helpers add update and copy coordinates" {
         .{ .latitude = 36.0, .longitude = -121.0 },
         .{ .latitude = 36.0, .longitude = -124.0 },
     };
-    try map.setImageSourceCoordinates(testing.allocator, "image-inline-source", updated_coordinates);
-    const updated = (try map.getImageSourceCoordinates(testing.allocator, "image-inline-source")).?;
+    _ = try map.setImageSourceCoordinates(testing.allocator, "image-inline-source", updated_coordinates);
+    const updated = (try support.imageSourceCoordinates(&map, "image-inline-source")).?;
     try testing.expectApproxEqAbs(updated_coordinates[0].latitude, updated[0].latitude, 0.000001);
     try testing.expectApproxEqAbs(updated_coordinates[0].longitude, updated[0].longitude, 0.000001);
 
-    try testing.expect((try map.getImageSourceCoordinates(testing.allocator, "missing-image-source")) == null);
-    try testing.expectError(error.InvalidArgument, map.addImageSourceUrl(testing.allocator, "image-url-source", coordinates, "https://example.com/duplicate.png"));
-    try testing.expectError(error.InvalidArgument, map.setImageSourceUrl(testing.allocator, "point", "https://example.com/not-image.png"));
+    try testing.expect((try support.imageSourceCoordinates(&map, "missing-image-source")) == null);
+    try testing.expect((try map.addImageSourceUrl(testing.allocator, "image-url-source", coordinates, "https://example.com/duplicate.png")) != 0);
+    try testing.expect((try map.setImageSourceUrl(testing.allocator, "point", "https://example.com/not-image.png")) != 0);
 }
 
 test "style source JSON buffers reject invalid source data and pass explicit-length IDs" {
@@ -205,13 +201,10 @@ test "style source JSON buffers reject invalid source data and pass explicit-len
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
-    try testing.expectError(
-        error.InvalidArgument,
-        map.addStyleSourceJson(testing.allocator, "invalid-json-source", "{\"type\":\"definitely-not-a-source-type\"}"),
-    );
-    try map.addStyleSourceJson(testing.allocator, "nul\x00source", "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\",\"features\":[]}}");
-    try testing.expect(try map.styleSourceExists(testing.allocator, "nul\x00source"));
-    var info = (try map.getStyleSourceInfo(testing.allocator, "nul\x00source")).?;
+    try testing.expect((try map.addStyleSourceJson(testing.allocator, "invalid-json-source", "{\"type\":\"definitely-not-a-source-type\"}")) != 0);
+    _ = try map.addStyleSourceJson(testing.allocator, "nul\x00source", "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\",\"features\":[]}}");
+    try testing.expect(try support.styleSourceExists(&map, "nul\x00source"));
+    var info = (try support.styleSourceInfo(&map, "nul\x00source")).?;
     defer info.deinit();
     try testing.expectEqual(@as(usize, "nul\x00source".len), info.id_size);
 }
@@ -247,7 +240,7 @@ test "custom geometry source helpers add sources and accept tile updates" {
     defer map.close() catch @panic("map close failed");
 
     var state = CustomGeometryState{};
-    try map.addCustomGeometrySource(testing.allocator, "custom", .{
+    _ = try map.addCustomGeometrySource(testing.allocator, "custom", .{
         .fetch_tile = fetchCustomGeometryTile,
         .cancel_tile = cancelCustomGeometryTile,
         .context = &state,
@@ -260,36 +253,37 @@ test "custom geometry source helpers add sources and accept tile updates" {
         .wrap = true,
     });
 
-    try testing.expect(try map.styleSourceExists(testing.allocator, "custom"));
-    try testing.expectEqual(maplibre.StyleSourceType.custom_vector, (try map.getStyleSourceType(testing.allocator, "custom")).?);
+    try testing.expect(try support.styleSourceExists(&map, "custom"));
+    try testing.expectEqual(maplibre.StyleSourceType.custom_vector, (try support.styleSourceType(&map, "custom")).?);
 
     const tile_id = maplibre.CanonicalTileId{ .z = 0, .x = 0, .y = 0 };
-    try map.setCustomGeometrySourceTileData(testing.allocator, "custom", tile_id, "{\"type\":\"FeatureCollection\",\"features\":[]}");
-    try map.invalidateCustomGeometrySourceTile(testing.allocator, "custom", tile_id);
-    try map.invalidateCustomGeometrySourceRegion(testing.allocator, "custom", .{
+    _ = try map.setCustomGeometrySourceTileData(testing.allocator, "custom", tile_id, "{\"type\":\"FeatureCollection\",\"features\":[]}");
+    _ = try map.invalidateCustomGeometrySourceTile(testing.allocator, "custom", tile_id);
+    _ = try map.invalidateCustomGeometrySourceRegion(testing.allocator, "custom", .{
         .southwest = .{ .latitude = -1.0, .longitude = -1.0 },
         .northeast = .{ .latitude = 1.0, .longitude = 1.0 },
     });
 
-    try testing.expectError(error.InvalidArgument, map.addCustomGeometrySource(testing.allocator, "custom", .{
+    const duplicate_custom = try map.addCustomGeometrySource(testing.allocator, "custom", .{
         .fetch_tile = fetchCustomGeometryTile,
         .context = &state,
-    }));
+    });
+    try testing.expect(std.meta.eql(
+        try support.waitForCommandDisposition(&runtime, duplicate_custom),
+        maplibre.CommandDisposition.failed,
+    ));
     try testing.expectError(error.InvalidArgument, map.addCustomGeometrySource(testing.allocator, "bad-zoom", .{
         .fetch_tile = fetchCustomGeometryTile,
         .context = &state,
         .max_zoom = 33.0,
     }));
-    try testing.expectError(
-        error.InvalidArgument,
-        map.setCustomGeometrySourceTileData(
-            testing.allocator,
-            "custom",
-            .{ .z = 1, .x = 2, .y = 0 },
-            "{\"type\":\"FeatureCollection\",\"features\":[]}",
-        ),
-    );
-    try testing.expectError(error.InvalidArgument, map.invalidateCustomGeometrySourceTile(testing.allocator, "point", tile_id));
+    try testing.expect((try map.setCustomGeometrySourceTileData(
+        testing.allocator,
+        "custom",
+        .{ .z = 1, .x = 2, .y = 0 },
+        "{\"type\":\"FeatureCollection\",\"features\":[]}",
+    )) != 0);
+    try testing.expect((try map.invalidateCustomGeometrySourceTile(testing.allocator, "point", tile_id)) != 0);
 }
 
 // A host owns the context its callbacks read, and the release callback is the
@@ -302,19 +296,19 @@ test "a custom geometry source releases its context once per lifetime end" {
     defer if (map_open) map.close() catch @panic("map close failed");
 
     var removed = CustomGeometryState{};
-    try map.addCustomGeometrySource(testing.allocator, "removed", .{
+    _ = try map.addCustomGeometrySource(testing.allocator, "removed", .{
         .fetch_tile = fetchCustomGeometryTile,
         .release_context = releaseCustomGeometryContext,
         .context = &removed,
     });
     var retained = CustomGeometryState{};
-    try map.addCustomGeometrySource(testing.allocator, "retained", .{
+    _ = try map.addCustomGeometrySource(testing.allocator, "retained", .{
         .fetch_tile = fetchCustomGeometryTile,
         .release_context = releaseCustomGeometryContext,
         .context = &retained,
     });
 
-    try testing.expect(try map.removeStyleSource(testing.allocator, "removed"));
+    try testing.expect(try support.removeStyleSource(&map, "removed"));
     try testing.expectEqual(@as(usize, 1), removed.release_count);
     try testing.expectEqual(@as(usize, 0), retained.release_count);
 

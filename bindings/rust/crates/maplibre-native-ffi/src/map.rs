@@ -1,25 +1,23 @@
-use std::cell::RefCell;
 use std::fmt;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use maplibre_native_ffi_core as maplibre_core;
-use maplibre_native_ffi_core::ptr::{const_ptr_or_null, mut_ptr_or_null, option_ptr};
+use maplibre_native_ffi_core::ptr::{const_ptr_or_null, option_ptr};
 use maplibre_native_ffi_core::values::{
-    empty_lat_lng, empty_lat_lng_bounds as empty_bounds, empty_screen_point, lat_lngs_to_native,
-    screen_points_to_native,
+    empty_lat_lng_bounds, lat_lngs_to_native, screen_points_to_native,
 };
 use maplibre_native_ffi_sys as sys;
 
 #[cfg(test)]
 use crate::PremultipliedRgba8Image;
 use crate::camera::{
-    AnimationOptionsNativeExt, BoundOptionsNativeExt, CameraFitOptionsNativeExt,
-    CameraOptionsNativeExt, FreeCameraOptionsNativeExt, ProjectionModeNativeExt,
+    BoundOptionsNativeExt, CameraFitOptionsNativeExt, CameraOptionsNativeExt,
+    CameraUpdateNativeExt, FreeCameraOptionsNativeExt, ProjectionModeNativeExt,
 };
 #[cfg(test)]
 use crate::custom_geometry::CanonicalTileId;
 use crate::events::MapId;
-use crate::handle::{ThreadAffineNativeHandle, closed_handle_error};
+use crate::handle::{ConcurrentNativeHandle, closed_handle_error, out_handle};
 use crate::options::{MapOptionsNativeExt, MapTileOptionsNativeExt, MapViewportOptionsNativeExt};
 use crate::render::{
     MetalBorrowedTextureDescriptor, MetalOwnedTextureDescriptor, MetalSurfaceDescriptor,
@@ -28,40 +26,39 @@ use crate::render::{
     VulkanSurfaceDescriptor, WebGpuBorrowedTextureDescriptor, WebGpuOwnedTextureDescriptor,
     WebGpuSurfaceDescriptor,
 };
-use crate::runtime::{RuntimeHandle, RuntimeState};
+use crate::runtime::{
+    OperationHandle, OperationKind, RuntimeHandle, RuntimeState, wait_raw_operation_completed,
+};
 use crate::values::NativeValue;
 use crate::{
-    AnimationOptions, BoundOptions, CameraFitOptions, CameraOptions, Error, ErrorKind,
-    FreeCameraOptions, HandleOperationError, LatLng, LatLngBounds, MapDebugOptions, MapOptions,
-    MapProjectionHandle, MapTileOptions, MapViewportOptions, ProjectionMode, Result,
-    RuntimeEventMask, ScreenPoint,
+    BoundOptions, CameraFitOptions, CameraOptions, CameraSnapshot, CameraUpdate, Error, ErrorKind,
+    FreeCameraOptions, HandleOperationError, LatLng, LatLngBounds, MapOptions, MapProjectionHandle,
+    MapTileOptions, MapViewportOptions, ProjectionMode, Result, RuntimeEventMask, ScreenPoint,
 };
 
 mod style;
 pub use style::{
     GeoJsonSourceOptions, ImageContent, ImageStretch, LocationIndicatorImageKind, SourceInfo,
-    SourceType, StyleImage, StyleImageInfo, StyleImageOptions, StyleImageTextFit,
-    StyleLayerVisibility, StyleTransitionOptions, TileJsonInfo, TileScheme, TileSourceOptions,
-    VectorTileEncoding,
+    SourceType, StyleImage, StyleImageInfo, StyleImageOperation, StyleImageOptions,
+    StyleImageStretches, StyleImageTextFit, StyleLayerVisibility, StyleSourceInfoOperation,
+    StyleTransitionOptions, TileJsonInfo, TileScheme, TileSourceOptions, VectorTileEncoding,
 };
 
 #[derive(Debug)]
 pub(crate) struct MapState {
-    handle: ThreadAffineNativeHandle<sys::mln_map>,
-    runtime: RefCell<Option<Rc<RuntimeState>>>,
+    handle: ConcurrentNativeHandle<sys::mln_map>,
+    pub(crate) runtime: Mutex<Option<Arc<RuntimeState>>>,
     id: MapId,
 }
 
 impl MapState {
-    fn new(native: sys::mln_map, runtime: Rc<RuntimeState>, id: MapId) -> Result<Self> {
-        // SAFETY: native came from successful mln_map_create and is paired with
-        // the matching map destroy function.
-        let handle = unsafe {
-            ThreadAffineNativeHandle::from_handle(native, sys::mln_map_destroy, "mln_map")
-        }?;
+    fn new(native: sys::mln_map, runtime: Arc<RuntimeState>, id: MapId) -> Result<Self> {
+        // SAFETY: native came from a successful typed creation take and map
+        // control state supports calls from any thread.
+        let handle = unsafe { ConcurrentNativeHandle::from_handle(native, "mln_map") }?;
         Ok(Self {
             handle,
-            runtime: RefCell::new(Some(runtime)),
+            runtime: Mutex::new(Some(runtime)),
             id,
         })
     }
@@ -77,26 +74,61 @@ impl MapState {
     }
 
     fn close(&self) -> Result<()> {
-        // The destroy releases the callback state of this map's custom geometry
-        // sources before it returns.
-        self.handle.close()?;
-        self.runtime.borrow_mut().take();
+        let map = self.native()?;
+        let mut operation = sys::mln_operation(0);
+        // SAFETY: map is live and operation is null writable storage.
+        maplibre_core::check(unsafe { sys::mln_map_close_start(map, &mut operation) })?;
+        let result = wait_raw_operation_completed(operation);
+        // SAFETY: this call owns the close observer.
+        unsafe { sys::mln_operation_release(operation) };
+        result?;
+        self.handle.mark_closed();
+        self.runtime
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take();
         Ok(())
     }
 }
 
 impl Drop for MapState {
     fn drop(&mut self) {
-        self.runtime.borrow_mut().take();
-        // A failed destroy, such as one with a render session still attached,
-        // is reported through the leak channel by the handle's own `Drop`.
-        let _ = self.handle.close();
+        if self.close().is_err() {
+            self.handle.leak_for_report();
+        }
+        self.runtime
+            .get_mut()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take();
     }
 }
 
-/// Owner-thread map handle bound to a retained runtime.
+/// Any-thread map control handle bound to a retained runtime.
 pub struct MapHandle {
-    pub(crate) inner: Rc<MapState>,
+    pub(crate) inner: Arc<MapState>,
+}
+
+/// Logical map extent in UI pixels and device-pixel scale.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LogicalExtent {
+    pub width: u32,
+    pub height: u32,
+    pub scale_factor: f64,
+}
+
+/// Immutable map state copied from the latest worker publication.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MapSnapshot {
+    pub generation: u64,
+    pub camera: CameraOptions,
+    pub logical_extent: LogicalExtent,
+    pub projection_mode: ProjectionMode,
+    pub viewport: MapViewportOptions,
+    pub loading: bool,
+    pub fully_rendered: bool,
+    pub repaint_demand: bool,
+    pub event_mask: RuntimeEventMask,
+    pub latest_render_update_generation: u64,
 }
 
 impl fmt::Debug for MapHandle {
@@ -108,23 +140,52 @@ impl fmt::Debug for MapHandle {
 }
 
 impl MapHandle {
-    /// Creates a map with explicit map options on the runtime owner thread.
+    /// Creates a map and waits for the worker-side creation operation.
     pub fn with_options(runtime: &RuntimeHandle, options: &MapOptions) -> Result<Self> {
         let runtime_ptr = runtime.inner.native()?;
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_map>::new();
         let raw_options = options.to_native()?;
-
-        // SAFETY: runtime_ptr is a live runtime handle. raw_options is a
-        // materialized map descriptor with size filled by the binding. out is a
-        // valid null-initialized out-pointer owned by this call.
+        let mut operation = sys::mln_operation(0);
+        // SAFETY: inputs remain readable and operation is null writable storage.
         maplibre_core::check(unsafe {
-            sys::mln_map_create(runtime_ptr, &raw_options, out.as_mut_ptr())
+            sys::mln_map_create_start(runtime_ptr, &raw_options, &mut operation)
         })?;
-        let native = out.get();
-        let id = MapId::new(native.0);
-        let state = Rc::new(MapState::new(native, Rc::clone(&runtime.inner), id)?);
+        let result = (|| {
+            wait_raw_operation_completed(operation)?;
+            let mut out = maplibre_core::ptr::OutHandle::<sys::mln_map>::new();
+            // SAFETY: creation completed successfully and out is null writable.
+            maplibre_core::check(unsafe {
+                sys::mln_map_create_take_result(operation, out.as_mut_ptr())
+            })?;
+            let native = out_handle(out, "mln_map")?;
+            let id = MapId::new(native.0);
+            Ok(Self {
+                inner: Arc::new(MapState::new(native, Arc::clone(&runtime.inner), id)?),
+            })
+        })();
+        // SAFETY: this call owns the creation observer.
+        unsafe { sys::mln_operation_release(operation) };
+        result
+    }
 
-        Ok(Self { inner: state })
+    fn start_operation<T>(
+        &self,
+        operation: sys::mln_operation,
+        kind: OperationKind,
+    ) -> Result<OperationHandle<T>> {
+        let registry = {
+            let runtime = self
+                .inner
+                .runtime
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            Arc::clone(
+                &runtime
+                    .as_ref()
+                    .ok_or_else(|| closed_handle_error("MapHandle"))?
+                    .operations,
+            )
+        };
+        OperationHandle::new(operation, kind, registry)
     }
 
     /// Returns this map's runtime-local event source identity.
@@ -132,17 +193,12 @@ impl MapHandle {
         self.inner.id
     }
 
-    /// Explicitly destroys the map. A failed destroy leaves the native handle
-    /// live so child handles can keep retaining and closing the map.
-    ///
-    /// Closing discards this map's queued runtime events and its recorded
-    /// loading failure, with no flush and no terminal event. Dropping the
-    /// handle ends the event stream the same way.
+    /// Explicitly closes the map and waits for worker-side retirement.
     pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
         if self.inner.is_closed() {
             return Ok(());
         }
-        if Rc::strong_count(&self.inner) > 1 {
+        if Arc::strong_count(&self.inner) > 1 {
             return Err(HandleOperationError::new(
                 Error::new(
                     ErrorKind::InvalidState,
@@ -157,615 +213,638 @@ impl MapHandle {
             .map_err(|error| HandleOperationError::new(error, self))
     }
 
-    /// Requests a repaint for a continuous map.
-    pub fn request_repaint(&self) -> Result<()> {
+    /// Copies the latest immutable map publication.
+    pub fn snapshot(&self) -> Result<MapSnapshot> {
         let map = self.inner.native()?;
-        // SAFETY: map is a live map handle owned by this wrapper.
-        maplibre_core::check(unsafe { sys::mln_map_request_repaint(map) })
+        let mut raw = sys::mln_map_snapshot {
+            size: std::mem::size_of::<sys::mln_map_snapshot>() as u32,
+            reserved: 0,
+            generation: 0,
+            // SAFETY: these constructors initialize the nested ABI descriptors.
+            camera: unsafe { sys::mln_camera_options_default() },
+            logical_extent: sys::mln_logical_extent {
+                width: 0,
+                height: 0,
+                scale_factor: 0.0,
+            },
+            projection_mode: unsafe { sys::mln_projection_mode_default() },
+            viewport: unsafe { sys::mln_map_viewport_options_default() },
+            loading: false,
+            fully_rendered: false,
+            repaint_demand: false,
+            reserved_flags: 0,
+            event_mask: 0,
+            latest_render_update_generation: 0,
+        };
+        // SAFETY: map is live and raw is a size-tagged writable descriptor.
+        maplibre_core::check(unsafe { sys::mln_map_snapshot_get(map, &mut raw) })?;
+        Ok(MapSnapshot {
+            generation: raw.generation,
+            camera: CameraOptions::from_native(raw.camera),
+            logical_extent: LogicalExtent {
+                width: raw.logical_extent.width,
+                height: raw.logical_extent.height,
+                scale_factor: raw.logical_extent.scale_factor,
+            },
+            projection_mode: ProjectionMode::from_native(raw.projection_mode),
+            viewport: MapViewportOptions::from_native(raw.viewport),
+            loading: raw.loading,
+            fully_rendered: raw.fully_rendered,
+            repaint_demand: raw.repaint_demand,
+            event_mask: RuntimeEventMask::from_bits_retain(raw.event_mask),
+            latest_render_update_generation: raw.latest_render_update_generation,
+        })
     }
 
-    /// Requests one still image for a static or tile map.
-    pub fn request_still_image(&self) -> Result<()> {
+    /// Submits the map's logical extent update and returns its command ID.
+    pub fn resize(&self, extent: LogicalExtent) -> Result<u64> {
         let map = self.inner.native()?;
-        // SAFETY: map is a live map handle owned by this wrapper.
-        maplibre_core::check(unsafe { sys::mln_map_request_still_image(map) })
+        let mut command_id = 0;
+        let raw = sys::mln_logical_extent {
+            width: extent.width,
+            height: extent.height,
+            scale_factor: extent.scale_factor,
+        };
+        // SAFETY: map is live and command_id is zero writable storage.
+        maplibre_core::check(unsafe { sys::mln_map_resize(map, raw, &mut command_id) })?;
+        Ok(command_id)
     }
 
-    /// Selects which map-originated event types this map queues.
-    ///
-    /// A map reads the bits in
-    /// [`RuntimeEventMask::ALL_MAP_EVENTS`](crate::RuntimeEventMask::ALL_MAP_EVENTS),
-    /// so [`RuntimeEventMask::ALL`](crate::RuntimeEventMask::ALL) selects every
-    /// map-originated type. Narrowing gates later events and keeps queued ones.
-    /// A bit outside `ALL` is an invalid-argument error.
-    pub fn set_event_mask(&self, mask: RuntimeEventMask) -> Result<()> {
+    /// Requests a continuous-map repaint and returns its command ID.
+    pub fn request_repaint(&self) -> Result<u64> {
         let map = self.inner.native()?;
-        // SAFETY: map is live. The C API validates unknown mask bits.
-        maplibre_core::check(unsafe { sys::mln_map_set_event_mask(map, mask.bits()) })
+        let mut command_id = 0;
+        // SAFETY: map is live and command_id is zero writable storage.
+        maplibre_core::check(unsafe { sys::mln_map_request_repaint(map, &mut command_id) })?;
+        Ok(command_id)
     }
 
-    /// Reports which map-originated event types this map queues, starting from
-    /// the mask its creation options selected.
-    pub fn event_mask(&self) -> Result<RuntimeEventMask> {
+    /// Starts one noncoalescing still-image operation.
+    pub fn request_still_image(&self) -> Result<OperationHandle<()>> {
         let map = self.inner.native()?;
-        let mut raw = 0;
-        // SAFETY: map is live and out_mask points to writable u64 storage.
-        maplibre_core::check(unsafe { sys::mln_map_get_event_mask(map, &mut raw) })?;
-        Ok(RuntimeEventMask::from_bits_retain(raw))
-    }
-
-    /// Applies MapLibre debug overlay mask bits.
-    pub fn set_debug_options(&self, options: MapDebugOptions) -> Result<()> {
-        let map = self.inner.native()?;
-        // SAFETY: map is live. The C API validates unknown mask bits.
-        maplibre_core::check(unsafe { sys::mln_map_set_debug_options(map, options.bits()) })
-    }
-
-    /// Reads MapLibre debug overlay mask bits.
-    pub fn debug_options(&self) -> Result<MapDebugOptions> {
-        let map = self.inner.native()?;
-        let mut raw = 0;
-        // SAFETY: map is live and out_options points to writable u32 storage.
-        maplibre_core::check(unsafe { sys::mln_map_get_debug_options(map, &mut raw) })?;
-        Ok(MapDebugOptions::from_bits_retain(raw))
-    }
-
-    /// Enables or disables MapLibre's rendering stats overlay view.
-    pub fn set_rendering_stats_view_enabled(&self, enabled: bool) -> Result<()> {
-        let map = self.inner.native()?;
-        // SAFETY: map is live and enabled is passed by value.
-        maplibre_core::check(unsafe { sys::mln_map_set_rendering_stats_view_enabled(map, enabled) })
-    }
-
-    /// Reads whether MapLibre's rendering stats overlay view is enabled.
-    pub fn rendering_stats_view_enabled(&self) -> Result<bool> {
-        let map = self.inner.native()?;
-        let mut enabled = false;
-        // SAFETY: map is live and out_enabled points to writable bool storage.
+        let mut operation = sys::mln_operation(0);
+        // SAFETY: map is live and operation is null writable storage.
         maplibre_core::check(unsafe {
-            sys::mln_map_get_rendering_stats_view_enabled(map, &mut enabled)
+            sys::mln_map_request_still_image_start(map, &mut operation)
         })?;
-        Ok(enabled)
-    }
-
-    /// Reads whether MapLibre currently considers the map fully loaded.
-    pub fn is_fully_loaded(&self) -> Result<bool> {
-        let map = self.inner.native()?;
-        let mut loaded = false;
-        // SAFETY: map is live and out_loaded points to writable bool storage.
-        maplibre_core::check(unsafe { sys::mln_map_is_fully_loaded(map, &mut loaded) })?;
-        Ok(loaded)
-    }
-
-    /// Dumps map debug logs through MapLibre Native logging.
-    pub fn dump_debug_logs(&self) -> Result<()> {
-        let map = self.inner.native()?;
-        // SAFETY: map is live.
-        maplibre_core::check(unsafe { sys::mln_map_dump_debug_logs(map) })
-    }
-
-    /// Reads the map's logical viewport size in UI pixels and its pixel ratio.
-    /// The scale factor is fixed for the lifetime of the map and independent of
-    /// any render target's scale factor.
-    pub fn size(&self) -> Result<(u32, u32, f64)> {
-        let map = self.inner.native()?;
-        let mut width = 0u32;
-        let mut height = 0u32;
-        let mut scale_factor = 0f64;
-        // SAFETY: map is live and all three out pointers reference live locals
-        // for the duration of the call.
-        maplibre_core::check(unsafe {
-            sys::mln_map_get_size(map, &mut width, &mut height, &mut scale_factor)
-        })?;
-        Ok((width, height, scale_factor))
-    }
-
-    /// Reads live viewport and render-transform controls.
-    pub fn viewport_options(&self) -> Result<MapViewportOptions> {
-        let map = self.inner.native()?;
-        // SAFETY: Default constructor takes no arguments and initializes size.
-        let mut raw = unsafe { sys::mln_map_viewport_options_default() };
-        // SAFETY: map is live and raw has a valid size field for C to fill.
-        maplibre_core::check(unsafe { sys::mln_map_get_viewport_options(map, &mut raw) })?;
-        Ok(MapViewportOptions::from_native(raw))
-    }
-
-    /// Applies selected live viewport and render-transform controls.
-    pub fn set_viewport_options(&self, options: &MapViewportOptions) -> Result<()> {
-        let map = self.inner.native()?;
-        let raw = options.to_native();
-        // SAFETY: map is live and raw is a materialized descriptor valid for
-        // the duration of this call.
-        maplibre_core::check(unsafe { sys::mln_map_set_viewport_options(map, &raw) })
-    }
-
-    /// Reads tile prefetch and LOD tuning controls.
-    pub fn tile_options(&self) -> Result<MapTileOptions> {
-        let map = self.inner.native()?;
-        // SAFETY: Default constructor takes no arguments and initializes size.
-        let mut raw = unsafe { sys::mln_map_tile_options_default() };
-        // SAFETY: map is live and raw has a valid size field for C to fill.
-        maplibre_core::check(unsafe { sys::mln_map_get_tile_options(map, &mut raw) })?;
-        Ok(MapTileOptions::from_native(raw))
-    }
-
-    /// Applies selected tile prefetch and LOD tuning controls.
-    pub fn set_tile_options(&self, options: &MapTileOptions) -> Result<()> {
-        let map = self.inner.native()?;
-        let raw = options.to_native();
-        // SAFETY: map is live and raw is a materialized descriptor valid for
-        // the duration of this call.
-        maplibre_core::check(unsafe { sys::mln_map_set_tile_options(map, &raw) })
-    }
-
-    /// Reads the current camera snapshot.
-    pub fn camera(&self) -> Result<CameraOptions> {
-        let map = self.inner.native()?;
-        // SAFETY: Default constructor takes no arguments and initializes size.
-        let mut raw = unsafe { sys::mln_camera_options_default() };
-        // SAFETY: map is live and raw has a valid size field for C to fill.
-        maplibre_core::check(unsafe { sys::mln_map_get_camera(map, &mut raw) })?;
-        Ok(CameraOptions::from_native(raw))
-    }
-
-    /// Applies a camera jump command.
-    pub fn jump_to(&self, camera: &CameraOptions) -> Result<()> {
-        let map = self.inner.native()?;
-        let raw = camera.to_native();
-        // SAFETY: map is live and raw is a materialized descriptor valid for
-        // the duration of this call.
-        maplibre_core::check(unsafe { sys::mln_map_jump_to(map, &raw) })
-    }
-
-    /// Applies a camera ease transition command. An absent `animation`, or one
-    /// with no duration, reaches the target before this call returns.
-    pub fn ease_to(
-        &self,
-        camera: &CameraOptions,
-        animation: Option<&AnimationOptions>,
-    ) -> Result<()> {
-        let map = self.inner.native()?;
-        let raw_camera = camera.to_native();
-        let raw_animation = animation.map(AnimationOptions::to_native);
-        // SAFETY: map is live and descriptors are valid for this call. A null
-        // animation pointer requests native defaults.
-        maplibre_core::check(unsafe {
-            sys::mln_map_ease_to(map, &raw_camera, option_ptr(raw_animation.as_ref()))
-        })
-    }
-
-    /// Applies a camera fly transition command. Fly animates by default, so the
-    /// camera is still en route when this call returns and advances as the
-    /// runtime is pumped.
-    pub fn fly_to(
-        &self,
-        camera: &CameraOptions,
-        animation: Option<&AnimationOptions>,
-    ) -> Result<()> {
-        let map = self.inner.native()?;
-        let raw_camera = camera.to_native();
-        let raw_animation = animation.map(AnimationOptions::to_native);
-        // SAFETY: map is live and descriptors are valid for this call. A null
-        // animation pointer requests native defaults.
-        maplibre_core::check(unsafe {
-            sys::mln_map_fly_to(map, &raw_camera, option_ptr(raw_animation.as_ref()))
-        })
-    }
-
-    /// Applies a screen-space pan command.
-    pub fn move_by(&self, delta_x: f64, delta_y: f64) -> Result<()> {
-        let map = self.inner.native()?;
-        // SAFETY: map is live. The C API validates numeric values.
-        maplibre_core::check(unsafe { sys::mln_map_move_by(map, delta_x, delta_y) })
-    }
-
-    /// Applies an animated screen-space pan command.
-    /// An absent `animation`, or one with no duration, applies the pan
-    /// instantly.
-    pub fn move_by_animated(
-        &self,
-        delta_x: f64,
-        delta_y: f64,
-        animation: Option<&AnimationOptions>,
-    ) -> Result<()> {
-        let map = self.inner.native()?;
-        let raw_animation = animation.map(AnimationOptions::to_native);
-        // SAFETY: map is live and the optional animation descriptor is valid
-        // for this call. The C API validates numeric values.
-        maplibre_core::check(unsafe {
-            sys::mln_map_move_by_animated(map, delta_x, delta_y, option_ptr(raw_animation.as_ref()))
-        })
-    }
-
-    /// Applies a screen-space zoom command.
-    pub fn scale_by(&self, scale: f64, anchor: Option<ScreenPoint>) -> Result<()> {
-        let map = self.inner.native()?;
-        let raw_anchor = anchor.map(ScreenPoint::to_native);
-        // SAFETY: map is live and the optional anchor pointer is valid for this
-        // call. The C API validates numeric values.
-        maplibre_core::check(unsafe {
-            sys::mln_map_scale_by(map, scale, option_ptr(raw_anchor.as_ref()))
-        })
-    }
-
-    /// Applies an animated screen-space zoom command.
-    /// An absent `animation`, or one with no duration, applies the zoom
-    /// instantly.
-    pub fn scale_by_animated(
-        &self,
-        scale: f64,
-        anchor: Option<ScreenPoint>,
-        animation: Option<&AnimationOptions>,
-    ) -> Result<()> {
-        let map = self.inner.native()?;
-        let raw_anchor = anchor.map(ScreenPoint::to_native);
-        let raw_animation = animation.map(AnimationOptions::to_native);
-        // SAFETY: map is live and optional descriptors are valid for this call.
-        // The C API validates numeric values.
-        maplibre_core::check(unsafe {
-            sys::mln_map_scale_by_animated(
-                map,
-                scale,
-                option_ptr(raw_anchor.as_ref()),
-                option_ptr(raw_animation.as_ref()),
+        let registry = {
+            let runtime = self
+                .inner
+                .runtime
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            Arc::clone(
+                &runtime
+                    .as_ref()
+                    .ok_or_else(|| closed_handle_error("MapHandle"))?
+                    .operations,
             )
-        })
+        };
+        OperationHandle::new(operation, OperationKind::MapStillImage, registry)
     }
 
-    /// Applies a screen-space rotate command.
-    pub fn rotate_by(&self, first: ScreenPoint, second: ScreenPoint) -> Result<()> {
+    /// Copies the latest published camera without entering the runtime queue.
+    pub fn camera_snapshot(&self) -> Result<CameraSnapshot> {
         let map = self.inner.native()?;
-        // SAFETY: map is live. Points are passed by value and validated by C.
+        // SAFETY: the constructor initializes this ABI version's descriptor.
+        let mut camera = unsafe { sys::mln_camera_options_default() };
+        let mut generation = 0;
+        // SAFETY: map is live and both outputs are writable.
         maplibre_core::check(unsafe {
-            sys::mln_map_rotate_by(map, first.to_native(), second.to_native())
-        })
-    }
-
-    /// Applies an animated screen-space rotate command.
-    /// An absent `animation`, or one with no duration, applies the rotation
-    /// instantly.
-    pub fn rotate_by_animated(
-        &self,
-        first: ScreenPoint,
-        second: ScreenPoint,
-        animation: Option<&AnimationOptions>,
-    ) -> Result<()> {
-        let map = self.inner.native()?;
-        let raw_animation = animation.map(AnimationOptions::to_native);
-        // SAFETY: map is live and optional animation descriptor is valid for
-        // this call. Points are passed by value and validated by C.
-        maplibre_core::check(unsafe {
-            sys::mln_map_rotate_by_animated(
-                map,
-                first.to_native(),
-                second.to_native(),
-                option_ptr(raw_animation.as_ref()),
-            )
-        })
-    }
-
-    /// Applies a pitch delta command.
-    pub fn pitch_by(&self, pitch: f64) -> Result<()> {
-        let map = self.inner.native()?;
-        // SAFETY: map is live. The C API validates numeric values.
-        maplibre_core::check(unsafe { sys::mln_map_pitch_by(map, pitch) })
-    }
-
-    /// Applies an animated pitch delta command.
-    /// An absent `animation`, or one with no duration, applies the pitch
-    /// instantly.
-    pub fn pitch_by_animated(
-        &self,
-        pitch: f64,
-        animation: Option<&AnimationOptions>,
-    ) -> Result<()> {
-        let map = self.inner.native()?;
-        let raw_animation = animation.map(AnimationOptions::to_native);
-        // SAFETY: map is live and optional animation descriptor is valid for
-        // this call. The C API validates numeric values.
-        maplibre_core::check(unsafe {
-            sys::mln_map_pitch_by_animated(map, pitch, option_ptr(raw_animation.as_ref()))
-        })
-    }
-
-    /// Cancels active camera transitions.
-    pub fn cancel_transitions(&self) -> Result<()> {
-        let map = self.inner.native()?;
-        // SAFETY: map is live.
-        maplibre_core::check(unsafe { sys::mln_map_cancel_transitions(map) })
-    }
-
-    /// Marks whether a host-driven gesture is in progress. The flag stays set
-    /// until the host clears it, so pair every `true` with a `false`.
-    pub fn set_gesture_in_progress(&self, in_progress: bool) -> Result<()> {
-        let map = self.inner.native()?;
-        // SAFETY: map is live and in_progress is passed by value.
-        maplibre_core::check(unsafe { sys::mln_map_set_gesture_in_progress(map, in_progress) })
-    }
-
-    /// Reads whether a host-driven gesture is currently in progress.
-    pub fn is_gesture_in_progress(&self) -> Result<bool> {
-        let map = self.inner.native()?;
-        let mut in_progress = false;
-        // SAFETY: map is live and out_in_progress points to writable bool
-        // storage.
-        maplibre_core::check(unsafe {
-            sys::mln_map_is_gesture_in_progress(map, &mut in_progress)
+            sys::mln_map_camera_snapshot_get(map, &mut camera, &mut generation)
         })?;
-        Ok(in_progress)
+        Ok(CameraSnapshot {
+            generation,
+            camera: CameraOptions::from_native(camera),
+        })
     }
 
-    /// Computes a camera that fits geographic bounds in the current viewport.
-    pub fn camera_for_lat_lng_bounds(
+    /// Submits one copied atomic camera update and returns its command ID.
+    pub fn update_camera(&self, update: &CameraUpdate) -> Result<u64> {
+        let map = self.inner.native()?;
+        let raw = update.to_native();
+        let mut command_id = 0;
+        // SAFETY: raw is readable for this call and command_id is writable.
+        maplibre_core::check(unsafe { sys::mln_map_update_camera(map, &raw, &mut command_id) })?;
+        Ok(command_id)
+    }
+
+    /// Starts an ordered camera query.
+    pub fn start_camera_query(&self) -> Result<OperationHandle<CameraSnapshot>> {
+        let map = self.inner.native()?;
+        let mut operation = sys::mln_operation(0);
+        // SAFETY: map is live and operation is null writable storage.
+        maplibre_core::check(unsafe { sys::mln_map_camera_query_start(map, &mut operation) })?;
+        let registry = {
+            let runtime = self
+                .inner
+                .runtime
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            Arc::clone(
+                &runtime
+                    .as_ref()
+                    .ok_or_else(|| closed_handle_error("MapHandle"))?
+                    .operations,
+            )
+        };
+        OperationHandle::new(operation, OperationKind::CameraQuery, registry)
+    }
+
+    /// Selects which map-originated event types this map queues and returns the
+    /// accepted command ID.
+    pub fn set_event_mask(&self, mask: RuntimeEventMask) -> Result<u64> {
+        let map = self.inner.native()?;
+        let mut command_id = 0;
+        // SAFETY: map is live and command_id is zero writable storage.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_event_mask(map, mask.bits(), &mut command_id)
+        })?;
+        Ok(command_id)
+    }
+
+    pub fn start_viewport_options(&self) -> Result<OperationHandle<MapViewportOptions>> {
+        let map = self.inner.native()?;
+        let mut operation = sys::mln_operation(0);
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_viewport_options_start(map, &mut operation)
+        })?;
+        self.start_operation(operation, OperationKind::ViewportOptions)
+    }
+
+    pub fn set_viewport_options(&self, options: &MapViewportOptions) -> Result<u64> {
+        let map = self.inner.native()?;
+        let mut command_id = 0;
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_viewport_options(map, &options.to_native(), &mut command_id)
+        })?;
+        Ok(command_id)
+    }
+
+    pub fn start_tile_options(&self) -> Result<OperationHandle<MapTileOptions>> {
+        let map = self.inner.native()?;
+        let mut operation = sys::mln_operation(0);
+        maplibre_core::check(unsafe { sys::mln_map_get_tile_options_start(map, &mut operation) })?;
+        self.start_operation(operation, OperationKind::TileOptions)
+    }
+
+    pub fn set_tile_options(&self, options: &MapTileOptions) -> Result<u64> {
+        let map = self.inner.native()?;
+        let mut command_id = 0;
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_tile_options(map, &options.to_native(), &mut command_id)
+        })?;
+        Ok(command_id)
+    }
+
+    pub fn start_bounds(&self) -> Result<OperationHandle<BoundOptions>> {
+        let map = self.inner.native()?;
+        let mut operation = sys::mln_operation(0);
+        maplibre_core::check(unsafe { sys::mln_map_get_bounds_start(map, &mut operation) })?;
+        self.start_operation(operation, OperationKind::Bounds)
+    }
+
+    pub fn set_bounds(&self, options: &BoundOptions) -> Result<u64> {
+        let map = self.inner.native()?;
+        let mut command_id = 0;
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_bounds(map, &options.to_native(), &mut command_id)
+        })?;
+        Ok(command_id)
+    }
+
+    pub fn start_free_camera_options(&self) -> Result<OperationHandle<FreeCameraOptions>> {
+        let map = self.inner.native()?;
+        let mut operation = sys::mln_operation(0);
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_free_camera_options_start(map, &mut operation)
+        })?;
+        self.start_operation(operation, OperationKind::FreeCameraOptions)
+    }
+
+    pub fn set_free_camera_options(&self, options: &FreeCameraOptions) -> Result<u64> {
+        let map = self.inner.native()?;
+        let mut command_id = 0;
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_free_camera_options(map, &options.to_native(), &mut command_id)
+        })?;
+        Ok(command_id)
+    }
+
+    pub fn projection_mode(&self) -> Result<ProjectionMode> {
+        Ok(self.snapshot()?.projection_mode)
+    }
+
+    pub fn set_projection_mode(&self, mode: &ProjectionMode) -> Result<u64> {
+        let map = self.inner.native()?;
+        let mut command_id = 0;
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_projection_mode(map, &mode.to_native(), &mut command_id)
+        })?;
+        Ok(command_id)
+    }
+
+    pub fn start_camera_for_lat_lng_bounds(
         &self,
         bounds: LatLngBounds,
         fit_options: Option<&CameraFitOptions>,
-    ) -> Result<CameraOptions> {
+    ) -> Result<OperationHandle<CameraOptions>> {
         let map = self.inner.native()?;
-        let raw_fit = fit_options.map(CameraFitOptions::to_native);
-        // SAFETY: Default constructor takes no arguments and initializes size.
-        let mut raw_camera = unsafe { sys::mln_camera_options_default() };
-        // SAFETY: map is live, bounds is passed by value, optional fit options
-        // are valid for this call, and raw_camera is writable.
+        let fit = fit_options.map(CameraFitOptions::to_native);
+        let mut operation = sys::mln_operation(0);
         maplibre_core::check(unsafe {
-            sys::mln_map_camera_for_lat_lng_bounds(
+            sys::mln_map_camera_for_lat_lng_bounds_start(
                 map,
                 bounds.to_native(),
-                option_ptr(raw_fit.as_ref()),
-                &mut raw_camera,
+                option_ptr(fit.as_ref()),
+                &mut operation,
             )
         })?;
-        Ok(CameraOptions::from_native(raw_camera))
+        self.start_operation(operation, OperationKind::CameraFitBounds)
     }
 
-    /// Computes a camera that fits geographic coordinates in the current viewport.
-    pub fn camera_for_lat_lngs(
+    pub fn start_camera_for_lat_lngs(
         &self,
         coordinates: &[LatLng],
         fit_options: Option<&CameraFitOptions>,
-    ) -> Result<CameraOptions> {
-        let map = self.inner.native()?;
+    ) -> Result<OperationHandle<CameraOptions>> {
         if coordinates.is_empty() {
             return Err(Error::invalid_argument(
-                "camera_for_lat_lngs requires at least one coordinate",
+                "start_camera_for_lat_lngs requires at least one coordinate",
             ));
         }
-        let raw_coordinates = lat_lngs_to_native(coordinates);
-        let raw_fit = fit_options.map(CameraFitOptions::to_native);
-        // SAFETY: Default constructor takes no arguments and initializes size.
-        let mut raw_camera = unsafe { sys::mln_camera_options_default() };
-        // SAFETY: map is live, arrays are valid for coordinate_count non-empty
-        // entries, optional fit options are valid, and raw_camera is writable.
+        let map = self.inner.native()?;
+        let coordinates = lat_lngs_to_native(coordinates);
+        let fit = fit_options.map(CameraFitOptions::to_native);
+        let mut operation = sys::mln_operation(0);
         maplibre_core::check(unsafe {
-            sys::mln_map_camera_for_lat_lngs(
+            sys::mln_map_camera_for_lat_lngs_start(
                 map,
-                const_ptr_or_null(&raw_coordinates),
-                raw_coordinates.len(),
-                option_ptr(raw_fit.as_ref()),
-                &mut raw_camera,
+                const_ptr_or_null(&coordinates),
+                coordinates.len(),
+                option_ptr(fit.as_ref()),
+                &mut operation,
             )
         })?;
-        Ok(CameraOptions::from_native(raw_camera))
+        self.start_operation(operation, OperationKind::CameraFitCoordinates)
     }
 
-    /// Computes a camera that fits a geometry in the current viewport.
-    pub fn camera_for_geometry(
+    pub fn start_camera_for_geometry(
         &self,
         geometry: &[u8],
         fit_options: Option<&CameraFitOptions>,
-    ) -> Result<CameraOptions> {
+    ) -> Result<OperationHandle<CameraOptions>> {
         let map = self.inner.native()?;
-        let native_geometry = maplibre_core::string::buffer_view(geometry);
-        let raw_fit = fit_options.map(CameraFitOptions::to_native);
-        // SAFETY: Default constructor takes no arguments and initializes size.
-        let mut raw_camera = unsafe { sys::mln_camera_options_default() };
-        // SAFETY: map is live, native_geometry owns backing storage for the
-        // duration of this call, optional fit options are valid, and raw_camera
-        // is writable.
+        let fit = fit_options.map(CameraFitOptions::to_native);
+        let mut operation = sys::mln_operation(0);
         maplibre_core::check(unsafe {
-            sys::mln_map_camera_for_geometry(
+            sys::mln_map_camera_for_geometry_start(
                 map,
-                native_geometry,
-                option_ptr(raw_fit.as_ref()),
-                &mut raw_camera,
+                maplibre_core::string::buffer_view(geometry),
+                option_ptr(fit.as_ref()),
+                &mut operation,
             )
         })?;
-        Ok(CameraOptions::from_native(raw_camera))
+        self.start_operation(operation, OperationKind::CameraFitGeometry)
     }
 
-    /// Computes wrapped geographic bounds for a camera in the current viewport.
-    pub fn lat_lng_bounds_for_camera(&self, camera: &CameraOptions) -> Result<LatLngBounds> {
-        let map = self.inner.native()?;
-        let raw_camera = camera.to_native();
-        let mut raw_bounds = empty_bounds();
-        // SAFETY: map is live, raw_camera is a valid descriptor for this call,
-        // and raw_bounds points to writable storage.
-        maplibre_core::check(unsafe {
-            sys::mln_map_lat_lng_bounds_for_camera(map, &raw_camera, &mut raw_bounds)
-        })?;
-        Ok(LatLngBounds::from_native(raw_bounds))
-    }
-
-    /// Computes unwrapped geographic bounds for a camera in the current viewport.
-    pub fn lat_lng_bounds_for_camera_unwrapped(
+    fn start_bounds_for_camera(
         &self,
         camera: &CameraOptions,
-    ) -> Result<LatLngBounds> {
+        kind: OperationKind,
+    ) -> Result<OperationHandle<LatLngBounds>> {
         let map = self.inner.native()?;
-        let raw_camera = camera.to_native();
-        let mut raw_bounds = empty_bounds();
-        // SAFETY: map is live, raw_camera is a valid descriptor for this call,
-        // and raw_bounds points to writable storage.
+        let camera = camera.to_native();
+        let mut operation = sys::mln_operation(0);
+        let status = unsafe {
+            match kind {
+                OperationKind::BoundsForCamera => {
+                    sys::mln_map_lat_lng_bounds_for_camera_start(map, &camera, &mut operation)
+                }
+                OperationKind::BoundsForCameraUnwrapped => {
+                    sys::mln_map_lat_lng_bounds_for_camera_unwrapped_start(
+                        map,
+                        &camera,
+                        &mut operation,
+                    )
+                }
+                _ => sys::MLN_STATUS_INVALID_STATE,
+            }
+        };
+        maplibre_core::check(status)?;
+        self.start_operation(operation, kind)
+    }
+
+    pub fn start_lat_lng_bounds_for_camera(
+        &self,
+        camera: &CameraOptions,
+    ) -> Result<OperationHandle<LatLngBounds>> {
+        self.start_bounds_for_camera(camera, OperationKind::BoundsForCamera)
+    }
+
+    pub fn start_lat_lng_bounds_for_camera_unwrapped(
+        &self,
+        camera: &CameraOptions,
+    ) -> Result<OperationHandle<LatLngBounds>> {
+        self.start_bounds_for_camera(camera, OperationKind::BoundsForCameraUnwrapped)
+    }
+
+    pub fn start_pixel_for_lat_lng(
+        &self,
+        coordinate: LatLng,
+    ) -> Result<OperationHandle<ScreenPoint>> {
+        let map = self.inner.native()?;
+        let mut operation = sys::mln_operation(0);
         maplibre_core::check(unsafe {
-            sys::mln_map_lat_lng_bounds_for_camera_unwrapped(map, &raw_camera, &mut raw_bounds)
+            sys::mln_map_pixel_for_lat_lng_start(map, coordinate.to_native(), &mut operation)
         })?;
-        Ok(LatLngBounds::from_native(raw_bounds))
+        self.start_operation(operation, OperationKind::PixelForLatLng)
     }
 
-    /// Reads map camera constraint options.
-    pub fn bounds(&self) -> Result<BoundOptions> {
+    pub fn start_lat_lng_for_pixel(&self, point: ScreenPoint) -> Result<OperationHandle<LatLng>> {
         let map = self.inner.native()?;
-        // SAFETY: Default constructor takes no arguments and initializes size.
-        let mut raw = unsafe { sys::mln_bound_options_default() };
-        // SAFETY: map is live and raw has a valid size field for C to fill.
-        maplibre_core::check(unsafe { sys::mln_map_get_bounds(map, &mut raw) })?;
-        Ok(BoundOptions::from_native(raw))
-    }
-
-    /// Applies selected map camera constraint options.
-    pub fn set_bounds(&self, options: &BoundOptions) -> Result<()> {
-        let map = self.inner.native()?;
-        let raw = options.to_native();
-        // SAFETY: map is live and raw is a valid descriptor for this call.
-        maplibre_core::check(unsafe { sys::mln_map_set_bounds(map, &raw) })
-    }
-
-    /// Reads the current free camera position and orientation.
-    pub fn free_camera_options(&self) -> Result<FreeCameraOptions> {
-        let map = self.inner.native()?;
-        // SAFETY: Default constructor takes no arguments and initializes size.
-        let mut raw = unsafe { sys::mln_free_camera_options_default() };
-        // SAFETY: map is live and raw has a valid size field for C to fill.
-        maplibre_core::check(unsafe { sys::mln_map_get_free_camera_options(map, &mut raw) })?;
-        Ok(FreeCameraOptions::from_native(raw))
-    }
-
-    /// Applies selected free camera position and orientation fields.
-    pub fn set_free_camera_options(&self, options: &FreeCameraOptions) -> Result<()> {
-        let map = self.inner.native()?;
-        let raw = options.to_native();
-        // SAFETY: map is live and raw is a valid descriptor for this call.
-        maplibre_core::check(unsafe { sys::mln_map_set_free_camera_options(map, &raw) })
-    }
-
-    /// Reads current axonometric rendering options.
-    pub fn projection_mode(&self) -> Result<ProjectionMode> {
-        let map = self.inner.native()?;
-        // SAFETY: Default constructor takes no arguments and initializes size.
-        let mut raw = unsafe { sys::mln_projection_mode_default() };
-        // SAFETY: map is live and raw has a valid size field for C to fill.
-        maplibre_core::check(unsafe { sys::mln_map_get_projection_mode(map, &mut raw) })?;
-        Ok(ProjectionMode::from_native(raw))
-    }
-
-    /// Applies selected axonometric rendering option fields.
-    pub fn set_projection_mode(&self, mode: &ProjectionMode) -> Result<()> {
-        let map = self.inner.native()?;
-        let raw = mode.to_native();
-        // SAFETY: map is live and raw is a valid descriptor for this call.
-        maplibre_core::check(unsafe { sys::mln_map_set_projection_mode(map, &raw) })
-    }
-
-    /// Converts a geographic world coordinate to a screen point for the current map.
-    pub fn pixel_for_lat_lng(&self, coordinate: LatLng) -> Result<ScreenPoint> {
-        let map = self.inner.native()?;
-        let mut raw_point = empty_screen_point();
-        // SAFETY: map is live, coordinate is passed by value, and raw_point is
-        // writable storage for the output.
+        let mut operation = sys::mln_operation(0);
         maplibre_core::check(unsafe {
-            sys::mln_map_pixel_for_lat_lng(map, coordinate.to_native(), &mut raw_point)
+            sys::mln_map_lat_lng_for_pixel_start(map, point.to_native(), &mut operation)
         })?;
-        Ok(ScreenPoint::from_native(raw_point))
+        self.start_operation(operation, OperationKind::LatLngForPixel)
     }
 
-    /// Converts a screen point to a geographic world coordinate for the current map.
-    pub fn lat_lng_for_pixel(&self, point: ScreenPoint) -> Result<LatLng> {
+    pub fn start_pixels_for_lat_lngs(
+        &self,
+        coordinates: &[LatLng],
+    ) -> Result<OperationHandle<Vec<ScreenPoint>>> {
         let map = self.inner.native()?;
-        let mut raw_coordinate = empty_lat_lng();
-        // SAFETY: map is live, point is passed by value, and raw_coordinate is
-        // writable storage for the output.
+        let coordinates = lat_lngs_to_native(coordinates);
+        let mut operation = sys::mln_operation(0);
         maplibre_core::check(unsafe {
-            sys::mln_map_lat_lng_for_pixel(map, point.to_native(), &mut raw_coordinate)
-        })?;
-        Ok(LatLng::from_native(raw_coordinate))
-    }
-
-    /// Converts geographic world coordinates to screen points for the current map.
-    pub fn pixels_for_lat_lngs(&self, coordinates: &[LatLng]) -> Result<Vec<ScreenPoint>> {
-        let map = self.inner.native()?;
-        let raw_coordinates = lat_lngs_to_native(coordinates);
-        let mut raw_points = vec![empty_screen_point(); coordinates.len()];
-        // SAFETY: map is live. Input and output arrays are valid for len
-        // entries, or null when len is 0.
-        maplibre_core::check(unsafe {
-            sys::mln_map_pixels_for_lat_lngs(
+            sys::mln_map_pixels_for_lat_lngs_start(
                 map,
-                const_ptr_or_null(&raw_coordinates),
-                raw_coordinates.len(),
-                mut_ptr_or_null(&mut raw_points),
+                const_ptr_or_null(&coordinates),
+                coordinates.len(),
+                &mut operation,
             )
         })?;
-        Ok(raw_points
-            .into_iter()
-            .map(ScreenPoint::from_native)
-            .collect())
+        self.start_operation(operation, OperationKind::PixelsForLatLngs)
     }
 
-    /// Converts screen points to geographic world coordinates for the current map.
-    pub fn lat_lngs_for_pixels(&self, points: &[ScreenPoint]) -> Result<Vec<LatLng>> {
+    pub fn start_lat_lngs_for_pixels(
+        &self,
+        points: &[ScreenPoint],
+    ) -> Result<OperationHandle<Vec<LatLng>>> {
         let map = self.inner.native()?;
-        let raw_points = screen_points_to_native(points);
-        let mut raw_coordinates = vec![empty_lat_lng(); points.len()];
-        // SAFETY: map is live. Input and output arrays are valid for len
-        // entries, or null when len is 0.
+        let points = screen_points_to_native(points);
+        let mut operation = sys::mln_operation(0);
         maplibre_core::check(unsafe {
-            sys::mln_map_lat_lngs_for_pixels(
+            sys::mln_map_lat_lngs_for_pixels_start(
                 map,
-                const_ptr_or_null(&raw_points),
-                raw_points.len(),
-                mut_ptr_or_null(&mut raw_coordinates),
+                const_ptr_or_null(&points),
+                points.len(),
+                &mut operation,
             )
         })?;
-        Ok(raw_coordinates
-            .into_iter()
-            .map(LatLng::from_native)
-            .collect())
+        self.start_operation(operation, OperationKind::LatLngsForPixels)
     }
 
     /// Creates a standalone projection snapshot from the current map transform.
     pub fn create_projection(&self) -> Result<MapProjectionHandle> {
         MapProjectionHandle::new(self)
     }
+}
 
-    /// Produces a [`Send`] reference to this map for attaching a render session.
-    /// A render session is owned by the thread that attaches it, which need not
-    /// be the map's owner thread.
-    pub fn attach_ref(&self) -> Result<MapAttachRef> {
-        Ok(MapAttachRef {
-            map: self.inner.native()?,
-        })
+impl OperationHandle<MapViewportOptions> {
+    pub fn take(&self) -> Result<MapViewportOptions> {
+        let mut raw = unsafe { sys::mln_map_viewport_options_default() };
+        self.with_result_operation(|operation| {
+            if self.operation_kind != OperationKind::ViewportOptions {
+                return Err(Error::new(
+                    ErrorKind::InvalidState,
+                    None,
+                    "operation does not contain viewport options",
+                ));
+            }
+            maplibre_core::check(unsafe {
+                sys::mln_map_get_viewport_options_take_result(operation, &mut raw)
+            })
+        })?;
+        Ok(MapViewportOptions::from_native(raw))
     }
 }
 
-/// A reference to a map for the sole purpose of attaching a render session,
-/// produced by [`MapHandle::attach_ref`]. Attaching is the one map operation
-/// that runs on the render session's thread instead of the map's.
-///
-/// This is a copied handle value and carries no Rust retention of the map.
-/// Native destroys a map only once no session is attached, and rejects a
-/// reference that outlives its map rather than binding to a later one.
-///
-/// Close the session before the map: dropping a [`MapHandle`] with a session
-/// still attached leaks the native map, reports it through
-/// [`set_leak_reporter`](crate::set_leak_reporter), and leaves the runtime
-/// undestroyable.
-#[derive(Clone, Copy)]
-pub struct MapAttachRef {
-    map: sys::mln_map,
-}
-
-impl fmt::Debug for MapAttachRef {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("MapAttachRef").finish()
+impl OperationHandle<MapTileOptions> {
+    pub fn take(&self) -> Result<MapTileOptions> {
+        let mut raw = unsafe { sys::mln_map_tile_options_default() };
+        self.with_result_operation(|operation| {
+            if self.operation_kind != OperationKind::TileOptions {
+                return Err(Error::new(
+                    ErrorKind::InvalidState,
+                    None,
+                    "operation does not contain tile options",
+                ));
+            }
+            maplibre_core::check(unsafe {
+                sys::mln_map_get_tile_options_take_result(operation, &mut raw)
+            })
+        })?;
+        Ok(MapTileOptions::from_native(raw))
     }
 }
 
-impl MapAttachRef {
-    /// The handle of the map this reference names.
-    pub(crate) fn map(&self) -> sys::mln_map {
-        self.map
+impl OperationHandle<BoundOptions> {
+    pub fn take(&self) -> Result<BoundOptions> {
+        let mut raw = unsafe { sys::mln_bound_options_default() };
+        self.with_result_operation(|operation| {
+            if self.operation_kind != OperationKind::Bounds {
+                return Err(Error::new(
+                    ErrorKind::InvalidState,
+                    None,
+                    "operation does not contain camera constraints",
+                ));
+            }
+            maplibre_core::check(unsafe {
+                sys::mln_map_get_bounds_take_result(operation, &mut raw)
+            })
+        })?;
+        Ok(BoundOptions::from_native(raw))
     }
+}
 
+impl OperationHandle<FreeCameraOptions> {
+    pub fn take(&self) -> Result<FreeCameraOptions> {
+        let mut raw = unsafe { sys::mln_free_camera_options_default() };
+        self.with_result_operation(|operation| {
+            if self.operation_kind != OperationKind::FreeCameraOptions {
+                return Err(Error::new(
+                    ErrorKind::InvalidState,
+                    None,
+                    "operation does not contain free-camera options",
+                ));
+            }
+            maplibre_core::check(unsafe {
+                sys::mln_map_get_free_camera_options_take_result(operation, &mut raw)
+            })
+        })?;
+        Ok(FreeCameraOptions::from_native(raw))
+    }
+}
+
+impl OperationHandle<CameraOptions> {
+    pub fn take(&self) -> Result<CameraOptions> {
+        let mut raw = unsafe { sys::mln_camera_options_default() };
+        self.with_result_operation(|operation| {
+            let status = unsafe {
+                match self.operation_kind {
+                    OperationKind::CameraFitBounds => {
+                        sys::mln_map_camera_for_lat_lng_bounds_take_result(operation, &mut raw)
+                    }
+                    OperationKind::CameraFitCoordinates => {
+                        sys::mln_map_camera_for_lat_lngs_take_result(operation, &mut raw)
+                    }
+                    OperationKind::CameraFitGeometry => {
+                        sys::mln_map_camera_for_geometry_take_result(operation, &mut raw)
+                    }
+                    _ => sys::MLN_STATUS_INVALID_STATE,
+                }
+            };
+            maplibre_core::check(status)
+        })?;
+        Ok(CameraOptions::from_native(raw))
+    }
+}
+
+impl OperationHandle<LatLngBounds> {
+    pub fn take(&self) -> Result<LatLngBounds> {
+        let mut raw = empty_lat_lng_bounds();
+        self.with_result_operation(|operation| {
+            let status = unsafe {
+                match self.operation_kind {
+                    OperationKind::BoundsForCamera => {
+                        sys::mln_map_lat_lng_bounds_for_camera_take_result(operation, &mut raw)
+                    }
+                    OperationKind::BoundsForCameraUnwrapped => {
+                        sys::mln_map_lat_lng_bounds_for_camera_unwrapped_take_result(
+                            operation, &mut raw,
+                        )
+                    }
+                    _ => sys::MLN_STATUS_INVALID_STATE,
+                }
+            };
+            maplibre_core::check(status)
+        })?;
+        Ok(LatLngBounds::from_native(raw))
+    }
+}
+
+impl OperationHandle<ScreenPoint> {
+    pub fn take(&self) -> Result<ScreenPoint> {
+        let mut raw = sys::mln_screen_point { x: 0.0, y: 0.0 };
+        self.with_result_operation(|operation| {
+            if self.operation_kind != OperationKind::PixelForLatLng {
+                return Err(Error::new(
+                    ErrorKind::InvalidState,
+                    None,
+                    "operation does not contain a screen point",
+                ));
+            }
+            maplibre_core::check(unsafe {
+                sys::mln_map_pixel_for_lat_lng_take_result(operation, &mut raw)
+            })
+        })?;
+        Ok(ScreenPoint::from_native(raw))
+    }
+}
+
+impl OperationHandle<LatLng> {
+    pub fn take(&self) -> Result<LatLng> {
+        let mut raw = sys::mln_lat_lng {
+            latitude: 0.0,
+            longitude: 0.0,
+        };
+        self.with_result_operation(|operation| {
+            if self.operation_kind != OperationKind::LatLngForPixel {
+                return Err(Error::new(
+                    ErrorKind::InvalidState,
+                    None,
+                    "operation does not contain a geographic coordinate",
+                ));
+            }
+            maplibre_core::check(unsafe {
+                sys::mln_map_lat_lng_for_pixel_take_result(operation, &mut raw)
+            })
+        })?;
+        Ok(LatLng::from_native(raw))
+    }
+}
+
+impl OperationHandle<Vec<ScreenPoint>> {
+    pub fn take(&self) -> Result<Vec<ScreenPoint>> {
+        let mut count = 0;
+        self.with_operation(|operation| {
+            // SAFETY: null/zero is a required-count probe. Native may report a
+            // capacity status while still filling count and preserving result.
+            unsafe {
+                sys::mln_map_pixels_for_lat_lngs_take_result(
+                    operation,
+                    std::ptr::null_mut(),
+                    0,
+                    &mut count,
+                );
+            }
+            Ok(())
+        })?;
+        let mut raw = vec![sys::mln_screen_point { x: 0.0, y: 0.0 }; count];
+        self.with_result_operation(|operation| {
+            maplibre_core::check(unsafe {
+                sys::mln_map_pixels_for_lat_lngs_take_result(
+                    operation,
+                    raw.as_mut_ptr(),
+                    raw.len(),
+                    &mut count,
+                )
+            })
+        })?;
+        Ok(raw.into_iter().map(ScreenPoint::from_native).collect())
+    }
+}
+
+impl OperationHandle<Vec<LatLng>> {
+    pub fn take(&self) -> Result<Vec<LatLng>> {
+        let mut count = 0;
+        self.with_operation(|operation| {
+            // SAFETY: null/zero is a required-count probe. Native may report a
+            // capacity status while still filling count and preserving result.
+            unsafe {
+                sys::mln_map_lat_lngs_for_pixels_take_result(
+                    operation,
+                    std::ptr::null_mut(),
+                    0,
+                    &mut count,
+                );
+            }
+            Ok(())
+        })?;
+        let mut raw = vec![
+            sys::mln_lat_lng {
+                latitude: 0.0,
+                longitude: 0.0,
+            };
+            count
+        ];
+        self.with_result_operation(|operation| {
+            maplibre_core::check(unsafe {
+                sys::mln_map_lat_lngs_for_pixels_take_result(
+                    operation,
+                    raw.as_mut_ptr(),
+                    raw.len(),
+                    &mut count,
+                )
+            })
+        })?;
+        Ok(raw.into_iter().map(LatLng::from_native).collect())
+    }
+}
+
+impl MapHandle {
     /// Attaches a Metal native surface render target to the map.
     ///
     /// The layer and optional device pointers are backend-native handles. They

@@ -23,11 +23,96 @@ static const char credentialed_unsupported_scheme_style_url[] =
 static const uint8_t inline_style_json[] =
   "{\"version\":8,\"sources\":{},\"layers\":[]}";
 
+static mln_status wait_for_resource_command(
+  mln_runtime runtime, uint64_t command_id
+) {
+  for (size_t attempt = 0; attempt < 5000; attempt += 1) {
+    mln_test_event_batch batch = mln_test_event_batch_default();
+    if (mln_test_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) {
+      return MLN_STATUS_INVALID_STATE;
+    }
+    for (size_t index = 0; index < batch.event_count; index += 1) {
+      const mln_runtime_event* event =
+        (const mln_runtime_event*)((const char*)batch.events +
+                                   (index * batch.event_size));
+      if (
+        event->type == MLN_RUNTIME_EVENT_COMMAND_FINISHED &&
+        event->source == runtime &&
+        event->payload.command_finished.command_id == command_id
+      ) {
+        return (mln_status)event->code;
+      }
+    }
+    mln_test_sleep_millisecond();
+  }
+  return MLN_STATUS_INVALID_STATE;
+}
+
+static mln_status set_resource_provider_committed(
+  mln_runtime runtime, const mln_resource_provider* provider
+) {
+  uint64_t command_id = 0;
+  const mln_status status =
+    mln_runtime_set_resource_provider(runtime, provider, &command_id);
+  return status == MLN_STATUS_OK
+           ? wait_for_resource_command(runtime, command_id)
+           : status;
+}
+
+static mln_status clear_resource_provider_committed(mln_runtime runtime) {
+  uint64_t command_id = 0;
+  const mln_status status =
+    mln_runtime_clear_resource_provider(runtime, &command_id);
+  return status == MLN_STATUS_OK
+           ? wait_for_resource_command(runtime, command_id)
+           : status;
+}
+
+static mln_status set_resource_transform_committed(
+  mln_runtime runtime, const mln_resource_transform* transform
+) {
+  uint64_t command_id = 0;
+  const mln_status status =
+    mln_runtime_set_resource_transform(runtime, transform, &command_id);
+  return status == MLN_STATUS_OK
+           ? wait_for_resource_command(runtime, command_id)
+           : status;
+}
+
+static mln_status clear_resource_transform_committed(mln_runtime runtime) {
+  uint64_t command_id = 0;
+  const mln_status status =
+    mln_runtime_clear_resource_transform(runtime, &command_id);
+  return status == MLN_STATUS_OK
+           ? wait_for_resource_command(runtime, command_id)
+           : status;
+}
+
+static mln_status set_http_header_transform_committed(
+  mln_runtime runtime, const mln_http_header_transform* transform
+) {
+  uint64_t command_id = 0;
+  const mln_status status =
+    mln_runtime_set_http_header_transform(runtime, transform, &command_id);
+  return status == MLN_STATUS_OK
+           ? wait_for_resource_command(runtime, command_id)
+           : status;
+}
+
+static mln_status clear_http_header_transform_committed(mln_runtime runtime) {
+  uint64_t command_id = 0;
+  const mln_status status =
+    mln_runtime_clear_http_header_transform(runtime, &command_id);
+  return status == MLN_STATUS_OK
+           ? wait_for_resource_command(runtime, command_id)
+           : status;
+}
+
 static bool wait_for_offline_completion(
   mln_runtime runtime, mln_operation operation
 ) {
   for (size_t attempt = 0; attempt < 5000; attempt += 1) {
-    if (mln_runtime_pump(runtime, 0) != MLN_STATUS_OK) {
+    if (mln_test_runtime_barrier(runtime) != MLN_STATUS_OK) {
       return false;
     }
     bool completed = false;
@@ -47,7 +132,7 @@ static bool wait_for_map_loading_failure(
   size_t out_message_capacity
 ) {
   for (size_t attempt = 0; attempt < 5000; attempt += 1) {
-    if (mln_runtime_pump(runtime, 0) != MLN_STATUS_OK) {
+    if (mln_test_runtime_barrier(runtime) != MLN_STATUS_OK) {
       return false;
     }
     mln_runtime_event event = {0};
@@ -347,24 +432,23 @@ static void resource_transform_rejects_raw_invalid_descriptors(void) {
   mln_runtime runtime = mln_test_create_runtime();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_clear_resource_transform(MLN_HANDLE_NULL)
+    clear_resource_transform_committed(MLN_HANDLE_NULL)
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_set_resource_transform(runtime, NULL)
+    MLN_STATUS_INVALID_ARGUMENT, set_resource_transform_committed(runtime, NULL)
   );
   mln_resource_transform transform = {
     .size = 0, .callback = resource_transform_stub
   };
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_set_resource_transform(runtime, &transform)
+    set_resource_transform_committed(runtime, &transform)
   );
   transform.size = sizeof(mln_resource_transform);
   transform.callback = NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_set_resource_transform(runtime, &transform)
+    set_resource_transform_committed(runtime, &transform)
   );
   mln_test_destroy_runtime(runtime);
 }
@@ -381,14 +465,14 @@ static void http_header_transform_registration_follows_the_transport(void) {
 #if defined(__EMSCRIPTEN__) || defined(__OHOS__)
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_UNSUPPORTED,
-    mln_runtime_set_http_header_transform(runtime, &transform)
+    set_http_header_transform_committed(runtime, &transform)
   );
 #else
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_set_http_header_transform(runtime, &transform)
+    MLN_STATUS_OK, set_http_header_transform_committed(runtime, &transform)
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_clear_http_header_transform(runtime)
+    MLN_STATUS_OK, clear_http_header_transform_committed(runtime)
   );
 #endif
   mln_test_destroy_runtime(runtime);
@@ -399,24 +483,24 @@ static void http_header_transform_rejects_raw_invalid_inputs(void) {
   mln_runtime runtime = mln_test_create_runtime();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_clear_http_header_transform(MLN_HANDLE_NULL)
+    clear_http_header_transform_committed(MLN_HANDLE_NULL)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_set_http_header_transform(runtime, NULL)
+    set_http_header_transform_committed(runtime, NULL)
   );
   mln_http_header_transform transform = {
     .size = 0, .callback = http_header_transform_stub
   };
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_set_http_header_transform(runtime, &transform)
+    set_http_header_transform_committed(runtime, &transform)
   );
   transform.size = sizeof(mln_http_header_transform);
   transform.callback = NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_set_http_header_transform(runtime, &transform)
+    set_http_header_transform_committed(runtime, &transform)
   );
 
   mln_http_header_transform_response response = {
@@ -450,8 +534,8 @@ static void http_header_transform_rejects_raw_invalid_inputs(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// The transform callback runs on a MapLibre file source thread and the second
-// runtime on its own owner thread, so every field crosses a thread boundary.
+// The transform callback and the second runtime executor run concurrently, so
+// every field crosses a thread boundary.
 typedef struct teardown_probe {
   atomic_bool transform_entered;
   atomic_bool teardown_started;
@@ -470,8 +554,8 @@ enum {
   provider_callback_block_milliseconds = 200,
 };
 
-// The provider callback runs on a MapLibre file source thread while the owner
-// thread clears the provider, so every field crosses a thread boundary.
+// The provider callback runs on a MapLibre file source thread while a runtime
+// command clears the provider, so every field crosses a thread boundary.
 typedef struct provider_quiescence_probe {
   atomic_bool entered;
   atomic_bool clear_started;
@@ -489,8 +573,8 @@ static bool wait_for_flag(atomic_bool* flag) {
   return false;
 }
 
-// Blocks so the per-runtime transform lock stays held while the owner thread
-// tears the runtime down. Calls no C API function while blocked.
+// Blocks so the per-runtime transform lock stays held while another thread
+// starts runtime teardown. Calls no C API function while blocked.
 static mln_status blocking_resource_transform(
   void* user_data, uint32_t kind, const char* url,
   mln_resource_transform_response* out_response
@@ -526,7 +610,7 @@ static void other_runtime_entry(void* argument) {
   mln_runtime_options options = mln_runtime_options_default();
   options.notification_source = source;
   if (create_status == MLN_STATUS_OK) {
-    create_status = mln_runtime_create(&options, &runtime);
+    create_status = mln_test_runtime_create(&options, &runtime);
   }
   if (create_status != MLN_STATUS_OK) {
     (void)mln_notification_source_close(source);
@@ -537,11 +621,11 @@ static void other_runtime_entry(void* argument) {
 
   atomic_store(&probe->other_runtime_ready, true);
   wait_for_flag(&probe->teardown_started);
-  // Give the owner thread time to reach the transform wait inside teardown.
+  // Give the teardown thread time to reach the transform wait.
   mln_test_sleep_milliseconds(teardown_call_delay_milliseconds);
-  atomic_store(&probe->other_runtime_status, mln_runtime_pump(runtime, 0));
+  atomic_store(&probe->other_runtime_status, mln_test_runtime_barrier(runtime));
   atomic_store(&probe->other_runtime_call_done, true);
-  mln_runtime_destroy(runtime);
+  (void)mln_test_runtime_close(runtime);
   mln_notification_source_close(source);
 }
 
@@ -595,14 +679,14 @@ static bool activate_style_download(
   return true;
 }
 
-// Pumps the owner thread's run loop until `flag` is set by a MapLibre thread.
-static bool pump_until_flag(mln_runtime runtime, atomic_bool* flag) {
+// Waits until `flag` is set by a MapLibre thread.
+static bool wait_until_flag(mln_runtime runtime, atomic_bool* flag) {
   for (size_t attempt = 0; attempt < teardown_probe_wait_attempts;
        attempt += 1) {
     if (atomic_load(flag)) {
       return true;
     }
-    if (mln_runtime_pump(runtime, 0) != MLN_STATUS_OK) {
+    if (mln_test_runtime_barrier(runtime) != MLN_STATUS_OK) {
       return false;
     }
     mln_test_sleep_millisecond();
@@ -614,7 +698,7 @@ static bool start_offline_region_download(
   mln_runtime runtime, teardown_probe* probe
 ) {
   return activate_style_download(runtime, offline_style_url) &&
-         pump_until_flag(runtime, &probe->transform_entered);
+         wait_until_flag(runtime, &probe->transform_entered);
 }
 
 // Runtime teardown waits for an in-flight resource transform callback without
@@ -635,7 +719,7 @@ static void runtime_teardown_leaves_other_runtimes_responsive(void) {
     .user_data = &probe,
   };
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_set_resource_transform(runtime, &transform)
+    MLN_STATUS_OK, set_resource_transform_committed(runtime, &transform)
   );
   TEST_ASSERT_TRUE(start_offline_region_download(runtime, &probe));
 
@@ -698,8 +782,8 @@ static mln_status lookup_blocking_transform(
 }
 
 // Runs on the file source thread immediately before that thread looks up the
-// resource transform: blocking here parks the thread until the owner thread has
-// a transform writer waiting, and passing the request through then enters the
+// resource transform. Blocking here parks the thread until the runtime worker
+// has a transform writer waiting; passing the request through then enters the
 // lookup under test.
 static uint32_t lookup_probe_resource_provider(
   void* user_data, const mln_resource_request* request,
@@ -722,7 +806,7 @@ static uint32_t lookup_probe_resource_provider(
     }
     mln_test_sleep_millisecond();
   }
-  // Give the owner thread time to reach the exclusive transform lock, so the
+  // Give the runtime worker time to reach the exclusive transform lock, so the
   // lookup this thread is about to make queues behind a waiting writer.
   mln_test_sleep_milliseconds(teardown_call_delay_milliseconds);
   atomic_store(&probe->lookup_reached, true);
@@ -739,7 +823,7 @@ static void lookup_other_runtime_entry(void* argument) {
   mln_runtime_options options = mln_runtime_options_default();
   options.notification_source = source;
   if (create_status == MLN_STATUS_OK) {
-    create_status = mln_runtime_create(&options, &runtime);
+    create_status = mln_test_runtime_create(&options, &runtime);
   }
   if (create_status != MLN_STATUS_OK) {
     (void)mln_notification_source_close(source);
@@ -752,9 +836,9 @@ static void lookup_other_runtime_entry(void* argument) {
   wait_for_flag(&probe->lookup_reached);
   // Give the file source thread time to reach the lookup itself.
   mln_test_sleep_milliseconds(teardown_call_delay_milliseconds);
-  atomic_store(&probe->other_runtime_status, mln_runtime_pump(runtime, 0));
+  atomic_store(&probe->other_runtime_status, mln_test_runtime_barrier(runtime));
   atomic_store(&probe->other_runtime_call_done, true);
-  mln_runtime_destroy(runtime);
+  (void)mln_test_runtime_close(runtime);
   mln_notification_source_close(source);
 }
 
@@ -776,7 +860,7 @@ static void resource_transform_lookup_leaves_other_runtimes_responsive(void) {
     .user_data = &probe,
   };
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_set_resource_provider(runtime, &provider)
+    MLN_STATUS_OK, set_resource_provider_committed(runtime, &provider)
   );
   const mln_resource_transform transform = {
     .size = sizeof(mln_resource_transform),
@@ -784,23 +868,23 @@ static void resource_transform_lookup_leaves_other_runtimes_responsive(void) {
     .user_data = &probe,
   };
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_set_resource_transform(runtime, &transform)
+    MLN_STATUS_OK, set_resource_transform_committed(runtime, &transform)
   );
 
   // The first download parks a transform callback inside the shared lock.
   TEST_ASSERT_TRUE(activate_style_download(runtime, lookup_blocking_style_url));
-  TEST_ASSERT_TRUE(pump_until_flag(runtime, &probe.transform_entered));
+  TEST_ASSERT_TRUE(wait_until_flag(runtime, &probe.transform_entered));
 
   // The second download parks a file source thread in the provider callback,
   // one step ahead of the lookup under test.
   TEST_ASSERT_TRUE(activate_style_download(runtime, lookup_probe_style_url));
-  TEST_ASSERT_TRUE(pump_until_flag(runtime, &probe.provider_entered));
+  TEST_ASSERT_TRUE(wait_until_flag(runtime, &probe.provider_entered));
 
   atomic_store(&probe.writer_pending, true);
   // Clearing waits for the in-flight transform callback to return, so it is
   // the pending writer the lookup queues behind.
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_clear_resource_transform(runtime)
+    MLN_STATUS_OK, clear_resource_transform_committed(runtime)
   );
   mln_test_thread_join(other_thread);
 
@@ -821,32 +905,31 @@ static void resource_transform_lookup_leaves_other_runtimes_responsive(void) {
 static void resource_provider_rejects_raw_invalid_descriptors(void) {
   mln_runtime runtime = mln_test_create_runtime();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_set_resource_provider(runtime, NULL)
+    MLN_STATUS_INVALID_ARGUMENT, set_resource_provider_committed(runtime, NULL)
   );
   mln_resource_provider provider = {
     .size = 0, .callback = resource_provider_stub
   };
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_set_resource_provider(runtime, &provider)
+    set_resource_provider_committed(runtime, &provider)
   );
   provider.size = sizeof(mln_resource_provider);
   provider.callback = NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_set_resource_provider(runtime, &provider)
+    set_resource_provider_committed(runtime, &provider)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_clear_resource_provider(MLN_HANDLE_NULL)
+    clear_resource_provider_committed(MLN_HANDLE_NULL)
   );
   mln_test_destroy_runtime(runtime);
 }
 
 // Blocks inside the provider callback so the per-runtime provider lock stays
-// held while the owner thread clears the provider. It calls no C API function
-// while blocked.
+// held while the runtime executor clears the provider. It calls no C API
+// function while blocked.
 static uint32_t blocking_resource_provider_for_clear(
   void* user_data, const mln_resource_request* request,
   mln_resource_request_handle handle
@@ -862,8 +945,8 @@ static uint32_t blocking_resource_provider_for_clear(
     }
     mln_test_sleep_millisecond();
   }
-  // Keep running past the clear call so a clear that skips the wait returns
-  // while this callback is still using its user data.
+  // Keep running after clear submission so an implementation that emits the
+  // terminal event too early exposes callback-owned state.
   mln_test_sleep_milliseconds(provider_callback_block_milliseconds);
   atomic_store(&probe->callback_returned, true);
   return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
@@ -921,16 +1004,74 @@ static bool wait_for_clear_provider_callback(
     if (atomic_load(&probe->entered)) {
       return true;
     }
-    if (mln_runtime_pump(runtime, 0) != MLN_STATUS_OK) {
+    if (mln_test_runtime_barrier(runtime) != MLN_STATUS_OK) {
       return false;
     }
     mln_test_sleep_millisecond();
   }
   return false;
 }
+typedef struct cross_thread_provider_submission {
+  mln_runtime runtime;
+  mln_resource_provider provider;
+  mln_status status;
+  uint64_t command_id;
+} cross_thread_provider_submission;
 
-// Clearing the resource provider waits for a provider callback already running,
-// so the callback and its user data are unreferenced once the clear returns.
+static void submit_provider_from_thread(void* user_data) {
+  cross_thread_provider_submission* submission = user_data;
+  submission->status = mln_runtime_set_resource_provider(
+    submission->runtime, &submission->provider, &submission->command_id
+  );
+}
+
+static uint32_t recording_resource_provider(
+  void* user_data, const mln_resource_request* request,
+  mln_resource_request_handle handle
+) {
+  (void)request;
+  (void)handle;
+  provider_quiescence_probe* probe = user_data;
+  atomic_store(&probe->entered, true);
+  return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+}
+
+static void resource_provider_command_copies_cross_thread_descriptor(void) {
+  provider_quiescence_probe probe = {0};
+  mln_runtime runtime = mln_test_create_runtime();
+  cross_thread_provider_submission submission = {
+    .runtime = runtime,
+    .provider =
+      {
+        .size = sizeof(mln_resource_provider),
+        .callback = recording_resource_provider,
+        .user_data = &probe,
+      },
+    .status = MLN_STATUS_NATIVE_ERROR,
+    .command_id = 0,
+  };
+  mln_test_thread* thread =
+    mln_test_thread_start(submit_provider_from_thread, &submission);
+  TEST_ASSERT_NOT_NULL(thread);
+  mln_test_thread_join(thread);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, submission.status);
+  TEST_ASSERT_NOT_EQUAL(0, submission.command_id);
+
+  // The accepted command owns the descriptor shape, not this binding storage.
+  submission.provider.callback = NULL;
+  submission.provider.user_data = NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, wait_for_resource_command(runtime, submission.command_id)
+  );
+  TEST_ASSERT_TRUE(wait_for_clear_provider_callback(runtime, &probe));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, clear_resource_provider_committed(runtime)
+  );
+  mln_test_destroy_runtime(runtime);
+}
+
+// The clear command reaches its terminal event only after a provider callback
+// that was already running returns.
 static void clearing_resource_provider_waits_for_in_flight_callback(void) {
   provider_quiescence_probe probe = {0};
   mln_runtime runtime = mln_test_create_runtime();
@@ -940,19 +1081,18 @@ static void clearing_resource_provider_waits_for_in_flight_callback(void) {
     .user_data = &probe,
   };
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_set_resource_provider(runtime, &provider)
+    MLN_STATUS_OK, set_resource_provider_committed(runtime, &provider)
   );
   TEST_ASSERT_TRUE(wait_for_clear_provider_callback(runtime, &probe));
 
   atomic_store(&probe.clear_started, true);
-  // The clear blocks here until the provider callback returns.
+  // The terminal event waits until the provider callback returns.
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_clear_resource_provider(runtime)
+    MLN_STATUS_OK, clear_resource_provider_committed(runtime)
   );
   TEST_ASSERT_TRUE_MESSAGE(
     atomic_load(&probe.callback_returned),
-    "clearing the resource provider returned while a provider callback was "
-    "still running"
+    "the clear command finished while a provider callback was still running"
   );
 
   mln_test_destroy_runtime(runtime);
@@ -962,7 +1102,7 @@ static void unsupported_style_url_scheme_names_scheme_and_url(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_style_url(map, unsupported_scheme_style_url)
+    MLN_STATUS_OK, mln_test_map_set_style_url(map, unsupported_scheme_style_url)
   );
   char message[512];
   TEST_ASSERT_TRUE(
@@ -980,7 +1120,7 @@ static void unsupported_style_url_diagnostic_redacts_credentials(void) {
   mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_map_set_style_url(map, credentialed_unsupported_scheme_style_url)
+    mln_test_map_set_style_url(map, credentialed_unsupported_scheme_style_url)
   );
   char message[512];
   TEST_ASSERT_TRUE(
@@ -1002,11 +1142,11 @@ static void unsupported_style_url_names_declining_provider(void) {
     .callback = resource_provider_stub,
   };
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_set_resource_provider(runtime, &provider)
+    MLN_STATUS_OK, set_resource_provider_committed(runtime, &provider)
   );
   mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_style_url(map, unsupported_scheme_style_url)
+    MLN_STATUS_OK, mln_test_map_set_style_url(map, unsupported_scheme_style_url)
   );
   char message[512];
   TEST_ASSERT_TRUE(
@@ -1032,15 +1172,15 @@ static void resource_provider_defers_inline_release_until_callback_returns(
     .user_data = &state,
   };
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_set_resource_provider(runtime, &provider)
+    MLN_STATUS_OK, set_resource_provider_committed(runtime, &provider)
   );
   mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_style_url(map, "custom://inline-style.json")
+    MLN_STATUS_OK, mln_test_map_set_style_url(map, "custom://inline-style.json")
   );
   for (size_t attempt = 0;
        attempt < 5000 && !atomic_load(&state.callback_finished); attempt += 1) {
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0));
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
     mln_test_sleep_millisecond();
   }
   TEST_ASSERT_TRUE(atomic_load(&state.callback_finished));
@@ -1138,7 +1278,7 @@ static bool wait_for_provider_callback(
     if (atomic_load(&probe->entered)) {
       return true;
     }
-    if (mln_runtime_pump(runtime, 0) != MLN_STATUS_OK) {
+    if (mln_test_runtime_barrier(runtime) != MLN_STATUS_OK) {
       return false;
     }
     mln_test_sleep_millisecond();
@@ -1157,7 +1297,7 @@ static void runtime_teardown_waits_for_in_flight_provider_callback(void) {
     .user_data = &probe,
   };
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_set_resource_provider(runtime, &provider)
+    MLN_STATUS_OK, set_resource_provider_committed(runtime, &provider)
   );
   TEST_ASSERT_TRUE(wait_for_provider_callback(runtime, &probe));
 
@@ -1185,6 +1325,7 @@ void run_resources_abi_tests(void) {
   RUN_TEST(runtime_teardown_leaves_other_runtimes_responsive);
   RUN_TEST(resource_transform_lookup_leaves_other_runtimes_responsive);
   RUN_TEST(resource_provider_rejects_raw_invalid_descriptors);
+  RUN_TEST(resource_provider_command_copies_cross_thread_descriptor);
   RUN_TEST(clearing_resource_provider_waits_for_in_flight_callback);
   RUN_TEST(unsupported_style_url_scheme_names_scheme_and_url);
   RUN_TEST(unsupported_style_url_diagnostic_redacts_credentials);

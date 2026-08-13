@@ -15,17 +15,31 @@ namespace Maplibre.NativeFfi.Map;
 internal unsafe delegate mln_status MapAddCustomGeometrySource(
     MlnMap map,
     mln_buffer_view sourceId,
-    mln_custom_geometry_source_options* options
+    mln_custom_geometry_source_options* options,
+    ulong* outCommandId
 );
 
-/// <summary>Owner-thread map handle bound to a runtime.</summary>
-public sealed unsafe class MapHandle : IDisposable
+internal unsafe delegate mln_status MapTakeCameraResult(
+    MlnOperation operation,
+    mln_camera_options* outCamera
+);
+
+internal unsafe delegate mln_status MapTakeBoundsResult(
+    MlnOperation operation,
+    mln_lat_lng_bounds* outBounds
+);
+internal unsafe delegate mln_status MapOperationStart(MlnOperation* outOperation);
+internal delegate TResult MapOperationTake<TResult>(MlnOperation operation);
+
+/// <summary>Any-thread map handle bound to a runtime.</summary>
+public sealed unsafe partial class MapHandle : IDisposable
 {
     private static readonly MapAddCustomGeometrySource DefaultAddCustomGeometrySource = static (
         map,
         sourceId,
-        options
-    ) => NativeMethods.mln_map_add_custom_geometry_source(map, sourceId, options);
+        options,
+        commandId
+    ) => NativeMethods.mln_map_add_custom_geometry_source(map, sourceId, options, commandId);
 
     [ThreadStatic]
     private static MapAddCustomGeometrySource? addCustomGeometrySourceForTest;
@@ -40,26 +54,40 @@ public sealed unsafe class MapHandle : IDisposable
         nativeId = handle.Value;
         state = new NativeHandleState<MlnMap>(
             handle,
-            static handle => NativeMethods.mln_map_destroy(handle),
+            static _ => mln_status.MLN_STATUS_OK,
             nameof(MapHandle)
         );
     }
 
-    /// <summary>Creates a map from a runtime on the runtime owner thread.</summary>
-    public static MapHandle Create(RuntimeHandle runtime, MapOptions options)
+    /// <summary>Creates a map asynchronously.</summary>
+    public static Task<MapHandle> CreateAsync(
+        RuntimeHandle runtime,
+        MapOptions options,
+        CancellationToken cancellationToken = default
+    )
     {
         ArgumentNullException.ThrowIfNull(runtime);
         ArgumentNullException.ThrowIfNull(options);
+        cancellationToken.ThrowIfCancellationRequested();
         var nativeOptions = options.ToNative();
-        MlnMap map = default;
-
-        NativeStatus.Check(NativeMethods.mln_map_create(runtime.Handle, &nativeOptions, &map));
-        var handle = new MapHandle(runtime, map);
-        runtime.RegisterMap(handle);
-        return handle;
+        var operation = StartCreate(runtime.Handle, nativeOptions);
+        return OperationAwaiter.WaitThen(
+            runtime.WaitForOperationAsync(operation, cancellationToken),
+            () =>
+            {
+                MlnMap map = default;
+                NativeStatus.Check(NativeMethods.mln_map_create_take_result(operation, &map));
+                var handle = new MapHandle(runtime, map);
+                runtime.RegisterMap(handle);
+                return handle;
+            },
+            () => NativeMethods.mln_operation_release(operation)
+        );
     }
 
     internal MlnMap Handle => state.Handle;
+
+    internal RuntimeHandle Runtime => runtime;
 
     /// <summary>The issued native handle id, readable after close.</summary>
     internal ulong NativeId => nativeId;
@@ -67,312 +95,278 @@ public sealed unsafe class MapHandle : IDisposable
     /// <summary>Whether this wrapper has successfully closed its native handle.</summary>
     public bool IsClosed => state.IsClosed;
 
-    /// <summary>Requests a repaint for a continuous map.</summary>
-    public void RequestRepaint()
+    /// <summary>Requests a repaint and returns its runtime command id.</summary>
+    public ulong RequestRepaint()
     {
-        NativeStatus.Check(NativeMethods.mln_map_request_repaint(Handle));
+        ulong commandId = 0;
+        NativeStatus.Check(NativeMethods.mln_map_request_repaint(Handle, &commandId));
+        return commandId;
     }
 
-    /// <summary>Requests an asynchronous still-image render for a static map.</summary>
-    public void RequestStillImage()
+    /// <summary>Requests a noncoalescing still-image render.</summary>
+    public Task RequestStillImageAsync(CancellationToken cancellationToken = default)
     {
-        NativeStatus.Check(NativeMethods.mln_map_request_still_image(Handle));
+        var operation = StartMapOperation(outOperation =>
+            NativeMethods.mln_map_request_still_image_start(Handle, outOperation)
+        );
+        return OperationAwaiter.WaitThen(
+            runtime.WaitForOperationAsync(operation, cancellationToken),
+            () => RuntimeHandle.CheckOperationCompletion(operation),
+            () => NativeMethods.mln_operation_release(operation)
+        );
     }
 
-    /// <summary>Sets native debug drawing options.</summary>
-    public void SetDebugOptions(DebugOptions options)
+    /// <summary>Sets native debug drawing options and returns its command ID.</summary>
+    public ulong SetDebugOptions(DebugOptions options)
     {
-        NativeStatus.Check(NativeMethods.mln_map_set_debug_options(Handle, (uint)options));
+        ulong commandId = 0;
+        NativeStatus.Check(
+            NativeMethods.mln_map_set_debug_options(Handle, (uint)options, &commandId)
+        );
+        return commandId;
     }
 
-    /// <summary>Gets native debug drawing options.</summary>
-    public DebugOptions GetDebugOptions()
-    {
-        uint options = 0;
-        NativeStatus.Check(NativeMethods.mln_map_get_debug_options(Handle, &options));
-        return (DebugOptions)options;
-    }
+    /// <summary>Gets native debug drawing options in runtime order.</summary>
+    public Task<DebugOptions> GetDebugOptionsAsync(CancellationToken cancellationToken = default) =>
+        RunMapOperationAsync(
+            operation => NativeMethods.mln_map_get_debug_options_start(Handle, operation),
+            operation =>
+            {
+                uint options = 0;
+                NativeStatus.Check(
+                    NativeMethods.mln_map_get_debug_options_take_result(operation, &options)
+                );
+                return (DebugOptions)options;
+            },
+            cancellationToken
+        );
 
-    /// <summary>Shows or hides the built-in rendering statistics overlay.</summary>
-    public void SetRenderingStatsViewEnabled(bool enabled)
+    /// <summary>Shows or hides the built-in rendering statistics overlay and returns its command ID.</summary>
+    public ulong SetRenderingStatsViewEnabled(bool enabled)
     {
+        ulong commandId = 0;
         NativeStatus.Check(
             NativeMethods.mln_map_set_rendering_stats_view_enabled(
                 Handle,
-                enabled ? (byte)1 : (byte)0
+                enabled ? (byte)1 : (byte)0,
+                &commandId
             )
         );
+        return commandId;
     }
 
-    /// <summary>Whether the built-in rendering statistics overlay is enabled.</summary>
-    public bool GetRenderingStatsViewEnabled()
-    {
-        bool enabled = false;
-        NativeStatus.Check(
-            NativeMethods.mln_map_get_rendering_stats_view_enabled(Handle, &enabled)
+    /// <summary>Gets whether the built-in rendering statistics overlay is enabled in runtime order.</summary>
+    public Task<bool> GetRenderingStatsViewEnabledAsync(
+        CancellationToken cancellationToken = default
+    ) =>
+        RunMapOperationAsync(
+            operation =>
+                NativeMethods.mln_map_get_rendering_stats_view_enabled_start(Handle, operation),
+            operation =>
+            {
+                bool enabled = false;
+                NativeStatus.Check(
+                    NativeMethods.mln_map_get_rendering_stats_view_enabled_take_result(
+                        operation,
+                        &enabled
+                    )
+                );
+                return enabled;
+            },
+            cancellationToken
         );
-        return enabled;
-    }
 
-    /// <summary>Whether the native map reports all required resources loaded.</summary>
-    public bool IsFullyLoaded()
+    /// <summary>Gets whether the native map reports all required resources loaded in runtime order.</summary>
+    public Task<bool> IsFullyLoadedAsync(CancellationToken cancellationToken = default) =>
+        RunMapOperationAsync(
+            operation => NativeMethods.mln_map_is_fully_loaded_start(Handle, operation),
+            operation =>
+            {
+                bool loaded = false;
+                NativeStatus.Check(
+                    NativeMethods.mln_map_is_fully_loaded_take_result(operation, &loaded)
+                );
+                return loaded;
+            },
+            cancellationToken
+        );
+
+    /// <summary>Asks the native map to write debug logs and returns its command ID.</summary>
+    public ulong DumpDebugLogs()
     {
-        bool loaded = false;
-        NativeStatus.Check(NativeMethods.mln_map_is_fully_loaded(Handle, &loaded));
-        return loaded;
+        ulong commandId = 0;
+        NativeStatus.Check(NativeMethods.mln_map_dump_debug_logs(Handle, &commandId));
+        return commandId;
     }
 
-    /// <summary>Asks the native map to write debug logs through the native log system.</summary>
-    public void DumpDebugLogs()
+    /// <summary>Gets a synchronous copy of the committed map state.</summary>
+    public MapSnapshot GetSnapshot()
     {
-        NativeStatus.Check(NativeMethods.mln_map_dump_debug_logs(Handle));
+        var snapshot = new mln_map_snapshot { size = (uint)sizeof(mln_map_snapshot) };
+        NativeStatus.Check(NativeMethods.mln_map_snapshot_get(Handle, &snapshot));
+        return new MapSnapshot(
+            snapshot.generation,
+            MapStructs.CameraOptionsFromNative(snapshot.camera),
+            new LogicalExtent(
+                snapshot.logical_extent.width,
+                snapshot.logical_extent.height,
+                snapshot.logical_extent.scale_factor
+            ),
+            MapStructs.ProjectionModeOptionsFromNative(snapshot.projection_mode),
+            MapStructs.ViewportOptionsFromNative(snapshot.viewport),
+            snapshot.loading != 0,
+            snapshot.fully_rendered != 0,
+            snapshot.repaint_demand != 0,
+            (RuntimeEventMask)snapshot.event_mask,
+            snapshot.latest_render_update_generation
+        );
     }
 
-    /// <summary>
-    /// Gets the map's logical viewport size in UI pixels and its pixel ratio. The scale factor is
-    /// fixed for the lifetime of the map and is independent of any render target's scale factor.
-    /// </summary>
-    public (uint Width, uint Height, double ScaleFactor) GetSize()
+    /// <summary>Submits a logical extent change and returns its runtime command id.</summary>
+    public ulong Resize(LogicalExtent extent)
     {
-        uint width;
-        uint height;
-        double scaleFactor;
-        NativeStatus.Check(NativeMethods.mln_map_get_size(Handle, &width, &height, &scaleFactor));
-        return (width, height, scaleFactor);
+        ulong commandId = 0;
+        NativeStatus.Check(
+            NativeMethods.mln_map_resize(
+                Handle,
+                new mln_logical_extent
+                {
+                    width = extent.Width,
+                    height = extent.Height,
+                    scale_factor = extent.ScaleFactor,
+                },
+                &commandId
+            )
+        );
+        return commandId;
     }
 
-    /// <summary>Gets the map's viewport options.</summary>
-    public ViewportOptions GetViewportOptions()
-    {
-        var options = NativeMethods.mln_map_viewport_options_default();
-        NativeStatus.Check(NativeMethods.mln_map_get_viewport_options(Handle, &options));
-        return MapStructs.ViewportOptionsFromNative(options);
-    }
+    /// <summary>Gets the map's viewport options in runtime order.</summary>
+    public Task<ViewportOptions> GetViewportOptionsAsync(
+        CancellationToken cancellationToken = default
+    ) =>
+        RunMapOperationAsync(
+            operation => NativeMethods.mln_map_get_viewport_options_start(Handle, operation),
+            operation =>
+            {
+                var options = NativeMethods.mln_map_viewport_options_default();
+                NativeStatus.Check(
+                    NativeMethods.mln_map_get_viewport_options_take_result(operation, &options)
+                );
+                return MapStructs.ViewportOptionsFromNative(options);
+            },
+            cancellationToken
+        );
 
-    /// <summary>Sets viewport options, applying only non-null descriptor fields.</summary>
-    public void SetViewportOptions(ViewportOptions options)
+    /// <summary>Sets viewport options and returns its command ID.</summary>
+    public ulong SetViewportOptions(ViewportOptions options)
     {
         var nativeOptions = MapStructs.ToNative(options);
-        NativeStatus.Check(NativeMethods.mln_map_set_viewport_options(Handle, &nativeOptions));
+        ulong commandId = 0;
+        NativeStatus.Check(
+            NativeMethods.mln_map_set_viewport_options(Handle, &nativeOptions, &commandId)
+        );
+        return commandId;
     }
 
-    /// <summary>Gets tile tuning options.</summary>
-    public TileOptions GetTileOptions()
-    {
-        var options = NativeMethods.mln_map_tile_options_default();
-        NativeStatus.Check(NativeMethods.mln_map_get_tile_options(Handle, &options));
-        return MapStructs.TileOptionsFromNative(options);
-    }
+    /// <summary>Gets tile tuning options in runtime order.</summary>
+    public Task<TileOptions> GetTileOptionsAsync(CancellationToken cancellationToken = default) =>
+        RunMapOperationAsync(
+            operation => NativeMethods.mln_map_get_tile_options_start(Handle, operation),
+            operation =>
+            {
+                var options = NativeMethods.mln_map_tile_options_default();
+                NativeStatus.Check(
+                    NativeMethods.mln_map_get_tile_options_take_result(operation, &options)
+                );
+                return MapStructs.TileOptionsFromNative(options);
+            },
+            cancellationToken
+        );
 
-    /// <summary>Sets tile tuning options, applying only non-null descriptor fields.</summary>
-    public void SetTileOptions(TileOptions options)
+    /// <summary>Sets tile tuning options and returns its command ID.</summary>
+    public ulong SetTileOptions(TileOptions options)
     {
         var nativeOptions = MapStructs.ToNative(options);
-        NativeStatus.Check(NativeMethods.mln_map_set_tile_options(Handle, &nativeOptions));
+        ulong commandId = 0;
+        NativeStatus.Check(
+            NativeMethods.mln_map_set_tile_options(Handle, &nativeOptions, &commandId)
+        );
+        return commandId;
     }
 
-    /// <summary>Gets the current camera descriptor.</summary>
-    public CameraOptions GetCamera()
+    /// <summary>Gets a synchronous camera snapshot.</summary>
+    public CameraSnapshot GetCameraSnapshot()
     {
         var camera = NativeMethods.mln_camera_options_default();
-        NativeStatus.Check(NativeMethods.mln_map_get_camera(Handle, &camera));
-        return MapStructs.CameraOptionsFromNative(camera);
+        ulong generation = 0;
+        NativeStatus.Check(NativeMethods.mln_map_camera_snapshot_get(Handle, &camera, &generation));
+        return new CameraSnapshot(MapStructs.CameraOptionsFromNative(camera), generation);
     }
 
-    /// <summary>Moves immediately to the camera descriptor, applying only non-null fields.</summary>
-    public void JumpTo(CameraOptions camera)
+    /// <summary>Submits a copied camera update and returns its runtime command id.</summary>
+    public ulong UpdateCamera(CameraUpdate update)
     {
-        var nativeCamera = MapStructs.ToNative(camera);
-        NativeStatus.Check(NativeMethods.mln_map_jump_to(Handle, &nativeCamera));
+        var native = MapStructs.ToNative(update);
+        ulong commandId = 0;
+        NativeStatus.Check(NativeMethods.mln_map_update_camera(Handle, &native, &commandId));
+        return commandId;
     }
 
-    /// <summary>Eases to the camera descriptor with animation options.</summary>
-    /// <remarks>
-    /// A <see langword="null" /> <paramref name="animation" />, or one with no
-    /// <c>Duration</c>, uses a duration of zero. Set <c>Duration</c> to animate.
-    /// </remarks>
-    public void EaseTo(CameraOptions camera, AnimationOptions? animation)
+    /// <summary>Reads the camera in runtime order.</summary>
+    public Task<CameraSnapshot> QueryCameraAsync(CancellationToken cancellationToken = default)
     {
-        var nativeCamera = MapStructs.ToNative(camera);
-        var nativeAnimation = animation is null ? default : MapStructs.ToNative(animation);
-        NativeStatus.Check(
-            NativeMethods.mln_map_ease_to(
-                Handle,
-                &nativeCamera,
-                animation is null ? null : &nativeAnimation
-            )
+        var operation = StartMapOperation(outOperation =>
+            NativeMethods.mln_map_camera_query_start(Handle, outOperation)
+        );
+        return OperationAwaiter.WaitThen(
+            runtime.WaitForOperationAsync(operation, cancellationToken),
+            () =>
+            {
+                var result = new mln_camera_query_result
+                {
+                    size = (uint)sizeof(mln_camera_query_result),
+                };
+                NativeStatus.Check(
+                    NativeMethods.mln_map_camera_query_take_result(operation, &result)
+                );
+                return new CameraSnapshot(
+                    MapStructs.CameraOptionsFromNative(result.camera),
+                    result.generation
+                );
+            },
+            () => NativeMethods.mln_operation_release(operation)
         );
     }
 
-    /// <summary>Flies to the camera descriptor with animation options.</summary>
-    /// <remarks>
-    /// Unlike the other camera commands, a <see langword="null" />
-    /// <paramref name="animation" />, or one with no <c>Duration</c>, derives a
-    /// duration from the distance travelled at 1.2 rho-screenfuls per second.
-    /// </remarks>
-    public void FlyTo(CameraOptions camera, AnimationOptions? animation)
-    {
-        var nativeCamera = MapStructs.ToNative(camera);
-        var nativeAnimation = animation is null ? default : MapStructs.ToNative(animation);
-        NativeStatus.Check(
-            NativeMethods.mln_map_fly_to(
-                Handle,
-                &nativeCamera,
-                animation is null ? null : &nativeAnimation
-            )
-        );
-    }
-
-    /// <summary>Moves the map by a screen delta.</summary>
-    public void MoveBy(double deltaX, double deltaY)
-    {
-        NativeStatus.Check(NativeMethods.mln_map_move_by(Handle, deltaX, deltaY));
-    }
-
-    /// <summary>Moves the map by a screen delta with animation options.</summary>
-    /// <remarks>
-    /// A <see langword="null" /> <paramref name="animation" />, or one with no
-    /// <c>Duration</c>, applies the change instantly; see <see cref="EaseTo" />.
-    /// </remarks>
-    public void MoveByAnimated(double deltaX, double deltaY, AnimationOptions? animation)
-    {
-        var nativeAnimation = animation is null ? default : MapStructs.ToNative(animation);
-        NativeStatus.Check(
-            NativeMethods.mln_map_move_by_animated(
-                Handle,
-                deltaX,
-                deltaY,
-                animation is null ? null : &nativeAnimation
-            )
-        );
-    }
-
-    /// <summary>Scales the map around a screen anchor.</summary>
-    public void ScaleBy(double scale, ScreenPoint? anchor)
-    {
-        var nativeAnchor = anchor is { } value ? MapStructs.ToNative(value) : default;
-        NativeStatus.Check(
-            NativeMethods.mln_map_scale_by(Handle, scale, anchor.HasValue ? &nativeAnchor : null)
-        );
-    }
-
-    /// <summary>Scales the map around a screen anchor with animation options.</summary>
-    /// <remarks>
-    /// A <see langword="null" /> <paramref name="animation" />, or one with no
-    /// <c>Duration</c>, applies the change instantly; see <see cref="EaseTo" />.
-    /// </remarks>
-    public void ScaleByAnimated(double scale, ScreenPoint? anchor, AnimationOptions? animation)
-    {
-        var nativeAnchor = anchor is { } anchorValue ? MapStructs.ToNative(anchorValue) : default;
-        var nativeAnimation = animation is null ? default : MapStructs.ToNative(animation);
-        NativeStatus.Check(
-            NativeMethods.mln_map_scale_by_animated(
-                Handle,
-                scale,
-                anchor.HasValue ? &nativeAnchor : null,
-                animation is null ? null : &nativeAnimation
-            )
-        );
-    }
-
-    /// <summary>Rotates around two screen points.</summary>
-    public void RotateBy(ScreenPoint first, ScreenPoint second)
-    {
-        var nativeFirst = MapStructs.ToNative(first);
-        var nativeSecond = MapStructs.ToNative(second);
-        NativeStatus.Check(NativeMethods.mln_map_rotate_by(Handle, nativeFirst, nativeSecond));
-    }
-
-    /// <summary>Rotates around two screen points with animation options.</summary>
-    /// <remarks>
-    /// A <see langword="null" /> <paramref name="animation" />, or one with no
-    /// <c>Duration</c>, applies the change instantly; see <see cref="EaseTo" />.
-    /// </remarks>
-    public void RotateByAnimated(ScreenPoint first, ScreenPoint second, AnimationOptions? animation)
-    {
-        var nativeFirst = MapStructs.ToNative(first);
-        var nativeSecond = MapStructs.ToNative(second);
-        var nativeAnimation = animation is null ? default : MapStructs.ToNative(animation);
-        NativeStatus.Check(
-            NativeMethods.mln_map_rotate_by_animated(
-                Handle,
-                nativeFirst,
-                nativeSecond,
-                animation is null ? null : &nativeAnimation
-            )
-        );
-    }
-
-    /// <summary>Pitches the map by a delta in degrees.</summary>
-    public void PitchBy(double pitch)
-    {
-        NativeStatus.Check(NativeMethods.mln_map_pitch_by(Handle, pitch));
-    }
-
-    /// <summary>Pitches the map by a delta in degrees with animation options.</summary>
-    /// <remarks>
-    /// A <see langword="null" /> <paramref name="animation" />, or one with no
-    /// <c>Duration</c>, applies the change instantly; see <see cref="EaseTo" />.
-    /// </remarks>
-    public void PitchByAnimated(double pitch, AnimationOptions? animation)
-    {
-        var nativeAnimation = animation is null ? default : MapStructs.ToNative(animation);
-        NativeStatus.Check(
-            NativeMethods.mln_map_pitch_by_animated(
-                Handle,
-                pitch,
-                animation is null ? null : &nativeAnimation
-            )
-        );
-    }
-
-    /// <summary>Cancels in-flight camera transitions.</summary>
-    public void CancelTransitions()
-    {
-        NativeStatus.Check(NativeMethods.mln_map_cancel_transitions(Handle));
-    }
-
-    /// <summary>Marks whether a host-driven gesture is in progress.</summary>
-    /// <remarks>
-    /// The flag stays set until the host clears it: pair every
-    /// <see langword="true"/> with a <see langword="false"/>.
-    /// </remarks>
-    public void SetGestureInProgress(bool inProgress)
-    {
-        NativeStatus.Check(
-            NativeMethods.mln_map_set_gesture_in_progress(Handle, inProgress ? (byte)1 : (byte)0)
-        );
-    }
-
-    /// <summary>Whether a host-driven gesture is currently in progress.</summary>
-    public bool IsGestureInProgress()
-    {
-        bool inProgress = false;
-        NativeStatus.Check(NativeMethods.mln_map_is_gesture_in_progress(Handle, &inProgress));
-        return inProgress;
-    }
-
-    /// <summary>Calculates a camera that fits geographic bounds and fit options.</summary>
-    public CameraOptions CameraForLatLngBounds(LatLngBounds bounds, CameraFitOptions? fitOptions)
+    public Task<CameraOptions> CameraForLatLngBoundsAsync(
+        LatLngBounds bounds,
+        CameraFitOptions? fitOptions,
+        CancellationToken cancellationToken = default
+    )
     {
         var nativeBounds = MapStructs.ToNative(bounds);
         var nativeFitOptions = fitOptions is null ? default : MapStructs.ToNative(fitOptions);
-        var camera = NativeMethods.mln_camera_options_default();
+        MlnOperation operation = default;
         NativeStatus.Check(
-            NativeMethods.mln_map_camera_for_lat_lng_bounds(
+            NativeMethods.mln_map_camera_for_lat_lng_bounds_start(
                 Handle,
                 nativeBounds,
                 fitOptions is null ? null : &nativeFitOptions,
-                &camera
+                &operation
             )
         );
-        return MapStructs.CameraOptionsFromNative(camera);
+        return TakeCameraAsync(
+            operation,
+            NativeMethods.mln_map_camera_for_lat_lng_bounds_take_result,
+            cancellationToken
+        );
     }
 
-    /// <summary>Calculates a camera that fits geographic coordinates and fit options.</summary>
-    public CameraOptions CameraForLatLngs(
+    public Task<CameraOptions> CameraForLatLngsAsync(
         IReadOnlyList<LatLng> coordinates,
-        CameraFitOptions? fitOptions
+        CameraFitOptions? fitOptions,
+        CancellationToken cancellationToken = default
     )
     {
         ArgumentNullException.ThrowIfNull(coordinates);
@@ -381,521 +375,489 @@ public sealed unsafe class MapHandle : IDisposable
         {
             nativeCoordinates[index] = CoreStructs.ToNative(coordinates[index]);
         }
-
         var nativeFitOptions = fitOptions is null ? default : MapStructs.ToNative(fitOptions);
-        var camera = NativeMethods.mln_camera_options_default();
-        fixed (mln_lat_lng* coordinatesPointer = nativeCoordinates)
+        MlnOperation operation = default;
+        fixed (mln_lat_lng* pointer = nativeCoordinates)
         {
             NativeStatus.Check(
-                NativeMethods.mln_map_camera_for_lat_lngs(
+                NativeMethods.mln_map_camera_for_lat_lngs_start(
                     Handle,
-                    nativeCoordinates.Length == 0 ? null : coordinatesPointer,
+                    nativeCoordinates.Length == 0 ? null : pointer,
                     (nuint)nativeCoordinates.Length,
                     fitOptions is null ? null : &nativeFitOptions,
-                    &camera
+                    &operation
                 )
             );
         }
-        return MapStructs.CameraOptionsFromNative(camera);
+        return TakeCameraAsync(
+            operation,
+            NativeMethods.mln_map_camera_for_lat_lngs_take_result,
+            cancellationToken
+        );
     }
 
-    /// <summary>Calculates a camera that fits geographic geometry and fit options.</summary>
-    public CameraOptions CameraForGeometry(byte[] geometry, CameraFitOptions? fitOptions)
+    public Task<CameraOptions> CameraForGeometryAsync(
+        byte[] geometry,
+        CameraFitOptions? fitOptions,
+        CancellationToken cancellationToken = default
+    )
     {
         using var nativeGeometry = NativeStringView.From(geometry, nameof(geometry));
         var nativeFitOptions = fitOptions is null ? default : MapStructs.ToNative(fitOptions);
-        var camera = NativeMethods.mln_camera_options_default();
+        MlnOperation operation = default;
         NativeStatus.Check(
-            NativeMethods.mln_map_camera_for_geometry(
+            NativeMethods.mln_map_camera_for_geometry_start(
                 Handle,
                 nativeGeometry.Value,
                 fitOptions is null ? null : &nativeFitOptions,
-                &camera
+                &operation
             )
         );
-        return MapStructs.CameraOptionsFromNative(camera);
-    }
-
-    /// <summary>Calculates geographic bounds for a camera.</summary>
-    public LatLngBounds LatLngBoundsForCamera(CameraOptions camera)
-    {
-        var nativeCamera = MapStructs.ToNative(camera);
-        mln_lat_lng_bounds bounds = default;
-        NativeStatus.Check(
-            NativeMethods.mln_map_lat_lng_bounds_for_camera(Handle, &nativeCamera, &bounds)
+        return TakeCameraAsync(
+            operation,
+            NativeMethods.mln_map_camera_for_geometry_take_result,
+            cancellationToken
         );
-        return MapStructs.FromNative(bounds);
     }
 
-    /// <summary>Calculates unwrapped geographic bounds for a camera.</summary>
-    public LatLngBounds LatLngBoundsForCameraUnwrapped(CameraOptions camera)
+    public Task<LatLngBounds> LatLngBoundsForCameraAsync(
+        CameraOptions camera,
+        CancellationToken cancellationToken = default
+    )
     {
         var nativeCamera = MapStructs.ToNative(camera);
-        mln_lat_lng_bounds bounds = default;
+        MlnOperation operation = default;
         NativeStatus.Check(
-            NativeMethods.mln_map_lat_lng_bounds_for_camera_unwrapped(
+            NativeMethods.mln_map_lat_lng_bounds_for_camera_start(Handle, &nativeCamera, &operation)
+        );
+        return TakeBoundsAsync(
+            operation,
+            NativeMethods.mln_map_lat_lng_bounds_for_camera_take_result,
+            cancellationToken
+        );
+    }
+
+    public Task<LatLngBounds> LatLngBoundsForCameraUnwrappedAsync(
+        CameraOptions camera,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var nativeCamera = MapStructs.ToNative(camera);
+        MlnOperation operation = default;
+        NativeStatus.Check(
+            NativeMethods.mln_map_lat_lng_bounds_for_camera_unwrapped_start(
                 Handle,
                 &nativeCamera,
-                &bounds
+                &operation
             )
         );
-        return MapStructs.FromNative(bounds);
+        return TakeBoundsAsync(
+            operation,
+            NativeMethods.mln_map_lat_lng_bounds_for_camera_unwrapped_take_result,
+            cancellationToken
+        );
     }
 
-    /// <summary>Gets map bounds constraints.</summary>
-    public BoundOptions GetBounds()
-    {
-        var options = NativeMethods.mln_bound_options_default();
-        NativeStatus.Check(NativeMethods.mln_map_get_bounds(Handle, &options));
-        return MapStructs.BoundOptionsFromNative(options);
-    }
+    /// <summary>Gets map bounds constraints in runtime order.</summary>
+    public Task<BoundOptions> GetBoundsAsync(CancellationToken cancellationToken = default) =>
+        RunMapOperationAsync(
+            operation => NativeMethods.mln_map_get_bounds_start(Handle, operation),
+            operation =>
+            {
+                var options = NativeMethods.mln_bound_options_default();
+                NativeStatus.Check(
+                    NativeMethods.mln_map_get_bounds_take_result(operation, &options)
+                );
+                return MapStructs.BoundOptionsFromNative(options);
+            },
+            cancellationToken
+        );
 
-    /// <summary>Sets map bounds constraints, applying only non-null descriptor fields.</summary>
-    public void SetBounds(BoundOptions options)
+    /// <summary>Sets map bounds constraints and returns its command ID.</summary>
+    public ulong SetBounds(BoundOptions options)
     {
         var nativeOptions = MapStructs.ToNative(options);
-        NativeStatus.Check(NativeMethods.mln_map_set_bounds(Handle, &nativeOptions));
+        ulong commandId = 0;
+        NativeStatus.Check(NativeMethods.mln_map_set_bounds(Handle, &nativeOptions, &commandId));
+        return commandId;
     }
 
-    /// <summary>Gets free-camera options.</summary>
-    public FreeCameraOptions GetFreeCameraOptions()
-    {
-        var options = NativeMethods.mln_free_camera_options_default();
-        NativeStatus.Check(NativeMethods.mln_map_get_free_camera_options(Handle, &options));
-        return MapStructs.FreeCameraOptionsFromNative(options);
-    }
+    /// <summary>Gets free-camera options in runtime order.</summary>
+    public Task<FreeCameraOptions> GetFreeCameraOptionsAsync(
+        CancellationToken cancellationToken = default
+    ) =>
+        RunMapOperationAsync(
+            operation => NativeMethods.mln_map_get_free_camera_options_start(Handle, operation),
+            operation =>
+            {
+                var options = NativeMethods.mln_free_camera_options_default();
+                NativeStatus.Check(
+                    NativeMethods.mln_map_get_free_camera_options_take_result(operation, &options)
+                );
+                return MapStructs.FreeCameraOptionsFromNative(options);
+            },
+            cancellationToken
+        );
 
-    /// <summary>Sets free-camera options, applying only non-null descriptor fields.</summary>
-    public void SetFreeCameraOptions(FreeCameraOptions options)
+    /// <summary>Sets free-camera options and returns its command ID.</summary>
+    public ulong SetFreeCameraOptions(FreeCameraOptions options)
     {
         var nativeOptions = MapStructs.ToNative(options);
-        NativeStatus.Check(NativeMethods.mln_map_set_free_camera_options(Handle, &nativeOptions));
-    }
-
-    /// <summary>Converts a geographic coordinate to a screen pixel using the current map projection.</summary>
-    public ScreenPoint PixelForLatLng(LatLng coordinate)
-    {
-        var nativeCoordinate = CoreStructs.ToNative(coordinate);
-        mln_screen_point point = default;
+        ulong commandId = 0;
         NativeStatus.Check(
-            NativeMethods.mln_map_pixel_for_lat_lng(Handle, nativeCoordinate, &point)
+            NativeMethods.mln_map_set_free_camera_options(Handle, &nativeOptions, &commandId)
         );
-        return MapStructs.FromNative(point);
+        return commandId;
     }
 
-    /// <summary>Converts a screen pixel to a geographic coordinate using the current map projection.</summary>
-    public LatLng LatLngForPixel(ScreenPoint point)
+    public Task<ScreenPoint> PixelForLatLngAsync(
+        LatLng coordinate,
+        CancellationToken cancellationToken = default
+    )
     {
-        var nativePoint = MapStructs.ToNative(point);
-        mln_lat_lng coordinate = default;
+        MlnOperation operation = default;
         NativeStatus.Check(
-            NativeMethods.mln_map_lat_lng_for_pixel(Handle, nativePoint, &coordinate)
+            NativeMethods.mln_map_pixel_for_lat_lng_start(
+                Handle,
+                CoreStructs.ToNative(coordinate),
+                &operation
+            )
         );
-        return CoreStructs.FromNative(coordinate);
+        return TakePointAsync(operation, cancellationToken);
     }
 
-    /// <summary>Converts geographic coordinates to screen pixels using the current map projection.</summary>
-    public ScreenPoint[] PixelsForLatLngs(IReadOnlyList<LatLng> coordinates)
+    public Task<LatLng> LatLngForPixelAsync(
+        ScreenPoint point,
+        CancellationToken cancellationToken = default
+    )
+    {
+        MlnOperation operation = default;
+        NativeStatus.Check(
+            NativeMethods.mln_map_lat_lng_for_pixel_start(
+                Handle,
+                MapStructs.ToNative(point),
+                &operation
+            )
+        );
+        return TakeCoordinateAsync(operation, cancellationToken);
+    }
+
+    public Task<ScreenPoint[]> PixelsForLatLngsAsync(
+        IReadOnlyList<LatLng> coordinates,
+        CancellationToken cancellationToken = default
+    )
     {
         ArgumentNullException.ThrowIfNull(coordinates);
-        if (coordinates.Count == 0)
-        {
-            return [];
-        }
-
-        var nativeCoordinates = new mln_lat_lng[coordinates.Count];
-        var points = new mln_screen_point[coordinates.Count];
-        for (var index = 0; index < coordinates.Count; index++)
-        {
-            nativeCoordinates[index] = CoreStructs.ToNative(coordinates[index]);
-        }
-
-        fixed (mln_lat_lng* coordinatesPointer = nativeCoordinates)
-        fixed (mln_screen_point* pointsPointer = points)
+        var native = coordinates.Select(value => CoreStructs.ToNative(value)).ToArray();
+        MlnOperation operation = default;
+        fixed (mln_lat_lng* pointer = native)
         {
             NativeStatus.Check(
-                NativeMethods.mln_map_pixels_for_lat_lngs(
+                NativeMethods.mln_map_pixels_for_lat_lngs_start(
                     Handle,
-                    coordinatesPointer,
-                    (nuint)nativeCoordinates.Length,
-                    pointsPointer
+                    native.Length == 0 ? null : pointer,
+                    (nuint)native.Length,
+                    &operation
                 )
             );
         }
-
-        var result = new ScreenPoint[points.Length];
-        for (var index = 0; index < result.Length; index++)
-        {
-            result[index] = MapStructs.FromNative(points[index]);
-        }
-        return result;
+        return TakePointsAsync(operation, native.Length, cancellationToken);
     }
 
-    /// <summary>Converts screen pixels to geographic coordinates using the current map projection.</summary>
-    public LatLng[] LatLngsForPixels(IReadOnlyList<ScreenPoint> points)
+    public Task<LatLng[]> LatLngsForPixelsAsync(
+        IReadOnlyList<ScreenPoint> points,
+        CancellationToken cancellationToken = default
+    )
     {
         ArgumentNullException.ThrowIfNull(points);
-        if (points.Count == 0)
-        {
-            return [];
-        }
-
-        var nativePoints = new mln_screen_point[points.Count];
-        var coordinates = new mln_lat_lng[points.Count];
-        for (var index = 0; index < points.Count; index++)
-        {
-            nativePoints[index] = MapStructs.ToNative(points[index]);
-        }
-
-        fixed (mln_screen_point* pointsPointer = nativePoints)
-        fixed (mln_lat_lng* coordinatesPointer = coordinates)
+        var native = points.Select(value => MapStructs.ToNative(value)).ToArray();
+        MlnOperation operation = default;
+        fixed (mln_screen_point* pointer = native)
         {
             NativeStatus.Check(
-                NativeMethods.mln_map_lat_lngs_for_pixels(
+                NativeMethods.mln_map_lat_lngs_for_pixels_start(
                     Handle,
-                    pointsPointer,
-                    (nuint)nativePoints.Length,
-                    coordinatesPointer
+                    native.Length == 0 ? null : pointer,
+                    (nuint)native.Length,
+                    &operation
                 )
             );
         }
-
-        var result = new LatLng[coordinates.Length];
-        for (var index = 0; index < result.Length; index++)
-        {
-            result[index] = CoreStructs.FromNative(coordinates[index]);
-        }
-        return result;
+        return TakeCoordinatesAsync(operation, native.Length, cancellationToken);
     }
 
-    /// <summary>Creates a standalone projection snapshot from the map's current camera state.</summary>
-    public MapProjectionHandle CreateProjection()
-    {
-        return MapProjectionHandle.Create(this);
-    }
+    /// <summary>Creates a standalone projection in runtime order.</summary>
+    public Task<MapProjectionHandle> CreateProjectionAsync(
+        CancellationToken cancellationToken = default
+    ) => MapProjectionHandle.CreateAsync(this, cancellationToken);
 
-    /// <summary>Gets projection mode options.</summary>
-    public ProjectionModeOptions GetProjectionMode()
-    {
-        var mode = NativeMethods.mln_projection_mode_default();
-        NativeStatus.Check(NativeMethods.mln_map_get_projection_mode(Handle, &mode));
-        return MapStructs.ProjectionModeOptionsFromNative(mode);
-    }
-
-    /// <summary>Sets projection mode options, applying only non-null descriptor fields.</summary>
-    public void SetProjectionMode(ProjectionModeOptions mode)
+    /// <summary>Sets projection mode options and returns its command ID.</summary>
+    public ulong SetProjectionMode(ProjectionModeOptions mode)
     {
         var nativeMode = MapStructs.ToNative(mode);
-        NativeStatus.Check(NativeMethods.mln_map_set_projection_mode(Handle, &nativeMode));
+        ulong commandId = 0;
+        NativeStatus.Check(
+            NativeMethods.mln_map_set_projection_mode(Handle, &nativeMode, &commandId)
+        );
+        return commandId;
     }
 
-    /// <summary>Loads a style URL through MapLibre Native style APIs.</summary>
-    /// <remarks>
-    /// Loading is asynchronous: a style that is missing, unreachable, or malformed
-    /// returns normally here and reports through a
-    /// <see cref="RuntimeEventType.MapLoadingFailed" /> runtime event. A style
-    /// MapLibre rejects semantically produces neither an exception nor an event.
-    /// </remarks>
-    public void SetStyleUrl(string url)
+    /// <summary>Loads a style URL and returns its command ID.</summary>
+    public ulong SetStyleUrl(string url)
     {
         ArgumentNullException.ThrowIfNull(url);
         using var nativeUrl = NativeUtf8String.FromNullableString(url, nameof(url));
-        NativeStatus.Check(NativeMethods.mln_map_set_style_url(Handle, nativeUrl.Pointer));
+        ulong commandId = 0;
+        NativeStatus.Check(
+            NativeMethods.mln_map_set_style_url(Handle, nativeUrl.Pointer, &commandId)
+        );
+        return commandId;
     }
 
-    /// <summary>Loads inline style JSON through MapLibre Native style APIs.</summary>
-    /// <remarks>
-    /// Malformed JSON is reported twice: this call throws the parse error, and the
-    /// same message also arrives as a
-    /// <see cref="RuntimeEventType.MapLoadingFailed" /> runtime event. A style
-    /// MapLibre rejects semantically produces neither an exception nor an event.
-    /// </remarks>
-    public void SetStyleJson(byte[] json)
+    /// <summary>Loads inline style JSON and returns its command ID.</summary>
+    public ulong SetStyleJson(byte[] json)
     {
         ArgumentNullException.ThrowIfNull(json);
         using var nativeJson = NativeStringView.From(json, nameof(json));
-        NativeStatus.Check(NativeMethods.mln_map_set_style_json(Handle, nativeJson.Value));
+        ulong commandId = 0;
+        NativeStatus.Check(
+            NativeMethods.mln_map_set_style_json(Handle, nativeJson.Value, &commandId)
+        );
+        return commandId;
     }
 
-    /// <summary>Gets the style document this map's style was last parsed from.</summary>
-    /// <remarks>
-    /// This is the loaded document, not a serialization of the live style: runtime
-    /// mutations do not change it, and a failed parse leaves the previously parsed
-    /// document in place. The result is empty when no document has been parsed.
-    /// </remarks>
-    public byte[] GetLoadedStyleJson() =>
-        CopyMapBytes(
-            (map, text, capacity, size) =>
-                NativeMethods.mln_map_copy_loaded_style_json(map, text, capacity, size)
+    /// <summary>Gets the style document that this map's style was last parsed from.</summary>
+    public Task<byte[]> GetLoadedStyleJsonAsync(CancellationToken cancellationToken = default) =>
+        RunMapOperationAsync(
+            operation => NativeMethods.mln_map_loaded_style_json_start(Handle, operation),
+            operation =>
+            {
+                MlnBuffer buffer = default;
+                NativeStatus.Check(
+                    NativeMethods.mln_map_loaded_style_json_take_result(operation, &buffer)
+                );
+                return ValueStructs.ReadBuffer(buffer);
+            },
+            cancellationToken
         );
 
-    /// <summary>Gets the URL this map's style was last requested from.</summary>
-    /// <remarks>
-    /// <see cref="SetStyleUrl" /> records the URL when the request is made, before
-    /// the response arrives, and <see cref="SetStyleJson" /> clears it, so this can
-    /// disagree with <see cref="GetLoadedStyleJson" />. The result is empty for
-    /// inline JSON, for a map with no style, and for an empty URL alike.
-    /// </remarks>
-    public string GetStyleUrl() =>
-        CopyMapText(
-            (map, text, capacity, size) =>
-                NativeMethods.mln_map_copy_style_url(map, text, capacity, size)
+    /// <summary>Gets the URL that this map's style was last requested from.</summary>
+    public Task<string> GetStyleUrlAsync(CancellationToken cancellationToken = default) =>
+        RunMapOperationAsync(
+            operation => NativeMethods.mln_map_style_url_start(Handle, operation),
+            operation =>
+            {
+                MlnBuffer buffer = default;
+                NativeStatus.Check(NativeMethods.mln_map_style_url_take_result(operation, &buffer));
+                return System.Text.Encoding.UTF8.GetString(ValueStructs.ReadBuffer(buffer));
+            },
+            cancellationToken
         );
 
     /// <summary>Selects which map-originated event types this map queues.</summary>
-    /// <remarks>
-    /// The mask reads the bits in <see cref="RuntimeEventMask.AllMapEvents" /> and ignores the rest,
-    /// so <see cref="RuntimeEventMask.All" /> selects every map-originated type. An event type this
-    /// mask clears is never queued, so it neither reaches a batch nor wakes a parked
-    /// <see cref="RuntimeHandle.Pump" />. Select every event type the host reads, because
-    /// <see cref="RuntimeEventType.MapRenderUpdateAvailable" />, the two still-image types, and
-    /// <see cref="RuntimeEventType.MapCameraTransitionFinished" /> carry state a host reaches no
-    /// other way. Narrowing gates later events and keeps queued ones, so a host drains what it
-    /// already caused.
-    /// </remarks>
-    public void SetEventMask(RuntimeEventMask mask)
+    public ulong SetEventMask(RuntimeEventMask mask)
     {
-        NativeStatus.Check(NativeMethods.mln_map_set_event_mask(Handle, (ulong)mask));
+        ulong commandId = 0;
+        NativeStatus.Check(NativeMethods.mln_map_set_event_mask(Handle, (ulong)mask, &commandId));
+        return commandId;
     }
 
-    /// <summary>Reports which map-originated event types this map queues.</summary>
-    /// <remarks>
-    /// The value is the mask last set, including bits outside
-    /// <see cref="RuntimeEventMask.AllMapEvents" /> that this map ignores. A map created with the
-    /// default <see cref="MapOptions.EventMask" /> reports every event type this library selects
-    /// by default, including any this binding does not declare.
-    /// </remarks>
-    public RuntimeEventMask GetEventMask()
-    {
-        ulong mask = 0;
-        NativeStatus.Check(NativeMethods.mln_map_get_event_mask(Handle, &mask));
-        return (RuntimeEventMask)mask;
-    }
+    /// <summary>Reports the event mask in the latest committed map snapshot.</summary>
+    public RuntimeEventMask GetEventMask() => GetSnapshot().EventMask;
 
-    /// <summary>Adds a style source from UTF-8 JSON bytes.</summary>
-    public void AddStyleSourceJson(string sourceId, byte[] sourceJson)
+    /// <summary>Adds a style source and returns its command ID.</summary>
+    public ulong AddStyleSourceJson(string sourceId, byte[] sourceJson)
     {
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeJson = NativeStringView.From(sourceJson, nameof(sourceJson));
+        ulong commandId = 0;
         NativeStatus.Check(
             NativeMethods.mln_map_add_style_source_json(
                 Handle,
                 nativeSourceId.Value,
-                nativeJson.Value
+                nativeJson.Value,
+                &commandId
             )
         );
+        return commandId;
     }
 
     /// <summary>Removes a style source and reports whether it existed.</summary>
-    public bool RemoveStyleSource(string sourceId)
+    public Task<bool> RemoveStyleSourceAsync(
+        string sourceId,
+        CancellationToken cancellationToken = default
+    )
     {
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
-        bool removed = false;
-        NativeStatus.Check(
-            NativeMethods.mln_map_remove_style_source(Handle, nativeSourceId.Value, &removed)
+        return RunMapOperationAsync(
+            operation =>
+                NativeMethods.mln_map_remove_style_source_start(
+                    Handle,
+                    nativeSourceId.Value,
+                    operation
+                ),
+            operation =>
+            {
+                bool removed = false;
+                NativeStatus.Check(
+                    NativeMethods.mln_map_remove_style_source_take_result(operation, &removed)
+                );
+                return removed;
+            },
+            cancellationToken
         );
-        return removed;
     }
 
-    /// <summary>Whether a style source exists.</summary>
-    public bool StyleSourceExists(string sourceId)
+    /// <summary>Reports whether a style source exists.</summary>
+    public Task<bool> StyleSourceExistsAsync(
+        string sourceId,
+        CancellationToken cancellationToken = default
+    )
     {
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
-        bool exists = false;
-        NativeStatus.Check(
-            NativeMethods.mln_map_style_source_exists(Handle, nativeSourceId.Value, &exists)
+        return RunMapOperationAsync(
+            operation =>
+                NativeMethods.mln_map_style_source_exists_start(
+                    Handle,
+                    nativeSourceId.Value,
+                    operation
+                ),
+            operation =>
+            {
+                bool exists = false;
+                NativeStatus.Check(
+                    NativeMethods.mln_map_style_source_exists_take_result(operation, &exists)
+                );
+                return exists;
+            },
+            cancellationToken
         );
-        return exists;
     }
 
     /// <summary>Gets a style source type when the source exists.</summary>
-    public SourceType? StyleSourceType(string sourceId)
+    public Task<SourceType?> StyleSourceTypeAsync(
+        string sourceId,
+        CancellationToken cancellationToken = default
+    )
     {
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
-        uint sourceType = 0;
-        bool found = false;
-        NativeStatus.Check(
-            NativeMethods.mln_map_get_style_source_type(
-                Handle,
-                nativeSourceId.Value,
-                &sourceType,
-                &found
-            )
-        );
-        return found ? (SourceType)sourceType : null;
-    }
-
-    /// <summary>Gets copied style source metadata when the source exists.</summary>
-    public SourceInfo? StyleSourceInfo(string sourceId)
-    {
-        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
-        var info = new mln_style_source_info { size = (uint)sizeof(mln_style_source_info) };
-        bool found = false;
-        NativeStatus.Check(
-            NativeMethods.mln_map_get_style_source_info(Handle, nativeSourceId.Value, &info, &found)
-        );
-        if (!found)
-        {
-            return null;
-        }
-
-        string? attribution = null;
-        if (info.has_attribution != 0)
-        {
-            attribution = string.Empty;
-            if (info.attribution_size > 0)
-            {
-                var buffer = new byte[checked((int)info.attribution_size)];
-                nuint attributionSize = 0;
-                bool attributionFound = false;
-                fixed (byte* bufferPointer = buffer)
-                {
-                    NativeStatus.Check(
-                        NativeMethods.mln_map_copy_style_source_attribution(
-                            Handle,
-                            nativeSourceId.Value,
-                            (sbyte*)bufferPointer,
-                            (nuint)buffer.Length,
-                            &attributionSize,
-                            &attributionFound
-                        )
-                    );
-                }
-
-                if (!attributionFound)
-                {
-                    return null;
-                }
-
-                if (attributionSize > (nuint)buffer.Length)
-                {
-                    throw new InvalidOperationException(
-                        $"Native style source attribution size {attributionSize} exceeds buffer length {buffer.Length}."
-                    );
-                }
-
-                fixed (byte* bufferPointer = buffer)
-                {
-                    attribution = RuntimeStructs.CopyUtf8((sbyte*)bufferPointer, attributionSize);
-                }
-            }
-        }
-
-        var fields = (mln_style_source_info_field)info.fields;
-        string? url = null;
-        if (fields.HasFlag(mln_style_source_info_field.MLN_STYLE_SOURCE_INFO_URL))
-        {
-            url = string.Empty;
-            if (info.url_size > 0)
-            {
-                var buffer = new byte[checked((int)info.url_size)];
-                nuint urlSize = 0;
-                bool urlFound = false;
-                fixed (byte* bufferPointer = buffer)
-                {
-                    NativeStatus.Check(
-                        NativeMethods.mln_map_copy_style_source_url(
-                            Handle,
-                            nativeSourceId.Value,
-                            (sbyte*)bufferPointer,
-                            (nuint)buffer.Length,
-                            &urlSize,
-                            &urlFound
-                        )
-                    );
-                }
-
-                if (!urlFound)
-                {
-                    return null;
-                }
-
-                if (urlSize > (nuint)buffer.Length)
-                {
-                    throw new InvalidOperationException(
-                        $"Native style source URL size {urlSize} exceeds buffer length {buffer.Length}."
-                    );
-                }
-
-                fixed (byte* bufferPointer = buffer)
-                {
-                    url = RuntimeStructs.CopyUtf8((sbyte*)bufferPointer, urlSize);
-                }
-            }
-        }
-
-        TileJson? tileJson = null;
-        if (fields.HasFlag(mln_style_source_info_field.MLN_STYLE_SOURCE_INFO_TILEJSON))
-        {
-            MlnStyleStringList tileUrlList = default;
-            bool tileUrlsFound = false;
-            NativeStatus.Check(
-                NativeMethods.mln_map_get_style_source_tile_urls(
+        return RunMapOperationAsync(
+            operation =>
+                NativeMethods.mln_map_get_style_source_type_start(
                     Handle,
                     nativeSourceId.Value,
-                    &tileUrlList,
-                    &tileUrlsFound
-                )
-            );
-            if (!tileUrlsFound)
+                    operation
+                ),
+            operation =>
             {
-                return null;
-            }
+                uint sourceType = 0;
+                bool found = false;
+                NativeStatus.Check(
+                    NativeMethods.mln_map_get_style_source_type_take_result(
+                        operation,
+                        &sourceType,
+                        &found
+                    )
+                );
+                return found ? (SourceType?)sourceType : null;
+            },
+            cancellationToken
+        );
+    }
 
-            var tileUrls = CopyStyleStringList(tileUrlList);
-            tileJson = new TileJson(
-                tileUrls,
-                info.min_zoom,
-                info.max_zoom,
-                (TileScheme)info.scheme,
-                info.scheme,
-                fields.HasFlag(mln_style_source_info_field.MLN_STYLE_SOURCE_INFO_BOUNDS)
-                    ? MapStructs.FromNative(info.bounds)
-                    : null
-            );
-        }
+    internal Task<(mln_style_source_info Info, bool Found)> QueryStyleSourceInfoAsync(
+        string sourceId,
+        CancellationToken cancellationToken
+    )
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        return RunMapOperationAsync(
+            operation =>
+                NativeMethods.mln_map_get_style_source_info_start(
+                    Handle,
+                    nativeSourceId.Value,
+                    operation
+                ),
+            operation =>
+            {
+                var info = new mln_style_source_info { size = (uint)sizeof(mln_style_source_info) };
+                bool found = false;
+                NativeStatus.Check(
+                    NativeMethods.mln_map_get_style_source_info_take_result(
+                        operation,
+                        &info,
+                        &found
+                    )
+                );
+                return (info, found);
+            },
+            cancellationToken
+        );
+    }
 
-        return new SourceInfo(
-            sourceId,
-            (SourceType)info.type,
-            info.type,
-            info.is_volatile != 0,
-            attribution,
-            url,
-            tileJson,
-            fields.HasFlag(mln_style_source_info_field.MLN_STYLE_SOURCE_INFO_TILE_SIZE)
-                ? info.tile_size
-                : null,
-            fields.HasFlag(mln_style_source_info_field.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING)
-                ? (VectorTileEncoding)info.vector_encoding
-                : null,
-            fields.HasFlag(mln_style_source_info_field.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING)
-                ? info.vector_encoding
-                : null,
-            fields.HasFlag(mln_style_source_info_field.MLN_STYLE_SOURCE_INFO_RASTER_ENCODING)
-                ? (RasterDemEncoding)info.raster_encoding
-                : null,
-            fields.HasFlag(mln_style_source_info_field.MLN_STYLE_SOURCE_INFO_RASTER_ENCODING)
-                ? info.raster_encoding
-                : null
+    internal Task<string?> CopyStyleSourceStringAsync(
+        string sourceId,
+        bool attribution,
+        CancellationToken cancellationToken
+    )
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        return CopyStyleSourceStringAsync(nativeSourceId.Value, attribution, cancellationToken);
+    }
+
+    internal Task<string[]?> CopyStyleSourceTileUrlsAsync(
+        string sourceId,
+        CancellationToken cancellationToken
+    )
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        return RunMapOperationAsync(
+            operation =>
+                NativeMethods.mln_map_get_style_source_tile_urls_start(
+                    Handle,
+                    nativeSourceId.Value,
+                    operation
+                ),
+            operation =>
+            {
+                MlnStyleStringList list = default;
+                bool found = false;
+                NativeStatus.Check(
+                    NativeMethods.mln_map_get_style_source_tile_urls_take_result(
+                        operation,
+                        &list,
+                        &found
+                    )
+                );
+                return found ? CopyStyleStringList(list) : null;
+            },
+            cancellationToken
         );
     }
 
     /// <summary>Lists style source IDs in style order.</summary>
-    public string[] StyleSourceIds()
-    {
-        MlnStyleIdList list = default;
-        NativeStatus.Check(NativeMethods.mln_map_list_style_source_ids(Handle, &list));
-        return CopyStyleIdList(list);
-    }
+    public Task<string[]> StyleSourceIdsAsync(CancellationToken cancellationToken = default) =>
+        RunMapOperationAsync(
+            operation => NativeMethods.mln_map_list_style_source_ids_start(Handle, operation),
+            operation =>
+            {
+                MlnStyleIdList list = default;
+                NativeStatus.Check(
+                    NativeMethods.mln_map_list_style_source_ids_take_result(operation, &list)
+                );
+                return CopyStyleIdList(list);
+            },
+            cancellationToken
+        );
 
     /// <summary>Adds a GeoJSON source that loads data from a URL.</summary>
     /// <remarks>
     /// <paramref name="options" /> is fixed when the source is created;
     /// <see cref="SetGeoJsonSourceUrl" /> and <see cref="SetGeoJsonSourceData" /> keep it.
     /// </remarks>
-    public void AddGeoJsonSourceUrl(string sourceId, string url, GeoJsonSourceOptions? options)
+    public ulong AddGeoJsonSourceUrl(string sourceId, string url, GeoJsonSourceOptions? options)
     {
+        ulong commandId = 0;
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeUrl = NativeStringView.From(url, nameof(url));
         using var nativeOptions = options is null ? null : NativeGeoJsonSourceOptions.From(options);
@@ -905,23 +867,28 @@ public sealed unsafe class MapHandle : IDisposable
                 Handle,
                 nativeSourceId.Value,
                 nativeUrl.Value,
-                nativeOptions is null ? null : &optionsValue
+                nativeOptions is null ? null : &optionsValue,
+                &commandId
             )
         );
+        return commandId;
     }
 
     /// <summary>Updates a GeoJSON source to load data from a URL.</summary>
-    public void SetGeoJsonSourceUrl(string sourceId, string url)
+    public ulong SetGeoJsonSourceUrl(string sourceId, string url)
     {
+        ulong commandId = 0;
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeUrl = NativeStringView.From(url, nameof(url));
         NativeStatus.Check(
             NativeMethods.mln_map_set_geojson_source_url(
                 Handle,
                 nativeSourceId.Value,
-                nativeUrl.Value
+                nativeUrl.Value,
+                &commandId
             )
         );
+        return commandId;
     }
 
     /// <summary>Adds a GeoJSON source with inline data.</summary>
@@ -929,8 +896,9 @@ public sealed unsafe class MapHandle : IDisposable
     /// <paramref name="options" /> is fixed when the source is created;
     /// <see cref="SetGeoJsonSourceUrl" /> and <see cref="SetGeoJsonSourceData" /> keep it.
     /// </remarks>
-    public void AddGeoJsonSourceData(string sourceId, byte[] data, GeoJsonSourceOptions? options)
+    public ulong AddGeoJsonSourceData(string sourceId, byte[] data, GeoJsonSourceOptions? options)
     {
+        ulong commandId = 0;
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeData = NativeStringView.From(data, nameof(data));
         using var nativeOptions = options is null ? null : NativeGeoJsonSourceOptions.From(options);
@@ -940,23 +908,28 @@ public sealed unsafe class MapHandle : IDisposable
                 Handle,
                 nativeSourceId.Value,
                 nativeData.Value,
-                nativeOptions is null ? null : &optionsValue
+                nativeOptions is null ? null : &optionsValue,
+                &commandId
             )
         );
+        return commandId;
     }
 
     /// <summary>Updates a GeoJSON source with inline data.</summary>
-    public void SetGeoJsonSourceData(string sourceId, byte[] data)
+    public ulong SetGeoJsonSourceData(string sourceId, byte[] data)
     {
+        ulong commandId = 0;
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeData = NativeStringView.From(data, nameof(data));
         NativeStatus.Check(
             NativeMethods.mln_map_set_geojson_source_data(
                 Handle,
                 nativeSourceId.Value,
-                nativeData.Value
+                nativeData.Value,
+                &commandId
             )
         );
+        return commandId;
     }
 
     /// <summary>Adds a custom geometry source with tile callbacks.</summary>
@@ -966,37 +939,39 @@ public sealed unsafe class MapHandle : IDisposable
     /// binding releases them from the callback the C API invokes then, so nothing here depends on
     /// the events <see cref="SetEventMask" /> selects.
     /// </remarks>
-    public void AddCustomGeometrySource(string sourceId, CustomGeometrySourceOptions options)
+    public ulong AddCustomGeometrySource(string sourceId, CustomGeometrySourceOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
-        AddCustomGeometrySource(sourceId, new CustomGeometrySourceState(options));
+        return AddCustomGeometrySource(sourceId, new CustomGeometrySourceState(options));
     }
 
-    internal void AddCustomGeometrySource(string sourceId, CustomGeometrySourceState sourceState)
+    internal ulong AddCustomGeometrySource(string sourceId, CustomGeometrySourceState sourceState)
     {
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         try
         {
             var descriptor = sourceState.Descriptor;
+            ulong commandId = 0;
             NativeStatus.Check(
-                AddCustomGeometrySourceNative(Handle, nativeSourceId.Value, &descriptor)
+                AddCustomGeometrySourceNative(Handle, nativeSourceId.Value, &descriptor, &commandId)
             );
+            return commandId;
         }
         catch
         {
-            // A rejected add never referenced the state, so no release callback is owed for it.
             sourceState.Dispose();
             throw;
         }
     }
 
     /// <summary>Sets custom geometry source tile data.</summary>
-    public void SetCustomGeometrySourceTileData(
+    public ulong SetCustomGeometrySourceTileData(
         string sourceId,
         CanonicalTileId tileId,
         byte[] data
     )
     {
+        ulong commandId = 0;
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeData = NativeStringView.From(data, nameof(data));
         var nativeTileId = StyleStructs.ToNative(tileId);
@@ -1005,40 +980,49 @@ public sealed unsafe class MapHandle : IDisposable
                 Handle,
                 nativeSourceId.Value,
                 nativeTileId,
-                nativeData.Value
+                nativeData.Value,
+                &commandId
             )
         );
+        return commandId;
     }
 
     /// <summary>Invalidates one custom geometry source tile.</summary>
-    public void InvalidateCustomGeometrySourceTile(string sourceId, CanonicalTileId tileId)
+    public ulong InvalidateCustomGeometrySourceTile(string sourceId, CanonicalTileId tileId)
     {
+        ulong commandId = 0;
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         NativeStatus.Check(
             NativeMethods.mln_map_invalidate_custom_geometry_source_tile(
                 Handle,
                 nativeSourceId.Value,
-                StyleStructs.ToNative(tileId)
+                StyleStructs.ToNative(tileId),
+                &commandId
             )
         );
+        return commandId;
     }
 
     /// <summary>Invalidates custom geometry source tiles that intersect bounds.</summary>
-    public void InvalidateCustomGeometrySourceRegion(string sourceId, LatLngBounds bounds)
+    public ulong InvalidateCustomGeometrySourceRegion(string sourceId, LatLngBounds bounds)
     {
+        ulong commandId = 0;
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         NativeStatus.Check(
             NativeMethods.mln_map_invalidate_custom_geometry_source_region(
                 Handle,
                 nativeSourceId.Value,
-                MapStructs.ToNative(bounds)
+                MapStructs.ToNative(bounds),
+                &commandId
             )
         );
+        return commandId;
     }
 
     /// <summary>Adds a vector source that loads TileJSON from a URL.</summary>
-    public void AddVectorSourceUrl(string sourceId, string url, TileSourceOptions? options)
+    public ulong AddVectorSourceUrl(string sourceId, string url, TileSourceOptions? options)
     {
+        ulong commandId = 0;
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeUrl = NativeStringView.From(url, nameof(url));
         using var nativeOptions = options is null ? null : NativeTileSourceOptions.From(options);
@@ -1048,18 +1032,21 @@ public sealed unsafe class MapHandle : IDisposable
                 Handle,
                 nativeSourceId.Value,
                 nativeUrl.Value,
-                nativeOptions is null ? null : &optionsValue
+                nativeOptions is null ? null : &optionsValue,
+                &commandId
             )
         );
+        return commandId;
     }
 
     /// <summary>Adds a vector source from inline tile URL templates.</summary>
-    public void AddVectorSourceTiles(
+    public ulong AddVectorSourceTiles(
         string sourceId,
         IReadOnlyList<string> tiles,
         TileSourceOptions? options
     )
     {
+        ulong commandId = 0;
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeTiles = NativeStringViewArray.From(tiles, nameof(tiles));
         using var nativeOptions = options is null ? null : NativeTileSourceOptions.From(options);
@@ -1070,14 +1057,17 @@ public sealed unsafe class MapHandle : IDisposable
                 nativeSourceId.Value,
                 nativeTiles.Count == 0 ? null : nativeTiles.Pointer,
                 nativeTiles.Count,
-                nativeOptions is null ? null : &optionsValue
+                nativeOptions is null ? null : &optionsValue,
+                &commandId
             )
         );
+        return commandId;
     }
 
     /// <summary>Adds a raster source that loads TileJSON from a URL.</summary>
-    public void AddRasterSourceUrl(string sourceId, string url, TileSourceOptions? options)
+    public ulong AddRasterSourceUrl(string sourceId, string url, TileSourceOptions? options)
     {
+        ulong commandId = 0;
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeUrl = NativeStringView.From(url, nameof(url));
         using var nativeOptions = options is null ? null : NativeTileSourceOptions.From(options);
@@ -1087,18 +1077,21 @@ public sealed unsafe class MapHandle : IDisposable
                 Handle,
                 nativeSourceId.Value,
                 nativeUrl.Value,
-                nativeOptions is null ? null : &optionsValue
+                nativeOptions is null ? null : &optionsValue,
+                &commandId
             )
         );
+        return commandId;
     }
 
     /// <summary>Adds a raster source from inline tile URL templates.</summary>
-    public void AddRasterSourceTiles(
+    public ulong AddRasterSourceTiles(
         string sourceId,
         IReadOnlyList<string> tiles,
         TileSourceOptions? options
     )
     {
+        ulong commandId = 0;
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeTiles = NativeStringViewArray.From(tiles, nameof(tiles));
         using var nativeOptions = options is null ? null : NativeTileSourceOptions.From(options);
@@ -1109,14 +1102,17 @@ public sealed unsafe class MapHandle : IDisposable
                 nativeSourceId.Value,
                 nativeTiles.Count == 0 ? null : nativeTiles.Pointer,
                 nativeTiles.Count,
-                nativeOptions is null ? null : &optionsValue
+                nativeOptions is null ? null : &optionsValue,
+                &commandId
             )
         );
+        return commandId;
     }
 
     /// <summary>Adds a raster DEM source that loads TileJSON from a URL.</summary>
-    public void AddRasterDemSourceUrl(string sourceId, string url, TileSourceOptions? options)
+    public ulong AddRasterDemSourceUrl(string sourceId, string url, TileSourceOptions? options)
     {
+        ulong commandId = 0;
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeUrl = NativeStringView.From(url, nameof(url));
         using var nativeOptions = options is null ? null : NativeTileSourceOptions.From(options);
@@ -1126,18 +1122,21 @@ public sealed unsafe class MapHandle : IDisposable
                 Handle,
                 nativeSourceId.Value,
                 nativeUrl.Value,
-                nativeOptions is null ? null : &optionsValue
+                nativeOptions is null ? null : &optionsValue,
+                &commandId
             )
         );
+        return commandId;
     }
 
     /// <summary>Adds a raster DEM source from inline tile URL templates.</summary>
-    public void AddRasterDemSourceTiles(
+    public ulong AddRasterDemSourceTiles(
         string sourceId,
         IReadOnlyList<string> tiles,
         TileSourceOptions? options
     )
     {
+        ulong commandId = 0;
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeTiles = NativeStringViewArray.From(tiles, nameof(tiles));
         using var nativeOptions = options is null ? null : NativeTileSourceOptions.From(options);
@@ -1148,18 +1147,21 @@ public sealed unsafe class MapHandle : IDisposable
                 nativeSourceId.Value,
                 nativeTiles.Count == 0 ? null : nativeTiles.Pointer,
                 nativeTiles.Count,
-                nativeOptions is null ? null : &optionsValue
+                nativeOptions is null ? null : &optionsValue,
+                &commandId
             )
         );
+        return commandId;
     }
 
     /// <summary>Sets or replaces a style image.</summary>
-    public void SetStyleImage(
+    public ulong SetStyleImage(
         string imageId,
         PremultipliedRgba8Image image,
         StyleImageOptions? options
     )
     {
+        ulong commandId = 0;
         using var nativeImageId = NativeStringView.From(imageId, nameof(imageId));
         using var nativeImage = NativeStyleImage.From(image);
         var imageValue = nativeImage.Value;
@@ -1170,93 +1172,90 @@ public sealed unsafe class MapHandle : IDisposable
                 Handle,
                 nativeImageId.Value,
                 &imageValue,
-                nativeOptions is null ? null : &optionsValue
+                nativeOptions is null ? null : &optionsValue,
+                &commandId
             )
         );
+        return commandId;
     }
 
     /// <summary>Removes a style image and reports whether it existed.</summary>
-    public bool RemoveStyleImage(string imageId)
+    public Task<bool> RemoveStyleImageAsync(
+        string imageId,
+        CancellationToken cancellationToken = default
+    )
     {
         using var nativeImageId = NativeStringView.From(imageId, nameof(imageId));
-        bool removed = false;
-        NativeStatus.Check(
-            NativeMethods.mln_map_remove_style_image(Handle, nativeImageId.Value, &removed)
+        return RunMapOperationAsync(
+            operation =>
+                NativeMethods.mln_map_remove_style_image_start(
+                    Handle,
+                    nativeImageId.Value,
+                    operation
+                ),
+            operation =>
+            {
+                bool removed = false;
+                NativeStatus.Check(
+                    NativeMethods.mln_map_remove_style_image_take_result(operation, &removed)
+                );
+                return removed;
+            },
+            cancellationToken
         );
-        return removed;
     }
 
-    /// <summary>Whether a style image exists.</summary>
-    public bool StyleImageExists(string imageId)
+    /// <summary>Reports whether a style image exists.</summary>
+    public Task<bool> StyleImageExistsAsync(
+        string imageId,
+        CancellationToken cancellationToken = default
+    )
     {
         using var nativeImageId = NativeStringView.From(imageId, nameof(imageId));
-        bool exists = false;
-        NativeStatus.Check(
-            NativeMethods.mln_map_style_image_exists(Handle, nativeImageId.Value, &exists)
+        return RunMapOperationAsync(
+            operation =>
+                NativeMethods.mln_map_style_image_exists_start(
+                    Handle,
+                    nativeImageId.Value,
+                    operation
+                ),
+            operation =>
+            {
+                bool exists = false;
+                NativeStatus.Check(
+                    NativeMethods.mln_map_style_image_exists_take_result(operation, &exists)
+                );
+                return exists;
+            },
+            cancellationToken
         );
-        return exists;
     }
 
     /// <summary>Gets style image metadata when the image exists.</summary>
-    public StyleImageInfo? StyleImageInfo(string imageId)
+    public Task<StyleImageInfo?> StyleImageInfoAsync(
+        string imageId,
+        CancellationToken cancellationToken = default
+    )
     {
         using var nativeImageId = NativeStringView.From(imageId, nameof(imageId));
-        var info = NativeMethods.mln_style_image_info_default();
-        bool found = false;
-        NativeStatus.Check(
-            NativeMethods.mln_map_get_style_image_info(Handle, nativeImageId.Value, &info, &found)
-        );
-        return found ? StyleStructs.FromNative(info) : null;
-    }
-
-    /// <summary>Copies a style image's stretchable intervals when it exists.</summary>
-    public (
-        IReadOnlyList<ImageStretch> StretchX,
-        IReadOnlyList<ImageStretch> StretchY
-    )? StyleImageStretches(string imageId)
-    {
-        using var nativeImageId = NativeStringView.From(imageId, nameof(imageId));
-        nuint xCount = 0;
-        nuint yCount = 0;
-        bool found = false;
-        NativeStatus.Check(
-            NativeMethods.mln_map_copy_style_image_stretches(
-                Handle,
-                nativeImageId.Value,
-                null,
-                0,
-                &xCount,
-                null,
-                0,
-                &yCount,
-                &found
-            )
-        );
-        if (!found)
-        {
-            return null;
-        }
-
-        var rawX = new mln_image_stretch[checked((int)xCount)];
-        var rawY = new mln_image_stretch[checked((int)yCount)];
-        fixed (mln_image_stretch* pointerX = rawX)
-        fixed (mln_image_stretch* pointerY = rawY)
-        {
-            NativeStatus.Check(
-                NativeMethods.mln_map_copy_style_image_stretches(
+        return RunMapOperationAsync(
+            operation =>
+                NativeMethods.mln_map_get_style_image_info_start(
                     Handle,
                     nativeImageId.Value,
-                    rawX.Length == 0 ? null : pointerX,
-                    (nuint)rawX.Length,
-                    &xCount,
-                    rawY.Length == 0 ? null : pointerY,
-                    (nuint)rawY.Length,
-                    &yCount,
-                    &found
-                )
-            );
-        }
-        return (ToStretches(rawX), ToStretches(rawY));
+                    operation
+                ),
+            operation =>
+            {
+                var info = NativeMethods.mln_style_image_info_default();
+                bool found = false;
+                NativeStatus.Check(
+                    NativeMethods.mln_map_get_style_image_info_take_result(operation, &info, &found)
+                );
+                return found ? StyleStructs.FromNative(info) : null;
+            },
+            cancellationToken
+        );
     }
 
     private static IReadOnlyList<ImageStretch> ToStretches(mln_image_stretch[] raw) =>
@@ -1265,73 +1264,110 @@ public sealed unsafe class MapHandle : IDisposable
     private static IReadOnlyList<ImageStretch>? NullIfEmpty(IReadOnlyList<ImageStretch>? values) =>
         values is null || values.Count == 0 ? null : values;
 
-    /// <summary>Copies a style image as premultiplied RGBA8 pixels when it exists.</summary>
-    public StyleImage? CopyStyleImagePremultipliedRgba8(string imageId)
+    internal Task<(
+        IReadOnlyList<ImageStretch> StretchX,
+        IReadOnlyList<ImageStretch> StretchY
+    )?> TakeStyleImageStretchesAsync(
+        string imageId,
+        StyleImageInfo info,
+        CancellationToken cancellationToken
+    )
     {
-        var info = StyleImageInfo(imageId);
-        if (info is null)
-        {
-            return null;
-        }
-
         using var nativeImageId = NativeStringView.From(imageId, nameof(imageId));
-        var bytes = new byte[checked((int)info.ByteLength)];
-        nuint byteLength = 0;
-        bool found = false;
-        fixed (byte* bytesPointer = bytes)
-        {
-            NativeStatus.Check(
-                NativeMethods.mln_map_copy_style_image_premultiplied_rgba8(
+        var operation = StartMapOperation(outOperation =>
+            NativeMethods.mln_map_copy_style_image_stretches_start(
+                Handle,
+                nativeImageId.Value,
+                outOperation
+            )
+        );
+        return OperationAwaiter.WaitThen(
+            runtime.WaitForOperationAsync(operation, cancellationToken),
+            () =>
+            {
+                RuntimeHandle.CheckOperationCompletion(operation);
+                var rawX = new mln_image_stretch[checked((int)info.StretchXCount)];
+                var rawY = new mln_image_stretch[checked((int)info.StretchYCount)];
+                nuint xCount = 0;
+                nuint yCount = 0;
+                bool found = false;
+                mln_status status;
+                fixed (mln_image_stretch* pointerX = rawX)
+                fixed (mln_image_stretch* pointerY = rawY)
+                {
+                    status = NativeMethods.mln_map_copy_style_image_stretches_take_result(
+                        operation,
+                        rawX.Length == 0 ? null : pointerX,
+                        (nuint)rawX.Length,
+                        &xCount,
+                        rawY.Length == 0 ? null : pointerY,
+                        (nuint)rawY.Length,
+                        &yCount,
+                        &found
+                    );
+                }
+                if (status == mln_status.MLN_STATUS_INVALID_ARGUMENT && found)
+                {
+                    rawX = new mln_image_stretch[checked((int)xCount)];
+                    rawY = new mln_image_stretch[checked((int)yCount)];
+                    fixed (mln_image_stretch* pointerX = rawX)
+                    fixed (mln_image_stretch* pointerY = rawY)
+                    {
+                        status = NativeMethods.mln_map_copy_style_image_stretches_take_result(
+                            operation,
+                            rawX.Length == 0 ? null : pointerX,
+                            (nuint)rawX.Length,
+                            &xCount,
+                            rawY.Length == 0 ? null : pointerY,
+                            (nuint)rawY.Length,
+                            &yCount,
+                            &found
+                        );
+                    }
+                }
+                NativeStatus.Check(status);
+                return found
+                    ? (ToStretches(rawX), ToStretches(rawY))
+                    : ((IReadOnlyList<ImageStretch>, IReadOnlyList<ImageStretch>)?)null;
+            },
+            () => NativeMethods.mln_operation_release(operation)
+        );
+    }
+
+    internal Task<byte[]?> CopyStyleImagePixelsAsync(
+        string imageId,
+        CancellationToken cancellationToken
+    )
+    {
+        using var nativeImageId = NativeStringView.From(imageId, nameof(imageId));
+        return RunMapOperationAsync(
+            operation =>
+                NativeMethods.mln_map_copy_style_image_premultiplied_rgba8_start(
                     Handle,
                     nativeImageId.Value,
-                    bytes.Length == 0 ? null : bytesPointer,
-                    (nuint)bytes.Length,
-                    &byteLength,
-                    &found
-                )
-            );
-        }
-
-        if (!found)
-        {
-            return null;
-        }
-
-        if (byteLength > (nuint)bytes.Length)
-        {
-            throw new InvalidOperationException(
-                $"Native style image byte length {byteLength} exceeds buffer length {bytes.Length}."
-            );
-        }
-
-        if (byteLength != (nuint)bytes.Length)
-        {
-            Array.Resize(ref bytes, checked((int)byteLength));
-        }
-
-        // Native storage keeps no empty-versus-absent distinction for stretches.
-        var stretches = StyleImageStretches(imageId);
-        return new StyleImage(
-            new PremultipliedRgba8Image(
-                bytes,
-                new TextureImageInfo(info.Width, info.Height, info.Stride, (ulong)byteLength)
-            ),
-            new StyleImageOptions
+                    operation
+                ),
+            operation =>
             {
-                PixelRatio = info.PixelRatio,
-                Sdf = info.Sdf,
-                StretchX = NullIfEmpty(stretches?.StretchX),
-                StretchY = NullIfEmpty(stretches?.StretchY),
-                Content = info.Content,
-                TextFitWidth = info.TextFitWidth,
-                TextFitHeight = info.TextFitHeight,
-            }
+                MlnBuffer buffer = default;
+                bool found = false;
+                NativeStatus.Check(
+                    NativeMethods.mln_map_copy_style_image_premultiplied_rgba8_take_result(
+                        operation,
+                        &buffer,
+                        &found
+                    )
+                );
+                return found ? ValueStructs.ReadBuffer(buffer) : null;
+            },
+            cancellationToken
         );
     }
 
     /// <summary>Adds an image source that loads image data from a URL.</summary>
-    public void AddImageSourceUrl(string sourceId, IReadOnlyList<LatLng> coordinates, string url)
+    public ulong AddImageSourceUrl(string sourceId, IReadOnlyList<LatLng> coordinates, string url)
     {
+        ulong commandId = 0;
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeUrl = NativeStringView.From(url, nameof(url));
         var nativeCoordinates = ToNativeCoordinates(coordinates, nameof(coordinates));
@@ -1343,19 +1379,22 @@ public sealed unsafe class MapHandle : IDisposable
                     nativeSourceId.Value,
                     coordinatesPointer,
                     (nuint)nativeCoordinates.Length,
-                    nativeUrl.Value
+                    nativeUrl.Value,
+                    &commandId
                 )
             );
         }
+        return commandId;
     }
 
     /// <summary>Adds an image source with inline premultiplied RGBA8 image data.</summary>
-    public void AddImageSourceImage(
+    public ulong AddImageSourceImage(
         string sourceId,
         IReadOnlyList<LatLng> coordinates,
         PremultipliedRgba8Image image
     )
     {
+        ulong commandId = 0;
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeImage = NativeStyleImage.From(image);
         var imageValue = nativeImage.Value;
@@ -1368,40 +1407,53 @@ public sealed unsafe class MapHandle : IDisposable
                     nativeSourceId.Value,
                     coordinatesPointer,
                     (nuint)nativeCoordinates.Length,
-                    &imageValue
+                    &imageValue,
+                    &commandId
                 )
             );
         }
+        return commandId;
     }
 
     /// <summary>Updates an image source to load image data from a URL.</summary>
-    public void SetImageSourceUrl(string sourceId, string url)
+    public ulong SetImageSourceUrl(string sourceId, string url)
     {
+        ulong commandId = 0;
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeUrl = NativeStringView.From(url, nameof(url));
         NativeStatus.Check(
             NativeMethods.mln_map_set_image_source_url(
                 Handle,
                 nativeSourceId.Value,
-                nativeUrl.Value
+                nativeUrl.Value,
+                &commandId
             )
         );
+        return commandId;
     }
 
     /// <summary>Updates an image source with inline premultiplied RGBA8 image data.</summary>
-    public void SetImageSourceImage(string sourceId, PremultipliedRgba8Image image)
+    public ulong SetImageSourceImage(string sourceId, PremultipliedRgba8Image image)
     {
+        ulong commandId = 0;
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeImage = NativeStyleImage.From(image);
         var imageValue = nativeImage.Value;
         NativeStatus.Check(
-            NativeMethods.mln_map_set_image_source_image(Handle, nativeSourceId.Value, &imageValue)
+            NativeMethods.mln_map_set_image_source_image(
+                Handle,
+                nativeSourceId.Value,
+                &imageValue,
+                &commandId
+            )
         );
+        return commandId;
     }
 
     /// <summary>Updates image source coordinates.</summary>
-    public void SetImageSourceCoordinates(string sourceId, IReadOnlyList<LatLng> coordinates)
+    public ulong SetImageSourceCoordinates(string sourceId, IReadOnlyList<LatLng> coordinates)
     {
+        ulong commandId = 0;
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         var nativeCoordinates = ToNativeCoordinates(coordinates, nameof(coordinates));
         fixed (mln_lat_lng* coordinatesPointer = nativeCoordinates)
@@ -1411,49 +1463,64 @@ public sealed unsafe class MapHandle : IDisposable
                     Handle,
                     nativeSourceId.Value,
                     coordinatesPointer,
-                    (nuint)nativeCoordinates.Length
+                    (nuint)nativeCoordinates.Length,
+                    &commandId
                 )
             );
         }
+        return commandId;
     }
 
     /// <summary>Gets image source coordinates when the source exists.</summary>
-    public LatLng[]? GetImageSourceCoordinates(string sourceId)
+    public Task<LatLng[]?> GetImageSourceCoordinatesAsync(
+        string sourceId,
+        CancellationToken cancellationToken = default
+    )
     {
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
-        var coordinates = new mln_lat_lng[4];
-        nuint coordinateCount = 0;
-        bool found = false;
-        fixed (mln_lat_lng* coordinatesPointer = coordinates)
-        {
-            NativeStatus.Check(
-                NativeMethods.mln_map_get_image_source_coordinates(
+        return RunMapOperationAsync(
+            operation =>
+                NativeMethods.mln_map_get_image_source_coordinates_start(
                     Handle,
                     nativeSourceId.Value,
-                    coordinatesPointer,
-                    (nuint)coordinates.Length,
-                    &coordinateCount,
-                    &found
-                )
-            );
-        }
-
-        if (!found)
-        {
-            return null;
-        }
-
-        var result = new LatLng[checked((int)coordinateCount)];
-        for (var index = 0; index < result.Length; index++)
-        {
-            result[index] = CoreStructs.FromNative(coordinates[index]);
-        }
-        return result;
+                    operation
+                ),
+            operation =>
+            {
+                var coordinates = new mln_lat_lng[4];
+                nuint count = 0;
+                bool found = false;
+                fixed (mln_lat_lng* pointer = coordinates)
+                {
+                    NativeStatus.Check(
+                        NativeMethods.mln_map_get_image_source_coordinates_take_result(
+                            operation,
+                            pointer,
+                            (nuint)coordinates.Length,
+                            &count,
+                            &found
+                        )
+                    );
+                }
+                if (!found)
+                {
+                    return null;
+                }
+                var result = new LatLng[checked((int)count)];
+                for (var index = 0; index < result.Length; index++)
+                {
+                    result[index] = CoreStructs.FromNative(coordinates[index]);
+                }
+                return result;
+            },
+            cancellationToken
+        );
     }
 
     /// <summary>Adds a hillshade layer for a raster DEM source.</summary>
-    public void AddHillshadeLayer(string layerId, string sourceId, string beforeLayerId)
+    public ulong AddHillshadeLayer(string layerId, string sourceId, string beforeLayerId)
     {
+        ulong commandId = 0;
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeBeforeLayerId = NativeStringView.From(beforeLayerId, nameof(beforeLayerId));
@@ -1462,14 +1529,17 @@ public sealed unsafe class MapHandle : IDisposable
                 Handle,
                 nativeLayerId.Value,
                 nativeSourceId.Value,
-                nativeBeforeLayerId.Value
+                nativeBeforeLayerId.Value,
+                &commandId
             )
         );
+        return commandId;
     }
 
     /// <summary>Adds a color-relief layer for a raster DEM source.</summary>
-    public void AddColorReliefLayer(string layerId, string sourceId, string beforeLayerId)
+    public ulong AddColorReliefLayer(string layerId, string sourceId, string beforeLayerId)
     {
+        ulong commandId = 0;
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeBeforeLayerId = NativeStringView.From(beforeLayerId, nameof(beforeLayerId));
@@ -1478,72 +1548,87 @@ public sealed unsafe class MapHandle : IDisposable
                 Handle,
                 nativeLayerId.Value,
                 nativeSourceId.Value,
-                nativeBeforeLayerId.Value
+                nativeBeforeLayerId.Value,
+                &commandId
             )
         );
+        return commandId;
     }
 
     /// <summary>Adds a source-free location indicator layer.</summary>
-    public void AddLocationIndicatorLayer(string layerId, string beforeLayerId)
+    public ulong AddLocationIndicatorLayer(string layerId, string beforeLayerId)
     {
+        ulong commandId = 0;
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         using var nativeBeforeLayerId = NativeStringView.From(beforeLayerId, nameof(beforeLayerId));
         NativeStatus.Check(
             NativeMethods.mln_map_add_location_indicator_layer(
                 Handle,
                 nativeLayerId.Value,
-                nativeBeforeLayerId.Value
+                nativeBeforeLayerId.Value,
+                &commandId
             )
         );
+        return commandId;
     }
 
     /// <summary>Sets a location indicator layer location.</summary>
-    public void SetLocationIndicatorLocation(string layerId, LatLng coordinate, double altitude)
+    public ulong SetLocationIndicatorLocation(string layerId, LatLng coordinate, double altitude)
     {
+        ulong commandId = 0;
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         NativeStatus.Check(
             NativeMethods.mln_map_set_location_indicator_location(
                 Handle,
                 nativeLayerId.Value,
                 CoreStructs.ToNative(coordinate),
-                altitude
+                altitude,
+                &commandId
             )
         );
+        return commandId;
     }
 
     /// <summary>Sets a location indicator layer bearing in degrees.</summary>
-    public void SetLocationIndicatorBearing(string layerId, double bearing)
+    public ulong SetLocationIndicatorBearing(string layerId, double bearing)
     {
+        ulong commandId = 0;
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         NativeStatus.Check(
             NativeMethods.mln_map_set_location_indicator_bearing(
                 Handle,
                 nativeLayerId.Value,
-                bearing
+                bearing,
+                &commandId
             )
         );
+        return commandId;
     }
 
     /// <summary>Sets a location indicator layer accuracy radius in logical pixels.</summary>
-    public void SetLocationIndicatorAccuracyRadius(string layerId, double radius)
+    public ulong SetLocationIndicatorAccuracyRadius(string layerId, double radius)
     {
+        ulong commandId = 0;
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         NativeStatus.Check(
             NativeMethods.mln_map_set_location_indicator_accuracy_radius(
                 Handle,
                 nativeLayerId.Value,
-                radius
+                radius,
+                &commandId
             )
         );
+        return commandId;
     }
 
     /// <summary>Sets a location indicator layer image-name property.</summary>
-    public void SetLocationIndicatorImageName(
+    public ulong SetLocationIndicatorImageName(
         string layerId,
         LocationIndicatorImageKind imageKind,
         string imageId
     )
     {
+        ulong commandId = 0;
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         using var nativeImageId = NativeStringView.From(imageId, nameof(imageId));
         NativeStatus.Check(
@@ -1551,432 +1636,662 @@ public sealed unsafe class MapHandle : IDisposable
                 Handle,
                 nativeLayerId.Value,
                 (uint)imageKind,
-                nativeImageId.Value
+                nativeImageId.Value,
+                &commandId
             )
         );
+        return commandId;
     }
 
-    /// <summary>Adds a style layer from UTF-8 JSON bytes.</summary>
-    public void AddStyleLayerJson(byte[] layerJson, string beforeLayerId)
+    /// <summary>Adds a style layer and returns its command ID.</summary>
+    public ulong AddStyleLayerJson(byte[] layerJson, string beforeLayerId)
     {
         using var nativeJson = NativeStringView.From(layerJson, nameof(layerJson));
         using var nativeBeforeLayerId = NativeStringView.From(beforeLayerId, nameof(beforeLayerId));
+        ulong commandId = 0;
         NativeStatus.Check(
             NativeMethods.mln_map_add_style_layer_json(
                 Handle,
                 nativeJson.Value,
-                nativeBeforeLayerId.Value
+                nativeBeforeLayerId.Value,
+                &commandId
             )
         );
+        return commandId;
     }
 
     /// <summary>Removes a style layer and reports whether it existed.</summary>
-    public bool RemoveStyleLayer(string layerId)
+    public Task<bool> RemoveStyleLayerAsync(
+        string layerId,
+        CancellationToken cancellationToken = default
+    )
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
-        bool removed = false;
-        NativeStatus.Check(
-            NativeMethods.mln_map_remove_style_layer(Handle, nativeLayerId.Value, &removed)
+        return RunMapOperationAsync(
+            operation =>
+                NativeMethods.mln_map_remove_style_layer_start(
+                    Handle,
+                    nativeLayerId.Value,
+                    operation
+                ),
+            operation =>
+            {
+                bool removed = false;
+                NativeStatus.Check(
+                    NativeMethods.mln_map_remove_style_layer_take_result(operation, &removed)
+                );
+                return removed;
+            },
+            cancellationToken
         );
-        return removed;
     }
 
-    /// <summary>Whether a style layer exists.</summary>
-    public bool StyleLayerExists(string layerId)
+    /// <summary>Reports whether a style layer exists.</summary>
+    public Task<bool> StyleLayerExistsAsync(
+        string layerId,
+        CancellationToken cancellationToken = default
+    )
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
-        bool exists = false;
-        NativeStatus.Check(
-            NativeMethods.mln_map_style_layer_exists(Handle, nativeLayerId.Value, &exists)
+        return RunMapOperationAsync(
+            operation =>
+                NativeMethods.mln_map_style_layer_exists_start(
+                    Handle,
+                    nativeLayerId.Value,
+                    operation
+                ),
+            operation =>
+            {
+                bool exists = false;
+                NativeStatus.Check(
+                    NativeMethods.mln_map_style_layer_exists_take_result(operation, &exists)
+                );
+                return exists;
+            },
+            cancellationToken
         );
-        return exists;
     }
 
     /// <summary>Gets a style layer type when the layer exists.</summary>
-    public string? StyleLayerType(string layerId)
+    public Task<string?> StyleLayerTypeAsync(
+        string layerId,
+        CancellationToken cancellationToken = default
+    )
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
-        mln_buffer_view layerType = default;
-        bool found = false;
-        NativeStatus.Check(
-            NativeMethods.mln_map_get_style_layer_type(
-                Handle,
-                nativeLayerId.Value,
-                &layerType,
-                &found
-            )
+        return RunMapOperationAsync(
+            operation =>
+                NativeMethods.mln_map_get_style_layer_type_start(
+                    Handle,
+                    nativeLayerId.Value,
+                    operation
+                ),
+            operation =>
+            {
+                MlnBuffer buffer = default;
+                bool found = false;
+                NativeStatus.Check(
+                    NativeMethods.mln_map_get_style_layer_type_take_result(
+                        operation,
+                        &buffer,
+                        &found
+                    )
+                );
+                return found
+                    ? System.Text.Encoding.UTF8.GetString(ValueStructs.ReadBuffer(buffer))
+                    : null;
+            },
+            cancellationToken
         );
-        return found ? RuntimeStructs.CopyUtf8((sbyte*)layerType.data, layerType.size) : null;
     }
 
     /// <summary>Lists style layer IDs in style order.</summary>
-    public string[] StyleLayerIds()
-    {
-        MlnStyleIdList list = default;
-        NativeStatus.Check(NativeMethods.mln_map_list_style_layer_ids(Handle, &list));
-        return CopyStyleIdList(list);
-    }
+    public Task<string[]> StyleLayerIdsAsync(CancellationToken cancellationToken = default) =>
+        RunMapOperationAsync(
+            operation => NativeMethods.mln_map_list_style_layer_ids_start(Handle, operation),
+            operation =>
+            {
+                MlnStyleIdList list = default;
+                NativeStatus.Check(
+                    NativeMethods.mln_map_list_style_layer_ids_take_result(operation, &list)
+                );
+                return CopyStyleIdList(list);
+            },
+            cancellationToken
+        );
 
-    /// <summary>Moves a style layer before another layer, or to the top when beforeLayerId is empty.</summary>
-    public void MoveStyleLayer(string layerId, string beforeLayerId)
+    /// <summary>Moves a style layer and returns its command ID.</summary>
+    public ulong MoveStyleLayer(string layerId, string beforeLayerId)
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         using var nativeBeforeLayerId = NativeStringView.From(beforeLayerId, nameof(beforeLayerId));
+        ulong commandId = 0;
         NativeStatus.Check(
             NativeMethods.mln_map_move_style_layer(
                 Handle,
                 nativeLayerId.Value,
-                nativeBeforeLayerId.Value
+                nativeBeforeLayerId.Value,
+                &commandId
             )
         );
+        return commandId;
     }
 
     /// <summary>Gets a full style-spec layer JSON snapshot when the layer exists.</summary>
-    public byte[]? GetStyleLayerJson(string layerId)
+    public Task<byte[]?> GetStyleLayerJsonAsync(
+        string layerId,
+        CancellationToken cancellationToken = default
+    )
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
-        MlnBuffer buffer = default;
-        bool found = false;
-        NativeStatus.Check(
-            NativeMethods.mln_map_get_style_layer_json(Handle, nativeLayerId.Value, &buffer, &found)
+        return RunMapOperationAsync(
+            operation =>
+                NativeMethods.mln_map_get_style_layer_json_start(
+                    Handle,
+                    nativeLayerId.Value,
+                    operation
+                ),
+            operation =>
+            {
+                MlnBuffer buffer = default;
+                bool found = false;
+                NativeStatus.Check(
+                    NativeMethods.mln_map_get_style_layer_json_take_result(
+                        operation,
+                        &buffer,
+                        &found
+                    )
+                );
+                return found ? ValueStructs.ReadBuffer(buffer) : null;
+            },
+            cancellationToken
         );
-        return found ? ValueStructs.ReadBuffer(buffer) : null;
     }
 
-    /// <summary>Sets the style light document from UTF-8 JSON bytes.</summary>
-    public void SetStyleLightJson(byte[] lightJson)
+    /// <summary>Sets the style light document and returns its command ID.</summary>
+    public ulong SetStyleLightJson(byte[] lightJson)
     {
         using var nativeJson = NativeStringView.From(lightJson, nameof(lightJson));
-        NativeStatus.Check(NativeMethods.mln_map_set_style_light_json(Handle, nativeJson.Value));
+        ulong commandId = 0;
+        NativeStatus.Check(
+            NativeMethods.mln_map_set_style_light_json(Handle, nativeJson.Value, &commandId)
+        );
+        return commandId;
     }
 
-    /// <summary>Sets one style light property from UTF-8 JSON bytes.</summary>
-    public void SetStyleLightProperty(string propertyName, byte[] value)
+    /// <summary>Sets one style light property and returns its command ID.</summary>
+    public ulong SetStyleLightProperty(string propertyName, byte[] value)
     {
         using var nativePropertyName = NativeStringView.From(propertyName, nameof(propertyName));
         using var nativeValue = NativeStringView.From(value, nameof(value));
+        ulong commandId = 0;
         NativeStatus.Check(
             NativeMethods.mln_map_set_style_light_property(
                 Handle,
                 nativePropertyName.Value,
-                nativeValue.Value
+                nativeValue.Value,
+                &commandId
             )
         );
+        return commandId;
     }
 
     /// <summary>Gets one style light property snapshot, or null when undefined.</summary>
-    public byte[]? GetStyleLightProperty(string propertyName)
+    public Task<byte[]?> GetStyleLightPropertyAsync(
+        string propertyName,
+        CancellationToken cancellationToken = default
+    )
     {
         using var nativePropertyName = NativeStringView.From(propertyName, nameof(propertyName));
-        MlnBuffer buffer = default;
-        NativeStatus.Check(
-            NativeMethods.mln_map_get_style_light_property(
-                Handle,
-                nativePropertyName.Value,
-                &buffer
-            )
+        return RunMapOperationAsync(
+            operation =>
+                NativeMethods.mln_map_get_style_light_property_start(
+                    Handle,
+                    nativePropertyName.Value,
+                    operation
+                ),
+            operation =>
+            {
+                MlnBuffer buffer = default;
+                NativeStatus.Check(
+                    NativeMethods.mln_map_get_style_light_property_take_result(operation, &buffer)
+                );
+                return ValueStructs.ReadOptionalBuffer(buffer);
+            },
+            cancellationToken
         );
-        return ValueStructs.ReadOptionalBuffer(buffer);
     }
 
-    /// <summary>Sets the style's global transition options.</summary>
-    /// <remarks>
-    /// This replaces the whole transition configuration rather than merging into it, and null
-    /// duration and delay clear the style-wide override. Loading a style replaces these options,
-    /// so apply an override after the style loads.
-    /// </remarks>
-    public void SetStyleTransitionOptions(StyleTransitionOptions options)
+    /// <summary>Sets the style's transition options and returns its command ID.</summary>
+    public ulong SetStyleTransitionOptions(StyleTransitionOptions options)
     {
         var native = StyleStructs.ToNative(options);
-        NativeStatus.Check(NativeMethods.mln_map_set_style_transition_options(Handle, &native));
+        ulong commandId = 0;
+        NativeStatus.Check(
+            NativeMethods.mln_map_set_style_transition_options(Handle, &native, &commandId)
+        );
+        return commandId;
     }
 
     /// <summary>Gets the style's global transition options.</summary>
-    public StyleTransitionOptions GetStyleTransitionOptions()
-    {
-        var native = NativeMethods.mln_style_transition_options_default();
-        NativeStatus.Check(NativeMethods.mln_map_get_style_transition_options(Handle, &native));
-        return StyleStructs.FromNative(native);
-    }
+    public Task<StyleTransitionOptions> GetStyleTransitionOptionsAsync(
+        CancellationToken cancellationToken = default
+    ) =>
+        RunMapOperationAsync(
+            operation =>
+                NativeMethods.mln_map_get_style_transition_options_start(Handle, operation),
+            operation =>
+            {
+                var options = NativeMethods.mln_style_transition_options_default();
+                NativeStatus.Check(
+                    NativeMethods.mln_map_get_style_transition_options_take_result(
+                        operation,
+                        &options
+                    )
+                );
+                return StyleStructs.FromNative(options);
+            },
+            cancellationToken
+        );
 
-    /// <summary>Sets one layer property from UTF-8 JSON bytes.</summary>
-    public void SetLayerProperty(string layerId, string propertyName, byte[] value)
+    /// <summary>Sets one layer property and returns its command ID.</summary>
+    public ulong SetLayerProperty(string layerId, string propertyName, byte[] value)
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         using var nativePropertyName = NativeStringView.From(propertyName, nameof(propertyName));
         using var nativeValue = NativeStringView.From(value, nameof(value));
+        ulong commandId = 0;
         NativeStatus.Check(
             NativeMethods.mln_map_set_layer_property(
                 Handle,
                 nativeLayerId.Value,
                 nativePropertyName.Value,
-                nativeValue.Value
+                nativeValue.Value,
+                &commandId
             )
         );
+        return commandId;
     }
 
     /// <summary>Gets one layer property snapshot, or null when undefined.</summary>
-    public byte[]? GetLayerProperty(string layerId, string propertyName)
+    public Task<byte[]?> GetLayerPropertyAsync(
+        string layerId,
+        string propertyName,
+        CancellationToken cancellationToken = default
+    )
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         using var nativePropertyName = NativeStringView.From(propertyName, nameof(propertyName));
-        MlnBuffer buffer = default;
-        NativeStatus.Check(
-            NativeMethods.mln_map_get_layer_property(
-                Handle,
-                nativeLayerId.Value,
-                nativePropertyName.Value,
-                &buffer
-            )
+        return RunMapOperationAsync(
+            operation =>
+                NativeMethods.mln_map_get_layer_property_start(
+                    Handle,
+                    nativeLayerId.Value,
+                    nativePropertyName.Value,
+                    operation
+                ),
+            operation =>
+            {
+                MlnBuffer buffer = default;
+                NativeStatus.Check(
+                    NativeMethods.mln_map_get_layer_property_take_result(operation, &buffer)
+                );
+                return ValueStructs.ReadOptionalBuffer(buffer);
+            },
+            cancellationToken
         );
-        return ValueStructs.ReadOptionalBuffer(buffer);
     }
 
-    /// <summary>Sets or clears one layer filter from UTF-8 JSON bytes.</summary>
-    public void SetLayerFilter(string layerId, byte[]? filter)
+    /// <summary>Sets or clears a layer filter and returns its command ID.</summary>
+    public ulong SetLayerFilter(string layerId, byte[]? filter)
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         using var nativeFilter = filter is null
             ? null
             : NativeStringView.From(filter, nameof(filter));
+        ulong commandId = 0;
         NativeStatus.Check(
             NativeMethods.mln_map_set_layer_filter(
                 Handle,
                 nativeLayerId.Value,
-                nativeFilter?.Pointer
+                nativeFilter?.Pointer,
+                &commandId
             )
         );
+        return commandId;
     }
 
     /// <summary>Gets one layer filter snapshot, or null when no filter exists.</summary>
-    public byte[]? GetLayerFilter(string layerId)
+    public Task<byte[]?> GetLayerFilterAsync(
+        string layerId,
+        CancellationToken cancellationToken = default
+    )
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
-        MlnBuffer buffer = default;
-        NativeStatus.Check(
-            NativeMethods.mln_map_get_layer_filter(Handle, nativeLayerId.Value, &buffer)
+        return RunMapOperationAsync(
+            operation =>
+                NativeMethods.mln_map_get_layer_filter_start(
+                    Handle,
+                    nativeLayerId.Value,
+                    operation
+                ),
+            operation =>
+            {
+                MlnBuffer buffer = default;
+                NativeStatus.Check(
+                    NativeMethods.mln_map_get_layer_filter_take_result(operation, &buffer)
+                );
+                return ValueStructs.ReadOptionalBuffer(buffer);
+            },
+            cancellationToken
         );
-        return ValueStructs.ReadOptionalBuffer(buffer);
     }
 
-    /// <summary>Sets one layer's source-layer ID.</summary>
-    /// <remarks>
-    /// Layer types that take no source, such as background, are rejected.
-    /// </remarks>
-    public void SetLayerSourceLayer(string layerId, string sourceLayer)
+    /// <summary>Sets a layer's source-layer ID and returns its command ID.</summary>
+    public ulong SetLayerSourceLayer(string layerId, string sourceLayer)
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         using var nativeSourceLayer = NativeStringView.From(sourceLayer, nameof(sourceLayer));
+        ulong commandId = 0;
         NativeStatus.Check(
             NativeMethods.mln_map_set_layer_source_layer(
                 Handle,
                 nativeLayerId.Value,
-                nativeSourceLayer.Value
+                nativeSourceLayer.Value,
+                &commandId
             )
         );
+        return commandId;
     }
 
-    /// <summary>Gets one layer's source-layer ID, empty when it carries none.</summary>
-    public string GetLayerSourceLayer(string layerId) => CopyLayerText(layerId, sourceLayer: true);
+    /// <summary>Gets one layer's source-layer ID.</summary>
+    public Task<string> GetLayerSourceLayerAsync(
+        string layerId,
+        CancellationToken cancellationToken = default
+    ) => CopyLayerTextAsync(layerId, sourceLayer: true, cancellationToken);
 
-    /// <summary>Sets one layer's source ID.</summary>
-    /// <remarks>
-    /// Layer types that take no source, such as background, are rejected. The named source need
-    /// not exist yet.
-    /// </remarks>
-    public void SetLayerSourceId(string layerId, string sourceId)
+    /// <summary>Sets a layer's source ID and returns its command ID.</summary>
+    public ulong SetLayerSourceId(string layerId, string sourceId)
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        ulong commandId = 0;
         NativeStatus.Check(
             NativeMethods.mln_map_set_layer_source_id(
                 Handle,
                 nativeLayerId.Value,
-                nativeSourceId.Value
+                nativeSourceId.Value,
+                &commandId
             )
         );
+        return commandId;
     }
 
-    /// <summary>Gets one layer's source ID, empty when it carries none.</summary>
-    public string GetLayerSourceId(string layerId) => CopyLayerText(layerId, sourceLayer: false);
+    /// <summary>Gets one layer's source ID.</summary>
+    public Task<string> GetLayerSourceIdAsync(
+        string layerId,
+        CancellationToken cancellationToken = default
+    ) => CopyLayerTextAsync(layerId, sourceLayer: false, cancellationToken);
 
-    private delegate mln_status CopyMapTextCall(
-        MlnMap map,
-        sbyte* text,
-        nuint capacity,
-        nuint* size
-    );
-
-    private delegate mln_status CopyMapBytesCall(
-        MlnMap map,
-        byte* bytes,
-        nuint capacity,
-        nuint* size
-    );
-
-    private byte[] CopyMapBytes(CopyMapBytesCall copy)
-    {
-        nuint required = 0;
-        NativeStatus.Check(copy(Handle, null, 0, &required));
-        if (required == 0)
-        {
-            return [];
-        }
-        var buffer = new byte[checked((int)required)];
-        nuint copied = 0;
-        fixed (byte* bufferPointer = buffer)
-        {
-            NativeStatus.Check(copy(Handle, bufferPointer, required, &copied));
-        }
-        return copied == required ? buffer : buffer[..checked((int)copied)];
-    }
-
-    private string CopyMapText(CopyMapTextCall copy)
-    {
-        nuint required = 0;
-        NativeStatus.Check(copy(Handle, null, 0, &required));
-        if (required == 0)
-        {
-            return string.Empty;
-        }
-
-        var buffer = new byte[checked((int)required)];
-        nuint copied = 0;
-        fixed (byte* bufferPointer = buffer)
-        {
-            NativeStatus.Check(copy(Handle, (sbyte*)bufferPointer, required, &copied));
-            return RuntimeStructs.CopyUtf8((sbyte*)bufferPointer, copied) ?? string.Empty;
-        }
-    }
-
-    private string CopyLayerText(string layerId, bool sourceLayer)
+    /// <summary>Sets the lowest layer zoom and returns its command ID.</summary>
+    public ulong SetLayerMinZoom(string layerId, double minZoom)
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
-        nuint required = 0;
+        ulong commandId = 0;
         NativeStatus.Check(
-            sourceLayer
-                ? NativeMethods.mln_map_copy_layer_source_layer(
-                    Handle,
-                    nativeLayerId.Value,
-                    null,
-                    0,
-                    &required
-                )
-                : NativeMethods.mln_map_copy_layer_source_id(
-                    Handle,
-                    nativeLayerId.Value,
-                    null,
-                    0,
-                    &required
-                )
+            NativeMethods.mln_map_set_layer_min_zoom(
+                Handle,
+                nativeLayerId.Value,
+                minZoom,
+                &commandId
+            )
         );
-        if (required == 0)
-        {
-            return string.Empty;
-        }
-
-        var buffer = new byte[checked((int)required)];
-        nuint copied = 0;
-        fixed (byte* bufferPointer = buffer)
-        {
-            NativeStatus.Check(
-                sourceLayer
-                    ? NativeMethods.mln_map_copy_layer_source_layer(
-                        Handle,
-                        nativeLayerId.Value,
-                        (sbyte*)bufferPointer,
-                        required,
-                        &copied
-                    )
-                    : NativeMethods.mln_map_copy_layer_source_id(
-                        Handle,
-                        nativeLayerId.Value,
-                        (sbyte*)bufferPointer,
-                        required,
-                        &copied
-                    )
-            );
-            return RuntimeStructs.CopyUtf8((sbyte*)bufferPointer, copied) ?? string.Empty;
-        }
-    }
-
-    /// <summary>Sets the lowest zoom at which one layer draws.</summary>
-    /// <remarks>Pass <c>double.NegativeInfinity</c> for no lower bound.</remarks>
-    public void SetLayerMinZoom(string layerId, double minZoom)
-    {
-        using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
-        NativeStatus.Check(
-            NativeMethods.mln_map_set_layer_min_zoom(Handle, nativeLayerId.Value, minZoom)
-        );
+        return commandId;
     }
 
     /// <summary>Gets the lowest zoom at which one layer draws.</summary>
-    /// <remarks>A layer with no lower bound reports <c>double.NegativeInfinity</c>.</remarks>
-    public double GetLayerMinZoom(string layerId)
+    public Task<double> GetLayerMinZoomAsync(
+        string layerId,
+        CancellationToken cancellationToken = default
+    )
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
-        double minZoom = 0;
-        NativeStatus.Check(
-            NativeMethods.mln_map_get_layer_min_zoom(Handle, nativeLayerId.Value, &minZoom)
+        return RunMapOperationAsync(
+            operation =>
+                NativeMethods.mln_map_get_layer_min_zoom_start(
+                    Handle,
+                    nativeLayerId.Value,
+                    operation
+                ),
+            operation =>
+            {
+                double zoom = 0;
+                NativeStatus.Check(
+                    NativeMethods.mln_map_get_layer_min_zoom_take_result(operation, &zoom)
+                );
+                return zoom;
+            },
+            cancellationToken
         );
-        return minZoom;
     }
 
-    /// <summary>Sets the highest zoom at which one layer draws.</summary>
-    /// <remarks>Pass <c>double.PositiveInfinity</c> for no upper bound.</remarks>
-    public void SetLayerMaxZoom(string layerId, double maxZoom)
+    /// <summary>Sets the highest layer zoom and returns its command ID.</summary>
+    public ulong SetLayerMaxZoom(string layerId, double maxZoom)
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
+        ulong commandId = 0;
         NativeStatus.Check(
-            NativeMethods.mln_map_set_layer_max_zoom(Handle, nativeLayerId.Value, maxZoom)
+            NativeMethods.mln_map_set_layer_max_zoom(
+                Handle,
+                nativeLayerId.Value,
+                maxZoom,
+                &commandId
+            )
         );
+        return commandId;
     }
 
     /// <summary>Gets the highest zoom at which one layer draws.</summary>
-    /// <remarks>A layer with no upper bound reports <c>double.PositiveInfinity</c>.</remarks>
-    public double GetLayerMaxZoom(string layerId)
+    public Task<double> GetLayerMaxZoomAsync(
+        string layerId,
+        CancellationToken cancellationToken = default
+    )
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
-        double maxZoom = 0;
-        NativeStatus.Check(
-            NativeMethods.mln_map_get_layer_max_zoom(Handle, nativeLayerId.Value, &maxZoom)
+        return RunMapOperationAsync(
+            operation =>
+                NativeMethods.mln_map_get_layer_max_zoom_start(
+                    Handle,
+                    nativeLayerId.Value,
+                    operation
+                ),
+            operation =>
+            {
+                double zoom = 0;
+                NativeStatus.Check(
+                    NativeMethods.mln_map_get_layer_max_zoom_take_result(operation, &zoom)
+                );
+                return zoom;
+            },
+            cancellationToken
         );
-        return maxZoom;
     }
 
-    /// <summary>Sets whether one layer draws.</summary>
-    public void SetLayerVisibility(string layerId, StyleLayerVisibility visibility)
+    /// <summary>Sets layer visibility and returns its command ID.</summary>
+    public ulong SetLayerVisibility(string layerId, StyleLayerVisibility visibility)
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
+        ulong commandId = 0;
         NativeStatus.Check(
             NativeMethods.mln_map_set_layer_visibility(
                 Handle,
                 nativeLayerId.Value,
-                (uint)visibility
+                (uint)visibility,
+                &commandId
             )
         );
+        return commandId;
     }
 
     /// <summary>Gets whether one layer draws.</summary>
-    public StyleLayerVisibility GetLayerVisibility(string layerId)
+    public Task<StyleLayerVisibility> GetLayerVisibilityAsync(
+        string layerId,
+        CancellationToken cancellationToken = default
+    )
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
-        uint visibility = 0;
-        NativeStatus.Check(
-            NativeMethods.mln_map_get_layer_visibility(Handle, nativeLayerId.Value, &visibility)
+        return RunMapOperationAsync(
+            operation =>
+                NativeMethods.mln_map_get_layer_visibility_start(
+                    Handle,
+                    nativeLayerId.Value,
+                    operation
+                ),
+            operation =>
+            {
+                uint visibility = 0;
+                NativeStatus.Check(
+                    NativeMethods.mln_map_get_layer_visibility_take_result(operation, &visibility)
+                );
+                return (StyleLayerVisibility)visibility;
+            },
+            cancellationToken
         );
-        return (StyleLayerVisibility)visibility;
     }
 
-    /// <summary>Destroys the map on its owner thread.</summary>
-    /// <remarks>
-    /// Closing discards this map's queued runtime events and its recorded loading
-    /// failure without a flush and without a terminal event.
-    /// </remarks>
-    public void Close()
+    private static MlnOperation StartCreate(MlnRuntime runtime, mln_map_options options)
     {
-        state.Close();
-        runtime.UnregisterMap(this);
+        MlnOperation operation = default;
+        NativeStatus.Check(NativeMethods.mln_map_create_start(runtime, &options, &operation));
+        return operation;
+    }
+
+    private static MlnOperation StartMapOperation(MapOperationStart start)
+    {
+        MlnOperation operation = default;
+        NativeStatus.Check(start(&operation));
+        return operation;
+    }
+
+    private Task<TResult> RunMapOperationAsync<TResult>(
+        MapOperationStart start,
+        MapOperationTake<TResult> take,
+        CancellationToken cancellationToken
+    )
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var operation = StartMapOperation(start);
+        return OperationAwaiter.WaitThen(
+            runtime.WaitForOperationAsync(operation, cancellationToken),
+            () =>
+            {
+                RuntimeHandle.CheckOperationCompletion(operation);
+                return take(operation);
+            },
+            () => NativeMethods.mln_operation_release(operation)
+        );
+    }
+
+    private Task<string?> CopyStyleSourceStringAsync(
+        mln_buffer_view sourceId,
+        bool attribution,
+        CancellationToken cancellationToken
+    ) =>
+        RunMapOperationAsync(
+            operation =>
+                attribution
+                    ? NativeMethods.mln_map_copy_style_source_attribution_start(
+                        Handle,
+                        sourceId,
+                        operation
+                    )
+                    : NativeMethods.mln_map_copy_style_source_url_start(
+                        Handle,
+                        sourceId,
+                        operation
+                    ),
+            operation =>
+            {
+                MlnBuffer buffer = default;
+                bool found = false;
+                NativeStatus.Check(
+                    attribution
+                        ? NativeMethods.mln_map_copy_style_source_attribution_take_result(
+                            operation,
+                            &buffer,
+                            &found
+                        )
+                        : NativeMethods.mln_map_copy_style_source_url_take_result(
+                            operation,
+                            &buffer,
+                            &found
+                        )
+                );
+                return found
+                    ? System.Text.Encoding.UTF8.GetString(ValueStructs.ReadBuffer(buffer))
+                    : null;
+            },
+            cancellationToken
+        );
+
+    private Task<string> CopyLayerTextAsync(
+        string layerId,
+        bool sourceLayer,
+        CancellationToken cancellationToken
+    )
+    {
+        using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
+        return RunMapOperationAsync(
+            operation =>
+                sourceLayer
+                    ? NativeMethods.mln_map_copy_layer_source_layer_start(
+                        Handle,
+                        nativeLayerId.Value,
+                        operation
+                    )
+                    : NativeMethods.mln_map_copy_layer_source_id_start(
+                        Handle,
+                        nativeLayerId.Value,
+                        operation
+                    ),
+            operation =>
+            {
+                MlnBuffer buffer = default;
+                NativeStatus.Check(
+                    sourceLayer
+                        ? NativeMethods.mln_map_copy_layer_source_layer_take_result(
+                            operation,
+                            &buffer
+                        )
+                        : NativeMethods.mln_map_copy_layer_source_id_take_result(operation, &buffer)
+                );
+                return System.Text.Encoding.UTF8.GetString(ValueStructs.ReadBuffer(buffer));
+            },
+            cancellationToken
+        );
+    }
+
+    /// <summary>Closes the map after its previously accepted work completes.</summary>
+    public Task CloseAsync(CancellationToken cancellationToken = default)
+    {
+        if (IsClosed)
+        {
+            return Task.CompletedTask;
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        var operation = StartMapOperation(outOperation =>
+            NativeMethods.mln_map_close_start(Handle, outOperation)
+        );
+        return OperationAwaiter.WaitThen(
+            runtime.WaitForOperationAsync(operation),
+            () =>
+            {
+                RuntimeHandle.CheckOperationCompletion(operation);
+                state.Close();
+                runtime.UnregisterMap(this);
+            },
+            () => NativeMethods.mln_operation_release(operation)
+        );
     }
 
     internal static IDisposable UseCustomGeometrySourceInstallForTest(
@@ -2070,13 +2385,136 @@ public sealed unsafe class MapHandle : IDisposable
         }
     }
 
+    private Task<CameraOptions> TakeCameraAsync(
+        MlnOperation operation,
+        MapTakeCameraResult take,
+        CancellationToken cancellationToken
+    ) =>
+        OperationAwaiter.WaitThen(
+            runtime.WaitForOperationAsync(operation, cancellationToken),
+            () =>
+            {
+                var camera = NativeMethods.mln_camera_options_default();
+                NativeStatus.Check(take(operation, &camera));
+                return MapStructs.CameraOptionsFromNative(camera);
+            },
+            () => NativeMethods.mln_operation_release(operation)
+        );
+
+    private Task<LatLngBounds> TakeBoundsAsync(
+        MlnOperation operation,
+        MapTakeBoundsResult take,
+        CancellationToken cancellationToken
+    ) =>
+        OperationAwaiter.WaitThen(
+            runtime.WaitForOperationAsync(operation, cancellationToken),
+            () =>
+            {
+                mln_lat_lng_bounds bounds = default;
+                NativeStatus.Check(take(operation, &bounds));
+                return MapStructs.FromNative(bounds);
+            },
+            () => NativeMethods.mln_operation_release(operation)
+        );
+
+    private Task<ScreenPoint> TakePointAsync(
+        MlnOperation operation,
+        CancellationToken cancellationToken
+    ) =>
+        OperationAwaiter.WaitThen(
+            runtime.WaitForOperationAsync(operation, cancellationToken),
+            () =>
+            {
+                mln_screen_point point = default;
+                NativeStatus.Check(
+                    NativeMethods.mln_map_pixel_for_lat_lng_take_result(operation, &point)
+                );
+                return MapStructs.FromNative(point);
+            },
+            () => NativeMethods.mln_operation_release(operation)
+        );
+
+    private Task<LatLng> TakeCoordinateAsync(
+        MlnOperation operation,
+        CancellationToken cancellationToken
+    ) =>
+        OperationAwaiter.WaitThen(
+            runtime.WaitForOperationAsync(operation, cancellationToken),
+            () =>
+            {
+                mln_lat_lng coordinate = default;
+                NativeStatus.Check(
+                    NativeMethods.mln_map_lat_lng_for_pixel_take_result(operation, &coordinate)
+                );
+                return CoreStructs.FromNative(coordinate);
+            },
+            () => NativeMethods.mln_operation_release(operation)
+        );
+
+    private Task<ScreenPoint[]> TakePointsAsync(
+        MlnOperation operation,
+        int count,
+        CancellationToken cancellationToken
+    ) =>
+        OperationAwaiter.WaitThen(
+            runtime.WaitForOperationAsync(operation, cancellationToken),
+            () =>
+            {
+                var native = new mln_screen_point[count];
+                nuint actual = 0;
+                fixed (mln_screen_point* pointer = native)
+                {
+                    NativeStatus.Check(
+                        NativeMethods.mln_map_pixels_for_lat_lngs_take_result(
+                            operation,
+                            native.Length == 0 ? null : pointer,
+                            (nuint)native.Length,
+                            &actual
+                        )
+                    );
+                }
+                return native
+                    .Take(checked((int)actual))
+                    .Select(value => MapStructs.FromNative(value))
+                    .ToArray();
+            },
+            () => NativeMethods.mln_operation_release(operation)
+        );
+
+    private Task<LatLng[]> TakeCoordinatesAsync(
+        MlnOperation operation,
+        int count,
+        CancellationToken cancellationToken
+    ) =>
+        OperationAwaiter.WaitThen(
+            runtime.WaitForOperationAsync(operation, cancellationToken),
+            () =>
+            {
+                var native = new mln_lat_lng[count];
+                nuint actual = 0;
+                fixed (mln_lat_lng* pointer = native)
+                {
+                    NativeStatus.Check(
+                        NativeMethods.mln_map_lat_lngs_for_pixels_take_result(
+                            operation,
+                            native.Length == 0 ? null : pointer,
+                            (nuint)native.Length,
+                            &actual
+                        )
+                    );
+                }
+                return native
+                    .Take(checked((int)actual))
+                    .Select(value => CoreStructs.FromNative(value))
+                    .ToArray();
+            },
+            () => NativeMethods.mln_operation_release(operation)
+        );
+
     /// <inheritdoc />
     public void Dispose()
     {
-        if (state.TryClose())
-        {
-            runtime.UnregisterMap(this);
-        }
+        CloseAsync().ConfigureAwait(false).GetAwaiter().GetResult();
         GC.KeepAlive(runtime);
     }
 }

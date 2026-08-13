@@ -13,6 +13,7 @@
 #include "handles/handle_table.hpp"
 #include "notification/notification.hpp"
 #include "operation/operation.hpp"
+#include "runtime/runtime.hpp"
 
 struct operation_cancel_state {
   std::atomic_uint count = 0;
@@ -69,6 +70,56 @@ extern "C" mln_status mln_test_operation_create(
     *out_control = control.release();
     return MLN_STATUS_OK;
   });
+}
+
+extern "C" mln_status mln_test_runtime_pending_operation_create(
+  mln_runtime runtime, mln_operation* out_operation,
+  mln_test_operation_control** out_control
+) {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    if (out_control == nullptr || *out_control != nullptr) {
+      mln::core::set_thread_error("out_control must point to null");
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    auto live = mln::core::lease_runtime(runtime);
+    if (live == nullptr) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    auto control = std::make_unique<mln_test_operation_control>();
+    const auto register_status = mln::core::register_operation(
+      live->event_queue->notification_source, UINT32_C(0xFFFE), false, {},
+      out_operation, control->operation
+    );
+    if (register_status != MLN_STATUS_OK) {
+      return register_status;
+    }
+    const auto submit_status = mln::core::submit_runtime_operation(
+      live, control->operation, []() -> void {}
+    );
+    if (submit_status != MLN_STATUS_OK) {
+      mln::core::abandon_operation(*out_operation);
+      *out_operation = MLN_HANDLE_NULL;
+      return submit_status;
+    }
+    *out_control = control.release();
+    return MLN_STATUS_OK;
+  });
+}
+
+extern "C" mln_status mln_test_runtime_reserve_child(mln_runtime runtime) {
+  auto live = mln::core::lease_runtime(runtime);
+  if (live == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return live->control.reserve_child() ? MLN_STATUS_OK
+                                       : MLN_STATUS_INVALID_STATE;
+}
+
+extern "C" void mln_test_runtime_abandon_child(mln_runtime runtime) {
+  auto live = mln::core::lease_runtime(runtime);
+  if (live != nullptr) {
+    live->control.abandon_child_reservation();
+  }
 }
 
 extern "C" void mln_test_operation_complete(

@@ -22,8 +22,8 @@ The required binding layer is a low-level FFI API. It MUST NOT add
 application-framework policy, UI/view lifecycle integration, general async APIs,
 or scheduler models above the C API concepts.
 
-A subproject that needs host-thread confinement uses the owner-thread helper
-design in Threading. No other execution model belongs in the binding layer.
+A subproject that needs graphics-thread confinement keeps that policy on the
+render-session wrapper. It MUST NOT add an owner thread for runtime or map work.
 
 ---
 
@@ -277,13 +277,12 @@ binding's own closed-handle error rather than surfacing the C API's rejection of
 an id retired underneath the call. The mechanism belongs to the shared handle
 state, so every handle of that kind gets the same ordering.
 
-Deterministic cleanup hooks follow the same release operation when they can
-report release failure through the target language's normal error path.
-Non-deterministic cleanup hooks report leaks for thread-affine handles. They
-MUST NOT destroy runtime, map, projection, or render-session handles from
-cleanup hooks. Infallible language destructors that attempt best-effort release
-MUST preserve the explicit release contract and MUST NOT mask native errors from
-the explicit release path.
+Deterministic cleanup hooks follow the same release or lifecycle-close operation
+when they can report failure through the target language's normal error path.
+Non-deterministic cleanup may start asynchronous close only when the binding can
+retain every callback root and native dependency until completion. Otherwise it
+reports a leak and preserves the state that native code can still reach.
+Thread-affine render-session cleanup runs only on the owning graphics thread.
 
 ### Stale and mismatched handles
 
@@ -304,19 +303,19 @@ argument rather than reaching a later native handle.
 
 ### Parent validity
 
-Bindings MUST preserve native parent validity while child wrappers are live:
+Bindings MUST preserve native parent validity while child wrappers are live.
+Child wrappers retain parent owner state whenever native validity depends on the
+parent. Parent close preflight rejects both live children and pending
+child-creation reservations without consuming or closing the parent.
 
-Child wrappers retain the parent owner state whenever native validity depends on
-the parent. Releasing a parent while children are live MUST fail without
-consuming or destroying the parent.
+A `MapProjectionHandle` is a child of its source map. It remains usable from any
+thread until its close operation completes, and a live projection prevents map
+close.
 
-`MapProjectionHandle` is the exception: after creation it owns a standalone
-projection snapshot. It MUST remain valid after the source map closes and MUST
-release with `mln_map_projection_destroy()`.
-
-An `OperationHandle` is a child of its runtime. Runtime release MUST reject a
-live operation before calling native runtime destruction, including an operation
-whose result was already taken or discarded.
+An `OperationHandle` retains its own result, diagnostic, notification endpoint,
+and internal work independently of the initiating runtime or map wrapper.
+Releasing the public observer does not cancel accepted work. The notification
+source remains live until every associated operation observer is released.
 
 ### Operation result lifetime
 
@@ -573,14 +572,15 @@ Callback invocation follows this operation:
    callback boundary. If the public callback returns a recoverable host failure,
    convert the failure to the C callback's documented behavior.
 3. Synchronize callback state that native can invoke concurrently.
-4. Return promptly. Callback code hands owner-thread work back to the owner
-   thread before calling runtime or map APIs.
+4. Return promptly. Callback code schedules any later host work before calling
+   runtime or map APIs.
 
-Callback replacement installs the new native registration before releasing old
-callback state. If installation fails, the old callback remains active and the
-replacement state is released. Clearing, replacing, or closing prevents new
-upcalls, waits for in-flight upcalls, and releases callback roots after native
-can no longer invoke them.
+Callback replacement retains both old and new roots through native acceptance.
+For a command registration, keep the new root through terminal failure or later
+replacement, and keep the old root through the terminal committed replacement or
+clear event. For an Immediate registration, release the old root only after the
+call returns successfully. Native quiescence prevents new entries and waits for
+in-flight upcalls before the old root becomes unreachable.
 
 If a leaked native owner can still reach callback user data, non-deterministic
 cleanup reports the leak and keeps callback memory reachable from native alive.
@@ -672,8 +672,9 @@ Resource provider invocation follows this operation:
    changing one-shot or release behavior.
 
 Provider registration is replaceable for a runtime's whole life. A binding keeps
-the registered callback state reachable until the C call that replaces or clears
-the provider returns, and releases it after that call returns.
+the new callback state reachable after command acceptance and keeps the old
+state reachable until the replacement or clear command reaches a terminal
+disposition.
 
 Handled request completion is terminal. A request can complete once; a
 completion that reaches C consumes the completion path even when native returns
@@ -688,61 +689,47 @@ argument, so one request handle type covers both the owning and the moved use.
 
 ---
 
-## Threading
+## Execution
 
-The C API owner-thread model is visible at the binding layer. Ordinary public
-methods call C synchronously on the calling native thread and surface the C
-owner-thread status when called from the wrong thread.
+Runtime, map, projection, operation, notification-source, and event-batch
+handles are callable from any native thread. The C API owns the runtime's
+scheduler thread. A binding MUST NOT create an owner thread, expose a pump, or
+pin a task to a native thread for runtime or map progress.
 
-### Owner-thread helpers
+Bindings preserve the C execution category:
 
-Provide an owner-thread execution helper when the host language can move a
-logical task across native threads or cannot otherwise give safe callers a
-stable native owner thread for a runtime/map lifecycle. Bindings with stable
-native caller identity expose ordinary methods and wrong-thread errors without
-this helper.
+1. Immediate functions return synchronously in the language's ordinary result or
+   error shape.
+2. Commands return after native code accepts and copies the input. The binding
+   exposes the command ID and preserves terminal command dispositions in its
+   event model.
+3. Published snapshots return synchronous language-owned copies. A binding does
+   not relabel an ordered query as a snapshot.
+4. Operations use the language's future, promise, task, suspension, or explicit
+   wait idiom. Cooperative and UI executors suspend instead of blocking.
+5. Event batches drain after notification and become language-owned event
+   sequences.
+6. Render-driver calls preserve the graphics-thread requirement documented by
+   the target.
 
-The helper follows this design:
+Lifecycle wrappers start and observe native lifecycle operations. A constructor
+does not publish its runtime or map wrapper until typed result take transfers
+the live handle. Explicit close performs native preflight, retains callbacks and
+dependencies until the close operation completes, and then makes every public
+alias observe closed state. A preflight failure leaves the wrapper open.
 
-1. It owns or binds one native owner thread before creating thread-affine
-   handles.
-2. It runs submitted operations by calling the ordinary low-level binding
-   methods on that owner thread.
-3. It serializes submitted operations with event draining and close on that
-   owner thread.
-4. It returns the ordinary binding result or error shape, including copied
-   native diagnostics.
-5. Closing rejects new submissions, releases thread-affine handles on the owner
-   thread, and leaves later submissions in the binding's closed-state error
-   shape.
+Operation wrappers retain their native observer until result take, discard, or
+release. They expose permanent terminal status and copied diagnostics. A
+binding's nondeterministic cleanup may detach a pending observer only when every
+callback root and native dependency remains reachable until internal work
+finishes; otherwise it reports a leak.
 
-A helper that parks its owner thread between iterations acquires a wake source
-and signals it from submission and close, so a submitted operation runs at
-submission time.
-
-### Parking and wake
-
-The pump is one method taking a timeout. Bindings expose it alongside a wake
-source handle.
-
-The pump wrapper follows this design:
-
-1. It takes the host language's duration or timeout type, maps zero to a
-   non-blocking drain, and maps the language's "no timeout" spelling to an
-   unbounded park.
-2. It releases the host runtime's blocking-call machinery for the duration of
-   the call, including any interpreter lock, so other host threads run while the
-   owner thread parks.
-3. Its documentation states that a wake signal sets a flag the pump clears, and
-   that callers drain events after every return.
-
-The wake source follows this design:
-
-1. It is a distinct owned handle that the host releases explicitly, and
-   releasing it is independent of the runtime's lifetime in both orders.
-2. It is transferable and callable from any thread, and the binding declares
-   that where the host language can express it.
-3. Signalling after the runtime is closed succeeds and does nothing.
+A binding has one private operation adapter for waiting, cancellation, terminal
+status, copied diagnostics, typed result transfer or discard, and release.
+Domain APIs materialize inputs, start the operation, and convert the transferred
+result. A blocking resource-release path MAY use the same adapter's explicit
+wait, but a binding MUST NOT add paired blocking and asynchronous workflows for
+ordinary operations.
 
 ### Notification source
 
@@ -751,15 +738,21 @@ pass that source in the native runtime options. Operations and runtime events
 use the same receiver-scoped source. A binding that drains ready endpoints MUST
 release each owned ready batch after copying its endpoint view.
 
-Runtime release MUST destroy the native runtime before closing its notification
-source. Closing the source while an endpoint remains associated leaves the
-source open, so the binding MUST preserve its live state after that failure.
+The native callback schedules a later drain on an existing host execution
+context. A binding MUST NOT create a scheduler, executor, worker, or owner
+thread for notification delivery. A host integration MAY supply the execution
+context. Bindings that leave scheduling to the host expose callback registration
+and ready-endpoint draining together.
+
+Runtime close MUST complete before the binding closes its notification source.
+Closing the source while an endpoint remains associated leaves the source open,
+so the binding MUST preserve its live state after that failure.
 
 ### Event draining
 
-The public event API is explicit: host code pumps native runtime work, then
-drains the queued runtime events. One drain returns the ordered sequence of
-events that the queue held, empty when it held none.
+The public event API is notification-driven. The host drains when the
+receiver-scoped source reports the runtime endpoint ready. One drain returns the
+ordered sequence that the queue held, empty when it held none.
 
 The drain follows this operation:
 
@@ -789,7 +782,8 @@ The drain follows this operation:
 ### Event subscription
 
 A map and a runtime each carry a subscription: the event types it queues. An
-unselected event is never built, never queued, and raises no wake.
+unselected event is never built, never queued, and does not make the
+notification source readable.
 
 The subscription follows this design:
 
@@ -820,51 +814,38 @@ The subscription follows this design:
 ### Attaching a render session
 
 A render session's owner thread is the thread that attached it, fixed for the
-session's lifetime, and it need not be the map's owner thread.
+session's lifetime. Runtime and map handles have no host-thread affinity.
 
-1. Attach requires the map to be live, not to be owned by the calling thread.
+1. Attach requires the map to be live.
 2. The session a binding returns is affine to the attaching thread. Every
    session operation from another thread reports the binding's wrong-thread
    error, including close.
-3. A binding MUST NOT retain the map in binding-owned state that cannot reach
-   the attaching thread. Where a binding drops that retention, it documents that
-   the C API keeps the map alive instead, by rejecting map destroy while a
-   session is attached, and that releasing a map before its session reports
-   through the binding's leak channel rather than destroying the map.
-4. A binding whose map handle cannot cross threads MUST expose the map to the
-   attaching thread through a transferable attach reference whose only operation
-   is attach. Bindings whose map handle is already safe to use from another
-   thread expose attach on the map handle directly and MUST NOT add a redundant
-   reference type. A binding whose owner identity is a host construct rather
-   than the native thread, such as a Dart isolate, states that the two must
-   coincide for its handles to stay usable.
+3. The binding retains the map until session close. Map close preflight reports
+   invalid state and leaves the map open while a session is attached.
+4. Attach is exposed directly on the map handle. A binding MUST NOT add an
+   attach-only reference or owner-thread adapter for the map.
 
 ### Transferability
 
-When the language can declare or enforce cross-thread transferability, ordinary
-owner-thread handles MUST be non-transferable. A transferable owner-thread
-helper handle is allowed only when every operation either is submitted back to
-the bound native owner thread or is serviced entirely under native
-synchronization. Two handles are the second kind. A map attach reference reaches
-no thread-affine map state: attach claims the map's render-session slot under
-the C API's map registry lock and posts the new size to the map's own owner
-thread. A wake source handle reaches native wake state that carries its own
-synchronization and holds no owner-thread state. Both are transferable and MUST
-NOT be shareable. Copied immutable values can be transferable when their
-contents are independent of native owner-thread state. Unchecked or unsafe
-concurrency conformance MUST name the synchronization invariant that makes it
-sound.
+Runtime, map, projection, operation, notification-source, ready-batch, and
+event-batch handles are safe to move between native threads. A binding may
+declare them transferable when its wrapper synchronizes close, release, and
+in-flight calls. Render sessions and their frame handles remain bound to the
+graphics thread that attached the session. Copied immutable values can be
+transferable when their contents are independent of native handles.
 
----
+Unchecked or unsafe concurrency conformance MUST name the wrapper
+synchronization invariant that makes concurrent use and close sound.
 
 ## Rendering
 
 Rendering bindings expose render sessions, frame lifetimes, and readback without
 taking ownership of caller-owned backend resources.
 
-Render session calls may run on a thread other than the one that pumps the
-runtime. Events produced by rendering are delivered by a runtime event drain
-from any thread.
+Render session calls run on the graphics thread that attached the session.
+Runtime and map work progresses on the core-owned scheduler independently.
+Events produced by rendering are delivered by a runtime event drain from any
+thread.
 
 ### Render sessions
 
@@ -1006,24 +987,14 @@ that a real native failure would expose.
 
 | ID      | Test                                                                                                                                                                                                      |
 | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-040 | Runtime creation followed by explicit release destroys the native handle exactly once; every public alias observes release state, and a second release no-ops.                                            |
-| BND-041 | A failed native destroy leaves the handle live; a later successful release destroys the native handle.                                                                                                    |
-| BND-042 | A child handle retains parent owner state, and parent release fails while child handles are live.                                                                                                         |
-| BND-043 | `MapProjectionHandle` remains usable after the source map closes and then releases successfully.                                                                                                          |
-| BND-044 | Runtime release rejects a live operation child before native destruction; after explicit operation release, runtime release succeeds.                                                                     |
+| BND-040 | Runtime creation followed by explicit close retires the native handle exactly once; every public alias observes closed state, and a second binding close no-ops.                                          |
+| BND-041 | A failed native close preflight leaves the handle live; a later accepted close operation retires it.                                                                                                      |
+| BND-042 | A parent close rejects a live or pending child, leaves the parent open, and succeeds after the child closes or creation resolves.                                                                         |
+| BND-043 | A map projection remains usable until explicit close; a live projection prevents map close.                                                                                                               |
+| BND-044 | Releasing an operation observer does not cancel or stall accepted native work, and a pending lifecycle operation preserves every dependency through completion.                                           |
 | BND-045 | A released handle's id, replayed through an internal seam after a new handle of the same kind is created, reports the binding's invalid-argument error naming it stale, and the new handle keeps working. |
 | BND-047 | A handle id of one kind passed to another kind's operation through an internal seam reports the binding's invalid-argument error, and the safe public API has no expression of that call.                 |
-| BND-049 | A handle id moved to a different native thread and called there reports the binding's wrong-thread error rather than a stale-handle or closed-handle error.                                               |
-
-BND-049 applies where the host language can reach a second native thread while
-the handle stays live. Dart is excluded: an isolate may resume on a different
-native thread after an await, so a handle must be closed before the test awaits
-another isolate, which leaves its id stale rather than live.
-
-BND-049 applies where the host language can reach a second native thread while
-the handle stays live. Dart is excluded: an isolate may resume on a different
-native thread after an await, so a handle must be closed before the test awaits
-the other isolate, which makes its id stale rather than live.
+| BND-049 | A runtime, map, projection, or operation handle remains usable when an asynchronous continuation resumes on another native thread.                                                                        |
 
 ### Input Structs, Values, and Copied Data
 
@@ -1046,7 +1017,7 @@ the other isolate, which makes its id stale rather than live.
 
 | ID      | Test                                                                                                                                                                     |
 | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| BND-080 | `pump` drives native event processing through the public runtime API, and a later drain reports an empty batch.                                                          |
+| BND-080 | Native runtime work progresses without a host pump, and a runtime barrier completes after every preceding submission reaches a terminal disposition.                     |
 | BND-081 | Map style loading returns the expected copied map event through a drain and identifies the correct public map identity.                                                  |
 | BND-082 | Event message and payload data remain valid after the native batch is released because the binding copied them.                                                          |
 | BND-083 | An unknown event or payload domain preserves its raw value, and an unknown payload keeps the bytes that the batch's event stride reports.                                |
@@ -1054,23 +1025,24 @@ the other isolate, which makes its id stale rather than live.
 | BND-085 | Offline region observation returns copied status/error events through the public runtime event model.                                                                    |
 | BND-086 | A map-originated event with no provable live public map exposes no public map handle.                                                                                    |
 | BND-087 | A binding steps events by the batch's reported event stride.                                                                                                             |
-| BND-088 | A parked owner thread is released by native work and by a wake source signalled from another thread, and reports a wake rather than a timeout.                           |
-| BND-089 | A pump clears the wake flag it returned on, and a wake source stays signalable and releasable after its runtime closes.                                                  |
+| BND-088 | An idle receiver resumes when native work makes a runtime event or operation endpoint ready, without polling either domain.                                              |
+| BND-089 | Runtime close completes before its notification source closes, and a failed premature source close preserves the binding's live source state.                            |
 | BND-090 | One drain reports more than one event and preserves queue order.                                                                                                         |
-| BND-091 | The default subscription parameter delivers every event type, a narrowed one delivers neither the cleared type nor a wake for it, and an unknown bit is rejected.        |
+| BND-091 | The default subscription delivers every event type; a narrowed one delivers neither the cleared type nor readiness for it; an unknown bit is rejected.                   |
 | BND-092 | Two owned batches remain readable independently until release, and the values a binding copied out of them remain readable afterward.                                    |
 | BND-093 | Binding-owned cleanup that a style load drives still runs while the map's subscription leaves out the style-loaded type.                                                 |
+| BND-094 | Accepted commands expose their IDs and one terminal committed, failed, cancelled, or superseded disposition with copied diagnostic data.                                 |
 
 ### Map, camera, projection, style, and query
 
 | ID      | Test                                                                                                                                                                                                    |
 | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-100 | Map creation applies public map options, extent, and mode, then releases through the runtime parent relationship.                                                                                       |
-| BND-101 | Style URL and style JSON loading succeed through public map APIs and return copied style-loaded events through a drain.                                                                                 |
-| BND-102 | Camera set/get, animated camera commands, transition cancellation, and gesture-in-progress bracketing produce the expected native camera state and statuses.                                            |
+| BND-100 | Runtime and map lifecycle operations apply public options, transfer each created handle once, enforce close preflight, and preserve parent relationships.                                               |
+| BND-101 | Style URL and style JSON commands succeed and return copied style-loaded events through a drain.                                                                                                        |
+| BND-102 | One atomic camera command applies every selected field and correlation value; published snapshots and ordered queries report the expected committed state and generation.                               |
 | BND-103 | Projection helpers round-trip screen, lat/lng, and projected-meter values through copied public values within documented tolerance.                                                                     |
 | BND-104 | Representative invalid map and projection inputs propagate native invalid-argument diagnostics through the public error shape.                                                                          |
-| BND-105 | Style source, layer, image, and feature-state workflows add, update, query/list, and remove public input values and copied IDs.                                                                         |
+| BND-105 | Style source, layer, image, and feature-state workflows submit commands, await ordered query/list operations, and preserve copied IDs.                                                                  |
 | BND-106 | Query workflows return one copied UTF-8 JSON envelope containing feature geometry, properties, identifiers, state, and optional source/layer identifiers.                                               |
 | BND-108 | The loaded style document reads back byte-for-byte through public map APIs, the style URL reads back the last requested URL, and both report empty when absent.                                         |
 | BND-109 | Source inspection copies a URL-backed source URL and inline tile-source metadata, including multiple tile URLs and absent fields, and the result remains valid after the map no longer owns the source. |
@@ -1156,21 +1128,19 @@ When the host language can run cleanup outside explicit release, include:
 
 #### Cross-thread public handle use
 
-When safe public code can call owner-thread-affine APIs from the wrong native
-thread or race release on the same owner-thread handle, include:
+When safe public code can use or close the same any-thread handle concurrently,
+include:
 
-| ID      | Test                                                                                                                                                          |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-046 | Concurrent releases call native release at most once and public calls fail while release is in progress.                                                      |
-| BND-190 | Owner-thread-affine calls from a different native thread report the binding's wrong-thread error.                                                             |
-| BND-191 | Runtime wrong-thread errors include the copied native diagnostic.                                                                                             |
-| BND-197 | A release racing a use of the same handle waits for the in-flight use, and a use starting after the release begins reports the binding's closed-handle error. |
+| ID      | Test                                                                                                                                                               |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| BND-046 | Concurrent close or release attempts call the terminal native function at most once, and public calls fail while close or release is in progress.                  |
+| BND-190 | Runtime, map, projection, and operation calls from another native thread preserve validity and runtime submission order.                                           |
+| BND-191 | An operation's copied final diagnostic remains stable after unrelated native calls on another thread.                                                              |
+| BND-197 | A close or release racing a use of the same handle waits for the in-flight use, and a use starting after the transition begins reports the binding's closed error. |
 
-BND-197 applies to handles the host can use and release from different threads,
-which today means the wake source and the resource request. A binding that
-orders the two by holding one lock across the native call satisfies it by
-construction and has nothing beyond that lock to assert; a binding that counts
-in-flight uses and drains them exercises the counter directly.
+A binding that orders the race by holding one lock across the native call
+satisfies BND-197 by construction. A binding that counts in-flight uses and
+drains them exercises the counter directly.
 
 #### Render sessions on a second thread
 
@@ -1179,7 +1149,7 @@ backend and the host language can start a native thread, include:
 
 | ID      | Test                                                                                                                                                  |
 | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-193 | A native thread that does not own the map attaches its own render session against it and renders while the map is pumped on its own owner thread.     |
+| BND-193 | A native thread attaches its own render session against a map and renders while the map progresses on the core-owned scheduler thread.                |
 | BND-194 | Every render-session operation reports the binding's wrong-thread error on a thread other than the one that attached the session, leaving it usable.  |
 | BND-195 | A session attached and closed on a second native thread destroys the native handle exactly once, after which the map closes successfully.             |
 | BND-196 | Attaching through a reference to a released map reports the binding's invalid-argument error naming the map stale, including once a later map exists. |
@@ -1195,11 +1165,3 @@ backend, include:
 
 Bindings without live render-session fixtures cover byte ownership and copying
 through BND-066 and BND-067.
-
-#### Owner-thread execution adapters
-
-When the subproject ships an owner-thread execution adapter, include:
-
-| ID      | Test                                                                        |
-| ------- | --------------------------------------------------------------------------- |
-| BND-192 | The adapter confines create, pump, event draining, and close to one thread. |

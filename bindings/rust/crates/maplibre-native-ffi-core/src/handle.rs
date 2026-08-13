@@ -38,7 +38,6 @@ native_handle!(
     sys::mln_map,
     sys::mln_map_projection,
     sys::mln_render_session,
-    sys::mln_wake_source,
     sys::mln_operation,
     sys::mln_notification_source,
     sys::mln_event_batch,

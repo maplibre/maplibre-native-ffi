@@ -23,18 +23,16 @@ func liveCustomGeometrySources(t *testing.T, baseline int64) int64 {
 	return callback.CustomGeometrySourceLiveCountForTest() - baseline
 }
 
-// loadStyleAndCollect loads an inline style and pumps until the map settles,
+// loadStyleAndCollect loads an inline style and waits until the map settles,
 // returning every event it drained.
 func loadStyleAndCollect(t *testing.T, runtime *RuntimeHandle, m *MapHandle, style string) []RuntimeEvent {
 	t.Helper()
-	if err := m.SetStyleJSON([]byte(style)); err != nil {
+	if _, err := m.SetStyleJSON([]byte(style)); err != nil {
 		t.Fatalf("SetStyleJSON(): %v", err)
 	}
 	var events []RuntimeEvent
 	for range make([]struct{}, 200) {
-		if err := runtime.Pump(2 * time.Millisecond); err != nil {
-			t.Fatalf("Pump(): %v", err)
-		}
+		time.Sleep(time.Millisecond)
 		batch, err := runtime.DrainEvents(0)
 		if err != nil {
 			t.Fatalf("DrainEvents(): %v", err)
@@ -58,7 +56,7 @@ func TestCustomGeometrySourceDescriptors(t *testing.T) {
 	wrap := false
 	fetches := 0
 	cancels := 0
-	if err := m.AddCustomGeometrySource("custom", CustomGeometrySourceOptions{
+	if _, err := m.AddCustomGeometrySource("custom", CustomGeometrySourceOptions{
 		FetchTile:  func(CanonicalTileID) { fetches++ },
 		CancelTile: func(CanonicalTileID) { cancels++ },
 		MinZoom:    &minZoom,
@@ -75,28 +73,28 @@ func TestCustomGeometrySourceDescriptors(t *testing.T) {
 		t.Fatalf("callbacks invoked during registration: fetches=%d cancels=%d", fetches, cancels)
 	}
 	tileID := CanonicalTileID{Z: 0, X: 0, Y: 0}
-	if err := m.SetCustomGeometrySourceTileData("custom", tileID, []byte(`{"type":"FeatureCollection","features":[]}`)); err != nil {
+	if _, err := m.SetCustomGeometrySourceTileData("custom", tileID, []byte(`{"type":"FeatureCollection","features":[]}`)); err != nil {
 		t.Fatalf("SetCustomGeometrySourceTileData(): %v", err)
 	}
-	if err := m.InvalidateCustomGeometrySourceTile("custom", tileID); err != nil {
+	if _, err := m.InvalidateCustomGeometrySourceTile("custom", tileID); err != nil {
 		t.Fatalf("InvalidateCustomGeometrySourceTile(): %v", err)
 	}
-	if err := m.InvalidateCustomGeometrySourceRegion("custom", LatLngBounds{Southwest: LatLng{Latitude: -1, Longitude: -1}, Northeast: LatLng{Latitude: 1, Longitude: 1}}); err != nil {
+	if _, err := m.InvalidateCustomGeometrySourceRegion("custom", LatLngBounds{Southwest: LatLng{Latitude: -1, Longitude: -1}, Northeast: LatLng{Latitude: 1, Longitude: 1}}); err != nil {
 		t.Fatalf("InvalidateCustomGeometrySourceRegion(): %v", err)
 	}
-	removed, err := m.RemoveStyleSource("custom")
+	removed, err := takeStyleOperationForTest(m.StartRemoveStyleSource("custom"))
 	if err != nil {
 		t.Fatalf("RemoveStyleSource(custom): %v", err)
 	}
 	if !removed {
 		t.Fatal("RemoveStyleSource(custom) removed=false, want true")
 	}
-	if err := m.AddCustomGeometrySource("bad-custom", CustomGeometrySourceOptions{}); !errors.Is(err, ErrInvalidArgument) {
+	if _, err := m.AddCustomGeometrySource("bad-custom", CustomGeometrySourceOptions{}); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("AddCustomGeometrySource(nil fetch) error = %v, want ErrInvalidArgument", err)
 	}
 	// A native add the style rejects owes no release callback, so the binding
 	// frees the state it built for it before returning.
-	if err := m.AddCustomGeometrySource("", CustomGeometrySourceOptions{
+	if _, err := m.AddCustomGeometrySource("", CustomGeometrySourceOptions{
 		FetchTile: func(CanonicalTileID) {},
 	}); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("AddCustomGeometrySource(empty ID) error = %v, want ErrInvalidArgument", err)
@@ -117,7 +115,7 @@ func TestCustomGeometrySourceReleasedWhenStyleLoadDropsIt(t *testing.T) {
 	baseline := callback.CustomGeometrySourceLiveCountForTest()
 
 	loadStyleAndCollect(t, runtime, m, backgroundStyleJSON)
-	if err := m.AddCustomGeometrySource("custom", CustomGeometrySourceOptions{
+	if _, err := m.AddCustomGeometrySource("custom", CustomGeometrySourceOptions{
 		FetchTile: func(CanonicalTileID) {},
 	}); err != nil {
 		t.Fatalf("AddCustomGeometrySource(): %v", err)
@@ -145,13 +143,13 @@ func TestCustomGeometrySourceReleasedByRemovalAndMapClose(t *testing.T) {
 	loadStyleAndCollect(t, runtime, m, backgroundStyleJSON)
 
 	for _, sourceID := range []string{"removed", "surviving"} {
-		if err := m.AddCustomGeometrySource(sourceID, CustomGeometrySourceOptions{
+		if _, err := m.AddCustomGeometrySource(sourceID, CustomGeometrySourceOptions{
 			FetchTile: func(CanonicalTileID) {},
 		}); err != nil {
 			t.Fatalf("AddCustomGeometrySource(%s): %v", sourceID, err)
 		}
 	}
-	if removed, err := m.RemoveStyleSource("removed"); err != nil || !removed {
+	if removed, err := takeStyleOperationForTest(m.StartRemoveStyleSource("removed")); err != nil || !removed {
 		t.Fatalf("RemoveStyleSource(removed) = (%v, %v), want (true, nil)", removed, err)
 	}
 	if live := liveCustomGeometrySources(t, baseline); live != 1 {

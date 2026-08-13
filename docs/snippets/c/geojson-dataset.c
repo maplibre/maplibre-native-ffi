@@ -18,10 +18,11 @@ mln_status show_earthquakes(mln_map map, const char* geojson_url) {
   options.cluster = true;
   options.cluster_radius = 60;  // pixels
   // #endregion options
+  uint64_t command_id = 0;
 
   // #region source
   mln_status status = mln_map_add_geojson_source_url(
-    map, view("earthquakes"), view(geojson_url), &options
+    map, view("earthquakes"), view(geojson_url), &options, &command_id
   );
   if (status != MLN_STATUS_OK) return status;
   // #endregion source
@@ -33,7 +34,7 @@ mln_status show_earthquakes(mln_map map, const char* geojson_url) {
   // #endregion layer
 
   // #region add-layer
-  return mln_map_add_style_layer_json(map, view(layer), view(""));
+  return mln_map_add_style_layer_json(map, view(layer), view(""), &command_id);
   // #endregion add-layer
 }
 
@@ -52,6 +53,9 @@ mln_status show_one_point(mln_map map, mln_lat_lng position) {
   }
 
   // A null options pointer selects the defaults. Clustering is off by default.
-  return mln_map_add_geojson_source_data(map, view("pins"), view(data), NULL);
+  uint64_t command_id = 0;
+  return mln_map_add_geojson_source_data(
+    map, view("pins"), view(data), NULL, &command_id
+  );
   // #endregion inline-data
 }

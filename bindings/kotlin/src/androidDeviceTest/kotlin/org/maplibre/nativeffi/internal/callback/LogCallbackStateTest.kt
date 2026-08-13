@@ -15,69 +15,71 @@ import org.maplibre.nativeffi.log.LogRecord
 
 class LogCallbackStateTest {
   @Test
-  fun callbackClosureWaitsForEnteredCallbacksAndSupportsClosureFromCallback() {
-    val entered = CountDownLatch(1)
-    val release = CountDownLatch(1)
-    val state =
-      install(
-        LogCallback {
-          entered.countDown()
-          release.await(5, TimeUnit.SECONDS)
-          true
-        }
-      )
-    val invocation = thread { state.invoke(0, 0, 0, null) }
-    assertTrue(entered.await(5, TimeUnit.SECONDS))
-    val closed = CountDownLatch(1)
-    val closer = thread {
-      state.close()
-      closed.countDown()
-    }
-    assertFalse(closed.await(50, TimeUnit.MILLISECONDS))
-    release.countDown()
-    invocation.join()
-    closer.join()
-    assertTrue(state.isClosedForTesting())
-
-    lateinit var reentrant: LogCallbackState
-    reentrant =
-      install(
-        LogCallback {
-          reentrant.close()
-          true
-        }
-      )
-    assertEquals(1, reentrant.invoke(0, 0, 0, null))
-    assertTrue(reentrant.isClosedForTesting())
-    LogCallbackState.clearForTesting()
-  }
-
-  @Test
-  fun replacementPreservesRawEnumsAndFailedReplacementKeepsPreviousState() {
-    var copied: LogRecord? = null
-    try {
-      val previous =
+  fun callbackClosureWaitsForEnteredCallbacksAndSupportsClosureFromCallback(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val entered = CountDownLatch(1)
+      val release = CountDownLatch(1)
+      val state =
         install(
           LogCallback {
-            copied = it
-            false
+            entered.countDown()
+            release.await(5, TimeUnit.SECONDS)
+            true
           }
         )
-      assertFailsWith<IllegalStateException> {
-        LogCallbackState.setForTesting(LogCallback { true }) { error("registration failed") }
+      val invocation = thread { state.invoke(0, 0, 0, null) }
+      assertTrue(entered.await(5, TimeUnit.SECONDS))
+      val closed = CountDownLatch(1)
+      val closer = thread {
+        state.close()
+        closed.countDown()
       }
-      assertSame(previous, LogCallbackState.currentForTesting())
-      assertFalse(previous.isClosedForTesting())
-      previous.invoke(991, 992, 7, null)
-      assertEquals(991, copied?.severity?.nativeValue)
-      assertEquals(992, copied?.event?.nativeValue)
+      assertFalse(closed.await(50, TimeUnit.MILLISECONDS))
+      release.countDown()
+      invocation.join()
+      closer.join()
+      assertTrue(state.isClosedForTesting())
 
-      LogCallbackState.setForTesting(LogCallback { true })
-      assertTrue(previous.isClosedForTesting())
-    } finally {
+      lateinit var reentrant: LogCallbackState
+      reentrant =
+        install(
+          LogCallback {
+            reentrant.close()
+            true
+          }
+        )
+      assertEquals(1, reentrant.invoke(0, 0, 0, null))
+      assertTrue(reentrant.isClosedForTesting())
       LogCallbackState.clearForTesting()
     }
-  }
+
+  @Test
+  fun replacementPreservesRawEnumsAndFailedReplacementKeepsPreviousState(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      var copied: LogRecord? = null
+      try {
+        val previous =
+          install(
+            LogCallback {
+              copied = it
+              false
+            }
+          )
+        assertFailsWith<IllegalStateException> {
+          LogCallbackState.setForTesting(LogCallback { true }) { error("registration failed") }
+        }
+        assertSame(previous, LogCallbackState.currentForTesting())
+        assertFalse(previous.isClosedForTesting())
+        previous.invoke(991, 992, 7, null)
+        assertEquals(991, copied?.severity?.nativeValue)
+        assertEquals(992, copied?.event?.nativeValue)
+
+        LogCallbackState.setForTesting(LogCallback { true })
+        assertTrue(previous.isClosedForTesting())
+      } finally {
+        LogCallbackState.clearForTesting()
+      }
+    }
 
   private fun install(callback: LogCallback): LogCallbackState {
     LogCallbackState.setForTesting(callback)

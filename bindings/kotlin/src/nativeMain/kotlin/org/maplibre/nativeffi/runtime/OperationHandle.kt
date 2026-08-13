@@ -103,6 +103,7 @@ internal constructor(
 
   public actual override fun close() {
     if (!core.beginClose()) return
+    runtime.forgetOperation(core.id.toULong())
     mln_operation_release(core.id.toULong())
     core.finishClose()
   }

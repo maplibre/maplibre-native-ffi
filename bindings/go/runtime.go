@@ -9,7 +9,6 @@ import "C"
 
 import (
 	"errors"
-	stdruntime "runtime"
 	"sync"
 	"time"
 	"unsafe"
@@ -52,6 +51,9 @@ const (
 	operationRegionInvalidate
 	operationRegionDelete
 	operationSetMaximumAmbientCacheSize
+	operationCameraQuery
+	operationStillImage
+	operationBarrier
 )
 
 type operationResultKind uint8
@@ -62,6 +64,7 @@ const (
 	operationResultOptionalRegion
 	operationResultRegionList
 	operationResultRegionStatus
+	operationResultCamera
 )
 
 // OperationHandle owns a common asynchronous native operation.
@@ -70,6 +73,7 @@ type OperationHandle[T any] struct {
 	id             uint64
 	kind           operationKind
 	resultKind     operationResultKind
+	takeResult     func(uint64) (T, bool, error)
 	mu             sync.Mutex
 	cond           *sync.Cond
 	activeUses     int
@@ -369,11 +373,11 @@ const (
 	RuntimeEventOfflineRegionResponseError          RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR)
 	RuntimeEventOfflineRegionTileCountLimitExceeded RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED)
 	RuntimeEventMapCameraTransitionFinished         RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED)
+	RuntimeEventCommandFinished                     RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_COMMAND_FINISHED)
 )
 
 // RuntimeEventMask selects which event types a map or a runtime queues. An event
-// whose type is unselected is never built and never queued, so it neither
-// reaches a batch nor raises the runtime's wake flag.
+// whose type is unselected is never built, queued, or reported ready.
 //
 // Every bit value comes from the C API, so a mask cannot drift from the
 // RuntimeEventType constants. Masks combine with the bitwise operators: | adds
@@ -405,6 +409,7 @@ const (
 	RuntimeEventMaskOfflineRegionStatusChanged          RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED)
 	RuntimeEventMaskOfflineRegionResponseError          RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR)
 	RuntimeEventMaskOfflineRegionTileCountLimitExceeded RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED)
+	RuntimeEventMaskCommandFinished                     RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_COMMAND_FINISHED)
 	// RuntimeEventMaskAllMapEvents selects every map-originated event type this
 	// binding version defines.
 	RuntimeEventMaskAllMapEvents RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS)
@@ -441,6 +446,7 @@ const (
 	RuntimeEventPayloadOfflineRegionResponseError  RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR)
 	RuntimeEventPayloadOfflineRegionTileCountLimit RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT)
 	RuntimeEventPayloadCameraTransitionFinished    RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED)
+	RuntimeEventPayloadCommandFinished             RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_COMMAND_FINISHED)
 )
 
 // MapID identifies a map within one RuntimeHandle.
@@ -579,6 +585,25 @@ type RuntimeEventCameraTransitionFinishedPayload struct {
 	TransitionID uint64
 }
 
+// CommandDisposition identifies a command's terminal disposition.
+type CommandDisposition uint32
+
+const (
+	CommandDispositionCommitted  CommandDisposition = CommandDisposition(C.MLN_COMMAND_DISPOSITION_COMMITTED)
+	CommandDispositionSuperseded CommandDisposition = CommandDisposition(C.MLN_COMMAND_DISPOSITION_SUPERSEDED)
+	CommandDispositionFailed     CommandDisposition = CommandDisposition(C.MLN_COMMAND_DISPOSITION_FAILED)
+	CommandDispositionCancelled  CommandDisposition = CommandDisposition(C.MLN_COMMAND_DISPOSITION_CANCELLED)
+)
+
+// RuntimeEventCommandFinishedPayload identifies the command that reached a
+// terminal disposition and its committed generation, when it has one.
+type RuntimeEventCommandFinishedPayload struct {
+	CommandID      uint64
+	Disposition    CommandDisposition
+	RawDisposition uint32
+	Generation     uint64
+}
+
 // RuntimeEventOfflineRegionStatusPayload is a copied offline status event payload.
 type RuntimeEventOfflineRegionStatusPayload struct {
 	RegionID OfflineRegionID
@@ -607,28 +632,106 @@ type RuntimeEventUnknownPayload struct {
 	Bytes []byte
 }
 
-// RuntimeHandle owns scheduler state and event storage for one owner thread.
-type RuntimeHandle struct {
-	state              *handle.State[nativeRuntime]
-	notificationSource nativeNotificationSource
+type pendingResourceTransform struct {
+	replacement *callback.ResourceTransformState
+}
 
-	resourceTransformMu   sync.Mutex
-	resourceTransform     *callback.ResourceTransformState
-	httpHeaderTransformMu sync.Mutex
-	httpHeaderTransform   *callback.HttpHeaderTransformState
-	resourceProviderMu    sync.Mutex
-	resourceProvider      *callback.ResourceProviderState
-	mapsMu                sync.Mutex
+type pendingHttpHeaderTransform struct {
+	replacement *callback.HttpHeaderTransformState
+}
+
+type pendingResourceProvider struct {
+	replacement *callback.ResourceProviderState
+}
+
+// RuntimeHandle owns autonomous scheduler state and event storage.
+type RuntimeHandle struct {
+	state                *handle.State[nativeRuntime]
+	notificationSource   nativeNotificationSource
+	notificationMu       sync.Mutex
+	notificationCallback uintptr
+
+	resourceTransformMu        sync.Mutex
+	resourceTransform          *callback.ResourceTransformState
+	pendingResourceTransform   map[uint64]pendingResourceTransform
+	httpHeaderTransformMu      sync.Mutex
+	httpHeaderTransform        *callback.HttpHeaderTransformState
+	pendingHttpHeaderTransform map[uint64]pendingHttpHeaderTransform
+	resourceProviderMu         sync.Mutex
+	resourceProvider           *callback.ResourceProviderState
+	pendingResourceProvider    map[uint64]pendingResourceProvider
+	mapsMu                     sync.Mutex
 	// Resolves an event's source id to the public wrapper.
 	maps map[MapID]*MapHandle
 }
 
-var destroyRuntimeHandle = func(native nativeRuntime) int32 {
-	return int32(C.mln_runtime_destroy(C.mln_runtime(native)))
-}
+// Test seam for synthetic handles. Production close uses closeNativeRuntime.
+var destroyRuntimeHandle func(nativeRuntime) int32
 
 var operationDiscard = func(id uint64) int32 {
 	return int32(C.mln_operation_discard_result(C.mln_operation(id)))
+}
+
+func waitNativeOperation(operation C.mln_operation) error {
+	var completed C.bool
+	if err := checkNative(func() int32 {
+		return int32(C.mln_operation_wait(operation, -1, &completed))
+	}); err != nil {
+		return err
+	}
+	if !bool(completed) {
+		return newBindingError(ErrInvalidState, "native operation wait returned before completion")
+	}
+	var terminal C.mln_status
+	if err := checkNative(func() int32 {
+		return int32(C.mln_operation_get_status(operation, &terminal))
+	}); err != nil {
+		return err
+	}
+	if int32(terminal) == int32(C.MLN_STATUS_OK) {
+		return nil
+	}
+	diagnostic, _ := copyNativeOperationDiagnostic(operation)
+	return &Error{
+		kind:       kindForStatus(int32(terminal)),
+		rawStatus:  int32(terminal),
+		hasStatus:  true,
+		diagnostic: diagnostic,
+	}
+}
+
+func copyNativeOperationDiagnostic(operation C.mln_operation) (string, error) {
+	var size C.size_t
+	if err := checkNative(func() int32 {
+		return int32(C.mln_operation_copy_diagnostic(operation, nil, 0, &size))
+	}); err != nil {
+		return "", err
+	}
+	if size == 0 {
+		return "", nil
+	}
+	buffer := make([]byte, int(size))
+	if err := checkNative(func() int32 {
+		return int32(C.mln_operation_copy_diagnostic(
+			operation,
+			(*C.char)(unsafe.Pointer(&buffer[0])),
+			C.size_t(len(buffer)),
+			&size,
+		))
+	}); err != nil {
+		return "", err
+	}
+	return string(buffer[:int(size)]), nil
+}
+
+func statusFromError(err error) int32 {
+	var native *Error
+	if errors.As(err, &native) {
+		if status, ok := native.RawStatus(); ok {
+			return status
+		}
+	}
+	return int32(C.MLN_STATUS_NATIVE_ERROR)
 }
 
 // String returns a diagnostic name for the status.
@@ -674,16 +777,20 @@ func rawNetworkStatusForSet(status NetworkStatus) (uint32, error) {
 	}
 }
 
-// NewRuntime creates a runtime on the current OS thread using native defaults.
+// NewRuntime creates a runtime using native defaults. Native worker threads
+// make progress independently of the calling goroutine.
 func NewRuntime() (*RuntimeHandle, error) {
 	return NewRuntimeWithOptions(NewRuntimeOptions("", ""))
 }
 
-// NewRuntimeWithOptions creates a runtime on the current OS thread using
-// explicit options. Start from NewRuntimeOptions to keep every event type
-// selected; a zero-value RuntimeOptions queues no event.
+// NewRuntimeWithOptions creates a runtime using explicit options. Start from
+// NewRuntimeOptions to keep every event type selected; a zero-value
+// RuntimeOptions queues no event.
 func NewRuntimeWithOptions(options RuntimeOptions) (*RuntimeHandle, error) {
 	if err := options.validate(); err != nil {
+		return nil, err
+	}
+	if err := checkCompatibleCABI(CVersion()); err != nil {
 		return nil, err
 	}
 	var source C.mln_notification_source
@@ -692,30 +799,60 @@ func NewRuntimeWithOptions(options RuntimeOptions) (*RuntimeHandle, error) {
 	}); err != nil {
 		return nil, err
 	}
-	runtime, err := createRuntime(CVersion(), func(out *nativeRuntime) int32 {
-		rawOptions := C.mln_runtime_options_default()
-		assetPath := C.CString(options.AssetPath)
-		defer C.free(unsafe.Pointer(assetPath))
-		cachePath := C.CString(options.CachePath)
-		defer C.free(unsafe.Pointer(cachePath))
-		rawOptions.asset_path = assetPath
-		rawOptions.cache_path = cachePath
-		rawOptions.event_mask = C.uint64_t(options.EventMask)
-		rawOptions.notification_source = source
-
-		var raw C.mln_runtime
-		status := int32(C.mln_runtime_create(&rawOptions, &raw))
-		if status == int32(C.MLN_STATUS_OK) {
-			*out = nativeRuntime(raw)
+	keepSource := false
+	defer func() {
+		if !keepSource {
+			_ = C.mln_notification_source_close(source)
 		}
-		return status
-	})
-	if err != nil {
-		_ = C.mln_notification_source_close(source)
+	}()
+
+	rawOptions := C.mln_runtime_options_default()
+	assetPath := C.CString(options.AssetPath)
+	defer C.free(unsafe.Pointer(assetPath))
+	cachePath := C.CString(options.CachePath)
+	defer C.free(unsafe.Pointer(cachePath))
+	rawOptions.asset_path = assetPath
+	rawOptions.cache_path = cachePath
+	rawOptions.event_mask = C.uint64_t(options.EventMask)
+	rawOptions.notification_source = source
+
+	var operation C.mln_operation
+	if err := checkNative(func() int32 {
+		return int32(C.mln_runtime_create_start(&rawOptions, &operation))
+	}); err != nil {
 		return nil, err
 	}
-	runtime.notificationSource = nativeNotificationSource(source)
-	return runtime, nil
+	defer C.mln_operation_release(operation)
+	if err := waitNativeOperation(operation); err != nil {
+		return nil, err
+	}
+	var raw C.mln_runtime
+	if err := checkNative(func() int32 {
+		return int32(C.mln_runtime_create_take_result(operation, &raw))
+	}); err != nil {
+		return nil, err
+	}
+	state, err := newRuntimeState(nativeRuntime(raw))
+	if err != nil {
+		_ = closeNativeRuntime(nativeRuntime(raw))
+		return nil, newBindingError(ErrInvalidArgument, err.Error())
+	}
+	keepSource = true
+	return &RuntimeHandle{
+		state:              state,
+		notificationSource: nativeNotificationSource(source),
+	}, nil
+}
+
+func closeNativeRuntime(runtime nativeRuntime) error {
+	var operation C.mln_operation
+	if err := checkNative(func() int32 {
+		return int32(C.mln_runtime_close_start(C.mln_runtime(runtime), &operation))
+	}); err != nil {
+		return err
+	}
+	defer C.mln_operation_release(operation)
+	return waitNativeOperation(operation)
 }
 
 type runtimeStateFactory func(nativeRuntime) (*handle.State[nativeRuntime], error)
@@ -735,7 +872,11 @@ func createRuntimeWithStateFactory(actualCABI uint32, create func(*nativeRuntime
 	}
 	state, err := newState(runtime)
 	if err != nil {
-		_ = destroyRuntimeHandle(runtime)
+		if destroyRuntimeHandle != nil {
+			_ = destroyRuntimeHandle(runtime)
+		} else {
+			_ = closeNativeRuntime(runtime)
+		}
 		return nil, newBindingError(ErrInvalidArgument, err.Error())
 	}
 	return &RuntimeHandle{state: state}, nil
@@ -756,99 +897,12 @@ func (runtime *RuntimeHandle) ptr() (nativeRuntime, func(), error) {
 	return borrow.Handle(), borrow.Release, nil
 }
 
-// Pump advances this runtime. It parks the owner thread when timeout allows,
-// then drains the owner-thread task queues, including tasks the drained ones
-// enqueue. Take the queued runtime events with DrainEvents afterwards.
-//
-// timeout sets the park bound: zero drains and returns, a positive value parks
-// for up to that long, and a negative value parks until a wake arrives. A
-// parking call returns as soon as the runtime's wake flag is set and clears it,
-// and returns without parking while unread runtime events are queued. Timers
-// and ready file descriptors set the flag only when they queue owner-thread
-// work, so pass a bounded timeout to cap how long a call waits.
-//
-// A non-zero timeout blocks the calling goroutine and its OS thread. Call it
-// outside any lock that a goroutine signalling a WakeSource takes.
-func (runtime *RuntimeHandle) Pump(timeout time.Duration) error {
-	ptr, release, err := runtime.ptr()
-	if err != nil {
-		return err
-	}
-	defer release()
-	defer runtime.state.KeepAlive()
-
-	timeoutMS := int64(-1)
-	if timeout >= 0 {
-		timeoutMS = int64(timeout / time.Millisecond)
-	}
-	return checkNative(func() int32 {
-		return int32(C.mln_runtime_pump(C.mln_runtime(ptr), C.int64_t(timeoutMS)))
+// Barrier starts an ordered runtime operation that completes after every
+// command accepted before it reaches a terminal disposition.
+func (runtime *RuntimeHandle) Barrier() (*OperationHandle[struct{}], error) {
+	return startOperation[struct{}](runtime, operationBarrier, operationResultNone, func(handle nativeRuntime, out *C.mln_operation) int32 {
+		return int32(C.mln_runtime_barrier_start(C.mln_runtime(handle), out))
 	})
-}
-
-// WakeSource acquires a wake source that releases this runtime's parked owner
-// thread. The returned source is usable from any goroutine, and the caller
-// closes it.
-func (runtime *RuntimeHandle) WakeSource() (*WakeSource, error) {
-	ptr, release, err := runtime.ptr()
-	if err != nil {
-		return nil, err
-	}
-	defer release()
-	defer runtime.state.KeepAlive()
-
-	var raw C.mln_wake_source
-	if err := checkNative(func() int32 {
-		return int32(C.mln_runtime_wake_source_acquire(C.mln_runtime(ptr), &raw))
-	}); err != nil {
-		return nil, err
-	}
-	state, err := handle.New(nativeWakeSource(raw), "WakeSource")
-	if err != nil {
-		C.mln_wake_source_destroy(raw)
-		return nil, newBindingError(ErrInvalidArgument, err.Error())
-	}
-	source := &WakeSource{state: state}
-	stdruntime.SetFinalizer(source, func(source *WakeSource) { source.Close() })
-	return source, nil
-}
-
-// WakeSource releases a runtime owner thread parked in RuntimeHandle.Pump. It
-// is usable from any goroutine. Signalling it after its runtime closes does
-// nothing.
-type WakeSource struct {
-	state *handle.State[nativeWakeSource]
-}
-
-var destroyWakeSource = func(native nativeWakeSource) int32 {
-	C.mln_wake_source_destroy(C.mln_wake_source(native))
-	return int32(C.MLN_STATUS_OK)
-}
-
-// Signal sets the runtime's wake flag and releases the parked owner thread. A
-// signal raised while the owner thread runs leaves the flag set, so the next
-// Pump returns without parking.
-func (source *WakeSource) Signal() error {
-	if source == nil || source.state == nil {
-		return newBindingError(ErrInvalidArgument, "WakeSource is nil")
-	}
-	borrow, live := source.state.Borrow()
-	if !live {
-		return newBindingError(ErrInvalidArgument, "WakeSource is closed")
-	}
-	defer borrow.Release()
-	defer source.state.KeepAlive()
-	return checkNative(func() int32 {
-		return int32(C.mln_wake_source_signal(C.mln_wake_source(borrow.Handle())))
-	})
-}
-
-// Close releases the wake source. Later signals report a closed handle.
-func (source *WakeSource) Close() {
-	if source == nil || source.state == nil {
-		return
-	}
-	source.state.Close(destroyWakeSource)
 }
 
 // DrainEvents takes this runtime's queued events as one batch of copied values.
@@ -858,9 +912,6 @@ func (source *WakeSource) Close() {
 // maxEvents bounds the drain: zero takes every queued event, and a positive
 // value takes at most that many and leaves the rest queued. A negative value
 // returns ErrInvalidArgument.
-//
-// Call Pump first to advance the runtime, then drain the events that pump
-// produced.
 func (runtime *RuntimeHandle) DrainEvents(maxEvents int) (RuntimeEventBatch, error) {
 	if maxEvents < 0 {
 		return RuntimeEventBatch{}, newBindingError(ErrInvalidArgument, "maxEvents is negative")
@@ -970,15 +1021,20 @@ func (runtime *RuntimeHandle) copyEventBatch(raw C.mln_runtime_event_batch_view)
 				source.MapID = sourceMap.id
 			}
 		}
-		events = append(events, RuntimeEvent{
+		payload := runtimeEventPayloadFromC(rawEvent, unsafe.Add(eventPtr, runtimeEventPayloadOffset), payloadWindow)
+		event := RuntimeEvent{
 			Type:        RuntimeEventType(rawEvent._type),
 			SourceType:  source.Type,
 			Source:      source,
 			Code:        int32(rawEvent.code),
 			PayloadType: RuntimeEventPayloadType(rawEvent.payload_type),
 			Message:     runtimeEventMessage(raw, rawEvent),
-			Payload:     runtimeEventPayloadFromC(rawEvent, unsafe.Add(eventPtr, runtimeEventPayloadOffset), payloadWindow),
-		})
+			Payload:     payload,
+		}
+		events = append(events, event)
+		if finished, ok := payload.(RuntimeEventCommandFinishedPayload); ok {
+			runtime.finishResourceCallbackCommand(finished.CommandID, finished.Disposition)
+		}
 	}
 	runtime.mapsMu.Unlock()
 
@@ -1013,6 +1069,56 @@ func (runtime *RuntimeHandle) unregisterMap(m *MapHandle) {
 	runtime.mapsMu.Lock()
 	delete(runtime.maps, m.id)
 	runtime.mapsMu.Unlock()
+}
+
+func (runtime *RuntimeHandle) finishResourceCallbackCommand(commandID uint64, disposition CommandDisposition) {
+	runtime.resourceTransformMu.Lock()
+	if transition, ok := runtime.pendingResourceTransform[commandID]; ok {
+		delete(runtime.pendingResourceTransform, commandID)
+		if disposition == CommandDispositionCommitted {
+			previous := runtime.resourceTransform
+			runtime.resourceTransform = transition.replacement
+			runtime.resourceTransformMu.Unlock()
+			previous.Release()
+		} else {
+			runtime.resourceTransformMu.Unlock()
+			transition.replacement.Release()
+		}
+	} else {
+		runtime.resourceTransformMu.Unlock()
+	}
+
+	runtime.httpHeaderTransformMu.Lock()
+	if transition, ok := runtime.pendingHttpHeaderTransform[commandID]; ok {
+		delete(runtime.pendingHttpHeaderTransform, commandID)
+		if disposition == CommandDispositionCommitted {
+			previous := runtime.httpHeaderTransform
+			runtime.httpHeaderTransform = transition.replacement
+			runtime.httpHeaderTransformMu.Unlock()
+			previous.Release()
+		} else {
+			runtime.httpHeaderTransformMu.Unlock()
+			transition.replacement.Release()
+		}
+	} else {
+		runtime.httpHeaderTransformMu.Unlock()
+	}
+
+	runtime.resourceProviderMu.Lock()
+	if transition, ok := runtime.pendingResourceProvider[commandID]; ok {
+		delete(runtime.pendingResourceProvider, commandID)
+		if disposition == CommandDispositionCommitted {
+			previous := runtime.resourceProvider
+			runtime.resourceProvider = transition.replacement
+			runtime.resourceProviderMu.Unlock()
+			previous.Release()
+		} else {
+			runtime.resourceProviderMu.Unlock()
+			transition.replacement.Release()
+		}
+	} else {
+		runtime.resourceProviderMu.Unlock()
+	}
 }
 
 // runtimeEventPayloadFromC copies the payload member payload_type names. The
@@ -1058,6 +1164,15 @@ func runtimeEventPayloadFromC(event *C.mln_runtime_event, window unsafe.Pointer,
 	case uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT):
 		payload := C.mln_go_runtime_event_offline_region_tile_count_limit(event)
 		return RuntimeEventOfflineRegionTileCountLimitPayload{RegionID: OfflineRegionID(payload.region_id), Limit: uint64(payload.limit)}
+	case uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_COMMAND_FINISHED):
+		payload := C.mln_go_runtime_event_command_finished(event)
+		disposition := uint32(payload.disposition)
+		return RuntimeEventCommandFinishedPayload{
+			CommandID:      uint64(payload.command_id),
+			Disposition:    CommandDisposition(disposition),
+			RawDisposition: disposition,
+			Generation:     uint64(payload.generation),
+		}
 	default:
 		bytes, ok := goByteSlice(window, C.size_t(windowSize))
 		if !ok {
@@ -1147,26 +1262,27 @@ func (runtime *RuntimeHandle) StartSetMaximumAmbientCacheSize(size uint64) (*Ope
 	return newOperationHandle[struct{}](runtime, uint64(id), operationSetMaximumAmbientCacheSize, operationResultNone), nil
 }
 
-// SetResourceProvider installs or replaces the runtime-scoped network resource
-// provider, and may be called while maps are live. Native code may invoke the
-// provider on worker or network threads, so callbacks must be thread-safe and
-// must not call MapLibre map or runtime APIs. Once this call returns, a
-// replaced provider is no longer invoked; requests it already took a handle for
-// keep that handle, so complete or close each one as usual.
-func (runtime *RuntimeHandle) SetResourceProvider(provider ResourceProviderCallback) error {
+// SetResourceProvider submits a runtime-scoped network resource provider.
+// Native code may invoke the provider on worker or network threads. The
+// callback must be thread-safe and must not call map or runtime APIs. The
+// returned command ID identifies the terminal command-finished event.
+func (runtime *RuntimeHandle) SetResourceProvider(provider ResourceProviderCallback) (uint64, error) {
 	if provider == nil {
-		return newBindingError(ErrInvalidArgument, "ResourceProviderCallback is nil")
+		return 0, newBindingError(ErrInvalidArgument, "ResourceProviderCallback is nil")
 	}
 	ptr, release, err := runtime.ptr()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer release()
 	defer runtime.state.KeepAlive()
 
+	runtime.resourceProviderMu.Lock()
+	defer runtime.resourceProviderMu.Unlock()
 	var replacement *callback.ResourceProviderState
+	var commandID uint64
 	if err := checkNative(func() int32 {
-		state, status := callback.SetResourceProvider(uint64(ptr), func(request callback.ResourceRequest, handle *callback.ResourceRequestHandle) uint32 {
+		state, id, status := callback.SetResourceProvider(uint64(ptr), func(request callback.ResourceRequest, handle *callback.ResourceRequestHandle) uint32 {
 			decision := provider(ResourceRequest{
 				RequestedURL:        request.RequestedURL,
 				ResolvedURL:         request.ResolvedURL,
@@ -1189,119 +1305,152 @@ func (runtime *RuntimeHandle) SetResourceProvider(provider ResourceProviderCallb
 			return rawResourceProviderDecision(decision)
 		})
 		replacement = state
+		commandID = id
 		return status
 	}); err != nil {
-		return err
+		return 0, err
 	}
-
-	runtime.resourceProviderMu.Lock()
-	previous := runtime.resourceProvider
-	runtime.resourceProvider = replacement
-	runtime.resourceProviderMu.Unlock()
-	previous.Release()
-	return nil
+	if runtime.pendingResourceProvider == nil {
+		runtime.pendingResourceProvider = make(map[uint64]pendingResourceProvider)
+	}
+	runtime.pendingResourceProvider[commandID] = pendingResourceProvider{replacement: replacement}
+	return commandID, nil
 }
 
-// ClearResourceProvider clears the runtime-scoped network resource provider, so
-// later requests go to MapLibre's online file source. Once this call returns,
-// the cleared provider is no longer invoked; requests it already took a handle
-// for keep that handle, so complete or close each one as usual.
-func (runtime *RuntimeHandle) ClearResourceProvider() error {
+// ClearResourceProvider submits removal of the runtime-scoped network resource
+// provider and returns the accepted command ID.
+func (runtime *RuntimeHandle) ClearResourceProvider() (uint64, error) {
 	ptr, release, err := runtime.ptr()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer release()
 	defer runtime.state.KeepAlive()
 
-	if err := checkNative(func() int32 { return callback.ClearResourceProvider(uint64(ptr)) }); err != nil {
-		return err
+	runtime.resourceProviderMu.Lock()
+	defer runtime.resourceProviderMu.Unlock()
+	var commandID uint64
+	if err := checkNative(func() int32 {
+		id, status := callback.ClearResourceProvider(uint64(ptr))
+		commandID = id
+		return status
+	}); err != nil {
+		return 0, err
 	}
-	runtime.releaseResourceProvider()
-	return nil
+	if runtime.pendingResourceProvider == nil {
+		runtime.pendingResourceProvider = make(map[uint64]pendingResourceProvider)
+	}
+	runtime.pendingResourceProvider[commandID] = pendingResourceProvider{}
+	return commandID, nil
 }
 
 func (runtime *RuntimeHandle) releaseResourceProvider() {
 	runtime.resourceProviderMu.Lock()
-	previous := runtime.resourceProvider
+	current := runtime.resourceProvider
 	runtime.resourceProvider = nil
+	pending := runtime.pendingResourceProvider
+	runtime.pendingResourceProvider = nil
 	runtime.resourceProviderMu.Unlock()
-	previous.Release()
+	current.Release()
+	for _, transition := range pending {
+		transition.replacement.Release()
+	}
 }
 
-// SetResourceTransform installs or replaces the runtime-scoped network URL
-// transform. Native code may invoke the transform on worker or network threads,
-// so callbacks must be thread-safe and must not call MapLibre map/runtime APIs.
-func (runtime *RuntimeHandle) SetResourceTransform(transform ResourceTransformCallback) error {
+// SetResourceTransform submits a runtime-scoped network URL transform. Native
+// code may invoke the transform on worker or network threads. The callback must
+// be thread-safe and must not call map or runtime APIs.
+func (runtime *RuntimeHandle) SetResourceTransform(transform ResourceTransformCallback) (uint64, error) {
 	if transform == nil {
-		return newBindingError(ErrInvalidArgument, "ResourceTransformCallback is nil")
+		return 0, newBindingError(ErrInvalidArgument, "ResourceTransformCallback is nil")
 	}
 	ptr, release, err := runtime.ptr()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer release()
 	defer runtime.state.KeepAlive()
 
+	runtime.resourceTransformMu.Lock()
+	defer runtime.resourceTransformMu.Unlock()
 	var replacement *callback.ResourceTransformState
+	var commandID uint64
 	if err := checkNative(func() int32 {
-		state, status := callback.SetResourceTransform(uint64(ptr), func(kind uint32, url string) (string, bool) {
+		state, id, status := callback.SetResourceTransform(uint64(ptr), func(kind uint32, url string) (string, bool) {
 			return transform(ResourceTransformRequest{Kind: ResourceKind(kind), RawKind: kind, URL: url})
 		})
 		replacement = state
+		commandID = id
 		return status
 	}); err != nil {
-		return err
+		return 0, err
 	}
-
-	runtime.resourceTransformMu.Lock()
-	previous := runtime.resourceTransform
-	runtime.resourceTransform = replacement
-	runtime.resourceTransformMu.Unlock()
-	previous.Release()
-	return nil
+	if runtime.pendingResourceTransform == nil {
+		runtime.pendingResourceTransform = make(map[uint64]pendingResourceTransform)
+	}
+	runtime.pendingResourceTransform[commandID] = pendingResourceTransform{replacement: replacement}
+	return commandID, nil
 }
 
-// ClearResourceTransform clears the runtime-scoped network URL transform.
-func (runtime *RuntimeHandle) ClearResourceTransform() error {
+// ClearResourceTransform submits removal of the runtime-scoped network URL
+// transform and returns the accepted command ID.
+func (runtime *RuntimeHandle) ClearResourceTransform() (uint64, error) {
 	ptr, release, err := runtime.ptr()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer release()
 	defer runtime.state.KeepAlive()
 
-	if err := checkNative(func() int32 { return callback.ClearResourceTransform(uint64(ptr)) }); err != nil {
-		return err
+	runtime.resourceTransformMu.Lock()
+	defer runtime.resourceTransformMu.Unlock()
+	var commandID uint64
+	if err := checkNative(func() int32 {
+		id, status := callback.ClearResourceTransform(uint64(ptr))
+		commandID = id
+		return status
+	}); err != nil {
+		return 0, err
 	}
-	runtime.releaseResourceTransform()
-	return nil
+	if runtime.pendingResourceTransform == nil {
+		runtime.pendingResourceTransform = make(map[uint64]pendingResourceTransform)
+	}
+	runtime.pendingResourceTransform[commandID] = pendingResourceTransform{}
+	return commandID, nil
 }
 
 func (runtime *RuntimeHandle) releaseResourceTransform() {
 	runtime.resourceTransformMu.Lock()
-	previous := runtime.resourceTransform
+	current := runtime.resourceTransform
 	runtime.resourceTransform = nil
+	pending := runtime.pendingResourceTransform
+	runtime.pendingResourceTransform = nil
 	runtime.resourceTransformMu.Unlock()
-	previous.Release()
+	current.Release()
+	for _, transition := range pending {
+		transition.replacement.Release()
+	}
 }
 
-// SetHttpHeaderTransform installs or replaces the runtime-scoped outgoing HTTP
-// header transform.
-func (runtime *RuntimeHandle) SetHttpHeaderTransform(transform HttpHeaderTransformCallback) error {
+// SetHttpHeaderTransform submits a runtime-scoped outgoing HTTP header
+// transform and returns the accepted command ID.
+func (runtime *RuntimeHandle) SetHttpHeaderTransform(transform HttpHeaderTransformCallback) (uint64, error) {
 	if transform == nil {
-		return newBindingError(ErrInvalidArgument, "HttpHeaderTransformCallback is nil")
+		return 0, newBindingError(ErrInvalidArgument, "HttpHeaderTransformCallback is nil")
 	}
 	ptr, release, err := runtime.ptr()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer release()
 	defer runtime.state.KeepAlive()
 
+	runtime.httpHeaderTransformMu.Lock()
+	defer runtime.httpHeaderTransformMu.Unlock()
 	var replacement *callback.HttpHeaderTransformState
+	var commandID uint64
 	if err := checkNative(func() int32 {
-		state, status := callback.SetHttpHeaderTransform(uint64(ptr), func(kind uint32, url string) []callback.HttpHeader {
+		state, id, status := callback.SetHttpHeaderTransform(uint64(ptr), func(kind uint32, url string) []callback.HttpHeader {
 			provided := transform(HttpHeaderTransformRequest{Kind: ResourceKind(kind), RawKind: kind, URL: url})
 			headers := make([]callback.HttpHeader, len(provided))
 			for index, header := range provided {
@@ -1310,76 +1459,67 @@ func (runtime *RuntimeHandle) SetHttpHeaderTransform(transform HttpHeaderTransfo
 			return headers
 		})
 		replacement = state
+		commandID = id
 		return status
 	}); err != nil {
-		return err
+		return 0, err
 	}
-	runtime.httpHeaderTransformMu.Lock()
-	previous := runtime.httpHeaderTransform
-	runtime.httpHeaderTransform = replacement
-	runtime.httpHeaderTransformMu.Unlock()
-	previous.Release()
-	return nil
+	if runtime.pendingHttpHeaderTransform == nil {
+		runtime.pendingHttpHeaderTransform = make(map[uint64]pendingHttpHeaderTransform)
+	}
+	runtime.pendingHttpHeaderTransform[commandID] = pendingHttpHeaderTransform{replacement: replacement}
+	return commandID, nil
 }
 
-// ClearHttpHeaderTransform clears the runtime-scoped outgoing HTTP header transform.
-func (runtime *RuntimeHandle) ClearHttpHeaderTransform() error {
+// ClearHttpHeaderTransform submits removal of the runtime-scoped outgoing HTTP
+// header transform and returns the accepted command ID.
+func (runtime *RuntimeHandle) ClearHttpHeaderTransform() (uint64, error) {
 	ptr, release, err := runtime.ptr()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer release()
 	defer runtime.state.KeepAlive()
-	if err := checkNative(func() int32 { return callback.ClearHttpHeaderTransform(uint64(ptr)) }); err != nil {
-		return err
+
+	runtime.httpHeaderTransformMu.Lock()
+	defer runtime.httpHeaderTransformMu.Unlock()
+	var commandID uint64
+	if err := checkNative(func() int32 {
+		id, status := callback.ClearHttpHeaderTransform(uint64(ptr))
+		commandID = id
+		return status
+	}); err != nil {
+		return 0, err
 	}
-	runtime.releaseHttpHeaderTransform()
-	return nil
+	if runtime.pendingHttpHeaderTransform == nil {
+		runtime.pendingHttpHeaderTransform = make(map[uint64]pendingHttpHeaderTransform)
+	}
+	runtime.pendingHttpHeaderTransform[commandID] = pendingHttpHeaderTransform{}
+	return commandID, nil
 }
 
 func (runtime *RuntimeHandle) releaseHttpHeaderTransform() {
 	runtime.httpHeaderTransformMu.Lock()
-	previous := runtime.httpHeaderTransform
+	current := runtime.httpHeaderTransform
 	runtime.httpHeaderTransform = nil
+	pending := runtime.pendingHttpHeaderTransform
+	runtime.pendingHttpHeaderTransform = nil
 	runtime.httpHeaderTransformMu.Unlock()
-	previous.Release()
+	current.Release()
+	for _, transition := range pending {
+		transition.replacement.Release()
+	}
 }
 
-// NewMap creates a map owned by this runtime with native default options.
+// NewMap creates a 512 by 512 logical map with native default options.
 func (runtime *RuntimeHandle) NewMap() (*MapHandle, error) {
-	return runtime.createMap(func(ptr nativeRuntime, out *nativeMap) int32 {
-		var raw C.mln_map
-		status := int32(C.mln_map_create(C.mln_runtime(ptr), nil, &raw))
-		if status == int32(C.MLN_STATUS_OK) {
-			*out = nativeMap(raw)
-		}
-		return status
-	})
+	return runtime.NewMapWithOptions(NewMapOptions(512, 512, 1))
 }
 
 // NewMapWithOptions creates a map owned by this runtime with explicit options.
 // Start from NewMapOptions to keep every map-originated event type selected; a
 // zero-value MapOptions queues no event.
 func (runtime *RuntimeHandle) NewMapWithOptions(options MapOptions) (*MapHandle, error) {
-	return runtime.createMap(func(ptr nativeRuntime, out *nativeMap) int32 {
-		rawOptions := C.mln_map_options_default()
-		rawOptions.width = C.uint32_t(options.Width)
-		rawOptions.height = C.uint32_t(options.Height)
-		rawOptions.scale_factor = C.double(options.ScaleFactor)
-		rawOptions.map_mode = C.uint32_t(options.Mode)
-		rawOptions.fast_pfor_enabled = C.bool(options.FastPFOREnabled)
-		rawOptions.event_mask = C.uint64_t(options.EventMask)
-
-		var raw C.mln_map
-		status := int32(C.mln_map_create(C.mln_runtime(ptr), &rawOptions, &raw))
-		if status == int32(C.MLN_STATUS_OK) {
-			*out = nativeMap(raw)
-		}
-		return status
-	})
-}
-
-func (runtime *RuntimeHandle) createMap(create func(nativeRuntime, *nativeMap) int32) (*MapHandle, error) {
 	ptr, release, err := runtime.ptr()
 	if err != nil {
 		return nil, err
@@ -1387,54 +1527,108 @@ func (runtime *RuntimeHandle) createMap(create func(nativeRuntime, *nativeMap) i
 	defer release()
 	defer runtime.state.KeepAlive()
 
-	var rawMap nativeMap
-	if err := checkNative(func() int32 { return create(ptr, &rawMap) }); err != nil {
+	rawOptions := C.mln_map_options_default()
+	rawOptions.initial_extent = C.mln_logical_extent{
+		width:        C.uint32_t(options.Width),
+		height:       C.uint32_t(options.Height),
+		scale_factor: C.double(options.ScaleFactor),
+	}
+	rawOptions.map_mode = C.uint32_t(options.Mode)
+	rawOptions.fast_pfor_enabled = C.bool(options.FastPFOREnabled)
+	rawOptions.event_mask = C.uint64_t(options.EventMask)
+
+	var operation C.mln_operation
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_create_start(C.mln_runtime(ptr), &rawOptions, &operation))
+	}); err != nil {
 		return nil, err
 	}
-	state, err := handle.New(rawMap, "MapHandle", runtime)
+	defer C.mln_operation_release(operation)
+	if err := waitNativeOperation(operation); err != nil {
+		return nil, err
+	}
+	var raw C.mln_map
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_create_take_result(operation, &raw))
+	}); err != nil {
+		return nil, err
+	}
+	state, err := handle.New(nativeMap(raw), "MapHandle", runtime)
 	if err != nil {
+		_ = closeNativeMap(nativeMap(raw))
 		return nil, newBindingError(ErrInvalidArgument, err.Error())
 	}
 	m := &MapHandle{
 		state:        state,
 		runtime:      runtime,
 		runtimeChild: runtime.state.AddChild(),
-		id:           MapID(rawMap),
+		id:           MapID(raw),
 	}
 	runtime.registerMap(m)
 	return m, nil
 }
 
-// Close destroys this runtime. A successful close makes later calls no-ops. A
-// failed close leaves the native handle live so callers can retry on the owner
-// thread.
+func closeNativeMap(m nativeMap) error {
+	var operation C.mln_operation
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_close_start(C.mln_map(m), &operation))
+	}); err != nil {
+		return err
+	}
+	defer C.mln_operation_release(operation)
+	return waitNativeOperation(operation)
+}
+
+// Close waits for this runtime's native close operation. A successful close
+// makes later calls no-ops. A failed close leaves the native handle live so
+// callers can retry after closing its children.
 func (runtime *RuntimeHandle) Close() error {
 	if runtime == nil || runtime.state == nil {
 		return newBindingError(ErrInvalidArgument, "RuntimeHandle is nil")
 	}
-	var bindingErr error
-	if err := checkNative(func() int32 {
-		status, err := runtime.state.CloseChecked(func(native nativeRuntime) int32 {
-			return destroyRuntimeHandle(native)
-		})
-		if err != nil {
-			if errors.Is(err, handle.ErrLiveChildren) {
-				bindingErr = newBindingError(ErrInvalidState, "RuntimeHandle has live child handles")
-				return int32(C.MLN_STATUS_OK)
+	var closeErr error
+	_, err := runtime.state.CloseChecked(func(native nativeRuntime) int32 {
+		var operation C.mln_operation
+		if destroyRuntimeHandle != nil {
+			status := destroyRuntimeHandle(native)
+			if status != int32(C.MLN_STATUS_OK) {
+				closeErr = &Error{
+					kind:       kindForStatus(status),
+					rawStatus:  status,
+					hasStatus:  true,
+					diagnostic: "synthetic runtime close failure",
+				}
 			}
-			bindingErr = newBindingError(ErrInvalidState, err.Error())
-			return int32(C.MLN_STATUS_OK)
+			return status
 		}
-		return status
-	}); err != nil {
-		return err
+		if err := checkNative(func() int32 {
+			return int32(C.mln_runtime_close_start(C.mln_runtime(native), &operation))
+		}); err != nil {
+			closeErr = err
+			return statusFromError(err)
+		}
+		defer C.mln_operation_release(operation)
+		if err := waitNativeOperation(operation); err != nil {
+			closeErr = err
+			return statusFromError(err)
+		}
+		return int32(C.MLN_STATUS_OK)
+	})
+	if err != nil {
+		if errors.Is(err, handle.ErrLiveChildren) {
+			return newBindingError(ErrInvalidState, "RuntimeHandle has live child handles")
+		}
+		return newBindingError(ErrInvalidState, err.Error())
 	}
-	if bindingErr != nil {
-		return bindingErr
+	if closeErr != nil {
+		return closeErr
 	}
 	runtime.releaseResourceTransform()
 	runtime.releaseHttpHeaderTransform()
 	runtime.releaseResourceProvider()
+	if err := runtime.clearNotificationCallback(); err != nil {
+		return err
+	}
 	source := runtime.notificationSource
 	if source != 0 {
 		if err := checkNative(func() int32 {

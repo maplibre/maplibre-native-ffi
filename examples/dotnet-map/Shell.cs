@@ -1,9 +1,8 @@
 using Maplibre.NativeFfi.Render;
-using Maplibre.NativeFfi.Runtime;
 
 namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
-/// <summary>App shell: toolkit lifetime, the two loops, and shutdown ordering.</summary>
+/// <summary>App shell: GLFW/render-session affinity and autonomous map execution.</summary>
 internal static class Shell
 {
     public const int InitialWidth = 960;
@@ -12,116 +11,35 @@ internal static class Shell
     // TODO(map-example-spec): Replace the fixed interval with a display-paced host loop. See Frame loop.
     private static readonly TimeSpan RenderLoopInterval = TimeSpan.FromMilliseconds(8);
 
-    /// <summary>
-    /// Backstop for the runtime loop's park; the render loop's wake source normally releases it.
-    /// </summary>
-    private static readonly TimeSpan ParkTimeout = TimeSpan.FromMilliseconds(100);
-
     public static void Run(RenderTargetMode mode, RenderBackend backends)
     {
-        // GLFW creates windows and polls events on the main thread only, so the main thread is the
-        // render loop and the runtime loop gets a thread of its own.
+        // GLFW, the graphics context, and the render session remain on the main thread.
         using var graphics = GraphicsContext.Create(
             "dotnet-map",
             InitialWidth,
             InitialHeight,
             backends
         );
-        var commands = new CommandQueue();
-        using var channel = new MapChannel();
+        using var state = MapState.Create(graphics.ReadViewport());
+        var commands = new CommandQueue(state);
         var renderRequest = new RenderRequest();
-        var initialViewport = graphics.ReadViewport();
 
-        // A dedicated thread, because the native owner-thread checks are keyed on the OS thread;
-        // thread pools and async continuations do not guarantee that affinity.
-        var runtimeThread = new Thread(() =>
-            RuntimeLoop(initialViewport, commands, renderRequest, channel)
-        )
-        {
-            IsBackground = true,
-            Name = "maplibre-runtime-loop",
-        };
-        runtimeThread.Start();
-
-        try
-        {
-            RenderLoop(graphics, mode, commands, renderRequest, channel);
-        }
-        finally
-        {
-            // Only here: the render loop has closed its session by the time it returns, and a map
-            // with an attached session cannot be destroyed.
-            channel.RequestShutdown();
-            runtimeThread.Join();
-        }
-
-        channel.ThrowIfFailed();
+        RenderLoop(graphics, mode, state, commands, renderRequest);
     }
 
-    /// <summary>
-    /// Owns the runtime and the map for their whole lifetime. It never touches the render session:
-    /// the render loop attaches its own against the map published here.
-    /// </summary>
-    private static void RuntimeLoop(
-        Viewport initialViewport,
-        CommandQueue commands,
-        RenderRequest renderRequest,
-        MapChannel channel
-    )
-    {
-        MapState? state = null;
-        WakeSource? wake = null;
-        try
-        {
-            state = MapState.Create(initialViewport);
-            wake = state.AcquireWakeSource();
-            channel.PublishMap(state.Map, wake);
-            commands.OnEnqueue = channel.WakeRuntimeLoop;
-
-            while (!channel.ShutdownRequested)
-            {
-                state.ApplyCommands(commands);
-                if (state.Step(ParkTimeout))
-                {
-                    renderRequest.Set();
-                }
-            }
-        }
-        catch (Exception error)
-        {
-            channel.Fail(error);
-        }
-        finally
-        {
-            // Wait even after a failure: the render loop closes its session before signalling
-            // shutdown, and the map cannot be destroyed until then.
-            channel.WaitForShutdown();
-            // Stop handing out the wake source before disposing it, or the channel signals a closed
-            // handle and throws over the original failure.
-            commands.OnEnqueue = null;
-            channel.ClearWake();
-            wake?.Dispose();
-            state?.Dispose();
-        }
-    }
-
-    /// <summary>
-    /// Owns the window, input decoding, the graphics context, and the render session it attaches.
-    /// </summary>
     private static void RenderLoop(
         IGraphicsContext graphics,
         RenderTargetMode mode,
+        MapState state,
         CommandQueue commands,
-        RenderRequest renderRequest,
-        MapChannel channel
+        RenderRequest renderRequest
     )
     {
-        var map = channel.WaitForMap();
         var viewport = graphics.ReadViewport();
         IRenderTarget? target = null;
         try
         {
-            target = RenderTargetFactory.Attach(graphics, map, mode);
+            target = RenderTargetFactory.Attach(graphics, state.Map, mode);
             Console.WriteLine($"render target: {mode.CliName}");
             Console.WriteLine($"render target status: {mode.Status}");
             InputController.PrintControls();
@@ -129,8 +47,11 @@ internal static class Shell
 
             while (!graphics.ShouldClose)
             {
-                channel.ThrowIfFailed();
                 graphics.PollEvents();
+                if (state.DrainRenderRequests())
+                {
+                    renderRequest.Set();
+                }
 
                 var currentViewport = graphics.ReadViewport();
                 if (currentViewport != viewport)
@@ -139,17 +60,20 @@ internal static class Shell
                     if (!viewport.IsEmpty)
                     {
                         graphics.Resize(viewport);
-                        // Every mode resizes against the live session; none needs a re-attach.
                         target.Resize(viewport);
+                        _ = state.Map.Resize(
+                            new global::Maplibre.NativeFfi.Map.LogicalExtent(
+                                viewport.LogicalWidth,
+                                viewport.LogicalHeight,
+                                viewport.ScaleFactor
+                            )
+                        );
                         renderRequest.Set();
                     }
                 }
 
-                // Consume before rendering, so a request the runtime loop publishes during the
-                // render call is not discarded.
                 if (graphics.CanRenderFrame && renderRequest.Consume() && !Render(graphics, target))
                 {
-                    // Nothing reached the screen; ask again rather than dropping the frame.
                     renderRequest.Set();
                 }
 
@@ -158,7 +82,7 @@ internal static class Shell
         }
         finally
         {
-            // Close the session before the runtime loop destroys the map.
+            // The thread-affine session closes before the map/runtime close operations run.
             target?.Dispose();
         }
     }

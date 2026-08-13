@@ -1,7 +1,5 @@
-use std::cell::{Cell, RefCell};
 use std::fmt;
 use std::marker::PhantomData;
-use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
@@ -11,7 +9,7 @@ use maplibre_native_ffi_core as maplibre_core;
 use maplibre_native_ffi_sys as sys;
 
 use crate::events::{OfflineRegionDownloadState, OfflineRegionStatus, RuntimeEventBatch};
-use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
+use crate::handle::{ConcurrentNativeHandle, closed_handle_error, out_handle};
 use crate::resource::{HttpHeaderTransformState, ResourceProviderState, ResourceTransformState};
 use crate::{
     Error, ErrorKind, HandleOperationError, ResourceProviderDecision, Result, RuntimeEventMask,
@@ -24,32 +22,127 @@ pub(crate) use maplibre_core::runtime::{
     OfflineRegionDefinitionNativeExt, RuntimeOptionsNativeExt,
 };
 
-#[derive(Debug)]
-pub(crate) struct RuntimeState {
-    handle: ThreadAffineNativeHandle<sys::mln_runtime>,
-    notification_source: Cell<sys::mln_notification_source>,
-    resource_transform: RefCell<Option<Box<ResourceTransformState>>>,
-    http_header_transform: RefCell<Option<Box<HttpHeaderTransformState>>>,
-    resource_provider: RefCell<Option<Box<ResourceProviderState>>>,
-    operations: Arc<OperationRegistry>,
+pub(crate) fn wait_raw_operation_completed(operation: sys::mln_operation) -> Result<()> {
+    (|| {
+        let mut completed = false;
+        // SAFETY: operation is an owned live observer and completed is writable.
+        maplibre_core::check(unsafe { sys::mln_operation_wait(operation, -1, &mut completed) })?;
+        if !completed {
+            return Err(Error::new(
+                ErrorKind::InvalidState,
+                None,
+                "an unbounded operation wait returned before completion",
+            ));
+        }
+        let mut terminal_status = sys::MLN_STATUS_OK;
+        // SAFETY: operation completed and terminal_status is writable.
+        maplibre_core::check(unsafe {
+            sys::mln_operation_get_status(operation, &mut terminal_status)
+        })?;
+        if terminal_status == sys::MLN_STATUS_OK {
+            Ok(())
+        } else {
+            let mut size = 0;
+            // SAFETY: null/zero is the documented diagnostic size probe.
+            maplibre_core::check(unsafe {
+                sys::mln_operation_copy_diagnostic(operation, std::ptr::null_mut(), 0, &mut size)
+            })?;
+            let mut bytes = vec![0_u8; size];
+            // SAFETY: bytes is writable for its full capacity.
+            maplibre_core::check(unsafe {
+                sys::mln_operation_copy_diagnostic(
+                    operation,
+                    bytes.as_mut_ptr().cast(),
+                    bytes.len(),
+                    &mut size,
+                )
+            })?;
+            Err(Error::from_status_and_diagnostic(
+                terminal_status,
+                String::from_utf8_lossy(&bytes),
+            ))
+        }
+    })()
 }
 
+struct NotificationCallbackState {
+    callback: Box<dyn Fn() + Send + Sync + 'static>,
+}
+
+impl fmt::Debug for NotificationCallbackState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("NotificationCallbackState").finish()
+    }
+}
+
+unsafe extern "C" fn notification_callback(user_data: *mut std::ffi::c_void) {
+    if user_data.is_null() {
+        return;
+    }
+    // SAFETY: user_data points to the boxed state retained until native clears
+    // the callback and waits for in-flight invocations.
+    let state = unsafe { &*user_data.cast::<NotificationCallbackState>() };
+    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| (state.callback)()));
+}
+
+/// Kind of receiver endpoint reported ready by the runtime's notification source.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReadyEndpointKind {
+    RuntimeEvents,
+    Operation,
+    Unknown(u32),
+}
+
+/// Copied notification endpoint ready for receiver-side service.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ReadyEndpoint {
+    pub kind: ReadyEndpointKind,
+    pub id: u64,
+}
+
+fn ready_endpoint_kind(raw: u32) -> ReadyEndpointKind {
+    match raw {
+        sys::MLN_NOTIFICATION_ENDPOINT_RUNTIME_EVENTS => ReadyEndpointKind::RuntimeEvents,
+        sys::MLN_NOTIFICATION_ENDPOINT_OPERATION => ReadyEndpointKind::Operation,
+        value => ReadyEndpointKind::Unknown(value),
+    }
+}
+
+#[expect(
+    clippy::vec_box,
+    reason = "retired callback boxes must keep stable addresses until native releases them"
+)]
+#[derive(Debug)]
+pub(crate) struct RuntimeState {
+    handle: ConcurrentNativeHandle<sys::mln_runtime>,
+    notification_source: Mutex<sys::mln_notification_source>,
+    resource_transform: Mutex<Option<Box<ResourceTransformState>>>,
+    retired_resource_transforms: Mutex<Vec<Box<ResourceTransformState>>>,
+    http_header_transform: Mutex<Option<Box<HttpHeaderTransformState>>>,
+    retired_http_header_transforms: Mutex<Vec<Box<HttpHeaderTransformState>>>,
+    resource_provider: Mutex<Option<Box<ResourceProviderState>>>,
+    retired_resource_providers: Mutex<Vec<Box<ResourceProviderState>>>,
+    notification_callback: Mutex<Option<Box<NotificationCallbackState>>>,
+    pub(crate) operations: Arc<OperationRegistry>,
+}
 impl RuntimeState {
     fn new(
         native: sys::mln_runtime,
         notification_source: sys::mln_notification_source,
     ) -> Result<Self> {
-        // SAFETY: native came from successful mln_runtime_create and is paired
-        // with the matching runtime destroy function.
-        let handle = unsafe {
-            ThreadAffineNativeHandle::from_handle(native, sys::mln_runtime_destroy, "mln_runtime")
-        }?;
+        // SAFETY: native came from a successful typed creation take and its
+        // registry/control state supports calls from any thread.
+        let handle = unsafe { ConcurrentNativeHandle::from_handle(native, "mln_runtime") }?;
         Ok(Self {
             handle,
-            notification_source: Cell::new(notification_source),
-            resource_transform: RefCell::new(None),
-            http_header_transform: RefCell::new(None),
-            resource_provider: RefCell::new(None),
+            notification_source: Mutex::new(notification_source),
+            resource_transform: Mutex::new(None),
+            retired_resource_transforms: Mutex::new(Vec::new()),
+            http_header_transform: Mutex::new(None),
+            retired_http_header_transforms: Mutex::new(Vec::new()),
+            resource_provider: Mutex::new(None),
+            retired_resource_providers: Mutex::new(Vec::new()),
+            notification_callback: Mutex::new(None),
             operations: Arc::new(OperationRegistry::default()),
         })
     }
@@ -61,7 +154,13 @@ impl RuntimeState {
     }
 
     fn is_closed(&self) -> bool {
-        self.handle.is_closed() && self.notification_source.get().0 == 0
+        self.handle.is_closed()
+            && self
+                .notification_source
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .0
+                == 0
     }
 
     fn close(&self) -> Result<()> {
@@ -72,27 +171,56 @@ impl RuntimeState {
                 "RuntimeHandle cannot close while operation handles are live",
             ));
         }
-        self.handle.close()?;
-        self.resource_transform.borrow_mut().take();
-        self.http_header_transform.borrow_mut().take();
-        self.resource_provider.borrow_mut().take();
-        let source = self
+        let runtime = self.native()?;
+        let mut operation = sys::mln_operation(0);
+        // SAFETY: runtime is live and operation is a null writable handle.
+        maplibre_core::check(unsafe { sys::mln_runtime_close_start(runtime, &mut operation) })?;
+        let result = wait_raw_operation_completed(operation);
+        // SAFETY: the close observer is owned by this call.
+        unsafe { sys::mln_operation_release(operation) };
+        result?;
+        self.handle.mark_closed();
+        self.resource_transform
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take();
+        self.http_header_transform
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take();
+        self.resource_provider
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take();
+        self.retired_resource_transforms
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clear();
+        self.retired_http_header_transforms
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clear();
+        self.retired_resource_providers
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clear();
+        let mut source = self
             .notification_source
-            .replace(sys::mln_notification_source(0));
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         if source.0 != 0 {
-            // SAFETY: Runtime destruction detached its endpoint; this state owns
-            // the source handle.
-            if let Err(error) =
-                maplibre_core::check(unsafe { sys::mln_notification_source_close(source) })
-            {
-                self.notification_source.set(source);
-                return Err(error);
-            }
+            // SAFETY: Runtime close completed and detached its endpoint.
+            maplibre_core::check(unsafe { sys::mln_notification_source_close(*source) })?;
+            *source = sys::mln_notification_source(0);
         }
+        self.notification_callback
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take();
         Ok(())
     }
 
-    fn set_resource_provider<F>(&self, callback: F) -> Result<()>
+    fn set_resource_provider<F>(&self, callback: F) -> Result<u64>
     where
         F: Fn(crate::ResourceRequest, crate::ResourceRequestHandle) -> ResourceProviderDecision
             + Send
@@ -110,7 +238,7 @@ impl RuntimeState {
     fn set_resource_provider_with_rejected_descriptor_for_testing<F>(
         &self,
         callback: F,
-    ) -> Result<()>
+    ) -> Result<u64>
     where
         F: Fn(crate::ResourceRequest, crate::ResourceRequestHandle) -> ResourceProviderDecision
             + Send
@@ -127,78 +255,135 @@ impl RuntimeState {
         &self,
         replacement: Box<ResourceProviderState>,
         descriptor: sys::mln_resource_provider,
-    ) -> Result<()> {
+    ) -> Result<u64> {
         let runtime = self.native()?;
-
-        // SAFETY: runtime is live and descriptor's user_data points to the boxed
-        // replacement, kept alive on success. Native retires the previous
-        // provider before returning, so the state dropped below is unreachable.
+        let mut command_id = 0;
+        // SAFETY: descriptor points to replacement, retained after acceptance.
         maplibre_core::check(unsafe {
-            sys::mln_runtime_set_resource_provider(runtime, &descriptor)
+            sys::mln_runtime_set_resource_provider(runtime, &descriptor, &mut command_id)
         })?;
-        self.resource_provider.borrow_mut().replace(replacement);
-        Ok(())
+        if let Some(previous) = self
+            .resource_provider
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .replace(replacement)
+        {
+            self.retired_resource_providers
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .push(previous);
+        }
+        Ok(command_id)
     }
 
-    fn clear_resource_provider(&self) -> Result<()> {
+    fn clear_resource_provider(&self) -> Result<u64> {
         let runtime = self.native()?;
-
-        // SAFETY: runtime is live. Native clear waits for in-flight provider
-        // callbacks before returning, so dropping Rust callback state below is safe.
-        maplibre_core::check(unsafe { sys::mln_runtime_clear_resource_provider(runtime) })?;
-        self.resource_provider.borrow_mut().take();
-        Ok(())
+        let mut command_id = 0;
+        maplibre_core::check(unsafe {
+            sys::mln_runtime_clear_resource_provider(runtime, &mut command_id)
+        })?;
+        if let Some(previous) = self
+            .resource_provider
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take()
+        {
+            self.retired_resource_providers
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .push(previous);
+        }
+        Ok(command_id)
     }
 
-    fn set_resource_transform<F>(&self, callback: F) -> Result<()>
+    fn set_resource_transform<F>(&self, callback: F) -> Result<u64>
     where
         F: Fn(crate::ResourceTransformRequest) -> Option<String> + Send + Sync + 'static,
     {
         let runtime = self.native()?;
         let replacement = ResourceTransformState::new(callback);
         let descriptor = replacement.descriptor();
-
-        // SAFETY: runtime is live and descriptor's user_data points to
-        // replacement, kept alive on success. On failure native preserves the
-        // previous transform and replacement is dropped below.
+        let mut command_id = 0;
         maplibre_core::check(unsafe {
-            sys::mln_runtime_set_resource_transform(runtime, &descriptor)
+            sys::mln_runtime_set_resource_transform(runtime, &descriptor, &mut command_id)
         })?;
-        self.resource_transform.borrow_mut().replace(replacement);
-        Ok(())
+        if let Some(previous) = self
+            .resource_transform
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .replace(replacement)
+        {
+            self.retired_resource_transforms
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .push(previous);
+        }
+        Ok(command_id)
     }
 
-    fn clear_resource_transform(&self) -> Result<()> {
+    fn clear_resource_transform(&self) -> Result<u64> {
         let runtime = self.native()?;
-
-        // SAFETY: runtime is live. Native clear waits for in-flight transform
-        // callbacks before returning, so dropping Rust callback state below is safe.
-        maplibre_core::check(unsafe { sys::mln_runtime_clear_resource_transform(runtime) })?;
-        self.resource_transform.borrow_mut().take();
-        Ok(())
+        let mut command_id = 0;
+        maplibre_core::check(unsafe {
+            sys::mln_runtime_clear_resource_transform(runtime, &mut command_id)
+        })?;
+        if let Some(previous) = self
+            .resource_transform
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take()
+        {
+            self.retired_resource_transforms
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .push(previous);
+        }
+        Ok(command_id)
     }
 
-    fn set_http_header_transform<F>(&self, callback: F) -> Result<()>
+    fn set_http_header_transform<F>(&self, callback: F) -> Result<u64>
     where
         F: Fn(crate::HttpHeaderTransformRequest) -> Vec<crate::HttpHeader> + Send + Sync + 'static,
     {
         let runtime = self.native()?;
         let replacement = HttpHeaderTransformState::new(callback);
         let descriptor = replacement.descriptor();
-        // SAFETY: descriptor retains replacement through native registration.
+        let mut command_id = 0;
         maplibre_core::check(unsafe {
-            sys::mln_runtime_set_http_header_transform(runtime, &descriptor)
+            sys::mln_runtime_set_http_header_transform(runtime, &descriptor, &mut command_id)
         })?;
-        self.http_header_transform.borrow_mut().replace(replacement);
-        Ok(())
+        if let Some(previous) = self
+            .http_header_transform
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .replace(replacement)
+        {
+            self.retired_http_header_transforms
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .push(previous);
+        }
+        Ok(command_id)
     }
 
-    fn clear_http_header_transform(&self) -> Result<()> {
+    fn clear_http_header_transform(&self) -> Result<u64> {
         let runtime = self.native()?;
-        // SAFETY: native waits for in-flight callbacks before returning.
-        maplibre_core::check(unsafe { sys::mln_runtime_clear_http_header_transform(runtime) })?;
-        self.http_header_transform.borrow_mut().take();
-        Ok(())
+        let mut command_id = 0;
+        maplibre_core::check(unsafe {
+            sys::mln_runtime_clear_http_header_transform(runtime, &mut command_id)
+        })?;
+        if let Some(previous) = self
+            .http_header_transform
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take()
+        {
+            self.retired_http_header_transforms
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .push(previous);
+        }
+        Ok(command_id)
     }
 }
 
@@ -206,9 +391,10 @@ impl Drop for RuntimeState {
     fn drop(&mut self) {
         if self.operations.live.load(Ordering::Acquire) != 0 {
             self.handle.leak_for_report();
-            let source = self
+            let source = *self
                 .notification_source
-                .replace(sys::mln_notification_source(0));
+                .get_mut()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
             if source.0 != 0 {
                 maplibre_core::handle::report_leak(maplibre_core::handle::NativeHandleLeak {
                     type_name: "mln_notification_source",
@@ -218,9 +404,11 @@ impl Drop for RuntimeState {
             return;
         }
         if self.close().is_err() {
-            let source = self
+            self.handle.leak_for_report();
+            let source = *self
                 .notification_source
-                .replace(sys::mln_notification_source(0));
+                .get_mut()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
             if source.0 != 0 {
                 maplibre_core::handle::report_leak(maplibre_core::handle::NativeHandleLeak {
                     type_name: "mln_notification_source",
@@ -231,9 +419,9 @@ impl Drop for RuntimeState {
     }
 }
 
-/// Runtime handle for owner-thread work and any-thread event draining.
+/// Any-thread runtime handle backed by a core-owned worker.
 pub struct RuntimeHandle {
-    pub(crate) inner: Rc<RuntimeState>,
+    pub(crate) inner: Arc<RuntimeState>,
 }
 
 impl fmt::Debug for RuntimeHandle {
@@ -244,9 +432,39 @@ impl fmt::Debug for RuntimeHandle {
     }
 }
 
+#[derive(Debug, Default)]
+pub(crate) struct OperationRegistry {
+    live: AtomicUsize,
+}
+
+#[derive(Debug, Default)]
+struct OperationState {
+    live: bool,
+    closing: bool,
+    result_consumed: bool,
+    result_in_use: bool,
+    active_uses: usize,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum OperationKind {
+pub(crate) enum OperationKind {
     AmbientCache,
+    Barrier,
+    MapStillImage,
+    CameraQuery,
+    ViewportOptions,
+    TileOptions,
+    Bounds,
+    FreeCameraOptions,
+    CameraFitBounds,
+    CameraFitCoordinates,
+    CameraFitGeometry,
+    BoundsForCamera,
+    BoundsForCameraUnwrapped,
+    PixelForLatLng,
+    LatLngForPixel,
+    PixelsForLatLngs,
+    LatLngsForPixels,
     RegionCreate,
     RegionGet,
     RegionsList,
@@ -256,28 +474,44 @@ enum OperationKind {
     RegionSetObserved,
     RegionSetDownloadState,
     RegionInvalidate,
+    LoadedStyleJson,
+    StyleUrl,
+    RemoveStyleSource,
+    StyleSourceExists,
+    StyleSourceType,
+    StyleSourceInfo,
+    StyleSourceAttribution,
+    StyleSourceUrl,
+    StyleSourceTileUrls,
+    StyleSourceIds,
+    ImageSourceCoordinates,
+    RemoveStyleImage,
+    StyleImageExists,
+    StyleImageInfo,
+    StyleImagePixels,
+    StyleImageStretches,
+    RemoveStyleLayer,
+    StyleLayerExists,
+    StyleLayerType,
+    StyleLayerIds,
+    StyleLayerJson,
+    StyleLightProperty,
+    StyleTransitionOptions,
+    LayerProperty,
+    LayerFilter,
+    LayerSourceLayer,
+    LayerSourceId,
+    LayerMinZoom,
+    LayerMaxZoom,
+    LayerVisibility,
     RegionDelete,
     SetMaximumAmbientCacheSize,
-}
-
-#[derive(Debug, Default)]
-struct OperationRegistry {
-    live: AtomicUsize,
-}
-
-#[derive(Debug)]
-struct OperationState {
-    live: bool,
-    closing: bool,
-    result_consumed: bool,
-    result_in_use: bool,
-    active_uses: usize,
 }
 
 /// Common asynchronous operation handle with a typed result.
 pub struct OperationHandle<T> {
     operation: sys::mln_operation,
-    operation_kind: OperationKind,
+    pub(crate) operation_kind: OperationKind,
     registry: Arc<OperationRegistry>,
     state: Mutex<OperationState>,
     idle: Condvar,
@@ -298,9 +532,8 @@ impl<T> fmt::Debug for OperationHandle<T> {
             .finish()
     }
 }
-
 impl<T> OperationHandle<T> {
-    fn new(
+    pub(crate) fn new(
         operation: sys::mln_operation,
         operation_kind: OperationKind,
         registry: Arc<OperationRegistry>,
@@ -325,7 +558,10 @@ impl<T> OperationHandle<T> {
         })
     }
 
-    fn with_operation<R>(&self, call: impl FnOnce(sys::mln_operation) -> Result<R>) -> Result<R> {
+    pub(crate) fn with_operation<R>(
+        &self,
+        call: impl FnOnce(sys::mln_operation) -> Result<R>,
+    ) -> Result<R> {
         {
             let mut state = self
                 .state
@@ -348,7 +584,7 @@ impl<T> OperationHandle<T> {
         result
     }
 
-    fn with_result_operation<R>(
+    pub(crate) fn with_result_operation<R>(
         &self,
         call: impl FnOnce(sys::mln_operation) -> Result<R>,
     ) -> Result<R> {
@@ -592,6 +828,36 @@ impl OperationHandle<OfflineRegionStatus> {
     }
 }
 
+impl OperationHandle<crate::CameraSnapshot> {
+    /// Takes the completed ordered camera result exactly once.
+    pub fn take(&self) -> Result<crate::CameraSnapshot> {
+        if self.operation_kind != OperationKind::CameraQuery {
+            return Err(Error::new(
+                ErrorKind::InvalidState,
+                None,
+                "operation does not contain a camera query result",
+            ));
+        }
+        let mut raw = sys::mln_camera_query_result {
+            size: std::mem::size_of::<sys::mln_camera_query_result>() as u32,
+            reserved: 0,
+            generation: 0,
+            // SAFETY: the constructor initializes this ABI version's descriptor.
+            camera: unsafe { sys::mln_camera_options_default() },
+        };
+        self.with_result_operation(|operation| {
+            // SAFETY: operation is leased and raw is size-tagged writable storage.
+            maplibre_core::check(unsafe {
+                sys::mln_map_camera_query_take_result(operation, &mut raw)
+            })
+        })?;
+        Ok(crate::CameraSnapshot {
+            generation: raw.generation,
+            camera: maplibre_core::camera::camera_options_from_native(raw.camera),
+        })
+    }
+}
+
 impl RuntimeHandle {
     /// Creates a runtime on the current thread using explicit options.
     pub fn with_options(options: &RuntimeOptions) -> Result<Self> {
@@ -624,20 +890,34 @@ impl RuntimeHandle {
             unsafe { *options }
         };
         raw_options.notification_source = source;
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_runtime>::new();
-        // SAFETY: raw_options is materialized for this ABI version and out is a
-        // null writable handle.
-        if let Err(error) =
-            maplibre_core::check(unsafe { sys::mln_runtime_create(&raw_options, out.as_mut_ptr()) })
-        {
-            // SAFETY: No runtime endpoint was associated after a failed create.
+        let mut operation = sys::mln_operation(0);
+        // SAFETY: raw_options remains readable and operation is null writable storage.
+        if let Err(error) = maplibre_core::check(unsafe {
+            sys::mln_runtime_create_start(&raw_options, &mut operation)
+        }) {
+            // SAFETY: failed creation did not retain the source.
             unsafe { sys::mln_notification_source_close(source) };
             return Err(error);
         }
-        let ptr = out_handle(out, "mln_runtime")?;
-        Ok(Self {
-            inner: Rc::new(RuntimeState::new(ptr, source)?),
-        })
+        let result = (|| {
+            wait_raw_operation_completed(operation)?;
+            let mut out = maplibre_core::ptr::OutHandle::<sys::mln_runtime>::new();
+            // SAFETY: operation completed successfully and out is null writable storage.
+            maplibre_core::check(unsafe {
+                sys::mln_runtime_create_take_result(operation, out.as_mut_ptr())
+            })?;
+            let ptr = out_handle(out, "mln_runtime")?;
+            Ok(Self {
+                inner: Arc::new(RuntimeState::new(ptr, source)?),
+            })
+        })();
+        // SAFETY: the creation observer is owned by this call.
+        unsafe { sys::mln_operation_release(operation) };
+        if result.is_err() {
+            // SAFETY: no runtime wrapper retained source on failure.
+            unsafe { sys::mln_notification_source_close(source) };
+        }
+        result
     }
 
     /// Installs or replaces the runtime-scoped network resource provider.
@@ -650,7 +930,7 @@ impl RuntimeHandle {
     /// A successful replacement retires the previous provider before returning
     /// and then releases its Rust state. Handles the previous provider already
     /// took stay valid; complete and release each one as usual.
-    pub fn set_resource_provider<F>(&self, callback: F) -> Result<()>
+    pub fn set_resource_provider<F>(&self, callback: F) -> Result<u64>
     where
         F: Fn(crate::ResourceRequest, crate::ResourceRequestHandle) -> ResourceProviderDecision
             + Send
@@ -664,7 +944,7 @@ impl RuntimeHandle {
     /// requests to MapLibre's online file source. The clear waits for in-flight
     /// provider callbacks before returning and then releases the Rust callback
     /// state. Handles the provider already took stay valid.
-    pub fn clear_resource_provider(&self) -> Result<()> {
+    pub fn clear_resource_provider(&self) -> Result<u64> {
         self.inner.clear_resource_provider()
     }
 
@@ -673,7 +953,7 @@ impl RuntimeHandle {
     /// Native may invoke the closure from worker or network threads, so keep it
     /// quick and call no MapLibre Native APIs from it. `Some(url)` replaces the
     /// request URL; `None`, an empty string, or a panic keeps the original.
-    pub fn set_resource_transform<F>(&self, callback: F) -> Result<()>
+    pub fn set_resource_transform<F>(&self, callback: F) -> Result<u64>
     where
         F: Fn(crate::ResourceTransformRequest) -> Option<String> + Send + Sync + 'static,
     {
@@ -683,7 +963,7 @@ impl RuntimeHandle {
     /// Clears the runtime-scoped network URL transform. The clear waits for
     /// in-flight transform callbacks before returning and then releases the
     /// Rust callback state.
-    pub fn clear_resource_transform(&self) -> Result<()> {
+    pub fn clear_resource_transform(&self) -> Result<u64> {
         self.inner.clear_resource_transform()
     }
 
@@ -693,7 +973,7 @@ impl RuntimeHandle {
     /// after URL transformation. Returned headers are copied before the closure
     /// returns. Panics, duplicate names, and invalid headers leave the request
     /// unchanged.
-    pub fn set_http_header_transform<F>(&self, callback: F) -> Result<()>
+    pub fn set_http_header_transform<F>(&self, callback: F) -> Result<u64>
     where
         F: Fn(crate::HttpHeaderTransformRequest) -> Vec<crate::HttpHeader> + Send + Sync + 'static,
     {
@@ -701,11 +981,124 @@ impl RuntimeHandle {
     }
 
     /// Clears the runtime-scoped outgoing HTTP header transform.
-    pub fn clear_http_header_transform(&self) -> Result<()> {
+    pub fn clear_http_header_transform(&self) -> Result<u64> {
         self.inner.clear_http_header_transform()
     }
 
-    fn start_operation<T>(
+    /// Installs the any-thread scheduling callback for this runtime's receiver.
+    ///
+    /// The callback must only schedule receiver work; call [`Self::drain_ready`]
+    /// later on that receiver to identify ready endpoints.
+    pub fn set_notification_callback<F>(&self, callback: F) -> Result<()>
+    where
+        F: Fn() + Send + Sync + 'static,
+    {
+        let replacement = Box::new(NotificationCallbackState {
+            callback: Box::new(callback),
+        });
+        let user_data = (&*replacement as *const NotificationCallbackState)
+            .cast_mut()
+            .cast();
+        let mut callback_slot = self
+            .inner
+            .notification_callback
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let source = *self
+            .inner
+            .notification_source
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        // SAFETY: replacement remains boxed at a stable address after success.
+        maplibre_core::check(unsafe {
+            sys::mln_notification_source_set_callback(
+                source,
+                Some(notification_callback),
+                user_data,
+            )
+        })?;
+        callback_slot.replace(replacement);
+        Ok(())
+    }
+
+    /// Clears the receiver scheduling callback after native exits all entries.
+    pub fn clear_notification_callback(&self) -> Result<()> {
+        let mut callback_slot = self
+            .inner
+            .notification_callback
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let source = *self
+            .inner
+            .notification_source
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        // SAFETY: source is owned by this live runtime.
+        maplibre_core::check(unsafe { sys::mln_notification_source_clear_callback(source) })?;
+        callback_slot.take();
+        Ok(())
+    }
+
+    /// Drains and copies the receiver endpoints currently ready for service.
+    pub fn drain_ready(&self) -> Result<Vec<ReadyEndpoint>> {
+        let source = *self
+            .inner
+            .notification_source
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut batch = sys::mln_ready_batch(0);
+        // SAFETY: source is live and batch is null writable storage.
+        maplibre_core::check(unsafe {
+            sys::mln_notification_source_drain_ready(source, &mut batch)
+        })?;
+        let mut view = sys::mln_ready_batch_view {
+            size: std::mem::size_of::<sys::mln_ready_batch_view>() as u32,
+            endpoint_size: 0,
+            endpoints: std::ptr::null(),
+            endpoint_count: 0,
+        };
+        // SAFETY: batch is owned and view is writable.
+        if let Err(error) =
+            maplibre_core::check(unsafe { sys::mln_ready_batch_get(batch, &mut view) })
+        {
+            // SAFETY: this call owns batch.
+            unsafe { sys::mln_ready_batch_release(batch) };
+            return Err(error);
+        }
+        if view.endpoint_size < std::mem::size_of::<sys::mln_ready_endpoint>() as u32
+            || (view.endpoint_count != 0 && view.endpoints.is_null())
+        {
+            // SAFETY: this call owns batch.
+            unsafe { sys::mln_ready_batch_release(batch) };
+            return Err(Error::new(
+                ErrorKind::NativeError,
+                None,
+                "native returned an invalid ready-batch view",
+            ));
+        }
+        let mut endpoints = Vec::with_capacity(view.endpoint_count);
+        for index in 0..view.endpoint_count {
+            // SAFETY: the validated view exposes endpoint_count records at
+            // endpoint_size byte strides until batch is released below.
+            let raw = unsafe {
+                std::ptr::read_unaligned(
+                    view.endpoints
+                        .cast::<u8>()
+                        .add(index * view.endpoint_size as usize)
+                        .cast::<sys::mln_ready_endpoint>(),
+                )
+            };
+            endpoints.push(ReadyEndpoint {
+                kind: ready_endpoint_kind(raw.kind),
+                id: raw.id,
+            });
+        }
+        // SAFETY: copied endpoints no longer borrow batch.
+        unsafe { sys::mln_ready_batch_release(batch) };
+        Ok(endpoints)
+    }
+
+    pub(crate) fn start_operation<T>(
         &self,
         operation: sys::mln_operation,
         operation_kind: OperationKind,
@@ -911,46 +1304,14 @@ impl RuntimeHandle {
         self.start_operation(operation, OperationKind::RegionDelete)
     }
 
-    /// Advances this runtime: parks the owner thread when `timeout` allows it,
-    /// then drains the owner-thread task queues. Drain the queued runtime
-    /// events with [`Self::drain_events`] afterwards.
-    ///
-    /// `Some(Duration::ZERO)` drains and returns, a longer `Some` parks for up
-    /// to that long, and `None` parks until a wake arrives. The drain runs
-    /// every task queued when it begins plus every task those enqueue, so a
-    /// single call can span a full style parse.
-    ///
-    /// A parking call returns as soon as the runtime's wake flag is set, and
-    /// returns without parking while unread runtime events are queued. Timers
-    /// and ready file descriptors set the flag only when they queue
-    /// owner-thread work, so pass a bounded timeout to cap how long a call
-    /// waits.
-    ///
-    /// A non-zero timeout blocks the calling thread. Call it outside any lock
-    /// that a thread signalling a [`WakeSource`] takes, and outside native
-    /// callbacks.
-    pub fn pump(&self, timeout: Option<Duration>) -> Result<()> {
+    /// Starts an ordered barrier that completes after all previously accepted
+    /// runtime work reaches a terminal disposition.
+    pub fn start_barrier(&self) -> Result<OperationHandle<()>> {
         let runtime = self.inner.native()?;
-        let timeout_ms = timeout.map_or(-1, |timeout| {
-            i64::try_from(timeout.as_millis()).unwrap_or(i64::MAX)
-        });
-        // SAFETY: runtime is a live runtime handle owned by this wrapper.
-        maplibre_core::check(unsafe { sys::mln_runtime_pump(runtime, timeout_ms) })
-    }
-
-    /// Acquires a [`WakeSource`] that releases this runtime's parked owner
-    /// thread. The returned source is usable from any thread.
-    pub fn wake_source(&self) -> Result<WakeSource> {
-        let runtime = self.inner.native()?;
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_wake_source>::new();
-        // SAFETY: runtime is a live runtime handle owned by this wrapper, and
-        // out is a valid null-initialized out-pointer owned by this call.
-        maplibre_core::check(unsafe {
-            sys::mln_runtime_wake_source_acquire(runtime, out.as_mut_ptr())
-        })?;
-        Ok(WakeSource {
-            handle: out_handle(out, "mln_wake_source")?,
-        })
+        let mut operation = sys::mln_operation(0);
+        // SAFETY: runtime is live and operation is null writable storage.
+        maplibre_core::check(unsafe { sys::mln_runtime_barrier_start(runtime, &mut operation) })?;
+        self.start_operation(operation, OperationKind::Barrier)
     }
 
     /// Drains an owned batch of queued runtime events.
@@ -993,13 +1354,13 @@ impl RuntimeHandle {
         Ok(RuntimeEventMask::from_bits_retain(raw))
     }
 
-    /// Explicitly destroys the runtime. A failed destroy leaves the native
-    /// handle live so child handles can still close safely.
+    /// Explicitly closes the runtime and waits for its worker to stop before
+    /// releasing the shared notification source.
     pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
         if self.inner.is_closed() {
             return Ok(());
         }
-        if Rc::strong_count(&self.inner) > 1 {
+        if Arc::strong_count(&self.inner) > 1 {
             return Err(HandleOperationError::new(
                 Error::new(
                     ErrorKind::InvalidState,
@@ -1012,37 +1373,6 @@ impl RuntimeHandle {
         self.inner
             .close()
             .map_err(|error| HandleOperationError::new(error, self))
-    }
-}
-
-/// Releases a runtime owner thread parked in [`RuntimeHandle::pump`].
-///
-/// Signalling and destruction are callable from any thread. Each source holds
-/// its own reference to the runtime's wake state, so it stays usable after the
-/// runtime closes, where signalling does nothing.
-#[derive(Debug)]
-pub struct WakeSource {
-    handle: sys::mln_wake_source,
-}
-
-impl WakeSource {
-    /// Sets the runtime's wake flag and releases the parked owner thread.
-    ///
-    /// A signal raised while the owner thread is running sets the wake flag,
-    /// so the next [`RuntimeHandle::pump`] returns without parking. Signalling
-    /// after the runtime closes succeeds and does nothing.
-    pub fn signal(&self) -> Result<()> {
-        // SAFETY: handle is a live wake source owned by this wrapper, and
-        // native accepts signals from any thread.
-        maplibre_core::check(unsafe { sys::mln_wake_source_signal(self.handle) })
-    }
-}
-
-impl Drop for WakeSource {
-    fn drop(&mut self) {
-        // SAFETY: handle is a live wake source this wrapper owns and destroys
-        // exactly once, and native accepts destruction from any thread.
-        unsafe { sys::mln_wake_source_destroy(self.handle) };
     }
 }
 
@@ -1060,8 +1390,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        ErrorKind, ResourceErrorReason, ResourceKind, ResourceProviderDecision, ResourceResponse,
-        RuntimeEvent, RuntimeEventSource, RuntimeEventType,
+        CommandDisposition, ErrorKind, ResourceErrorReason, ResourceKind, ResourceProviderDecision,
+        ResourceResponse, RuntimeEvent, RuntimeEventPayload, RuntimeEventSource, RuntimeEventType,
     };
 
     const PROVIDER_STYLE_JSON: &str = r#"{"version":8,"sources":{},"layers":[]}"#;
@@ -1237,7 +1567,7 @@ mod tests {
     }
 
     fn wait_for_operation<T>(
-        runtime: &mut RuntimeHandle,
+        _runtime: &mut RuntimeHandle,
         operation: &OperationHandle<T>,
     ) -> Result<()> {
         let deadline = Instant::now() + Duration::from_secs(30);
@@ -1252,7 +1582,7 @@ mod tests {
                     ),
                 ));
             }
-            runtime.pump(Some(Duration::ZERO))?;
+            std::thread::sleep(std::time::Duration::from_millis(1));
             if operation.is_completed()? {
                 let status = operation.terminal_status()?;
                 if status != sys::MLN_STATUS_OK {
@@ -1538,7 +1868,7 @@ mod tests {
         options.cache_path = Some(String::new());
         let runtime = RuntimeHandle::with_options(&options).unwrap();
 
-        runtime.pump(Some(Duration::ZERO)).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(1));
         runtime.close().unwrap();
     }
 
@@ -1560,7 +1890,7 @@ mod tests {
         );
     }
 
-    fn drain_holds_event_type(runtime: &mut RuntimeHandle, event_type: RuntimeEventType) -> bool {
+    fn drain_holds_event_type(runtime: &RuntimeHandle, event_type: RuntimeEventType) -> bool {
         runtime
             .drain_events(0)
             .unwrap()
@@ -1570,7 +1900,7 @@ mod tests {
 
     fn wait_for_runtime_event(runtime: &mut RuntimeHandle, event_type: RuntimeEventType) -> bool {
         for _ in 0..100 {
-            let _ = runtime.pump(Some(Duration::ZERO));
+            std::thread::sleep(std::time::Duration::from_millis(1));
             if drain_holds_event_type(runtime, event_type) {
                 return true;
             }
@@ -1581,7 +1911,7 @@ mod tests {
 
     fn wait_for_map_loading_failure(runtime: &mut RuntimeHandle) -> RuntimeEvent {
         for _ in 0..100 {
-            runtime.pump(Some(Duration::ZERO)).unwrap();
+            std::thread::sleep(std::time::Duration::from_millis(1));
             let mut failure = None;
             for event in runtime.drain_events(0).unwrap().iter() {
                 if event.event_type() == RuntimeEventType::MapLoadingFailed {
@@ -1602,7 +1932,7 @@ mod tests {
     fn runtime_create_run_drain_and_close() {
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
 
-        runtime.pump(Some(Duration::ZERO)).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(1));
         // A fresh runtime with no map queues nothing.
         let batch = runtime.drain_events(0).unwrap();
         assert!(batch.is_empty());
@@ -1614,107 +1944,40 @@ mod tests {
         runtime.close().unwrap();
     }
 
-    // Pumps until the runtime is idle, so a park that follows is released by
-    // the signal the test raises.
-    fn quiesce(runtime: &mut RuntimeHandle) {
-        for _ in 0..100 {
-            runtime.pump(Some(Duration::ZERO)).unwrap();
-            if runtime.drain_events(0).unwrap().is_empty() {
-                return;
-            }
-        }
-        panic!("the runtime kept producing events while idle");
-    }
-
-    // Drives the runtime the way a parked host does, so a missing wake shows up
-    // as an expired timeout.
-    fn park_for_runtime_event(runtime: &mut RuntimeHandle, event_type: RuntimeEventType) -> bool {
-        let started = Instant::now();
-        for _ in 0..20 {
-            runtime.pump(Some(Duration::from_secs(10))).unwrap();
-            assert!(
-                started.elapsed() < Duration::from_secs(5),
-                "parks sat out their timeouts instead of taking wakes"
-            );
+    fn wait_for_event(runtime: &RuntimeHandle, event_type: RuntimeEventType) -> bool {
+        for _ in 0..500 {
             if drain_holds_event_type(runtime, event_type) {
                 return true;
             }
+            std::thread::sleep(Duration::from_millis(1));
         }
         false
     }
 
     #[test]
-    // Spec coverage: BND-088.
-    fn parked_owner_thread_wakes_for_native_work_and_for_a_wake_source() {
-        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-        runtime
-            .set_resource_provider(move |request, handle| {
-                if request.requested_url != "custom://style.json" {
-                    return ResourceProviderDecision::PassThrough;
-                }
-                handle
-                    .complete(ResourceResponse::ok(
-                        PROVIDER_STYLE_JSON.as_bytes().to_vec(),
-                    ))
-                    .unwrap();
-                ResourceProviderDecision::PassThrough
-            })
-            .unwrap();
-
+    fn native_worker_makes_progress_without_host_driving() {
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-        map.set_style_url("custom://style.json").unwrap();
-        assert!(park_for_runtime_event(
-            &mut runtime,
-            RuntimeEventType::MapStyleLoaded
-        ));
+        map.set_style_json(PROVIDER_STYLE_JSON.as_bytes()).unwrap();
 
-        // A source moved to another thread matches a host's submission path,
-        // and the park it releases has no other work to end it.
-        let source = runtime.wake_source().unwrap();
-        quiesce(&mut runtime);
-        let signaller = std::thread::spawn(move || {
-            std::thread::sleep(Duration::from_millis(20));
-            source.signal().unwrap();
-            source
-        });
-        let started = Instant::now();
-        runtime.pump(Some(Duration::from_secs(10))).unwrap();
-        assert!(
-            started.elapsed() < Duration::from_secs(5),
-            "the parked owner thread timed out instead of taking the signal"
-        );
-        let source = signaller.join().unwrap();
+        assert!(wait_for_event(&runtime, RuntimeEventType::MapStyleLoaded));
 
-        // A wake source stays usable after its runtime closes, so hosts tear
-        // the two down in either order.
         map.close().unwrap();
         runtime.close().unwrap();
-        source.signal().unwrap();
     }
 
     #[test]
-    // Spec coverage: BND-089.
-    fn a_pump_clears_the_wake_flag_it_returns_on() {
-        let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-        let source = runtime.wake_source().unwrap();
-        quiesce(&mut runtime);
-
-        source.signal().unwrap();
-        let started = Instant::now();
-        runtime.pump(Some(Duration::from_secs(10))).unwrap();
-        assert!(
-            started.elapsed() < Duration::from_secs(5),
-            "a pump waited even though the wake flag was set"
-        );
-
-        // The pump above cleared the wake flag, so this one waits its full timeout.
-        let started = Instant::now();
-        runtime.pump(Some(Duration::from_millis(200))).unwrap();
-        assert!(
-            started.elapsed() >= Duration::from_millis(100),
-            "the first pump left the wake flag set"
-        );
-
+    fn runtime_accepts_concurrent_barrier_submissions() {
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        std::thread::scope(|scope| {
+            let first = scope.spawn(|| runtime.start_barrier().unwrap());
+            let second = scope.spawn(|| runtime.start_barrier().unwrap());
+            for operation in [first.join().unwrap(), second.join().unwrap()] {
+                assert!(operation.wait(Duration::from_secs(5)).unwrap());
+                assert_eq!(operation.terminal_status().unwrap(), sys::MLN_STATUS_OK);
+                operation.discard().unwrap();
+            }
+        });
         runtime.close().unwrap();
     }
 
@@ -1724,7 +1987,7 @@ mod tests {
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
         map.set_style_json(PROVIDER_STYLE_JSON.as_bytes()).unwrap();
-        runtime.pump(Some(Duration::ZERO)).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(1));
 
         let bounded = runtime.drain_events(1).unwrap();
         assert_eq!(bounded.len(), 1);
@@ -1792,22 +2055,15 @@ mod tests {
     }
 
     #[test]
-    // Spec coverage: BND-020, BND-022, BND-190, and BND-191.
-    fn runtime_wrong_thread_status_maps_error_and_copies_diagnostic() {
+    fn runtime_state_is_readable_from_another_thread() {
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-        let runtime_handle = runtime.inner.native().unwrap();
-
-        let error = std::thread::spawn(move || {
-            // SAFETY: This intentionally exercises the C API's owner-thread
-            // validation path with a live runtime handle from another thread.
-            maplibre_core::check(unsafe { sys::mln_runtime_pump(runtime_handle, 0) }).unwrap_err()
-        })
-        .join()
-        .unwrap();
-
-        assert_eq!(error.kind(), ErrorKind::WrongThread);
-        assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_WRONG_THREAD));
-        assert!(!error.diagnostic().is_empty());
+        std::thread::scope(|scope| {
+            let mask = scope
+                .spawn(|| runtime.event_mask().unwrap())
+                .join()
+                .unwrap();
+            assert_eq!(mask, RuntimeEventMask::ALL);
+        });
         runtime.close().unwrap();
     }
 
@@ -1834,11 +2090,11 @@ mod tests {
                 crate::ResourceProviderDecision::PassThrough
             })
             .unwrap();
-        assert_eq!(Arc::strong_count(&first), 1);
+        assert_eq!(Arc::strong_count(&first), 2);
         assert_eq!(Arc::strong_count(&second), 2);
 
         runtime.clear_resource_provider().unwrap();
-        assert_eq!(Arc::strong_count(&second), 1);
+        assert_eq!(Arc::strong_count(&second), 2);
 
         let third = Arc::new(());
         let third_callback = Arc::clone(&third);
@@ -1852,6 +2108,8 @@ mod tests {
 
         runtime.close().unwrap();
         assert_eq!(Arc::strong_count(&third), 1);
+        assert_eq!(Arc::strong_count(&first), 1);
+        assert_eq!(Arc::strong_count(&second), 1);
     }
 
     #[test]
@@ -2132,12 +2390,14 @@ mod tests {
                 Some("https://example.test/replacement".to_owned())
             })
             .unwrap();
-        assert_eq!(Arc::strong_count(&first), 1);
+        assert_eq!(Arc::strong_count(&first), 2);
         assert_eq!(Arc::strong_count(&second), 2);
 
         runtime.clear_resource_transform().unwrap();
-        assert_eq!(Arc::strong_count(&second), 1);
+        assert_eq!(Arc::strong_count(&second), 2);
         runtime.close().unwrap();
+        assert_eq!(Arc::strong_count(&first), 1);
+        assert_eq!(Arc::strong_count(&second), 1);
     }
 
     /// The browser has no in-process TCP server, so the runner serves the two
@@ -2174,12 +2434,10 @@ mod tests {
         ));
         // Contains rather than equals: MapLibre adds its own annotation layer to
         // every style it loads.
-        assert!(
-            map.style_layer_ids()
-                .unwrap()
-                .iter()
-                .any(|id| id == "rewritten")
-        );
+        let layer_ids = map.style_layer_ids().unwrap();
+        assert!(layer_ids.wait(Duration::from_secs(5)).unwrap());
+        assert!(layer_ids.take().unwrap().iter().any(|id| id == "rewritten"));
+        layer_ids.release();
 
         runtime.clear_resource_transform().unwrap();
         map.set_style_url(&format!("{origin}/__fixture/original-after-clear.json"))
@@ -2188,12 +2446,16 @@ mod tests {
             &mut runtime,
             RuntimeEventType::MapStyleLoaded
         ));
+        let layer_ids = map.style_layer_ids().unwrap();
+        assert!(layer_ids.wait(Duration::from_secs(5)).unwrap());
         assert!(
-            map.style_layer_ids()
+            layer_ids
+                .take()
                 .unwrap()
                 .iter()
                 .any(|id| id == "original-after-clear")
         );
+        layer_ids.release();
 
         map.close().unwrap();
         runtime.close().unwrap();
@@ -2407,12 +2669,13 @@ mod tests {
             })
             .unwrap();
 
-        assert_eq!(Arc::strong_count(&first), 1);
+        assert_eq!(Arc::strong_count(&first), 2);
         assert_eq!(Arc::strong_count(&second), 2);
 
         map.close().unwrap();
         runtime.close().unwrap();
         assert_eq!(Arc::strong_count(&second), 1);
+        assert_eq!(Arc::strong_count(&first), 1);
     }
 
     #[test]
@@ -2466,9 +2729,10 @@ mod tests {
 
         runtime.clear_resource_transform().unwrap();
 
-        assert_eq!(Arc::strong_count(&token), 1);
+        assert_eq!(Arc::strong_count(&token), 2);
 
         runtime.close().unwrap();
+        assert_eq!(Arc::strong_count(&token), 1);
     }
 
     #[test]
@@ -2478,9 +2742,11 @@ mod tests {
         let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
         let map_id = map.id();
 
-        let error = map.set_style_json(b"{").unwrap_err();
-        assert_eq!(error.kind(), ErrorKind::NativeError);
-        assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_NATIVE_ERROR));
+        let command_id = map.set_style_json(b"{").unwrap();
+        let barrier = runtime.start_barrier().unwrap();
+        assert!(barrier.wait(Duration::from_secs(5)).unwrap());
+        barrier.discard().unwrap();
+        barrier.release();
 
         let batch = runtime.drain_events(0).unwrap();
         let types = batch
@@ -2502,6 +2768,18 @@ mod tests {
                 .unwrap()
                 .is_some_and(|message| !message.is_empty())
         );
+        let command_finished = batch
+            .iter()
+            .find_map(|event| match event.payload() {
+                RuntimeEventPayload::CommandFinished(finished)
+                    if finished.command_id == command_id =>
+                {
+                    Some(finished)
+                }
+                _ => None,
+            })
+            .expect("the malformed style command should complete terminally");
+        assert_eq!(command_finished.disposition, CommandDisposition::Failed);
         let owned = loading_failed.to_owned().unwrap();
 
         // A later drain leaves the owned batch readable.
@@ -2532,7 +2810,7 @@ mod tests {
         assert_eq!(error.raw_status(), None);
         let runtime = error.into_handle();
 
-        runtime.pump(Some(Duration::ZERO)).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(1));
         map.close().unwrap();
         runtime.close().unwrap();
     }

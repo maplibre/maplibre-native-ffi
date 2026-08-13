@@ -133,9 +133,8 @@ dart test
 
 [tasks."test:download"]
 description = "Test the build hook against a downloaded native snapshot archive."
-# Runs one file rather than the suite, because the rest holds native handles
-# across isolate boundaries. Removing the pointer forces the download; it goes
-# back afterwards so a local prefix survives this task.
+# Run the isolate migration regression against the downloaded artifact. Removing
+# the pointer forces the download; the trap restores a local prefix afterward.
 run = '''
 pointer=.dart_tool/maplibre_native_install_dir
 saved="$(mktemp)"
@@ -143,5 +142,5 @@ trap 'if [[ -s "$saved" ]]; then mv "$saved" "$pointer"; else rm -f "$saved"; fi
 if [[ -f "$pointer" ]]; then
   mv "$pointer" "$saved"
 fi
-dart test test/native_library_test.dart
+dart test test/isolate_migration_test.dart
 '''

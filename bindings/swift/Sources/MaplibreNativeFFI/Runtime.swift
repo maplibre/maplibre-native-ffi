@@ -50,6 +50,7 @@ public enum RuntimeEventType: Sendable, Hashable {
   case offlineRegionResponseError
   case offlineRegionTileCountLimitExceeded
   case mapCameraTransitionFinished
+  case commandFinished
   case unknown(UInt32)
 
   public static func fromNative(_ rawValue: UInt32) -> Self {
@@ -76,6 +77,7 @@ public enum RuntimeEventType: Sendable, Hashable {
     case 20: .offlineRegionResponseError
     case 21: .offlineRegionTileCountLimitExceeded
     case 23: .mapCameraTransitionFinished
+    case 24: .commandFinished
     default: .unknown(rawValue)
     }
   }
@@ -89,8 +91,7 @@ public enum RuntimeEventType: Sendable, Hashable {
 /// runtime-originated ones, ignoring the rest, so ``all`` is a value both
 /// accept and a handle reports every bit last set.
 ///
-/// An unselected event type is never built and never queued, so it neither
-/// reaches a batch nor wakes a parked ``RuntimeHandle/pump(timeout:)``.
+/// An unselected event type is never built and never queued.
 public struct RuntimeEventMask: OptionSet, Sendable, Hashable {
   public let rawValue: UInt64
 
@@ -389,6 +390,16 @@ public struct CameraTransitionFinishedEvent: Equatable, Sendable {
   }
 }
 
+public struct CommandFinishedEvent: Equatable, Sendable {
+  public let commandId: UInt64
+  public let disposition: UInt32
+
+  init(native: NativeCommandFinishedEvent) {
+    commandId = native.commandId
+    disposition = native.disposition
+  }
+}
+
 public enum RuntimeEventPayload: Equatable, Sendable {
   case none
   case renderFrame(RenderFrameEvent)
@@ -398,6 +409,7 @@ public enum RuntimeEventPayload: Equatable, Sendable {
   case offlineRegionResponseError(OfflineRegionResponseErrorEvent)
   case offlineRegionTileCountLimit(OfflineRegionTileCountLimitEvent)
   case cameraTransitionFinished(CameraTransitionFinishedEvent)
+  case commandFinished(CommandFinishedEvent)
   /// A payload kind this version of the binding does not name, carrying the
   /// payload's fixed byte window so a host forwards it unchanged.
   case unknown(type: UInt32, bytes: [UInt8])
@@ -429,6 +441,8 @@ public enum RuntimeEventPayload: Equatable, Sendable {
         .cameraTransitionFinished(
           CameraTransitionFinishedEvent(native: event)
         )
+    case let .commandFinished(event):
+      self = .commandFinished(CommandFinishedEvent(native: event))
     case let .unknown(type, bytes):
       self = .unknown(type: type, bytes: bytes)
     }
@@ -468,6 +482,11 @@ public struct RuntimeEvent: Equatable, Sendable {
   }
 }
 
+private struct PendingCallbackReplacement<State> {
+  let replacement: State?
+  let previous: State?
+}
+
 /// One drained batch of runtime events.
 ///
 /// This is a copy of an owned C event batch, so a host keeps events, their
@@ -480,32 +499,58 @@ public struct RuntimeEventBatch: Equatable, Sendable {
   public let remainingCount: Int
 }
 
-public final class RuntimeHandle {
+public final class RuntimeHandle: @unchecked Sendable {
   private let handle: NativeHandleBox<NativeRuntimeHandle>
-  private var notificationSource: mln_notification_source
+  private let notificationReceiver: NativeNotificationReceiver
   private let operationLock = NSLock()
   private var operationCount = 0
+  private var isClosing = false
   private var resourceTransform: NativeResourceTransformState?
+  private var pendingResourceTransforms:
+    [UInt64: PendingCallbackReplacement<NativeResourceTransformState>] = [:]
+  private var pendingHttpHeaderTransforms:
+    [UInt64: PendingCallbackReplacement<NativeHttpHeaderTransformState>] = [:]
+  private var pendingResourceProviders:
+    [UInt64: PendingCallbackReplacement<NativeResourceProviderState>] = [:]
   private var httpHeaderTransform: NativeHttpHeaderTransformState?
   private var resourceProvider: NativeResourceProviderState?
 
-  public init(options: RuntimeOptions = RuntimeOptions()) throws {
-    var source: mln_notification_source = 0
-    try mapNativeFailure {
-      try checkStatus(mln_notification_source_create(&source))
-    }
+  public init(options: RuntimeOptions = RuntimeOptions()) async throws {
+    let receiver = try mapNativeFailure { try NativeNotificationReceiver() }
+    let operation: NativeOperationHandle
     do {
-      let runtime = try mapNativeFailure {
+      operation = try mapNativeFailure {
         try options.nativeInput.withNativeOptions(
-          notificationSource: source
+          notificationSource: receiver.source
         ) { nativeOptions in
-          try NativeRuntime.create(nativeOptions)
+          try NativeRuntime.createStart(nativeOptions)
         }
       }
-      handle = try NativeHandleBox(typeName: "RuntimeHandle", handle: runtime)
-      notificationSource = source
     } catch {
-      _ = mln_notification_source_close(source)
+      try? receiver.close()
+      throw error
+    }
+
+    do {
+      try await mapNativeFailure {
+        try await NativeOperation.waitForSuccess(
+          operation,
+          receiver: receiver
+        )
+      }
+      let runtime = try mapNativeFailure {
+        try NativeRuntime.createTakeResult(operation)
+      }
+      let runtimeHandle = try NativeHandleBox(
+        typeName: "RuntimeHandle",
+        handle: runtime
+      )
+      mln_operation_release(operation.raw)
+      handle = runtimeHandle
+      notificationReceiver = receiver
+    } catch {
+      mln_operation_release(operation.raw)
+      try? receiver.close()
       throw error
     }
   }
@@ -514,31 +559,130 @@ public final class RuntimeHandle {
     handle.isClosed
   }
 
-  public func close() throws {
-    try operationLock.withLock {
-      guard operationCount == 0 else {
-        throw MaplibreError(
-          kind: .invalidState,
-          rawStatus: nil,
-          diagnostic: "RuntimeHandle has open operations"
+  public func close() async throws {
+    let operation = try mapNativeFailure {
+      try operationLock.withLock {
+        guard operationCount == 0 else {
+          throw NativeStatusFailure(
+            rawStatus: MLN_STATUS_INVALID_STATE.rawValue,
+            diagnostic: "RuntimeHandle has open operations",
+            isNativeStatus: false
+          )
+        }
+        guard !isClosing else {
+          throw NativeStatusFailure(
+            rawStatus: MLN_STATUS_INVALID_STATE.rawValue,
+            diagnostic: "RuntimeHandle is closing",
+            isNativeStatus: false
+          )
+        }
+        guard !handle.isClosed else { return NativeOperationHandle(raw: 0) }
+        let operation = try NativeRuntime.closeStart(handle.requireLive())
+        isClosing = true
+        return operation
+      }
+    }
+    guard !operation.isNull else { return }
+    do {
+      try await mapNativeFailure {
+        try await NativeOperation.waitForSuccess(
+          operation,
+          receiver: notificationReceiver
         )
       }
-      try handle.closeOnce { handle in
-        try checkStatus(mln_runtime_destroy(handle.raw))
-      }
+      try handle.closeOnce { _ in }
+    } catch {
+      mln_operation_release(operation.raw)
+      operationLock.withLock { isClosing = false }
+      throw error
     }
-    let source = notificationSource
-    if source != 0 {
-      try checkStatus(mln_notification_source_close(source))
-      notificationSource = 0
-    }
+
+    // The close operation is itself an endpoint on this source. Release it
+    // before closing the source so no endpoint remains associated.
+    mln_operation_release(operation.raw)
+    operationLock.withLock { isClosing = false }
+    try mapNativeFailure { try notificationReceiver.close() }
     resourceTransform = nil
     httpHeaderTransform = nil
     resourceProvider = nil
   }
 
+  func closeBlockingForTests() throws {
+    let operation = try mapNativeFailure {
+      try operationLock.withLock {
+        guard operationCount == 0 else {
+          throw NativeStatusFailure(
+            rawStatus: MLN_STATUS_INVALID_STATE.rawValue,
+            diagnostic: "RuntimeHandle has open operations",
+            isNativeStatus: false
+          )
+        }
+        guard !isClosing else {
+          throw NativeStatusFailure(
+            rawStatus: MLN_STATUS_INVALID_STATE.rawValue,
+            diagnostic: "RuntimeHandle is closing",
+            isNativeStatus: false
+          )
+        }
+        guard !handle.isClosed else { return NativeOperationHandle(raw: 0) }
+        let operation = try NativeRuntime.closeStart(handle.requireLive())
+        isClosing = true
+        return operation
+      }
+    }
+    guard !operation.isNull else { return }
+    do {
+      try mapNativeFailure {
+        try NativeOperation.waitForSuccessBlocking(operation)
+      }
+      try handle.closeOnce { _ in }
+    } catch {
+      mln_operation_release(operation.raw)
+      operationLock.withLock { isClosing = false }
+      throw error
+    }
+    mln_operation_release(operation.raw)
+    operationLock.withLock { isClosing = false }
+    try mapNativeFailure { try notificationReceiver.close() }
+    resourceTransform = nil
+    httpHeaderTransform = nil
+    resourceProvider = nil
+  }
+
+  /// Waits until every command accepted before this call has committed.
+  public func barrier() async throws {
+    let operation = try mapNativeFailure {
+      try NativeRuntime.barrierStart(requireLiveHandle())
+    }
+    defer { mln_operation_release(operation.raw) }
+    try await mapNativeFailure {
+      try await NativeOperation.waitForSuccess(
+        operation,
+        receiver: notificationReceiver
+      )
+    }
+  }
+
   func requireLiveHandle() throws -> NativeRuntimeHandle {
-    try handle.requireLive()
+    try operationLock.withLock {
+      guard !isClosing else {
+        throw NativeStatusFailure.swiftNativeError("RuntimeHandle is closing")
+      }
+      return try handle.requireLive()
+    }
+  }
+
+  func forgetOperation(_ operation: NativeOperationHandle) {
+    notificationReceiver.forget(operation)
+  }
+
+  func waitForOperation(_ operation: NativeOperationHandle) async throws {
+    try await mapNativeFailure {
+      try await NativeOperation.waitForSuccess(
+        operation,
+        receiver: notificationReceiver
+      )
+    }
   }
 
   func registerOperation() throws {
@@ -555,52 +699,7 @@ public final class RuntimeHandle {
   }
 
   func unregisterOperation() {
-    operationLock.withLock {
-      operationCount -= 1
-    }
-  }
-
-  /// Advances this runtime: parks the owner thread when `timeout` allows it,
-  /// then drains the owner-thread task queues. Drain queued runtime events with
-  /// ``drainEvents(maxEvents:)`` afterwards.
-  ///
-  /// `timeout` is in seconds. Zero drains and returns, a positive value parks
-  /// for up to that long, and `nil` parks until a wake arrives. Timers and
-  /// ready file descriptors wake the runtime only when they queue owner-thread
-  /// work, so pass a bounded timeout to cap how long a call waits.
-  ///
-  /// A non-zero timeout blocks the calling thread. Call it outside any lock
-  /// that a thread signalling a `WakeSource` takes. A call never parks while
-  /// this runtime holds undrained events.
-  public func pump(timeout: TimeInterval? = 0) throws {
-    try mapNativeFailure {
-      let timeoutMilliseconds: Int64
-      if let timeout {
-        // A negative or non-finite timeout collapses to no wait; `nil` is the
-        // spelling for an unbounded park. The upper clamp keeps the conversion
-        // inside Int64.
-        let milliseconds = timeout.isFinite ? (timeout * 1000).rounded() : 0
-        timeoutMilliseconds = Int64(min(max(milliseconds, 0), 9.0e18))
-      } else {
-        timeoutMilliseconds = -1
-      }
-      try checkStatus(
-        mln_runtime_pump(handle.requireLive().raw, timeoutMilliseconds)
-      )
-    }
-  }
-
-  /// Acquires a wake source that releases this runtime's parked owner thread.
-  /// The returned source is usable from any thread, and the caller closes it.
-  public func wakeSource() throws -> WakeSource {
-    try mapNativeFailure {
-      var source = mln_wake_source()
-      try checkStatus(mln_runtime_wake_source_acquire(
-        handle.requireLive().raw,
-        &source
-      ))
-      return try WakeSource(handle: NativeWakeSourceHandle(raw: source))
-    }
+    operationLock.withLock { operationCount -= 1 }
   }
 
   /// Drains this runtime's queued events, copying every event out of the owned
@@ -610,134 +709,195 @@ public final class RuntimeHandle {
   /// owns. `maxEvents` bounds the drain: zero drains everything, and a positive
   /// value drains at most that many and reports the rest through
   /// ``RuntimeEventBatch/remainingCount``.
-  ///
-  /// Draining is a queue operation that runs no owner-thread work. Call
-  /// ``pump(timeout:)`` to advance the runtime, then drain what it produced.
   public func drainEvents(maxEvents: Int = 0) throws -> RuntimeEventBatch {
     try mapNativeFailure {
       guard maxEvents >= 0 else {
         throw NativeStatusFailure
+
           .swiftInvalidArgument("maxEvents cannot be negative")
       }
       let batch = try NativeRuntime.drainEvents(
         handle.requireLive(),
         maxEvents: maxEvents
       )
-      return RuntimeEventBatch(
+      let result = RuntimeEventBatch(
         events: batch.events.map { RuntimeEvent(native: $0) },
         remainingCount: batch.remainingCount
       )
+      applyCommandFinishedEvents(result.events)
+      return result
     }
+  }
+
+  /// Schedules the receiver when runtime events become ready to drain.
+  ///
+  /// The callback may coalesce and carries no event payload. It should schedule
+  /// ``drainEvents(maxEvents:)`` on the host execution context that consumes
+  /// runtime events.
+  public func setEventReadyHandler(
+    _ handler: (@Sendable () -> Void)?
+  ) {
+    notificationReceiver.setRuntimeEventsHandler(handler)
   }
 
   /// Selects which runtime-originated event types this runtime queues.
-  ///
-  /// The call reads the bits in ``RuntimeEventMask/allRuntimeEvents`` and
-  /// ignores the rest, so ``RuntimeEventMask/all`` selects every one of them.
-  /// Narrowing gates later events and keeps queued ones, so a host drains what
-  /// it already caused.
-  ///
-  /// Region status, response error, and tile count limit events also require an
-  /// observed region, so this mask narrows that subscription rather than
-  /// replacing it.
   public func setEventMask(_ mask: RuntimeEventMask) throws {
-    try mapNativeFailure {
-      try NativeRuntime.setEventMask(handle.requireLive(), mask: mask.rawValue)
-    }
+    try mapNativeFailure { try NativeRuntime.setEventMask(
+      handle.requireLive(),
+      mask: mask.rawValue
+    ) }
   }
 
-  /// The mask last set. A runtime that has not been narrowed reports
-  /// ``RuntimeEventMask/all``. Read it, change one bit, and write it back to
-  /// leave the other bits alone.
   public var eventMask: RuntimeEventMask {
     get throws {
       try mapNativeFailure {
-        try RuntimeEventMask(
-          rawValue: NativeRuntime.eventMask(handle.requireLive())
-        )
+        try RuntimeEventMask(rawValue: NativeRuntime
+          .eventMask(handle.requireLive()))
       }
     }
   }
 
-  public func setResourceTransform(
-    _ callback: @escaping @Sendable (ResourceTransformRequest) -> String?
-  ) throws {
-    let replacement = NativeResourceTransformState { nativeRequest in
-      callback(ResourceTransformRequest(native: nativeRequest))
+  @discardableResult
+  public func setResourceTransform(_ callback: @escaping @Sendable (
+    ResourceTransformRequest
+  )
+    -> String?) throws -> UInt64
+  {
+    let replacement = NativeResourceTransformState {
+      callback(ResourceTransformRequest(native: $0))
     }
-    try mapNativeFailure {
-      try replacement.withDescriptor { descriptor in
-        try checkStatus(mln_runtime_set_resource_transform(
-          handle.requireLive().raw,
-          descriptor
-        ))
-      }
-    }
-    resourceTransform = replacement
+    let commandId = try replacement.withDescriptor { try submitCallbackSet(
+      $0,
+      mln_runtime_set_resource_transform
+    ) }
+    operationLock.withLock { pendingResourceTransforms[commandId] = .init(
+      replacement: replacement,
+      previous: resourceTransform
+    ) }
+    return commandId
   }
 
-  public func clearResourceTransform() throws {
-    try mapNativeFailure {
-      try checkStatus(mln_runtime_clear_resource_transform(handle
-          .requireLive().raw))
-    }
-    resourceTransform = nil
+  @discardableResult
+  public func clearResourceTransform() throws -> UInt64 {
+    let commandId =
+      try submitCallbackClear(mln_runtime_clear_resource_transform)
+    operationLock.withLock { pendingResourceTransforms[commandId] = .init(
+      replacement: nil,
+      previous: resourceTransform
+    ) }
+    return commandId
   }
 
-  public func setHttpHeaderTransform(
-    _ callback: @escaping @Sendable (HttpHeaderTransformRequest) -> [HttpHeader]
-  ) throws {
+  @discardableResult
+  public func setHttpHeaderTransform(_ callback: @escaping @Sendable (
+    HttpHeaderTransformRequest
+  )
+    -> [HttpHeader]) throws -> UInt64
+  {
     let replacement = NativeHttpHeaderTransformState(callback)
-    try mapNativeFailure {
-      try replacement.withDescriptor { descriptor in
-        try checkStatus(mln_runtime_set_http_header_transform(
-          handle.requireLive().raw,
-          descriptor
-        ))
-      }
-    }
-    httpHeaderTransform = replacement
+    let commandId = try replacement.withDescriptor { try submitCallbackSet(
+      $0,
+      mln_runtime_set_http_header_transform
+    ) }
+    operationLock.withLock { pendingHttpHeaderTransforms[commandId] = .init(
+      replacement: replacement,
+      previous: httpHeaderTransform
+    ) }
+    return commandId
   }
 
-  public func clearHttpHeaderTransform() throws {
-    try mapNativeFailure {
-      try checkStatus(mln_runtime_clear_http_header_transform(handle
-          .requireLive().raw))
-    }
-    httpHeaderTransform = nil
+  @discardableResult
+  public func clearHttpHeaderTransform() throws -> UInt64 {
+    let commandId =
+      try submitCallbackClear(mln_runtime_clear_http_header_transform)
+    operationLock.withLock { pendingHttpHeaderTransforms[commandId] = .init(
+      replacement: nil,
+      previous: httpHeaderTransform
+    ) }
+    return commandId
   }
 
-  public func setResourceProvider(
-    _ callback: @escaping @Sendable (ResourceRequest, ResourceRequestHandle)
-      -> ResourceProviderDecision
-  ) throws {
-    let replacement =
-      NativeResourceProviderState { nativeRequest, nativeHandle in
-        let request = ResourceRequest(native: nativeRequest)
-        let handle = ResourceRequestHandle(state: nativeHandle)
-        switch callback(request, handle) {
-        case .passThrough:
-          return 0
-        case .handle:
-          return 1
-        }
-      }
-    try mapNativeFailure {
-      try replacement.withDescriptor { descriptor in
-        try checkStatus(mln_runtime_set_resource_provider(
-          handle.requireLive().raw,
-          descriptor
-        ))
+  @discardableResult
+  public func setResourceProvider(_ callback: @escaping @Sendable (
+    ResourceRequest,
+    ResourceRequestHandle
+  ) -> ResourceProviderDecision) throws -> UInt64 {
+    let replacement = NativeResourceProviderState { request, handle in
+      switch callback(
+        ResourceRequest(native: request),
+        ResourceRequestHandle(state: handle)
+      ) {
+      case .passThrough: return 0
+      case .handle: return 1
       }
     }
-    resourceProvider = replacement
+    let commandId = try replacement.withDescriptor { try submitCallbackSet(
+      $0,
+      mln_runtime_set_resource_provider
+    ) }
+    operationLock.withLock { pendingResourceProviders[commandId] = .init(
+      replacement: replacement,
+      previous: resourceProvider
+    ) }
+    return commandId
   }
 
-  public func clearResourceProvider() throws {
+  @discardableResult
+  public func clearResourceProvider() throws -> UInt64 {
+    let commandId = try submitCallbackClear(mln_runtime_clear_resource_provider)
+    operationLock.withLock { pendingResourceProviders[commandId] = .init(
+      replacement: nil,
+      previous: resourceProvider
+    ) }
+    return commandId
+  }
+
+  private func submitCallbackSet<Descriptor>(
+    _ descriptor: UnsafePointer<Descriptor>,
+    _ submit: (
+      mln_runtime,
+      UnsafePointer<Descriptor>,
+      UnsafeMutablePointer<UInt64>
+    ) -> mln_status
+  ) throws -> UInt64 {
     try mapNativeFailure {
-      try checkStatus(mln_runtime_clear_resource_provider(handle
-          .requireLive().raw))
+      try NativeMemory.withTemporary(UInt64(0)) { try checkStatus(submit(
+        handle.requireLive().raw,
+        descriptor,
+        $0
+      )) }.value
     }
-    resourceProvider = nil
+  }
+
+  private func submitCallbackClear(_ submit: (
+    mln_runtime,
+    UnsafeMutablePointer<UInt64>
+  ) -> mln_status) throws -> UInt64 {
+    try mapNativeFailure {
+      try NativeMemory.withTemporary(UInt64(0)) { try checkStatus(submit(
+        handle.requireLive().raw,
+        $0
+      )) }.value
+    }
+  }
+
+  private func applyCommandFinishedEvents(_ events: [RuntimeEvent]) {
+    operationLock.withLock {
+      for event in events {
+        guard case let .commandFinished(finished) = event.payload
+        else { continue }
+        let committed = finished
+          .disposition == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue
+        if let pending = pendingResourceTransforms
+          .removeValue(forKey: finished.commandId),
+          committed { resourceTransform = pending.replacement }
+        if let pending = pendingHttpHeaderTransforms
+          .removeValue(forKey: finished.commandId),
+          committed { httpHeaderTransform = pending.replacement }
+        if let pending = pendingResourceProviders
+          .removeValue(forKey: finished.commandId),
+          committed { resourceProvider = pending.replacement }
+      }
+    }
   }
 }

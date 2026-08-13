@@ -92,9 +92,12 @@ function(mln_ffi_configure_c_api_implementation target)
       ${PROJECT_SOURCE_DIR}/src/c_api/android.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/buffer.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/callback_adapter.cpp
+      ${PROJECT_SOURCE_DIR}/src/c_api/camera.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/diagnostics.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/logging.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/map.cpp
+      ${PROJECT_SOURCE_DIR}/src/c_api/projection.cpp
+      ${PROJECT_SOURCE_DIR}/src/c_api/style.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/network.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/notification.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/operation.cpp
@@ -106,10 +109,12 @@ function(mln_ffi_configure_c_api_implementation target)
       ${PROJECT_SOURCE_DIR}/src/diagnostics/diagnostics.cpp
       ${PROJECT_SOURCE_DIR}/src/geojson/geojson.cpp
       ${PROJECT_SOURCE_DIR}/src/handles/handle_table.cpp
+      ${PROJECT_SOURCE_DIR}/src/execution/runtime_executor.cpp
       ${PROJECT_SOURCE_DIR}/src/logging/logging.cpp
       ${PROJECT_SOURCE_DIR}/src/notification/notification.cpp
       ${PROJECT_SOURCE_DIR}/src/operation/operation.cpp
       ${PROJECT_SOURCE_DIR}/src/map/map.cpp
+      ${PROJECT_SOURCE_DIR}/src/map/style.cpp
       ${PROJECT_SOURCE_DIR}/src/render/render_session_common.cpp
       ${PROJECT_SOURCE_DIR}/src/render/surface_session.cpp
       ${PROJECT_SOURCE_DIR}/src/render/texture_session.cpp

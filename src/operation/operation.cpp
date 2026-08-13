@@ -30,10 +30,31 @@ auto OperationObject::publish(
   endpoint_ = std::move(endpoint);
 }
 
+auto OperationObject::set_terminal_callback(TerminalCallback callback) noexcept
+  -> void {
+  auto invoke_now = false;
+  {
+    const std::scoped_lock lock(mutex_);
+    if (completed_) {
+      invoke_now = true;
+    } else {
+      terminal_callback_ = std::move(callback);
+    }
+  }
+  if (invoke_now && callback) {
+    try {
+      callback();
+    } catch (...) {
+      // Terminal observation cannot reopen a completed operation.
+    }
+  }
+}
+
 auto OperationObject::complete(
   mln_status status, std::string diagnostic, std::any result
 ) noexcept -> void {
   auto endpoint = std::shared_ptr<NotificationEndpoint>{};
+  auto terminal = TerminalCallback{};
   {
     const std::scoped_lock lock(mutex_);
     if (completed_) {
@@ -45,6 +66,7 @@ auto OperationObject::complete(
     result_ = std::move(result);
     result_available_ = true;
     cancel_callback_ = {};
+    terminal = std::move(terminal_callback_);
     if (observer_attached_) {
       endpoint = endpoint_;
     } else {
@@ -56,11 +78,18 @@ auto OperationObject::complete(
   if (endpoint != nullptr) {
     endpoint->mark_ready();
   }
+  if (terminal) {
+    try {
+      terminal();
+    } catch (...) {
+      // Terminal observation cannot reopen a completed operation.
+    }
+  }
 }
 
 auto OperationObject::finish_cancelled_locked(
   std::shared_ptr<NotificationEndpoint>& out_endpoint,
-  CancelCallback& out_cancel
+  CancelCallback& out_cancel, TerminalCallback& out_terminal
 ) noexcept -> void {
   completed_ = true;
   status_ = MLN_STATUS_CANCELLED;
@@ -68,6 +97,7 @@ auto OperationObject::finish_cancelled_locked(
   result_ = std::monostate{};
   result_available_ = true;
   out_cancel = std::move(cancel_callback_);
+  out_terminal = std::move(terminal_callback_);
   if (observer_attached_) {
     out_endpoint = endpoint_;
   } else {
@@ -79,6 +109,7 @@ auto OperationObject::finish_cancelled_locked(
 auto OperationObject::cancel() -> mln_status {
   auto endpoint = std::shared_ptr<NotificationEndpoint>{};
   auto cancel = CancelCallback{};
+  auto terminal = TerminalCallback{};
   {
     const std::scoped_lock lock(mutex_);
     if (completed_) {
@@ -89,7 +120,7 @@ auto OperationObject::cancel() -> mln_status {
       set_thread_error("operation does not support cancellation");
       return MLN_STATUS_UNSUPPORTED;
     }
-    finish_cancelled_locked(endpoint, cancel);
+    finish_cancelled_locked(endpoint, cancel, terminal);
   }
   condition_.notify_all();
   if (cancel) {
@@ -101,6 +132,13 @@ auto OperationObject::cancel() -> mln_status {
   }
   if (endpoint != nullptr) {
     endpoint->mark_ready();
+  }
+  if (terminal) {
+    try {
+      terminal();
+    } catch (...) {
+      // Cancellation is already terminal.
+    }
   }
   return MLN_STATUS_OK;
 }
@@ -199,6 +237,7 @@ auto OperationObject::discard_result() -> mln_status {
 auto OperationObject::release_observer() noexcept -> void {
   auto endpoint = std::shared_ptr<NotificationEndpoint>{};
   auto cancel = CancelCallback{};
+  auto terminal = TerminalCallback{};
   {
     const std::scoped_lock lock(mutex_);
     if (!observer_attached_) {
@@ -207,7 +246,7 @@ auto OperationObject::release_observer() noexcept -> void {
     observer_attached_ = false;
     endpoint = std::move(endpoint_);
     if (!completed_ && cancellable_) {
-      finish_cancelled_locked(endpoint, cancel);
+      finish_cancelled_locked(endpoint, cancel, terminal);
     }
     result_.reset();
     result_available_ = false;
@@ -219,6 +258,13 @@ auto OperationObject::release_observer() noexcept -> void {
   if (cancel) {
     try {
       cancel();
+    } catch (...) {
+      // Observer release is unconditional.
+    }
+  }
+  if (terminal) {
+    try {
+      terminal();
     } catch (...) {
       // Observer release is unconditional.
     }

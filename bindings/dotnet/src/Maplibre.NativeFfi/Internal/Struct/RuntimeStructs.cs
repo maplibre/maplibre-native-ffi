@@ -96,6 +96,8 @@ internal static unsafe class RuntimeStructs
                 ReadOfflineRegionTileCountLimit(record->payload.offline_region_tile_count_limit),
             mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED =>
                 ReadCameraTransitionFinished(record->payload.camera_transition_finished),
+            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_COMMAND_FINISHED =>
+                ReadCommandFinished(record->payload.command_finished),
             _ => new RuntimeEventPayload.Unknown(
                 record->payload_type,
                 CopyBytes((byte*)record + PayloadOffset, eventSize - PayloadOffset)
@@ -136,6 +138,16 @@ internal static unsafe class RuntimeStructs
     private static RuntimeEventPayload.CameraTransitionFinished ReadCameraTransitionFinished(
         in mln_runtime_event_camera_transition_finished payload
     ) => new(payload.transition_id);
+
+    private static RuntimeEventPayload.CommandFinished ReadCommandFinished(
+        in mln_runtime_event_command_finished payload
+    ) =>
+        new(
+            payload.command_id,
+            (CommandDisposition)payload.disposition,
+            payload.disposition,
+            payload.generation
+        );
 
     private static RenderingStats RenderingStats(mln_rendering_stats value) =>
         new(

@@ -10,28 +10,30 @@ class ActiveFrameStateTest {
   // BND-170.
 
   @Test
-  fun activeFrameRejectsForbiddenSessionOperations() {
-    val state = ActiveFrameState()
+  fun activeFrameRejectsForbiddenSessionOperations(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val state = ActiveFrameState()
 
-    state.beginAcquire()
-    val error = assertFailsWith<InvalidStateException> { state.ensureInactive("render") }
-    assertEquals(MaplibreStatus.INVALID_STATE, error.status)
-    assertEquals(MaplibreStatus.INVALID_STATE.nativeCode, error.nativeStatusCode)
-    assertEquals(
-      "RenderSessionHandle cannot render while a texture frame is acquired",
-      error.diagnostic,
-    )
-    assertFailsWith<InvalidStateException> { state.beginAcquire() }
-  }
+      state.beginAcquire()
+      val error = assertFailsWith<InvalidStateException> { state.ensureInactive("render") }
+      assertEquals(MaplibreStatus.INVALID_STATE, error.status)
+      assertEquals(MaplibreStatus.INVALID_STATE.nativeCode, error.nativeStatusCode)
+      assertEquals(
+        "RenderSessionHandle cannot render while a texture frame is acquired",
+        error.diagnostic,
+      )
+      assertFailsWith<InvalidStateException> { state.beginAcquire() }
+    }
 
   @Test
-  fun endingFrameBorrowAllowsLaterOperationsAndAcquisition() {
-    val state = ActiveFrameState()
+  fun endingFrameBorrowAllowsLaterOperationsAndAcquisition(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val state = ActiveFrameState()
 
-    state.beginAcquire()
-    state.endBorrow()
+      state.beginAcquire()
+      state.endBorrow()
 
-    state.ensureInactive("render")
-    state.beginAcquire()
-  }
+      state.ensureInactive("render")
+      state.beginAcquire()
+    }
 }

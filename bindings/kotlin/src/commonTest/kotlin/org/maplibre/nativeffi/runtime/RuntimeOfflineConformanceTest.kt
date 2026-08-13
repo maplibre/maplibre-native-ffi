@@ -17,83 +17,90 @@ class RuntimeOfflineConformanceTest {
   private val drained = mutableListOf<RuntimeEvent>()
 
   @Test
-  fun offlineRegionApisCreateObserveAndCopyPublicEvents() {
-    val runtime = RuntimeHandle.create(RuntimeOptions().apply { cachePath = ":memory:" })
-    try {
-      val definition = tileDefinition()
-      val createMetadata = byteArrayOf(1, 2, 3)
-      val createOperation = runtime.startCreateOfflineRegion(definition, createMetadata)
-      createMetadata[0] = 9
-      waitForOperation(runtime, createOperation)
-      val created = runtime.takeCreateOfflineRegionResult(createOperation)
-      createOperation.close()
-      assertTrue(created.id > 0)
-      assertEquals(definition, created.definition)
-      assertContentEquals(byteArrayOf(1, 2, 3), created.metadata)
-      val copiedMetadata = created.metadata
-      copiedMetadata[0] = 9
-      assertContentEquals(byteArrayOf(1, 2, 3), created.metadata)
+  fun offlineRegionApisCreateObserveAndCopyPublicEvents(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val runtime = RuntimeHandle.create(RuntimeOptions().apply { cachePath = ":memory:" })
+      try {
+        val definition = tileDefinition()
+        val createMetadata = byteArrayOf(1, 2, 3)
+        val createOperation = runtime.startCreateOfflineRegion(definition, createMetadata)
+        createMetadata[0] = 9
+        waitForOperation(runtime, createOperation)
+        val created = runtime.takeCreateOfflineRegionResult(createOperation)
+        createOperation.close()
+        assertTrue(created.id > 0)
+        assertEquals(definition, created.definition)
+        assertContentEquals(byteArrayOf(1, 2, 3), created.metadata)
+        val copiedMetadata = created.metadata
+        copiedMetadata[0] = 9
+        assertContentEquals(byteArrayOf(1, 2, 3), created.metadata)
 
-      assertEquals(created, offlineRegion(runtime, created.id))
-      assertTrue(offlineRegions(runtime).contains(created))
+        assertEquals(created, offlineRegion(runtime, created.id))
+        assertTrue(offlineRegions(runtime).contains(created))
 
-      val updateMetadata = byteArrayOf(4, 5)
-      val updateOperation = runtime.startUpdateOfflineRegionMetadata(created.id, updateMetadata)
-      updateMetadata[0] = 9
-      waitForOperation(runtime, updateOperation)
-      val updated = runtime.takeUpdateOfflineRegionMetadataResult(updateOperation)
-      updateOperation.close()
-      assertEquals(created.id, updated.id)
-      assertContentEquals(byteArrayOf(4, 5), updated.metadata)
+        val updateMetadata = byteArrayOf(4, 5)
+        val updateOperation = runtime.startUpdateOfflineRegionMetadata(created.id, updateMetadata)
+        updateMetadata[0] = 9
+        waitForOperation(runtime, updateOperation)
+        val updated = runtime.takeUpdateOfflineRegionMetadataResult(updateOperation)
+        updateOperation.close()
+        assertEquals(created.id, updated.id)
+        assertContentEquals(byteArrayOf(4, 5), updated.metadata)
 
-      val status = offlineRegionStatus(runtime, created.id)
-      assertEquals(OfflineRegionDownloadState.INACTIVE, status.downloadState)
+        val status = offlineRegionStatus(runtime, created.id)
+        assertEquals(OfflineRegionDownloadState.INACTIVE, status.downloadState)
 
-      completeVoidOperation(runtime, runtime.startSetOfflineRegionObserved(created.id, true))
-      completeVoidOperation(
-        runtime,
-        runtime.startSetOfflineRegionDownloadState(created.id, OfflineRegionDownloadState.ACTIVE),
-      )
-      val observed = waitForObservedOfflineRegionEvent(runtime, created.id)
-      assertEquals(RuntimeEventSourceType.RUNTIME, observed.sourceType)
-      assertEquals(runtime, observed.runtimeSource)
-      assertNull(observed.mapSource)
-      assertObservedOfflineRegionStatusPayload(created.id, observed.payload)
-      // A drained value stays readable after the next drain ends the batch window.
-      val copiedMessage = observed.message
-      runtime.drainEvents()
-      assertEquals(copiedMessage, observed.message)
+        completeVoidOperation(runtime, runtime.startSetOfflineRegionObserved(created.id, true))
+        completeVoidOperation(
+          runtime,
+          runtime.startSetOfflineRegionDownloadState(created.id, OfflineRegionDownloadState.ACTIVE),
+        )
+        val observed = waitForObservedOfflineRegionEvent(runtime, created.id)
+        assertEquals(RuntimeEventSourceType.RUNTIME, observed.sourceType)
+        assertEquals(runtime, observed.runtimeSource)
+        assertNull(observed.mapSource)
+        assertObservedOfflineRegionStatusPayload(created.id, observed.payload)
+        // A drained value stays readable after the next drain ends the batch window.
+        val copiedMessage = observed.message
+        runtime.drainEvents()
+        assertEquals(copiedMessage, observed.message)
 
-      completeVoidOperation(runtime, runtime.startSetOfflineRegionObserved(created.id, false))
-      completeVoidOperation(
-        runtime,
-        runtime.startSetOfflineRegionDownloadState(created.id, OfflineRegionDownloadState.INACTIVE),
-      )
-      completeVoidOperation(runtime, runtime.startInvalidateOfflineRegion(created.id))
-      completeVoidOperation(runtime, runtime.startDeleteOfflineRegion(created.id))
-      assertNull(offlineRegion(runtime, created.id))
-    } finally {
-      runtime.close()
+        completeVoidOperation(runtime, runtime.startSetOfflineRegionObserved(created.id, false))
+        completeVoidOperation(
+          runtime,
+          runtime.startSetOfflineRegionDownloadState(
+            created.id,
+            OfflineRegionDownloadState.INACTIVE,
+          ),
+        )
+        completeVoidOperation(runtime, runtime.startInvalidateOfflineRegion(created.id))
+        completeVoidOperation(runtime, runtime.startDeleteOfflineRegion(created.id))
+        assertNull(offlineRegion(runtime, created.id))
+      } finally {
+        runtime.close()
+      }
     }
-  }
 
-  private fun waitForOperation(runtime: RuntimeHandle, operation: OperationHandle<*>) {
+  private suspend fun waitForOperation(runtime: RuntimeHandle, operation: OperationHandle<*>) {
     repeat(10_000) {
       if (operation.poll()) {
         return
       }
-      runtime.pump(1)
+      runtime.barrier()
     }
     error("operation did not complete")
   }
 
-  private fun completeVoidOperation(runtime: RuntimeHandle, operation: OperationHandle<Unit>) {
+  private suspend fun completeVoidOperation(
+    runtime: RuntimeHandle,
+    operation: OperationHandle<Unit>,
+  ) {
     waitForOperation(runtime, operation)
     operation.discard()
     operation.close()
   }
 
-  private fun offlineRegion(runtime: RuntimeHandle, id: Long): OfflineRegionInfo? {
+  private suspend fun offlineRegion(runtime: RuntimeHandle, id: Long): OfflineRegionInfo? {
     val operation = runtime.startOfflineRegion(id)
     waitForOperation(runtime, operation)
     return try {
@@ -103,7 +110,7 @@ class RuntimeOfflineConformanceTest {
     }
   }
 
-  private fun offlineRegions(runtime: RuntimeHandle): List<OfflineRegionInfo> {
+  private suspend fun offlineRegions(runtime: RuntimeHandle): List<OfflineRegionInfo> {
     val operation = runtime.startOfflineRegions()
     waitForOperation(runtime, operation)
     return try {
@@ -113,7 +120,7 @@ class RuntimeOfflineConformanceTest {
     }
   }
 
-  private fun offlineRegionStatus(runtime: RuntimeHandle, id: Long): OfflineRegionStatus {
+  private suspend fun offlineRegionStatus(runtime: RuntimeHandle, id: Long): OfflineRegionStatus {
     val operation = runtime.startOfflineRegionStatus(id)
     waitForOperation(runtime, operation)
     return try {
@@ -123,7 +130,7 @@ class RuntimeOfflineConformanceTest {
     }
   }
 
-  private fun waitForObservedOfflineRegionEvent(
+  private suspend fun waitForObservedOfflineRegionEvent(
     runtime: RuntimeHandle,
     regionId: Long,
   ): RuntimeEvent {
@@ -140,7 +147,7 @@ class RuntimeOfflineConformanceTest {
           else -> Unit
         }
       }
-      runtime.pump(1)
+      runtime.barrier()
     }
     error("offline region observation event did not arrive for region $regionId")
   }
@@ -150,8 +157,8 @@ class RuntimeOfflineConformanceTest {
    * the steps before it, so the waiters below scan what the whole test has seen rather than one
    * batch.
    */
-  private fun drain(runtime: RuntimeHandle) {
-    runtime.pump(0)
+  private suspend fun drain(runtime: RuntimeHandle) {
+    runtime.barrier()
     drained += runtime.drainEvents().events
   }
 

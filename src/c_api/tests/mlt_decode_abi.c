@@ -54,9 +54,9 @@ static uint32_t serve_recorded_tile(
   return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
 }
 
-// Renders and pumps until the source reports features or the attempts run out.
-// Tiles arrive through a worker thread, so the count stays zero until the map
-// has parsed the tile and folded it into the render tree.
+// Renders until the source reports features or the attempts run out. Tiles
+// arrive through a worker thread, so the count stays zero until the runtime
+// worker parses the tile and folds it into the render tree.
 static size_t query_admin_feature_count(
   mln_runtime runtime, mln_render_session session
 ) {
@@ -73,7 +73,7 @@ static size_t query_admin_feature_count(
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK, mln_render_session_render_update(session, &render_result)
     );
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0));
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
 
     mln_buffer result = MLN_HANDLE_NULL;
     const mln_status status = mln_render_session_query_source_features(
@@ -122,19 +122,21 @@ static size_t decode_recorded_tile(
     .callback = serve_recorded_tile,
     .user_data = &provider_state,
   };
+  uint64_t resource_command_id = 0;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_set_resource_provider(runtime, &provider)
+    MLN_STATUS_OK,
+    mln_runtime_set_resource_provider(runtime, &provider, &resource_command_id)
   );
 
   mln_map_options map_options = mln_map_options_default();
-  map_options.width = 64;
-  map_options.height = 64;
+  map_options.initial_extent.width = 64;
+  map_options.initial_extent.height = 64;
   map_options.fast_pfor_enabled = fast_pfor_enabled;
   mln_map map = mln_test_create_map_with_options(runtime, &map_options);
 
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_map_set_style_json(map, MLN_BUFFER_LITERAL(mlt_style_json))
+    mln_test_map_set_style_json(map, MLN_BUFFER_LITERAL(mlt_style_json))
   );
 
   mln_test_render_fixture fixture = {0};
@@ -145,8 +147,10 @@ static size_t decode_recorded_tile(
 
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
+  resource_command_id = 0;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_clear_resource_provider(runtime)
+    MLN_STATUS_OK,
+    mln_runtime_clear_resource_provider(runtime, &resource_command_id)
   );
   mln_test_destroy_runtime(runtime);
   free(tile_bytes);

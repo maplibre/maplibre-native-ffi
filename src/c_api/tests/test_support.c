@@ -150,34 +150,265 @@ static void untrack_session(mln_render_session session) {
   }
 }
 
+mln_status mln_test_runtime_create(
+  const mln_runtime_options* options, mln_runtime* out_runtime
+) {
+  mln_operation operation = MLN_HANDLE_NULL;
+  mln_status status = mln_runtime_create_start(options, &operation);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  bool completed = false;
+  status = mln_operation_wait(operation, -1, &completed);
+  if (status == MLN_STATUS_OK && !completed) {
+    status = MLN_STATUS_NATIVE_ERROR;
+  }
+  if (status == MLN_STATUS_OK) {
+    mln_status result = MLN_STATUS_NATIVE_ERROR;
+    status = mln_operation_get_status(operation, &result);
+    if (status == MLN_STATUS_OK) {
+      status = result;
+    }
+  }
+  if (status == MLN_STATUS_OK) {
+    status = mln_runtime_create_take_result(operation, out_runtime);
+  }
+  mln_operation_release(operation);
+  return status;
+}
+
+mln_status mln_test_runtime_close(mln_runtime runtime) {
+  mln_operation operation = MLN_HANDLE_NULL;
+  mln_status status = mln_runtime_close_start(runtime, &operation);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  bool completed = false;
+  status = mln_operation_wait(operation, -1, &completed);
+  if (status == MLN_STATUS_OK && !completed) {
+    status = MLN_STATUS_NATIVE_ERROR;
+  }
+  if (status == MLN_STATUS_OK) {
+    mln_status result = MLN_STATUS_NATIVE_ERROR;
+    status = mln_operation_get_status(operation, &result);
+    if (status == MLN_STATUS_OK) {
+      status = result;
+    }
+  }
+  mln_operation_release(operation);
+  return status;
+}
+
 mln_runtime mln_test_create_runtime(void) {
   mln_runtime runtime = MLN_HANDLE_NULL;
   mln_notification_source source = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_notification_source_create(&source));
   mln_runtime_options options = mln_runtime_options_default();
   options.notification_source = source;
-  const mln_status status = mln_runtime_create(&options, &runtime);
-  if (status == MLN_STATUS_INVALID_STATE) {
-    mln_notification_source_close(source);
-    TEST_FAIL_MESSAGE(
-      "This thread already owns a live runtime, so an earlier test leaked one. "
-      "Look for the first failing test above and destroy the runtime it "
-      "created."
-    );
-  }
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, status);
+  mln_operation operation = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_create_start(&options, &operation)
+  );
+  bool completed = false;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_operation_wait(operation, -1, &completed)
+  );
+  TEST_ASSERT_TRUE(completed);
+  mln_status result_status = MLN_STATUS_NATIVE_ERROR;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_operation_get_status(operation, &result_status)
+  );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, result_status);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_create_take_result(operation, &runtime)
+  );
+  mln_operation_release(operation);
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, runtime);
   tracked_runtime = runtime;
   tracked_notification_source = source;
   return runtime;
 }
 
+mln_status mln_test_map_create_status(
+  mln_runtime runtime, const mln_map_options* options, mln_map* out_map
+) {
+  mln_operation operation = MLN_HANDLE_NULL;
+  mln_status status = mln_map_create_start(runtime, options, &operation);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  bool completed = false;
+  status = mln_operation_wait(operation, -1, &completed);
+  if (status == MLN_STATUS_OK && !completed) {
+    status = MLN_STATUS_NATIVE_ERROR;
+  }
+  if (status == MLN_STATUS_OK) {
+    mln_status result = MLN_STATUS_NATIVE_ERROR;
+    status = mln_operation_get_status(operation, &result);
+    if (status == MLN_STATUS_OK) {
+      status = result;
+    }
+  }
+  if (status == MLN_STATUS_OK) {
+    status = mln_map_create_take_result(operation, out_map);
+  }
+  mln_operation_release(operation);
+  return status;
+}
+
+mln_status mln_test_map_close(mln_map map) {
+  mln_operation operation = MLN_HANDLE_NULL;
+  mln_status status = mln_map_close_start(map, &operation);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  bool completed = false;
+  status = mln_operation_wait(operation, -1, &completed);
+  if (status == MLN_STATUS_OK && !completed) {
+    status = MLN_STATUS_NATIVE_ERROR;
+  }
+  if (status == MLN_STATUS_OK) {
+    mln_status result = MLN_STATUS_NATIVE_ERROR;
+    status = mln_operation_get_status(operation, &result);
+    if (status == MLN_STATUS_OK) {
+      status = result;
+    }
+  }
+  mln_operation_release(operation);
+  return status;
+}
+
+mln_status mln_test_map_get_size(
+  mln_map map, uint32_t* out_width, uint32_t* out_height,
+  double* out_scale_factor
+) {
+  if (out_width == NULL || out_height == NULL || out_scale_factor == NULL) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
+  const mln_status status = mln_map_snapshot_get(map, &snapshot);
+  if (status == MLN_STATUS_OK) {
+    *out_width = snapshot.logical_extent.width;
+    *out_height = snapshot.logical_extent.height;
+    *out_scale_factor = snapshot.logical_extent.scale_factor;
+  }
+  return status;
+}
+
+mln_status mln_test_map_get_event_mask(mln_map map, uint64_t* out_mask) {
+  if (out_mask == NULL) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
+  const mln_status status = mln_map_snapshot_get(map, &snapshot);
+  if (status == MLN_STATUS_OK) {
+    *out_mask = snapshot.event_mask;
+  }
+  return status;
+}
+
+mln_status mln_test_map_get_camera(
+  mln_map map, mln_camera_options* out_camera
+) {
+  if (out_camera == NULL) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  uint64_t generation = 0;
+  return mln_map_camera_snapshot_get(map, out_camera, &generation);
+}
+
+mln_status mln_test_map_request_repaint(mln_map map) {
+  uint64_t command_id = 0;
+  return mln_map_request_repaint(map, &command_id);
+}
+
+mln_status mln_test_map_set_event_mask(mln_map map, uint64_t mask) {
+  uint64_t command_id = 0;
+  return mln_map_set_event_mask(map, mask, &command_id);
+}
+
+mln_status mln_test_map_set_style_json(mln_map map, mln_buffer_view json) {
+  uint64_t command_id = 0;
+  return mln_map_set_style_json(map, json, &command_id);
+}
+
+mln_status mln_test_map_set_style_url(mln_map map, const char* url) {
+  uint64_t command_id = 0;
+  return mln_map_set_style_url(map, url, &command_id);
+}
+
+static mln_status copy_map_buffer_operation(
+  mln_status (*start)(mln_map, mln_operation*),
+  mln_status (*take)(mln_operation, mln_buffer*), mln_map map, char* out,
+  size_t capacity, size_t* out_size
+) {
+  if (out_size == NULL || (out == NULL && capacity != 0)) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  mln_operation operation = MLN_HANDLE_NULL;
+  mln_status status = start(map, &operation);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  bool completed = false;
+  status = mln_operation_wait(operation, -1, &completed);
+  mln_buffer buffer = MLN_HANDLE_NULL;
+  if (status == MLN_STATUS_OK && completed) {
+    status = take(operation, &buffer);
+  }
+  if (status == MLN_STATUS_OK) {
+    mln_buffer_view view = {0};
+    status = mln_buffer_get(buffer, &view);
+    if (status == MLN_STATUS_OK) {
+      *out_size = view.size;
+      if (capacity < view.size) {
+        status = MLN_STATUS_INVALID_ARGUMENT;
+      } else if (view.size != 0) {
+        memcpy(out, view.data, view.size);
+      }
+    }
+  }
+  mln_buffer_destroy(buffer);
+  mln_operation_release(operation);
+  return status;
+}
+
+mln_status mln_test_map_copy_loaded_style_json(
+  mln_map map, char* out, size_t capacity, size_t* out_size
+) {
+  return copy_map_buffer_operation(
+    mln_map_loaded_style_json_start, mln_map_loaded_style_json_take_result, map,
+    out, capacity, out_size
+  );
+}
+
+mln_status mln_test_map_copy_style_url(
+  mln_map map, char* out, size_t capacity, size_t* out_size
+) {
+  return copy_map_buffer_operation(
+    mln_map_style_url_start, mln_map_style_url_take_result, map, out, capacity,
+    out_size
+  );
+}
+
 mln_map mln_test_create_map_with_options(
   mln_runtime runtime, const mln_map_options* options
 ) {
   mln_map map = MLN_HANDLE_NULL;
+  mln_operation operation = MLN_HANDLE_NULL;
   reserve_map_slot();
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_create(runtime, options, &map));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_create_start(runtime, options, &operation)
+  );
+  bool completed = false;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_operation_wait(operation, -1, &completed)
+  );
+  TEST_ASSERT_TRUE(completed);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_create_take_result(operation, &map)
+  );
+  mln_operation_release(operation);
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, map);
   track_map(map);
   return map;
@@ -185,17 +416,30 @@ mln_map mln_test_create_map_with_options(
 
 mln_map mln_test_create_map(mln_runtime runtime) {
   mln_map_options options = mln_map_options_default();
-  options.width = 512;
-  options.height = 512;
+  options.initial_extent.width = 64;
+  options.initial_extent.height = 64;
   return mln_test_create_map_with_options(runtime, &options);
 }
 
-// Untracking happens only after the destroy succeeds, so a handle whose destroy
-// is rejected for now stays tracked for teardown to reclaim.
+// Untracking happens only after committed close completes.
 void mln_test_destroy_runtime(mln_runtime runtime) {
   mln_event_batch_release(compatibility_batch_handle);
   compatibility_batch_handle = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_destroy(runtime));
+  mln_operation operation = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_close_start(runtime, &operation)
+  );
+  bool completed = false;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_operation_wait(operation, -1, &completed)
+  );
+  TEST_ASSERT_TRUE(completed);
+  mln_status result_status = MLN_STATUS_NATIVE_ERROR;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_operation_get_status(operation, &result_status)
+  );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, result_status);
+  mln_operation_release(operation);
   if (tracked_runtime == runtime) {
     tracked_runtime = MLN_HANDLE_NULL;
   }
@@ -207,10 +451,44 @@ void mln_test_destroy_runtime(mln_runtime runtime) {
   }
 }
 
+mln_status mln_test_runtime_barrier(mln_runtime runtime) {
+  mln_operation operation = MLN_HANDLE_NULL;
+  mln_status status = mln_runtime_barrier_start(runtime, &operation);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  bool completed = false;
+  status = mln_operation_wait(operation, -1, &completed);
+  if (status == MLN_STATUS_OK && !completed) {
+    status = MLN_STATUS_NATIVE_ERROR;
+  }
+  if (status == MLN_STATUS_OK) {
+    mln_status result = MLN_STATUS_NATIVE_ERROR;
+    status = mln_operation_get_status(operation, &result);
+    if (status == MLN_STATUS_OK) {
+      status = result;
+    }
+  }
+  mln_operation_release(operation);
+  return status;
+}
+
 void mln_test_destroy_map(mln_map map) {
   mln_event_batch_release(compatibility_batch_handle);
   compatibility_batch_handle = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_destroy(map));
+  mln_operation operation = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_close_start(map, &operation));
+  bool completed = false;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_operation_wait(operation, -1, &completed)
+  );
+  TEST_ASSERT_TRUE(completed);
+  mln_status result_status = MLN_STATUS_NATIVE_ERROR;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_operation_get_status(operation, &result_status)
+  );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, result_status);
+  mln_operation_release(operation);
   untrack_map(map);
 }
 
@@ -1374,15 +1652,10 @@ bool mln_test_drain_find(
   }
 }
 
-bool mln_test_pump_until(mln_runtime runtime, atomic_bool* flag) {
+bool mln_test_wait_until(mln_runtime runtime, atomic_bool* flag) {
   for (unsigned int attempt = 0; attempt < 500; attempt += 1) {
     if (atomic_load(flag)) {
       return true;
-    }
-    // A short park rather than zero: this waits on another thread's flag, so
-    // spinning would burn the whole loop budget before that thread ran.
-    if (mln_runtime_pump(runtime, 2) != MLN_STATUS_OK) {
-      return false;
     }
     // Drain so the queue does not grow without bound while we wait.
     mln_test_drain_all(runtime);
@@ -1427,11 +1700,24 @@ bool mln_test_reclaim_thread_resources(void) {
   }
   while (tracked_map_count > 0) {
     tracked_map_count -= 1;
-    mln_map_destroy(tracked_maps[tracked_map_count]);
+    mln_operation close = MLN_HANDLE_NULL;
+    if (
+      mln_map_close_start(tracked_maps[tracked_map_count], &close) ==
+      MLN_STATUS_OK
+    ) {
+      bool completed = false;
+      mln_operation_wait(close, -1, &completed);
+      mln_operation_release(close);
+    }
     reclaimed = true;
   }
   if (tracked_runtime != MLN_HANDLE_NULL) {
-    mln_runtime_destroy(tracked_runtime);
+    mln_operation close = MLN_HANDLE_NULL;
+    if (mln_runtime_close_start(tracked_runtime, &close) == MLN_STATUS_OK) {
+      bool completed = false;
+      (void)mln_operation_wait(close, -1, &completed);
+      mln_operation_release(close);
+    }
     tracked_runtime = MLN_HANDLE_NULL;
     reclaimed = true;
   }

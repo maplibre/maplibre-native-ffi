@@ -9,26 +9,27 @@ import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 
 class CustomGeometrySourceStateTest {
   @Test
-  fun callbacksCopyTileIdsContainFailuresAndStopAfterClosureDuringCallback() {
-    val received = mutableListOf<CanonicalTileId>()
-    lateinit var state: CustomGeometrySourceState
-    state =
-      CustomGeometrySourceState(
-        CustomGeometrySourceOptions(
-          object : CustomGeometrySourceCallback {
-            override fun fetchTile(tileId: CanonicalTileId) {
-              received += tileId
-              state.close()
-              throw IllegalStateException("contained")
+  fun callbacksCopyTileIdsContainFailuresAndStopAfterClosureDuringCallback(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val received = mutableListOf<CanonicalTileId>()
+      lateinit var state: CustomGeometrySourceState
+      state =
+        CustomGeometrySourceState(
+          CustomGeometrySourceOptions(
+            object : CustomGeometrySourceCallback {
+              override fun fetchTile(tileId: CanonicalTileId) {
+                received += tileId
+                state.close()
+                throw IllegalStateException("contained")
+              }
             }
-          }
-        )
-      ) {}
+          )
+        ) {}
 
-    state.fetchTileForTesting(CanonicalTileId(4, 5, 6))
-    state.fetchTileForTesting(CanonicalTileId(7, 8, 9))
+      state.fetchTileForTesting(CanonicalTileId(4, 5, 6))
+      state.fetchTileForTesting(CanonicalTileId(7, 8, 9))
 
-    assertEquals(listOf(CanonicalTileId(4, 5, 6)), received)
-    assertTrue(state.isClosedForTesting())
-  }
+      assertEquals(listOf(CanonicalTileId(4, 5, 6)), received)
+      assertTrue(state.isClosedForTesting())
+    }
 }

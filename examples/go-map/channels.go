@@ -7,9 +7,7 @@ import (
 	maplibre "github.com/maplibre/maplibre-native-ffi/bindings/go"
 )
 
-// cameraCommand is decoded on the render loop and applied on the runtime loop.
-// Commands that depend on the current camera carry deltas so the read and write
-// stay together on the map's owner thread.
+// cameraCommand is decoded and submitted directly from the SDL event loop.
 type cameraCommand struct {
 	kind       cameraCommandKind
 	deltaX     float64
@@ -36,36 +34,24 @@ const (
 	commandResetOrientation
 )
 
-// commandQueue holds the camera commands the render loop has decoded and the
-// runtime loop has not applied yet. It grows rather than dropping, because
-// deltas and gesture brackets are not recoverable once discarded.
-type commandQueue struct {
-	mu      sync.Mutex
-	pending []cameraCommand
+// cameraController submits commands directly to the any-thread map API.
+type cameraController struct {
+	state  *runtimeMapState
+	shared *sharedState
 }
 
-// push is called on the render loop.
-func (queue *commandQueue) push(command cameraCommand) {
-	queue.mu.Lock()
-	queue.pending = append(queue.pending, command)
-	queue.mu.Unlock()
+func (commands *cameraController) submit(command cameraCommand) bool {
+	if err := commands.state.applyCommand(command); err != nil {
+		commands.shared.fail(err)
+		return false
+	}
+	return true
 }
 
-// drain is called on the runtime loop. It swaps the caller's buffer in for the
-// pending slice, keeping the locked section O(1).
-func (queue *commandQueue) drain(out []cameraCommand) []cameraCommand {
-	queue.mu.Lock()
-	defer queue.mu.Unlock()
-	pending := queue.pending
-	queue.pending = out[:0]
-	return pending
-}
-
-// sharedState carries the render request, shutdown, and first failure between
-// the render and runtime loops.
+// sharedState carries render requests and the first failure observed by the
+// host loop.
 type sharedState struct {
 	renderRequested atomic.Bool
-	shutdown        atomic.Bool
 	failureMu       sync.Mutex
 	failure         error
 }
@@ -82,14 +68,6 @@ func (shared *sharedState) requestRender() {
 
 func (shared *sharedState) consumeRenderRequest() bool {
 	return shared.renderRequested.Swap(false)
-}
-
-func (shared *sharedState) requestShutdown() {
-	shared.shutdown.Store(true)
-}
-
-func (shared *sharedState) shutdownRequested() bool {
-	return shared.shutdown.Load()
 }
 
 func (shared *sharedState) fail(err error) {

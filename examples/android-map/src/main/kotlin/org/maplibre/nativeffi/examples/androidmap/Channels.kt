@@ -3,13 +3,7 @@ package org.maplibre.nativeffi.examples.androidmap
 import java.util.concurrent.atomic.AtomicBoolean
 import org.maplibre.nativeffi.geo.ScreenPoint
 
-/**
- * A camera change decoded on the render loop and applied on the map's owner thread.
- *
- * Commands carry deltas rather than absolute targets, because reading the camera and writing the
- * new one has to happen together on the thread that owns the map. Coordinates are logical map
- * units, converted by the render loop that owns the viewport.
- */
+/** A camera change decoded on the UI thread and submitted directly to the map worker. */
 internal sealed interface CameraCommand {
   data object CancelTransitions : CameraCommand
 

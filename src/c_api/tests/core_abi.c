@@ -15,72 +15,81 @@
 
 static void runtime_rejects_invalid_arguments(void) {
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_create(NULL, NULL)
+    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_create_start(NULL, NULL)
   );
 
   mln_runtime_options small_options = mln_runtime_options_default();
   small_options.size = sizeof(mln_runtime_options) - 1;
-  mln_runtime runtime = MLN_HANDLE_NULL;
+  mln_operation operation = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_create(&small_options, &runtime)
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_runtime_create_start(&small_options, &operation)
   );
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, runtime);
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, operation);
 
-  runtime = 1;
+  operation = 1;
   const mln_runtime_options options = mln_runtime_options_default();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_create(&options, &runtime)
+    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_create_start(&options, &operation)
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_destroy(MLN_HANDLE_NULL)
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_runtime_close_start(MLN_HANDLE_NULL, &operation)
   );
 }
 
 static void runtime_rejects_stale_handles(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_test_destroy_runtime(runtime);
+  mln_operation operation = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_destroy(runtime)
+    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_close_start(runtime, &operation)
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_pump(runtime, 0)
+    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_barrier_start(runtime, &operation)
   );
 }
 
-static void runtime_pump_rejects_null_runtime(void) {
+static void runtime_barrier_rejects_null_runtime(void) {
+  mln_operation operation = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_pump(MLN_HANDLE_NULL, 0)
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_runtime_barrier_start(MLN_HANDLE_NULL, &operation)
   );
 }
 
 static void map_create_rejects_invalid_arguments(void) {
-  mln_map map = MLN_HANDLE_NULL;
   const mln_map_options options = mln_map_options_default();
+  mln_operation operation = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_create(MLN_HANDLE_NULL, &options, &map)
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_create_start(MLN_HANDLE_NULL, &options, &operation)
   );
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, map);
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, operation);
 
   mln_runtime runtime = mln_test_create_runtime();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_create(runtime, &options, NULL)
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_create_start(runtime, &options, NULL)
   );
-  map = 1;
+  operation = 1;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_create(runtime, &options, &map)
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_create_start(runtime, &options, &operation)
   );
 
-  map = MLN_HANDLE_NULL;
+  operation = MLN_HANDLE_NULL;
   mln_map_options small_options = mln_map_options_default();
   small_options.size = sizeof(mln_map_options) - 1;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_create(runtime, &small_options, &map)
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_create_start(runtime, &small_options, &operation)
   );
 
   mln_map_options invalid_options = mln_map_options_default();
   invalid_options.map_mode = (mln_map_mode)999;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_create(runtime, &invalid_options, &map)
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_create_start(runtime, &invalid_options, &operation)
   );
   mln_test_destroy_runtime(runtime);
 }
@@ -89,20 +98,22 @@ static void map_lifecycle_rejects_invalid_state_and_stale_handles(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_destroy_map(map);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_INVALID_ARGUMENT, mln_map_destroy(map));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_INVALID_ARGUMENT, mln_test_map_close(map));
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_style_json(map, MLN_BUFFER_LITERAL("{}"))
+    mln_test_map_set_style_json(map, MLN_BUFFER_LITERAL("{}"))
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_request_repaint(map)
+    MLN_STATUS_INVALID_ARGUMENT, mln_test_map_request_repaint(map)
   );
+  mln_operation operation = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_request_still_image(map)
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_request_still_image_start(map, &operation)
   );
   mln_camera_options camera = mln_camera_options_default();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_get_camera(map, &camera)
+    MLN_STATUS_INVALID_ARGUMENT, mln_test_map_get_camera(map, &camera)
   );
   mln_test_destroy_runtime(runtime);
 }
@@ -112,10 +123,10 @@ static void style_functions_reject_null_inputs(void) {
   mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_style_json(map, (mln_buffer_view){0})
+    mln_test_map_set_style_json(map, (mln_buffer_view){0})
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_set_style_url(map, NULL)
+    MLN_STATUS_INVALID_ARGUMENT, mln_test_map_set_style_url(map, NULL)
   );
 
   // The copy entry points treat a null buffer as a probe only at zero capacity,
@@ -124,19 +135,19 @@ static void style_functions_reject_null_inputs(void) {
   char buffer[8] = {0};
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_copy_loaded_style_json(map, NULL, sizeof(buffer), &size)
+    mln_test_map_copy_loaded_style_json(map, NULL, sizeof(buffer), &size)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_copy_loaded_style_json(map, buffer, sizeof(buffer), NULL)
+    mln_test_map_copy_loaded_style_json(map, buffer, sizeof(buffer), NULL)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_copy_style_url(map, NULL, sizeof(buffer), &size)
+    mln_test_map_copy_style_url(map, NULL, sizeof(buffer), &size)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_copy_style_url(map, buffer, sizeof(buffer), NULL)
+    mln_test_map_copy_style_url(map, buffer, sizeof(buffer), NULL)
   );
 
   mln_test_destroy_map(map);
@@ -145,7 +156,7 @@ static void style_functions_reject_null_inputs(void) {
 
 static void failing_status_sets_and_successful_status_clears_diagnostics(void) {
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_destroy(MLN_HANDLE_NULL)
+    MLN_STATUS_INVALID_ARGUMENT, mln_test_runtime_close(MLN_HANDLE_NULL)
   );
   TEST_ASSERT_GREATER_THAN_size_t(0, strlen(mln_thread_last_error_message()));
   mln_runtime runtime = mln_test_create_runtime();
@@ -164,7 +175,7 @@ static DWORD WINAPI fail_on_thread(void* opaque_result) {
 static void* fail_on_thread(void* opaque_result) {
 #endif
   worker_diagnostic* result = opaque_result;
-  result->status = mln_runtime_destroy(MLN_HANDLE_NULL);
+  result->status = mln_test_runtime_close(MLN_HANDLE_NULL);
   result->message_length = strlen(mln_thread_last_error_message());
 #if defined(_WIN32)
   return 0;
@@ -175,7 +186,7 @@ static void* fail_on_thread(void* opaque_result) {
 
 static void diagnostics_are_thread_local(void) {
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_destroy(MLN_HANDLE_NULL)
+    MLN_STATUS_INVALID_ARGUMENT, mln_test_runtime_close(MLN_HANDLE_NULL)
   );
   char main_message[512] = {0};
   strncpy(
@@ -212,7 +223,7 @@ void run_core_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(runtime_rejects_invalid_arguments);
   RUN_TEST(runtime_rejects_stale_handles);
-  RUN_TEST(runtime_pump_rejects_null_runtime);
+  RUN_TEST(runtime_barrier_rejects_null_runtime);
   RUN_TEST(map_create_rejects_invalid_arguments);
   RUN_TEST(map_lifecycle_rejects_invalid_state_and_stale_handles);
   RUN_TEST(style_functions_reject_null_inputs);

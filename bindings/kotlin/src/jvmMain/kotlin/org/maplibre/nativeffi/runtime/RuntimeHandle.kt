@@ -1,6 +1,7 @@
 package org.maplibre.nativeffi.runtime
 
 import java.lang.ref.WeakReference
+import org.maplibre.nativeffi.internal.callback.CallbackCommandRegistry
 import org.maplibre.nativeffi.internal.callback.HttpHeaderTransformState
 import org.maplibre.nativeffi.internal.callback.ResourceProviderState
 import org.maplibre.nativeffi.internal.callback.ResourceTransformState
@@ -21,32 +22,63 @@ import org.maplibre.nativeffi.resource.ResourceTransformCallback
 
 /** Owned runtime handle backed by the JVM FFM bridge. */
 public actual class RuntimeHandle
-private constructor(private val handle: NativeRuntime, private var notificationSource: Long) :
-  AutoCloseable {
+private constructor(
+  private val handle: NativeRuntime,
+  private var notificationSource: Long,
+  private val notifications: NotificationDispatcher,
+) {
   private val core = HandleStateCore("RuntimeHandle", handle.raw)
 
   init {
     HandleLeakCleaner.register(this, core.leakReport)
   }
 
-  private var resourceProviderState: ResourceProviderState? = null
-  private var resourceTransformState: ResourceTransformState? = null
-  private var httpHeaderTransformState: HttpHeaderTransformState? = null
+  private val resourceProviderCommands =
+    CallbackCommandRegistry<ResourceProviderState>(
+      HandleLeakCleaner::retainNativeCallbackRoot,
+      ::releaseCallbackRoot,
+    )
+  private val resourceTransformCommands =
+    CallbackCommandRegistry<ResourceTransformState>(
+      HandleLeakCleaner::retainNativeCallbackRoot,
+      ::releaseCallbackRoot,
+    )
+  private val httpHeaderTransformCommands =
+    CallbackCommandRegistry<HttpHeaderTransformState>(
+      HandleLeakCleaner::retainNativeCallbackRoot,
+      ::releaseCallbackRoot,
+    )
   private val liveMaps = mutableMapOf<Long, WeakReference<MapHandle>>()
 
   public actual val isClosed: Boolean
     get() = core.isReleased()
 
-  public actual fun pump(timeoutMillis: Long) {
+  public actual fun setNotificationCallback(callback: () -> Unit) {
     NativeAccess.ensureLoaded()
     core.requireLive()
-    NativeAccess.pumpRuntime(handle, timeoutMillis)
+    notifications.setCallback(callback)
   }
 
-  public actual fun acquireWakeSource(): WakeSource {
+  public actual fun clearNotificationCallback() {
     NativeAccess.ensureLoaded()
     core.requireLive()
-    return WakeSource.fromNative(NativeAccess.acquireWakeSource(handle))
+    notifications.clearCallback()
+  }
+
+  public actual fun drainReady(): List<ReadyEndpoint> {
+    NativeAccess.ensureLoaded()
+    core.requireLive()
+    return notifications.drainReady()
+  }
+
+  public actual suspend fun barrier() {
+    NativeAccess.ensureLoaded()
+    val operation = NativeAccess.startRuntimeBarrier(requireLiveHandle())
+    try {
+      notifications.await(operation)
+    } finally {
+      NativeAccess.releaseOperation(operation)
+    }
   }
 
   public actual fun startAmbientCacheOperation(
@@ -211,92 +243,58 @@ private constructor(private val handle: NativeRuntime, private var notificationS
       NativeAccess.takeOfflineRegionStatusResult(operationId, operation::markResultConsumed)
     }
 
-  public actual fun setResourceProvider(callback: ResourceProviderCallback) {
+  public actual fun setResourceProvider(callback: ResourceProviderCallback): ULong {
     NativeAccess.ensureLoaded()
     val replacement = ResourceProviderState(callback)
-    val previous: ResourceProviderState?
-    try {
-      resourceProviderState?.checkCanClose()
-      Status.check(NativeAccess.setResourceProvider(requireLiveHandle(), replacement.descriptor()))
-      previous = resourceProviderState
-      resourceProviderState = replacement
-      HandleLeakCleaner.retainNativeCallbackRoot(replacement)
-    } catch (error: Throwable) {
-      closeAndSuppress(error, replacement)
-      throw error
+    return resourceProviderCommands.set(replacement) {
+      NativeAccess.setResourceProvider(requireLiveHandle(), replacement.descriptor()).toULong()
     }
-    releaseCallbackRoot(previous)
   }
 
-  public actual fun clearResourceProvider() {
+  public actual fun clearResourceProvider(): ULong {
     NativeAccess.ensureLoaded()
-    resourceProviderState?.checkCanClose()
-    Status.check(NativeAccess.clearResourceProvider(requireLiveHandle()))
-    val previous = resourceProviderState
-    resourceProviderState = null
-    // The install path retained this as a strong leak-cleaner root, so closing
-    // alone would keep it and everything its callback captured reachable.
-    releaseCallbackRoot(previous)
+    return resourceProviderCommands.clear {
+      NativeAccess.clearResourceProvider(requireLiveHandle()).toULong()
+    }
   }
 
-  public actual fun setResourceTransform(callback: ResourceTransformCallback) {
+  public actual fun setResourceTransform(callback: ResourceTransformCallback): ULong {
     NativeAccess.ensureLoaded()
     val replacement = ResourceTransformState(callback)
-    val previous: ResourceTransformState?
-    try {
-      resourceTransformState?.checkCanClose()
-      Status.check(NativeAccess.setResourceTransform(requireLiveHandle(), replacement.descriptor()))
-      previous = resourceTransformState
-      resourceTransformState = replacement
-      HandleLeakCleaner.retainNativeCallbackRoot(replacement)
-    } catch (error: Throwable) {
-      closeAndSuppress(error, replacement)
-      throw error
+    return resourceTransformCommands.set(replacement) {
+      NativeAccess.setResourceTransform(requireLiveHandle(), replacement.descriptor()).toULong()
     }
-    releaseCallbackRoot(previous)
   }
 
-  public actual fun clearResourceTransform() {
+  public actual fun clearResourceTransform(): ULong {
     NativeAccess.ensureLoaded()
-    resourceTransformState?.checkCanClose()
-    Status.check(NativeAccess.clearResourceTransform(requireLiveHandle()))
-    val previous = resourceTransformState
-    resourceTransformState = null
-    releaseCallbackRoot(previous)
+    return resourceTransformCommands.clear {
+      NativeAccess.clearResourceTransform(requireLiveHandle()).toULong()
+    }
   }
 
-  public actual fun setHttpHeaderTransform(callback: HttpHeaderTransformCallback) {
+  public actual fun setHttpHeaderTransform(callback: HttpHeaderTransformCallback): ULong {
     NativeAccess.ensureLoaded()
-    httpHeaderTransformState?.checkCanClose()
     val replacement = HttpHeaderTransformState(callback)
-    try {
-      Status.check(
-        NativeAccess.setHttpHeaderTransform(requireLiveHandle(), replacement.descriptor())
-      )
-    } catch (error: Throwable) {
-      closeAndSuppress(error, replacement)
-      throw error
+    return httpHeaderTransformCommands.set(replacement) {
+      NativeAccess.setHttpHeaderTransform(requireLiveHandle(), replacement.descriptor()).toULong()
     }
-    val previous = httpHeaderTransformState
-    httpHeaderTransformState = replacement
-    HandleLeakCleaner.retainNativeCallbackRoot(replacement)
-    releaseCallbackRoot(previous)
   }
 
-  public actual fun clearHttpHeaderTransform() {
+  public actual fun clearHttpHeaderTransform(): ULong {
     NativeAccess.ensureLoaded()
-    httpHeaderTransformState?.checkCanClose()
-    Status.check(NativeAccess.clearHttpHeaderTransform(requireLiveHandle()))
-    val previous = httpHeaderTransformState
-    httpHeaderTransformState = null
-    releaseCallbackRoot(previous)
+    return httpHeaderTransformCommands.clear {
+      NativeAccess.clearHttpHeaderTransform(requireLiveHandle()).toULong()
+    }
   }
 
   public actual fun drainEvents(maxEvents: Int): RuntimeEventBatch {
     NativeAccess.ensureLoaded()
     Status.requireArgument(maxEvents >= 0) { "maxEvents must be non-negative" }
     val batch = NativeAccess.drainRuntimeEvents(requireLiveHandle(), maxEvents.toLong())
-    return RuntimeEventBatch(batch.events.map { it.toRuntimeEvent() }, batch.remainingCount)
+    val events = batch.events.map { it.toRuntimeEvent() }
+    events.forEach(::finishCallbackCommand)
+    return RuntimeEventBatch(events, batch.remainingCount)
   }
 
   public actual var eventMask: RuntimeEventMask
@@ -309,22 +307,30 @@ private constructor(private val handle: NativeRuntime, private var notificationS
       NativeAccess.setRuntimeEventMask(requireLiveHandle(), value.nativeValue)
     }
 
-  public actual override fun close() {
-    resourceProviderState?.checkCanClose()
-    resourceTransformState?.checkCanClose()
-    httpHeaderTransformState?.checkCanClose()
-    core.closeOnce(
-      destroy = { NativeAccess.destroyRuntime(handle) },
-      afterSuccess = {
-        releaseCallbackRoot(resourceProviderState)
-        resourceProviderState = null
-        releaseCallbackRoot(resourceTransformState)
-        resourceTransformState = null
-        releaseCallbackRoot(httpHeaderTransformState)
-        httpHeaderTransformState = null
-        liveMaps.clear()
-      },
-    )
+  public actual suspend fun close() {
+    if (!core.beginClose()) return
+    val operation =
+      try {
+        NativeAccess.startRuntimeClose(handle)
+      } catch (error: Throwable) {
+        core.abortClose()
+        throw error
+      }
+    try {
+      notifications.await(operation)
+    } catch (error: Throwable) {
+      core.abortClose()
+      throw error
+    } finally {
+      NativeAccess.releaseOperation(operation)
+    }
+    core.completeClose {
+      resourceProviderCommands.close()
+      resourceTransformCommands.close()
+      httpHeaderTransformCommands.close()
+      liveMaps.clear()
+    }
+    notifications.close()
     val source = notificationSource
     if (source != 0L) {
       NativeAccess.closeNotificationSource(source)
@@ -332,14 +338,29 @@ private constructor(private val handle: NativeRuntime, private var notificationS
     }
   }
 
+  private fun finishCallbackCommand(event: RuntimeEvent) {
+    val payload = event.payload as? RuntimeEventPayload.CommandFinished ?: return
+    resourceProviderCommands.finish(payload.commandId, payload.disposition)
+    resourceTransformCommands.finish(payload.commandId, payload.disposition)
+    httpHeaderTransformCommands.finish(payload.commandId, payload.disposition)
+  }
+
   public actual companion object {
-    public actual fun create(options: RuntimeOptions): RuntimeHandle {
+    public actual suspend fun create(options: RuntimeOptions): RuntimeHandle {
       NativeAccess.ensureLoaded()
       val source = NativeAccess.createNotificationSource()
+      val notifications = NotificationDispatcher(source)
       try {
-        return RuntimeHandle(NativeAccess.createRuntime(options, source), source)
+        val operation = NativeAccess.startCreateRuntime(options, source)
+        try {
+          notifications.await(operation)
+          return RuntimeHandle(NativeAccess.takeCreatedRuntime(operation), source, notifications)
+        } finally {
+          NativeAccess.releaseOperation(operation)
+        }
       } catch (error: Throwable) {
         try {
+          notifications.close()
           NativeAccess.closeNotificationSource(source)
         } catch (cleanup: Throwable) {
           error.addSuppressed(cleanup)
@@ -359,6 +380,14 @@ private constructor(private val handle: NativeRuntime, private var notificationS
     core.retainChild(childTypeName)
 
   internal fun nativeHandle(): NativeRuntime = requireLiveHandle()
+
+  internal suspend fun awaitOperation(operation: Long) {
+    notifications.await(operation)
+  }
+
+  internal fun forgetOperation(operation: Long) {
+    notifications.forget(operation)
+  }
 
   internal fun registerMap(map: MapHandle) {
     liveMaps[map.nativeHandleId()] = WeakReference(map)

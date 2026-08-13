@@ -13,18 +13,19 @@ import org.maplibre.nativeffi.error.NativeErrorException
 @OptIn(ExperimentalForeignApi::class)
 class MaplibreNativeTest : org.maplibre.nativeffi.NativeTestBase() {
   @Test
-  fun abiVersionMismatchUsesStableBindingError() {
-    val error =
-      assertFailsWith<AbiVersionMismatchException> {
-        Maplibre.checkCompatibleCAbi(Maplibre.EXPECTED_C_ABI_VERSION + 1L)
-      }
+  fun abiVersionMismatchUsesStableBindingError(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val error =
+        assertFailsWith<AbiVersionMismatchException> {
+          Maplibre.checkCompatibleCAbi(Maplibre.EXPECTED_C_ABI_VERSION + 1L)
+        }
 
-    assertEquals(MaplibreStatus.NATIVE_ERROR, error.status)
-    assertIs<NativeErrorException>(error)
-    assertEquals(MaplibreStatus.NATIVE_ERROR.nativeCode, error.nativeStatusCode)
-    assertEquals(Maplibre.EXPECTED_C_ABI_VERSION + 1L, error.actualVersion)
-    assertEquals(Maplibre.EXPECTED_C_ABI_VERSION, error.expectedVersion)
-    assertTrue(error.diagnostic.contains("C ABI version"))
-    assertTrue(error.diagnostic.contains("expected ${Maplibre.EXPECTED_C_ABI_VERSION}"))
-  }
+      assertEquals(MaplibreStatus.NATIVE_ERROR, error.status)
+      assertIs<NativeErrorException>(error)
+      assertEquals(MaplibreStatus.NATIVE_ERROR.nativeCode, error.nativeStatusCode)
+      assertEquals(Maplibre.EXPECTED_C_ABI_VERSION + 1L, error.actualVersion)
+      assertEquals(Maplibre.EXPECTED_C_ABI_VERSION, error.expectedVersion)
+      assertTrue(error.diagnostic.contains("C ABI version"))
+      assertTrue(error.diagnostic.contains("expected ${Maplibre.EXPECTED_C_ABI_VERSION}"))
+    }
 }

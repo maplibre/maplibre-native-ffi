@@ -4,10 +4,12 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
-use crate::events::{RuntimeEventPayload, RuntimeEventSource, RuntimeEventType};
+use crate::custom_geometry::CustomGeometrySourceOptions;
+use crate::events::{
+    CommandDisposition, RuntimeEventPayload, RuntimeEventSource, RuntimeEventType,
+};
 use crate::{
-    BoundsConstraint, CameraChangeMode, CustomGeometrySourceOptions, EdgeInsets, ErrorKind,
-    MapMode, RasterDemEncoding, ResourceKind, ResourceProviderDecision, ResourceResponse,
+    ErrorKind, RasterDemEncoding, ResourceKind, ResourceProviderDecision, ResourceResponse,
     RuntimeEventMask, TextureImageInfo,
 };
 
@@ -17,6 +19,52 @@ const STYLE_WITH_TRANSITION_JSON: &str =
     r#"{"version":8,"transition":{"duration":750,"delay":100},"sources":{},"layers":[]}"#;
 const STYLE_WITH_DELAY_ONLY_TRANSITION_JSON: &str =
     r#"{"version":8,"transition":{"delay":100},"sources":{},"layers":[]}"#;
+
+macro_rules! operation_result {
+    ($operation:expr) => {{
+        let operation = $operation.unwrap();
+        assert!(operation.wait(Duration::from_secs(5)).unwrap());
+        let result = operation.take();
+        drop(operation);
+        result
+    }};
+}
+fn await_runtime_barrier(runtime: &RuntimeHandle) {
+    let barrier = runtime.start_barrier().unwrap();
+    assert!(barrier.wait(Duration::from_secs(5)).unwrap());
+    barrier.discard().unwrap();
+    barrier.release();
+}
+fn assert_command_disposition(
+    runtime: &RuntimeHandle,
+    command_id: u64,
+    expected: CommandDisposition,
+) -> Option<String> {
+    await_runtime_barrier(runtime);
+    let batch = runtime.drain_events(0).unwrap();
+    let matches = batch
+        .iter()
+        .filter_map(|event| match event.payload() {
+            RuntimeEventPayload::CommandFinished(finished) if finished.command_id == command_id => {
+                Some((
+                    finished.disposition,
+                    event.message().unwrap().map(str::to_owned),
+                ))
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        matches.len(),
+        1,
+        "terminal outcome count for command {command_id}"
+    );
+    assert_eq!(matches[0].0, expected);
+    matches
+        .into_iter()
+        .next()
+        .and_then(|(_, diagnostic)| diagnostic)
+}
 
 #[test]
 // Spec coverage: BND-105.
@@ -43,7 +91,9 @@ fn nine_patch_style_image_round_trips_stretch_content_and_text_fit() {
     map.set_style_image("patch", &image, Some(&options))
         .unwrap();
 
-    let info = map.style_image_info("patch").unwrap().unwrap();
+    let info = operation_result!(map.style_image_info("patch"))
+        .unwrap()
+        .unwrap();
     assert_eq!(info.stretch_x_count, 1);
     assert_eq!(info.stretch_y_count, 2);
     assert_eq!(
@@ -59,13 +109,19 @@ fn nine_patch_style_image_round_trips_stretch_content_and_text_fit() {
     assert_eq!(info.text_fit_width, None);
     assert_eq!(info.text_fit_height, Some(StyleImageTextFit::Proportional));
 
-    let (stretch_x, stretch_y) = map.style_image_stretches("patch").unwrap().unwrap();
+    let (stretch_x, stretch_y) = operation_result!(map.style_image_stretches("patch"))
+        .unwrap()
+        .unwrap();
     assert_eq!(stretch_x, vec![ImageStretch::new(0.0, 1.0)]);
     assert_eq!(
         stretch_y,
         vec![ImageStretch::new(0.0, 1.0), ImageStretch::new(1.0, 2.0)]
     );
-    assert!(map.style_image_stretches("missing").unwrap().is_none());
+    assert!(
+        operation_result!(map.style_image_stretches("missing"))
+            .unwrap()
+            .is_none()
+    );
 
     let mut bad = StyleImageOptions::default();
     bad.stretch_x = Some(vec![ImageStretch::new(2.0, 1.0)]);
@@ -83,44 +139,66 @@ fn layer_base_accessors_round_trip_through_real_c_abi() {
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
     map.set_style_json(STYLE_WITH_IDS_JSON.as_bytes()).unwrap();
 
-    assert_eq!(map.layer_source_layer("geo-fill").unwrap(), "");
+    assert_eq!(
+        operation_result!(map.layer_source_layer("geo-fill")).unwrap(),
+        ""
+    );
     map.set_layer_source_layer("geo-fill", "roads").unwrap();
-    assert_eq!(map.layer_source_layer("geo-fill").unwrap(), "roads");
-    assert_eq!(map.layer_source_id("geo-fill").unwrap(), "geo");
+    assert_eq!(
+        operation_result!(map.layer_source_layer("geo-fill")).unwrap(),
+        "roads"
+    );
+    assert_eq!(
+        operation_result!(map.layer_source_id("geo-fill")).unwrap(),
+        "geo"
+    );
 
-    let error = map
-        .set_layer_source_layer("background", "roads")
-        .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.diagnostic().contains("source-layer"));
-    assert_eq!(map.layer_source_id("background").unwrap(), "");
+    let rejected_command = map.set_layer_source_layer("background", "roads").unwrap();
+    assert_ne!(rejected_command, 0);
+    assert_eq!(
+        operation_result!(map.layer_source_id("background")).unwrap(),
+        ""
+    );
 
     // An unset zoom range crosses the boundary as infinities.
-    assert_eq!(map.layer_min_zoom("geo-fill").unwrap(), f64::NEG_INFINITY);
-    assert_eq!(map.layer_max_zoom("geo-fill").unwrap(), f64::INFINITY);
+    assert_eq!(
+        operation_result!(map.layer_min_zoom("geo-fill")).unwrap(),
+        f64::NEG_INFINITY
+    );
+    assert_eq!(
+        operation_result!(map.layer_max_zoom("geo-fill")).unwrap(),
+        f64::INFINITY
+    );
     map.set_layer_min_zoom("geo-fill", 4.0).unwrap();
     map.set_layer_max_zoom("geo-fill", 12.5).unwrap();
-    assert_eq!(map.layer_min_zoom("geo-fill").unwrap(), 4.0);
-    assert_eq!(map.layer_max_zoom("geo-fill").unwrap(), 12.5);
+    assert_eq!(
+        operation_result!(map.layer_min_zoom("geo-fill")).unwrap(),
+        4.0
+    );
+    assert_eq!(
+        operation_result!(map.layer_max_zoom("geo-fill")).unwrap(),
+        12.5
+    );
 
     assert_eq!(
-        map.layer_visibility("geo-fill").unwrap(),
+        operation_result!(map.layer_visibility("geo-fill")).unwrap(),
         StyleLayerVisibility::Visible
     );
     map.set_layer_visibility("geo-fill", StyleLayerVisibility::None)
         .unwrap();
     assert_eq!(
-        map.layer_visibility("geo-fill").unwrap(),
+        operation_result!(map.layer_visibility("geo-fill")).unwrap(),
         StyleLayerVisibility::None
     );
 
-    let error = map
+    let rejected_command = map
         .set_layer_visibility("geo-fill", StyleLayerVisibility::Unknown(900))
-        .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        .unwrap();
+    assert_command_disposition(&runtime, rejected_command, CommandDisposition::Failed);
 
-    let error = map.layer_min_zoom("missing").unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+    let error = operation_result!(map.layer_min_zoom("missing")).unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::InvalidState);
+    assert!(error.diagnostic().contains("layer does not exist"));
 
     map.close().unwrap();
     runtime.close().unwrap();
@@ -128,11 +206,6 @@ fn layer_base_accessors_round_trip_through_real_c_abi() {
 
 fn object_member<'a>(value: &'a JsonValue, key: &str) -> Option<&'a JsonValue> {
     value.as_object()?.get(key)
-}
-
-fn assert_lat_lng_close(actual: LatLng, expected: LatLng) {
-    assert!((actual.latitude - expected.latitude).abs() < 1e-7);
-    assert!((actual.longitude - expected.longitude).abs() < 1e-7);
 }
 
 #[test]
@@ -163,12 +236,12 @@ fn style_setters_accept_valid_input_and_reject_embedded_nul() {
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
 
     map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
-    let _ = map.style_source_ids().unwrap();
-    let _ = map.style_layer_ids().unwrap();
+    let _ = operation_result!(map.style_source_ids()).unwrap();
+    let _ = operation_result!(map.style_layer_ids()).unwrap();
 
     map.set_style_json(STYLE_WITH_IDS_JSON.as_bytes()).unwrap();
-    let source_ids = map.style_source_ids().unwrap();
-    let layer_ids = map.style_layer_ids().unwrap();
+    let source_ids = operation_result!(map.style_source_ids()).unwrap();
+    let layer_ids = operation_result!(map.style_layer_ids()).unwrap();
     assert!(source_ids.iter().any(|id| id == "geo"));
     assert!(layer_ids.iter().any(|id| id == "background"));
     assert!(layer_ids.iter().any(|id| id == "geo-fill"));
@@ -182,10 +255,9 @@ fn style_setters_accept_valid_input_and_reject_embedded_nul() {
     assert_eq!(error.raw_status(), None);
     assert!(error.diagnostic().contains("embedded NUL"));
 
-    let error = map.set_style_json(b"{").unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::NativeError);
-    assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_NATIVE_ERROR));
-    assert!(!error.diagnostic().trim().is_empty());
+    let malformed_id = map.set_style_json(b"{").unwrap();
+    assert_ne!(malformed_id, 0);
+    await_runtime_barrier(&runtime);
 
     map.close().unwrap();
     runtime.close().unwrap();
@@ -197,24 +269,31 @@ fn loaded_style_document_and_url_read_back_what_was_loaded() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
 
-    assert!(map.loaded_style_json().unwrap().is_empty());
-    assert_eq!(map.style_url().unwrap(), "");
+    assert!(
+        operation_result!(map.loaded_style_json())
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(operation_result!(map.style_url()).unwrap(), "");
 
     // The document reads back byte-for-byte, so it can be reloaded unchanged.
     map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
     assert_eq!(
-        map.loaded_style_json().unwrap(),
+        operation_result!(map.loaded_style_json()).unwrap(),
         VALID_STYLE_JSON.as_bytes()
     );
     // Inline JSON clears the URL.
-    assert_eq!(map.style_url().unwrap(), "");
+    assert_eq!(operation_result!(map.style_url()).unwrap(), "");
 
     // The URL records the request before the load succeeds; the document still
     // reports the style that last parsed.
     map.set_style_url("https://example.com/style.json").unwrap();
-    assert_eq!(map.style_url().unwrap(), "https://example.com/style.json");
     assert_eq!(
-        map.loaded_style_json().unwrap(),
+        operation_result!(map.style_url()).unwrap(),
+        "https://example.com/style.json"
+    );
+    assert_eq!(
+        operation_result!(map.loaded_style_json()).unwrap(),
         VALID_STYLE_JSON.as_bytes()
     );
 
@@ -235,14 +314,14 @@ fn style_source_exists_and_remove_call_real_c_api() {
     }))
     .unwrap();
 
-    assert!(!map.style_source_exists("owned-source").unwrap());
-    assert!(!map.remove_style_source("owned-source").unwrap());
+    assert!(!operation_result!(map.style_source_exists("owned-source")).unwrap());
+    assert!(!operation_result!(map.remove_style_source("owned-source")).unwrap());
 
     map.add_style_source_json("owned-source", &source).unwrap();
-    assert!(map.style_source_exists("owned-source").unwrap());
-    assert!(map.remove_style_source("owned-source").unwrap());
-    assert!(!map.style_source_exists("owned-source").unwrap());
-    assert!(!map.remove_style_source("owned-source").unwrap());
+    assert!(operation_result!(map.style_source_exists("owned-source")).unwrap());
+    assert!(operation_result!(map.remove_style_source("owned-source")).unwrap());
+    assert!(!operation_result!(map.style_source_exists("owned-source")).unwrap());
+    assert!(!operation_result!(map.remove_style_source("owned-source")).unwrap());
 
     map.close().unwrap();
     runtime.close().unwrap();
@@ -266,15 +345,13 @@ fn style_image_copy_uses_rust_owned_buffer() {
 
     map.set_style_image("plain", &image, None).unwrap();
     image.data.fill(0);
-    assert!(map.style_image_exists("plain").unwrap());
-    let info = map
-        .style_image_info("plain")
+    assert!(operation_result!(map.style_image_exists("plain")).unwrap());
+    let info = operation_result!(map.style_image_info("plain"))
         .unwrap()
         .expect("added image should have copied metadata");
     assert_eq!(info.width, image.info.width);
     assert_eq!(info.height, image.info.height);
-    let mut copied = map
-        .copy_style_image_premultiplied_rgba8("plain")
+    let mut copied = operation_result!(map.copy_style_image_premultiplied_rgba8("plain"))
         .unwrap()
         .expect("added Rust image should copy back through C");
 
@@ -283,16 +360,16 @@ fn style_image_copy_uses_rust_owned_buffer() {
     assert_eq!(copied.image.data, original_pixels);
     copied.image.data.fill(1);
     assert_eq!(
-        map.copy_style_image_premultiplied_rgba8("plain")
+        operation_result!(map.copy_style_image_premultiplied_rgba8("plain"))
             .unwrap()
             .expect("style image copy should not expose native storage")
             .image
             .data,
         original_pixels
     );
-    assert!(map.remove_style_image("plain").unwrap());
-    assert!(!map.style_image_exists("plain").unwrap());
-    assert!(!map.remove_style_image("plain").unwrap());
+    assert!(operation_result!(map.remove_style_image("plain")).unwrap());
+    assert!(!operation_result!(map.style_image_exists("plain")).unwrap());
+    assert!(!operation_result!(map.remove_style_image("plain")).unwrap());
 }
 
 fn image_source_coordinates() -> [LatLng; 4] {
@@ -315,7 +392,7 @@ fn image_source_helpers_accept_url_and_inline_images() {
     map.add_image_source_url("url-image", &coordinates, "https://example.com/image.png")
         .unwrap();
     assert_eq!(
-        map.image_source_coordinates("url-image").unwrap(),
+        operation_result!(map.image_source_coordinates("url-image")).unwrap(),
         Some(coordinates)
     );
 
@@ -323,7 +400,7 @@ fn image_source_helpers_accept_url_and_inline_images() {
     map.add_image_source_image("inline-image", &coordinates, &image)
         .unwrap();
     assert_eq!(
-        map.style_source_type("inline-image").unwrap(),
+        operation_result!(map.style_source_type("inline-image")).unwrap(),
         Some(SourceType::Image)
     );
 }
@@ -338,7 +415,7 @@ fn tile_source_helpers_call_real_c_api() {
     map.add_vector_source_url("vector-url", "https://example.com/vector.json", None)
         .unwrap();
     assert_eq!(
-        map.style_source_type("vector-url").unwrap(),
+        operation_result!(map.style_source_type("vector-url")).unwrap(),
         Some(SourceType::Vector)
     );
 
@@ -351,7 +428,7 @@ fn tile_source_helpers_call_real_c_api() {
     )
     .unwrap();
     assert_eq!(
-        map.style_source_type("dem-tiles").unwrap(),
+        operation_result!(map.style_source_type("dem-tiles")).unwrap(),
         Some(SourceType::RasterDem)
     );
 }
@@ -378,7 +455,7 @@ fn geojson_source_helpers_accept_options_and_keep_them_across_updates() {
     )
     .unwrap();
     assert_eq!(
-        map.style_source_type("geojson-url").unwrap(),
+        operation_result!(map.style_source_type("geojson-url")).unwrap(),
         Some(SourceType::GeoJson)
     );
 
@@ -394,7 +471,7 @@ fn geojson_source_helpers_accept_options_and_keep_them_across_updates() {
     map.add_geojson_source_data("geojson-data", &data, None)
         .unwrap();
     assert_eq!(
-        map.style_source_type("geojson-data").unwrap(),
+        operation_result!(map.style_source_type("geojson-data")).unwrap(),
         Some(SourceType::GeoJson)
     );
 
@@ -420,24 +497,20 @@ fn clustered_geojson_source_requires_a_feature_collection() {
     // MapLibre Native clusters feature collections only; anything else tiles
     // unclustered instead of honouring the requested option.
     let bare = br#"{"type":"Point","coordinates":[0.0,0.0]}"#;
-    let error = map
+    let bare_id = map
         .add_geojson_source_data("quakes", bare, Some(&options))
-        .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    let message = error.to_string();
-    assert!(message.contains("quakes"), "{message}");
-    assert!(
-        message.contains("requires a feature collection"),
-        "{message}"
-    );
-    assert!(message.contains("a bare geometry"), "{message}");
+        .unwrap();
+    assert_ne!(bare_id, 0);
+    await_runtime_barrier(&runtime);
+    assert!(!operation_result!(map.style_source_exists("quakes")).unwrap());
 
     let single = br#"{"type":"Feature","geometry":{"type":"Point","coordinates":[0.0,0.0]},"properties":{}}"#;
-    let error = map
+    let single_id = map
         .add_geojson_source_data("quakes", single, Some(&options))
-        .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.to_string().contains("a single feature"), "{error}");
+        .unwrap();
+    assert_ne!(single_id, 0);
+    await_runtime_barrier(&runtime);
+    assert!(!operation_result!(map.style_source_exists("quakes")).unwrap());
 
     // The constraint belongs to clustering alone, and the rejected ID stays free.
     map.add_geojson_source_data("quakes", bare, None).unwrap();
@@ -465,17 +538,12 @@ fn clustered_geojson_source_reports_non_point_geometry() {
     let mixed = br#"{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[0.0,0.0]},"properties":{}},{"type":"Feature","geometry":{"type":"GeometryCollection","geometries":[{"type":"Point","coordinates":[1.0,1.0]}]},"properties":{}}]}"#;
 
     // Supercluster reads every feature geometry as a point.
-    let error = map
+    let mixed_id = map
         .add_geojson_source_data("quakes", mixed, Some(&options))
-        .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    let message = error.to_string();
-    assert!(message.contains("quakes"), "{message}");
-    assert!(
-        message.contains("point geometry on every feature"),
-        "{message}"
-    );
-    assert!(message.contains("geometry collection"), "{message}");
+        .unwrap();
+    assert_ne!(mixed_id, 0);
+    await_runtime_barrier(&runtime);
+    assert!(!operation_result!(map.style_source_exists("quakes")).unwrap());
 
     // The constraint belongs to clustering alone, and the rejected ID stays free.
     map.add_geojson_source_data("quakes", mixed, None).unwrap();
@@ -503,15 +571,23 @@ fn style_source_type_and_info_call_real_c_api() {
     }))
     .unwrap();
 
-    assert_eq!(map.style_source_type("missing-source").unwrap(), None);
-    assert_eq!(map.style_source_info("missing-source").unwrap(), None);
+    assert_eq!(
+        operation_result!(map.style_source_type("missing-source")).unwrap(),
+        None
+    );
+    assert_eq!(
+        operation_result!(map.style_source_info("missing-source")).unwrap(),
+        None
+    );
 
     map.add_style_source_json("empty", &geojson_source).unwrap();
     assert_eq!(
-        map.style_source_type("empty").unwrap(),
+        operation_result!(map.style_source_type("empty")).unwrap(),
         Some(SourceType::GeoJson)
     );
-    let info = map.style_source_info("empty").unwrap().unwrap();
+    let info = operation_result!(map.style_source_info("empty"))
+        .unwrap()
+        .unwrap();
     assert_eq!(info.source_type, SourceType::GeoJson);
     assert_eq!(info.raw_source_type, sys::MLN_STYLE_SOURCE_TYPE_GEOJSON);
     assert!(!info.is_volatile);
@@ -520,10 +596,12 @@ fn style_source_type_and_info_call_real_c_api() {
     map.add_style_source_json("vector-meta", &vector_source)
         .unwrap();
     assert_eq!(
-        map.style_source_type("vector-meta").unwrap(),
+        operation_result!(map.style_source_type("vector-meta")).unwrap(),
         Some(SourceType::Vector)
     );
-    let info = map.style_source_info("vector-meta").unwrap().unwrap();
+    let info = operation_result!(map.style_source_info("vector-meta"))
+        .unwrap()
+        .unwrap();
     assert_eq!(info.source_type, SourceType::Vector);
     assert_eq!(info.raw_source_type, sys::MLN_STYLE_SOURCE_TYPE_VECTOR);
     assert_eq!(info.attribution.as_deref(), Some("Example attribution"));
@@ -541,7 +619,9 @@ fn style_source_info_copies_reconstructible_source_state() {
 
     map.add_vector_source_url("remote", "https://example.com/source.json", None)
         .unwrap();
-    let remote = map.style_source_info("remote").unwrap().unwrap();
+    let remote = operation_result!(map.style_source_info("remote"))
+        .unwrap()
+        .unwrap();
     assert_eq!(
         remote.url.as_deref(),
         Some("https://example.com/source.json")
@@ -564,7 +644,9 @@ fn style_source_info_copies_reconstructible_source_state() {
     ];
     map.add_vector_source_tiles("inline", &tiles, Some(&options))
         .unwrap();
-    let copied = map.style_source_info("inline").unwrap().unwrap();
+    let copied = operation_result!(map.style_source_info("inline"))
+        .unwrap()
+        .unwrap();
     assert_eq!(copied.url, None);
     assert_eq!(copied.attribution.as_deref(), Some("Example attribution"));
     assert_eq!(copied.tile_size, Some(512));
@@ -576,7 +658,7 @@ fn style_source_info_copies_reconstructible_source_state() {
     assert_eq!(tile_json.scheme, TileScheme::Tms);
     assert_eq!(tile_json.bounds, options.bounds);
 
-    assert!(map.remove_style_source("inline").unwrap());
+    assert!(operation_result!(map.remove_style_source("inline")).unwrap());
     map.close().unwrap();
     runtime.close().unwrap();
 
@@ -647,25 +729,22 @@ fn custom_geometry_source_apis_call_real_c_api_and_style_replacement_releases_st
     )
     .unwrap();
     assert_eq!(releases.load(Ordering::SeqCst), 0);
-
-    // An explicit removal releases the callback state once.
-    assert!(map.remove_style_source("custom").unwrap());
+    assert!(operation_result!(map.remove_style_source("custom")).unwrap());
     assert_eq!(releases.load(Ordering::SeqCst), 1);
-    assert!(!map.style_source_exists("custom").unwrap());
+    assert!(!operation_result!(map.style_source_exists("custom")).unwrap());
 
-    // A duplicate source ID is rejected, and a rejected add releases nothing
-    // this call handed over, so the state it built is freed here instead.
-    map.add_custom_geometry_source("custom", options_counting_releases(&releases))
-        .unwrap();
-    let error = map
+    let first_add = map
         .add_custom_geometry_source("custom", options_counting_releases(&releases))
-        .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        .unwrap();
+    let duplicate_add = map
+        .add_custom_geometry_source("custom", options_counting_releases(&releases))
+        .unwrap();
+    assert_ne!(first_add, duplicate_add);
+    await_runtime_barrier(&runtime);
     assert_eq!(releases.load(Ordering::SeqCst), 2);
 
-    // The inline style load replaces the style before it returns, so the source
-    // it dropped is released by then.
     map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
+    await_runtime_barrier(&runtime);
     assert_eq!(releases.load(Ordering::SeqCst), 3);
 
     map.close().unwrap();
@@ -700,7 +779,7 @@ fn custom_geometry_source_adds_to_current_style_after_url_style_request() {
     map.add_custom_geometry_source("custom", options_counting_releases(&releases))
         .unwrap();
 
-    assert!(map.style_source_exists("custom").unwrap());
+    assert!(operation_result!(map.style_source_exists("custom")).unwrap());
     assert_eq!(releases.load(Ordering::SeqCst), 0);
     map.close().unwrap();
     runtime.close().unwrap();
@@ -734,7 +813,7 @@ fn custom_geometry_source_state_releases_after_url_style_replacement() {
     map.set_style_url("custom://style.json").unwrap();
     let mut style_loaded_events = 0;
     for _ in 0..1000 {
-        runtime.pump(Some(Duration::ZERO)).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(1));
         for event in runtime.drain_events(0).unwrap().iter() {
             if event.event_type() == RuntimeEventType::MapStyleLoaded {
                 style_loaded_events += 1;
@@ -755,11 +834,6 @@ fn custom_geometry_source_state_releases_after_url_style_replacement() {
         style_loaded_events, 0,
         "the release must not need an event the host left unselected"
     );
-    assert_eq!(
-        map.event_mask().unwrap(),
-        RuntimeEventMask::ALL - RuntimeEventMask::MAP_STYLE_LOADED,
-        "the mask should report what the host set"
-    );
 
     map.close().unwrap();
     runtime.close().unwrap();
@@ -767,7 +841,7 @@ fn custom_geometry_source_state_releases_after_url_style_replacement() {
 
 fn drain_runtime_events(runtime: &mut RuntimeHandle) {
     for _ in 0..20 {
-        runtime.pump(Some(Duration::ZERO)).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(1));
         let _ = runtime.drain_events(0).unwrap();
     }
 }
@@ -782,7 +856,7 @@ fn collect_style_load_event_types(
     let mut types = Vec::new();
     map.set_style_json(style_json.as_bytes()).unwrap();
     for _ in 0..20 {
-        runtime.pump(Some(Duration::ZERO)).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(1));
         for event in runtime.drain_events(0).unwrap().iter() {
             if event.source() == RuntimeEventSource::Map(map.id()) {
                 types.push(event.event_type());
@@ -797,9 +871,6 @@ fn collect_style_load_event_types(
 fn a_narrowed_map_mask_delivers_the_kept_type_alone() {
     let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-
-    // The default options mask selects every type.
-    assert_eq!(map.event_mask().unwrap(), RuntimeEventMask::ALL);
 
     map.set_event_mask(RuntimeEventMask::ALL - RuntimeEventMask::MAP_LOADING_STARTED)
         .unwrap();
@@ -817,7 +888,6 @@ fn a_narrowed_map_mask_delivers_the_kept_type_alone() {
 
     // An empty mask leaves the map with nothing to report.
     map.set_event_mask(RuntimeEventMask::NONE).unwrap();
-    assert!(map.event_mask().unwrap().is_empty());
     let types = collect_style_load_event_types(&mut runtime, &map, STYLE_WITH_IDS_JSON);
     assert!(types.is_empty(), "{types:?}");
 
@@ -833,10 +903,6 @@ fn a_creation_mask_narrows_a_map_from_its_first_style_load() {
     options.event_mask = RuntimeEventMask::ALL - RuntimeEventMask::MAP_LOADING_STARTED;
     let map = MapHandle::with_options(&runtime, &options).unwrap();
 
-    assert_eq!(
-        map.event_mask().unwrap(),
-        RuntimeEventMask::ALL - RuntimeEventMask::MAP_LOADING_STARTED
-    );
     let types = collect_style_load_event_types(&mut runtime, &map, VALID_STYLE_JSON);
 
     assert!(
@@ -854,27 +920,21 @@ fn a_creation_mask_narrows_a_map_from_its_first_style_load() {
 
 #[test]
 // Spec coverage: BND-091.
-fn a_map_mask_round_trips_and_rejects_undefined_bits() {
+fn map_mask_commands_return_ids_and_reject_undefined_bits() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
 
-    map.set_event_mask(RuntimeEventMask::ALL).unwrap();
-    assert_eq!(map.event_mask().unwrap(), RuntimeEventMask::ALL);
-
-    // Read, clear one bit, write back: every other bit survives.
-    let mut mask = map.event_mask().unwrap();
-    mask.remove(RuntimeEventMask::MAP_TILE_ACTION);
-    map.set_event_mask(mask).unwrap();
-    let read_back = map.event_mask().unwrap();
-    assert!(!read_back.contains(RuntimeEventMask::MAP_TILE_ACTION));
-    assert!(read_back.contains(RuntimeEventMask::MAP_STYLE_LOADED));
+    let first_id = map.set_event_mask(RuntimeEventMask::ALL).unwrap();
+    let second_id = map
+        .set_event_mask(RuntimeEventMask::ALL - RuntimeEventMask::MAP_TILE_ACTION)
+        .unwrap();
+    assert!(second_id > first_id);
 
     let error = map
         .set_event_mask(RuntimeEventMask::from_bits_retain(1 << 63))
         .unwrap_err();
     assert_eq!(error.kind(), ErrorKind::InvalidArgument);
     assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_INVALID_ARGUMENT));
-    assert_eq!(map.event_mask().unwrap(), read_back);
 
     map.close().unwrap();
     runtime.close().unwrap();
@@ -888,7 +948,7 @@ fn style_transition_options_round_trip_through_the_real_c_api() {
 
     // MapLibre Native always holds a placement flag, so it reports even before
     // a style is loaded.
-    let empty = map.style_transition_options().unwrap();
+    let empty = operation_result!(map.style_transition_options()).unwrap();
     assert_eq!(empty.duration_ms, None);
     assert_eq!(empty.delay_ms, None);
     assert_eq!(empty.enable_placement_transitions, Some(true));
@@ -896,7 +956,7 @@ fn style_transition_options_round_trip_through_the_real_c_api() {
     // The style parser fills in its own 300ms duration when the style carries
     // no transition member.
     map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
-    let parsed = map.style_transition_options().unwrap();
+    let parsed = operation_result!(map.style_transition_options()).unwrap();
     assert_eq!(parsed.duration_ms, Some(300.0));
     assert_eq!(parsed.delay_ms, None);
 
@@ -904,13 +964,13 @@ fn style_transition_options_round_trip_through_the_real_c_api() {
     // transition replaces that default with no duration.
     map.set_style_json(STYLE_WITH_DELAY_ONLY_TRANSITION_JSON.as_bytes())
         .unwrap();
-    let delay_only = map.style_transition_options().unwrap();
+    let delay_only = operation_result!(map.style_transition_options()).unwrap();
     assert_eq!(delay_only.duration_ms, None);
     assert_eq!(delay_only.delay_ms, Some(100.0));
 
     map.set_style_json(STYLE_WITH_TRANSITION_JSON.as_bytes())
         .unwrap();
-    let declared = map.style_transition_options().unwrap();
+    let declared = operation_result!(map.style_transition_options()).unwrap();
     assert_eq!(declared.duration_ms, Some(750.0));
     assert_eq!(declared.delay_ms, Some(100.0));
     assert_eq!(declared.enable_placement_transitions, Some(true));
@@ -922,7 +982,7 @@ fn style_transition_options_round_trip_through_the_real_c_api() {
     options.enable_placement_transitions = Some(false);
     map.set_style_transition_options(&options).unwrap();
 
-    let applied = map.style_transition_options().unwrap();
+    let applied = operation_result!(map.style_transition_options()).unwrap();
     assert_eq!(applied, options);
     assert_eq!(applied.duration_ms, Some(0.0));
     assert_eq!(applied.delay_ms, None);
@@ -933,7 +993,7 @@ fn style_transition_options_round_trip_through_the_real_c_api() {
     duration_only.duration_ms = Some(250.0);
     map.set_style_transition_options(&duration_only).unwrap();
     assert_eq!(
-        map.style_transition_options()
+        operation_result!(map.style_transition_options())
             .unwrap()
             .enable_placement_transitions,
         Some(true)
@@ -942,13 +1002,17 @@ fn style_transition_options_round_trip_through_the_real_c_api() {
     // Loading a style replaces the override with what that style declares.
     map.set_style_json(STYLE_WITH_TRANSITION_JSON.as_bytes())
         .unwrap();
-    assert_eq!(map.style_transition_options().unwrap(), declared);
+    assert_eq!(
+        operation_result!(map.style_transition_options()).unwrap(),
+        declared
+    );
 
     let mut negative = StyleTransitionOptions::default();
     negative.delay_ms = Some(-1.0);
-    let error = map.set_style_transition_options(&negative).unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.diagnostic().contains("delay_ms"));
+    let rejected_command = map.set_style_transition_options(&negative).unwrap();
+    let diagnostic =
+        assert_command_disposition(&runtime, rejected_command, CommandDisposition::Failed);
+    assert!(diagnostic.unwrap().contains("delay_ms"));
 
     map.close().unwrap();
     runtime.close().unwrap();
@@ -968,8 +1032,7 @@ fn style_json_buffers_copy_owned_rust_values() {
     }))
     .unwrap();
     map.add_style_layer_json(&layer, None).unwrap();
-    let copied_layer = map
-        .style_layer_json("owned-background")
+    let copied_layer = operation_result!(map.style_layer_json("owned-background"))
         .unwrap()
         .expect("added layer should have a JSON snapshot");
     let copied_layer: JsonValue = serde_json::from_slice(&copied_layer).unwrap();
@@ -987,347 +1050,79 @@ fn style_json_buffers_copy_owned_rust_values() {
     map.set_layer_property("owned-background", "background-opacity", br#"0.75"#)
         .unwrap();
     assert_eq!(
-        map.layer_property("owned-background", "background-opacity")
-            .unwrap(),
+        operation_result!(map.layer_property("owned-background", "background-opacity")).unwrap(),
         Some(b"0.75".to_vec())
     );
 
     let filter = br#"["==",["get","kind"],"park"]"#;
     map.set_layer_filter("geo-fill", Some(filter)).unwrap();
-    assert_eq!(map.layer_filter("geo-fill").unwrap(), Some(filter.to_vec()));
+    assert_eq!(
+        operation_result!(map.layer_filter("geo-fill")).unwrap(),
+        Some(filter.to_vec())
+    );
     map.set_layer_filter("geo-fill", None).unwrap();
-    assert_eq!(map.layer_filter("geo-fill").unwrap(), None);
+    assert_eq!(
+        operation_result!(map.layer_filter("geo-fill")).unwrap(),
+        None
+    );
 
-    let error = map
+    let rejected_command = map
         .set_layer_filter("owned-background", Some(b"NaN"))
-        .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_INVALID_ARGUMENT));
+        .unwrap();
+    assert_ne!(rejected_command, 0);
+    assert_eq!(
+        operation_result!(map.layer_filter("owned-background")).unwrap(),
+        None
+    );
 
     map.close().unwrap();
     runtime.close().unwrap();
 }
 
 #[test]
-// Spec coverage: BND-102 and BND-103.
-fn camera_jump_and_coordinate_conversions_round_trip() {
+fn camera_commands_return_ids_and_ordered_queries_take_typed_results() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let mut options = MapOptions::new(512, 512, 1.0);
-    options.mode = MapMode::Continuous;
-    let map = MapHandle::with_options(&runtime, &options).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
     let center = LatLng::new(45.0, -122.0);
-    let eased_center = LatLng::new(46.0, -123.0);
-    let flown_center = LatLng::new(47.0, -124.0);
+    let mut update = CameraUpdate::default();
+    update.camera.center = Some(center);
+    update.camera.zoom = Some(4.0);
 
-    let mut jump_camera = CameraOptions::default();
-    jump_camera.center = Some(center);
-    jump_camera.zoom = Some(4.0);
-    map.jump_to(&jump_camera).unwrap();
-    let camera = map.camera().unwrap();
-    assert_eq!(camera.center, Some(center));
-    assert_eq!(camera.zoom, Some(4.0));
+    let command_id = map.update_camera(&update).unwrap();
+    assert_ne!(command_id, 0);
 
-    let mut immediate = AnimationOptions::default();
-    immediate.duration_ms = Some(0.0);
-    let mut ease_camera = CameraOptions::default();
-    ease_camera.center = Some(eased_center);
-    ease_camera.zoom = Some(5.0);
-    map.ease_to(&ease_camera, Some(&immediate)).unwrap();
-    let camera = map.camera().unwrap();
-    assert_lat_lng_close(camera.center.unwrap(), eased_center);
-    assert_eq!(camera.zoom, Some(5.0));
+    let query = map.start_camera_query().unwrap();
+    assert!(query.wait(Duration::from_secs(5)).unwrap());
+    let queried = query.take().unwrap();
+    query.release();
+    assert_eq!(queried.camera.center, Some(center));
+    assert_eq!(queried.camera.zoom, Some(4.0));
 
-    let mut fly_camera = CameraOptions::default();
-    fly_camera.center = Some(flown_center);
-    fly_camera.zoom = Some(6.0);
-    map.fly_to(&fly_camera, Some(&immediate)).unwrap();
-    let camera = map.camera().unwrap();
-    assert_lat_lng_close(camera.center.unwrap(), flown_center);
-    assert_eq!(camera.zoom, Some(6.0));
-
-    let mut cancel_camera = CameraOptions::default();
-    cancel_camera.center = Some(center);
-    let mut cancel_animation = AnimationOptions::default();
-    cancel_animation.duration_ms = Some(1000.0);
-    map.ease_to(&cancel_camera, Some(&cancel_animation))
-        .unwrap();
-    map.cancel_transitions().unwrap();
-
-    assert!(!map.is_gesture_in_progress().unwrap());
-    map.set_gesture_in_progress(true).unwrap();
-    map.move_by(8.0, -4.0).unwrap();
-    assert!(map.is_gesture_in_progress().unwrap());
-    map.set_gesture_in_progress(false).unwrap();
-    assert!(!map.is_gesture_in_progress().unwrap());
-
-    let point = map.pixel_for_lat_lng(center).unwrap();
-    let round_tripped = map.lat_lng_for_pixel(point).unwrap();
-    assert!((round_tripped.latitude - center.latitude).abs() < 1e-7);
-    assert!((round_tripped.longitude - center.longitude).abs() < 1e-7);
-
-    let points = map.pixels_for_lat_lngs(&[center]).unwrap();
-    let coordinates = map.lat_lngs_for_pixels(&points).unwrap();
-    assert_eq!(points.len(), 1);
-    assert!((coordinates[0].latitude - center.latitude).abs() < 1e-7);
-    assert!((coordinates[0].longitude - center.longitude).abs() < 1e-7);
-
-    map.close().unwrap();
-    runtime.close().unwrap();
-}
-
-/// Camera events drained from one runtime queue, in arrival order.
-#[derive(Default)]
-struct CameraEventTally {
-    finished_transition_ids: Vec<u64>,
-    did_change_modes: Vec<CameraChangeMode>,
-    did_change_followed_finish: bool,
-}
-
-/// Tallies the camera events among the queued runtime events.
-///
-/// The transition-finished event is queued while the camera command that ends
-/// the transition runs, so one drain observes it.
-fn drain_camera_events(runtime: &mut RuntimeHandle) -> CameraEventTally {
-    let mut tally = CameraEventTally::default();
-    for event in runtime.drain_events(0).unwrap().iter() {
-        match event.event_type() {
-            RuntimeEventType::MapCameraTransitionFinished => {
-                let RuntimeEventPayload::CameraTransitionFinished(payload) = event.payload() else {
-                    panic!("transition-finished event should carry its typed payload");
-                };
-                tally.finished_transition_ids.push(payload.transition_id);
-            }
-            RuntimeEventType::MapCameraDidChange => {
-                tally
-                    .did_change_modes
-                    .push(CameraChangeMode::from_raw(event.code() as u32));
-                tally.did_change_followed_finish |= !tally.finished_transition_ids.is_empty();
-            }
-            _ => {}
-        }
-    }
-    tally
-}
-
-fn identified_ease(transition_id: u64, duration_ms: f64) -> AnimationOptions {
-    let mut animation = AnimationOptions::default();
-    animation.transition_id = Some(transition_id);
-    animation.duration_ms = Some(duration_ms);
-    animation
-}
-
-#[test]
-// Spec coverage: BND-061, BND-102, and BND-087.
-fn identified_camera_transitions_report_each_terminal_outcome_once() {
-    let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let mut options = MapOptions::new(512, 512, 1.0);
-    options.mode = MapMode::Continuous;
-    let map = MapHandle::with_options(&runtime, &options).unwrap();
-    let mut camera = CameraOptions::default();
-    camera.center = Some(LatLng::new(45.0, -122.0));
-    camera.zoom = Some(4.0);
-    // Map construction queues its own camera events, so start from an empty
-    // queue.
-    let _ = drain_camera_events(&mut runtime);
-
-    // A zero-duration ease resolves inside the call, so its end is reported
-    // ahead of the did-change event for the same jump.
-    map.ease_to(&camera, Some(&identified_ease(0, 0.0)))
-        .unwrap();
-    let tally = drain_camera_events(&mut runtime);
-    assert_eq!(tally.finished_transition_ids, vec![0]);
-    assert!(tally.did_change_followed_finish);
-    assert_eq!(tally.did_change_modes, vec![CameraChangeMode::Immediate]);
-
-    camera.zoom = Some(12.0);
-    map.ease_to(&camera, Some(&identified_ease(11, 5_000.0)))
-        .unwrap();
-    let tally = drain_camera_events(&mut runtime);
-    assert!(tally.finished_transition_ids.is_empty());
-
-    // A later camera command supersedes the running transition.
-    camera.zoom = Some(13.0);
-    map.ease_to(&camera, Some(&identified_ease(12, 5_000.0)))
-        .unwrap();
-    let tally = drain_camera_events(&mut runtime);
-    assert_eq!(tally.finished_transition_ids, vec![11]);
-    assert_eq!(tally.did_change_modes, vec![CameraChangeMode::Animated]);
-
-    map.cancel_transitions().unwrap();
-    let tally = drain_camera_events(&mut runtime);
-    assert_eq!(tally.finished_transition_ids, vec![12]);
-
-    // An absent identity keeps the transition silent, so the present zero ID
-    // above stayed distinguishable from an omitted one.
-    camera.zoom = Some(14.0);
-    map.ease_to(&camera, Some(&AnimationOptions::default()))
-        .unwrap();
-    let tally = drain_camera_events(&mut runtime);
-    assert!(tally.finished_transition_ids.is_empty());
-
-    map.close().unwrap();
-    runtime.close().unwrap();
-}
-
-#[test]
-// Spec coverage: BND-104.
-fn empty_coordinate_slice_is_rejected_before_calling_c() {
-    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-    let mut fit = CameraFitOptions::default();
-    fit.padding = Some(EdgeInsets::new(1.0, 1.0, 1.0, 1.0));
-
-    let error = map.camera_for_lat_lngs(&[], Some(&fit)).unwrap_err();
-
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert_eq!(error.raw_status(), None);
-    assert!(error.diagnostic().contains("at least one coordinate"));
-
-    map.close().unwrap();
-    runtime.close().unwrap();
-}
-
-#[test]
-// Spec coverage: BND-102, BND-103.
-fn unbounded_and_world_bounds_constrain_the_camera_differently() {
-    fn jumped_longitude(map: &MapHandle, longitude: f64) -> f64 {
-        let mut camera = CameraOptions::default();
-        camera.center = Some(LatLng::new(0.0, longitude));
-        camera.zoom = Some(2.0);
-        map.jump_to(&camera).unwrap();
-        map.camera().unwrap().center.unwrap().longitude
-    }
-
-    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-
-    assert_eq!(
-        map.bounds().unwrap().bounds,
-        Some(BoundsConstraint::Unbounded)
-    );
-    assert!((jumped_longitude(&map, 200.0) - -160.0).abs() < 1e-6);
-
-    let world = LatLngBounds::new(LatLng::new(-90.0, -180.0), LatLng::new(90.0, 180.0));
-    let mut options = BoundOptions::default();
-    options.bounds = Some(BoundsConstraint::Bounded(world));
-    map.set_bounds(&options).unwrap();
-    assert_eq!(
-        map.bounds().unwrap().bounds,
-        Some(BoundsConstraint::Bounded(world))
-    );
-    // World bounds clamp at the antimeridian instead of wrapping.
-    assert!((jumped_longitude(&map, 200.0) - 180.0).abs() < 1e-6);
-
-    let mut options = BoundOptions::default();
-    options.bounds = Some(BoundsConstraint::Unbounded);
-    map.set_bounds(&options).unwrap();
-    assert_eq!(
-        map.bounds().unwrap().bounds,
-        Some(BoundsConstraint::Unbounded)
-    );
-    // Releasing the constraint restores antimeridian wrapping.
-    assert!((jumped_longitude(&map, 200.0) - -160.0).abs() < 1e-6);
-
-    map.close().unwrap();
-    runtime.close().unwrap();
-}
-
-#[test]
-// Spec coverage: BND-102.
-fn projection_mode_round_trips_through_real_c_api() {
-    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-
-    let mut projection_mode = ProjectionMode::default();
-    projection_mode.axonometric = Some(false);
-    projection_mode.x_skew = Some(0.0);
-    projection_mode.y_skew = Some(0.0);
-    map.set_projection_mode(&projection_mode).unwrap();
-    let copied_projection_mode = map.projection_mode().unwrap();
-
-    assert_eq!(copied_projection_mode.axonometric, Some(false));
-
+    let published = map.camera_snapshot().unwrap();
+    assert!(published.generation <= queried.generation);
     map.close().unwrap();
     runtime.close().unwrap();
 }
 
 #[test]
 // Spec coverage: BND-045.
-fn a_released_map_id_replayed_after_a_new_map_reports_it_stale() {
-    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-
-    let first = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-    let released = first.inner.native().unwrap();
-    first.close().unwrap();
-
-    // The next map takes the released slot, so the replayed id names a retired
-    // generation of a slot that is live again.
-    let second = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-
-    let mut width = 0;
-    let mut height = 0;
-    let mut scale = 0.0;
-    // SAFETY: the id is well-formed and the out-pointers are live locals; the
-    // C API resolves the id rather than dereferencing it.
-    let status = unsafe { sys::mln_map_get_size(released, &mut width, &mut height, &mut scale) };
-    assert_eq!(status, sys::MLN_STATUS_INVALID_ARGUMENT);
-    assert!(maplibre_native_ffi_core::error::capture_thread_diagnostic().contains("stale"));
-
-    assert_eq!(second.size().unwrap().0, MapOptions::default().width);
-    second.close().unwrap();
-    runtime.close().unwrap();
-}
-
-#[test]
-// Spec coverage: BND-047.
-fn a_map_id_passed_to_a_runtime_operation_reports_invalid_argument() {
+fn map_accepts_concurrent_commands_and_cross_thread_snapshots() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
 
-    // `mln_map` and `mln_runtime` are distinct newtypes, so this call has no
-    // expression in the safe API.
-    let wrong_kind = sys::mln_runtime(map.inner.native().unwrap().0);
-    // SAFETY: the value is well-formed; the C API rejects it on its kind tag.
-    let status = unsafe { sys::mln_runtime_pump(wrong_kind, 0) };
+    std::thread::scope(|scope| {
+        let first = scope.spawn(|| map.request_repaint().unwrap());
+        let second = scope.spawn(|| map.request_repaint().unwrap());
+        let first_id = first.join().unwrap();
+        let second_id = second.join().unwrap();
+        assert_ne!(first_id, 0);
+        assert_ne!(second_id, 0);
+        await_runtime_barrier(&runtime);
+        assert_ne!(second_id, first_id);
 
-    assert_eq!(status, sys::MLN_STATUS_INVALID_ARGUMENT);
-    let message = maplibre_native_ffi_core::error::capture_thread_diagnostic();
-    assert!(message.contains("map"), "{message}");
-    assert!(message.contains("runtime"), "{message}");
-
-    map.close().unwrap();
-    runtime.close().unwrap();
-}
-
-#[test]
-// Spec coverage: BND-049.
-fn a_live_map_id_called_from_another_thread_reports_wrong_thread() {
-    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-
-    let live = map.inner.native().unwrap();
-    let (status, message) = std::thread::scope(|scope| {
-        scope
-            .spawn(|| {
-                let mut width = 0;
-                let mut height = 0;
-                let mut scale = 0.0;
-                // SAFETY: the id is live; only the calling thread is wrong.
-                let status =
-                    unsafe { sys::mln_map_get_size(live, &mut width, &mut height, &mut scale) };
-                (
-                    status,
-                    maplibre_native_ffi_core::error::capture_thread_diagnostic(),
-                )
-            })
-            .join()
-            .unwrap()
+        let snapshot = scope.spawn(|| map.snapshot().unwrap()).join().unwrap();
+        assert_eq!(snapshot.logical_extent.width, MapOptions::default().width);
     });
-
-    // The id is live, so the owner-thread rule decides rather than identity.
-    assert_eq!(status, sys::MLN_STATUS_WRONG_THREAD);
-    assert!(!message.contains("stale"), "{message}");
-
     map.close().unwrap();
     runtime.close().unwrap();
 }

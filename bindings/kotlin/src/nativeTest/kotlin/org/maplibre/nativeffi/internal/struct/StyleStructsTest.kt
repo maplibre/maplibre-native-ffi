@@ -42,209 +42,219 @@ class StyleStructsTest : org.maplibre.nativeffi.NativeTestBase() {
   // BND-060, BND-061, BND-062, BND-066.
 
   @Test
-  fun styleOptionsInitializeDefaultsAndPresentZeroMasks() {
-    memScoped {
-      val absentImage = StyleStructs.styleImageOptions(null, this).pointed
-      assertEquals(sizeOf<mln_style_image_options>().toUInt(), absentImage.size)
-      assertEquals(0U, absentImage.fields)
+  fun styleOptionsInitializeDefaultsAndPresentZeroMasks(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      memScoped {
+        val absentImage = StyleStructs.styleImageOptions(null, this).pointed
+        assertEquals(sizeOf<mln_style_image_options>().toUInt(), absentImage.size)
+        assertEquals(0U, absentImage.fields)
 
-      val image =
-        StyleStructs.styleImageOptions(
-            StyleImageOptions().apply {
-              pixelRatio = 0.0f
-              sdf = false
-            },
-            this,
-          )
-          .pointed
-      assertEquals(MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO or MLN_STYLE_IMAGE_OPTION_SDF, image.fields)
-      assertEquals(0.0f, image.pixel_ratio)
-      assertEquals(false, image.sdf)
+        val image =
+          StyleStructs.styleImageOptions(
+              StyleImageOptions().apply {
+                pixelRatio = 0.0f
+                sdf = false
+              },
+              this,
+            )
+            .pointed
+        assertEquals(MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO or MLN_STYLE_IMAGE_OPTION_SDF, image.fields)
+        assertEquals(0.0f, image.pixel_ratio)
+        assertEquals(false, image.sdf)
 
-      val source =
-        StyleStructs.tileSourceOptions(
-            TileSourceOptions().apply {
-              minZoom = 0.0
-              tileSize = 0
-              bounds = LatLngBounds(LatLng(0.0, 0.0), LatLng(0.0, 0.0))
-            },
-            this,
-          )!!
-          .pointed
-      assertEquals(sizeOf<mln_style_tile_source_options>().toUInt(), source.size)
-      assertEquals(
-        MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM or
-          MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS or
-          MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE,
-        source.fields,
-      )
-      assertEquals(0.0, source.min_zoom)
-      assertEquals(0U, source.tile_size)
-      assertEquals(0.0, source.bounds.southwest.latitude)
-      assertEquals(0.0, source.bounds.northeast.longitude)
-    }
-  }
-
-  @Test
-  fun geoJsonSourceOptionsKeepNativeDefaultsAndMaskPresentZeroValues() {
-    memScoped {
-      assertNull(StyleStructs.geoJsonSourceOptions(null, this))
-
-      val clusterProperties = "{\"weight\":[\"+\",[\"get\",\"weight\"]]}".encodeToByteArray()
-      val options =
-        StyleStructs.geoJsonSourceOptions(
-            GeoJsonSourceOptions().apply {
-              minZoom = 0.0
-              clusterMinPoints = 0
-              cluster = false
-              this.clusterProperties = clusterProperties
-            },
-            this,
-          )!!
-          .pointed
-
-      assertEquals(sizeOf<mln_geojson_source_options>().toUInt(), options.size)
-      assertEquals(
-        MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM or
-          MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS or
-          MLN_GEOJSON_SOURCE_OPTION_CLUSTER or
-          MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES,
-        options.fields,
-      )
-      assertEquals(0.0, options.min_zoom)
-      assertEquals(0U, options.cluster_min_points)
-      assertEquals(false, options.cluster)
-      assertContentEquals(clusterProperties, ByteStructs.copyBufferView(options.cluster_properties))
-
-      // Fields left absent keep the values mln_geojson_source_options_default() wrote.
-      val defaults = alloc<mln_geojson_source_options>()
-      mln_geojson_source_options_default().place(defaults.ptr)
-      assertEquals(defaults.max_zoom, options.max_zoom)
-      assertEquals(defaults.tolerance, options.tolerance)
-      assertEquals(defaults.tile_size, options.tile_size)
-      assertEquals(defaults.cluster_radius, options.cluster_radius)
-    }
-  }
-
-  @Test
-  fun styleIdListCopiesIdsAndDestroysNativeHandle() {
-    var destroys = 0
-    val ids = memScoped {
-      val list = SyntheticHandles.styleIdList()
-
-      StyleStructs.styleIdList(
-        list.rawHandleValue,
-        counter = { _, outCount ->
-          outCount[0] = 1UL
-          MaplibreStatus.OK.nativeCode
-        },
-        getter = { _, _, outId ->
-          CoreStructs.setStringView(outId.pointed, "roads", this)
-          MaplibreStatus.OK.nativeCode
-        },
-        destroyer = { destroys++ },
-      )
+        val source =
+          StyleStructs.tileSourceOptions(
+              TileSourceOptions().apply {
+                minZoom = 0.0
+                tileSize = 0
+                bounds = LatLngBounds(LatLng(0.0, 0.0), LatLng(0.0, 0.0))
+              },
+              this,
+            )!!
+            .pointed
+        assertEquals(sizeOf<mln_style_tile_source_options>().toUInt(), source.size)
+        assertEquals(
+          MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM or
+            MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS or
+            MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE,
+          source.fields,
+        )
+        assertEquals(0.0, source.min_zoom)
+        assertEquals(0U, source.tile_size)
+        assertEquals(0.0, source.bounds.southwest.latitude)
+        assertEquals(0.0, source.bounds.northeast.longitude)
+      }
     }
 
-    assertEquals(listOf("roads"), ids)
-    assertEquals(1, destroys)
-  }
+  @Test
+  fun geoJsonSourceOptionsKeepNativeDefaultsAndMaskPresentZeroValues(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      memScoped {
+        assertNull(StyleStructs.geoJsonSourceOptions(null, this))
+
+        val clusterProperties = "{\"weight\":[\"+\",[\"get\",\"weight\"]]}".encodeToByteArray()
+        val options =
+          StyleStructs.geoJsonSourceOptions(
+              GeoJsonSourceOptions().apply {
+                minZoom = 0.0
+                clusterMinPoints = 0
+                cluster = false
+                this.clusterProperties = clusterProperties
+              },
+              this,
+            )!!
+            .pointed
+
+        assertEquals(sizeOf<mln_geojson_source_options>().toUInt(), options.size)
+        assertEquals(
+          MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM or
+            MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS or
+            MLN_GEOJSON_SOURCE_OPTION_CLUSTER or
+            MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES,
+          options.fields,
+        )
+        assertEquals(0.0, options.min_zoom)
+        assertEquals(0U, options.cluster_min_points)
+        assertEquals(false, options.cluster)
+        assertContentEquals(
+          clusterProperties,
+          ByteStructs.copyBufferView(options.cluster_properties),
+        )
+
+        // Fields left absent keep the values mln_geojson_source_options_default() wrote.
+        val defaults = alloc<mln_geojson_source_options>()
+        mln_geojson_source_options_default().place(defaults.ptr)
+        assertEquals(defaults.max_zoom, options.max_zoom)
+        assertEquals(defaults.tolerance, options.tolerance)
+        assertEquals(defaults.tile_size, options.tile_size)
+        assertEquals(defaults.cluster_radius, options.cluster_radius)
+      }
+    }
 
   @Test
-  fun styleIdListDestroysNativeHandleWhenCopyFails() {
-    memScoped {
+  fun styleIdListCopiesIdsAndDestroysNativeHandle(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
       var destroys = 0
-      val list = SyntheticHandles.styleIdList()
+      val ids = memScoped {
+        val list = SyntheticHandles.styleIdList()
 
-      assertFailsWith<IllegalArgumentException> {
         StyleStructs.styleIdList(
           list.rawHandleValue,
-          counter = { _, outCount ->
-            outCount[0] = Int.MAX_VALUE.toULong() + 1UL
-            MaplibreStatus.OK.nativeCode
-          },
-          getter = { _, _, _ -> MaplibreStatus.OK.nativeCode },
-          destroyer = { destroys++ },
-        )
-      }
-
-      assertEquals(1, destroys)
-    }
-  }
-
-  @Test
-  fun styleStringListCopiesValuesAndDestroysOnSuccessAndFailure() {
-    memScoped {
-      var destroys = 0
-      val values =
-        StyleStructs.styleStringList(
-          123UL,
           counter = { _, outCount ->
             outCount[0] = 1UL
             MaplibreStatus.OK.nativeCode
           },
-          getter = { _, _, outValue ->
-            CoreStructs.setStringView(outValue.pointed, "tile", this)
+          getter = { _, _, outId ->
+            CoreStructs.setStringView(outId.pointed, "roads", this)
             MaplibreStatus.OK.nativeCode
           },
-          destroyer = { destroys++ },
-        )
-      assertEquals(listOf("tile"), values)
-      assertEquals(1, destroys)
-
-      assertFailsWith<IllegalArgumentException> {
-        StyleStructs.styleStringList(
-          456UL,
-          counter = { _, outCount ->
-            outCount[0] = Int.MAX_VALUE.toULong() + 1UL
-            MaplibreStatus.OK.nativeCode
-          },
-          getter = { _, _, _ -> MaplibreStatus.OK.nativeCode },
           destroyer = { destroys++ },
         )
       }
-      assertEquals(2, destroys)
+
+      assertEquals(listOf("roads"), ids)
+      assertEquals(1, destroys)
     }
-  }
 
   @Test
-  fun sourceInfoPreservesUnknownTypeAndStableFields() {
-    memScoped {
-      val native = alloc<mln_style_source_info>()
-      native.type = 999U
-      native.is_volatile = true
+  fun styleIdListDestroysNativeHandleWhenCopyFails(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      memScoped {
+        var destroys = 0
+        val list = SyntheticHandles.styleIdList()
 
-      val info = StyleStructs.sourceInfo(native, "source attribution")
+        assertFailsWith<IllegalArgumentException> {
+          StyleStructs.styleIdList(
+            list.rawHandleValue,
+            counter = { _, outCount ->
+              outCount[0] = Int.MAX_VALUE.toULong() + 1UL
+              MaplibreStatus.OK.nativeCode
+            },
+            getter = { _, _, _ -> MaplibreStatus.OK.nativeCode },
+            destroyer = { destroys++ },
+          )
+        }
 
-      assertEquals(SourceType(999), info.type)
-      assertEquals(999, info.type.nativeValue)
-      assertEquals(true, info.volatileSource)
-      assertEquals("source attribution", info.attribution)
+        assertEquals(1, destroys)
+      }
     }
-  }
 
   @Test
-  fun styleImageInfoCopiesMetadataAndRejectsOverflow() {
-    memScoped {
-      val native = alloc<mln_style_image_info>()
-      native.width = 1U
-      native.height = 2U
-      native.stride = 8U
-      native.byte_length = 16UL
-      native.pixel_ratio = 2.0f
-      native.sdf = true
+  fun styleStringListCopiesValuesAndDestroysOnSuccessAndFailure(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      memScoped {
+        var destroys = 0
+        val values =
+          StyleStructs.styleStringList(
+            123UL,
+            counter = { _, outCount ->
+              outCount[0] = 1UL
+              MaplibreStatus.OK.nativeCode
+            },
+            getter = { _, _, outValue ->
+              CoreStructs.setStringView(outValue.pointed, "tile", this)
+              MaplibreStatus.OK.nativeCode
+            },
+            destroyer = { destroys++ },
+          )
+        assertEquals(listOf("tile"), values)
+        assertEquals(1, destroys)
 
-      val info = StyleStructs.styleImageInfo(native)
-
-      assertEquals(1, info.width)
-      assertEquals(2, info.height)
-      assertEquals(8, info.stride)
-      assertEquals(16L, info.byteLength)
-      assertEquals(2.0f, info.pixelRatio)
-      assertEquals(true, info.sdf)
-
-      native.byte_length = Long.MAX_VALUE.toULong() + 1UL
-      assertFailsWith<IllegalArgumentException> { StyleStructs.styleImageInfo(native) }
+        assertFailsWith<IllegalArgumentException> {
+          StyleStructs.styleStringList(
+            456UL,
+            counter = { _, outCount ->
+              outCount[0] = Int.MAX_VALUE.toULong() + 1UL
+              MaplibreStatus.OK.nativeCode
+            },
+            getter = { _, _, _ -> MaplibreStatus.OK.nativeCode },
+            destroyer = { destroys++ },
+          )
+        }
+        assertEquals(2, destroys)
+      }
     }
-  }
+
+  @Test
+  fun sourceInfoPreservesUnknownTypeAndStableFields(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      memScoped {
+        val native = alloc<mln_style_source_info>()
+        native.type = 999U
+        native.is_volatile = true
+
+        val info = StyleStructs.sourceInfo(native, "source attribution")
+
+        assertEquals(SourceType(999), info.type)
+        assertEquals(999, info.type.nativeValue)
+        assertEquals(true, info.volatileSource)
+        assertEquals("source attribution", info.attribution)
+      }
+    }
+
+  @Test
+  fun styleImageInfoCopiesMetadataAndRejectsOverflow(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      memScoped {
+        val native = alloc<mln_style_image_info>()
+        native.width = 1U
+        native.height = 2U
+        native.stride = 8U
+        native.byte_length = 16UL
+        native.pixel_ratio = 2.0f
+        native.sdf = true
+
+        val info = StyleStructs.styleImageInfo(native)
+
+        assertEquals(1, info.width)
+        assertEquals(2, info.height)
+        assertEquals(8, info.stride)
+        assertEquals(16L, info.byteLength)
+        assertEquals(2.0f, info.pixelRatio)
+        assertEquals(true, info.sdf)
+
+        native.byte_length = Long.MAX_VALUE.toULong() + 1UL
+        assertFailsWith<IllegalArgumentException> { StyleStructs.styleImageInfo(native) }
+      }
+    }
 }

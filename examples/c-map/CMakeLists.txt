@@ -25,7 +25,7 @@ pkg_check_modules(SDL3 REQUIRED IMPORTED_TARGET sdl3)
 
 add_executable(
   c-map
-  channel.c
+  render_request.c
   diagnostics.c
   input.c
   main.c

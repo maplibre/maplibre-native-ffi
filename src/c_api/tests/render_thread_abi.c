@@ -1,5 +1,5 @@
 // Raw C ABI coverage: a render session's owner thread is the thread that
-// attached it, which need not be the map's owner thread.
+// attached it, independent of the runtime worker.
 
 #include <stdatomic.h>
 #include <stddef.h>
@@ -14,8 +14,8 @@ static const char background_style_json[] =
   "[{\"id\":\"bg\",\"type\":\"background\","
   "\"paint\":{\"background-color\":\"#ff0000\"}}]}";
 
-// Renders until the map publishes an update for the session's extent, which
-// takes at least one pump on the map owner thread. Returns the last status.
+// Renders until the runtime worker publishes an update for the session's
+// extent. Returns the last status.
 static mln_status render_until_frame(
   mln_render_session session, bool* out_rendered
 ) {
@@ -79,7 +79,7 @@ static void a_second_thread_attaches_and_renders(void) {
   mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_map_set_style_json(map, MLN_BUFFER_LITERAL(background_style_json))
+    mln_test_map_set_style_json(map, MLN_BUFFER_LITERAL(background_style_json))
   );
 
   render_probe probe = {.map = map};
@@ -87,7 +87,7 @@ static void a_second_thread_attaches_and_renders(void) {
 
   mln_test_thread* thread =
     mln_test_thread_start(attach_render_readback, &probe);
-  TEST_ASSERT_TRUE(mln_test_pump_until(runtime, &probe.finished));
+  TEST_ASSERT_TRUE(mln_test_wait_until(runtime, &probe.finished));
   mln_test_thread_join(thread);
 
   TEST_ASSERT_TRUE(probe.attached);
@@ -182,7 +182,7 @@ static void session_entry_points_reject_a_foreign_thread(void) {
 
   mln_test_thread* thread =
     mln_test_thread_start(call_session_from_a_foreign_thread, &probe);
-  TEST_ASSERT_TRUE(mln_test_pump_until(runtime, &probe.finished));
+  TEST_ASSERT_TRUE(mln_test_wait_until(runtime, &probe.finished));
   mln_test_thread_join(thread);
 
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_WRONG_THREAD, probe.render_status);
@@ -251,13 +251,13 @@ static void map_destroy_rejects_a_session_owned_by_another_thread(void) {
   atomic_init(&probe.destroyed, false);
 
   mln_test_thread* thread = mln_test_thread_start(attach_hold_destroy, &probe);
-  TEST_ASSERT_TRUE(mln_test_pump_until(runtime, &probe.attached));
+  TEST_ASSERT_TRUE(mln_test_wait_until(runtime, &probe.attached));
   TEST_ASSERT_TRUE(probe.attach_succeeded);
 
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_INVALID_STATE, mln_map_destroy(map));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_INVALID_STATE, mln_test_map_close(map));
 
   atomic_store(&probe.start_destroy, true);
-  TEST_ASSERT_TRUE(mln_test_pump_until(runtime, &probe.destroyed));
+  TEST_ASSERT_TRUE(mln_test_wait_until(runtime, &probe.destroyed));
   mln_test_thread_join(thread);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.destroy_status);
 
@@ -293,12 +293,20 @@ static void attach_resize_render(void* argument) {
     mln_test_sleep_millisecond();
   }
 
-  probe->resize_status =
-    mln_render_session_resize(fixture.session, 96, 48, 1.0);
+  uint64_t resize_command_id = 0;
+  const mln_logical_extent extent = {
+    .width = 96,
+    .height = 48,
+    .scale_factor = 1.0,
+  };
+  probe->resize_status = mln_map_resize(probe->map, extent, &resize_command_id);
+  if (probe->resize_status == MLN_STATUS_OK) {
+    probe->resize_status =
+      mln_render_session_resize(fixture.session, 96, 48, 1.0);
+  }
 
-  // Immediately after the resize the map still holds an update built for the
-  // previous extent, so rendering must report a pending size rather than
-  // project that update into the new target.
+  // The runtime worker may publish the matching map extent before or after the
+  // render thread checks the resized session.
   mln_render_result immediate = MLN_RENDER_RESULT_RENDERED;
   if (
     mln_render_session_render_update(fixture.session, &immediate) !=
@@ -319,16 +327,15 @@ static void attach_resize_render(void* argument) {
   atomic_store(&probe->finished, true);
 }
 
-// A resize from the render thread reaches the map through the map's owner
-// thread. Rendering waits for the map to catch up, or the frame would take its
-// projection from the old logical size and its viewport from the new physical
-// one.
-static void resize_from_the_render_thread_lands_on_the_map_thread(void) {
+// A resize from the render thread reaches the map through the runtime worker.
+// Rendering waits for the map to catch up, or a frame would take its projection
+// from the old logical size and its viewport from the new physical one.
+static void resize_from_the_render_thread_lands_on_the_map(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_map_set_style_json(map, MLN_BUFFER_LITERAL(background_style_json))
+    mln_test_map_set_style_json(map, MLN_BUFFER_LITERAL(background_style_json))
   );
 
   resize_probe probe = {.map = map};
@@ -338,11 +345,11 @@ static void resize_from_the_render_thread_lands_on_the_map_thread(void) {
   atomic_init(&probe.finished, false);
 
   mln_test_thread* thread = mln_test_thread_start(attach_resize_render, &probe);
-  TEST_ASSERT_TRUE(mln_test_pump_until(runtime, &probe.ready_to_resize));
+  TEST_ASSERT_TRUE(mln_test_wait_until(runtime, &probe.ready_to_resize));
   atomic_store(&probe.start_resize, true);
 
-  // Keep the map owner thread from processing the queued resize until the
-  // render thread has checked the update for the previous extent.
+  // Wait for the render thread while the resize command advances independently
+  // on the runtime worker.
   for (unsigned int attempt = 0;
        attempt < 500 && !atomic_load(&probe.immediate_render_checked);
        attempt += 1) {
@@ -350,19 +357,17 @@ static void resize_from_the_render_thread_lands_on_the_map_thread(void) {
   }
   TEST_ASSERT_TRUE(atomic_load(&probe.immediate_render_checked));
 
-  TEST_ASSERT_TRUE(mln_test_pump_until(runtime, &probe.finished));
+  TEST_ASSERT_TRUE(mln_test_wait_until(runtime, &probe.finished));
   mln_test_thread_join(thread);
 
   TEST_ASSERT_TRUE(probe.attached);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.resize_status);
-  TEST_ASSERT_EQUAL_INT(MLN_RENDER_RESULT_SIZE_PENDING, probe.immediate_result);
-  TEST_ASSERT_TRUE(probe.rendered);
 
   uint32_t width = 0;
   uint32_t height = 0;
   double scale_factor = 0.0;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_get_size(map, &width, &height, &scale_factor)
+    MLN_STATUS_OK, mln_test_map_get_size(map, &width, &height, &scale_factor)
   );
   TEST_ASSERT_EQUAL_UINT32(96, width);
   TEST_ASSERT_EQUAL_UINT32(48, height);
@@ -395,10 +400,10 @@ static void render_then_create_runtime(void* argument) {
   mln_runtime_options options = mln_runtime_options_default();
   options.notification_source = source;
   if (probe->create_status == MLN_STATUS_OK) {
-    probe->create_status = mln_runtime_create(&options, &runtime);
+    probe->create_status = mln_test_runtime_create(&options, &runtime);
   }
   if (probe->create_status == MLN_STATUS_OK) {
-    (void)mln_runtime_destroy(runtime);
+    (void)mln_test_runtime_close(runtime);
   }
   (void)mln_notification_source_close(source);
   atomic_store(&probe->finished, true);
@@ -412,14 +417,14 @@ static void render_thread_is_not_poisoned_for_runtime_creation(void) {
   mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_map_set_style_json(map, MLN_BUFFER_LITERAL(background_style_json))
+    mln_test_map_set_style_json(map, MLN_BUFFER_LITERAL(background_style_json))
   );
 
   runtime_after_render_probe probe = {.map = map};
   atomic_init(&probe.finished, false);
   mln_test_thread* thread =
     mln_test_thread_start(render_then_create_runtime, &probe);
-  TEST_ASSERT_TRUE(mln_test_pump_until(runtime, &probe.finished));
+  TEST_ASSERT_TRUE(mln_test_wait_until(runtime, &probe.finished));
   mln_test_thread_join(thread);
 
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.create_status);
@@ -428,40 +433,11 @@ static void render_thread_is_not_poisoned_for_runtime_creation(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-typedef struct token_probe {
-  atomic_bool finished;
-  uint64_t token;
-} token_probe;
-
-static void read_thread_token(void* argument) {
-  token_probe* probe = (token_probe*)argument;
-  probe->token = mln_thread_token();
-  atomic_store(&probe->finished, true);
-}
-
-// Hosts whose unit of execution is not pinned to a native thread compare this
-// token to detect that they moved.
-static void thread_tokens_are_stable_and_distinct(void) {
-  const uint64_t first = mln_thread_token();
-  TEST_ASSERT_NOT_EQUAL_UINT64(0, first);
-  TEST_ASSERT_EQUAL_UINT64(first, mln_thread_token());
-
-  token_probe probe = {0};
-  atomic_init(&probe.finished, false);
-  mln_test_thread* thread = mln_test_thread_start(read_thread_token, &probe);
-  mln_test_thread_join(thread);
-
-  TEST_ASSERT_NOT_EQUAL_UINT64(0, probe.token);
-  TEST_ASSERT_NOT_EQUAL_UINT64(first, probe.token);
-  TEST_ASSERT_EQUAL_UINT64(first, mln_thread_token());
-}
-
 void run_render_thread_abi_tests(void) {
   UnitySetTestFile(__FILE__);
-  RUN_TEST(thread_tokens_are_stable_and_distinct);
   RUN_TEST(a_second_thread_attaches_and_renders);
   RUN_TEST(session_entry_points_reject_a_foreign_thread);
   RUN_TEST(map_destroy_rejects_a_session_owned_by_another_thread);
-  RUN_TEST(resize_from_the_render_thread_lands_on_the_map_thread);
+  RUN_TEST(resize_from_the_render_thread_lands_on_the_map);
   RUN_TEST(render_thread_is_not_poisoned_for_runtime_creation);
 }

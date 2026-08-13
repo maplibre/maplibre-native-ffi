@@ -136,6 +136,81 @@ impl AnimationOptions {
     }
 }
 
+/// Transition behavior for one atomic camera update.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum CameraUpdateMode {
+    #[default]
+    Jump,
+    Ease,
+    Fly,
+}
+
+impl CameraUpdateMode {
+    fn to_native(self) -> u32 {
+        match self {
+            Self::Jump => sys::MLN_CAMERA_UPDATE_MODE_JUMP,
+            Self::Ease => sys::MLN_CAMERA_UPDATE_MODE_EASE,
+            Self::Fly => sys::MLN_CAMERA_UPDATE_MODE_FLY,
+        }
+    }
+}
+
+/// Gesture boundary carried atomically with a camera update.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum GesturePhase {
+    #[default]
+    None,
+    Begin,
+    Update,
+    End,
+    Cancel,
+}
+
+impl GesturePhase {
+    fn to_native(self) -> u32 {
+        match self {
+            Self::None => sys::MLN_GESTURE_PHASE_NONE,
+            Self::Begin => sys::MLN_GESTURE_PHASE_BEGIN,
+            Self::Update => sys::MLN_GESTURE_PHASE_UPDATE,
+            Self::End => sys::MLN_GESTURE_PHASE_END,
+            Self::Cancel => sys::MLN_GESTURE_PHASE_CANCEL,
+        }
+    }
+}
+
+/// One copied, atomic camera command.
+#[derive(Debug, Clone, PartialEq, Default)]
+#[non_exhaustive]
+pub struct CameraUpdate {
+    pub mode: CameraUpdateMode,
+    pub camera: CameraOptions,
+    pub animation: AnimationOptions,
+    pub gesture_phase: GesturePhase,
+    pub gesture_id: u64,
+    pub animation_id: u64,
+}
+
+impl CameraUpdate {
+    fn to_native(&self) -> sys::mln_camera_update {
+        // SAFETY: the default constructor initializes this ABI version's size.
+        let mut raw = unsafe { sys::mln_camera_update_default() };
+        raw.mode = self.mode.to_native();
+        raw.camera = self.camera.to_native();
+        raw.animation = self.animation.to_native();
+        raw.gesture_phase = self.gesture_phase.to_native();
+        raw.gesture_id = self.gesture_id;
+        raw.animation_id = self.animation_id;
+        raw
+    }
+}
+
+/// Camera and publication generation returned by a snapshot or ordered query.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CameraSnapshot {
+    pub generation: u64,
+    pub camera: CameraOptions,
+}
+
 /// Optional fitting controls for camera-for-viewport queries.
 #[derive(Debug, Clone, PartialEq, Default)]
 #[non_exhaustive]
@@ -352,6 +427,17 @@ pub fn projection_mode_to_native(mode: &ProjectionMode) -> sys::mln_projection_m
 
 pub fn projection_mode_from_native(raw: sys::mln_projection_mode) -> ProjectionMode {
     ProjectionMode::from_native(raw)
+}
+
+#[doc(hidden)]
+pub trait CameraUpdateNativeExt {
+    fn to_native(&self) -> sys::mln_camera_update;
+}
+
+impl CameraUpdateNativeExt for CameraUpdate {
+    fn to_native(&self) -> sys::mln_camera_update {
+        CameraUpdate::to_native(self)
+    }
 }
 
 #[doc(hidden)]

@@ -10,7 +10,7 @@ use maplibre_native_ffi_core::{OpenGLClientApi, OpenGLContextOwnership, RenderRe
 use maplibre_native_ffi_sys as sys;
 
 use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
-use crate::map::MapAttachRef;
+use crate::map::MapHandle;
 use crate::{HandleOperationError, Result};
 
 /// Borrowed opaque native address used for backend interop handles. It does not
@@ -1567,14 +1567,13 @@ impl Drop for OpenGLOwnedTextureFrameHandle {
 }
 
 impl RenderSessionHandle {
-    pub(crate) fn attach<F>(map: &MapAttachRef, attach: F) -> Result<Self>
+    pub(crate) fn attach<F>(map: &MapHandle, attach: F) -> Result<Self>
     where
         F: FnOnce(sys::mln_map, *mut sys::mln_render_session) -> sys::mln_status,
     {
         let mut out = maplibre_core::ptr::OutHandle::<sys::mln_render_session>::new();
-        // A close racing this attach makes the handle stale, which the C API
-        // rejects.
-        let status = attach(map.map(), out.as_mut_ptr());
+        let map = map.inner.native()?;
+        let status = attach(map, out.as_mut_ptr());
         maplibre_core::check(status)?;
         let ptr = out_handle(out, "mln_render_session")?;
         Ok(Self {

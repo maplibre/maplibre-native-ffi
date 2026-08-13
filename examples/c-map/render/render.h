@@ -39,8 +39,8 @@ void render_target_frame_scope_close(void* scope);
   render_target_mode mode
 );
 
-/// Attaches a render session against the published map. The calling thread
-/// becomes the session's owner thread for its whole life.
+/// Attaches a render session to the live map. The calling render-loop thread
+/// remains the session's graphics-affine thread for its whole life.
 [[nodiscard]] app_error render_target_attach(
   render_target* target, mln_map map, viewport current_viewport
 );

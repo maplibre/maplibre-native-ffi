@@ -17,27 +17,24 @@ import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.readBytes
+import kotlinx.cinterop.readValue
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.value
-import org.maplibre.nativeffi.camera.AnimationOptions
-import org.maplibre.nativeffi.camera.BoundOptions
-import org.maplibre.nativeffi.camera.CameraFitOptions
-import org.maplibre.nativeffi.camera.CameraOptions
-import org.maplibre.nativeffi.camera.FreeCameraOptions
+import org.maplibre.nativeffi.camera.CameraSnapshot
+import org.maplibre.nativeffi.camera.CameraUpdate
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
-import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_SOURCE_INFO_TILEJSON
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_SOURCE_INFO_URL
-import org.maplibre.nativeffi.internal.c.mln_bound_options_default
 import org.maplibre.nativeffi.internal.c.mln_buffer_view
 import org.maplibre.nativeffi.internal.c.mln_camera_options_default
-import org.maplibre.nativeffi.internal.c.mln_free_camera_options_default
+import org.maplibre.nativeffi.internal.c.mln_camera_query_result
+import org.maplibre.nativeffi.internal.c.mln_camera_update_default
 import org.maplibre.nativeffi.internal.c.mln_image_stretch
 import org.maplibre.nativeffi.internal.c.mln_lat_lng
-import org.maplibre.nativeffi.internal.c.mln_lat_lng_bounds
+import org.maplibre.nativeffi.internal.c.mln_logical_extent
 import org.maplibre.nativeffi.internal.c.mln_map_add_color_relief_layer
 import org.maplibre.nativeffi.internal.c.mln_map_add_custom_geometry_source
 import org.maplibre.nativeffi.internal.c.mln_map_add_geojson_source_data
@@ -54,85 +51,78 @@ import org.maplibre.nativeffi.internal.c.mln_map_add_style_layer_json
 import org.maplibre.nativeffi.internal.c.mln_map_add_style_source_json
 import org.maplibre.nativeffi.internal.c.mln_map_add_vector_source_tiles
 import org.maplibre.nativeffi.internal.c.mln_map_add_vector_source_url
-import org.maplibre.nativeffi.internal.c.mln_map_camera_for_geometry
-import org.maplibre.nativeffi.internal.c.mln_map_camera_for_lat_lng_bounds
-import org.maplibre.nativeffi.internal.c.mln_map_camera_for_lat_lngs
-import org.maplibre.nativeffi.internal.c.mln_map_cancel_transitions
-import org.maplibre.nativeffi.internal.c.mln_map_copy_layer_source_id
-import org.maplibre.nativeffi.internal.c.mln_map_copy_layer_source_layer
-import org.maplibre.nativeffi.internal.c.mln_map_copy_loaded_style_json
-import org.maplibre.nativeffi.internal.c.mln_map_copy_style_image_premultiplied_rgba8
-import org.maplibre.nativeffi.internal.c.mln_map_copy_style_image_stretches
-import org.maplibre.nativeffi.internal.c.mln_map_copy_style_source_attribution
-import org.maplibre.nativeffi.internal.c.mln_map_copy_style_source_url
-import org.maplibre.nativeffi.internal.c.mln_map_copy_style_url
-import org.maplibre.nativeffi.internal.c.mln_map_create
-import org.maplibre.nativeffi.internal.c.mln_map_destroy
-import org.maplibre.nativeffi.internal.c.mln_map_dump_debug_logs
-import org.maplibre.nativeffi.internal.c.mln_map_ease_to
-import org.maplibre.nativeffi.internal.c.mln_map_fly_to
-import org.maplibre.nativeffi.internal.c.mln_map_get_bounds
-import org.maplibre.nativeffi.internal.c.mln_map_get_camera
-import org.maplibre.nativeffi.internal.c.mln_map_get_debug_options
-import org.maplibre.nativeffi.internal.c.mln_map_get_event_mask
-import org.maplibre.nativeffi.internal.c.mln_map_get_free_camera_options
-import org.maplibre.nativeffi.internal.c.mln_map_get_image_source_coordinates
-import org.maplibre.nativeffi.internal.c.mln_map_get_layer_filter
-import org.maplibre.nativeffi.internal.c.mln_map_get_layer_max_zoom
-import org.maplibre.nativeffi.internal.c.mln_map_get_layer_min_zoom
-import org.maplibre.nativeffi.internal.c.mln_map_get_layer_property
-import org.maplibre.nativeffi.internal.c.mln_map_get_layer_visibility
-import org.maplibre.nativeffi.internal.c.mln_map_get_projection_mode
-import org.maplibre.nativeffi.internal.c.mln_map_get_rendering_stats_view_enabled
-import org.maplibre.nativeffi.internal.c.mln_map_get_size
-import org.maplibre.nativeffi.internal.c.mln_map_get_style_image_info
-import org.maplibre.nativeffi.internal.c.mln_map_get_style_layer_json
-import org.maplibre.nativeffi.internal.c.mln_map_get_style_layer_type
-import org.maplibre.nativeffi.internal.c.mln_map_get_style_light_property
-import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_info
-import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_tile_urls
-import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_type
-import org.maplibre.nativeffi.internal.c.mln_map_get_style_transition_options
-import org.maplibre.nativeffi.internal.c.mln_map_get_tile_options
-import org.maplibre.nativeffi.internal.c.mln_map_get_viewport_options
+import org.maplibre.nativeffi.internal.c.mln_map_camera_query_start
+import org.maplibre.nativeffi.internal.c.mln_map_camera_query_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_camera_snapshot_get
+import org.maplibre.nativeffi.internal.c.mln_map_close_start
+import org.maplibre.nativeffi.internal.c.mln_map_copy_layer_source_id_start
+import org.maplibre.nativeffi.internal.c.mln_map_copy_layer_source_id_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_copy_layer_source_layer_start
+import org.maplibre.nativeffi.internal.c.mln_map_copy_layer_source_layer_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_copy_style_image_premultiplied_rgba8_start
+import org.maplibre.nativeffi.internal.c.mln_map_copy_style_image_premultiplied_rgba8_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_copy_style_image_stretches_start
+import org.maplibre.nativeffi.internal.c.mln_map_copy_style_image_stretches_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_copy_style_source_attribution_start
+import org.maplibre.nativeffi.internal.c.mln_map_copy_style_source_attribution_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_copy_style_source_url_start
+import org.maplibre.nativeffi.internal.c.mln_map_copy_style_source_url_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_create_start
+import org.maplibre.nativeffi.internal.c.mln_map_create_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_get_image_source_coordinates_start
+import org.maplibre.nativeffi.internal.c.mln_map_get_image_source_coordinates_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_get_layer_filter_start
+import org.maplibre.nativeffi.internal.c.mln_map_get_layer_filter_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_get_layer_max_zoom_start
+import org.maplibre.nativeffi.internal.c.mln_map_get_layer_max_zoom_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_get_layer_min_zoom_start
+import org.maplibre.nativeffi.internal.c.mln_map_get_layer_min_zoom_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_get_layer_property_start
+import org.maplibre.nativeffi.internal.c.mln_map_get_layer_property_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_get_layer_visibility_start
+import org.maplibre.nativeffi.internal.c.mln_map_get_layer_visibility_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_image_info_start
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_image_info_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_layer_json_start
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_layer_json_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_layer_type_start
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_layer_type_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_light_property_start
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_light_property_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_info_start
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_info_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_tile_urls_start
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_tile_urls_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_type_start
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_type_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_transition_options_start
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_transition_options_take_result
 import org.maplibre.nativeffi.internal.c.mln_map_invalidate_custom_geometry_source_region
 import org.maplibre.nativeffi.internal.c.mln_map_invalidate_custom_geometry_source_tile
-import org.maplibre.nativeffi.internal.c.mln_map_is_fully_loaded
-import org.maplibre.nativeffi.internal.c.mln_map_is_gesture_in_progress
-import org.maplibre.nativeffi.internal.c.mln_map_jump_to
-import org.maplibre.nativeffi.internal.c.mln_map_lat_lng_bounds_for_camera
-import org.maplibre.nativeffi.internal.c.mln_map_lat_lng_bounds_for_camera_unwrapped
-import org.maplibre.nativeffi.internal.c.mln_map_lat_lng_for_pixel
-import org.maplibre.nativeffi.internal.c.mln_map_lat_lngs_for_pixels
-import org.maplibre.nativeffi.internal.c.mln_map_list_style_layer_ids
-import org.maplibre.nativeffi.internal.c.mln_map_list_style_source_ids
-import org.maplibre.nativeffi.internal.c.mln_map_move_by
-import org.maplibre.nativeffi.internal.c.mln_map_move_by_animated
+import org.maplibre.nativeffi.internal.c.mln_map_list_style_layer_ids_start
+import org.maplibre.nativeffi.internal.c.mln_map_list_style_layer_ids_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_list_style_source_ids_start
+import org.maplibre.nativeffi.internal.c.mln_map_list_style_source_ids_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_loaded_style_json_start
+import org.maplibre.nativeffi.internal.c.mln_map_loaded_style_json_take_result
 import org.maplibre.nativeffi.internal.c.mln_map_move_style_layer
 import org.maplibre.nativeffi.internal.c.mln_map_options
 import org.maplibre.nativeffi.internal.c.mln_map_options_default
-import org.maplibre.nativeffi.internal.c.mln_map_pitch_by
-import org.maplibre.nativeffi.internal.c.mln_map_pitch_by_animated
-import org.maplibre.nativeffi.internal.c.mln_map_pixel_for_lat_lng
-import org.maplibre.nativeffi.internal.c.mln_map_pixels_for_lat_lngs
-import org.maplibre.nativeffi.internal.c.mln_map_projection_create
-import org.maplibre.nativeffi.internal.c.mln_map_remove_style_image
-import org.maplibre.nativeffi.internal.c.mln_map_remove_style_layer
-import org.maplibre.nativeffi.internal.c.mln_map_remove_style_source
+import org.maplibre.nativeffi.internal.c.mln_map_projection_create_start
+import org.maplibre.nativeffi.internal.c.mln_map_projection_create_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_remove_style_image_start
+import org.maplibre.nativeffi.internal.c.mln_map_remove_style_image_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_remove_style_layer_start
+import org.maplibre.nativeffi.internal.c.mln_map_remove_style_layer_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_remove_style_source_start
+import org.maplibre.nativeffi.internal.c.mln_map_remove_style_source_take_result
 import org.maplibre.nativeffi.internal.c.mln_map_request_repaint
-import org.maplibre.nativeffi.internal.c.mln_map_request_still_image
-import org.maplibre.nativeffi.internal.c.mln_map_rotate_by
-import org.maplibre.nativeffi.internal.c.mln_map_rotate_by_animated
-import org.maplibre.nativeffi.internal.c.mln_map_scale_by
-import org.maplibre.nativeffi.internal.c.mln_map_scale_by_animated
-import org.maplibre.nativeffi.internal.c.mln_map_set_bounds
+import org.maplibre.nativeffi.internal.c.mln_map_request_still_image_start
+import org.maplibre.nativeffi.internal.c.mln_map_resize
 import org.maplibre.nativeffi.internal.c.mln_map_set_custom_geometry_source_tile_data
-import org.maplibre.nativeffi.internal.c.mln_map_set_debug_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_event_mask
-import org.maplibre.nativeffi.internal.c.mln_map_set_free_camera_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_geojson_source_data
 import org.maplibre.nativeffi.internal.c.mln_map_set_geojson_source_url
-import org.maplibre.nativeffi.internal.c.mln_map_set_gesture_in_progress
 import org.maplibre.nativeffi.internal.c.mln_map_set_image_source_coordinates
 import org.maplibre.nativeffi.internal.c.mln_map_set_image_source_image
 import org.maplibre.nativeffi.internal.c.mln_map_set_image_source_url
@@ -147,23 +137,24 @@ import org.maplibre.nativeffi.internal.c.mln_map_set_location_indicator_accuracy
 import org.maplibre.nativeffi.internal.c.mln_map_set_location_indicator_bearing
 import org.maplibre.nativeffi.internal.c.mln_map_set_location_indicator_image_name
 import org.maplibre.nativeffi.internal.c.mln_map_set_location_indicator_location
-import org.maplibre.nativeffi.internal.c.mln_map_set_projection_mode
-import org.maplibre.nativeffi.internal.c.mln_map_set_rendering_stats_view_enabled
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_image
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_json
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_light_json
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_light_property
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_transition_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_url
-import org.maplibre.nativeffi.internal.c.mln_map_set_tile_options
-import org.maplibre.nativeffi.internal.c.mln_map_set_viewport_options
-import org.maplibre.nativeffi.internal.c.mln_map_style_image_exists
-import org.maplibre.nativeffi.internal.c.mln_map_style_layer_exists
-import org.maplibre.nativeffi.internal.c.mln_map_style_source_exists
-import org.maplibre.nativeffi.internal.c.mln_map_tile_options_default
-import org.maplibre.nativeffi.internal.c.mln_map_viewport_options_default
-import org.maplibre.nativeffi.internal.c.mln_projection_mode_default
-import org.maplibre.nativeffi.internal.c.mln_screen_point
+import org.maplibre.nativeffi.internal.c.mln_map_snapshot
+import org.maplibre.nativeffi.internal.c.mln_map_snapshot_get
+import org.maplibre.nativeffi.internal.c.mln_map_style_image_exists_start
+import org.maplibre.nativeffi.internal.c.mln_map_style_image_exists_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_style_layer_exists_start
+import org.maplibre.nativeffi.internal.c.mln_map_style_layer_exists_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_style_source_exists_start
+import org.maplibre.nativeffi.internal.c.mln_map_style_source_exists_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_style_url_start
+import org.maplibre.nativeffi.internal.c.mln_map_style_url_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_update_camera
+import org.maplibre.nativeffi.internal.c.mln_operation_release
 import org.maplibre.nativeffi.internal.c.mln_style_image_info_default
 import org.maplibre.nativeffi.internal.c.mln_style_source_info
 import org.maplibre.nativeffi.internal.c.mln_style_transition_options_default
@@ -196,6 +187,7 @@ import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 import org.maplibre.nativeffi.runtime.RuntimeEventMask
 import org.maplibre.nativeffi.runtime.RuntimeHandle
+import org.maplibre.nativeffi.runtime.startOperation
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.ImageStretch
@@ -209,111 +201,144 @@ import org.maplibre.nativeffi.style.StyleLayerVisibility
 import org.maplibre.nativeffi.style.StyleTransitionOptions
 import org.maplibre.nativeffi.style.TileSourceOptions
 
-/** Owned native map handle. Close it on the map owner thread. */
+/** Owned any-thread native map handle. */
 @OptIn(ExperimentalForeignApi::class)
 public actual class MapHandle
-private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : AutoCloseable {
+private constructor(
+  private val runtime: RuntimeHandle,
+  handle: NativeMap,
+  cachedEventMask: RuntimeEventMask,
+) {
   private val runtimeRetention = runtime.retainChild("MapHandle")
   private val state = HandleState("MapHandle", handle, runtime)
+  private var cachedEventMask =
+    RuntimeEventMask(cachedEventMask.nativeValue and RuntimeEventMask.ALL_MAP_EVENTS.nativeValue)
   private val customGeometrySources =
     CustomGeometrySourceRegistry<CustomGeometrySourceState> { it.close() }
 
   public actual var eventMask: RuntimeEventMask
-    get() = memScoped {
-      val outMask = alloc<ULongVar>()
-      Status.check(mln_map_get_event_mask(state.requireLive().rawHandleValue, outMask.ptr))
-      RuntimeEventMask(outMask.value.toLong())
-    }
+    get() = cachedEventMask
     set(value) {
-      Status.check(
-        mln_map_set_event_mask(state.requireLive().rawHandleValue, value.nativeValue.toULong())
-      )
+      command { outCommandId ->
+        Status.check(
+          mln_map_set_event_mask(
+            state.requireLive().rawHandleValue,
+            value.nativeValue.toULong(),
+            outCommandId,
+          )
+        )
+      }
+      cachedEventMask =
+        RuntimeEventMask(value.nativeValue and RuntimeEventMask.ALL_MAP_EVENTS.nativeValue)
     }
 
-  public actual fun setStyleUrl(url: String) {
+  public actual fun setStyleUrl(url: String): ULong = command { outCommandId ->
     MemoryUtil.requireValidCString(url)
-    Status.check(mln_map_set_style_url(state.requireLive().rawHandleValue, url))
+    Status.check(mln_map_set_style_url(state.requireLive().rawHandleValue, url, outCommandId))
   }
 
-  public actual fun setStyleJson(json: ByteArray) {
+  public actual fun setStyleJson(json: ByteArray): ULong = command { outCommandId ->
     memScoped {
       Status.check(
         mln_map_set_style_json(
           state.requireLive().rawHandleValue,
           ByteStructs.bufferView(json, this),
+          outCommandId,
         )
       )
     }
   }
 
-  public actual fun loadedStyleJson(): ByteArray = copyMapBytes { handle, text, capacity, outSize ->
-    mln_map_copy_loaded_style_json(handle, text, capacity, outSize)
-  }
+  public actual suspend fun loadedStyleJson(): ByteArray =
+    takeStyleBuffer(::mln_map_loaded_style_json_start, ::mln_map_loaded_style_json_take_result)
 
-  public actual fun styleUrl(): String = copyMapText { handle, text, capacity, outSize ->
-    mln_map_copy_style_url(handle, text, capacity, outSize)
-  }
+  public actual suspend fun styleUrl(): String =
+    takeStyleBuffer(::mln_map_style_url_start, ::mln_map_style_url_take_result).decodeToString()
 
-  public actual fun addStyleSourceJson(sourceId: String, sourceJson: ByteArray) {
-    memScoped {
-      Status.check(
-        mln_map_add_style_source_json(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          ByteStructs.bufferView(sourceJson, this),
+  public actual fun addStyleSourceJson(sourceId: String, sourceJson: ByteArray): ULong =
+    command { outCommandId ->
+      memScoped {
+        Status.check(
+          mln_map_add_style_source_json(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(sourceId, this),
+            ByteStructs.bufferView(sourceJson, this),
+            outCommandId,
+          )
         )
-      )
+      }
     }
-  }
 
-  public actual fun removeStyleSource(sourceId: String): Boolean = memScoped {
+  public actual suspend fun removeStyleSource(sourceId: String): Boolean = memScoped {
     val outRemoved = alloc<BooleanVar>()
     Status.check(
-      mln_map_remove_style_source(
-        state.requireLive().rawHandleValue,
-        CoreStructs.stringView(sourceId, this),
-        outRemoved.ptr,
+      ordered(
+        { outOperation ->
+          mln_map_remove_style_source_start(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(sourceId, this),
+            outOperation,
+          )
+        },
+        { operation -> mln_map_remove_style_source_take_result(operation, outRemoved.ptr) },
       )
     )
     outRemoved.value
   }
 
-  public actual fun styleSourceExists(sourceId: String): Boolean = memScoped {
+  public actual suspend fun styleSourceExists(sourceId: String): Boolean = memScoped {
     val outExists = alloc<BooleanVar>()
     Status.check(
-      mln_map_style_source_exists(
-        state.requireLive().rawHandleValue,
-        CoreStructs.stringView(sourceId, this),
-        outExists.ptr,
+      ordered(
+        { outOperation ->
+          mln_map_style_source_exists_start(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(sourceId, this),
+            outOperation,
+          )
+        },
+        { operation -> mln_map_style_source_exists_take_result(operation, outExists.ptr) },
       )
     )
     outExists.value
   }
 
-  public actual fun styleSourceType(sourceId: String): SourceType? = memScoped {
+  public actual suspend fun styleSourceType(sourceId: String): SourceType? = memScoped {
     val outType = alloc<UIntVar>()
     val outFound = alloc<BooleanVar>()
     Status.check(
-      mln_map_get_style_source_type(
-        state.requireLive().rawHandleValue,
-        CoreStructs.stringView(sourceId, this),
-        outType.ptr,
-        outFound.ptr,
+      ordered(
+        { outOperation ->
+          mln_map_get_style_source_type_start(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(sourceId, this),
+            outOperation,
+          )
+        },
+        { operation ->
+          mln_map_get_style_source_type_take_result(operation, outType.ptr, outFound.ptr)
+        },
       )
     )
     if (outFound.value) SourceType.fromNative(outType.value) else null
   }
 
-  public actual fun styleSourceInfo(sourceId: String): SourceInfo? = memScoped {
+  public actual suspend fun styleSourceInfo(sourceId: String): SourceInfo? = memScoped {
     val outInfo = alloc<mln_style_source_info>()
     outInfo.size = sizeOf<mln_style_source_info>().toUInt()
     val outFound = alloc<BooleanVar>()
     Status.check(
-      mln_map_get_style_source_info(
-        state.requireLive().rawHandleValue,
-        CoreStructs.stringView(sourceId, this),
-        outInfo.ptr,
-        outFound.ptr,
+      ordered(
+        { outOperation ->
+          mln_map_get_style_source_info_start(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(sourceId, this),
+            outOperation,
+          )
+        },
+        { operation ->
+          mln_map_get_style_source_info_take_result(operation, outInfo.ptr, outFound.ptr)
+        },
       )
     )
     if (!outFound.value) return@memScoped null
@@ -323,10 +348,17 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     StyleStructs.sourceInfo(outInfo, attribution, url, tileUrls)
   }
 
-  public actual fun styleSourceIds(): List<String> = memScoped {
+  public actual suspend fun styleSourceIds(): List<String> = memScoped {
     val outList = alloc<ULongVar>()
     outList.value = 0uL
-    Status.check(mln_map_list_style_source_ids(state.requireLive().rawHandleValue, outList.ptr))
+    Status.check(
+      ordered(
+        { outOperation ->
+          mln_map_list_style_source_ids_start(state.requireLive().rawHandleValue, outOperation)
+        },
+        { operation -> mln_map_list_style_source_ids_take_result(operation, outList.ptr) },
+      )
+    )
     StyleStructs.styleIdList(outList.value.asHandle("mln_map_list_style_ids", ::styleIdListHandle))
   }
 
@@ -334,7 +366,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     sourceId: String,
     url: String,
     options: GeoJsonSourceOptions?,
-  ) {
+  ): ULong = command { outCommandId ->
     memScoped {
       Status.check(
         mln_map_add_geojson_source_url(
@@ -342,6 +374,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           CoreStructs.stringView(sourceId, this),
           CoreStructs.stringView(url, this),
           StyleStructs.geoJsonSourceOptions(options, this),
+          outCommandId,
         )
       )
     }
@@ -351,7 +384,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     sourceId: String,
     data: ByteArray,
     options: GeoJsonSourceOptions?,
-  ) {
+  ): ULong = command { outCommandId ->
     memScoped {
       Status.check(
         mln_map_add_geojson_source_data(
@@ -359,61 +392,68 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           CoreStructs.stringView(sourceId, this),
           ByteStructs.bufferView(data, this),
           StyleStructs.geoJsonSourceOptions(options, this),
+          outCommandId,
         )
       )
     }
   }
 
-  public actual fun setGeoJsonSourceUrl(sourceId: String, url: String) {
-    memScoped {
-      Status.check(
-        mln_map_set_geojson_source_url(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          CoreStructs.stringView(url, this),
-        )
-      )
-    }
-  }
-
-  public actual fun setGeoJsonSourceData(sourceId: String, data: ByteArray) {
-    memScoped {
-      Status.check(
-        mln_map_set_geojson_source_data(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          ByteStructs.bufferView(data, this),
-        )
-      )
-    }
-  }
-
-  public actual fun addCustomGeometrySource(
-    sourceId: String,
-    options: CustomGeometrySourceOptions,
-  ) {
-    // The release callback captures the registry rather than this map, so a map a
-    // host leaks with a live source still reports as leaked.
-    val registry = customGeometrySources
-    val sourceState = CustomGeometrySourceState(options) { registry.remove(sourceId) }
-    registry.install(sourceId, sourceState) {
+  public actual fun setGeoJsonSourceUrl(sourceId: String, url: String): ULong =
+    command { outCommandId ->
       memScoped {
         Status.check(
-          mln_map_add_custom_geometry_source(
+          mln_map_set_geojson_source_url(
             state.requireLive().rawHandleValue,
             CoreStructs.stringView(sourceId, this),
-            sourceState.descriptor(),
+            CoreStructs.stringView(url, this),
+            outCommandId,
           )
         )
       }
     }
-  }
+
+  public actual fun setGeoJsonSourceData(sourceId: String, data: ByteArray): ULong =
+    command { outCommandId ->
+      memScoped {
+        Status.check(
+          mln_map_set_geojson_source_data(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(sourceId, this),
+            ByteStructs.bufferView(data, this),
+            outCommandId,
+          )
+        )
+      }
+    }
+
+  public actual fun addCustomGeometrySource(
+    sourceId: String,
+    options: CustomGeometrySourceOptions,
+  ): ULong =
+    command { outCommandId
+      -> // The release callback captures the registry rather than this map, so a map a
+      // host leaks with a live source still reports as leaked.
+      val registry = customGeometrySources
+      val sourceState = CustomGeometrySourceState(options) { registry.remove(sourceId) }
+      registry.install(sourceId, sourceState) {
+        memScoped {
+          Status.check(
+            mln_map_add_custom_geometry_source(
+              state.requireLive().rawHandleValue,
+              CoreStructs.stringView(sourceId, this),
+              sourceState.descriptor(),
+              outCommandId,
+            )
+          )
+        }
+      }
+    }
 
   public actual fun setCustomGeometrySourceTileData(
     sourceId: String,
     tileId: CanonicalTileId,
     data: ByteArray,
-  ) {
+  ): ULong = command { outCommandId ->
     memScoped {
       Status.check(
         mln_map_set_custom_geometry_source_tile_data(
@@ -421,30 +461,39 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           CoreStructs.stringView(sourceId, this),
           StyleStructs.canonicalTileId(tileId),
           ByteStructs.bufferView(data, this),
+          outCommandId,
         )
       )
     }
   }
 
-  public actual fun invalidateCustomGeometrySourceTile(sourceId: String, tileId: CanonicalTileId) {
+  public actual fun invalidateCustomGeometrySourceTile(
+    sourceId: String,
+    tileId: CanonicalTileId,
+  ): ULong = command { outCommandId ->
     memScoped {
       Status.check(
         mln_map_invalidate_custom_geometry_source_tile(
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           StyleStructs.canonicalTileId(tileId),
+          outCommandId,
         )
       )
     }
   }
 
-  public actual fun invalidateCustomGeometrySourceRegion(sourceId: String, bounds: LatLngBounds) {
+  public actual fun invalidateCustomGeometrySourceRegion(
+    sourceId: String,
+    bounds: LatLngBounds,
+  ): ULong = command { outCommandId ->
     memScoped {
       Status.check(
         mln_map_invalidate_custom_geometry_source_region(
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           CoreStructs.latLngBounds(bounds),
+          outCommandId,
         )
       )
     }
@@ -452,7 +501,11 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
 
   internal fun customGeometrySourceCountForTesting(): Int = customGeometrySources.size
 
-  public actual fun addVectorSourceUrl(sourceId: String, url: String, options: TileSourceOptions?) {
+  public actual fun addVectorSourceUrl(
+    sourceId: String,
+    url: String,
+    options: TileSourceOptions?,
+  ): ULong = command { outCommandId ->
     memScoped {
       Status.check(
         mln_map_add_vector_source_url(
@@ -460,6 +513,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           CoreStructs.stringView(sourceId, this),
           CoreStructs.stringView(url, this),
           StyleStructs.tileSourceOptions(options, this),
+          outCommandId,
         )
       )
     }
@@ -469,7 +523,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     sourceId: String,
     tiles: List<String>,
     options: TileSourceOptions?,
-  ) {
+  ): ULong = command { outCommandId ->
     val tileSnapshot = tiles.toList()
     memScoped {
       Status.check(
@@ -479,12 +533,17 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           StyleStructs.stringViewArray(tileSnapshot, this),
           tileSnapshot.size.toULong(),
           StyleStructs.tileSourceOptions(options, this),
+          outCommandId,
         )
       )
     }
   }
 
-  public actual fun addRasterSourceUrl(sourceId: String, url: String, options: TileSourceOptions?) {
+  public actual fun addRasterSourceUrl(
+    sourceId: String,
+    url: String,
+    options: TileSourceOptions?,
+  ): ULong = command { outCommandId ->
     memScoped {
       Status.check(
         mln_map_add_raster_source_url(
@@ -492,6 +551,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           CoreStructs.stringView(sourceId, this),
           CoreStructs.stringView(url, this),
           StyleStructs.tileSourceOptions(options, this),
+          outCommandId,
         )
       )
     }
@@ -501,7 +561,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     sourceId: String,
     tiles: List<String>,
     options: TileSourceOptions?,
-  ) {
+  ): ULong = command { outCommandId ->
     val tileSnapshot = tiles.toList()
     memScoped {
       Status.check(
@@ -511,6 +571,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           StyleStructs.stringViewArray(tileSnapshot, this),
           tileSnapshot.size.toULong(),
           StyleStructs.tileSourceOptions(options, this),
+          outCommandId,
         )
       )
     }
@@ -520,7 +581,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     sourceId: String,
     url: String,
     options: TileSourceOptions?,
-  ) {
+  ): ULong = command { outCommandId ->
     memScoped {
       Status.check(
         mln_map_add_raster_dem_source_url(
@@ -528,6 +589,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           CoreStructs.stringView(sourceId, this),
           CoreStructs.stringView(url, this),
           StyleStructs.tileSourceOptions(options, this),
+          outCommandId,
         )
       )
     }
@@ -537,7 +599,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     sourceId: String,
     tiles: List<String>,
     options: TileSourceOptions?,
-  ) {
+  ): ULong = command { outCommandId ->
     val tileSnapshot = tiles.toList()
     memScoped {
       Status.check(
@@ -547,6 +609,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           StyleStructs.stringViewArray(tileSnapshot, this),
           tileSnapshot.size.toULong(),
           StyleStructs.tileSourceOptions(options, this),
+          outCommandId,
         )
       )
     }
@@ -556,7 +619,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     imageId: String,
     image: PremultipliedRgba8Image,
     options: StyleImageOptions,
-  ) {
+  ): ULong = command { outCommandId ->
     memScoped {
       Status.check(
         mln_map_set_style_image(
@@ -564,50 +627,65 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           CoreStructs.stringView(imageId, this),
           StyleStructs.premultipliedRgba8Image(image, this),
           StyleStructs.styleImageOptions(options, this),
+          outCommandId,
         )
       )
     }
   }
 
-  public actual fun removeStyleImage(imageId: String): Boolean = memScoped {
+  public actual suspend fun removeStyleImage(imageId: String): Boolean = memScoped {
     val outRemoved = alloc<BooleanVar>()
     Status.check(
-      mln_map_remove_style_image(
-        state.requireLive().rawHandleValue,
-        CoreStructs.stringView(imageId, this),
-        outRemoved.ptr,
+      ordered(
+        { outOperation ->
+          mln_map_remove_style_image_start(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(imageId, this),
+            outOperation,
+          )
+        },
+        { operation -> mln_map_remove_style_image_take_result(operation, outRemoved.ptr) },
       )
     )
     outRemoved.value
   }
 
-  public actual fun styleImageExists(imageId: String): Boolean = memScoped {
+  public actual suspend fun styleImageExists(imageId: String): Boolean = memScoped {
     val outExists = alloc<BooleanVar>()
     Status.check(
-      mln_map_style_image_exists(
-        state.requireLive().rawHandleValue,
-        CoreStructs.stringView(imageId, this),
-        outExists.ptr,
+      ordered(
+        { outOperation ->
+          mln_map_style_image_exists_start(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(imageId, this),
+            outOperation,
+          )
+        },
+        { operation -> mln_map_style_image_exists_take_result(operation, outExists.ptr) },
       )
     )
     outExists.value
   }
 
-  public actual fun styleImageInfo(imageId: String): StyleImageInfo? = memScoped {
+  public actual suspend fun styleImageInfo(imageId: String): StyleImageInfo? = memScoped {
     val outInfo = mln_style_image_info_default().getPointer(this)
     val outFound = alloc<BooleanVar>()
     Status.check(
-      mln_map_get_style_image_info(
-        state.requireLive().rawHandleValue,
-        CoreStructs.stringView(imageId, this),
-        outInfo,
-        outFound.ptr,
+      ordered(
+        { outOperation ->
+          mln_map_get_style_image_info_start(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(imageId, this),
+            outOperation,
+          )
+        },
+        { operation -> mln_map_get_style_image_info_take_result(operation, outInfo, outFound.ptr) },
       )
     )
     if (outFound.value) StyleStructs.styleImageInfo(outInfo.pointed) else null
   }
 
-  public actual fun styleImageStretches(
+  public actual suspend fun styleImageStretches(
     imageId: String
   ): Pair<List<ImageStretch>, List<ImageStretch>>? = memScoped {
     val handle = state.requireLive().rawHandleValue
@@ -615,16 +693,26 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     val outYCount = alloc<ULongVar>()
     val outFound = alloc<BooleanVar>()
     Status.check(
-      mln_map_copy_style_image_stretches(
-        handle,
-        CoreStructs.stringView(imageId, this),
-        null,
-        0UL,
-        outXCount.ptr,
-        null,
-        0UL,
-        outYCount.ptr,
-        outFound.ptr,
+      ordered(
+        { outOperation ->
+          mln_map_copy_style_image_stretches_start(
+            handle,
+            CoreStructs.stringView(imageId, this),
+            outOperation,
+          )
+        },
+        { operation ->
+          mln_map_copy_style_image_stretches_take_result(
+            operation,
+            null,
+            0UL,
+            outXCount.ptr,
+            null,
+            0UL,
+            outYCount.ptr,
+            outFound.ptr,
+          )
+        },
       )
     )
     if (!outFound.value) return@memScoped null
@@ -634,16 +722,26 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     val rawX = if (xCount == 0) null else allocArray<mln_image_stretch>(xCount)
     val rawY = if (yCount == 0) null else allocArray<mln_image_stretch>(yCount)
     Status.check(
-      mln_map_copy_style_image_stretches(
-        handle,
-        CoreStructs.stringView(imageId, this),
-        rawX,
-        xCount.toULong(),
-        outXCount.ptr,
-        rawY,
-        yCount.toULong(),
-        outYCount.ptr,
-        outFound.ptr,
+      ordered(
+        { outOperation ->
+          mln_map_copy_style_image_stretches_start(
+            handle,
+            CoreStructs.stringView(imageId, this),
+            outOperation,
+          )
+        },
+        { operation ->
+          mln_map_copy_style_image_stretches_take_result(
+            operation,
+            rawX,
+            xCount.toULong(),
+            outXCount.ptr,
+            rawY,
+            yCount.toULong(),
+            outYCount.ptr,
+            outFound.ptr,
+          )
+        },
       )
     )
     val toList = { array: CPointer<mln_image_stretch>?, count: Int ->
@@ -652,38 +750,48 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     toList(rawX, xCount) to toList(rawY, yCount)
   }
 
-  public actual fun copyStyleImagePremultipliedRgba8(imageId: String): StyleImage? = memScoped {
-    val info = styleImageInfo(imageId) ?: return@memScoped null
-    val outPixels =
-      allocArray<UByteVar>(checkedInt(info.byteLength.toULong(), "style image byte length"))
-    val outByteLength = alloc<ULongVar>()
-    val outFound = alloc<BooleanVar>()
-    Status.check(
-      mln_map_copy_style_image_premultiplied_rgba8(
-        state.requireLive().rawHandleValue,
-        CoreStructs.stringView(imageId, this),
-        outPixels,
-        info.byteLength.toULong(),
-        outByteLength.ptr,
-        outFound.ptr,
+  public actual suspend fun copyStyleImagePremultipliedRgba8(imageId: String): StyleImage? =
+    memScoped {
+      val info = styleImageInfo(imageId) ?: return@memScoped null
+      val outPixels = alloc<ULongVar>()
+      outPixels.value = 0uL
+      val outFound = alloc<BooleanVar>()
+      Status.check(
+        ordered(
+          { outOperation ->
+            mln_map_copy_style_image_premultiplied_rgba8_start(
+              state.requireLive().rawHandleValue,
+              CoreStructs.stringView(imageId, this),
+              outOperation,
+            )
+          },
+          { operation ->
+            mln_map_copy_style_image_premultiplied_rgba8_take_result(
+              operation,
+              outPixels.ptr,
+              outFound.ptr,
+            )
+          },
+        )
       )
-    )
-    if (!outFound.value) return@memScoped null
-    StyleImage(
-      PremultipliedRgba8Image(
-        info.width,
-        info.height,
-        info.stride,
-        outPixels
-          .reinterpret<kotlinx.cinterop.ByteVar>()
-          .readBytes(checkedInt(outByteLength.value, "style image copied byte length")),
-      ),
-      info.pixelRatio,
-      info.sdf,
-    )
-  }
+      if (!outFound.value) return@memScoped null
+      StyleImage(
+        PremultipliedRgba8Image(
+          info.width,
+          info.height,
+          info.stride,
+          ByteStructs.ownedBuffer(outPixels.value.asHandle("mln_buffer", ::ownedBufferHandle)),
+        ),
+        info.pixelRatio,
+        info.sdf,
+      )
+    }
 
-  public actual fun addImageSourceUrl(sourceId: String, coordinates: List<LatLng>, url: String) {
+  public actual fun addImageSourceUrl(
+    sourceId: String,
+    coordinates: List<LatLng>,
+    url: String,
+  ): ULong = command { outCommandId ->
     val coordinateSnapshot = coordinates.toList()
     memScoped {
       Status.check(
@@ -693,6 +801,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           CoreStructs.latLngArray(coordinateSnapshot, this),
           coordinateSnapshot.size.toULong(),
           CoreStructs.stringView(url, this),
+          outCommandId,
         )
       )
     }
@@ -702,7 +811,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     sourceId: String,
     coordinates: List<LatLng>,
     image: PremultipliedRgba8Image,
-  ) {
+  ): ULong = command { outCommandId ->
     val coordinateSnapshot = coordinates.toList()
     memScoped {
       Status.check(
@@ -712,61 +821,78 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           CoreStructs.latLngArray(coordinateSnapshot, this),
           coordinateSnapshot.size.toULong(),
           StyleStructs.premultipliedRgba8Image(image, this),
+          outCommandId,
         )
       )
     }
   }
 
-  public actual fun setImageSourceUrl(sourceId: String, url: String) {
-    memScoped {
-      Status.check(
-        mln_map_set_image_source_url(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          CoreStructs.stringView(url, this),
+  public actual fun setImageSourceUrl(sourceId: String, url: String): ULong =
+    command { outCommandId ->
+      memScoped {
+        Status.check(
+          mln_map_set_image_source_url(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(sourceId, this),
+            CoreStructs.stringView(url, this),
+            outCommandId,
+          )
         )
-      )
+      }
     }
-  }
 
-  public actual fun setImageSourceImage(sourceId: String, image: PremultipliedRgba8Image) {
-    memScoped {
-      Status.check(
-        mln_map_set_image_source_image(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          StyleStructs.premultipliedRgba8Image(image, this),
+  public actual fun setImageSourceImage(sourceId: String, image: PremultipliedRgba8Image): ULong =
+    command { outCommandId ->
+      memScoped {
+        Status.check(
+          mln_map_set_image_source_image(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(sourceId, this),
+            StyleStructs.premultipliedRgba8Image(image, this),
+            outCommandId,
+          )
         )
-      )
+      }
     }
-  }
 
-  public actual fun setImageSourceCoordinates(sourceId: String, coordinates: List<LatLng>) {
-    val coordinateSnapshot = coordinates.toList()
-    memScoped {
-      Status.check(
-        mln_map_set_image_source_coordinates(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          CoreStructs.latLngArray(coordinateSnapshot, this),
-          coordinateSnapshot.size.toULong(),
+  public actual fun setImageSourceCoordinates(sourceId: String, coordinates: List<LatLng>): ULong =
+    command { outCommandId ->
+      val coordinateSnapshot = coordinates.toList()
+      memScoped {
+        Status.check(
+          mln_map_set_image_source_coordinates(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(sourceId, this),
+            CoreStructs.latLngArray(coordinateSnapshot, this),
+            coordinateSnapshot.size.toULong(),
+            outCommandId,
+          )
         )
-      )
+      }
     }
-  }
 
-  public actual fun imageSourceCoordinates(sourceId: String): List<LatLng>? = memScoped {
+  public actual suspend fun imageSourceCoordinates(sourceId: String): List<LatLng>? = memScoped {
     val outCoordinates = allocArray<mln_lat_lng>(4)
     val outCoordinateCount = alloc<ULongVar>()
     val outFound = alloc<BooleanVar>()
     Status.check(
-      mln_map_get_image_source_coordinates(
-        state.requireLive().rawHandleValue,
-        CoreStructs.stringView(sourceId, this),
-        outCoordinates,
-        4UL,
-        outCoordinateCount.ptr,
-        outFound.ptr,
+      ordered(
+        { outOperation ->
+          mln_map_get_image_source_coordinates_start(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(sourceId, this),
+            outOperation,
+          )
+        },
+        { operation ->
+          mln_map_get_image_source_coordinates_take_result(
+            operation,
+            outCoordinates,
+            4UL,
+            outCoordinateCount.ptr,
+            outFound.ptr,
+          )
+        },
       )
     )
     if (outFound.value)
@@ -777,58 +903,68 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     else null
   }
 
-  private fun copyStyleSourceAttribution(sourceId: String, info: mln_style_source_info): String? {
+  private suspend fun copyStyleSourceAttribution(
+    sourceId: String,
+    info: mln_style_source_info,
+  ): String? {
     if (!info.has_attribution) return null
-    if (info.attribution_size == 0UL) return ""
     return memScoped {
-      val outAttribution =
-        allocArray<ByteVar>(checkedInt(info.attribution_size, "style source attribution size"))
-      val outAttributionSize = alloc<ULongVar>()
+      val outAttribution = alloc<ULongVar>()
+      outAttribution.value = 0uL
       val outFound = alloc<BooleanVar>()
       Status.check(
-        mln_map_copy_style_source_attribution(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          outAttribution,
-          info.attribution_size,
-          outAttributionSize.ptr,
-          outFound.ptr,
+        ordered(
+          { outOperation ->
+            mln_map_copy_style_source_attribution_start(
+              state.requireLive().rawHandleValue,
+              CoreStructs.stringView(sourceId, this),
+              outOperation,
+            )
+          },
+          { operation ->
+            mln_map_copy_style_source_attribution_take_result(
+              operation,
+              outAttribution.ptr,
+              outFound.ptr,
+            )
+          },
         )
       )
       if (outFound.value)
-        outAttribution
-          .readBytes(checkedInt(outAttributionSize.value, "style source copied attribution size"))
+        ByteStructs.ownedBuffer(outAttribution.value.asHandle("mln_buffer", ::ownedBufferHandle))
           .decodeToString()
       else null
     }
   }
 
-  private fun copyStyleSourceUrl(sourceId: String, info: mln_style_source_info): String? {
+  private suspend fun copyStyleSourceUrl(sourceId: String, info: mln_style_source_info): String? {
     if (info.fields and MLN_STYLE_SOURCE_INFO_URL == 0u) return null
-    if (info.url_size == 0UL) return ""
     return memScoped {
-      val outUrl = allocArray<ByteVar>(checkedInt(info.url_size, "style source URL size"))
-      val outUrlSize = alloc<ULongVar>()
+      val outUrl = alloc<ULongVar>()
+      outUrl.value = 0uL
       val outFound = alloc<BooleanVar>()
       Status.check(
-        mln_map_copy_style_source_url(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          outUrl,
-          info.url_size,
-          outUrlSize.ptr,
-          outFound.ptr,
+        ordered(
+          { outOperation ->
+            mln_map_copy_style_source_url_start(
+              state.requireLive().rawHandleValue,
+              CoreStructs.stringView(sourceId, this),
+              outOperation,
+            )
+          },
+          { operation ->
+            mln_map_copy_style_source_url_take_result(operation, outUrl.ptr, outFound.ptr)
+          },
         )
       )
       if (outFound.value)
-        outUrl
-          .readBytes(checkedInt(outUrlSize.value, "style source copied URL size"))
+        ByteStructs.ownedBuffer(outUrl.value.asHandle("mln_buffer", ::ownedBufferHandle))
           .decodeToString()
       else null
     }
   }
 
-  private fun copyStyleSourceTileUrls(
+  private suspend fun copyStyleSourceTileUrls(
     sourceId: String,
     info: mln_style_source_info,
   ): List<String>? {
@@ -838,11 +974,17 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
       outList.value = 0uL
       val outFound = alloc<BooleanVar>()
       Status.check(
-        mln_map_get_style_source_tile_urls(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          outList.ptr,
-          outFound.ptr,
+        ordered(
+          { outOperation ->
+            mln_map_get_style_source_tile_urls_start(
+              state.requireLive().rawHandleValue,
+              CoreStructs.stringView(sourceId, this),
+              outOperation,
+            )
+          },
+          { operation ->
+            mln_map_get_style_source_tile_urls_take_result(operation, outList.ptr, outFound.ptr)
+          },
         )
       )
       check(outFound.value) { "style source disappeared while its metadata was copied" }
@@ -852,19 +994,25 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     }
   }
 
-  public actual fun addStyleLayerJson(layerJson: ByteArray, beforeLayerId: String) {
-    memScoped {
-      Status.check(
-        mln_map_add_style_layer_json(
-          state.requireLive().rawHandleValue,
-          ByteStructs.bufferView(layerJson, this),
-          CoreStructs.stringView(beforeLayerId, this),
+  public actual fun addStyleLayerJson(layerJson: ByteArray, beforeLayerId: String): ULong =
+    command { outCommandId ->
+      memScoped {
+        Status.check(
+          mln_map_add_style_layer_json(
+            state.requireLive().rawHandleValue,
+            ByteStructs.bufferView(layerJson, this),
+            CoreStructs.stringView(beforeLayerId, this),
+            outCommandId,
+          )
         )
-      )
+      }
     }
-  }
 
-  public actual fun addHillshadeLayer(layerId: String, sourceId: String, beforeLayerId: String) {
+  public actual fun addHillshadeLayer(
+    layerId: String,
+    sourceId: String,
+    beforeLayerId: String,
+  ): ULong = command { outCommandId ->
     memScoped {
       Status.check(
         mln_map_add_hillshade_layer(
@@ -872,12 +1020,17 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           CoreStructs.stringView(layerId, this),
           CoreStructs.stringView(sourceId, this),
           CoreStructs.stringView(beforeLayerId, this),
+          outCommandId,
         )
       )
     }
   }
 
-  public actual fun addColorReliefLayer(layerId: String, sourceId: String, beforeLayerId: String) {
+  public actual fun addColorReliefLayer(
+    layerId: String,
+    sourceId: String,
+    beforeLayerId: String,
+  ): ULong = command { outCommandId ->
     memScoped {
       Status.check(
         mln_map_add_color_relief_layer(
@@ -885,28 +1038,31 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           CoreStructs.stringView(layerId, this),
           CoreStructs.stringView(sourceId, this),
           CoreStructs.stringView(beforeLayerId, this),
+          outCommandId,
         )
       )
     }
   }
 
-  public actual fun addLocationIndicatorLayer(layerId: String, beforeLayerId: String) {
-    memScoped {
-      Status.check(
-        mln_map_add_location_indicator_layer(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(layerId, this),
-          CoreStructs.stringView(beforeLayerId, this),
+  public actual fun addLocationIndicatorLayer(layerId: String, beforeLayerId: String): ULong =
+    command { outCommandId ->
+      memScoped {
+        Status.check(
+          mln_map_add_location_indicator_layer(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(layerId, this),
+            CoreStructs.stringView(beforeLayerId, this),
+            outCommandId,
+          )
         )
-      )
+      }
     }
-  }
 
   public actual fun setLocationIndicatorLocation(
     layerId: String,
     coordinate: LatLng,
     altitude: Double,
-  ) {
+  ): ULong = command { outCommandId ->
     memScoped {
       Status.check(
         mln_map_set_location_indicator_location(
@@ -914,40 +1070,45 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           CoreStructs.stringView(layerId, this),
           CoreStructs.latLng(coordinate),
           altitude,
+          outCommandId,
         )
       )
     }
   }
 
-  public actual fun setLocationIndicatorBearing(layerId: String, bearing: Double) {
-    memScoped {
-      Status.check(
-        mln_map_set_location_indicator_bearing(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(layerId, this),
-          bearing,
+  public actual fun setLocationIndicatorBearing(layerId: String, bearing: Double): ULong =
+    command { outCommandId ->
+      memScoped {
+        Status.check(
+          mln_map_set_location_indicator_bearing(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(layerId, this),
+            bearing,
+            outCommandId,
+          )
         )
-      )
+      }
     }
-  }
 
-  public actual fun setLocationIndicatorAccuracyRadius(layerId: String, radius: Double) {
-    memScoped {
-      Status.check(
-        mln_map_set_location_indicator_accuracy_radius(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(layerId, this),
-          radius,
+  public actual fun setLocationIndicatorAccuracyRadius(layerId: String, radius: Double): ULong =
+    command { outCommandId ->
+      memScoped {
+        Status.check(
+          mln_map_set_location_indicator_accuracy_radius(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(layerId, this),
+            radius,
+            outCommandId,
+          )
         )
-      )
+      }
     }
-  }
 
   public actual fun setLocationIndicatorImageName(
     layerId: String,
     imageKind: LocationIndicatorImageKind,
     imageId: String,
-  ) {
+  ): ULong = command { outCommandId ->
     memScoped {
       Status.check(
         mln_map_set_location_indicator_image_name(
@@ -955,78 +1116,114 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           CoreStructs.stringView(layerId, this),
           imageKind.nativeValue.toUInt(),
           CoreStructs.stringView(imageId, this),
+          outCommandId,
         )
       )
     }
   }
 
-  public actual fun removeStyleLayer(layerId: String): Boolean = memScoped {
+  public actual suspend fun removeStyleLayer(layerId: String): Boolean = memScoped {
     val outRemoved = alloc<BooleanVar>()
     Status.check(
-      mln_map_remove_style_layer(
-        state.requireLive().rawHandleValue,
-        CoreStructs.stringView(layerId, this),
-        outRemoved.ptr,
+      ordered(
+        { outOperation ->
+          mln_map_remove_style_layer_start(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(layerId, this),
+            outOperation,
+          )
+        },
+        { operation -> mln_map_remove_style_layer_take_result(operation, outRemoved.ptr) },
       )
     )
     outRemoved.value
   }
 
-  public actual fun styleLayerExists(layerId: String): Boolean = memScoped {
+  public actual suspend fun styleLayerExists(layerId: String): Boolean = memScoped {
     val outExists = alloc<BooleanVar>()
     Status.check(
-      mln_map_style_layer_exists(
-        state.requireLive().rawHandleValue,
-        CoreStructs.stringView(layerId, this),
-        outExists.ptr,
+      ordered(
+        { outOperation ->
+          mln_map_style_layer_exists_start(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(layerId, this),
+            outOperation,
+          )
+        },
+        { operation -> mln_map_style_layer_exists_take_result(operation, outExists.ptr) },
       )
     )
     outExists.value
   }
 
-  public actual fun styleLayerType(layerId: String): String? = memScoped {
-    val outType = alloc<org.maplibre.nativeffi.internal.c.mln_buffer_view>()
+  public actual suspend fun styleLayerType(layerId: String): String? = memScoped {
+    val outType = alloc<ULongVar>()
+    outType.value = 0uL
     val outFound = alloc<BooleanVar>()
     Status.check(
-      mln_map_get_style_layer_type(
-        state.requireLive().rawHandleValue,
-        CoreStructs.stringView(layerId, this),
-        outType.ptr,
-        outFound.ptr,
+      ordered(
+        { outOperation ->
+          mln_map_get_style_layer_type_start(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(layerId, this),
+            outOperation,
+          )
+        },
+        { operation ->
+          mln_map_get_style_layer_type_take_result(operation, outType.ptr, outFound.ptr)
+        },
       )
     )
-    if (outFound.value) CoreStructs.stringView(outType) else null
+    if (outFound.value)
+      ByteStructs.ownedBuffer(outType.value.asHandle("mln_buffer", ::ownedBufferHandle))
+        .decodeToString()
+    else null
   }
 
-  public actual fun styleLayerIds(): List<String> = memScoped {
+  public actual suspend fun styleLayerIds(): List<String> = memScoped {
     val outList = alloc<ULongVar>()
     outList.value = 0uL
-    Status.check(mln_map_list_style_layer_ids(state.requireLive().rawHandleValue, outList.ptr))
+    Status.check(
+      ordered(
+        { outOperation ->
+          mln_map_list_style_layer_ids_start(state.requireLive().rawHandleValue, outOperation)
+        },
+        { operation -> mln_map_list_style_layer_ids_take_result(operation, outList.ptr) },
+      )
+    )
     StyleStructs.styleIdList(outList.value.asHandle("mln_map_list_style_ids", ::styleIdListHandle))
   }
 
-  public actual fun moveStyleLayer(layerId: String, beforeLayerId: String) {
-    memScoped {
-      Status.check(
-        mln_map_move_style_layer(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(layerId, this),
-          CoreStructs.stringView(beforeLayerId, this),
+  public actual fun moveStyleLayer(layerId: String, beforeLayerId: String): ULong =
+    command { outCommandId ->
+      memScoped {
+        Status.check(
+          mln_map_move_style_layer(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(layerId, this),
+            CoreStructs.stringView(beforeLayerId, this),
+            outCommandId,
+          )
         )
-      )
+      }
     }
-  }
 
-  public actual fun styleLayerJson(layerId: String): ByteArray? = memScoped {
+  public actual suspend fun styleLayerJson(layerId: String): ByteArray? = memScoped {
     val outLayer = alloc<ULongVar>()
     val outFound = alloc<BooleanVar>()
     outLayer.value = 0uL
     Status.check(
-      mln_map_get_style_layer_json(
-        state.requireLive().rawHandleValue,
-        CoreStructs.stringView(layerId, this),
-        outLayer.ptr,
-        outFound.ptr,
+      ordered(
+        { outOperation ->
+          mln_map_get_style_layer_json_start(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(layerId, this),
+            outOperation,
+          )
+        },
+        { operation ->
+          mln_map_get_style_layer_json_take_result(operation, outLayer.ptr, outFound.ptr)
+        },
       )
     )
     if (outFound.value)
@@ -1034,63 +1231,85 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     else null
   }
 
-  public actual fun setStyleLightJson(lightJson: ByteArray) {
+  public actual fun setStyleLightJson(lightJson: ByteArray): ULong = command { outCommandId ->
     memScoped {
       Status.check(
         mln_map_set_style_light_json(
           state.requireLive().rawHandleValue,
           ByteStructs.bufferView(lightJson, this),
+          outCommandId,
         )
       )
     }
   }
 
-  public actual fun setStyleLightProperty(propertyName: String, value: ByteArray) {
-    memScoped {
-      Status.check(
-        mln_map_set_style_light_property(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(propertyName, this),
-          ByteStructs.bufferView(value, this),
+  public actual fun setStyleLightProperty(propertyName: String, value: ByteArray): ULong =
+    command { outCommandId ->
+      memScoped {
+        Status.check(
+          mln_map_set_style_light_property(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(propertyName, this),
+            ByteStructs.bufferView(value, this),
+            outCommandId,
+          )
         )
-      )
+      }
     }
-  }
 
-  public actual fun styleLightProperty(propertyName: String): ByteArray? = memScoped {
+  public actual suspend fun styleLightProperty(propertyName: String): ByteArray? = memScoped {
     val outValue = alloc<ULongVar>()
     outValue.value = 0uL
     Status.check(
-      mln_map_get_style_light_property(
-        state.requireLive().rawHandleValue,
-        CoreStructs.stringView(propertyName, this),
-        outValue.ptr,
+      ordered(
+        { outOperation ->
+          mln_map_get_style_light_property_start(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(propertyName, this),
+            outOperation,
+          )
+        },
+        { operation -> mln_map_get_style_light_property_take_result(operation, outValue.ptr) },
       )
     )
     if (outValue.value == 0uL) null
     else ByteStructs.ownedBuffer(outValue.value.asHandle("mln_buffer", ::ownedBufferHandle))
   }
 
-  public actual fun setStyleTransitionOptions(options: StyleTransitionOptions) {
-    memScoped {
-      Status.check(
-        mln_map_set_style_transition_options(
-          state.requireLive().rawHandleValue,
-          StyleStructs.styleTransitionOptions(options, this),
+  public actual fun setStyleTransitionOptions(options: StyleTransitionOptions): ULong =
+    command { outCommandId ->
+      memScoped {
+        Status.check(
+          mln_map_set_style_transition_options(
+            state.requireLive().rawHandleValue,
+            StyleStructs.styleTransitionOptions(options, this),
+            outCommandId,
+          )
         )
-      )
+      }
     }
-  }
 
-  public actual fun styleTransitionOptions(): StyleTransitionOptions = memScoped {
+  public actual suspend fun styleTransitionOptions(): StyleTransitionOptions = memScoped {
     val outOptions = mln_style_transition_options_default().getPointer(this)
     Status.check(
-      mln_map_get_style_transition_options(state.requireLive().rawHandleValue, outOptions)
+      ordered(
+        { outOperation ->
+          mln_map_get_style_transition_options_start(
+            state.requireLive().rawHandleValue,
+            outOperation,
+          )
+        },
+        { operation -> mln_map_get_style_transition_options_take_result(operation, outOptions) },
+      )
     )
     StyleStructs.styleTransitionOptions(outOptions.pointed)
   }
 
-  public actual fun setLayerProperty(layerId: String, propertyName: String, value: ByteArray) {
+  public actual fun setLayerProperty(
+    layerId: String,
+    propertyName: String,
+    value: ByteArray,
+  ): ULong = command { outCommandId ->
     memScoped {
       Status.check(
         mln_map_set_layer_property(
@@ -1098,97 +1317,122 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           CoreStructs.stringView(layerId, this),
           CoreStructs.stringView(propertyName, this),
           ByteStructs.bufferView(value, this),
+          outCommandId,
         )
       )
     }
   }
 
-  public actual fun layerProperty(layerId: String, propertyName: String): ByteArray? = memScoped {
-    val outValue = alloc<ULongVar>()
-    outValue.value = 0uL
-    Status.check(
-      mln_map_get_layer_property(
-        state.requireLive().rawHandleValue,
-        CoreStructs.stringView(layerId, this),
-        CoreStructs.stringView(propertyName, this),
-        outValue.ptr,
-      )
-    )
-    if (outValue.value == 0uL) null
-    else ByteStructs.ownedBuffer(outValue.value.asHandle("mln_buffer", ::ownedBufferHandle))
-  }
-
-  public actual fun setLayerFilter(layerId: String, filter: ByteArray) {
+  public actual suspend fun layerProperty(layerId: String, propertyName: String): ByteArray? =
     memScoped {
+      val outValue = alloc<ULongVar>()
+      outValue.value = 0uL
       Status.check(
-        mln_map_set_layer_filter(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(layerId, this),
-          ByteStructs.bufferViewPointer(filter, this),
+        ordered(
+          { outOperation ->
+            mln_map_get_layer_property_start(
+              state.requireLive().rawHandleValue,
+              CoreStructs.stringView(layerId, this),
+              CoreStructs.stringView(propertyName, this),
+              outOperation,
+            )
+          },
+          { operation -> mln_map_get_layer_property_take_result(operation, outValue.ptr) },
         )
       )
+      if (outValue.value == 0uL) null
+      else ByteStructs.ownedBuffer(outValue.value.asHandle("mln_buffer", ::ownedBufferHandle))
     }
-  }
 
-  public actual fun clearLayerFilter(layerId: String) {
+  public actual fun setLayerFilter(layerId: String, filter: ByteArray): ULong =
+    command { outCommandId ->
+      memScoped {
+        Status.check(
+          mln_map_set_layer_filter(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(layerId, this),
+            ByteStructs.bufferViewPointer(filter, this),
+            outCommandId,
+          )
+        )
+      }
+    }
+
+  public actual fun clearLayerFilter(layerId: String): ULong = command { outCommandId ->
     memScoped {
       Status.check(
         mln_map_set_layer_filter(
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(layerId, this),
           null,
+          outCommandId,
         )
       )
     }
   }
 
-  public actual fun layerFilter(layerId: String): ByteArray? = memScoped {
+  public actual suspend fun layerFilter(layerId: String): ByteArray? = memScoped {
     val outFilter = alloc<ULongVar>()
     outFilter.value = 0uL
     Status.check(
-      mln_map_get_layer_filter(
-        state.requireLive().rawHandleValue,
-        CoreStructs.stringView(layerId, this),
-        outFilter.ptr,
+      ordered(
+        { outOperation ->
+          mln_map_get_layer_filter_start(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(layerId, this),
+            outOperation,
+          )
+        },
+        { operation -> mln_map_get_layer_filter_take_result(operation, outFilter.ptr) },
       )
     )
     if (outFilter.value == 0uL) null
     else ByteStructs.ownedBuffer(outFilter.value.asHandle("mln_buffer", ::ownedBufferHandle))
   }
 
-  public actual fun setLayerSourceLayer(layerId: String, sourceLayer: String) {
-    memScoped {
-      Status.check(
-        mln_map_set_layer_source_layer(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(layerId, this),
-          CoreStructs.stringView(sourceLayer, this),
+  public actual fun setLayerSourceLayer(layerId: String, sourceLayer: String): ULong =
+    command { outCommandId ->
+      memScoped {
+        Status.check(
+          mln_map_set_layer_source_layer(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(layerId, this),
+            CoreStructs.stringView(sourceLayer, this),
+            outCommandId,
+          )
         )
+      }
+    }
+
+  public actual suspend fun layerSourceLayer(layerId: String): String =
+    takeLayerBuffer(
+        layerId,
+        ::mln_map_copy_layer_source_layer_start,
+        ::mln_map_copy_layer_source_layer_take_result,
       )
-    }
-  }
+      .decodeToString()
 
-  public actual fun layerSourceLayer(layerId: String): String =
-    copyLayerText(layerId) { handle, layerView, text, capacity, outSize ->
-      mln_map_copy_layer_source_layer(handle, layerView, text, capacity, outSize)
-    }
-
-  public actual fun setLayerSourceId(layerId: String, sourceId: String) {
-    memScoped {
-      Status.check(
-        mln_map_set_layer_source_id(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(layerId, this),
-          CoreStructs.stringView(sourceId, this),
+  public actual fun setLayerSourceId(layerId: String, sourceId: String): ULong =
+    command { outCommandId ->
+      memScoped {
+        Status.check(
+          mln_map_set_layer_source_id(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(layerId, this),
+            CoreStructs.stringView(sourceId, this),
+            outCommandId,
+          )
         )
-      )
+      }
     }
-  }
 
-  public actual fun layerSourceId(layerId: String): String =
-    copyLayerText(layerId) { handle, layerView, text, capacity, outSize ->
-      mln_map_copy_layer_source_id(handle, layerView, text, capacity, outSize)
-    }
+  public actual suspend fun layerSourceId(layerId: String): String =
+    takeLayerBuffer(
+        layerId,
+        ::mln_map_copy_layer_source_id_start,
+        ::mln_map_copy_layer_source_id_take_result,
+      )
+      .decodeToString()
 
   /**
    * Probes the required length, then copies. A null buffer with zero capacity is a size probe the C
@@ -1242,494 +1486,211 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     buffer.readBytes(checkedInt(outCopied.value, "layer copied text size")).decodeToString()
   }
 
-  public actual fun setLayerMinZoom(layerId: String, minZoom: Double) {
-    memScoped {
-      Status.check(
-        mln_map_set_layer_min_zoom(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(layerId, this),
-          minZoom,
+  public actual fun setLayerMinZoom(layerId: String, minZoom: Double): ULong =
+    command { outCommandId ->
+      memScoped {
+        Status.check(
+          mln_map_set_layer_min_zoom(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(layerId, this),
+            minZoom,
+            outCommandId,
+          )
         )
-      )
+      }
     }
-  }
 
-  public actual fun layerMinZoom(layerId: String): Double = memScoped {
+  public actual suspend fun layerMinZoom(layerId: String): Double = memScoped {
     val outZoom = alloc<DoubleVar>()
     Status.check(
-      mln_map_get_layer_min_zoom(
-        state.requireLive().rawHandleValue,
-        CoreStructs.stringView(layerId, this),
-        outZoom.ptr,
+      ordered(
+        { outOperation ->
+          mln_map_get_layer_min_zoom_start(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(layerId, this),
+            outOperation,
+          )
+        },
+        { operation -> mln_map_get_layer_min_zoom_take_result(operation, outZoom.ptr) },
       )
     )
     outZoom.value
   }
 
-  public actual fun setLayerMaxZoom(layerId: String, maxZoom: Double) {
-    memScoped {
-      Status.check(
-        mln_map_set_layer_max_zoom(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(layerId, this),
-          maxZoom,
+  public actual fun setLayerMaxZoom(layerId: String, maxZoom: Double): ULong =
+    command { outCommandId ->
+      memScoped {
+        Status.check(
+          mln_map_set_layer_max_zoom(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(layerId, this),
+            maxZoom,
+            outCommandId,
+          )
         )
-      )
+      }
     }
-  }
 
-  public actual fun layerMaxZoom(layerId: String): Double = memScoped {
+  public actual suspend fun layerMaxZoom(layerId: String): Double = memScoped {
     val outZoom = alloc<DoubleVar>()
     Status.check(
-      mln_map_get_layer_max_zoom(
-        state.requireLive().rawHandleValue,
-        CoreStructs.stringView(layerId, this),
-        outZoom.ptr,
+      ordered(
+        { outOperation ->
+          mln_map_get_layer_max_zoom_start(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(layerId, this),
+            outOperation,
+          )
+        },
+        { operation -> mln_map_get_layer_max_zoom_take_result(operation, outZoom.ptr) },
       )
     )
     outZoom.value
   }
 
-  public actual fun setLayerVisibility(layerId: String, visibility: StyleLayerVisibility) {
-    memScoped {
-      Status.check(
-        mln_map_set_layer_visibility(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(layerId, this),
-          visibility.nativeValue.toUInt(),
+  public actual fun setLayerVisibility(layerId: String, visibility: StyleLayerVisibility): ULong =
+    command { outCommandId ->
+      memScoped {
+        Status.check(
+          mln_map_set_layer_visibility(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(layerId, this),
+            visibility.nativeValue.toUInt(),
+            outCommandId,
+          )
         )
-      )
+      }
     }
-  }
 
-  public actual fun layerVisibility(layerId: String): StyleLayerVisibility = memScoped {
+  public actual suspend fun layerVisibility(layerId: String): StyleLayerVisibility = memScoped {
     val outVisibility = alloc<UIntVar>()
     Status.check(
-      mln_map_get_layer_visibility(
-        state.requireLive().rawHandleValue,
-        CoreStructs.stringView(layerId, this),
-        outVisibility.ptr,
+      ordered(
+        { outOperation ->
+          mln_map_get_layer_visibility_start(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(layerId, this),
+            outOperation,
+          )
+        },
+        { operation -> mln_map_get_layer_visibility_take_result(operation, outVisibility.ptr) },
       )
     )
     StyleLayerVisibility.fromNative(outVisibility.value)
   }
 
-  public actual fun requestRepaint() {
-    Status.check(mln_map_request_repaint(state.requireLive().rawHandleValue))
+  public actual fun requestRepaint(): Long = memScoped {
+    val outCommand = alloc<ULongVar>()
+    Status.check(mln_map_request_repaint(state.requireLive().rawHandleValue, outCommand.ptr))
+    outCommand.value.toLong()
   }
 
-  public actual fun requestStillImage() {
-    Status.check(mln_map_request_still_image(state.requireLive().rawHandleValue))
-  }
-
-  public actual var debugOptions: Set<DebugOption>
-    get() = memScoped {
-      val outOptions = alloc<UIntVar>()
-      Status.check(mln_map_get_debug_options(state.requireLive().rawHandleValue, outOptions.ptr))
-      DebugOption.entries.filterTo(mutableSetOf()) {
-        (outOptions.value.toInt() and it.nativeMask) != 0
-      }
+  public actual suspend fun requestStillImage() {
+    val operation = startOperation { outOperation ->
+      mln_map_request_still_image_start(state.requireLive().rawHandleValue, outOperation)
     }
-    set(options) {
-      val mask = options.fold(0) { acc, option -> acc or option.nativeMask }
-      Status.check(mln_map_set_debug_options(state.requireLive().rawHandleValue, mask.toUInt()))
-    }
-
-  public actual var isRenderingStatsViewEnabled: Boolean
-    get() = memScoped {
-      val outEnabled = alloc<BooleanVar>()
-      Status.check(
-        mln_map_get_rendering_stats_view_enabled(state.requireLive().rawHandleValue, outEnabled.ptr)
-      )
-      outEnabled.value
-    }
-    set(enabled) {
-      Status.check(
-        mln_map_set_rendering_stats_view_enabled(state.requireLive().rawHandleValue, enabled)
-      )
-    }
-
-  public actual val isFullyLoaded: Boolean
-    get() = memScoped {
-      val outLoaded = alloc<BooleanVar>()
-      Status.check(mln_map_is_fully_loaded(state.requireLive().rawHandleValue, outLoaded.ptr))
-      outLoaded.value
-    }
-
-  public actual fun dumpDebugLogs() {
-    Status.check(mln_map_dump_debug_logs(state.requireLive().rawHandleValue))
-  }
-
-  public actual val size: MapSize
-    get() = memScoped {
-      val outWidth = alloc<UIntVar>()
-      val outHeight = alloc<UIntVar>()
-      val outScaleFactor = alloc<DoubleVar>()
-      Status.check(
-        mln_map_get_size(
-          state.requireLive().rawHandleValue,
-          outWidth.ptr,
-          outHeight.ptr,
-          outScaleFactor.ptr,
-        )
-      )
-      MapSize(outWidth.value.toInt(), outHeight.value.toInt(), outScaleFactor.value)
-    }
-
-  public actual var viewportOptions: ViewportOptions
-    get() = memScoped {
-      val outOptions = mln_map_viewport_options_default().getPointer(this)
-      Status.check(mln_map_get_viewport_options(state.requireLive().rawHandleValue, outOptions))
-      MapStructs.viewportOptions(outOptions.pointed)
-    }
-    set(options) {
-      memScoped {
-        Status.check(
-          mln_map_set_viewport_options(
-            state.requireLive().rawHandleValue,
-            MapStructs.viewportOptions(options, this),
-          )
-        )
-      }
-    }
-
-  public actual var tileOptions: TileOptions
-    get() = memScoped {
-      val outOptions = mln_map_tile_options_default().getPointer(this)
-      Status.check(mln_map_get_tile_options(state.requireLive().rawHandleValue, outOptions))
-      MapStructs.tileOptions(outOptions.pointed)
-    }
-    set(options) {
-      memScoped {
-        Status.check(
-          mln_map_set_tile_options(
-            state.requireLive().rawHandleValue,
-            MapStructs.tileOptions(options, this),
-          )
-        )
-      }
-    }
-
-  public actual val camera: CameraOptions
-    get() = memScoped {
-      val outCamera = mln_camera_options_default().getPointer(this)
-      Status.check(mln_map_get_camera(state.requireLive().rawHandleValue, outCamera))
-      MapStructs.cameraOptions(outCamera.pointed)
-    }
-
-  public actual fun jumpTo(camera: CameraOptions) {
-    memScoped {
-      Status.check(
-        mln_map_jump_to(state.requireLive().rawHandleValue, MapStructs.cameraOptions(camera, this))
-      )
+    try {
+      runtime.awaitOperation(operation)
+    } finally {
+      mln_operation_release(operation)
     }
   }
 
-  public actual fun easeTo(camera: CameraOptions, animation: AnimationOptions?) {
-    memScoped {
-      Status.check(
-        mln_map_ease_to(
-          state.requireLive().rawHandleValue,
-          MapStructs.cameraOptions(camera, this),
-          animation?.let { MapStructs.animationOptions(it, this) },
-        )
-      )
-    }
-  }
-
-  public actual fun flyTo(camera: CameraOptions, animation: AnimationOptions?) {
-    memScoped {
-      Status.check(
-        mln_map_fly_to(
-          state.requireLive().rawHandleValue,
-          MapStructs.cameraOptions(camera, this),
-          animation?.let { MapStructs.animationOptions(it, this) },
-        )
-      )
-    }
-  }
-
-  public actual fun moveBy(deltaX: Double, deltaY: Double) {
-    Status.check(mln_map_move_by(state.requireLive().rawHandleValue, deltaX, deltaY))
-  }
-
-  public actual fun moveByAnimated(deltaX: Double, deltaY: Double, animation: AnimationOptions?) {
-    memScoped {
-      Status.check(
-        mln_map_move_by_animated(
-          state.requireLive().rawHandleValue,
-          deltaX,
-          deltaY,
-          animation?.let { MapStructs.animationOptions(it, this) },
-        )
-      )
-    }
-  }
-
-  public actual fun scaleBy(scale: Double, anchor: ScreenPoint?) {
-    Status.check(
-      mln_map_scale_by(
-        state.requireLive().rawHandleValue,
-        scale,
-        anchor?.let { CoreStructs.screenPoint(it) },
-      )
+  public actual fun snapshot(): MapSnapshot = memScoped {
+    val value = alloc<mln_map_snapshot>()
+    value.size = sizeOf<mln_map_snapshot>().toUInt()
+    Status.check(mln_map_snapshot_get(state.requireLive().rawHandleValue, value.ptr))
+    val extent = value.logical_extent
+    MapSnapshot(
+      value.generation.toLong(),
+      MapStructs.cameraOptions(value.camera),
+      MapSize(extent.width.toInt(), extent.height.toInt(), extent.scale_factor),
+      MapStructs.projectionModeOptions(value.projection_mode),
+      MapStructs.viewportOptions(value.viewport),
+      value.loading,
+      value.fully_rendered,
+      value.repaint_demand,
+      value.latest_render_update_generation.toLong(),
     )
   }
 
-  public actual fun scaleByAnimated(
-    scale: Double,
-    anchor: ScreenPoint?,
-    animation: AnimationOptions?,
-  ) {
-    memScoped {
-      Status.check(
-        mln_map_scale_by_animated(
-          state.requireLive().rawHandleValue,
-          scale,
-          anchor?.let { CoreStructs.screenPoint(it) },
-          animation?.let { MapStructs.animationOptions(it, this) },
-        )
-      )
-    }
-  }
-
-  public actual fun rotateBy(first: ScreenPoint, second: ScreenPoint) {
+  public actual fun resize(size: MapSize): Long = memScoped {
+    val extent = alloc<mln_logical_extent>()
+    extent.width = size.width.toUInt()
+    extent.height = size.height.toUInt()
+    extent.scale_factor = size.scaleFactor
+    val outCommand = alloc<ULongVar>()
     Status.check(
-      mln_map_rotate_by(
-        state.requireLive().rawHandleValue,
-        CoreStructs.screenPoint(first),
-        CoreStructs.screenPoint(second),
-      )
+      mln_map_resize(state.requireLive().rawHandleValue, extent.readValue(), outCommand.ptr)
     )
+    outCommand.value.toLong()
   }
 
-  public actual fun rotateByAnimated(
-    first: ScreenPoint,
-    second: ScreenPoint,
-    animation: AnimationOptions?,
-  ) {
-    memScoped {
-      Status.check(
-        mln_map_rotate_by_animated(
-          state.requireLive().rawHandleValue,
-          CoreStructs.screenPoint(first),
-          CoreStructs.screenPoint(second),
-          animation?.let { MapStructs.animationOptions(it, this) },
-        )
-      )
-    }
-  }
-
-  public actual fun pitchBy(pitch: Double) {
-    Status.check(mln_map_pitch_by(state.requireLive().rawHandleValue, pitch))
-  }
-
-  public actual fun pitchByAnimated(pitch: Double, animation: AnimationOptions?) {
-    memScoped {
-      Status.check(
-        mln_map_pitch_by_animated(
-          state.requireLive().rawHandleValue,
-          pitch,
-          animation?.let { MapStructs.animationOptions(it, this) },
-        )
-      )
-    }
-  }
-
-  public actual fun cancelTransitions() {
-    Status.check(mln_map_cancel_transitions(state.requireLive().rawHandleValue))
-  }
-
-  public actual var isGestureInProgress: Boolean
-    get() = memScoped {
-      val outInProgress = alloc<BooleanVar>()
-      Status.check(
-        mln_map_is_gesture_in_progress(state.requireLive().rawHandleValue, outInProgress.ptr)
-      )
-      outInProgress.value
-    }
-    set(inProgress) {
-      Status.check(mln_map_set_gesture_in_progress(state.requireLive().rawHandleValue, inProgress))
-    }
-
-  public actual fun cameraForLatLngBounds(
-    bounds: LatLngBounds,
-    fitOptions: CameraFitOptions?,
-  ): CameraOptions = memScoped {
+  public actual fun cameraSnapshot(): CameraSnapshot = memScoped {
     val outCamera = mln_camera_options_default().getPointer(this)
+    val outGeneration = alloc<ULongVar>()
     Status.check(
-      mln_map_camera_for_lat_lng_bounds(
-        state.requireLive().rawHandleValue,
-        CoreStructs.latLngBounds(bounds),
-        fitOptions?.let { MapStructs.cameraFitOptions(it, this) },
-        outCamera,
-      )
+      mln_map_camera_snapshot_get(state.requireLive().rawHandleValue, outCamera, outGeneration.ptr)
     )
-    MapStructs.cameraOptions(outCamera.pointed)
+    CameraSnapshot(outGeneration.value.toLong(), MapStructs.cameraOptions(outCamera.pointed))
   }
 
-  public actual fun cameraForLatLngs(
-    coordinates: List<LatLng>,
-    fitOptions: CameraFitOptions?,
-  ): CameraOptions = memScoped {
-    val coordinateSnapshot = coordinates.toList()
-    val outCamera = mln_camera_options_default().getPointer(this)
+  public actual fun updateCamera(update: CameraUpdate): Long = memScoped {
+    val nativeUpdate = mln_camera_update_default().getPointer(this)
+    nativeUpdate.pointed.mode = update.mode.nativeValue.toUInt()
+    val camera = MapStructs.cameraOptions(update.camera, this).pointed
+    nativeUpdate.pointed.camera.size = camera.size
+    nativeUpdate.pointed.camera.fields = camera.fields
+    nativeUpdate.pointed.camera.latitude = camera.latitude
+    nativeUpdate.pointed.camera.longitude = camera.longitude
+    nativeUpdate.pointed.camera.center_altitude = camera.center_altitude
+    nativeUpdate.pointed.camera.padding.top = camera.padding.top
+    nativeUpdate.pointed.camera.padding.left = camera.padding.left
+    nativeUpdate.pointed.camera.padding.bottom = camera.padding.bottom
+    nativeUpdate.pointed.camera.padding.right = camera.padding.right
+    nativeUpdate.pointed.camera.anchor.x = camera.anchor.x
+    nativeUpdate.pointed.camera.anchor.y = camera.anchor.y
+    nativeUpdate.pointed.camera.zoom = camera.zoom
+    nativeUpdate.pointed.camera.bearing = camera.bearing
+    nativeUpdate.pointed.camera.pitch = camera.pitch
+    nativeUpdate.pointed.camera.roll = camera.roll
+    nativeUpdate.pointed.camera.field_of_view = camera.field_of_view
+    val animation = MapStructs.animationOptions(update.animation, this).pointed
+    nativeUpdate.pointed.animation.size = animation.size
+    nativeUpdate.pointed.animation.fields = animation.fields
+    nativeUpdate.pointed.animation.duration_ms = animation.duration_ms
+    nativeUpdate.pointed.animation.velocity = animation.velocity
+    nativeUpdate.pointed.animation.min_zoom = animation.min_zoom
+    nativeUpdate.pointed.animation.easing.x1 = animation.easing.x1
+    nativeUpdate.pointed.animation.easing.y1 = animation.easing.y1
+    nativeUpdate.pointed.animation.easing.x2 = animation.easing.x2
+    nativeUpdate.pointed.animation.easing.y2 = animation.easing.y2
+    nativeUpdate.pointed.animation.transition_id = animation.transition_id
+    nativeUpdate.pointed.gesture_phase = update.gesturePhase.nativeValue.toUInt()
+    nativeUpdate.pointed.gesture_id = update.gestureId.toULong()
+    nativeUpdate.pointed.animation_id = update.animationId.toULong()
+    val outCommand = alloc<ULongVar>()
     Status.check(
-      mln_map_camera_for_lat_lngs(
-        state.requireLive().rawHandleValue,
-        CoreStructs.latLngArray(coordinateSnapshot, this),
-        coordinateSnapshot.size.toULong(),
-        fitOptions?.let { MapStructs.cameraFitOptions(it, this) },
-        outCamera,
-      )
+      mln_map_update_camera(state.requireLive().rawHandleValue, nativeUpdate, outCommand.ptr)
     )
-    MapStructs.cameraOptions(outCamera.pointed)
+    outCommand.value.toLong()
   }
 
-  public actual fun cameraForGeometry(
-    geometry: ByteArray,
-    fitOptions: CameraFitOptions?,
-  ): CameraOptions = memScoped {
-    val outCamera = mln_camera_options_default().getPointer(this)
-    Status.check(
-      mln_map_camera_for_geometry(
-        state.requireLive().rawHandleValue,
-        ByteStructs.bufferView(geometry, this),
-        fitOptions?.let { MapStructs.cameraFitOptions(it, this) },
-        outCamera,
-      )
-    )
-    MapStructs.cameraOptions(outCamera.pointed)
-  }
-
-  public actual fun latLngBoundsForCamera(camera: CameraOptions): LatLngBounds = memScoped {
-    val outBounds = alloc<mln_lat_lng_bounds>()
-    Status.check(
-      mln_map_lat_lng_bounds_for_camera(
-        state.requireLive().rawHandleValue,
-        MapStructs.cameraOptions(camera, this),
-        outBounds.ptr,
-      )
-    )
-    CoreStructs.latLngBounds(outBounds)
-  }
-
-  public actual fun latLngBoundsForCameraUnwrapped(camera: CameraOptions): LatLngBounds =
-    memScoped {
-      val outBounds = alloc<mln_lat_lng_bounds>()
-      Status.check(
-        mln_map_lat_lng_bounds_for_camera_unwrapped(
-          state.requireLive().rawHandleValue,
-          MapStructs.cameraOptions(camera, this),
-          outBounds.ptr,
-        )
-      )
-      CoreStructs.latLngBounds(outBounds)
+  public actual suspend fun queryCamera(): CameraSnapshot {
+    val operation = startOperation { outOperation ->
+      mln_map_camera_query_start(state.requireLive().rawHandleValue, outOperation)
     }
-
-  public actual var bounds: BoundOptions
-    get() = memScoped {
-      val outOptions = mln_bound_options_default().getPointer(this)
-      Status.check(mln_map_get_bounds(state.requireLive().rawHandleValue, outOptions))
-      MapStructs.boundOptions(outOptions.pointed)
-    }
-    set(options) {
-      memScoped {
-        Status.check(
-          mln_map_set_bounds(
-            state.requireLive().rawHandleValue,
-            MapStructs.boundOptions(options, this),
-          )
-        )
+    try {
+      runtime.awaitOperation(operation)
+      return memScoped {
+        val result = alloc<mln_camera_query_result>()
+        result.size = sizeOf<mln_camera_query_result>().toUInt()
+        Status.check(mln_map_camera_query_take_result(operation, result.ptr))
+        CameraSnapshot(result.generation.toLong(), MapStructs.cameraOptions(result.camera))
       }
+    } finally {
+      mln_operation_release(operation)
     }
-
-  public actual var freeCameraOptions: FreeCameraOptions
-    get() = memScoped {
-      val outOptions = mln_free_camera_options_default().getPointer(this)
-      Status.check(mln_map_get_free_camera_options(state.requireLive().rawHandleValue, outOptions))
-      MapStructs.freeCameraOptions(outOptions.pointed)
-    }
-    set(options) {
-      memScoped {
-        Status.check(
-          mln_map_set_free_camera_options(
-            state.requireLive().rawHandleValue,
-            MapStructs.freeCameraOptions(options, this),
-          )
-        )
-      }
-    }
-
-  public actual var projectionMode: ProjectionModeOptions
-    get() = memScoped {
-      val outMode = mln_projection_mode_default().getPointer(this)
-      Status.check(mln_map_get_projection_mode(state.requireLive().rawHandleValue, outMode))
-      MapStructs.projectionModeOptions(outMode.pointed)
-    }
-    set(mode) {
-      memScoped {
-        Status.check(
-          mln_map_set_projection_mode(
-            state.requireLive().rawHandleValue,
-            MapStructs.projectionModeOptions(mode, this),
-          )
-        )
-      }
-    }
-
-  public actual fun pixelForLatLng(coordinate: LatLng): ScreenPoint = memScoped {
-    val outPoint = alloc<mln_screen_point>()
-    Status.check(
-      mln_map_pixel_for_lat_lng(
-        state.requireLive().rawHandleValue,
-        CoreStructs.latLng(coordinate),
-        outPoint.ptr,
-      )
-    )
-    CoreStructs.screenPoint(outPoint)
-  }
-
-  public actual fun latLngForPixel(point: ScreenPoint): LatLng = memScoped {
-    val outCoordinate = alloc<mln_lat_lng>()
-    Status.check(
-      mln_map_lat_lng_for_pixel(
-        state.requireLive().rawHandleValue,
-        CoreStructs.screenPoint(point),
-        outCoordinate.ptr,
-      )
-    )
-    CoreStructs.latLng(outCoordinate)
-  }
-
-  public actual fun pixelsForLatLngs(coordinates: List<LatLng>): List<ScreenPoint> = memScoped {
-    val coordinateSnapshot = coordinates.toList()
-    if (coordinateSnapshot.isEmpty()) return@memScoped emptyList()
-    val outPoints = allocArray<mln_screen_point>(coordinateSnapshot.size)
-    Status.check(
-      mln_map_pixels_for_lat_lngs(
-        state.requireLive().rawHandleValue,
-        CoreStructs.latLngArray(coordinateSnapshot, this),
-        coordinateSnapshot.size.toULong(),
-        outPoints,
-      )
-    )
-    CoreStructs.screenPointArray(outPoints, coordinateSnapshot.size)
-  }
-
-  public actual fun latLngsForPixels(points: List<ScreenPoint>): List<LatLng> = memScoped {
-    val pointSnapshot = points.toList()
-    if (pointSnapshot.isEmpty()) return@memScoped emptyList()
-    val outCoordinates = allocArray<mln_lat_lng>(pointSnapshot.size)
-    Status.check(
-      mln_map_lat_lngs_for_pixels(
-        state.requireLive().rawHandleValue,
-        CoreStructs.screenPointArray(pointSnapshot, this),
-        pointSnapshot.size.toULong(),
-        outCoordinates,
-      )
-    )
-    CoreStructs.latLngArray(outCoordinates, pointSnapshot.size)
   }
 
   public actual fun attachMetalOwnedTexture(
@@ -1765,17 +1726,49 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
   public actual fun attachOpenGLSurface(descriptor: OpenGLSurfaceDescriptor): RenderSessionHandle =
     RenderSessionHandle.attachOpenGLSurface(this, descriptor)
 
-  public actual fun createProjection(): MapProjectionHandle = memScoped {
-    val outProjection = alloc<ULongVar>()
-    outProjection.value = 0uL
-    Status.check(mln_map_projection_create(state.requireLive().rawHandleValue, outProjection.ptr))
-    MapProjectionHandle(
-      outProjection.value.asHandle("mln_map_projection_create", ::mapProjectionHandle)
-    )
+  public actual suspend fun createProjection(): MapProjectionHandle {
+    val operation = startOperation { outOperation ->
+      mln_map_projection_create_start(state.requireLive().rawHandleValue, outOperation)
+    }
+    try {
+      runtime.awaitOperation(operation)
+      return memScoped {
+        val outProjection = alloc<ULongVar>()
+        outProjection.value = 0uL
+        Status.check(mln_map_projection_create_take_result(operation, outProjection.ptr))
+        MapProjectionHandle(
+          runtime,
+          outProjection.value.asHandle(
+            "mln_map_projection_create_take_result",
+            ::mapProjectionHandle,
+          ),
+        )
+      }
+    } finally {
+      mln_operation_release(operation)
+    }
   }
 
-  public actual override fun close() {
-    state.closeOnce({ handle -> mln_map_destroy(handle.rawHandleValue) }) {
+  public actual suspend fun close() {
+    if (!state.beginClose()) return
+    val operation =
+      try {
+        startOperation { outOperation ->
+          mln_map_close_start(state.handleForClose().rawHandleValue, outOperation)
+        }
+      } catch (error: Throwable) {
+        state.abortClose()
+        throw error
+      }
+    try {
+      runtime.awaitOperation(operation)
+    } catch (error: Throwable) {
+      state.abortClose()
+      throw error
+    } finally {
+      mln_operation_release(operation)
+    }
+    state.completeClose {
       runtime.unregisterMap(this)
       runtimeRetention.close()
     }
@@ -1798,17 +1791,70 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     return value.toInt()
   }
 
-  public actual companion object {
-    public actual fun create(runtime: RuntimeHandle, options: MapOptions): MapHandle = memScoped {
-      val outMap = alloc<ULongVar>()
-      outMap.value = 0uL
-      Status.check(
-        mln_map_create(runtime.nativeHandle().rawHandleValue, mapOptions(options, this), outMap.ptr)
+  private suspend fun takeStyleBuffer(
+    start: (ULong, CPointer<ULongVar>) -> Int,
+    take: (ULong, CPointer<ULongVar>) -> Int,
+  ): ByteArray = memScoped {
+    val outBuffer = alloc<ULongVar>()
+    outBuffer.value = 0uL
+    Status.check(
+      ordered(
+        { outOperation -> start(state.requireLive().rawHandleValue, outOperation) },
+        { operation -> take(operation, outBuffer.ptr) },
       )
-      val map = MapHandle(runtime, outMap.value.asHandle("mln_map_create", ::mapHandle))
-      runtime.registerMap(map)
-      map
-    }
+    )
+    ByteStructs.ownedBuffer(outBuffer.value.asHandle("mln_buffer", ::ownedBufferHandle))
+  }
+
+  private suspend fun takeLayerBuffer(
+    layerId: String,
+    start: (ULong, CValue<mln_buffer_view>, CPointer<ULongVar>) -> Int,
+    take: (ULong, CPointer<ULongVar>) -> Int,
+  ): ByteArray = memScoped {
+    val outBuffer = alloc<ULongVar>()
+    outBuffer.value = 0uL
+    Status.check(
+      ordered(
+        { outOperation ->
+          start(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(layerId, this),
+            outOperation,
+          )
+        },
+        { operation -> take(operation, outBuffer.ptr) },
+      )
+    )
+    ByteStructs.ownedBuffer(outBuffer.value.asHandle("mln_buffer", ::ownedBufferHandle))
+  }
+
+  public actual companion object {
+    public actual suspend fun create(runtime: RuntimeHandle, options: MapOptions): MapHandle =
+      memScoped {
+        val operation = startOperation { outOperation ->
+          mln_map_create_start(
+            runtime.nativeHandle().rawHandleValue,
+            mapOptions(options, this),
+            outOperation,
+          )
+        }
+        try {
+          runtime.awaitOperation(operation)
+          val outMap = alloc<ULongVar>()
+          outMap.value = 0uL
+          Status.check(mln_map_create_take_result(operation, outMap.ptr))
+          val map =
+            MapHandle(
+              runtime,
+              outMap.value.asHandle("mln_map_create_take_result", ::mapHandle),
+              options.eventMask,
+            )
+          runtime.registerMap(map)
+          map
+        } finally {
+          mln_operation_release(operation)
+        }
+      }
 
     internal fun mapOptionsForTesting(options: MapOptions, inspect: (mln_map_options) -> Unit) {
       memScoped { inspect(mapOptions(options, this).pointed) }
@@ -1819,13 +1865,13 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
       mln_map_options_default().place(nativeOptions.ptr)
       options.width?.let {
         Status.requireArgument(it >= 0) { "width must be non-negative" }
-        nativeOptions.width = it.toUInt()
+        nativeOptions.initial_extent.width = it.toUInt()
       }
       options.height?.let {
         Status.requireArgument(it >= 0) { "height must be non-negative" }
-        nativeOptions.height = it.toUInt()
+        nativeOptions.initial_extent.height = it.toUInt()
       }
-      options.scaleFactor?.let { nativeOptions.scale_factor = it }
+      options.scaleFactor?.let { nativeOptions.initial_extent.scale_factor = it }
       options.mapMode?.let {
         Status.requireArgument(it.isKnown) {
           "Unknown map mode cannot be used as input: ${it.nativeValue}"
@@ -1837,4 +1883,25 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
       return nativeOptions.ptr
     }
   }
+
+  private suspend inline fun ordered(
+    start: (CPointer<ULongVar>) -> Int,
+    take: (ULong) -> Int,
+  ): Int {
+    val operation = startOperation(start)
+    try {
+      runtime.awaitOperation(operation)
+      return take(operation)
+    } finally {
+      mln_operation_release(operation)
+    }
+  }
+}
+
+@OptIn(ExperimentalForeignApi::class)
+private inline fun command(call: (CPointer<ULongVar>) -> Unit): ULong = memScoped {
+  val outCommandId = alloc<ULongVar>()
+  outCommandId.value = 0uL
+  call(outCommandId.ptr)
+  outCommandId.value
 }

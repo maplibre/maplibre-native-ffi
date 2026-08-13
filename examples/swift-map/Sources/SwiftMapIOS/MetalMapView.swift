@@ -6,7 +6,7 @@ import UIKit
 
 /// The display-paced render loop. This view runs on the main thread and owns
 /// the layer, gesture decoding, the Metal objects, and the render session. The
-/// runtime and the map live on the runtime loop thread it starts, reached
+/// runtime and the map live on the asynchronous runtime task it starts, reached
 /// through ``Channels``.
 @MainActor
 final class MetalMapView: UIView {
@@ -19,7 +19,7 @@ final class MetalMapView: UIView {
   private let channels = Channels()
   private var graphics: MetalGraphicsContext?
   private var renderTarget: MetalRenderTarget?
-  private var runtimeLoop: RuntimeLoopThread?
+  private var mapTask: MapTask?
   private var displayLink: CADisplayLink?
   private var currentViewport: Viewport?
   private var didLogStartupStatus = false
@@ -94,7 +94,7 @@ final class MetalMapView: UIView {
     teardown()
   }
 
-  /// Closes the session before the runtime loop closes the map; a map with an
+  /// Closes the session before the map task closes the map; a map with an
   /// attached session cannot be destroyed.
   private func teardown() {
     guard !isShutDown else { return }
@@ -105,19 +105,19 @@ final class MetalMapView: UIView {
       log.error("\(String(describing: error), privacy: .public)")
     }
     renderTarget = nil
-    guard runtimeLoop != nil else { return }
+    guard mapTask != nil else { return }
     channels.requestShutdown()
-    if !channels.waitForRuntimeLoopExit(timeout: 5.0) {
-      log.error("runtime loop did not finish before the shutdown deadline")
+    if !channels.waitForMapTaskExit(timeout: 5.0) {
+      log.error("map task did not finish before the shutdown deadline")
     }
-    runtimeLoop = nil
+    mapTask = nil
   }
 
   @objc private func displayLinkTick() {
     guard !isShutDown else { return }
     if let failureMessage = channels.failureMessage {
       log.error("\(failureMessage, privacy: .public)")
-      // The runtime loop waits for the session to close before destroying the
+      // The map task waits for the session to close before destroying the
       // map, so tear down rather than only stopping the display link.
       stopHostLoop()
       teardown()
@@ -141,7 +141,7 @@ final class MetalMapView: UIView {
     } catch {
       showError(error)
       // Stopping the display link alone leaves the session attached, and the
-      // runtime loop would hold a map it can never destroy.
+      // map task would hold a map it can never destroy.
       stopHostLoop()
       teardown()
     }
@@ -154,12 +154,12 @@ final class MetalMapView: UIView {
           let graphics,
           let viewport = currentViewport,
           !viewport.isEmpty,
-          let attachRef = channels.attachRef()
+          let renderMap = channels.map()
     else { return }
 
     do {
       renderTarget = try MetalRenderTarget.attach(
-        attachRef: attachRef,
+        map: renderMap,
         graphics: graphics,
         viewport: viewport
       )
@@ -173,8 +173,8 @@ final class MetalMapView: UIView {
       channels.setRenderRequest()
     } catch {
       showError(error)
-      // The runtime loop waits for the session to close before destroying the
-      // map, so tear down rather than only stopping the display link.
+      // The map task waits for the session to close before destroying the map,
+      // so tear down rather than only stopping the display link.
       stopHostLoop()
       teardown()
     }
@@ -201,13 +201,13 @@ final class MetalMapView: UIView {
     displayLink = nil
   }
 
-  /// Starts the runtime loop once a non-empty viewport is known, because the
-  /// map takes its initial extent from it.
-  private func startRuntimeLoopIfNeeded(viewport: Viewport) {
-    guard runtimeLoop == nil else { return }
-    let loop = RuntimeLoopThread(channels: channels, viewport: viewport)
-    runtimeLoop = loop
-    loop.start()
+  /// Starts the map task once a non-empty viewport is known, because the map
+  /// takes its initial extent from it.
+  private func startMapTaskIfNeeded(viewport: Viewport) {
+    guard mapTask == nil else { return }
+    let task = MapTask(channels: channels, viewport: viewport)
+    mapTask = task
+    task.start()
   }
 
   private func refreshViewport() {
@@ -225,8 +225,15 @@ final class MetalMapView: UIView {
       graphics.resize(viewport)
       try renderTarget?.resize(viewport)
       currentViewport = viewport
+      if mapTask != nil {
+        channels.push(.resize(MapLogicalExtent(
+          width: viewport.logicalWidth,
+          height: viewport.logicalHeight,
+          scaleFactor: viewport.scaleFactor
+        )))
+      }
       channels.setRenderRequest()
-      startRuntimeLoopIfNeeded(viewport: viewport)
+      startMapTaskIfNeeded(viewport: viewport)
     } catch {
       showError(error)
     }
@@ -347,7 +354,6 @@ final class MetalMapView: UIView {
     enqueue { commands in
       switch recognizer.state {
       case .began:
-        commands.push(.cancelTransitions)
         self.beginGesture(recognizer, commands)
         recognizer.setTranslation(.zero, in: self)
         return false
@@ -371,7 +377,6 @@ final class MetalMapView: UIView {
     enqueue { commands in
       switch recognizer.state {
       case .began:
-        commands.push(.cancelTransitions)
         self.beginGesture(recognizer, commands)
         recognizer.scale = 1.0
         return false
@@ -396,7 +401,6 @@ final class MetalMapView: UIView {
     enqueue { commands in
       switch recognizer.state {
       case .began:
-        commands.push(.cancelTransitions)
         self.beginGesture(recognizer, commands)
         recognizer.rotation = 0
         return false
@@ -422,7 +426,6 @@ final class MetalMapView: UIView {
       switch recognizer.state {
       case .began:
         guard recognizer.numberOfTouches == 2 else { return false }
-        commands.push(.cancelTransitions)
         self.beginGesture(recognizer, commands)
         recognizer.setTranslation(.zero, in: self)
         return false
@@ -442,7 +445,6 @@ final class MetalMapView: UIView {
 
   @objc private func handleDoubleTap(_ recognizer: UITapGestureRecognizer) {
     enqueue { commands in
-      commands.push(.cancelTransitions)
       let location = recognizer.location(in: self)
       commands.push(.zoomToNextStep(
         anchor: screenPoint(location),

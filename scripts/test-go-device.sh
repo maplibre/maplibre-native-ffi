@@ -1,18 +1,24 @@
 #!/usr/bin/env bash
-# Cross-compiles the Go binding tests for an Android or OpenHarmony x64 preset
-# and runs them in the emulator, one executable per package.
+# Cross-compiles the Go binding tests for an Android preset or OpenHarmony x64
+# preset and runs them in the matching emulator, one executable per package.
 set -euo pipefail
 
 preset=${1:?usage: test-go-device.sh <android|ohos preset>}
 
 case "$preset" in
-  android-x64-* | ohos-x64-egl) ;;
+  android-arm64-*)
+    abi=arm64-v8a
+    ;;
+  android-x64-*)
+    abi=x86_64
+    ;;
+  ohos-x64-egl) ;;
   ohos-x64-*)
     echo "The OpenHarmony emulator runs EGL only; check $preset with //bindings/go:build and test ohos-x64-egl instead." >&2
     exit 2
     ;;
-  android-* | ohos-*)
-    echo "The emulators run x64 guests only; check $preset with //bindings/go:build and run an x64 preset's tests instead." >&2
+  ohos-*)
+    echo "The OpenHarmony emulator runs an x64 guest; check $preset with //bindings/go:build and test ohos-x64-egl instead." >&2
     exit 2
     ;;
   *)
@@ -39,6 +45,7 @@ test_binaries=("$test_dir"/*.test)
 if [[ "$platform" == android ]]; then
   exec "$MISE_MONOREPO_ROOT/scripts/run-android-emulator-test.sh" \
     180 \
+    "$abi" \
     "$native_install_dir/lib/libmaplibre-native-c.so" \
     -test.v -- ${test_binaries[@]+"${test_binaries[@]}"}
 fi

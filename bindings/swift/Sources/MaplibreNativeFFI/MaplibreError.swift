@@ -68,3 +68,13 @@ func mapNativeFailure<T>(_ body: () throws -> T) throws -> T {
     throw MaplibreError.invalidArgument(error.message)
   }
 }
+
+func mapNativeFailure<T>(_ body: () async throws -> T) async throws -> T {
+  do {
+    return try await body()
+  } catch let failure as NativeStatusFailure {
+    throw MaplibreError.fromNativeFailure(failure)
+  } catch let error as NativeStringError {
+    throw MaplibreError.invalidArgument(error.message)
+  }
+}

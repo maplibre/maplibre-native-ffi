@@ -9,61 +9,65 @@ import kotlin.test.assertTrue
 import org.maplibre.nativeffi.runtime.OperationLeakReport
 
 class HandleLeakCleanerTest {
-  // BND-044. Destruction is owner-thread-bound, so the cleaner thread only reports.
+  // BND-044. The cleaner reports; explicit close keeps native failures observable.
 
   @Test
-  fun unreachableHandleReportsLeakWithoutExplicitRelease() {
-    val reports = CopyOnWriteArrayList<String>()
+  fun unreachableHandleReportsLeakWithoutExplicitRelease(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val reports = CopyOnWriteArrayList<String>()
 
-    registerUnreachableHandle(reports)
+      registerUnreachableHandle(reports)
 
-    assertTrue(awaitReport(reports), "expected the cleaner to report the unreachable handle")
-    assertEquals(
-      "Leaked RuntimeHandle native handle 0x1234; close handles explicitly on their owner thread.",
-      reports.single(),
-    )
-  }
-
-  @Test
-  fun releasedHandleStaysSilentWhenCollected() {
-    val reports = CopyOnWriteArrayList<String>()
-    val liveReports = CopyOnWriteArrayList<String>()
-
-    registerReleasedHandle(reports)
-    // A second unreleased registration proves the cleaner ran, so the silence above is a
-    // real result.
-    registerUnreachableHandle(liveReports)
-
-    assertTrue(awaitReport(liveReports), "expected the cleaner to run")
-    assertEquals(emptyList(), reports)
-  }
-
-  @Test
-  fun unreachableOperationReportsLeak() {
-    val reports = CopyOnWriteArrayList<String>()
-
-    HandleLeakCleaner.registerOperation(Any(), OperationLeakReport(reports::add))
-
-    assertTrue(awaitReport(reports), "expected the cleaner to report the operation")
-    assertEquals("Leaked OperationHandle; close the operation explicitly.", reports.single())
-  }
-
-  @Test
-  fun blockedLeakReportDoesNotBlockNativeReclamationWorker() {
-    val reportStarted = CountDownLatch(1)
-    val unblockReport = CountDownLatch(1)
-    val reclaimed = CountDownLatch(1)
-
-    registerBlockingLeakReport(reportStarted, unblockReport)
-    UnreachableActions.register(Any(), reclaimed::countDown)
-
-    try {
-      assertTrue(awaitAction(reportStarted), "expected the leak-report worker to start")
-      assertTrue(awaitAction(reclaimed), "expected native reclamation to use another worker")
-    } finally {
-      unblockReport.countDown()
+      assertTrue(awaitReport(reports), "expected the cleaner to report the unreachable handle")
+      assertEquals(
+        "Leaked RuntimeHandle native handle 0x1234; close it explicitly.",
+        reports.single(),
+      )
     }
-  }
+
+  @Test
+  fun releasedHandleStaysSilentWhenCollected(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val reports = CopyOnWriteArrayList<String>()
+      val liveReports = CopyOnWriteArrayList<String>()
+
+      registerReleasedHandle(reports)
+      // A second unreleased registration proves the cleaner ran, so the silence above is a
+      // real result.
+      registerUnreachableHandle(liveReports)
+
+      assertTrue(awaitReport(liveReports), "expected the cleaner to run")
+      assertEquals(emptyList(), reports)
+    }
+
+  @Test
+  fun unreachableOperationReportsLeak(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val reports = CopyOnWriteArrayList<String>()
+
+      HandleLeakCleaner.registerOperation(Any(), OperationLeakReport(reports::add))
+
+      assertTrue(awaitReport(reports), "expected the cleaner to report the operation")
+      assertEquals("Leaked OperationHandle; close the operation explicitly.", reports.single())
+    }
+
+  @Test
+  fun blockedLeakReportDoesNotBlockNativeReclamationWorker(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val reportStarted = CountDownLatch(1)
+      val unblockReport = CountDownLatch(1)
+      val reclaimed = CountDownLatch(1)
+
+      registerBlockingLeakReport(reportStarted, unblockReport)
+      UnreachableActions.register(Any(), reclaimed::countDown)
+
+      try {
+        assertTrue(awaitAction(reportStarted), "expected the leak-report worker to start")
+        assertTrue(awaitAction(reclaimed), "expected native reclamation to use another worker")
+      } finally {
+        unblockReport.countDown()
+      }
+    }
 
   /** Registers a handle that is unreachable once this call returns. */
   private fun registerUnreachableHandle(reports: MutableList<String>) {

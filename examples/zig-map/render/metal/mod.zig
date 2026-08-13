@@ -46,7 +46,7 @@ pub const MetalRenderTarget = union(enum) {
         };
     }
 
-    /// Attaches the render session on the map owner thread.
+    /// Attaches the render session on the graphics thread.
     pub fn attach(self: *MetalRenderTarget, map: *maplibre.MapHandle, viewport: types.Viewport) !void {
         switch (self.*) {
             .owned_texture => |*backend| try backend.attach(map, viewport),

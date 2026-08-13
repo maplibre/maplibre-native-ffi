@@ -6,6 +6,23 @@ import '../geo/geo.dart';
 export '../geo/geo.dart'
     show EdgeInsets, LatLng, LatLngBounds, Quaternion, ScreenPoint, Vec3;
 
+/// Native execution mode for one atomic camera update.
+enum CameraUpdateMode {
+  /// Applies the camera immediately.
+  jump(0),
+
+  /// Animates with easing.
+  ease(1),
+
+  /// Animates along a flight path.
+  fly(2);
+
+  const CameraUpdateMode(this.rawValue);
+
+  /// Native camera update mode value.
+  final int rawValue;
+}
+
 /// Cubic easing curve for animated camera transitions.
 final class UnitBezier {
   /// Creates a cubic unit bezier.

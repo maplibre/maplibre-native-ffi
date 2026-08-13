@@ -9,62 +9,66 @@ import org.maplibre.nativeffi.error.InvalidStateException
 
 class OperationHandleCoreTest {
   @Test
-  fun takeValidatesOperationKindInsideUseLease() {
-    val runtime = Any()
-    val core = operation(runtime)
+  fun takeValidatesOperationKindInsideUseLease(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val runtime = Any()
+      val core = operation(runtime)
 
-    assertFailsWith<InvalidStateException> {
-      core.withUse(runtime, OperationKind.REGION_GET, OperationResultKind.OPTIONAL_REGION) {}
-    }
-
-    assertFalse(core.isClosed)
-    assertEquals(
-      7L,
-      core.withUse(runtime, OperationKind.REGION_CREATE, OperationResultKind.REGION) { it },
-    )
-  }
-
-  @Test
-  fun failedTakeLeavesResultRetryable() {
-    val runtime = Any()
-    val core = operation(runtime)
-
-    repeat(2) {
-      assertFailsWith<IllegalStateException> {
-        core.withUse(runtime) { error("native take failed") }
+      assertFailsWith<InvalidStateException> {
+        core.withUse(runtime, OperationKind.REGION_GET, OperationResultKind.OPTIONAL_REGION) {}
       }
+
       assertFalse(core.isClosed)
+      assertEquals(
+        7L,
+        core.withUse(runtime, OperationKind.REGION_CREATE, OperationResultKind.REGION) { it },
+      )
     }
-  }
 
   @Test
-  fun consumedResultKeepsObserverLive() {
-    val runtime = Any()
-    val core = operation(runtime)
+  fun failedTakeLeavesResultRetryable(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val runtime = Any()
+      val core = operation(runtime)
 
-    core.markResultConsumed()
-
-    assertFalse(core.isClosed)
-    assertEquals(7L, core.withUse(runtime) { it })
-    assertFailsWith<InvalidStateException> {
-      core.withUse(runtime, OperationKind.REGION_CREATE, OperationResultKind.REGION) {}
+      repeat(2) {
+        assertFailsWith<IllegalStateException> {
+          core.withUse(runtime) { error("native take failed") }
+        }
+        assertFalse(core.isClosed)
+      }
     }
-  }
 
   @Test
-  fun closeReleasesRuntimeRetentionOnce() {
-    var retentionReleases = 0
-    val runtime = Any()
-    val core = operation(runtime) { retentionReleases += 1 }
+  fun consumedResultKeepsObserverLive(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val runtime = Any()
+      val core = operation(runtime)
 
-    assertTrue(core.beginClose())
-    core.finishClose()
-    assertFalse(core.beginClose())
+      core.markResultConsumed()
 
-    assertTrue(core.isClosed)
-    assertEquals(1, retentionReleases)
-    assertFailsWith<InvalidStateException> { core.withUse(runtime) {} }
-  }
+      assertFalse(core.isClosed)
+      assertEquals(7L, core.withUse(runtime) { it })
+      assertFailsWith<InvalidStateException> {
+        core.withUse(runtime, OperationKind.REGION_CREATE, OperationResultKind.REGION) {}
+      }
+    }
+
+  @Test
+  fun closeReleasesRuntimeRetentionOnce(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      var retentionReleases = 0
+      val runtime = Any()
+      val core = operation(runtime) { retentionReleases += 1 }
+
+      assertTrue(core.beginClose())
+      core.finishClose()
+      assertFalse(core.beginClose())
+
+      assertTrue(core.isClosed)
+      assertEquals(1, retentionReleases)
+      assertFailsWith<InvalidStateException> { core.withUse(runtime) {} }
+    }
 
   private fun operation(
     runtime: Any,

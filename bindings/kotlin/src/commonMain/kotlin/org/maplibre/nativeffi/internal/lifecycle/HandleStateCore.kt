@@ -73,10 +73,16 @@ internal class HandleStateCore(
     }
   }
 
-  fun closeOnce(destroy: () -> Int, afterSuccess: () -> Unit = {}) {
+  /**
+   * Acquires the exclusive close lease before an asynchronous native close starts.
+   *
+   * Returns false when the handle is already closed. The caller must pair a true result with
+   * [completeClose] or [abortClose].
+   */
+  fun beginClose(): Boolean {
     if (!releaseState.compareAndSet(STATE_LIVE, STATE_RELEASING)) {
       when (releaseState.load()) {
-        STATE_CLOSED -> return
+        STATE_CLOSED -> return false
         STATE_RELEASING -> throw Status.invalidState("$typeName is currently releasing")
         else -> throw Status.released(typeName)
       }
@@ -86,19 +92,32 @@ internal class HandleStateCore(
       releaseState.store(STATE_LIVE)
       throw Status.liveChildren(typeName, children)
     }
-    // Uses that already passed their liveness check still hold the handle; wait them out.
     while (activeUses.load() != 0) {
       yieldWhileClosing()
     }
-    try {
-      Status.check(destroy())
-    } catch (error: Throwable) {
-      releaseState.store(STATE_LIVE)
-      throw error
-    }
+    return true
+  }
+
+  fun completeClose(afterSuccess: () -> Unit = {}) {
+    check(releaseState.load() == STATE_RELEASING)
     leakReport.markReleased()
     releaseState.store(STATE_CLOSED)
     afterSuccess()
+  }
+
+  fun abortClose() {
+    check(releaseState.compareAndSet(STATE_RELEASING, STATE_LIVE))
+  }
+
+  fun closeOnce(destroy: () -> Int, afterSuccess: () -> Unit = {}) {
+    if (!beginClose()) return
+    try {
+      Status.check(destroy())
+    } catch (error: Throwable) {
+      abortClose()
+      throw error
+    }
+    completeClose(afterSuccess)
   }
 
   private fun releaseChild(childTypeName: String) {
@@ -143,10 +162,7 @@ internal class HandleStateCore(
 
     fun report() {
       if (released.load() == 0) {
-        writeLine(
-          "Leaked $typeName native handle 0x${handleId.toString(16)}; " +
-            "close handles explicitly on their owner thread."
-        )
+        writeLine("Leaked $typeName native handle 0x${handleId.toString(16)}; close it explicitly.")
       }
     }
   }

@@ -288,7 +288,7 @@ class StyleImage:
 
     @classmethod
     def _from_native(cls, raw: dict[str, Any]) -> StyleImage:
-        info = StyleImageInfo._from_native(raw["info"])
+        info = StyleImageInfo._from_native(raw)
         return cls(
             image=PremultipliedRgba8Image(
                 TextureImageInfo(
@@ -297,7 +297,7 @@ class StyleImage:
                     stride=info.stride,
                     byte_length=info.byte_length,
                 ),
-                raw["data"],
+                raw["pixels"],
             ),
             pixel_ratio=info.pixel_ratio,
             sdf=info.sdf,
@@ -359,7 +359,7 @@ class CustomGeometrySourceOptions:
 
 
 class CustomGeometrySourceHandle(NativeHandleMixin):
-    """Owner-thread handle for queued custom geometry source callback events."""
+    """Any-thread handle for queued custom geometry source callback events."""
 
     _handle_name = "CustomGeometrySourceHandle"
 

@@ -2,22 +2,25 @@ package maplibre
 
 import (
 	"errors"
-	stdruntime "runtime"
 	"testing"
 	"time"
 
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/handle"
 )
 
-func TestRuntimeCreateWithOptions(t *testing.T) {
-	lockOSThreadForTest(t)
-
+func TestRuntimeCreateWithOptionsAndClose(t *testing.T) {
 	runtime, err := NewRuntimeWithOptions(NewRuntimeOptions("", ":memory:"))
 	if err != nil {
 		t.Fatalf("NewRuntimeWithOptions(): %v", err)
 	}
 	if err := runtime.Close(); err != nil {
 		t.Fatalf("Close(): %v", err)
+	}
+	if err := runtime.Close(); err != nil {
+		t.Fatalf("second Close(): %v", err)
+	}
+	if _, err := runtime.NewMap(); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("NewMap() after Close error = %v, want ErrInvalidArgument", err)
 	}
 }
 
@@ -31,280 +34,115 @@ func TestRuntimeOptionsRejectEmbeddedNUL(t *testing.T) {
 func TestRuntimeCreationRejectsABIMismatchBeforeNativeCreateOrHandleStore(t *testing.T) {
 	createCalled := false
 	storeCalled := false
-
 	runtime, err := createRuntimeWithStateFactory(
 		ExpectedCABIVersion+1,
-		func(out *nativeRuntime) int32 {
+		func(*nativeRuntime) int32 {
 			createCalled = true
 			return 0
 		},
-		func(runtime nativeRuntime) (*handle.State[nativeRuntime], error) {
+		func(nativeRuntime) (*handle.State[nativeRuntime], error) {
 			storeCalled = true
 			return nil, nil
 		},
 	)
-
-	if runtime != nil {
-		t.Fatalf("createRuntimeWithStateFactory() runtime = %v, want nil", runtime)
+	if runtime != nil || !errors.Is(err, ErrABIVersionMismatch) {
+		t.Fatalf("createRuntimeWithStateFactory() = (%v, %v)", runtime, err)
 	}
-	if !errors.Is(err, ErrABIVersionMismatch) {
-		t.Fatalf("createRuntimeWithStateFactory() error = %v, want ErrABIVersionMismatch", err)
-	}
-	if createCalled {
-		t.Fatal("runtime create hook was called after ABI mismatch")
-	}
-	if storeCalled {
-		t.Fatal("runtime handle store hook was called after ABI mismatch")
+	if createCalled || storeCalled {
+		t.Fatal("ABI mismatch invoked a native create or stored a handle")
 	}
 }
 
-func TestRuntimeCreationDestroysNativeRuntimeWhenHandleStoreFails(t *testing.T) {
-	const raw = nativeRuntime(42)
-	var destroyed nativeRuntime
-	restore := replaceRuntimeDestroyForTest(func(runtime nativeRuntime) int32 {
-		destroyed = runtime
-		return 0
-	})
-	defer restore()
-
-	runtime, err := createRuntimeWithStateFactory(
-		ExpectedCABIVersion,
-		func(out *nativeRuntime) int32 {
-			*out = raw
-			return 0
-		},
-		func(nativeRuntime) (*handle.State[nativeRuntime], error) {
-			return nil, errors.New("handle store failed")
-		},
-	)
-	if runtime != nil || !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("createRuntimeWithStateFactory() = (%v, %v), want (nil, ErrInvalidArgument)", runtime, err)
-	}
-	if destroyed != raw {
-		t.Fatalf("destroyed runtime = %d, want %d", destroyed, raw)
-	}
-}
-
-func TestRuntimeAmbientCacheOperationRelease(t *testing.T) {
-	lockOSThreadForTest(t)
-
+func TestRuntimeBarrierProgressesAutonomously(t *testing.T) {
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
-	defer func() {
-		if err := runtime.Close(); err != nil {
-			t.Errorf("Close(): %v", err)
-		}
-	}()
+	defer runtime.Close()
 
-	operation, err := runtime.StartAmbientCacheOperation(AmbientCacheOperationClear)
+	operation, err := runtime.Barrier()
 	if err != nil {
-		t.Fatalf("StartAmbientCacheOperation(): %v", err)
+		t.Fatalf("Barrier(): %v", err)
 	}
-	operation.Release()
-	operation.Release()
-	if _, err := operation.Poll(); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("Poll() after Release() error = %v, want ErrInvalidArgument", err)
+	defer operation.Release()
+	completed, err := operation.Wait(2 * time.Second)
+	if err != nil {
+		t.Fatalf("Wait(): %v", err)
 	}
-	if err := operation.Cancel(); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("Cancel() after Release() error = %v, want ErrInvalidArgument", err)
+	if !completed {
+		t.Fatal("runtime barrier did not progress autonomously")
 	}
-	if _, err := operation.Diagnostic(); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("Diagnostic() after Release() error = %v, want ErrInvalidArgument", err)
+	if err := operation.Discard(); err != nil {
+		t.Fatalf("Discard(): %v", err)
 	}
 }
 
-func TestRuntimeAmbientCacheOperationRejectsUnknownOperation(t *testing.T) {
-	lockOSThreadForTest(t)
-
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	defer func() {
-		if err := runtime.Close(); err != nil {
-			t.Errorf("Close(): %v", err)
-		}
-	}()
-
-	_, err = runtime.StartAmbientCacheOperation(AmbientCacheOperation(999_999))
-	if !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("StartAmbientCacheOperation(unknown) error = %v, want ErrInvalidArgument", err)
-	}
-}
-
-func TestRuntimeCreatePumpAndClose(t *testing.T) {
-	lockOSThreadForTest(t)
-
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	if err := runtime.Pump(0); err != nil {
-		t.Fatalf("Pump(): %v", err)
-	}
-	if batch, err := runtime.DrainEvents(0); err != nil {
-		t.Fatalf("DrainEvents(): %v", err)
-	} else if batch.RemainingCount != 0 {
-		t.Fatalf("DrainEvents(0) left %d events queued", batch.RemainingCount)
-	}
-	if err := runtime.Close(); err != nil {
-		t.Fatalf("Close(): %v", err)
-	}
-	if err := runtime.Close(); err != nil {
-		t.Fatalf("second Close(): %v", err)
-	}
-	if _, err := runtime.NewMap(); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("NewMap() after Close error = %v, want ErrInvalidArgument", err)
-	}
-}
-
-func TestRuntimeCloseWrongThreadLeavesHandleRetryable(t *testing.T) {
-	stdruntime.LockOSThread()
-	defer stdruntime.UnlockOSThread()
-
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-
+func TestRuntimeLifecycleMigratesAcrossGoroutines(t *testing.T) {
+	runtimeCh := make(chan *RuntimeHandle, 1)
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- runtime.Close()
-	}()
-	if err := <-errCh; !errors.Is(err, ErrWrongThread) {
-		_ = runtime.Close()
-		t.Fatalf("Close() from another thread error = %v, want ErrWrongThread", err)
-	}
-	if err := runtime.Pump(0); err != nil {
-		_ = runtime.Close()
-		t.Fatalf("Pump() after failed close: %v", err)
-	}
-	if err := runtime.Close(); err != nil {
-		t.Fatalf("Close() on owner thread after failed close: %v", err)
-	}
-}
-
-func TestRuntimePumpWakesForNativeWorkAndForAWakeSource(t *testing.T) {
-	lockOSThreadForTest(t)
-
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	mapHandle, err := runtime.NewMap()
-	if err != nil {
-		t.Fatalf("NewMap(): %v", err)
-	}
-	drainAllRuntimeEvents(t, runtime)
-
-	// Native reports the malformed style from its own threads; the failure has
-	// to reach the parked owner thread.
-	if err := mapHandle.SetStyleURL("unsupported://style.json"); err != nil {
-		t.Fatalf("SetStyleURL(): %v", err)
-	}
-	loadingFailed := false
-	loadStarted := time.Now()
-	for i := 0; i < 20; i++ {
-		if err := runtime.Pump(10 * time.Second); err != nil {
-			t.Fatalf("Pump(): %v", err)
-		}
-		if time.Since(loadStarted) > 5*time.Second {
-			t.Fatal("parks sat out their timeouts while the style load was pending")
-		}
-		batch, err := runtime.DrainEvents(0)
+		runtime, err := NewRuntime()
 		if err != nil {
-			t.Fatalf("DrainEvents(): %v", err)
+			errCh <- err
+			return
 		}
-		for _, event := range batch.Events {
-			if event.Type == RuntimeEventMapLoadingFailed {
-				loadingFailed = true
-			}
-		}
-		if loadingFailed {
-			break
-		}
-	}
-	if !loadingFailed {
-		t.Fatal("the parked owner thread never saw the loading failure")
-	}
-
-	// Nothing else ends the park below, so only the signal from the other
-	// goroutine can release it.
-	source, err := runtime.WakeSource()
-	if err != nil {
-		t.Fatalf("WakeSource(): %v", err)
-	}
-	drainAllRuntimeEvents(t, runtime)
-	signalErr := make(chan error, 1)
-	go func() {
-		time.Sleep(20 * time.Millisecond)
-		signalErr <- source.Signal()
+		runtimeCh <- runtime
 	}()
-	parkStarted := time.Now()
-	if err := runtime.Pump(10 * time.Second); err != nil {
-		t.Fatalf("Pump(): %v", err)
-	}
-	if time.Since(parkStarted) > 5*time.Second {
-		t.Fatal("the parked owner thread timed out instead of taking the signal")
-	}
-	if err := <-signalErr; err != nil {
-		t.Fatalf("Signal(): %v", err)
-	}
 
-	// A wake source stays usable after its runtime closes.
-	if err := mapHandle.Close(); err != nil {
-		t.Fatalf("map Close(): %v", err)
+	var runtime *RuntimeHandle
+	select {
+	case err := <-errCh:
+		t.Fatalf("NewRuntime() on goroutine: %v", err)
+	case runtime = <-runtimeCh:
 	}
-	if err := runtime.Close(); err != nil {
-		t.Fatalf("Close(): %v", err)
+	m, err := runtime.NewMapWithOptions(NewMapOptions(128, 128, 1))
+	if err != nil {
+		t.Fatalf("NewMap() after goroutine migration: %v", err)
 	}
-	if err := source.Signal(); err != nil {
-		t.Fatalf("Signal() after runtime close: %v", err)
+	closed := make(chan error, 1)
+	go func() { closed <- m.Close() }()
+	if err := <-closed; err != nil {
+		t.Fatalf("Map Close() on another goroutine: %v", err)
 	}
-	source.Close()
-	if err := source.Signal(); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("Signal() after source Close error = %v, want ErrInvalidArgument", err)
+	go func() { closed <- runtime.Close() }()
+	if err := <-closed; err != nil {
+		t.Fatalf("Runtime Close() on another goroutine: %v", err)
 	}
 }
 
-func TestRuntimePumpConsumesOneLatchedSignal(t *testing.T) {
-	lockOSThreadForTest(t)
-
+func TestNotificationCallbackOnlySchedulesOwnedReadyDrain(t *testing.T) {
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
-	defer func() {
-		if err := runtime.Close(); err != nil {
-			t.Fatalf("Close(): %v", err)
+	defer runtime.Close()
+
+	scheduled := make(chan struct{}, 1)
+	if err := runtime.SetNotificationCallback(func() {
+		select {
+		case scheduled <- struct{}{}:
+		default:
 		}
-	}()
-	source, err := runtime.WakeSource()
+	}); err != nil {
+		t.Fatalf("SetNotificationCallback(): %v", err)
+	}
+	operation, err := runtime.Barrier()
 	if err != nil {
-		t.Fatalf("WakeSource(): %v", err)
+		t.Fatalf("Barrier(): %v", err)
 	}
-	defer source.Close()
-	drainAllRuntimeEvents(t, runtime)
-
-	if err := source.Signal(); err != nil {
-		t.Fatalf("Signal(): %v", err)
+	defer operation.Release()
+	select {
+	case <-scheduled:
+	case <-time.After(2 * time.Second):
+		t.Fatal("notification callback did not schedule the receiver")
 	}
-	signalledStarted := time.Now()
-	if err := runtime.Pump(10 * time.Second); err != nil {
-		t.Fatalf("Pump(): %v", err)
+	if _, err := runtime.DrainReady(); err != nil {
+		t.Fatalf("DrainReady(): %v", err)
 	}
-	if time.Since(signalledStarted) > 5*time.Second {
-		t.Fatal("a pump waited even though the wake flag was set")
+	if completed, err := operation.Wait(-1); err != nil || !completed {
+		t.Fatalf("Wait() = %v, %v; want true, nil", completed, err)
 	}
-
-	// The pump above cleared the wake flag, so this one waits its full timeout.
-	idleStarted := time.Now()
-	if err := runtime.Pump(200 * time.Millisecond); err != nil {
-		t.Fatalf("Pump(): %v", err)
-	}
-	if time.Since(idleStarted) < 100*time.Millisecond {
-		t.Fatal("the first pump left the wake flag set")
+	if err := operation.Discard(); err != nil {
+		t.Fatalf("Discard(): %v", err)
 	}
 }

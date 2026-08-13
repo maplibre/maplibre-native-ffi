@@ -34,210 +34,225 @@ class LogCallbackStateTest : org.maplibre.nativeffi.NativeTestBase() {
   // BND-120, BND-121, BND-122, BND-123.
 
   @Test
-  fun processGlobalLogCallbackCopiesRecordsContainsHostFailuresAndClearsState() {
-    val records = mutableListOf<LogRecord>()
-    val replacementRecords = mutableListOf<LogRecord>()
-    var initialState: LogCallbackState? = null
-    var replacementState: LogCallbackState? = null
-    try {
-      Maplibre.setLogCallback(
-        LogCallback { record ->
-          records += record
-          true
-        }
-      )
-      initialState = LogCallbackState.currentForTesting()
-      memScoped {
-        assertEquals(1U, initialState?.invoke(1U, 3U, 7L, "hello".cstr.getPointer(this)))
-      }
-      assertEquals(LogSeverity.INFO, records.single().severity)
-      assertEquals(LogSeverity.INFO.nativeValue, records.single().severity.nativeValue)
-      assertEquals(LogEvent.PARSE_STYLE, records.single().event)
-      assertEquals(LogEvent.PARSE_STYLE.nativeValue, records.single().event.nativeValue)
-      assertEquals(7L, records.single().code)
-      assertEquals("hello", records.single().message)
-
-      Maplibre.setLogCallback(
-        LogCallback { record ->
-          replacementRecords += record
-          false
-        }
-      )
-      replacementState = LogCallbackState.currentForTesting()
-      assertEquals(0U, initialState?.invoke(1U, 3U, 8L, null))
-      memScoped {
-        assertEquals(0U, replacementState?.invoke(2U, 6U, 9L, "replacement".cstr.getPointer(this)))
-      }
-      assertEquals(1, records.size)
-      assertEquals("replacement", replacementRecords.single().message)
-
-      Maplibre.setLogCallback(LogCallback { throw IllegalStateException("contained") })
-      assertEquals(0U, replacementState?.invoke(2U, 6U, 10L, null))
-      assertEquals(0U, LogCallbackState.currentForTesting()?.invoke(2U, 6U, 0L, null))
-    } finally {
-      Maplibre.clearLogCallback()
-      assertNull(LogCallbackState.currentForTesting())
-      assertEquals(0U, LogCallbackState.invokeCurrent(1U, 3U, 12L, null))
-      assertEquals(0U, replacementState?.invoke(2U, 6U, 11L, null))
-    }
-  }
-
-  @Test
-  fun logCallbackCopiesMessageAndPreservesUnknownRawEnums() {
-    var record: LogRecord? = null
-    try {
-      Maplibre.setLogCallback(
-        LogCallback {
-          record = it
-          true
-        }
-      )
-      val state = requireNotNull(LogCallbackState.currentForTesting())
-
-      memScoped { assertEquals(1U, state.invoke(900U, 901U, 12L, "future".cstr.getPointer(this))) }
-
-      assertEquals(LogSeverity(900), record?.severity)
-      assertEquals(900, record?.severity?.nativeValue)
-      assertEquals(LogEvent(901), record?.event)
-      assertEquals(901, record?.event?.nativeValue)
-      assertEquals(12L, record?.code)
-      assertEquals("future", record?.message)
-    } finally {
-      Maplibre.clearLogCallback()
-    }
-  }
-
-  @Test
-  fun failedInitialNativeLogInstallClosesReplacementState() {
-    var replacementState: LogCallbackState? = null
-
-    val error =
-      assertFailsWith<MaplibreException> {
-        LogCallbackState.setForTesting(
-          LogCallback { true },
-          install = { MaplibreStatus.NATIVE_ERROR.nativeCode },
-          captureReplacement = { replacementState = it },
-        )
-      }
-
-    assertEquals(MaplibreStatus.NATIVE_ERROR, error.status)
-    assertNull(LogCallbackState.currentForTesting())
-    assertTrue(replacementState?.isClosedForTesting() == true)
-  }
-
-  @Test
-  fun closeDuringLogCallbackAllowsEnteredCallbackAndSuppressesLaterUpcalls() {
-    var accepted = 0
-    lateinit var state: LogCallbackState
-    try {
-      Maplibre.setLogCallback(
-        LogCallback {
-          state.close()
-          accepted += 1
-          true
-        }
-      )
-      state = requireNotNull(LogCallbackState.currentForTesting())
-
-      assertEquals(1U, state.invoke(1U, 3U, 7L, null))
-      assertEquals(1, accepted)
-      assertEquals(0U, state.invoke(1U, 3U, 8L, null))
-    } finally {
-      Maplibre.clearLogCallback()
-    }
-  }
-
-  @Test
-  fun clearDuringLogCallbackRejectsBeforeNativeClear() {
-    var clearError: Throwable? = null
-    lateinit var state: LogCallbackState
-    try {
-      Maplibre.setLogCallback(
-        LogCallback {
-          clearError = assertFailsWith<InvalidStateException> { Maplibre.clearLogCallback() }
-          true
-        }
-      )
-      state = requireNotNull(LogCallbackState.currentForTesting())
-
-      assertEquals(1U, state.invoke(1U, 3U, 7L, null))
-      assertTrue(clearError is InvalidStateException)
-      assertTrue(LogCallbackState.currentForTesting() === state)
-    } finally {
-      Maplibre.clearLogCallback()
-    }
-  }
-
-  @Test
-  fun setDuringLogCallbackRejectsBeforeNativeInstall() {
-    var setError: Throwable? = null
-    lateinit var state: LogCallbackState
-    try {
-      Maplibre.setLogCallback(
-        LogCallback {
-          setError =
-            assertFailsWith<InvalidStateException> { Maplibre.setLogCallback(LogCallback { true }) }
-          true
-        }
-      )
-      state = requireNotNull(LogCallbackState.currentForTesting())
-
-      assertEquals(1U, state.invoke(1U, 3U, 7L, null))
-      assertTrue(setError is InvalidStateException)
-      assertTrue(LogCallbackState.currentForTesting() === state)
-    } finally {
-      Maplibre.clearLogCallback()
-    }
-  }
-
-  @Test
-  fun concurrentCloseDuringLogCallbackAllowsEnteredCallbackAndSuppressesLaterUpcalls() {
-    val phase = AtomicInt(LOG_PHASE_READY)
-    val closeReturned = AtomicInt(0)
-    val error = AtomicReference<Throwable?>(null)
-    val accepted = AtomicInt(0)
-    lateinit var state: LogCallbackState
-    try {
-      Maplibre.setLogCallback(
-        LogCallback {
-          accepted.addAndFetch(1)
-          phase.store(LOG_PHASE_ENTERED)
-          waitForLogPhase(phase, LOG_PHASE_RELEASE)
-          true
-        }
-      )
-      state = requireNotNull(LogCallbackState.currentForTesting())
-
-      runLogInvokeOnNativeThread(ConcurrentLogInvoke(state, phase, error)) {
-        waitForLogPhase(phase, LOG_PHASE_ENTERED)
-        runNativeAction(
-          NativeAction(error) {
-            state.close()
-            closeReturned.store(1)
+  fun processGlobalLogCallbackCopiesRecordsContainsHostFailuresAndClearsState(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val records = mutableListOf<LogRecord>()
+      val replacementRecords = mutableListOf<LogRecord>()
+      var initialState: LogCallbackState? = null
+      var replacementState: LogCallbackState? = null
+      try {
+        Maplibre.setLogCallback(
+          LogCallback { record ->
+            records += record
+            true
           }
-        ) {
-          waitForLogClosing(state)
-          assertEquals(0, closeReturned.load())
-          assertEquals(0U, state.invoke(1U, 3U, 8L, null))
-          phase.store(LOG_PHASE_RELEASE)
+        )
+        initialState = LogCallbackState.currentForTesting()
+        memScoped {
+          assertEquals(1U, initialState?.invoke(1U, 3U, 7L, "hello".cstr.getPointer(this)))
         }
-      }
+        assertEquals(LogSeverity.INFO, records.single().severity)
+        assertEquals(LogSeverity.INFO.nativeValue, records.single().severity.nativeValue)
+        assertEquals(LogEvent.PARSE_STYLE, records.single().event)
+        assertEquals(LogEvent.PARSE_STYLE.nativeValue, records.single().event.nativeValue)
+        assertEquals(7L, records.single().code)
+        assertEquals("hello", records.single().message)
 
-      error.load()?.let { throw it }
-      assertEquals(1, accepted.load())
-      assertEquals(1, closeReturned.load())
-      assertTrue(state.isClosedForTesting())
-    } finally {
-      phase.store(LOG_PHASE_RELEASE)
-      Maplibre.clearLogCallback()
+        Maplibre.setLogCallback(
+          LogCallback { record ->
+            replacementRecords += record
+            false
+          }
+        )
+        replacementState = LogCallbackState.currentForTesting()
+        assertEquals(0U, initialState?.invoke(1U, 3U, 8L, null))
+        memScoped {
+          assertEquals(
+            0U,
+            replacementState?.invoke(2U, 6U, 9L, "replacement".cstr.getPointer(this)),
+          )
+        }
+        assertEquals(1, records.size)
+        assertEquals("replacement", replacementRecords.single().message)
+
+        Maplibre.setLogCallback(LogCallback { throw IllegalStateException("contained") })
+        assertEquals(0U, replacementState?.invoke(2U, 6U, 10L, null))
+        assertEquals(0U, LogCallbackState.currentForTesting()?.invoke(2U, 6U, 0L, null))
+      } finally {
+        Maplibre.clearLogCallback()
+        assertNull(LogCallbackState.currentForTesting())
+        assertEquals(0U, LogCallbackState.invokeCurrent(1U, 3U, 12L, null))
+        assertEquals(0U, replacementState?.invoke(2U, 6U, 11L, null))
+      }
     }
-  }
 
   @Test
-  fun logSeverityMasksRejectUnknownInputs() {
-    assertEquals(1 shl 1, LogSeverity.INFO.nativeMask)
-    kotlin.test.assertFailsWith<InvalidArgumentException> { LogSeverity(900).nativeMask }
-  }
+  fun logCallbackCopiesMessageAndPreservesUnknownRawEnums(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      var record: LogRecord? = null
+      try {
+        Maplibre.setLogCallback(
+          LogCallback {
+            record = it
+            true
+          }
+        )
+        val state = requireNotNull(LogCallbackState.currentForTesting())
+
+        memScoped {
+          assertEquals(1U, state.invoke(900U, 901U, 12L, "future".cstr.getPointer(this)))
+        }
+
+        assertEquals(LogSeverity(900), record?.severity)
+        assertEquals(900, record?.severity?.nativeValue)
+        assertEquals(LogEvent(901), record?.event)
+        assertEquals(901, record?.event?.nativeValue)
+        assertEquals(12L, record?.code)
+        assertEquals("future", record?.message)
+      } finally {
+        Maplibre.clearLogCallback()
+      }
+    }
+
+  @Test
+  fun failedInitialNativeLogInstallClosesReplacementState(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      var replacementState: LogCallbackState? = null
+
+      val error =
+        assertFailsWith<MaplibreException> {
+          LogCallbackState.setForTesting(
+            LogCallback { true },
+            install = { MaplibreStatus.NATIVE_ERROR.nativeCode },
+            captureReplacement = { replacementState = it },
+          )
+        }
+
+      assertEquals(MaplibreStatus.NATIVE_ERROR, error.status)
+      assertNull(LogCallbackState.currentForTesting())
+      assertTrue(replacementState?.isClosedForTesting() == true)
+    }
+
+  @Test
+  fun closeDuringLogCallbackAllowsEnteredCallbackAndSuppressesLaterUpcalls(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      var accepted = 0
+      lateinit var state: LogCallbackState
+      try {
+        Maplibre.setLogCallback(
+          LogCallback {
+            state.close()
+            accepted += 1
+            true
+          }
+        )
+        state = requireNotNull(LogCallbackState.currentForTesting())
+
+        assertEquals(1U, state.invoke(1U, 3U, 7L, null))
+        assertEquals(1, accepted)
+        assertEquals(0U, state.invoke(1U, 3U, 8L, null))
+      } finally {
+        Maplibre.clearLogCallback()
+      }
+    }
+
+  @Test
+  fun clearDuringLogCallbackRejectsBeforeNativeClear(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      var clearError: Throwable? = null
+      lateinit var state: LogCallbackState
+      try {
+        Maplibre.setLogCallback(
+          LogCallback {
+            clearError = assertFailsWith<InvalidStateException> { Maplibre.clearLogCallback() }
+            true
+          }
+        )
+        state = requireNotNull(LogCallbackState.currentForTesting())
+
+        assertEquals(1U, state.invoke(1U, 3U, 7L, null))
+        assertTrue(clearError is InvalidStateException)
+        assertTrue(LogCallbackState.currentForTesting() === state)
+      } finally {
+        Maplibre.clearLogCallback()
+      }
+    }
+
+  @Test
+  fun setDuringLogCallbackRejectsBeforeNativeInstall(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      var setError: Throwable? = null
+      lateinit var state: LogCallbackState
+      try {
+        Maplibre.setLogCallback(
+          LogCallback {
+            setError =
+              assertFailsWith<InvalidStateException> {
+                Maplibre.setLogCallback(LogCallback { true })
+              }
+            true
+          }
+        )
+        state = requireNotNull(LogCallbackState.currentForTesting())
+
+        assertEquals(1U, state.invoke(1U, 3U, 7L, null))
+        assertTrue(setError is InvalidStateException)
+        assertTrue(LogCallbackState.currentForTesting() === state)
+      } finally {
+        Maplibre.clearLogCallback()
+      }
+    }
+
+  @Test
+  fun concurrentCloseDuringLogCallbackAllowsEnteredCallbackAndSuppressesLaterUpcalls(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val phase = AtomicInt(LOG_PHASE_READY)
+      val closeReturned = AtomicInt(0)
+      val error = AtomicReference<Throwable?>(null)
+      val accepted = AtomicInt(0)
+      lateinit var state: LogCallbackState
+      try {
+        Maplibre.setLogCallback(
+          LogCallback {
+            accepted.addAndFetch(1)
+            phase.store(LOG_PHASE_ENTERED)
+            waitForLogPhase(phase, LOG_PHASE_RELEASE)
+            true
+          }
+        )
+        state = requireNotNull(LogCallbackState.currentForTesting())
+
+        runLogInvokeOnNativeThread(ConcurrentLogInvoke(state, phase, error)) {
+          waitForLogPhase(phase, LOG_PHASE_ENTERED)
+          runNativeAction(
+            NativeAction(error) {
+              state.close()
+              closeReturned.store(1)
+            }
+          ) {
+            waitForLogClosing(state)
+            assertEquals(0, closeReturned.load())
+            assertEquals(0U, state.invoke(1U, 3U, 8L, null))
+            phase.store(LOG_PHASE_RELEASE)
+          }
+        }
+
+        error.load()?.let { throw it }
+        assertEquals(1, accepted.load())
+        assertEquals(1, closeReturned.load())
+        assertTrue(state.isClosedForTesting())
+      } finally {
+        phase.store(LOG_PHASE_RELEASE)
+        Maplibre.clearLogCallback()
+      }
+    }
+
+  @Test
+  fun logSeverityMasksRejectUnknownInputs(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      assertEquals(1 shl 1, LogSeverity.INFO.nativeMask)
+      kotlin.test.assertFailsWith<InvalidArgumentException> { LogSeverity(900).nativeMask }
+    }
 
   private fun runLogInvokeOnNativeThread(invocation: ConcurrentLogInvoke, block: () -> Unit) {
     runNativeAction(invocation, block)

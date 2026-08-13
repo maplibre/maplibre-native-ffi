@@ -43,6 +43,7 @@ void install_transform(mln_runtime runtime, char* api_key) {
     .callback = add_api_key,
     .user_data = api_key,
   };
-  mln_runtime_set_resource_transform(runtime, &transform);
+  uint64_t command_id = 0;
+  mln_runtime_set_resource_transform(runtime, &transform, &command_id);
 }
 // #endregion install

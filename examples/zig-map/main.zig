@@ -4,7 +4,6 @@ const build_options = @import("build_options");
 const objc = if (build_options.supports_metal) @import("objc") else struct {};
 
 const c = @import("c.zig").c;
-const channel = @import("channel.zig");
 const diagnostics = @import("diagnostics.zig");
 const maplibre = @import("maplibre_native_ffi");
 const input = @import("input.zig");
@@ -14,54 +13,8 @@ const types = @import("types.zig");
 const viewport = @import("viewport.zig");
 
 const RenderTarget = render.RenderTarget;
-
-/// Backstop for a parked pump that nothing signals; the wake source is what
-/// normally releases it.
-const park_timeout_milliseconds = 100;
-const uses_egl = build_options.supports_opengl and (builtin.os.tag == .linux or builtin.os.tag == .macos);
-
-const RuntimeLoopArgs = struct {
-    allocator: std.mem.Allocator,
-    io: std.Io,
-    initial_viewport: types.Viewport,
-    commands: *channel.CommandQueue,
-    render_request: *channel.RenderRequest,
-    map_channel: *channel.MapChannel,
-};
-
-/// Owns the runtime and the map for their whole lifetime, on a thread that is
-/// not the one presenting.
-fn runtimeLoop(args: RuntimeLoopArgs) void {
-    var state = map_state.MapState.init(args.allocator, args.initial_viewport) catch |err| {
-        args.map_channel.fail(err);
-        return;
-    };
-    // A map with an attached session cannot be destroyed, so wait for the render
-    // loop to close its session first; defers run in reverse.
-    defer state.deinit();
-    defer args.map_channel.awaitShutdown(args.io);
-
-    runtimeLoopBody(args, &state) catch |err| args.map_channel.fail(err);
-}
-
-fn runtimeLoopBody(args: RuntimeLoopArgs, state: *map_state.MapState) !void {
-    // The render loop signals this to release the parked pump.
-    const wake = try state.runtime.wakeSource();
-    defer wake.release();
-
-    var batch: std.ArrayList(channel.CameraCommand) = .empty;
-    defer batch.deinit(args.allocator);
-
-    args.map_channel.publish(state.map, wake);
-
-    while (!args.map_channel.shutdownRequested() and args.map_channel.failureValue() == null) {
-        try state.applyCommands(args.commands, &batch);
-        try state.runtime.pump(park_timeout_milliseconds);
-        if (try map_state.drainEvents(state.allocator, &state.runtime, &state.map)) {
-            args.render_request.set();
-        }
-    }
-}
+const uses_egl = build_options.supports_opengl and
+    (builtin.os.tag == .linux or builtin.os.tag == .macos);
 
 pub fn main(init_args: std.process.Init) !void {
     const target_mode = (try parseRenderTargetMode(init_args)) orelse return;
@@ -114,74 +67,46 @@ pub fn main(init_args: std.process.Init) !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    // The graphics context, the render session, and every presentation resource
-    // belong to this thread, which owns the window.
+    var state = try map_state.MapState.init(allocator, current_viewport);
+    defer state.deinit();
+
+    // The graphics context, render session, and presentation resources remain
+    // on the window-owning thread.
     var target = try RenderTarget.init(allocator, window_handle, current_viewport, target_mode);
+    defer target.deinit();
+    try target.attach(&state.map, current_viewport);
 
-    var commands = channel.CommandQueue.init(allocator);
-    defer commands.deinit();
-    var render_request = channel.RenderRequest{};
-    var map_channel = channel.MapChannel{};
-
-    const runtime_thread = try std.Thread.spawn(.{}, runtimeLoop, .{RuntimeLoopArgs{
-        .allocator = allocator,
-        .io = init_args.io,
-        .initial_viewport = current_viewport,
-        .commands = &commands,
-        .render_request = &render_request,
-        .map_channel = &map_channel,
-    }});
-
-    const result = renderLoop(
+    try renderLoop(
         init_args.io,
         window_handle,
         target_mode,
         &target,
         &current_viewport,
-        &commands,
-        &render_request,
-        &map_channel,
+        &state,
     );
-
-    // Destroy the session before the runtime loop destroys the map: a map with
-    // an attached session cannot be destroyed.
-    target.deinit();
-    map_channel.requestShutdown();
-    runtime_thread.join();
-
-    try result;
-    if (map_channel.failureValue()) |err| return err;
 }
 
-/// The display-paced render loop. Owns the window, input, and the render
-/// session once it adopts it.
+/// The display-paced loop. Runtime/map calls are any-thread; the render session
+/// remains attached to this graphics thread.
 fn renderLoop(
     io: std.Io,
     window_handle: *c.SDL_Window,
     target_mode: types.RenderTargetMode,
     target: *RenderTarget,
     current_viewport: *types.Viewport,
-    commands: *channel.CommandQueue,
-    render_request: *channel.RenderRequest,
-    map_channel: *channel.MapChannel,
+    state: *map_state.MapState,
 ) !void {
-    var map = while (true) {
-        if (map_channel.failureValue()) |err| return err;
-        if (map_channel.mapHandle()) |handle| break handle;
-        try io.sleep(.fromMilliseconds(1), .awake);
-    };
-    try target.attach(&map, current_viewport.*);
-
     printStartupStatus(target_mode);
     input.logControls();
 
     var running = true;
+    var render_requested = true;
     var input_controller = input.Controller{};
     while (running) {
         const pool = if (build_options.supports_metal) objc.AutoreleasePool.init() else {};
         defer if (build_options.supports_metal) pool.deinit();
 
-        if (map_channel.failureValue()) |err| return err;
+        if (try map_state.drainNotifications(state)) render_requested = true;
 
         var event: c.SDL_Event = undefined;
         while (c.SDL_PollEvent(&event)) {
@@ -195,32 +120,31 @@ fn renderLoop(
                     current_viewport.* = viewport.get(window_handle);
                     viewport.log("resized viewport", current_viewport.*);
                     try target.resize(current_viewport.*);
-                    // The resize is queued to the map's owner thread; release
-                    // its pump.
-                    map_channel.wakeRuntimeLoop();
-                    render_request.set();
+                    _ = try state.map.resize(
+                        current_viewport.logical_width,
+                        current_viewport.logical_height,
+                        current_viewport.scale_factor,
+                    );
+                    render_requested = true;
                 },
                 else => {
-                    const input_result = input_controller.handleEvent(
+                    const input_result = try input_controller.handleEvent(
                         &event,
-                        commands,
+                        &state.map,
+                        state.diagnostic_store,
                         current_viewport.*,
                     );
-                    if (input_result.handled) {
-                        map_channel.wakeRuntimeLoop();
-                    }
-                    if (input_result.camera_changed) render_request.set();
+                    if (input_result.camera_changed) render_requested = true;
                 },
             }
         }
 
         try target.finishFrame();
 
-        // Consume before rendering, so a request published during the render
-        // call is not discarded.
-        if (render_request.consume()) {
+        if (render_requested) {
+            render_requested = false;
             if (!try target.renderUpdate(null, current_viewport.*)) {
-                render_request.set();
+                render_requested = true;
             }
         }
 

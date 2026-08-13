@@ -24,6 +24,14 @@ internal static unsafe class NativeStatus
         throw CreateException(rawStatus, CaptureDiagnostic());
     }
 
+    internal static void Check(int rawStatus, string diagnostic)
+    {
+        if (rawStatus != (int)MaplibreStatus.Ok)
+        {
+            throw CreateException(rawStatus, diagnostic);
+        }
+    }
+
     private static MaplibreException CreateException(int rawStatus, string diagnostic)
     {
         var status = StatusFromRaw(rawStatus);

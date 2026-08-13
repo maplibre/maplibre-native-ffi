@@ -16,10 +16,13 @@ public sealed class GeoJsonSourceTests
 
     [BindingSpecTest("BND-065", "BND-105")]
     [Fact]
-    public void GeoJsonSourceDataAdaptsThroughNativeMap()
+    public async Task GeoJsonSourceDataAdaptsThroughNativeMap()
     {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
         map.SetStyleJson("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
 
         map.AddGeoJsonSourceData("geo-data", EmptyFeatureCollection, null);
@@ -28,32 +31,36 @@ public sealed class GeoJsonSourceTests
             """{"type":"Point","coordinates":[2,1]}"""u8.ToArray()
         );
 
-        Assert.True(map.StyleSourceExists("geo-data"));
-        Assert.Equal(SourceType.GeoJson, map.StyleSourceType("geo-data"));
+        Assert.True(await map.StyleSourceExistsAsync("geo-data"));
+        Assert.Equal(SourceType.GeoJson, await map.StyleSourceTypeAsync("geo-data"));
     }
 
     [BindingSpecTest("BND-060", "BND-105")]
     [Fact]
-    public void ClusteredGeoJsonSourceOptionsParseThroughNativeMap()
+    public async Task ClusteredGeoJsonSourceOptionsParseThroughNativeMap()
     {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
         map.SetStyleJson("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
 
         map.AddGeoJsonSourceData("clustered", NearbyPoints, ClusterOptions());
 
-        Assert.True(map.StyleSourceExists("clustered"));
-        Assert.Equal(SourceType.GeoJson, map.StyleSourceType("clustered"));
+        Assert.True(await map.StyleSourceExistsAsync("clustered"));
+        Assert.Equal(SourceType.GeoJson, await map.StyleSourceTypeAsync("clustered"));
 
         var options = ClusterOptions();
         options.ClusterProperties = """{"weight_sum":"not-an-expression"}"""u8.ToArray();
 
-        var error = Assert.Throws<InvalidArgumentException>(() =>
-            map.AddGeoJsonSourceData("clustered-invalid", NearbyPoints, options)
-        );
-
-        Assert.Equal(MaplibreStatus.InvalidArgument, error.Status);
-        Assert.False(map.StyleSourceExists("clustered-invalid"));
+        var rejected = map.AddGeoJsonSourceData("clustered-invalid", NearbyPoints, options);
+        var failure = RuntimeEventTestHelpers.WaitForCommand(runtime, rejected);
+        var completion = Assert.IsType<RuntimeEventPayload.CommandFinished>(failure.Payload);
+        Assert.Equal(CommandDisposition.Failed, completion.Disposition);
+        Assert.Equal((int)MaplibreStatus.InvalidArgument, failure.Code);
+        Assert.NotEmpty(failure.Message);
+        Assert.False(await map.StyleSourceExistsAsync("clustered-invalid"));
     }
 
     private static GeoJsonSourceOptions ClusterOptions() =>

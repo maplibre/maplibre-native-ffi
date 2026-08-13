@@ -1,12 +1,10 @@
-// The runtime and the map, owned for their whole lifetime by the runtime loop
-// thread.
+// The runtime and map driven by the core-owned scheduler.
 
 #ifndef C_MAP_MAP_STATE_H
 #define C_MAP_MAP_STATE_H
 
 #include <maplibre_native_c.h>
 
-#include "channel.h"
 #include "types.h"
 
 typedef struct map_state {
@@ -16,18 +14,23 @@ typedef struct map_state {
 } map_state;
 
 [[nodiscard]] app_error map_state_init(
-  map_state* out_state, viewport initial_viewport
+  map_state* out_state, viewport initial_viewport,
+  mln_notification_callback notification_callback, void* notification_user_data
 );
 void map_state_deinit(map_state* state);
 
-/// Applies every queued camera command on the map's owner thread.
-[[nodiscard]] app_error map_state_apply_commands(
-  map_state* state, command_queue* commands, command_list* batch
+[[nodiscard]] app_error map_state_camera_query(
+  map_state* state, mln_camera_options* out_camera
 );
+[[nodiscard]] app_error map_state_update_camera(
+  map_state* state, const mln_camera_options* camera, uint32_t mode,
+  const mln_animation_options* animation, uint32_t gesture_phase,
+  uint64_t gesture_id
+);
+[[nodiscard]] app_error map_state_resize(map_state* state, viewport value);
 
-/// Drains one batch of runtime events, reporting whether the map wants another
-/// frame.
-[[nodiscard]] app_error map_state_drain_events(
+/// Drains owned notification and event batches on the render-loop receiver.
+[[nodiscard]] app_error map_state_drain_notifications(
   map_state* state, bool* out_render_update
 );
 

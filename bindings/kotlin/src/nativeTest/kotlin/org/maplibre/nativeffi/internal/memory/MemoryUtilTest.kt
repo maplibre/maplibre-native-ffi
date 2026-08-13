@@ -11,13 +11,14 @@ import kotlinx.cinterop.ptr
 @OptIn(ExperimentalForeignApi::class)
 class MemoryUtilTest : org.maplibre.nativeffi.NativeTestBase() {
   @Test
-  fun stringViewCopiesRejectOversizedNativeLengths() {
-    memScoped {
-      val byte = alloc<ByteVar>()
+  fun stringViewCopiesRejectOversizedNativeLengths(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      memScoped {
+        val byte = alloc<ByteVar>()
 
-      assertFailsWith<IllegalArgumentException> {
-        MemoryUtil.copyStringView(byte.ptr, Int.MAX_VALUE.toULong() + 1UL)
+        assertFailsWith<IllegalArgumentException> {
+          MemoryUtil.copyStringView(byte.ptr, Int.MAX_VALUE.toULong() + 1UL)
+        }
       }
     }
-  }
 }

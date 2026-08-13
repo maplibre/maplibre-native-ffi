@@ -527,8 +527,8 @@ func newRenderSessionHandle(parent *MapHandle, session nativeRenderSession) (*Re
 }
 
 // AttachMetalSurface attaches a Metal native surface render target to this map.
-// The returned session is affine to the OS thread that attaches it, which need
-// not be the map owner thread.
+// The returned session is affine to the OS thread that attaches it. The map
+// handle remains usable from any goroutine.
 func (m *MapHandle) AttachMetalSurface(descriptor MetalSurfaceDescriptor) (*RenderSessionHandle, error) {
 	if err := descriptor.Extent.validate(); err != nil {
 		return nil, err
@@ -551,8 +551,8 @@ func (m *MapHandle) AttachMetalSurface(descriptor MetalSurfaceDescriptor) (*Rend
 }
 
 // AttachVulkanSurface attaches a Vulkan native surface render target to this
-// map. The returned session is affine to the OS thread that attaches it, which
-// need not be the map owner thread, and borrowed Vulkan handles must outlive
+// map. The returned session is affine to the OS thread that attaches it. The
+// map handle remains any-thread, and borrowed Vulkan handles must outlive
 // detach or session close.
 func (m *MapHandle) AttachVulkanSurface(descriptor VulkanSurfaceDescriptor) (*RenderSessionHandle, error) {
 	if err := descriptor.Extent.validate(); err != nil {
@@ -576,8 +576,8 @@ func (m *MapHandle) AttachVulkanSurface(descriptor VulkanSurfaceDescriptor) (*Re
 }
 
 // AttachOpenGLSurface attaches an OpenGL native surface render target to this
-// map. The returned session is affine to the OS thread that attaches it, which
-// need not be the map owner thread, and borrowed OpenGL context handles must
+// map. The returned session is affine to the OS thread that attaches it. The
+// map handle remains any-thread, and borrowed OpenGL context handles must
 // outlive detach or session close.
 func (m *MapHandle) AttachOpenGLSurface(descriptor OpenGLSurfaceDescriptor) (*RenderSessionHandle, error) {
 	if err := descriptor.Extent.validate(); err != nil {

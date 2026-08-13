@@ -22,15 +22,15 @@ offline regions, and resource transform.
 <Code code={region(loadStyle, "url")} lang="c" title="load-style.c" />
 
 Set style text when the host already has the document, such as a bundled base
-style or one composed at runtime. MapLibre parses and copies the text before the
-call returns.
+style or one composed at runtime. The command copies the text before returning
+acceptance.
 
 <Code code={region(loadStyle, "json")} lang="c" title="load-style.c" />
 
-Either call returns when the map accepts the request. Later pumps load the
-style, sources, glyphs, and first tiles. A style-loaded event reports that the
-style has parsed and its sources exist. A loading-failed event carries the
-failure text.
+Either command returns after copying and accepting its input. The native
+scheduler loads the style, sources, glyphs, and first tiles. A style-loaded
+event reports that the style parsed and its sources exist. A loading-failed event
+or failed command-finished event carries diagnostic text.
 [Handle events](/maplibre-native-ffi/guides/handle-events/) covers reading both.
 
 ## Replay additions after a style load

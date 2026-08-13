@@ -32,34 +32,39 @@ pub const MapProjectionHandle = enum(c.mln_map_projection) {
     _,
 
     pub fn create(map: *MapHandle) status.Error!MapProjectionHandle {
-        var projection: c.mln_map_projection = 0;
+        var operation: c.mln_operation = 0;
         const diagnostic_store = map_module.diagnosticStore(map);
-        try status.checkStatus(
-            c.mln_map_projection_create(try map_module.native(map), &projection),
-            diagnostic_store,
-        );
-        errdefer _ = c.mln_map_projection_destroy(projection);
+        try status.checkStatus(c.mln_map_projection_create_start(try map_module.native(map), &operation), diagnostic_store);
+        defer c.mln_operation_release(operation);
+        try runtime_module.waitNativeOperation(operation, diagnostic_store);
+        var projection: c.mln_map_projection = 0;
+        try status.checkStatus(c.mln_map_projection_create_take_result(operation, &projection), diagnostic_store);
 
         const projection_state = try std.heap.smp_allocator.create(ProjectionState);
         projection_state.* = .{ .diagnostic_store = diagnostic_store };
         errdefer std.heap.smp_allocator.destroy(projection_state);
-
         return try registerProjectionState(projection, projection_state);
     }
 
     pub fn getCamera(self: *MapProjectionHandle) status.Error!values.CameraOptions {
-        var camera = c.mln_camera_options_default();
         const lease = try projectionLease(self.*);
         defer lease.release();
-        try status.checkStatus(c.mln_map_projection_get_camera(lease.native, &camera), lease.diagnostic_store);
+        var operation: c.mln_operation = 0;
+        try status.checkStatus(c.mln_map_projection_get_camera_start(lease.native, &operation), lease.diagnostic_store);
+        defer c.mln_operation_release(operation);
+        try runtime_module.waitNativeOperation(operation, lease.diagnostic_store);
+        var camera = c.mln_camera_options_default();
+        try status.checkStatus(c.mln_map_projection_get_camera_take_result(operation, &camera), lease.diagnostic_store);
         return values.cameraOptionsFromNative(camera);
     }
 
-    pub fn setCamera(self: *MapProjectionHandle, camera: values.CameraOptions) status.Error!void {
+    pub fn setCamera(self: *MapProjectionHandle, camera: values.CameraOptions) status.Error!u64 {
         var raw_camera = values.cameraOptionsToNative(camera);
         const lease = try projectionLease(self.*);
         defer lease.release();
-        try status.checkStatus(c.mln_map_projection_set_camera(lease.native, &raw_camera), lease.diagnostic_store);
+        var command_id: u64 = 0;
+        try status.checkStatus(c.mln_map_projection_set_camera(lease.native, &raw_camera, &command_id), lease.diagnostic_store);
+        return command_id;
     }
 
     pub fn setVisibleCoordinates(
@@ -67,22 +72,19 @@ pub const MapProjectionHandle = enum(c.mln_map_projection) {
         allocator: std.mem.Allocator,
         coordinates: []const values.LatLng,
         padding: values.EdgeInsets,
-    ) status.Error!void {
+    ) status.Error!u64 {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         const raw_coordinates = try temp.latLngs(coordinates);
         const coordinate_ptr = if (raw_coordinates.len == 0) null else raw_coordinates.ptr;
         const lease = try projectionLease(self.*);
         defer lease.release();
+        var command_id: u64 = 0;
         try status.checkStatus(
-            c.mln_map_projection_set_visible_coordinates(
-                lease.native,
-                coordinate_ptr,
-                raw_coordinates.len,
-                values.edgeInsetsToNative(padding),
-            ),
+            c.mln_map_projection_set_visible_coordinates(lease.native, coordinate_ptr, raw_coordinates.len, values.edgeInsetsToNative(padding), &command_id),
             lease.diagnostic_store,
         );
+        return command_id;
     }
 
     pub fn setVisibleGeometry(
@@ -90,46 +92,52 @@ pub const MapProjectionHandle = enum(c.mln_map_projection) {
         allocator: std.mem.Allocator,
         geometry: []const u8,
         padding: values.EdgeInsets,
-    ) status.Error!void {
+    ) status.Error!u64 {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         const lease = try projectionLease(self.*);
         defer lease.release();
+        var command_id: u64 = 0;
         try status.checkStatus(
-            c.mln_map_projection_set_visible_geometry(
-                lease.native,
-                try temp.stringView(geometry),
-                values.edgeInsetsToNative(padding),
-            ),
+            c.mln_map_projection_set_visible_geometry(lease.native, try temp.stringView(geometry), values.edgeInsetsToNative(padding), &command_id),
             lease.diagnostic_store,
         );
+        return command_id;
     }
 
     pub fn pixelForLatLng(self: *MapProjectionHandle, coordinate: values.LatLng) status.Error!values.ScreenPoint {
-        var point: c.mln_screen_point = undefined;
         const lease = try projectionLease(self.*);
         defer lease.release();
-        try status.checkStatus(
-            c.mln_map_projection_pixel_for_lat_lng(lease.native, values.latLngToNative(coordinate), &point),
-            lease.diagnostic_store,
-        );
+        var operation: c.mln_operation = 0;
+        try status.checkStatus(c.mln_map_projection_pixel_for_lat_lng_start(lease.native, values.latLngToNative(coordinate), &operation), lease.diagnostic_store);
+        defer c.mln_operation_release(operation);
+        try runtime_module.waitNativeOperation(operation, lease.diagnostic_store);
+        var point: c.mln_screen_point = undefined;
+        try status.checkStatus(c.mln_map_projection_pixel_for_lat_lng_take_result(operation, &point), lease.diagnostic_store);
         return values.screenPointFromNative(point);
     }
 
     pub fn latLngForPixel(self: *MapProjectionHandle, point: values.ScreenPoint) status.Error!values.LatLng {
-        var coordinate: c.mln_lat_lng = undefined;
         const lease = try projectionLease(self.*);
         defer lease.release();
-        try status.checkStatus(
-            c.mln_map_projection_lat_lng_for_pixel(lease.native, values.screenPointToNative(point), &coordinate),
-            lease.diagnostic_store,
-        );
+        var operation: c.mln_operation = 0;
+        try status.checkStatus(c.mln_map_projection_lat_lng_for_pixel_start(lease.native, values.screenPointToNative(point), &operation), lease.diagnostic_store);
+        defer c.mln_operation_release(operation);
+        try runtime_module.waitNativeOperation(operation, lease.diagnostic_store);
+        var coordinate: c.mln_lat_lng = undefined;
+        try status.checkStatus(c.mln_map_projection_lat_lng_for_pixel_take_result(operation, &coordinate), lease.diagnostic_store);
         return values.latLngFromNative(coordinate);
     }
 
     pub fn close(self: *MapProjectionHandle) status.Error!void {
         const projection_close = try beginProjectionClose(self.*) orelse return;
-        status.checkStatus(c.mln_map_projection_destroy(projection_close.native), projection_close.diagnostic_store) catch |err| {
+        var operation: c.mln_operation = 0;
+        status.checkStatus(c.mln_map_projection_close_start(projection_close.native, &operation), projection_close.diagnostic_store) catch |err| {
+            cancelProjectionClose(projection_close.state);
+            return err;
+        };
+        defer c.mln_operation_release(operation);
+        runtime_module.waitNativeOperation(operation, projection_close.diagnostic_store) catch |err| {
             cancelProjectionClose(projection_close.state);
             return err;
         };

@@ -8,6 +8,7 @@ package maplibre
 import "C"
 
 import (
+	"bytes"
 	"errors"
 	"unsafe"
 
@@ -44,16 +45,12 @@ func (options MapDebugOptions) Has(requested MapDebugOptions) bool {
 
 // MapOptions configures map creation.
 type MapOptions struct {
-	// Width is the initial logical width in UI pixels, replaced by the extent of
-	// the first attached render session.
+	// Width is the initial logical width in UI pixels.
 	Width uint32
-	// Height is the initial logical height in UI pixels, replaced by the extent
-	// of the first attached render session.
+	// Height is the initial logical height in UI pixels.
 	Height uint32
-	// ScaleFactor is the UI-to-device pixel scale, fixed for the lifetime of the
-	// map. It selects sprites, glyphs, and raster tiles. A render session whose
-	// own scale factor differs logs a warning and renders imagery chosen for
-	// this density.
+	// ScaleFactor is the initial UI-to-device pixel scale. It selects sprites,
+	// glyphs, and raster tiles. Resize may update it with the logical size.
 	ScaleFactor float64
 	Mode        MapMode
 	// FastPFOREnabled decodes MapLibre Tile (MLT) tiles whose integer streams
@@ -96,6 +93,34 @@ func defaultMapEventMask() RuntimeEventMask {
 	return RuntimeEventMask(C.mln_map_options_default().event_mask)
 }
 
+// LogicalExtent is a map's logical size and device-pixel scale.
+type LogicalExtent struct {
+	Width       uint32
+	Height      uint32
+	ScaleFactor float64
+}
+
+// MapSnapshot is a copied immutable map state generation.
+type MapSnapshot struct {
+	Generation                   uint64
+	Camera                       CameraOptions
+	LogicalExtent                LogicalExtent
+	ProjectionMode               ProjectionModeOptions
+	Viewport                     ViewportOptions
+	Loading                      bool
+	FullyRendered                bool
+	RepaintDemand                bool
+	EventMask                    RuntimeEventMask
+	LatestRenderUpdateGeneration uint64
+}
+
+// CameraSnapshot is a copied camera and the immutable map generation that
+// supplied it.
+type CameraSnapshot struct {
+	Generation uint64
+	Camera     CameraOptions
+}
+
 // MapHandle owns map state for one RuntimeHandle.
 type MapHandle struct {
 	state        *handle.State[nativeMap]
@@ -105,9 +130,8 @@ type MapHandle struct {
 	id MapID
 }
 
-var destroyMapHandle = func(native nativeMap) int32 {
-	return int32(C.mln_map_destroy(C.mln_map(native)))
-}
+// Test seam for synthetic handles. Production close uses closeNativeMap.
+var destroyMapHandle func(nativeMap) int32
 
 func (m *MapHandle) ptr() (nativeMap, func(), error) {
 	if m == nil || m.state == nil {
@@ -118,6 +142,37 @@ func (m *MapHandle) ptr() (nativeMap, func(), error) {
 		return 0, nil, newBindingError(ErrInvalidArgument, "MapHandle is closed")
 	}
 	return borrow.Handle(), borrow.Release, nil
+}
+
+func waitMapOperation(start func(*C.mln_operation) int32) (C.mln_operation, error) {
+	var operation C.mln_operation
+	if err := checkNative(func() int32 { return start(&operation) }); err != nil {
+		return 0, err
+	}
+	if err := waitNativeOperation(operation); err != nil {
+		C.mln_operation_release(operation)
+		return 0, err
+	}
+	return operation, nil
+}
+
+func takeMapBuffer(operation C.mln_operation, take func(C.mln_operation, *C.mln_buffer) int32) ([]byte, error) {
+	var buffer C.mln_buffer
+	if err := checkNative(func() int32 { return take(operation, &buffer) }); err != nil {
+		return nil, err
+	}
+	if buffer == 0 {
+		return nil, nil
+	}
+	defer C.mln_buffer_destroy(buffer)
+	var view C.mln_buffer_view
+	if err := checkNative(func() int32 { return int32(C.mln_buffer_get(buffer, &view)) }); err != nil {
+		return nil, err
+	}
+	if view.size == 0 {
+		return []byte{}, nil
+	}
+	return append([]byte(nil), unsafe.Slice((*byte)(view.data), int(view.size))...), nil
 }
 
 func validateCStringArgument(name string, value string) error {
@@ -141,139 +196,166 @@ func (m *MapHandle) ID() (MapID, error) {
 	return m.id, nil
 }
 
-// SetEventMask selects which map-originated event types this map queues. It
-// accepts RuntimeEventMaskAll, reads the bits in RuntimeEventMaskAllMapEvents,
-// and returns ErrInvalidArgument for a bit outside RuntimeEventMaskAll.
-//
-// Select every event type the caller reads. Render-update-available is the map's
-// only invalidation report, the two still-image types are the only reports that
-// a still-image request finished, and loading-failed and render-error carry
-// native failure text. Narrowing gates later events and keeps queued ones, so a
-// caller drains what it already caused.
-func (m *MapHandle) SetEventMask(mask RuntimeEventMask) error {
-	ptr, release, err := m.ptr()
-	if err != nil {
-		return err
-	}
-	defer release()
-	defer m.state.KeepAlive()
-
-	return checkNative(func() int32 {
-		return int32(C.mln_map_set_event_mask(C.mln_map(ptr), C.uint64_t(mask)))
-	})
-}
-
-// EventMask reports which map-originated event types this map queues. A map that
-// has not been narrowed reports RuntimeEventMaskAll.
-func (m *MapHandle) EventMask() (RuntimeEventMask, error) {
+// SetEventMask submits a command that selects map-originated event types and
+// returns its command ID.
+func (m *MapHandle) SetEventMask(mask RuntimeEventMask) (uint64, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
 	defer release()
 	defer m.state.KeepAlive()
-
-	var raw C.uint64_t
+	var commandID C.uint64_t
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_get_event_mask(C.mln_map(ptr), &raw))
+		return int32(C.mln_map_set_event_mask(C.mln_map(ptr), C.uint64_t(mask), &commandID))
 	}); err != nil {
 		return 0, err
 	}
-	return RuntimeEventMask(raw), nil
+	return uint64(commandID), nil
 }
 
-// RequestRepaint requests a repaint for a continuous map.
-func (m *MapHandle) RequestRepaint() error {
+// EventMask returns the mask copied in the latest immutable map snapshot.
+func (m *MapHandle) EventMask() (RuntimeEventMask, error) {
+	snapshot, err := m.Snapshot()
+	if err != nil {
+		return 0, err
+	}
+	return snapshot.EventMask, nil
+}
+
+// RequestRepaint submits a repaint command for a continuous map.
+func (m *MapHandle) RequestRepaint() (uint64, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer release()
 	defer m.state.KeepAlive()
-	return checkNative(func() int32 { return int32(C.mln_map_request_repaint(C.mln_map(ptr))) })
+	var commandID C.uint64_t
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_request_repaint(C.mln_map(ptr), &commandID))
+	}); err != nil {
+		return 0, err
+	}
+	return uint64(commandID), nil
 }
 
-// RequestStillImage requests one still image for a static or tile map.
-func (m *MapHandle) RequestStillImage() error {
+// RequestStillImage starts one noncoalescing still-image operation for a static
+// or tile map.
+func (m *MapHandle) RequestStillImage() (*OperationHandle[struct{}], error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer release()
 	defer m.state.KeepAlive()
-	return checkNative(func() int32 { return int32(C.mln_map_request_still_image(C.mln_map(ptr))) })
+	return startOperation[struct{}](m.runtime, operationStillImage, operationResultNone, func(_ nativeRuntime, out *C.mln_operation) int32 {
+		return int32(C.mln_map_request_still_image_start(C.mln_map(ptr), out))
+	})
 }
 
-// SetStyleURL loads a style URL. Loading is asynchronous: a style that is
-// missing, unreachable, or malformed still returns success here and reports
-// through a map-loading-failed runtime event. A well-formed style that MapLibre
-// rejects semantically produces neither an error nor an event.
-func (m *MapHandle) SetStyleURL(url string) error {
+// SetStyleURL submits a style URL command and returns its command ID. Loading
+// failures arrive through runtime events.
+func (m *MapHandle) SetStyleURL(url string) (uint64, error) {
 	if err := validateCStringArgument("style URL", url); err != nil {
-		return err
+		return 0, err
 	}
 	ptr, release, err := m.ptr()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer release()
 	defer m.state.KeepAlive()
 	cURL := C.CString(url)
 	defer C.free(unsafe.Pointer(cURL))
-	return checkNative(func() int32 { return int32(C.mln_map_set_style_url(C.mln_map(ptr), cURL)) })
+	var commandID C.uint64_t
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_set_style_url(C.mln_map(ptr), cURL, &commandID))
+	}); err != nil {
+		return 0, err
+	}
+	return uint64(commandID), nil
 }
 
-// SetStyleJSON loads inline style JSON. Malformed JSON is reported twice: this
-// call returns the parse error, and the same message arrives as a
-// map-loading-failed runtime event. A well-formed style that MapLibre rejects
-// semantically produces neither an error nor an event.
-func (m *MapHandle) SetStyleJSON(json []byte) error {
+// SetStyleJSON submits an inline style command and returns its command ID.
+// Loading failures arrive through runtime events.
+func (m *MapHandle) SetStyleJSON(json []byte) (uint64, error) {
+	if bytes.IndexByte(json, 0) >= 0 {
+		return 0, newBindingError(ErrInvalidArgument, "style JSON contains a NUL byte")
+	}
 	ptr, release, err := m.ptr()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer release()
 	defer m.state.KeepAlive()
 	jsonView := newCBufferView(json)
 	defer jsonView.free()
-	return checkNative(func() int32 { return int32(C.mln_map_set_style_json(C.mln_map(ptr), jsonView.raw())) })
+	var commandID C.uint64_t
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_set_style_json(C.mln_map(ptr), jsonView.raw(), &commandID))
+	}); err != nil {
+		return 0, err
+	}
+	return uint64(commandID), nil
 }
 
-// LoadedStyleJSON returns the style document this map's style was last parsed
-// from, byte for byte, rather than a serialization of the live style. Runtime
-// mutations such as adding a layer do not change it, and a failed parse leaves
-// the previously parsed document in place. The result is empty only when no
-// document has been parsed.
+// LoadedStyleJSON returns an ordered copy of the last loaded style document.
 func (m *MapHandle) LoadedStyleJSON() ([]byte, error) {
-	return m.copyMapBytes(func(rawMap C.mln_map, data *C.uint8_t, capacity C.size_t, size *C.size_t) int32 {
-		return int32(C.mln_map_copy_loaded_style_json(rawMap, data, capacity, size))
-	})
-}
-
-// StyleURL returns the URL this map's style was last requested from.
-// SetStyleURL records the URL when the request is made, before the response
-// arrives or the document parses, and SetStyleJSON clears it, so this and
-// LoadedStyleJSON can disagree while a load is in flight or after one fails.
-//
-// The result is empty for a style loaded from inline JSON, a map that has
-// loaded no style, and a URL load requested with an empty string alike.
-func (m *MapHandle) StyleURL() (string, error) {
-	return m.copyMapText(func(rawMap C.mln_map, text *C.char, capacity C.size_t, size *C.size_t) int32 {
-		return int32(C.mln_map_copy_style_url(rawMap, text, capacity, size))
-	})
-}
-
-// SetDebugOptions applies MapLibre debug overlay mask bits to a map.
-func (m *MapHandle) SetDebugOptions(options MapDebugOptions) error {
 	ptr, release, err := m.ptr()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer release()
 	defer m.state.KeepAlive()
-	return checkNative(func() int32 {
-		return int32(C.mln_map_set_debug_options(C.mln_map(ptr), C.uint32_t(options)))
+	operation, err := waitMapOperation(func(out *C.mln_operation) int32 {
+		return int32(C.mln_map_loaded_style_json_start(C.mln_map(ptr), out))
 	})
+	if err != nil {
+		return nil, err
+	}
+	defer C.mln_operation_release(operation)
+	return takeMapBuffer(operation, func(operation C.mln_operation, out *C.mln_buffer) int32 {
+		return int32(C.mln_map_loaded_style_json_take_result(operation, out))
+	})
+}
+
+// StyleURL returns an ordered copy of the last requested style URL.
+func (m *MapHandle) StyleURL() (string, error) {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return "", err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	operation, err := waitMapOperation(func(out *C.mln_operation) int32 {
+		return int32(C.mln_map_style_url_start(C.mln_map(ptr), out))
+	})
+	if err != nil {
+		return "", err
+	}
+	defer C.mln_operation_release(operation)
+	bytes, err := takeMapBuffer(operation, func(operation C.mln_operation, out *C.mln_buffer) int32 {
+		return int32(C.mln_map_style_url_take_result(operation, out))
+	})
+	return string(bytes), err
+}
+
+// SetDebugOptions applies MapLibre debug overlay mask bits to a map.
+func (m *MapHandle) SetDebugOptions(options MapDebugOptions) (uint64, error) {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return 0, err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	var commandID C.uint64_t
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_set_debug_options(C.mln_map(ptr), C.uint32_t(options), &commandID))
+	}); err != nil {
+		return 0, err
+	}
+	return uint64(commandID), nil
 }
 
 // DebugOptions returns the current MapLibre debug overlay mask bits.
@@ -284,9 +366,16 @@ func (m *MapHandle) DebugOptions() (MapDebugOptions, error) {
 	}
 	defer release()
 	defer m.state.KeepAlive()
+	operation, err := waitMapOperation(func(out *C.mln_operation) int32 {
+		return int32(C.mln_map_get_debug_options_start(C.mln_map(ptr), out))
+	})
+	if err != nil {
+		return 0, err
+	}
+	defer C.mln_operation_release(operation)
 	var raw C.uint32_t
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_get_debug_options(C.mln_map(ptr), &raw))
+		return int32(C.mln_map_get_debug_options_take_result(operation, &raw))
 	}); err != nil {
 		return 0, err
 	}
@@ -295,16 +384,20 @@ func (m *MapHandle) DebugOptions() (MapDebugOptions, error) {
 
 // SetRenderingStatsViewEnabled enables or disables MapLibre's rendering stats
 // overlay view.
-func (m *MapHandle) SetRenderingStatsViewEnabled(enabled bool) error {
+func (m *MapHandle) SetRenderingStatsViewEnabled(enabled bool) (uint64, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer release()
 	defer m.state.KeepAlive()
-	return checkNative(func() int32 {
-		return int32(C.mln_map_set_rendering_stats_view_enabled(C.mln_map(ptr), C.bool(enabled)))
-	})
+	var commandID C.uint64_t
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_set_rendering_stats_view_enabled(C.mln_map(ptr), C.bool(enabled), &commandID))
+	}); err != nil {
+		return 0, err
+	}
+	return uint64(commandID), nil
 }
 
 // RenderingStatsViewEnabled reports whether MapLibre's rendering stats overlay
@@ -316,9 +409,16 @@ func (m *MapHandle) RenderingStatsViewEnabled() (bool, error) {
 	}
 	defer release()
 	defer m.state.KeepAlive()
+	operation, err := waitMapOperation(func(out *C.mln_operation) int32 {
+		return int32(C.mln_map_get_rendering_stats_view_enabled_start(C.mln_map(ptr), out))
+	})
+	if err != nil {
+		return false, err
+	}
+	defer C.mln_operation_release(operation)
 	var enabled C.bool
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_get_rendering_stats_view_enabled(C.mln_map(ptr), &enabled))
+		return int32(C.mln_map_get_rendering_stats_view_enabled_take_result(operation, &enabled))
 	}); err != nil {
 		return false, err
 	}
@@ -334,297 +434,175 @@ func (m *MapHandle) IsFullyLoaded() (bool, error) {
 	}
 	defer release()
 	defer m.state.KeepAlive()
+	operation, err := waitMapOperation(func(out *C.mln_operation) int32 {
+		return int32(C.mln_map_is_fully_loaded_start(C.mln_map(ptr), out))
+	})
+	if err != nil {
+		return false, err
+	}
+	defer C.mln_operation_release(operation)
 	var loaded C.bool
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_is_fully_loaded(C.mln_map(ptr), &loaded))
+		return int32(C.mln_map_is_fully_loaded_take_result(operation, &loaded))
 	}); err != nil {
 		return false, err
 	}
 	return bool(loaded), nil
 }
 
-// Size returns the map's logical viewport size in UI pixels and its scale
-// factor. The scale factor is independent of any render target's.
-func (m *MapHandle) Size() (width uint32, height uint32, scaleFactor float64, err error) {
+// Snapshot returns a copy of the latest immutable map state.
+func (m *MapHandle) Snapshot() (MapSnapshot, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
-		return 0, 0, 0, err
+		return MapSnapshot{}, err
 	}
 	defer release()
 	defer m.state.KeepAlive()
-	var rawWidth, rawHeight C.uint32_t
-	var rawScaleFactor C.double
+	raw := C.mln_map_snapshot{size: C.uint32_t(unsafe.Sizeof(C.mln_map_snapshot{}))}
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_get_size(C.mln_map(ptr), &rawWidth, &rawHeight, &rawScaleFactor))
+		return int32(C.mln_map_snapshot_get(C.mln_map(ptr), &raw))
 	}); err != nil {
+		return MapSnapshot{}, err
+	}
+	return MapSnapshot{
+		Generation: uint64(raw.generation),
+		Camera:     goCameraOptions(raw.camera),
+		LogicalExtent: LogicalExtent{
+			Width:       uint32(raw.logical_extent.width),
+			Height:      uint32(raw.logical_extent.height),
+			ScaleFactor: float64(raw.logical_extent.scale_factor),
+		},
+		ProjectionMode:               goProjectionModeOptions(raw.projection_mode),
+		Viewport:                     goViewportOptions(raw.viewport),
+		Loading:                      bool(raw.loading),
+		FullyRendered:                bool(raw.fully_rendered),
+		RepaintDemand:                bool(raw.repaint_demand),
+		EventMask:                    RuntimeEventMask(raw.event_mask),
+		LatestRenderUpdateGeneration: uint64(raw.latest_render_update_generation),
+	}, nil
+}
+
+// Size returns the latest logical extent copied from the map snapshot.
+func (m *MapHandle) Size() (width uint32, height uint32, scaleFactor float64, err error) {
+	snapshot, err := m.Snapshot()
+	if err != nil {
 		return 0, 0, 0, err
 	}
-	return uint32(rawWidth), uint32(rawHeight), float64(rawScaleFactor), nil
+	extent := snapshot.LogicalExtent
+	return extent.Width, extent.Height, extent.ScaleFactor, nil
+}
+
+// Resize submits a logical extent update and returns its command ID.
+func (m *MapHandle) Resize(extent LogicalExtent) (uint64, error) {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return 0, err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	raw := C.mln_logical_extent{
+		width:        C.uint32_t(extent.Width),
+		height:       C.uint32_t(extent.Height),
+		scale_factor: C.double(extent.ScaleFactor),
+	}
+	var commandID C.uint64_t
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_resize(C.mln_map(ptr), raw, &commandID))
+	}); err != nil {
+		return 0, err
+	}
+	return uint64(commandID), nil
 }
 
 // DumpDebugLogs dumps map debug logs through MapLibre Native logging.
-func (m *MapHandle) DumpDebugLogs() error {
+func (m *MapHandle) DumpDebugLogs() (uint64, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer release()
 	defer m.state.KeepAlive()
-	return checkNative(func() int32 { return int32(C.mln_map_dump_debug_logs(C.mln_map(ptr))) })
+	var commandID C.uint64_t
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_dump_debug_logs(C.mln_map(ptr), &commandID))
+	}); err != nil {
+		return 0, err
+	}
+	return uint64(commandID), nil
 }
 
-// Camera returns the current camera snapshot.
+// Camera returns a copy of the latest published camera.
 func (m *MapHandle) Camera() (CameraOptions, error) {
-	ptr, release, err := m.ptr()
+	snapshot, err := m.CameraSnapshot()
 	if err != nil {
 		return CameraOptions{}, err
 	}
+	return snapshot.Camera, nil
+}
+
+// CameraSnapshot returns a copied camera and its map snapshot generation.
+func (m *MapHandle) CameraSnapshot() (CameraSnapshot, error) {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return CameraSnapshot{}, err
+	}
 	defer release()
 	defer m.state.KeepAlive()
-	var raw C.mln_camera_options = C.mln_camera_options_default()
+	raw := C.mln_camera_options_default()
+	var generation C.uint64_t
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_get_camera(C.mln_map(ptr), &raw))
+		return int32(C.mln_map_camera_snapshot_get(C.mln_map(ptr), &raw, &generation))
 	}); err != nil {
-		return CameraOptions{}, err
+		return CameraSnapshot{}, err
 	}
-	return goCameraOptions(raw), nil
+	return CameraSnapshot{Generation: uint64(generation), Camera: goCameraOptions(raw)}, nil
 }
 
-// JumpTo applies a camera jump command.
-func (m *MapHandle) JumpTo(camera CameraOptions) error {
+// QueryCamera starts an ordered camera read that observes every previously
+// committed command.
+func (m *MapHandle) QueryCamera() (*OperationHandle[CameraSnapshot], error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer release()
 	defer m.state.KeepAlive()
-	rawCamera := cCameraOptions(camera)
-	return checkNative(func() int32 {
-		return int32(C.mln_map_jump_to(C.mln_map(ptr), &rawCamera))
+	return startOperation[CameraSnapshot](m.runtime, operationCameraQuery, operationResultCamera, func(_ nativeRuntime, out *C.mln_operation) int32 {
+		return int32(C.mln_map_camera_query_start(C.mln_map(ptr), out))
 	})
 }
 
-// EaseTo applies a camera ease transition command. A nil animation, or one with
-// no Duration, uses the native default duration of zero, so the camera reaches
-// the target immediately; set Duration explicitly to animate.
-func (m *MapHandle) EaseTo(camera CameraOptions, animation *AnimationOptions) error {
+// UpdateCamera submits one atomic camera update and returns its command ID.
+func (m *MapHandle) UpdateCamera(update CameraUpdate) (uint64, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer release()
 	defer m.state.KeepAlive()
-	rawCamera := cCameraOptions(camera)
-	rawAnimation, rawAnimationPtr := cAnimationOptionsPointer(animation)
-	_ = rawAnimation
-	return checkNative(func() int32 {
-		return int32(C.mln_map_ease_to(C.mln_map(ptr), &rawCamera, rawAnimationPtr))
-	})
-}
-
-// FlyTo applies a camera fly transition command. A nil animation, or one with
-// no Duration, flies at a default velocity of 1.2 ρ-screenfuls per second, so
-// the duration scales with the distance travelled.
-func (m *MapHandle) FlyTo(camera CameraOptions, animation *AnimationOptions) error {
-	ptr, release, err := m.ptr()
-	if err != nil {
-		return err
-	}
-	defer release()
-	defer m.state.KeepAlive()
-	rawCamera := cCameraOptions(camera)
-	rawAnimation, rawAnimationPtr := cAnimationOptionsPointer(animation)
-	_ = rawAnimation
-	return checkNative(func() int32 {
-		return int32(C.mln_map_fly_to(C.mln_map(ptr), &rawCamera, rawAnimationPtr))
-	})
-}
-
-// MoveBy applies a screen-space pan command.
-func (m *MapHandle) MoveBy(delta ScreenPoint) error {
-	ptr, release, err := m.ptr()
-	if err != nil {
-		return err
-	}
-	defer release()
-	defer m.state.KeepAlive()
-	return checkNative(func() int32 {
-		return int32(C.mln_map_move_by(C.mln_map(ptr), C.double(delta.X), C.double(delta.Y)))
-	})
-}
-
-// MoveByAnimated applies an animated screen-space pan command. A nil
-// animation, or one with no Duration, applies the change instantly; see EaseTo.
-func (m *MapHandle) MoveByAnimated(delta ScreenPoint, animation *AnimationOptions) error {
-	ptr, release, err := m.ptr()
-	if err != nil {
-		return err
-	}
-	defer release()
-	defer m.state.KeepAlive()
-	rawAnimation, rawAnimationPtr := cAnimationOptionsPointer(animation)
-	_ = rawAnimation
-	return checkNative(func() int32 {
-		return int32(C.mln_map_move_by_animated(
-			C.mln_map(ptr),
-			C.double(delta.X),
-			C.double(delta.Y),
-			rawAnimationPtr,
-		))
-	})
-}
-
-// ScaleBy applies a screen-space zoom command. Passing nil anchor uses the
-// native default zoom anchor.
-func (m *MapHandle) ScaleBy(scale float64, anchor *ScreenPoint) error {
-	ptr, release, err := m.ptr()
-	if err != nil {
-		return err
-	}
-	defer release()
-	defer m.state.KeepAlive()
-	var rawAnchor C.mln_screen_point
-	var rawAnchorPtr *C.mln_screen_point
-	if anchor != nil {
-		rawAnchor = cScreenPoint(*anchor)
-		rawAnchorPtr = &rawAnchor
-	}
-	return checkNative(func() int32 {
-		return int32(C.mln_map_scale_by(C.mln_map(ptr), C.double(scale), rawAnchorPtr))
-	})
-}
-
-// ScaleByAnimated applies an animated screen-space zoom command. Passing nil
-// anchor or animation uses the native default for that option.
-func (m *MapHandle) ScaleByAnimated(scale float64, anchor *ScreenPoint, animation *AnimationOptions) error {
-	ptr, release, err := m.ptr()
-	if err != nil {
-		return err
-	}
-	defer release()
-	defer m.state.KeepAlive()
-	var rawAnchor C.mln_screen_point
-	var rawAnchorPtr *C.mln_screen_point
-	if anchor != nil {
-		rawAnchor = cScreenPoint(*anchor)
-		rawAnchorPtr = &rawAnchor
-	}
-	rawAnimation, rawAnimationPtr := cAnimationOptionsPointer(animation)
-	_ = rawAnimation
-	return checkNative(func() int32 {
-		return int32(C.mln_map_scale_by_animated(
-			C.mln_map(ptr),
-			C.double(scale),
-			rawAnchorPtr,
-			rawAnimationPtr,
-		))
-	})
-}
-
-// RotateBy applies a screen-space rotate command.
-func (m *MapHandle) RotateBy(first ScreenPoint, second ScreenPoint) error {
-	ptr, release, err := m.ptr()
-	if err != nil {
-		return err
-	}
-	defer release()
-	defer m.state.KeepAlive()
-	return checkNative(func() int32 {
-		return int32(C.mln_map_rotate_by(C.mln_map(ptr), cScreenPoint(first), cScreenPoint(second)))
-	})
-}
-
-// RotateByAnimated applies an animated screen-space rotate command. A nil
-// animation, or one with no Duration, applies the change instantly; see EaseTo.
-func (m *MapHandle) RotateByAnimated(first ScreenPoint, second ScreenPoint, animation *AnimationOptions) error {
-	ptr, release, err := m.ptr()
-	if err != nil {
-		return err
-	}
-	defer release()
-	defer m.state.KeepAlive()
-	rawAnimation, rawAnimationPtr := cAnimationOptionsPointer(animation)
-	_ = rawAnimation
-	return checkNative(func() int32 {
-		return int32(C.mln_map_rotate_by_animated(
-			C.mln_map(ptr),
-			cScreenPoint(first),
-			cScreenPoint(second),
-			rawAnimationPtr,
-		))
-	})
-}
-
-// PitchBy applies a pitch delta command.
-func (m *MapHandle) PitchBy(pitch float64) error {
-	ptr, release, err := m.ptr()
-	if err != nil {
-		return err
-	}
-	defer release()
-	defer m.state.KeepAlive()
-	return checkNative(func() int32 {
-		return int32(C.mln_map_pitch_by(C.mln_map(ptr), C.double(pitch)))
-	})
-}
-
-// PitchByAnimated applies an animated pitch delta command. A nil animation, or
-// one with no Duration, applies the change instantly; see EaseTo.
-func (m *MapHandle) PitchByAnimated(pitch float64, animation *AnimationOptions) error {
-	ptr, release, err := m.ptr()
-	if err != nil {
-		return err
-	}
-	defer release()
-	defer m.state.KeepAlive()
-	rawAnimation, rawAnimationPtr := cAnimationOptionsPointer(animation)
-	_ = rawAnimation
-	return checkNative(func() int32 {
-		return int32(C.mln_map_pitch_by_animated(C.mln_map(ptr), C.double(pitch), rawAnimationPtr))
-	})
-}
-
-// CancelTransitions cancels active camera transitions.
-func (m *MapHandle) CancelTransitions() error {
-	ptr, release, err := m.ptr()
-	if err != nil {
-		return err
-	}
-	defer release()
-	defer m.state.KeepAlive()
-	return checkNative(func() int32 { return int32(C.mln_map_cancel_transitions(C.mln_map(ptr))) })
-}
-
-// SetGestureInProgress marks whether a host-driven gesture is in progress. The
-// flag stays set until the host clears it, so pair every true with a false.
-func (m *MapHandle) SetGestureInProgress(inProgress bool) error {
-	ptr, release, err := m.ptr()
-	if err != nil {
-		return err
-	}
-	defer release()
-	defer m.state.KeepAlive()
-	return checkNative(func() int32 {
-		return int32(C.mln_map_set_gesture_in_progress(C.mln_map(ptr), C.bool(inProgress)))
-	})
-}
-
-// IsGestureInProgress reports whether a host-driven gesture is currently in
-// progress.
-func (m *MapHandle) IsGestureInProgress() (bool, error) {
-	ptr, release, err := m.ptr()
-	if err != nil {
-		return false, err
-	}
-	defer release()
-	defer m.state.KeepAlive()
-	var inProgress C.bool
+	raw := cCameraUpdate(update)
+	var commandID C.uint64_t
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_is_gesture_in_progress(C.mln_map(ptr), &inProgress))
+		return int32(C.mln_map_update_camera(C.mln_map(ptr), &raw, &commandID))
 	}); err != nil {
-		return false, err
+		return 0, err
 	}
-	return bool(inProgress), nil
+	return uint64(commandID), nil
+}
+
+// JumpTo submits an atomic camera jump.
+func (m *MapHandle) JumpTo(camera CameraOptions) (uint64, error) {
+	return m.UpdateCamera(CameraUpdate{Mode: CameraUpdateModeJump, Camera: camera})
+}
+
+// EaseTo submits an atomic eased camera transition.
+func (m *MapHandle) EaseTo(camera CameraOptions, animation *AnimationOptions) (uint64, error) {
+	return m.UpdateCamera(CameraUpdate{Mode: CameraUpdateModeEase, Camera: camera, Animation: animation})
+}
+
+// FlyTo submits an atomic flying camera transition.
+func (m *MapHandle) FlyTo(camera CameraOptions, animation *AnimationOptions) (uint64, error) {
+	return m.UpdateCamera(CameraUpdate{Mode: CameraUpdateModeFly, Camera: camera, Animation: animation})
 }
 
 // CameraForLatLngBounds computes a camera that fits geographic bounds. Passing
@@ -639,13 +617,17 @@ func (m *MapHandle) CameraForLatLngBounds(bounds LatLngBounds, fitOptions *Camer
 	var raw C.mln_camera_options = C.mln_camera_options_default()
 	rawFitOptions, rawFitOptionsPtr := cCameraFitOptionsPointer(fitOptions)
 	_ = rawFitOptions
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_camera_for_lat_lng_bounds(
-			C.mln_map(ptr),
-			cLatLngBounds(bounds),
-			rawFitOptionsPtr,
-			&raw,
+	operation, err := waitMapOperation(func(out *C.mln_operation) int32 {
+		return int32(C.mln_map_camera_for_lat_lng_bounds_start(
+			C.mln_map(ptr), cLatLngBounds(bounds), rawFitOptionsPtr, out,
 		))
+	})
+	if err != nil {
+		return CameraOptions{}, err
+	}
+	defer C.mln_operation_release(operation)
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_camera_for_lat_lng_bounds_take_result(operation, &raw))
 	}); err != nil {
 		return CameraOptions{}, err
 	}
@@ -669,14 +651,18 @@ func (m *MapHandle) CameraForLatLngs(coordinates []LatLng, fitOptions *CameraFit
 	}
 	rawFitOptions, rawFitOptionsPtr := cCameraFitOptionsPointer(fitOptions)
 	_ = rawFitOptions
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_camera_for_lat_lngs(
-			C.mln_map(ptr),
-			rawCoordinatesPtr,
-			C.size_t(len(rawCoordinates)),
-			rawFitOptionsPtr,
-			&raw,
+	operation, err := waitMapOperation(func(out *C.mln_operation) int32 {
+		return int32(C.mln_map_camera_for_lat_lngs_start(
+			C.mln_map(ptr), rawCoordinatesPtr, C.size_t(len(rawCoordinates)),
+			rawFitOptionsPtr, out,
 		))
+	})
+	if err != nil {
+		return CameraOptions{}, err
+	}
+	defer C.mln_operation_release(operation)
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_camera_for_lat_lngs_take_result(operation, &raw))
 	}); err != nil {
 		return CameraOptions{}, err
 	}
@@ -697,13 +683,17 @@ func (m *MapHandle) CameraForGeometry(geometry []byte, fitOptions *CameraFitOpti
 	defer rawGeometry.free()
 	rawFitOptions, rawFitOptionsPtr := cCameraFitOptionsPointer(fitOptions)
 	_ = rawFitOptions
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_camera_for_geometry(
-			C.mln_map(ptr),
-			rawGeometry.raw(),
-			rawFitOptionsPtr,
-			&raw,
+	operation, err := waitMapOperation(func(out *C.mln_operation) int32 {
+		return int32(C.mln_map_camera_for_geometry_start(
+			C.mln_map(ptr), rawGeometry.raw(), rawFitOptionsPtr, out,
 		))
+	})
+	if err != nil {
+		return CameraOptions{}, err
+	}
+	defer C.mln_operation_release(operation)
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_camera_for_geometry_take_result(operation, &raw))
 	}); err != nil {
 		return CameraOptions{}, err
 	}
@@ -721,8 +711,15 @@ func (m *MapHandle) LatLngBoundsForCamera(camera CameraOptions) (LatLngBounds, e
 	defer m.state.KeepAlive()
 	rawCamera := cCameraOptions(camera)
 	var raw C.mln_lat_lng_bounds
+	operation, err := waitMapOperation(func(out *C.mln_operation) int32 {
+		return int32(C.mln_map_lat_lng_bounds_for_camera_start(C.mln_map(ptr), &rawCamera, out))
+	})
+	if err != nil {
+		return LatLngBounds{}, err
+	}
+	defer C.mln_operation_release(operation)
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_lat_lng_bounds_for_camera(C.mln_map(ptr), &rawCamera, &raw))
+		return int32(C.mln_map_lat_lng_bounds_for_camera_take_result(operation, &raw))
 	}); err != nil {
 		return LatLngBounds{}, err
 	}
@@ -740,8 +737,15 @@ func (m *MapHandle) LatLngBoundsForCameraUnwrapped(camera CameraOptions) (LatLng
 	defer m.state.KeepAlive()
 	rawCamera := cCameraOptions(camera)
 	var raw C.mln_lat_lng_bounds
+	operation, err := waitMapOperation(func(out *C.mln_operation) int32 {
+		return int32(C.mln_map_lat_lng_bounds_for_camera_unwrapped_start(C.mln_map(ptr), &rawCamera, out))
+	})
+	if err != nil {
+		return LatLngBounds{}, err
+	}
+	defer C.mln_operation_release(operation)
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_lat_lng_bounds_for_camera_unwrapped(C.mln_map(ptr), &rawCamera, &raw))
+		return int32(C.mln_map_lat_lng_bounds_for_camera_unwrapped_take_result(operation, &raw))
 	}); err != nil {
 		return LatLngBounds{}, err
 	}
@@ -756,9 +760,16 @@ func (m *MapHandle) Bounds() (BoundOptions, error) {
 	}
 	defer release()
 	defer m.state.KeepAlive()
-	var raw C.mln_bound_options = C.mln_bound_options_default()
+	operation, err := waitMapOperation(func(out *C.mln_operation) int32 {
+		return int32(C.mln_map_get_bounds_start(C.mln_map(ptr), out))
+	})
+	if err != nil {
+		return BoundOptions{}, err
+	}
+	defer C.mln_operation_release(operation)
+	raw := C.mln_bound_options_default()
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_get_bounds(C.mln_map(ptr), &raw))
+		return int32(C.mln_map_get_bounds_take_result(operation, &raw))
 	}); err != nil {
 		return BoundOptions{}, err
 	}
@@ -766,20 +777,24 @@ func (m *MapHandle) Bounds() (BoundOptions, error) {
 }
 
 // SetBounds applies selected map camera constraint options.
-func (m *MapHandle) SetBounds(options BoundOptions) error {
+func (m *MapHandle) SetBounds(options BoundOptions) (uint64, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer release()
 	defer m.state.KeepAlive()
 	rawOptions, err := cBoundOptions(options)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	return checkNative(func() int32 {
-		return int32(C.mln_map_set_bounds(C.mln_map(ptr), &rawOptions))
-	})
+	var commandID C.uint64_t
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_set_bounds(C.mln_map(ptr), &rawOptions, &commandID))
+	}); err != nil {
+		return 0, err
+	}
+	return uint64(commandID), nil
 }
 
 // FreeCameraOptions returns current free camera position and orientation.
@@ -790,9 +805,16 @@ func (m *MapHandle) FreeCameraOptions() (FreeCameraOptions, error) {
 	}
 	defer release()
 	defer m.state.KeepAlive()
-	var raw C.mln_free_camera_options = C.mln_free_camera_options_default()
+	operation, err := waitMapOperation(func(out *C.mln_operation) int32 {
+		return int32(C.mln_map_get_free_camera_options_start(C.mln_map(ptr), out))
+	})
+	if err != nil {
+		return FreeCameraOptions{}, err
+	}
+	defer C.mln_operation_release(operation)
+	raw := C.mln_free_camera_options_default()
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_get_free_camera_options(C.mln_map(ptr), &raw))
+		return int32(C.mln_map_get_free_camera_options_take_result(operation, &raw))
 	}); err != nil {
 		return FreeCameraOptions{}, err
 	}
@@ -801,17 +823,21 @@ func (m *MapHandle) FreeCameraOptions() (FreeCameraOptions, error) {
 
 // SetFreeCameraOptions applies selected free camera position and orientation
 // fields.
-func (m *MapHandle) SetFreeCameraOptions(options FreeCameraOptions) error {
+func (m *MapHandle) SetFreeCameraOptions(options FreeCameraOptions) (uint64, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer release()
 	defer m.state.KeepAlive()
 	rawOptions := cFreeCameraOptions(options)
-	return checkNative(func() int32 {
-		return int32(C.mln_map_set_free_camera_options(C.mln_map(ptr), &rawOptions))
-	})
+	var commandID C.uint64_t
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_set_free_camera_options(C.mln_map(ptr), &rawOptions, &commandID))
+	}); err != nil {
+		return 0, err
+	}
+	return uint64(commandID), nil
 }
 
 // ViewportOptions returns live map viewport and render-transform controls.
@@ -822,9 +848,16 @@ func (m *MapHandle) ViewportOptions() (ViewportOptions, error) {
 	}
 	defer release()
 	defer m.state.KeepAlive()
-	var raw C.mln_map_viewport_options = C.mln_map_viewport_options_default()
+	operation, err := waitMapOperation(func(out *C.mln_operation) int32 {
+		return int32(C.mln_map_get_viewport_options_start(C.mln_map(ptr), out))
+	})
+	if err != nil {
+		return ViewportOptions{}, err
+	}
+	defer C.mln_operation_release(operation)
+	raw := C.mln_map_viewport_options_default()
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_get_viewport_options(C.mln_map(ptr), &raw))
+		return int32(C.mln_map_get_viewport_options_take_result(operation, &raw))
 	}); err != nil {
 		return ViewportOptions{}, err
 	}
@@ -833,17 +866,21 @@ func (m *MapHandle) ViewportOptions() (ViewportOptions, error) {
 
 // SetViewportOptions applies selected live map viewport and render-transform
 // controls.
-func (m *MapHandle) SetViewportOptions(options ViewportOptions) error {
+func (m *MapHandle) SetViewportOptions(options ViewportOptions) (uint64, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer release()
 	defer m.state.KeepAlive()
 	rawOptions := cViewportOptions(options)
-	return checkNative(func() int32 {
-		return int32(C.mln_map_set_viewport_options(C.mln_map(ptr), &rawOptions))
-	})
+	var commandID C.uint64_t
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_set_viewport_options(C.mln_map(ptr), &rawOptions, &commandID))
+	}); err != nil {
+		return 0, err
+	}
+	return uint64(commandID), nil
 }
 
 // TileOptions returns tile prefetch and LOD tuning controls.
@@ -854,9 +891,16 @@ func (m *MapHandle) TileOptions() (TileOptions, error) {
 	}
 	defer release()
 	defer m.state.KeepAlive()
-	var raw C.mln_map_tile_options = C.mln_map_tile_options_default()
+	operation, err := waitMapOperation(func(out *C.mln_operation) int32 {
+		return int32(C.mln_map_get_tile_options_start(C.mln_map(ptr), out))
+	})
+	if err != nil {
+		return TileOptions{}, err
+	}
+	defer C.mln_operation_release(operation)
+	raw := C.mln_map_tile_options_default()
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_get_tile_options(C.mln_map(ptr), &raw))
+		return int32(C.mln_map_get_tile_options_take_result(operation, &raw))
 	}); err != nil {
 		return TileOptions{}, err
 	}
@@ -864,48 +908,48 @@ func (m *MapHandle) TileOptions() (TileOptions, error) {
 }
 
 // SetTileOptions applies selected tile prefetch and LOD tuning controls.
-func (m *MapHandle) SetTileOptions(options TileOptions) error {
+func (m *MapHandle) SetTileOptions(options TileOptions) (uint64, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer release()
 	defer m.state.KeepAlive()
 	rawOptions := cTileOptions(options)
-	return checkNative(func() int32 {
-		return int32(C.mln_map_set_tile_options(C.mln_map(ptr), &rawOptions))
-	})
+	var commandID C.uint64_t
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_set_tile_options(C.mln_map(ptr), &rawOptions, &commandID))
+	}); err != nil {
+		return 0, err
+	}
+	return uint64(commandID), nil
 }
 
-// ProjectionMode returns current axonometric rendering options.
+// ProjectionMode returns the latest published axonometric rendering options.
 func (m *MapHandle) ProjectionMode() (ProjectionModeOptions, error) {
-	ptr, release, err := m.ptr()
+	snapshot, err := m.Snapshot()
 	if err != nil {
 		return ProjectionModeOptions{}, err
 	}
-	defer release()
-	defer m.state.KeepAlive()
-	var raw C.mln_projection_mode = C.mln_projection_mode_default()
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_get_projection_mode(C.mln_map(ptr), &raw))
-	}); err != nil {
-		return ProjectionModeOptions{}, err
-	}
-	return goProjectionModeOptions(raw), nil
+	return snapshot.ProjectionMode, nil
 }
 
 // SetProjectionMode applies axonometric rendering option fields.
-func (m *MapHandle) SetProjectionMode(options ProjectionModeOptions) error {
+func (m *MapHandle) SetProjectionMode(options ProjectionModeOptions) (uint64, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer release()
 	defer m.state.KeepAlive()
 	rawOptions := cProjectionModeOptions(options)
-	return checkNative(func() int32 {
-		return int32(C.mln_map_set_projection_mode(C.mln_map(ptr), &rawOptions))
-	})
+	var commandID C.uint64_t
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_set_projection_mode(C.mln_map(ptr), &rawOptions, &commandID))
+	}); err != nil {
+		return 0, err
+	}
+	return uint64(commandID), nil
 }
 
 // PixelForLatLng converts a geographic coordinate to a logical screen point for
@@ -918,8 +962,15 @@ func (m *MapHandle) PixelForLatLng(coordinate LatLng) (ScreenPoint, error) {
 	defer release()
 	defer m.state.KeepAlive()
 	var raw C.mln_screen_point
+	operation, err := waitMapOperation(func(out *C.mln_operation) int32 {
+		return int32(C.mln_map_pixel_for_lat_lng_start(C.mln_map(ptr), cLatLng(coordinate), out))
+	})
+	if err != nil {
+		return ScreenPoint{}, err
+	}
+	defer C.mln_operation_release(operation)
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_pixel_for_lat_lng(C.mln_map(ptr), cLatLng(coordinate), &raw))
+		return int32(C.mln_map_pixel_for_lat_lng_take_result(operation, &raw))
 	}); err != nil {
 		return ScreenPoint{}, err
 	}
@@ -936,8 +987,15 @@ func (m *MapHandle) LatLngForPixel(point ScreenPoint) (LatLng, error) {
 	defer release()
 	defer m.state.KeepAlive()
 	var raw C.mln_lat_lng
+	operation, err := waitMapOperation(func(out *C.mln_operation) int32 {
+		return int32(C.mln_map_lat_lng_for_pixel_start(C.mln_map(ptr), cScreenPoint(point), out))
+	})
+	if err != nil {
+		return LatLng{}, err
+	}
+	defer C.mln_operation_release(operation)
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_lat_lng_for_pixel(C.mln_map(ptr), cScreenPoint(point), &raw))
+		return int32(C.mln_map_lat_lng_for_pixel_take_result(operation, &raw))
 	}); err != nil {
 		return LatLng{}, err
 	}
@@ -961,16 +1019,24 @@ func (m *MapHandle) PixelsForLatLngs(coordinates []LatLng) ([]ScreenPoint, error
 		rawCoordinatesPtr = &rawCoordinates[0]
 		rawPointsPtr = &rawPoints[0]
 	}
+	operation, err := waitMapOperation(func(out *C.mln_operation) int32 {
+		return int32(C.mln_map_pixels_for_lat_lngs_start(
+			C.mln_map(ptr), rawCoordinatesPtr, C.size_t(len(coordinates)), out,
+		))
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer C.mln_operation_release(operation)
+	var count C.size_t
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_pixels_for_lat_lngs(
-			C.mln_map(ptr),
-			rawCoordinatesPtr,
-			C.size_t(len(coordinates)),
-			rawPointsPtr,
+		return int32(C.mln_map_pixels_for_lat_lngs_take_result(
+			operation, rawPointsPtr, C.size_t(len(rawPoints)), &count,
 		))
 	}); err != nil {
 		return nil, err
 	}
+	rawPoints = rawPoints[:int(count)]
 	return goScreenPointSlice(rawPoints), nil
 }
 
@@ -991,24 +1057,29 @@ func (m *MapHandle) LatLngsForPixels(points []ScreenPoint) ([]LatLng, error) {
 		rawPointsPtr = &rawPoints[0]
 		rawCoordinatesPtr = &rawCoordinates[0]
 	}
+	operation, err := waitMapOperation(func(out *C.mln_operation) int32 {
+		return int32(C.mln_map_lat_lngs_for_pixels_start(
+			C.mln_map(ptr), rawPointsPtr, C.size_t(len(points)), out,
+		))
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer C.mln_operation_release(operation)
+	var count C.size_t
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_lat_lngs_for_pixels(
-			C.mln_map(ptr),
-			rawPointsPtr,
-			C.size_t(len(points)),
-			rawCoordinatesPtr,
+		return int32(C.mln_map_lat_lngs_for_pixels_take_result(
+			operation, rawCoordinatesPtr, C.size_t(len(rawCoordinates)), &count,
 		))
 	}); err != nil {
 		return nil, err
 	}
+	rawCoordinates = rawCoordinates[:int(count)]
 	return goLatLngSlice(rawCoordinates), nil
 }
 
-// Close destroys this map. A successful close makes later calls no-ops. A
-// failed close leaves the native handle live so callers can retry on the owner
-// thread. Close discards this map's queued runtime events and its recorded
-// loading failure without a flush and without a terminal event, and releases the
-// callback state of every custom geometry source the map still holds.
+// Close waits for this map's native close operation. It discards this map's
+// queued runtime events and releases callback state that the map still holds.
 func (m *MapHandle) Close() error {
 	if m == nil || m.state == nil {
 		return newBindingError(ErrInvalidArgument, "MapHandle is nil")
@@ -1018,25 +1089,42 @@ func (m *MapHandle) Close() error {
 			m.runtime.state.KeepAlive()
 		}
 	}()
-	var bindingErr error
-	if err := checkNative(func() int32 {
-		status, err := m.state.CloseChecked(func(native nativeMap) int32 {
-			return destroyMapHandle(native)
-		})
-		if err != nil {
-			if errors.Is(err, handle.ErrLiveChildren) {
-				bindingErr = newBindingError(ErrInvalidState, "MapHandle has live child handles")
-				return int32(C.MLN_STATUS_OK)
+	var closeErr error
+	_, err := m.state.CloseChecked(func(native nativeMap) int32 {
+		var operation C.mln_operation
+		if destroyMapHandle != nil {
+			status := destroyMapHandle(native)
+			if status != int32(C.MLN_STATUS_OK) {
+				closeErr = &Error{
+					kind:       kindForStatus(status),
+					rawStatus:  status,
+					hasStatus:  true,
+					diagnostic: "synthetic map close failure",
+				}
 			}
-			bindingErr = newBindingError(ErrInvalidState, err.Error())
-			return int32(C.MLN_STATUS_OK)
+			return status
 		}
-		return status
-	}); err != nil {
-		return err
+		if err := checkNative(func() int32 {
+			return int32(C.mln_map_close_start(C.mln_map(native), &operation))
+		}); err != nil {
+			closeErr = err
+			return statusFromError(err)
+		}
+		defer C.mln_operation_release(operation)
+		if err := waitNativeOperation(operation); err != nil {
+			closeErr = err
+			return statusFromError(err)
+		}
+		return int32(C.MLN_STATUS_OK)
+	})
+	if err != nil {
+		if errors.Is(err, handle.ErrLiveChildren) {
+			return newBindingError(ErrInvalidState, "MapHandle has live child handles")
+		}
+		return newBindingError(ErrInvalidState, err.Error())
 	}
-	if bindingErr != nil {
-		return bindingErr
+	if closeErr != nil {
+		return closeErr
 	}
 	if m.runtime != nil {
 		m.runtime.unregisterMap(m)
@@ -1045,21 +1133,11 @@ func (m *MapHandle) Close() error {
 	return nil
 }
 
-// mapSizeByIDForTest calls the C size accessor with a raw map id, so a test can
-// replay a released id or use one from another thread. The safe API expresses
-// neither.
+// mapSizeByIDForTest calls the C snapshot accessor with a raw map id, so a test
+// can replay a released id. The safe API cannot express a raw id.
 func mapSizeByIDForTest(id nativeMap) error {
-	var width, height C.uint32_t
-	var scale C.double
+	raw := C.mln_map_snapshot{size: C.uint32_t(unsafe.Sizeof(C.mln_map_snapshot{}))}
 	return checkNative(func() int32 {
-		return int32(C.mln_map_get_size(C.mln_map(id), &width, &height, &scale))
-	})
-}
-
-// pumpRuntimeWithMapIDForTest passes a map id where a runtime id belongs, which
-// the distinct Go types make unexpressible in the safe API.
-func pumpRuntimeWithMapIDForTest(id nativeMap) error {
-	return checkNative(func() int32 {
-		return int32(C.mln_runtime_pump(C.mln_runtime(id), 0))
+		return int32(C.mln_map_snapshot_get(C.mln_map(id), &raw))
 	})
 }

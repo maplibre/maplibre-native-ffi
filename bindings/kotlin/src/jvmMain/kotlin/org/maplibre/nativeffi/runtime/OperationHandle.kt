@@ -60,6 +60,7 @@ internal constructor(
 
   public actual override fun close() {
     if (!core.beginClose()) return
+    runtime.forgetOperation(core.id)
     NativeAccess.releaseOfflineOperation(core.id)
     core.finishClose()
   }

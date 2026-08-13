@@ -8,19 +8,20 @@ import kotlin.test.assertTrue
 
 class NativeLibraryTest {
   @Test
-  fun explicitMissingPathReportsSourceAndPath() {
-    val missingPath = Path.of("build", "missing-maplibre-native-c")
+  fun explicitMissingPathReportsSourceAndPath(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val missingPath = Path.of("build", "missing-maplibre-native-c")
 
-    if (NativeLibrary.isLoaded()) {
-      NativeLibrary.load(missingPath)
-      assertTrue(NativeLibrary.isLoaded())
-      return
+      if (NativeLibrary.isLoaded()) {
+        NativeLibrary.load(missingPath)
+        assertTrue(NativeLibrary.isLoaded())
+        return@runSuspendTest
+      }
+
+      val error = assertFailsWith<UnsatisfiedLinkError> { NativeLibrary.load(missingPath) }
+
+      assertTrue(error.message.orEmpty().contains("explicit path"))
+      assertTrue(error.message.orEmpty().contains(missingPath.toString()))
+      assertFalse(NativeLibrary.isLoaded())
     }
-
-    val error = assertFailsWith<UnsatisfiedLinkError> { NativeLibrary.load(missingPath) }
-
-    assertTrue(error.message.orEmpty().contains("explicit path"))
-    assertTrue(error.message.orEmpty().contains(missingPath.toString()))
-    assertFalse(NativeLibrary.isLoaded())
-  }
 }

@@ -95,6 +95,7 @@ internal constructor(
 
   public actual override fun close() {
     if (!core.beginClose()) return
+    runtime.forgetOperation(core.id)
     MaplibreNativeC.mln_operation_release(core.id)
     core.finishClose()
   }

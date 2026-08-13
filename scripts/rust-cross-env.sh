@@ -16,7 +16,21 @@ esac
 
 case "$1" in
   android-*64-*)
-    ndk_prebuilt="$ANDROID_HOME/ndk/$MLN_FFI_ANDROID_NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64"
+    ndk_prebuilt_root="$ANDROID_HOME/ndk/$MLN_FFI_ANDROID_NDK_VERSION/toolchains/llvm/prebuilt"
+    ndk_prebuilt=
+    for host_prebuilt in "$ndk_prebuilt_root"/*; do
+      if [[ -d "$host_prebuilt/bin" ]]; then
+        if [[ -n "$ndk_prebuilt" ]]; then
+          echo "The pinned Android NDK has multiple host prebuilts under $ndk_prebuilt_root." >&2
+          return 2
+        fi
+        ndk_prebuilt="$host_prebuilt"
+      fi
+    done
+    if [[ -z "$ndk_prebuilt" ]]; then
+      echo "The pinned Android NDK has no host prebuilt under $ndk_prebuilt_root." >&2
+      return 2
+    fi
     target_env="${cargo_target//-/_}"
     export "BINDGEN_EXTRA_CLANG_ARGS_$target_env=--target=$cargo_target --sysroot=$ndk_prebuilt/sysroot"
     export "CC_$target_env=$ndk_prebuilt/bin/${cargo_target}24-clang"

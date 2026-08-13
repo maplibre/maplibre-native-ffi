@@ -6,8 +6,6 @@ import (
 )
 
 func TestMapCameraGeometryAndCoordinateConversions(t *testing.T) {
-	lockOSThreadForTest(t)
-
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -68,10 +66,10 @@ func TestMapCameraGeometryAndCoordinateConversions(t *testing.T) {
 			t.Errorf("Projection Close(): %v", err)
 		}
 	}()
-	if err := projection.SetVisibleGeometry(geometry, EdgeInsets{}); err != nil {
+	if _, err := projection.SetVisibleGeometry(geometry, EdgeInsets{}); err != nil {
 		t.Fatalf("Projection SetVisibleGeometry(): %v", err)
 	}
-	if err := projection.SetVisibleGeometry([]byte(`{"type":"Unsupported"}`), EdgeInsets{}); !errors.Is(err, ErrInvalidArgument) {
+	if _, err := projection.SetVisibleGeometry([]byte(`{"type":"Unsupported"}`), EdgeInsets{}); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("Projection SetVisibleGeometry(invalid) error = %v, want ErrInvalidArgument", err)
 	}
 }

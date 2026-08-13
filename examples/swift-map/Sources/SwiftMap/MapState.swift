@@ -26,100 +26,87 @@ struct Viewport: Equatable {
   }
 }
 
-/// Runtime and map, owned for their whole lifetime by the runtime loop thread.
-/// The render loop thread owns the view, the Metal objects, and the session.
-final class MapState {
+/// Runtime and map state used from resumable Swift tasks. Render sessions
+/// remain
+/// owned by the main AppKit thread.
+final class MapState: @unchecked Sendable {
   private let runtime: RuntimeHandle
   private let map: MapHandle
+  private let closeLock = NSLock()
   private var isClosed = false
 
-  init(viewport: Viewport) throws {
+  init(viewport: Viewport) async throws {
     precondition(
       !viewport.isEmpty,
       "cannot create MapState with an empty viewport"
     )
-    let runtime =
-      try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
-    var createdMap: MapHandle?
-    var didInitialize = false
-    defer {
-      if !didInitialize {
-        try? createdMap?.close()
-        try? runtime.close()
-      }
+    let runtime = try await RuntimeHandle(
+      options: RuntimeOptions(cachePath: ":memory:")
+    )
+    let map: MapHandle
+    do {
+      map = try await MapHandle(
+        runtime: runtime,
+        options: MapOptions(
+          width: viewport.logicalWidth,
+          height: viewport.logicalHeight,
+          scaleFactor: viewport.scaleFactor,
+          mode: .continuous
+        )
+      )
+    } catch {
+      try? await runtime.close()
+      throw error
     }
 
-    let map = try MapHandle(
-      runtime: runtime,
-      options: MapOptions(
-        width: viewport.logicalWidth,
-        height: viewport.logicalHeight,
-        scaleFactor: viewport.scaleFactor,
-        mode: .continuous
-      )
-    )
-    createdMap = map
-    // The two event types the runtime loop reads. A map queues no event of an
-    // unselected type, so this runs before the style load.
+    self.runtime = runtime
+    self.map = map
     try map.setEventMask([.mapRenderUpdateAvailable, .mapRenderFrameFinished])
     try map.setStyleURL("https://tiles.openfreemap.org/styles/bright")
-    try map.jump(to: CameraOptions(
+    _ = try map.updateCamera(CameraUpdate(camera: CameraOptions(
       center: LatLng(latitude: 37.7749, longitude: -122.4194),
       zoom: 13.0,
       bearing: 12.0,
       pitch: 30.0
-    ))
-    try map.requestRepaint()
-
-    self.runtime = runtime
-    self.map = map
-    didInitialize = true
+    )))
+    _ = try map.requestRepaint()
+    try await runtime.barrier()
   }
 
-  /// The `Sendable` reference the render loop attaches its own session against.
-  /// `MapHandle` itself stays on this thread.
-  func attachRef() throws -> MapAttachRef {
-    try map.attachRef()
+  func mapHandle() -> MapHandle {
+    map
   }
 
-  /// Closes the map and then the runtime. The render session must already be
-  /// closed; a map with an attached session cannot be destroyed.
-  func close() throws {
-    guard !isClosed else { return }
-    isClosed = true
-    var firstError: Error?
-    do {
-      try map.close()
-    } catch {
-      firstError = firstError ?? error
-    }
-    do {
-      try runtime.close()
-    } catch {
-      firstError = firstError ?? error
-    }
-    if let firstError {
-      throw firstError
+  func scheduleEventDrains(on channels: Channels) {
+    runtime.setEventReadyHandler { [weak self, weak channels] in
+      Task { @MainActor in
+        guard let self, let channels else { return }
+        do {
+          if try self.drainEvents() { channels.setRenderRequest() }
+        } catch {
+          channels.fail(error)
+        }
+      }
     }
   }
 
-  /// Pumps the runtime, parking up to `timeout` when there is nothing to do.
-  func pump(timeout: TimeInterval) throws {
-    try runtime.pump(timeout: timeout)
+  func close() async throws {
+    let shouldClose = closeLock.withLock { () -> Bool in
+      guard !isClosed else { return false }
+      isClosed = true
+      return true
+    }
+    guard shouldClose else { return }
+    runtime.setEventReadyHandler(nil)
+    try await map.close()
+    try await runtime.close()
   }
 
-  /// Acquires the wake source the render loop uses to release this loop's park.
-  func wakeSource() throws -> WakeSource {
-    try runtime.wakeSource()
-  }
-
-  /// Drains one batch of runtime events, reporting whether the map wants
-  /// another frame.
-  func drainEvents() throws -> Bool {
+  private func drainEvents() throws -> Bool {
     var renderPending = false
-    // One drain takes every event the pump produced.
-    for event in try runtime.drainEvents().events {
-      guard map.isSource(of: event) else { continue }
+    for event in try runtime.drainEvents().events
+      where map.isSource(of: event)
+    {
       switch event.type {
       case .mapRenderUpdateAvailable:
         renderPending = true
@@ -134,48 +121,99 @@ final class MapState {
     return renderPending
   }
 
-  /// Applies one decoded camera command on the map's owner thread, where
-  /// read-modify-write commands also read the current camera.
-  func apply(_ command: CameraCommand) throws {
+  func apply(_ command: CameraCommand) async throws {
     switch command {
-    case .cancelTransitions:
-      try map.cancelTransitions()
+    case let .resize(extent):
+      _ = try map.resize(to: extent)
     case let .setGestureInProgress(inProgress):
-      try map.setGestureInProgress(inProgress)
+      _ = try map.updateCamera(CameraUpdate(
+        camera: CameraOptions(),
+        gesturePhase: inProgress ? .begin : .end,
+        gestureId: 1
+      ))
     case let .moveBy(dx, dy):
-      try map.moveBy(deltaX: dx, deltaY: dy)
+      try await moveBy(dx: dx, dy: dy, mode: .jump)
     case let .moveByAnimated(dx, dy, animation):
-      try map.moveBy(deltaX: dx, deltaY: dy, animation: animation)
+      try await moveBy(dx: dx, dy: dy, mode: .ease, animation: animation)
     case let .scaleBy(scale, anchor):
-      try map.scaleBy(scale, anchor: anchor)
+      try await scaleBy(scale, anchor: anchor, mode: .jump)
     case let .scaleByAnimated(scale, anchor, animation):
-      try map.scaleBy(scale, anchor: anchor, animation: animation)
+      try await scaleBy(
+        scale,
+        anchor: anchor,
+        mode: .ease,
+        animation: animation
+      )
     case let .adjustBearing(delta):
-      let current = try map.camera()
-      try map.jump(to: CameraOptions(bearing: (current.bearing ?? 0) + delta))
+      let current = try await map.queryCamera().camera
+      _ = try map.updateCamera(CameraUpdate(camera: CameraOptions(
+        bearing: (current.bearing ?? 0) + delta
+      )))
     case let .adjustBearingAnimated(delta, animation):
-      let current = try map.camera()
-      try map.ease(
-        to: CameraOptions(bearing: (current.bearing ?? 0) + delta),
+      let current = try await map.queryCamera().camera
+      _ = try map.updateCamera(CameraUpdate(
+        mode: .ease,
+        camera: CameraOptions(bearing: (current.bearing ?? 0) + delta),
         animation: animation
-      )
+      ))
     case let .adjustPitch(delta):
-      let current = try map.camera()
-      try map.jump(
-        to: CameraOptions(pitch: clampedPitch((current.pitch ?? 0) + delta))
-      )
+      let current = try await map.queryCamera().camera
+      _ = try map.updateCamera(CameraUpdate(camera: CameraOptions(
+        pitch: clampedPitch((current.pitch ?? 0) + delta)
+      )))
     case let .adjustPitchAnimated(delta, animation):
-      let current = try map.camera()
-      try map.ease(
-        to: CameraOptions(pitch: clampedPitch((current.pitch ?? 0) + delta)),
+      let current = try await map.queryCamera().camera
+      _ = try map.updateCamera(CameraUpdate(
+        mode: .ease,
+        camera: CameraOptions(
+          pitch: clampedPitch((current.pitch ?? 0) + delta)
+        ),
         animation: animation
-      )
+      ))
     case let .resetOrientation(animation):
-      try map.ease(
-        to: CameraOptions(bearing: 0, pitch: 0),
+      _ = try map.updateCamera(CameraUpdate(
+        mode: .ease,
+        camera: CameraOptions(bearing: 0, pitch: 0),
         animation: animation
-      )
+      ))
     }
+  }
+
+  private func moveBy(
+    dx: Double,
+    dy: Double,
+    mode: CameraUpdateMode,
+    animation: AnimationOptions = AnimationOptions()
+  ) async throws {
+    let current = try await map.queryCamera().camera
+    guard let center = current.center else { return }
+    let centerPoint = try await map.pixel(for: center)
+    let movedCenter = try await map.latLng(for: ScreenPoint(
+      x: centerPoint.x - dx,
+      y: centerPoint.y - dy
+    ))
+    _ = try map.updateCamera(CameraUpdate(
+      mode: mode,
+      camera: CameraOptions(center: movedCenter),
+      animation: animation
+    ))
+  }
+
+  private func scaleBy(
+    _ scale: Double,
+    anchor: ScreenPoint,
+    mode: CameraUpdateMode,
+    animation: AnimationOptions = AnimationOptions()
+  ) async throws {
+    let current = try await map.queryCamera().camera
+    _ = try map.updateCamera(CameraUpdate(
+      mode: mode,
+      camera: CameraOptions(
+        zoom: (current.zoom ?? 0) + log2(scale),
+        anchor: anchor
+      ),
+      animation: animation
+    ))
   }
 }
 

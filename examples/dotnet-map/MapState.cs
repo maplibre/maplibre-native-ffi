@@ -5,7 +5,7 @@ using Maplibre.NativeFfi.Runtime;
 
 namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
-/// <summary>Runtime and map, owned for their whole lifetime by the runtime loop thread.</summary>
+/// <summary>Autonomous runtime and any-thread map state.</summary>
 internal sealed class MapState : IDisposable
 {
     private const string StyleUrl = "https://tiles.openfreemap.org/styles/bright";
@@ -14,6 +14,7 @@ internal sealed class MapState : IDisposable
 
     private readonly RuntimeHandle runtime;
     private bool closed;
+    private ulong gestureId;
 
     private MapState(RuntimeHandle runtime, MapHandle map)
     {
@@ -25,33 +26,41 @@ internal sealed class MapState : IDisposable
 
     public static MapState Create(Viewport viewport)
     {
-        var runtime = RuntimeHandle.Create(new RuntimeOptions { CachePath = ":memory:" });
+        var runtime = RuntimeHandle
+            .CreateAsync(new RuntimeOptions { CachePath = ":memory:" })
+            .GetAwaiter()
+            .GetResult();
         MapHandle? map = null;
         try
         {
-            map = MapHandle.Create(
-                runtime,
-                new MapOptions
-                {
-                    Width = viewport.LogicalWidth,
-                    Height = viewport.LogicalHeight,
-                    ScaleFactor = viewport.ScaleFactor,
-                    MapMode = MapMode.Continuous,
-                    // The two event types the runtime loop reads. A map queues no event of an
-                    // unselected type, from its first style load on.
-                    EventMask =
-                        RuntimeEventMask.MapRenderUpdateAvailable
-                        | RuntimeEventMask.MapRenderFrameFinished,
-                }
-            );
+            map = MapHandle
+                .CreateAsync(
+                    runtime,
+                    new MapOptions
+                    {
+                        Width = viewport.LogicalWidth,
+                        Height = viewport.LogicalHeight,
+                        ScaleFactor = viewport.ScaleFactor,
+                        MapMode = MapMode.Continuous,
+                        EventMask =
+                            RuntimeEventMask.MapRenderUpdateAvailable
+                            | RuntimeEventMask.MapRenderFrameFinished,
+                    }
+                )
+                .GetAwaiter()
+                .GetResult();
             map.SetStyleUrl(StyleUrl);
-            map.JumpTo(
-                new CameraOptions
+            map.UpdateCamera(
+                new CameraUpdate
                 {
-                    Center = new LatLng(37.7749, -122.4194),
-                    Zoom = 13.0,
-                    Bearing = 12.0,
-                    Pitch = 30.0,
+                    Mode = CameraUpdateMode.Jump,
+                    Camera = new CameraOptions
+                    {
+                        Center = new LatLng(37.7749, -122.4194),
+                        Zoom = 13.0,
+                        Bearing = 12.0,
+                        Pitch = 30.0,
+                    },
                 }
             );
             return new MapState(runtime, map);
@@ -64,24 +73,66 @@ internal sealed class MapState : IDisposable
         }
     }
 
-    /// <summary>Applies every queued camera command on the map's owner thread.</summary>
-    public void ApplyCommands(CommandQueue commands)
+    /// <summary>Submits a copied any-thread camera command and returns its native command id.</summary>
+    public ulong Apply(CameraCommand command)
     {
-        ArgumentNullException.ThrowIfNull(commands);
-        while (commands.TryDequeue(out var command))
+        var current = Map.GetCameraSnapshot().Camera;
+        return command switch
         {
-            Apply(command);
-        }
+            CancelTransitionsCommand => Submit(current, null),
+            SetGestureInProgressCommand gesture => SubmitGesture(current, gesture.InProgress),
+            MoveByCommand move => Submit(MovedCamera(current, move), move.Animation),
+            ScaleByCommand zoom => Submit(
+                new CameraOptions
+                {
+                    Zoom = (current.Zoom ?? 0) + Math.Log2(zoom.Scale),
+                    Anchor = zoom.Anchor,
+                },
+                zoom.Animation
+            ),
+            AdjustBearingCommand bearing => Submit(
+                new CameraOptions { Bearing = (current.Bearing ?? 0) + bearing.Delta },
+                bearing.Animation
+            ),
+            AdjustPitchCommand pitch => Submit(
+                new CameraOptions
+                {
+                    Pitch = Math.Clamp(
+                        (current.Pitch ?? 0) + pitch.Delta,
+                        MinimumPitch,
+                        MaximumPitch
+                    ),
+                },
+                pitch.Animation
+            ),
+            ResetOrientationCommand reset => Submit(
+                new CameraOptions { Bearing = 0, Pitch = 0 },
+                reset.Animation
+            ),
+            _ => throw new ArgumentOutOfRangeException(nameof(command)),
+        };
     }
 
-    /// <summary>Acquires the wake source the render loop uses to release this loop's parked pump.</summary>
-    public WakeSource AcquireWakeSource() => runtime.AcquireWakeSource();
-
-    /// <summary>Pumps the runtime once, reporting whether the map wants another frame.</summary>
-    public bool Step(TimeSpan parkTimeout)
+    public bool DrainRenderRequests()
     {
-        runtime.Pump(parkTimeout);
-        return DrainEvents();
+        var requested = false;
+        foreach (var runtimeEvent in runtime.DrainEvents().Events)
+        {
+            if (!ReferenceEquals(runtimeEvent.MapSource, Map))
+            {
+                continue;
+            }
+            if (
+                runtimeEvent.Type == RuntimeEventType.MapRenderUpdateAvailable
+                || runtimeEvent.Type == RuntimeEventType.MapRenderFrameFinished
+                    && runtimeEvent.Payload
+                        is RuntimeEventPayload.RenderFrame { NeedsRepaint: true }
+            )
+            {
+                requested = true;
+            }
+        }
+        return requested;
     }
 
     public void Dispose()
@@ -90,117 +141,57 @@ internal sealed class MapState : IDisposable
         {
             return;
         }
-
         closed = true;
         try
         {
-            Map.Dispose();
+            Map.CloseAsync().GetAwaiter().GetResult();
         }
         finally
         {
-            runtime.Dispose();
+            runtime.CloseAsync().GetAwaiter().GetResult();
         }
     }
 
-    private bool DrainEvents()
+    private ulong Submit(CameraOptions camera, AnimationOptions? animation)
     {
-        var renderUpdateAvailable = false;
-        // One drain takes every event the pump produced.
-        foreach (var runtimeEvent in runtime.DrainEvents().Events)
-        {
-            if (!ReferenceEquals(runtimeEvent.MapSource, Map))
+        return Map.UpdateCamera(
+            new CameraUpdate
             {
-                continue;
+                Mode = animation is null ? CameraUpdateMode.Jump : CameraUpdateMode.Ease,
+                Camera = camera,
+                Animation = animation ?? new AnimationOptions(),
             }
+        );
+    }
 
-            if (
-                runtimeEvent.Type == RuntimeEventType.MapRenderUpdateAvailable
-                || (
-                    runtimeEvent.Type == RuntimeEventType.MapRenderFrameFinished
-                    && runtimeEvent.Payload
-                        is RuntimeEventPayload.RenderFrame { NeedsRepaint: true }
-                )
-            )
+    private ulong SubmitGesture(CameraOptions current, bool begin)
+    {
+        if (begin)
+        {
+            gestureId++;
+        }
+        return Map.UpdateCamera(
+            new CameraUpdate
             {
-                renderUpdateAvailable = true;
+                Mode = CameraUpdateMode.Jump,
+                Camera = current,
+                GesturePhase = begin ? GesturePhase.Begin : GesturePhase.End,
+                GestureId = gestureId,
             }
-        }
-
-        return renderUpdateAvailable;
+        );
     }
 
-    /// <summary>
-    /// Applies one decoded camera command on the map's owner thread, where the read-modify-write
-    /// commands also read the current camera.
-    /// </summary>
-    private void Apply(CameraCommand command)
+    private CameraOptions MovedCamera(CameraOptions current, MoveByCommand move)
     {
-        switch (command)
+        var center = current.Center ?? new LatLng(0, 0);
+        var zoom = current.Zoom ?? 0;
+        var degreesPerPixel = 360.0 / (512.0 * Math.Pow(2, zoom));
+        return new CameraOptions
         {
-            case CancelTransitionsCommand:
-                Map.CancelTransitions();
-                break;
-            case SetGestureInProgressCommand gesture:
-                Map.SetGestureInProgress(gesture.InProgress);
-                break;
-            case MoveByCommand { Animation: null } move:
-                Map.MoveBy(move.DeltaX, move.DeltaY);
-                break;
-            case MoveByCommand move:
-                Map.MoveByAnimated(move.DeltaX, move.DeltaY, move.Animation);
-                break;
-            case ScaleByCommand { Animation: null } zoom:
-                Map.ScaleBy(zoom.Scale, zoom.Anchor);
-                break;
-            case ScaleByCommand zoom:
-                Map.ScaleByAnimated(zoom.Scale, zoom.Anchor, zoom.Animation);
-                break;
-            case AdjustBearingCommand bearing:
-                ApplyCamera(
-                    new CameraOptions { Bearing = CurrentBearing() + bearing.Delta },
-                    bearing.Animation
-                );
-                break;
-            case AdjustPitchCommand pitch:
-                ApplyCamera(
-                    new CameraOptions
-                    {
-                        Pitch = Math.Clamp(
-                            CurrentPitch() + pitch.Delta,
-                            MinimumPitch,
-                            MaximumPitch
-                        ),
-                    },
-                    pitch.Animation
-                );
-                break;
-            case ResetOrientationCommand reset:
-                Map.EaseTo(new CameraOptions { Bearing = 0.0, Pitch = 0.0 }, reset.Animation);
-                break;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(command));
-        }
-    }
-
-    private void ApplyCamera(CameraOptions camera, AnimationOptions? animation)
-    {
-        if (animation is null)
-        {
-            Map.JumpTo(camera);
-        }
-        else
-        {
-            Map.EaseTo(camera, animation);
-        }
-    }
-
-    private double CurrentBearing()
-    {
-        return Map.GetCamera().Bearing ?? 0.0;
-    }
-
-    private double CurrentPitch()
-    {
-        return Map.GetCamera().Pitch ?? 0.0;
+            Center = new LatLng(
+                Math.Clamp(center.Latitude + move.DeltaY * degreesPerPixel, -85, 85),
+                center.Longitude - move.DeltaX * degreesPerPixel
+            ),
+        };
     }
 }

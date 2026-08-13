@@ -2,6 +2,7 @@ const std = @import("std");
 const testing = std.testing;
 
 const maplibre = @import("maplibre_native_ffi");
+const support = @import("support.zig");
 
 const center = maplibre.LatLng{ .latitude = 37.7749, .longitude = -122.4194 };
 
@@ -20,13 +21,21 @@ fn expectLatLngApprox(expected: maplibre.LatLng, actual: maplibre.LatLng) !void 
     try testing.expectApproxEqAbs(expected.longitude, actual.longitude, 0.000001);
 }
 
+fn waitForCameraCommands(map: *maplibre.MapHandle) !void {
+    const operation = try map.cameraQueryStart();
+    defer operation.release();
+    try testing.expect(try operation.wait(-1));
+    _ = try map.cameraQueryTakeResult(operation);
+}
+
 test "map projection mode updates snapshot fields through public binding" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
 
-    try map.setProjectionMode(.{ .axonometric = true, .x_skew = 0.25, .y_skew = -0.125 });
+    _ = try map.setProjectionMode(.{ .axonometric = true, .x_skew = 0.25, .y_skew = -0.125 });
+    try support.waitForBarrier(&runtime);
 
     const snapshot = try map.getProjectionMode();
     try testing.expectEqual(true, snapshot.axonometric.?);
@@ -40,7 +49,8 @@ test "map converts between lat lngs and screen points" {
     var map = try maplibre.MapHandle.create(&runtime, .{ .width = viewport_extent, .height = viewport_extent });
     defer map.close() catch @panic("map close failed");
 
-    try map.jumpTo(.{ .center = center, .zoom = 10.0 });
+    _ = try map.updateCamera(.{ .camera = .{ .center = center, .zoom = 10.0 } });
+    try waitForCameraCommands(&map);
 
     const point = try map.pixelForLatLng(center);
     try expectCenterPoint(point);
@@ -71,7 +81,8 @@ test "standalone projection converts and updates camera" {
     var map = try maplibre.MapHandle.create(&runtime, .{ .width = viewport_extent, .height = viewport_extent });
     defer map.close() catch @panic("map close failed");
 
-    try map.jumpTo(.{ .center = center, .zoom = 10.0 });
+    _ = try map.updateCamera(.{ .camera = .{ .center = center, .zoom = 10.0 } });
+    try waitForCameraCommands(&map);
     var projection = try maplibre.MapProjectionHandle.create(&map);
     defer projection.close() catch @panic("projection close failed");
 
@@ -82,7 +93,7 @@ test "standalone projection converts and updates camera" {
     try expectLatLngApprox(center, coordinate);
 
     const helper_camera = maplibre.CameraOptions{ .center = .{ .latitude = 0.0, .longitude = 0.0 }, .zoom = 3.0 };
-    try projection.setCamera(helper_camera);
+    _ = try projection.setCamera(helper_camera);
     const snapshot = try projection.getCamera();
     try expectLatLngApprox(helper_camera.center.?, snapshot.center.?);
     try testing.expectApproxEqAbs(helper_camera.zoom.?, snapshot.zoom.?, 0.000001);
@@ -91,12 +102,12 @@ test "standalone projection converts and updates camera" {
         .{ .latitude = -10.0, .longitude = -10.0 },
         .{ .latitude = 10.0, .longitude = 10.0 },
     };
-    try projection.setVisibleCoordinates(testing.allocator, visible[0..], .{ .top = 10.0, .left = 20.0, .bottom = 10.0, .right = 20.0 });
+    _ = try projection.setVisibleCoordinates(testing.allocator, visible[0..], .{ .top = 10.0, .left = 20.0, .bottom = 10.0, .right = 20.0 });
     const fitted = try projection.getCamera();
     try testing.expect(fitted.center != null);
     try testing.expect(fitted.zoom != null);
 
-    try projection.setVisibleGeometry(testing.allocator, "{\"type\":\"LineString\",\"coordinates\":[[-10,-10],[10,10]]}", .{ .top = 0.0, .left = 0.0, .bottom = 0.0, .right = 0.0 });
+    _ = try projection.setVisibleGeometry(testing.allocator, "{\"type\":\"LineString\",\"coordinates\":[[-10,-10],[10,10]]}", .{ .top = 0.0, .left = 0.0, .bottom = 0.0, .right = 0.0 });
     const geometry_fitted = try projection.getCamera();
     try testing.expect(geometry_fitted.center != null);
     try testing.expect(geometry_fitted.zoom != null);

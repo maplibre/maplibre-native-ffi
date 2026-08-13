@@ -56,7 +56,12 @@ class MetalOwnedSession:
         runtime = mln.RuntimeHandle()
         try:
             map_handle = runtime.create_map(
-                mln.MapOptions(width=64, height=64, mode=mln.MapMode.STATIC)
+                mln.MapOptions(
+                    width=width,
+                    height=height,
+                    scale_factor=scale_factor,
+                    mode=mln.MapMode.STATIC,
+                )
             )
             try:
                 session = map_handle.attach_metal_owned_texture(
@@ -83,6 +88,7 @@ class MetalOwnedSession:
 
     def render_once(self) -> None:
         self.map.set_style_json(EMPTY_STYLE_JSON.encode())
+        self.runtime.barrier()
         frame = wait_for_metal_frame(self, lambda _: True)
         frame.close()
 
@@ -96,12 +102,8 @@ def metal_owned_session() -> MetalOwnedSession:
         fixture.close()
 
 
-def request_still_image_if_needed(map_handle: mln.MapHandle) -> None:
-    try:
-        map_handle.request_still_image()
-    except mln.InvalidStateError as error:
-        if "pending still-image request" not in error.diagnostic:
-            raise
+def request_still_image(map_handle: mln.MapHandle) -> mln.OperationHandle[None]:
+    return map_handle.request_still_image()
 
 
 def wait_for_texture_info(
@@ -110,19 +112,22 @@ def wait_for_texture_info(
     iterations: int = 5000,
 ) -> render.TextureImageInfo:
     fixture.map.set_style_json(EMPTY_STYLE_JSON.encode())
-    request_still_image_if_needed(fixture.map)
+    fixture.runtime.barrier()
+    operation = request_still_image(fixture.map)
     for _ in range(iterations):
-        fixture.runtime.pump()
-        for event in fixture.runtime.drain_events().events:
-            if event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE:
-                try:
-                    fixture.session.render_update()
-                except mln.InvalidStateError:
-                    pass
+        time.sleep(0.001)
+        fixture.runtime.drain_events()
         try:
-            return fixture.session.texture_image_info()
+            fixture.session.render_update()
+        except mln.InvalidStateError:
+            pass
+        try:
+            info = fixture.session.texture_image_info()
+            operation.close()
+            return info
         except mln.InvalidStateError:
             time.sleep(0.001)
+    operation.close()
     raise AssertionError("Metal texture readback metadata was not observed")
 
 
@@ -132,16 +137,15 @@ def wait_for_metal_frame(
     *,
     iterations: int = 5000,
 ) -> render.MetalOwnedTextureFrameHandle:
-    request_still_image_if_needed(fixture.map)
+    operation = request_still_image(fixture.map)
     last_frame: render.MetalOwnedTextureFrame | None = None
     for _ in range(iterations):
-        fixture.runtime.pump()
-        for event in fixture.runtime.drain_events().events:
-            if event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE:
-                try:
-                    fixture.session.render_update()
-                except mln.InvalidStateError:
-                    pass
+        time.sleep(0.001)
+        fixture.runtime.drain_events()
+        try:
+            fixture.session.render_update()
+        except mln.InvalidStateError:
+            pass
         try:
             frame = fixture.session.acquire_metal_owned_texture_frame()
         except mln.InvalidStateError:
@@ -149,9 +153,11 @@ def wait_for_metal_frame(
             continue
         last_frame = frame.frame
         if predicate(last_frame):
+            operation.close()
             return frame
         frame.close()
         time.sleep(0.001)
+    operation.close()
     raise AssertionError(f"matching Metal frame was not observed; last={last_frame!r}")
 
 
@@ -232,13 +238,12 @@ def test_resize_updates_metal_owned_texture_frame_extent(
     metal_owned_session.render_once()
 
     metal_owned_session.session.resize(16, 8, 2.0)
-    # The map applies the new logical size on its next pump, and a static map
-    # renders only on request, so pump the resize through before requesting the
-    # still image. A render before that pump reports the pending size.
-    assert (
-        metal_owned_session.session.render_update() == render.RenderResult.SIZE_PENDING
+    # The autonomous map worker may commit before this thread renders.
+    assert metal_owned_session.session.render_update() in (
+        render.RenderResult.SIZE_PENDING,
+        render.RenderResult.RENDERED,
     )
-    metal_owned_session.runtime.pump()
+    time.sleep(0.001)
     frame = wait_for_metal_frame(
         metal_owned_session,
         lambda info: (

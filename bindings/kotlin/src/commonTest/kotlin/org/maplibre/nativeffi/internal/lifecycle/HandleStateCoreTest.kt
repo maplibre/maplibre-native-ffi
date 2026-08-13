@@ -11,193 +11,197 @@ import org.maplibre.nativeffi.error.NativeErrorException
 
 class HandleStateCoreTest {
   @Test
-  fun failedNativeDestroyLeavesHandleLiveAndRetryable() {
-    val state = HandleStateCore("TestHandle", 0x1234)
-    var attempts = 0
+  fun failedNativeDestroyLeavesHandleLiveAndRetryable(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val state = HandleStateCore("TestHandle", 0x1234)
+      var attempts = 0
 
-    val failure =
-      assertFailsWith<NativeErrorException> {
-        state.closeOnce(
-          destroy = {
-            attempts += 1
-            MaplibreStatus.NATIVE_ERROR.nativeCode
-          }
-        )
-      }
+      val failure =
+        assertFailsWith<NativeErrorException> {
+          state.closeOnce(
+            destroy = {
+              attempts += 1
+              MaplibreStatus.NATIVE_ERROR.nativeCode
+            }
+          )
+        }
 
-    assertEquals(MaplibreStatus.NATIVE_ERROR, failure.status)
-    assertEquals(1, attempts)
-    assertFalse(state.isReleased())
-    state.requireLive()
+      assertEquals(MaplibreStatus.NATIVE_ERROR, failure.status)
+      assertEquals(1, attempts)
+      assertFalse(state.isReleased())
+      state.requireLive()
 
-    state.closeOnce(
-      destroy = {
-        attempts += 1
-        MaplibreStatus.OK.nativeCode
-      }
-    )
+      state.closeOnce(
+        destroy = {
+          attempts += 1
+          MaplibreStatus.OK.nativeCode
+        }
+      )
 
-    assertEquals(2, attempts)
-    assertTrue(state.isReleased())
+      assertEquals(2, attempts)
+      assertTrue(state.isReleased())
 
-    state.closeOnce(
-      destroy = {
-        attempts += 1
-        error("destroy must not be called after release")
-      }
-    )
+      state.closeOnce(
+        destroy = {
+          attempts += 1
+          error("destroy must not be called after release")
+        }
+      )
 
-    assertEquals(2, attempts)
-  }
-
-  @Test
-  fun releasingHandleRejectsPublicAccessAndReentrantRelease() {
-    val state = HandleStateCore("TestHandle", 0x1234)
-    var attempts = 0
-
-    state.closeOnce(
-      destroy = {
-        attempts += 1
-        val accessError = assertFailsWith<InvalidStateException> { state.requireLive() }
-        assertEquals(MaplibreStatus.INVALID_STATE, accessError.status)
-        assertEquals("TestHandle is currently releasing", accessError.diagnostic)
-
-        val closeError =
-          assertFailsWith<InvalidStateException> {
-            state.closeOnce(
-              destroy = {
-                attempts += 1
-                MaplibreStatus.OK.nativeCode
-              }
-            )
-          }
-        assertEquals(MaplibreStatus.INVALID_STATE, closeError.status)
-        assertEquals("TestHandle is currently releasing", closeError.diagnostic)
-        MaplibreStatus.OK.nativeCode
-      }
-    )
-
-    assertEquals(1, attempts)
-    assertTrue(state.isReleased())
-  }
-
-  @Test
-  fun liveChildrenBlockParentCloseUntilReleased() {
-    val state = HandleStateCore("ParentHandle", 0x1234)
-    val child = state.retainChild("ChildHandle")
-    var attempts = 0
-
-    val error =
-      assertFailsWith<InvalidStateException> {
-        state.closeOnce(
-          destroy = {
-            attempts += 1
-            MaplibreStatus.OK.nativeCode
-          }
-        )
-      }
-
-    assertEquals(MaplibreStatus.INVALID_STATE, error.status)
-    assertEquals("ParentHandle has 1 live child handle(s): ChildHandle", error.diagnostic)
-    assertEquals(0, attempts)
-    assertFalse(state.isReleased())
-
-    child.close()
-    child.close()
-
-    state.closeOnce(
-      destroy = {
-        attempts += 1
-        MaplibreStatus.OK.nativeCode
-      }
-    )
-
-    assertEquals(1, attempts)
-    assertTrue(state.isReleased())
-  }
-
-  @Test
-  fun blockedParentCloseNamesEachLiveChildTypeUntilItIsReleased() {
-    val state = HandleStateCore("MapHandle", 0x1234)
-    val session = state.retainChild("RenderSessionHandle")
-    val projection = state.retainChild("MapProjectionHandle")
-    var attempts = 0
-    val destroy = {
-      attempts += 1
-      MaplibreStatus.OK.nativeCode
+      assertEquals(2, attempts)
     }
 
-    val bothLive = assertFailsWith<InvalidStateException> { state.closeOnce(destroy) }
-    assertEquals(
-      "MapHandle has 2 live child handle(s): MapProjectionHandle, RenderSessionHandle",
-      bothLive.diagnostic,
-    )
+  @Test
+  fun releasingHandleRejectsPublicAccessAndReentrantRelease(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val state = HandleStateCore("TestHandle", 0x1234)
+      var attempts = 0
 
-    session.close()
+      state.closeOnce(
+        destroy = {
+          attempts += 1
+          val accessError = assertFailsWith<InvalidStateException> { state.requireLive() }
+          assertEquals(MaplibreStatus.INVALID_STATE, accessError.status)
+          assertEquals("TestHandle is currently releasing", accessError.diagnostic)
 
-    val projectionLive = assertFailsWith<InvalidStateException> { state.closeOnce(destroy) }
-    assertEquals(
-      "MapHandle has 1 live child handle(s): MapProjectionHandle",
-      projectionLive.diagnostic,
-    )
-    assertEquals(0, attempts)
+          val closeError =
+            assertFailsWith<InvalidStateException> {
+              state.closeOnce(
+                destroy = {
+                  attempts += 1
+                  MaplibreStatus.OK.nativeCode
+                }
+              )
+            }
+          assertEquals(MaplibreStatus.INVALID_STATE, closeError.status)
+          assertEquals("TestHandle is currently releasing", closeError.diagnostic)
+          MaplibreStatus.OK.nativeCode
+        }
+      )
 
-    projection.close()
-    state.closeOnce(destroy)
-
-    assertEquals(1, attempts)
-    assertTrue(state.isReleased())
-  }
+      assertEquals(1, attempts)
+      assertTrue(state.isReleased())
+    }
 
   @Test
-  fun leakReportReportsOnlyUnreleasedHandles() {
-    val reports = mutableListOf<String>()
-    val unreleased = HandleStateCore.LeakReport("RuntimeHandle", 0x1234L, reports::add)
+  fun liveChildrenBlockParentCloseUntilReleased(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val state = HandleStateCore("ParentHandle", 0x1234)
+      val child = state.retainChild("ChildHandle")
+      var attempts = 0
 
-    unreleased.report()
+      val error =
+        assertFailsWith<InvalidStateException> {
+          state.closeOnce(
+            destroy = {
+              attempts += 1
+              MaplibreStatus.OK.nativeCode
+            }
+          )
+        }
 
-    assertEquals(
-      listOf(
-        "Leaked RuntimeHandle native handle 0x1234; " +
-          "close handles explicitly on their owner thread."
-      ),
-      reports,
-    )
+      assertEquals(MaplibreStatus.INVALID_STATE, error.status)
+      assertEquals("ParentHandle has 1 live child handle(s): ChildHandle", error.diagnostic)
+      assertEquals(0, attempts)
+      assertFalse(state.isReleased())
 
-    val released = HandleStateCore.LeakReport("MapHandle", 0x5678L, reports::add)
-    released.markReleased()
-    released.report()
+      child.close()
+      child.close()
 
-    assertEquals(1, reports.size)
-  }
+      state.closeOnce(
+        destroy = {
+          attempts += 1
+          MaplibreStatus.OK.nativeCode
+        }
+      )
+
+      assertEquals(1, attempts)
+      assertTrue(state.isReleased())
+    }
 
   @Test
-  fun aUseStartingAfterCloseBeginsIsRefused() {
-    val state = HandleStateCore("TestHandle", 0x1234)
-    var refusal: Throwable? = null
-
-    // Runs while closeOnce holds the releasing state, the window a use on another thread
-    // would land in.
-    state.closeOnce(
-      destroy = {
-        refusal = assertFailsWith<InvalidStateException> { state.withLive {} }
+  fun blockedParentCloseNamesEachLiveChildTypeUntilItIsReleased(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val state = HandleStateCore("MapHandle", 0x1234)
+      val session = state.retainChild("RenderSessionHandle")
+      val projection = state.retainChild("MapProjectionHandle")
+      var attempts = 0
+      val destroy = {
+        attempts += 1
         MaplibreStatus.OK.nativeCode
       }
-    )
 
-    assertTrue(refusal!!.message!!.contains("releasing"))
-    assertFailsWith<InvalidStateException> { state.withLive {} }
-  }
+      val bothLive = assertFailsWith<InvalidStateException> { state.closeOnce(destroy) }
+      assertEquals(
+        "MapHandle has 2 live child handle(s): MapProjectionHandle, RenderSessionHandle",
+        bothLive.diagnostic,
+      )
+
+      session.close()
+
+      val projectionLive = assertFailsWith<InvalidStateException> { state.closeOnce(destroy) }
+      assertEquals(
+        "MapHandle has 1 live child handle(s): MapProjectionHandle",
+        projectionLive.diagnostic,
+      )
+      assertEquals(0, attempts)
+
+      projection.close()
+      state.closeOnce(destroy)
+
+      assertEquals(1, attempts)
+      assertTrue(state.isReleased())
+    }
 
   @Test
-  fun withLiveReturnsTheBlockResultAndPropagatesFailures() {
-    val state = HandleStateCore("TestHandle", 0x1234)
+  fun leakReportReportsOnlyUnreleasedHandles(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val reports = mutableListOf<String>()
+      val unreleased = HandleStateCore.LeakReport("RuntimeHandle", 0x1234L, reports::add)
 
-    assertEquals(7, state.withLive { 7 })
-    assertFailsWith<IllegalStateException> { state.withLive { error("boom") } }
+      unreleased.report()
 
-    // A block that threw must not leave a use counted, or close would wait forever.
-    state.closeOnce(destroy = { MaplibreStatus.OK.nativeCode })
-    assertTrue(state.isReleased())
-  }
+      assertEquals(
+        listOf("Leaked RuntimeHandle native handle 0x1234; close it explicitly."),
+        reports,
+      )
+
+      val released = HandleStateCore.LeakReport("MapHandle", 0x5678L, reports::add)
+      released.markReleased()
+      released.report()
+
+      assertEquals(1, reports.size)
+    }
+
+  @Test
+  fun aUseStartingAfterCloseBeginsIsRefused(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val state = HandleStateCore("TestHandle", 0x1234)
+      var refusal: Throwable? = null
+
+      // Runs while closeOnce holds the releasing state, the window a use on another thread
+      // would land in.
+      state.closeOnce(
+        destroy = {
+          refusal = assertFailsWith<InvalidStateException> { state.withLive {} }
+          MaplibreStatus.OK.nativeCode
+        }
+      )
+
+      assertTrue(refusal!!.message!!.contains("releasing"))
+      assertFailsWith<InvalidStateException> { state.withLive {} }
+    }
+
+  @Test
+  fun withLiveReturnsTheBlockResultAndPropagatesFailures(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val state = HandleStateCore("TestHandle", 0x1234)
+
+      assertEquals(7, state.withLive { 7 })
+      assertFailsWith<IllegalStateException> { state.withLive { error("boom") } }
+
+      // A block that threw must not leave a use counted, or close would wait forever.
+      state.closeOnce(destroy = { MaplibreStatus.OK.nativeCode })
+      assertTrue(state.isReleased())
+    }
 }

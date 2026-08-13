@@ -69,40 +69,23 @@ copy of the same library.
 
 ## Ownership and execution
 
-Owned handles have an idempotent `close()` or `discard()` operation. Close child
-maps, render sessions, frames, snapshots, request handles, and offline
-operations before their parent runtime. Scoped backend values remain valid only
-until their frame or owner is closed.
+Runtime, map, and projection handles have an idempotent asynchronous `close()`.
+Await close so that native execution finishes before dependencies and callback
+roots are released. Close child maps, render sessions, frames, snapshots,
+request handles, and offline operations before their parent runtime. Scoped
+backend values remain valid only until their frame or owner is closed.
 
-Runtime and map work is synchronous and owner-thread-affine. Keep a handle and
-all calls that use it on the isolate that created it. Run queued callbacks with
-`RuntimeHandle.pump()`, then take the events it produced with
-`RuntimeHandle.drainEvents()`. Narrow what a map or a runtime queues with
-`setEventMask`.
+Create runtimes and maps with `await`. Runtime and map commands copy their input
+and return a command ID immediately. Snapshot methods synchronously copy
+immutable state. Ordered queries and lifecycle operations return `Future`
+values. A runtime's notification source completes those futures and reports
+event readiness, so native execution progresses without blocking the UI isolate.
+Read queued events with `RuntimeHandle.drainEvents()`. Narrow what a map or a
+runtime queues with `setEventMask`.
 
-A render session is the exception: it belongs to the isolate that attached it,
-which need not be the map's. A `MapHandle` cannot cross isolates, so
-`MapHandle.attachRef()` produces a `MapAttachRef` that can. It carries the
-native address and attaches; every other map call stays on the map's isolate.
-
-## Known draft deviation: do not await in an isolate that holds a handle
-
-The C API keys owner-thread checks on the OS thread. This binding keys them on
-`Isolate.current.hashCode`, and the two are not equivalent: the Dart VM moves an
-isolate between OS threads, and it does so when an isolate resumes from awaited
-I/O. The isolate hash does not change, so the binding's own check still passes
-while the native check starts failing.
-
-Until that is addressed, do not `await` I/O on an isolate that holds a runtime,
-map, projection, or render session. Create the handles, use them, and close them
-without yielding to I/O in between. Dart offers no equivalent of Go's
-`runtime.LockOSThread()`, so the binding cannot pin the isolate on your behalf.
-
-Exceeding this produces `wrongThread` from every call on the handle, including
-`close()`. Because close fails too, the native runtime is never destroyed and
-`mln_runtime_destroy` refuses for the rest of the process.
-
-Tracked in [#412](https://github.com/maplibre/maplibre-native-ffi/issues/412).
+Runtime, map, camera, and projection calls remain valid when Dart resumes an
+isolate on another native thread after `await`. Attach a render session directly
+from its map on the isolate that will own the graphics session.
 
 Resource-request completion is one-shot. Calling `complete()` or `close()`
 releases the provider reference even when completion reports a native error.

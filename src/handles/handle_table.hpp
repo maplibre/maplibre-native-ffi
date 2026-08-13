@@ -27,7 +27,6 @@ enum class HandleKind : std::uint8_t {
   OfflineRegionList = 6,
   Buffer = 7,
   StyleIdList = 8,
-  WakeSource = 11,
   ResourceRequest = 12,
   StyleStringList = 13,
   Operation = 14,
@@ -188,6 +187,17 @@ class HandleTable {
     requires(Traits::leasable)
   {
     const std::scoped_lock lock(mutex_);
+    const auto* slot = find_slot(handle);
+    if (slot == nullptr) {
+      set_handle_fault_error(Traits::kind, handle, fault_for(handle));
+      return nullptr;
+    }
+    return slot->object;
+  }
+  [[nodiscard]] auto lease_locked(std::uint64_t handle) const
+    -> std::shared_ptr<Object>
+    requires(Traits::leasable)
+  {
     const auto* slot = find_slot(handle);
     if (slot == nullptr) {
       set_handle_fault_error(Traits::kind, handle, fault_for(handle));

@@ -8,15 +8,12 @@ public enum MapMode: UInt32, Sendable, Hashable {
 }
 
 public struct MapOptions: Equatable, Sendable {
-  /// Initial logical width in UI pixels, replaced by the extent of the first
-  /// attached render session.
+  /// Initial logical width in UI pixels.
   public var width: UInt32
-  /// Initial logical height in UI pixels, replaced by the extent of the first
-  /// attached render session.
+  /// Initial logical height in UI pixels.
   public var height: UInt32
   /// UI-to-device pixel scale, fixed for the lifetime of the map. It selects
-  /// sprites, glyphs, and raster tiles; a render session attached or resized
-  /// with a different scale factor logs a warning.
+  /// sprites, glyphs, and raster tiles.
   public var scaleFactor: Double
   public var mode: MapMode
   /// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
@@ -55,19 +52,91 @@ public struct MapOptions: Equatable, Sendable {
   }
 }
 
-public final class MapHandle {
+public struct MapLogicalExtent: Equatable, Sendable {
+  public var width: UInt32
+  public var height: UInt32
+  public var scaleFactor: Double
+
+  public init(width: UInt32, height: UInt32, scaleFactor: Double) {
+    self.width = width
+    self.height = height
+    self.scaleFactor = scaleFactor
+  }
+
+  var native: mln_logical_extent {
+    mln_logical_extent(
+      width: width,
+      height: height,
+      scale_factor: scaleFactor
+    )
+  }
+
+  init(native: mln_logical_extent) {
+    width = native.width
+    height = native.height
+    scaleFactor = native.scale_factor
+  }
+}
+
+public struct MapSnapshot: Equatable, Sendable {
+  public let generation: UInt64
+  public let camera: CameraOptions
+  public let logicalExtent: MapLogicalExtent
+  public let projectionMode: ProjectionMode
+  public let viewportOptions: MapViewportOptions
+  public let isLoading: Bool
+  public let isFullyRendered: Bool
+  public let needsRepaint: Bool
+  public let eventMask: RuntimeEventMask
+  public let latestRenderUpdateGeneration: UInt64
+
+  init(native: mln_map_snapshot) {
+    generation = native.generation
+    camera = CameraOptions(native: NativeCameraOptionsInput(native.camera))
+    logicalExtent = MapLogicalExtent(native: native.logical_extent)
+    projectionMode = ProjectionMode(
+      native: NativeProjectionModeInput(native.projection_mode)
+    )
+    viewportOptions = MapViewportOptions(
+      native: NativeMapViewportOptionsInput(native.viewport)
+    )
+    isLoading = native.loading
+    isFullyRendered = native.fully_rendered
+    needsRepaint = native.repaint_demand
+    eventMask = RuntimeEventMask(rawValue: native.event_mask)
+    latestRenderUpdateGeneration = native.latest_render_update_generation
+  }
+}
+
+public struct CameraSnapshot: Equatable, Sendable {
+  public let generation: UInt64
+  public let camera: CameraOptions
+}
+
+public final class MapHandle: @unchecked Sendable {
   private let handle: NativeHandleBox<NativeMapHandle>
+  private let runtime: RuntimeHandle
+  private let lifecycleLock = NSLock()
+  private var isClosing = false
   private let mapId: MapId
 
-  public init(runtime: RuntimeHandle, options: MapOptions) throws {
-    let native = try mapNativeFailure {
+  public init(runtime: RuntimeHandle, options: MapOptions) async throws {
+    let operation = try mapNativeFailure {
       try options.nativeInput.withNativeOptions { nativeOptions in
-        try NativeMap.create(
+        try NativeMap.createStart(
           runtime: runtime.requireLiveHandle(),
           options: nativeOptions
         )
       }
     }
+    defer { mln_operation_release(operation.raw) }
+    try await mapNativeFailure {
+      try await runtime.waitForOperation(operation)
+    }
+    let native = try mapNativeFailure {
+      try NativeMap.createTakeResult(operation)
+    }
+    self.runtime = runtime
     mapId = MapId(value: native.raw)
     handle = try NativeHandleBox(typeName: "MapHandle", handle: native)
   }
@@ -84,15 +153,34 @@ public final class MapHandle {
   }
 
   func requireLiveHandle() throws -> NativeMapHandle {
-    try handle.requireLive()
+    try lifecycleLock.withLock {
+      guard !isClosing else {
+        throw NativeStatusFailure.swiftNativeError("MapHandle is closing")
+      }
+      return try handle.requireLive()
+    }
   }
 
-  /// Produces a `Sendable` reference to this map for attaching a render
-  /// session from a thread other than the map's owner thread.
-  public func attachRef() throws -> MapAttachRef {
-    // Resolve once so a closed map fails here rather than at the first attach.
-    _ = try requireLiveHandle()
-    return MapAttachRef(handle: handle)
+  var runtimeForOperations: RuntimeHandle {
+    runtime
+  }
+
+  func submitCommand(
+    _ submit: (NativeMapHandle, UnsafeMutablePointer<UInt64>) throws -> Void
+  ) throws -> UInt64 {
+    try NativeMemory.withTemporary(UInt64(0)) { commandId in
+      try submit(requireLiveHandle(), commandId)
+    }.value
+  }
+
+  func orderedResult<Result>(
+    start: (NativeMapHandle) throws -> NativeOperationHandle,
+    take: (NativeOperationHandle) throws -> Result
+  ) async throws -> Result {
+    let operation = try mapNativeFailure { try start(requireLiveHandle()) }
+    defer { mln_operation_release(operation.raw) }
+    try await mapNativeFailure { try await runtime.waitForOperation(operation) }
+    return try mapNativeFailure { try take(operation) }
   }
 
   /// Selects which map-originated event types this map queues.
@@ -106,30 +194,70 @@ public final class MapHandle {
   /// only invalidation report, the two still-image types are the only reports
   /// that a still-image request finished, and map-loading-failed and
   /// map-render-error carry native failure text.
-  public func setEventMask(_ mask: RuntimeEventMask) throws {
+  @discardableResult
+  public func setEventMask(_ mask: RuntimeEventMask) throws -> UInt64 {
     try mapNativeFailure {
       try NativeMap.setEventMask(handle.requireLive(), mask: mask.rawValue)
     }
   }
 
-  /// The mask last set. A map that has not been narrowed reports
-  /// ``RuntimeEventMask/all``. Read it, change one bit, and write it back to
-  /// leave the other bits alone.
+  /// The mask in the latest immutable map snapshot.
   public var eventMask: RuntimeEventMask {
     get throws {
-      try mapNativeFailure {
-        try RuntimeEventMask(
-          rawValue: NativeMap.eventMask(handle.requireLive())
-        )
-      }
+      try snapshot().eventMask
     }
   }
 
-  /// Destroys this map, discarding its undrained events the way the C API
-  /// discards the ones it still holds.
-  public func close() throws {
-    try handle.closeOnce { handle in
-      try checkStatus(mln_map_destroy(handle.raw))
+  /// Closes this map after its worker has retired the native handle.
+  public func close() async throws {
+    let operation = try mapNativeFailure {
+      try lifecycleLock.withLock {
+        guard !isClosing else {
+          throw NativeStatusFailure.swiftNativeError("MapHandle is closing")
+        }
+        guard !handle.isClosed else { return NativeOperationHandle(raw: 0) }
+        let operation = try NativeMap.closeStart(handle.requireLive())
+        isClosing = true
+        return operation
+      }
+    }
+    guard !operation.isNull else { return }
+    defer { mln_operation_release(operation.raw) }
+    do {
+      try await mapNativeFailure {
+        try await runtime.waitForOperation(operation)
+      }
+      try handle.closeOnce { _ in }
+      lifecycleLock.withLock { isClosing = false }
+    } catch {
+      lifecycleLock.withLock { isClosing = false }
+      throw error
+    }
+  }
+
+  func closeBlockingForTests() throws {
+    let operation = try mapNativeFailure {
+      try lifecycleLock.withLock {
+        guard !isClosing else {
+          throw NativeStatusFailure.swiftNativeError("MapHandle is closing")
+        }
+        guard !handle.isClosed else { return NativeOperationHandle(raw: 0) }
+        let operation = try NativeMap.closeStart(handle.requireLive())
+        isClosing = true
+        return operation
+      }
+    }
+    guard !operation.isNull else { return }
+    defer { mln_operation_release(operation.raw) }
+    do {
+      try mapNativeFailure {
+        try NativeOperation.waitForSuccessBlocking(operation)
+      }
+      try handle.closeOnce { _ in }
+      lifecycleLock.withLock { isClosing = false }
+    } catch {
+      lifecycleLock.withLock { isClosing = false }
+      throw error
     }
   }
 
@@ -139,10 +267,17 @@ public final class MapHandle {
   /// returns normally here and reports through a map-loading-failed runtime
   /// event. A style MapLibre rejects semantically, such as one with an unknown
   /// `version`, produces neither an error nor an event.
-  public func setStyleURL(_ url: String) throws {
+  @discardableResult
+  public func setStyleURL(_ url: String) throws -> UInt64 {
     try mapNativeFailure {
       try NativeString.withCString(url) { url in
-        try checkStatus(mln_map_set_style_url(handle.requireLive().raw, url))
+        try NativeMemory.withTemporary(UInt64(0)) { commandId in
+          try checkStatus(mln_map_set_style_url(
+            handle.requireLive().raw,
+            url,
+            commandId
+          ))
+        }.value
       }
     }
   }
@@ -153,14 +288,18 @@ public final class MapHandle {
   /// the same message arrives as a map-loading-failed runtime event. A style
   /// MapLibre rejects semantically, such as one with an unknown `version`,
   /// produces neither an error nor an event.
-  public func setStyleJSON(_ json: Data) throws {
+  @discardableResult
+  public func setStyleJSON(_ json: Data) throws -> UInt64 {
     try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try checkStatus(mln_map_set_style_json(
-        handle.requireLive().raw,
-        arena.view(json)
-      ))
+      return try NativeMemory.withTemporary(UInt64(0)) { commandId in
+        try checkStatus(mln_map_set_style_json(
+          handle.requireLive().raw,
+          arena.view(json),
+          commandId
+        ))
+      }.value
     }
   }
 
@@ -168,162 +307,129 @@ public final class MapHandle {
   /// byte, rather than a serialization of the live style. Runtime mutations do
   /// not change it, and a failed parse leaves the previous document in place.
   /// The result is empty when no document has been parsed.
-  public func loadedStyleJSON() throws -> Data {
-    try mapNativeFailure {
-      try NativeStyle.copyMapData(handle.requireLive()) {
-        mln_map_copy_loaded_style_json($0, $1, $2, $3)
-      }
+  public func loadedStyleJSON() async throws -> Data {
+    let operation = try mapNativeFailure {
+      try NativeStyle.mapReadStart(
+        handle.requireLive(),
+        start: mln_map_loaded_style_json_start
+      )
+    }
+    defer { mln_operation_release(operation.raw) }
+    try await runtime.waitForOperation(operation)
+    return try mapNativeFailure {
+      try NativeStyle.mapDataTakeResult(
+        operation,
+        take: mln_map_loaded_style_json_take_result
+      )
     }
   }
 
-  /// Copies the URL this map's style was last requested from.
-  ///
-  /// ``setStyleURL(_:)`` records the URL when the request is made, before the
-  /// document parses, so this can disagree with ``loadedStyleJSON()`` while a
-  /// load is in flight or after one fails. The result is empty for inline JSON,
-  /// for a map that has loaded no style, and for an empty URL alike.
-  public func styleURL() throws -> String {
-    try mapNativeFailure {
-      try NativeStyle
-        .copyMapText(handle.requireLive()) { map, text, capacity, size in
-          mln_map_copy_style_url(map, text, capacity, size)
-        }
+  public func styleURL() async throws -> String {
+    let operation = try mapNativeFailure {
+      try NativeStyle.mapReadStart(
+        handle.requireLive(),
+        start: mln_map_style_url_start
+      )
+    }
+    defer { mln_operation_release(operation.raw) }
+    try await runtime.waitForOperation(operation)
+    return try mapNativeFailure {
+      try NativeStyle.mapTextTakeResult(
+        operation,
+        take: mln_map_style_url_take_result
+      )
     }
   }
 
-  public func requestRepaint() throws {
+  /// Requests a repaint and returns its runtime-wide command ID.
+  @discardableResult
+  public func requestRepaint() throws -> UInt64 {
     try mapNativeFailure {
-      try checkStatus(mln_map_request_repaint(handle.requireLive().raw))
-    }
-  }
-
-  public func requestStillImage() throws {
-    try mapNativeFailure {
-      try checkStatus(mln_map_request_still_image(handle.requireLive().raw))
-    }
-  }
-
-  public func camera() throws -> CameraOptions {
-    try mapNativeFailure {
-      try CameraOptions(native: NativeCameraOptionsInput(NativeMap
-          .camera(handle.requireLive())))
-    }
-  }
-
-  public func jump(to camera: CameraOptions) throws {
-    try mapNativeFailure {
-      try camera.nativeInput.withNativeOptions { nativeCamera in
-        try checkStatus(mln_map_jump_to(handle.requireLive().raw, nativeCamera))
-      }
-    }
-  }
-
-  public func ease(
-    to camera: CameraOptions,
-    animation: AnimationOptions? = nil
-  ) throws {
-    try mapNativeFailure {
-      try camera.nativeInput.withNativeOptions { nativeCamera in
-        try (animation?.nativeInput ?? NativeAnimationOptionsInput())
-          .withOptionalNativeOptions { nativeAnimation in
-            try checkStatus(mln_map_ease_to(
-              handle.requireLive().raw,
-              nativeCamera,
-              nativeAnimation
-            ))
-          }
-      }
-    }
-  }
-
-  public func moveBy(deltaX: Double, deltaY: Double) throws {
-    try mapNativeFailure {
-      try checkStatus(mln_map_move_by(handle.requireLive().raw, deltaX, deltaY))
-    }
-  }
-
-  public func moveBy(
-    deltaX: Double,
-    deltaY: Double,
-    animation: AnimationOptions
-  ) throws {
-    try mapNativeFailure {
-      try animation.nativeInput.withOptionalNativeOptions { nativeAnimation in
-        try checkStatus(mln_map_move_by_animated(
+      try NativeMemory.withTemporary(UInt64(0)) { commandId in
+        try checkStatus(mln_map_request_repaint(
           handle.requireLive().raw,
-          deltaX,
-          deltaY,
-          nativeAnimation
+          commandId
         ))
-      }
+      }.value
     }
   }
 
-  public func scaleBy(_ scale: Double, anchor: ScreenPoint? = nil) throws {
+  /// Requests and awaits one noncoalescing still-image operation.
+  public func requestStillImage() async throws {
+    let operation = try mapNativeFailure {
+      try NativeMap.requestStillImageStart(handle.requireLive())
+    }
+    defer { mln_operation_release(operation.raw) }
+    try await mapNativeFailure {
+      try await runtime.waitForOperation(operation)
+    }
+  }
+
+  /// Copies the latest immutable map state.
+  public func snapshot() throws -> MapSnapshot {
     try mapNativeFailure {
-      if var nativeAnchor = anchor?.nativeInput.native {
-        try withUnsafePointer(to: &nativeAnchor) { anchor in
-          try checkStatus(mln_map_scale_by(
+      try MapSnapshot(native: NativeMap.snapshot(handle.requireLive()))
+    }
+  }
+
+  /// Copies the camera from the latest immutable map snapshot.
+  public func cameraSnapshot() throws -> CameraSnapshot {
+    try mapNativeFailure {
+      let snapshot = try NativeMap.cameraSnapshot(handle.requireLive())
+      return CameraSnapshot(
+        generation: snapshot.generation,
+        camera: CameraOptions(
+          native: NativeCameraOptionsInput(snapshot.camera)
+        )
+      )
+    }
+  }
+
+  /// Reads the camera after every command accepted before this call.
+  public func queryCamera() async throws -> CameraSnapshot {
+    let operation = try mapNativeFailure {
+      try NativeMap.cameraQueryStart(handle.requireLive())
+    }
+    defer { mln_operation_release(operation.raw) }
+    try await mapNativeFailure {
+      try await runtime.waitForOperation(operation)
+    }
+    return try mapNativeFailure {
+      let result = try NativeMap.cameraQueryTakeResult(operation)
+      return CameraSnapshot(
+        generation: result.generation,
+        camera: CameraOptions(native: NativeCameraOptionsInput(result.camera))
+      )
+    }
+  }
+
+  /// Submits one atomic camera command and returns its runtime-wide command ID.
+  @discardableResult
+  public func updateCamera(_ update: CameraUpdate) throws -> UInt64 {
+    try mapNativeFailure {
+      try update.withNativeUpdate { update in
+        try NativeMemory.withTemporary(UInt64(0)) { commandId in
+          try checkStatus(mln_map_update_camera(
             handle.requireLive().raw,
-            scale,
-            anchor
+            update,
+            commandId
           ))
-        }
-      } else {
-        try checkStatus(mln_map_scale_by(handle.requireLive().raw, scale, nil))
+        }.value
       }
     }
   }
 
-  public func scaleBy(
-    _ scale: Double,
-    anchor: ScreenPoint? = nil,
-    animation: AnimationOptions
-  ) throws {
+  /// Resizes the logical map viewport and returns its command ID.
+  @discardableResult
+  public func resize(to extent: MapLogicalExtent) throws -> UInt64 {
     try mapNativeFailure {
-      try animation.nativeInput.withOptionalNativeOptions { nativeAnimation in
-        if var nativeAnchor = anchor?.nativeInput.native {
-          try withUnsafePointer(to: &nativeAnchor) { anchor in
-            try checkStatus(mln_map_scale_by_animated(
-              handle.requireLive().raw,
-              scale,
-              anchor,
-              nativeAnimation
-            ))
-          }
-        } else {
-          try checkStatus(mln_map_scale_by_animated(
-            handle.requireLive().raw,
-            scale,
-            nil,
-            nativeAnimation
-          ))
-        }
-      }
-    }
-  }
-
-  public func cancelTransitions() throws {
-    try mapNativeFailure {
-      try checkStatus(mln_map_cancel_transitions(handle.requireLive().raw))
-    }
-  }
-
-  /// Marks whether a host-driven gesture is in progress. The flag stays set
-  /// until the host clears it, so pair every `true` with a `false`.
-  public func setGestureInProgress(_ inProgress: Bool) throws {
-    try mapNativeFailure {
-      try checkStatus(mln_map_set_gesture_in_progress(
-        handle.requireLive().raw,
-        inProgress
-      ))
-    }
-  }
-
-  /// Returns whether a host-driven gesture is currently in progress.
-  public func isGestureInProgress() throws -> Bool {
-    try mapNativeFailure {
-      try NativeMap.isGestureInProgress(handle.requireLive())
+      try NativeMemory.withTemporary(UInt64(0)) { commandId in
+        try checkStatus(mln_map_resize(
+          handle.requireLive().raw,
+          extent.native,
+          commandId
+        ))
+      }.value
     }
   }
 }

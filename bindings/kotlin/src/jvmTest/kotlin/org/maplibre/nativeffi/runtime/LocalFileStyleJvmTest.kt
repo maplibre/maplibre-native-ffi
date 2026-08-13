@@ -8,38 +8,39 @@ import org.maplibre.nativeffi.map.MapOptions
 
 class LocalFileStyleJvmTest {
   @Test
-  fun localFileStyleLoadsFromCanonicalEncodedUri() {
-    val tempDirectory = Files.createTempDirectory("maplibre resources ké地図")
-    try {
-      val styleFile =
-        Files.createDirectories(tempDirectory.resolve("style sheets").resolve("スタイル"))
-          .resolve("style.json")
-      Files.writeString(styleFile, STYLE_JSON)
+  fun localFileStyleLoadsFromCanonicalEncodedUri(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val tempDirectory = Files.createTempDirectory("maplibre resources ké地図")
+      try {
+        val styleFile =
+          Files.createDirectories(tempDirectory.resolve("style sheets").resolve("スタイル"))
+            .resolve("style.json")
+        Files.writeString(styleFile, STYLE_JSON)
 
-      RuntimeHandle.create(RuntimeOptions()).use { runtime ->
-        val map =
-          MapHandle.create(
-            runtime,
-            MapOptions().apply {
-              width = 64
-              height = 64
-            },
-          )
-        try {
-          map.setStyleUrl(styleFile.toUri().toASCIIString())
-          assertTrue(waitForStyleLoaded(runtime, map))
-        } finally {
-          map.close()
+        RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+          val map =
+            MapHandle.create(
+              runtime,
+              MapOptions().apply {
+                width = 64
+                height = 64
+              },
+            )
+          try {
+            map.setStyleUrl(styleFile.toUri().toASCIIString())
+            assertTrue(waitForStyleLoaded(runtime, map))
+          } finally {
+            map.close()
+          }
         }
+      } finally {
+        tempDirectory.toFile().deleteRecursively()
       }
-    } finally {
-      tempDirectory.toFile().deleteRecursively()
     }
-  }
 
-  private fun waitForStyleLoaded(runtime: RuntimeHandle, map: MapHandle): Boolean {
+  private suspend fun waitForStyleLoaded(runtime: RuntimeHandle, map: MapHandle): Boolean {
     repeat(10_000) {
-      runtime.pump(1)
+      runtime.barrier()
       if (
         runtime.drainEvents().events.any {
           it.type == RuntimeEventType.MAP_STYLE_LOADED && it.mapSource == map

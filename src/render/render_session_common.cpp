@@ -1015,8 +1015,8 @@ auto attach_render_session(
     return output_status;
   }
 
-  // The attaching thread owns the session for its whole lifetime, and need not
-  // be the map's thread.
+  // The attaching thread owns the session for its whole lifetime, independently
+  // of the runtime's native worker.
   session->owner_thread = std::this_thread::get_id();
 
   const auto map = session->map;
@@ -1039,15 +1039,8 @@ auto attach_render_session(
       const auto prime = mbgl::gfx::BackendScope{*backend};
     }
 
-    // After the graphics setup succeeds: the map applies this on its own
-    // thread, so a size queued before a throwing prime would still land.
-    const auto size_status =
-      map_post_set_size(map, session->width, session->height);
-    if (size_status != MLN_STATUS_OK) {
-      session->scheduler.set_repaint_request({});
-      static_cast<void>(map_detach_render_target_session(map, handle));
-      return size_status;
-    }
+    // Attaching a graphics resource does not mutate map state. Map creation
+    // and explicit resize commands remain the sole extent authorities.
     warn_on_scale_factor_mismatch(map, session->scale_factor);
 
     *out_session = register_render_session(std::move(session));
@@ -1057,6 +1050,9 @@ auto attach_render_session(
     throw;
   }
 
+  // A map can publish its last update before a render target exists. Request
+  // another update so the newly attached session has a frame to consume.
+  static_cast<void>(map_post_trigger_repaint(map));
   return MLN_STATUS_OK;
 }
 
@@ -1112,11 +1108,14 @@ auto render_session_resize(
     live->texture.acquired_native_texture = nullptr;
     live->texture.acquired_frame_kind = TextureSessionFrameKind::None;
   }
-  const auto size_status = map_post_set_size(live->map, width, height);
+  const auto size_status = map_post_resize(
+    live->map, mln_logical_extent{
+                 .width = width, .height = height, .scale_factor = scale_factor
+               }
+  );
   if (size_status != MLN_STATUS_OK) {
     return size_status;
   }
-  warn_on_scale_factor_mismatch(live->map, scale_factor);
   // Keep the renderer across a resize, which carries the tile pyramid, atlases,
   // symbol placement, and feature state. Pixel ratio is the exception: it is
   // fixed when a Renderer is constructed and baked into its shaders.
@@ -1227,11 +1226,8 @@ auto render_session_set_target(
   }
   ++live->generation;
 
-  const auto size_status =
-    map_post_set_size(live->map, extent.width, extent.height);
-  if (size_status != MLN_STATUS_OK) {
-    return size_status;
-  }
+  // Target replacement changes only the graphics resource. Map creation and
+  // explicit resize commands remain the sole extent authorities.
   warn_on_scale_factor_mismatch(live->map, extent.scale_factor);
   return MLN_STATUS_OK;
 }
@@ -1378,8 +1374,8 @@ auto render_session_detach(mln_render_session session) -> mln_status {
 
   // Tear the renderer down before releasing the map's slot. The renderer holds
   // the map's forwarding observer, which the map's frontend owns; releasing the
-  // slot first lets the map owner thread destroy the map and free that observer
-  // underneath the drain and reset below.
+  // slot first lets the runtime worker destroy the map and free that observer
+  // while the drain and reset below still use it.
   {
     auto current = ScopedCurrentScheduler{live->scheduler};
     live->scheduler.drain();

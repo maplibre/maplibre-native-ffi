@@ -35,6 +35,7 @@ void install_header_transform(mln_runtime runtime, char* token) {
     .callback = add_authorization,
     .user_data = token,
   };
-  mln_runtime_set_http_header_transform(runtime, &transform);
+  uint64_t command_id = 0;
+  mln_runtime_set_http_header_transform(runtime, &transform, &command_id);
 }
 // #endregion install

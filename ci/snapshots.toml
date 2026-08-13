@@ -18,6 +18,7 @@ shared = [
   "cmake/**",
   "include/**",
   "src/**",
+  "api/**",
   "third_party/**",
   ".gitmodules",
   "patches/**",

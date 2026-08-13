@@ -165,6 +165,7 @@ public final class OperationHandle: @unchecked Sendable {
   /// cancellation when the native operation supports it.
   public func close() throws {
     try handle.closeOnce { operation in
+      runtime.forgetOperation(operation)
       mln_operation_release(operation.raw)
     }
     lifecycleLock.withLock {

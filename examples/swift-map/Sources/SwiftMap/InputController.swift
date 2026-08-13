@@ -7,8 +7,8 @@ private let preciseScrollDeltaDivisor = 10.0
 private let maxScrollDeltaPerEvent = 4.0
 
 /// Decodes host input into camera commands on the render loop, converting to
-/// logical map coordinates. The runtime loop applies the commands. Every
-/// handler returns whether the camera changed.
+/// logical map coordinates. The map task applies the commands. Every handler
+/// returns whether the camera changed.
 @MainActor
 final class InputController {
   enum DragMode {
@@ -69,8 +69,6 @@ final class InputController {
     lastLocation = location
     dragMode = mode
     dragButton = button
-    // Cancel first, so the running transition stops before the first delta.
-    commands.push(.cancelTransitions)
     commands.push(.setGestureInProgress(true))
   }
 

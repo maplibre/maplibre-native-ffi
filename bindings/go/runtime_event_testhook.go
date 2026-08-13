@@ -77,6 +77,15 @@ func (event runtimeEventForTest) withCameraTransitionFinished(payload RuntimeEve
 	return event
 }
 
+func (event runtimeEventForTest) withCommandFinished(payload RuntimeEventCommandFinishedPayload) runtimeEventForTest {
+	event.raw = C.mln_go_runtime_event_with_command_finished(event.raw, C.mln_runtime_event_command_finished{
+		command_id:  C.uint64_t(payload.CommandID),
+		disposition: C.uint32_t(payload.RawDisposition),
+		generation:  C.uint64_t(payload.Generation),
+	})
+	return event
+}
+
 func (event runtimeEventForTest) withOfflineRegionStatus(payload RuntimeEventOfflineRegionStatusPayload) runtimeEventForTest {
 	event.raw = C.mln_go_runtime_event_with_offline_region_status(event.raw, C.mln_runtime_event_offline_region_status{
 		region_id: C.mln_offline_region_id(payload.RegionID),

@@ -35,7 +35,7 @@ func logControls() {
   0: reset pitch and bearing`)
 }
 
-func (input *inputController) handleEvent(event *sdl.Event, commands *commandQueue, v viewport) bool {
+func (input *inputController) handleEvent(event *sdl.Event, commands *cameraController, v viewport) bool {
 	switch event.Type() {
 	case sdl.EventMouseButtonDown:
 		return input.handleMouseButtonDown(event.MouseButton(), commands, v)
@@ -52,7 +52,7 @@ func (input *inputController) handleEvent(event *sdl.Event, commands *commandQue
 	}
 }
 
-func (input *inputController) handleMouseButtonDown(event *sdl.MouseButtonEvent, commands *commandQueue, v viewport) bool {
+func (input *inputController) handleMouseButtonDown(event *sdl.MouseButtonEvent, commands *cameraController, v viewport) bool {
 	if event == nil {
 		return false
 	}
@@ -78,7 +78,7 @@ func (input *inputController) handleMouseButtonDown(event *sdl.MouseButtonEvent,
 
 // handleMouseButtonUp ends the drag only for the button that started it, so the
 // gesture bracket stays paired.
-func (input *inputController) handleMouseButtonUp(event *sdl.MouseButtonEvent, commands *commandQueue, v viewport) bool {
+func (input *inputController) handleMouseButtonUp(event *sdl.MouseButtonEvent, commands *cameraController, v viewport) bool {
 	if event == nil || (event.Button != sdl.ButtonLeft && event.Button != sdl.ButtonRight) {
 		return false
 	}
@@ -93,7 +93,7 @@ func (input *inputController) handleMouseButtonUp(event *sdl.MouseButtonEvent, c
 	return enqueueCameraCommand(commands, cameraCommand{kind: commandSetGestureInProgress, inProgress: false})
 }
 
-func (input *inputController) handleMouseMotion(event *sdl.MouseMotionEvent, commands *commandQueue, v viewport) bool {
+func (input *inputController) handleMouseMotion(event *sdl.MouseMotionEvent, commands *cameraController, v viewport) bool {
 	if event == nil || input.dragMode == dragNone {
 		return false
 	}
@@ -117,7 +117,7 @@ func (input *inputController) handleMouseMotion(event *sdl.MouseMotionEvent, com
 	return false
 }
 
-func handleMouseWheel(event *sdl.MouseWheelEvent, commands *commandQueue, v viewport) bool {
+func handleMouseWheel(event *sdl.MouseWheelEvent, commands *cameraController, v viewport) bool {
 	if event == nil || event.Y == 0 {
 		return false
 	}
@@ -125,7 +125,7 @@ func handleMouseWheel(event *sdl.MouseWheelEvent, commands *commandQueue, v view
 	return enqueueCameraCommand(commands, cameraCommand{kind: commandScaleBy, scale: math.Pow(2, float64(event.Y)*0.25), anchor: anchor})
 }
 
-func handleKeyDown(event *sdl.KeyboardEvent, commands *commandQueue, v viewport) bool {
+func handleKeyDown(event *sdl.KeyboardEvent, commands *cameraController, v viewport) bool {
 	if event == nil {
 		return false
 	}
@@ -167,9 +167,8 @@ func handleKeyDown(event *sdl.KeyboardEvent, commands *commandQueue, v viewport)
 	return enqueueCameraCommand(commands, command)
 }
 
-func enqueueCameraCommand(commands *commandQueue, command cameraCommand) bool {
-	commands.push(command)
-	return true
+func enqueueCameraCommand(commands *cameraController, command cameraCommand) bool {
+	return commands.submit(command)
 }
 
 func dragModeForButton(button byte) dragMode {

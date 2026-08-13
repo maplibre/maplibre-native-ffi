@@ -3,7 +3,8 @@
 // Adapts synchronous MapLibre callback contracts to hosts that can only receive
 // callbacks asynchronously through void listener functions.
 //
-// Everything here runs on MapLibre's own threads.
+// Native callbacks enqueue on MapLibre threads; hosts drain and close queues
+// from their own execution contexts.
 
 #include <algorithm>
 #include <cstddef>

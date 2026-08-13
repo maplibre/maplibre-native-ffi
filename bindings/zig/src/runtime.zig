@@ -26,9 +26,10 @@ const RuntimeState = struct {
     notification_source: c.mln_notification_source,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
     registry: ?*RuntimeRegistry,
-    resource_transform: ?*ResourceTransform,
-    http_header_transform: ?*HttpHeaderTransform,
-    resource_provider: ?*ResourceProviderState,
+    resource_roots_lock: std.Io.Mutex,
+    resource_transforms: std.ArrayList(*ResourceTransform),
+    http_header_transforms: std.ArrayList(*HttpHeaderTransform),
+    resource_providers: std.ArrayList(*ResourceProviderState),
     active_leases: std.atomic.Value(usize),
     closing: bool,
     runtime_destroyed: bool,
@@ -55,11 +56,6 @@ const ResourceRequestState = struct {
     diagnostic_store: ?*diagnostics.DiagnosticStore,
 };
 
-const WakeSourceState = struct {
-    native: c.mln_wake_source,
-    diagnostic_store: ?*diagnostics.DiagnosticStore,
-};
-
 const OperationState = struct {
     runtime: RuntimeHandle,
     operation_id: c.mln_operation,
@@ -74,16 +70,16 @@ const OperationRegistrySlot = struct {
     generation: u64,
 };
 
-const OperationLease = struct {
+pub const OperationLease = struct {
     state: *OperationState,
     native: c.mln_operation,
 
-    fn release(self: OperationLease) void {
+    pub fn release(self: OperationLease) void {
         _ = self.state.active_uses.fetchSub(1, .seq_cst);
     }
 };
 
-const RequiredOperation = struct {
+pub const RequiredOperation = struct {
     lease: OperationLease,
     operation_kind: OperationKind,
 };
@@ -95,9 +91,6 @@ var runtime_handle_registry: std.AutoHashMapUnmanaged(c.mln_runtime, *RuntimeSta
 
 var resource_request_registry_lock = std.atomic.Value(bool).init(false);
 var resource_request_registry: std.AutoHashMapUnmanaged(c.mln_resource_request_handle, *ResourceRequestState) = .empty;
-
-var wake_source_registry_lock = std.atomic.Value(bool).init(false);
-var wake_source_registry: std.AutoHashMapUnmanaged(c.mln_wake_source, *WakeSourceState) = .empty;
 
 var operation_registry_lock = std.atomic.Value(bool).init(false);
 var operation_registry: std.ArrayList(OperationRegistrySlot) = .empty;
@@ -175,7 +168,40 @@ pub const AmbientCacheOperation = enum {
 
 pub const OfflineRegionId = i64;
 
-const OperationKind = enum {
+pub const OperationKind = enum {
+    runtime_barrier,
+    map_camera_query,
+    map_still_image,
+    map_loaded_style_json,
+    map_style_url,
+    map_remove_style_source,
+    map_style_source_exists,
+    map_get_style_source_type,
+    map_get_style_source_info,
+    map_copy_style_source_attribution,
+    map_copy_style_source_url,
+    map_get_style_source_tile_urls,
+    map_list_style_source_ids,
+    map_remove_style_layer,
+    map_style_layer_exists,
+    map_get_style_layer_type,
+    map_list_style_layer_ids,
+    map_get_style_layer_json,
+    map_get_style_light_property,
+    map_get_style_transition_options,
+    map_get_layer_property,
+    map_get_layer_filter,
+    map_copy_layer_source_layer,
+    map_copy_layer_source_id,
+    map_get_layer_min_zoom,
+    map_get_layer_max_zoom,
+    map_get_layer_visibility,
+    map_remove_style_image,
+    map_style_image_exists,
+    map_get_style_image_info,
+    map_copy_style_image_pixels,
+    map_copy_style_image_stretches,
+    map_get_image_source_coordinates,
     ambient_cache,
     region_create,
     region_get,
@@ -190,9 +216,22 @@ const OperationKind = enum {
     set_maximum_ambient_cache_size,
 };
 
-const OperationResultKind = enum {
+pub const OperationResultKind = enum {
     none,
+    camera,
     region,
+    boolean,
+    optional_style_source_type,
+    optional_style_source_info,
+    optional_string,
+    string,
+    string_list,
+    style_transition_options,
+    optional_style_image_info,
+    optional_image_stretches,
+    optional_coordinates,
+    number,
+    style_layer_visibility,
     optional_region,
     region_list,
     region_status,
@@ -515,38 +554,6 @@ pub const ResourceRequestHandle = enum(c.mln_resource_request_handle) {
     }
 };
 
-/// Releases a runtime owner thread parked in `RuntimeHandle.pump`.
-///
-/// Usable from any thread, and still usable after its runtime closes, when
-/// signalling does nothing. The diagnostic store the runtime was created with
-/// must outlive the source.
-pub const WakeSourceHandle = enum(c.mln_wake_source) {
-    _,
-
-    /// Sets the runtime's wake flag and releases the parked owner thread. A
-    /// signal raised while the owner thread runs leaves the flag set, so the
-    /// next `RuntimeHandle.pump` returns without parking.
-    pub fn signal(self: WakeSourceHandle) status.Error!void {
-        lockWakeSourceRegistry();
-        defer unlockWakeSourceRegistry();
-
-        const source_state = wakeSourceState(self) orelse return error.ClosedHandle;
-        if (source_state.native == 0) return error.ClosedHandle;
-        const native_source = source_state.native;
-        try status.checkStatus(c.mln_wake_source_signal(native_source), source_state.diagnostic_store);
-    }
-
-    /// Releases the wake source. Later signals report a closed handle.
-    pub fn release(self: WakeSourceHandle) void {
-        lockWakeSourceRegistry();
-        defer unlockWakeSourceRegistry();
-
-        const source_state = unregisterWakeSourceState(self) orelse return;
-        defer std.heap.smp_allocator.destroy(source_state);
-        c.mln_wake_source_destroy(source_state.native);
-    }
-};
-
 /// One drained batch of copied runtime events.
 ///
 /// The batch owns its events and remains valid after another drain or after the
@@ -671,6 +678,7 @@ pub const RuntimeEventPayload = union(enum) {
     offline_region_status: OfflineRegionStatusPayload,
     offline_region_response_error: OfflineRegionResponseErrorPayload,
     offline_region_tile_count_limit: OfflineRegionTileCountLimitPayload,
+    command_finished: CommandFinishedPayload,
     camera_transition_finished: CameraTransitionFinishedPayload,
     unknown: UnknownPayload,
 
@@ -894,6 +902,29 @@ pub const CameraTransitionFinishedPayload = struct {
     /// transition.
     transition_id: u64,
 };
+pub const CommandDisposition = union(enum) {
+    committed,
+    superseded,
+    failed,
+    cancelled,
+    unknown: u32,
+
+    fn fromRaw(raw: u32) CommandDisposition {
+        return switch (raw) {
+            c.MLN_COMMAND_DISPOSITION_COMMITTED => .committed,
+            c.MLN_COMMAND_DISPOSITION_SUPERSEDED => .superseded,
+            c.MLN_COMMAND_DISPOSITION_FAILED => .failed,
+            c.MLN_COMMAND_DISPOSITION_CANCELLED => .cancelled,
+            else => .{ .unknown = raw },
+        };
+    }
+};
+
+pub const CommandFinishedPayload = struct {
+    command_id: u64,
+    disposition: CommandDisposition,
+    generation: u64,
+};
 
 /// Payload of a type this binding does not name, kept as the event's fixed
 /// payload window: the batch's event size less the payload's offset in the
@@ -926,6 +957,7 @@ pub const RuntimeEventType = union(enum) {
     offline_region_response_error,
     offline_region_tile_count_limit_exceeded,
     map_camera_transition_finished,
+    command_finished,
     unknown: u32,
 
     fn fromRaw(raw: u32) RuntimeEventType {
@@ -952,6 +984,7 @@ pub const RuntimeEventType = union(enum) {
             c.MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR => .offline_region_response_error,
             c.MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED => .offline_region_tile_count_limit_exceeded,
             c.MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED => .map_camera_transition_finished,
+            c.MLN_RUNTIME_EVENT_COMMAND_FINISHED => .command_finished,
             else => .{ .unknown = raw },
         };
     }
@@ -987,6 +1020,7 @@ pub const RuntimeEventMask = struct {
     offline_region_status_changed: bool = false,
     offline_region_response_error: bool = false,
     offline_region_tile_count_limit_exceeded: bool = false,
+    command_finished: bool = false,
     /// Bits reported by a newer native library that this binding does not name.
     unknown_bits: u64 = 0,
 
@@ -1146,10 +1180,15 @@ pub const ReadyBatch = struct {
     }
 };
 
+/// Native callback that schedules a later ready-endpoint drain.
+///
+/// The callback may run on any thread. It must not call the C API.
+pub const NotificationCallback = *const fn (?*anyopaque) callconv(.c) void;
+
 pub const OperationHandle = enum(u128) {
     _,
 
-    fn init(
+    pub fn init(
         runtime: *RuntimeHandle,
         operation_id: c.mln_operation,
         operation_kind: OperationKind,
@@ -1178,7 +1217,7 @@ pub const OperationHandle = enum(u128) {
         return @enumFromInt(operation_lease.native);
     }
 
-    fn require(
+    pub fn require(
         self: OperationHandle,
         expected_runtime: *RuntimeHandle,
         operation_kind: OperationKind,
@@ -1211,6 +1250,25 @@ pub const OperationHandle = enum(u128) {
         var completed = false;
         try status.checkStatus(c.mln_operation_wait(operation_lease.native, timeout_ms, &completed), null);
         return completed;
+    }
+    /// Waits for terminal completion and reports the operation's own failure.
+    ///
+    /// A timeout returns `false`. A terminal non-OK status is mapped to a Zig
+    /// error after its copied diagnostic replaces the runtime diagnostic.
+    pub fn waitForSuccess(self: OperationHandle, timeout_ms: i64) status.Error!bool {
+        const operation_lease = try operationLease(self);
+        defer operation_lease.release();
+        var completed = false;
+        try status.checkStatus(
+            c.mln_operation_wait(operation_lease.native, timeout_ms, &completed),
+            null,
+        );
+        if (!completed) return false;
+        try checkNativeOperationResult(
+            operation_lease.native,
+            operation_lease.state.runtime,
+        );
+        return true;
     }
 
     /// Requests cancellation of this operation. Cancellation may run while
@@ -1312,6 +1370,7 @@ pub const RuntimeEventPayloadType = union(enum) {
     offline_region_response_error,
     offline_region_tile_count_limit,
     camera_transition_finished,
+    command_finished,
     unknown: u32,
 
     fn fromRaw(raw: u32) RuntimeEventPayloadType {
@@ -1324,6 +1383,7 @@ pub const RuntimeEventPayloadType = union(enum) {
             c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR => .offline_region_response_error,
             c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT => .offline_region_tile_count_limit,
             c.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED => .camera_transition_finished,
+            c.MLN_RUNTIME_EVENT_PAYLOAD_COMMAND_FINISHED => .command_finished,
             else => .{ .unknown = raw },
         };
     }
@@ -1356,58 +1416,53 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
         return createNative(&native_options, diagnostic_store);
     }
 
-    /// Advances this runtime: parks the owner thread when `timeout_ms` allows
-    /// it, then drains the owner-thread task queues. Drain the resulting
-    /// runtime events with `drainEvents` afterwards.
-    ///
-    /// `timeout_ms` bounds the park: zero drains and returns, a positive value
-    /// parks for at most that many milliseconds, and null parks until a wake
-    /// arrives. Timers and ready file descriptors only wake the runtime when
-    /// they queue owner-thread work, so pass a bounded timeout to cap the wait.
-    ///
-    /// A non-zero timeout blocks the calling thread. Call it outside any lock
-    /// that a thread signalling a wake source takes. An undrained event never
-    /// parks the owner thread, so a host that pumps and drains in a loop keeps
-    /// draining.
-    pub fn pump(self: *RuntimeHandle, timeout_ms: ?u64) status.Error!void {
+    pub fn barrierStart(self: *RuntimeHandle) status.Error!OperationHandle {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
-        const native_timeout: i64 = if (timeout_ms) |value|
-            std.math.cast(i64, value) orelse std.math.maxInt(i64)
-        else
-            -1;
+        var operation: c.mln_operation = 0;
         try status.checkStatus(
-            c.mln_runtime_pump(runtime_lease.native, native_timeout),
+            c.mln_runtime_barrier_start(runtime_lease.native, &operation),
+            runtime_lease.diagnostic_store,
+        );
+        return OperationHandle.init(self, operation, .runtime_barrier, .none) catch |err| {
+            c.mln_operation_release(operation);
+            return err;
+        };
+    }
+
+    /// Installs or replaces the receiver scheduling callback.
+    ///
+    /// `user_data` must remain valid until this callback is replaced, cleared,
+    /// or the runtime closes.
+    pub fn setNotificationCallback(
+        self: *RuntimeHandle,
+        callback: NotificationCallback,
+        user_data: ?*anyopaque,
+    ) status.Error!void {
+        const runtime_lease = try lease(self);
+        defer runtime_lease.release();
+        try status.checkStatus(
+            c.mln_notification_source_set_callback(
+                runtime_lease.state.notification_source,
+                callback,
+                user_data,
+            ),
             runtime_lease.diagnostic_store,
         );
     }
 
-    /// Acquires a wake source that releases this runtime's parked owner thread.
-    /// The returned handle is usable from any thread, and the caller releases
-    /// it.
-    pub fn wakeSource(self: *RuntimeHandle) status.Error!WakeSourceHandle {
+    /// Clears the receiver scheduling callback after in-flight entries return.
+    pub fn clearNotificationCallback(self: *RuntimeHandle) status.Error!void {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
-
-        var native_source: c.mln_wake_source = 0;
         try status.checkStatus(
-            c.mln_runtime_wake_source_acquire(runtime_lease.native, &native_source),
+            c.mln_notification_source_clear_callback(
+                runtime_lease.state.notification_source,
+            ),
             runtime_lease.diagnostic_store,
         );
-        if (native_source == 0) return error.NativeError;
-        const source = native_source;
-
-        const source_state = std.heap.smp_allocator.create(WakeSourceState) catch {
-            c.mln_wake_source_destroy(source);
-            return error.OutOfMemory;
-        };
-        source_state.* = .{ .native = source, .diagnostic_store = runtime_lease.diagnostic_store };
-        return registerWakeSourceState(source, source_state) catch {
-            std.heap.smp_allocator.destroy(source_state);
-            c.mln_wake_source_destroy(source);
-            return error.OutOfMemory;
-        };
     }
+
     /// Drains and copies the endpoints currently ready on this runtime's
     /// receiver-scoped notification source.
     pub fn drainReady(
@@ -1799,141 +1854,131 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
         return offlineStatusFromNative(native_status_value);
     }
 
-    /// Registers, replaces, or clears the runtime-scoped URL transform for
-    /// network resources; passing null clears it. The binding keeps the handler
-    /// and context alive until the call that replaces or clears them returns,
-    /// and releases them when the runtime closes.
-    pub fn setResourceTransform(self: *RuntimeHandle, transform: ?ResourceTransform) status.Error!void {
+    /// Registers, replaces, or clears the runtime-scoped URL transform.
+    /// The binding retains accepted callback roots through every terminal
+    /// command disposition and releases them when the runtime closes.
+    pub fn setResourceTransform(self: *RuntimeHandle, transform: ?ResourceTransform) status.Error!u64 {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
-        const runtime_state = runtime_lease.state;
+        var command_id: u64 = 0;
         if (transform) |value| {
             const replacement = try std.heap.smp_allocator.create(ResourceTransform);
             errdefer std.heap.smp_allocator.destroy(replacement);
             replacement.* = value;
+            std.Io.Threaded.mutexLock(&runtime_lease.state.resource_roots_lock);
+            defer std.Io.Threaded.mutexUnlock(&runtime_lease.state.resource_roots_lock);
+            try runtime_lease.state.resource_transforms.append(std.heap.smp_allocator, replacement);
+            errdefer _ = runtime_lease.state.resource_transforms.pop();
             var native_transform = c.mln_resource_transform{
                 .size = @sizeOf(c.mln_resource_transform),
                 .callback = resourceTransformTrampoline,
                 .user_data = replacement,
             };
-            try status.checkStatus(
-                c.mln_runtime_set_resource_transform(runtime_lease.native, &native_transform),
-                runtime_lease.diagnostic_store,
-            );
-            const previous = runtime_state.resource_transform;
-            runtime_state.resource_transform = replacement;
-            if (previous) |old| std.heap.smp_allocator.destroy(old);
-            return;
+            try status.checkStatus(c.mln_runtime_set_resource_transform(
+                runtime_lease.native,
+                &native_transform,
+                &command_id,
+            ), runtime_lease.diagnostic_store);
+            return command_id;
         }
-
-        try status.checkStatus(
-            c.mln_runtime_clear_resource_transform(runtime_lease.native),
-            runtime_lease.diagnostic_store,
-        );
-        if (runtime_state.resource_transform) |old| {
-            runtime_state.resource_transform = null;
-            std.heap.smp_allocator.destroy(old);
-        }
+        try status.checkStatus(c.mln_runtime_clear_resource_transform(
+            runtime_lease.native,
+            &command_id,
+        ), runtime_lease.diagnostic_store);
+        return command_id;
     }
 
-    /// Registers, replaces, or clears the runtime-scoped network resource
-    /// provider; passing null clears it. The binding keeps the handler and
-    /// context alive until the call that replaces or clears them returns, and
-    /// releases them when the runtime closes. Handles the previous provider
-    /// already took stay valid: complete and release each one as usual.
-    pub fn setResourceProvider(self: *RuntimeHandle, provider: ?ResourceProvider) status.Error!void {
+    pub fn setResourceProvider(self: *RuntimeHandle, provider: ?ResourceProvider) status.Error!u64 {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
-        const runtime_state = runtime_lease.state;
+        var command_id: u64 = 0;
         if (provider) |value| {
             const replacement = try std.heap.smp_allocator.create(ResourceProviderState);
             errdefer std.heap.smp_allocator.destroy(replacement);
             replacement.* = .{ .provider = value, .diagnostic_store = runtime_lease.diagnostic_store };
+            std.Io.Threaded.mutexLock(&runtime_lease.state.resource_roots_lock);
+            defer std.Io.Threaded.mutexUnlock(&runtime_lease.state.resource_roots_lock);
+            try runtime_lease.state.resource_providers.append(std.heap.smp_allocator, replacement);
+            errdefer _ = runtime_lease.state.resource_providers.pop();
             var native_provider = c.mln_resource_provider{
                 .size = @sizeOf(c.mln_resource_provider),
                 .callback = resourceProviderTrampoline,
                 .user_data = replacement,
             };
-            try status.checkStatus(
-                c.mln_runtime_set_resource_provider(runtime_lease.native, &native_provider),
-                runtime_lease.diagnostic_store,
-            );
-            const previous = runtime_state.resource_provider;
-            runtime_state.resource_provider = replacement;
-            if (previous) |old_provider| std.heap.smp_allocator.destroy(old_provider);
-            return;
+            try status.checkStatus(c.mln_runtime_set_resource_provider(
+                runtime_lease.native,
+                &native_provider,
+                &command_id,
+            ), runtime_lease.diagnostic_store);
+            return command_id;
         }
-
-        try status.checkStatus(
-            c.mln_runtime_clear_resource_provider(runtime_lease.native),
-            runtime_lease.diagnostic_store,
-        );
-        if (runtime_state.resource_provider) |old_provider| {
-            runtime_state.resource_provider = null;
-            std.heap.smp_allocator.destroy(old_provider);
-        }
+        try status.checkStatus(c.mln_runtime_clear_resource_provider(
+            runtime_lease.native,
+            &command_id,
+        ), runtime_lease.diagnostic_store);
+        return command_id;
     }
 
-    /// Registers, replaces, or clears headers added to built-in HTTP requests.
-    pub fn setHttpHeaderTransform(self: *RuntimeHandle, transform: ?HttpHeaderTransform) status.Error!void {
+    pub fn setHttpHeaderTransform(self: *RuntimeHandle, transform: ?HttpHeaderTransform) status.Error!u64 {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
-        const runtime_state = runtime_lease.state;
+        var command_id: u64 = 0;
         if (transform) |value| {
             const replacement = try std.heap.smp_allocator.create(HttpHeaderTransform);
             errdefer std.heap.smp_allocator.destroy(replacement);
             replacement.* = value;
+            std.Io.Threaded.mutexLock(&runtime_lease.state.resource_roots_lock);
+            defer std.Io.Threaded.mutexUnlock(&runtime_lease.state.resource_roots_lock);
+            try runtime_lease.state.http_header_transforms.append(std.heap.smp_allocator, replacement);
+            errdefer _ = runtime_lease.state.http_header_transforms.pop();
             var native_transform = c.mln_http_header_transform{
                 .size = @sizeOf(c.mln_http_header_transform),
                 .callback = httpHeaderTransformTrampoline,
                 .user_data = replacement,
             };
-            try status.checkStatus(
-                c.mln_runtime_set_http_header_transform(runtime_lease.native, &native_transform),
-                runtime_lease.diagnostic_store,
-            );
-            const previous = runtime_state.http_header_transform;
-            runtime_state.http_header_transform = replacement;
-            if (previous) |old| std.heap.smp_allocator.destroy(old);
-            return;
+            try status.checkStatus(c.mln_runtime_set_http_header_transform(
+                runtime_lease.native,
+                &native_transform,
+                &command_id,
+            ), runtime_lease.diagnostic_store);
+            return command_id;
         }
-        try status.checkStatus(
-            c.mln_runtime_clear_http_header_transform(runtime_lease.native),
-            runtime_lease.diagnostic_store,
-        );
-        if (runtime_state.http_header_transform) |old| {
-            runtime_state.http_header_transform = null;
-            std.heap.smp_allocator.destroy(old);
-        }
+        try status.checkStatus(c.mln_runtime_clear_http_header_transform(
+            runtime_lease.native,
+            &command_id,
+        ), runtime_lease.diagnostic_store);
+        return command_id;
     }
 
     pub fn close(self: *RuntimeHandle) status.Error!void {
         const runtime_close = try beginRuntimeClose(self.*) orelse return;
         if (!runtime_close.state.runtime_destroyed) {
-            status.checkStatus(c.mln_runtime_destroy(runtime_close.native), runtime_close.diagnostic_store) catch |err| {
+            var operation: c.mln_operation = 0;
+            status.checkStatus(
+                c.mln_runtime_close_start(runtime_close.native, &operation),
+                runtime_close.diagnostic_store,
+            ) catch |err| {
                 cancelRuntimeClose(runtime_close.state);
                 return err;
             };
+            waitNativeOperation(operation, runtime_close.diagnostic_store) catch |err| {
+                c.mln_operation_release(operation);
+                cancelRuntimeClose(runtime_close.state);
+                return err;
+            };
+            c.mln_operation_release(operation);
             runtime_close.state.runtime_destroyed = true;
         }
-        // Preserve the state on failure: the native runtime is already gone,
-        // but a retry must still be able to close and release its source.
         try status.checkStatus(
             notification_source_close_for_testing(runtime_close.state.notification_source),
             runtime_close.diagnostic_store,
         );
-        if (runtime_close.state.resource_transform) |old| {
-            runtime_close.state.resource_transform = null;
-            std.heap.smp_allocator.destroy(old);
-        }
-        if (runtime_close.state.http_header_transform) |old| {
-            runtime_close.state.http_header_transform = null;
-            std.heap.smp_allocator.destroy(old);
-        }
-        if (runtime_close.state.resource_provider) |old| {
-            runtime_close.state.resource_provider = null;
-            std.heap.smp_allocator.destroy(old);
-        }
+        for (runtime_close.state.resource_transforms.items) |root| std.heap.smp_allocator.destroy(root);
+        runtime_close.state.resource_transforms.deinit(std.heap.smp_allocator);
+        for (runtime_close.state.http_header_transforms.items) |root| std.heap.smp_allocator.destroy(root);
+        runtime_close.state.http_header_transforms.deinit(std.heap.smp_allocator);
+        for (runtime_close.state.resource_providers.items) |root| std.heap.smp_allocator.destroy(root);
+        runtime_close.state.resource_providers.deinit(std.heap.smp_allocator);
         runtime_close.registry.maps.deinit(std.heap.smp_allocator);
         std.heap.smp_allocator.destroy(runtime_close.registry);
         const runtime_state = finishRuntimeClose(self.*) orelse runtime_close.state;
@@ -1962,9 +2007,12 @@ fn createNative(
     );
     errdefer _ = notification_source_close_for_testing(notification_source);
     native_options.notification_source = notification_source;
+    var operation: c.mln_operation = 0;
+    try status.checkStatus(c.mln_runtime_create_start(native_options, &operation), diagnostic_store);
+    defer c.mln_operation_release(operation);
+    try waitNativeOperation(operation, diagnostic_store);
     var runtime: c.mln_runtime = 0;
-    try status.checkStatus(c.mln_runtime_create(native_options, &runtime), diagnostic_store);
-    errdefer _ = c.mln_runtime_destroy(runtime);
+    try status.checkStatus(c.mln_runtime_create_take_result(operation, &runtime), diagnostic_store);
 
     const runtime_registry = try std.heap.smp_allocator.create(RuntimeRegistry);
     runtime_registry.* = .{ .maps = .empty, .next_map_id = 1, .live_operations = 0 };
@@ -1975,9 +2023,10 @@ fn createNative(
         .notification_source = notification_source,
         .diagnostic_store = diagnostic_store,
         .registry = runtime_registry,
-        .resource_transform = null,
-        .http_header_transform = null,
-        .resource_provider = null,
+        .resource_roots_lock = std.Io.Mutex.init,
+        .resource_transforms = .empty,
+        .http_header_transforms = .empty,
+        .resource_providers = .empty,
         .active_leases = std.atomic.Value(usize).init(0),
         .closing = false,
         .runtime_destroyed = false,
@@ -1987,6 +2036,66 @@ fn createNative(
     return try registerRuntimeState(runtime, runtime_state);
 }
 
+fn checkNativeOperationResult(
+    operation: c.mln_operation,
+    runtime_handle: RuntimeHandle,
+) status.Error!void {
+    var result_status: c.mln_status = c.MLN_STATUS_NATIVE_ERROR;
+    try status.checkStatus(c.mln_operation_get_status(operation, &result_status), null);
+    if (result_status == c.MLN_STATUS_OK) return;
+
+    if (runtimeState(runtime_handle)) |runtime_state| {
+        if (runtime_state.diagnostic_store) |store| {
+            var required: usize = 0;
+            try status.checkStatus(
+                c.mln_operation_copy_diagnostic(operation, null, 0, &required),
+                null,
+            );
+            const message = try std.heap.smp_allocator.alloc(u8, required);
+            defer std.heap.smp_allocator.free(message);
+            var copied: usize = 0;
+            try status.checkStatus(
+                c.mln_operation_copy_diagnostic(
+                    operation,
+                    if (message.len == 0) null else message.ptr,
+                    message.len,
+                    &copied,
+                ),
+                null,
+            );
+            try store.set(result_status, message[0..copied]);
+        }
+    }
+    try status.checkStatus(result_status, null);
+}
+
+pub fn waitNativeOperation(
+    operation: c.mln_operation,
+    diagnostic_store: ?*diagnostics.DiagnosticStore,
+) status.Error!void {
+    var completed = false;
+    try status.checkStatus(c.mln_operation_wait(operation, -1, &completed), diagnostic_store);
+    if (!completed) return error.NativeError;
+    var result_status: c.mln_status = c.MLN_STATUS_NATIVE_ERROR;
+    try status.checkStatus(c.mln_operation_get_status(operation, &result_status), diagnostic_store);
+    if (result_status != c.MLN_STATUS_OK) {
+        if (diagnostic_store) |store| {
+            var required: usize = 0;
+            try status.checkStatus(c.mln_operation_copy_diagnostic(operation, null, 0, &required), null);
+            const message = try std.heap.smp_allocator.alloc(u8, required);
+            defer std.heap.smp_allocator.free(message);
+            var copied: usize = 0;
+            try status.checkStatus(c.mln_operation_copy_diagnostic(
+                operation,
+                if (message.len == 0) null else message.ptr,
+                message.len,
+                &copied,
+            ), null);
+            try store.set(result_status, message[0..copied]);
+        }
+        try status.checkStatus(result_status, null);
+    }
+}
 // Events index by the batch's stride, which a later C API version may widen
 // past this binding's compiled event size, so the fixed prefix is copied out
 // rather than read through a pointer cast.
@@ -2304,36 +2413,6 @@ fn unlockResourceRequestRegistry() void {
     resource_request_registry_lock.store(false, .seq_cst);
 }
 
-fn registerWakeSourceState(
-    native_handle: c.mln_wake_source,
-    source_state: *WakeSourceState,
-) std.mem.Allocator.Error!WakeSourceHandle {
-    lockWakeSourceRegistry();
-    defer unlockWakeSourceRegistry();
-
-    try wake_source_registry.put(std.heap.smp_allocator, native_handle, source_state);
-    return @enumFromInt(native_handle);
-}
-
-fn wakeSourceState(handle: WakeSourceHandle) ?*WakeSourceState {
-    return wake_source_registry.get(@intFromEnum(handle));
-}
-
-fn unregisterWakeSourceState(handle: WakeSourceHandle) ?*WakeSourceState {
-    const entry = wake_source_registry.fetchRemove(@intFromEnum(handle)) orelse return null;
-    return entry.value;
-}
-
-fn lockWakeSourceRegistry() void {
-    while (wake_source_registry_lock.cmpxchgWeak(false, true, .seq_cst, .seq_cst) != null) {
-        std.Thread.yield() catch {};
-    }
-}
-
-fn unlockWakeSourceRegistry() void {
-    wake_source_registry_lock.store(false, .seq_cst);
-}
-
 fn registerOperationState(operation_state: *OperationState) std.mem.Allocator.Error!OperationHandle {
     lockOperationRegistry();
     defer unlockOperationRegistry();
@@ -2546,6 +2625,13 @@ fn payloadFromNative(native_event: c.mln_runtime_event, window: []const u8) Runt
         c.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED => .{
             .camera_transition_finished = .{
                 .transition_id = native_event.payload.camera_transition_finished.transition_id,
+            },
+        },
+        c.MLN_RUNTIME_EVENT_PAYLOAD_COMMAND_FINISHED => .{
+            .command_finished = .{
+                .command_id = native_event.payload.command_finished.command_id,
+                .disposition = CommandDisposition.fromRaw(native_event.payload.command_finished.disposition),
+                .generation = native_event.payload.command_finished.generation,
             },
         },
         else => .{ .unknown = .{
@@ -2780,6 +2866,11 @@ fn countingOfflineRegionListDestroy(list: c.mln_offline_region_list) callconv(.c
     c.mln_offline_region_list_destroy(list);
 }
 
+fn markNotification(user_data: ?*anyopaque) callconv(.c) void {
+    const notified: *std.atomic.Value(bool) = @ptrCast(@alignCast(user_data orelse return));
+    notified.store(true, .seq_cst);
+}
+
 fn tempPathForTesting(allocator: std.mem.Allocator, sub_path: []const u8, filename: []const u8) ![]u8 {
     return std.fmt.allocPrint(allocator, ".zig-cache/tmp/{s}/{s}", .{ sub_path, filename });
 }
@@ -2796,9 +2887,8 @@ fn offlineTileDefinitionForTesting() OfflineRegionDefinition {
         .pixel_ratio = 2.0,
     } };
 }
-fn waitForOfflineOperationForTesting(runtime: *RuntimeHandle, operation: OperationHandle) !void {
+fn waitForOfflineOperationForTesting(_: *RuntimeHandle, operation: OperationHandle) !void {
     for (0..5000) |_| {
-        try runtime.pump(0);
         if (try operation.poll()) {
             try std.testing.expectEqual(@as(i32, c.MLN_STATUS_OK), try operation.resultStatus());
             return;
@@ -3052,6 +3142,36 @@ test "runtime close rejects live operations" {
     try runtime.close();
     runtime_open = false;
 }
+
+test "runtime notification callback exposes ready operation endpoint" {
+    var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var notified = std.atomic.Value(bool).init(false);
+    try runtime.setNotificationCallback(markNotification, &notified);
+
+    const operation = try runtime.barrierStart();
+    defer operation.release();
+    try std.testing.expect(try operation.wait(-1));
+    for (0..1000) |_| {
+        if (notified.load(.seq_cst)) break;
+        std.Thread.yield() catch {};
+    }
+    try std.testing.expect(notified.load(.seq_cst));
+
+    var ready = try runtime.drainReady(std.testing.allocator);
+    defer ready.deinit();
+    const operation_id = try operation.id();
+    var found = false;
+    for (ready.endpoints) |endpoint| {
+        if (endpoint.kind == .operation and endpoint.id.operation == operation_id) {
+            found = true;
+            break;
+        }
+    }
+    try std.testing.expect(found);
+    try runtime.clearNotificationCallback();
+}
+
 test "runtime close preserves notification source ownership for retry" {
     var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
     var runtime_open = true;
@@ -3062,7 +3182,6 @@ test "runtime close preserves notification source ownership for retry" {
     defer notification_source_close_for_testing = c.mln_notification_source_close;
 
     try std.testing.expectError(error.InvalidState, runtime.close());
-    try std.testing.expectError(error.ActiveBorrow, runtime.pump(0));
     try runtime.close();
     runtime_open = false;
     try std.testing.expectEqual(@as(usize, 2), notification_source_close_attempts_for_testing);

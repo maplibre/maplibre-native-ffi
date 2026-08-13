@@ -612,8 +612,8 @@ public sealed unsafe class RenderSessionTests
                 return mln_status.MLN_STATUS_OK;
             }
         );
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 64, Height = 64 });
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(runtime, new MapOptions { Width = 64, Height = 64 });
         var context = new WglContextDescriptor
         {
             DeviceContext = NativePointer.FromBorrowedAddress(1),
@@ -700,8 +700,8 @@ public sealed unsafe class RenderSessionTests
             (_, _, _, _) => mln_status.MLN_STATUS_OK,
             _ => mln_status.MLN_STATUS_OK
         );
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 64, Height = 64 });
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(runtime, new MapOptions { Width = 64, Height = 64 });
         var descriptor = new OpenGLSurfaceDescriptor
         {
             Extent = new RenderTargetExtent(32, 16, 1),
@@ -800,8 +800,8 @@ public sealed unsafe class RenderSessionTests
             Assert.Skip("OpenGL native build exercises positive attach paths");
         }
 
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 64, Height = 64 });
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(runtime, new MapOptions { Width = 64, Height = 64 });
         var context = new WglContextDescriptor
         {
             DeviceContext = NativePointer.FromBorrowedAddress(1),

@@ -9,29 +9,23 @@ import org.maplibre.nativeffi.resource.ResourceProviderCallback
 import org.maplibre.nativeffi.resource.ResourceTransformCallback
 
 /** Owned runtime handle. Platform actuals own the native runtime carrier. */
-public expect class RuntimeHandle : AutoCloseable {
+public expect class RuntimeHandle {
   public val isClosed: Boolean
 
+  /** Suspends until every command accepted before this call has reached a terminal disposition. */
   /**
-   * Advances this runtime: parks the owner thread when [timeoutMillis] allows it, then drains the
-   * owner-thread task queues. Drain the queued runtime events with [drainEvents] afterwards.
-   *
-   * [timeoutMillis] bounds the park. Zero drains and returns, a positive value parks for up to that
-   * many milliseconds, and a negative value parks until a wake arrives. A parking call returns as
-   * soon as the runtime's wake flag is set, and returns without parking while unread runtime events
-   * are queued. Timers and ready I/O set the flag only when they queue owner-thread work, so pass a
-   * bounded timeout to cap how long a call waits.
-   *
-   * A non-zero timeout blocks the calling thread and ignores interruption. Call it outside any lock
-   * that a thread signalling a [WakeSource] takes.
+   * Installs the receiver callback for this runtime's notification source. Native threads call the
+   * callback only to schedule [drainReady] on the receiver.
    */
-  public fun pump(timeoutMillis: Long)
+  public fun setNotificationCallback(callback: () -> Unit)
 
-  /**
-   * Acquires a [WakeSource] that releases this runtime's parked owner thread. The returned source
-   * is usable from any thread, and the caller closes it.
-   */
-  public fun acquireWakeSource(): WakeSource
+  /** Clears the receiver callback after every callback invocation has returned. */
+  public fun clearNotificationCallback()
+
+  /** Drains one owned copy of the endpoints that are currently ready. */
+  public fun drainReady(): List<ReadyEndpoint>
+
+  public suspend fun barrier()
 
   public fun startAmbientCacheOperation(operation: AmbientCacheOperation): OperationHandle<Unit>
 
@@ -96,17 +90,17 @@ public expect class RuntimeHandle : AutoCloseable {
     operation: OperationHandle<OfflineRegionStatus>
   ): OfflineRegionStatus
 
-  public fun setResourceProvider(callback: ResourceProviderCallback)
+  public fun setResourceProvider(callback: ResourceProviderCallback): ULong
 
-  public fun clearResourceProvider()
+  public fun clearResourceProvider(): ULong
 
-  public fun setResourceTransform(callback: ResourceTransformCallback)
+  public fun setResourceTransform(callback: ResourceTransformCallback): ULong
 
-  public fun clearResourceTransform()
+  public fun clearResourceTransform(): ULong
 
-  public fun setHttpHeaderTransform(callback: HttpHeaderTransformCallback)
+  public fun setHttpHeaderTransform(callback: HttpHeaderTransformCallback): ULong
 
-  public fun clearHttpHeaderTransform()
+  public fun clearHttpHeaderTransform(): ULong
 
   /**
    * Drains this runtime's queued events into one batch, in queue order.
@@ -115,8 +109,8 @@ public expect class RuntimeHandle : AutoCloseable {
    * that many events and reports the rest in [RuntimeEventBatch.remainingCount]. A negative value
    * throws [org.maplibre.nativeffi.error.InvalidArgumentException].
    *
-   * The two subscription masks decide which events reach the queue. Draining is a queue operation
-   * that runs no owner-thread work, so call [pump] first and drain what the pump produced.
+   * The two subscription masks decide which events reach the queue. Draining copies events that the
+   * runtime worker has already published.
    */
   public fun drainEvents(maxEvents: Int = 0): RuntimeEventBatch
 
@@ -130,9 +124,14 @@ public expect class RuntimeHandle : AutoCloseable {
    */
   public var eventMask: RuntimeEventMask
 
-  override fun close()
+  /**
+   * Suspends until native runtime retirement completes, then releases callbacks and notification
+   * resources.
+   */
+  public suspend fun close()
 
   public companion object {
-    public fun create(options: RuntimeOptions): RuntimeHandle
+    /** Creates a runtime without blocking the caller's coroutine. */
+    public suspend fun create(options: RuntimeOptions): RuntimeHandle
   }
 }

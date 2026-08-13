@@ -16,73 +16,78 @@ import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 
 class ResourceRequestHandleAndroidTest {
   @Test
-  fun unreachableProviderOwnedHandleReleasesNativeRequest() {
-    val released = CountDownLatch(1)
+  fun unreachableProviderOwnedHandleReleasesNativeRequest(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val released = CountDownLatch(1)
 
-    registerUnreachableProviderOwnedHandle(released)
+      registerUnreachableProviderOwnedHandle(released)
 
-    assertTrue(awaitRelease(released), "expected unreachable request cleanup to release native")
-  }
+      assertTrue(awaitRelease(released), "expected unreachable request cleanup to release native")
+    }
 
   @Test
-  fun completionFailureIsTerminalAndCopiesDiagnosticBeforeReleaseCleanup() {
-    val releases = AtomicInteger(0)
-    val handle =
-      ResourceRequestHandle(
-        1L,
-        completer = { _, _ -> MaplibreNativeC.mln_network_status_set(999_999) },
-        releaser = {
-          releases.incrementAndGet()
-          MaplibreNativeC.mln_runtime_destroy(0L)
-        },
+  fun completionFailureIsTerminalAndCopiesDiagnosticBeforeReleaseCleanup(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val releases = AtomicInteger(0)
+      val handle =
+        ResourceRequestHandle(
+          1L,
+          completer = { _, _ -> MaplibreNativeC.mln_network_status_set(999_999) },
+          releaser = {
+            releases.incrementAndGet()
+            MaplibreNativeC.mln_operation_release(0L)
+          },
+        )
+      assertEquals(
+        ResourceProviderDecision.HANDLE.nativeValue,
+        handle.finishProviderDecision(ResourceProviderDecision.HANDLE),
       )
-    assertEquals(
-      ResourceProviderDecision.HANDLE.nativeValue,
-      handle.finishProviderDecision(ResourceProviderDecision.HANDLE),
-    )
 
-    val failure =
-      assertFailsWith<InvalidArgumentException> {
+      val failure =
+        assertFailsWith<InvalidArgumentException> {
+          handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
+        }
+      assertTrue(failure.diagnostic.contains("network status"))
+      assertFalse(failure.diagnostic.contains("runtime"))
+      assertEquals(1, releases.get())
+      assertFailsWith<InvalidStateException> {
         handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
       }
-    assertTrue(failure.diagnostic.contains("network status"))
-    assertFalse(failure.diagnostic.contains("runtime"))
-    assertEquals(1, releases.get())
-    assertFailsWith<InvalidStateException> {
-      handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
     }
-  }
 
   @Test
-  fun concurrentCloseDefersReleaseUntilCompletionAndCancellationUsesInjectedCheck() {
-    val entered = CountDownLatch(1)
-    val continueCompletion = CountDownLatch(1)
-    val releases = AtomicInteger(0)
-    val handle =
-      ResourceRequestHandle(
-        1L,
-        completer = { _, _ ->
-          entered.countDown()
-          continueCompletion.await(5, TimeUnit.SECONDS)
-          MaplibreStatus.OK.nativeCode
-        },
-        cancellationChecker = { true },
-        releaser = { releases.incrementAndGet() },
+  fun concurrentCloseDefersReleaseUntilCompletionAndCancellationUsesInjectedCheck(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val entered = CountDownLatch(1)
+      val continueCompletion = CountDownLatch(1)
+      val releases = AtomicInteger(0)
+      val handle =
+        ResourceRequestHandle(
+          1L,
+          completer = { _, _ ->
+            entered.countDown()
+            continueCompletion.await(5, TimeUnit.SECONDS)
+            MaplibreStatus.OK.nativeCode
+          },
+          cancellationChecker = { true },
+          releaser = { releases.incrementAndGet() },
+        )
+      assertEquals(
+        ResourceProviderDecision.HANDLE.nativeValue,
+        handle.finishProviderDecision(ResourceProviderDecision.HANDLE),
       )
-    assertEquals(
-      ResourceProviderDecision.HANDLE.nativeValue,
-      handle.finishProviderDecision(ResourceProviderDecision.HANDLE),
-    )
-    assertTrue(handle.isCancelled())
-    val completion = thread { handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT)) }
-    assertTrue(entered.await(5, TimeUnit.SECONDS))
-    handle.close()
-    assertEquals(0, releases.get())
-    continueCompletion.countDown()
-    completion.join()
-    assertEquals(1, releases.get())
-    assertFailsWith<InvalidStateException> { handle.isCancelled() }
-  }
+      assertTrue(handle.isCancelled())
+      val completion = thread {
+        handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
+      }
+      assertTrue(entered.await(5, TimeUnit.SECONDS))
+      handle.close()
+      assertEquals(0, releases.get())
+      continueCompletion.countDown()
+      completion.join()
+      assertEquals(1, releases.get())
+      assertFailsWith<InvalidStateException> { handle.isCancelled() }
+    }
 
   private fun registerUnreachableProviderOwnedHandle(released: CountDownLatch) {
     val handle = ResourceRequestHandle(1L, releaser = { released.countDown() })

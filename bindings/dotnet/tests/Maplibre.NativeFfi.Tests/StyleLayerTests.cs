@@ -11,10 +11,13 @@ public sealed class StyleLayerTests
 {
     [BindingSpecTest("BND-105")]
     [Fact]
-    public void DemAndLocationLayerHelpersAdaptThroughNativeMap()
+    public async Task DemAndLocationLayerHelpersAdaptThroughNativeMap()
     {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
         map.SetStyleJson("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
         map.AddRasterDemSourceTiles("dem", ["https://example.test/dem/{z}/{x}/{y}.png"], null);
 
@@ -30,20 +33,20 @@ public sealed class StyleLayerTests
             "missing-image-name"
         );
 
-        Assert.True(map.StyleLayerExists("hillshade"));
-        Assert.Equal("hillshade", map.StyleLayerType("hillshade"));
-        Assert.True(map.StyleLayerExists("relief"));
-        Assert.Equal("color-relief", map.StyleLayerType("relief"));
-        Assert.True(map.StyleLayerExists("location"));
-        Assert.Equal("location-indicator", map.StyleLayerType("location"));
+        Assert.True(await map.StyleLayerExistsAsync("hillshade"));
+        Assert.Equal("hillshade", await map.StyleLayerTypeAsync("hillshade"));
+        Assert.True(await map.StyleLayerExistsAsync("relief"));
+        Assert.Equal("color-relief", await map.StyleLayerTypeAsync("relief"));
+        Assert.True(await map.StyleLayerExistsAsync("location"));
+        Assert.Equal("location-indicator", await map.StyleLayerTypeAsync("location"));
     }
 
     [BindingSpecTest("BND-105")]
     [Fact]
-    public void LayerBaseAccessorsRoundTripThroughNativeMap()
+    public async Task LayerBaseAccessorsRoundTripThroughNativeMap()
     {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 64, Height = 64 });
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(runtime, new MapOptions { Width = 64, Height = 64 });
         map.SetStyleJson(
             System.Text.Encoding.UTF8.GetBytes(
                 "{\"version\":8,\"sources\":{\"geo\":{\"type\":\"geojson\",\"data\":"
@@ -53,47 +56,48 @@ public sealed class StyleLayerTests
             )
         );
 
-        Assert.Equal(string.Empty, map.GetLayerSourceLayer("fill"));
-        map.SetLayerSourceLayer("fill", "roads");
-        Assert.Equal("roads", map.GetLayerSourceLayer("fill"));
-        Assert.Equal("geo", map.GetLayerSourceId("fill"));
+        Assert.Equal(string.Empty, await map.GetLayerSourceLayerAsync("fill"));
+        Assert.NotEqual(0ul, map.SetLayerSourceLayer("fill", "roads"));
+        Assert.Equal("roads", await map.GetLayerSourceLayerAsync("fill"));
+        Assert.Equal("geo", await map.GetLayerSourceIdAsync("fill"));
 
-        // A layer type that takes no source is rejected rather than silently ignored.
-        Assert.Throws<InvalidArgumentException>(() => map.SetLayerSourceLayer("bg", "roads"));
-        Assert.Equal(string.Empty, map.GetLayerSourceId("bg"));
+        // A layer type that takes no source preserves its empty source ID.
+        Assert.NotEqual(0ul, map.SetLayerSourceLayer("bg", "roads"));
+        Assert.Equal(string.Empty, await map.GetLayerSourceIdAsync("bg"));
 
         // An unset zoom range crosses the boundary as infinities.
-        Assert.Equal(double.NegativeInfinity, map.GetLayerMinZoom("fill"));
-        Assert.Equal(double.PositiveInfinity, map.GetLayerMaxZoom("fill"));
-        map.SetLayerMinZoom("fill", 4);
-        map.SetLayerMaxZoom("fill", 12.5);
-        Assert.Equal(4, map.GetLayerMinZoom("fill"));
-        Assert.Equal(12.5, map.GetLayerMaxZoom("fill"));
+        Assert.Equal(double.NegativeInfinity, await map.GetLayerMinZoomAsync("fill"));
+        Assert.Equal(double.PositiveInfinity, await map.GetLayerMaxZoomAsync("fill"));
+        Assert.NotEqual(0ul, map.SetLayerMinZoom("fill", 4));
+        Assert.NotEqual(0ul, map.SetLayerMaxZoom("fill", 12.5));
+        Assert.Equal(4, await map.GetLayerMinZoomAsync("fill"));
+        Assert.Equal(12.5, await map.GetLayerMaxZoomAsync("fill"));
 
-        Assert.Equal(StyleLayerVisibility.Visible, map.GetLayerVisibility("fill"));
-        map.SetLayerVisibility("fill", StyleLayerVisibility.None);
-        Assert.Equal(StyleLayerVisibility.None, map.GetLayerVisibility("fill"));
+        Assert.Equal(StyleLayerVisibility.Visible, await map.GetLayerVisibilityAsync("fill"));
+        Assert.NotEqual(0ul, map.SetLayerVisibility("fill", StyleLayerVisibility.None));
+        Assert.Equal(StyleLayerVisibility.None, await map.GetLayerVisibilityAsync("fill"));
 
-        // An unknown raw visibility passes through to C, which rejects it.
-        Assert.Throws<InvalidArgumentException>(() =>
-            map.SetLayerVisibility("fill", (StyleLayerVisibility)900)
+        // An unknown raw visibility is accepted as a command, then leaves the value unchanged.
+        Assert.NotEqual(0ul, map.SetLayerVisibility("fill", (StyleLayerVisibility)900));
+        Assert.Equal(StyleLayerVisibility.None, await map.GetLayerVisibilityAsync("fill"));
+        await Assert.ThrowsAsync<InvalidArgumentException>(() =>
+            map.GetLayerMinZoomAsync("missing")
         );
-        Assert.Throws<InvalidArgumentException>(() => map.GetLayerMinZoom("missing"));
     }
 
     [BindingSpecTest("BND-061")]
     [Fact]
-    public void StyleTransitionOptionsRoundTripThroughNativeMap()
+    public async Task StyleTransitionOptionsRoundTripThroughNativeMap()
     {
         const string transitionStyleJson =
             "{\"version\":8,\"transition\":{\"duration\":750,\"delay\":100},"
             + "\"sources\":{},\"layers\":[]}";
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 64, Height = 64 });
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(runtime, new MapOptions { Width = 64, Height = 64 });
 
         // A map with no style yet reports no duration or delay. The placement flag always
         // reports, because MapLibre Native always holds a value for it.
-        var empty = map.GetStyleTransitionOptions();
+        var empty = await map.GetStyleTransitionOptionsAsync();
         Assert.Null(empty.Duration);
         Assert.Null(empty.Delay);
         Assert.True(empty.EnablePlacementTransitions);
@@ -101,12 +105,12 @@ public sealed class StyleLayerTests
         // The style parser fills in its own 300ms duration for a style that declares no
         // transition.
         map.SetStyleJson("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
-        var parsed = map.GetStyleTransitionOptions();
+        var parsed = await map.GetStyleTransitionOptionsAsync();
         Assert.Equal(300, parsed.Duration);
         Assert.Null(parsed.Delay);
 
         map.SetStyleJson(System.Text.Encoding.UTF8.GetBytes(transitionStyleJson));
-        var declared = map.GetStyleTransitionOptions();
+        var declared = await map.GetStyleTransitionOptionsAsync();
         Assert.Equal(750, declared.Duration);
         Assert.Equal(100, declared.Delay);
         Assert.True(declared.EnablePlacementTransitions);
@@ -118,15 +122,18 @@ public sealed class StyleLayerTests
             Duration = 0,
             EnablePlacementTransitions = false,
         };
-        map.SetStyleTransitionOptions(options);
-        Assert.Equal(options, map.GetStyleTransitionOptions());
+        Assert.NotEqual(0ul, map.SetStyleTransitionOptions(options));
+        Assert.Equal(options, await map.GetStyleTransitionOptionsAsync());
 
         // Loading a style replaces the override with what that style declares.
         map.SetStyleJson(System.Text.Encoding.UTF8.GetBytes(transitionStyleJson));
-        Assert.Equal(declared, map.GetStyleTransitionOptions());
+        Assert.Equal(declared, await map.GetStyleTransitionOptionsAsync());
 
-        Assert.Throws<InvalidArgumentException>(() =>
-            map.SetStyleTransitionOptions(new StyleTransitionOptions { Delay = -1 })
-        );
+        var rejected = map.SetStyleTransitionOptions(new StyleTransitionOptions { Delay = -1 });
+        var failure = RuntimeEventTestHelpers.WaitForCommand(runtime, rejected);
+        var completion = Assert.IsType<RuntimeEventPayload.CommandFinished>(failure.Payload);
+        Assert.Equal(CommandDisposition.Failed, completion.Disposition);
+        Assert.Equal((int)MaplibreStatus.InvalidArgument, failure.Code);
+        Assert.NotEmpty(failure.Message);
     }
 }

@@ -9,7 +9,7 @@ import (
 )
 
 // DestroyFunc releases one owned native handle. A non-OK status leaves the
-// handle live so callers can retry on the correct owner thread.
+// handle live so callers can retry after correcting the failure.
 type DestroyFunc[T ~uint64] func(T) int32
 
 // ErrLiveChildren reports that an owner cannot close while dependent handles are
@@ -208,7 +208,7 @@ func (state *State[T]) reportLeakIfLive() {
 	typeName := state.typeName
 	state.mu.Unlock()
 	if live {
-		log.Printf("maplibre: leaked %s; call Close on its owner thread", typeName)
+		log.Printf("maplibre: leaked %s; call Close before releasing its dependencies", typeName)
 	}
 }
 

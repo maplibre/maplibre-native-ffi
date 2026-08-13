@@ -119,11 +119,17 @@ public sealed class CustomGeometrySourceTests
     {
         var failInstall = false;
         using var install = MapHandle.UseCustomGeometrySourceInstallForTest(
-            (_, _, _) =>
-                failInstall ? mln_status.MLN_STATUS_INVALID_STATE : mln_status.MLN_STATUS_OK
+            (_, _, _, commandId) =>
+            {
+                *commandId = 1;
+                return failInstall ? mln_status.MLN_STATUS_INVALID_STATE : mln_status.MLN_STATUS_OK;
+            }
         );
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
         var installed = new CustomGeometrySourceState(
             new CustomGeometrySourceOptions { FetchTile = _ => { } }
         );
@@ -146,10 +152,13 @@ public sealed class CustomGeometrySourceTests
 
     [BindingSpecTest("BND-105", "BND-124")]
     [Fact]
-    public void CustomGeometrySourceApisAdaptThroughNativeMap()
+    public async Task CustomGeometrySourceApisAdaptThroughNativeMap()
     {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
         map.SetStyleJson(EmptyStyleJson);
         var tile = new CanonicalTileId(0, 0, 0);
 
@@ -179,16 +188,19 @@ public sealed class CustomGeometrySourceTests
             new LatLngBounds(new LatLng(-1, -1), new LatLng(1, 1))
         );
 
-        Assert.Equal(SourceType.CustomVector, map.StyleSourceType("custom"));
-        Assert.True(map.RemoveStyleSource("custom"));
+        Assert.Equal(SourceType.CustomVector, await map.StyleSourceTypeAsync("custom"));
+        Assert.True(await map.RemoveStyleSourceAsync("custom"));
     }
 
     [BindingSpecTest("BND-124")]
     [Fact]
-    public void RemovingACustomGeometrySourceReleasesItsCallbackState()
+    public async Task RemovingACustomGeometrySourceReleasesItsCallbackState()
     {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
         map.SetStyleJson(EmptyStyleJson);
         var state = new CustomGeometrySourceState(
             new CustomGeometrySourceOptions { FetchTile = _ => { } }
@@ -196,7 +208,7 @@ public sealed class CustomGeometrySourceTests
         map.AddCustomGeometrySource("custom", state);
         Assert.True(state.IsHandleAllocatedForTest);
 
-        Assert.True(map.RemoveStyleSource("custom"));
+        Assert.True(await map.RemoveStyleSourceAsync("custom"));
 
         Assert.False(state.IsHandleAllocatedForTest);
     }
@@ -205,15 +217,15 @@ public sealed class CustomGeometrySourceTests
     [Fact]
     public void ClosingAMapReleasesItsCustomGeometrySourceCallbackState()
     {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        var map = TestHandles.CreateMap(runtime, new MapOptions { Width = 512, Height = 512 });
         map.SetStyleJson(EmptyStyleJson);
         var state = new CustomGeometrySourceState(
             new CustomGeometrySourceOptions { FetchTile = _ => { } }
         );
         map.AddCustomGeometrySource("custom", state);
 
-        map.Close();
+        TestHandles.Close(map);
 
         Assert.False(state.IsHandleAllocatedForTest);
     }
@@ -222,8 +234,8 @@ public sealed class CustomGeometrySourceTests
     [Fact]
     public void AStyleReplacementReleasesADroppedSourceWithoutStyleLoadedEvents()
     {
-        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
-        using var map = MapHandle.Create(
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(
             runtime,
             new MapOptions
             {
@@ -244,7 +256,7 @@ public sealed class CustomGeometrySourceTests
         var drained = new List<RuntimeEventType>();
         for (var attempt = 0; attempt < 1000 && state.IsHandleAllocatedForTest; attempt++)
         {
-            runtime.Pump(TimeSpan.FromMilliseconds(1));
+            Thread.Sleep(1);
             drained.AddRange(runtime.DrainEvents().Events.Select(polled => polled.Type));
         }
 

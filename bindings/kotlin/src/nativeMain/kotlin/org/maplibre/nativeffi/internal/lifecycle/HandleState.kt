@@ -36,6 +36,20 @@ internal class HandleState<T : NativeHandle>(
   fun retainChild(childTypeName: String): HandleStateCore.ChildRetention =
     core.retainChild(childTypeName)
 
+  fun beginClose(): Boolean = core.beginClose()
+
+  fun handleForClose(): T =
+    handle ?: throw org.maplibre.nativeffi.internal.status.Status.released(typeName)
+
+  fun abortClose() = core.abortClose()
+
+  fun completeClose(afterSuccess: () -> Unit = {}) {
+    core.completeClose {
+      handle = null
+      afterSuccess()
+    }
+  }
+
   fun closeOnce(destroy: (T) -> Int) {
     closeOnce(destroy) {}
   }

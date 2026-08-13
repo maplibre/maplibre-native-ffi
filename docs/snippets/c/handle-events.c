@@ -12,11 +12,14 @@ typedef struct map_observer {
 
 // #region subscribe
 mln_status select_map_events(mln_map map) {
+  uint64_t command_id = 0;
   return mln_map_set_event_mask(
-    map, MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED |
-           MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED |
-           MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE |
-           MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED
+    map,
+    MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED |
+      MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED |
+      MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE |
+      MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED,
+    &command_id
   );
 }
 // #endregion subscribe
@@ -34,7 +37,9 @@ void drain_events(mln_runtime runtime, map_observer* observer) {
   // #region drain
   mln_event_batch batch = MLN_HANDLE_NULL;
   if (mln_runtime_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) return;
-  mln_runtime_event_batch_view view = {0};
+  mln_runtime_event_batch_view view = {
+    .size = sizeof(mln_runtime_event_batch_view)
+  };
   if (mln_event_batch_get(batch, &view) != MLN_STATUS_OK) {
     mln_event_batch_release(batch);
     return;

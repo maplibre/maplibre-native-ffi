@@ -4,11 +4,8 @@ using Silk.NET.GLFW;
 
 namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
-/// <summary>Decodes host input into camera commands.</summary>
-/// <remarks>
-/// This runs on the render loop, which does not own the map, so it only queues commands for the
-/// runtime loop. GLFW reports pointer positions in the map's logical coordinates already.
-/// </remarks>
+/// <summary>Decodes host input into any-thread camera submissions.</summary>
+/// <remarks>GLFW reports pointer positions in the map's logical coordinates already.</remarks>
 internal sealed unsafe class InputController : IDisposable
 {
     private const double DragRotateFactor = 0.5;

@@ -1,4 +1,5 @@
 use std::ptr;
+use std::time::{Duration, Instant};
 
 pub(crate) use maplibre_core::style::{
     GeoJsonSourceOptionsNativeExt, NativeGeoJsonSourceOptions, NativeStyleImageOptions,
@@ -16,10 +17,16 @@ use maplibre_native_ffi_core::ptr::const_ptr_or_null;
 use maplibre_native_ffi_core::values::lat_lngs_to_native;
 use maplibre_native_ffi_sys as sys;
 
-use crate::custom_geometry::{CanonicalTileId, CustomGeometrySourceState};
+use crate::custom_geometry::{
+    CanonicalTileId, CustomGeometrySourceOptions, CustomGeometrySourceState,
+};
 use crate::render::PremultipliedRgba8Image;
+use crate::runtime::{OperationHandle, OperationKind};
 use crate::values::NativeValue;
-use crate::{CustomGeometrySourceOptions, Error, ErrorKind, LatLng, LatLngBounds, Result};
+use crate::{Error, ErrorKind, LatLng, LatLngBounds, Result};
+
+/// Horizontal and vertical stretch intervals for one style image.
+pub type StyleImageStretches = (Vec<ImageStretch>, Vec<ImageStretch>);
 
 impl super::MapHandle {
     /// Loads a style URL through MapLibre Native style APIs.
@@ -27,41 +34,42 @@ impl super::MapHandle {
     /// Loading is asynchronous: a style that fails to fetch or parse still
     /// returns `Ok` here and reports through a later loading-failed runtime
     /// event. Watch the event stream for the load outcome.
-    pub fn set_style_url(&self, url: &str) -> Result<()> {
+    pub fn set_style_url(&self, url: &str) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let url = maplibre_core::string::c_string(url)?;
         // SAFETY: map is live and url is a NUL-terminated UTF-8 string the C
         // API consumes before returning.
-        maplibre_core::check(unsafe { sys::mln_map_set_style_url(map, url.as_ptr()) })?;
-        Ok(())
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_style_url(map, url.as_ptr(), &mut command_id)
+        })?;
+        Ok(command_id)
     }
 
     /// Loads inline style JSON through MapLibre Native style APIs.
     ///
     /// A parse failure is reported twice: this call returns the error, and the
     /// same message arrives as a loading-failed runtime event.
-    pub fn set_style_json(&self, json: &[u8]) -> Result<()> {
+    pub fn set_style_json(&self, json: &[u8]) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let json = maplibre_core::string::buffer_view(json);
         // SAFETY: map is live and json is valid for the call. Style replacement
         // completes before a successful return, so the C API has already
         // released the callback state of the sources this load dropped.
-        maplibre_core::check(unsafe { sys::mln_map_set_style_json(map, json) })
+        maplibre_core::check(unsafe { sys::mln_map_set_style_json(map, json, &mut command_id) })?;
+        Ok(command_id)
     }
 
     /// Copies the style document this map's style was last parsed from: the
     /// string given to [`Self::set_style_json`] or the body fetched for
     /// [`Self::set_style_url`], byte for byte. Runtime mutations do not change
     /// it. An empty buffer means no document has been parsed.
-    pub fn loaded_style_json(&self) -> Result<Vec<u8>> {
+    pub fn loaded_style_json(&self) -> Result<OperationHandle<Vec<u8>>> {
         let map = self.inner.native()?;
-        // SAFETY: map is live, and each call writes only through the pointers
-        // it is given.
-        unsafe {
-            copy_bytes(|text, capacity, out_size| {
-                sys::mln_map_copy_loaded_style_json(map, text, capacity, out_size)
-            })
-        }
+        let mut operation = sys::mln_operation(0);
+        maplibre_core::check(unsafe { sys::mln_map_loaded_style_json_start(map, &mut operation) })?;
+        self.start_operation(operation, OperationKind::LoadedStyleJson)
     }
 
     /// Copies the URL this map's style was last requested from.
@@ -70,15 +78,11 @@ impl super::MapHandle {
     /// the response arrives, and [`Self::set_style_json`] clears it, so this can
     /// disagree with [`Self::loaded_style_json`] while a load is in flight. An
     /// empty string means no URL bytes are available.
-    pub fn style_url(&self) -> Result<String> {
+    pub fn style_url(&self) -> Result<OperationHandle<String>> {
         let map = self.inner.native()?;
-        // SAFETY: map is live, and each call writes only through the pointers
-        // it is given.
-        unsafe {
-            copy_text(|url, capacity, out_size| {
-                sys::mln_map_copy_style_url(map, url, capacity, out_size)
-            })
-        }
+        let mut operation = sys::mln_operation(0);
+        maplibre_core::check(unsafe { sys::mln_map_style_url_start(map, &mut operation) })?;
+        self.start_operation(operation, OperationKind::StyleUrl)
     }
 
     /// Adds a custom geometry source to the current style.
@@ -92,7 +96,8 @@ impl super::MapHandle {
         &self,
         source_id: &str,
         options: CustomGeometrySourceOptions,
-    ) -> Result<()> {
+    ) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let source_id_view = maplibre_core::string::string_view(source_id);
         let state = CustomGeometrySourceState::new(options);
@@ -103,7 +108,12 @@ impl super::MapHandle {
         // SAFETY: map is live, source_id_view is valid for this call, and
         // descriptor names callback state that lives until the release callback.
         let status = unsafe {
-            sys::mln_map_add_custom_geometry_source(map, source_id_view.raw(), &descriptor)
+            sys::mln_map_add_custom_geometry_source(
+                map,
+                source_id_view.raw(),
+                &descriptor,
+                &mut command_id,
+            )
         };
         if let Err(error) = maplibre_core::check(status) {
             // SAFETY: A rejected add releases nothing, so this box is still
@@ -111,7 +121,7 @@ impl super::MapHandle {
             drop(unsafe { Box::from_raw(state) });
             return Err(error);
         }
-        Ok(())
+        Ok(command_id)
     }
 
     /// Sets custom geometry source data for one canonical tile.
@@ -120,7 +130,8 @@ impl super::MapHandle {
         source_id: &str,
         tile_id: CanonicalTileId,
         data: &[u8],
-    ) -> Result<()> {
+    ) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let data = maplibre_core::string::buffer_view(data);
@@ -132,8 +143,10 @@ impl super::MapHandle {
                 source_id.raw(),
                 tile_id.to_native(),
                 data,
+                &mut command_id,
             )
-        })
+        })?;
+        Ok(command_id)
     }
 
     /// Invalidates custom geometry source data for one canonical tile.
@@ -141,7 +154,8 @@ impl super::MapHandle {
         &self,
         source_id: &str,
         tile_id: CanonicalTileId,
-    ) -> Result<()> {
+    ) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         // SAFETY: map is live, source_id is valid for this call, and tile_id is
@@ -151,8 +165,10 @@ impl super::MapHandle {
                 map,
                 source_id.raw(),
                 tile_id.to_native(),
+                &mut command_id,
             )
-        })
+        })?;
+        Ok(command_id)
     }
 
     /// Invalidates custom geometry source data inside a geographic region.
@@ -160,7 +176,8 @@ impl super::MapHandle {
         &self,
         source_id: &str,
         bounds: LatLngBounds,
-    ) -> Result<()> {
+    ) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         // SAFETY: map is live, source_id is valid for this call, and bounds is
@@ -170,20 +187,24 @@ impl super::MapHandle {
                 map,
                 source_id.raw(),
                 bounds.to_native(),
+                &mut command_id,
             )
-        })
+        })?;
+        Ok(command_id)
     }
 
     /// Adds one style source from a style-spec source JSON object.
-    pub fn add_style_source_json(&self, source_id: &str, source_json: &[u8]) -> Result<()> {
+    pub fn add_style_source_json(&self, source_id: &str, source_json: &[u8]) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let source_json = maplibre_core::string::buffer_view(source_json);
         // SAFETY: map is live, source_id and source_json are explicit-length
         // views valid for this call.
         maplibre_core::check(unsafe {
-            sys::mln_map_add_style_source_json(map, source_id.raw(), source_json)
-        })
+            sys::mln_map_add_style_source_json(map, source_id.raw(), source_json, &mut command_id)
+        })?;
+        Ok(command_id)
     }
 
     /// Adds a vector source with a TileJSON URL.
@@ -192,7 +213,8 @@ impl super::MapHandle {
         source_id: &str,
         url: &str,
         options: Option<&TileSourceOptions>,
-    ) -> Result<()> {
+    ) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let url = maplibre_core::string::string_view(url);
@@ -203,8 +225,15 @@ impl super::MapHandle {
         // SAFETY: map is live, source_id and url are valid for this call, and
         // options_ptr is null or points to call-scoped native options.
         maplibre_core::check(unsafe {
-            sys::mln_map_add_vector_source_url(map, source_id.raw(), url.raw(), options_ptr)
-        })
+            sys::mln_map_add_vector_source_url(
+                map,
+                source_id.raw(),
+                url.raw(),
+                options_ptr,
+                &mut command_id,
+            )
+        })?;
+        Ok(command_id)
     }
 
     /// Adds a vector source with inline tile URLs.
@@ -213,7 +242,8 @@ impl super::MapHandle {
         source_id: &str,
         tiles: &[S],
         options: Option<&TileSourceOptions>,
-    ) -> Result<()> {
+    ) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let raw_tiles = NativeTileUrls::new(tiles);
@@ -231,8 +261,10 @@ impl super::MapHandle {
                 raw_tiles.as_ptr(),
                 raw_tiles.len(),
                 options_ptr,
+                &mut command_id,
             )
-        })
+        })?;
+        Ok(command_id)
     }
 
     /// Adds a raster source with a TileJSON URL.
@@ -241,7 +273,8 @@ impl super::MapHandle {
         source_id: &str,
         url: &str,
         options: Option<&TileSourceOptions>,
-    ) -> Result<()> {
+    ) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let url = maplibre_core::string::string_view(url);
@@ -252,8 +285,15 @@ impl super::MapHandle {
         // SAFETY: map is live, source_id and url are valid for this call, and
         // options_ptr is null or points to call-scoped native options.
         maplibre_core::check(unsafe {
-            sys::mln_map_add_raster_source_url(map, source_id.raw(), url.raw(), options_ptr)
-        })
+            sys::mln_map_add_raster_source_url(
+                map,
+                source_id.raw(),
+                url.raw(),
+                options_ptr,
+                &mut command_id,
+            )
+        })?;
+        Ok(command_id)
     }
 
     /// Adds a raster source with inline tile URLs.
@@ -262,7 +302,8 @@ impl super::MapHandle {
         source_id: &str,
         tiles: &[S],
         options: Option<&TileSourceOptions>,
-    ) -> Result<()> {
+    ) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let raw_tiles = NativeTileUrls::new(tiles);
@@ -280,8 +321,10 @@ impl super::MapHandle {
                 raw_tiles.as_ptr(),
                 raw_tiles.len(),
                 options_ptr,
+                &mut command_id,
             )
-        })
+        })?;
+        Ok(command_id)
     }
 
     /// Adds a raster DEM source with a TileJSON URL.
@@ -290,7 +333,8 @@ impl super::MapHandle {
         source_id: &str,
         url: &str,
         options: Option<&TileSourceOptions>,
-    ) -> Result<()> {
+    ) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let url = maplibre_core::string::string_view(url);
@@ -301,8 +345,15 @@ impl super::MapHandle {
         // SAFETY: map is live, source_id and url are valid for this call, and
         // options_ptr is null or points to call-scoped native options.
         maplibre_core::check(unsafe {
-            sys::mln_map_add_raster_dem_source_url(map, source_id.raw(), url.raw(), options_ptr)
-        })
+            sys::mln_map_add_raster_dem_source_url(
+                map,
+                source_id.raw(),
+                url.raw(),
+                options_ptr,
+                &mut command_id,
+            )
+        })?;
+        Ok(command_id)
     }
 
     /// Adds a raster DEM source with inline tile URLs.
@@ -311,7 +362,8 @@ impl super::MapHandle {
         source_id: &str,
         tiles: &[S],
         options: Option<&TileSourceOptions>,
-    ) -> Result<()> {
+    ) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let raw_tiles = NativeTileUrls::new(tiles);
@@ -329,8 +381,10 @@ impl super::MapHandle {
                 raw_tiles.as_ptr(),
                 raw_tiles.len(),
                 options_ptr,
+                &mut command_id,
             )
-        })
+        })?;
+        Ok(command_id)
     }
 
     /// Adds an image source that loads its image from a URL.
@@ -343,7 +397,8 @@ impl super::MapHandle {
         source_id: &str,
         coordinates: &[LatLng; 4],
         url: &str,
-    ) -> Result<()> {
+    ) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let coordinates = lat_lngs_to_native(coordinates);
@@ -358,8 +413,10 @@ impl super::MapHandle {
                 const_ptr_or_null(&coordinates),
                 coordinates.len(),
                 url.raw(),
+                &mut command_id,
             )
-        })
+        })?;
+        Ok(command_id)
     }
 
     /// Adds an image source with inline premultiplied RGBA8 pixels.
@@ -372,7 +429,8 @@ impl super::MapHandle {
         source_id: &str,
         coordinates: &[LatLng; 4],
         image: &PremultipliedRgba8Image,
-    ) -> Result<()> {
+    ) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let coordinates = lat_lngs_to_native(coordinates);
@@ -387,20 +445,24 @@ impl super::MapHandle {
                 const_ptr_or_null(&coordinates),
                 coordinates.len(),
                 &image,
+                &mut command_id,
             )
-        })
+        })?;
+        Ok(command_id)
     }
 
     /// Updates an image source to load its image from a URL.
-    pub fn set_image_source_url(&self, source_id: &str, url: &str) -> Result<()> {
+    pub fn set_image_source_url(&self, source_id: &str, url: &str) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let url = maplibre_core::string::string_view(url);
         // SAFETY: map is live, and source_id and url are explicit-length views
         // valid for this call.
         maplibre_core::check(unsafe {
-            sys::mln_map_set_image_source_url(map, source_id.raw(), url.raw())
-        })
+            sys::mln_map_set_image_source_url(map, source_id.raw(), url.raw(), &mut command_id)
+        })?;
+        Ok(command_id)
     }
 
     /// Updates an image source with inline premultiplied RGBA8 pixels.
@@ -408,15 +470,17 @@ impl super::MapHandle {
         &self,
         source_id: &str,
         image: &PremultipliedRgba8Image,
-    ) -> Result<()> {
+    ) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let image = maplibre_core::values::premultiplied_rgba8_image_to_native(image);
         // SAFETY: map is live, source_id is an explicit-length view valid for
         // this call, and image points into the borrowed Rust image for this call.
         maplibre_core::check(unsafe {
-            sys::mln_map_set_image_source_image(map, source_id.raw(), &image)
-        })
+            sys::mln_map_set_image_source_image(map, source_id.raw(), &image, &mut command_id)
+        })?;
+        Ok(command_id)
     }
 
     /// Updates image source coordinates.
@@ -428,7 +492,8 @@ impl super::MapHandle {
         &self,
         source_id: &str,
         coordinates: &[LatLng; 4],
-    ) -> Result<()> {
+    ) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let coordinates = lat_lngs_to_native(coordinates);
@@ -441,73 +506,49 @@ impl super::MapHandle {
                 source_id.raw(),
                 const_ptr_or_null(&coordinates),
                 coordinates.len(),
+                &mut command_id,
             )
-        })
+        })?;
+        Ok(command_id)
     }
 
     /// Copies image source coordinates into owned Rust values.
-    pub fn image_source_coordinates(&self, source_id: &str) -> Result<Option<[LatLng; 4]>> {
+    pub fn image_source_coordinates(
+        &self,
+        source_id: &str,
+    ) -> Result<OperationHandle<Option<[LatLng; 4]>>> {
         let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
-        let mut coordinates = [sys::mln_lat_lng {
-            latitude: 0.0,
-            longitude: 0.0,
-        }; 4];
-        let mut coordinate_count = 0;
-        let mut found = false;
-        // SAFETY: map is live, source_id is an explicit-length view valid for
-        // this call, coordinates has capacity for four native coordinates, and
-        // output pointers refer to writable storage.
+        let mut operation = sys::mln_operation(0);
         maplibre_core::check(unsafe {
-            sys::mln_map_get_image_source_coordinates(
-                map,
-                source_id.raw(),
-                coordinates.as_mut_ptr(),
-                coordinates.len(),
-                &mut coordinate_count,
-                &mut found,
-            )
+            sys::mln_map_get_image_source_coordinates_start(map, source_id.raw(), &mut operation)
         })?;
-        if !found {
-            return Ok(None);
-        }
-        if coordinate_count != coordinates.len() {
-            return Err(Error::new(
-                ErrorKind::NativeError,
-                None,
-                "native image source coordinate count did not match Rust image source invariant",
-            ));
-        }
-        Ok(Some(coordinates.map(LatLng::from_native)))
+        self.start_operation(operation, OperationKind::ImageSourceCoordinates)
     }
 
     /// Removes one style source by ID.
     ///
     /// Returns whether a source existed and was removed. Native returns an
     /// error when a layer still uses the source.
-    pub fn remove_style_source(&self, source_id: &str) -> Result<bool> {
+    pub fn remove_style_source(&self, source_id: &str) -> Result<OperationHandle<bool>> {
         let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
-        let mut removed = false;
-        // SAFETY: map is live, source_id is an explicit-length view valid for
-        // this call, and removed points to writable storage.
+        let mut operation = sys::mln_operation(0);
         maplibre_core::check(unsafe {
-            sys::mln_map_remove_style_source(map, source_id.raw(), &mut removed)
+            sys::mln_map_remove_style_source_start(map, source_id.raw(), &mut operation)
         })?;
-        Ok(removed)
+        self.start_operation(operation, OperationKind::RemoveStyleSource)
     }
 
     /// Reports whether a style source ID exists.
-    pub fn style_source_exists(&self, source_id: &str) -> Result<bool> {
+    pub fn style_source_exists(&self, source_id: &str) -> Result<OperationHandle<bool>> {
         let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
-        let mut exists = false;
-        // SAFETY: map is live, source_id is an explicit-length view valid for
-        // this call, and exists points to writable storage.
+        let mut operation = sys::mln_operation(0);
         maplibre_core::check(unsafe {
-            sys::mln_map_style_source_exists(map, source_id.raw(), &mut exists)
+            sys::mln_map_style_source_exists_start(map, source_id.raw(), &mut operation)
         })?;
-        Ok(exists)
+        self.start_operation(operation, OperationKind::StyleSourceExists)
     }
 
     /// Adds or replaces one runtime style image.
@@ -516,7 +557,8 @@ impl super::MapHandle {
         image_id: &str,
         image: &PremultipliedRgba8Image,
         options: Option<&StyleImageOptions>,
-    ) -> Result<()> {
+    ) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let image_id = maplibre_core::string::string_view(image_id);
         let image = maplibre_core::values::premultiplied_rgba8_image_to_native(image);
@@ -528,295 +570,114 @@ impl super::MapHandle {
         // this call, image points into the borrowed Rust image for this call,
         // and options_ptr is either null or points to call-scoped options.
         maplibre_core::check(unsafe {
-            sys::mln_map_set_style_image(map, image_id.raw(), &image, options_ptr)
-        })
+            sys::mln_map_set_style_image(map, image_id.raw(), &image, options_ptr, &mut command_id)
+        })?;
+        Ok(command_id)
     }
 
     /// Removes one runtime style image by ID.
     ///
     /// Returns whether an image existed and was removed.
-    pub fn remove_style_image(&self, image_id: &str) -> Result<bool> {
+    pub fn remove_style_image(&self, image_id: &str) -> Result<OperationHandle<bool>> {
         let map = self.inner.native()?;
         let image_id = maplibre_core::string::string_view(image_id);
-        let mut removed = false;
-        // SAFETY: map is live, image_id is an explicit-length view valid for
-        // this call, and removed points to writable storage.
+        let mut operation = sys::mln_operation(0);
         maplibre_core::check(unsafe {
-            sys::mln_map_remove_style_image(map, image_id.raw(), &mut removed)
+            sys::mln_map_remove_style_image_start(map, image_id.raw(), &mut operation)
         })?;
-        Ok(removed)
+        self.start_operation(operation, OperationKind::RemoveStyleImage)
     }
 
     /// Reports whether a runtime style image ID exists.
-    pub fn style_image_exists(&self, image_id: &str) -> Result<bool> {
+    pub fn style_image_exists(&self, image_id: &str) -> Result<OperationHandle<bool>> {
         let map = self.inner.native()?;
         let image_id = maplibre_core::string::string_view(image_id);
-        let mut exists = false;
-        // SAFETY: map is live, image_id is an explicit-length view valid for
-        // this call, and exists points to writable storage.
+        let mut operation = sys::mln_operation(0);
         maplibre_core::check(unsafe {
-            sys::mln_map_style_image_exists(map, image_id.raw(), &mut exists)
+            sys::mln_map_style_image_exists_start(map, image_id.raw(), &mut operation)
         })?;
-        Ok(exists)
+        self.start_operation(operation, OperationKind::StyleImageExists)
     }
 
     /// Copies fixed metadata for one runtime style image.
-    pub fn style_image_info(&self, image_id: &str) -> Result<Option<StyleImageInfo>> {
+    pub fn style_image_info(
+        &self,
+        image_id: &str,
+    ) -> Result<OperationHandle<Option<StyleImageInfo>>> {
         let map = self.inner.native()?;
         let image_id = maplibre_core::string::string_view(image_id);
-        let mut info = maplibre_core::style::empty_style_image_info();
-        let mut found = false;
-        // SAFETY: map is live, image_id is an explicit-length view valid for
-        // this call, info has its ABI size initialized, and found points to
-        // writable storage.
+        let mut operation = sys::mln_operation(0);
         maplibre_core::check(unsafe {
-            sys::mln_map_get_style_image_info(map, image_id.raw(), &mut info, &mut found)
+            sys::mln_map_get_style_image_info_start(map, image_id.raw(), &mut operation)
         })?;
-        Ok(found.then(|| maplibre_core::values::style_image_info_from_native(&info)))
+        self.start_operation(operation, OperationKind::StyleImageInfo)
     }
 
     /// Copies one runtime style image into owned tightly packed premultiplied RGBA8 pixels.
     pub fn copy_style_image_premultiplied_rgba8(
         &self,
         image_id: &str,
-    ) -> Result<Option<StyleImage>> {
+    ) -> Result<StyleImageOperation> {
+        let info = self.style_image_info(image_id)?;
         let map = self.inner.native()?;
         let image_id = maplibre_core::string::string_view(image_id);
-        let mut raw_info = maplibre_core::style::empty_style_image_info();
-        let mut info_found = false;
-        // SAFETY: map is live, image_id is an explicit-length view valid for
-        // this call, raw_info has its ABI size initialized, and info_found
-        // points to writable storage.
+        let mut pixels = sys::mln_operation(0);
         maplibre_core::check(unsafe {
-            sys::mln_map_get_style_image_info(map, image_id.raw(), &mut raw_info, &mut info_found)
-        })?;
-        if !info_found {
-            return Ok(None);
-        }
-        let info = maplibre_core::values::style_image_info_from_native(&raw_info);
-
-        let mut data = vec![0u8; info.byte_length];
-        let mut copied_size = 0;
-        let mut found = false;
-        let pixels = if data.is_empty() {
-            ptr::null_mut()
-        } else {
-            data.as_mut_ptr()
-        };
-        // SAFETY: map is live, image_id remains valid for this call, data is
-        // writable for info.byte_length bytes (or null with zero capacity), and
-        // output pointers refer to writable storage.
-        maplibre_core::check(unsafe {
-            sys::mln_map_copy_style_image_premultiplied_rgba8(
+            sys::mln_map_copy_style_image_premultiplied_rgba8_start(
                 map,
                 image_id.raw(),
-                pixels,
-                data.len(),
-                &mut copied_size,
-                &mut found,
+                &mut pixels,
             )
         })?;
-        if !found {
-            return Ok(None);
-        }
-        maplibre_core::style::style_image_from_copied_premultiplied_rgba8(info, data, copied_size)
-            .map(Some)
+        let pixels = self.start_operation(pixels, OperationKind::StyleImagePixels)?;
+        Ok(StyleImageOperation { info, pixels })
     }
 
     /// Gets one style source type.
-    pub fn style_source_type(&self, source_id: &str) -> Result<Option<SourceType>> {
+    pub fn style_source_type(
+        &self,
+        source_id: &str,
+    ) -> Result<OperationHandle<Option<SourceType>>> {
         let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
-        let mut raw_source_type = sys::MLN_STYLE_SOURCE_TYPE_UNKNOWN;
-        let mut found = false;
-        // SAFETY: map is live, source_id is an explicit-length view valid for
-        // this call, and output pointers refer to writable storage.
+        let mut operation = sys::mln_operation(0);
         maplibre_core::check(unsafe {
-            sys::mln_map_get_style_source_type(
-                map,
-                source_id.raw(),
-                &mut raw_source_type,
-                &mut found,
-            )
+            sys::mln_map_get_style_source_type_start(map, source_id.raw(), &mut operation)
         })?;
-        Ok(found.then(|| SourceType::from_raw(raw_source_type)))
+        self.start_operation(operation, OperationKind::StyleSourceType)
     }
 
     /// Copies retained metadata for one style source.
-    pub fn style_source_info(&self, source_id: &str) -> Result<Option<SourceInfo>> {
+    pub fn style_source_info(&self, source_id: &str) -> Result<StyleSourceInfoOperation> {
         let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
-        let mut info = maplibre_core::style::empty_style_source_info();
-        let mut found = false;
-        // SAFETY: map is live, source_id is an explicit-length view valid for
-        // this call, info has its ABI size initialized, and found points to
-        // writable storage.
+        let mut info = sys::mln_operation(0);
         maplibre_core::check(unsafe {
-            sys::mln_map_get_style_source_info(map, source_id.raw(), &mut info, &mut found)
+            sys::mln_map_get_style_source_info_start(map, source_id.raw(), &mut info)
         })?;
-        if !found {
-            return Ok(None);
-        }
-
-        let attribution = if info.has_attribution {
-            match self.copy_style_source_attribution(map, source_id.raw(), info.attribution_size)? {
-                Some(attribution) => Some(attribution),
-                None => return Ok(None),
-            }
-        } else {
-            None
-        };
-
-        let url = if info.fields & sys::MLN_STYLE_SOURCE_INFO_URL != 0 {
-            match self.copy_style_source_url(map, source_id.raw(), info.url_size)? {
-                Some(url) => Some(url),
-                None => return Ok(None),
-            }
-        } else {
-            None
-        };
-
-        let tiles = if info.fields & sys::MLN_STYLE_SOURCE_INFO_TILEJSON != 0 {
-            match self.copy_style_source_tile_urls(map, source_id.raw())? {
-                Some(tiles) => tiles,
-                None => return Ok(None),
-            }
-        } else {
-            Vec::new()
-        };
-
-        Ok(Some(maplibre_core::style::style_source_info_from_native(
-            &info,
+        let info = self.start_operation(info, OperationKind::StyleSourceInfo)?;
+        let mut attribution = sys::mln_operation(0);
+        maplibre_core::check(unsafe {
+            sys::mln_map_copy_style_source_attribution_start(map, source_id.raw(), &mut attribution)
+        })?;
+        let attribution =
+            self.start_operation(attribution, OperationKind::StyleSourceAttribution)?;
+        let mut url = sys::mln_operation(0);
+        maplibre_core::check(unsafe {
+            sys::mln_map_copy_style_source_url_start(map, source_id.raw(), &mut url)
+        })?;
+        let url = self.start_operation(url, OperationKind::StyleSourceUrl)?;
+        let mut tile_urls = sys::mln_operation(0);
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_style_source_tile_urls_start(map, source_id.raw(), &mut tile_urls)
+        })?;
+        let tile_urls = self.start_operation(tile_urls, OperationKind::StyleSourceTileUrls)?;
+        Ok(StyleSourceInfoOperation {
+            info,
             attribution,
             url,
-            tiles,
-        )))
-    }
-
-    fn copy_style_source_attribution(
-        &self,
-        map: sys::mln_map,
-        source_id: sys::mln_buffer_view,
-        attribution_size: usize,
-    ) -> Result<Option<String>> {
-        if attribution_size == 0 {
-            let mut copied_size = 0;
-            let mut found = false;
-            // SAFETY: map is live, source_id remains valid for this call,
-            // capacity is zero so the output buffer may be null, and output
-            // pointers refer to writable storage.
-            maplibre_core::check(unsafe {
-                sys::mln_map_copy_style_source_attribution(
-                    map,
-                    source_id,
-                    ptr::null_mut(),
-                    0,
-                    &mut copied_size,
-                    &mut found,
-                )
-            })?;
-            return Ok(found.then(String::new));
-        }
-
-        let mut buffer = vec![0u8; attribution_size];
-        let mut copied_size = 0;
-        let mut found = false;
-        // SAFETY: map is live, source_id remains valid for this call, buffer is
-        // writable for attribution_size bytes, and output pointers refer to
-        // writable storage.
-        maplibre_core::check(unsafe {
-            sys::mln_map_copy_style_source_attribution(
-                map,
-                source_id,
-                buffer.as_mut_ptr().cast(),
-                buffer.len(),
-                &mut copied_size,
-                &mut found,
-            )
-        })?;
-        if !found {
-            return Ok(None);
-        }
-        if copied_size > buffer.len() {
-            return Err(Error::new(
-                ErrorKind::NativeError,
-                None,
-                "native style source attribution size exceeded caller buffer",
-            ));
-        }
-        buffer.truncate(copied_size);
-        String::from_utf8(buffer).map(Some).map_err(|error| {
-            Error::invalid_argument(format!(
-                "native style source attribution was not valid UTF-8: {error}"
-            ))
+            tile_urls,
         })
-    }
-
-    fn copy_style_source_url(
-        &self,
-        map: sys::mln_map,
-        source_id: sys::mln_buffer_view,
-        url_size: usize,
-    ) -> Result<Option<String>> {
-        let mut buffer = vec![0u8; url_size];
-        let mut copied_size = 0;
-        let mut found = false;
-        // SAFETY: map and source_id remain live for this call, the buffer is
-        // writable for url_size bytes or null-equivalent when empty, and the
-        // output pointers refer to writable storage.
-        maplibre_core::check(unsafe {
-            sys::mln_map_copy_style_source_url(
-                map,
-                source_id,
-                if buffer.is_empty() {
-                    ptr::null_mut()
-                } else {
-                    buffer.as_mut_ptr().cast()
-                },
-                buffer.len(),
-                &mut copied_size,
-                &mut found,
-            )
-        })?;
-        if !found {
-            return Ok(None);
-        }
-        if copied_size > buffer.len() {
-            return Err(Error::new(
-                ErrorKind::NativeError,
-                None,
-                "native style source URL size exceeded caller buffer",
-            ));
-        }
-        buffer.truncate(copied_size);
-        String::from_utf8(buffer).map(Some).map_err(|error| {
-            Error::invalid_argument(format!(
-                "native style source URL was not valid UTF-8: {error}"
-            ))
-        })
-    }
-
-    fn copy_style_source_tile_urls(
-        &self,
-        map: sys::mln_map,
-        source_id: sys::mln_buffer_view,
-    ) -> Result<Option<Vec<String>>> {
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_style_string_list>::new();
-        let mut found = false;
-        // SAFETY: map and source_id remain live for this call, out is a
-        // null-initialized output handle, and found points to writable storage.
-        maplibre_core::check(unsafe {
-            sys::mln_map_get_style_source_tile_urls(map, source_id, out.as_mut_ptr(), &mut found)
-        })?;
-        if !found {
-            return Ok(None);
-        }
-        // SAFETY: A found source returns an owned style string list; core
-        // copies every borrowed view and releases the list on all paths.
-        unsafe {
-            maplibre_core::style::copy_style_string_list(out.into_live("mln_style_string_list")?)
-                .map(Some)
-        }
     }
 
     /// Adds a GeoJSON source that loads data from a URL.
@@ -826,7 +687,8 @@ impl super::MapHandle {
         source_id: &str,
         url: &str,
         options: Option<&GeoJsonSourceOptions>,
-    ) -> Result<()> {
+    ) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let url = maplibre_core::string::string_view(url);
@@ -840,8 +702,15 @@ impl super::MapHandle {
         // options_ptr is null or points to call-scoped native options that keep
         // the cluster-properties buffer alive.
         maplibre_core::check(unsafe {
-            sys::mln_map_add_geojson_source_url(map, source_id.raw(), url.raw(), options_ptr)
-        })
+            sys::mln_map_add_geojson_source_url(
+                map,
+                source_id.raw(),
+                url.raw(),
+                options_ptr,
+                &mut command_id,
+            )
+        })?;
+        Ok(command_id)
     }
 
     /// Adds a GeoJSON source with inline data.
@@ -851,7 +720,8 @@ impl super::MapHandle {
         source_id: &str,
         data: &[u8],
         options: Option<&GeoJsonSourceOptions>,
-    ) -> Result<()> {
+    ) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let data = maplibre_core::string::buffer_view(data);
@@ -865,34 +735,45 @@ impl super::MapHandle {
         // and options_ptr is null or points to call-scoped native options that
         // keep the cluster-properties buffer alive.
         maplibre_core::check(unsafe {
-            sys::mln_map_add_geojson_source_data(map, source_id.raw(), data, options_ptr)
-        })
+            sys::mln_map_add_geojson_source_data(
+                map,
+                source_id.raw(),
+                data,
+                options_ptr,
+                &mut command_id,
+            )
+        })?;
+        Ok(command_id)
     }
 
     /// Updates one GeoJSON source to load data from a URL.
     ///
     /// The source keeps the options it was added with.
-    pub fn set_geojson_source_url(&self, source_id: &str, url: &str) -> Result<()> {
+    pub fn set_geojson_source_url(&self, source_id: &str, url: &str) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let url = maplibre_core::string::string_view(url);
         // SAFETY: map is live and source_id and url are valid for this call.
         maplibre_core::check(unsafe {
-            sys::mln_map_set_geojson_source_url(map, source_id.raw(), url.raw())
-        })
+            sys::mln_map_set_geojson_source_url(map, source_id.raw(), url.raw(), &mut command_id)
+        })?;
+        Ok(command_id)
     }
 
     /// Updates one GeoJSON source with inline data.
     ///
     /// The source keeps the options it was added with.
-    pub fn set_geojson_source_data(&self, source_id: &str, data: &[u8]) -> Result<()> {
+    pub fn set_geojson_source_data(&self, source_id: &str, data: &[u8]) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let data = maplibre_core::string::buffer_view(data);
         // SAFETY: map is live, and source_id and data remain valid for this call.
         maplibre_core::check(unsafe {
-            sys::mln_map_set_geojson_source_data(map, source_id.raw(), data)
-        })
+            sys::mln_map_set_geojson_source_data(map, source_id.raw(), data, &mut command_id)
+        })?;
+        Ok(command_id)
     }
 
     /// Adds one style layer from a full style-spec layer JSON object.
@@ -900,15 +781,22 @@ impl super::MapHandle {
         &self,
         layer_json: &[u8],
         before_layer_id: Option<&str>,
-    ) -> Result<()> {
+    ) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let layer_json = maplibre_core::string::buffer_view(layer_json);
         let before_layer_id = maplibre_core::string::string_view(before_layer_id.unwrap_or(""));
         // SAFETY: map is live, and layer_json and before_layer_id are
         // explicit-length views valid for this call.
         maplibre_core::check(unsafe {
-            sys::mln_map_add_style_layer_json(map, layer_json, before_layer_id.raw())
-        })
+            sys::mln_map_add_style_layer_json(
+                map,
+                layer_json,
+                before_layer_id.raw(),
+                &mut command_id,
+            )
+        })?;
+        Ok(command_id)
     }
 
     /// Adds a hillshade layer for a raster DEM source.
@@ -917,7 +805,8 @@ impl super::MapHandle {
         layer_id: &str,
         source_id: &str,
         before_layer_id: Option<&str>,
-    ) -> Result<()> {
+    ) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
         let source_id = maplibre_core::string::string_view(source_id);
@@ -929,8 +818,10 @@ impl super::MapHandle {
                 layer_id.raw(),
                 source_id.raw(),
                 before_layer_id.raw(),
+                &mut command_id,
             )
-        })
+        })?;
+        Ok(command_id)
     }
 
     /// Adds a color-relief layer for a raster DEM source.
@@ -939,7 +830,8 @@ impl super::MapHandle {
         layer_id: &str,
         source_id: &str,
         before_layer_id: Option<&str>,
-    ) -> Result<()> {
+    ) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
         let source_id = maplibre_core::string::string_view(source_id);
@@ -951,8 +843,10 @@ impl super::MapHandle {
                 layer_id.raw(),
                 source_id.raw(),
                 before_layer_id.raw(),
+                &mut command_id,
             )
-        })
+        })?;
+        Ok(command_id)
     }
 
     /// Adds a source-free location indicator layer.
@@ -960,14 +854,21 @@ impl super::MapHandle {
         &self,
         layer_id: &str,
         before_layer_id: Option<&str>,
-    ) -> Result<()> {
+    ) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
         let before_layer_id = maplibre_core::string::string_view(before_layer_id.unwrap_or(""));
         // SAFETY: map is live, and string views are valid for this call.
         maplibre_core::check(unsafe {
-            sys::mln_map_add_location_indicator_layer(map, layer_id.raw(), before_layer_id.raw())
-        })
+            sys::mln_map_add_location_indicator_layer(
+                map,
+                layer_id.raw(),
+                before_layer_id.raw(),
+                &mut command_id,
+            )
+        })?;
+        Ok(command_id)
     }
 
     /// Sets a location indicator layer location.
@@ -976,7 +877,8 @@ impl super::MapHandle {
         layer_id: &str,
         coordinate: LatLng,
         altitude: f64,
-    ) -> Result<()> {
+    ) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
         // SAFETY: map is live, layer_id is valid for this call, and coordinate
@@ -987,18 +889,27 @@ impl super::MapHandle {
                 layer_id.raw(),
                 coordinate.to_native(),
                 altitude,
+                &mut command_id,
             )
-        })
+        })?;
+        Ok(command_id)
     }
 
     /// Sets a location indicator layer bearing in degrees.
-    pub fn set_location_indicator_bearing(&self, layer_id: &str, bearing: f64) -> Result<()> {
+    pub fn set_location_indicator_bearing(&self, layer_id: &str, bearing: f64) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
         // SAFETY: map is live and layer_id is valid for this call.
         maplibre_core::check(unsafe {
-            sys::mln_map_set_location_indicator_bearing(map, layer_id.raw(), bearing)
-        })
+            sys::mln_map_set_location_indicator_bearing(
+                map,
+                layer_id.raw(),
+                bearing,
+                &mut command_id,
+            )
+        })?;
+        Ok(command_id)
     }
 
     /// Sets a location indicator layer accuracy radius in logical pixels.
@@ -1006,13 +917,20 @@ impl super::MapHandle {
         &self,
         layer_id: &str,
         radius: f64,
-    ) -> Result<()> {
+    ) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
         // SAFETY: map is live and layer_id is valid for this call.
         maplibre_core::check(unsafe {
-            sys::mln_map_set_location_indicator_accuracy_radius(map, layer_id.raw(), radius)
-        })
+            sys::mln_map_set_location_indicator_accuracy_radius(
+                map,
+                layer_id.raw(),
+                radius,
+                &mut command_id,
+            )
+        })?;
+        Ok(command_id)
     }
 
     /// Sets one location indicator image-name property.
@@ -1021,7 +939,8 @@ impl super::MapHandle {
         layer_id: &str,
         image_kind: LocationIndicatorImageKind,
         image_id: &str,
-    ) -> Result<()> {
+    ) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
         let image_id = maplibre_core::string::string_view(image_id);
@@ -1033,84 +952,85 @@ impl super::MapHandle {
                 layer_id.raw(),
                 image_kind.raw_value(),
                 image_id.raw(),
+                &mut command_id,
             )
-        })
+        })?;
+        Ok(command_id)
     }
 
     /// Copies one style layer as a full style-spec JSON object.
-    pub fn style_layer_json(&self, layer_id: &str) -> Result<Option<Vec<u8>>> {
+    pub fn style_layer_json(&self, layer_id: &str) -> Result<OperationHandle<Option<Vec<u8>>>> {
         let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
-        let mut found = false;
-        // SAFETY: map is live, layer_id is valid for this call, out is a
-        // null-initialized out-pointer, and found points to writable storage.
+        let mut operation = sys::mln_operation(0);
         maplibre_core::check(unsafe {
-            sys::mln_map_get_style_layer_json(map, layer_id.raw(), out.as_mut_ptr(), &mut found)
+            sys::mln_map_get_style_layer_json_start(map, layer_id.raw(), &mut operation)
         })?;
-        if !found {
-            return Ok(None);
-        }
-        // SAFETY: Success transfers the owned buffer to this call.
-        unsafe { maplibre_core::string::copy_owned_buffer(out.get()) }.map(Some)
+        self.start_operation(operation, OperationKind::StyleLayerJson)
     }
 
     /// Sets the style light from a style-spec light JSON object.
-    pub fn set_style_light_json(&self, light_json: &[u8]) -> Result<()> {
+    pub fn set_style_light_json(&self, light_json: &[u8]) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let light_json = maplibre_core::string::buffer_view(light_json);
         // SAFETY: map is live and light_json remains valid for this call.
-        maplibre_core::check(unsafe { sys::mln_map_set_style_light_json(map, light_json) })
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_style_light_json(map, light_json, &mut command_id)
+        })?;
+        Ok(command_id)
     }
 
     /// Sets one style light property.
-    pub fn set_style_light_property(&self, property_name: &str, value: &[u8]) -> Result<()> {
+    pub fn set_style_light_property(&self, property_name: &str, value: &[u8]) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let property_name = maplibre_core::string::string_view(property_name);
         let value = maplibre_core::string::buffer_view(value);
         // SAFETY: map is live, and property_name and value remain valid for this call.
         maplibre_core::check(unsafe {
-            sys::mln_map_set_style_light_property(map, property_name.raw(), value)
-        })
+            sys::mln_map_set_style_light_property(map, property_name.raw(), value, &mut command_id)
+        })?;
+        Ok(command_id)
     }
 
     /// Copies one style light property as a style-spec JSON value.
-    pub fn style_light_property(&self, property_name: &str) -> Result<Option<Vec<u8>>> {
+    pub fn style_light_property(
+        &self,
+        property_name: &str,
+    ) -> Result<OperationHandle<Option<Vec<u8>>>> {
         let map = self.inner.native()?;
         let property_name = maplibre_core::string::string_view(property_name);
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
-        // SAFETY: map is live, property_name is valid for this call, and out is
-        // a null-initialized out-pointer.
+        let mut operation = sys::mln_operation(0);
         maplibre_core::check(unsafe {
-            sys::mln_map_get_style_light_property(map, property_name.raw(), out.as_mut_ptr())
+            sys::mln_map_get_style_light_property_start(map, property_name.raw(), &mut operation)
         })?;
-        let Some(buffer) = out.into_option() else {
-            return Ok(None);
-        };
-        // SAFETY: Success transfers the owned buffer to this call.
-        unsafe { maplibre_core::string::copy_owned_buffer(buffer) }.map(Some)
+        self.start_operation(operation, OperationKind::StyleLightProperty)
     }
 
     /// Sets the style's global transition options. This replaces the whole
     /// configuration rather than merging, and loading a style replaces it
     /// again, so apply an override after the style loads.
-    pub fn set_style_transition_options(&self, options: &StyleTransitionOptions) -> Result<()> {
+    pub fn set_style_transition_options(&self, options: &StyleTransitionOptions) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let raw = maplibre_core::style::style_transition_options_to_native(options);
         // SAFETY: map is live and raw is a fully initialized options struct
         // borrowed for this call.
-        maplibre_core::check(unsafe { sys::mln_map_set_style_transition_options(map, &raw) })
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_style_transition_options(map, &raw, &mut command_id)
+        })?;
+        Ok(command_id)
     }
 
     /// Reads the style's global transition options.
-    pub fn style_transition_options(&self) -> Result<StyleTransitionOptions> {
+    pub fn style_transition_options(&self) -> Result<OperationHandle<StyleTransitionOptions>> {
         let map = self.inner.native()?;
-        let mut raw = maplibre_core::style::empty_style_transition_options();
-        // SAFETY: map is live and raw has its ABI size initialized.
-        maplibre_core::check(unsafe { sys::mln_map_get_style_transition_options(map, &mut raw) })?;
-        Ok(maplibre_core::style::style_transition_options_from_native(
-            &raw,
-        ))
+        let mut operation = sys::mln_operation(0);
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_style_transition_options_start(map, &mut operation)
+        })?;
+        self.start_operation(operation, OperationKind::StyleTransitionOptions)
     }
 
     /// Sets one layer style property.
@@ -1119,7 +1039,8 @@ impl super::MapHandle {
         layer_id: &str,
         property_name: &str,
         value: &[u8],
-    ) -> Result<()> {
+    ) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
         let property_name = maplibre_core::string::string_view(property_name);
@@ -1127,35 +1048,41 @@ impl super::MapHandle {
         // SAFETY: map is live, and all string and buffer views remain valid for
         // this call.
         maplibre_core::check(unsafe {
-            sys::mln_map_set_layer_property(map, layer_id.raw(), property_name.raw(), value)
-        })
-    }
-
-    /// Copies one layer style property as a style-spec JSON value.
-    pub fn layer_property(&self, layer_id: &str, property_name: &str) -> Result<Option<Vec<u8>>> {
-        let map = self.inner.native()?;
-        let layer_id = maplibre_core::string::string_view(layer_id);
-        let property_name = maplibre_core::string::string_view(property_name);
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
-        // SAFETY: map is live, string views are valid for this call, and out is
-        // a null-initialized out-pointer.
-        maplibre_core::check(unsafe {
-            sys::mln_map_get_layer_property(
+            sys::mln_map_set_layer_property(
                 map,
                 layer_id.raw(),
                 property_name.raw(),
-                out.as_mut_ptr(),
+                value,
+                &mut command_id,
             )
         })?;
-        let Some(buffer) = out.into_option() else {
-            return Ok(None);
-        };
-        // SAFETY: Success transfers the owned buffer to this call.
-        unsafe { maplibre_core::string::copy_owned_buffer(buffer) }.map(Some)
+        Ok(command_id)
+    }
+
+    /// Copies one layer style property as a style-spec JSON value.
+    pub fn layer_property(
+        &self,
+        layer_id: &str,
+        property_name: &str,
+    ) -> Result<OperationHandle<Option<Vec<u8>>>> {
+        let map = self.inner.native()?;
+        let layer_id = maplibre_core::string::string_view(layer_id);
+        let property_name = maplibre_core::string::string_view(property_name);
+        let mut operation = sys::mln_operation(0);
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_layer_property_start(
+                map,
+                layer_id.raw(),
+                property_name.raw(),
+                &mut operation,
+            )
+        })?;
+        self.start_operation(operation, OperationKind::LayerProperty)
     }
 
     /// Sets or clears one layer filter.
-    pub fn set_layer_filter(&self, layer_id: &str, filter: Option<&[u8]>) -> Result<()> {
+    pub fn set_layer_filter(&self, layer_id: &str, filter: Option<&[u8]>) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
         let native_filter = filter.map(maplibre_core::string::buffer_view);
@@ -1166,25 +1093,21 @@ impl super::MapHandle {
                 map,
                 layer_id.raw(),
                 native_filter.as_ref().map_or(ptr::null(), ptr::from_ref),
+                &mut command_id,
             )
-        })
+        })?;
+        Ok(command_id)
     }
 
     /// Copies one layer filter as a style-spec JSON value.
-    pub fn layer_filter(&self, layer_id: &str) -> Result<Option<Vec<u8>>> {
+    pub fn layer_filter(&self, layer_id: &str) -> Result<OperationHandle<Option<Vec<u8>>>> {
         let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
-        // SAFETY: map is live, layer_id is valid for this call, and out is a
-        // null-initialized out-pointer.
+        let mut operation = sys::mln_operation(0);
         maplibre_core::check(unsafe {
-            sys::mln_map_get_layer_filter(map, layer_id.raw(), out.as_mut_ptr())
+            sys::mln_map_get_layer_filter_start(map, layer_id.raw(), &mut operation)
         })?;
-        let Some(buffer) = out.into_option() else {
-            return Ok(None);
-        };
-        // SAFETY: Success transfers the owned buffer to this call.
-        unsafe { maplibre_core::string::copy_owned_buffer(buffer) }.map(Some)
+        self.start_operation(operation, OperationKind::LayerFilter)
     }
 
     /// Copies one runtime style image's stretchable intervals.
@@ -1193,163 +1116,126 @@ impl super::MapHandle {
     pub fn style_image_stretches(
         &self,
         image_id: &str,
-    ) -> Result<Option<(Vec<ImageStretch>, Vec<ImageStretch>)>> {
+    ) -> Result<OperationHandle<Option<StyleImageStretches>>> {
         let map = self.inner.native()?;
         let image_id = maplibre_core::string::string_view(image_id);
-        let mut x_count = 0;
-        let mut y_count = 0;
-        let mut found = false;
-        // SAFETY: map is live, image_id stays valid for this call, both arrays
-        // are null with zero capacity so this is a size probe, and the output
-        // pointers refer to writable storage.
+        let mut operation = sys::mln_operation(0);
         maplibre_core::check(unsafe {
-            sys::mln_map_copy_style_image_stretches(
-                map,
-                image_id.raw(),
-                ptr::null_mut(),
-                0,
-                &mut x_count,
-                ptr::null_mut(),
-                0,
-                &mut y_count,
-                &mut found,
-            )
+            sys::mln_map_copy_style_image_stretches_start(map, image_id.raw(), &mut operation)
         })?;
-        if !found {
-            return Ok(None);
-        }
-
-        let mut stretch_x = vec![sys::mln_image_stretch { from: 0.0, to: 0.0 }; x_count];
-        let mut stretch_y = vec![sys::mln_image_stretch { from: 0.0, to: 0.0 }; y_count];
-        // SAFETY: each buffer is writable for its reported count, and the output
-        // pointers refer to writable storage.
-        maplibre_core::check(unsafe {
-            sys::mln_map_copy_style_image_stretches(
-                map,
-                image_id.raw(),
-                stretch_x.as_mut_ptr(),
-                stretch_x.len(),
-                &mut x_count,
-                stretch_y.as_mut_ptr(),
-                stretch_y.len(),
-                &mut y_count,
-                &mut found,
-            )
-        })?;
-        let to_public = |stretches: &[sys::mln_image_stretch]| -> Vec<ImageStretch> {
-            stretches
-                .iter()
-                .map(|stretch| ImageStretch::new(stretch.from, stretch.to))
-                .collect()
-        };
-        Ok(Some((to_public(&stretch_x), to_public(&stretch_y))))
+        self.start_operation(operation, OperationKind::StyleImageStretches)
     }
 
     /// Sets one layer's source-layer ID.
     ///
     /// Layer types that take no source, such as background, are rejected.
-    pub fn set_layer_source_layer(&self, layer_id: &str, source_layer: &str) -> Result<()> {
+    pub fn set_layer_source_layer(&self, layer_id: &str, source_layer: &str) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
         let source_layer = maplibre_core::string::string_view(source_layer);
         // SAFETY: map is live and both string views stay valid for this call.
         maplibre_core::check(unsafe {
-            sys::mln_map_set_layer_source_layer(map, layer_id.raw(), source_layer.raw())
-        })
+            sys::mln_map_set_layer_source_layer(
+                map,
+                layer_id.raw(),
+                source_layer.raw(),
+                &mut command_id,
+            )
+        })?;
+        Ok(command_id)
     }
 
     /// Copies one layer's source-layer ID, empty when the layer carries none.
-    pub fn layer_source_layer(&self, layer_id: &str) -> Result<String> {
+    pub fn layer_source_layer(&self, layer_id: &str) -> Result<OperationHandle<String>> {
         let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
-        // SAFETY: map is live, layer_id stays valid for both calls, and each
-        // call writes only through the pointers it is given.
-        unsafe {
-            copy_text(|text, capacity, out_size| {
-                sys::mln_map_copy_layer_source_layer(map, layer_id.raw(), text, capacity, out_size)
-            })
-        }
+        let mut operation = sys::mln_operation(0);
+        maplibre_core::check(unsafe {
+            sys::mln_map_copy_layer_source_layer_start(map, layer_id.raw(), &mut operation)
+        })?;
+        self.start_operation(operation, OperationKind::LayerSourceLayer)
     }
 
     /// Sets one layer's source ID.
     ///
     /// Layer types that take no source, such as background, are rejected. The
     /// named source need not exist yet.
-    pub fn set_layer_source_id(&self, layer_id: &str, source_id: &str) -> Result<()> {
+    pub fn set_layer_source_id(&self, layer_id: &str, source_id: &str) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
         let source_id = maplibre_core::string::string_view(source_id);
         // SAFETY: map is live and both string views stay valid for this call.
         maplibre_core::check(unsafe {
-            sys::mln_map_set_layer_source_id(map, layer_id.raw(), source_id.raw())
-        })
+            sys::mln_map_set_layer_source_id(map, layer_id.raw(), source_id.raw(), &mut command_id)
+        })?;
+        Ok(command_id)
     }
 
     /// Copies one layer's source ID, empty when the layer carries none.
-    pub fn layer_source_id(&self, layer_id: &str) -> Result<String> {
+    pub fn layer_source_id(&self, layer_id: &str) -> Result<OperationHandle<String>> {
         let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
-        // SAFETY: map is live, layer_id stays valid for both calls, and each
-        // call writes only through the pointers it is given.
-        unsafe {
-            copy_text(|text, capacity, out_size| {
-                sys::mln_map_copy_layer_source_id(map, layer_id.raw(), text, capacity, out_size)
-            })
-        }
+        let mut operation = sys::mln_operation(0);
+        maplibre_core::check(unsafe {
+            sys::mln_map_copy_layer_source_id_start(map, layer_id.raw(), &mut operation)
+        })?;
+        self.start_operation(operation, OperationKind::LayerSourceId)
     }
 
     /// Sets the lowest zoom at which one layer draws.
     ///
     /// Pass `f64::NEG_INFINITY` for no lower bound.
-    pub fn set_layer_min_zoom(&self, layer_id: &str, min_zoom: f64) -> Result<()> {
+    pub fn set_layer_min_zoom(&self, layer_id: &str, min_zoom: f64) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
         // SAFETY: map is live and layer_id stays valid for this call.
         maplibre_core::check(unsafe {
-            sys::mln_map_set_layer_min_zoom(map, layer_id.raw(), min_zoom)
-        })
+            sys::mln_map_set_layer_min_zoom(map, layer_id.raw(), min_zoom, &mut command_id)
+        })?;
+        Ok(command_id)
     }
 
     /// Reads the lowest zoom at which one layer draws.
     ///
     /// A layer with no lower bound reports `f64::NEG_INFINITY`.
-    pub fn layer_min_zoom(&self, layer_id: &str) -> Result<f64> {
+    pub fn layer_min_zoom(&self, layer_id: &str) -> Result<OperationHandle<f64>> {
         let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
-        let mut min_zoom = 0.0;
-        // SAFETY: map is live, layer_id stays valid for this call, and min_zoom
-        // is writable storage.
+        let mut operation = sys::mln_operation(0);
         maplibre_core::check(unsafe {
-            sys::mln_map_get_layer_min_zoom(map, layer_id.raw(), &mut min_zoom)
+            sys::mln_map_get_layer_min_zoom_start(map, layer_id.raw(), &mut operation)
         })?;
-        Ok(min_zoom)
+        self.start_operation(operation, OperationKind::LayerMinZoom)
     }
 
     /// Sets the highest zoom at which one layer draws.
     ///
     /// Pass `f64::INFINITY` for no upper bound.
-    pub fn set_layer_max_zoom(&self, layer_id: &str, max_zoom: f64) -> Result<()> {
+    pub fn set_layer_max_zoom(&self, layer_id: &str, max_zoom: f64) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
         // SAFETY: map is live and layer_id stays valid for this call.
         maplibre_core::check(unsafe {
-            sys::mln_map_set_layer_max_zoom(map, layer_id.raw(), max_zoom)
-        })
+            sys::mln_map_set_layer_max_zoom(map, layer_id.raw(), max_zoom, &mut command_id)
+        })?;
+        Ok(command_id)
     }
 
     /// Reads the highest zoom at which one layer draws.
     ///
     /// A layer with no upper bound reports `f64::INFINITY`.
-    pub fn layer_max_zoom(&self, layer_id: &str) -> Result<f64> {
+    pub fn layer_max_zoom(&self, layer_id: &str) -> Result<OperationHandle<f64>> {
         let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
-        let mut max_zoom = 0.0;
-        // SAFETY: map is live, layer_id stays valid for this call, and max_zoom
-        // is writable storage.
+        let mut operation = sys::mln_operation(0);
         maplibre_core::check(unsafe {
-            sys::mln_map_get_layer_max_zoom(map, layer_id.raw(), &mut max_zoom)
+            sys::mln_map_get_layer_max_zoom_start(map, layer_id.raw(), &mut operation)
         })?;
-        Ok(max_zoom)
+        self.start_operation(operation, OperationKind::LayerMaxZoom)
     }
 
     /// Sets whether one layer draws.
@@ -1357,116 +1243,594 @@ impl super::MapHandle {
         &self,
         layer_id: &str,
         visibility: StyleLayerVisibility,
-    ) -> Result<()> {
+    ) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
         // SAFETY: map is live and layer_id stays valid for this call.
         maplibre_core::check(unsafe {
-            sys::mln_map_set_layer_visibility(map, layer_id.raw(), visibility.raw_value())
-        })
+            sys::mln_map_set_layer_visibility(
+                map,
+                layer_id.raw(),
+                visibility.raw_value(),
+                &mut command_id,
+            )
+        })?;
+        Ok(command_id)
     }
 
     /// Reads whether one layer draws.
-    pub fn layer_visibility(&self, layer_id: &str) -> Result<StyleLayerVisibility> {
+    pub fn layer_visibility(
+        &self,
+        layer_id: &str,
+    ) -> Result<OperationHandle<StyleLayerVisibility>> {
         let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
-        let mut visibility = 0;
-        // SAFETY: map is live, layer_id stays valid for this call, and
-        // visibility is writable storage.
+        let mut operation = sys::mln_operation(0);
         maplibre_core::check(unsafe {
-            sys::mln_map_get_layer_visibility(map, layer_id.raw(), &mut visibility)
+            sys::mln_map_get_layer_visibility_start(map, layer_id.raw(), &mut operation)
         })?;
-        Ok(StyleLayerVisibility::from_raw(visibility))
+        self.start_operation(operation, OperationKind::LayerVisibility)
     }
 
     /// Copies current style source IDs into owned Rust strings.
-    pub fn style_source_ids(&self) -> Result<Vec<String>> {
+    pub fn style_source_ids(&self) -> Result<OperationHandle<Vec<String>>> {
         let map = self.inner.native()?;
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_style_id_list>::new();
-        // SAFETY: map is live and out is a null-initialized out-pointer owned by
-        // this call. On success the returned handle is wrapped and destroyed by
-        // the copying helper below.
-        maplibre_core::check(unsafe { sys::mln_map_list_style_source_ids(map, out.as_mut_ptr()) })?;
-        // SAFETY: On success, the C API returns an owned style ID list handle;
-        // core copies and releases it.
-        unsafe { maplibre_core::style::copy_style_id_list(out.into_live("mln_style_id_list")?) }
+        let mut operation = sys::mln_operation(0);
+        maplibre_core::check(unsafe {
+            sys::mln_map_list_style_source_ids_start(map, &mut operation)
+        })?;
+        self.start_operation(operation, OperationKind::StyleSourceIds)
     }
 
     /// Copies current style layer IDs into owned Rust strings.
-    pub fn style_layer_ids(&self) -> Result<Vec<String>> {
+    pub fn style_layer_ids(&self) -> Result<OperationHandle<Vec<String>>> {
         let map = self.inner.native()?;
+        let mut operation = sys::mln_operation(0);
+        maplibre_core::check(unsafe {
+            sys::mln_map_list_style_layer_ids_start(map, &mut operation)
+        })?;
+        self.start_operation(operation, OperationKind::StyleLayerIds)
+    }
+    pub fn remove_style_layer(&self, layer_id: &str) -> Result<OperationHandle<bool>> {
+        let map = self.inner.native()?;
+        let layer_id = maplibre_core::string::string_view(layer_id);
+        let mut operation = sys::mln_operation(0);
+        maplibre_core::check(unsafe {
+            sys::mln_map_remove_style_layer_start(map, layer_id.raw(), &mut operation)
+        })?;
+        self.start_operation(operation, OperationKind::RemoveStyleLayer)
+    }
+
+    pub fn style_layer_exists(&self, layer_id: &str) -> Result<OperationHandle<bool>> {
+        let map = self.inner.native()?;
+        let layer_id = maplibre_core::string::string_view(layer_id);
+        let mut operation = sys::mln_operation(0);
+        maplibre_core::check(unsafe {
+            sys::mln_map_style_layer_exists_start(map, layer_id.raw(), &mut operation)
+        })?;
+        self.start_operation(operation, OperationKind::StyleLayerExists)
+    }
+
+    pub fn style_layer_type(&self, layer_id: &str) -> Result<OperationHandle<Option<String>>> {
+        let map = self.inner.native()?;
+        let layer_id = maplibre_core::string::string_view(layer_id);
+        let mut operation = sys::mln_operation(0);
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_style_layer_type_start(map, layer_id.raw(), &mut operation)
+        })?;
+        self.start_operation(operation, OperationKind::StyleLayerType)
+    }
+
+    pub fn move_style_layer(&self, layer_id: &str, before_layer_id: Option<&str>) -> Result<u64> {
+        let map = self.inner.native()?;
+        let layer_id = maplibre_core::string::string_view(layer_id);
+        let before_layer_id = maplibre_core::string::string_view(before_layer_id.unwrap_or(""));
+        let mut command_id = 0;
+        maplibre_core::check(unsafe {
+            sys::mln_map_move_style_layer(
+                map,
+                layer_id.raw(),
+                before_layer_id.raw(),
+                &mut command_id,
+            )
+        })?;
+        Ok(command_id)
+    }
+}
+
+/// Ordered read of retained metadata for one style source.
+pub struct StyleSourceInfoOperation {
+    info: OperationHandle<Option<SourceInfo>>,
+    attribution: OperationHandle<Option<String>>,
+    url: OperationHandle<Option<String>>,
+    tile_urls: OperationHandle<Option<Vec<String>>>,
+}
+
+impl StyleSourceInfoOperation {
+    pub fn wait(&self, timeout: Duration) -> Result<bool> {
+        let deadline = Instant::now() + timeout;
+        for completed in [
+            self.info.wait(timeout)?,
+            self.attribution
+                .wait(deadline.saturating_duration_since(Instant::now()))?,
+            self.url
+                .wait(deadline.saturating_duration_since(Instant::now()))?,
+            self.tile_urls
+                .wait(deadline.saturating_duration_since(Instant::now()))?,
+        ] {
+            if !completed {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
+    pub fn is_completed(&self) -> Result<bool> {
+        Ok(self.info.is_completed()?
+            && self.attribution.is_completed()?
+            && self.url.is_completed()?
+            && self.tile_urls.is_completed()?)
+    }
+
+    pub fn cancel(&self) -> Result<()> {
+        self.info.cancel()?;
+        self.attribution.cancel()?;
+        self.url.cancel()?;
+        self.tile_urls.cancel()
+    }
+
+    pub fn take(&self) -> Result<Option<SourceInfo>> {
+        if !self.is_completed()? {
+            return Err(Error::new(
+                ErrorKind::InvalidState,
+                None,
+                "style source info operation has not completed",
+            ));
+        }
+        let Some(mut info) = self.info.take()? else {
+            self.attribution.discard()?;
+            self.url.discard()?;
+            self.tile_urls.discard()?;
+            return Ok(None);
+        };
+        info.attribution = self.attribution.take()?;
+        info.url = self.url.take()?;
+        let tiles = self.tile_urls.take()?.unwrap_or_default();
+        if let Some(tile_json) = info.tile_json.as_mut() {
+            tile_json.tiles = tiles;
+        }
+        Ok(Some(info))
+    }
+}
+
+/// Ordered read of one style image and its metadata.
+pub struct StyleImageOperation {
+    info: OperationHandle<Option<StyleImageInfo>>,
+    pixels: OperationHandle<Option<Vec<u8>>>,
+}
+
+impl StyleImageOperation {
+    pub fn wait(&self, timeout: Duration) -> Result<bool> {
+        let deadline = Instant::now() + timeout;
+        if !self.info.wait(timeout)? {
+            return Ok(false);
+        }
+        self.pixels
+            .wait(deadline.saturating_duration_since(Instant::now()))
+    }
+
+    pub fn is_completed(&self) -> Result<bool> {
+        Ok(self.info.is_completed()? && self.pixels.is_completed()?)
+    }
+
+    pub fn cancel(&self) -> Result<()> {
+        self.info.cancel()?;
+        self.pixels.cancel()
+    }
+
+    pub fn take(&self) -> Result<Option<StyleImage>> {
+        if !self.is_completed()? {
+            return Err(Error::new(
+                ErrorKind::InvalidState,
+                None,
+                "style image operation has not completed",
+            ));
+        }
+        let Some(info) = self.info.take()? else {
+            self.pixels.discard()?;
+            return Ok(None);
+        };
+        let Some(pixels) = self.pixels.take()? else {
+            return Ok(None);
+        };
+        maplibre_core::style::style_image_from_copied_premultiplied_rgba8(
+            info,
+            pixels,
+            info.byte_length,
+        )
+        .map(Some)
+    }
+}
+
+impl OperationHandle<Vec<u8>> {
+    pub fn take(&self) -> Result<Vec<u8>> {
+        if self.operation_kind != OperationKind::LoadedStyleJson {
+            return Err(Error::invalid_argument(
+                "operation does not contain byte data",
+            ));
+        }
+        take_buffer(self, |operation, out| unsafe {
+            sys::mln_map_loaded_style_json_take_result(operation, out)
+        })
+    }
+}
+
+impl OperationHandle<String> {
+    pub fn take(&self) -> Result<String> {
+        let bytes = take_buffer(self, |operation, out| unsafe {
+            match self.operation_kind {
+                OperationKind::StyleUrl => sys::mln_map_style_url_take_result(operation, out),
+                OperationKind::LayerSourceLayer => {
+                    sys::mln_map_copy_layer_source_layer_take_result(operation, out)
+                }
+                OperationKind::LayerSourceId => {
+                    sys::mln_map_copy_layer_source_id_take_result(operation, out)
+                }
+                _ => sys::MLN_STATUS_INVALID_STATE,
+            }
+        })?;
+        String::from_utf8(bytes).map_err(|error| {
+            Error::invalid_argument(format!("native style text was not valid UTF-8: {error}"))
+        })
+    }
+}
+
+impl OperationHandle<Option<String>> {
+    pub fn take(&self) -> Result<Option<String>> {
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
+        let mut found = false;
+        self.with_result_operation(|operation| {
+            let status = unsafe {
+                match self.operation_kind {
+                    OperationKind::StyleSourceAttribution => {
+                        sys::mln_map_copy_style_source_attribution_take_result(
+                            operation,
+                            out.as_mut_ptr(),
+                            &mut found,
+                        )
+                    }
+                    OperationKind::StyleSourceUrl => {
+                        sys::mln_map_copy_style_source_url_take_result(
+                            operation,
+                            out.as_mut_ptr(),
+                            &mut found,
+                        )
+                    }
+                    OperationKind::StyleLayerType => sys::mln_map_get_style_layer_type_take_result(
+                        operation,
+                        out.as_mut_ptr(),
+                        &mut found,
+                    ),
+                    _ => sys::MLN_STATUS_INVALID_STATE,
+                }
+            };
+            maplibre_core::check(status)
+        })?;
+        if !found {
+            return Ok(None);
+        }
+        let bytes = unsafe { maplibre_core::string::copy_owned_buffer(out.get()) }?;
+        String::from_utf8(bytes).map(Some).map_err(|error| {
+            Error::invalid_argument(format!("native style text was not valid UTF-8: {error}"))
+        })
+    }
+}
+
+impl OperationHandle<Option<Vec<u8>>> {
+    pub fn take(&self) -> Result<Option<Vec<u8>>> {
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
+        let mut found = true;
+        self.with_result_operation(|operation| {
+            let status = unsafe {
+                match self.operation_kind {
+                    OperationKind::StyleImagePixels => {
+                        sys::mln_map_copy_style_image_premultiplied_rgba8_take_result(
+                            operation,
+                            out.as_mut_ptr(),
+                            &mut found,
+                        )
+                    }
+                    OperationKind::StyleLayerJson => sys::mln_map_get_style_layer_json_take_result(
+                        operation,
+                        out.as_mut_ptr(),
+                        &mut found,
+                    ),
+                    OperationKind::StyleLightProperty => {
+                        sys::mln_map_get_style_light_property_take_result(
+                            operation,
+                            out.as_mut_ptr(),
+                        )
+                    }
+                    OperationKind::LayerProperty => {
+                        sys::mln_map_get_layer_property_take_result(operation, out.as_mut_ptr())
+                    }
+                    OperationKind::LayerFilter => {
+                        sys::mln_map_get_layer_filter_take_result(operation, out.as_mut_ptr())
+                    }
+                    _ => sys::MLN_STATUS_INVALID_STATE,
+                }
+            };
+            maplibre_core::check(status)
+        })?;
+        if !found || out.get().0 == 0 {
+            return Ok(None);
+        }
+        unsafe { maplibre_core::string::copy_owned_buffer(out.get()) }.map(Some)
+    }
+}
+
+impl OperationHandle<bool> {
+    pub fn take(&self) -> Result<bool> {
+        let mut value = false;
+        self.with_result_operation(|operation| {
+            let status = unsafe {
+                match self.operation_kind {
+                    OperationKind::RemoveStyleSource => {
+                        sys::mln_map_remove_style_source_take_result(operation, &mut value)
+                    }
+                    OperationKind::StyleSourceExists => {
+                        sys::mln_map_style_source_exists_take_result(operation, &mut value)
+                    }
+                    OperationKind::RemoveStyleImage => {
+                        sys::mln_map_remove_style_image_take_result(operation, &mut value)
+                    }
+                    OperationKind::StyleImageExists => {
+                        sys::mln_map_style_image_exists_take_result(operation, &mut value)
+                    }
+                    OperationKind::RemoveStyleLayer => {
+                        sys::mln_map_remove_style_layer_take_result(operation, &mut value)
+                    }
+                    OperationKind::StyleLayerExists => {
+                        sys::mln_map_style_layer_exists_take_result(operation, &mut value)
+                    }
+                    _ => sys::MLN_STATUS_INVALID_STATE,
+                }
+            };
+            maplibre_core::check(status)
+        })?;
+        Ok(value)
+    }
+}
+
+impl OperationHandle<Option<SourceType>> {
+    pub fn take(&self) -> Result<Option<SourceType>> {
+        let mut raw = sys::MLN_STYLE_SOURCE_TYPE_UNKNOWN;
+        let mut found = false;
+        self.with_result_operation(|operation| {
+            maplibre_core::check(unsafe {
+                sys::mln_map_get_style_source_type_take_result(operation, &mut raw, &mut found)
+            })
+        })?;
+        Ok(found.then(|| SourceType::from_raw(raw)))
+    }
+}
+
+impl OperationHandle<Option<SourceInfo>> {
+    pub fn take(&self) -> Result<Option<SourceInfo>> {
+        let mut raw = maplibre_core::style::empty_style_source_info();
+        let mut found = false;
+        self.with_result_operation(|operation| {
+            maplibre_core::check(unsafe {
+                sys::mln_map_get_style_source_info_take_result(operation, &mut raw, &mut found)
+            })
+        })?;
+        Ok(found.then(|| {
+            maplibre_core::style::style_source_info_from_native(&raw, None, None, Vec::new())
+        }))
+    }
+}
+
+impl OperationHandle<Option<Vec<String>>> {
+    pub fn take(&self) -> Result<Option<Vec<String>>> {
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_style_string_list>::new();
+        let mut found = false;
+        self.with_result_operation(|operation| {
+            maplibre_core::check(unsafe {
+                sys::mln_map_get_style_source_tile_urls_take_result(
+                    operation,
+                    out.as_mut_ptr(),
+                    &mut found,
+                )
+            })
+        })?;
+        if !found {
+            return Ok(None);
+        }
+        unsafe {
+            maplibre_core::style::copy_style_string_list(out.into_live("mln_style_string_list")?)
+        }
+        .map(Some)
+    }
+}
+
+impl OperationHandle<Vec<String>> {
+    pub fn take(&self) -> Result<Vec<String>> {
         let mut out = maplibre_core::ptr::OutHandle::<sys::mln_style_id_list>::new();
-        // SAFETY: map is live and out is a null-initialized out-pointer owned by
-        // this call. On success the returned handle is wrapped and destroyed by
-        // the copying helper below.
-        maplibre_core::check(unsafe { sys::mln_map_list_style_layer_ids(map, out.as_mut_ptr()) })?;
-        // SAFETY: On success, the C API returns an owned style ID list handle;
-        // core copies and releases it.
+        self.with_result_operation(|operation| {
+            let status = unsafe {
+                match self.operation_kind {
+                    OperationKind::StyleSourceIds => {
+                        sys::mln_map_list_style_source_ids_take_result(operation, out.as_mut_ptr())
+                    }
+                    OperationKind::StyleLayerIds => {
+                        sys::mln_map_list_style_layer_ids_take_result(operation, out.as_mut_ptr())
+                    }
+                    _ => sys::MLN_STATUS_INVALID_STATE,
+                }
+            };
+            maplibre_core::check(status)
+        })?;
         unsafe { maplibre_core::style::copy_style_id_list(out.into_live("mln_style_id_list")?) }
     }
 }
 
-/// Probes the required byte length, then copies the text into an owned `String`.
-///
-/// # Safety
-///
-/// `copy` must forward its arguments to a C entry point that writes at most
-/// `capacity` bytes through the text pointer and the required length through the
-/// size pointer.
-unsafe fn copy_text(
-    copy: impl Fn(*mut std::os::raw::c_char, usize, *mut usize) -> sys::mln_status,
-) -> Result<String> {
-    let mut required = 0;
-    maplibre_core::check(copy(ptr::null_mut(), 0, &mut required))?;
-    if required == 0 {
-        return Ok(String::new());
+impl OperationHandle<Option<StyleImageInfo>> {
+    pub fn take(&self) -> Result<Option<StyleImageInfo>> {
+        let mut raw = maplibre_core::style::empty_style_image_info();
+        let mut found = false;
+        self.with_result_operation(|operation| {
+            maplibre_core::check(unsafe {
+                sys::mln_map_get_style_image_info_take_result(operation, &mut raw, &mut found)
+            })
+        })?;
+        Ok(found.then(|| maplibre_core::values::style_image_info_from_native(&raw)))
     }
-
-    let mut buffer = vec![0u8; required];
-    let mut copied = 0;
-    maplibre_core::check(copy(buffer.as_mut_ptr().cast(), buffer.len(), &mut copied))?;
-    if copied > buffer.len() {
-        return Err(Error::new(
-            ErrorKind::NativeError,
-            None,
-            "native text size exceeded caller buffer",
-        ));
-    }
-    buffer.truncate(copied);
-    String::from_utf8(buffer).map_err(|_| {
-        Error::new(
-            ErrorKind::NativeError,
-            None,
-            "native text was not valid UTF-8",
-        )
-    })
 }
 
-/// Probes the required byte length, then copies the bytes into owned storage.
-///
-/// # Safety
-///
-/// `copy` must write at most `capacity` bytes and report the required length
-/// through the size pointer.
-unsafe fn copy_bytes(
-    copy: impl Fn(*mut u8, usize, *mut usize) -> sys::mln_status,
-) -> Result<Vec<u8>> {
-    let mut required = 0;
-    maplibre_core::check(copy(ptr::null_mut(), 0, &mut required))?;
-    if required == 0 {
-        return Ok(Vec::new());
+impl OperationHandle<Option<[LatLng; 4]>> {
+    pub fn take(&self) -> Result<Option<[LatLng; 4]>> {
+        let mut raw = [sys::mln_lat_lng {
+            latitude: 0.0,
+            longitude: 0.0,
+        }; 4];
+        let mut count = 0;
+        let mut found = false;
+        self.with_result_operation(|operation| {
+            maplibre_core::check(unsafe {
+                sys::mln_map_get_image_source_coordinates_take_result(
+                    operation,
+                    raw.as_mut_ptr(),
+                    raw.len(),
+                    &mut count,
+                    &mut found,
+                )
+            })
+        })?;
+        if !found {
+            return Ok(None);
+        }
+        if count != raw.len() {
+            return Err(Error::new(
+                ErrorKind::NativeError,
+                None,
+                "native image source coordinate count did not match Rust image source invariant",
+            ));
+        }
+        Ok(Some(raw.map(LatLng::from_native)))
     }
+}
 
-    let mut buffer = vec![0u8; required];
-    let mut copied = 0;
-    maplibre_core::check(copy(buffer.as_mut_ptr(), buffer.len(), &mut copied))?;
-    if copied > buffer.len() {
-        return Err(Error::new(
-            ErrorKind::NativeError,
-            None,
-            "native byte size exceeded caller buffer",
-        ));
+impl OperationHandle<Option<(Vec<ImageStretch>, Vec<ImageStretch>)>> {
+    pub fn take(&self) -> Result<Option<(Vec<ImageStretch>, Vec<ImageStretch>)>> {
+        let mut x_count = 0;
+        let mut y_count = 0;
+        let mut found = false;
+        let mut copied = None;
+        self.with_result_operation(|operation| {
+            maplibre_core::check(unsafe {
+                sys::mln_map_copy_style_image_stretches_take_result(
+                    operation,
+                    ptr::null_mut(),
+                    0,
+                    &mut x_count,
+                    ptr::null_mut(),
+                    0,
+                    &mut y_count,
+                    &mut found,
+                )
+            })?;
+            let mut x = vec![sys::mln_image_stretch { from: 0.0, to: 0.0 }; x_count];
+            let mut y = vec![sys::mln_image_stretch { from: 0.0, to: 0.0 }; y_count];
+            maplibre_core::check(unsafe {
+                sys::mln_map_copy_style_image_stretches_take_result(
+                    operation,
+                    x.as_mut_ptr(),
+                    x.len(),
+                    &mut x_count,
+                    y.as_mut_ptr(),
+                    y.len(),
+                    &mut y_count,
+                    &mut found,
+                )
+            })?;
+            copied = Some((x, y));
+            Ok(())
+        })?;
+        if !found {
+            return Ok(None);
+        }
+        let (x, y) = copied.ok_or_else(|| {
+            Error::new(
+                ErrorKind::NativeError,
+                None,
+                "native stretch result was unavailable",
+            )
+        })?;
+        let convert = |values: Vec<sys::mln_image_stretch>| {
+            values
+                .into_iter()
+                .map(|value| ImageStretch::new(value.from, value.to))
+                .collect()
+        };
+        Ok(Some((convert(x), convert(y))))
     }
-    buffer.truncate(copied);
-    Ok(buffer)
+}
+
+impl OperationHandle<StyleTransitionOptions> {
+    pub fn take(&self) -> Result<StyleTransitionOptions> {
+        let mut raw = maplibre_core::style::empty_style_transition_options();
+        self.with_result_operation(|operation| {
+            maplibre_core::check(unsafe {
+                sys::mln_map_get_style_transition_options_take_result(operation, &mut raw)
+            })
+        })?;
+        Ok(maplibre_core::style::style_transition_options_from_native(
+            &raw,
+        ))
+    }
+}
+
+impl OperationHandle<f64> {
+    pub fn take(&self) -> Result<f64> {
+        let mut value = 0.0;
+        self.with_result_operation(|operation| {
+            let status = unsafe {
+                match self.operation_kind {
+                    OperationKind::LayerMinZoom => {
+                        sys::mln_map_get_layer_min_zoom_take_result(operation, &mut value)
+                    }
+                    OperationKind::LayerMaxZoom => {
+                        sys::mln_map_get_layer_max_zoom_take_result(operation, &mut value)
+                    }
+                    _ => sys::MLN_STATUS_INVALID_STATE,
+                }
+            };
+            maplibre_core::check(status)
+        })?;
+        Ok(value)
+    }
+}
+
+impl OperationHandle<StyleLayerVisibility> {
+    pub fn take(&self) -> Result<StyleLayerVisibility> {
+        let mut value = 0;
+        self.with_result_operation(|operation| {
+            maplibre_core::check(unsafe {
+                sys::mln_map_get_layer_visibility_take_result(operation, &mut value)
+            })
+        })?;
+        Ok(StyleLayerVisibility::from_raw(value))
+    }
+}
+
+fn take_buffer<T>(
+    operation: &OperationHandle<T>,
+    take: impl FnOnce(sys::mln_operation, *mut sys::mln_buffer) -> sys::mln_status,
+) -> Result<Vec<u8>> {
+    let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
+    operation.with_result_operation(|operation| {
+        maplibre_core::check(take(operation, out.as_mut_ptr()))
+    })?;
+    unsafe { maplibre_core::string::copy_owned_buffer(out.get()) }
 }

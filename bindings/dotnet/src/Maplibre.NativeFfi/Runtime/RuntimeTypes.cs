@@ -19,6 +19,14 @@ public enum AmbientCacheOperation : uint
 /// <summary>The terminal state copied from a completed operation.</summary>
 public sealed record OperationCompletion(MaplibreStatus Status, int RawStatus, string Diagnostic);
 
+public enum CommandDisposition : uint
+{
+    Committed = 0,
+    Superseded = 1,
+    Failed = 2,
+    Cancelled = 3,
+}
+
 public enum NotificationEndpointKind : uint
 {
     Unknown = 0,
@@ -63,6 +71,7 @@ public enum RuntimeEventType : uint
     OfflineRegionResponseError = 20,
     OfflineRegionTileCountLimitExceeded = 21,
     MapCameraTransitionFinished = 23,
+    CommandFinished = 24,
 }
 
 /// <summary>Event types a map or a runtime queues.</summary>
@@ -99,6 +108,7 @@ public enum RuntimeEventMask : ulong
     MapStyleImageMissing = 1UL << (int)RuntimeEventType.MapStyleImageMissing,
     MapTileAction = 1UL << (int)RuntimeEventType.MapTileAction,
     MapCameraTransitionFinished = 1UL << (int)RuntimeEventType.MapCameraTransitionFinished,
+    CommandFinished = 1UL << (int)RuntimeEventType.CommandFinished,
     OfflineRegionStatusChanged = 1UL << (int)RuntimeEventType.OfflineRegionStatusChanged,
     OfflineRegionResponseError = 1UL << (int)RuntimeEventType.OfflineRegionResponseError,
     OfflineRegionTileCountLimitExceeded =
@@ -124,13 +134,15 @@ public enum RuntimeEventMask : ulong
         | MapRenderMapFinished
         | MapStyleImageMissing
         | MapTileAction
-        | MapCameraTransitionFinished,
+        | MapCameraTransitionFinished
+        | CommandFinished,
 
     /// <summary>Selects every runtime-originated event type this binding declares.</summary>
     AllRuntimeEvents =
         OfflineRegionStatusChanged
         | OfflineRegionResponseError
-        | OfflineRegionTileCountLimitExceeded,
+        | OfflineRegionTileCountLimitExceeded
+        | CommandFinished,
 
     /// <summary>Selects every event type this binding declares.</summary>
     All = AllMapEvents | AllRuntimeEvents,
@@ -273,6 +285,14 @@ public abstract record RuntimeEventPayload
     /// covers.
     /// </param>
     public sealed record CameraTransitionFinished(ulong TransitionId) : RuntimeEventPayload;
+
+    /// <summary>Terminal outcome of an accepted ordered command.</summary>
+    public sealed record CommandFinished(
+        ulong CommandId,
+        CommandDisposition Disposition,
+        uint RawDisposition,
+        ulong Generation
+    ) : RuntimeEventPayload;
 
     /// <summary>Payload for a payload kind this binding does not declare.</summary>
     /// <remarks>

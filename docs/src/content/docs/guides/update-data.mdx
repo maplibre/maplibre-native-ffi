@@ -10,8 +10,8 @@ import { region } from "../../../snippets";
 
 import liveUpdates from "../../../../snippets/c/geojson-live-updates.c?raw";
 
-A GeoJSON source accepts new inline data or a new URL. Both updates run on the
-map's owner thread and replace the whole dataset. A host that tracks individual
+A GeoJSON source accepts new inline data or a new URL. Both commands replace the
+whole dataset in runtime submission order. A host that tracks individual
 features keeps its own collection and publishes the collection after each
 change.
 
@@ -43,8 +43,8 @@ for most feeds.
 
 Set the synchronous-update option when the next frame must include the update.
 Examples include a simulation that advances with rendering and a still image
-captured immediately after an update. Tiling then runs during the render call on
-the render session's owner thread. A large dataset extends that frame.
+captured immediately after an update. Tiling then runs on native worker threads.
+A large dataset can delay the render update that publishes the new tiles.
 
 <Code code={region(liveUpdates, "options")} lang="c" title="geojson-live-updates.c" />
 

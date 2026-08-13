@@ -212,9 +212,11 @@ def test_vulkan_borrowed_texture_set_target_hands_over_a_replacement() -> None:
                 ) as replacement:
                     replacement_descriptor = replacement.descriptor()
                     session.set_vulkan_borrowed_texture_target(replacement_descriptor)
+                    map_handle.resize(48, 24, 1.0)
+                    runtime.barrier()
 
                     # The session kept its renderer and renders at the
-                    # extent it was handed, once the map catches up.
+                    # extent it was handed, once the map has caught up.
                     render_until(
                         runtime,
                         session,

@@ -169,6 +169,19 @@ internal static class MapStructs
         return native;
     }
 
+    internal static mln_camera_update ToNative(CameraUpdate update)
+    {
+        ArgumentNullException.ThrowIfNull(update);
+        var native = NativeMethods.mln_camera_update_default();
+        native.mode = (uint)update.Mode;
+        native.camera = ToNative(update.Camera);
+        native.animation = ToNative(update.Animation);
+        native.gesture_phase = (uint)update.GesturePhase;
+        native.gesture_id = update.GestureId;
+        native.animation_id = update.AnimationId;
+        return native;
+    }
+
     internal static CameraOptions CameraOptionsFromNative(mln_camera_options native)
     {
         var options = new CameraOptions();

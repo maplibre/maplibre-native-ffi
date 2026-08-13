@@ -1,8 +1,8 @@
 //! Safe Rust binding for the MapLibre Native C API.
 //!
-//! This crate owns Rust-specific ergonomics and safety policy: thread-affine
-//! public handles, parent retention, owner-thread `Drop`, Rust errors,
-//! callback closure APIs, and lifetime-scoped render resources. Shared C ABI
+//! Runtime and map control handles are any-thread; graphics sessions retain
+//! their backend thread affinity. This crate also owns parent retention, Rust
+//! errors, callback closures, and render-resource lifetimes. Shared C ABI
 //! adaptation lives in `maplibre-native-ffi-core`.
 
 #![deny(unsafe_op_in_unsafe_fn)]
@@ -26,21 +26,24 @@ use maplibre_native_ffi_sys as sys;
 
 pub use camera::{
     AnimationOptions, BoundOptions, BoundsConstraint, CameraFitOptions, CameraOptions,
-    FreeCameraOptions, ProjectionMode,
+    CameraSnapshot, CameraUpdate, CameraUpdateMode, FreeCameraOptions, GesturePhase,
+    ProjectionMode,
 };
 pub use custom_geometry::{CanonicalTileId, CustomGeometrySourceOptions};
 pub use events::{
-    CameraTransitionFinishedEvent, MapId, OfflineRegionResponseErrorEvent, OfflineRegionStatus,
-    OfflineRegionStatusEvent, OfflineRegionTileCountLimitEvent, RenderFrameEvent, RenderMapEvent,
-    RenderingStats, RuntimeEvent, RuntimeEventBatch, RuntimeEventPayload, RuntimeEventRef,
-    RuntimeEventSource, TileActionEvent, TileId, UnknownRuntimeEventPayload,
+    CameraTransitionFinishedEvent, CommandDisposition, CommandFinishedEvent, MapId,
+    OfflineRegionResponseErrorEvent, OfflineRegionStatus, OfflineRegionStatusEvent,
+    OfflineRegionTileCountLimitEvent, RenderFrameEvent, RenderMapEvent, RenderingStats,
+    RuntimeEvent, RuntimeEventBatch, RuntimeEventPayload, RuntimeEventRef, RuntimeEventSource,
+    TileActionEvent, TileId, UnknownRuntimeEventPayload,
 };
 pub use logging::{LogRecord, clear_log_callback, set_async_log_severity_mask, set_log_callback};
 pub use map::{
-    GeoJsonSourceOptions, ImageContent, ImageStretch, LocationIndicatorImageKind, MapAttachRef,
-    MapHandle, SourceInfo, SourceType, StyleImage, StyleImageInfo, StyleImageOptions,
-    StyleImageTextFit, StyleLayerVisibility, StyleTransitionOptions, TileJsonInfo, TileScheme,
-    TileSourceOptions, VectorTileEncoding,
+    GeoJsonSourceOptions, ImageContent, ImageStretch, LocationIndicatorImageKind, LogicalExtent,
+    MapHandle, MapSnapshot, SourceInfo, SourceType, StyleImage, StyleImageInfo,
+    StyleImageOperation, StyleImageOptions, StyleImageStretches, StyleImageTextFit,
+    StyleLayerVisibility, StyleSourceInfoOperation, StyleTransitionOptions, TileJsonInfo,
+    TileScheme, TileSourceOptions, VectorTileEncoding,
 };
 pub use maplibre_core::{
     AmbientCacheOperation, CameraChangeMode, ConstrainMode, Error, ErrorKind, LogEvent,
@@ -74,8 +77,8 @@ pub use resource::{
     ResourceRequestHandle, ResourceResponse, ResourceTransformRequest,
 };
 pub use runtime::{
-    OfflineRegionDefinition, OfflineRegionInfo, OperationHandle, RuntimeHandle, RuntimeOptions,
-    WakeSource,
+    OfflineRegionDefinition, OfflineRegionInfo, OperationHandle, ReadyEndpoint, ReadyEndpointKind,
+    RuntimeHandle, RuntimeOptions,
 };
 pub use values::{
     EdgeInsets, LatLng, LatLngBounds, ProjectedMeters, Quaternion, ScreenBox, ScreenPoint,
@@ -211,16 +214,13 @@ mod tests {
 
     use super::*;
 
-    assert_not_impl_any!(RuntimeHandle: Send, Sync);
-    assert_not_impl_any!(MapHandle: Send, Sync);
-    assert_not_impl_any!(MapProjectionHandle: Send, Sync);
+    assert_impl_all!(RuntimeHandle: Send, Sync);
+    assert_impl_all!(MapHandle: Send, Sync);
+    assert_impl_all!(MapProjectionHandle: Send, Sync);
     assert_not_impl_any!(NativePointer: Send, Sync);
     assert_not_impl_any!(FrameNativePointer<'static>: Send, Sync);
     assert_not_impl_any!(RenderSessionHandle: Send, Sync);
     assert_not_impl_any!(DetachedRenderSessionHandle: Send, Sync);
-    // The one map value that crosses threads: a copied handle id that lets a
-    // render thread name a map owned elsewhere.
-    assert_impl_all!(MapAttachRef: Send, Sync);
 
     #[test]
     // Spec coverage: BND-103.

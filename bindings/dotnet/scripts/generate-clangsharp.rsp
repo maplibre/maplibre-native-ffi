@@ -20,7 +20,6 @@ mln_runtime=MlnRuntime
 mln_map=MlnMap
 mln_map_projection=MlnMapProjection
 mln_render_session=MlnRenderSession
-mln_wake_source=MlnWakeSource
 mln_operation=MlnOperation
 mln_notification_source=MlnNotificationSource
 mln_event_batch=MlnEventBatch

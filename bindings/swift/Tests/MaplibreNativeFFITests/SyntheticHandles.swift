@@ -24,10 +24,6 @@ enum SyntheticHandles {
     NativeRenderSessionHandle(raw: kind(0x04) | ordinal)
   }
 
-  static func wakeSource(_ ordinal: UInt64 = 1) -> NativeWakeSourceHandle {
-    NativeWakeSourceHandle(raw: kind(0x0B) | ordinal)
-  }
-
   static func resourceRequest(_ ordinal: UInt64 = 1)
     -> NativeResourceRequestHandle
   {

@@ -102,6 +102,8 @@ kotlin {
   }
 
   sourceSets {
+    commonMain.dependencies { implementation(libs.coroutines) }
+
     androidMain { dependencies { implementation(libs.javacpp) } }
 
     named("androidDeviceTest") {

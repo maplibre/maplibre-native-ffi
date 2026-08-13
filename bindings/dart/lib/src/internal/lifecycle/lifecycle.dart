@@ -1,5 +1,4 @@
 import 'dart:ffi';
-import 'dart:isolate';
 
 import 'package:ffi/ffi.dart';
 
@@ -12,9 +11,6 @@ final NativeFinalizer _leakReporter = NativeFinalizer(
 );
 
 const _createLeakToken = raw.mln_adapter_handle_leak_token_create;
-
-/// Opaque token for the calling native thread, stable for its life.
-const _threadToken = raw.mln_thread_token;
 
 const _destroyLeakToken = raw.mln_adapter_handle_leak_token_destroy;
 
@@ -53,14 +49,7 @@ final class NativeLeakReporter {
 /// Close-once state for an owned native handle.
 final class NativeHandleState<H extends NativeHandle> implements Finalizable {
   /// Creates state for a live native handle.
-  NativeHandleState(
-    this._handle,
-    this.typeName, {
-    int? ownerIsolateHash,
-    int? ownerThreadToken,
-    bool leakReporting = true,
-  }) : _ownerIsolateHash = ownerIsolateHash ?? Isolate.current.hashCode,
-       _ownerThreadToken = ownerThreadToken ?? _threadToken() {
+  NativeHandleState(this._handle, this.typeName, {bool leakReporting = true}) {
     if (_handle.isNull) {
       throwInvalidArgument('$typeName handle must not be the null handle');
     }
@@ -71,12 +60,7 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
 
   final H _handle;
   bool _closed = false;
-  final int _ownerIsolateHash;
-
-  /// The native thread this handle was created on. The C API keys its
-  /// owner-thread checks on that thread, not on the isolate, and the Dart VM
-  /// moves an isolate between threads when it resumes from awaited I/O.
-  final int _ownerThreadToken;
+  Future<void>? _closeFuture;
   final Object _finalizerDetachToken = Object();
   Pointer<Void>? _leakToken;
 
@@ -86,12 +70,11 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
   /// Whether this binding object has released its native handle.
   bool get isClosed => _closed;
 
-  /// The issued handle id without owner-isolate validation.
+  /// The issued handle ID.
   int get handleId => _handle.raw;
 
   /// Returns the live handle, or throws when it is closed.
   H get handle {
-    _checkOwnerIsolate();
     if (_closed) {
       throwInvalidArgument('$typeName is closed');
     }
@@ -100,7 +83,6 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
 
   /// Releases the native handle with [destroy] exactly once after success.
   void close(int Function(H) destroy, String Function() diagnostic) {
-    _checkOwnerIsolate();
     if (_closed) {
       return;
     }
@@ -111,20 +93,28 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
     _detachLeakReporter();
   }
 
-  void _checkOwnerIsolate() {
-    if (Isolate.current.hashCode != _ownerIsolateHash) {
-      throwWrongThread('$typeName belongs to a different Dart isolate');
+  /// Releases the native handle asynchronously exactly once after success.
+  Future<void> closeAsync(Future<void> Function(H) close) {
+    if (_closed) {
+      return Future.value();
     }
-    if (_threadToken() != _ownerThreadToken) {
-      // Same isolate, different native thread: every native call on this
-      // handle would now fail, including close, which leaks it permanently.
-      throwWrongThread(
-        '$typeName is owned by a native thread its isolate has since left. '
-        'The Dart VM moves an isolate between native threads when it resumes '
-        'from awaited I/O, so do not await I/O on an isolate that holds a '
-        'runtime, map, projection, or render session. See '
-        'https://github.com/maplibre/maplibre-native-ffi/issues/412',
-      );
+    final pending = _closeFuture;
+    if (pending != null) {
+      return pending;
+    }
+    final future = _runClose(close);
+    _closeFuture = future;
+    return future;
+  }
+
+  Future<void> _runClose(Future<void> Function(H) close) async {
+    try {
+      await close(_handle);
+      _closed = true;
+      _detachLeakReporter();
+    } catch (_) {
+      _closeFuture = null;
+      rethrow;
     }
   }
 

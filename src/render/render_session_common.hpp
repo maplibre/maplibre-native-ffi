@@ -269,13 +269,10 @@ class RenderSessionScheduler final : public mbgl::Scheduler {
 };
 
 // Gives the calling thread a current mbgl scheduler for the duration of a
-// session call, but only when it does not already have one. A session sharing
-// its owner thread with the runtime keeps the runtime's run loop, which the
-// host pumps more often than it renders.
+// session call, but only when it does not already have one.
 //
-// GetCurrent(false) is required: the default would create a thread_local
-// RunLoop on a bare render thread, which permanently disqualifies that thread
-// from mln_runtime_create().
+// GetCurrent(false) is required: the default would create a thread-local
+// RunLoop whose lifetime and task queue are not owned by the render session.
 class ScopedCurrentScheduler {
  public:
   explicit ScopedCurrentScheduler(mbgl::Scheduler& scheduler)

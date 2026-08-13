@@ -5,16 +5,16 @@
 #include <stdbool.h>
 #include <string.h>
 
-// Pumps until the operation completes, then returns its terminal status.
+// Waits for the operation, then returns its terminal status.
 static mln_status await_operation(
   mln_runtime runtime, mln_operation operation
 ) {
+  (void)runtime;
   bool completed = false;
-  while (!completed) {
-    mln_runtime_pump(runtime, 100);
-    if (mln_operation_poll(operation, &completed) != MLN_STATUS_OK) {
-      return MLN_STATUS_NATIVE_ERROR;
-    }
+  if (
+    mln_operation_wait(operation, -1, &completed) != MLN_STATUS_OK || !completed
+  ) {
+    return MLN_STATUS_NATIVE_ERROR;
   }
 
   mln_status status = MLN_STATUS_NATIVE_ERROR;

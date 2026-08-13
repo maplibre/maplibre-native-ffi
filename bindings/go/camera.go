@@ -255,6 +255,50 @@ func cAnimationOptionsPointer(options *AnimationOptions) (C.mln_animation_option
 	return raw, &raw
 }
 
+// CameraUpdateMode selects how an atomic camera update reaches its target.
+type CameraUpdateMode uint32
+
+const (
+	CameraUpdateModeJump CameraUpdateMode = CameraUpdateMode(C.MLN_CAMERA_UPDATE_MODE_JUMP)
+	CameraUpdateModeEase CameraUpdateMode = CameraUpdateMode(C.MLN_CAMERA_UPDATE_MODE_EASE)
+	CameraUpdateModeFly  CameraUpdateMode = CameraUpdateMode(C.MLN_CAMERA_UPDATE_MODE_FLY)
+)
+
+// GesturePhase marks a gesture boundary carried with an atomic camera update.
+type GesturePhase uint32
+
+const (
+	GesturePhaseNone   GesturePhase = GesturePhase(C.MLN_GESTURE_PHASE_NONE)
+	GesturePhaseBegin  GesturePhase = GesturePhase(C.MLN_GESTURE_PHASE_BEGIN)
+	GesturePhaseUpdate GesturePhase = GesturePhase(C.MLN_GESTURE_PHASE_UPDATE)
+	GesturePhaseEnd    GesturePhase = GesturePhase(C.MLN_GESTURE_PHASE_END)
+	GesturePhaseCancel GesturePhase = GesturePhase(C.MLN_GESTURE_PHASE_CANCEL)
+)
+
+// CameraUpdate is one atomic camera command. GestureID and AnimationID are
+// caller-defined correlation values.
+type CameraUpdate struct {
+	Mode         CameraUpdateMode
+	Camera       CameraOptions
+	Animation    *AnimationOptions
+	GesturePhase GesturePhase
+	GestureID    uint64
+	AnimationID  uint64
+}
+
+func cCameraUpdate(update CameraUpdate) C.mln_camera_update {
+	raw := C.mln_camera_update_default()
+	raw.mode = C.uint32_t(update.Mode)
+	raw.camera = cCameraOptions(update.Camera)
+	if update.Animation != nil {
+		raw.animation = cAnimationOptions(*update.Animation)
+	}
+	raw.gesture_phase = C.uint32_t(update.GesturePhase)
+	raw.gesture_id = C.uint64_t(update.GestureID)
+	raw.animation_id = C.uint64_t(update.AnimationID)
+	return raw
+}
+
 // CameraFitOptions configures camera fitting queries.
 type CameraFitOptions struct {
 	Padding *EdgeInsets

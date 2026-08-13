@@ -29,30 +29,96 @@ enum NativeStyle {
     return Data(bytes[0 ..< size])
   }
 
-  static func removeSource(_ map: NativeMapHandle,
-                           sourceId: mln_buffer_view) throws -> Bool
-  {
+  static func mapReadStart(
+    _ map: NativeMapHandle,
+    start: (mln_map, UnsafeMutablePointer<mln_operation>) -> mln_status
+  ) throws -> NativeOperationHandle {
+    try self.start { try checkStatus(start(map.raw, $0)) }
+  }
+
+  static func mapDataTakeResult(
+    _ operation: NativeOperationHandle,
+    take: (mln_operation, UnsafeMutablePointer<mln_buffer>) -> mln_status
+  ) throws -> Data {
+    try bufferTakeResult(operation, take: take) ?? Data()
+  }
+
+  static func mapTextTakeResult(
+    _ operation: NativeOperationHandle,
+    take: (mln_operation, UnsafeMutablePointer<mln_buffer>) -> mln_status
+  ) throws -> String {
+    try bufferStringTakeResult(operation, take: take)
+  }
+
+  private static func start(
+    _ body: (UnsafeMutablePointer<mln_operation>) throws -> Void
+  ) throws -> NativeOperationHandle {
+    let raw = try NativeMemory.withTemporary(mln_operation(0)) { operation in
+      try body(operation)
+    }.value
+    return NativeOperationHandle(raw: raw)
+  }
+
+  static func removeSourceStart(
+    _ map: NativeMapHandle,
+    sourceId: mln_buffer_view
+  ) throws -> NativeOperationHandle {
+    try start {
+      try checkStatus(mln_map_remove_style_source_start(map.raw, sourceId, $0))
+    }
+  }
+
+  static func removeSourceTakeResult(
+    _ operation: NativeOperationHandle
+  ) throws -> Bool {
     try NativeMemory.withTemporary(false) { removed in
-      try checkStatus(mln_map_remove_style_source(map.raw, sourceId, removed))
+      try checkStatus(mln_map_remove_style_source_take_result(
+        operation.raw,
+        removed
+      ))
     }.value
   }
 
-  static func sourceExists(_ map: NativeMapHandle,
-                           sourceId: mln_buffer_view) throws -> Bool
-  {
+  static func sourceExistsStart(
+    _ map: NativeMapHandle,
+    sourceId: mln_buffer_view
+  ) throws -> NativeOperationHandle {
+    try start {
+      try checkStatus(mln_map_style_source_exists_start(map.raw, sourceId, $0))
+    }
+  }
+
+  static func sourceExistsTakeResult(
+    _ operation: NativeOperationHandle
+  ) throws -> Bool {
     try NativeMemory.withTemporary(false) { exists in
-      try checkStatus(mln_map_style_source_exists(map.raw, sourceId, exists))
+      try checkStatus(mln_map_style_source_exists_take_result(
+        operation.raw,
+        exists
+      ))
     }.value
   }
 
-  static func sourceType(_ map: NativeMapHandle,
-                         sourceId: mln_buffer_view) throws -> UInt32?
-  {
-    var type = UInt32(0)
-    let found = try NativeMemory.withTemporary(false) { found in
-      try checkStatus(mln_map_get_style_source_type(
+  static func sourceTypeStart(
+    _ map: NativeMapHandle,
+    sourceId: mln_buffer_view
+  ) throws -> NativeOperationHandle {
+    try start {
+      try checkStatus(mln_map_get_style_source_type_start(
         map.raw,
         sourceId,
+        $0
+      ))
+    }
+  }
+
+  static func sourceTypeTakeResult(
+    _ operation: NativeOperationHandle
+  ) throws -> UInt32? {
+    var type = UInt32(0)
+    let found = try NativeMemory.withTemporary(false) { found in
+      try checkStatus(mln_map_get_style_source_type_take_result(
+        operation.raw,
         &type,
         found
       ))
@@ -60,195 +126,125 @@ enum NativeStyle {
     return found ? type : nil
   }
 
-  static func sourceInfo(_ map: NativeMapHandle,
-                         sourceId: mln_buffer_view) throws
-    -> NativeStyleSourceInfo?
-  {
+  static func sourceInfoStart(
+    _ map: NativeMapHandle,
+    sourceId: mln_buffer_view
+  ) throws -> NativeOperationHandle {
+    try start {
+      try checkStatus(mln_map_get_style_source_info_start(
+        map.raw,
+        sourceId,
+        $0
+      ))
+    }
+  }
+
+  static func sourceInfoTakeResult(
+    _ operation: NativeOperationHandle
+  ) throws -> mln_style_source_info? {
     var info = mln_style_source_info()
     info.size = UInt32(MemoryLayout<mln_style_source_info>.size)
     let found = try NativeMemory.withTemporary(false) { found in
-      try checkStatus(mln_map_get_style_source_info(
-        map.raw,
-        sourceId,
+      try checkStatus(mln_map_get_style_source_info_take_result(
+        operation.raw,
         &info,
         found
       ))
     }.value
-    guard found else { return nil }
-
-    let attribution = info.has_attribution
-      ? try copySourceAttribution(
-        map,
-        sourceId: sourceId,
-        capacity: info.attribution_size
-      ).0
-      : nil
-    let url = hasSourceInfoField(info, MLN_STYLE_SOURCE_INFO_URL.rawValue)
-      ? try copySourceURL(map, sourceId: sourceId, capacity: info.url_size).0
-      : nil
-    let tileJSON: NativeStyleSourceTileJSON?
-    if hasSourceInfoField(info, MLN_STYLE_SOURCE_INFO_TILEJSON.rawValue) {
-      let tileURLs = try sourceTileURLs(map, sourceId: sourceId) ?? []
-      tileJSON = NativeStyleSourceTileJSON(
-        tileURLs: tileURLs,
-        minZoom: info.min_zoom,
-        maxZoom: info.max_zoom,
-        scheme: info.scheme,
-        bounds: hasSourceInfoField(info, MLN_STYLE_SOURCE_INFO_BOUNDS.rawValue)
-          ? NativeLatLngBounds(info.bounds)
-          : nil
-      )
-    } else {
-      tileJSON = nil
-    }
-
-    return NativeStyleSourceInfo(
-      type: info.type,
-      isVolatile: info.is_volatile,
-      attribution: attribution,
-      url: url,
-      tileJSON: tileJSON,
-      tileSize: hasSourceInfoField(
-        info,
-        MLN_STYLE_SOURCE_INFO_TILE_SIZE.rawValue
-      ) ? info.tile_size : nil,
-      vectorEncoding: hasSourceInfoField(
-        info,
-        MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING.rawValue
-      ) ? info.vector_encoding : nil,
-      rasterEncoding: hasSourceInfoField(
-        info,
-        MLN_STYLE_SOURCE_INFO_RASTER_ENCODING.rawValue
-      ) ? info.raster_encoding : nil
-    )
+    return found ? info : nil
   }
 
-  static func sourceAttribution(
+  static func sourceAttributionStart(
     _ map: NativeMapHandle,
     sourceId: mln_buffer_view
+  ) throws -> NativeOperationHandle {
+    try start {
+      try checkStatus(mln_map_copy_style_source_attribution_start(
+        map.raw,
+        sourceId,
+        $0
+      ))
+    }
+  }
+
+  static func sourceAttributionTakeResult(
+    _ operation: NativeOperationHandle
   ) throws -> String? {
-    var info = mln_style_source_info()
-    info.size = UInt32(MemoryLayout<mln_style_source_info>.size)
-    let found = try NativeMemory.withTemporary(false) { found in
-      try checkStatus(mln_map_get_style_source_info(
-        map.raw,
-        sourceId,
-        &info,
-        found
-      ))
-    }.value
-    guard found, info.has_attribution else { return nil }
-    return try copySourceAttribution(
-      map,
-      sourceId: sourceId,
-      capacity: info.attribution_size
-    ).0
-  }
-
-  private static func hasSourceInfoField(
-    _ info: mln_style_source_info,
-    _ field: UInt32
-  ) -> Bool {
-    (info.fields & field) != 0
-  }
-
-  static func copySourceAttribution(
-    _ map: NativeMapHandle,
-    sourceId: mln_buffer_view,
-    capacity: Int
-  ) throws -> (String?, Int) {
-    var bytes = [UInt8](repeating: 0, count: capacity)
     var found = false
-    let size = try bytes.withUnsafeMutableBufferPointer { buffer in
-      try NativeMemory.withTemporary(0) { outSize in
-        try NativeMemory.withTemporary(false) { outFound in
-          try checkStatus(mln_map_copy_style_source_attribution(
-            map.raw,
-            sourceId,
-            buffer.baseAddress,
-            capacity,
-            outSize,
-            outFound
-          ))
-          found = outFound.pointee
-        }
-      }.value
-    }
-    guard found else { return (nil, size) }
-    guard size <= capacity else {
-      throw NativeStatusFailure(
-        rawStatus: MLN_STATUS_NATIVE_ERROR.rawValue,
-        diagnostic: "native style source attribution size exceeded caller buffer"
-      )
-    }
-    let attribution = try bytes.withUnsafeBufferPointer { buffer in
-      try NativeString.copyUTF8(
-        data: buffer.baseAddress.map(UnsafeRawPointer.init),
-        size: size
-      )
-    }
-    return (attribution, size)
-  }
-
-  static func copySourceURL(
-    _ map: NativeMapHandle,
-    sourceId: mln_buffer_view,
-    capacity: Int
-  ) throws -> (String?, Int) {
-    var bytes = [UInt8](repeating: 0, count: capacity)
-    var found = false
-    let size = try bytes.withUnsafeMutableBufferPointer { buffer in
-      try NativeMemory.withTemporary(0) { outSize in
-        try NativeMemory.withTemporary(false) { outFound in
-          try checkStatus(mln_map_copy_style_source_url(
-            map.raw,
-            sourceId,
-            buffer.baseAddress,
-            capacity,
-            outSize,
-            outFound
-          ))
-          found = outFound.pointee
-        }
-      }.value
-    }
-    guard found else { return (nil, size) }
-    guard size <= capacity else {
-      throw NativeStatusFailure(
-        rawStatus: MLN_STATUS_NATIVE_ERROR.rawValue,
-        diagnostic: "native style source URL size exceeded caller buffer"
-      )
-    }
-    let url = try bytes.withUnsafeBufferPointer { buffer in
-      try NativeString.copyUTF8(
-        data: buffer.baseAddress.map(UnsafeRawPointer.init),
-        size: size
-      )
-    }
-    return (url, size)
-  }
-
-  static func sourceTileURLs(
-    _ map: NativeMapHandle,
-    sourceId: mln_buffer_view
-  ) throws -> [String]? {
-    var found = false
-    let listValue = try NativeMemory.withTemporary(UInt64(0)) { outHandle in
+    let raw = try NativeMemory.withTemporary(mln_buffer(0)) { buffer in
       try NativeMemory.withTemporary(false) { outFound in
-        try checkStatus(mln_map_get_style_source_tile_urls(
-          map.raw,
-          sourceId,
-          outHandle,
+        try checkStatus(mln_map_copy_style_source_attribution_take_result(
+          operation.raw,
+          buffer,
           outFound
         ))
         found = outFound.pointee
       }
     }.value
     guard found else { return nil }
-    let list = NativeStyleStringListHandle(raw: listValue)
-    guard !list.isNull else {
-      throw NativeStatusFailure.swiftNativeError("tile URL list was null")
+    return try copyBufferString(NativeBufferHandle(raw: raw))
+  }
+
+  static func sourceURLStart(
+    _ map: NativeMapHandle,
+    sourceId: mln_buffer_view
+  ) throws -> NativeOperationHandle {
+    try start {
+      try checkStatus(mln_map_copy_style_source_url_start(
+        map.raw,
+        sourceId,
+        $0
+      ))
     }
+  }
+
+  static func sourceURLTakeResult(
+    _ operation: NativeOperationHandle
+  ) throws -> String? {
+    var found = false
+    let raw = try NativeMemory.withTemporary(mln_buffer(0)) { buffer in
+      try NativeMemory.withTemporary(false) { outFound in
+        try checkStatus(mln_map_copy_style_source_url_take_result(
+          operation.raw,
+          buffer,
+          outFound
+        ))
+        found = outFound.pointee
+      }
+    }.value
+    guard found else { return nil }
+    return try copyBufferString(NativeBufferHandle(raw: raw))
+  }
+
+  static func sourceTileURLsStart(
+    _ map: NativeMapHandle,
+    sourceId: mln_buffer_view
+  ) throws -> NativeOperationHandle {
+    try start {
+      try checkStatus(mln_map_get_style_source_tile_urls_start(
+        map.raw,
+        sourceId,
+        $0
+      ))
+    }
+  }
+
+  static func sourceTileURLsTakeResult(
+    _ operation: NativeOperationHandle
+  ) throws -> [String]? {
+    var found = false
+    let raw = try NativeMemory.withTemporary(mln_style_string_list(0)) { list in
+      try NativeMemory.withTemporary(false) { outFound in
+        try checkStatus(mln_map_get_style_source_tile_urls_take_result(
+          operation.raw,
+          list,
+          outFound
+        ))
+        found = outFound.pointee
+      }
+    }.value
+    guard found else { return nil }
+    let list = NativeStyleStringListHandle(raw: raw)
     defer { mln_style_string_list_destroy(list.raw) }
     let count = try NativeMemory.withTemporary(0) { count in
       try checkStatus(mln_style_string_list_count(list.raw, count))
@@ -256,175 +252,173 @@ enum NativeStyle {
     return try (0 ..< count).map { index in
       let output = try NativeMemory.withTemporary(mln_buffer_view()) { value in
         try checkStatus(mln_style_string_list_get(list.raw, index, value))
-      }
-      return try NativeString.copyUTF8(
-        data: output.value.data,
-        size: output.value.size
-      )
+      }.value
+      return try NativeString.copyUTF8(data: output.data, size: output.size)
     }
   }
 
-  static func sourceIds(_ map: NativeMapHandle) throws -> [String] {
-    let listValue = try NativeMemory.withTemporary(UInt64(0)) { outHandle in
-      try checkStatus(mln_map_list_style_source_ids(map.raw, outHandle))
-    }.value
-    let list = NativeStyleIdListHandle(raw: listValue)
-    guard !list.isNull
-    else {
-      throw NativeStatusFailure.swiftNativeError("source ID list was null")
+  static func sourceIdsStart(
+    _ map: NativeMapHandle
+  ) throws -> NativeOperationHandle {
+    try start {
+      try checkStatus(mln_map_list_style_source_ids_start(map.raw, $0))
     }
+  }
+
+  static func sourceIdsTakeResult(
+    _ operation: NativeOperationHandle
+  ) throws -> [String] {
+    let raw = try NativeMemory.withTemporary(mln_style_id_list(0)) { list in
+      try checkStatus(mln_map_list_style_source_ids_take_result(
+        operation.raw,
+        list
+      ))
+    }.value
+    let list = NativeStyleIdListHandle(raw: raw)
     defer { mln_style_id_list_destroy(list.raw) }
     return try copyStyleIdList(list)
   }
 
-  static func removeImage(_ map: NativeMapHandle,
-                          imageId: mln_buffer_view) throws -> Bool
-  {
-    try NativeMemory.withTemporary(false) { removed in
-      try checkStatus(mln_map_remove_style_image(map.raw, imageId, removed))
+  private static func copyBufferString(
+    _ buffer: NativeBufferHandle
+  ) throws -> String {
+    let data = try NativeMemory.copyBuffer(buffer)
+    return try data.withUnsafeBytes {
+      try NativeString.copyUTF8(data: $0.baseAddress, size: $0.count)
+    }
+  }
+
+  static func imageOperationStart(
+    _ map: NativeMapHandle,
+    imageId: mln_buffer_view,
+    start: (mln_map, mln_buffer_view, UnsafeMutablePointer<mln_operation>)
+      -> mln_status
+  ) throws -> NativeOperationHandle {
+    try self.start { try checkStatus(start(map.raw, imageId, $0)) }
+  }
+
+  static func boolTakeResult(
+    _ operation: NativeOperationHandle,
+    take: (mln_operation, UnsafeMutablePointer<Bool>) -> mln_status
+  ) throws -> Bool {
+    try NativeMemory.withTemporary(false) {
+      try checkStatus(take(operation.raw, $0))
     }.value
   }
 
   static func setTransitionOptions(
     _ map: NativeMapHandle,
     options: NativeStyleTransitionOptions
-  ) throws {
+  ) throws -> UInt64 {
     try options.withNativeOptions { native in
-      try checkStatus(mln_map_set_style_transition_options(map.raw, native))
+      try NativeMemory.withTemporary(UInt64(0)) { commandId in
+        try checkStatus(mln_map_set_style_transition_options(
+          map.raw,
+          native,
+          commandId
+        ))
+      }.value
     }
   }
 
-  static func transitionOptions(_ map: NativeMapHandle) throws
-    -> NativeStyleTransitionOptions
-  {
+  static func transitionOptionsStart(
+    _ map: NativeMapHandle
+  ) throws -> NativeOperationHandle {
+    try start {
+      try checkStatus(mln_map_get_style_transition_options_start(map.raw, $0))
+    }
+  }
+
+  static func transitionOptionsTakeResult(
+    _ operation: NativeOperationHandle
+  ) throws -> NativeStyleTransitionOptions {
     var options = mln_style_transition_options_default()
-    try checkStatus(mln_map_get_style_transition_options(map.raw, &options))
+    try checkStatus(mln_map_get_style_transition_options_take_result(
+      operation.raw,
+      &options
+    ))
     return NativeStyleTransitionOptions(options)
   }
 
-  static func imageExists(_ map: NativeMapHandle,
-                          imageId: mln_buffer_view) throws -> Bool
-  {
-    try NativeMemory.withTemporary(false) { exists in
-      try checkStatus(mln_map_style_image_exists(map.raw, imageId, exists))
-    }.value
+  static func sourceInfo(
+    fixed info: mln_style_source_info,
+    attribution: String?,
+    url: String?,
+    tileURLs: [String]?
+  ) -> NativeStyleSourceInfo {
+    let has: (UInt32) -> Bool = { (info.fields & $0) != 0 }
+    let tileJSON = has(MLN_STYLE_SOURCE_INFO_TILEJSON.rawValue)
+      ? NativeStyleSourceTileJSON(
+        tileURLs: tileURLs ?? [],
+        minZoom: info.min_zoom,
+        maxZoom: info.max_zoom,
+        scheme: info.scheme,
+        bounds: has(MLN_STYLE_SOURCE_INFO_BOUNDS.rawValue)
+          ? NativeLatLngBounds(info.bounds) : nil
+      ) : nil
+    return NativeStyleSourceInfo(
+      type: info.type,
+      isVolatile: info.is_volatile,
+      attribution: attribution,
+      url: url,
+      tileJSON: tileJSON,
+      tileSize: has(MLN_STYLE_SOURCE_INFO_TILE_SIZE.rawValue)
+        ? info.tile_size : nil,
+      vectorEncoding: has(MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING.rawValue)
+        ? info.vector_encoding : nil,
+      rasterEncoding: has(MLN_STYLE_SOURCE_INFO_RASTER_ENCODING.rawValue)
+        ? info.raster_encoding : nil
+    )
   }
 
-  static func imageInfo(_ map: NativeMapHandle,
-                        imageId: mln_buffer_view) throws
-    -> NativeStyleImageInfo?
-  {
+  static func imageInfoTakeResult(
+    _ operation: NativeOperationHandle
+  ) throws -> NativeStyleImageInfo? {
     var info = mln_style_image_info_default()
-    let found = try NativeMemory.withTemporary(false) { found in
-      try checkStatus(mln_map_get_style_image_info(
-        map.raw,
-        imageId,
+    let found = try NativeMemory.withTemporary(false) {
+      try checkStatus(mln_map_get_style_image_info_take_result(
+        operation.raw,
         &info,
-        found
+        $0
       ))
     }.value
     return found ? NativeStyleImageInfo(info) : nil
   }
 
-  static func copyImagePremultipliedRGBA8(
-    _ map: NativeMapHandle,
-    imageId: mln_buffer_view,
-    capacity: Int
-  ) throws -> ([UInt8]?, Int) {
-    var bytes = [UInt8](repeating: 0, count: capacity)
-    var found = false
-    let size = try bytes.withUnsafeMutableBufferPointer { buffer in
-      try NativeMemory.withTemporary(0) { outSize in
-        try NativeMemory.withTemporary(false) { outFound in
-          try checkStatus(mln_map_copy_style_image_premultiplied_rgba8(
-            map.raw,
-            imageId,
-            buffer.baseAddress,
-            capacity,
-            outSize,
-            outFound
-          ))
-          found = outFound.pointee
-        }
+  static func imagePixelsTakeResult(
+    _ operation: NativeOperationHandle
+  ) throws -> [UInt8]? {
+    guard let data = try optionalBufferTakeResult(
+      operation,
+      take: mln_map_copy_style_image_premultiplied_rgba8_take_result
+    ) else { return nil }
+    return Array(data)
+  }
+
+  static func imageSourceCommand(
+    _ coordinates: [NativeLatLng],
+    _ body: (UnsafePointer<mln_lat_lng>?, Int, UnsafeMutablePointer<UInt64>)
+      throws -> Void
+  ) throws -> UInt64 {
+    try validateImageSourceCoordinates(coordinates)
+    let rawCoordinates = coordinates.map(\.native)
+    return try rawCoordinates.withUnsafeBufferPointer { coordinates in
+      try NativeMemory.withTemporary(UInt64(0)) { commandId in
+        try body(coordinates.baseAddress, coordinates.count, commandId)
       }.value
     }
-    guard found else { return (nil, size) }
-    guard size <= capacity else {
-      throw NativeStatusFailure(
-        rawStatus: MLN_STATUS_NATIVE_ERROR.rawValue,
-        diagnostic: "native style image byte size exceeded caller buffer"
-      )
-    }
-    return (Array(bytes.prefix(size)), size)
   }
 
-  static func addImageSourceURL(
-    _ map: NativeMapHandle,
-    sourceId: mln_buffer_view,
-    coordinates: [NativeLatLng],
-    url: mln_buffer_view
-  ) throws {
-    try validateImageSourceCoordinates(coordinates)
-    let rawCoordinates = coordinates.map(\.native)
-    try rawCoordinates.withUnsafeBufferPointer { coordinates in
-      try checkStatus(mln_map_add_image_source_url(
-        map.raw,
-        sourceId,
-        coordinates.baseAddress,
-        coordinates.count,
-        url
-      ))
-    }
-  }
-
-  static func addImageSourceImage(
-    _ map: NativeMapHandle,
-    sourceId: mln_buffer_view,
-    coordinates: [NativeLatLng],
-    image: UnsafePointer<mln_premultiplied_rgba8_image>
-  ) throws {
-    try validateImageSourceCoordinates(coordinates)
-    let rawCoordinates = coordinates.map(\.native)
-    try rawCoordinates.withUnsafeBufferPointer { coordinates in
-      try checkStatus(mln_map_add_image_source_image(
-        map.raw,
-        sourceId,
-        coordinates.baseAddress,
-        coordinates.count,
-        image
-      ))
-    }
-  }
-
-  static func setImageSourceCoordinates(
-    _ map: NativeMapHandle,
-    sourceId: mln_buffer_view,
-    coordinates: [NativeLatLng]
-  ) throws {
-    try validateImageSourceCoordinates(coordinates)
-    let rawCoordinates = coordinates.map(\.native)
-    try rawCoordinates.withUnsafeBufferPointer { coordinates in
-      try checkStatus(mln_map_set_image_source_coordinates(
-        map.raw,
-        sourceId,
-        coordinates.baseAddress,
-        coordinates.count
-      ))
-    }
-  }
-
-  static func imageSourceCoordinates(
-    _ map: NativeMapHandle,
-    sourceId: mln_buffer_view
+  static func imageSourceCoordinatesTakeResult(
+    _ operation: NativeOperationHandle
   ) throws -> [NativeLatLng]? {
     var coordinates = [mln_lat_lng](repeating: mln_lat_lng(), count: 4)
     var found = false
     let count = try coordinates.withUnsafeMutableBufferPointer { coordinates in
       try NativeMemory.withTemporary(0) { count in
         try NativeMemory.withTemporary(false) { outFound in
-          try checkStatus(mln_map_get_image_source_coordinates(
-            map.raw,
-            sourceId,
+          try checkStatus(mln_map_get_image_source_coordinates_take_result(
+            operation.raw,
             coordinates.baseAddress,
             coordinates.count,
             count,
@@ -436,9 +430,8 @@ enum NativeStyle {
     }
     guard found else { return nil }
     guard count == coordinates.count else {
-      throw NativeStatusFailure(
-        rawStatus: MLN_STATUS_NATIVE_ERROR.rawValue,
-        diagnostic: "native image source coordinate count did not match Swift image source invariant"
+      throw NativeStatusFailure.swiftNativeError(
+        "native image source coordinate count did not match Swift image source invariant"
       )
     }
     return coordinates.map(NativeLatLng.init)
@@ -455,156 +448,245 @@ enum NativeStyle {
     }
   }
 
-  static func removeLayer(_ map: NativeMapHandle,
-                          layerId: mln_buffer_view) throws -> Bool
-  {
+  static func removeLayerStart(
+    _ map: NativeMapHandle,
+    layerId: mln_buffer_view
+  ) throws -> NativeOperationHandle {
+    try start {
+      try checkStatus(mln_map_remove_style_layer_start(map.raw, layerId, $0))
+    }
+  }
+
+  static func removeLayerTakeResult(
+    _ operation: NativeOperationHandle
+  ) throws -> Bool {
     try NativeMemory.withTemporary(false) { removed in
-      try checkStatus(mln_map_remove_style_layer(map.raw, layerId, removed))
-    }.value
-  }
-
-  static func layerExists(_ map: NativeMapHandle,
-                          layerId: mln_buffer_view) throws -> Bool
-  {
-    try NativeMemory.withTemporary(false) { exists in
-      try checkStatus(mln_map_style_layer_exists(map.raw, layerId, exists))
-    }.value
-  }
-
-  static func layerType(_ map: NativeMapHandle,
-                        layerId: mln_buffer_view) throws -> String?
-  {
-    var layerType = mln_buffer_view()
-    let found = try NativeMemory.withTemporary(false) { found in
-      try checkStatus(mln_map_get_style_layer_type(
-        map.raw,
-        layerId,
-        &layerType,
-        found
+      try checkStatus(mln_map_remove_style_layer_take_result(
+        operation.raw,
+        removed
       ))
     }.value
-    return found ? try NativeString.copyUTF8(
-      data: layerType.data,
-      size: layerType.size
-    ) : nil
   }
 
-  static func layerIds(_ map: NativeMapHandle) throws -> [String] {
-    let listValue = try NativeMemory.withTemporary(UInt64(0)) { outHandle in
-      try checkStatus(mln_map_list_style_layer_ids(map.raw, outHandle))
-    }.value
-    let list = NativeStyleIdListHandle(raw: listValue)
-    guard !list.isNull
-    else {
-      throw NativeStatusFailure.swiftNativeError("layer ID list was null")
+  static func layerExistsStart(
+    _ map: NativeMapHandle,
+    layerId: mln_buffer_view
+  ) throws -> NativeOperationHandle {
+    try start {
+      try checkStatus(mln_map_style_layer_exists_start(map.raw, layerId, $0))
     }
+  }
+
+  static func layerExistsTakeResult(
+    _ operation: NativeOperationHandle
+  ) throws -> Bool {
+    try NativeMemory.withTemporary(false) { exists in
+      try checkStatus(mln_map_style_layer_exists_take_result(
+        operation.raw,
+        exists
+      ))
+    }.value
+  }
+
+  static func layerTypeStart(
+    _ map: NativeMapHandle,
+    layerId: mln_buffer_view
+  ) throws -> NativeOperationHandle {
+    try start {
+      try checkStatus(mln_map_get_style_layer_type_start(map.raw, layerId, $0))
+    }
+  }
+
+  static func layerTypeTakeResult(
+    _ operation: NativeOperationHandle
+  ) throws -> String? {
+    var found = false
+    let raw = try NativeMemory.withTemporary(mln_buffer(0)) { buffer in
+      try NativeMemory.withTemporary(false) { outFound in
+        try checkStatus(mln_map_get_style_layer_type_take_result(
+          operation.raw,
+          buffer,
+          outFound
+        ))
+        found = outFound.pointee
+      }
+    }.value
+    return found ? try copyBufferString(NativeBufferHandle(raw: raw)) : nil
+  }
+
+  static func layerIdsStart(_ map: NativeMapHandle) throws
+    -> NativeOperationHandle
+  {
+    try start {
+      try checkStatus(mln_map_list_style_layer_ids_start(map.raw, $0))
+    }
+  }
+
+  static func layerIdsTakeResult(
+    _ operation: NativeOperationHandle
+  ) throws -> [String] {
+    let raw = try NativeMemory.withTemporary(mln_style_id_list(0)) { list in
+      try checkStatus(mln_map_list_style_layer_ids_take_result(
+        operation.raw,
+        list
+      ))
+    }.value
+    let list = NativeStyleIdListHandle(raw: raw)
     defer { mln_style_id_list_destroy(list.raw) }
     return try copyStyleIdList(list)
   }
 
-  static func layerJSON(_ map: NativeMapHandle,
-                        layerId: mln_buffer_view) throws -> Data?
-  {
-    let output = try NativeMemory
-      .withTemporary(UInt64(0)) { outHandle in
-        try NativeMemory.withTemporary(false) { found in
-          try checkStatus(mln_map_get_style_layer_json(
-            map.raw,
-            layerId,
-            outHandle,
-            found
-          ))
-          if !found.pointee { outHandle.pointee = 0 }
-        }
-      }.value
-    let buffer = NativeBufferHandle(raw: output)
-    return buffer.isNull ? nil : try NativeMemory.copyBuffer(buffer)
+  static func layerJSONStart(
+    _ map: NativeMapHandle,
+    layerId: mln_buffer_view
+  ) throws -> NativeOperationHandle {
+    try start {
+      try checkStatus(mln_map_get_style_layer_json_start(map.raw, layerId, $0))
+    }
   }
 
-  static func lightProperty(
+  static func lightPropertyStart(
     _ map: NativeMapHandle,
     propertyName: mln_buffer_view
-  ) throws -> Data? {
-    let snapshotValue = try NativeMemory
-      .withTemporary(UInt64(0)) { outHandle in
-        try checkStatus(mln_map_get_style_light_property(
-          map.raw,
-          propertyName,
-          outHandle
-        ))
-      }.value
-    let buffer = NativeBufferHandle(raw: snapshotValue)
-    return buffer.isNull ? nil : try NativeMemory.copyBuffer(buffer)
+  ) throws -> NativeOperationHandle {
+    try start {
+      try checkStatus(mln_map_get_style_light_property_start(
+        map.raw,
+        propertyName,
+        $0
+      ))
+    }
   }
 
-  static func layerProperty(
+  static func layerPropertyStart(
     _ map: NativeMapHandle,
     layerId: mln_buffer_view,
     propertyName: mln_buffer_view
+  ) throws -> NativeOperationHandle {
+    try start {
+      try checkStatus(mln_map_get_layer_property_start(
+        map.raw,
+        layerId,
+        propertyName,
+        $0
+      ))
+    }
+  }
+
+  static func layerFilterStart(
+    _ map: NativeMapHandle,
+    layerId: mln_buffer_view
+  ) throws -> NativeOperationHandle {
+    try start {
+      try checkStatus(mln_map_get_layer_filter_start(map.raw, layerId, $0))
+    }
+  }
+
+  static func bufferTakeResult(
+    _ operation: NativeOperationHandle,
+    take: (mln_operation, UnsafeMutablePointer<mln_buffer>) -> mln_status
   ) throws -> Data? {
-    let snapshotValue = try NativeMemory
-      .withTemporary(UInt64(0)) { outHandle in
-        try checkStatus(mln_map_get_layer_property(
-          map.raw,
-          layerId,
-          propertyName,
-          outHandle
-        ))
-      }.value
-    let buffer = NativeBufferHandle(raw: snapshotValue)
+    let raw = try NativeMemory.withTemporary(mln_buffer(0)) { buffer in
+      try checkStatus(take(operation.raw, buffer))
+    }.value
+    let buffer = NativeBufferHandle(raw: raw)
     return buffer.isNull ? nil : try NativeMemory.copyBuffer(buffer)
   }
 
-  static func layerFilter(_ map: NativeMapHandle,
-                          layerId: mln_buffer_view) throws -> Data?
-  {
-    let snapshotValue = try NativeMemory
-      .withTemporary(UInt64(0)) { outHandle in
-        try checkStatus(mln_map_get_layer_filter(map.raw, layerId, outHandle))
-      }.value
-    let buffer = NativeBufferHandle(raw: snapshotValue)
-    return buffer.isNull ? nil : try NativeMemory.copyBuffer(buffer)
+  static func optionalBufferTakeResult(
+    _ operation: NativeOperationHandle,
+    take: (
+      mln_operation,
+      UnsafeMutablePointer<mln_buffer>,
+      UnsafeMutablePointer<Bool>
+    ) -> mln_status
+  ) throws -> Data? {
+    var found = false
+    let raw = try NativeMemory.withTemporary(mln_buffer(0)) { buffer in
+      try NativeMemory.withTemporary(false) { outFound in
+        try checkStatus(take(operation.raw, buffer, outFound))
+        found = outFound.pointee
+      }
+    }.value
+    guard found else { return nil }
+    return try NativeMemory.copyBuffer(NativeBufferHandle(raw: raw))
+  }
+
+  static func layerTextStart(
+    _ map: NativeMapHandle,
+    layerId: mln_buffer_view,
+    start: (mln_map, mln_buffer_view, UnsafeMutablePointer<mln_operation>)
+      -> mln_status
+  ) throws -> NativeOperationHandle {
+    try self.start { try checkStatus(start(map.raw, layerId, $0)) }
+  }
+
+  static func bufferStringTakeResult(
+    _ operation: NativeOperationHandle,
+    take: (mln_operation, UnsafeMutablePointer<mln_buffer>) -> mln_status
+  ) throws -> String {
+    let raw = try NativeMemory.withTemporary(mln_buffer(0)) { buffer in
+      try checkStatus(take(operation.raw, buffer))
+    }.value
+    return try copyBufferString(NativeBufferHandle(raw: raw))
+  }
+
+  static func doubleTakeResult(
+    _ operation: NativeOperationHandle,
+    take: (mln_operation, UnsafeMutablePointer<Double>) -> mln_status
+  ) throws -> Double {
+    try NativeMemory.withTemporary(0.0) {
+      try checkStatus(take(operation.raw, $0))
+    }.value
+  }
+
+  static func visibilityTakeResult(
+    _ operation: NativeOperationHandle
+  ) throws -> UInt32 {
+    try NativeMemory.withTemporary(UInt32(0)) {
+      try checkStatus(mln_map_get_layer_visibility_take_result(
+        operation.raw,
+        $0
+      ))
+    }.value
   }
 
   /// Probes the required interval counts, then copies. Null arrays with zero
   /// capacity are a size probe the C API answers with OK.
-  static func copyImageStretches(
-    _ map: NativeMapHandle,
-    imageId: mln_buffer_view
+  static func imageStretchesTakeResult(
+    _ operation: NativeOperationHandle
   ) throws -> ([ImageStretch], [ImageStretch])? {
     var xCount = 0
     var yCount = 0
     var found = false
-    try checkStatus(mln_map_copy_style_image_stretches(
-      map.raw, imageId, nil, 0, &xCount, nil, 0, &yCount, &found
+    try checkStatus(mln_map_copy_style_image_stretches_take_result(
+      operation.raw, nil, 0, &xCount, nil, 0, &yCount, &found
     ))
     guard found else { return nil }
-
     var rawX = [mln_image_stretch](
       repeating: mln_image_stretch(from: 0, to: 0), count: xCount
     )
     var rawY = [mln_image_stretch](
       repeating: mln_image_stretch(from: 0, to: 0), count: yCount
     )
-    try rawX.withUnsafeMutableBufferPointer { bufferX in
-      try rawY.withUnsafeMutableBufferPointer { bufferY in
-        try checkStatus(mln_map_copy_style_image_stretches(
-          map.raw,
-          imageId,
-          bufferX.baseAddress,
-          bufferX.count,
+    try rawX.withUnsafeMutableBufferPointer { x in
+      try rawY.withUnsafeMutableBufferPointer { y in
+        try checkStatus(mln_map_copy_style_image_stretches_take_result(
+          operation.raw,
+          x.baseAddress,
+          x.count,
           &xCount,
-          bufferY.baseAddress,
-          bufferY.count,
+          y.baseAddress,
+          y.count,
           &yCount,
           &found
         ))
       }
     }
-    let toPublic = { (raw: [mln_image_stretch]) -> [ImageStretch] in
-      raw.map { ImageStretch(from: $0.from, to: $0.to) }
-    }
-    return (toPublic(rawX), toPublic(rawY))
+    return (
+      rawX.map { ImageStretch(from: $0.from, to: $0.to) },
+      rawY.map { ImageStretch(from: $0.from, to: $0.to) }
+    )
   }
 
   /// Probes the required byte length, then copies. A null buffer with zero

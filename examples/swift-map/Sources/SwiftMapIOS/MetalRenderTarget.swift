@@ -51,13 +51,13 @@ final class MetalRenderTarget {
     self.session = session
   }
 
-  /// Attaches a session against the map the runtime loop published.
+  /// Attaches a session against the map the map task published.
   static func attach(
-    attachRef: MapAttachRef,
+    map: MapHandle,
     graphics: MetalGraphicsContext,
     viewport: Viewport
   ) throws -> MetalRenderTarget {
-    let session = try attachRef.attachMetalSurface(MetalSurfaceDescriptor(
+    let session = try map.attachMetalSurface(MetalSurfaceDescriptor(
       extent: viewport.extent,
       context: graphics.contextDescriptor,
       layer: graphics.layerPointer
@@ -75,8 +75,7 @@ final class MetalRenderTarget {
 
   /// Renders the latest map update, reporting whether a frame was drawn. For a
   /// few iterations after attach or resize the session reports a pending size,
-  /// because the map applies a new logical size on the runtime loop's next
-  /// pump.
+  /// because the map applies a new logical size on the scheduler's next turn.
   func renderUpdate() throws -> Bool {
     try session.renderUpdate() == .rendered
   }

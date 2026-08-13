@@ -510,140 +510,237 @@ public struct CustomGeometrySourceOptions: Sendable {
 }
 
 public extension MapHandle {
-  func addStyleSourceJSON(sourceId: String, sourceJSON: Data) throws {
-    try mapNativeFailure {
+  @discardableResult
+  func addStyleSourceJSON(sourceId: String, sourceJSON: Data) throws -> UInt64 {
+    return try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try checkStatus(mln_map_add_style_source_json(
-        requireLiveHandle().raw,
-        arena.view(sourceId),
-        arena.view(sourceJSON)
-      ))
+      return try NativeMemory.withTemporary(UInt64(0)) { commandId in
+        try checkStatus(mln_map_add_style_source_json(
+          requireLiveHandle().raw,
+          arena.view(sourceId),
+          arena.view(sourceJSON),
+          commandId
+        ))
+      }.value
     }
   }
 
-  @discardableResult func removeStyleSource(_ sourceId: String) throws -> Bool {
-    try mapNativeFailure {
+  func removeStyleSource(_ sourceId: String) async throws -> Bool {
+    let operation = try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      return try NativeStyle.removeSource(
+      return try NativeStyle.removeSourceStart(
         requireLiveHandle(),
         sourceId: arena.view(sourceId)
       )
     }
+    defer { mln_operation_release(operation.raw) }
+    try await runtimeForOperations.waitForOperation(operation)
+    return try mapNativeFailure {
+      try NativeStyle.removeSourceTakeResult(operation)
+    }
   }
 
-  func styleSourceExists(_ sourceId: String) throws -> Bool {
-    try mapNativeFailure {
+  func styleSourceExists(_ sourceId: String) async throws -> Bool {
+    let operation = try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      return try NativeStyle.sourceExists(
+      return try NativeStyle.sourceExistsStart(
         requireLiveHandle(),
         sourceId: arena.view(sourceId)
       )
     }
-  }
-
-  func styleSourceType(_ sourceId: String) throws -> StyleSourceType? {
-    try mapNativeFailure {
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeStyle.sourceType(
-        requireLiveHandle(),
-        sourceId: arena.view(sourceId)
-      ).map(StyleSourceType.init(rawValue:))
+    defer { mln_operation_release(operation.raw) }
+    try await runtimeForOperations.waitForOperation(operation)
+    return try mapNativeFailure {
+      try NativeStyle.sourceExistsTakeResult(operation)
     }
   }
 
-  func styleSourceInfo(_ sourceId: String) throws -> StyleSourceInfo? {
-    try mapNativeFailure {
+  func styleSourceType(_ sourceId: String) async throws -> StyleSourceType? {
+    let operation = try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      return try NativeStyle.sourceInfo(
-        requireLiveHandle(),
-        sourceId: arena.view(sourceId)
-      ).map(StyleSourceInfo.init(native:))
-    }
-  }
-
-  func styleSourceAttribution(_ sourceId: String) throws -> String? {
-    try mapNativeFailure {
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeStyle.sourceAttribution(
+      return try NativeStyle.sourceTypeStart(
         requireLiveHandle(),
         sourceId: arena.view(sourceId)
       )
     }
+    defer { mln_operation_release(operation.raw) }
+    try await runtimeForOperations.waitForOperation(operation)
+    return try mapNativeFailure {
+      try NativeStyle.sourceTypeTakeResult(operation)
+        .map(StyleSourceType.init(rawValue:))
+    }
   }
 
-  func styleSourceIds() throws -> [String] {
-    try mapNativeFailure { try NativeStyle.sourceIds(requireLiveHandle()) }
+  func styleSourceInfo(_ sourceId: String) async throws -> StyleSourceInfo? {
+    let operation = try mapNativeFailure {
+      let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
+      return try NativeStyle.sourceInfoStart(
+        requireLiveHandle(),
+        sourceId: arena.view(sourceId)
+      )
+    }
+    defer { mln_operation_release(operation.raw) }
+    try await runtimeForOperations.waitForOperation(operation)
+    guard let info = try mapNativeFailure({
+      try NativeStyle.sourceInfoTakeResult(operation)
+    }) else { return nil }
+    let attribution = info.has_attribution
+      ? try await styleSourceAttribution(sourceId) : nil
+    let url = (info.fields & MLN_STYLE_SOURCE_INFO_URL.rawValue) != 0
+      ? try await styleSourceURL(sourceId) : nil
+    let tileURLs = (info.fields & MLN_STYLE_SOURCE_INFO_TILEJSON.rawValue) != 0
+      ? try await styleSourceTileURLs(sourceId) : nil
+    return StyleSourceInfo(native: NativeStyle.sourceInfo(
+      fixed: info,
+      attribution: attribution,
+      url: url,
+      tileURLs: tileURLs
+    ))
+  }
+
+  func styleSourceAttribution(_ sourceId: String) async throws -> String? {
+    let operation = try mapNativeFailure {
+      let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
+      return try NativeStyle.sourceAttributionStart(
+        requireLiveHandle(),
+        sourceId: arena.view(sourceId)
+      )
+    }
+    defer { mln_operation_release(operation.raw) }
+    try await runtimeForOperations.waitForOperation(operation)
+    return try mapNativeFailure {
+      try NativeStyle.sourceAttributionTakeResult(operation)
+    }
+  }
+
+  func styleSourceURL(_ sourceId: String) async throws -> String? {
+    let operation = try mapNativeFailure {
+      let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
+      return try NativeStyle.sourceURLStart(
+        requireLiveHandle(),
+        sourceId: arena.view(sourceId)
+      )
+    }
+    defer { mln_operation_release(operation.raw) }
+    try await runtimeForOperations.waitForOperation(operation)
+    return try mapNativeFailure {
+      try NativeStyle.sourceURLTakeResult(operation)
+    }
+  }
+
+  func styleSourceTileURLs(_ sourceId: String) async throws -> [String]? {
+    let operation = try mapNativeFailure {
+      let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
+      return try NativeStyle.sourceTileURLsStart(
+        requireLiveHandle(),
+        sourceId: arena.view(sourceId)
+      )
+    }
+    defer { mln_operation_release(operation.raw) }
+    try await runtimeForOperations.waitForOperation(operation)
+    return try mapNativeFailure {
+      try NativeStyle.sourceTileURLsTakeResult(operation)
+    }
+  }
+
+  func styleSourceIds() async throws -> [String] {
+    let operation = try mapNativeFailure {
+      try NativeStyle.sourceIdsStart(requireLiveHandle())
+    }
+    defer { mln_operation_release(operation.raw) }
+    try await runtimeForOperations.waitForOperation(operation)
+    return try mapNativeFailure {
+      try NativeStyle.sourceIdsTakeResult(operation)
+    }
   }
 
   /// Adds a GeoJSON source that loads data from a URL. `options` is fixed when
   /// the source is created.
+  @discardableResult
   func addGeoJSONSourceURL(
     sourceId: String,
     url: String,
     options: StyleGeoJSONSourceOptions = StyleGeoJSONSourceOptions()
-  ) throws {
-    try mapNativeFailure {
+  ) throws -> UInt64 {
+    return try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try options.nativeOptions.withNativeOptions { options in
-        try checkStatus(mln_map_add_geojson_source_url(
-          requireLiveHandle().raw,
-          arena.view(sourceId),
-          arena.view(url),
-          options
-        ))
+      return try options.nativeOptions.withNativeOptions { options in
+        try NativeMemory.withTemporary(UInt64(0)) { commandId in
+          try checkStatus(mln_map_add_geojson_source_url(
+            requireLiveHandle().raw,
+            arena.view(sourceId),
+            arena.view(url),
+            options,
+            commandId
+          ))
+        }.value
       }
     }
   }
 
   /// Adds a GeoJSON source with inline data. `options` is fixed when the source
   /// is created.
+  @discardableResult
   func addGeoJSONSourceData(
     sourceId: String,
     data: Data,
     options: StyleGeoJSONSourceOptions = StyleGeoJSONSourceOptions()
-  ) throws {
-    try mapNativeFailure {
+  ) throws -> UInt64 {
+    return try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try options.nativeOptions.withNativeOptions { options in
-        try checkStatus(mln_map_add_geojson_source_data(
-          requireLiveHandle().raw,
-          arena.view(sourceId),
-          arena.view(data),
-          options
-        ))
+      return try options.nativeOptions.withNativeOptions { options in
+        try NativeMemory.withTemporary(UInt64(0)) { commandId in
+          try checkStatus(mln_map_add_geojson_source_data(
+            requireLiveHandle().raw,
+            arena.view(sourceId),
+            arena.view(data),
+            options,
+            commandId
+          ))
+        }.value
       }
     }
   }
 
-  func setGeoJSONSourceURL(sourceId: String, url: String) throws {
-    try mapNativeFailure {
+  @discardableResult
+  func setGeoJSONSourceURL(sourceId: String, url: String) throws -> UInt64 {
+    return try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try checkStatus(mln_map_set_geojson_source_url(
-        requireLiveHandle().raw,
-        arena.view(sourceId),
-        arena.view(url)
-      ))
+      return try NativeMemory.withTemporary(UInt64(0)) { commandId in
+        try checkStatus(mln_map_set_geojson_source_url(
+          requireLiveHandle().raw,
+          arena.view(sourceId),
+          arena.view(url),
+          commandId
+        ))
+      }.value
     }
   }
 
-  func setGeoJSONSourceData(sourceId: String, data: Data) throws {
-    try mapNativeFailure {
+  @discardableResult
+  func setGeoJSONSourceData(sourceId: String, data: Data) throws -> UInt64 {
+    return try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try checkStatus(mln_map_set_geojson_source_data(
-        requireLiveHandle().raw,
-        arena.view(sourceId),
-        arena.view(data)
-      ))
+      return try NativeMemory.withTemporary(UInt64(0)) { commandId in
+        try checkStatus(mln_map_set_geojson_source_data(
+          requireLiveHandle().raw,
+          arena.view(sourceId),
+          arena.view(data),
+          commandId
+        ))
+      }.value
     }
   }
 
@@ -655,19 +752,23 @@ public extension MapHandle {
       mln_map,
       mln_buffer_view,
       mln_buffer_view,
-      UnsafePointer<mln_style_tile_source_options>?
+      UnsafePointer<mln_style_tile_source_options>?,
+      UnsafeMutablePointer<UInt64>?
     ) -> mln_status
-  ) throws {
-    try mapNativeFailure {
+  ) throws -> UInt64 {
+    return try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try options.nativeOptions.withNativeOptions { options in
-        try checkStatus(add(
-          requireLiveHandle().raw,
-          arena.view(sourceId),
-          arena.view(url),
-          options
-        ))
+      return try options.nativeOptions.withNativeOptions { options in
+        try NativeMemory.withTemporary(UInt64(0)) { commandId in
+          try checkStatus(add(
+            requireLiveHandle().raw,
+            arena.view(sourceId),
+            arena.view(url),
+            options,
+            commandId
+          ))
+        }.value
       }
     }
   }
@@ -681,32 +782,37 @@ public extension MapHandle {
       mln_buffer_view,
       UnsafePointer<mln_buffer_view>?,
       Int,
-      UnsafePointer<mln_style_tile_source_options>?
+      UnsafePointer<mln_style_tile_source_options>?,
+      UnsafeMutablePointer<UInt64>?
     ) -> mln_status
-  ) throws {
-    try mapNativeFailure {
+  ) throws -> UInt64 {
+    return try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       let tileViews = tiles.map { arena.view($0) }
-      try tileViews.withUnsafeBufferPointer { tiles in
+      return try tileViews.withUnsafeBufferPointer { tiles in
         try options.nativeOptions.withNativeOptions { options in
-          try checkStatus(add(
-            requireLiveHandle().raw,
-            arena.view(sourceId),
-            tiles.baseAddress,
-            tiles.count,
-            options
-          ))
+          try NativeMemory.withTemporary(UInt64(0)) { commandId in
+            try checkStatus(add(
+              requireLiveHandle().raw,
+              arena.view(sourceId),
+              tiles.baseAddress,
+              tiles.count,
+              options,
+              commandId
+            ))
+          }.value
         }
       }
     }
   }
 
+  @discardableResult
   func addVectorSourceURL(
     sourceId: String,
     url: String,
     options: StyleTileSourceOptions = StyleTileSourceOptions()
-  ) throws {
+  ) throws -> UInt64 {
     try addTiledSourceURL(
       sourceId: sourceId,
       url: url,
@@ -715,11 +821,12 @@ public extension MapHandle {
     )
   }
 
+  @discardableResult
   func addVectorSourceTiles(
     sourceId: String,
     tiles: [String],
     options: StyleTileSourceOptions = StyleTileSourceOptions()
-  ) throws {
+  ) throws -> UInt64 {
     try addTiledSourceTiles(
       sourceId: sourceId,
       tiles: tiles,
@@ -728,11 +835,12 @@ public extension MapHandle {
     )
   }
 
+  @discardableResult
   func addRasterSourceURL(
     sourceId: String,
     url: String,
     options: StyleTileSourceOptions = StyleTileSourceOptions()
-  ) throws {
+  ) throws -> UInt64 {
     try addTiledSourceURL(
       sourceId: sourceId,
       url: url,
@@ -741,11 +849,12 @@ public extension MapHandle {
     )
   }
 
+  @discardableResult
   func addRasterSourceTiles(
     sourceId: String,
     tiles: [String],
     options: StyleTileSourceOptions = StyleTileSourceOptions()
-  ) throws {
+  ) throws -> UInt64 {
     try addTiledSourceTiles(
       sourceId: sourceId,
       tiles: tiles,
@@ -754,11 +863,12 @@ public extension MapHandle {
     )
   }
 
+  @discardableResult
   func addRasterDEMSourceURL(
     sourceId: String,
     url: String,
     options: StyleTileSourceOptions = StyleTileSourceOptions()
-  ) throws {
+  ) throws -> UInt64 {
     try addTiledSourceURL(
       sourceId: sourceId,
       url: url,
@@ -767,11 +877,12 @@ public extension MapHandle {
     )
   }
 
+  @discardableResult
   func addRasterDEMSourceTiles(
     sourceId: String,
     tiles: [String],
     options: StyleTileSourceOptions = StyleTileSourceOptions()
-  ) throws {
+  ) throws -> UInt64 {
     try addTiledSourceTiles(
       sourceId: sourceId,
       tiles: tiles,
@@ -787,10 +898,11 @@ public extension MapHandle {
   /// which is when the source is removed, when a style load drops it, or when
   /// the map is destroyed. The C API then releases them, waiting for any tile
   /// callback still running, so a closure is never entered afterwards.
+  @discardableResult
   func addCustomGeometrySource(
     sourceId: String,
     options: CustomGeometrySourceOptions
-  ) throws {
+  ) throws -> UInt64 {
     let fetchTile: NativeCustomGeometrySourceCallbacks
       .TileCallback = { tileId in
         options.fetchTile(CanonicalTileID(native: tileId))
@@ -806,16 +918,19 @@ public extension MapHandle {
       cancelTile: cancelTile
     )
     do {
-      try mapNativeFailure {
+      return try mapNativeFailure {
         let arena = NativeInputArena()
         defer { withExtendedLifetime(arena) {} }
-        try options.nativeOptions(callbacks: callbacks)
+        return try options.nativeOptions(callbacks: callbacks)
           .withNativeOptions { nativeOptions in
-            try checkStatus(mln_map_add_custom_geometry_source(
-              requireLiveHandle().raw,
-              arena.view(sourceId),
-              nativeOptions
-            ))
+            try NativeMemory.withTemporary(UInt64(0)) { commandId in
+              try checkStatus(mln_map_add_custom_geometry_source(
+                requireLiveHandle().raw,
+                arena.view(sourceId),
+                nativeOptions,
+                commandId
+              ))
+            }.value
           }
       }
     } catch {
@@ -826,451 +941,607 @@ public extension MapHandle {
     }
   }
 
+  @discardableResult
   func setCustomGeometrySourceTileData(
     sourceId: String,
     tileId: CanonicalTileID,
     data: Data
-  ) throws {
-    try mapNativeFailure {
+  ) throws -> UInt64 {
+    return try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try checkStatus(mln_map_set_custom_geometry_source_tile_data(
-        requireLiveHandle().raw,
-        arena.view(sourceId),
-        tileId.nativeTileID.native,
-        arena.view(data)
-      ))
+      return try NativeMemory.withTemporary(UInt64(0)) { commandId in
+        try checkStatus(mln_map_set_custom_geometry_source_tile_data(
+          requireLiveHandle().raw,
+          arena.view(sourceId),
+          tileId.nativeTileID.native,
+          arena.view(data),
+          commandId
+        ))
+      }.value
     }
   }
 
+  @discardableResult
   func invalidateCustomGeometrySourceTile(
     sourceId: String,
     tileId: CanonicalTileID
-  ) throws {
-    try mapNativeFailure {
+  ) throws -> UInt64 {
+    return try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try checkStatus(mln_map_invalidate_custom_geometry_source_tile(
-        requireLiveHandle().raw,
-        arena.view(sourceId),
-        tileId.nativeTileID.native
-      ))
+      return try NativeMemory.withTemporary(UInt64(0)) { commandId in
+        try checkStatus(mln_map_invalidate_custom_geometry_source_tile(
+          requireLiveHandle().raw,
+          arena.view(sourceId),
+          tileId.nativeTileID.native,
+          commandId
+        ))
+      }.value
     }
   }
 
+  @discardableResult
   func invalidateCustomGeometrySourceRegion(
     sourceId: String,
     bounds: LatLngBounds
-  ) throws {
-    try mapNativeFailure {
+  ) throws -> UInt64 {
+    return try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try checkStatus(mln_map_invalidate_custom_geometry_source_region(
-        requireLiveHandle().raw,
-        arena.view(sourceId),
-        bounds.nativeInput.native
-      ))
+      return try NativeMemory.withTemporary(UInt64(0)) { commandId in
+        try checkStatus(mln_map_invalidate_custom_geometry_source_region(
+          requireLiveHandle().raw,
+          arena.view(sourceId),
+          bounds.nativeInput.native,
+          commandId
+        ))
+      }.value
     }
   }
 
+  @discardableResult
   func setStyleImage(
     imageId: String,
     image: StyleRGBA8Image,
     options: StyleImageOptions = StyleImageOptions()
-  ) throws {
-    try mapNativeFailure {
+  ) throws -> UInt64 {
+    return try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try image.nativeImage.withNativeImage { image in
+      return try image.nativeImage.withNativeImage { image in
         try options.nativeOptions.withNativeOptions { options in
-          try checkStatus(mln_map_set_style_image(
-            requireLiveHandle().raw,
-            arena.view(imageId),
-            image,
-            options
-          ))
+          try NativeMemory.withTemporary(UInt64(0)) { commandId in
+            try checkStatus(mln_map_set_style_image(
+              requireLiveHandle().raw,
+              arena.view(imageId),
+              image,
+              options,
+              commandId
+            ))
+          }.value
         }
       }
     }
   }
 
-  @discardableResult func removeStyleImage(_ imageId: String) throws -> Bool {
-    try mapNativeFailure {
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeStyle.removeImage(
-        requireLiveHandle(),
-        imageId: arena.view(imageId)
-      )
-    }
+  func removeStyleImage(_ imageId: String) async throws -> Bool {
+    try await imageBoolOperation(
+      imageId,
+      start: mln_map_remove_style_image_start,
+      take: mln_map_remove_style_image_take_result
+    )
   }
 
-  func styleImageExists(_ imageId: String) throws -> Bool {
-    try mapNativeFailure {
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeStyle.imageExists(
-        requireLiveHandle(),
-        imageId: arena.view(imageId)
-      )
-    }
+  func styleImageExists(_ imageId: String) async throws -> Bool {
+    try await imageBoolOperation(
+      imageId,
+      start: mln_map_style_image_exists_start,
+      take: mln_map_style_image_exists_take_result
+    )
   }
 
-  func styleImageInfo(_ imageId: String) throws -> StyleImageInfo? {
-    try mapNativeFailure {
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeStyle.imageInfo(
-        requireLiveHandle(),
-        imageId: arena.view(imageId)
-      ).map(StyleImageInfo.init(native:))
-    }
+  func styleImageInfo(_ imageId: String) async throws -> StyleImageInfo? {
+    let operation = try imageOperation(
+      imageId,
+      start: mln_map_get_style_image_info_start
+    )
+    defer { mln_operation_release(operation.raw) }
+    try await runtimeForOperations.waitForOperation(operation)
+    return try NativeStyle.imageInfoTakeResult(operation)
+      .map(StyleImageInfo.init(native:))
   }
 
-  /// Copies one runtime style image's stretchable intervals, or nil when no
-  /// image carries `imageId`.
+  func styleImage(_ imageId: String) async throws -> StyleImage? {
+    guard let info = try await styleImageInfo(imageId) else { return nil }
+    let operation = try imageOperation(
+      imageId,
+      start: mln_map_copy_style_image_premultiplied_rgba8_start
+    )
+    defer { mln_operation_release(operation.raw) }
+    try await runtimeForOperations.waitForOperation(operation)
+    guard let pixels = try NativeStyle.imagePixelsTakeResult(operation)
+    else { return nil }
+    return StyleImage(info: info, pixels: pixels)
+  }
+
   func styleImageStretches(
     _ imageId: String
-  ) throws -> (stretchX: [ImageStretch], stretchY: [ImageStretch])? {
+  ) async throws -> (stretchX: [ImageStretch], stretchY: [ImageStretch])? {
+    let operation = try imageOperation(
+      imageId,
+      start: mln_map_copy_style_image_stretches_start
+    )
+    defer { mln_operation_release(operation.raw) }
+    try await runtimeForOperations.waitForOperation(operation)
+    return try NativeStyle.imageStretchesTakeResult(operation)
+  }
+
+  private func imageOperation(
+    _ imageId: String,
+    start: (mln_map, mln_buffer_view, UnsafeMutablePointer<mln_operation>)
+      -> mln_status
+  ) throws -> NativeOperationHandle {
     try mapNativeFailure {
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeStyle.copyImageStretches(
+      let arena = NativeInputArena(); defer { withExtendedLifetime(arena) {} }
+      return try NativeStyle.imageOperationStart(
         requireLiveHandle(),
-        imageId: arena.view(imageId)
+        imageId: arena.view(imageId),
+        start: start
       )
     }
   }
 
-  func styleImage(_ imageId: String) throws -> StyleImage? {
-    try mapNativeFailure {
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      let imageIdView = arena.view(imageId)
-      guard let info = try NativeStyle.imageInfo(
-        requireLiveHandle(),
-        imageId: imageIdView
-      ) else { return nil }
-      guard let pixels = try NativeStyle.copyImagePremultipliedRGBA8(
-        requireLiveHandle(),
-        imageId: imageIdView,
-        capacity: info.byteLength
-      ).0 else { return nil }
-      return StyleImage(info: StyleImageInfo(native: info), pixels: pixels)
-    }
+  private func imageBoolOperation(
+    _ imageId: String,
+    start: (mln_map, mln_buffer_view, UnsafeMutablePointer<mln_operation>)
+      -> mln_status,
+    take: (mln_operation, UnsafeMutablePointer<Bool>) -> mln_status
+  ) async throws -> Bool {
+    let operation = try imageOperation(imageId, start: start)
+    defer { mln_operation_release(operation.raw) }
+    try await runtimeForOperations.waitForOperation(operation)
+    return try NativeStyle.boolTakeResult(operation, take: take)
   }
 
+  @discardableResult
   func addImageSourceURL(
     sourceId: String,
     coordinates: [LatLng],
     url: String
-  ) throws {
-    try mapNativeFailure {
+  ) throws -> UInt64 {
+    return try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try NativeStyle.addImageSourceURL(
-        requireLiveHandle(),
-        sourceId: arena.view(sourceId),
-        coordinates: coordinates.map(\.nativeInput),
-        url: arena.view(url)
-      )
+      return try NativeStyle
+        .imageSourceCommand(coordinates
+          .map(\.nativeInput))
+        { points, count, commandId in
+          try checkStatus(mln_map_add_image_source_url(
+            requireLiveHandle().raw,
+            arena.view(sourceId),
+            points,
+            count,
+            arena.view(url),
+            commandId
+          ))
+        }
     }
   }
 
+  @discardableResult
   func addImageSourceImage(
     sourceId: String,
     coordinates: [LatLng],
     image: StyleRGBA8Image
-  ) throws {
-    try mapNativeFailure {
+  ) throws -> UInt64 {
+    return try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try image.nativeImage.withNativeImage { image in
-        try NativeStyle.addImageSourceImage(
-          requireLiveHandle(),
-          sourceId: arena.view(sourceId),
-          coordinates: coordinates.map(\.nativeInput),
-          image: image
-        )
+      return try image.nativeImage.withNativeImage { image in
+        try NativeStyle
+          .imageSourceCommand(coordinates
+            .map(\.nativeInput))
+          { points, count, commandId in
+            try checkStatus(mln_map_add_image_source_image(
+              requireLiveHandle().raw,
+              arena.view(sourceId),
+              points,
+              count,
+              image,
+              commandId
+            ))
+          }
       }
     }
   }
 
-  func setImageSourceURL(sourceId: String, url: String) throws {
-    try mapNativeFailure {
+  @discardableResult
+  func setImageSourceURL(sourceId: String, url: String) throws -> UInt64 {
+    return try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try checkStatus(mln_map_set_image_source_url(
-        requireLiveHandle().raw,
-        arena.view(sourceId),
-        arena.view(url)
-      ))
-    }
-  }
-
-  func setImageSourceImage(sourceId: String, image: StyleRGBA8Image) throws {
-    try mapNativeFailure {
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      try image.nativeImage.withNativeImage { image in
-        try checkStatus(mln_map_set_image_source_image(
+      return try NativeMemory.withTemporary(UInt64(0)) { commandId in
+        try checkStatus(mln_map_set_image_source_url(
           requireLiveHandle().raw,
           arena.view(sourceId),
-          image
+          arena.view(url),
+          commandId
         ))
+      }.value
+    }
+  }
+
+  @discardableResult
+  func setImageSourceImage(sourceId: String,
+                           image: StyleRGBA8Image) throws -> UInt64
+  {
+    return try mapNativeFailure {
+      let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
+      return try image.nativeImage.withNativeImage { image in
+        try NativeMemory.withTemporary(UInt64(0)) { commandId in
+          try checkStatus(mln_map_set_image_source_image(
+            requireLiveHandle().raw,
+            arena.view(sourceId),
+            image,
+            commandId
+          ))
+        }.value
       }
     }
   }
 
+  @discardableResult
   func setImageSourceCoordinates(
     sourceId: String,
     coordinates: [LatLng]
-  ) throws {
-    try mapNativeFailure {
+  ) throws -> UInt64 {
+    return try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try NativeStyle.setImageSourceCoordinates(
+      return try NativeStyle
+        .imageSourceCommand(coordinates
+          .map(\.nativeInput))
+        { points, count, commandId in
+          try checkStatus(mln_map_set_image_source_coordinates(
+            requireLiveHandle().raw,
+            arena.view(sourceId),
+            points,
+            count,
+            commandId
+          ))
+        }
+    }
+  }
+
+  func imageSourceCoordinates(sourceId: String) async throws -> [LatLng]? {
+    let operation = try mapNativeFailure {
+      let arena = NativeInputArena(); defer { withExtendedLifetime(arena) {} }
+      return try NativeStyle.imageOperationStart(
         requireLiveHandle(),
-        sourceId: arena.view(sourceId),
-        coordinates: coordinates.map(\.nativeInput)
+        imageId: arena.view(sourceId),
+        start: mln_map_get_image_source_coordinates_start
       )
     }
+    defer { mln_operation_release(operation.raw) }
+    try await runtimeForOperations.waitForOperation(operation)
+    return try NativeStyle.imageSourceCoordinatesTakeResult(operation)?
+      .map(LatLng.init(native:))
   }
 
-  func imageSourceCoordinates(sourceId: String) throws -> [LatLng]? {
-    try mapNativeFailure {
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeStyle.imageSourceCoordinates(
-        requireLiveHandle(),
-        sourceId: arena.view(sourceId)
-      )?.map(LatLng.init(native:))
-    }
-  }
-
+  @discardableResult
   func addHillshadeLayer(
     layerId: String,
     sourceId: String,
     beforeLayerId: String? = nil
-  ) throws {
-    try mapNativeFailure {
+  ) throws -> UInt64 {
+    return try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try checkStatus(mln_map_add_hillshade_layer(
-        requireLiveHandle().raw,
-        arena.view(layerId),
-        arena.view(sourceId),
-        arena.view(beforeLayerId ?? "")
-      ))
+      return try NativeMemory.withTemporary(UInt64(0)) { commandId in
+        try checkStatus(mln_map_add_hillshade_layer(
+          requireLiveHandle().raw,
+          arena.view(layerId),
+          arena.view(sourceId),
+          arena.view(beforeLayerId ?? ""),
+          commandId
+        ))
+      }.value
     }
   }
 
+  @discardableResult
   func addColorReliefLayer(
     layerId: String,
     sourceId: String,
     beforeLayerId: String? = nil
-  ) throws {
-    try mapNativeFailure {
+  ) throws -> UInt64 {
+    return try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try checkStatus(mln_map_add_color_relief_layer(
-        requireLiveHandle().raw,
-        arena.view(layerId),
-        arena.view(sourceId),
-        arena.view(beforeLayerId ?? "")
-      ))
+      return try NativeMemory.withTemporary(UInt64(0)) { commandId in
+        try checkStatus(mln_map_add_color_relief_layer(
+          requireLiveHandle().raw,
+          arena.view(layerId),
+          arena.view(sourceId),
+          arena.view(beforeLayerId ?? ""),
+          commandId
+        ))
+      }.value
     }
   }
 
+  @discardableResult
   func addLocationIndicatorLayer(
     layerId: String,
     beforeLayerId: String? = nil
-  ) throws {
-    try mapNativeFailure {
+  ) throws -> UInt64 {
+    return try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try checkStatus(mln_map_add_location_indicator_layer(
-        requireLiveHandle().raw,
-        arena.view(layerId),
-        arena.view(beforeLayerId ?? "")
-      ))
+      return try NativeMemory.withTemporary(UInt64(0)) { commandId in
+        try checkStatus(mln_map_add_location_indicator_layer(
+          requireLiveHandle().raw,
+          arena.view(layerId),
+          arena.view(beforeLayerId ?? ""),
+          commandId
+        ))
+      }.value
     }
   }
 
+  @discardableResult
   func setLocationIndicatorLocation(
     layerId: String,
     coordinate: LatLng,
     altitude: Double
-  ) throws {
-    try mapNativeFailure {
+  ) throws -> UInt64 {
+    return try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try checkStatus(mln_map_set_location_indicator_location(
-        requireLiveHandle().raw,
-        arena.view(layerId),
-        coordinate.nativeInput.native,
-        altitude
-      ))
+      return try NativeMemory.withTemporary(UInt64(0)) { commandId in
+        try checkStatus(mln_map_set_location_indicator_location(
+          requireLiveHandle().raw,
+          arena.view(layerId),
+          coordinate.nativeInput.native,
+          altitude,
+          commandId
+        ))
+      }.value
     }
   }
 
-  func setLocationIndicatorBearing(layerId: String, bearing: Double) throws {
-    try mapNativeFailure {
+  @discardableResult
+  func setLocationIndicatorBearing(layerId: String,
+                                   bearing: Double) throws -> UInt64
+  {
+    return try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try checkStatus(mln_map_set_location_indicator_bearing(
-        requireLiveHandle().raw,
-        arena.view(layerId),
-        bearing
-      ))
+      return try NativeMemory.withTemporary(UInt64(0)) { commandId in
+        try checkStatus(mln_map_set_location_indicator_bearing(
+          requireLiveHandle().raw,
+          arena.view(layerId),
+          bearing,
+          commandId
+        ))
+      }.value
     }
   }
 
+  @discardableResult
   func setLocationIndicatorAccuracyRadius(
     layerId: String,
     radius: Double
-  ) throws {
-    try mapNativeFailure {
+  ) throws -> UInt64 {
+    return try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try checkStatus(mln_map_set_location_indicator_accuracy_radius(
-        requireLiveHandle().raw,
-        arena.view(layerId),
-        radius
-      ))
+      return try NativeMemory.withTemporary(UInt64(0)) { commandId in
+        try checkStatus(mln_map_set_location_indicator_accuracy_radius(
+          requireLiveHandle().raw,
+          arena.view(layerId),
+          radius,
+          commandId
+        ))
+      }.value
     }
   }
 
+  @discardableResult
   func setLocationIndicatorImageName(
     layerId: String,
     kind: LocationIndicatorImageKind,
     imageId: String
-  ) throws {
-    try mapNativeFailure {
+  ) throws -> UInt64 {
+    return try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try checkStatus(mln_map_set_location_indicator_image_name(
-        requireLiveHandle().raw,
-        arena.view(layerId),
-        kind.rawValue,
-        arena.view(imageId)
-      ))
+      return try NativeMemory.withTemporary(UInt64(0)) { commandId in
+        try checkStatus(mln_map_set_location_indicator_image_name(
+          requireLiveHandle().raw,
+          arena.view(layerId),
+          kind.rawValue,
+          arena.view(imageId),
+          commandId
+        ))
+      }.value
     }
   }
 
+  @discardableResult
   func addStyleLayerJSON(
     _ layerJSON: Data,
     beforeLayerId: String? = nil
-  ) throws {
-    try mapNativeFailure {
+  ) throws -> UInt64 {
+    return try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try checkStatus(mln_map_add_style_layer_json(
-        requireLiveHandle().raw,
-        arena.view(layerJSON),
-        arena.view(beforeLayerId ?? "")
-      ))
+      return try NativeMemory.withTemporary(UInt64(0)) { commandId in
+        try checkStatus(mln_map_add_style_layer_json(
+          requireLiveHandle().raw,
+          arena.view(layerJSON),
+          arena.view(beforeLayerId ?? ""),
+          commandId
+        ))
+      }.value
     }
   }
 
-  @discardableResult func removeStyleLayer(_ layerId: String) throws -> Bool {
-    try mapNativeFailure {
+  func removeStyleLayer(_ layerId: String) async throws -> Bool {
+    let operation = try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      return try NativeStyle.removeLayer(
+      return try NativeStyle.removeLayerStart(
         requireLiveHandle(),
         layerId: arena.view(layerId)
       )
     }
+    defer { mln_operation_release(operation.raw) }
+    try await runtimeForOperations.waitForOperation(operation)
+    return try mapNativeFailure {
+      try NativeStyle.removeLayerTakeResult(operation)
+    }
   }
 
-  func styleLayerExists(_ layerId: String) throws -> Bool {
-    try mapNativeFailure {
+  func styleLayerExists(_ layerId: String) async throws -> Bool {
+    let operation = try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      return try NativeStyle.layerExists(
+      return try NativeStyle.layerExistsStart(
         requireLiveHandle(),
         layerId: arena.view(layerId)
       )
     }
+    defer { mln_operation_release(operation.raw) }
+    try await runtimeForOperations.waitForOperation(operation)
+    return try mapNativeFailure {
+      try NativeStyle.layerExistsTakeResult(operation)
+    }
   }
 
-  func styleLayerType(_ layerId: String) throws -> String? {
-    try mapNativeFailure {
+  func styleLayerType(_ layerId: String) async throws -> String? {
+    let operation = try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      return try NativeStyle.layerType(
+      return try NativeStyle.layerTypeStart(
         requireLiveHandle(),
         layerId: arena.view(layerId)
       )
     }
-  }
-
-  func styleLayerIds() throws -> [String] {
-    try mapNativeFailure { try NativeStyle.layerIds(requireLiveHandle()) }
-  }
-
-  func moveStyleLayer(_ layerId: String, beforeLayerId: String? = nil) throws {
-    try mapNativeFailure {
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      try checkStatus(mln_map_move_style_layer(
-        requireLiveHandle().raw,
-        arena.view(layerId),
-        arena.view(beforeLayerId ?? "")
-      ))
+    defer { mln_operation_release(operation.raw) }
+    try await runtimeForOperations.waitForOperation(operation)
+    return try mapNativeFailure {
+      try NativeStyle.layerTypeTakeResult(operation)
     }
   }
 
-  func styleLayerJSON(_ layerId: String) throws -> Data? {
-    try mapNativeFailure {
+  func styleLayerIds() async throws -> [String] {
+    let operation = try mapNativeFailure {
+      try NativeStyle.layerIdsStart(requireLiveHandle())
+    }
+    defer { mln_operation_release(operation.raw) }
+    try await runtimeForOperations.waitForOperation(operation)
+    return try mapNativeFailure { try NativeStyle.layerIdsTakeResult(operation)
+    }
+  }
+
+  @discardableResult
+  func moveStyleLayer(
+    _ layerId: String,
+    beforeLayerId: String? = nil
+  ) throws -> UInt64 {
+    return try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      return try NativeStyle.layerJSON(
+      return try NativeMemory.withTemporary(UInt64(0)) { commandId in
+        try checkStatus(mln_map_move_style_layer(
+          requireLiveHandle().raw,
+          arena.view(layerId),
+          arena.view(beforeLayerId ?? ""),
+          commandId
+        ))
+      }.value
+    }
+  }
+
+  func styleLayerJSON(_ layerId: String) async throws -> Data? {
+    let operation = try mapNativeFailure {
+      let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
+      return try NativeStyle.layerJSONStart(
         requireLiveHandle(),
         layerId: arena.view(layerId)
       )
     }
-  }
-
-  func setStyleLightJSON(_ lightJSON: Data) throws {
-    try mapNativeFailure {
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      try checkStatus(mln_map_set_style_light_json(
-        requireLiveHandle().raw,
-        arena.view(lightJSON)
-      ))
+    defer { mln_operation_release(operation.raw) }
+    try await runtimeForOperations.waitForOperation(operation)
+    return try mapNativeFailure {
+      try NativeStyle.optionalBufferTakeResult(
+        operation,
+        take: mln_map_get_style_layer_json_take_result
+      )
     }
   }
 
-  func setStyleLightProperty(_ propertyName: String, value: Data) throws {
-    try mapNativeFailure {
+  @discardableResult
+  func setStyleLightJSON(_ lightJSON: Data) throws -> UInt64 {
+    return try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try checkStatus(mln_map_set_style_light_property(
-        requireLiveHandle().raw,
-        arena.view(propertyName),
-        arena.view(value)
-      ))
+      return try NativeMemory.withTemporary(UInt64(0)) { commandId in
+        try checkStatus(mln_map_set_style_light_json(
+          requireLiveHandle().raw,
+          arena.view(lightJSON),
+          commandId
+        ))
+      }.value
     }
   }
 
-  func styleLightProperty(_ propertyName: String) throws -> Data? {
-    try mapNativeFailure {
+  @discardableResult
+  func setStyleLightProperty(
+    _ propertyName: String,
+    value: Data
+  ) throws -> UInt64 {
+    return try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      return try NativeStyle.lightProperty(
+      return try NativeMemory.withTemporary(UInt64(0)) { commandId in
+        try checkStatus(mln_map_set_style_light_property(
+          requireLiveHandle().raw,
+          arena.view(propertyName),
+          arena.view(value),
+          commandId
+        ))
+      }.value
+    }
+  }
+
+  func styleLightProperty(_ propertyName: String) async throws -> Data? {
+    let operation = try mapNativeFailure {
+      let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
+      return try NativeStyle.lightPropertyStart(
         requireLiveHandle(),
         propertyName: arena.view(propertyName)
       )
     }
+    defer { mln_operation_release(operation.raw) }
+    try await runtimeForOperations.waitForOperation(operation)
+    return try mapNativeFailure {
+      try NativeStyle.bufferTakeResult(
+        operation,
+        take: mln_map_get_style_light_property_take_result
+      )
+    }
   }
 
-  /// Replaces the style's global transition options; absent fields clear the
-  /// style-wide override rather than merging. Loading a style replaces these
-  /// options, so apply an override after the style loads.
-  func setStyleTransitionOptions(_ options: StyleTransitionOptions) throws {
+  @discardableResult
+  func setStyleTransitionOptions(
+    _ options: StyleTransitionOptions
+  ) throws -> UInt64 {
     try mapNativeFailure {
       try NativeStyle.setTransitionOptions(
         requireLiveHandle(),
@@ -1279,225 +1550,245 @@ public extension MapHandle {
     }
   }
 
-  /// Reads the style's global transition options.
-  func styleTransitionOptions() throws -> StyleTransitionOptions {
-    try mapNativeFailure {
+  func styleTransitionOptions() async throws -> StyleTransitionOptions {
+    let operation = try mapNativeFailure {
+      try NativeStyle.transitionOptionsStart(requireLiveHandle())
+    }
+    defer { mln_operation_release(operation.raw) }
+    try await runtimeForOperations.waitForOperation(operation)
+    return try mapNativeFailure {
       try StyleTransitionOptions(
-        native: NativeStyle.transitionOptions(requireLiveHandle())
+        native: NativeStyle.transitionOptionsTakeResult(operation)
       )
     }
   }
 
+  @discardableResult
   func setLayerProperty(
     layerId: String,
     propertyName: String,
     value: Data
-  ) throws {
-    try mapNativeFailure {
+  ) throws -> UInt64 {
+    return try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try checkStatus(mln_map_set_layer_property(
-        requireLiveHandle().raw,
-        arena.view(layerId),
-        arena.view(propertyName),
-        arena.view(value)
-      ))
+      return try NativeMemory.withTemporary(UInt64(0)) { commandId in
+        try checkStatus(mln_map_set_layer_property(
+          requireLiveHandle().raw,
+          arena.view(layerId),
+          arena.view(propertyName),
+          arena.view(value),
+          commandId
+        ))
+      }.value
     }
   }
 
-  func layerProperty(layerId: String,
-                     propertyName: String) throws -> Data?
-  {
-    try mapNativeFailure {
+  func layerProperty(
+    layerId: String,
+    propertyName: String
+  ) async throws -> Data? {
+    let operation = try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      return try NativeStyle.layerProperty(
+      return try NativeStyle.layerPropertyStart(
         requireLiveHandle(),
         layerId: arena.view(layerId),
         propertyName: arena.view(propertyName)
       )
     }
-  }
-
-  func setLayerFilter(layerId: String, filter: Data?) throws {
-    try mapNativeFailure {
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      guard let filter else {
-        return try checkStatus(mln_map_set_layer_filter(
-          requireLiveHandle().raw, arena.view(layerId), nil
-        ))
-      }
-      var filterView = arena.view(filter)
-      try withUnsafePointer(to: &filterView) { filter in
-        try checkStatus(mln_map_set_layer_filter(
-          requireLiveHandle().raw, arena.view(layerId), filter
-        ))
-      }
-    }
-  }
-
-  func layerFilter(_ layerId: String) throws -> Data? {
-    try mapNativeFailure {
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeStyle.layerFilter(
-        requireLiveHandle(),
-        layerId: arena.view(layerId)
+    defer { mln_operation_release(operation.raw) }
+    try await runtimeForOperations.waitForOperation(operation)
+    return try mapNativeFailure {
+      try NativeStyle.bufferTakeResult(
+        operation,
+        take: mln_map_get_layer_property_take_result
       )
     }
   }
 
-  /// Sets one layer's source-layer ID. Layer types that take no source, such as
-  /// background, are rejected.
-  func setLayerSourceLayer(layerId: String, sourceLayer: String) throws {
-    try mapNativeFailure {
+  @discardableResult
+  func setLayerFilter(layerId: String, filter: Data?) throws -> UInt64 {
+    return try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try checkStatus(mln_map_set_layer_source_layer(
-        requireLiveHandle().raw,
-        arena.view(layerId),
-        arena.view(sourceLayer)
-      ))
-    }
-  }
-
-  /// Copies one layer's source-layer ID, empty when the layer carries none.
-  func layerSourceLayer(_ layerId: String) throws -> String {
-    try mapNativeFailure {
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeStyle.copyLayerText(
-        requireLiveHandle(),
-        layerId: arena.view(layerId),
-        copy: mln_map_copy_layer_source_layer
-      )
-    }
-  }
-
-  /// Sets one layer's source ID. Layer types that take no source, such as
-  /// background, are rejected. The named source need not exist yet.
-  func setLayerSourceId(layerId: String, sourceId: String) throws {
-    try mapNativeFailure {
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      try checkStatus(mln_map_set_layer_source_id(
-        requireLiveHandle().raw,
-        arena.view(layerId),
-        arena.view(sourceId)
-      ))
-    }
-  }
-
-  /// Copies one layer's source ID, empty when the layer carries none.
-  func layerSourceId(_ layerId: String) throws -> String {
-    try mapNativeFailure {
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeStyle.copyLayerText(
-        requireLiveHandle(),
-        layerId: arena.view(layerId),
-        copy: mln_map_copy_layer_source_id
-      )
-    }
-  }
-
-  /// Sets the lowest zoom at which one layer draws. Pass `-.infinity` for no
-  /// lower bound.
-  func setLayerMinZoom(layerId: String, minZoom: Double) throws {
-    try mapNativeFailure {
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      try checkStatus(mln_map_set_layer_min_zoom(
-        requireLiveHandle().raw,
-        arena.view(layerId),
-        minZoom
-      ))
-    }
-  }
-
-  /// Reads the lowest zoom at which one layer draws. A layer with no lower
-  /// bound
-  /// reports `-.infinity`.
-  func layerMinZoom(_ layerId: String) throws -> Double {
-    try mapNativeFailure {
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      let handle = try requireLiveHandle()
-      let layerView = arena.view(layerId)
-      return try NativeMemory.withTemporary(0.0) { outZoom in
-        try checkStatus(mln_map_get_layer_min_zoom(
-          handle.raw,
-          layerView,
-          outZoom
-        ))
+      return try NativeMemory.withTemporary(UInt64(0)) { commandId in
+        guard let filter else {
+          return try checkStatus(mln_map_set_layer_filter(
+            requireLiveHandle().raw, arena.view(layerId), nil, commandId
+          ))
+        }
+        var filterView = arena.view(filter)
+        return try withUnsafePointer(to: &filterView) { filter in
+          try checkStatus(mln_map_set_layer_filter(
+            requireLiveHandle().raw, arena.view(layerId), filter, commandId
+          ))
+        }
       }.value
     }
   }
 
-  /// Sets the highest zoom at which one layer draws. Pass `.infinity` for no
-  /// upper bound.
-  func setLayerMaxZoom(layerId: String, maxZoom: Double) throws {
-    try mapNativeFailure {
+  func layerFilter(_ layerId: String) async throws -> Data? {
+    let operation = try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try checkStatus(mln_map_set_layer_max_zoom(
-        requireLiveHandle().raw,
+      return try NativeStyle.layerFilterStart(
+        requireLiveHandle(), layerId: arena.view(layerId)
+      )
+    }
+    defer { mln_operation_release(operation.raw) }
+    try await runtimeForOperations.waitForOperation(operation)
+    return try mapNativeFailure {
+      try NativeStyle.bufferTakeResult(
+        operation, take: mln_map_get_layer_filter_take_result
+      )
+    }
+  }
+
+  @discardableResult
+  func setLayerSourceLayer(layerId: String,
+                           sourceLayer: String) throws -> UInt64
+  {
+    try styleCommand { map, arena, commandId in
+      mln_map_set_layer_source_layer(
+        map, arena.view(layerId), arena.view(sourceLayer), commandId
+      )
+    }
+  }
+
+  func layerSourceLayer(_ layerId: String) async throws -> String {
+    try await layerText(
+      layerId, start: mln_map_copy_layer_source_layer_start,
+      take: mln_map_copy_layer_source_layer_take_result
+    )
+  }
+
+  @discardableResult
+  func setLayerSourceId(layerId: String, sourceId: String) throws -> UInt64 {
+    try styleCommand { map, arena, commandId in
+      mln_map_set_layer_source_id(
+        map,
         arena.view(layerId),
-        maxZoom
-      ))
+        arena.view(sourceId),
+        commandId
+      )
     }
   }
 
-  /// Reads the highest zoom at which one layer draws. A layer with no upper
-  /// bound reports `.infinity`.
-  func layerMaxZoom(_ layerId: String) throws -> Double {
-    try mapNativeFailure {
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      let handle = try requireLiveHandle()
-      let layerView = arena.view(layerId)
-      return try NativeMemory.withTemporary(0.0) { outZoom in
-        try checkStatus(mln_map_get_layer_max_zoom(
-          handle.raw,
-          layerView,
-          outZoom
-        ))
-      }.value
+  func layerSourceId(_ layerId: String) async throws -> String {
+    try await layerText(
+      layerId, start: mln_map_copy_layer_source_id_start,
+      take: mln_map_copy_layer_source_id_take_result
+    )
+  }
+
+  @discardableResult
+  func setLayerMinZoom(layerId: String, minZoom: Double) throws -> UInt64 {
+    try styleCommand { map, arena, commandId in
+      mln_map_set_layer_min_zoom(map, arena.view(layerId), minZoom, commandId)
     }
   }
 
-  /// Sets whether one layer draws.
+  func layerMinZoom(_ layerId: String) async throws -> Double {
+    try await layerDouble(
+      layerId, start: mln_map_get_layer_min_zoom_start,
+      take: mln_map_get_layer_min_zoom_take_result
+    )
+  }
+
+  @discardableResult
+  func setLayerMaxZoom(layerId: String, maxZoom: Double) throws -> UInt64 {
+    try styleCommand { map, arena, commandId in
+      mln_map_set_layer_max_zoom(map, arena.view(layerId), maxZoom, commandId)
+    }
+  }
+
+  func layerMaxZoom(_ layerId: String) async throws -> Double {
+    try await layerDouble(
+      layerId, start: mln_map_get_layer_max_zoom_start,
+      take: mln_map_get_layer_max_zoom_take_result
+    )
+  }
+
+  @discardableResult
   func setLayerVisibility(
     layerId: String,
     visibility: StyleLayerVisibility
-  ) throws {
-    try mapNativeFailure {
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      try checkStatus(mln_map_set_layer_visibility(
-        requireLiveHandle().raw,
-        arena.view(layerId),
-        visibility.rawValue
-      ))
+  ) throws -> UInt64 {
+    try styleCommand { map, arena, commandId in
+      mln_map_set_layer_visibility(
+        map, arena.view(layerId), visibility.rawValue, commandId
+      )
     }
   }
 
-  /// Reads whether one layer draws.
-  func layerVisibility(_ layerId: String) throws -> StyleLayerVisibility {
-    try mapNativeFailure {
+  func layerVisibility(_ layerId: String) async throws -> StyleLayerVisibility {
+    let operation = try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      let handle = try requireLiveHandle()
-      let layerView = arena.view(layerId)
-      let raw = try NativeMemory.withTemporary(UInt32(0)) { outVisibility in
-        try checkStatus(mln_map_get_layer_visibility(
-          handle.raw,
-          layerView,
-          outVisibility
-        ))
+      return try NativeStyle.layerTextStart(
+        requireLiveHandle(), layerId: arena.view(layerId),
+        start: mln_map_get_layer_visibility_start
+      )
+    }
+    defer { mln_operation_release(operation.raw) }
+    try await runtimeForOperations.waitForOperation(operation)
+    return try mapNativeFailure {
+      try StyleLayerVisibility(rawValue: NativeStyle
+        .visibilityTakeResult(operation))
+    }
+  }
+
+  private func styleCommand(
+    _ body: (mln_map, NativeInputArena, UnsafeMutablePointer<UInt64>)
+      -> mln_status
+  ) throws -> UInt64 {
+    return try mapNativeFailure {
+      let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
+      return try NativeMemory.withTemporary(UInt64(0)) {
+        try checkStatus(body(requireLiveHandle().raw, arena, $0))
       }.value
-      return StyleLayerVisibility(rawValue: raw)
+    }
+  }
+
+  private func layerText(
+    _ layerId: String,
+    start: (mln_map, mln_buffer_view, UnsafeMutablePointer<mln_operation>)
+      -> mln_status,
+    take: (mln_operation, UnsafeMutablePointer<mln_buffer>) -> mln_status
+  ) async throws -> String {
+    let operation = try mapNativeFailure {
+      let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
+      return try NativeStyle.layerTextStart(
+        requireLiveHandle(), layerId: arena.view(layerId), start: start
+      )
+    }
+    defer { mln_operation_release(operation.raw) }
+    try await runtimeForOperations.waitForOperation(operation)
+    return try mapNativeFailure {
+      try NativeStyle.bufferStringTakeResult(operation, take: take)
+    }
+  }
+
+  private func layerDouble(
+    _ layerId: String,
+    start: (mln_map, mln_buffer_view, UnsafeMutablePointer<mln_operation>)
+      -> mln_status,
+    take: (mln_operation, UnsafeMutablePointer<Double>) -> mln_status
+  ) async throws -> Double {
+    let operation = try mapNativeFailure {
+      let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
+      return try NativeStyle.layerTextStart(
+        requireLiveHandle(), layerId: arena.view(layerId), start: start
+      )
+    }
+    defer { mln_operation_release(operation.raw) }
+    try await runtimeForOperations.waitForOperation(operation)
+    return try mapNativeFailure {
+      try NativeStyle.doubleTakeResult(operation, take: take)
     }
   }
 }

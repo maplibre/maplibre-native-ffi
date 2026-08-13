@@ -65,6 +65,7 @@ public value class RuntimeEventMask(public val nativeValue: Long) {
     public val MAP_TILE_ACTION: RuntimeEventMask = of(RuntimeEventType.MAP_TILE_ACTION)
     public val MAP_CAMERA_TRANSITION_FINISHED: RuntimeEventMask =
       of(RuntimeEventType.MAP_CAMERA_TRANSITION_FINISHED)
+    public val COMMAND_FINISHED: RuntimeEventMask = of(RuntimeEventType.COMMAND_FINISHED)
     public val OFFLINE_REGION_STATUS_CHANGED: RuntimeEventMask =
       of(RuntimeEventType.OFFLINE_REGION_STATUS_CHANGED)
     public val OFFLINE_REGION_RESPONSE_ERROR: RuntimeEventMask =
@@ -92,13 +93,15 @@ public value class RuntimeEventMask(public val nativeValue: Long) {
         MAP_RENDER_MAP_FINISHED +
         MAP_STYLE_IMAGE_MISSING +
         MAP_TILE_ACTION +
-        MAP_CAMERA_TRANSITION_FINISHED
+        MAP_CAMERA_TRANSITION_FINISHED +
+        COMMAND_FINISHED
 
     /** Selects every runtime-originated event type this version defines. */
     public val ALL_RUNTIME_EVENTS: RuntimeEventMask =
       OFFLINE_REGION_STATUS_CHANGED +
         OFFLINE_REGION_RESPONSE_ERROR +
-        OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED
+        OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED +
+        COMMAND_FINISHED
 
     /** Selects every event type this version defines. */
     public val ALL: RuntimeEventMask = ALL_MAP_EVENTS + ALL_RUNTIME_EVENTS

@@ -21,7 +21,7 @@ test "Metal surface renders to window-attached layer through public binding" {
 
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try maplibre.MapHandle.create(&runtime, .{});
+    var map = try maplibre.MapHandle.create(&runtime, .{ .width = 64, .height = 64 });
     defer map.close() catch @panic("map close failed");
 
     var surface = try maplibre.attachMetalSurface(&map, .{
@@ -30,7 +30,7 @@ test "Metal surface renders to window-attached layer through public binding" {
     });
     defer surface.close() catch {};
 
-    try map.setStyleJson(testing.allocator, support.style_json);
+    _ = try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
     try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try surface.renderUpdate());
 }
@@ -46,7 +46,7 @@ test "Metal surface render acquires one drawable per frame through public bindin
 
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try maplibre.MapHandle.create(&runtime, .{});
+    var map = try maplibre.MapHandle.create(&runtime, .{ .width = 64, .height = 64 });
     defer map.close() catch @panic("map close failed");
 
     var surface = try maplibre.attachMetalSurface(&map, .{
@@ -55,7 +55,7 @@ test "Metal surface render acquires one drawable per frame through public bindin
     });
     defer surface.close() catch {};
 
-    try map.setStyleJson(testing.allocator, support.style_json);
+    _ = try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
     try testing.expectEqual(@as(u32, 0), metal_support.nextDrawableCount(window_layer.layer.?));
     try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try surface.renderUpdate());
@@ -75,7 +75,7 @@ test "Metal surface set target presents through a replacement layer" {
 
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try maplibre.MapHandle.create(&runtime, .{});
+    var map = try maplibre.MapHandle.create(&runtime, .{ .width = 64, .height = 64 });
     defer map.close() catch @panic("map close failed");
 
     var surface = try maplibre.attachMetalSurface(&map, .{
@@ -84,7 +84,7 @@ test "Metal surface set target presents through a replacement layer" {
     });
     defer surface.close() catch {};
 
-    try map.setStyleJson(testing.allocator, support.style_json);
+    _ = try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
     try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try surface.renderUpdate());
     try testing.expectEqual(@as(u32, 1), metal_support.nextDrawableCount(window_layer.layer.?));
@@ -104,10 +104,11 @@ test "Metal surface set target presents through a replacement layer" {
         .texture = nativePointer(@ptrFromInt(1)),
     }));
 
-    // Replacing the surface enqueues the new size for the map's owner thread,
-    // so the map publishes a matching update only once pumped.
+    // Target replacement changes only the graphics resource. The map remains
+    // the authority for logical extent and scale.
     try testing.expectEqual(@as(maplibre.RenderResult, .size_pending), try surface.renderUpdate());
-    try runtime.pump(0);
+    _ = try map.resize(48, 32, 1.0);
+    try support.waitForBarrier(&runtime);
     const resized = try map.getSize();
     try testing.expectEqual(@as(u32, 48), resized.width);
     try testing.expectEqual(@as(u32, 32), resized.height);

@@ -18,8 +18,8 @@ var (
 	ErrInvalidArgument = errors.New("maplibre: invalid argument")
 	// ErrInvalidState reports valid objects used in an invalid lifecycle state.
 	ErrInvalidState = errors.New("maplibre: invalid state")
-	// ErrWrongThread reports use of an owner-thread-affine handle from the wrong
-	// OS thread.
+	// ErrWrongThread reports use of a thread-affine render handle from the
+	// wrong OS thread.
 	ErrWrongThread = errors.New("maplibre: wrong thread")
 	// ErrUnsupported reports a backend, platform, or operation unavailable in
 	// the linked native build.

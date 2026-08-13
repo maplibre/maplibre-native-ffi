@@ -11,90 +11,93 @@ import org.maplibre.nativeffi.resource.ResourceTransformCallback
 
 class ResourceTransformStateTest {
   @Test
-  fun transformCallbackCopiesRequestAndKeepsOriginalUrlWhenNullIsReturned() {
-    var copiedKind: ResourceKind? = null
-    var copiedUrl: String? = null
-    ResourceTransformState(
-        ResourceTransformCallback { request ->
-          copiedKind = request.kind
-          copiedUrl = request.url
-          null
+  fun transformCallbackCopiesRequestAndKeepsOriginalUrlWhenNullIsReturned(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      var copiedKind: ResourceKind? = null
+      var copiedUrl: String? = null
+      ResourceTransformState(
+          ResourceTransformCallback { request ->
+            copiedKind = request.kind
+            copiedUrl = request.url
+            null
+          }
+        )
+        .use { state ->
+          Arena.ofConfined().use { arena ->
+            val response = arena.allocate(24)
+            val status =
+              state.invoke(
+                MemorySegment.NULL,
+                ResourceKind.TILE.nativeValue,
+                arena.allocateFrom("https://example.com/tile.pbf"),
+                response,
+              )
+
+            assertEquals(MaplibreStatus.OK.nativeCode, status)
+            assertEquals(ResourceKind.TILE, copiedKind)
+            assertEquals("https://example.com/tile.pbf", copiedUrl)
+            assertEquals(24, response.get(ValueLayout.JAVA_INT, 0))
+            assertEquals(MemorySegment.NULL, response.get(ValueLayout.ADDRESS, 8))
+          }
         }
-      )
-      .use { state ->
+    }
+
+  @Test
+  fun invalidRewriteUrlReturnsInvalidArgument(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      ResourceTransformState(ResourceTransformCallback { "bad\u0000url" }).use { state ->
         Arena.ofConfined().use { arena ->
           val response = arena.allocate(24)
           val status =
             state.invoke(
               MemorySegment.NULL,
-              ResourceKind.TILE.nativeValue,
-              arena.allocateFrom("https://example.com/tile.pbf"),
+              ResourceKind.STYLE.nativeValue,
+              arena.allocateFrom("https://example.com/style.json"),
               response,
             )
 
-          assertEquals(MaplibreStatus.OK.nativeCode, status)
-          assertEquals(ResourceKind.TILE, copiedKind)
-          assertEquals("https://example.com/tile.pbf", copiedUrl)
+          assertEquals(MaplibreStatus.INVALID_ARGUMENT.nativeCode, status)
           assertEquals(24, response.get(ValueLayout.JAVA_INT, 0))
           assertEquals(MemorySegment.NULL, response.get(ValueLayout.ADDRESS, 8))
         }
       }
-  }
+    }
 
   @Test
-  fun invalidRewriteUrlReturnsInvalidArgument() {
-    ResourceTransformState(ResourceTransformCallback { "bad\u0000url" }).use { state ->
+  fun unknownKindsHostFailuresAndClosureDuringCallbackAreContained(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      var copiedKind: ResourceKind? = null
+      lateinit var state: ResourceTransformState
+      state =
+        ResourceTransformState(
+          ResourceTransformCallback { request ->
+            copiedKind = request.kind
+            state.close()
+            throw IllegalStateException("contained")
+          }
+        )
       Arena.ofConfined().use { arena ->
         val response = arena.allocate(24)
-        val status =
+        assertEquals(
+          MaplibreStatus.NATIVE_ERROR.nativeCode,
           state.invoke(
             MemorySegment.NULL,
-            ResourceKind.STYLE.nativeValue,
+            991,
             arena.allocateFrom("https://example.com/style.json"),
             response,
-          )
-
-        assertEquals(MaplibreStatus.INVALID_ARGUMENT.nativeCode, status)
-        assertEquals(24, response.get(ValueLayout.JAVA_INT, 0))
-        assertEquals(MemorySegment.NULL, response.get(ValueLayout.ADDRESS, 8))
+          ),
+        )
+        assertEquals(991, copiedKind?.nativeValue)
+        assertEquals(
+          MaplibreStatus.INVALID_ARGUMENT.nativeCode,
+          state.invoke(
+            MemorySegment.NULL,
+            991,
+            arena.allocateFrom("https://example.com/style.json"),
+            response,
+          ),
+        )
+        assertEquals(true, state.isClosedForTesting())
       }
     }
-  }
-
-  @Test
-  fun unknownKindsHostFailuresAndClosureDuringCallbackAreContained() {
-    var copiedKind: ResourceKind? = null
-    lateinit var state: ResourceTransformState
-    state =
-      ResourceTransformState(
-        ResourceTransformCallback { request ->
-          copiedKind = request.kind
-          state.close()
-          throw IllegalStateException("contained")
-        }
-      )
-    Arena.ofConfined().use { arena ->
-      val response = arena.allocate(24)
-      assertEquals(
-        MaplibreStatus.NATIVE_ERROR.nativeCode,
-        state.invoke(
-          MemorySegment.NULL,
-          991,
-          arena.allocateFrom("https://example.com/style.json"),
-          response,
-        ),
-      )
-      assertEquals(991, copiedKind?.nativeValue)
-      assertEquals(
-        MaplibreStatus.INVALID_ARGUMENT.nativeCode,
-        state.invoke(
-          MemorySegment.NULL,
-          991,
-          arena.allocateFrom("https://example.com/style.json"),
-          response,
-        ),
-      )
-      assertEquals(true, state.isClosedForTesting())
-    }
-  }
 }

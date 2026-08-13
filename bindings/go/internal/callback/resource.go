@@ -9,7 +9,7 @@ package callback
 
 extern mln_status goMaplibreResourceTransform(void* user_data, uint32_t kind, const char* url, mln_resource_transform_response* out_response);
 extern mln_status goMaplibreHttpHeaderTransform(void* user_data, uint32_t kind, const char* url, mln_http_header_transform_response* out_response);
-extern uint32_t goMaplibreResourceProvider(void* user_data, const mln_resource_request* request, mln_resource_request_handle* handle);
+extern uint32_t goMaplibreResourceProvider(void* user_data, const mln_resource_request* request, mln_resource_request_handle handle);
 */
 import "C"
 
@@ -39,9 +39,9 @@ func newResourceTransformState(callback ResourceTransformCallback) *ResourceTran
 }
 
 // SetResourceTransform installs or replaces a runtime-scoped resource transform.
-func SetResourceTransform(runtime uint64, callback ResourceTransformCallback) (*ResourceTransformState, int32) {
+func SetResourceTransform(runtime uint64, callback ResourceTransformCallback) (*ResourceTransformState, uint64, int32) {
 	if callback == nil {
-		return nil, int32(C.MLN_STATUS_INVALID_ARGUMENT)
+		return nil, 0, int32(C.MLN_STATUS_INVALID_ARGUMENT)
 	}
 	state := newResourceTransformState(callback)
 	descriptor := C.mln_resource_transform{
@@ -49,20 +49,24 @@ func SetResourceTransform(runtime uint64, callback ResourceTransformCallback) (*
 		callback:  C.mln_resource_transform_callback(C.goMaplibreResourceTransform),
 		user_data: C.mln_go_handle_to_pointer(C.uintptr_t(state.handle)),
 	}
+	var commandID C.uint64_t
 	status := int32(C.mln_runtime_set_resource_transform(
 		C.mln_runtime(runtime),
 		&descriptor,
+		&commandID,
 	))
 	if status != int32(C.MLN_STATUS_OK) {
 		state.Release()
-		return nil, status
+		return nil, 0, status
 	}
-	return state, int32(C.MLN_STATUS_OK)
+	return state, uint64(commandID), int32(C.MLN_STATUS_OK)
 }
 
 // ClearResourceTransform clears the runtime-scoped resource transform.
-func ClearResourceTransform(runtime uint64) int32 {
-	return int32(C.mln_runtime_clear_resource_transform(C.mln_runtime(runtime)))
+func ClearResourceTransform(runtime uint64) (uint64, int32) {
+	var commandID C.uint64_t
+	status := int32(C.mln_runtime_clear_resource_transform(C.mln_runtime(runtime), &commandID))
+	return uint64(commandID), status
 }
 
 // Release frees callback state after native no longer references it.
@@ -135,9 +139,9 @@ func newHttpHeaderTransformState(callback HttpHeaderTransformCallback) *HttpHead
 	return state
 }
 
-func SetHttpHeaderTransform(runtime uint64, callback HttpHeaderTransformCallback) (*HttpHeaderTransformState, int32) {
+func SetHttpHeaderTransform(runtime uint64, callback HttpHeaderTransformCallback) (*HttpHeaderTransformState, uint64, int32) {
 	if callback == nil {
-		return nil, int32(C.MLN_STATUS_INVALID_ARGUMENT)
+		return nil, 0, int32(C.MLN_STATUS_INVALID_ARGUMENT)
 	}
 	state := newHttpHeaderTransformState(callback)
 	descriptor := C.mln_http_header_transform{
@@ -145,16 +149,19 @@ func SetHttpHeaderTransform(runtime uint64, callback HttpHeaderTransformCallback
 		callback:  C.mln_http_header_transform_callback(C.goMaplibreHttpHeaderTransform),
 		user_data: C.mln_go_handle_to_pointer(C.uintptr_t(state.handle)),
 	}
-	status := int32(C.mln_runtime_set_http_header_transform(C.mln_runtime(runtime), &descriptor))
+	var commandID C.uint64_t
+	status := int32(C.mln_runtime_set_http_header_transform(C.mln_runtime(runtime), &descriptor, &commandID))
 	if status != int32(C.MLN_STATUS_OK) {
 		state.Release()
-		return nil, status
+		return nil, 0, status
 	}
-	return state, int32(C.MLN_STATUS_OK)
+	return state, uint64(commandID), int32(C.MLN_STATUS_OK)
 }
 
-func ClearHttpHeaderTransform(runtime uint64) int32 {
-	return int32(C.mln_runtime_clear_http_header_transform(C.mln_runtime(runtime)))
+func ClearHttpHeaderTransform(runtime uint64) (uint64, int32) {
+	var commandID C.uint64_t
+	status := int32(C.mln_runtime_clear_http_header_transform(C.mln_runtime(runtime), &commandID))
+	return uint64(commandID), status
 }
 
 func (state *HttpHeaderTransformState) Release() {
@@ -239,9 +246,9 @@ func newResourceProviderState(callback ResourceProviderCallback) *ResourceProvid
 }
 
 // SetResourceProvider installs or replaces a runtime-scoped resource provider.
-func SetResourceProvider(runtime uint64, callback ResourceProviderCallback) (*ResourceProviderState, int32) {
+func SetResourceProvider(runtime uint64, callback ResourceProviderCallback) (*ResourceProviderState, uint64, int32) {
 	if callback == nil {
-		return nil, int32(C.MLN_STATUS_INVALID_ARGUMENT)
+		return nil, 0, int32(C.MLN_STATUS_INVALID_ARGUMENT)
 	}
 	state := newResourceProviderState(callback)
 	descriptor := C.mln_resource_provider{
@@ -249,20 +256,24 @@ func SetResourceProvider(runtime uint64, callback ResourceProviderCallback) (*Re
 		callback:  C.mln_resource_provider_callback(C.goMaplibreResourceProvider),
 		user_data: C.mln_go_handle_to_pointer(C.uintptr_t(state.handle)),
 	}
+	var commandID C.uint64_t
 	status := int32(C.mln_runtime_set_resource_provider(
 		C.mln_runtime(runtime),
 		&descriptor,
+		&commandID,
 	))
 	if status != int32(C.MLN_STATUS_OK) {
 		state.Release()
-		return nil, status
+		return nil, 0, status
 	}
-	return state, int32(C.MLN_STATUS_OK)
+	return state, uint64(commandID), int32(C.MLN_STATUS_OK)
 }
 
 // ClearResourceProvider clears the runtime-scoped resource provider.
-func ClearResourceProvider(runtime uint64) int32 {
-	return int32(C.mln_runtime_clear_resource_provider(C.mln_runtime(runtime)))
+func ClearResourceProvider(runtime uint64) (uint64, int32) {
+	var commandID C.uint64_t
+	status := int32(C.mln_runtime_clear_resource_provider(C.mln_runtime(runtime), &commandID))
+	return uint64(commandID), status
 }
 
 // Release frees provider callback state after native no longer references it.

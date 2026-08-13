@@ -74,22 +74,33 @@ mln_render_session attach_to_host_texture(
 }
 
 mln_status resize_session(
-  mln_render_session session, uint32_t width, uint32_t height,
+  mln_map map, mln_render_session session, uint32_t width, uint32_t height,
   double scale_factor
 ) {
   // #region resize
-  // Surface and session-owned texture targets resize in place. A borrowed
-  // texture takes its size from the host's texture and reports an unsupported
-  // status here.
+  const mln_logical_extent extent = {
+    .width = width, .height = height, .scale_factor = scale_factor
+  };
+  uint64_t command_id = 0;
+  const mln_status status = mln_map_resize(map, extent, &command_id);
+  if (status != MLN_STATUS_OK) return status;
   return mln_render_session_resize(session, width, height, scale_factor);
   // #endregion resize
 }
 
 mln_status resize_window_target(
-  mln_render_session session, const mln_opengl_context_descriptor* context,
-  void* egl_surface, uint32_t width, uint32_t height, double scale_factor
+  mln_map map, mln_render_session session,
+  const mln_opengl_context_descriptor* context, void* egl_surface,
+  uint32_t width, uint32_t height, double scale_factor
 ) {
   // #region set-target
+  const mln_logical_extent extent = {
+    .width = width, .height = height, .scale_factor = scale_factor
+  };
+  uint64_t command_id = 0;
+  mln_status status = mln_map_resize(map, extent, &command_id);
+  if (status != MLN_STATUS_OK) return status;
+
   mln_opengl_surface_descriptor descriptor =
     mln_opengl_surface_descriptor_default();
   descriptor.extent.width = width;
@@ -97,14 +108,26 @@ mln_status resize_window_target(
   descriptor.extent.scale_factor = scale_factor;
   descriptor.context = *context;
   descriptor.surface = egl_surface;
-
   return mln_opengl_surface_set_target(session, &descriptor);
   // #endregion set-target
+}
+
+static mln_status wait_ok(mln_operation operation) {
+  bool completed = false;
+  mln_status status = mln_operation_wait(operation, -1, &completed);
+  if (status != MLN_STATUS_OK || !completed) return status;
+  return mln_operation_get_status(operation, &status) == MLN_STATUS_OK
+           ? status
+           : MLN_STATUS_NATIVE_ERROR;
 }
 
 void release_map(mln_map map, mln_render_session session) {
   // #region teardown
   mln_render_session_destroy(session);
-  mln_map_destroy(map);
+  mln_operation close = MLN_HANDLE_NULL;
+  if (mln_map_close_start(map, &close) == MLN_STATUS_OK) {
+    (void)wait_ok(close);
+  }
+  mln_operation_release(close);
   // #endregion teardown
 }

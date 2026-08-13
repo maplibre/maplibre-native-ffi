@@ -36,6 +36,36 @@ public sealed record CameraOptions
     public double? FieldOfView { get; set; }
 }
 
+public enum CameraUpdateMode : uint
+{
+    Jump = 0,
+    Ease = 1,
+    Fly = 2,
+}
+
+public enum GesturePhase : uint
+{
+    None = 0,
+    Begin = 1,
+    Update = 2,
+    End = 3,
+    Cancel = 4,
+}
+
+/// <summary>One copied camera command submitted to a map.</summary>
+public sealed record CameraUpdate
+{
+    public CameraUpdateMode Mode { get; set; }
+    public CameraOptions Camera { get; set; } = new();
+    public AnimationOptions Animation { get; set; } = new();
+    public GesturePhase GesturePhase { get; set; }
+    public ulong GestureId { get; set; }
+    public ulong AnimationId { get; set; }
+}
+
+/// <summary>A camera snapshot and its committed generation.</summary>
+public readonly record struct CameraSnapshot(CameraOptions Camera, ulong Generation);
+
 /// <summary>Camera animation descriptor.</summary>
 /// <remarks>
 /// Compares and hashes by property value; keep an instance unmodified while it is a key in a

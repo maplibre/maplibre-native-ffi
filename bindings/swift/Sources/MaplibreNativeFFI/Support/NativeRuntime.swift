@@ -1,13 +1,41 @@
 internal import CMaplibreNativeC
 
 enum NativeRuntime {
-  static func create(_ options: UnsafePointer<mln_runtime_options>) throws
+  static func createStart(_ options: UnsafePointer<mln_runtime_options>) throws
+    -> NativeOperationHandle
+  {
+    let raw = try NativeMemory.withTemporary(mln_operation(0)) { operation in
+      try checkStatus(mln_runtime_create_start(options, operation))
+    }.value
+    return NativeOperationHandle(raw: raw)
+  }
+
+  static func createTakeResult(_ operation: NativeOperationHandle) throws
     -> NativeRuntimeHandle
   {
-    try NativeHandleFactory
-      .create(nullDiagnostic: "mln_runtime_create returned a null runtime") { outHandle in
-        try checkStatus(mln_runtime_create(options, outHandle))
-      }
+    try NativeHandleFactory.create(
+      nullDiagnostic: "mln_runtime_create_take_result returned a null runtime"
+    ) { runtime in
+      try checkStatus(mln_runtime_create_take_result(operation.raw, runtime))
+    }
+  }
+
+  static func barrierStart(_ runtime: NativeRuntimeHandle) throws
+    -> NativeOperationHandle
+  {
+    let raw = try NativeMemory.withTemporary(mln_operation(0)) { operation in
+      try checkStatus(mln_runtime_barrier_start(runtime.raw, operation))
+    }.value
+    return NativeOperationHandle(raw: raw)
+  }
+
+  static func closeStart(_ runtime: NativeRuntimeHandle) throws
+    -> NativeOperationHandle
+  {
+    let raw = try NativeMemory.withTemporary(mln_operation(0)) { operation in
+      try checkStatus(mln_runtime_close_start(runtime.raw, operation))
+    }.value
+    return NativeOperationHandle(raw: raw)
   }
 
   static func drainEvents(

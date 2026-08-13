@@ -1,4 +1,5 @@
 using Maplibre.NativeFfi.Camera;
+using Maplibre.NativeFfi.Runtime;
 
 namespace Maplibre.NativeFfi.Map;
 
@@ -41,6 +42,22 @@ public sealed record ProjectionModeOptions
     public double? XSkew { get; set; }
     public double? YSkew { get; set; }
 }
+
+public readonly record struct LogicalExtent(uint Width, uint Height, double ScaleFactor);
+
+/// <summary>A synchronous copy of the map's committed executor state.</summary>
+public readonly record struct MapSnapshot(
+    ulong Generation,
+    CameraOptions Camera,
+    LogicalExtent LogicalExtent,
+    ProjectionModeOptions ProjectionMode,
+    ViewportOptions Viewport,
+    bool Loading,
+    bool FullyRendered,
+    bool RepaintDemand,
+    RuntimeEventMask EventMask,
+    ulong LatestRenderUpdateGeneration
+);
 
 /// <summary>Rendering statistics snapshot.</summary>
 public readonly record struct RenderingStats(

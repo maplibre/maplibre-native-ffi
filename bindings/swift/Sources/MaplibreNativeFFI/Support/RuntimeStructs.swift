@@ -158,6 +158,16 @@ struct NativeOfflineRegionTileCountLimitEvent: Equatable {
   }
 }
 
+struct NativeCommandFinishedEvent: Equatable {
+  let commandId: UInt64
+  let disposition: UInt32
+
+  init(_ raw: mln_runtime_event_command_finished) {
+    commandId = raw.command_id
+    disposition = raw.disposition
+  }
+}
+
 enum NativeRuntimeEventPayload: Equatable {
   case none
   case renderFrame(NativeRenderFrameEvent)
@@ -167,6 +177,7 @@ enum NativeRuntimeEventPayload: Equatable {
   case offlineRegionResponseError(NativeOfflineRegionResponseErrorEvent)
   case offlineRegionTileCountLimit(NativeOfflineRegionTileCountLimitEvent)
   case cameraTransitionFinished(NativeCameraTransitionFinishedEvent)
+  case commandFinished(NativeCommandFinishedEvent)
   /// A payload kind this binding does not name, carrying the payload union's
   /// fixed byte window copied out of the batch.
   case unknown(type: UInt32, bytes: [UInt8])
@@ -279,6 +290,10 @@ struct NativeRuntimeEventBatch: Equatable {
         NativeCameraTransitionFinishedEvent(
           raw.payload.camera_transition_finished
         )
+      )
+    case MLN_RUNTIME_EVENT_PAYLOAD_COMMAND_FINISHED.rawValue:
+      return .commandFinished(
+        NativeCommandFinishedEvent(raw.payload.command_finished)
       )
     default:
       return try .unknown(

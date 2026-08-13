@@ -1,10 +1,8 @@
-use std::sync::mpsc::Sender;
-
 use maplibre_native_ffi::ScreenPoint;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::keyboard::{KeyCode, ModifiersState, PhysicalKey};
 
-use crate::channel::CameraCommand;
+use crate::map_state::CameraCommand;
 use crate::viewport::Viewport;
 
 const DRAG_ROTATE_FACTOR: f64 = 0.5;
@@ -16,8 +14,7 @@ const KEYBOARD_PITCH: f64 = 5.0;
 const KEYBOARD_ANIMATION_MS: f64 = 160.0;
 const RESET_ANIMATION_MS: f64 = 220.0;
 
-/// Decodes host input into camera commands on the render loop, converting to
-/// logical map coordinates. The runtime loop applies the commands.
+/// Decodes host input into camera commands in logical map coordinates.
 #[derive(Default)]
 pub struct Controller {
     left_down: bool,
@@ -42,33 +39,41 @@ impl Controller {
         println!("  0: reset pitch and bearing");
     }
 
-    /// Reports whether the camera changed.
-    pub fn handle(
+    /// Reports whether the event submitted a camera change.
+    pub fn handle<F, E>(
         &mut self,
         event: &WindowEvent,
-        commands: &Sender<CameraCommand>,
         viewport: Viewport,
-    ) -> bool {
+        mut submit: F,
+    ) -> Result<bool, E>
+    where
+        F: FnMut(CameraCommand) -> Result<(), E>,
+    {
         match event {
             WindowEvent::CursorMoved { position, .. } => self.cursor(
-                commands,
                 position.x / viewport.scale_factor,
                 position.y / viewport.scale_factor,
+                &mut submit,
             ),
-            WindowEvent::MouseInput { state, button, .. } => self.mouse(commands, *button, *state),
-            WindowEvent::MouseWheel { delta, .. } => self.wheel(commands, viewport, *delta),
+            WindowEvent::MouseInput { state, button, .. } => {
+                self.mouse(*button, *state, &mut submit)
+            }
+            WindowEvent::MouseWheel { delta, .. } => self.wheel(viewport, *delta, &mut submit),
             WindowEvent::KeyboardInput { event, .. } => {
-                keyboard(commands, viewport, event.physical_key, event.state)
+                keyboard(viewport, event.physical_key, event.state, &mut submit)
             }
             WindowEvent::ModifiersChanged(modifiers) => {
                 self.modifiers = modifiers.state();
-                false
+                Ok(false)
             }
-            _ => false,
+            _ => Ok(false),
         }
     }
 
-    fn cursor(&mut self, commands: &Sender<CameraCommand>, x: f64, y: f64) -> bool {
+    fn cursor<F, E>(&mut self, x: f64, y: f64, submit: &mut F) -> Result<bool, E>
+    where
+        F: FnMut(CameraCommand) -> Result<(), E>,
+    {
         let dx = x - self.last_x;
         let dy = y - self.last_y;
         self.last_x = x;
@@ -78,97 +83,92 @@ impl Controller {
 
         if self.right_down || (self.left_down && self.modifiers.control_key()) {
             if dx != 0.0 {
-                push(
-                    commands,
-                    CameraCommand::AdjustBearing {
-                        delta: dx * DRAG_ROTATE_FACTOR,
-                    },
-                );
+                submit(CameraCommand::AdjustBearing {
+                    delta: dx * DRAG_ROTATE_FACTOR,
+                })?;
             }
             if dy != 0.0 {
-                push(
-                    commands,
-                    CameraCommand::PitchBy {
-                        delta: dy * DRAG_PITCH_FACTOR,
-                    },
-                );
+                submit(CameraCommand::PitchBy {
+                    delta: dy * DRAG_PITCH_FACTOR,
+                })?;
             }
-            dx != 0.0 || dy != 0.0
+            Ok(dx != 0.0 || dy != 0.0)
         } else if self.left_down && (dx != 0.0 || dy != 0.0) {
-            push(commands, CameraCommand::MoveBy { dx, dy });
-            true
+            submit(CameraCommand::MoveBy { dx, dy })?;
+            Ok(true)
         } else {
-            false
+            Ok(false)
         }
     }
 
-    fn mouse(
+    fn mouse<F, E>(
         &mut self,
-        commands: &Sender<CameraCommand>,
         button: MouseButton,
         state: ElementState,
-    ) -> bool {
+        submit: &mut F,
+    ) -> Result<bool, E>
+    where
+        F: FnMut(CameraCommand) -> Result<(), E>,
+    {
         let was_dragging = self.dragging();
         match button {
             MouseButton::Left => self.left_down = state == ElementState::Pressed,
             MouseButton::Right => self.right_down = state == ElementState::Pressed,
-            _ => return false,
+            _ => return Ok(false),
         }
         if state == ElementState::Pressed {
-            // Cancel first, so the running transition stops before the first
-            // delta.
-            push(commands, CameraCommand::CancelTransitions);
+            submit(CameraCommand::CancelTransitions)?;
         }
         if self.dragging() != was_dragging {
-            push(
-                commands,
-                CameraCommand::SetGestureInProgress {
-                    in_progress: self.dragging(),
-                },
-            );
+            submit(CameraCommand::SetGestureInProgress {
+                in_progress: self.dragging(),
+            })?;
         }
-        false
+        Ok(false)
     }
 
     fn dragging(&self) -> bool {
         self.left_down || self.right_down
     }
 
-    fn wheel(
+    fn wheel<F, E>(
         &mut self,
-        commands: &Sender<CameraCommand>,
         viewport: Viewport,
         delta: MouseScrollDelta,
-    ) -> bool {
+        submit: &mut F,
+    ) -> Result<bool, E>
+    where
+        F: FnMut(CameraCommand) -> Result<(), E>,
+    {
         let lines = match delta {
             MouseScrollDelta::LineDelta(_, y) => f64::from(y),
             MouseScrollDelta::PixelDelta(position) => position.y / viewport.scale_factor / 120.0,
         };
         if lines == 0.0 {
-            return false;
+            return Ok(false);
         }
-        push(
-            commands,
-            CameraCommand::ScaleBy {
-                scale: 2.0_f64.powf(lines * 0.25),
-                anchor: ScreenPoint::new(self.cursor_x, self.cursor_y),
-            },
-        );
-        true
+        submit(CameraCommand::ScaleBy {
+            scale: 2.0_f64.powf(lines * 0.25),
+            anchor: ScreenPoint::new(self.cursor_x, self.cursor_y),
+        })?;
+        Ok(true)
     }
 }
 
-fn keyboard(
-    commands: &Sender<CameraCommand>,
+fn keyboard<F, E>(
     viewport: Viewport,
     physical_key: PhysicalKey,
     state: ElementState,
-) -> bool {
+    submit: &mut F,
+) -> Result<bool, E>
+where
+    F: FnMut(CameraCommand) -> Result<(), E>,
+{
     if state != ElementState::Pressed {
-        return false;
+        return Ok(false);
     }
     let PhysicalKey::Code(code) = physical_key else {
-        return false;
+        return Ok(false);
     };
     let center = ScreenPoint::new(
         f64::from(viewport.logical_width) / 2.0,
@@ -200,10 +200,10 @@ fn keyboard(
         KeyCode::Digit0 | KeyCode::Numpad0 => CameraCommand::ResetOrientation {
             duration_ms: RESET_ANIMATION_MS,
         },
-        _ => return false,
+        _ => return Ok(false),
     };
-    push(commands, command);
-    true
+    submit(command)?;
+    Ok(true)
 }
 
 fn pan(dx: f64, dy: f64) -> CameraCommand {
@@ -220,10 +220,4 @@ fn zoom(scale: f64, anchor: ScreenPoint) -> CameraCommand {
         anchor,
         duration_ms: KEYBOARD_ANIMATION_MS,
     }
-}
-
-/// Drops the command if the queue is closed; the runtime loop has stopped and
-/// the render loop reports that through the shared failure.
-fn push(commands: &Sender<CameraCommand>, command: CameraCommand) {
-    let _ = commands.send(command);
 }

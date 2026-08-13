@@ -8,10 +8,7 @@ import kotlin.math.atan2
 import kotlin.math.hypot
 import org.maplibre.nativeffi.geo.ScreenPoint
 
-/**
- * Decodes touch input into camera commands. This runs on the UI thread, which does not own the map,
- * so it only produces commands; the runtime loop applies them on the map's owner thread.
- */
+/** Decodes touch input and submits camera commands directly from the UI thread. */
 internal class InputController(context: Context, private val enqueue: (CameraCommand) -> Unit) {
   private val density = context.resources.displayMetrics.density.takeIf { it > 0f } ?: 1f
   private val tapGestureDetector = GestureDetector(context, TapListener())
