@@ -39,6 +39,10 @@ class _PatchedVulkanLoader(abc.SourceLoader):
 
 
 def _import_vulkan() -> Any:
+    if sys.platform == "android":
+        from render_backend_helpers import vulkan_ctypes
+
+        return vulkan_ctypes
     if sys.platform != "darwin":
         import vulkan
 
@@ -99,7 +103,15 @@ vk = _import_vulkan()
 
 
 def _addr(value: Any) -> int:
+    if hasattr(vk, "address"):
+        return vk.address(value)
     return int(vk.ffi.cast("uintptr_t", value))
+
+
+def _function_address(name: str) -> int:
+    if hasattr(vk, "function_address"):
+        return vk.function_address(name)
+    return _addr(vk.ffi.addressof(vk.lib, name))
 
 
 def _pointer(value: Any, name: str) -> render.NativePointer:
@@ -254,11 +266,11 @@ class VulkanContext:
             graphics_queue=_pointer(self.queue, "VkQueue"),
             graphics_queue_family_index=self.queue_family_index,
             get_instance_proc_addr=_pointer(
-                vk.ffi.addressof(vk.lib, "vkGetInstanceProcAddr"),
+                _function_address("vkGetInstanceProcAddr"),
                 "vkGetInstanceProcAddr",
             ),
             get_device_proc_addr=_pointer(
-                vk.ffi.addressof(vk.lib, "vkGetDeviceProcAddr"),
+                _function_address("vkGetDeviceProcAddr"),
                 "vkGetDeviceProcAddr",
             ),
         )
