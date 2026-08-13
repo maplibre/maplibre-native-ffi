@@ -25,3 +25,33 @@ if [[ "$state" != "Booted" ]]; then
   xcrun simctl bootstatus "$device" -b
 fi
 '''
+
+[tasks."tvos-simulator:boot"]
+description = "Boot an available Apple TV simulator and wait until it is ready."
+run = '''
+device=$(
+  xcrun simctl list devices available tvOS |
+    awk '
+      /Apple TV/ && /Shutdown|Booted/ {
+        if (match($0, /[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}/)) {
+          print substr($0, RSTART, RLENGTH)
+          exit
+        }
+      }
+    '
+)
+[[ -n "$device" ]] || { echo "No available tvOS simulator device found." >&2; exit 2; }
+state=$(
+  xcrun simctl list devices "$device" |
+    awk -v id="$device" '
+      index($0, id) {
+        if ($0 ~ /Booted/) { print "Booted"; exit }
+        if ($0 ~ /Shutdown/) { print "Shutdown"; exit }
+      }
+    '
+)
+if [[ "$state" != "Booted" ]]; then
+  xcrun simctl boot "$device"
+  xcrun simctl bootstatus "$device" -b
+fi
+'''

@@ -311,6 +311,8 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
 if [[ "$usage_preset" == ios-simulator-* ]]; then
   mise run //:ios-simulator:boot
+elif [[ "$usage_preset" == tvos-simulator-* ]]; then
+  mise run //:tvos-simulator:boot
 elif [[ "$usage_preset" == ohos-x64-egl || "$usage_preset" == android-x64-* ]]; then
   # An emulator target runs the suite through a device shell rather than ctest,
   # so the tile fixtures ctest would name by absolute source path are staged

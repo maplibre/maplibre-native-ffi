@@ -30,6 +30,7 @@ PLATFORM_LABELS = {
     "linux": "Linux",
     "macos": "macOS",
     "ohos": "OpenHarmony",
+    "tvos": "tvOS",
     "windows": "Windows",
 }
 BACKEND_LABELS = {
@@ -50,6 +51,8 @@ ENVIRONMENT_ORDER = [
     "android-x64",
     "ios-arm64",
     "ios-simulator-arm64",
+    "tvos-arm64",
+    "tvos-simulator-arm64",
     "ohos-arm64",
     "ohos-x64",
 ]
@@ -73,20 +76,24 @@ class Coverage:
     @property
     def environment(self) -> str:
         if self.simulator:
-            return f"ios-simulator-{self.arch}"
+            return f"{self.platform}-simulator-{self.arch}"
         return f"{self.platform}-{self.arch}"
 
 
 def coverage_from_preset(preset: str, status: str) -> Coverage:
     target_platform = platform(preset)
+    simulator = target_platform.endswith("-simulator")
+    base_platform = (
+        target_platform.removesuffix("-simulator") if simulator else target_platform
+    )
     return Coverage(
-        platform="ios" if target_platform == "ios-simulator" else target_platform,
+        platform=base_platform,
         arch=architecture(preset),
         backend={"egl": "opengl", "wgl": "opengl", "webgl": "opengl"}.get(
             backend(preset), backend(preset)
         ),
         status=status,
-        simulator=target_platform == "ios-simulator",
+        simulator=simulator,
     )
 
 
@@ -144,9 +151,9 @@ def backend_sort_key(value: str) -> tuple[int, str]:
 
 def environment_label(entry: Coverage) -> str:
     if entry.simulator:
-        return f"iOS Simulator {entry.arch}"
-    if entry.platform == "ios":
-        return f"iOS device {entry.arch}"
+        return f"{PLATFORM_LABELS[entry.platform]} Simulator {entry.arch}"
+    if entry.platform in {"ios", "tvos"}:
+        return f"{PLATFORM_LABELS[entry.platform]} device {entry.arch}"
     return f"{PLATFORM_LABELS[entry.platform]} {entry.arch}"
 
 

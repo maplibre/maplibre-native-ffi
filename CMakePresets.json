@@ -57,6 +57,17 @@
       }
     },
     {
+      "name": "_tvos-arm64",
+      "hidden": true,
+      "inherits": "_single-config",
+      "toolchainFile": "${sourceDir}/cmake/toolchains/apple.cmake",
+      "cacheVariables": {
+        "CMAKE_SYSTEM_NAME": "tvOS",
+        "CMAKE_OSX_ARCHITECTURES": "arm64",
+        "CMAKE_OSX_DEPLOYMENT_TARGET": "14.3"
+      }
+    },
+    {
       "name": "_android",
       "hidden": true,
       "inherits": "_single-config",
@@ -236,6 +247,18 @@
       "cacheVariables": { "CMAKE_OSX_SYSROOT": "iphonesimulator" }
     },
     {
+      "name": "tvos-arm64-metal",
+      "displayName": "tvOS ARM64 Metal",
+      "inherits": ["_tvos-arm64", "_metal"],
+      "cacheVariables": { "CMAKE_OSX_SYSROOT": "appletvos" }
+    },
+    {
+      "name": "tvos-simulator-arm64-metal",
+      "displayName": "tvOS Simulator ARM64 Metal",
+      "inherits": ["_tvos-arm64", "_metal"],
+      "cacheVariables": { "CMAKE_OSX_SYSROOT": "appletvsimulator" }
+    },
+    {
       "name": "android-arm64-egl",
       "displayName": "Android ARM64 EGL",
       "inherits": ["_android-arm64", "_egl"]
@@ -361,6 +384,20 @@
     {
       "name": "ios-simulator-arm64-metal",
       "configurePreset": "ios-simulator-arm64-metal",
+      "targets": ["install"],
+      "configuration": "Release",
+      "jobs": 0
+    },
+    {
+      "name": "tvos-arm64-metal",
+      "configurePreset": "tvos-arm64-metal",
+      "targets": ["install"],
+      "configuration": "Release",
+      "jobs": 0
+    },
+    {
+      "name": "tvos-simulator-arm64-metal",
+      "configurePreset": "tvos-simulator-arm64-metal",
       "targets": ["install"],
       "configuration": "Release",
       "jobs": 0
@@ -501,6 +538,11 @@
       "inherits": "_test-base"
     },
     {
+      "name": "tvos-simulator-arm64-metal",
+      "configurePreset": "tvos-simulator-arm64-metal",
+      "inherits": "_test-base"
+    },
+    {
       "name": "windows-x64-wgl",
       "configurePreset": "windows-x64-wgl",
       "configuration": "Release",
@@ -589,6 +631,18 @@
     {
       "name": "ios-simulator-arm64-metal",
       "configurePreset": "ios-simulator-arm64-metal",
+      "generators": ["TGZ"],
+      "configurations": ["Release"]
+    },
+    {
+      "name": "tvos-arm64-metal",
+      "configurePreset": "tvos-arm64-metal",
+      "generators": ["TGZ"],
+      "configurations": ["Release"]
+    },
+    {
+      "name": "tvos-simulator-arm64-metal",
+      "configurePreset": "tvos-simulator-arm64-metal",
       "generators": ["TGZ"],
       "configurations": ["Release"]
     },
@@ -741,6 +795,20 @@
       "steps": [
         { "type": "configure", "name": "ios-simulator-arm64-metal" },
         { "type": "build", "name": "ios-simulator-arm64-metal" }
+      ]
+    },
+    {
+      "name": "tvos-arm64-metal",
+      "steps": [
+        { "type": "configure", "name": "tvos-arm64-metal" },
+        { "type": "build", "name": "tvos-arm64-metal" }
+      ]
+    },
+    {
+      "name": "tvos-simulator-arm64-metal",
+      "steps": [
+        { "type": "configure", "name": "tvos-simulator-arm64-metal" },
+        { "type": "build", "name": "tvos-simulator-arm64-metal" }
       ]
     },
     {

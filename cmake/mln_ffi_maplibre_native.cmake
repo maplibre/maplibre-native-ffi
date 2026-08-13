@@ -50,7 +50,9 @@ function(mln_ffi_add_maplibre_native)
     endforeach()
   endif()
 
-  if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+  if(CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS)$")
+    # action_journal_impl.cpp selects ghc::filesystem whenever TARGET_OS_IPHONE
+    # is set, and that macro is true on tvOS as well as iOS.
     target_link_libraries(mbgl-core PRIVATE mbgl-vendor-filesystem)
   endif()
 

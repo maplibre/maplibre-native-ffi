@@ -9,16 +9,39 @@ fi
 test_executable=$1
 timeout_seconds=${2:-120}
 if [[ ! -x "$test_executable" ]]; then
-  echo "iOS simulator test executable is not executable: $test_executable" >&2
+  echo "Simulator test executable is not executable: $test_executable" >&2
   exit 2
 fi
 
+runtime=${MLN_FFI_SIMULATOR_RUNTIME:-iOS}
+case "$runtime" in
+  iOS)
+    device_filter=' iPhone '
+    boot_task=ios-simulator:boot
+    ;;
+  tvOS)
+    device_filter='Apple TV'
+    boot_task=tvos-simulator:boot
+    ;;
+  *)
+    echo "Unknown simulator runtime: $runtime" >&2
+    exit 2
+    ;;
+esac
+
 device=$(
-  xcrun simctl list devices available iOS |
-    awk -F '[()]' '/ iPhone / && /Booted/ { print $2; exit }'
+  xcrun simctl list devices available "$runtime" |
+    awk -v filter="$device_filter" '
+      index($0, filter) && /Booted/ {
+        if (match($0, /[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}/)) {
+          print substr($0, RSTART, RLENGTH)
+          exit
+        }
+      }
+    '
 )
 if [[ -z "$device" ]]; then
-  echo "No booted iOS simulator device found. Run 'mise run //:ios-simulator:boot' first." >&2
+  echo "No booted $runtime simulator device found. Run 'mise run //:$boot_task' first." >&2
   exit 2
 fi
 
