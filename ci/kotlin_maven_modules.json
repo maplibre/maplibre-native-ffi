@@ -1,7 +1,6 @@
 [
   "maplibre-native-ffi",
   "maplibre-native-ffi-android",
-  "maplibre-native-ffi-android-platform",
   "maplibre-native-ffi-androidnativearm64",
   "maplibre-native-ffi-androidnativex64",
   "maplibre-native-ffi-iosarm64",

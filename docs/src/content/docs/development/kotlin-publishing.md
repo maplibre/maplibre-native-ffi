@@ -74,10 +74,11 @@ link requirements for that target and backend. The final application links the
 archive without acquiring a separate MapLibre Native FFI shared library or
 framework.
 
-An Android runtime KLIB cannot place JVM bytecode in its host APK. The host's
-packaging module depends on `maplibre-native-ffi-android-platform`, which
-carries the Rustls platform verifier classes, consumer keep rule, and licenses
-without a second native library.
+An Android runtime KLIB cannot place JVM bytecode in its host APK. The
+application packaging module therefore depends directly on the matching runtime
+AAR and excludes that AAR's `libmaplibre-native-c.so`. The AAR contributes the
+Rustls platform verifier classes, consumer keep rule, and licenses. The final
+Kotlin/Native host library already contains the static runtime from the KLIB.
 
 The native runtime publications are OpenGL and Vulkan for Android arm64, Android
 x64, Linux arm64, Linux x64, and macOS arm64, plus Metal for macOS arm64, iOS

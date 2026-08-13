@@ -2,7 +2,6 @@
 # [MISE] description="Verify staged Kotlin Maven payloads."
 # [MISE] shell="python"
 
-import io
 import json
 import pathlib
 import sys
@@ -271,33 +270,6 @@ def aar_keep_rules(aar: zipfile.ZipFile) -> str:
 
 
 def verify_android(root: pathlib.Path) -> None:
-    platform = one(
-        module_files(root, "maplibre-native-ffi-android-platform", ".aar"),
-        "Android platform AAR",
-    )
-    with zipfile.ZipFile(platform) as aar:
-        names = set(aar.namelist())
-        classes_jar = "classes.jar"
-        if classes_jar not in names:
-            raise SystemExit(f"{platform} is missing {classes_jar}")
-        with zipfile.ZipFile(io.BytesIO(aar.read(classes_jar))) as jar:
-            package_path = RUSTLS_VERIFIER_PACKAGE.replace(".", "/")
-            if not any(
-                name.startswith(package_path) and name.endswith(".class")
-                for name in jar.namelist()
-            ):
-                raise SystemExit(
-                    f"{platform} does not contain the Rustls verifier classes"
-                )
-        if RUSTLS_VERIFIER_PACKAGE not in aar_keep_rules(aar):
-            raise SystemExit(f"{platform} is missing the Rustls consumer keep rule")
-        for license_name in ("LICENSE-APACHE", "LICENSE-MIT", "NOTICE"):
-            expected = "META-INF/licenses/rustls-platform-verifier/" + license_name
-            if expected not in names:
-                raise SystemExit(f"{platform} is missing {expected}")
-        if any(name.startswith("jni/") and not name.endswith("/") for name in names):
-            raise SystemExit(f"{platform} contains native libraries")
-
     # The binding AAR carries the Kotlin API and its private JavaCPP bridge. An
     # Android host of any language takes the C library and the TLS component from
     # a runtime AAR alone, so neither may appear here.

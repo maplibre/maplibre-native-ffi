@@ -1,11 +1,4 @@
-import com.vanniktech.maven.publish.AndroidSingleVariantLibrary
-import com.vanniktech.maven.publish.JavadocJar
-import com.vanniktech.maven.publish.SourcesJar
-
-plugins {
-  id("com.android.library")
-  id("com.vanniktech.maven.publish")
-}
+plugins { id("com.android.library") }
 
 val repositoryRoot = projectDir.resolve("../..")
 val verifierSourceDirectory =
@@ -47,20 +40,6 @@ android {
 tasks.configureEach {
   if (name == "preBuild") {
     dependsOn(verifyRustlsPlatformVerifierSource)
-  }
-}
-
-mavenPublishing {
-  configure(AndroidSingleVariantLibrary(JavadocJar.Empty(), SourcesJar.Sources()))
-  coordinates(
-    groupId = providers.gradleProperty("maplibre.maven.group").get(),
-    artifactId = "maplibre-native-ffi-android-platform",
-    version = providers.gradleProperty("maplibre.maven.version").get(),
-  )
-  publishToMavenCentral()
-  pom {
-    name.set("MapLibre Native FFI Android platform support")
-    description.set("Android platform support for MapLibre Native FFI hosts.")
   }
 }
 

@@ -276,11 +276,20 @@ implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan:0.2026
 ```
 
 A Kotlin/Native target gets the native library from its runtime KLIB. Add the
-Android platform AAR to the module that packages the APK or AAB so that the app
-also carries the TLS component.
+matching runtime AAR directly to the module that packages the APK or AAB so that
+the app also carries the TLS component. Exclude the AAR's shared library because
+the Kotlin/Native host library already contains the static runtime.
 
 ```kotlin title="build.gradle.kts"
-implementation("org.maplibre.nativeffi:maplibre-native-ffi-android-platform:0.202608.0")
+dependencies {
+  implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan-android:0.202608.0")
+}
+
+android {
+  packaging {
+    jniLibs.excludes += "**/libmaplibre-native-c.so"
+  }
+}
 ```
 
 Initialize the platform once before you create a runtime, passing an
