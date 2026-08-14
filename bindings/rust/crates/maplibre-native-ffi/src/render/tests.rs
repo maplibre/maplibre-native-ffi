@@ -2398,7 +2398,8 @@ fn load_cluster_style(runtime: &mut RuntimeHandle, map: &MapHandle, session: &Re
     options.cluster_max_zoom = Some(17.0);
     options.cluster_properties =
         Some(serde_json::to_vec(&json!({"weight_sum": ["+", ["get", "weight"]]})).unwrap());
-    map.add_geojson_source_data("cluster-source", &data, Some(&options))
+    let data = crate::GeoJsonSourceDataHandle::new(&data, Some(&options)).unwrap();
+    map.add_geojson_source_data("cluster-source", &data)
         .unwrap();
 
     let layer = serde_json::to_vec(&json!({

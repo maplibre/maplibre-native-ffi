@@ -1685,6 +1685,67 @@ final class MapSize {
   int get hashCode => Object.hash(width, height, scaleFactor);
 }
 
+/// Owned prepared GeoJSON source data.
+///
+/// [prepare] parses one complete UTF-8 GeoJSON document and tiles or clusters
+/// it into an immutable prepared index with its options baked in. Preparation
+/// needs no runtime or map, and this handle is not pinned to a native thread,
+/// so its isolate keeps using it after resuming from awaited I/O. Like every
+/// owned handle, it belongs to the isolate that created it; its native id is
+/// copiable identity only, so a raw id sent to another isolate cannot become
+/// an operable handle there.
+///
+/// Install calls borrow this handle, so one prepared value may be installed on
+/// any number of sources and closed at any time afterward; [close] never
+/// invalidates a source the data was installed on.
+final class GeoJsonSourceDataHandle {
+  GeoJsonSourceDataHandle._(NativeGeoJsonSourceData handle)
+    : _state = NativeHandleState(
+        handle,
+        'GeoJsonSourceDataHandle',
+        threadAffine: false,
+      );
+
+  /// Parses and tiles one complete UTF-8 GeoJSON document with [options].
+  ///
+  /// Cluster validation happens here: clustering accepts only a feature
+  /// collection whose every feature carries point geometry.
+  factory GeoJsonSourceDataHandle.prepare(
+    Uint8List data, {
+    GeoJsonSourceOptions? options,
+  }) {
+    return withNativeArena((arena) {
+      final nativeData = nativeBufferView(data, arena);
+      final nativeOptions = _nativeGeoJsonSourceOptions(
+        options ?? GeoJsonSourceOptions(),
+        arena,
+      );
+      final outData = arena<Uint64>();
+      outData.value = 0;
+      _check(
+        raw.mln_geojson_source_data_create(nativeData, nativeOptions, outData),
+      );
+      return GeoJsonSourceDataHandle._(NativeGeoJsonSourceData(outData.value));
+    });
+  }
+
+  final NativeHandleState<NativeGeoJsonSourceData> _state;
+
+  /// Whether this prepared data has been closed by the Dart binding.
+  bool get isClosed => _state.isClosed;
+
+  /// Explicitly releases this prepared data.
+  ///
+  /// Sources the data was installed on keep their own reference, so this never
+  /// invalidates a source.
+  void close() {
+    _state.close((handle) {
+      raw.mln_geojson_source_data_destroy(handle.raw);
+      return 0;
+    }, _c.threadLastErrorMessage);
+  }
+}
+
 /// Owner-thread map handle bound to a retained runtime.
 final class MapHandle {
   MapHandle._(this._runtime, NativeMap handle)
@@ -2512,25 +2573,19 @@ final class MapHandle {
     });
   }
 
-  /// Adds a GeoJSON source with inline data.
-  void addGeoJsonSourceData(
-    String sourceId,
-    Uint8List data, {
-    GeoJsonSourceOptions? options,
-  }) {
+  /// Adds a GeoJSON source with prepared inline [data].
+  ///
+  /// The call borrows [data]'s handle and the source retains the prepared
+  /// index, adopting the options the data was prepared with, fixed for the
+  /// lifetime of the source.
+  void addGeoJsonSourceData(String sourceId, GeoJsonSourceDataHandle data) {
     withNativeArena((arena) {
       final nativeId = nativeStringView(sourceId, arena);
-      final nativeData = nativeBufferView(data, arena);
-      final nativeOptions = _nativeGeoJsonSourceOptions(
-        options ?? GeoJsonSourceOptions(),
-        arena,
-      );
       _check(
         raw.mln_map_add_geojson_source_data(
           _handle.raw,
           nativeId.value,
-          nativeData,
-          nativeOptions,
+          data._state.handle.raw,
         ),
       );
     });
@@ -2551,16 +2606,38 @@ final class MapHandle {
     });
   }
 
-  /// Updates one GeoJSON source with inline data.
-  void setGeoJsonSourceData(String sourceId, Uint8List data) {
+  /// Updates one GeoJSON source with prepared inline [data].
+  ///
+  /// The call borrows [data]'s handle. Installing is cheap: the heavy parse
+  /// and tiling already ran in [GeoJsonSourceDataHandle.prepare]. Data whose
+  /// baked-in options differ from the source's is rejected as invalid
+  /// argument, with cluster properties excepted from the comparison.
+  void setGeoJsonSourceData(String sourceId, GeoJsonSourceDataHandle data) {
     withNativeArena((arena) {
       final nativeId = nativeStringView(sourceId, arena);
-      final nativeData = nativeBufferView(data, arena);
       _check(
         raw.mln_map_set_geojson_source_data(
           _handle.raw,
           nativeId.value,
-          nativeData,
+          data._state.handle.raw,
+        ),
+      );
+    });
+  }
+
+  /// Overrides one GeoJSON source's synchronous-tiling behavior at runtime.
+  ///
+  /// Tiles are sliced inline during the update pass when either the source's
+  /// baked-in [GeoJsonSourceOptions.synchronousTiling] option or this override
+  /// enables it.
+  void setGeoJsonSourceSynchronousTiling(String sourceId, bool enabled) {
+    withNativeArena((arena) {
+      final nativeId = nativeStringView(sourceId, arena);
+      _check(
+        raw.mln_map_set_geojson_source_synchronous_tiling(
+          _handle.raw,
+          nativeId.value,
+          enabled,
         ),
       );
     });

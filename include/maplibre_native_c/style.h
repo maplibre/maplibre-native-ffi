@@ -22,6 +22,7 @@ extern "C" {
 
 typedef uint64_t mln_style_id_list;
 typedef uint64_t mln_style_string_list;
+typedef uint64_t mln_geojson_source_data;
 
 /** Style source type values returned by mln_map_get_style_source_type(). */
 typedef enum mln_style_source_type : uint32_t {
@@ -135,7 +136,7 @@ typedef enum mln_geojson_source_option_field : uint32_t {
   MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS = 1U << 8U,
   MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS = 1U << 9U,
   MLN_GEOJSON_SOURCE_OPTION_CLUSTER = 1U << 10U,
-  MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE = 1U << 11U,
+  MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING = 1U << 11U,
 } mln_geojson_source_option_field;
 
 /** Field mask values for mln_custom_geometry_source_options. */
@@ -229,8 +230,9 @@ typedef struct mln_style_tile_source_options {
  * Options for GeoJSON sources.
  *
  * MapLibre Native fixes these options when the source is created, so
- * mln_map_set_geojson_source_url() and mln_map_set_geojson_source_data() keep
- * the options the source was added with.
+ * mln_map_set_geojson_source_url() keeps the options the source was added
+ * with, and mln_map_set_geojson_source_data() requires data prepared with
+ * matching options.
  */
 typedef struct mln_geojson_source_options {
   uint32_t size;
@@ -264,21 +266,22 @@ typedef struct mln_geojson_source_options {
    *
    * Clustering applies to feature collections whose every feature carries point
    * geometry. MapLibre Native clusters feature collections only, so
-   * mln_map_add_geojson_source_data() and mln_map_set_geojson_source_data()
-   * reject a bare geometry or a single feature, along with a feature collection
-   * that mixes in other geometry. An empty feature collection stays accepted
-   * and carries nothing to cluster.
+   * mln_geojson_source_data_create() rejects a bare geometry or a single
+   * feature, along with a feature collection that mixes in other geometry. An
+   * empty feature collection stays accepted and carries nothing to cluster.
    */
   bool cluster;
   /**
-   * Applies data updates synchronously. Defaults to false.
+   * Slices requested tiles inline during the update pass. Defaults to false.
    *
-   * MapLibre Native normally tiles updated GeoJSON data on a worker and shows
-   * it in a later frame. When this is set, tiling runs inline during the update
-   * pass, so data set through mln_map_set_geojson_source_data() reaches the
-   * next rendered frame at the cost of that work running on the update thread.
+   * MapLibre Native normally slices tiles out of the prepared data index on a
+   * worker and shows them in a later frame. When this is set, slicing runs
+   * inline, so data installed through mln_map_set_geojson_source_data() reaches
+   * the next rendered frame at the cost of that work running on the update
+   * thread. mln_map_set_geojson_source_synchronous_tiling() overrides this at
+   * runtime.
    */
-  bool synchronous_update;
+  bool synchronous_tiling;
 } mln_geojson_source_options;
 
 /** Canonical tile identity used by custom geometry source callbacks. */
@@ -757,29 +760,71 @@ MLN_API mln_status mln_map_add_geojson_source_url(
 ) MLN_NOEXCEPT;
 
 /**
- * Adds a GeoJSON source with inline data.
+ * Prepares GeoJSON source data for installation on a map.
  *
- * source_id, data, and options are borrowed for the call. The accepted GeoJSON
- * bytes are parsed into MapLibre Native before return. options may be null
- * for defaults, and the options are fixed for the lifetime of the source.
+ * data and options are borrowed for the call. The UTF-8 GeoJSON bytes are
+ * parsed and tiled (or clustered) into the index a GeoJSON source consumes,
+ * which is the expensive part of a data update. options may be null for
+ * defaults; the options are baked into the prepared data and must match the
+ * options of every source the data is installed on.
  *
  * When options enable clustering, the data must be a feature collection whose
- * every feature carries point geometry. Data that does not is rejected, and the
- * thread-local diagnostic names the source and the constraint.
+ * every feature carries point geometry. Data that does not is rejected, and
+ * the thread-local diagnostic names the constraint.
+ *
+ * This entry point is callable from any thread and touches no runtime or map,
+ * so a host prepares data on a worker thread and installs it on the map owner
+ * thread. The prepared data is immutable; create, read, and destroy may each
+ * happen on different threads.
+ *
+ * *out_data must be MLN_HANDLE_NULL on entry. On success it receives an owned
+ * handle the host releases with mln_geojson_source_data_destroy(). Installing
+ * the data borrows the handle, so one prepared handle may be installed on any
+ * number of sources and destroyed at any time afterward.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when data is empty or invalid, options is
+ *   invalid, out_data is null or *out_data is not MLN_HANDLE_NULL, or
+ *   clustering is enabled and the data is a bare geometry or a single feature,
+ *   or a feature carries geometry other than a point.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_geojson_source_data_create(
+  mln_buffer_view data, const mln_geojson_source_options* options,
+  mln_geojson_source_data* out_data
+) MLN_NOEXCEPT;
+
+/**
+ * Releases prepared GeoJSON source data.
+ *
+ * Callable from any thread. A null or already-released handle is a no-op.
+ * Sources the data was installed on keep their own reference, so destroying
+ * the handle never invalidates a source.
+ */
+MLN_API void mln_geojson_source_data_destroy(
+  mln_geojson_source_data data
+) MLN_NOEXCEPT;
+
+/**
+ * Adds a GeoJSON source with prepared inline data.
+ *
+ * source_id is borrowed for the call. data names a live handle from
+ * mln_geojson_source_data_create(); the call borrows the handle and retains
+ * the prepared index, and the source adopts the options the data was prepared
+ * with, fixed for the lifetime of the source.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, data is empty or invalid, options is invalid, the source
- *   ID already exists, or clustering is enabled and the data is a bare geometry
- *   or a single feature, or a feature carries geometry other than a point.
+ *   invalid or empty, data is null or not live, or the source ID already
+ *   exists.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
  *   thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_add_geojson_source_data(
-  mln_map map, mln_buffer_view source_id, mln_buffer_view data,
-  const mln_geojson_source_options* options
+  mln_map map, mln_buffer_view source_id, mln_geojson_source_data data
 ) MLN_NOEXCEPT;
 
 /**
@@ -802,30 +847,55 @@ MLN_API mln_status mln_map_set_geojson_source_url(
 ) MLN_NOEXCEPT;
 
 /**
- * Updates one GeoJSON source with inline data.
+ * Updates one GeoJSON source with prepared inline data.
  *
- * source_id and UTF-8 GeoJSON data are borrowed for the call and parsed before
- * return. The source keeps the
- * mln_geojson_source_options it was added with.
+ * source_id is borrowed for the call. data names a live handle from
+ * mln_geojson_source_data_create(); the call borrows the handle and retains
+ * the prepared index, which makes this a cheap install: the expensive parse
+ * and tiling already happened when the data was prepared. Requested tiles are
+ * still sliced out of the index on a worker unless synchronous tiling is on.
  *
- * When the source was added with clustering enabled, the data must be a feature
- * collection whose every feature carries point geometry. Data that does not is
- * rejected, and the thread-local diagnostic names the source and the
- * constraint.
+ * The data must have been prepared with options equal to the options the
+ * source was added with, cluster_properties excepted, which this call does not
+ * compare. A mismatch is rejected, because MapLibre Native fixes a source's
+ * options at creation and data prepared under different options would tile
+ * inconsistently with them.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, data is empty or invalid, the source does not exist, the
- *   source is not a GeoJSON source, or the source clusters and the data is a
- *   bare geometry or a single feature, or a feature carries geometry other than
- *   a point.
+ *   invalid or empty, data is null or not live, the source does not exist, the
+ *   source is not a GeoJSON source, or the data was prepared with options that
+ *   do not match the source's options.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
  *   thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_set_geojson_source_data(
-  mln_map map, mln_buffer_view source_id, mln_buffer_view data
+  mln_map map, mln_buffer_view source_id, mln_geojson_source_data data
+) MLN_NOEXCEPT;
+
+/**
+ * Overrides one GeoJSON source's synchronous tiling at runtime.
+ *
+ * source_id is borrowed for the call. While enabled is true, the source slices
+ * requested tiles inline during the update pass, as if the source's options
+ * had set synchronous_tiling; false restores the option the source was added
+ * with. The override applies to update passes after this call returns. Hosts
+ * enable it around high-frequency small updates, such as a tracked position,
+ * so each installed update reaches the next rendered frame.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
+ *   invalid or empty, the source does not exist, or the source is not a
+ *   GeoJSON source.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_set_geojson_source_synchronous_tiling(
+  mln_map map, mln_buffer_view source_id, bool enabled
 ) MLN_NOEXCEPT;
 
 /**

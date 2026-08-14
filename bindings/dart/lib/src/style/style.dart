@@ -278,7 +278,7 @@ final class GeoJsonSourceOptions {
     this.clusterMinPoints,
     this.lineMetrics,
     this.cluster,
-    this.synchronousUpdate,
+    this.synchronousTiling,
   }) : clusterProperties = copyOptionalBytes(clusterProperties);
 
   /// Optional minimum tiling zoom.
@@ -314,9 +314,10 @@ final class GeoJsonSourceOptions {
   /// Optional point-clustering switch.
   final bool? cluster;
 
-  /// Optional synchronous-update switch. When set, data updates are tiled
-  /// inline so they reach the next rendered frame instead of a later one.
-  final bool? synchronousUpdate;
+  /// Optional synchronous-tiling switch. When set, requested tiles are sliced
+  /// inline during the update pass, so installed data reaches the next rendered
+  /// frame instead of a later one.
+  final bool? synchronousTiling;
 
   @override
   bool operator ==(Object other) =>
@@ -332,7 +333,7 @@ final class GeoJsonSourceOptions {
       other.clusterMinPoints == clusterMinPoints &&
       other.lineMetrics == lineMetrics &&
       other.cluster == cluster &&
-      other.synchronousUpdate == synchronousUpdate;
+      other.synchronousTiling == synchronousTiling;
 
   @override
   int get hashCode => Object.hash(
@@ -347,7 +348,7 @@ final class GeoJsonSourceOptions {
     clusterMinPoints,
     lineMetrics,
     cluster,
-    synchronousUpdate,
+    synchronousTiling,
   );
 }
 

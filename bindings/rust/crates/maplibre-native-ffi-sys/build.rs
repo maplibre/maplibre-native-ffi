@@ -102,7 +102,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         // keeps a map from being passed where a runtime is expected.
         .new_type_alias(concat!(
             "^mln_(buffer|runtime|map|map_projection|render_session|wake_source",
-            "|resource_request_handle|offline_region_snapshot",
+            "|resource_request_handle|geojson_source_data|offline_region_snapshot",
             "|offline_region_list|style_id_list|style_string_list)$"
         ))
         .prepend_enum_name(false)

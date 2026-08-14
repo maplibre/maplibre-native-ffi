@@ -101,14 +101,16 @@ auto map_add_geojson_source_url(
   const mln_geojson_source_options* options
 ) -> mln_status;
 auto map_add_geojson_source_data(
-  mln_map map, mln_buffer_view source_id, mln_buffer_view data,
-  const mln_geojson_source_options* options
+  mln_map map, mln_buffer_view source_id, mln_geojson_source_data data
 ) -> mln_status;
 auto map_set_geojson_source_url(
   mln_map map, mln_buffer_view source_id, mln_buffer_view url
 ) -> mln_status;
 auto map_set_geojson_source_data(
-  mln_map map, mln_buffer_view source_id, mln_buffer_view data
+  mln_map map, mln_buffer_view source_id, mln_geojson_source_data data
+) -> mln_status;
+auto map_set_geojson_source_synchronous_tiling(
+  mln_map map, mln_buffer_view source_id, bool enabled
 ) -> mln_status;
 auto map_add_vector_source_url(
   mln_map map, mln_buffer_view source_id, mln_buffer_view url,

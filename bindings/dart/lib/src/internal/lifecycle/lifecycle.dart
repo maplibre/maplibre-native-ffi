@@ -59,6 +59,7 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
     int? ownerIsolateHash,
     int? ownerThreadToken,
     bool leakReporting = true,
+    this.threadAffine = true,
   }) : _ownerIsolateHash = ownerIsolateHash ?? Isolate.current.hashCode,
        _ownerThreadToken = ownerThreadToken ?? _threadToken() {
     if (_handle.isNull) {
@@ -82,6 +83,13 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
 
   /// Native handle type name used in diagnostics.
   final String typeName;
+
+  /// Whether the C API pins this handle kind to its creating native thread.
+  ///
+  /// A non-affine handle is callable from any native thread, so its owner
+  /// isolate keeps using it after the Dart VM moves the isolate to another
+  /// thread on resuming from awaited I/O.
+  final bool threadAffine;
 
   /// Whether this binding object has released its native handle.
   bool get isClosed => _closed;
@@ -115,7 +123,7 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
     if (Isolate.current.hashCode != _ownerIsolateHash) {
       throwWrongThread('$typeName belongs to a different Dart isolate');
     }
-    if (_threadToken() != _ownerThreadToken) {
+    if (threadAffine && _threadToken() != _ownerThreadToken) {
       // Same isolate, different native thread: every native call on this
       // handle would now fail, including close, which leaks it permanently.
       throwWrongThread(

@@ -40,7 +40,9 @@ test "style layer JSON helpers manage lifecycle and order" {
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
-    try map.addGeoJsonSourceData(testing.allocator, "empty-layer-source", "{\"type\":\"FeatureCollection\",\"features\":[]}", null);
+    const empty_data = try maplibre.GeoJsonSourceDataHandle.create(testing.allocator, "{\"type\":\"FeatureCollection\",\"features\":[]}", null);
+    defer empty_data.release();
+    try map.addGeoJsonSourceData(testing.allocator, "empty-layer-source", empty_data);
     try map.addStyleLayerJson(testing.allocator, "{\"id\":\"empty-circle\",\"type\":\"circle\",\"source\":\"empty-layer-source\"}", "point-circle");
     try testing.expect(try map.styleLayerExists("empty-circle"));
 

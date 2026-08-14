@@ -23,7 +23,7 @@ import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIU
 import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS
 import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM
 import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM
-import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE
+import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING
 import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE
 import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_IMAGE_OPTION_CONTENT
@@ -341,9 +341,9 @@ internal object StyleStructs {
       native.fields = native.fields or MLN_GEOJSON_SOURCE_OPTION_CLUSTER
       native.cluster = it
     }
-    value.synchronousUpdate?.let {
-      native.fields = native.fields or MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE
-      native.synchronous_update = it
+    value.synchronousTiling?.let {
+      native.fields = native.fields or MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING
+      native.synchronous_tiling = it
     }
     return native.ptr
   }

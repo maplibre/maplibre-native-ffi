@@ -924,37 +924,59 @@ public sealed unsafe class MapHandle : IDisposable
         );
     }
 
-    /// <summary>Adds a GeoJSON source with inline data.</summary>
+    /// <summary>Adds a GeoJSON source backed by prepared data.</summary>
     /// <remarks>
-    /// <paramref name="options" /> is fixed when the source is created;
-    /// <see cref="SetGeoJsonSourceUrl" /> and <see cref="SetGeoJsonSourceData" /> keep it.
+    /// The call borrows <paramref name="data" />; the source adopts the options baked into it
+    /// when the data was prepared and keeps its own reference, so the handle may be released
+    /// afterward.
     /// </remarks>
-    public void AddGeoJsonSourceData(string sourceId, byte[] data, GeoJsonSourceOptions? options)
+    public void AddGeoJsonSourceData(string sourceId, GeoJsonSourceDataHandle data)
     {
+        ArgumentNullException.ThrowIfNull(data);
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
-        using var nativeData = NativeStringView.From(data, nameof(data));
-        using var nativeOptions = options is null ? null : NativeGeoJsonSourceOptions.From(options);
-        var optionsValue = nativeOptions?.Value ?? default;
-        NativeStatus.Check(
-            NativeMethods.mln_map_add_geojson_source_data(
-                Handle,
-                nativeSourceId.Value,
-                nativeData.Value,
-                nativeOptions is null ? null : &optionsValue
+        data.WithLive(prepared =>
+            NativeStatus.Check(
+                NativeMethods.mln_map_add_geojson_source_data(
+                    Handle,
+                    nativeSourceId.Value,
+                    prepared
+                )
             )
         );
     }
 
-    /// <summary>Updates a GeoJSON source with inline data.</summary>
-    public void SetGeoJsonSourceData(string sourceId, byte[] data)
+    /// <summary>Updates a GeoJSON source with prepared data.</summary>
+    /// <remarks>
+    /// The call borrows <paramref name="data" /> and fails when the options baked into it
+    /// differ from the source's, except for cluster properties.
+    /// </remarks>
+    public void SetGeoJsonSourceData(string sourceId, GeoJsonSourceDataHandle data)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        data.WithLive(prepared =>
+            NativeStatus.Check(
+                NativeMethods.mln_map_set_geojson_source_data(
+                    Handle,
+                    nativeSourceId.Value,
+                    prepared
+                )
+            )
+        );
+    }
+
+    /// <summary>Overrides synchronous tiling for a GeoJSON source.</summary>
+    /// <remarks>
+    /// The effective behavior is the source's baked-in option OR this override.
+    /// </remarks>
+    public void SetGeoJsonSourceSynchronousTiling(string sourceId, bool enabled)
     {
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
-        using var nativeData = NativeStringView.From(data, nameof(data));
         NativeStatus.Check(
-            NativeMethods.mln_map_set_geojson_source_data(
+            NativeMethods.mln_map_set_geojson_source_synchronous_tiling(
                 Handle,
                 nativeSourceId.Value,
-                nativeData.Value
+                enabled ? (byte)1 : (byte)0
             )
         );
     }

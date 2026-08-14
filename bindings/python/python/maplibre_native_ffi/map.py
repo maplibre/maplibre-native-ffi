@@ -42,6 +42,7 @@ from .style import (
     CanonicalTileId,
     CustomGeometrySourceHandle,
     CustomGeometrySourceOptions,
+    GeoJsonSourceDataHandle,
     GeoJsonSourceOptions,
     ImageStretch,
     LocationIndicatorImageKind,
@@ -53,6 +54,7 @@ from .style import (
     StyleSourceType,
     StyleTransitionOptions,
     TileSourceOptions,
+    _geojson_source_parts,
 )
 
 _MAP_HANDLE_CREATE_KEY = object()
@@ -376,53 +378,6 @@ def _tile_source_parts(
     )
 
 
-def _geojson_source_parts(
-    options: GeoJsonSourceOptions | None,
-) -> tuple[
-    float | None,
-    float | None,
-    float | None,
-    float | None,
-    bytes | None,
-    int | None,
-    int | None,
-    int | None,
-    int | None,
-    bool | None,
-    bool | None,
-    bool | None,
-]:
-    if options is None:
-        return (
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
-    return (
-        options.min_zoom,
-        options.max_zoom,
-        options.tolerance,
-        options.cluster_max_zoom,
-        options.cluster_properties,
-        options.tile_size,
-        options.buffer,
-        options.cluster_radius,
-        options.cluster_min_points,
-        options.line_metrics,
-        options.cluster,
-        options.synchronous_update,
-    )
-
-
 def projected_meters_for_lat_lng(coordinate: LatLng) -> ProjectedMeters:
     """Convert a geographic coordinate to spherical Mercator projected meters."""
     raw = _native.projected_meters_for_lat_lng(
@@ -722,21 +677,38 @@ class MapHandle(NativeHandleMixin):
     def add_geojson_source_data(
         self,
         source_id: str,
-        data: bytes,
-        options: GeoJsonSourceOptions | None = None,
+        data: GeoJsonSourceDataHandle,
     ) -> None:
-        """Add a GeoJSON source with inline data."""
-        self._native.add_geojson_source_data(
-            source_id, data, *_geojson_source_parts(options)
-        )
+        """Add a GeoJSON source backed by prepared data.
+
+        The call borrows the handle, and the source adopts the options the
+        data was prepared with.
+        """
+        self._native.add_geojson_source_data(source_id, data._native)
 
     def set_geojson_source_url(self, source_id: str, url: str) -> None:
         """Update one GeoJSON source to load data from a URL."""
         self._native.set_geojson_source_url(source_id, url)
 
-    def set_geojson_source_data(self, source_id: str, data: bytes) -> None:
-        """Update one GeoJSON source with inline data."""
-        self._native.set_geojson_source_data(source_id, data)
+    def set_geojson_source_data(
+        self, source_id: str, data: GeoJsonSourceDataHandle
+    ) -> None:
+        """Update one GeoJSON source with prepared data.
+
+        The call borrows the handle and rejects data whose baked-in options
+        differ from the source's, cluster properties excepted.
+        """
+        self._native.set_geojson_source_data(source_id, data._native)
+
+    def set_geojson_source_synchronous_tiling(
+        self, source_id: str, enabled: bool
+    ) -> None:
+        """Override one GeoJSON source's synchronous tiling at runtime.
+
+        Tiling runs inline when either the source's baked-in option or this
+        override enables it.
+        """
+        self._native.set_geojson_source_synchronous_tiling(source_id, enabled)
 
     def _add_tile_source_url(
         self,

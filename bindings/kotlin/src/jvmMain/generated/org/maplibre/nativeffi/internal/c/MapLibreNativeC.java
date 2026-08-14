@@ -11557,14 +11557,14 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     public static int MLN_GEOJSON_SOURCE_OPTION_CLUSTER() {
         return MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
     }
-    private static final int MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE = (int)2048L;
+    private static final int MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING = (int)2048L;
     /**
      * {@snippet lang=c :
-     * enum mln_geojson_source_option_field.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE = 2048
+     * enum mln_geojson_source_option_field.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING = 2048
      * }
      */
-    public static int MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE() {
-        return MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE;
+    public static int MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING() {
+        return MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING;
     }
     private static final int MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM = (int)1L;
     /**
@@ -13137,13 +13137,133 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         }
     }
 
+    private static class mln_geojson_source_data_create {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            mln_buffer_view.layout(),
+            MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_geojson_source_data_create");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_geojson_source_data_create(mln_buffer_view data, const mln_geojson_source_options *options, mln_geojson_source_data *out_data)
+     * }
+     */
+    public static FunctionDescriptor mln_geojson_source_data_create$descriptor() {
+        return mln_geojson_source_data_create.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_geojson_source_data_create(mln_buffer_view data, const mln_geojson_source_options *options, mln_geojson_source_data *out_data)
+     * }
+     */
+    public static MethodHandle mln_geojson_source_data_create$handle() {
+        return mln_geojson_source_data_create.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_geojson_source_data_create(mln_buffer_view data, const mln_geojson_source_options *options, mln_geojson_source_data *out_data)
+     * }
+     */
+    public static MemorySegment mln_geojson_source_data_create$address() {
+        return mln_geojson_source_data_create.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_geojson_source_data_create(mln_buffer_view data, const mln_geojson_source_options *options, mln_geojson_source_data *out_data)
+     * }
+     */
+    public static int mln_geojson_source_data_create(MemorySegment data, MemorySegment options, MemorySegment out_data) {
+        var mh$ = mln_geojson_source_data_create.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_geojson_source_data_create", data, options, out_data);
+            }
+            return (int)mh$.invokeExact(data, options, out_data);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_geojson_source_data_destroy {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.ofVoid(
+            MapLibreNativeC.C_LONG
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_geojson_source_data_destroy");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * void mln_geojson_source_data_destroy(mln_geojson_source_data data)
+     * }
+     */
+    public static FunctionDescriptor mln_geojson_source_data_destroy$descriptor() {
+        return mln_geojson_source_data_destroy.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * void mln_geojson_source_data_destroy(mln_geojson_source_data data)
+     * }
+     */
+    public static MethodHandle mln_geojson_source_data_destroy$handle() {
+        return mln_geojson_source_data_destroy.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * void mln_geojson_source_data_destroy(mln_geojson_source_data data)
+     * }
+     */
+    public static MemorySegment mln_geojson_source_data_destroy$address() {
+        return mln_geojson_source_data_destroy.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * void mln_geojson_source_data_destroy(mln_geojson_source_data data)
+     * }
+     */
+    public static void mln_geojson_source_data_destroy(long data) {
+        var mh$ = mln_geojson_source_data_destroy.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_geojson_source_data_destroy", data);
+            }
+            mh$.invokeExact(data);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
     private static class mln_map_add_geojson_source_data {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
-            mln_buffer_view.layout(),
-            MapLibreNativeC.C_POINTER
+            MapLibreNativeC.C_LONG
         );
 
         public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_add_geojson_source_data");
@@ -13154,7 +13274,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_geojson_source_data(mln_map map, mln_buffer_view source_id, mln_buffer_view data, const mln_geojson_source_options *options)
+     * mln_status mln_map_add_geojson_source_data(mln_map map, mln_buffer_view source_id, mln_geojson_source_data data)
      * }
      */
     public static FunctionDescriptor mln_map_add_geojson_source_data$descriptor() {
@@ -13164,7 +13284,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_geojson_source_data(mln_map map, mln_buffer_view source_id, mln_buffer_view data, const mln_geojson_source_options *options)
+     * mln_status mln_map_add_geojson_source_data(mln_map map, mln_buffer_view source_id, mln_geojson_source_data data)
      * }
      */
     public static MethodHandle mln_map_add_geojson_source_data$handle() {
@@ -13174,7 +13294,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_add_geojson_source_data(mln_map map, mln_buffer_view source_id, mln_buffer_view data, const mln_geojson_source_options *options)
+     * mln_status mln_map_add_geojson_source_data(mln_map map, mln_buffer_view source_id, mln_geojson_source_data data)
      * }
      */
     public static MemorySegment mln_map_add_geojson_source_data$address() {
@@ -13183,16 +13303,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_add_geojson_source_data(mln_map map, mln_buffer_view source_id, mln_buffer_view data, const mln_geojson_source_options *options)
+     * mln_status mln_map_add_geojson_source_data(mln_map map, mln_buffer_view source_id, mln_geojson_source_data data)
      * }
      */
-    public static int mln_map_add_geojson_source_data(long map, MemorySegment source_id, MemorySegment data, MemorySegment options) {
+    public static int mln_map_add_geojson_source_data(long map, MemorySegment source_id, long data) {
         var mh$ = mln_map_add_geojson_source_data.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_add_geojson_source_data", map, source_id, data, options);
+                traceDowncall("mln_map_add_geojson_source_data", map, source_id, data);
             }
-            return (int)mh$.invokeExact(map, source_id, data, options);
+            return (int)mh$.invokeExact(map, source_id, data);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -13267,7 +13387,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
             mln_buffer_view.layout(),
-            mln_buffer_view.layout()
+            MapLibreNativeC.C_LONG
         );
 
         public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_set_geojson_source_data");
@@ -13278,7 +13398,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_geojson_source_data(mln_map map, mln_buffer_view source_id, mln_buffer_view data)
+     * mln_status mln_map_set_geojson_source_data(mln_map map, mln_buffer_view source_id, mln_geojson_source_data data)
      * }
      */
     public static FunctionDescriptor mln_map_set_geojson_source_data$descriptor() {
@@ -13288,7 +13408,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_geojson_source_data(mln_map map, mln_buffer_view source_id, mln_buffer_view data)
+     * mln_status mln_map_set_geojson_source_data(mln_map map, mln_buffer_view source_id, mln_geojson_source_data data)
      * }
      */
     public static MethodHandle mln_map_set_geojson_source_data$handle() {
@@ -13298,7 +13418,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_set_geojson_source_data(mln_map map, mln_buffer_view source_id, mln_buffer_view data)
+     * mln_status mln_map_set_geojson_source_data(mln_map map, mln_buffer_view source_id, mln_geojson_source_data data)
      * }
      */
     public static MemorySegment mln_map_set_geojson_source_data$address() {
@@ -13307,16 +13427,78 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_set_geojson_source_data(mln_map map, mln_buffer_view source_id, mln_buffer_view data)
+     * mln_status mln_map_set_geojson_source_data(mln_map map, mln_buffer_view source_id, mln_geojson_source_data data)
      * }
      */
-    public static int mln_map_set_geojson_source_data(long map, MemorySegment source_id, MemorySegment data) {
+    public static int mln_map_set_geojson_source_data(long map, MemorySegment source_id, long data) {
         var mh$ = mln_map_set_geojson_source_data.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
                 traceDowncall("mln_map_set_geojson_source_data", map, source_id, data);
             }
             return (int)mh$.invokeExact(map, source_id, data);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_map_set_geojson_source_synchronous_tiling {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            mln_buffer_view.layout(),
+            MapLibreNativeC.C_BOOL
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_set_geojson_source_synchronous_tiling");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_map_set_geojson_source_synchronous_tiling(mln_map map, mln_buffer_view source_id, bool enabled)
+     * }
+     */
+    public static FunctionDescriptor mln_map_set_geojson_source_synchronous_tiling$descriptor() {
+        return mln_map_set_geojson_source_synchronous_tiling.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_map_set_geojson_source_synchronous_tiling(mln_map map, mln_buffer_view source_id, bool enabled)
+     * }
+     */
+    public static MethodHandle mln_map_set_geojson_source_synchronous_tiling$handle() {
+        return mln_map_set_geojson_source_synchronous_tiling.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_map_set_geojson_source_synchronous_tiling(mln_map map, mln_buffer_view source_id, bool enabled)
+     * }
+     */
+    public static MemorySegment mln_map_set_geojson_source_synchronous_tiling$address() {
+        return mln_map_set_geojson_source_synchronous_tiling.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_map_set_geojson_source_synchronous_tiling(mln_map map, mln_buffer_view source_id, bool enabled)
+     * }
+     */
+    public static int mln_map_set_geojson_source_synchronous_tiling(long map, MemorySegment source_id, boolean enabled) {
+        var mh$ = mln_map_set_geojson_source_synchronous_tiling.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_map_set_geojson_source_synchronous_tiling", map, source_id, enabled);
+            }
+            return (int)mh$.invokeExact(map, source_id, enabled);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {

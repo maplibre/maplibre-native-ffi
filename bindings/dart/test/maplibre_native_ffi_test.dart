@@ -1512,29 +1512,64 @@ void main() {
     );
     expect(map.removeStyleSource('dart-geojson-url-source'), isTrue);
     expect(
-      () => map.addGeoJsonSourceData(
-        'dart-invalid-geojson-options',
+      () => GeoJsonSourceDataHandle.prepare(
         _jsonBytes('{"type":"FeatureCollection","features":[]}'),
         options: GeoJsonSourceOptions(tileSize: 4294967296),
       ),
       throwsA(isA<InvalidArgumentException>()),
     );
-    map.addGeoJsonSourceData(
-      'dart-clustered-geojson-source',
+    // Cluster validation runs at preparation: clustering rejects a bare
+    // geometry because it accepts only point-feature collections.
+    expect(
+      () => GeoJsonSourceDataHandle.prepare(
+        _jsonBytes('{"type":"Point","coordinates":[0,0]}'),
+        options: GeoJsonSourceOptions(cluster: true),
+      ),
+      throwsA(isA<InvalidArgumentException>()),
+    );
+    final clusteredData = GeoJsonSourceDataHandle.prepare(
       _jsonBytes(
         '{"type":"FeatureCollection","features":[{"type":"Feature",'
         '"geometry":{"type":"Point","coordinates":[0,0]},"properties":{}}]}',
       ),
       options: GeoJsonSourceOptions(cluster: true, clusterRadius: 60),
     );
+    map.addGeoJsonSourceData('dart-clustered-geojson-source', clusteredData);
+    // Installing rejects data whose baked-in options differ from the source's.
+    final plainData = GeoJsonSourceDataHandle.prepare(
+      _jsonBytes('{"type":"Point","coordinates":[0,0]}'),
+    );
     expect(
-      () => map.setGeoJsonSourceData(
-        'dart-clustered-geojson-source',
-        _jsonBytes('{"type":"Point","coordinates":[0,0]}'),
-      ),
+      () =>
+          map.setGeoJsonSourceData('dart-clustered-geojson-source', plainData),
       throwsA(isA<InvalidArgumentException>()),
     );
+    plainData.close();
+    map.setGeoJsonSourceSynchronousTiling(
+      'dart-clustered-geojson-source',
+      true,
+    );
+    map.setGeoJsonSourceSynchronousTiling(
+      'dart-clustered-geojson-source',
+      false,
+    );
+    expect(
+      () => map.setGeoJsonSourceSynchronousTiling('missing-source', true),
+      throwsA(isA<InvalidArgumentException>()),
+    );
+    // One prepared handle installs on any number of sources.
+    map.addGeoJsonSourceData('dart-clustered-geojson-copy', clusteredData);
+    clusteredData.close();
+    // Closing the handle never invalidates a source it was installed on.
+    expect(map.styleSourceExists('dart-clustered-geojson-source'), isTrue);
+    expect(map.removeStyleSource('dart-clustered-geojson-copy'), isTrue);
     expect(map.removeStyleSource('dart-clustered-geojson-source'), isTrue);
+    clusteredData.close();
+    expect(clusteredData.isClosed, isTrue);
+    expect(
+      () => map.addGeoJsonSourceData('dart-closed-data', clusteredData),
+      throwsA(isA<InvalidArgumentException>()),
+    );
     map.addVectorSourceUrl(
       'dart-vector-source',
       'https://example.com/vector.json',
@@ -1721,13 +1756,14 @@ void main() {
     );
     expect(map.removeStyleSource('dart-custom-source'), isTrue);
 
-    map.addGeoJsonSourceData(
-      'dart-geojson-source',
+    final geoJsonData = GeoJsonSourceDataHandle.prepare(
       _jsonBytes(
         '{"type":"Feature","geometry":{"type":"Point","coordinates":[0,0]},'
         '"properties":{"kind":"dart"}}',
       ),
     );
+    map.addGeoJsonSourceData('dart-geojson-source', geoJsonData);
+    geoJsonData.close();
     expect(map.styleSourceExists('dart-geojson-source'), isTrue);
     final info = map.getStyleSourceInfo('dart-geojson-source');
     expect(info, isNotNull);
@@ -1736,10 +1772,11 @@ void main() {
     expect(info.attribution, isNull);
     expect(map.listStyleSourceIds(), contains('dart-geojson-source'));
 
-    map.setGeoJsonSourceData(
-      'dart-geojson-source',
+    final updatedGeoJsonData = GeoJsonSourceDataHandle.prepare(
       _jsonBytes('{"type":"Point","coordinates":[2,1]}'),
     );
+    map.setGeoJsonSourceData('dart-geojson-source', updatedGeoJsonData);
+    updatedGeoJsonData.close();
     map.addStyleLayerJson(
       _jsonBytes(
         '{"id":"dart-circle-layer","type":"circle","source":"dart-geojson-source"}',

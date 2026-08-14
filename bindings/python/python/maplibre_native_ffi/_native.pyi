@@ -242,27 +242,18 @@ class _MapHandle:
         cluster_min_points: int | None,
         line_metrics: bool | None,
         cluster: bool | None,
-        synchronous_update: bool | None,
+        synchronous_tiling: bool | None,
     ) -> None: ...
     def add_geojson_source_data(
-        self,
-        source_id: str,
-        data: bytes,
-        min_zoom: float | None,
-        max_zoom: float | None,
-        tolerance: float | None,
-        cluster_max_zoom: float | None,
-        cluster_properties: bytes | None,
-        tile_size: int | None,
-        buffer: int | None,
-        cluster_radius: int | None,
-        cluster_min_points: int | None,
-        line_metrics: bool | None,
-        cluster: bool | None,
-        synchronous_update: bool | None,
+        self, source_id: str, data: "_GeoJsonSourceDataHandle"
     ) -> None: ...
     def set_geojson_source_url(self, source_id: str, url: str) -> None: ...
-    def set_geojson_source_data(self, source_id: str, data: bytes) -> None: ...
+    def set_geojson_source_data(
+        self, source_id: str, data: "_GeoJsonSourceDataHandle"
+    ) -> None: ...
+    def set_geojson_source_synchronous_tiling(
+        self, source_id: str, enabled: bool
+    ) -> None: ...
     def add_vector_source_url(
         self,
         source_id: str,
@@ -493,6 +484,11 @@ class _MapProjectionHandle:
     def pixel_for_lat_lng(self, latitude: float, longitude: float) -> _WireDict: ...
     def lat_lng_for_pixel(self, x: float, y: float) -> _WireDict: ...
 
+class _GeoJsonSourceDataHandle:
+    @property
+    def closed(self) -> bool: ...
+    def close(self) -> None: ...
+
 class _RenderSessionHandle:
     @property
     def closed(self) -> bool: ...
@@ -702,6 +698,21 @@ def supported_opengl_context_providers_raw() -> int: ...
 def render_target_extent_physical_size(
     width: int, height: int, scale_factor: float
 ) -> tuple[int, int]: ...
+def create_geojson_source_data(
+    data: bytes,
+    min_zoom: float | None,
+    max_zoom: float | None,
+    tolerance: float | None,
+    cluster_max_zoom: float | None,
+    cluster_properties: bytes | None,
+    tile_size: int | None,
+    buffer: int | None,
+    cluster_radius: int | None,
+    cluster_min_points: int | None,
+    line_metrics: bool | None,
+    cluster: bool | None,
+    synchronous_tiling: bool | None,
+) -> _GeoJsonSourceDataHandle: ...
 def network_status_raw() -> int: ...
 def set_network_status_raw(raw_status: int) -> None: ...
 def set_network_status_raw_unchecked_for_test(raw_status: int) -> None: ...

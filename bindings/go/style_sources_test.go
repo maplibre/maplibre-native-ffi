@@ -268,8 +268,16 @@ func TestStyleSourceInfoCopiesReconstructibleMetadata(t *testing.T) {
 		t.Fatalf("StyleSourceInfo(url-vector) optional loaded fields = (%v, %v), want absent", urlInfo.TileJSON, urlInfo.Attribution)
 	}
 
-	data := []byte(`{"type":"FeatureCollection","features":[]}`)
-	if err := m.AddGeoJSONSourceData("inline-geojson", data, nil); err != nil {
+	data, err := NewGeoJSONSourceData([]byte(`{"type":"FeatureCollection","features":[]}`), nil)
+	if err != nil {
+		t.Fatalf("NewGeoJSONSourceData(): %v", err)
+	}
+	defer func() {
+		if err := data.Close(); err != nil {
+			t.Errorf("GeoJSONSourceDataHandle Close(): %v", err)
+		}
+	}()
+	if err := m.AddGeoJSONSourceData("inline-geojson", data); err != nil {
 		t.Fatalf("AddGeoJSONSourceData(): %v", err)
 	}
 	geoJSONInfo, found, err := m.StyleSourceInfo("inline-geojson")
@@ -281,7 +289,7 @@ func TestStyleSourceInfoCopiesReconstructibleMetadata(t *testing.T) {
 	}
 }
 
-func TestGeoJSONSourceDataBuffers(t *testing.T) {
+func TestGeoJSONSourceDataPrepareAndInstall(t *testing.T) {
 	lockOSThreadForTest(t)
 
 	runtime, err := NewRuntime()
@@ -305,7 +313,7 @@ func TestGeoJSONSourceDataBuffers(t *testing.T) {
 	if err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
-	data := []byte(`{"type":"FeatureCollection","features":[{"type":"Feature","id":"feature-1","geometry":{"type":"LineString","coordinates":[[2,1],[4,3]]},"properties":{"name":"before","rank":7}}]}`)
+	document := []byte(`{"type":"FeatureCollection","features":[{"type":"Feature","id":"feature-1","geometry":{"type":"LineString","coordinates":[[2,1],[4,3]]},"properties":{"name":"before","rank":7}}]}`)
 	options := StyleGeoJSONSourceOptions{}.
 		WithMinZoom(1).
 		WithMaxZoom(16).
@@ -313,12 +321,15 @@ func TestGeoJSONSourceDataBuffers(t *testing.T) {
 		WithBuffer(0).
 		WithLineMetrics(true).
 		WithTileSize(256)
-	if err := m.AddGeoJSONSourceData("geojson-data", data, &options); err != nil {
-		t.Fatalf("AddGeoJSONSourceData(): %v", err)
+	data, err := NewGeoJSONSourceData(document, &options)
+	if err != nil {
+		t.Fatalf("NewGeoJSONSourceData(): %v", err)
 	}
-	data[0] = 'x'
-	if err := m.SetGeoJSONSourceData("geojson-data", []byte(`{"type":"Point","coordinates":[6,5]}`)); err != nil {
-		t.Fatalf("SetGeoJSONSourceData(): %v", err)
+	// The document is copied at preparation, so mutating it afterward does not
+	// reach the prepared index.
+	document[0] = 'x'
+	if err := m.AddGeoJSONSourceData("geojson-data", data); err != nil {
+		t.Fatalf("AddGeoJSONSourceData(): %v", err)
 	}
 	sourceType, found, err := m.StyleSourceType("geojson-data")
 	if err != nil {
@@ -327,26 +338,93 @@ func TestGeoJSONSourceDataBuffers(t *testing.T) {
 	if !found || sourceType != StyleSourceTypeGeoJSON {
 		t.Fatalf("StyleSourceType(geojson-data) = (%v, %v), want GeoJSON true", sourceType, found)
 	}
+
+	// One prepared handle installs on any number of sources.
+	if err := m.AddGeoJSONSourceData("geojson-data-2", data); err != nil {
+		t.Fatalf("AddGeoJSONSourceData(reused handle): %v", err)
+	}
+
+	// A set requires data prepared with the source's options.
+	update, err := NewGeoJSONSourceData([]byte(`{"type":"Point","coordinates":[6,5]}`), &options)
+	if err != nil {
+		t.Fatalf("NewGeoJSONSourceData(update): %v", err)
+	}
+	if err := m.SetGeoJSONSourceData("geojson-data", update); err != nil {
+		t.Fatalf("SetGeoJSONSourceData(): %v", err)
+	}
+	if err := m.SetGeoJSONSourceData("geojson-data-2", update); err != nil {
+		t.Fatalf("SetGeoJSONSourceData(reused handle): %v", err)
+	}
+	if err := update.Close(); err != nil {
+		t.Fatalf("update Close(): %v", err)
+	}
+
+	// Data prepared under different options tiles inconsistently with the
+	// source, so the install is rejected.
+	mismatchedOptions := options.WithTolerance(0.25)
+	mismatched, err := NewGeoJSONSourceData([]byte(`{"type":"Point","coordinates":[6,5]}`), &mismatchedOptions)
+	if err != nil {
+		t.Fatalf("NewGeoJSONSourceData(mismatched): %v", err)
+	}
+	if err := m.SetGeoJSONSourceData("geojson-data", mismatched); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("SetGeoJSONSourceData(mismatched options) error = %v, want ErrInvalidArgument", err)
+	}
+	if err := mismatched.Close(); err != nil {
+		t.Fatalf("mismatched Close(): %v", err)
+	}
+
+	// Closing the handle never invalidates a source it was installed on, and a
+	// closed handle reports the binding's closed-handle error before crossing
+	// into C.
+	if err := data.Close(); err != nil {
+		t.Fatalf("data Close(): %v", err)
+	}
+	if err := data.Close(); err != nil {
+		t.Fatalf("second data Close(): %v", err)
+	}
+	if err := m.AddGeoJSONSourceData("closed-handle", data); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("AddGeoJSONSourceData(closed handle) error = %v, want ErrInvalidArgument", err)
+	}
+	if err := m.SetGeoJSONSourceData("geojson-data", data); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("SetGeoJSONSourceData(closed handle) error = %v, want ErrInvalidArgument", err)
+	}
+	sourceType, found, err = m.StyleSourceType("geojson-data")
+	if err != nil || !found || sourceType != StyleSourceTypeGeoJSON {
+		t.Fatalf("StyleSourceType(geojson-data) after handle close = (%v, %v, %v), want GeoJSON true nil", sourceType, found, err)
+	}
+	exists, err := m.StyleSourceExists("closed-handle")
+	if err != nil {
+		t.Fatalf("StyleSourceExists(closed-handle): %v", err)
+	}
+	if exists {
+		t.Fatalf("StyleSourceExists(closed-handle) = true, want false")
+	}
+}
+
+func TestGeoJSONSourceDataRejectsInvalidDocumentsAtPreparation(t *testing.T) {
 	badID := []byte(`{"type":"FeatureCollection","features":[{"type":"Feature","id":{},"geometry":{"type":"Point","coordinates":[0,0]},"properties":{}}]}`)
-	if err := m.AddGeoJSONSourceData("bad-geojson-data", badID, nil); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("AddGeoJSONSourceData(unsupported id) error = %v, want ErrInvalidArgument", err)
+	if _, err := NewGeoJSONSourceData(badID, nil); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("NewGeoJSONSourceData(unsupported id) error = %v, want ErrInvalidArgument", err)
 	}
 	badGeometry := []byte(`{"type":"Unsupported","coordinates":[]}`)
-	if err := m.AddGeoJSONSourceData("bad-geometry", badGeometry, nil); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("AddGeoJSONSourceData(unsupported geometry) error = %v, want ErrInvalidArgument", err)
+	if _, err := NewGeoJSONSourceData(badGeometry, nil); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("NewGeoJSONSourceData(unsupported geometry) error = %v, want ErrInvalidArgument", err)
 	}
 	badClusterProperties := StyleGeoJSONSourceOptions{}.
 		WithCluster(true).
 		WithClusterProperties([]byte(`{"total":NaN}`))
-	if err := m.AddGeoJSONSourceData("bad-cluster-properties", data, &badClusterProperties); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("AddGeoJSONSourceData(non-finite cluster property) error = %v, want ErrInvalidArgument", err)
+	points := []byte(`{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[0,0]},"properties":{"rank":1}}]}`)
+	if _, err := NewGeoJSONSourceData(points, &badClusterProperties); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("NewGeoJSONSourceData(non-finite cluster property) error = %v, want ErrInvalidArgument", err)
 	}
-	exists, err := m.StyleSourceExists("bad-cluster-properties")
-	if err != nil {
-		t.Fatalf("StyleSourceExists(bad-cluster-properties): %v", err)
+	// Clustering requires a feature collection of point features.
+	clustered := StyleGeoJSONSourceOptions{}.WithCluster(true)
+	if _, err := NewGeoJSONSourceData([]byte(`{"type":"Point","coordinates":[0,0]}`), &clustered); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("NewGeoJSONSourceData(clustered bare geometry) error = %v, want ErrInvalidArgument", err)
 	}
-	if exists {
-		t.Fatalf("StyleSourceExists(bad-cluster-properties) = true, want false")
+	lines := []byte(`{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"LineString","coordinates":[[0,0],[1,1]]},"properties":{}}]}`)
+	if _, err := NewGeoJSONSourceData(lines, &clustered); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("NewGeoJSONSourceData(clustered non-point feature) error = %v, want ErrInvalidArgument", err)
 	}
 }
 
@@ -382,10 +460,17 @@ func TestGeoJSONSourceClusterOptions(t *testing.T) {
 		WithClusterMinPoints(2).
 		WithClusterMaxZoom(14).
 		WithClusterProperties(clusterProperties)
-	if err := m.AddGeoJSONSourceData("cluster-source", points, &options); err != nil {
-		t.Fatalf("AddGeoJSONSourceData(clustered): %v", err)
+	data, err := NewGeoJSONSourceData(points, &options)
+	if err != nil {
+		t.Fatalf("NewGeoJSONSourceData(clustered): %v", err)
 	}
 	clusterProperties[0] = 'x'
+	if err := m.AddGeoJSONSourceData("cluster-source", data); err != nil {
+		t.Fatalf("AddGeoJSONSourceData(clustered): %v", err)
+	}
+	if err := data.Close(); err != nil {
+		t.Fatalf("data Close(): %v", err)
+	}
 	sourceType, found, err := m.StyleSourceType("cluster-source")
 	if err != nil {
 		t.Fatalf("StyleSourceType(cluster-source): %v", err)
@@ -393,15 +478,24 @@ func TestGeoJSONSourceClusterOptions(t *testing.T) {
 	if !found || sourceType != StyleSourceTypeGeoJSON {
 		t.Fatalf("StyleSourceType(cluster-source) = (%v, %v), want GeoJSON true", sourceType, found)
 	}
-	// Options are fixed at creation, so updating the data keeps the clustered source usable.
-	if err := m.SetGeoJSONSourceData("cluster-source", points); err != nil {
-		t.Fatalf("SetGeoJSONSourceData(clustered): %v", err)
+	// Cluster properties are excepted from the options match, so an update
+	// prepared with different aggregations installs on the source.
+	updatedProperties := options.WithClusterProperties([]byte(`{"top":["max",["get","rank"]]}`))
+	update, err := NewGeoJSONSourceData(points, &updatedProperties)
+	if err != nil {
+		t.Fatalf("NewGeoJSONSourceData(updated cluster properties): %v", err)
+	}
+	if err := m.SetGeoJSONSourceData("cluster-source", update); err != nil {
+		t.Fatalf("SetGeoJSONSourceData(updated cluster properties): %v", err)
+	}
+	if err := update.Close(); err != nil {
+		t.Fatalf("update Close(): %v", err)
 	}
 	malformed := StyleGeoJSONSourceOptions{}.
 		WithCluster(true).
 		WithClusterProperties([]byte(`{"total":["+"]}`))
-	if err := m.AddGeoJSONSourceData("malformed-cluster-source", points, &malformed); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("AddGeoJSONSourceData(malformed cluster properties) error = %v, want ErrInvalidArgument", err)
+	if _, err := NewGeoJSONSourceData(points, &malformed); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("NewGeoJSONSourceData(malformed cluster properties) error = %v, want ErrInvalidArgument", err)
 	}
 	emptyClusterProperties := []struct {
 		name    string
@@ -422,10 +516,126 @@ func TestGeoJSONSourceClusterOptions(t *testing.T) {
 		},
 	}
 	for _, test := range emptyClusterProperties {
-		err := m.AddGeoJSONSourceData("empty-cluster-properties-"+test.name, points, &test.options)
-		if !errors.Is(err, ErrInvalidArgument) {
-			t.Errorf("AddGeoJSONSourceData(%s empty cluster properties) error = %v, want ErrInvalidArgument", test.name, err)
+		if _, err := NewGeoJSONSourceData(points, &test.options); !errors.Is(err, ErrInvalidArgument) {
+			t.Errorf("NewGeoJSONSourceData(%s empty cluster properties) error = %v, want ErrInvalidArgument", test.name, err)
 		}
+	}
+}
+
+// Preparation touches no runtime or map, so a plain goroutine prepares data
+// that installs on the map owner thread, and another goroutine releases it.
+func TestGeoJSONSourceDataPreparesOnAnotherGoroutine(t *testing.T) {
+	lockOSThreadForTest(t)
+
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMap()
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMap(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	if err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+		t.Fatalf("SetStyleJSON(empty style): %v", err)
+	}
+
+	type prepared struct {
+		data *GeoJSONSourceDataHandle
+		err  error
+	}
+	results := make(chan prepared)
+	go func() {
+		data, err := NewGeoJSONSourceData([]byte(`{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[1,2]},"properties":{}}]}`), nil)
+		results <- prepared{data: data, err: err}
+	}()
+	result := <-results
+	if result.err != nil {
+		t.Fatalf("NewGeoJSONSourceData() on a goroutine: %v", result.err)
+	}
+	if err := m.AddGeoJSONSourceData("worker-prepared", result.data); err != nil {
+		t.Fatalf("AddGeoJSONSourceData(worker prepared): %v", err)
+	}
+	closed := make(chan error)
+	go func() {
+		closed <- result.data.Close()
+	}()
+	if err := <-closed; err != nil {
+		t.Fatalf("Close() on a goroutine: %v", err)
+	}
+	sourceType, found, err := m.StyleSourceType("worker-prepared")
+	if err != nil || !found || sourceType != StyleSourceTypeGeoJSON {
+		t.Fatalf("StyleSourceType(worker-prepared) = (%v, %v, %v), want GeoJSON true nil", sourceType, found, err)
+	}
+}
+
+func TestGeoJSONSourceSynchronousTilingOverride(t *testing.T) {
+	lockOSThreadForTest(t)
+
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMap()
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMap(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	if err := m.SetStyleJSON([]byte(`{"version":8,"sources":{},"layers":[]}`)); err != nil {
+		t.Fatalf("SetStyleJSON(empty style): %v", err)
+	}
+	data, err := NewGeoJSONSourceData([]byte(`{"type":"FeatureCollection","features":[]}`), nil)
+	if err != nil {
+		t.Fatalf("NewGeoJSONSourceData(): %v", err)
+	}
+	if err := m.AddGeoJSONSourceData("tracked", data); err != nil {
+		t.Fatalf("AddGeoJSONSourceData(): %v", err)
+	}
+	if err := m.SetGeoJSONSourceSynchronousTiling("tracked", true); err != nil {
+		t.Fatalf("SetGeoJSONSourceSynchronousTiling(true): %v", err)
+	}
+	update, err := NewGeoJSONSourceData([]byte(`{"type":"Point","coordinates":[3,4]}`), nil)
+	if err != nil {
+		t.Fatalf("NewGeoJSONSourceData(update): %v", err)
+	}
+	if err := m.SetGeoJSONSourceData("tracked", update); err != nil {
+		t.Fatalf("SetGeoJSONSourceData() under the override: %v", err)
+	}
+	if err := update.Close(); err != nil {
+		t.Fatalf("update Close(): %v", err)
+	}
+	if err := m.SetGeoJSONSourceSynchronousTiling("tracked", false); err != nil {
+		t.Fatalf("SetGeoJSONSourceSynchronousTiling(false): %v", err)
+	}
+	if err := data.Close(); err != nil {
+		t.Fatalf("data Close(): %v", err)
+	}
+	if err := m.SetGeoJSONSourceSynchronousTiling("missing", true); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("SetGeoJSONSourceSynchronousTiling(missing source) error = %v, want ErrInvalidArgument", err)
+	}
+	if err := m.AddVectorSourceURL("vector", "https://example.invalid/tiles.json", nil); err != nil {
+		t.Fatalf("AddVectorSourceURL(): %v", err)
+	}
+	if err := m.SetGeoJSONSourceSynchronousTiling("vector", true); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("SetGeoJSONSourceSynchronousTiling(non-GeoJSON source) error = %v, want ErrInvalidArgument", err)
 	}
 }
 

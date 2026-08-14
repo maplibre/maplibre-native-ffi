@@ -6,6 +6,7 @@
 #include "map/map.hpp"
 
 #include "c_api/boundary.hpp"
+#include "geojson/geojson_source_data.hpp"
 #include "maplibre_native_c.h"
 
 auto mln_map_options_default(void) noexcept -> mln_map_options {
@@ -288,14 +289,24 @@ auto mln_map_add_geojson_source_url(
   });
 }
 
-auto mln_map_add_geojson_source_data(
-  mln_map map, mln_buffer_view source_id, mln_buffer_view data,
-  const mln_geojson_source_options* options
+auto mln_geojson_source_data_create(
+  mln_buffer_view data, const mln_geojson_source_options* options,
+  mln_geojson_source_data* out_data
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::map_add_geojson_source_data(
-      map, source_id, data, options
-    );
+    return mln::core::geojson_source_data_create(data, options, out_data);
+  });
+}
+
+void mln_geojson_source_data_destroy(mln_geojson_source_data data) noexcept {
+  mln::core::geojson_source_data_destroy(data);
+}
+
+auto mln_map_add_geojson_source_data(
+  mln_map map, mln_buffer_view source_id, mln_geojson_source_data data
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_add_geojson_source_data(map, source_id, data);
   });
 }
 
@@ -308,10 +319,20 @@ auto mln_map_set_geojson_source_url(
 }
 
 auto mln_map_set_geojson_source_data(
-  mln_map map, mln_buffer_view source_id, mln_buffer_view data
+  mln_map map, mln_buffer_view source_id, mln_geojson_source_data data
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_set_geojson_source_data(map, source_id, data);
+  });
+}
+
+auto mln_map_set_geojson_source_synchronous_tiling(
+  mln_map map, mln_buffer_view source_id, bool enabled
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_set_geojson_source_synchronous_tiling(
+      map, source_id, enabled
+    );
   });
 }
 

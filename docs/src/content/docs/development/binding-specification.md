@@ -215,6 +215,7 @@ Long-lived C-owned opaque handle concepts include:
 - `RenderSessionHandle`
 - `OfflineOperationHandle`
 - `ResourceRequestHandle`
+- `GeoJsonSourceDataHandle`
 
 `Handle` means the public value owns or controls an explicitly releasable native
 resource with identity across operations. The representation can vary by
@@ -435,6 +436,22 @@ The low-level API exposes no parallel string overload. Callers that start with
 text encode it as UTF-8. Callers that start with a file, response, database
 blob, or serializer output can pass its bytes without an intermediate host
 string.
+
+### Prepared GeoJSON source data
+
+Inline GeoJSON source data crosses the boundary in two steps: a preparation call
+parses and tiles one complete GeoJSON document into an owned prepared-data
+handle, and map calls install that handle when adding or updating a GeoJSON
+source. Bindings expose both steps and the handle between them.
+
+Preparation takes the GeoJSON source options, is free of any runtime or map, and
+is callable from any thread; the prepared value is immutable and safe to share
+across threads, subject to the binding's ordinary handle-lifetime rules. A
+binding whose language has a natural worker or async idiom SHOULD make
+off-thread preparation expressible with it, without owning a thread pool inside
+the binding. Install calls borrow the handle, so one prepared value may be
+installed on any number of sources and released at any time afterward; release
+never invalidates a source the data was installed on.
 
 ### Native pointers
 

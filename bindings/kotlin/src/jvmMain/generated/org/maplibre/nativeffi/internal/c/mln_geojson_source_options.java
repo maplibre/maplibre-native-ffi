@@ -28,7 +28,7 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  *     uint32_t cluster_min_points;
  *     bool line_metrics;
  *     bool cluster;
- *     bool synchronous_update;
+ *     bool synchronous_tiling;
  * }
  * }
  */
@@ -52,7 +52,7 @@ public class mln_geojson_source_options {
         MapLibreNativeC.C_INT.withName("cluster_min_points"),
         MapLibreNativeC.C_BOOL.withName("line_metrics"),
         MapLibreNativeC.C_BOOL.withName("cluster"),
-        MapLibreNativeC.C_BOOL.withName("synchronous_update"),
+        MapLibreNativeC.C_BOOL.withName("synchronous_tiling"),
         MemoryLayout.paddingLayout(5)
     ).withName("mln_geojson_source_options");
 
@@ -635,48 +635,48 @@ public class mln_geojson_source_options {
         struct.set(cluster$LAYOUT, cluster$OFFSET, fieldValue);
     }
 
-    private static final OfBoolean synchronous_update$LAYOUT = (OfBoolean)$LAYOUT.select(groupElement("synchronous_update"));
+    private static final OfBoolean synchronous_tiling$LAYOUT = (OfBoolean)$LAYOUT.select(groupElement("synchronous_tiling"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * bool synchronous_update
+     * bool synchronous_tiling
      * }
      */
-    public static final OfBoolean synchronous_update$layout() {
-        return synchronous_update$LAYOUT;
+    public static final OfBoolean synchronous_tiling$layout() {
+        return synchronous_tiling$LAYOUT;
     }
 
-    private static final long synchronous_update$OFFSET = $LAYOUT.byteOffset(groupElement("synchronous_update"));
+    private static final long synchronous_tiling$OFFSET = $LAYOUT.byteOffset(groupElement("synchronous_tiling"));
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * bool synchronous_update
+     * bool synchronous_tiling
      * }
      */
-    public static final long synchronous_update$offset() {
-        return synchronous_update$OFFSET;
+    public static final long synchronous_tiling$offset() {
+        return synchronous_tiling$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * bool synchronous_update
+     * bool synchronous_tiling
      * }
      */
-    public static boolean synchronous_update(MemorySegment struct) {
-        return struct.get(synchronous_update$LAYOUT, synchronous_update$OFFSET);
+    public static boolean synchronous_tiling(MemorySegment struct) {
+        return struct.get(synchronous_tiling$LAYOUT, synchronous_tiling$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * bool synchronous_update
+     * bool synchronous_tiling
      * }
      */
-    public static void synchronous_update(MemorySegment struct, boolean fieldValue) {
-        struct.set(synchronous_update$LAYOUT, synchronous_update$OFFSET, fieldValue);
+    public static void synchronous_tiling(MemorySegment struct, boolean fieldValue) {
+        struct.set(synchronous_tiling$LAYOUT, synchronous_tiling$OFFSET, fieldValue);
     }
 
     /**

@@ -45,6 +45,7 @@ import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
 import org.maplibre.nativeffi.runtime.RuntimeEventType
 import org.maplibre.nativeffi.runtime.RuntimeHandle
+import org.maplibre.nativeffi.style.GeoJsonSourceDataHandle
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import platform.CoreGraphics.CGSizeMake
 import platform.Metal.MTLCreateSystemDefaultDevice
@@ -689,7 +690,10 @@ class RenderSessionHandleTest {
             }
           )
           map.setStyleJson(CLUSTER_STYLE_JSON.encodeToByteArray())
-          map.addGeoJsonSourceData("cluster-source", clusterPoints(), clusterSourceOptions())
+          GeoJsonSourceDataHandle.create(clusterPoints(), clusterSourceOptions()).use { clusterData
+            ->
+            map.addGeoJsonSourceData("cluster-source", clusterData)
+          }
           map.addStyleLayerJson(clusterCircleLayer(), "")
           assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE))
           assertEquals(RenderResult.RENDERED, session.renderUpdate())
