@@ -43,6 +43,29 @@ EM_JS(
     };
   }
 );
+EM_JS(
+  void*, mln_test_register_transferred_offscreen_canvas,
+  (const char* name, int width, int height), {
+    const id = UTF8ToString(name);
+    const selector = "#" + id;
+    const canvas = new OffscreenCanvas(width, height);
+    const canvasSharedPtr = _malloc(12);
+    HEAP32[canvasSharedPtr >> 2] = width;
+    HEAP32[canvasSharedPtr + 4 >> 2] = height;
+    HEAPU32[canvasSharedPtr + 8 >> 2] = 0;
+    Module["GL"].offscreenCanvases[selector] = {
+      canvas : canvas,
+      offscreenCanvas : canvas,
+      canvasSharedPtr : canvasSharedPtr,
+      id : id,
+    };
+    return canvasSharedPtr;
+  }
+);
+EM_JS(
+  void, mln_test_unregister_transferred_offscreen_canvas, (const char* name),
+  { delete Module["GL"].offscreenCanvases["#" + UTF8ToString(name)]; }
+);
 EM_JS(void, mln_test_unregister_offscreen_canvas, (const char* name), {
   delete Module["GL"].offscreenCanvases[UTF8ToString(name)];
 });
@@ -83,6 +106,7 @@ EM_JS(void, mln_test_unregister_offscreen_canvas, (const char* name), {
 typedef struct tracked_session {
   mln_render_session session;
   void* backend_state;
+  mln_notification_source source;
 } tracked_session;
 
 static MLN_FFI_TEST_THREAD_LOCAL mln_runtime tracked_runtime;
@@ -135,7 +159,9 @@ static void reserve_session_slot(void) {
 
 static void track_session(const mln_test_render_fixture* fixture) {
   tracked_sessions[tracked_session_count] = (tracked_session){
-    .session = fixture->session, .backend_state = fixture->backend_state
+    .session = fixture->session,
+    .backend_state = fixture->backend_state,
+    .source = fixture->source,
   };
   tracked_session_count += 1;
 }
@@ -627,6 +653,64 @@ void mln_test_thread_join(mln_test_thread* thread) {
   free(thread);
 }
 
+static bool notification_source_contains_kind(
+  mln_notification_source source, uint32_t kind
+) {
+  mln_ready_batch batch = MLN_HANDLE_NULL;
+  if (mln_notification_source_drain_ready(source, &batch) != MLN_STATUS_OK) {
+    return false;
+  }
+  mln_ready_batch_view view = {.size = sizeof(mln_ready_batch_view)};
+  bool found = false;
+  if (mln_ready_batch_get(batch, &view) == MLN_STATUS_OK) {
+    for (size_t index = 0; index < view.endpoint_count; index += 1) {
+      const mln_ready_endpoint* endpoint =
+        (const mln_ready_endpoint*)((const char*)view.endpoints +
+                                    index * view.endpoint_size);
+      found = found || endpoint->kind == kind;
+    }
+  }
+  mln_ready_batch_release(batch);
+  return found;
+}
+
+mln_status mln_test_render_fixture_finish_operation(
+  const mln_test_render_fixture* fixture, mln_operation operation
+) {
+  if (
+    fixture == NULL || fixture->session == MLN_HANDLE_NULL ||
+    operation == MLN_HANDLE_NULL
+  ) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  bool completed = false;
+  for (unsigned int attempt = 0; attempt < 10000 && !completed; attempt += 1) {
+    if (fixture->driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {
+      size_t serviced = 0;
+      const mln_status service_status = mln_render_session_service_driver_work(
+        fixture->session, SIZE_MAX, &serviced
+      );
+      if (service_status != MLN_STATUS_OK) {
+        return service_status;
+      }
+    }
+    const mln_status wait_status = mln_operation_wait(operation, 0, &completed);
+    if (wait_status != MLN_STATUS_OK) {
+      return wait_status;
+    }
+    if (!completed) {
+      mln_test_sleep_millisecond();
+    }
+  }
+  if (!completed) {
+    return MLN_STATUS_NOT_READY;
+  }
+  mln_status terminal_status = MLN_STATUS_NATIVE_ERROR;
+  const mln_status status =
+    mln_operation_get_status(operation, &terminal_status);
+  return status == MLN_STATUS_OK ? terminal_status : status;
+}
+
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
 
 extern void* MTLCreateSystemDefaultDevice(void);
@@ -862,14 +946,33 @@ mln_test_fixture_result mln_test_dedicated_egl_surface_create(
   };
   descriptor.surface = state->surface;
 
-  mln_render_session session = 0;
-  if (mln_opengl_surface_attach(map, &descriptor, &session) != MLN_STATUS_OK) {
+  fixture->driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD;
+  fixture->backend_state = state;
+  mln_render_session_attach_options options =
+    mln_render_session_attach_options_default();
+  options.driver = fixture->driver;
+  mln_operation attach = MLN_HANDLE_NULL;
+  const mln_status attach_status = mln_opengl_surface_attach_start(
+    map, &descriptor, &options, &fixture->session, &attach
+  );
+  if (
+    attach_status != MLN_STATUS_OK ||
+    mln_test_render_fixture_finish_operation(fixture, attach) != MLN_STATUS_OK
+  ) {
+    mln_operation_release(attach);
+    if (fixture->session != MLN_HANDLE_NULL) {
+      mln_render_abandon_result abandoned = {
+        .size = sizeof(mln_render_abandon_result)
+      };
+      (void)mln_render_session_abandon(fixture->session, &abandoned);
+      (void)mln_render_session_destroy(fixture->session);
+    }
     eglDestroySurface(state->display, state->surface);
     free(state);
+    *fixture = (mln_test_render_fixture){0};
     return MLN_TEST_FIXTURE_ATTACH_FAILED;
   }
-  fixture->session = session;
-  fixture->backend_state = state;
+  mln_operation_release(attach);
   return MLN_TEST_FIXTURE_OK;
 }
 
@@ -878,7 +981,15 @@ void mln_test_dedicated_egl_surface_destroy(mln_test_render_fixture* fixture) {
     return;
   }
   if (fixture->session != 0) {
-    mln_render_session_destroy(fixture->session);
+    mln_operation detach = MLN_HANDLE_NULL;
+    if (
+      mln_render_session_detach_start(fixture->session, &detach) ==
+      MLN_STATUS_OK
+    ) {
+      (void)mln_test_render_fixture_finish_operation(fixture, detach);
+      mln_operation_release(detach);
+    }
+    (void)mln_render_session_destroy(fixture->session);
     fixture->session = 0;
   }
   egl_state* state = fixture->backend_state;
@@ -1054,16 +1165,36 @@ static void destroy_backend_state(void* opaque_state) { (void)opaque_state; }
 typedef struct webgl_state {
   EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context;
   char id[32];
+  void* canvas_shared_ptr;
 } webgl_state;
 
 static atomic_uint webgl_canvas_counter;
+static _Thread_local webgl_state thread_webgl_state;
 
 // The fixture creates a real WebGL2 context and hands it over, the way a
 // browser host would.
 static bool create_backend_state(void** out_state, void* out_context) {
-  webgl_state* state = calloc(1, sizeof(*state));
-  if (state == NULL) {
-    return false;
+  webgl_state* state = &thread_webgl_state;
+  if (state->context > 0) {
+    if (
+      emscripten_webgl_make_context_current(state->context) !=
+      EMSCRIPTEN_RESULT_SUCCESS
+    ) {
+      return false;
+    }
+    *(mln_opengl_context_descriptor*)out_context =
+      (mln_opengl_context_descriptor){
+        .size = sizeof(mln_opengl_context_descriptor),
+        .platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL,
+        .data = {
+          .webgl = {
+            .size = sizeof(mln_webgl_context_descriptor),
+            .context = state->context,
+          }
+        },
+      };
+    *out_state = state;
+    return true;
   }
 
   EmscriptenWebGLContextAttributes attributes;
@@ -1094,7 +1225,7 @@ static bool create_backend_state(void** out_state, void* out_context) {
       (long)state->context
     );
     mln_test_unregister_offscreen_canvas(state->id);
-    free(state);
+    *state = (webgl_state){0};
     return false;
   }
   const EMSCRIPTEN_RESULT current_result =
@@ -1106,7 +1237,7 @@ static bool create_backend_state(void** out_state, void* out_context) {
     );
     emscripten_webgl_destroy_context(state->context);
     mln_test_unregister_offscreen_canvas(state->id);
-    free(state);
+    *state = (webgl_state){0};
     return false;
   }
 
@@ -1126,13 +1257,16 @@ static bool create_backend_state(void** out_state, void* out_context) {
 }
 
 static void destroy_backend_state(void* opaque_state) {
+  // WebGL contexts are expensive and browsers cap their live count. Sequential
+  // fixtures on one test thread share one host-owned context; the thread-level
+  // cleanup releases it after the suite or foreign thread exits. A transferred
+  // canvas has no host-owned context and is released with its fixture.
   webgl_state* state = opaque_state;
-  if (state == NULL) {
-    return;
+  if (state != NULL && state != &thread_webgl_state) {
+    mln_test_unregister_transferred_offscreen_canvas(state->id);
+    free(state->canvas_shared_ptr);
+    free(state);
   }
-  emscripten_webgl_destroy_context(state->context);
-  mln_test_unregister_offscreen_canvas(state->id);
-  free(state);
 }
 
 #elif defined(MLN_FFI_TEST_BACKEND_OPENGL) && defined(MLN_FFI_TEST_OPENGL_WGL)
@@ -1477,10 +1611,19 @@ void mln_test_release_thread_gpu_resources(void) {
 #endif
 }
 
+#elif defined(MLN_FFI_TEST_BACKEND_OPENGL) && defined(MLN_FFI_TEST_OPENGL_WEBGL)
+
+void mln_test_release_thread_gpu_resources(void) {
+  if (thread_webgl_state.context > 0) {
+    emscripten_webgl_destroy_context(thread_webgl_state.context);
+    mln_test_unregister_offscreen_canvas(thread_webgl_state.id);
+  }
+  thread_webgl_state = (webgl_state){0};
+}
+
 #else
 
 void mln_test_release_thread_gpu_resources(void) {}
-
 #endif
 
 bool mln_test_render_fixture_create(
@@ -1491,7 +1634,11 @@ bool mln_test_render_fixture_create(
   }
   reserve_session_slot();
   *fixture = (mln_test_render_fixture){0};
+  mln_render_session_attach_options options =
+    mln_render_session_attach_options_default();
+  options.requested_texture_ring_depth = 2;
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
+  fixture->driver = MLN_RENDER_DRIVER_CORE_WORKER;
   mln_metal_context_descriptor context = {0};
   if (!create_backend_state(&fixture->backend_state, &context)) {
     return false;
@@ -1499,6 +1646,7 @@ bool mln_test_render_fixture_create(
   mln_metal_owned_texture_descriptor descriptor =
     mln_metal_owned_texture_descriptor_default();
 #elif defined(MLN_FFI_TEST_BACKEND_OPENGL)
+  fixture->driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD;
   mln_opengl_context_descriptor context = {0};
   if (!create_backend_state(&fixture->backend_state, &context)) {
     return false;
@@ -1506,6 +1654,7 @@ bool mln_test_render_fixture_create(
   mln_opengl_owned_texture_descriptor descriptor =
     mln_opengl_owned_texture_descriptor_default();
 #elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  fixture->driver = MLN_RENDER_DRIVER_CORE_WORKER;
   mln_vulkan_context_descriptor context = {0};
   if (!create_backend_state(&fixture->backend_state, &context)) {
     return false;
@@ -1513,6 +1662,7 @@ bool mln_test_render_fixture_create(
   mln_vulkan_owned_texture_descriptor descriptor =
     mln_vulkan_owned_texture_descriptor_default();
 #elif defined(MLN_FFI_TEST_BACKEND_WEBGPU)
+  fixture->driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD;
   mln_webgpu_context_descriptor context = {0};
   if (!create_backend_state(&fixture->backend_state, &context)) {
     return false;
@@ -1520,30 +1670,167 @@ bool mln_test_render_fixture_create(
   mln_webgpu_owned_texture_descriptor descriptor =
     mln_webgpu_owned_texture_descriptor_default();
 #endif
-  descriptor.extent.width = 64;
-  descriptor.extent.height = 64;
-  descriptor.context = context;
-#if defined(MLN_FFI_TEST_BACKEND_METAL)
-  const mln_status status =
-    mln_metal_owned_texture_attach(map, &descriptor, &fixture->session);
-#elif defined(MLN_FFI_TEST_BACKEND_OPENGL)
-  const mln_status status =
-    mln_opengl_owned_texture_attach(map, &descriptor, &fixture->session);
-#elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
-  const mln_status status =
-    mln_vulkan_owned_texture_attach(map, &descriptor, &fixture->session);
-#elif defined(MLN_FFI_TEST_BACKEND_WEBGPU)
-  const mln_status status =
-    mln_webgpu_owned_texture_attach(map, &descriptor, &fixture->session);
-#endif
-  if (status != MLN_STATUS_OK || fixture->session == MLN_HANDLE_NULL) {
+  if (mln_notification_source_create(&fixture->source) != MLN_STATUS_OK) {
     destroy_backend_state(fixture->backend_state);
     *fixture = (mln_test_render_fixture){0};
     return false;
   }
+  options.driver = fixture->driver;
+  options.operation_source = fixture->source;
+  descriptor.extent.width = 64;
+  descriptor.extent.height = 64;
+  descriptor.context = context;
+  mln_operation operation = MLN_HANDLE_NULL;
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+  const mln_status status = mln_metal_owned_texture_attach_start(
+    map, &descriptor, &options, &fixture->session, &operation
+  );
+#elif defined(MLN_FFI_TEST_BACKEND_OPENGL)
+  const mln_status status = mln_opengl_owned_texture_attach_start(
+    map, &descriptor, &options, &fixture->session, &operation
+  );
+#elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  const mln_status status = mln_vulkan_owned_texture_attach_start(
+    map, &descriptor, &options, &fixture->session, &operation
+  );
+#elif defined(MLN_FFI_TEST_BACKEND_WEBGPU)
+  const mln_status status = mln_webgpu_owned_texture_attach_start(
+    map, &descriptor, &options, &fixture->session, &operation
+  );
+#endif
+  if (
+    status == MLN_STATUS_OK && fixture->session != MLN_HANDLE_NULL &&
+    operation != MLN_HANDLE_NULL
+  ) {
+    mln_render_session_snapshot attaching = {
+      .size = sizeof(mln_render_session_snapshot)
+    };
+    fixture->observed_attaching =
+      mln_render_session_get_snapshot(fixture->session, &attaching) ==
+        MLN_STATUS_OK &&
+      attaching.state == MLN_RENDER_SESSION_STATE_ATTACHING;
+    if (fixture->driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {
+      fixture->observed_driver_ready = notification_source_contains_kind(
+        fixture->source, MLN_NOTIFICATION_ENDPOINT_DRIVER_WORK
+      );
+    }
+  }
+  const mln_status finish_status =
+    status == MLN_STATUS_OK && fixture->session != MLN_HANDLE_NULL &&
+        operation != MLN_HANDLE_NULL
+      ? mln_test_render_fixture_finish_operation(fixture, operation)
+      : MLN_STATUS_INVALID_STATE;
+  if (
+    status != MLN_STATUS_OK || fixture->session == MLN_HANDLE_NULL ||
+    operation == MLN_HANDLE_NULL || finish_status != MLN_STATUS_OK
+  ) {
+    mln_operation_release(operation);
+    if (fixture->session != MLN_HANDLE_NULL) {
+      mln_render_abandon_result abandoned = {
+        .size = sizeof(mln_render_abandon_result)
+      };
+      (void)mln_render_session_abandon(fixture->session, &abandoned);
+      (void)mln_render_session_destroy(fixture->session);
+    }
+    destroy_backend_state(fixture->backend_state);
+    (void)mln_notification_source_close(fixture->source);
+    *fixture = (mln_test_render_fixture){0};
+    return false;
+  }
+  mln_operation_release(operation);
   track_session(fixture);
   return true;
 }
+#if defined(MLN_FFI_TEST_BACKEND_OPENGL) && defined(MLN_FFI_TEST_OPENGL_WEBGL)
+
+bool mln_test_transferred_webgl_surface_create(
+  mln_map map, mln_test_render_fixture* fixture
+) {
+  if (map == MLN_HANDLE_NULL || fixture == NULL) {
+    return false;
+  }
+  reserve_session_slot();
+  *fixture = (mln_test_render_fixture){0};
+  fixture->driver = MLN_RENDER_DRIVER_CORE_WORKER;
+  webgl_state* state = calloc(1, sizeof(*state));
+  if (state == NULL) {
+    return false;
+  }
+  const unsigned int serial = atomic_fetch_add(&webgl_canvas_counter, 1U) + 1U;
+  (void)snprintf(state->id, sizeof(state->id), "mln-transfer-%u", serial);
+  state->canvas_shared_ptr =
+    mln_test_register_transferred_offscreen_canvas(state->id, 64, 64);
+  fixture->backend_state = state;
+
+  char target[sizeof(state->id) + 1];
+  (void)snprintf(target, sizeof(target), "#%s", state->id);
+  mln_opengl_surface_descriptor descriptor =
+    mln_opengl_surface_descriptor_default();
+  descriptor.extent.width = 64;
+  descriptor.extent.height = 64;
+  descriptor.context.platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL;
+  descriptor.context.ownership = MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED;
+  descriptor.context.data.webgl = (mln_webgl_context_descriptor){
+    .size = sizeof(mln_webgl_context_descriptor),
+    .kind = MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS,
+    .canvas_selector = mln_test_buffer_view(target, strlen(target)),
+  };
+  if (mln_notification_source_create(&fixture->source) != MLN_STATUS_OK) {
+    destroy_backend_state(fixture->backend_state);
+    *fixture = (mln_test_render_fixture){0};
+    return false;
+  }
+  mln_render_session_attach_options options =
+    mln_render_session_attach_options_default();
+  options.driver = fixture->driver;
+  options.operation_source = fixture->source;
+  mln_operation operation = MLN_HANDLE_NULL;
+  const mln_status status = mln_opengl_surface_attach_start(
+    map, &descriptor, &options, &fixture->session, &operation
+  );
+  const mln_status finish_status =
+    status == MLN_STATUS_OK && fixture->session != MLN_HANDLE_NULL &&
+        operation != MLN_HANDLE_NULL
+      ? mln_test_render_fixture_finish_operation(fixture, operation)
+      : MLN_STATUS_INVALID_STATE;
+  if (
+    status != MLN_STATUS_OK || finish_status != MLN_STATUS_OK ||
+    fixture->session == MLN_HANDLE_NULL
+  ) {
+    char diagnostic[256] = {0};
+    size_t diagnostic_size = 0;
+    if (operation != MLN_HANDLE_NULL) {
+      (void)mln_operation_copy_diagnostic(
+        operation, diagnostic, sizeof(diagnostic) - 1, &diagnostic_size
+      );
+    }
+    fprintf(
+      stderr,
+      "transferred WebGL attach failed: start=%d finish=%d diagnostic=%.*s\n",
+      status, finish_status,
+      (int)(diagnostic_size < sizeof(diagnostic) ? diagnostic_size
+                                                 : sizeof(diagnostic) - 1),
+      diagnostic
+    );
+    mln_operation_release(operation);
+    if (fixture->session != MLN_HANDLE_NULL) {
+      mln_render_abandon_result abandoned = {
+        .size = sizeof(mln_render_abandon_result)
+      };
+      (void)mln_render_session_abandon(fixture->session, &abandoned);
+      (void)mln_render_session_destroy(fixture->session);
+    }
+    destroy_backend_state(fixture->backend_state);
+    (void)mln_notification_source_close(fixture->source);
+    *fixture = (mln_test_render_fixture){0};
+    return false;
+  }
+  mln_operation_release(operation);
+  track_session(fixture);
+  return true;
+}
+
+#endif
 
 mln_test_event_batch mln_test_event_batch_default(void) {
   mln_event_batch_release(compatibility_batch_handle);
@@ -1674,12 +1961,24 @@ void mln_test_render_fixture_destroy(mln_test_render_fixture* fixture) {
     return;
   }
   if (fixture->session != MLN_HANDLE_NULL) {
+    mln_operation detach = MLN_HANDLE_NULL;
+    const mln_status detach_status =
+      mln_render_session_detach_start(fixture->session, &detach);
+    if (detach_status == MLN_STATUS_OK) {
+      TEST_ASSERT_EQUAL_INT(
+        MLN_STATUS_OK, mln_test_render_fixture_finish_operation(fixture, detach)
+      );
+      mln_operation_release(detach);
+    } else {
+      TEST_ASSERT_EQUAL_INT(MLN_STATUS_INVALID_STATE, detach_status);
+    }
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK, mln_render_session_destroy(fixture->session)
     );
   }
   untrack_session(fixture->session);
   destroy_backend_state(fixture->backend_state);
+  (void)mln_notification_source_close(fixture->source);
   *fixture = (mln_test_render_fixture){0};
 }
 
@@ -1693,9 +1992,14 @@ bool mln_test_reclaim_thread_resources(void) {
     tracked_session_count -= 1;
     const tracked_session entry = tracked_sessions[tracked_session_count];
     if (entry.session != MLN_HANDLE_NULL) {
-      mln_render_session_destroy(entry.session);
+      mln_render_abandon_result abandoned = {
+        .size = sizeof(mln_render_abandon_result)
+      };
+      (void)mln_render_session_abandon(entry.session, &abandoned);
+      (void)mln_render_session_destroy(entry.session);
     }
     destroy_backend_state(entry.backend_state);
+    (void)mln_notification_source_close(entry.source);
     reclaimed = true;
   }
   while (tracked_map_count > 0) {

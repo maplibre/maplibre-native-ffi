@@ -202,7 +202,6 @@ void main() {
       expect(state.isClosed, isTrue);
     });
 
-
     test('failed close leaves handle live for retry', () {
       final state = NativeHandleState<_FakeNativeHandle>(
         _fakeHandle,
@@ -250,144 +249,152 @@ void main() {
     });
   });
 
-  test('a drained batch is indexed by its stride and copied field by field', () async {
-    final runtime = await RuntimeHandle.create();
-    // A stride wider than this binding's own record is what a C API version
-    // that added a payload member reports, so the decoder indexes by it.
-    final eventSize = sizeOf<raw.mln_runtime_event>() + 8;
-    final payloadOffset =
-        sizeOf<raw.mln_runtime_event>() -
-        sizeOf<raw.mln_runtime_event_payload>();
-    final events = calloc<Uint8>(eventSize * 3);
-    final messageBytes = utf8.encode('copied message tile-source ');
-    final messages = calloc<Uint8>(messageBytes.length);
-    final batch = calloc<raw.mln_runtime_event_batch_view>();
-    try {
-      // The library this binding runs against reports the record size this
-      // binding compiled, so a later mismatch is an ABI change rather than a
-      // decode bug.
-      withNativeArena((arena) {
-        final outBatch = arena<Uint64>();
-        final view = arena<raw.mln_runtime_event_batch_view>();
-        view.ref.size = sizeOf<raw.mln_runtime_event_batch_view>();
-        expect(
-          raw.mln_runtime_drain_events(
-            runtimeHandleIdForTesting(runtime),
-            0,
-            outBatch,
-          ),
-          nativeStatusOk,
+  test(
+    'a drained batch is indexed by its stride and copied field by field',
+    () async {
+      final runtime = await RuntimeHandle.create();
+      // A stride wider than this binding's own record is what a C API version
+      // that added a payload member reports, so the decoder indexes by it.
+      final eventSize = sizeOf<raw.mln_runtime_event>() + 8;
+      final payloadOffset =
+          sizeOf<raw.mln_runtime_event>() -
+          sizeOf<raw.mln_runtime_event_payload>();
+      final events = calloc<Uint8>(eventSize * 3);
+      final messageBytes = utf8.encode('copied message tile-source ');
+      final messages = calloc<Uint8>(messageBytes.length);
+      final batch = calloc<raw.mln_runtime_event_batch_view>();
+      try {
+        // The library this binding runs against reports the record size this
+        // binding compiled, so a later mismatch is an ABI change rather than a
+        // decode bug.
+        withNativeArena((arena) {
+          final outBatch = arena<Uint64>();
+          final view = arena<raw.mln_runtime_event_batch_view>();
+          view.ref.size = sizeOf<raw.mln_runtime_event_batch_view>();
+          expect(
+            raw.mln_runtime_drain_events(
+              runtimeHandleIdForTesting(runtime),
+              0,
+              outBatch,
+            ),
+            nativeStatusOk,
+          );
+          try {
+            expect(
+              raw.mln_event_batch_get(outBatch.value, view),
+              nativeStatusOk,
+            );
+            expect(view.ref.event_size, sizeOf<raw.mln_runtime_event>());
+          } finally {
+            raw.mln_event_batch_release(outBatch.value);
+          }
+        });
+
+        messages.asTypedList(messageBytes.length).setAll(0, messageBytes);
+
+        final unknown = (events + 0).cast<raw.mln_runtime_event>().ref;
+        unknown.type = 0xfeed;
+        unknown.source_type = 0xbeef;
+        unknown.source = 0xcafe;
+        unknown.code = 17;
+        unknown.payload_type = 0xf00d;
+        unknown.message_offset = 0;
+        unknown.message_size = 14;
+        final unknownWindow = (events + payloadOffset).asTypedList(
+          eventSize - payloadOffset,
         );
-        try {
-          expect(raw.mln_event_batch_get(outBatch.value, view), nativeStatusOk);
-          expect(view.ref.event_size, sizeOf<raw.mln_runtime_event>());
-        } finally {
-          raw.mln_event_batch_release(outBatch.value);
+        for (var index = 0; index < unknownWindow.length; index += 1) {
+          unknownWindow[index] = index + 1;
         }
-      });
 
-      messages.asTypedList(messageBytes.length).setAll(0, messageBytes);
+        final renderMap = (events + eventSize)
+            .cast<raw.mln_runtime_event>()
+            .ref;
+        renderMap.type = 16;
+        renderMap.source_type = 1;
+        // A map id this build cannot resolve to a wrapper still names one object
+        // for the life of the process, so the raw id has to survive the decode:
+        // it is the only identity a host can route or correlate the event on.
+        renderMap.source = 0xfeed;
+        renderMap.code = 0;
+        renderMap.payload_type = 2;
+        renderMap.payload.render_map.mode = 1;
 
-      final unknown = (events + 0).cast<raw.mln_runtime_event>().ref;
-      unknown.type = 0xfeed;
-      unknown.source_type = 0xbeef;
-      unknown.source = 0xcafe;
-      unknown.code = 17;
-      unknown.payload_type = 0xf00d;
-      unknown.message_offset = 0;
-      unknown.message_size = 14;
-      final unknownWindow = (events + payloadOffset).asTypedList(
-        eventSize - payloadOffset,
-      );
-      for (var index = 0; index < unknownWindow.length; index += 1) {
-        unknownWindow[index] = index + 1;
+        final transition = (events + 2 * eventSize)
+            .cast<raw.mln_runtime_event>()
+            .ref;
+        transition.type = 23;
+        transition.source_type = 0;
+        transition.code = 0;
+        transition.payload_type = 9;
+        transition.payload.camera_transition_finished.transition_id = -1;
+        transition.message_offset = 15;
+        transition.message_size = 11;
+
+        batch.ref.size = sizeOf<raw.mln_runtime_event_batch_view>();
+        batch.ref.event_size = eventSize;
+        batch.ref.events = events.cast<raw.mln_runtime_event>();
+        batch.ref.event_count = 3;
+        batch.ref.messages = messages.cast<Char>();
+        batch.ref.messages_size = messageBytes.length;
+        batch.ref.remaining_count = 7;
+
+        final decoded = decodeRuntimeEventBatchForTesting(batch.ref, runtime);
+        // Every field is copied before the drain returns, so overwriting the
+        // arena cannot change what the host already holds.
+        unknownWindow.fillRange(0, unknownWindow.length, 9);
+        messages[0] = 'X'.codeUnitAt(0);
+
+        expect(decoded.remainingCount, 7);
+        expect(decoded.events, hasLength(3));
+
+        final unknownEvent = decoded.events[0];
+        expect(unknownEvent.eventType.rawValue, 0xfeed);
+        expect(unknownEvent.code, 17);
+        final unknownSource = unknownEvent.source as UnknownRuntimeEventSource;
+        expect(unknownSource.sourceType.rawValue, 0xbeef);
+        expect(unknownSource.sourceId, 0xcafe);
+        expect(unknownEvent.message, 'copied message');
+        final unknownPayload = unknownEvent.payload;
+        expect(unknownPayload, isA<RuntimeEventPayloadUnknown>());
+        expect(unknownPayload.rawPayloadType, 0xf00d);
+        expect(
+          (unknownPayload as RuntimeEventPayloadUnknown).bytes,
+          List.generate(eventSize - payloadOffset, (index) => index + 1),
+        );
+
+        // The second and third events decode only when the walk steps by the
+        // reported stride rather than by this binding's own record size.
+        final renderMapEvent = decoded.events[1];
+        expect(renderMapEvent.eventType, RuntimeEventType.mapRenderMapFinished);
+        final renderMapSource = renderMapEvent.source as MapRuntimeEventSource;
+        expect(renderMapSource.map, isNull);
+        expect(renderMapSource.sourceId, 0xfeed);
+        // A zero message size is the absent message, not the empty one.
+        expect(renderMapEvent.message, isNull);
+        expect(
+          (renderMapEvent.payload as RuntimeEventRenderMap).mode,
+          RenderMode.full,
+        );
+
+        final transitionEvent = decoded.events[2];
+        expect(
+          transitionEvent.eventType,
+          RuntimeEventType.mapCameraTransitionFinished,
+        );
+        expect(transitionEvent.source, isA<RuntimeRuntimeEventSource>());
+        expect(transitionEvent.message, 'tile-source');
+        expect(
+          (transitionEvent.payload as RuntimeEventCameraTransitionFinished)
+              .transitionId,
+          (BigInt.one << 64) - BigInt.one,
+        );
+      } finally {
+        calloc.free(batch);
+        calloc.free(messages);
+        calloc.free(events);
+        await runtime.close();
       }
-
-      final renderMap = (events + eventSize).cast<raw.mln_runtime_event>().ref;
-      renderMap.type = 16;
-      renderMap.source_type = 1;
-      // A map id this build cannot resolve to a wrapper still names one object
-      // for the life of the process, so the raw id has to survive the decode:
-      // it is the only identity a host can route or correlate the event on.
-      renderMap.source = 0xfeed;
-      renderMap.code = 0;
-      renderMap.payload_type = 2;
-      renderMap.payload.render_map.mode = 1;
-
-      final transition = (events + 2 * eventSize)
-          .cast<raw.mln_runtime_event>()
-          .ref;
-      transition.type = 23;
-      transition.source_type = 0;
-      transition.code = 0;
-      transition.payload_type = 9;
-      transition.payload.camera_transition_finished.transition_id = -1;
-      transition.message_offset = 15;
-      transition.message_size = 11;
-
-      batch.ref.size = sizeOf<raw.mln_runtime_event_batch_view>();
-      batch.ref.event_size = eventSize;
-      batch.ref.events = events.cast<raw.mln_runtime_event>();
-      batch.ref.event_count = 3;
-      batch.ref.messages = messages.cast<Char>();
-      batch.ref.messages_size = messageBytes.length;
-      batch.ref.remaining_count = 7;
-
-      final decoded = decodeRuntimeEventBatchForTesting(batch.ref, runtime);
-      // Every field is copied before the drain returns, so overwriting the
-      // arena cannot change what the host already holds.
-      unknownWindow.fillRange(0, unknownWindow.length, 9);
-      messages[0] = 'X'.codeUnitAt(0);
-
-      expect(decoded.remainingCount, 7);
-      expect(decoded.events, hasLength(3));
-
-      final unknownEvent = decoded.events[0];
-      expect(unknownEvent.eventType.rawValue, 0xfeed);
-      expect(unknownEvent.code, 17);
-      final unknownSource = unknownEvent.source as UnknownRuntimeEventSource;
-      expect(unknownSource.sourceType.rawValue, 0xbeef);
-      expect(unknownSource.sourceId, 0xcafe);
-      expect(unknownEvent.message, 'copied message');
-      final unknownPayload = unknownEvent.payload;
-      expect(unknownPayload, isA<RuntimeEventPayloadUnknown>());
-      expect(unknownPayload.rawPayloadType, 0xf00d);
-      expect(
-        (unknownPayload as RuntimeEventPayloadUnknown).bytes,
-        List.generate(eventSize - payloadOffset, (index) => index + 1),
-      );
-
-      // The second and third events decode only when the walk steps by the
-      // reported stride rather than by this binding's own record size.
-      final renderMapEvent = decoded.events[1];
-      expect(renderMapEvent.eventType, RuntimeEventType.mapRenderMapFinished);
-      final renderMapSource = renderMapEvent.source as MapRuntimeEventSource;
-      expect(renderMapSource.map, isNull);
-      expect(renderMapSource.sourceId, 0xfeed);
-      // A zero message size is the absent message, not the empty one.
-      expect(renderMapEvent.message, isNull);
-      expect(
-        (renderMapEvent.payload as RuntimeEventRenderMap).mode,
-        RenderMode.full,
-      );
-
-      final transitionEvent = decoded.events[2];
-      expect(
-        transitionEvent.eventType,
-        RuntimeEventType.mapCameraTransitionFinished,
-      );
-      expect(transitionEvent.source, isA<RuntimeRuntimeEventSource>());
-      expect(transitionEvent.message, 'tile-source');
-      expect(
-        (transitionEvent.payload as RuntimeEventCameraTransitionFinished)
-            .transitionId,
-        (BigInt.one << 64) - BigInt.one,
-      );
-    } finally {
-      calloc.free(batch);
-      calloc.free(messages);
-      calloc.free(events);
-      await runtime.close();
-    }
-  });
+    },
+  );
 }

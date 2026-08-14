@@ -3,7 +3,7 @@ package org.maplibre.nativeffi.render
 import kotlin.jvm.JvmInline
 
 /**
- * Outcome of a successful render-update call.
+ * Terminal disposition of an accepted frame demand.
  *
  * This is an open domain: a value may have no named constant here, so a `when` over this type needs
  * an `else` branch. Unknown values keep their raw [nativeValue].
@@ -28,6 +28,12 @@ public value class RenderResult(public val nativeValue: Int) {
      * target, or back off and retry.
      */
     public val TARGET_NOT_READY: RenderResult = RenderResult(3)
+
+    /** A newer demand in the same coalescing boundary replaced this demand. */
+    public val SUPERSEDED: RenderResult = RenderResult(4)
+
+    /** The demand's positive monotonic deadline elapsed before rendering began. */
+    public val DEADLINE_MISSED: RenderResult = RenderResult(5)
 
     internal fun fromNative(nativeValue: UInt): RenderResult = fromNative(nativeValue.toInt())
 

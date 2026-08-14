@@ -1,68 +1,68 @@
 ---
 title: Run the render loop
-description: Drain runtime notifications and draw published frames on the graphics thread.
+description: Submit frame demand, service graphics work when required, and drain owned results.
 sidebar:
   order: 4
 ---
 
-MapLibre Native advances runtime and map work on the runtime's core-owned
-scheduler thread. The host does not pump that scheduler. The host render loop
-drains notifications, observes render-update events, and draws through a render
-session on the graphics thread.
+MapLibre Native advances runtime and map work on its native scheduler. A render
+session advances through either a native graphics worker or a narrow service
+call on the host graphics thread. Neither contract requires a host runtime pump.
 
-## Schedule notification drains
+## Submit frame demand
 
-Create one notification source for the host receiver that handles the runtime.
-Pass it to runtime creation, then either install a callback or integrate the
-binding's equivalent suspension primitive.
+Submit a nonblocking frame demand from any thread. It carries a host token,
+presentation time, optional deadline, flags, and a coalescing boundary. Matching
+demands may coalesce before work starts, but every accepted demand produces one
+terminal result record. Presentation time selects render state. A positive
+deadline uses the host's monotonic clock; when it expires before work begins,
+the demand terminates as deadline missed. Neither timestamp supplies cadence.
 
-The callback may run on any native thread. It carries no event data and must not
-call the C API. Schedule a later ready-batch drain on the receiver's execution
-context instead.
+A core-worker session wakes its serial graphics worker. A caller-driver session
+makes its driver-work notification endpoint ready. Map updates use the same
+paths, so progress does not depend on runtime-event drains or display callbacks.
 
-A notification is level-triggered. Drain the source's owned ready batch, inspect
-each endpoint by its reported stride, and release the batch. When it contains the
-runtime-events endpoint, drain runtime events until the typed drain reports an
-empty queue. An operation endpoint means that operation reached a terminal
-disposition and can be inspected. Coalesced callbacks lose no readiness.
+The host may submit demand from a display source, after an earlier result, or
+from another scheduler. A demand captures the current extent generation. Its
+result identifies the token and the map-update, extent, and frame generations
+that the driver used.
 
-## Request frames from runtime events
+## Service a caller driver
 
-Select render-update-available and render-frame-finished before loading the map's
-style. When the runtime-events endpoint becomes ready, drain the event queue and
-match each map event to the map that the render session displays.
+When the driver-work endpoint is ready, schedule the driver-service call on the
+thread or realm where the target's graphics context is usable. The first
+successful call fixes that graphics-thread identity. Service work in serialized
+calls until the endpoint drains. Continue service while presentation callbacks
+are paused, because attach, resize, queries, readback, barriers, and detach also
+use the mailbox.
 
-A render-update-available event means the map published new render state. Set the
-host's render request. A render-frame-finished event carries a repaint flag; set
-another request when that flag is true so camera animations and label placement
-continue.
+A core-worker session rejects the service call because its native worker already
+owns execution. WGL, EGL, existing WebGL contexts, and browser WebGPU use caller
+drivers. Transferable Metal, Vulkan, and `OffscreenCanvas` WebGL targets can use
+core workers.
 
-Map and camera commands run on the scheduler thread after their input is copied.
-Any host thread may submit them. A command returns an ID; its command-finished
-event reports committed, superseded, failed, or cancelled. Use a runtime barrier
-when later host work must wait for every preceding submission to become
-terminal.
+If the graphics owner cannot run again, abandon the target. Leaving ready work
+unserviced can leave operations pending indefinitely.
 
-## Draw on the graphics thread
+## Drain results and present
 
-The thread that attaches a render session owns that session for its lifetime.
-Keep render-session calls on that graphics thread even though runtime, map, and
-projection handles are callable from any thread.
+Frame readiness is level-triggered. Drain an owned frame-result batch from any
+thread when its endpoint is ready. Only one batch may remain live per session;
+release it before another drain. Keep draining until the queue is empty.
 
-Draw when the host render request is set. Only a rendered result clears the
-request. A no-update result and a pending-size result mean that the map has not
-published render state for the session's current extent. A target-not-ready
-result means that the target had no frame to draw into, so retain the request
-for another turn.
+A rendered result means that a frame was presented or became available for
+acquisition. No update and size pending wait for a newer map update. Target not
+ready waits for host target readiness or paced retry. Superseded means that a
+newer demand replaced this demand within the same coalescing boundary. Deadline
+missed means that work did not begin before the positive deadline. These
+outcomes have different retry conditions, so preserve them in host pacing.
 
-Resize the target's platform allocation and submit the map resize command before
-the next draw. The resize command is the sole authority for the map's logical
-width, height, and scale factor.
+Owned texture acquisition is nonblocking and leases the oldest completed slot
+that is not already acquired. Wait for or submit work after its producer sync.
+Release the acquired handle with consumer-completion sync when host GPU work
+reads the texture. CPU-complete sync is valid only when that work completed
+before release. The release operation completes when the slot is reusable.
 
-## Close the loop
-
-Stop host frame callbacks, then close the render session on its graphics thread.
-Start and await map close after the session is gone. Start and await runtime
-close after every map and pending child creation is gone. Close the notification
-source last. A failed close preflight leaves the parent handle open so the host
-can close the remaining child and retry.
+Use a session barrier when later work must wait for every preceding render item
+to become terminal and for the driver to observe a minimum map-update
+generation. A barrier orders work; it does not request a frame.

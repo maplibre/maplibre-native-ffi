@@ -150,7 +150,7 @@ const MetalTextureCompositor = struct {
         self.view.resize(viewport);
     }
 
-    fn drawMetalTexture(self: *MetalTextureCompositor, metal_texture: *anyopaque) !bool {
+    fn drawMetalTexture(self: *MetalTextureCompositor, metal_texture: *anyopaque, producer_sync: maplibre.GpuSync) !bool {
         const drawable = self.view.layer.msgSend(objc.Object, "nextDrawable", .{});
         // A minimized or occluded window has no drawable, so skip the frame
         // rather than fail.
@@ -172,6 +172,14 @@ const MetalTextureCompositor = struct {
 
         const command_buffer = self.queue.msgSend(objc.Object, "commandBuffer", .{});
         if (command_buffer.value == null) return types.AppError.BackendDrawFailed;
+        switch (producer_sync) {
+            .cpu_complete => {},
+            .metal_shared_event => |producer| command_buffer.msgSend(void, "encodeWaitForEvent:value:", .{
+                objc.Object.fromId(producer.object.toPtr()),
+                producer.value,
+            }),
+            else => return types.AppError.BackendDrawFailed,
+        }
         const encoder = command_buffer.msgSend(
             objc.Object,
             "renderCommandEncoderWithDescriptor:",
@@ -237,11 +245,11 @@ const MetalOwnedTextureBackend = struct {
         const texture = maplibre.attachMetalOwnedTexture(map, .{
             .extent = render_target.extent(viewport),
             .context = .{ .device = maplibre.NativePointer.fromPtr(self.compositor.view.device.value.?) },
-        }) catch |err| {
+        }, .{ .driver = .caller_graphics_thread, .requested_texture_ring_depth = 2 }) catch |err| {
             diagnostics.logError("Metal texture attach failed", err, null);
             return types.AppError.TextureAttachFailed;
         };
-        return .{ .texture = texture };
+        return render_target.textureSession(texture);
     }
 
     fn renderUpdate(
@@ -255,17 +263,29 @@ const MetalOwnedTextureBackend = struct {
             .texture => |*texture| texture,
             else => return false,
         };
-        var frame = texture.acquireMetalOwnedTextureFrame() catch |err| switch (err) {
+        var frame = texture.acquireFrame() catch |err| switch (err) {
             error.InvalidState => return false,
             else => {
                 diagnostics.logError("Metal texture acquire failed", err, null);
                 return types.AppError.BackendDrawFailed;
             },
         };
-        defer frame.release() catch |err| diagnostics.logError("Metal texture release failed", err, null);
-
-        const info = try frame.info();
-        return try self.compositor.drawMetalTexture(info.texture.toPtr());
+        var frame_owned = true;
+        errdefer if (frame_owned) {
+            var cleanup = frame.releaseStart(.cpu_complete) catch null;
+            if (cleanup) |*operation| {
+                defer operation.release();
+                render_target.serviceUntilComplete(texture, operation.*) catch {};
+            }
+        };
+        const producer_sync = try frame.producerSync();
+        const info = try frame.metalTexture();
+        const drawn = try self.compositor.drawMetalTexture(info.texture.toPtr(), producer_sync);
+        var release = try frame.releaseStart(.cpu_complete);
+        frame_owned = false;
+        defer release.release();
+        try render_target.serviceUntilComplete(texture, release);
+        return drawn;
     }
 };
 
@@ -309,16 +329,18 @@ const MetalBorrowedTextureBackend = struct {
 
         const replacement = try createBorrowedTexture(self.compositor.view.device, viewport);
         errdefer replacement.release();
-        session.setMetalBorrowedTextureTarget(.{
+        var operation = session.setMetalBorrowedTextureTargetStart(.{
             .extent = render_target.extent(viewport),
             .physical_width = viewport.physical_width,
             .physical_height = viewport.physical_height,
             .texture = maplibre.NativePointer.fromPtr(replacement.value.?),
         }) catch |err| {
-            // The session may have taken the replacement before failing, so
-            // detach before either texture is released.
-            session.detach() catch {};
             diagnostics.logError("Metal borrowed texture set target failed", err, null);
+            return types.AppError.TextureResizeFailed;
+        };
+        defer operation.release();
+        render_target.serviceUntilComplete(session, operation) catch |err| {
+            diagnostics.logError("Metal borrowed texture replacement failed", err, null);
             return types.AppError.TextureResizeFailed;
         };
         // Released only once the session has taken the replacement.
@@ -336,11 +358,11 @@ const MetalBorrowedTextureBackend = struct {
             .physical_width = viewport.physical_width,
             .physical_height = viewport.physical_height,
             .texture = maplibre.NativePointer.fromPtr(self.borrowed_texture.value.?),
-        }) catch |err| {
+        }, .{ .driver = .caller_graphics_thread }) catch |err| {
             diagnostics.logError("Metal borrowed texture attach failed", err, null);
             return types.AppError.TextureAttachFailed;
         };
-        return .{ .texture = texture };
+        return render_target.textureSession(texture);
     }
 
     fn renderUpdate(
@@ -350,7 +372,7 @@ const MetalBorrowedTextureBackend = struct {
     ) !bool {
         _ = viewport;
         if (!try self.session.renderUpdate(diagnostic_store)) return false;
-        return try self.compositor.drawMetalTexture(self.borrowed_texture.value.?);
+        return try self.compositor.drawMetalTexture(self.borrowed_texture.value.?, .cpu_complete);
     }
 };
 
@@ -402,11 +424,11 @@ const MetalSurfaceBackend = struct {
             .extent = render_target.extent(viewport),
             .context = .{ .device = maplibre.NativePointer.fromPtr(self.view.device.value.?) },
             .layer = maplibre.NativePointer.fromPtr(self.view.layer.value.?),
-        }) catch |err| {
+        }, .{ .driver = .caller_graphics_thread }) catch |err| {
             diagnostics.logError("Metal surface attach failed", err, null);
             return types.AppError.SurfaceAttachFailed;
         };
-        return .{ .surface = surface };
+        return render_target.surfaceSession(surface);
     }
 };
 

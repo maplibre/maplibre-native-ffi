@@ -17,9 +17,10 @@ selection, hover, a live value, or a computed status, because each feature
 supplies its own input to that rule.
 
 Feature state belongs to the [render session](/maplibre-native-ffi/concepts/)
-and applies to its loaded tiles. Set state after the first render update that
-follows a style load. An earlier call reports an invalid-state status. Every
-feature-state call runs on the session's owner thread.
+and applies to its loaded tiles. Its set, get, and remove operations are callable
+from any thread and execute in order through the selected driver. A caller
+driver needs graphics-thread service while an operation is pending. Set state
+after the first rendered frame that follows a style load.
 
 ## Set state on a feature
 

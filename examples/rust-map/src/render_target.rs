@@ -12,7 +12,10 @@ pub use opengl_target::RenderTarget;
 #[cfg(maplibre_render_backend = "vulkan")]
 pub use vulkan_target::RenderTarget;
 
-use maplibre_native_ffi::RenderTargetExtent;
+use maplibre_native_ffi::{
+    AcquiredFrameHandle, Error, ErrorKind, FrameDemand, FrameDisposition, GpuSyncKind,
+    RenderSessionHandle, RenderTargetExtent,
+};
 
 use crate::viewport::Viewport;
 
@@ -58,4 +61,38 @@ fn extent(viewport: Viewport) -> RenderTargetExtent {
         viewport.logical_height,
         viewport.scale_factor,
     )
+}
+
+fn request_render_frame(
+    session: &RenderSessionHandle,
+    present: bool,
+    service_caller_driver: bool,
+) -> maplibre_native_ffi::Result<bool> {
+    session.request_frame(FrameDemand {
+        present,
+        ..FrameDemand::default()
+    })?;
+    if service_caller_driver {
+        session.service_driver_work(usize::MAX)?;
+    }
+    Ok(session
+        .drain_frame_results(0)?
+        .copy_results()?
+        .into_iter()
+        .any(|result| result.disposition == FrameDisposition::Rendered))
+}
+
+fn require_cpu_complete_producer(frame: &AcquiredFrameHandle) -> maplibre_native_ffi::Result<()> {
+    let producer = frame.producer_sync()?;
+    if producer.kind == GpuSyncKind::CpuComplete {
+        return Ok(());
+    }
+    Err(Error::new(
+        ErrorKind::InvalidState,
+        None,
+        format!(
+            "rust-map cannot consume a {:?} producer synchronization payload",
+            producer.kind
+        ),
+    ))
 }

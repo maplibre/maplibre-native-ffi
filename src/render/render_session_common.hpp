@@ -1,13 +1,20 @@
 #pragma once
 
+#include <any>
+#include <atomic>
 #include <cmath>
+#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <functional>
 #include <limits>
 #include <memory>
 #include <mutex>
+#include <optional>
+#include <string>
 #include <thread>
+#include <variant>
 #include <vector>
 
 #include <mbgl/actor/scheduler.hpp>
@@ -17,7 +24,10 @@
 #include <mbgl/util/size.hpp>
 
 #include "diagnostics/diagnostics.hpp"
+#include "handles/handle_table.hpp"
 #include "maplibre_native_c.h"
+#include "notification/notification.hpp"
+#include "operation/operation.hpp"
 
 struct mln_render_session_object;
 
@@ -195,6 +205,18 @@ class TextureSessionBackend {
     (void)out_frame;
     return MLN_STATUS_UNSUPPORTED;
   }
+  virtual auto release_consumer_sync(const mln_gpu_sync& sync) -> mln_status {
+    return sync.kind == MLN_GPU_SYNC_CPU_COMPLETE ? MLN_STATUS_OK
+                                                  : MLN_STATUS_UNSUPPORTED;
+  }
+  virtual auto copy_slot_metadata(
+    const mln_render_session_object&, std::size_t, std::any&
+  ) -> mln_status {
+    return MLN_STATUS_UNSUPPORTED;
+  }
+  virtual auto select_render_slot(std::size_t) -> mln_status {
+    return MLN_STATUS_OK;
+  }
 };
 
 // The scheduler mbgl sees as current while a render session renders. Work
@@ -296,6 +318,19 @@ struct RenderSurfaceState {
   std::unique_ptr<SurfaceSessionBackend> backend = nullptr;
 };
 
+struct RenderTextureSlot {
+  mln_render_frame_result result{};
+  mln_gpu_sync producer_sync{
+    .size = sizeof(mln_gpu_sync),
+    .kind = MLN_GPU_SYNC_CPU_COMPLETE,
+    .object = nullptr,
+    .value = 0
+  };
+  bool available = false;
+  bool acquired = false;
+  bool rendering = false;
+};
+
 struct RenderTextureState {
   std::unique_ptr<TextureSessionBackend> backend = nullptr;
   uint64_t next_frame_id = 1;
@@ -306,24 +341,118 @@ struct RenderTextureState {
   TextureSessionMode mode = TextureSessionMode::Owned;
   void* rendered_native_texture = nullptr;
   void* acquired_native_texture = nullptr;
+  std::vector<RenderTextureSlot> slots;
 };
 
+enum class RenderDriverWorkKind : std::uint8_t {
+  Attach,
+  FrameDemand,
+  Resize,
+  Barrier,
+  Query,
+  Maintenance,
+  FeatureState,
+  Retarget,
+  FrameRelease,
+  Detach,
+};
+
+struct DriverWorkCallbacks {
+  std::function<void()> execute;
+  std::function<void()> abandon;
+};
+struct AttachDriverWork {
+  DriverWorkCallbacks callbacks;
+};
+struct FrameDemandDriverWork {
+  DriverWorkCallbacks callbacks;
+};
+struct ResizeDriverWork {
+  DriverWorkCallbacks callbacks;
+};
+struct BarrierDriverWork {
+  DriverWorkCallbacks callbacks;
+};
+struct QueryDriverWork {
+  DriverWorkCallbacks callbacks;
+};
+struct MaintenanceDriverWork {
+  DriverWorkCallbacks callbacks;
+};
+struct FeatureStateDriverWork {
+  DriverWorkCallbacks callbacks;
+};
+struct RetargetDriverWork {
+  std::any backend_payload;
+  DriverWorkCallbacks callbacks;
+};
+struct FrameReleaseDriverWork {
+  DriverWorkCallbacks callbacks;
+};
+struct DetachDriverWork {
+  DriverWorkCallbacks callbacks;
+};
+using RenderDriverWorkItem = std::variant<
+  AttachDriverWork, FrameDemandDriverWork, ResizeDriverWork, BarrierDriverWork,
+  QueryDriverWork, MaintenanceDriverWork, FeatureStateDriverWork,
+  RetargetDriverWork, FrameReleaseDriverWork, DetachDriverWork>;
+
+struct PendingFrameDemand {
+  mln_frame_demand demand;
+  std::uint64_t barrier_epoch;
+};
 }  // namespace mln::core
 
-struct mln_render_session_object {
+struct mln_render_session_object
+    : public std::enable_shared_from_this<mln_render_session_object> {
   mln::core::RenderSessionKind kind = mln::core::RenderSessionKind::Surface;
+  mln_render_session self = MLN_HANDLE_NULL;
   mln_map map = MLN_HANDLE_NULL;
-  // The thread that attached the session, fixed for its lifetime. Set before
-  // the session is registered.
-  std::thread::id owner_thread;
   uint32_t width = 0;
   uint32_t height = 0;
   uint32_t physical_width = 0;
   uint32_t physical_height = 0;
+  uint64_t barrier_epoch = 0;
   double scale_factor = 1.0;
+
+  mutable std::mutex control_mutex;
+  mln_render_session_state state = MLN_RENDER_SESSION_STATE_ATTACHING;
+  mln_render_session_capabilities capabilities{};
   uint64_t generation = 1;
+  uint64_t map_update_generation = 0;
   uint64_t rendered_generation = 0;
-  bool attached = true;
+  uint64_t rendered_target_generation = 0;
+  uint64_t extent_generation = 1;
+  uint64_t frame_generation = 0;
+  uint64_t latest_demand_token = 0;
+  mln_render_result latest_result = MLN_RENDER_RESULT_NO_UPDATE;
+  bool target_ready = true;
+  bool pending_changes = true;
+  bool frame_batch_live = false;
+  std::optional<mln_render_target_extent> pending_extent;
+  std::optional<std::thread::id> graphics_thread;
+  uint32_t acquired_frame_count = 0;
+  bool driver_call_in_flight = false;
+  uint32_t active_demand_count = 0;
+  bool stop_worker = false;
+  bool attached = false;
+
+  std::deque<mln_render_frame_result> frame_results;
+  std::deque<mln::core::PendingFrameDemand> demands;
+  std::deque<mln::core::RenderDriverWorkItem> waiting_update_work;
+  std::deque<mln::core::RenderDriverWorkItem> driver_work;
+  std::condition_variable worker_condition;
+  std::thread worker;
+  // Backends with transfer-time thread attributes may replace the default
+  // std::thread worker before attachment.
+  std::function<mln_status(std::function<void()>)> start_worker;
+  std::function<void()> join_worker;
+  // Attachment descriptors are copied into this closure. It creates every
+  // graphics object on the selected driver.
+  std::function<mln_status(mln_render_session_object&)> initialize_backend;
+  std::shared_ptr<mln::core::NotificationSourceObject> operation_source;
+  std::shared_ptr<mln::core::NotificationEndpoint> frame_endpoint;
+  std::shared_ptr<mln::core::NotificationEndpoint> driver_endpoint;
 
   // Declared before `renderer` so reverse-order destruction tears the renderer
   // down while the scheduler its mailboxes point at is still alive.
@@ -333,13 +462,83 @@ struct mln_render_session_object {
   mln::core::RenderTextureState texture;
 };
 
-namespace mln::core {
-
-struct RenderSessionAttachMessages {
-  const char* null_session;
-  const char* null_output;
-  const char* non_null_output;
+struct mln_render_frame_batch_object {
+  std::shared_ptr<mln_render_session_object> session;
+  std::vector<mln_render_frame_result> results;
 };
+
+struct mln_acquired_frame_object {
+  std::shared_ptr<mln_render_session_object> session;
+  std::any backend_metadata;
+  std::size_t slot = 0;
+  mln_render_frame_result result{};
+  mln_gpu_sync producer_sync{};
+  std::atomic_bool valid{true};
+};
+
+namespace mln::core {
+template <>
+struct HandleTraits<mln_render_session_object> {
+  static constexpr auto kind = HandleKind::RenderSession;
+  static constexpr auto leasable = true;
+};
+
+template <>
+struct HandleTraits<mln_render_frame_batch_object> {
+  static constexpr auto kind = HandleKind::RenderFrameBatch;
+  static constexpr auto leasable = true;
+};
+
+template <>
+struct HandleTraits<mln_acquired_frame_object> {
+  static constexpr auto kind = HandleKind::AcquiredFrame;
+  static constexpr auto leasable = true;
+};
+
+enum : std::uint32_t {
+  RENDER_OPERATION_VOID = 0x3000u,
+  RENDER_OPERATION_ATTACH,
+  RENDER_OPERATION_RESIZE,
+  RENDER_OPERATION_BARRIER,
+  RENDER_OPERATION_MAINTENANCE,
+  RENDER_OPERATION_FEATURE_STATE_GET,
+  RENDER_OPERATION_FEATURE_STATE_SET,
+  RENDER_OPERATION_FEATURE_STATE_REMOVE,
+  RENDER_OPERATION_DETACH,
+  RENDER_OPERATION_FRAME_RELEASE,
+  RENDER_OPERATION_QUERY,
+  RENDER_OPERATION_READBACK,
+};
+
+using RenderDriverCallable =
+  std::function<mln_status(mln_render_session_object&)>;
+using RenderDriverResultCallable =
+  std::function<mln_status(mln_render_session_object&, std::any&)>;
+
+[[nodiscard]] auto lease_render_session(mln_render_session session)
+  -> std::shared_ptr<mln_render_session_object>;
+auto enqueue_driver_operation(
+  mln_render_session session, std::uint32_t operation_kind,
+  RenderDriverCallable work, mln_operation* out_operation
+) -> mln_status;
+auto enqueue_driver_result_operation(
+  mln_render_session session, std::uint32_t operation_kind,
+  RenderDriverResultCallable work, mln_operation* out_operation
+) -> mln_status;
+auto validate_render_session_attach_request(
+  const mln_render_session_attach_options* options,
+  const mln_render_session* out_session, const mln_operation* out_operation
+) -> mln_status;
+
+auto start_attach_render_session(
+  std::shared_ptr<mln_render_session_object> session, RenderSessionKind kind,
+  const mln_render_session_attach_options* options,
+  mln_render_session_capabilities capabilities, mln_render_session* out_session,
+  mln_operation* out_operation
+) -> mln_status;
+auto notify_render_session_map_update(
+  mln_render_session_object* session
+) noexcept -> void;
 
 auto register_render_session(std::shared_ptr<mln_render_session_object> session)
   -> mln_render_session;
@@ -351,21 +550,6 @@ auto validate_live_attached_render_session(
 ) -> mln_status;
 auto erase_render_session(mln_render_session session)
   -> std::shared_ptr<mln_render_session_object>;
-
-inline auto validate_attach_output(
-  mln_render_session* out_session, const char* null_message,
-  const char* not_null_message
-) -> mln_status {
-  if (out_session == nullptr) {
-    set_thread_error(null_message);
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (*out_session != MLN_HANDLE_NULL) {
-    set_thread_error(not_null_message);
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
-}
 
 inline auto physical_dimension(uint32_t logical, double scale_factor)
   -> uint32_t {
@@ -509,17 +693,6 @@ inline auto validate_physical_size(
   return MLN_STATUS_OK;
 }
 
-auto attach_render_session(
-  std::shared_ptr<mln_render_session_object> session,
-  mln_render_session* out_session, RenderSessionKind kind,
-  RenderSessionAttachMessages messages
-) -> mln_status;
-
-auto render_session_resize(
-  mln_render_session session, uint32_t width, uint32_t height,
-  double scale_factor
-) -> mln_status;
-
 enum class RetargetTargetKind : uint8_t { Surface, BorrowedTexture };
 
 // Checks that a session can take a replacement target of this kind, before any
@@ -552,25 +725,7 @@ auto surface_session_set_target(
   mln_render_session session, const mln_render_target_extent& extent,
   const RenderTargetReplacer& replace
 ) -> mln_status;
-auto render_session_render_update(
-  mln_render_session session, mln_render_result* out_result
-) -> mln_status;
-auto render_session_detach(mln_render_session session) -> mln_status;
 auto render_session_destroy(mln_render_session session) -> mln_status;
-auto render_session_reduce_memory_use(mln_render_session session) -> mln_status;
-auto render_session_clear_data(mln_render_session session) -> mln_status;
-auto render_session_dump_debug_logs(mln_render_session session) -> mln_status;
-auto render_session_set_feature_state(
-  mln_render_session session, const mln_feature_state_selector* selector,
-  mln_buffer_view state
-) -> mln_status;
-auto render_session_get_feature_state(
-  mln_render_session session, const mln_feature_state_selector* selector,
-  mln_buffer* out_state
-) -> mln_status;
-auto render_session_remove_feature_state(
-  mln_render_session session, const mln_feature_state_selector* selector
-) -> mln_status;
 auto render_session_query_rendered_features(
   mln_render_session session, const mln_rendered_query_geometry* geometry,
   const mln_rendered_feature_query_options* options, mln_buffer* out_result
@@ -586,4 +741,77 @@ auto render_session_query_feature_extensions(
   mln_buffer* out_result
 ) -> mln_status;
 
+auto render_session_query_rendered_features_start(
+  mln_render_session session, const mln_rendered_query_geometry* geometry,
+  const mln_rendered_feature_query_options* options,
+  mln_operation* out_operation
+) -> mln_status;
+auto render_session_query_source_features_start(
+  mln_render_session session, mln_buffer_view source_id,
+  const mln_source_feature_query_options* options, mln_operation* out_operation
+) -> mln_status;
+auto render_session_query_feature_extensions_start(
+  mln_render_session session, mln_buffer_view source_id,
+  mln_buffer_view feature, mln_buffer_view extension,
+  mln_buffer_view extension_field, const mln_buffer_view* arguments,
+  mln_operation* out_operation
+) -> mln_status;
+auto render_query_take_result(mln_operation operation, mln_buffer* out_result)
+  -> mln_status;
+
+auto render_session_get_capabilities(
+  mln_render_session, mln_render_session_capabilities*
+) -> mln_status;
+auto render_session_get_snapshot(
+  mln_render_session, mln_render_session_snapshot*
+) -> mln_status;
+auto render_session_request_frame(mln_render_session, const mln_frame_demand*)
+  -> mln_status;
+auto render_session_service_driver_work(
+  mln_render_session, std::size_t, std::size_t*
+) -> mln_status;
+auto render_session_drain_frame_results(
+  mln_render_session, std::size_t, mln_render_frame_batch*
+) -> mln_status;
+auto render_frame_batch_count(mln_render_frame_batch, std::size_t*)
+  -> mln_status;
+auto render_frame_batch_get(
+  mln_render_frame_batch, std::size_t, mln_render_frame_result*
+) -> mln_status;
+auto render_frame_batch_release(mln_render_frame_batch) noexcept -> void;
+auto render_session_acquire_frame(mln_render_session, mln_acquired_frame*)
+  -> mln_status;
+auto acquired_frame_get_result(mln_acquired_frame, mln_render_frame_result*)
+  -> mln_status;
+auto acquired_frame_get_producer_sync(mln_acquired_frame, mln_gpu_sync*)
+  -> mln_status;
+auto acquired_frame_release_start(
+  mln_acquired_frame*, const mln_gpu_sync*, mln_operation*
+) -> mln_status;
+auto render_session_resize_start(
+  mln_render_session, const mln_render_target_extent*, mln_operation*
+) -> mln_status;
+auto render_session_barrier_start(mln_render_session, uint64_t, mln_operation*)
+  -> mln_status;
+auto render_session_maintenance_start(
+  mln_render_session, std::uint32_t, mln_operation*
+) -> mln_status;
+auto render_session_detach_start(mln_render_session, mln_operation*)
+  -> mln_status;
+auto render_session_abandon(mln_render_session, mln_render_abandon_result*)
+  -> mln_status;
+auto render_session_set_feature_state_start(
+  mln_render_session, mln_buffer_view, mln_buffer_view, mln_buffer_view,
+  mln_buffer_view, mln_operation*
+) -> mln_status;
+auto render_session_get_feature_state_start(
+  mln_render_session, mln_buffer_view, mln_buffer_view, mln_buffer_view,
+  mln_operation*
+) -> mln_status;
+auto render_session_get_feature_state_take_result(mln_operation, mln_buffer*)
+  -> mln_status;
+auto render_session_remove_feature_state_start(
+  mln_render_session, mln_buffer_view, mln_buffer_view, mln_buffer_view,
+  mln_buffer_view, mln_operation*
+) -> mln_status;
 }  // namespace mln::core

@@ -181,6 +181,8 @@ import org.maplibre.nativeffi.render.OpenGLBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.OpenGLOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.OpenGLSurfaceDescriptor
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
+import org.maplibre.nativeffi.render.RenderSessionAttachOptions
+import org.maplibre.nativeffi.render.RenderSessionAttachment
 import org.maplibre.nativeffi.render.RenderSessionHandle
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
@@ -1694,37 +1696,55 @@ private constructor(
   }
 
   public actual fun attachMetalOwnedTexture(
-    descriptor: MetalOwnedTextureDescriptor
-  ): RenderSessionHandle = RenderSessionHandle.attachMetalOwnedTexture(this, descriptor)
+    descriptor: MetalOwnedTextureDescriptor,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionAttachment =
+    RenderSessionHandle.attachMetalOwnedTexture(this, descriptor, options)
 
   public actual fun attachMetalBorrowedTexture(
-    descriptor: MetalBorrowedTextureDescriptor
-  ): RenderSessionHandle = RenderSessionHandle.attachMetalBorrowedTexture(this, descriptor)
+    descriptor: MetalBorrowedTextureDescriptor,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionAttachment =
+    RenderSessionHandle.attachMetalBorrowedTexture(this, descriptor, options)
 
   public actual fun attachVulkanOwnedTexture(
-    descriptor: VulkanOwnedTextureDescriptor
-  ): RenderSessionHandle = RenderSessionHandle.attachVulkanOwnedTexture(this, descriptor)
+    descriptor: VulkanOwnedTextureDescriptor,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionAttachment =
+    RenderSessionHandle.attachVulkanOwnedTexture(this, descriptor, options)
 
   public actual fun attachVulkanBorrowedTexture(
-    descriptor: VulkanBorrowedTextureDescriptor
-  ): RenderSessionHandle = RenderSessionHandle.attachVulkanBorrowedTexture(this, descriptor)
+    descriptor: VulkanBorrowedTextureDescriptor,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionAttachment =
+    RenderSessionHandle.attachVulkanBorrowedTexture(this, descriptor, options)
 
   public actual fun attachOpenGLOwnedTexture(
-    descriptor: OpenGLOwnedTextureDescriptor
-  ): RenderSessionHandle = RenderSessionHandle.attachOpenGLOwnedTexture(this, descriptor)
+    descriptor: OpenGLOwnedTextureDescriptor,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionAttachment =
+    RenderSessionHandle.attachOpenGLOwnedTexture(this, descriptor, options)
 
   public actual fun attachOpenGLBorrowedTexture(
-    descriptor: OpenGLBorrowedTextureDescriptor
-  ): RenderSessionHandle = RenderSessionHandle.attachOpenGLBorrowedTexture(this, descriptor)
+    descriptor: OpenGLBorrowedTextureDescriptor,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionAttachment =
+    RenderSessionHandle.attachOpenGLBorrowedTexture(this, descriptor, options)
 
-  public actual fun attachMetalSurface(descriptor: MetalSurfaceDescriptor): RenderSessionHandle =
-    RenderSessionHandle.attachMetalSurface(this, descriptor)
+  public actual fun attachMetalSurface(
+    descriptor: MetalSurfaceDescriptor,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionAttachment = RenderSessionHandle.attachMetalSurface(this, descriptor, options)
 
-  public actual fun attachVulkanSurface(descriptor: VulkanSurfaceDescriptor): RenderSessionHandle =
-    RenderSessionHandle.attachVulkanSurface(this, descriptor)
+  public actual fun attachVulkanSurface(
+    descriptor: VulkanSurfaceDescriptor,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionAttachment = RenderSessionHandle.attachVulkanSurface(this, descriptor, options)
 
-  public actual fun attachOpenGLSurface(descriptor: OpenGLSurfaceDescriptor): RenderSessionHandle =
-    RenderSessionHandle.attachOpenGLSurface(this, descriptor)
+  public actual fun attachOpenGLSurface(
+    descriptor: OpenGLSurfaceDescriptor,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionAttachment = RenderSessionHandle.attachOpenGLSurface(this, descriptor, options)
 
   public actual suspend fun createProjection(): MapProjectionHandle {
     val operation = startOperation { outOperation ->

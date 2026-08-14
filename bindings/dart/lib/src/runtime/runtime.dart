@@ -13,7 +13,6 @@ import '../internal/c/maplibre_native_c.dart';
 import '../internal/c/maplibre_native_c.g.dart' as raw;
 import '../internal/lifecycle/lifecycle.dart';
 import '../internal/lifecycle/native_handles.dart';
-import '../internal/lifecycle/frame_construction.dart';
 import '../internal/memory/memory.dart';
 import '../internal/status/status.dart';
 import '../internal/struct/struct.dart' as native_struct;
@@ -133,6 +132,7 @@ final class RuntimeHandle {
   late final NativeCallable<raw.mln_notification_callbackFunction>
   _notificationListener;
   final _maps = <int, WeakReference<MapHandle>>{};
+  final _renderSessions = <int, WeakReference<RenderSessionHandle>>{};
   final _operations = <int, WeakReference<OperationHandle>>{};
   final _operationWaiters = <int, Completer<void>>{};
   final _queuedRuntimeEvents = <RuntimeEvent>[];
@@ -517,6 +517,18 @@ final class RuntimeHandle {
               .MLN_NOTIFICATION_ENDPOINT_ADAPTER_RESOURCE_REQUESTS
               .value) {
         _resourceProviderQueues[endpoint.id]?.drain();
+      } else if (endpoint.kind ==
+          raw
+              .mln_notification_endpoint_kind
+              .MLN_NOTIFICATION_ENDPOINT_RENDER_FRAMES
+              .value) {
+        _renderSessions[endpoint.id]?.target?._notifyFramesReady();
+      } else if (endpoint.kind ==
+          raw
+              .mln_notification_endpoint_kind
+              .MLN_NOTIFICATION_ENDPOINT_DRIVER_WORK
+              .value) {
+        _renderSessions[endpoint.id]?.target?._notifyDriverWorkReady();
       }
     }
   }

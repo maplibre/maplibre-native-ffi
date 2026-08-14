@@ -70,6 +70,7 @@ const (
 // OperationHandle owns a common asynchronous native operation.
 type OperationHandle[T any] struct {
 	child          *handle.Child
+	ownerChild     *handle.Child
 	id             uint64
 	kind           operationKind
 	resultKind     operationResultKind
@@ -90,6 +91,18 @@ func newOperationHandle[T any](runtime *RuntimeHandle, id uint64, kind operation
 	}
 	operation := &OperationHandle[T]{child: child, id: id, kind: kind, resultKind: resultKind, live: true}
 	operation.cond = sync.NewCond(&operation.mu)
+	return operation
+}
+
+func newOwnedOperationHandle[T any](
+	runtime *RuntimeHandle,
+	ownerChild *handle.Child,
+	id uint64,
+	kind operationKind,
+	resultKind operationResultKind,
+) *OperationHandle[T] {
+	operation := newOperationHandle[T](runtime, id, kind, resultKind)
+	operation.ownerChild = ownerChild
 	return operation
 }
 
@@ -280,6 +293,8 @@ func (operation *OperationHandle[T]) Release() {
 	}
 	id := operation.id
 	child := operation.child
+	ownerChild := operation.ownerChild
+	operation.ownerChild = nil
 	operation.child = nil
 	operation.live = false
 	operation.mu.Unlock()
@@ -287,6 +302,9 @@ func (operation *OperationHandle[T]) Release() {
 	C.mln_operation_release(C.mln_operation(id))
 	if child != nil {
 		child.Release()
+	}
+	if ownerChild != nil {
+		ownerChild.Release()
 	}
 
 	operation.mu.Lock()

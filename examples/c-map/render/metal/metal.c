@@ -453,6 +453,12 @@ app_error render_target_attach(
   render_target* target, mln_map map, viewport current_viewport
 ) {
   mln_render_session session = MLN_HANDLE_NULL;
+  mln_operation operation = MLN_HANDLE_NULL;
+  const mln_render_session_attach_options options =
+    render_session_attach_options();
+  render_session_kind kind = RENDER_SESSION_TEXTURE;
+  app_error error = APP_ERROR_TEXTURE_ATTACH_FAILED;
+  mln_status status = MLN_STATUS_INVALID_STATE;
   switch (target->mode) {
     case RENDER_TARGET_MODE_OWNED_TEXTURE: {
       mln_metal_owned_texture_descriptor descriptor =
@@ -460,28 +466,18 @@ app_error render_target_attach(
       descriptor.extent = render_target_extent(current_viewport);
       descriptor.context =
         metal_context_descriptor(target->as.owned.compositor.view.device);
-      const mln_status status =
-        mln_metal_owned_texture_attach(map, &descriptor, &session);
-      if (status != MLN_STATUS_OK) {
-        diagnostics_log_status("Metal texture attach failed", status);
-        return APP_ERROR_TEXTURE_ATTACH_FAILED;
-      }
-      target->session =
-        (render_session){.kind = RENDER_SESSION_TEXTURE, .handle = session};
-      return APP_OK;
+      status = mln_metal_owned_texture_attach_start(
+        map, &descriptor, &options, &session, &operation
+      );
+      break;
     }
     case RENDER_TARGET_MODE_BORROWED_TEXTURE: {
       const mln_metal_borrowed_texture_descriptor descriptor =
         borrowed_texture_descriptor(target, current_viewport);
-      const mln_status status =
-        mln_metal_borrowed_texture_attach(map, &descriptor, &session);
-      if (status != MLN_STATUS_OK) {
-        diagnostics_log_status("Metal borrowed texture attach failed", status);
-        return APP_ERROR_TEXTURE_ATTACH_FAILED;
-      }
-      target->session =
-        (render_session){.kind = RENDER_SESSION_TEXTURE, .handle = session};
-      return APP_OK;
+      status = mln_metal_borrowed_texture_attach_start(
+        map, &descriptor, &options, &session, &operation
+      );
+      break;
     }
     case RENDER_TARGET_MODE_NATIVE_SURFACE: {
       mln_metal_surface_descriptor descriptor =
@@ -490,18 +486,22 @@ app_error render_target_attach(
       descriptor.context =
         metal_context_descriptor(target->as.surface.view.device);
       descriptor.layer = target->as.surface.view.layer;
-      const mln_status status =
-        mln_metal_surface_attach(map, &descriptor, &session);
-      if (status != MLN_STATUS_OK) {
-        diagnostics_log_status("Metal surface attach failed", status);
-        return APP_ERROR_SURFACE_ATTACH_FAILED;
-      }
-      target->session =
-        (render_session){.kind = RENDER_SESSION_SURFACE, .handle = session};
-      return APP_OK;
+      kind = RENDER_SESSION_SURFACE;
+      error = APP_ERROR_SURFACE_ATTACH_FAILED;
+      status = mln_metal_surface_attach_start(
+        map, &descriptor, &options, &session, &operation
+      );
+      break;
     }
   }
-  return APP_ERROR_BACKEND_SETUP_FAILED;
+  if (status != MLN_STATUS_OK) {
+    diagnostics_log_status("Metal render target attach failed", status);
+    return error;
+  }
+  target->session = (render_session){.kind = kind, .handle = session};
+  return render_session_complete_operation(
+    &target->session, operation, error, "Metal render target attach failed"
+  );
 }
 
 void render_target_deinit(render_target* target) {
@@ -542,18 +542,23 @@ static app_error resize_borrowed(
   target->as.borrowed.texture = replacement;
   const mln_metal_borrowed_texture_descriptor descriptor =
     borrowed_texture_descriptor(target, current_viewport);
-  const mln_status status =
-    mln_metal_borrowed_texture_set_target(target->session.handle, &descriptor);
+  mln_operation operation = MLN_HANDLE_NULL;
+  const mln_status status = mln_metal_borrowed_texture_set_target_start(
+    target->session.handle, &descriptor, &operation
+  );
   if (status != MLN_STATUS_OK) {
-    // The session may have taken the replacement before failing, so detach
-    // before either texture is released.
-    mln_render_session_detach(target->session.handle);
     diagnostics_log_status("Metal borrowed texture set target failed", status);
     target->as.borrowed.texture = previous;
     release_object(&replacement);
     return APP_ERROR_TEXTURE_RESIZE_FAILED;
   }
-  // Released only once the session has taken the replacement.
+  const app_error completed = render_session_complete_operation(
+    &target->session, operation, APP_ERROR_TEXTURE_RESIZE_FAILED,
+    "Metal borrowed texture set target failed"
+  );
+  if (completed != APP_OK) {
+    return completed;
+  }
   release_object(&previous);
   return APP_OK;
 }
@@ -588,25 +593,36 @@ static app_error render_update_owned(
     return APP_OK;
   }
 
-  mln_metal_owned_texture_frame frame = {.size = sizeof(frame)};
-  const mln_status status =
-    mln_metal_owned_texture_acquire_frame(target->session.handle, &frame);
-  if (status == MLN_STATUS_INVALID_STATE) {
+  mln_acquired_frame acquired = MLN_HANDLE_NULL;
+  mln_status status =
+    mln_render_session_acquire_frame(target->session.handle, &acquired);
+  if (status == MLN_STATUS_NOT_READY) {
     return APP_OK;
   }
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status("Metal texture acquire failed", status);
     return APP_ERROR_BACKEND_DRAW_FAILED;
   }
-
+  mln_metal_owned_texture_frame frame = {.size = sizeof(frame)};
+  status = mln_acquired_frame_get_metal_texture(acquired, &frame);
   bool presented = false;
-  const app_error error = metal_compositor_draw_texture(
-    &target->as.owned.compositor, (id)frame.texture, &presented
-  );
-  const mln_status release_status =
-    mln_metal_owned_texture_release_frame(target->session.handle, &frame);
-  if (release_status != MLN_STATUS_OK) {
-    diagnostics_log_status("Metal texture release failed", release_status);
+  const app_error error =
+    status == MLN_STATUS_OK
+      ? metal_compositor_draw_texture(
+          &target->as.owned.compositor, (id)frame.texture, &presented
+        )
+      : APP_ERROR_BACKEND_DRAW_FAILED;
+  mln_gpu_sync sync = mln_gpu_sync_default();
+  mln_operation release = MLN_HANDLE_NULL;
+  status = mln_acquired_frame_release_start(&acquired, &sync, &release);
+  if (status == MLN_STATUS_OK) {
+    (void)render_session_complete_operation(
+      &target->session, release, APP_ERROR_BACKEND_DRAW_FAILED,
+      "Metal texture release failed"
+    );
+  }
+  if (status != MLN_STATUS_OK) {
+    diagnostics_log_status("Metal texture release failed", status);
   }
   MAP_TRY(error);
   *out_rendered = presented;

@@ -32,10 +32,15 @@ from .render import (
     OpenGLOwnedTextureDescriptor,
     OpenGLSurfaceDescriptor,
     PremultipliedRgba8Image,
+    RenderDriver,
+    RenderSessionAttachOptions,
     RenderSessionHandle,
     VulkanBorrowedTextureDescriptor,
     VulkanOwnedTextureDescriptor,
     VulkanSurfaceDescriptor,
+    WebGPUBorrowedTextureDescriptor,
+    WebGPUOwnedTextureDescriptor,
+    WebGPUSurfaceDescriptor,
     _opengl_context_parts,
 )
 from .style import (
@@ -54,6 +59,18 @@ from .style import (
     StyleTransitionOptions,
     TileSourceOptions,
 )
+
+_CORE_WORKER_ATTACH_OPTIONS = RenderSessionAttachOptions(RenderDriver.CORE_WORKER)
+_CORE_WORKER_OWNED_ATTACH_OPTIONS = RenderSessionAttachOptions(
+    RenderDriver.CORE_WORKER, 2
+)
+_CALLER_GRAPHICS_ATTACH_OPTIONS = RenderSessionAttachOptions(
+    RenderDriver.CALLER_GRAPHICS_THREAD
+)
+_CALLER_GRAPHICS_OWNED_ATTACH_OPTIONS = RenderSessionAttachOptions(
+    RenderDriver.CALLER_GRAPHICS_THREAD, 2
+)
+
 
 _MAP_HANDLE_CREATE_KEY = object()
 _MAP_PROJECTION_HANDLE_CREATE_KEY = object()
@@ -1523,36 +1540,50 @@ class MapHandle(NativeHandleMixin):
         self,
         attach: Callable[..., object],
         descriptor: Any,
+        options: RenderSessionAttachOptions,
         *args: object,
-    ) -> RenderSessionHandle:
+    ) -> tuple[RenderSessionHandle, Any]:
+        from .offline import OperationHandle
+
         extent = descriptor.extent
-        native = attach(
+        native, operation = attach(
             self._native,
             extent.width,
             extent.height,
             extent.scale_factor,
             *args,
+            options.driver.native_code,
+            options.requested_texture_ring_depth,
         )
-        return RenderSessionHandle._from_native(native, self)
+        session = RenderSessionHandle._from_native(native, self)
+        return session, OperationHandle._from_native(
+            self._runtime, operation, retained_owner=session
+        )
 
     def attach_metal_surface(
-        self, descriptor: MetalSurfaceDescriptor
-    ) -> RenderSessionHandle:
-        """Attach a Metal native surface render target to this map."""
+        self,
+        descriptor: MetalSurfaceDescriptor,
+        options: RenderSessionAttachOptions = _CORE_WORKER_ATTACH_OPTIONS,
+    ) -> tuple[RenderSessionHandle, Any]:
+        """Start attaching a Metal native surface render target."""
         return self._attach_render_session(
             _native.attach_metal_surface,
             descriptor,
+            options,
             descriptor.context.device.address,
             descriptor.layer.address,
         )
 
     def attach_vulkan_surface(
-        self, descriptor: VulkanSurfaceDescriptor
-    ) -> RenderSessionHandle:
-        """Attach a Vulkan native surface render target to this map."""
+        self,
+        descriptor: VulkanSurfaceDescriptor,
+        options: RenderSessionAttachOptions = _CORE_WORKER_ATTACH_OPTIONS,
+    ) -> tuple[RenderSessionHandle, Any]:
+        """Start attaching a Vulkan native surface render target."""
         return self._attach_render_session(
             _native.attach_vulkan_surface,
             descriptor,
+            options,
             descriptor.context.instance.address,
             descriptor.context.physical_device.address,
             descriptor.context.device.address,
@@ -1563,35 +1594,62 @@ class MapHandle(NativeHandleMixin):
             descriptor.surface.address,
         )
 
+    def attach_webgpu_surface(
+        self,
+        descriptor: WebGPUSurfaceDescriptor,
+        options: RenderSessionAttachOptions = _CALLER_GRAPHICS_ATTACH_OPTIONS,
+    ) -> tuple[RenderSessionHandle, Any]:
+        """Start attaching a WebGPU native surface render target."""
+        context = descriptor.context
+        return self._attach_render_session(
+            _native.attach_webgpu_surface,
+            descriptor,
+            options,
+            context.instance.address,
+            context.device.address,
+            context.queue.address,
+            descriptor.surface.address,
+            descriptor.format,
+        )
+
     def attach_metal_owned_texture(
-        self, descriptor: MetalOwnedTextureDescriptor
-    ) -> RenderSessionHandle:
-        """Attach a Metal session-owned texture render target to this map."""
+        self,
+        descriptor: MetalOwnedTextureDescriptor,
+        options: RenderSessionAttachOptions = _CORE_WORKER_OWNED_ATTACH_OPTIONS,
+    ) -> tuple[RenderSessionHandle, Any]:
+        """Start attaching a Metal session-owned texture ring."""
         return self._attach_render_session(
             _native.attach_metal_owned_texture,
             descriptor,
+            options,
             descriptor.context.device.address,
         )
 
     def attach_metal_borrowed_texture(
-        self, descriptor: MetalBorrowedTextureDescriptor
-    ) -> RenderSessionHandle:
-        """Attach a Metal caller-owned texture render target to this map."""
+        self,
+        descriptor: MetalBorrowedTextureDescriptor,
+        options: RenderSessionAttachOptions = _CORE_WORKER_ATTACH_OPTIONS,
+    ) -> tuple[RenderSessionHandle, Any]:
+        """Start attaching a caller-owned Metal texture."""
         return self._attach_render_session(
             _native.attach_metal_borrowed_texture,
             descriptor,
+            options,
             descriptor.physical_width,
             descriptor.physical_height,
             descriptor.texture.address,
         )
 
     def attach_vulkan_owned_texture(
-        self, descriptor: VulkanOwnedTextureDescriptor
-    ) -> RenderSessionHandle:
-        """Attach a Vulkan session-owned texture render target to this map."""
+        self,
+        descriptor: VulkanOwnedTextureDescriptor,
+        options: RenderSessionAttachOptions = _CORE_WORKER_OWNED_ATTACH_OPTIONS,
+    ) -> tuple[RenderSessionHandle, Any]:
+        """Start attaching a Vulkan session-owned texture ring."""
         return self._attach_render_session(
             _native.attach_vulkan_owned_texture,
             descriptor,
+            options,
             descriptor.context.instance.address,
             descriptor.context.physical_device.address,
             descriptor.context.device.address,
@@ -1601,13 +1659,53 @@ class MapHandle(NativeHandleMixin):
             descriptor.context.get_device_proc_addr.address,
         )
 
+    def attach_webgpu_owned_texture(
+        self,
+        descriptor: WebGPUOwnedTextureDescriptor,
+        options: RenderSessionAttachOptions = _CALLER_GRAPHICS_OWNED_ATTACH_OPTIONS,
+    ) -> tuple[RenderSessionHandle, Any]:
+        """Start attaching a WebGPU session-owned texture ring."""
+        context = descriptor.context
+        return self._attach_render_session(
+            _native.attach_webgpu_owned_texture,
+            descriptor,
+            options,
+            context.instance.address,
+            context.device.address,
+            context.queue.address,
+        )
+
+    def attach_webgpu_borrowed_texture(
+        self,
+        descriptor: WebGPUBorrowedTextureDescriptor,
+        options: RenderSessionAttachOptions = _CALLER_GRAPHICS_ATTACH_OPTIONS,
+    ) -> tuple[RenderSessionHandle, Any]:
+        """Start attaching a caller-owned WebGPU texture."""
+        context = descriptor.context
+        return self._attach_render_session(
+            _native.attach_webgpu_borrowed_texture,
+            descriptor,
+            options,
+            descriptor.physical_width,
+            descriptor.physical_height,
+            context.instance.address,
+            context.device.address,
+            context.queue.address,
+            descriptor.texture.address,
+            descriptor.texture_view.address,
+            descriptor.format,
+        )
+
     def attach_vulkan_borrowed_texture(
-        self, descriptor: VulkanBorrowedTextureDescriptor
-    ) -> RenderSessionHandle:
-        """Attach a Vulkan caller-owned texture render target to this map."""
+        self,
+        descriptor: VulkanBorrowedTextureDescriptor,
+        options: RenderSessionAttachOptions = _CORE_WORKER_ATTACH_OPTIONS,
+    ) -> tuple[RenderSessionHandle, Any]:
+        """Start attaching a caller-owned Vulkan texture."""
         return self._attach_render_session(
             _native.attach_vulkan_borrowed_texture,
             descriptor,
+            options,
             descriptor.physical_width,
             descriptor.physical_height,
             descriptor.context.instance.address,
@@ -1625,15 +1723,18 @@ class MapHandle(NativeHandleMixin):
         )
 
     def attach_opengl_surface(
-        self, descriptor: OpenGLSurfaceDescriptor
-    ) -> RenderSessionHandle:
-        """Attach an OpenGL native surface render target to this map."""
+        self,
+        descriptor: OpenGLSurfaceDescriptor,
+        options: RenderSessionAttachOptions = _CALLER_GRAPHICS_ATTACH_OPTIONS,
+    ) -> tuple[RenderSessionHandle, Any]:
+        """Start attaching an OpenGL native surface render target."""
         platform, ownership, first, second, share, client_api, get_proc = (
             _opengl_context_parts(descriptor.context)
         )
         return self._attach_render_session(
             _native.attach_opengl_surface,
             descriptor,
+            options,
             platform,
             ownership,
             first,
@@ -1645,15 +1746,18 @@ class MapHandle(NativeHandleMixin):
         )
 
     def attach_opengl_owned_texture(
-        self, descriptor: OpenGLOwnedTextureDescriptor
-    ) -> RenderSessionHandle:
-        """Attach an OpenGL session-owned texture render target to this map."""
+        self,
+        descriptor: OpenGLOwnedTextureDescriptor,
+        options: RenderSessionAttachOptions = _CALLER_GRAPHICS_OWNED_ATTACH_OPTIONS,
+    ) -> tuple[RenderSessionHandle, Any]:
+        """Start attaching an OpenGL session-owned texture ring."""
         platform, ownership, first, second, share, client_api, get_proc = (
             _opengl_context_parts(descriptor.context)
         )
         return self._attach_render_session(
             _native.attach_opengl_owned_texture,
             descriptor,
+            options,
             platform,
             ownership,
             first,
@@ -1664,15 +1768,18 @@ class MapHandle(NativeHandleMixin):
         )
 
     def attach_opengl_borrowed_texture(
-        self, descriptor: OpenGLBorrowedTextureDescriptor
-    ) -> RenderSessionHandle:
-        """Attach an OpenGL caller-owned texture render target to this map."""
+        self,
+        descriptor: OpenGLBorrowedTextureDescriptor,
+        options: RenderSessionAttachOptions = _CALLER_GRAPHICS_ATTACH_OPTIONS,
+    ) -> tuple[RenderSessionHandle, Any]:
+        """Start attaching a caller-owned OpenGL texture."""
         platform, ownership, first, second, share, client_api, get_proc = (
             _opengl_context_parts(descriptor.context)
         )
         return self._attach_render_session(
             _native.attach_opengl_borrowed_texture,
             descriptor,
+            options,
             descriptor.physical_width,
             descriptor.physical_height,
             platform,

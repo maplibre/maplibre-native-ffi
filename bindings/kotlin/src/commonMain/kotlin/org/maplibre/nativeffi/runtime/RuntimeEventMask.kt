@@ -7,8 +7,8 @@ import kotlin.jvm.JvmInline
  *
  * One bit selects one [RuntimeEventType]: the bit for a type is 1 shifted left by the type's
  * [RuntimeEventType.nativeValue], so [of] derives the bit for a type this version does not name. An
- * event type that a mask leaves out is never built and never queued, so it neither reaches a batch
- * nor wakes a parked [RuntimeHandle.pump].
+ * event type that a mask leaves out is never built or queued, so it neither reaches a batch nor
+ * wakes the notification receiver.
  *
  * [org.maplibre.nativeffi.map.MapHandle.eventMask] reads the [ALL_MAP_EVENTS] bits and
  * [RuntimeHandle.eventMask] reads the [ALL_RUNTIME_EVENTS] bits, so both accept [ALL]. A bit

@@ -98,8 +98,11 @@ private constructor(
   fun drainNotifications(renderRequest: RenderRequest) {
     if (!notificationPending.getAndSet(false)) return
     do {
-      val eventsReady = runtime.drainReady().any { it.kind == ReadyEndpoint.Kind.RUNTIME_EVENTS }
-      if (eventsReady && drainEvents()) {
+      val ready = runtime.drainReady()
+      if (ready.any { it.kind == ReadyEndpoint.Kind.DRIVER_WORK }) {
+        renderRequest.set()
+      }
+      if (ready.any { it.kind == ReadyEndpoint.Kind.RUNTIME_EVENTS } && drainEvents()) {
         renderRequest.set()
       }
     } while (notificationPending.getAndSet(false))

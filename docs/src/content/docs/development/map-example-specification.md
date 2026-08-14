@@ -168,38 +168,35 @@ flowchart TB
 Implementations SHOULD mirror this layout in the source tree (separate files or
 packages per module).
 
-#### Threads and loops
+#### Threads and drivers
 
-Examples have one host **render loop** and one native scheduler thread owned by
-the runtime.
+Examples have one host render loop and one native scheduler thread owned by the
+runtime. The render target chooses one of the driver contracts described in
+[Concepts](/maplibre-native-ffi/concepts/).
 
-- The render loop thread owns the host window and input events, the viewport,
-  the graphics API context and presentation resources, the compositor, and the
-  render session for the session's whole lifetime. It attaches the session,
-  renders through it, resizes it, and closes it.
 - The runtime owns its scheduler thread. Runtime creation starts it, runtime
-  close joins it, and no host code pumps or owns it.
-- Runtime, map, camera, projection, and style calls copy their input and may be
-  submitted from any host thread. Commands return IDs. Operations return handles
-  that the host waits on or resumes from.
+  close joins it, and no host code pumps it.
+- A core-worker session owns a native serial graphics worker.
+- A caller-driver session stores typed native work until the render loop
+  services it with the graphics context usable.
+- Runtime, map, render-session control, operation, and notification calls may
+  run on any host thread.
 - The notification callback may run on any native thread. It MUST only schedule
-  a later notification drain on the host receiver; it MUST NOT call the C API.
-- The render loop thread MUST be the thread on which the host toolkit delivers
-  window, input, and display-refresh callbacks.
-- Cross-thread state MUST be limited to receiver scheduling, a render request, a
-  shutdown signal, and a first-failure record. Use the host language's atomic or
-  synchronized mechanism for each.
+  a later drain and MUST NOT call the C API.
+- Driver service and thread-current accessors MUST run serially on the host
+  graphics thread.
 
-The native scheduler isolates style parsing, network completion, map mutation,
-and other runtime work from the display-paced loop. The host receives readiness
-through one receiver-scoped notification source rather than through polling.
+Desktop examples use caller drivers because their host WGL, EGL, Metal, or
+Vulkan presentation context belongs to the render loop. Browser examples use a
+caller driver for existing WebGL and WebGPU objects. A transferred
+`OffscreenCanvas` WebGL target MAY use a core worker, which creates and uses its
+WebGL2 context on that worker.
 
 ##### Render loop thread by host toolkit
 
-Where the host toolkit fixes which thread receives display-refresh and window
-callbacks, that thread is the render loop thread. Where a graphics API context
-is thread-current, such as OpenGL through EGL or WGL, the render loop thread is
-the only thread that makes it current.
+Where the host toolkit fixes display-refresh and window callbacks, that thread
+is the render loop thread. Where a graphics API context is thread-current, the
+render loop thread is the only thread that makes it current.
 
 | Example       | Render loop thread                                 |
 | ------------- | -------------------------------------------------- |
@@ -215,38 +212,31 @@ the only thread that makes it current.
 
 ##### Attaching the render session
 
-A render session's owner thread is the thread that attached it, and it does not
-change for the session's lifetime. The render loop thread MUST therefore be the
-thread that attaches the session, and the same thread MUST close it.
+Startup waits for map creation, then starts target attachment with the selected
+driver. Attach returns both an attaching session and an operation. A
+caller-driver example MUST service ready work before awaiting that operation;
+otherwise initialization deadlocks.
 
-Attach requires only a live map. Startup waits for the map-creation operation,
-takes the map handle, and attaches on the render loop thread. Shutdown closes
-the session before starting map close. A map close preflight reports invalid
-state and leaves the map open while a session is attached.
+The common options use the render-loop receiver's notification source for
+operation, frame-result, and driver-work readiness. A separate source MAY be
+used when the host has separate receivers.
 
-Attach creates the session's graphics resources on the calling thread, so for
-graphics APIs whose context is thread-current the host context MUST be current
-on the render loop thread when it attaches. That thread is the only one that
-makes it current, and it need never give it up.
+For a caller driver, attach descriptors are produced where the graphics context
+is usable. WGL and EGL contexts use the caller driver. A transferred
+`OffscreenCanvas` descriptor instead names its canvas selector and creates its
+WebGL2 context on a core worker.
 
-The requirement is specific to WGL: the session resolves
-`wglCreateContextAttribsARB` through the calling thread's current context, and
-without one it falls back to a legacy context that cannot share with a context
-current on another thread. Attaching where the host context is already current
-avoids both failure modes. Vulkan and Metal have no thread-current context and
-are unaffected.
-
-Reattaching, which a graphics context change requires, is entirely local to the
-render loop thread: close the session, rebuild the mode-specific resources,
-attach again.
+Reattachment first completes normal detach through the selected driver and
+destroys the CPU-only session handle. The example then rebuilds mode resources
+and starts a new attachment. If the graphics owner cannot service detach, the
+example MUST abandon the session before destroying it.
 
 #### Graphics API and mode matrix
 
-The example architecture MUST model the active graphics API separately from the
-active render-target mode. Graphics context code owns API-level resources
-(Vulkan, Metal, OpenGL/EGL/WGL as applicable). Render target code owns the
-attached `RenderSessionHandle`, mode-specific resources, resize behavior,
-`render_update`, and close behavior.
+The example architecture MUST model the active graphics API, render-target mode,
+and driver separately. Graphics context code owns API-level resources. Render
+target code owns the session, attach and detach operations, frame demand and
+result drains, driver service, mode resources, resize, and presentation.
 
 The loaded native library reports one render backend per library artifact
 through `mln_supported_render_backend_mask()`. Examples built across native
@@ -278,157 +268,110 @@ rather than branching ad hoc through shared draw code.
 
 Order MUST be:
 
-1. Parse profile entry configuration and validate the selected render mode.
-2. Read and log the loaded library's supported native render backends from
-   `mln_supported_render_backend_mask()`, then validate that the loaded native
-   library supports the graphics API selected for this run; fail fast with a
-   readable message if not.
-3. Create the host presentation surface and initialize the graphics backend for
-   the selected graphics API, on the render loop thread.
-4. Create a notification source and install the callback that schedules drains
-   on the render loop receiver.
-5. Start runtime creation with the `:memory:` cache, await the operation, and
-   take the runtime handle.
-6. Start map creation with the initial viewport and continuous mode, await the
-   operation, and take the map handle.
-7. Select the event types the example reads.
-8. Submit the style and initial atomic-camera commands.
-9. Attach the render target for the selected mode on the render loop thread,
-   using descriptors produced by the graphics context there.
-10. Emit startup information:
-    - active render-target mode identifier
-    - active render-target status line
+1. Parse profile entry configuration and validate the selected mode and driver.
+2. Validate the loaded library's backend and target capabilities.
+3. Create the host presentation surface and graphics resources.
+4. Create the receiver-scoped notification source and install a scheduling
+   callback.
+5. Start and await runtime creation.
+6. Start and await map creation with the initial extent.
+7. Select the event types that the example reads.
+8. Submit the style and initial camera commands.
+9. Start render-target attachment and retain both returned handles.
+10. For a caller driver, service ready work on the graphics thread until the
+    attach operation completes.
+11. Inspect and release the operation, then read negotiated capabilities.
+12. Print the active mode and driver.
 
-On failure after partial setup, close already-created handles in reverse order:
-render target, map, runtime, notification source, then graphics. Close the
-render target on its owner thread. Await each accepted lifecycle operation and
-release its operation handle after inspecting the result.
+Failure cleanup follows the same detach or abandon path as normal shutdown.
 
 #### Shutdown
 
-On host termination or fatal error, close resources in order:
+On host termination or fatal error:
 
-1. Leave the render loop and finish or wait on in-flight GPU work if the backend
-   requires it, on the render loop thread.
-2. Close the render target and its compositor or borrowed texture/image,
-   according to graphics API lifetime rules, on the render loop thread.
-3. Start and await map close.
-4. Start and await runtime close.
-5. Close the notification source.
-6. Destroy the graphics context and host presentation surface on the render loop
-   thread.
+1. Stop new frame demand.
+2. Release acquired frames and await their slot-release operations.
+3. Start normal detach. Continue caller-driver service until it completes.
+4. If graphics service is permanently unavailable, abandon instead and report
+   any quarantined resources.
+5. Destroy the detached or abandoned session from any thread.
+6. Release compositor and target resources.
+7. Start and await map close, then runtime close.
+8. Close the notification source and graphics resources.
 
-Map and runtime close preflight rejects a live or pending child without changing
-parent state. The example MUST close the child and retry rather than discard the
-parent handle.
+A map close preflight rejects an attaching or attached session without changing
+map state.
 
 #### Handle ownership
 
-- One notification source per render-loop receiver.
-- One runtime per process, with one core-owned scheduler thread.
+- One notification source per host receiver.
+- One runtime per process, with one native scheduler thread.
 - One map per runtime for the demo.
-- One live render target per map at a time.
-- One render session owner thread, fixed for the session's lifetime: the thread
-  that attached it, which is the render loop thread.
-- Map configuration uses commands and operations on the map handle;
-  render-target extent and present use the render target.
+- One attaching or attached session per map.
+- At most one live frame-result batch per session.
+- Every acquired-frame handle leases one texture-ring slot until its release
+  operation completes.
+- Graphics handles stay valid through normal detach. Abandon quarantines
+  resources that cannot be destroyed without graphics access.
 
 ### Frame loop
 
-The native scheduler continuously advances runtime and map work. The
-display-paced render loop reacts to receiver-scoped notifications and draws only
-when the render request is set.
+The host display source submits frame demand. Map updates wake the selected
+driver directly; runtime events are observations and are not a render-progress
+mechanism.
 
 #### Render loop iteration
 
-1. Handle window, input, and resize events. Submit camera and map-resize
-   commands directly; set the render request for input and completed target
-   changes.
-2. When notification readiness was scheduled, drain owned ready batches. Drain
-   the runtime event queue while its endpoint remains ready, and set the render
-   request for matching render events.
-3. Apply pending viewport changes to graphics resources and the render target.
-4. Consume the render request; when it was set, call `render_update`.
-5. Run `finishFrame()`.
+1. Handle window, input, and resize events. Submit any-thread map and session
+   work directly.
+2. Drain ready notification batches.
+3. Service caller-driver work on the graphics thread while its endpoint is
+   ready, including when presentation is paused.
+4. Drain frame-result batches until empty and release each batch.
+5. For a rendered owned-texture result, acquire one frame, wait for producer
+   synchronization, and submit the compositor pass.
+6. Present and release an acquired frame with consumer-completion
+   synchronization.
 
 ```mermaid
 sequenceDiagram
   participant N as Notification source
   participant RL as Render loop
-  participant RT as Runtime events
-  participant RS as Render session
-  participant BE as Backend
-
-  N-->>RL: schedule receiver
-  RL->>N: drain ready batch
-  RL->>RT: drain events when ready
-  RL->>RS: render_update() when requested
-  RL->>BE: finishFrame()
-```
-
-`finishFrame()` runs every iteration: swapchain or surface upkeep, resize
-handling, and present hooks as required by the host graphics API.
-
-#### Cadence
-
-While the map is visible and the example is active:
-
-- The render loop MUST subscribe to the host toolkit's display-refresh or
-  invalidation mechanism.
-- The notification callback MUST schedule the receiver immediately when an
-  endpoint becomes ready.
-- Input and resize callbacks MAY submit commands directly from their host
-  thread.
-- The native scheduler continues independently while display callbacks pause.
-  Readiness remains level-triggered until the receiver drains it.
-
-#### Render requests
-
-The render request can be set by input, resize, or a scheduled runtime-event
-drain while the render loop consumes it. It MUST therefore use the host
-language's atomic or synchronized mechanism.
-
-```mermaid
-sequenceDiagram
-  participant RL as Render loop
   participant RS as Render session
   participant CP as Compositor
-  participant BE as Backend
 
-  RL->>RS: render_update()
-  alt texture mode
-    RS-->>RL: map texture / frame
-    RL->>CP: draw into swapchain
-    CP->>BE: present
-  else native-surface
-    RS->>BE: present via surface session
-  end
+  RL->>RS: request frame(token, timestamp)
+  N-->>RL: schedule receiver
+  RL->>RS: service driver work when ready
+  RL->>RS: drain frame results
+  RS-->>RL: disposition and generations
+  RL->>RS: acquire frame
+  RL->>CP: compose after producer sync
+  RL->>RS: release frame with consumer sync
 ```
 
-Requirements:
+#### Cadence and results
 
-- A runtime-event drain MUST set the render request when
-  `map_render_update_available` targets this map, or when
-  `map_render_frame_finished` targets this map and `needs_repaint` is true.
-- The render loop MUST set the render request when input changes the camera and
-  when a resize or reattach completes.
-- The render loop MUST call `render_update` only when it consumed a set request.
-- The render loop MUST consume the request before calling `render_update`, and
-  MUST set it again when `render_update` reports any result other than a
-  rendered frame. Consuming afterwards could discard a request published during
-  the call.
-- `map_render_frame_finished` arrives asynchronously through the runtime event
-  queue. The render loop MUST NOT wait for it.
-- After resize, `render_update` may report a pending size until the resize
-  command commits and the map publishes matching state. Keep the render request
-  set and retry rather than treating this as a failure.
-- A compositor that cannot present the frame it was handed MUST report that as
-  no frame rendered, and the render loop MUST set the render request again. A
-  minimized or occluded window produces this, and so does a swapchain awaiting
-  its rebuild. The map retains the update, so the retry draws it.
+- The render loop MUST submit demand from the host display or invalidation
+  source while visible.
+- Each demand MUST carry a unique host token and the display timestamp.
+- A positive deadline MUST use the host's monotonic clock domain. Deadline
+  missed is terminal and does not enter an immediate retry loop.
+- Rendered, no update, size pending, target not ready, superseded, and deadline
+  missed MUST remain distinct outcomes.
+- No update and size pending wait for a newer map update. Target not ready waits
+  for target readiness or a paced retry.
+- Result readiness is level-triggered. The example MUST drain every result and
+  MUST release the batch before starting another drain.
+- The frame result's map-update, extent, and frame generations determine what
+  was rendered. Runtime event order MUST NOT be used as a substitute.
+- The example MAY keep presenting the previous completed texture when a newer
+  frame misses its deadline.
+- Resize, target replacement, queries, readback, barriers, maintenance, and
+  detach progress through the same selected driver.
 
-Texture modes: after `render_update` reports a rendered frame, MUST run the
-compositor pass to copy the map texture into the host swapchain before present.
+The example MUST continue servicing a caller-driver mailbox while display
+callbacks are paused. If that becomes impossible, it abandons the session.
 
 ### Viewport
 
@@ -469,14 +412,13 @@ map-specific setup.
 - Attach a render target by dispatching on active graphics API and selected
   mode.
 
-#### Event drain
+#### Notification drain
 
 - Drain the notification source when its callback schedules the receiver.
 - Read every endpoint in each owned ready batch, then release the batch.
-- Drain every runtime event while the runtime-events endpoint remains ready.
-- Set the render request when either:
-  - `map_render_update_available` targets this map, or
-  - `map_render_frame_finished` targets this map and `needs_repaint` is true.
+- Drain runtime events, frame results, and operation completions through their
+  typed APIs while their endpoints remain ready.
+- Schedule graphics-thread service when the driver-work endpoint is ready.
 
 #### Resize API
 
@@ -513,33 +455,30 @@ table:
 
 #### `owned-texture`
 
-- Attach with the C API owned-texture descriptor for the active graphics API.
-- Pass the host graphics context handles required by that descriptor (see
-  [Graphics API](#graphics-api)).
-- On `render_update`, acquire the frame/image from the session, draw via
-  compositor, release/close the frame per the C API frame lifetime rules.
+- Request a ring depth of two or three for interactive composition.
+- After a rendered result, acquire the oldest completed unacquired frame.
+- Wait for producer completion before sampling.
+- Release the handle with consumer-completion synchronization after submitting
+  compositor GPU work. Await or observe the release operation.
+- Keep presenting the previous completed frame when acquisition reports not
+  ready.
 
 #### `borrowed-texture`
 
-- Host creates an exportable texture sized to the viewport (see
-  [Graphics API](#graphics-api)).
+- Create an exportable texture sized to the viewport.
 - Attach with the borrowed-texture descriptor referencing host-owned handles.
-- On `render_update`, sample that texture through the same compositor path as
-  `owned-texture`.
-- On resize, allocate a host texture at the new size and hand it to the live
-  session with `set_target`, which the render target does inside its own
-  `resize` (see [Resize mechanics](#resize-mechanics)).
+- After a rendered result, sample that texture through the compositor path.
+- On resize, allocate a replacement and start the backend target-replacement
+  operation. Retain both allocations until its outcome is known.
 
 #### `native-surface`
 
-- Attach with the C API surface descriptor for host presentation (see
-  [Graphics API](#graphics-api)).
-- `render_update` presents through the surface render target directly.
-- `drawTexture` MUST NOT be called for this mode.
-- On resize, call session `resize` and rebuild host presentation. When the host
-  toolkit supplies a new surface handle for the same graphics context, call
-  `set_target` with it; reattach only when the context itself changed or was
-  lost.
+- Attach with the surface descriptor for host presentation.
+- Set the present flag on frame demand.
+- A rendered result means that the selected driver presented the frame.
+- On resize, start the session resize operation and rebuild host presentation.
+  Start target replacement when the toolkit supplies a new surface for the same
+  graphics context.
 
 ### Compositor shaders
 
@@ -557,60 +496,36 @@ that pass.
 
 ### Resize mechanics
 
-- Recompute viewport on host size or scale changes; skip rendering if extent is
-  empty.
-- `resize(viewport)` is a render-target method, and each mode follows the new
-  viewport its own way. `owned-texture` and `native-surface` resize
-  graphics-context resources, compositor resources for texture modes, and
-  session extent in place. `borrowed-texture` cannot: the host-owned exportable
-  texture is fixed to the viewport size, so it allocates one at the new size and
-  hands it to the live session with `set_target`. A host calls `resize` for
-  every mode and branches on none of them.
-- The session stays live either way, and so does its renderer, so the map keeps
-  its tiles and atlases across a resize. A scale factor change is the exception
-  the C API documents, rebuilding the renderer for the new pixel ratio.
-- Pick an ownership strategy for the handover and follow the C API's rules for
-  it. An example that keeps the outgoing target until the call returns can roll
-  back: a rejected replacement leaves the session on the target it had, so it
-  releases the replacement and keeps rendering. An example whose graphics layer
-  frees the outgoing target first cannot roll back, and treats a rejected
-  handover as a session to close and attach again. Caller-owned textures allow
-  either, because no backend reads the outgoing texture.
-- A Vulkan surface is the exception, and requires the retaining strategy: its
-  outgoing `VkSurfaceKHR` must still be valid when `set_target` is called,
-  because the session destroys the swapchain built from it first.
-- `MLN_STATUS_NATIVE_ERROR` may mean the replacement was already under way, and
-  a caller cannot tell it apart from a failure that came earlier. The session
-  may therefore hold either target. Detach or close it before releasing either
-  one, and attach again rather than reusing it; stopping before the next frame
-  is not enough on its own, because the release still happens while the session
-  holds the target. Every other status is reported before the target changes,
-  which is what makes rolling back to the outgoing target safe.
-- Build the replacement to match what the session attached with, which the C API
-  states per backend and per function. `set_target` reports
-  `MLN_STATUS_UNSUPPORTED` for a target that differs, leaving the session on the
-  one it has.
-- Reserve [reattach](#reattach) for a target the live session cannot take: a new
-  graphics context or device, a target that `set_target` reports as unsupported,
-  or a context that was lost.
-- Set the render request after any resize.
-- The render loop owns the session, so its in-place resize is a local call.
-  Submit the matching map resize command; `render_update` may report a pending
-  size until that command commits and publishes matching state.
+- Recompute the viewport on host size or scale changes.
+- Start one absolute session resize operation with the new logical extent.
+  Resize assigns a new extent generation and updates the map viewport through
+  the selected driver.
+- Resize API-level and compositor resources for owned textures and surfaces.
+- For a borrowed texture, allocate a matching host texture and start target
+  replacement instead of resizing the fixed allocation.
+- Retain outgoing and replacement borrowed resources until replacement
+  completes. Release the replacement on a rejected operation. After an ambiguous
+  native failure, detach or abandon before releasing either target.
+- A Vulkan surface's outgoing `VkSurfaceKHR` MUST remain valid until replacement
+  completes because graphics teardown is ordered through the driver.
+- A frame demand captures the current extent generation. Size pending waits for
+  a matching map update rather than causing an immediate retry loop.
+- Continuous resize MUST keep submitting paced demand and MUST NOT block the
+  platform resize callback.
 
 #### Reattach
 
-Reattaching is for a target the live session cannot take, not for a resize. It
-happens entirely on the render loop thread, which owns both the session and the
-graphics resources. The sequence MUST be:
+Reattach only for a new graphics context or device, an unsupported replacement,
+or target loss:
 
-1. Close the session, then destroy and recreate the host texture or surface.
-2. Attach the render target again against the published map.
-3. Set the render request.
+1. Stop frame demand and release acquired frames.
+2. Start detach and service the selected driver until it completes.
+3. Destroy the detached session.
+4. Destroy and recreate host graphics resources.
+5. Start attachment and service a caller driver until it completes.
 
-Closing the session first matters: the render loop owns both the session and the
-graphics resources it borrows, and the session must stop referencing a texture
-before that texture is destroyed.
+If the graphics owner is permanently unavailable, replace steps 2 and 3 with
+abandon, quarantine reporting, and CPU-only destruction.
 
 Profile sections define which host events trigger resize
 ([Desktop profile → Resize triggers](#resize-triggers) or
@@ -774,8 +689,8 @@ when the drag ends, and hold it for the whole drag when a second button goes
 down and up during one. Keyboard interactions are discrete commands and leave
 the state clear.
 
-Input handlers return whether the camera changed so the render loop can set the
-render request.
+Input handlers return whether the camera changed so the next display callback
+submits frame demand.
 
 ### Resize triggers
 
@@ -805,24 +720,23 @@ render loop only while the view is visible and the app is in the foreground. The
 runtime's native scheduler keeps running across these transitions, so loading
 continues while the view is off screen.
 
-When the host toolkit supplies a fresh presentation surface on the graphics
-context the session attached with, hand it over with `set_target` on the render
-loop thread, which is the thread that attached the session. The session keeps
-its renderer, so the map returns warm rather than rebuilding its tiles and
-atlases.
+When the host toolkit supplies a fresh presentation surface for the same
+graphics context, start target replacement and keep the outgoing surface alive
+until the operation completes. The session keeps its renderer, so the map
+returns warm.
 
-Close the render target only when the graphics context itself is gone, on that
-same render loop thread. Keep runtime and map handles alive either way, and
-attach again on that thread once a context and surface exist, per
-[Reattach](#reattach).
+When the graphics context is gone, stop demand and detach through the caller
+driver before destroying it. Abandon instead when the graphics thread can no
+longer service detach. Keep runtime and map handles alive, and attach again once
+a context and surface exist.
 
-| Transition                       | Behavior                                                                                                                                                                                             |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| View will appear                 | Mark the view visible. If the app is in the foreground, start the render loop, refresh viewport, hand a parked session its surface or attach the render target, and set the render request.          |
-| View did disappear               | Mark the view not visible. Stop the render loop. Park the session when the presentation surface goes away and the graphics context survives; close the render target only when that context is gone. |
-| App foreground                   | Mark the app foreground. If the view is visible, start the render loop, refresh viewport, hand a parked session its surface or attach the render target, and set the render request.                 |
-| App background                   | Mark the app background. Stop the render loop. Park the session when the presentation surface goes away and the graphics context survives; close the render target only when that context is gone.   |
-| View destroyed / app termination | Run [Shared shutdown](#shutdown).                                                                                                                                                                    |
+| Transition                       | Behavior                                                                                                                        |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| View will appear                 | Mark the view visible. In the foreground, resume display-paced demand, refresh the viewport, and replace or attach the surface. |
+| View did disappear               | Mark the view hidden. Pause demand but continue servicing caller-driver work. Replace the surface when it disappears.           |
+| App foreground                   | Mark the app foreground. If visible, resume display-paced demand and refresh the viewport.                                      |
+| App background                   | Mark the app background. Pause demand but continue servicing caller-driver work.                                                |
+| View destroyed / app termination | Run [Shared shutdown](#shutdown).                                                                                               |
 
 ### Entry and shell
 
@@ -864,8 +778,8 @@ concurrently share one state, so a gesture ending while another is still live
 leaves it set, and the last one to end clears it. Double-tap is a discrete
 animated command and leaves the state clear.
 
-Input handlers return whether the camera changed so the render loop can set the
-render request.
+Input handlers return whether the camera changed so the next display callback
+submits frame demand.
 
 ### Resize triggers
 

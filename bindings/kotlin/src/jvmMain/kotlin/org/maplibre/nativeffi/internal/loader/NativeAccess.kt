@@ -1,8 +1,11 @@
 package org.maplibre.nativeffi.internal.loader
 
 import java.lang.foreign.Arena
+import java.lang.foreign.FunctionDescriptor
 import java.lang.foreign.Linker
+import java.lang.foreign.MemoryLayout
 import java.lang.foreign.MemorySegment
+import java.lang.foreign.SymbolLookup
 import java.lang.foreign.ValueLayout
 import java.lang.invoke.MethodHandle
 import java.lang.invoke.MethodHandles
@@ -10,6 +13,7 @@ import java.lang.invoke.MethodType
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
 import java.util.NoSuchElementException
+import java.util.concurrent.ConcurrentHashMap
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.BoundOptions
 import org.maplibre.nativeffi.camera.BoundsConstraint
@@ -43,7 +47,6 @@ import org.maplibre.nativeffi.internal.c.mln_canonical_tile_id
 import org.maplibre.nativeffi.internal.c.mln_custom_geometry_source_options
 import org.maplibre.nativeffi.internal.c.mln_edge_insets
 import org.maplibre.nativeffi.internal.c.mln_egl_context_descriptor
-import org.maplibre.nativeffi.internal.c.mln_feature_state_selector
 import org.maplibre.nativeffi.internal.c.mln_free_camera_options
 import org.maplibre.nativeffi.internal.c.mln_geojson_source_options
 import org.maplibre.nativeffi.internal.c.mln_image_content
@@ -147,13 +150,15 @@ import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
 import org.maplibre.nativeffi.render.EglContextDescriptor
+import org.maplibre.nativeffi.render.FrameDemand
 import org.maplibre.nativeffi.render.FrameScope
+import org.maplibre.nativeffi.render.GpuSync
+import org.maplibre.nativeffi.render.GpuSyncKind
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalContextDescriptor
 import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalOwnedTextureFrame
 import org.maplibre.nativeffi.render.MetalSurfaceDescriptor
-import org.maplibre.nativeffi.render.NativeBuffer
 import org.maplibre.nativeffi.render.NativePointer
 import org.maplibre.nativeffi.render.OpenGLBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.OpenGLContextDescriptor
@@ -161,10 +166,19 @@ import org.maplibre.nativeffi.render.OpenGLOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.OpenGLOwnedTextureFrame
 import org.maplibre.nativeffi.render.OpenGLSurfaceDescriptor
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
+import org.maplibre.nativeffi.render.RenderAbandonDisposition
+import org.maplibre.nativeffi.render.RenderAbandonResult
+import org.maplibre.nativeffi.render.RenderDriver
+import org.maplibre.nativeffi.render.RenderFrameResult
 import org.maplibre.nativeffi.render.RenderMode
 import org.maplibre.nativeffi.render.RenderResult
+import org.maplibre.nativeffi.render.RenderSessionAttachOptions
+import org.maplibre.nativeffi.render.RenderSessionCapabilities
+import org.maplibre.nativeffi.render.RenderSessionSnapshot
+import org.maplibre.nativeffi.render.RenderSessionState
 import org.maplibre.nativeffi.render.RenderTargetExtent
 import org.maplibre.nativeffi.render.TextureImageInfo
+import org.maplibre.nativeffi.render.TextureReadback
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanContextDescriptor
 import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
@@ -2205,283 +2219,590 @@ internal object NativeAccess {
   internal fun attachMetalOwnedTexture(
     map: NativeMap,
     descriptor: MetalOwnedTextureDescriptor,
-  ): NativeRenderSession =
+    options: RenderSessionAttachOptions,
+  ): Pair<NativeRenderSession, Long> =
     attachRenderSession(
       map,
-      "mln_metal_owned_texture_attach",
+      "mln_metal_owned_texture_attach_start",
       metalOwnedTextureDescriptor(descriptor),
+      options,
     )
 
   internal fun attachMetalBorrowedTexture(
     map: NativeMap,
     descriptor: MetalBorrowedTextureDescriptor,
-  ): NativeRenderSession =
+    options: RenderSessionAttachOptions,
+  ): Pair<NativeRenderSession, Long> =
     attachRenderSession(
       map,
-      "mln_metal_borrowed_texture_attach",
+      "mln_metal_borrowed_texture_attach_start",
       metalBorrowedTextureDescriptor(descriptor),
+      options,
     )
 
   internal fun attachVulkanOwnedTexture(
     map: NativeMap,
     descriptor: VulkanOwnedTextureDescriptor,
-  ): NativeRenderSession =
+    options: RenderSessionAttachOptions,
+  ): Pair<NativeRenderSession, Long> =
     attachRenderSession(
       map,
-      "mln_vulkan_owned_texture_attach",
+      "mln_vulkan_owned_texture_attach_start",
       vulkanOwnedTextureDescriptor(descriptor),
+      options,
     )
 
   internal fun attachVulkanBorrowedTexture(
     map: NativeMap,
     descriptor: VulkanBorrowedTextureDescriptor,
-  ): NativeRenderSession =
+    options: RenderSessionAttachOptions,
+  ): Pair<NativeRenderSession, Long> =
     attachRenderSession(
       map,
-      "mln_vulkan_borrowed_texture_attach",
+      "mln_vulkan_borrowed_texture_attach_start",
       vulkanBorrowedTextureDescriptor(descriptor),
+      options,
     )
 
   internal fun attachOpenGLOwnedTexture(
     map: NativeMap,
     descriptor: OpenGLOwnedTextureDescriptor,
-  ): NativeRenderSession =
+    options: RenderSessionAttachOptions,
+  ): Pair<NativeRenderSession, Long> =
     attachRenderSession(
       map,
-      "mln_opengl_owned_texture_attach",
+      "mln_opengl_owned_texture_attach_start",
       openglOwnedTextureDescriptor(descriptor),
+      options,
     )
 
   internal fun attachOpenGLBorrowedTexture(
     map: NativeMap,
     descriptor: OpenGLBorrowedTextureDescriptor,
-  ): NativeRenderSession =
+    options: RenderSessionAttachOptions,
+  ): Pair<NativeRenderSession, Long> =
     attachRenderSession(
       map,
-      "mln_opengl_borrowed_texture_attach",
+      "mln_opengl_borrowed_texture_attach_start",
       openglBorrowedTextureDescriptor(descriptor),
+      options,
     )
 
   internal fun attachMetalSurface(
     map: NativeMap,
     descriptor: MetalSurfaceDescriptor,
-  ): NativeRenderSession =
-    attachRenderSession(map, "mln_metal_surface_attach", metalSurfaceDescriptor(descriptor))
+    options: RenderSessionAttachOptions,
+  ): Pair<NativeRenderSession, Long> =
+    attachRenderSession(
+      map,
+      "mln_metal_surface_attach_start",
+      metalSurfaceDescriptor(descriptor),
+      options,
+    )
 
   internal fun attachVulkanSurface(
     map: NativeMap,
     descriptor: VulkanSurfaceDescriptor,
-  ): NativeRenderSession =
-    attachRenderSession(map, "mln_vulkan_surface_attach", vulkanSurfaceDescriptor(descriptor))
+    options: RenderSessionAttachOptions,
+  ): Pair<NativeRenderSession, Long> =
+    attachRenderSession(
+      map,
+      "mln_vulkan_surface_attach_start",
+      vulkanSurfaceDescriptor(descriptor),
+      options,
+    )
 
   internal fun attachOpenGLSurface(
     map: NativeMap,
     descriptor: OpenGLSurfaceDescriptor,
-  ): NativeRenderSession =
-    attachRenderSession(map, "mln_opengl_surface_attach", openglSurfaceDescriptor(descriptor))
+    options: RenderSessionAttachOptions,
+  ): Pair<NativeRenderSession, Long> =
+    attachRenderSession(
+      map,
+      "mln_opengl_surface_attach_start",
+      openglSurfaceDescriptor(descriptor),
+      options,
+    )
 
   internal fun destroyRenderSession(session: NativeRenderSession): Int =
-    renderSessionStatusFunction("mln_render_session_destroy").invokeNative(session) as Int
+    phase3StatusDowncall("mln_render_session_destroy", ValueLayout.JAVA_LONG).invokeNative(session)
+      as Int
 
-  internal fun resizeRenderSession(
-    session: NativeRenderSession,
-    width: Int,
-    height: Int,
-    scaleFactor: Double,
-  ) {
-    Status.check(
-      renderSessionResizeFunction().invokeNative(session, width, height, scaleFactor) as Int
-    )
-  }
-
-  internal fun setMetalSurfaceTarget(
-    session: NativeRenderSession,
-    descriptor: MetalSurfaceDescriptor,
-  ) {
-    setRenderSessionTarget(
-      session,
-      "mln_metal_surface_set_target",
-      metalSurfaceDescriptor(descriptor),
-    )
-  }
-
-  internal fun setVulkanSurfaceTarget(
-    session: NativeRenderSession,
-    descriptor: VulkanSurfaceDescriptor,
-  ) {
-    setRenderSessionTarget(
-      session,
-      "mln_vulkan_surface_set_target",
-      vulkanSurfaceDescriptor(descriptor),
-    )
-  }
-
-  internal fun setOpenGLSurfaceTarget(
-    session: NativeRenderSession,
-    descriptor: OpenGLSurfaceDescriptor,
-  ) {
-    setRenderSessionTarget(
-      session,
-      "mln_opengl_surface_set_target",
-      openglSurfaceDescriptor(descriptor),
-    )
-  }
-
-  internal fun setMetalBorrowedTextureTarget(
-    session: NativeRenderSession,
-    descriptor: MetalBorrowedTextureDescriptor,
-  ) {
-    setRenderSessionTarget(
-      session,
-      "mln_metal_borrowed_texture_set_target",
-      metalBorrowedTextureDescriptor(descriptor),
-    )
-  }
-
-  internal fun setVulkanBorrowedTextureTarget(
-    session: NativeRenderSession,
-    descriptor: VulkanBorrowedTextureDescriptor,
-  ) {
-    setRenderSessionTarget(
-      session,
-      "mln_vulkan_borrowed_texture_set_target",
-      vulkanBorrowedTextureDescriptor(descriptor),
-    )
-  }
-
-  internal fun setOpenGLBorrowedTextureTarget(
-    session: NativeRenderSession,
-    descriptor: OpenGLBorrowedTextureDescriptor,
-  ) {
-    setRenderSessionTarget(
-      session,
-      "mln_opengl_borrowed_texture_set_target",
-      openglBorrowedTextureDescriptor(descriptor),
-    )
-  }
-
-  internal fun renderUpdate(session: NativeRenderSession): RenderResult =
+  internal fun renderSessionCapabilities(session: NativeRenderSession): RenderSessionCapabilities =
     Arena.ofConfined().use { arena ->
-      val outResult = arena.allocate(ValueLayout.JAVA_INT)
-      Status.check(renderSessionRenderUpdateFunction().invokeNative(session, outResult) as Int)
-      RenderResult.fromNative(outResult.get(ValueLayout.JAVA_INT, 0))
+      val out = arena.allocate(RENDER_SESSION_CAPABILITIES_SIZE)
+      out.set(ValueLayout.JAVA_INT, 0, RENDER_SESSION_CAPABILITIES_SIZE.toInt())
+      Status.check(
+        phase3StatusDowncall(
+            "mln_render_session_get_capabilities",
+            ValueLayout.JAVA_LONG,
+            ValueLayout.ADDRESS,
+          )
+          .invokeNative(session, out) as Int
+      )
+      val flags = out.get(ValueLayout.JAVA_INT, 12)
+      RenderSessionCapabilities(
+        driver = RenderDriver.fromNative(out.get(ValueLayout.JAVA_INT, 4)),
+        textureRingDepth = out.get(ValueLayout.JAVA_INT, 8),
+        frameAcquisition = flags and RENDER_CAPABILITY_FRAME_ACQUISITION != 0,
+        readback = flags and RENDER_CAPABILITY_READBACK != 0,
+        consumerSync = flags and RENDER_CAPABILITY_CONSUMER_SYNC != 0,
+        presentation = flags and RENDER_CAPABILITY_PRESENTATION != 0,
+      )
     }
 
-  internal fun detachRenderSession(session: NativeRenderSession) {
-    Status.check(
-      renderSessionStatusFunction("mln_render_session_detach").invokeNative(session) as Int
-    )
+  internal fun renderSessionSnapshot(session: NativeRenderSession): RenderSessionSnapshot =
+    Arena.ofConfined().use { arena ->
+      val out = arena.allocate(RENDER_SESSION_SNAPSHOT_SIZE)
+      out.set(ValueLayout.JAVA_INT, 0, RENDER_SESSION_SNAPSHOT_SIZE.toInt())
+      Status.check(
+        phase3StatusDowncall(
+            "mln_render_session_get_snapshot",
+            ValueLayout.JAVA_LONG,
+            ValueLayout.ADDRESS,
+          )
+          .invokeNative(session, out) as Int
+      )
+      val extent = out.asSlice(16, mln_render_target_extent.sizeof())
+      RenderSessionSnapshot(
+        state = RenderSessionState.fromNative(out.get(ValueLayout.JAVA_INT, 4)),
+        driver = RenderDriver.fromNative(out.get(ValueLayout.JAVA_INT, 8)),
+        latestResult = RenderResult.fromNative(out.get(ValueLayout.JAVA_INT, 12)),
+        extent =
+          RenderTargetExtent(
+            mln_render_target_extent.width(extent),
+            mln_render_target_extent.height(extent),
+            mln_render_target_extent.scale_factor(extent),
+          ),
+        generation = out.get(ValueLayout.JAVA_LONG, 32).toULong(),
+        mapUpdateGeneration = out.get(ValueLayout.JAVA_LONG, 40).toULong(),
+        renderedUpdateGeneration = out.get(ValueLayout.JAVA_LONG, 48).toULong(),
+        extentGeneration = out.get(ValueLayout.JAVA_LONG, 56).toULong(),
+        frameGeneration = out.get(ValueLayout.JAVA_LONG, 64).toULong(),
+        latestDemandToken = out.get(ValueLayout.JAVA_LONG, 72).toULong(),
+        pendingDemandCount = out.get(ValueLayout.JAVA_INT, 80),
+        acquiredFrameCount = out.get(ValueLayout.JAVA_INT, 84),
+        targetReady = out.get(ValueLayout.JAVA_BOOLEAN, 88),
+        pendingChanges = out.get(ValueLayout.JAVA_BOOLEAN, 89),
+      )
+    }
+
+  internal fun requestRenderFrame(session: NativeRenderSession, demand: FrameDemand) {
+    Arena.ofConfined().use { arena ->
+      val nativeDemand = arena.allocate(FRAME_DEMAND_SIZE)
+      nativeDemand.set(ValueLayout.JAVA_INT, 0, FRAME_DEMAND_SIZE.toInt())
+      var flags = 0
+      if (demand.ifNeeded) flags = flags or FRAME_DEMAND_IF_NEEDED
+      if (demand.present) flags = flags or FRAME_DEMAND_PRESENT
+      nativeDemand.set(ValueLayout.JAVA_INT, 4, flags)
+      nativeDemand.set(ValueLayout.JAVA_LONG, 8, demand.token.toLong())
+      nativeDemand.set(ValueLayout.JAVA_LONG, 16, demand.coalescingBoundary.toLong())
+      nativeDemand.set(ValueLayout.JAVA_LONG, 24, demand.presentationTimeNanoseconds)
+      nativeDemand.set(ValueLayout.JAVA_LONG, 32, demand.deadlineNanoseconds)
+      Status.check(
+        phase3StatusDowncall(
+            "mln_render_session_request_frame",
+            ValueLayout.JAVA_LONG,
+            ValueLayout.ADDRESS,
+          )
+          .invokeNative(session, nativeDemand) as Int
+      )
+    }
   }
 
-  internal fun reduceRenderSessionMemoryUse(session: NativeRenderSession) {
-    Status.check(
-      renderSessionStatusFunction("mln_render_session_reduce_memory_use").invokeNative(session)
-        as Int
-    )
-  }
+  internal fun drainRenderFrameResults(
+    session: NativeRenderSession,
+    maxResults: Int,
+  ): List<RenderFrameResult> =
+    Arena.ofConfined().use { arena ->
+      val outBatch = zeroHandle(arena)
+      Status.check(
+        phase3StatusDowncall(
+            "mln_render_session_drain_frame_results",
+            ValueLayout.JAVA_LONG,
+            ValueLayout.JAVA_LONG,
+            ValueLayout.ADDRESS,
+          )
+          .invokeNative(session, maxResults.toLong(), outBatch) as Int
+      )
+      val batch = outBatch.get(ValueLayout.JAVA_LONG, 0)
+      if (batch == 0L) return@use emptyList()
+      try {
+        val outCount = arena.allocate(ValueLayout.JAVA_LONG)
+        Status.check(
+          phase3StatusDowncall(
+              "mln_render_frame_batch_count",
+              ValueLayout.JAVA_LONG,
+              ValueLayout.ADDRESS,
+            )
+            .invokeNative(batch, outCount) as Int
+        )
+        val count = outCount.get(ValueLayout.JAVA_LONG, 0)
+        List(Math.toIntExact(count)) { index ->
+          val outResult = arena.allocate(RENDER_FRAME_RESULT_SIZE)
+          outResult.set(ValueLayout.JAVA_INT, 0, RENDER_FRAME_RESULT_SIZE.toInt())
+          Status.check(
+            phase3StatusDowncall(
+                "mln_render_frame_batch_get",
+                ValueLayout.JAVA_LONG,
+                ValueLayout.JAVA_LONG,
+                ValueLayout.ADDRESS,
+              )
+              .invokeNative(batch, index.toLong(), outResult) as Int
+          )
+          renderFrameResult(outResult)
+        }
+      } finally {
+        phase3Downcall(
+            "mln_render_frame_batch_release",
+            FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG),
+          )
+          .invokeNative(batch)
+      }
+    }
 
-  internal fun clearRenderSessionData(session: NativeRenderSession) {
-    Status.check(
-      renderSessionStatusFunction("mln_render_session_clear_data").invokeNative(session) as Int
-    )
-  }
+  internal fun serviceRenderDriverWork(session: NativeRenderSession, maxWork: Int): Int =
+    Arena.ofConfined().use { arena ->
+      val outServiced = arena.allocate(ValueLayout.JAVA_LONG)
+      Status.check(
+        phase3StatusDowncall(
+            "mln_render_session_service_driver_work",
+            ValueLayout.JAVA_LONG,
+            ValueLayout.JAVA_LONG,
+            ValueLayout.ADDRESS,
+          )
+          .invokeNative(session, maxWork.toLong(), outServiced) as Int
+      )
+      Math.toIntExact(outServiced.get(ValueLayout.JAVA_LONG, 0))
+    }
 
-  internal fun dumpRenderSessionDebugLogs(session: NativeRenderSession) {
-    Status.check(
-      renderSessionStatusFunction("mln_render_session_dump_debug_logs").invokeNative(session) as Int
-    )
-  }
+  internal fun acquireRenderFrame(session: NativeRenderSession): Long? =
+    Arena.ofConfined().use { arena ->
+      val outFrame = zeroHandle(arena)
+      val status =
+        phase3StatusDowncall(
+            "mln_render_session_acquire_frame",
+            ValueLayout.JAVA_LONG,
+            ValueLayout.ADDRESS,
+          )
+          .invokeNative(session, outFrame) as Int
+      if (status == -9) return@use null
+      Status.check(status)
+      outFrame.get(ValueLayout.JAVA_LONG, 0).also {
+        require(it != 0L) { "frame acquisition returned the null handle" }
+      }
+    }
 
-  internal fun setFeatureState(
+  internal fun acquiredFrameResult(frame: Long): RenderFrameResult =
+    Arena.ofConfined().use { arena ->
+      val out = arena.allocate(RENDER_FRAME_RESULT_SIZE)
+      out.set(ValueLayout.JAVA_INT, 0, RENDER_FRAME_RESULT_SIZE.toInt())
+      Status.check(
+        phase3StatusDowncall(
+            "mln_acquired_frame_get_result",
+            ValueLayout.JAVA_LONG,
+            ValueLayout.ADDRESS,
+          )
+          .invokeNative(frame, out) as Int
+      )
+      renderFrameResult(out)
+    }
+
+  internal fun acquiredFrameProducerSync(frame: Long): GpuSync =
+    Arena.ofConfined().use { arena ->
+      val out = gpuSync(arena, GpuSync())
+      Status.check(
+        phase3StatusDowncall(
+            "mln_acquired_frame_get_producer_sync",
+            ValueLayout.JAVA_LONG,
+            ValueLayout.ADDRESS,
+          )
+          .invokeNative(frame, out) as Int
+      )
+      readGpuSync(out)
+    }
+
+  internal fun acquiredMetalTexture(frame: Long, scope: FrameScope): MetalOwnedTextureFrame =
+    Arena.ofConfined().use { arena ->
+      val out = mln_metal_owned_texture_frame.allocate(arena)
+      mln_metal_owned_texture_frame.size(out, mln_metal_owned_texture_frame.sizeof().toInt())
+      Status.check(
+        phase3StatusDowncall(
+            "mln_acquired_frame_get_metal_texture",
+            ValueLayout.JAVA_LONG,
+            ValueLayout.ADDRESS,
+          )
+          .invokeNative(frame, out) as Int
+      )
+      metalOwnedTextureFrame(out, scope)
+    }
+
+  internal fun acquiredVulkanTexture(frame: Long, scope: FrameScope): VulkanOwnedTextureFrame =
+    Arena.ofConfined().use { arena ->
+      val out = mln_vulkan_owned_texture_frame.allocate(arena)
+      mln_vulkan_owned_texture_frame.size(out, mln_vulkan_owned_texture_frame.sizeof().toInt())
+      Status.check(
+        phase3StatusDowncall(
+            "mln_acquired_frame_get_vulkan_texture",
+            ValueLayout.JAVA_LONG,
+            ValueLayout.ADDRESS,
+          )
+          .invokeNative(frame, out) as Int
+      )
+      vulkanOwnedTextureFrame(out, scope)
+    }
+
+  internal fun acquiredOpenGLTexture(frame: Long, scope: FrameScope): OpenGLOwnedTextureFrame =
+    Arena.ofConfined().use { arena ->
+      val out = mln_opengl_owned_texture_frame.allocate(arena)
+      mln_opengl_owned_texture_frame.size(out, mln_opengl_owned_texture_frame.sizeof().toInt())
+      Status.check(
+        phase3StatusDowncall(
+            "mln_acquired_frame_get_opengl_texture",
+            ValueLayout.JAVA_LONG,
+            ValueLayout.ADDRESS,
+          )
+          .invokeNative(frame, out) as Int
+      )
+      openglOwnedTextureFrame(out, scope)
+    }
+
+  internal fun startReleaseAcquiredFrame(frame: Long, sync: GpuSync): Pair<Long, Long> =
+    Arena.ofConfined().use { arena ->
+      val inOutFrame = arena.allocate(ValueLayout.JAVA_LONG)
+      inOutFrame.set(ValueLayout.JAVA_LONG, 0, frame)
+      val outOperation = zeroHandle(arena)
+      Status.check(
+        phase3StatusDowncall(
+            "mln_acquired_frame_release_start",
+            ValueLayout.ADDRESS,
+            ValueLayout.ADDRESS,
+            ValueLayout.ADDRESS,
+          )
+          .invokeNative(inOutFrame, gpuSync(arena, sync), outOperation) as Int
+      )
+      inOutFrame.get(ValueLayout.JAVA_LONG, 0) to outOperation.get(ValueLayout.JAVA_LONG, 0)
+    }
+
+  internal fun startResizeRenderSession(
+    session: NativeRenderSession,
+    extent: RenderTargetExtent,
+  ): Long =
+    Arena.ofConfined().use { arena ->
+      val nativeExtent = mln_render_target_extent.allocate(arena)
+      fillRenderTargetExtent(nativeExtent, extent)
+      startRenderOperation("mln_render_session_resize_start", session, nativeExtent)
+    }
+
+  internal fun startSetMetalSurfaceTarget(
+    session: NativeRenderSession,
+    descriptor: MetalSurfaceDescriptor,
+  ): Long =
+    startRenderTargetOperation(
+      session,
+      "mln_metal_surface_set_target_start",
+      metalSurfaceDescriptor(descriptor),
+    )
+
+  internal fun startSetVulkanSurfaceTarget(
+    session: NativeRenderSession,
+    descriptor: VulkanSurfaceDescriptor,
+  ): Long =
+    startRenderTargetOperation(
+      session,
+      "mln_vulkan_surface_set_target_start",
+      vulkanSurfaceDescriptor(descriptor),
+    )
+
+  internal fun startSetOpenGLSurfaceTarget(
+    session: NativeRenderSession,
+    descriptor: OpenGLSurfaceDescriptor,
+  ): Long =
+    startRenderTargetOperation(
+      session,
+      "mln_opengl_surface_set_target_start",
+      openglSurfaceDescriptor(descriptor),
+    )
+
+  internal fun startSetMetalBorrowedTextureTarget(
+    session: NativeRenderSession,
+    descriptor: MetalBorrowedTextureDescriptor,
+  ): Long =
+    startRenderTargetOperation(
+      session,
+      "mln_metal_borrowed_texture_set_target_start",
+      metalBorrowedTextureDescriptor(descriptor),
+    )
+
+  internal fun startSetVulkanBorrowedTextureTarget(
+    session: NativeRenderSession,
+    descriptor: VulkanBorrowedTextureDescriptor,
+  ): Long =
+    startRenderTargetOperation(
+      session,
+      "mln_vulkan_borrowed_texture_set_target_start",
+      vulkanBorrowedTextureDescriptor(descriptor),
+    )
+
+  internal fun startSetOpenGLBorrowedTextureTarget(
+    session: NativeRenderSession,
+    descriptor: OpenGLBorrowedTextureDescriptor,
+  ): Long =
+    startRenderTargetOperation(
+      session,
+      "mln_opengl_borrowed_texture_set_target_start",
+      openglBorrowedTextureDescriptor(descriptor),
+    )
+
+  internal fun startRenderBarrier(session: NativeRenderSession, generation: ULong): Long =
+    Arena.ofConfined().use { arena ->
+      val outOperation = zeroHandle(arena)
+      Status.check(
+        phase3StatusDowncall(
+            "mln_render_session_barrier_start",
+            ValueLayout.JAVA_LONG,
+            ValueLayout.JAVA_LONG,
+            ValueLayout.ADDRESS,
+          )
+          .invokeNative(session, generation.toLong(), outOperation) as Int
+      )
+      outOperation.get(ValueLayout.JAVA_LONG, 0)
+    }
+
+  internal fun startRenderControl(session: NativeRenderSession, functionName: String): Long =
+    startRenderOperation(functionName, session)
+
+  internal fun startSetFeatureState(
     session: NativeRenderSession,
     selector: FeatureStateSelector,
     value: ByteArray,
-  ) {
+  ): Long =
     Arena.ofConfined().use { arena ->
-      Status.check(
-        renderSessionTwoAddressStatusFunction("mln_render_session_set_feature_state")
-          .invokeNative(session, featureStateSelector(arena, selector), byteArrayView(arena, value))
-          as Int
+      startFeatureStateOperation(
+        "mln_render_session_set_feature_state_start",
+        session,
+        selector,
+        byteArrayView(arena, value),
+        arena,
       )
     }
-  }
 
-  internal fun getFeatureState(
+  internal fun startGetFeatureState(
     session: NativeRenderSession,
     selector: FeatureStateSelector,
-  ): ByteArray =
+  ): Long =
     Arena.ofConfined().use { arena ->
-      val outSnapshot = arena.allocate(ValueLayout.JAVA_LONG)
-      outSnapshot.set(ValueLayout.JAVA_LONG, 0, 0L)
-      Status.check(
-        renderSessionTwoAddressStatusFunction("mln_render_session_get_feature_state")
-          .invokeNative(session, featureStateSelector(arena, selector), outSnapshot) as Int
-      )
-      ownedBuffer(NativeOwnedBuffer(outSnapshot.get(ValueLayout.JAVA_LONG, 0)))!!
-    }
-
-  internal fun removeFeatureState(session: NativeRenderSession, selector: FeatureStateSelector) {
-    Arena.ofConfined().use { arena ->
-      Status.check(
-        renderSessionAddressStatusFunction("mln_render_session_remove_feature_state")
-          .invokeNative(session, featureStateSelector(arena, selector)) as Int
+      startFeatureStateOperation(
+        "mln_render_session_get_feature_state_start",
+        session,
+        selector,
+        null,
+        arena,
       )
     }
-  }
 
-  internal fun queryRenderedFeatures(
+  internal fun takeFeatureStateResult(operation: Long): ByteArray =
+    takeOwnedBufferResult("mln_render_session_get_feature_state_take_result", operation)
+
+  internal fun startRemoveFeatureState(
+    session: NativeRenderSession,
+    selector: FeatureStateSelector,
+  ): Long =
+    Arena.ofConfined().use { arena ->
+      val outOperation = zeroHandle(arena)
+      Status.check(
+        phase3StatusDowncall(
+            "mln_render_session_remove_feature_state_start",
+            ValueLayout.JAVA_LONG,
+            stringViewLayout,
+            stringViewLayout,
+            stringViewLayout,
+            stringViewLayout,
+            ValueLayout.ADDRESS,
+          )
+          .invokeNative(
+            session,
+            stringView(arena, selector.sourceId),
+            optionalStringView(arena, selector.sourceLayerId),
+            optionalStringView(arena, selector.featureId),
+            optionalStringView(arena, selector.stateKey),
+            outOperation,
+          ) as Int
+      )
+      outOperation.get(ValueLayout.JAVA_LONG, 0)
+    }
+
+  internal fun startQueryRenderedFeatures(
     session: NativeRenderSession,
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions?,
-  ): ByteArray =
+  ): Long =
     Arena.ofConfined().use { arena ->
-      val outResult = arena.allocate(ValueLayout.JAVA_LONG)
-      outResult.set(ValueLayout.JAVA_LONG, 0, 0L)
+      val outOperation = zeroHandle(arena)
       Status.check(
-        renderSessionQueryRenderedFeaturesFunction()
+        phase3StatusDowncall(
+            "mln_render_session_query_rendered_features_start",
+            ValueLayout.JAVA_LONG,
+            ValueLayout.ADDRESS,
+            ValueLayout.ADDRESS,
+            ValueLayout.ADDRESS,
+          )
           .invokeNative(
             session,
             renderedQueryGeometry(arena, geometry),
             renderedFeatureQueryOptions(arena, options),
-            outResult,
+            outOperation,
           ) as Int
       )
-      ownedBuffer(NativeOwnedBuffer(outResult.get(ValueLayout.JAVA_LONG, 0)))!!
+      outOperation.get(ValueLayout.JAVA_LONG, 0)
     }
 
-  internal fun querySourceFeatures(
+  internal fun startQuerySourceFeatures(
     session: NativeRenderSession,
     sourceId: String,
     options: SourceFeatureQueryOptions?,
-  ): ByteArray =
+  ): Long =
     Arena.ofConfined().use { arena ->
-      val outResult = arena.allocate(ValueLayout.JAVA_LONG)
-      outResult.set(ValueLayout.JAVA_LONG, 0, 0L)
+      val outOperation = zeroHandle(arena)
       Status.check(
-        renderSessionQuerySourceFeaturesFunction()
+        phase3StatusDowncall(
+            "mln_render_session_query_source_features_start",
+            ValueLayout.JAVA_LONG,
+            stringViewLayout,
+            ValueLayout.ADDRESS,
+            ValueLayout.ADDRESS,
+          )
           .invokeNative(
             session,
             stringView(arena, sourceId),
             sourceFeatureQueryOptions(arena, options),
-            outResult,
+            outOperation,
           ) as Int
       )
-      ownedBuffer(NativeOwnedBuffer(outResult.get(ValueLayout.JAVA_LONG, 0)))!!
+      outOperation.get(ValueLayout.JAVA_LONG, 0)
     }
 
-  internal fun queryFeatureExtension(
+  internal fun startQueryFeatureExtension(
     session: NativeRenderSession,
     sourceId: String,
     feature: ByteArray,
     extension: String,
     extensionField: String,
     arguments: ByteArray?,
-  ): ByteArray =
+  ): Long =
     Arena.ofConfined().use { arena ->
-      val outResult = arena.allocate(ValueLayout.JAVA_LONG)
-      outResult.set(ValueLayout.JAVA_LONG, 0, 0L)
+      val outOperation = zeroHandle(arena)
       Status.check(
-        renderSessionQueryFeatureExtensionsFunction()
+        phase3StatusDowncall(
+            "mln_render_session_query_feature_extensions_start",
+            ValueLayout.JAVA_LONG,
+            stringViewLayout,
+            stringViewLayout,
+            stringViewLayout,
+            stringViewLayout,
+            ValueLayout.ADDRESS,
+            ValueLayout.ADDRESS,
+          )
           .invokeNative(
             session,
             stringView(arena, sourceId),
@@ -2489,98 +2810,54 @@ internal object NativeAccess {
             stringView(arena, extension),
             stringView(arena, extensionField),
             arguments?.let { byteArrayView(arena, it) } ?: MemorySegment.NULL,
-            outResult,
+            outOperation,
           ) as Int
       )
-      ownedBuffer(NativeOwnedBuffer(outResult.get(ValueLayout.JAVA_LONG, 0)))!!
+      outOperation.get(ValueLayout.JAVA_LONG, 0)
     }
 
-  internal fun textureImageInfo(session: NativeRenderSession): TextureImageInfo =
+  internal fun takeQueryResult(operation: Long): ByteArray =
+    takeOwnedBufferResult("mln_render_query_take_result", operation)
+
+  internal fun startTextureReadback(session: NativeRenderSession): Long =
+    startRenderControl(session, "mln_texture_read_premultiplied_rgba8_start")
+
+  internal fun takeTextureReadbackResult(operation: Long): TextureReadback =
     Arena.ofConfined().use { arena ->
+      val outBuffer = zeroHandle(arena)
       val outInfo = textureImageInfo(arena)
-      val status =
-        textureReadPremultipliedRgba8Function()
-          .invokeNative(session, MemorySegment.NULL, 0L, outInfo) as Int
-      val info = readTextureImageInfo(outInfo)
-      if (status == 0 || (status == -1 && info.byteLength > 0L)) {
-        info
-      } else {
-        Status.check(status)
-        error("unreachable")
-      }
+      Status.check(
+        phase3StatusDowncall(
+            "mln_texture_read_premultiplied_rgba8_take_result",
+            ValueLayout.JAVA_LONG,
+            ValueLayout.ADDRESS,
+            ValueLayout.ADDRESS,
+          )
+          .invokeNative(operation, outBuffer, outInfo) as Int
+      )
+      TextureReadback(
+        ownedBuffer(NativeOwnedBuffer(outBuffer.get(ValueLayout.JAVA_LONG, 0)))!!,
+        readTextureImageInfo(outInfo),
+      )
     }
 
-  internal fun readPremultipliedRgba8(
-    session: NativeRenderSession,
-    buffer: NativeBuffer,
-  ): TextureImageInfo =
+  internal fun abandonRenderSession(session: NativeRenderSession): RenderAbandonResult =
     Arena.ofConfined().use { arena ->
-      val outInfo = textureImageInfo(arena)
-      buffer.borrow { segment, length ->
-        Status.check(
-          textureReadPremultipliedRgba8Function().invokeNative(session, segment, length, outInfo)
-            as Int
-        )
-      }
-      readTextureImageInfo(outInfo)
+      val out = arena.allocate(RENDER_ABANDON_RESULT_SIZE)
+      out.set(ValueLayout.JAVA_INT, 0, RENDER_ABANDON_RESULT_SIZE.toInt())
+      Status.check(
+        phase3StatusDowncall(
+            "mln_render_session_abandon",
+            ValueLayout.JAVA_LONG,
+            ValueLayout.ADDRESS,
+          )
+          .invokeNative(session, out) as Int
+      )
+      RenderAbandonResult(
+        RenderAbandonDisposition.fromNative(out.get(ValueLayout.JAVA_INT, 4)),
+        out.get(ValueLayout.JAVA_INT, 8),
+      )
     }
-
-  internal fun acquireMetalOwnedTextureFrame(
-    session: NativeRenderSession
-  ): OwnedTextureFrameSegment {
-    val arena = Arena.ofShared()
-    val frame = mln_metal_owned_texture_frame.allocate(arena)
-    mln_metal_owned_texture_frame.size(frame, mln_metal_owned_texture_frame.sizeof().toInt())
-    try {
-      Status.check(metalOwnedTextureAcquireFrameFunction().invokeNative(session, frame) as Int)
-      return OwnedTextureFrameSegment(frame, arena)
-    } catch (error: Throwable) {
-      arena.close()
-      throw error
-    }
-  }
-
-  internal fun acquireVulkanOwnedTextureFrame(
-    session: NativeRenderSession
-  ): OwnedTextureFrameSegment {
-    val arena = Arena.ofShared()
-    val frame = mln_vulkan_owned_texture_frame.allocate(arena)
-    mln_vulkan_owned_texture_frame.size(frame, mln_vulkan_owned_texture_frame.sizeof().toInt())
-    try {
-      Status.check(vulkanOwnedTextureAcquireFrameFunction().invokeNative(session, frame) as Int)
-      return OwnedTextureFrameSegment(frame, arena)
-    } catch (error: Throwable) {
-      arena.close()
-      throw error
-    }
-  }
-
-  internal fun acquireOpenGLOwnedTextureFrame(
-    session: NativeRenderSession
-  ): OwnedTextureFrameSegment {
-    val arena = Arena.ofShared()
-    val frame = mln_opengl_owned_texture_frame.allocate(arena)
-    mln_opengl_owned_texture_frame.size(frame, mln_opengl_owned_texture_frame.sizeof().toInt())
-    try {
-      Status.check(openglOwnedTextureAcquireFrameFunction().invokeNative(session, frame) as Int)
-      return OwnedTextureFrameSegment(frame, arena)
-    } catch (error: Throwable) {
-      arena.close()
-      throw error
-    }
-  }
-
-  internal fun releaseMetalOwnedTextureFrame(session: NativeRenderSession, frame: MemorySegment) {
-    Status.check(metalOwnedTextureReleaseFrameFunction().invokeNative(session, frame) as Int)
-  }
-
-  internal fun releaseVulkanOwnedTextureFrame(session: NativeRenderSession, frame: MemorySegment) {
-    Status.check(vulkanOwnedTextureReleaseFrameFunction().invokeNative(session, frame) as Int)
-  }
-
-  internal fun releaseOpenGLOwnedTextureFrame(session: NativeRenderSession, frame: MemorySegment) {
-    Status.check(openglOwnedTextureReleaseFrameFunction().invokeNative(session, frame) as Int)
-  }
 
   internal fun metalOwnedTextureFrame(
     segment: MemorySegment,
@@ -2858,33 +3135,114 @@ internal object NativeAccess {
     map: NativeMap,
     functionName: String,
     descriptor: (Arena) -> MemorySegment,
-  ): NativeRenderSession =
+    options: RenderSessionAttachOptions,
+  ): Pair<NativeRenderSession, Long> =
     Arena.ofConfined().use { arena ->
-      val outSession = arena.allocate(ValueLayout.JAVA_LONG)
-      outSession.set(ValueLayout.JAVA_LONG, 0, 0L)
+      val nativeOptions = arena.allocate(RENDER_SESSION_ATTACH_OPTIONS_SIZE)
+      nativeOptions.set(ValueLayout.JAVA_INT, 0, RENDER_SESSION_ATTACH_OPTIONS_SIZE.toInt())
+      nativeOptions.set(ValueLayout.JAVA_INT, 4, options.driver.nativeValue)
+      nativeOptions.set(ValueLayout.JAVA_INT, 8, options.requestedTextureRingDepth)
+      val outSession = zeroHandle(arena)
+      val outOperation = zeroHandle(arena)
       Status.check(
-        mapAddressAddressStatusFunction(functionName)
-          .invokeNative(map, descriptor(arena), outSession) as Int
+        phase3StatusDowncall(
+            functionName,
+            ValueLayout.JAVA_LONG,
+            ValueLayout.ADDRESS,
+            ValueLayout.ADDRESS,
+            ValueLayout.ADDRESS,
+            ValueLayout.ADDRESS,
+          )
+          .invokeNative(map, descriptor(arena), nativeOptions, outSession, outOperation) as Int
       )
-      NativeRenderSession(outSession.get(ValueLayout.JAVA_LONG, 0)).also { session ->
-        require(!session.isNull) { "render session attach returned the null handle" }
-      }
+      val session = NativeRenderSession(outSession.get(ValueLayout.JAVA_LONG, 0))
+      require(!session.isNull) { "render session attach returned the null handle" }
+      session to
+        outOperation.get(ValueLayout.JAVA_LONG, 0).also {
+          require(it != 0L) { "render session attach returned the null operation" }
+        }
     }
 
-  // The C API borrows the replacement descriptor for the call alone, so the
-  // confined arena that materialized it closes once the call returns.
-  private fun setRenderSessionTarget(
+  private fun startRenderTargetOperation(
     session: NativeRenderSession,
     functionName: String,
     descriptor: (Arena) -> MemorySegment,
-  ) {
+  ): Long =
     Arena.ofConfined().use { arena ->
-      Status.check(
-        renderSessionAddressStatusFunction(functionName).invokeNative(session, descriptor(arena))
-          as Int
-      )
+      startRenderOperation(functionName, session, descriptor(arena))
     }
+
+  private fun startRenderOperation(
+    functionName: String,
+    session: NativeRenderSession,
+    argument: MemorySegment? = null,
+  ): Long =
+    Arena.ofConfined().use { arena ->
+      val outOperation = zeroHandle(arena)
+      val status =
+        if (argument == null) {
+          phase3StatusDowncall(functionName, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS)
+            .invokeNative(session, outOperation) as Int
+        } else {
+          phase3StatusDowncall(
+              functionName,
+              ValueLayout.JAVA_LONG,
+              ValueLayout.ADDRESS,
+              ValueLayout.ADDRESS,
+            )
+            .invokeNative(session, argument, outOperation) as Int
+        }
+      Status.check(status)
+      outOperation.get(ValueLayout.JAVA_LONG, 0).also {
+        require(it != 0L) { "$functionName returned the null operation" }
+      }
+    }
+
+  private fun startFeatureStateOperation(
+    functionName: String,
+    session: NativeRenderSession,
+    selector: FeatureStateSelector,
+    value: MemorySegment?,
+    arena: Arena,
+  ): Long {
+    val outOperation = zeroHandle(arena)
+    val arguments =
+      mutableListOf<Any?>(
+        session,
+        stringView(arena, selector.sourceId),
+        optionalStringView(arena, selector.sourceLayerId),
+        optionalStringView(arena, selector.featureId),
+      )
+    if (value != null) arguments += value
+    arguments += outOperation
+    val layouts = buildList {
+      add(ValueLayout.JAVA_LONG)
+      repeat(3) { add(stringViewLayout) }
+      if (value != null) add(stringViewLayout)
+      add(ValueLayout.ADDRESS)
+    }
+    Status.check(
+      phase3StatusDowncall(functionName, *layouts.toTypedArray())
+        .invokeNative(*arguments.toTypedArray()) as Int
+    )
+    return outOperation.get(ValueLayout.JAVA_LONG, 0)
   }
+
+  private fun takeOwnedBufferResult(functionName: String, operation: Long): ByteArray =
+    Arena.ofConfined().use { arena ->
+      val outBuffer = zeroHandle(arena)
+      Status.check(
+        phase3StatusDowncall(functionName, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS)
+          .invokeNative(operation, outBuffer) as Int
+      )
+      ownedBuffer(NativeOwnedBuffer(outBuffer.get(ValueLayout.JAVA_LONG, 0)))!!
+    }
+
+  private fun optionalStringView(arena: Arena, value: String?): MemorySegment =
+    stringView(arena, value.orEmpty())
+
+  private fun zeroHandle(arena: Arena): MemorySegment =
+    arena.allocate(ValueLayout.JAVA_LONG).also { it.set(ValueLayout.JAVA_LONG, 0, 0L) }
 
   private fun metalOwnedTextureDescriptor(
     descriptor: MetalOwnedTextureDescriptor
@@ -3064,47 +3422,6 @@ internal object NativeAccess {
     mln_egl_context_descriptor.share_context(segment, nativePointer(context.shareContext))
     mln_egl_context_descriptor.client_api(segment, context.clientApi.nativeValue)
     mln_egl_context_descriptor.get_proc_address(segment, nativePointer(context.getProcAddress))
-  }
-
-  private fun featureStateSelector(arena: Arena, selector: FeatureStateSelector): MemorySegment {
-    val segment = arena.allocate(FEATURE_STATE_SELECTOR_SIZE)
-    segment.set(
-      ValueLayout.JAVA_INT,
-      FEATURE_STATE_SELECTOR_SIZE_OFFSET,
-      FEATURE_STATE_SELECTOR_SIZE.toInt(),
-    )
-    segment.set(
-      ValueLayout.ADDRESS,
-      FEATURE_STATE_SELECTOR_SOURCE_ID_OFFSET,
-      stringView(arena, selector.sourceId),
-    )
-    var fields = 0
-    selector.sourceLayerId?.let {
-      fields = fields or FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID
-      segment.set(
-        ValueLayout.ADDRESS,
-        FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID_OFFSET,
-        stringView(arena, it),
-      )
-    }
-    selector.featureId?.let {
-      fields = fields or FEATURE_STATE_SELECTOR_FEATURE_ID
-      segment.set(
-        ValueLayout.ADDRESS,
-        FEATURE_STATE_SELECTOR_FEATURE_ID_OFFSET,
-        stringView(arena, it),
-      )
-    }
-    selector.stateKey?.let {
-      fields = fields or FEATURE_STATE_SELECTOR_STATE_KEY
-      segment.set(
-        ValueLayout.ADDRESS,
-        FEATURE_STATE_SELECTOR_STATE_KEY_OFFSET,
-        stringView(arena, it),
-      )
-    }
-    segment.set(ValueLayout.JAVA_INT, FEATURE_STATE_SELECTOR_FIELDS_OFFSET, fields)
-    return segment
   }
 
   private fun renderedQueryGeometry(arena: Arena, value: RenderedQueryGeometry): MemorySegment {
@@ -3542,47 +3859,6 @@ internal object NativeAccess {
 
   private fun projectionScreenPointAddressStatusFunction(name: String): MethodHandle =
     mapScreenPointAddressStatusFunction(name)
-
-  private fun renderSessionStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun renderSessionRenderUpdateFunction(): MethodHandle =
-    downcall("mln_render_session_render_update")
-
-  private fun renderSessionResizeFunction(): MethodHandle = downcall("mln_render_session_resize")
-
-  private fun renderSessionAddressStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun renderSessionTwoAddressStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun renderSessionQueryRenderedFeaturesFunction(): MethodHandle =
-    downcall("mln_render_session_query_rendered_features")
-
-  private fun renderSessionQuerySourceFeaturesFunction(): MethodHandle =
-    downcall("mln_render_session_query_source_features")
-
-  private fun renderSessionQueryFeatureExtensionsFunction(): MethodHandle =
-    downcall("mln_render_session_query_feature_extensions")
-
-  private fun textureReadPremultipliedRgba8Function(): MethodHandle =
-    downcall("mln_texture_read_premultiplied_rgba8")
-
-  private fun metalOwnedTextureAcquireFrameFunction(): MethodHandle =
-    renderSessionAddressStatusFunction("mln_metal_owned_texture_acquire_frame")
-
-  private fun vulkanOwnedTextureAcquireFrameFunction(): MethodHandle =
-    renderSessionAddressStatusFunction("mln_vulkan_owned_texture_acquire_frame")
-
-  private fun openglOwnedTextureAcquireFrameFunction(): MethodHandle =
-    renderSessionAddressStatusFunction("mln_opengl_owned_texture_acquire_frame")
-
-  private fun metalOwnedTextureReleaseFrameFunction(): MethodHandle =
-    renderSessionAddressStatusFunction("mln_metal_owned_texture_release_frame")
-
-  private fun vulkanOwnedTextureReleaseFrameFunction(): MethodHandle =
-    renderSessionAddressStatusFunction("mln_vulkan_owned_texture_release_frame")
-
-  private fun openglOwnedTextureReleaseFrameFunction(): MethodHandle =
-    renderSessionAddressStatusFunction("mln_opengl_owned_texture_release_frame")
 
   private fun mapStringViewDoubleStatusFunction(name: String): MethodHandle = downcall(name)
 
@@ -5441,6 +5717,36 @@ internal object NativeAccess {
       )
     )
 
+  private fun renderFrameResult(segment: MemorySegment): RenderFrameResult =
+    RenderFrameResult(
+      disposition = RenderResult.fromNative(segment.get(ValueLayout.JAVA_INT, 4)),
+      token = segment.get(ValueLayout.JAVA_LONG, 8).toULong(),
+      mapUpdateGeneration = segment.get(ValueLayout.JAVA_LONG, 16).toULong(),
+      extentGeneration = segment.get(ValueLayout.JAVA_LONG, 24).toULong(),
+      frameGeneration = segment.get(ValueLayout.JAVA_LONG, 32).toULong(),
+      presentationTimeNanoseconds = segment.get(ValueLayout.JAVA_LONG, 40),
+    )
+
+  private fun gpuSync(arena: Arena, sync: GpuSync): MemorySegment =
+    arena.allocate(GPU_SYNC_SIZE).also { segment ->
+      segment.set(ValueLayout.JAVA_INT, 0, GPU_SYNC_SIZE.toInt())
+      segment.set(ValueLayout.JAVA_INT, 4, sync.kind.nativeValue)
+      segment.set(
+        ValueLayout.ADDRESS,
+        8,
+        if (sync.objectHandle == 0uL) MemorySegment.NULL
+        else MemorySegment.ofAddress(sync.objectHandle.toLong()),
+      )
+      segment.set(ValueLayout.JAVA_LONG, 16, sync.value.toLong())
+    }
+
+  private fun readGpuSync(segment: MemorySegment): GpuSync =
+    GpuSync(
+      kind = GpuSyncKind.fromNative(segment.get(ValueLayout.JAVA_INT, 4)),
+      objectHandle = segment.get(ValueLayout.ADDRESS, 8).address().toULong(),
+      value = segment.get(ValueLayout.JAVA_LONG, 16).toULong(),
+    )
+
   /**
    * Invokes a downcall, passing each handle as the integer the C API declares.
    *
@@ -5452,6 +5758,26 @@ internal object NativeAccess {
 
   private fun downcall(name: String): MethodHandle =
     MapLibreNativeC::class.java.getMethod("${name}\$handle").invoke(null) as MethodHandle
+
+  private fun phase3StatusDowncall(
+    name: String,
+    vararg argumentLayouts: MemoryLayout,
+  ): MethodHandle =
+    phase3DowncallCache[name]
+      ?: phase3Downcall(name, FunctionDescriptor.of(ValueLayout.JAVA_INT, *argumentLayouts))
+
+  private fun phase3Downcall(name: String, descriptor: FunctionDescriptor): MethodHandle {
+    phase3DowncallCache[name]?.let {
+      return it
+    }
+    ensureLoaded()
+    val address =
+      SymbolLookup.loaderLookup().find(name).orElseThrow {
+        UnsatisfiedLinkError("Loaded native library does not expose $name.")
+      }
+    val handle = Linker.nativeLinker().downcallHandle(address, descriptor)
+    return phase3DowncallCache.putIfAbsent(name, handle) ?: handle
+  }
 
   private fun nativeAccessFailure(cause: Throwable): IllegalStateException =
     IllegalStateException(
@@ -5482,6 +5808,22 @@ internal object NativeAccess {
   private val latLngBoundsLayout = mln_lat_lng_bounds.layout()
   private val canonicalTileIdLayout = mln_canonical_tile_id.layout()
   private val unitBezierLayout = mln_unit_bezier.layout()
+
+  private const val RENDER_SESSION_ATTACH_OPTIONS_SIZE: Long = 40
+  private val phase3DowncallCache = ConcurrentHashMap<String, MethodHandle>()
+
+  private const val RENDER_SESSION_CAPABILITIES_SIZE: Long = 16
+  private const val FRAME_DEMAND_SIZE: Long = 40
+  private const val RENDER_FRAME_RESULT_SIZE: Long = 48
+  private const val RENDER_SESSION_SNAPSHOT_SIZE: Long = 96
+  private const val GPU_SYNC_SIZE: Long = 24
+  private const val RENDER_ABANDON_RESULT_SIZE: Long = 16
+  private const val RENDER_CAPABILITY_FRAME_ACQUISITION: Int = 1 shl 0
+  private const val RENDER_CAPABILITY_READBACK: Int = 1 shl 1
+  private const val RENDER_CAPABILITY_CONSUMER_SYNC: Int = 1 shl 2
+  private const val RENDER_CAPABILITY_PRESENTATION: Int = 1 shl 3
+  private const val FRAME_DEMAND_IF_NEEDED: Int = 1 shl 0
+  private const val FRAME_DEMAND_PRESENT: Int = 1 shl 1
   private val vec3Layout = mln_vec3.layout()
   private val quaternionLayout = mln_quaternion.layout()
   private val stringViewLayout = mln_buffer_view.layout()
@@ -5710,23 +6052,6 @@ internal object NativeAccess {
     mln_custom_geometry_source_options.`wrap$offset`()
   private val CUSTOM_GEOMETRY_SOURCE_OPTIONS_RELEASE_USER_DATA_OFFSET: Long =
     mln_custom_geometry_source_options.`release_user_data$offset`()
-
-  private const val FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID: Int = 1 shl 0
-  private const val FEATURE_STATE_SELECTOR_FEATURE_ID: Int = 1 shl 1
-  private const val FEATURE_STATE_SELECTOR_STATE_KEY: Int = 1 shl 2
-
-  private val FEATURE_STATE_SELECTOR_SIZE: Long = mln_feature_state_selector.sizeof()
-  private val FEATURE_STATE_SELECTOR_SIZE_OFFSET: Long = mln_feature_state_selector.`size$offset`()
-  private val FEATURE_STATE_SELECTOR_FIELDS_OFFSET: Long =
-    mln_feature_state_selector.`fields$offset`()
-  private val FEATURE_STATE_SELECTOR_SOURCE_ID_OFFSET: Long =
-    mln_feature_state_selector.`source_id$offset`()
-  private val FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID_OFFSET: Long =
-    mln_feature_state_selector.`source_layer_id$offset`()
-  private val FEATURE_STATE_SELECTOR_FEATURE_ID_OFFSET: Long =
-    mln_feature_state_selector.`feature_id$offset`()
-  private val FEATURE_STATE_SELECTOR_STATE_KEY_OFFSET: Long =
-    mln_feature_state_selector.`state_key$offset`()
 
   private const val STYLE_IMAGE_OPTION_PIXEL_RATIO: Int = 1 shl 0
   private const val STYLE_IMAGE_OPTION_SDF: Int = 1 shl 1
@@ -6364,11 +6689,4 @@ internal object NativeAccess {
     val events: List<NativeRuntimeEvent>,
     val remainingCount: Long,
   )
-
-  internal class OwnedTextureFrameSegment(val segment: MemorySegment, private val arena: Arena) :
-    AutoCloseable {
-    override fun close() {
-      arena.close()
-    }
-  }
 }

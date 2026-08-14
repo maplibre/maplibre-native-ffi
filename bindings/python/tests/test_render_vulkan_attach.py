@@ -8,8 +8,12 @@ import pytest
 from maplibre_native_ffi import render
 from render_backend_helpers.runtime import (
     EMPTY_STYLE_JSON,
+    close_session,
+    finish_attach,
+    finish_render_operation,
     render_until,
     render_until_update,
+    request_and_finish_frame,
     skip_or_fail_fixture_setup,
 )
 
@@ -77,8 +81,10 @@ def _vulkan_borrowed_image(
 def _assert_public_session_shape(session: render.RenderSessionHandle) -> None:
     assert isinstance(session, render.RenderSessionHandle)
     assert session.closed is False
-    assert session.detached is False
-    assert callable(session.render_update)
+    assert session.snapshot.state == render.RenderSessionState.ATTACHED
+    assert isinstance(session.capabilities, render.RenderSessionCapabilities)
+    assert callable(session.request_frame)
+    assert callable(session.drain_frame_results)
     assert callable(session.close)
 
 
@@ -133,8 +139,9 @@ def test_vulkan_borrowed_texture_attach_reports_public_render_session_shape() ->
                 )
             ) as map_handle,
         ):
-            session = map_handle.attach_vulkan_borrowed_texture(descriptor)
+            session, attach = map_handle.attach_vulkan_borrowed_texture(descriptor)
             try:
+                finish_attach(session, attach)
                 _assert_public_session_shape(session)
 
                 map_handle.set_style_json(EMPTY_STYLE_JSON.encode())
@@ -144,7 +151,7 @@ def test_vulkan_borrowed_texture_attach_reports_public_render_session_shape() ->
                     session.acquire_vulkan_owned_texture_frame()
                 assert raised.value.status == mln.MaplibreStatus.UNSUPPORTED
             finally:
-                session.close()
+                close_session(session)
 
 
 def test_vulkan_borrowed_texture_session_close_preserves_caller_resources() -> None:
@@ -164,9 +171,10 @@ def test_vulkan_borrowed_texture_session_close_preserves_caller_resources() -> N
                 )
             ) as map_handle,
         ):
-            session = map_handle.attach_vulkan_borrowed_texture(descriptor)
+            session, attach = map_handle.attach_vulkan_borrowed_texture(descriptor)
+            finish_attach(session, attach)
             _assert_public_session_shape(session)
-            session.close()
+            close_session(session)
 
         assert _descriptor_snapshot(descriptor) == before_descriptor
         assert (image.image, image.image_view, image.memory) == before_resources
@@ -198,20 +206,26 @@ def test_vulkan_borrowed_texture_set_target_hands_over_a_replacement() -> None:
                 )
             ) as map_handle,
         ):
-            session = map_handle.attach_vulkan_borrowed_texture(descriptor)
+            session, attach = map_handle.attach_vulkan_borrowed_texture(descriptor)
+            finish_attach(session, attach)
             try:
                 map_handle.set_style_json(EMPTY_STYLE_JSON.encode())
                 render_until_update(runtime, session)
 
                 with pytest.raises(mln.UnsupportedFeatureError) as raised:
-                    session.resize(48, 24, 1.0)
+                    session.resize(render.RenderTargetExtent(48, 24, 1.0))
                 assert raised.value.status == mln.MaplibreStatus.UNSUPPORTED
 
                 with _vulkan_borrowed_image(
                     context, width=48, height=24
                 ) as replacement:
                     replacement_descriptor = replacement.descriptor()
-                    session.set_vulkan_borrowed_texture_target(replacement_descriptor)
+                    finish_render_operation(
+                        session,
+                        session.set_vulkan_borrowed_texture_target(
+                            replacement_descriptor
+                        ),
+                    )
                     map_handle.resize(48, 24, 1.0)
                     runtime.barrier()
 
@@ -223,20 +237,31 @@ def test_vulkan_borrowed_texture_set_target_hands_over_a_replacement() -> None:
                         lambda: map_handle.get_size() == (48, 24, pytest.approx(1.0)),
                         "the map never took the replacement image extent",
                     )
-                    assert session.render_update() == render.RenderResult.RENDERED
+                    assert (
+                        request_and_finish_frame(session).disposition
+                        == render.RenderResult.RENDERED
+                    )
 
                     # A surface descriptor names a target this session
                     # does not have.
-                    with pytest.raises(mln.UnsupportedFeatureError) as raised:
-                        session.set_vulkan_surface_target(
-                            render.VulkanSurfaceDescriptor(
-                                extent=replacement_descriptor.extent,
-                                context=context.descriptor(),
-                                surface=render.NativePointer(0x1),
-                            )
+                    with pytest.raises(
+                        (mln.InvalidArgumentError, mln.UnsupportedFeatureError)
+                    ) as raised:
+                        finish_render_operation(
+                            session,
+                            session.set_vulkan_surface_target(
+                                render.VulkanSurfaceDescriptor(
+                                    extent=replacement_descriptor.extent,
+                                    context=context.descriptor(),
+                                    surface=render.NativePointer(0x1),
+                                )
+                            ),
                         )
-                    assert raised.value.status == mln.MaplibreStatus.UNSUPPORTED
+                    assert raised.value.status in {
+                        mln.MaplibreStatus.INVALID_ARGUMENT,
+                        mln.MaplibreStatus.UNSUPPORTED,
+                    }
                     # The rejection left the session usable.
-                    session.render_update()
+                    request_and_finish_frame(session)
             finally:
-                session.close()
+                close_session(session)

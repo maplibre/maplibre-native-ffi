@@ -91,26 +91,45 @@ pub const LogHandler = logging.LogHandler;
 pub const LogCallback = logging.LogCallback;
 
 pub const NativePointer = render.NativePointer;
+pub const RenderDriver = render.RenderDriver;
+pub const RenderSessionAttachOptions = render.RenderSessionAttachOptions;
+pub const RenderSessionAttachment = render.RenderSessionAttachment;
 pub const RenderResult = render.RenderResult;
+pub const FrameDemand = render.FrameDemand;
+pub const FrameResult = render.FrameResult;
+pub const RenderSessionCapabilities = render.RenderSessionCapabilities;
+pub const RenderSessionSnapshot = render.RenderSessionSnapshot;
+pub const RenderSessionLifecycle = render.RenderSessionLifecycle;
+pub const GpuSync = render.GpuSync;
+pub const AbandonResult = render.AbandonResult;
+pub const RenderFrameBatch = render.RenderFrameBatch;
+pub const AbandonDisposition = render.AbandonDisposition;
+pub const AcquiredFrame = render.AcquiredFrame;
+pub const OwnedReadback = render.OwnedReadback;
 pub const RenderBackendSupport = render.RenderBackendSupport;
 pub const OpenGLContextProviderSupport = render.OpenGLContextProviderSupport;
 pub const RenderTargetExtent = render.RenderTargetExtent;
 pub const MetalContextDescriptor = render.MetalContextDescriptor;
 pub const VulkanContextDescriptor = render.VulkanContextDescriptor;
+pub const WebGPUContextDescriptor = render.WebGPUContextDescriptor;
 pub const OpenGLContextOwnership = render.OpenGLContextOwnership;
 pub const OpenGLClientApi = render.OpenGLClientApi;
 pub const WglContextDescriptor = render.WglContextDescriptor;
 pub const EglContextDescriptor = render.EglContextDescriptor;
+pub const WebGLContextDescriptor = render.WebGLContextDescriptor;
 pub const OpenGLContextDescriptor = render.OpenGLContextDescriptor;
 pub const MetalOwnedTextureDescriptor = render.MetalOwnedTextureDescriptor;
 pub const MetalBorrowedTextureDescriptor = render.MetalBorrowedTextureDescriptor;
 pub const VulkanOwnedTextureDescriptor = render.VulkanOwnedTextureDescriptor;
 pub const VulkanBorrowedTextureDescriptor = render.VulkanBorrowedTextureDescriptor;
+pub const WebGPUOwnedTextureDescriptor = render.WebGPUOwnedTextureDescriptor;
+pub const WebGPUBorrowedTextureDescriptor = render.WebGPUBorrowedTextureDescriptor;
 pub const OpenGLOwnedTextureDescriptor = render.OpenGLOwnedTextureDescriptor;
 pub const OpenGLBorrowedTextureDescriptor = render.OpenGLBorrowedTextureDescriptor;
 pub const MetalSurfaceDescriptor = render.MetalSurfaceDescriptor;
 pub const VulkanSurfaceDescriptor = render.VulkanSurfaceDescriptor;
 pub const OpenGLSurfaceDescriptor = render.OpenGLSurfaceDescriptor;
+pub const WebGPUSurfaceDescriptor = render.WebGPUSurfaceDescriptor;
 pub const TextureImageInfo = render.TextureImageInfo;
 pub const FeatureStateSelector = render.FeatureStateSelector;
 pub const ScreenBox = render.ScreenBox;
@@ -120,10 +139,8 @@ pub const SourceFeatureQueryOptions = render.SourceFeatureQueryOptions;
 pub const MetalOwnedTextureFrameInfo = render.MetalOwnedTextureFrameInfo;
 pub const VulkanOwnedTextureFrameInfo = render.VulkanOwnedTextureFrameInfo;
 pub const OpenGLOwnedTextureFrameInfo = render.OpenGLOwnedTextureFrameInfo;
+pub const WebGPUOwnedTextureFrameInfo = render.WebGPUOwnedTextureFrameInfo;
 pub const RenderSessionHandle = render.RenderSessionHandle;
-pub const MetalOwnedTextureFrameHandle = render.MetalOwnedTextureFrameHandle;
-pub const VulkanOwnedTextureFrameHandle = render.VulkanOwnedTextureFrameHandle;
-pub const OpenGLOwnedTextureFrameHandle = render.OpenGLOwnedTextureFrameHandle;
 
 pub const MapHandle = map.MapHandle;
 pub const MapOptions = map.MapOptions;
@@ -198,6 +215,9 @@ pub const supportedOpenGLContextProviders = render.supportedOpenGLContextProvide
 pub const attachMetalOwnedTexture = render.attachMetalOwnedTexture;
 pub const attachMetalBorrowedTexture = render.attachMetalBorrowedTexture;
 pub const attachVulkanOwnedTexture = render.attachVulkanOwnedTexture;
+pub const attachWebGPUOwnedTexture = render.attachWebGPUOwnedTexture;
+pub const attachWebGPUBorrowedTexture = render.attachWebGPUBorrowedTexture;
+pub const attachWebGPUSurface = render.attachWebGPUSurface;
 pub const attachVulkanBorrowedTexture = render.attachVulkanBorrowedTexture;
 pub const attachOpenGLOwnedTexture = render.attachOpenGLOwnedTexture;
 pub const attachOpenGLBorrowedTexture = render.attachOpenGLBorrowedTexture;
@@ -219,15 +239,10 @@ pub fn validateAbiVersion(diagnostic_store: ?*DiagnosticStore) Error!void {
 comptime {
     _ = c.MLN_STATUS_OK;
     if (builtin.is_test) {
-        @export(&testFailNextOwnedTextureFrameWrapperAllocation, .{ .name = "mln_zig_test_fail_next_owned_texture_frame_wrapper_allocation" });
         @export(&testUseCountingBufferDestroy, .{ .name = "mln_zig_test_use_counting_buffer_destroy" });
         @export(&testRestoreBufferDestroy, .{ .name = "mln_zig_test_restore_buffer_destroy" });
         @export(&testBufferDestroyCount, .{ .name = "mln_zig_test_buffer_destroy_count" });
     }
-}
-
-fn testFailNextOwnedTextureFrameWrapperAllocation() callconv(.c) void {
-    render.failNextOwnedTextureFrameWrapperAllocationForTesting();
 }
 
 fn testUseCountingBufferDestroy() callconv(.c) void {

@@ -56,8 +56,12 @@ internal class MapState(initialViewport: Viewport, private val requestRender: ()
   private val drainNotifications = Runnable {
     if (!closed && notificationPending.getAndSet(false)) {
       do {
-        val eventsReady = runtime.drainReady().any { it.kind == ReadyEndpoint.Kind.RUNTIME_EVENTS }
-        if (eventsReady && drainEvents()) {
+        val ready = runtime.drainReady()
+        if (ready.any { it.kind == ReadyEndpoint.Kind.DRIVER_WORK }) {
+          renderRequest.set()
+          requestRender()
+        }
+        if (ready.any { it.kind == ReadyEndpoint.Kind.RUNTIME_EVENTS } && drainEvents()) {
           renderRequest.set()
           requestRender()
         }

@@ -88,6 +88,9 @@ internal static unsafe class NativeStatus
             -4 => MaplibreStatus.Unsupported,
             -5 => MaplibreStatus.NativeError,
             -6 => MaplibreStatus.Cancelled,
+            -7 => MaplibreStatus.Busy,
+            -8 => MaplibreStatus.TargetLost,
+            -9 => MaplibreStatus.NotReady,
             _ => MaplibreStatus.Unknown,
         };
 

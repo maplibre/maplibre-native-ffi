@@ -9,58 +9,82 @@
 
 static void* const fake_handle = (void*)(uintptr_t)1;
 
-#define EXPECT_ATTACH_REJECTS_UNSAFE_INPUTS(                          \
-  descriptor_type, default_descriptor, attach, clear_required, shrink \
-)                                                                     \
-  do {                                                                \
-    mln_render_session session = MLN_HANDLE_NULL;                     \
-    descriptor_type descriptor = default_descriptor();                \
-    TEST_ASSERT_EQUAL_INT(                                            \
-      MLN_STATUS_INVALID_ARGUMENT,                                    \
-      attach(MLN_HANDLE_NULL, &descriptor, &session)                  \
-    );                                                                \
-    TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);               \
-    mln_runtime runtime = mln_test_create_runtime();                  \
-    mln_map map = mln_test_create_map(runtime);                       \
-    TEST_ASSERT_EQUAL_INT(                                            \
-      MLN_STATUS_INVALID_ARGUMENT, attach(map, NULL, &session)        \
-    );                                                                \
-    TEST_ASSERT_EQUAL_INT(                                            \
-      MLN_STATUS_INVALID_ARGUMENT, attach(map, &descriptor, NULL)     \
-    );                                                                \
-    session = 1;                                                      \
-    TEST_ASSERT_EQUAL_INT(                                            \
-      MLN_STATUS_INVALID_ARGUMENT, attach(map, &descriptor, &session) \
-    );                                                                \
-    session = MLN_HANDLE_NULL;                                        \
-    descriptor_type invalid = default_descriptor();                   \
-    invalid.size = sizeof(descriptor_type) - 1;                       \
-    TEST_ASSERT_EQUAL_INT(                                            \
-      MLN_STATUS_INVALID_ARGUMENT, attach(map, &invalid, &session)    \
-    );                                                                \
-    invalid = default_descriptor();                                   \
-    invalid.extent.size = sizeof(mln_render_target_extent) - 1;       \
-    TEST_ASSERT_EQUAL_INT(                                            \
-      MLN_STATUS_INVALID_ARGUMENT, attach(map, &invalid, &session)    \
-    );                                                                \
-    invalid = default_descriptor();                                   \
-    invalid.extent.width = UINT32_MAX;                                \
-    invalid.extent.scale_factor = 2.0;                                \
-    TEST_ASSERT_EQUAL_INT(                                            \
-      MLN_STATUS_INVALID_ARGUMENT, attach(map, &invalid, &session)    \
-    );                                                                \
-    invalid = default_descriptor();                                   \
-    shrink(&invalid);                                                 \
-    TEST_ASSERT_EQUAL_INT(                                            \
-      MLN_STATUS_INVALID_ARGUMENT, attach(map, &invalid, &session)    \
-    );                                                                \
-    invalid = default_descriptor();                                   \
-    clear_required(&invalid);                                         \
-    TEST_ASSERT_EQUAL_INT(                                            \
-      MLN_STATUS_INVALID_ARGUMENT, attach(map, &invalid, &session)    \
-    );                                                                \
-    mln_test_destroy_map(map);                                        \
-    mln_test_destroy_runtime(runtime);                                \
+#define EXPECT_ATTACH_REJECTS_UNSAFE_INPUTS(                         \
+  descriptor_type, default_descriptor, attach_start, driver_kind,    \
+  clear_required, shrink                                             \
+)                                                                    \
+  do {                                                               \
+    mln_render_session session = MLN_HANDLE_NULL;                    \
+    mln_operation operation = MLN_HANDLE_NULL;                       \
+    mln_render_session_attach_options options =                      \
+      mln_render_session_attach_options_default();                   \
+    options.driver = driver_kind;                                    \
+    descriptor_type descriptor = default_descriptor();               \
+    TEST_ASSERT_EQUAL_INT(                                           \
+      MLN_STATUS_INVALID_ARGUMENT,                                   \
+      attach_start(                                                  \
+        MLN_HANDLE_NULL, &descriptor, &options, &session, &operation \
+      )                                                              \
+    );                                                               \
+    TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);              \
+    TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, operation);            \
+    mln_runtime runtime = mln_test_create_runtime();                 \
+    mln_map map = mln_test_create_map(runtime);                      \
+    TEST_ASSERT_EQUAL_INT(                                           \
+      MLN_STATUS_INVALID_ARGUMENT,                                   \
+      attach_start(map, NULL, &options, &session, &operation)        \
+    );                                                               \
+    TEST_ASSERT_EQUAL_INT(                                           \
+      MLN_STATUS_INVALID_ARGUMENT,                                   \
+      attach_start(map, &descriptor, NULL, &session, &operation)     \
+    );                                                               \
+    TEST_ASSERT_EQUAL_INT(                                           \
+      MLN_STATUS_INVALID_ARGUMENT,                                   \
+      attach_start(map, &descriptor, &options, NULL, &operation)     \
+    );                                                               \
+    TEST_ASSERT_EQUAL_INT(                                           \
+      MLN_STATUS_INVALID_ARGUMENT,                                   \
+      attach_start(map, &descriptor, &options, &session, NULL)       \
+    );                                                               \
+    session = 1;                                                     \
+    TEST_ASSERT_EQUAL_INT(                                           \
+      MLN_STATUS_INVALID_ARGUMENT,                                   \
+      attach_start(map, &descriptor, &options, &session, &operation) \
+    );                                                               \
+    session = MLN_HANDLE_NULL;                                       \
+    descriptor_type invalid = default_descriptor();                  \
+    invalid.size = sizeof(descriptor_type) - 1;                      \
+    TEST_ASSERT_EQUAL_INT(                                           \
+      MLN_STATUS_INVALID_ARGUMENT,                                   \
+      attach_start(map, &invalid, &options, &session, &operation)    \
+    );                                                               \
+    invalid = default_descriptor();                                  \
+    invalid.extent.size = sizeof(mln_render_target_extent) - 1;      \
+    TEST_ASSERT_EQUAL_INT(                                           \
+      MLN_STATUS_INVALID_ARGUMENT,                                   \
+      attach_start(map, &invalid, &options, &session, &operation)    \
+    );                                                               \
+    invalid = default_descriptor();                                  \
+    invalid.extent.width = UINT32_MAX;                               \
+    invalid.extent.scale_factor = 2.0;                               \
+    TEST_ASSERT_EQUAL_INT(                                           \
+      MLN_STATUS_INVALID_ARGUMENT,                                   \
+      attach_start(map, &invalid, &options, &session, &operation)    \
+    );                                                               \
+    invalid = default_descriptor();                                  \
+    shrink(&invalid);                                                \
+    TEST_ASSERT_EQUAL_INT(                                           \
+      MLN_STATUS_INVALID_ARGUMENT,                                   \
+      attach_start(map, &invalid, &options, &session, &operation)    \
+    );                                                               \
+    invalid = default_descriptor();                                  \
+    clear_required(&invalid);                                        \
+    TEST_ASSERT_EQUAL_INT(                                           \
+      MLN_STATUS_INVALID_ARGUMENT,                                   \
+      attach_start(map, &invalid, &options, &session, &operation)    \
+    );                                                               \
+    mln_test_destroy_map(map);                                       \
+    mln_test_destroy_runtime(runtime);                               \
   } while (false)
 
 // Every backend's descriptor validation runs on every build: a descriptor error
@@ -94,14 +118,16 @@ static void shrink_metal_owned(mln_metal_owned_texture_descriptor* descriptor) {
 static void metal_surface_attach_rejects_unsafe_raw_inputs(void) {
   EXPECT_ATTACH_REJECTS_UNSAFE_INPUTS(
     mln_metal_surface_descriptor, metal_surface_descriptor,
-    mln_metal_surface_attach, clear_metal_surface, shrink_metal_surface
+    mln_metal_surface_attach_start, MLN_RENDER_DRIVER_CORE_WORKER,
+    clear_metal_surface, shrink_metal_surface
   );
 }
 
 static void metal_owned_texture_attach_rejects_unsafe_raw_inputs(void) {
   EXPECT_ATTACH_REJECTS_UNSAFE_INPUTS(
     mln_metal_owned_texture_descriptor, metal_owned_descriptor,
-    mln_metal_owned_texture_attach, clear_metal_owned, shrink_metal_owned
+    mln_metal_owned_texture_attach_start, MLN_RENDER_DRIVER_CORE_WORKER,
+    clear_metal_owned, shrink_metal_owned
   );
 }
 
@@ -118,12 +144,26 @@ static void metal_borrowed_texture_rejects_unsafe_raw_descriptors(void) {
   invalid.texture = fake_handle;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_metal_borrowed_texture_attach(map, &invalid, &session)
+    mln_metal_borrowed_texture_attach_start(
+      map, &invalid,
+      &(mln_render_session_attach_options){
+        .size = sizeof(mln_render_session_attach_options),
+        .driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
+      },
+      &session, &(mln_operation){MLN_HANDLE_NULL}
+    )
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_metal_borrowed_texture_attach(map, &descriptor, &session)
+    mln_metal_borrowed_texture_attach_start(
+      map, &descriptor,
+      &(mln_render_session_attach_options){
+        .size = sizeof(mln_render_session_attach_options),
+        .driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
+      },
+      &session, &(mln_operation){MLN_HANDLE_NULL}
+    )
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
   mln_test_destroy_map(map);
@@ -150,7 +190,9 @@ static void shrink_webgpu_owned(
 static void webgpu_owned_texture_attach_rejects_unsafe_raw_inputs(void) {
   EXPECT_ATTACH_REJECTS_UNSAFE_INPUTS(
     mln_webgpu_owned_texture_descriptor, webgpu_owned_descriptor,
-    mln_webgpu_owned_texture_attach, clear_webgpu_owned, shrink_webgpu_owned
+    mln_webgpu_owned_texture_attach_start,
+    MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD, clear_webgpu_owned,
+    shrink_webgpu_owned
   );
 }
 
@@ -173,7 +215,8 @@ static void shrink_webgpu_surface(mln_webgpu_surface_descriptor* descriptor) {
 static void webgpu_surface_attach_rejects_unsafe_raw_inputs(void) {
   EXPECT_ATTACH_REJECTS_UNSAFE_INPUTS(
     mln_webgpu_surface_descriptor, webgpu_surface_descriptor,
-    mln_webgpu_surface_attach, clear_webgpu_surface, shrink_webgpu_surface
+    mln_webgpu_surface_attach_start, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD,
+    clear_webgpu_surface, shrink_webgpu_surface
   );
 }
 
@@ -187,7 +230,14 @@ static void webgpu_surface_attach_rejects_an_unspecified_format(void) {
   mln_render_session session = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_webgpu_surface_attach(map, &descriptor, &session)
+    mln_webgpu_surface_attach_start(
+      map, &descriptor,
+      &(mln_render_session_attach_options){
+        .size = sizeof(mln_render_session_attach_options),
+        .driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
+      },
+      &session, &(mln_operation){MLN_HANDLE_NULL}
+    )
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
   mln_test_destroy_map(map);
@@ -209,35 +259,70 @@ static void webgpu_borrowed_texture_rejects_unsafe_raw_descriptors(void) {
   invalid.extent.size = sizeof(mln_render_target_extent) - 1;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_webgpu_borrowed_texture_attach(map, &invalid, &session)
+    mln_webgpu_borrowed_texture_attach_start(
+      map, &invalid,
+      &(mln_render_session_attach_options){
+        .size = sizeof(mln_render_session_attach_options),
+        .driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
+      },
+      &session, &(mln_operation){MLN_HANDLE_NULL}
+    )
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
   invalid = descriptor;
   invalid.physical_width = 0;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_webgpu_borrowed_texture_attach(map, &invalid, &session)
+    mln_webgpu_borrowed_texture_attach_start(
+      map, &invalid,
+      &(mln_render_session_attach_options){
+        .size = sizeof(mln_render_session_attach_options),
+        .driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
+      },
+      &session, &(mln_operation){MLN_HANDLE_NULL}
+    )
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
   invalid = descriptor;
   invalid.context.device = NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_webgpu_borrowed_texture_attach(map, &invalid, &session)
+    mln_webgpu_borrowed_texture_attach_start(
+      map, &invalid,
+      &(mln_render_session_attach_options){
+        .size = sizeof(mln_render_session_attach_options),
+        .driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
+      },
+      &session, &(mln_operation){MLN_HANDLE_NULL}
+    )
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
   invalid = descriptor;
   invalid.texture_view = NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_webgpu_borrowed_texture_attach(map, &invalid, &session)
+    mln_webgpu_borrowed_texture_attach_start(
+      map, &invalid,
+      &(mln_render_session_attach_options){
+        .size = sizeof(mln_render_session_attach_options),
+        .driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
+      },
+      &session, &(mln_operation){MLN_HANDLE_NULL}
+    )
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
   invalid = descriptor;
   invalid.format = 0;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_webgpu_borrowed_texture_attach(map, &invalid, &session)
+    mln_webgpu_borrowed_texture_attach_start(
+      map, &invalid,
+      &(mln_render_session_attach_options){
+        .size = sizeof(mln_render_session_attach_options),
+        .driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
+      },
+      &session, &(mln_operation){MLN_HANDLE_NULL}
+    )
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
   mln_test_destroy_map(map);
@@ -328,14 +413,17 @@ static void shrink_opengl_owned(
 static void opengl_owned_texture_attach_rejects_unsafe_raw_inputs(void) {
   EXPECT_ATTACH_REJECTS_UNSAFE_INPUTS(
     mln_opengl_owned_texture_descriptor, opengl_owned_descriptor,
-    mln_opengl_owned_texture_attach, clear_opengl_owned, shrink_opengl_owned
+    mln_opengl_owned_texture_attach_start,
+    MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD, clear_opengl_owned,
+    shrink_opengl_owned
   );
 }
 
 static void opengl_surface_attach_rejects_unsafe_raw_inputs(void) {
   EXPECT_ATTACH_REJECTS_UNSAFE_INPUTS(
     mln_opengl_surface_descriptor, opengl_surface_descriptor,
-    mln_opengl_surface_attach, clear_opengl_surface, shrink_opengl_surface
+    mln_opengl_surface_attach_start, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD,
+    clear_opengl_surface, shrink_opengl_surface
   );
 }
 
@@ -350,7 +438,14 @@ static void opengl_surface_attach_rejects_a_webgl_surface_handle(void) {
   mln_render_session session = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_opengl_surface_attach(map, &descriptor, &session)
+    mln_opengl_surface_attach_start(
+      map, &descriptor,
+      &(mln_render_session_attach_options){
+        .size = sizeof(mln_render_session_attach_options),
+        .driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
+      },
+      &session, &(mln_operation){MLN_HANDLE_NULL}
+    )
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
   mln_test_destroy_map(map);
@@ -373,7 +468,14 @@ static void opengl_dedicated_context_rejects_shared_session_fields(void) {
   mln_render_session session = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_opengl_surface_attach(map, &with_share, &session)
+    mln_opengl_surface_attach_start(
+      map, &with_share,
+      &(mln_render_session_attach_options){
+        .size = sizeof(mln_render_session_attach_options),
+        .driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
+      },
+      &session, &(mln_operation){MLN_HANDLE_NULL}
+    )
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
 
@@ -391,7 +493,14 @@ static void opengl_owned_texture_attach_rejects_a_dedicated_context(void) {
   mln_render_session session = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_opengl_owned_texture_attach(map, &descriptor, &session)
+    mln_opengl_owned_texture_attach_start(
+      map, &descriptor,
+      &(mln_render_session_attach_options){
+        .size = sizeof(mln_render_session_attach_options),
+        .driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
+      },
+      &session, &(mln_operation){MLN_HANDLE_NULL}
+    )
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
   mln_test_destroy_map(map);
@@ -427,20 +536,31 @@ static void dedicated_egl_surface_renders_and_keeps_its_context_current(void) {
                      map, MLN_BUFFER_LITERAL(dedicated_background_style_json)
                    )
   );
-  mln_render_result result = MLN_RENDER_RESULT_NO_UPDATE;
-  // The render session owns this thread while the map advances independently
-  // on the runtime worker.
-  for (unsigned int attempt = 0;
-       attempt < 500 && result != MLN_RENDER_RESULT_RENDERED; attempt += 1) {
-    mln_test_runtime_barrier(runtime);
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_render_session_render_update(fixture.session, &result)
-    );
-    if (result != MLN_RENDER_RESULT_RENDERED) {
-      mln_test_sleep_millisecond();
-    }
-  }
-  TEST_ASSERT_EQUAL_INT(MLN_RENDER_RESULT_RENDERED, result);
+  mln_frame_demand demand = mln_frame_demand_default();
+  demand.flags = MLN_FRAME_DEMAND_PRESENT;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_render_session_request_frame(fixture.session, &demand)
+  );
+  mln_operation barrier = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_render_session_barrier_start(fixture.session, 0, &barrier)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, barrier)
+  );
+  mln_operation_release(barrier);
+  mln_render_frame_batch batch = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_render_session_drain_frame_results(fixture.session, SIZE_MAX, &batch)
+  );
+  mln_render_frame_result result = {.size = sizeof(mln_render_frame_result)};
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_render_frame_batch_get(batch, 0, &result)
+  );
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
+  mln_render_frame_batch_release(batch);
   TEST_ASSERT_TRUE(mln_test_egl_context_is_current());
 
   mln_test_dedicated_egl_surface_destroy(&fixture);
@@ -463,21 +583,42 @@ static void opengl_borrowed_texture_rejects_unsafe_raw_descriptors(void) {
   invalid.extent.size = sizeof(mln_render_target_extent) - 1;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_opengl_borrowed_texture_attach(map, &invalid, &session)
+    mln_opengl_borrowed_texture_attach_start(
+      map, &invalid,
+      &(mln_render_session_attach_options){
+        .size = sizeof(mln_render_session_attach_options),
+        .driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
+      },
+      &session, &(mln_operation){MLN_HANDLE_NULL}
+    )
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
   invalid = descriptor;
   invalid.context.size = sizeof(mln_opengl_context_descriptor) - 1;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_opengl_borrowed_texture_attach(map, &invalid, &session)
+    mln_opengl_borrowed_texture_attach_start(
+      map, &invalid,
+      &(mln_render_session_attach_options){
+        .size = sizeof(mln_render_session_attach_options),
+        .driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
+      },
+      &session, &(mln_operation){MLN_HANDLE_NULL}
+    )
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
   invalid = descriptor;
   invalid.texture = 0;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_opengl_borrowed_texture_attach(map, &invalid, &session)
+    mln_opengl_borrowed_texture_attach_start(
+      map, &invalid,
+      &(mln_render_session_attach_options){
+        .size = sizeof(mln_render_session_attach_options),
+        .driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
+      },
+      &session, &(mln_operation){MLN_HANDLE_NULL}
+    )
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
   mln_test_destroy_map(map);
@@ -525,14 +666,16 @@ static void shrink_vulkan_owned(
 static void vulkan_surface_attach_rejects_unsafe_raw_inputs(void) {
   EXPECT_ATTACH_REJECTS_UNSAFE_INPUTS(
     mln_vulkan_surface_descriptor, vulkan_surface_descriptor,
-    mln_vulkan_surface_attach, clear_vulkan_surface, shrink_vulkan_surface
+    mln_vulkan_surface_attach_start, MLN_RENDER_DRIVER_CORE_WORKER,
+    clear_vulkan_surface, shrink_vulkan_surface
   );
 }
 
 static void vulkan_owned_texture_attach_rejects_unsafe_raw_inputs(void) {
   EXPECT_ATTACH_REJECTS_UNSAFE_INPUTS(
     mln_vulkan_owned_texture_descriptor, vulkan_owned_descriptor,
-    mln_vulkan_owned_texture_attach, clear_vulkan_owned, shrink_vulkan_owned
+    mln_vulkan_owned_texture_attach_start, MLN_RENDER_DRIVER_CORE_WORKER,
+    clear_vulkan_owned, shrink_vulkan_owned
   );
 }
 
@@ -552,21 +695,42 @@ static void vulkan_borrowed_texture_rejects_unsafe_raw_descriptors(void) {
   invalid.extent.size = sizeof(mln_render_target_extent) - 1;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_vulkan_borrowed_texture_attach(map, &invalid, &session)
+    mln_vulkan_borrowed_texture_attach_start(
+      map, &invalid,
+      &(mln_render_session_attach_options){
+        .size = sizeof(mln_render_session_attach_options),
+        .driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
+      },
+      &session, &(mln_operation){MLN_HANDLE_NULL}
+    )
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
   invalid = descriptor;
   invalid.context.size = sizeof(mln_vulkan_context_descriptor) - 1;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_vulkan_borrowed_texture_attach(map, &invalid, &session)
+    mln_vulkan_borrowed_texture_attach_start(
+      map, &invalid,
+      &(mln_render_session_attach_options){
+        .size = sizeof(mln_render_session_attach_options),
+        .driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
+      },
+      &session, &(mln_operation){MLN_HANDLE_NULL}
+    )
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
   invalid = descriptor;
   invalid.image = NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_vulkan_borrowed_texture_attach(map, &invalid, &session)
+    mln_vulkan_borrowed_texture_attach_start(
+      map, &invalid,
+      &(mln_render_session_attach_options){
+        .size = sizeof(mln_render_session_attach_options),
+        .driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
+      },
+      &session, &(mln_operation){MLN_HANDLE_NULL}
+    )
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
   mln_test_destroy_map(map);

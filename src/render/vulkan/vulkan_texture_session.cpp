@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <utility>
@@ -111,9 +112,10 @@ class VulkanTextureSessionBackend final
     : public mln::core::TextureSessionBackend {
  public:
   VulkanTextureSessionBackend(
-    const mln_vulkan_owned_texture_descriptor& descriptor, mbgl::Size size
+    const mln_vulkan_owned_texture_descriptor& descriptor, mbgl::Size size,
+    std::size_t ring_depth
   )
-      : backend_(descriptor, size) {}
+      : backend_(descriptor, size, ring_depth) {}
 
   VulkanTextureSessionBackend(
     const mln_vulkan_borrowed_texture_descriptor& descriptor, mbgl::Size size
@@ -155,18 +157,23 @@ class VulkanTextureSessionBackend final
     backend_.prepareRenderResources();
   }
 
-  auto acquire_vulkan_owned_frame(
-    const mln_render_session_object& texture,
-    mln_vulkan_owned_texture_frame& out_frame
+  auto select_render_slot(std::size_t slot) -> mln_status override {
+    return backend_.select_slot(slot) ? MLN_STATUS_OK
+                                      : MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  auto copy_slot_metadata(
+    const mln_render_session_object& texture, std::size_t slot,
+    std::any& out_metadata
   ) -> mln_status override {
-    const auto resources = backend_.frame_resources();
-    out_frame = mln_vulkan_owned_texture_frame{
+    const auto resources = backend_.frame_resources(slot);
+    out_metadata = mln_vulkan_owned_texture_frame{
       .size = sizeof(mln_vulkan_owned_texture_frame),
       .generation = texture.generation,
       .width = texture.physical_width,
       .height = texture.physical_height,
       .scale_factor = texture.scale_factor,
-      .frame_id = texture.texture.next_frame_id,
+      .frame_id = texture.frame_generation,
       .image = resources.image,
       .image_view = resources.image_view,
       .device = resources.device,
@@ -188,9 +195,10 @@ auto supported_render_backend_mask() noexcept -> uint32_t {
   return MLN_RENDER_BACKEND_FLAG_VULKAN;
 }
 
-auto vulkan_owned_texture_attach(
+auto vulkan_owned_texture_attach_start(
   mln_map map, const mln_vulkan_owned_texture_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, mln_operation* out_operation
 ) -> mln_status {
   MapObject* live_map = nullptr;
   const auto map_status = validate_map_live(map, live_map);
@@ -202,13 +210,6 @@ auto vulkan_owned_texture_attach(
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
-  const auto output_status = validate_attach_output(
-    out_session, "out_session must not be null",
-    "out_session must point to a null handle"
-  );
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
-  }
   const auto physical_status = validate_physical_size(
     descriptor->extent.width, descriptor->extent.height,
     descriptor->extent.scale_factor, "scaled texture dimensions are too large"
@@ -216,32 +217,46 @@ auto vulkan_owned_texture_attach(
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
   }
-  const auto vulkan_status = validate_vulkan_handles(*descriptor);
-  if (vulkan_status != MLN_STATUS_OK) {
-    return vulkan_status;
-  }
 
   auto session = std::make_shared<mln_render_session_object>();
   session->map = map;
   set_session_extent(*session, descriptor->extent);
   session->texture.api_kind = TextureSessionApi::Vulkan;
   session->texture.mode = TextureSessionMode::Owned;
-  session->texture.backend = std::make_unique<VulkanTextureSessionBackend>(
-    *descriptor, mbgl::Size{session->physical_width, session->physical_height}
+  const auto copied = *descriptor;
+  const auto ring_depth = std::clamp(
+    options == nullptr ? 1u : options->requested_texture_ring_depth, 1u, 3u
   );
-  return attach_render_session(
-    std::move(session), out_session, RenderSessionKind::Texture,
-    RenderSessionAttachMessages{
-      .null_session = "texture session must not be null",
-      .null_output = "out_session must not be null",
-      .non_null_output = "out_session must point to a null handle"
-    }
+  session->initialize_backend =
+    [copied, ring_depth](mln_render_session_object& target) {
+      const auto handles_status = validate_vulkan_handles(copied);
+      if (handles_status != MLN_STATUS_OK) {
+        return handles_status;
+      }
+      target.texture.backend = std::make_unique<VulkanTextureSessionBackend>(
+        copied, mbgl::Size{target.physical_width, target.physical_height},
+        ring_depth
+      );
+      return MLN_STATUS_OK;
+    };
+  const auto capabilities = mln_render_session_capabilities{
+    .size = sizeof(mln_render_session_capabilities),
+    .driver = options == nullptr ? 0u : options->driver,
+    .texture_ring_depth = ring_depth,
+    .flags = MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION |
+             MLN_RENDER_SESSION_CAPABILITY_READBACK |
+             MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC
+  };
+  return start_attach_render_session(
+    std::move(session), RenderSessionKind::Texture, options, capabilities,
+    out_session, out_operation
   );
 }
 
-auto vulkan_borrowed_texture_attach(
+auto vulkan_borrowed_texture_attach_start(
   mln_map map, const mln_vulkan_borrowed_texture_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, mln_operation* out_operation
 ) -> mln_status {
   MapObject* live_map = nullptr;
   const auto map_status = validate_map_live(map, live_map);
@@ -253,27 +268,11 @@ auto vulkan_borrowed_texture_attach(
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
-  const auto output_status = validate_attach_output(
-    out_session, "out_session must not be null",
-    "out_session must point to a null handle"
-  );
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
-  }
   const auto physical_status = validate_borrowed_physical_size(
     descriptor->physical_width, descriptor->physical_height
   );
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
-  }
-  auto handle_descriptor = mln_vulkan_owned_texture_descriptor{
-    .size = sizeof(mln_vulkan_owned_texture_descriptor),
-    .extent = descriptor->extent,
-    .context = descriptor->context,
-  };
-  const auto vulkan_status = validate_vulkan_handles(handle_descriptor);
-  if (vulkan_status != MLN_STATUS_OK) {
-    return vulkan_status;
   }
 
   auto session = std::make_shared<mln_render_session_object>();
@@ -284,108 +283,39 @@ auto vulkan_borrowed_texture_attach(
   );
   session->texture.api_kind = TextureSessionApi::Vulkan;
   session->texture.mode = TextureSessionMode::Borrowed;
-  session->texture.backend = std::make_unique<VulkanTextureSessionBackend>(
-    *descriptor, mbgl::Size{session->physical_width, session->physical_height}
-  );
-  return attach_render_session(
-    std::move(session), out_session, RenderSessionKind::Texture,
-    RenderSessionAttachMessages{
-      .null_session = "texture session must not be null",
-      .null_output = "out_session must not be null",
-      .non_null_output = "out_session must point to a null handle"
+  const auto copied = *descriptor;
+  session->initialize_backend = [copied](mln_render_session_object& target) {
+    const auto handles = mln_vulkan_owned_texture_descriptor{
+      .size = sizeof(mln_vulkan_owned_texture_descriptor),
+      .extent = copied.extent,
+      .context = copied.context,
+    };
+    const auto handles_status = validate_vulkan_handles(handles);
+    if (handles_status != MLN_STATUS_OK) {
+      return handles_status;
     }
+    target.texture.backend = std::make_unique<VulkanTextureSessionBackend>(
+      copied, mbgl::Size{target.physical_width, target.physical_height}
+    );
+    return MLN_STATUS_OK;
+  };
+  const auto capabilities = mln_render_session_capabilities{
+    .size = sizeof(mln_render_session_capabilities),
+    .driver = options == nullptr ? 0u : options->driver,
+    .texture_ring_depth = 0,
+    .flags = MLN_RENDER_SESSION_CAPABILITY_READBACK
+  };
+  return start_attach_render_session(
+    std::move(session), RenderSessionKind::Texture, options, capabilities,
+    out_session, out_operation
   );
 }
 
-auto vulkan_owned_texture_acquire_frame(
-  mln_render_session texture, mln_vulkan_owned_texture_frame* out_frame
-) -> mln_status {
-  mln_render_session_object* live = nullptr;
-  const auto status = validate_live_attached_texture(texture, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (
-    out_frame == nullptr ||
-    out_frame->size < sizeof(mln_vulkan_owned_texture_frame)
-  ) {
-    set_thread_error("out_frame must not be null and must have a valid size");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (live->texture.acquired) {
-    set_thread_error("a texture frame is already acquired");
-    return MLN_STATUS_INVALID_STATE;
-  }
-  if (live->rendered_generation != live->generation) {
-    set_thread_error("no rendered frame is available for this generation");
-    return MLN_STATUS_INVALID_STATE;
-  }
-  if (
-    live->texture.mode != TextureSessionMode::Owned ||
-    live->texture.api_kind != TextureSessionApi::Vulkan
-  ) {
-    set_thread_error("texture session cannot expose a Vulkan texture frame");
-    return MLN_STATUS_UNSUPPORTED;
-  }
-
-  const auto acquire_status =
-    live->texture.backend->acquire_vulkan_owned_frame(*live, *out_frame);
-  if (acquire_status != MLN_STATUS_OK) {
-    return acquire_status;
-  }
-  live->texture.acquired = true;
-  live->texture.acquired_frame_id = out_frame->frame_id;
-  live->texture.acquired_frame_kind = TextureSessionFrameKind::VulkanOwned;
-  ++live->texture.next_frame_id;
-  return MLN_STATUS_OK;
-}
-
-auto vulkan_owned_texture_release_frame(
-  mln_render_session texture, const mln_vulkan_owned_texture_frame* frame
-) -> mln_status {
-  mln_render_session_object* live = nullptr;
-  const auto status = validate_texture(texture, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (
-    frame == nullptr || frame->size < sizeof(mln_vulkan_owned_texture_frame)
-  ) {
-    set_thread_error("frame must not be null and must have a valid size");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (
-    !live->texture.acquired ||
-    live->texture.acquired_frame_kind != TextureSessionFrameKind::VulkanOwned
-  ) {
-    set_thread_error("no texture frame is currently acquired");
-    return MLN_STATUS_INVALID_STATE;
-  }
-  if (frame->generation != live->generation) {
-    set_thread_error("frame generation does not match acquired frame");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (frame->frame_id != live->texture.acquired_frame_id) {
-    set_thread_error("frame identity does not match acquired frame");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  live->texture.acquired = false;
-  live->texture.acquired_frame_id = 0;
-  live->texture.acquired_frame_kind = TextureSessionFrameKind::None;
-  return MLN_STATUS_OK;
-}
-
-auto vulkan_borrowed_texture_set_target(
+auto vulkan_borrowed_texture_set_target_start(
   mln_render_session session,
-  const mln_vulkan_borrowed_texture_descriptor* descriptor
+  const mln_vulkan_borrowed_texture_descriptor* descriptor,
+  mln_operation* out_operation
 ) -> mln_status {
-  mln_render_session_object* live = nullptr;
-  const auto session_status = validate_render_session_retarget(
-    session, RetargetTargetKind::BorrowedTexture, live
-  );
-  if (session_status != MLN_STATUS_OK) {
-    return session_status;
-  }
   const auto descriptor_status =
     validate_vulkan_borrowed_texture_descriptor(descriptor);
   if (descriptor_status != MLN_STATUS_OK) {
@@ -397,14 +327,19 @@ auto vulkan_borrowed_texture_set_target(
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
   }
-  return render_session_set_target(
-    session, RetargetTargetKind::BorrowedTexture, descriptor->extent,
-    descriptor->physical_width, descriptor->physical_height,
-    [descriptor](mln_render_session_object& target_session) -> mln_status {
-      return target_session.texture.backend->set_vulkan_borrowed_target(
-        *descriptor
+  const auto copied = *descriptor;
+  return enqueue_driver_operation(
+    session, RENDER_OPERATION_MAINTENANCE,
+    [copied](mln_render_session_object& target) {
+      return render_session_set_target(
+        target.self, RetargetTargetKind::BorrowedTexture, copied.extent,
+        copied.physical_width, copied.physical_height,
+        [&copied](mln_render_session_object& live) {
+          return live.texture.backend->set_vulkan_borrowed_target(copied);
+        }
       );
-    }
+    },
+    out_operation
   );
 }
 

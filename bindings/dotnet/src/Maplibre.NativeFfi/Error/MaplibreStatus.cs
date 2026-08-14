@@ -24,6 +24,15 @@ public enum MaplibreStatus
     /// <summary>The operation reached its terminal cancelled disposition.</summary>
     Cancelled = -6,
 
+    /// <summary>A conflicting driver call or lifecycle transition is in flight.</summary>
+    Busy = -7,
+
+    /// <summary>The render target or graphics receiver was irreversibly lost.</summary>
+    TargetLost = -8,
+
+    /// <summary>A nonblocking acquisition or service call has no result yet.</summary>
+    NotReady = -9,
+
     /// <summary>The loaded C ABI version is incompatible with this binding.</summary>
     AbiMismatch = -1000,
 

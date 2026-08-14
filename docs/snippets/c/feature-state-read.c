@@ -12,9 +12,25 @@ bool read_selected(
   mln_render_session session, const mln_feature_state_selector* selector
 ) {
   // #region get
+  mln_operation operation = MLN_HANDLE_NULL;
+  mln_status got = mln_render_session_get_feature_state_start(
+    session, selector->source_id, selector->source_layer_id,
+    selector->feature_id, &operation
+  );
+  bool completed = false;
+  if (got == MLN_STATUS_OK) {
+    got = mln_operation_wait(operation, -1, &completed);
+  }
+  mln_status terminal = MLN_STATUS_INVALID_STATE;
+  if (got == MLN_STATUS_OK && completed) {
+    got = mln_operation_get_status(operation, &terminal);
+  }
   mln_buffer result = MLN_HANDLE_NULL;
-  const mln_status got =
-    mln_render_session_get_feature_state(session, selector, &result);
+  if (got == MLN_STATUS_OK) got = terminal;
+  if (got == MLN_STATUS_OK) {
+    got = mln_render_session_get_feature_state_take_result(operation, &result);
+  }
+  mln_operation_release(operation);
   if (got != MLN_STATUS_OK) return false;
   // #endregion get
 

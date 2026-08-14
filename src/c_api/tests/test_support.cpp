@@ -13,6 +13,7 @@
 #include "handles/handle_table.hpp"
 #include "notification/notification.hpp"
 #include "operation/operation.hpp"
+#include "render/render_session_test_support.hpp"
 #include "runtime/runtime.hpp"
 
 struct operation_cancel_state {
@@ -157,6 +158,18 @@ extern "C" void mln_test_operation_control_destroy(
   mln_test_operation_control* control
 ) {
   delete control;
+}
+
+extern "C" mln_status mln_test_render_session_blocking_operation_create(
+  mln_render_session session, atomic_bool* entered, const atomic_bool* release,
+  mln_operation* out_operation
+) {
+  if (entered == nullptr || release == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return mln::core::enqueue_blocking_test_render_operation(
+    session, entered, release, out_operation
+  );
 }
 
 extern "C" mln_status mln_test_endpoint_create(

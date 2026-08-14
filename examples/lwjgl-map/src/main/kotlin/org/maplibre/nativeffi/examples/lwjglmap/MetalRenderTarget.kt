@@ -33,7 +33,11 @@ internal object MetalRenderTarget {
         descriptor(context),
         NativePointer.ofAddress(context.layerAddress()),
       )
-    return Surface(map.attachMetalSurface(descriptor))
+    return Surface(
+      RenderTarget.completeAttachment(
+        map.attachMetalSurface(descriptor, RenderTarget.callerDriverOptions)
+      )
+    )
   }
 
   private fun attachOwnedTexture(
@@ -45,7 +49,10 @@ internal object MetalRenderTarget {
     var session: RenderSessionHandle? = null
     var compositor: MetalTextureCompositor? = null
     try {
-      session = map.attachMetalOwnedTexture(descriptor)
+      session =
+        RenderTarget.completeAttachment(
+          map.attachMetalOwnedTexture(descriptor, RenderTarget.callerDriverOptions)
+        )
       compositor = MetalTextureCompositor(context)
       return OwnedTexture(session, compositor)
     } catch (error: RuntimeException) {
@@ -65,7 +72,13 @@ internal object MetalRenderTarget {
     var compositor: MetalTextureCompositor? = null
     try {
       texture = MetalBorrowedTexture(context, viewport)
-      session = map.attachMetalBorrowedTexture(borrowedDescriptor(viewport, texture))
+      session =
+        RenderTarget.completeAttachment(
+          map.attachMetalBorrowedTexture(
+            borrowedDescriptor(viewport, texture),
+            RenderTarget.callerDriverOptions,
+          )
+        )
       compositor = MetalTextureCompositor(context)
       return BorrowedTexture(context, session, compositor, texture)
     } catch (error: RuntimeException) {
@@ -94,13 +107,17 @@ internal object MetalRenderTarget {
     override fun needsMetalAutoreleasePool(): Boolean = true
 
     override fun resize(viewport: Viewport) {
-      session.resize(viewport.width(), viewport.height(), viewport.scaleFactor())
+      RenderTarget.completeDriverOperation(
+        session,
+        session.startResize(RenderTarget.extent(viewport)),
+      )
     }
 
-    override fun renderUpdate(): Boolean = session.renderUpdate() == RenderResult.RENDERED
+    override fun renderUpdate(): Boolean =
+      RenderTarget.renderFrame(session)?.disposition == RenderResult.RENDERED
 
     override fun close() {
-      session.close()
+      RenderTarget.closeSession(session)
     }
   }
 
@@ -111,19 +128,24 @@ internal object MetalRenderTarget {
     override fun needsMetalAutoreleasePool(): Boolean = true
 
     override fun resize(viewport: Viewport) {
-      session.resize(viewport.width(), viewport.height(), viewport.scaleFactor())
+      RenderTarget.completeDriverOperation(
+        session,
+        session.startResize(RenderTarget.extent(viewport)),
+      )
     }
 
     override fun renderUpdate(): Boolean {
-      if (session.renderUpdate() != RenderResult.RENDERED) {
-        return false
-      }
-      return session.acquireMetalOwnedTextureFrame().use { frameHandle ->
-        val frame = frameHandle.frame()
+      if (RenderTarget.renderFrame(session)?.disposition != RenderResult.RENDERED) return false
+      val frameHandle =
+        checkNotNull(session.acquireFrame()) { "rendered Metal frame was unavailable" }
+      return try {
+        val frame = frameHandle.metalTexture()
         check(frame.width() != 0 && frame.height() != 0 && !frame.texture().isNull) {
           "owned Metal frame has an empty extent or null texture"
         }
         compositor.drawTexture(frame.texture().address)
+      } finally {
+        RenderTarget.completeDriverOperation(session, frameHandle.release())
       }
     }
 
@@ -131,7 +153,7 @@ internal object MetalRenderTarget {
       try {
         compositor.close()
       } finally {
-        session.close()
+        RenderTarget.closeSession(session)
       }
     }
   }
@@ -148,7 +170,10 @@ internal object MetalRenderTarget {
     override fun resize(viewport: Viewport) {
       val replacement = MetalBorrowedTexture(context, viewport)
       try {
-        session.setMetalBorrowedTextureTarget(borrowedDescriptor(viewport, replacement))
+        RenderTarget.completeDriverOperation(
+          session,
+          session.startSetMetalBorrowedTextureTarget(borrowedDescriptor(viewport, replacement)),
+        )
       } catch (error: RuntimeException) {
         // A failed handover leaves it unknown which texture the session holds, so detach before
         // either is released.
@@ -162,9 +187,7 @@ internal object MetalRenderTarget {
     }
 
     override fun renderUpdate(): Boolean {
-      if (session.renderUpdate() != RenderResult.RENDERED) {
-        return false
-      }
+      if (RenderTarget.renderFrame(session)?.disposition != RenderResult.RENDERED) return false
       return compositor.drawTexture(texture.texture())
     }
 
@@ -173,7 +196,7 @@ internal object MetalRenderTarget {
         compositor.close()
       } finally {
         try {
-          session.close()
+          RenderTarget.closeSession(session)
         } finally {
           texture.close()
         }

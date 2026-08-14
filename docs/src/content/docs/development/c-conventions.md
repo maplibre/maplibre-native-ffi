@@ -157,10 +157,18 @@ The runtime owns a native scheduler thread and one continuously running MapLibre
 acquire its control-state lease, copy the submission, and commit work to that
 run loop. They never make a host thread own or pump MapLibre scheduler state.
 
-A render session may remain bound to a caller graphics thread. The thread that
-attaches such a session owns its graphics calls for the session's lifetime.
-Attach validates that the map is live rather than imposing map thread affinity,
-so a graphics thread may receive and use a map handle created elsewhere.
+A render session selects one of two execution contracts at attachment. A
+core-worker driver owns a native serial graphics worker. A
+caller-graphics-thread driver stores typed work until the host services it where
+the context is usable. WGL, EGL, existing WebGL, and browser WebGPU use the
+caller driver. Transferable Metal, Vulkan, and `OffscreenCanvas` WebGL targets
+may use a core worker.
+
+Keep render-session control separate from graphics execution. Demand, snapshots,
+operations, abandonment, and destruction are any-thread calls. The caller-driver
+service call and backend accessors are graphics-thread-affine and serialized.
+Runtime and map updates wake the core worker or make the caller mailbox's
+notification endpoint ready.
 
 Classify each public function as Immediate, Command, Published snapshot,
 Operation, Event batch, or Render-driver call. A binding maps that category to
@@ -178,16 +186,11 @@ Published snapshots copy immutable committed state without entering mutable
 MapLibre state. Use an ordered operation instead when a query must observe every
 preceding command.
 
-Graphics contexts that bind to a thread, such as OpenGL, are made current for
-the duration of a session call and released before it returns, so a host keeps
-its own context current on the thread that owns the session. A context
-descriptor may instead give the session the thread's context: the session then
-creates that context itself, joins no host share group, and keeps it current
-between calls. Offer that mode where a target draws for one thread alone, and
-keep the shared mode the default, so a descriptor that names no ownership
-behaves as it always has. Attach creates the session's graphics resources on the
-calling thread, which is why attach belongs on the thread that draws rather than
-on the map's.
+Graphics contexts that bind to a thread, such as OpenGL, are made current during
+caller-driver service and restored afterward under shared ownership. Dedicated
+ownership keeps a session-created context current between service calls. Context
+ownership and driver placement are independent policies; dedicated OpenGL still
+uses the caller driver.
 
 On Apple targets each entry point and queued runtime submission drains its own
 Objective-C autorelease pool, so a native worker or host render thread does not
@@ -289,13 +292,25 @@ Callbacks must not unwind through the C API. Bindings catch host exceptions,
 panics, and errors inside the callback and convert them to the callback's
 documented return behavior.
 
-Render session APIs document owner thread, render target backend handle
-ownership, synchronization, borrowed pointer lifetimes, frame generation or
-stale-frame behavior, and teardown rules. Frame generations are session-scoped
-counters in frame structs and are unrelated to the generation inside a handle
-id. Attach entry points also document that the calling thread becomes the
-session's owner thread, what the calling thread's graphics context must provide,
-and which context ownership modes the target accepts.
+Render-session APIs document driver support, backend handle ownership,
+synchronization, borrowed pointer lifetimes, generation fields, backpressure,
+and teardown rules. Frame generations are session-scoped counters and are
+unrelated to the generation inside a handle id. Attach entry points document
+which descriptors are transferable, which graphics calls are thread-affine, and
+which context ownership modes the target accepts.
+
+Every accepted frame demand creates one owned terminal result record. Frame
+readiness stays level-triggered until the queue drains, and only one owned
+result batch may hold the session's drain lease. Owned textures negotiate a
+one-to-three-slot ring. An acquired-frame handle leases its slot until its
+release operation observes any consumer GPU-completion synchronization.
+
+Normal detach routes graphics destruction through the selected driver before
+CPU-only handle destruction. Abandon closes control and mailboxes without
+graphics calls, returns busy during an in-flight driver call, detaches the map
+in CPU state, invalidates accessors, and quarantines resources that require the
+lost owner. Releasing an acquired frame after abandon remains CPU-only and
+terminates its operation with target lost.
 
 ## Callback Adapter
 

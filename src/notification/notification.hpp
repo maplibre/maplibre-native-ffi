@@ -38,6 +38,7 @@ class NotificationEndpoint final {
 
  private:
   std::shared_ptr<NotificationSourceObject> source_;
+  std::uint32_t kind_;
   std::uint64_t id_;
   friend class NotificationSourceObject;
   mutable std::atomic_bool active_{false};
@@ -57,12 +58,15 @@ class NotificationSourceObject final
 
   auto associate(std::uint64_t id, std::uint32_t kind, bool sticky)
     -> std::shared_ptr<NotificationEndpoint>;
-  auto detach(std::uint64_t id, const NotificationEndpoint* owner) noexcept
-    -> void;
-  auto mark_ready(std::uint64_t id, const NotificationEndpoint* owner) noexcept
-    -> void;
-  auto clear_ready(std::uint64_t id, const NotificationEndpoint* owner) noexcept
-    -> void;
+  auto detach(
+    std::uint64_t id, std::uint32_t kind, const NotificationEndpoint* owner
+  ) noexcept -> void;
+  auto mark_ready(
+    std::uint64_t id, std::uint32_t kind, const NotificationEndpoint* owner
+  ) noexcept -> void;
+  auto clear_ready(
+    std::uint64_t id, std::uint32_t kind, const NotificationEndpoint* owner
+  ) noexcept -> void;
 
   auto set_callback(mln_notification_callback callback, void* user_data)
     -> mln_status;
@@ -96,7 +100,21 @@ class NotificationSourceObject final
 
   std::mutex mutex_;
   std::condition_variable callback_condition_;
-  std::unordered_map<std::uint64_t, EndpointState> endpoints_;
+  struct EndpointKey {
+    std::uint64_t id;
+    std::uint32_t kind;
+    [[nodiscard]] auto operator==(const EndpointKey&) const noexcept
+      -> bool = default;
+  };
+  struct EndpointKeyHash {
+    [[nodiscard]] auto operator()(const EndpointKey& key) const noexcept
+      -> std::size_t {
+      return std::hash<std::uint64_t>{}(
+        key.id ^ (static_cast<std::uint64_t>(key.kind) << 32u)
+      );
+    }
+  };
+  std::unordered_map<EndpointKey, EndpointState, EndpointKeyHash> endpoints_;
   mln_notification_callback callback_ = nullptr;
   void* callback_user_data_ = nullptr;
   std::size_t callbacks_in_flight_ = 0;

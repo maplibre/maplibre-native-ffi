@@ -616,6 +616,7 @@ static void adapter_records_and_runtime_events_share_one_source(void) {
 
   mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_map_request_repaint(map));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
   const mln_adapter_queued_resource_provider_route route = {
     .kind = MLN_ADAPTER_RESOURCE_KIND_ANY,
     .flags = MLN_ADAPTER_RESOURCE_ROUTE_MATCH_GLOB,

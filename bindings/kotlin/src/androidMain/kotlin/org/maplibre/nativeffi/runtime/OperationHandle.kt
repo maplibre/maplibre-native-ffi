@@ -8,6 +8,7 @@ import org.bytedeco.javacpp.SizeTPointer
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
+import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
 
 /** Common operation observer backed by the Android JNI bridge. */
@@ -17,9 +18,14 @@ internal constructor(
   id: Long,
   kind: OperationKind,
   resultKind: OperationResultKind,
+  ownerRetention: HandleStateCore.ChildRetention? = null,
 ) : AutoCloseable {
   private val runtimeRetention = runtime.retainChild("OperationHandle")
-  private val core = OperationHandleCore(runtime, id, kind, resultKind, runtimeRetention::close)
+  private val core =
+    OperationHandleCore(runtime, id, kind, resultKind) {
+      ownerRetention?.close()
+      runtimeRetention.close()
+    }
 
   init {
     HandleLeakCleaner.registerOperation(this, core.leakReport)

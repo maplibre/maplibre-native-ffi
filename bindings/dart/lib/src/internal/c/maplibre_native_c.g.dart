@@ -16,6 +16,77 @@ library;
 import 'dart:ffi' as ffi;
 
 @ffi.Native<
+  ffi.Int32 Function(
+    mln_acquired_frame,
+    ffi.Pointer<mln_metal_owned_texture_frame>,
+  )
+>()
+external int mln_acquired_frame_get_metal_texture(
+  int frame,
+  ffi.Pointer<mln_metal_owned_texture_frame> out_frame,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_acquired_frame,
+    ffi.Pointer<mln_opengl_owned_texture_frame>,
+  )
+>()
+external int mln_acquired_frame_get_opengl_texture(
+  int frame,
+  ffi.Pointer<mln_opengl_owned_texture_frame> out_frame,
+);
+
+@ffi.Native<ffi.Int32 Function(mln_acquired_frame, ffi.Pointer<mln_gpu_sync>)>()
+external int mln_acquired_frame_get_producer_sync(
+  int frame,
+  ffi.Pointer<mln_gpu_sync> out_sync,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(mln_acquired_frame, ffi.Pointer<mln_render_frame_result>)
+>()
+external int mln_acquired_frame_get_result(
+  int frame,
+  ffi.Pointer<mln_render_frame_result> out_result,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_acquired_frame,
+    ffi.Pointer<mln_vulkan_owned_texture_frame>,
+  )
+>()
+external int mln_acquired_frame_get_vulkan_texture(
+  int frame,
+  ffi.Pointer<mln_vulkan_owned_texture_frame> out_frame,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_acquired_frame,
+    ffi.Pointer<mln_webgpu_owned_texture_frame>,
+  )
+>()
+external int mln_acquired_frame_get_webgpu_texture(
+  int frame,
+  ffi.Pointer<mln_webgpu_owned_texture_frame> out_frame,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    ffi.Pointer<mln_acquired_frame>,
+    ffi.Pointer<mln_gpu_sync>,
+    ffi.Pointer<mln_operation>,
+  )
+>()
+external int mln_acquired_frame_release_start(
+  ffi.Pointer<mln_acquired_frame> frame,
+  ffi.Pointer<mln_gpu_sync> consumer_completion,
+  ffi.Pointer<mln_operation> out_operation,
+);
+
+@ffi.Native<
   ffi.Void Function(
     mln_custom_geometry_source_tile_callback,
     mln_custom_geometry_source_tile_callback,
@@ -236,11 +307,17 @@ external int mln_event_batch_get(
 @ffi.Native<ffi.Void Function(mln_event_batch)>()
 external void mln_event_batch_release(int batch);
 
+@ffi.Native<mln_frame_demand Function()>()
+external mln_frame_demand mln_frame_demand_default();
+
 @ffi.Native<mln_free_camera_options Function()>()
 external mln_free_camera_options mln_free_camera_options_default();
 
 @ffi.Native<mln_geojson_source_options Function()>()
 external mln_geojson_source_options mln_geojson_source_options_default();
+
+@ffi.Native<mln_gpu_sync Function()>()
+external mln_gpu_sync mln_gpu_sync_default();
 
 @ffi.Native<
   ffi.Int32 Function(
@@ -2080,13 +2157,17 @@ external mln_map_viewport_options mln_map_viewport_options_default();
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_metal_borrowed_texture_descriptor>,
+    ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
+    ffi.Pointer<mln_operation>,
   )
 >()
-external int mln_metal_borrowed_texture_attach(
+external int mln_metal_borrowed_texture_attach_start(
   int map,
   ffi.Pointer<mln_metal_borrowed_texture_descriptor> descriptor,
+  ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<mln_metal_borrowed_texture_descriptor Function()>()
@@ -2097,35 +2178,30 @@ mln_metal_borrowed_texture_descriptor_default();
   ffi.Int32 Function(
     mln_render_session,
     ffi.Pointer<mln_metal_borrowed_texture_descriptor>,
+    ffi.Pointer<mln_operation>,
   )
 >()
-external int mln_metal_borrowed_texture_set_target(
+external int mln_metal_borrowed_texture_set_target_start(
   int session,
   ffi.Pointer<mln_metal_borrowed_texture_descriptor> descriptor,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_render_session,
-    ffi.Pointer<mln_metal_owned_texture_frame>,
-  )
->()
-external int mln_metal_owned_texture_acquire_frame(
-  int session,
-  ffi.Pointer<mln_metal_owned_texture_frame> out_frame,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_metal_owned_texture_descriptor>,
+    ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
+    ffi.Pointer<mln_operation>,
   )
 >()
-external int mln_metal_owned_texture_attach(
+external int mln_metal_owned_texture_attach_start(
   int map,
   ffi.Pointer<mln_metal_owned_texture_descriptor> descriptor,
+  ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<mln_metal_owned_texture_descriptor Function()>()
@@ -2134,26 +2210,19 @@ mln_metal_owned_texture_descriptor_default();
 
 @ffi.Native<
   ffi.Int32 Function(
-    mln_render_session,
-    ffi.Pointer<mln_metal_owned_texture_frame>,
-  )
->()
-external int mln_metal_owned_texture_release_frame(
-  int session,
-  ffi.Pointer<mln_metal_owned_texture_frame> frame,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_metal_surface_descriptor>,
+    ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
+    ffi.Pointer<mln_operation>,
   )
 >()
-external int mln_metal_surface_attach(
+external int mln_metal_surface_attach_start(
   int map,
   ffi.Pointer<mln_metal_surface_descriptor> descriptor,
+  ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<mln_metal_surface_descriptor Function()>()
@@ -2163,11 +2232,13 @@ external mln_metal_surface_descriptor mln_metal_surface_descriptor_default();
   ffi.Int32 Function(
     mln_render_session,
     ffi.Pointer<mln_metal_surface_descriptor>,
+    ffi.Pointer<mln_operation>,
   )
 >()
-external int mln_metal_surface_set_target(
+external int mln_metal_surface_set_target_start(
   int session,
   ffi.Pointer<mln_metal_surface_descriptor> descriptor,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<ffi.Int32 Function(ffi.Pointer<ffi.Uint32>)>()
@@ -2250,13 +2321,17 @@ external int mln_offline_region_snapshot_get(
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_opengl_borrowed_texture_descriptor>,
+    ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
+    ffi.Pointer<mln_operation>,
   )
 >()
-external int mln_opengl_borrowed_texture_attach(
+external int mln_opengl_borrowed_texture_attach_start(
   int map,
   ffi.Pointer<mln_opengl_borrowed_texture_descriptor> descriptor,
+  ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<mln_opengl_borrowed_texture_descriptor Function()>()
@@ -2267,51 +2342,35 @@ mln_opengl_borrowed_texture_descriptor_default();
   ffi.Int32 Function(
     mln_render_session,
     ffi.Pointer<mln_opengl_borrowed_texture_descriptor>,
+    ffi.Pointer<mln_operation>,
   )
 >()
-external int mln_opengl_borrowed_texture_set_target(
+external int mln_opengl_borrowed_texture_set_target_start(
   int session,
   ffi.Pointer<mln_opengl_borrowed_texture_descriptor> descriptor,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_render_session,
-    ffi.Pointer<mln_opengl_owned_texture_frame>,
-  )
->()
-external int mln_opengl_owned_texture_acquire_frame(
-  int session,
-  ffi.Pointer<mln_opengl_owned_texture_frame> out_frame,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_opengl_owned_texture_descriptor>,
+    ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
+    ffi.Pointer<mln_operation>,
   )
 >()
-external int mln_opengl_owned_texture_attach(
+external int mln_opengl_owned_texture_attach_start(
   int map,
   ffi.Pointer<mln_opengl_owned_texture_descriptor> descriptor,
+  ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<mln_opengl_owned_texture_descriptor Function()>()
 external mln_opengl_owned_texture_descriptor
 mln_opengl_owned_texture_descriptor_default();
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_render_session,
-    ffi.Pointer<mln_opengl_owned_texture_frame>,
-  )
->()
-external int mln_opengl_owned_texture_release_frame(
-  int session,
-  ffi.Pointer<mln_opengl_owned_texture_frame> frame,
-);
 
 @ffi.Native<ffi.Uint32 Function()>()
 external int mln_opengl_supported_context_provider_mask();
@@ -2320,13 +2379,17 @@ external int mln_opengl_supported_context_provider_mask();
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_opengl_surface_descriptor>,
+    ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
+    ffi.Pointer<mln_operation>,
   )
 >()
-external int mln_opengl_surface_attach(
+external int mln_opengl_surface_attach_start(
   int map,
   ffi.Pointer<mln_opengl_surface_descriptor> descriptor,
+  ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<mln_opengl_surface_descriptor Function()>()
@@ -2336,11 +2399,13 @@ external mln_opengl_surface_descriptor mln_opengl_surface_descriptor_default();
   ffi.Int32 Function(
     mln_render_session,
     ffi.Pointer<mln_opengl_surface_descriptor>,
+    ffi.Pointer<mln_operation>,
   )
 >()
-external int mln_opengl_surface_set_target(
+external int mln_opengl_surface_set_target_start(
   int session,
   ffi.Pointer<mln_opengl_surface_descriptor> descriptor,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<ffi.Int32 Function(mln_operation)>()
@@ -2413,29 +2478,146 @@ external int mln_ready_batch_get(
 @ffi.Native<ffi.Void Function(mln_ready_batch)>()
 external void mln_ready_batch_release(int batch);
 
-@ffi.Native<ffi.Int32 Function(mln_render_session)>()
-external int mln_render_session_clear_data(int session);
+@ffi.Native<ffi.Int32 Function(mln_render_frame_batch, ffi.Pointer<ffi.Size>)>()
+external int mln_render_frame_batch_count(
+  int batch,
+  ffi.Pointer<ffi.Size> out_count,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_render_frame_batch,
+    ffi.Size,
+    ffi.Pointer<mln_render_frame_result>,
+  )
+>()
+external int mln_render_frame_batch_get(
+  int batch,
+  int index,
+  ffi.Pointer<mln_render_frame_result> out_result,
+);
+
+@ffi.Native<ffi.Void Function(mln_render_frame_batch)>()
+external void mln_render_frame_batch_release(int batch);
+
+@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<mln_buffer>)>()
+external int mln_render_query_take_result(
+  int operation,
+  ffi.Pointer<mln_buffer> out_result,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_render_abandon_result>)
+>()
+external int mln_render_session_abandon(
+  int session,
+  ffi.Pointer<mln_render_abandon_result> out_result,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_acquired_frame>)
+>()
+external int mln_render_session_acquire_frame(
+  int session,
+  ffi.Pointer<mln_acquired_frame> out_frame,
+);
+
+@ffi.Native<mln_render_session_attach_options Function()>()
+external mln_render_session_attach_options
+mln_render_session_attach_options_default();
+
+@ffi.Native<
+  ffi.Int32 Function(mln_render_session, ffi.Uint64, ffi.Pointer<mln_operation>)
+>()
+external int mln_render_session_barrier_start(
+  int session,
+  int min_update_generation,
+  ffi.Pointer<mln_operation> out_operation,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_operation>)
+>()
+external int mln_render_session_clear_data_start(
+  int session,
+  ffi.Pointer<mln_operation> out_operation,
+);
 
 @ffi.Native<ffi.Int32 Function(mln_render_session)>()
 external int mln_render_session_destroy(int session);
 
-@ffi.Native<ffi.Int32 Function(mln_render_session)>()
-external int mln_render_session_detach(int session);
-
-@ffi.Native<ffi.Int32 Function(mln_render_session)>()
-external int mln_render_session_dump_debug_logs(int session);
+@ffi.Native<
+  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_operation>)
+>()
+external int mln_render_session_detach_start(
+  int session,
+  ffi.Pointer<mln_operation> out_operation,
+);
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_render_session,
-    ffi.Pointer<mln_feature_state_selector>,
-    ffi.Pointer<mln_buffer>,
+    ffi.Size,
+    ffi.Pointer<mln_render_frame_batch>,
   )
 >()
-external int mln_render_session_get_feature_state(
+external int mln_render_session_drain_frame_results(
   int session,
-  ffi.Pointer<mln_feature_state_selector> selector,
-  ffi.Pointer<mln_buffer> out_state,
+  int max_results,
+  ffi.Pointer<mln_render_frame_batch> out_batch,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_operation>)
+>()
+external int mln_render_session_dump_debug_logs_start(
+  int session,
+  ffi.Pointer<mln_operation> out_operation,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_render_session,
+    ffi.Pointer<mln_render_session_capabilities>,
+  )
+>()
+external int mln_render_session_get_capabilities(
+  int session,
+  ffi.Pointer<mln_render_session_capabilities> out_capabilities,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_render_session,
+    mln_buffer_view,
+    mln_buffer_view,
+    mln_buffer_view,
+    ffi.Pointer<mln_operation>,
+  )
+>()
+external int mln_render_session_get_feature_state_start(
+  int session,
+  mln_buffer_view source_id,
+  mln_buffer_view source_layer_id,
+  mln_buffer_view feature_id,
+  ffi.Pointer<mln_operation> out_operation,
+);
+
+@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<mln_buffer>)>()
+external int mln_render_session_get_feature_state_take_result(
+  int operation,
+  ffi.Pointer<mln_buffer> out_state_json,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_render_session,
+    ffi.Pointer<mln_render_session_snapshot>,
+  )
+>()
+external int mln_render_session_get_snapshot(
+  int session,
+  ffi.Pointer<mln_render_session_snapshot> out_snapshot,
 );
 
 @ffi.Native<
@@ -2446,17 +2628,17 @@ external int mln_render_session_get_feature_state(
     mln_buffer_view,
     mln_buffer_view,
     ffi.Pointer<mln_buffer_view>,
-    ffi.Pointer<mln_buffer>,
+    ffi.Pointer<mln_operation>,
   )
 >()
-external int mln_render_session_query_feature_extensions(
+external int mln_render_session_query_feature_extensions_start(
   int session,
   mln_buffer_view source_id,
   mln_buffer_view feature,
   mln_buffer_view extension,
   mln_buffer_view extension_field,
   ffi.Pointer<mln_buffer_view> arguments,
-  ffi.Pointer<mln_buffer> out_result,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<
@@ -2464,14 +2646,14 @@ external int mln_render_session_query_feature_extensions(
     mln_render_session,
     ffi.Pointer<mln_rendered_query_geometry>,
     ffi.Pointer<mln_rendered_feature_query_options>,
-    ffi.Pointer<mln_buffer>,
+    ffi.Pointer<mln_operation>,
   )
 >()
-external int mln_render_session_query_rendered_features(
+external int mln_render_session_query_rendered_features_start(
   int session,
   ffi.Pointer<mln_rendered_query_geometry> geometry,
   ffi.Pointer<mln_rendered_feature_query_options> options,
-  ffi.Pointer<mln_buffer> out_result,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<
@@ -2479,57 +2661,90 @@ external int mln_render_session_query_rendered_features(
     mln_render_session,
     mln_buffer_view,
     ffi.Pointer<mln_source_feature_query_options>,
-    ffi.Pointer<mln_buffer>,
+    ffi.Pointer<mln_operation>,
   )
 >()
-external int mln_render_session_query_source_features(
+external int mln_render_session_query_source_features_start(
   int session,
   mln_buffer_view source_id,
   ffi.Pointer<mln_source_feature_query_options> options,
-  ffi.Pointer<mln_buffer> out_result,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_render_session)>()
-external int mln_render_session_reduce_memory_use(int session);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_render_session,
-    ffi.Pointer<mln_feature_state_selector>,
-  )
->()
-external int mln_render_session_remove_feature_state(
-  int session,
-  ffi.Pointer<mln_feature_state_selector> selector,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_render_session, ffi.Pointer<ffi.Uint32>)>()
-external int mln_render_session_render_update(
-  int session,
-  ffi.Pointer<ffi.Uint32> out_result,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_render_session, ffi.Uint32, ffi.Uint32, ffi.Double)
+  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_operation>)
 >()
-external int mln_render_session_resize(
+external int mln_render_session_reduce_memory_use_start(
   int session,
-  int width,
-  int height,
-  double scale_factor,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_render_session,
-    ffi.Pointer<mln_feature_state_selector>,
     mln_buffer_view,
+    mln_buffer_view,
+    mln_buffer_view,
+    mln_buffer_view,
+    ffi.Pointer<mln_operation>,
   )
 >()
-external int mln_render_session_set_feature_state(
+external int mln_render_session_remove_feature_state_start(
   int session,
-  ffi.Pointer<mln_feature_state_selector> selector,
-  mln_buffer_view state,
+  mln_buffer_view source_id,
+  mln_buffer_view source_layer_id,
+  mln_buffer_view feature_id,
+  mln_buffer_view state_key,
+  ffi.Pointer<mln_operation> out_operation,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_frame_demand>)
+>()
+external int mln_render_session_request_frame(
+  int session,
+  ffi.Pointer<mln_frame_demand> demand,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_render_session,
+    ffi.Pointer<mln_render_target_extent>,
+    ffi.Pointer<mln_operation>,
+  )
+>()
+external int mln_render_session_resize_start(
+  int session,
+  ffi.Pointer<mln_render_target_extent> extent,
+  ffi.Pointer<mln_operation> out_operation,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(mln_render_session, ffi.Size, ffi.Pointer<ffi.Size>)
+>()
+external int mln_render_session_service_driver_work(
+  int session,
+  int max_work,
+  ffi.Pointer<ffi.Size> out_serviced,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_render_session,
+    mln_buffer_view,
+    mln_buffer_view,
+    mln_buffer_view,
+    mln_buffer_view,
+    ffi.Pointer<mln_operation>,
+  )
+>()
+external int mln_render_session_set_feature_state_start(
+  int session,
+  mln_buffer_view source_id,
+  mln_buffer_view source_layer_id,
+  mln_buffer_view feature_id,
+  mln_buffer_view state_json,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<
@@ -2978,17 +3193,23 @@ external int mln_supported_render_backend_mask();
 external mln_texture_image_info mln_texture_image_info_default();
 
 @ffi.Native<
+  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_operation>)
+>()
+external int mln_texture_read_premultiplied_rgba8_start(
+  int session,
+  ffi.Pointer<mln_operation> out_operation,
+);
+
+@ffi.Native<
   ffi.Int32 Function(
-    mln_render_session,
-    ffi.Pointer<ffi.Uint8>,
-    ffi.Size,
+    mln_operation,
+    ffi.Pointer<mln_buffer>,
     ffi.Pointer<mln_texture_image_info>,
   )
 >()
-external int mln_texture_read_premultiplied_rgba8(
-  int session,
-  ffi.Pointer<ffi.Uint8> out_data,
-  int out_data_capacity,
+external int mln_texture_read_premultiplied_rgba8_take_result(
+  int operation,
+  ffi.Pointer<mln_buffer> out_data,
   ffi.Pointer<mln_texture_image_info> out_info,
 );
 
@@ -2999,13 +3220,17 @@ external ffi.Pointer<ffi.Char> mln_thread_last_error_message();
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_vulkan_borrowed_texture_descriptor>,
+    ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
+    ffi.Pointer<mln_operation>,
   )
 >()
-external int mln_vulkan_borrowed_texture_attach(
+external int mln_vulkan_borrowed_texture_attach_start(
   int map,
   ffi.Pointer<mln_vulkan_borrowed_texture_descriptor> descriptor,
+  ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<mln_vulkan_borrowed_texture_descriptor Function()>()
@@ -3016,35 +3241,30 @@ mln_vulkan_borrowed_texture_descriptor_default();
   ffi.Int32 Function(
     mln_render_session,
     ffi.Pointer<mln_vulkan_borrowed_texture_descriptor>,
+    ffi.Pointer<mln_operation>,
   )
 >()
-external int mln_vulkan_borrowed_texture_set_target(
+external int mln_vulkan_borrowed_texture_set_target_start(
   int session,
   ffi.Pointer<mln_vulkan_borrowed_texture_descriptor> descriptor,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_render_session,
-    ffi.Pointer<mln_vulkan_owned_texture_frame>,
-  )
->()
-external int mln_vulkan_owned_texture_acquire_frame(
-  int session,
-  ffi.Pointer<mln_vulkan_owned_texture_frame> out_frame,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_vulkan_owned_texture_descriptor>,
+    ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
+    ffi.Pointer<mln_operation>,
   )
 >()
-external int mln_vulkan_owned_texture_attach(
+external int mln_vulkan_owned_texture_attach_start(
   int map,
   ffi.Pointer<mln_vulkan_owned_texture_descriptor> descriptor,
+  ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<mln_vulkan_owned_texture_descriptor Function()>()
@@ -3053,26 +3273,19 @@ mln_vulkan_owned_texture_descriptor_default();
 
 @ffi.Native<
   ffi.Int32 Function(
-    mln_render_session,
-    ffi.Pointer<mln_vulkan_owned_texture_frame>,
-  )
->()
-external int mln_vulkan_owned_texture_release_frame(
-  int session,
-  ffi.Pointer<mln_vulkan_owned_texture_frame> frame,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_vulkan_surface_descriptor>,
+    ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
+    ffi.Pointer<mln_operation>,
   )
 >()
-external int mln_vulkan_surface_attach(
+external int mln_vulkan_surface_attach_start(
   int map,
   ffi.Pointer<mln_vulkan_surface_descriptor> descriptor,
+  ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<mln_vulkan_surface_descriptor Function()>()
@@ -3082,24 +3295,30 @@ external mln_vulkan_surface_descriptor mln_vulkan_surface_descriptor_default();
   ffi.Int32 Function(
     mln_render_session,
     ffi.Pointer<mln_vulkan_surface_descriptor>,
+    ffi.Pointer<mln_operation>,
   )
 >()
-external int mln_vulkan_surface_set_target(
+external int mln_vulkan_surface_set_target_start(
   int session,
   ffi.Pointer<mln_vulkan_surface_descriptor> descriptor,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_webgpu_borrowed_texture_descriptor>,
+    ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
+    ffi.Pointer<mln_operation>,
   )
 >()
-external int mln_webgpu_borrowed_texture_attach(
+external int mln_webgpu_borrowed_texture_attach_start(
   int map,
   ffi.Pointer<mln_webgpu_borrowed_texture_descriptor> descriptor,
+  ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<mln_webgpu_borrowed_texture_descriptor Function()>()
@@ -3110,35 +3329,30 @@ mln_webgpu_borrowed_texture_descriptor_default();
   ffi.Int32 Function(
     mln_render_session,
     ffi.Pointer<mln_webgpu_borrowed_texture_descriptor>,
+    ffi.Pointer<mln_operation>,
   )
 >()
-external int mln_webgpu_borrowed_texture_set_target(
+external int mln_webgpu_borrowed_texture_set_target_start(
   int session,
   ffi.Pointer<mln_webgpu_borrowed_texture_descriptor> descriptor,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_render_session,
-    ffi.Pointer<mln_webgpu_owned_texture_frame>,
-  )
->()
-external int mln_webgpu_owned_texture_acquire_frame(
-  int session,
-  ffi.Pointer<mln_webgpu_owned_texture_frame> out_frame,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_webgpu_owned_texture_descriptor>,
+    ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
+    ffi.Pointer<mln_operation>,
   )
 >()
-external int mln_webgpu_owned_texture_attach(
+external int mln_webgpu_owned_texture_attach_start(
   int map,
   ffi.Pointer<mln_webgpu_owned_texture_descriptor> descriptor,
+  ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<mln_webgpu_owned_texture_descriptor Function()>()
@@ -3147,26 +3361,19 @@ mln_webgpu_owned_texture_descriptor_default();
 
 @ffi.Native<
   ffi.Int32 Function(
-    mln_render_session,
-    ffi.Pointer<mln_webgpu_owned_texture_frame>,
-  )
->()
-external int mln_webgpu_owned_texture_release_frame(
-  int session,
-  ffi.Pointer<mln_webgpu_owned_texture_frame> frame,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_webgpu_surface_descriptor>,
+    ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
+    ffi.Pointer<mln_operation>,
   )
 >()
-external int mln_webgpu_surface_attach(
+external int mln_webgpu_surface_attach_start(
   int map,
   ffi.Pointer<mln_webgpu_surface_descriptor> descriptor,
+  ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<mln_webgpu_surface_descriptor Function()>()
@@ -3176,11 +3383,13 @@ external mln_webgpu_surface_descriptor mln_webgpu_surface_descriptor_default();
   ffi.Int32 Function(
     mln_render_session,
     ffi.Pointer<mln_webgpu_surface_descriptor>,
+    ffi.Pointer<mln_operation>,
   )
 >()
-external int mln_webgpu_surface_set_target(
+external int mln_webgpu_surface_set_target_start(
   int session,
   ffi.Pointer<mln_webgpu_surface_descriptor> descriptor,
+  ffi.Pointer<mln_operation> out_operation,
 );
 
 const int MLN_ADAPTER_RESOURCE_KIND_ANY = 4294967295;
@@ -3208,6 +3417,9 @@ final class UnnamedUnion$2 extends ffi.Union {
 
   external mln_screen_line_string line_string;
 }
+
+typedef mln_acquired_frame = ffi.Uint64;
+typedef Dartmln_acquired_frame = int;
 
 final class mln_adapter_http_header extends ffi.Struct {
   external ffi.Pointer<ffi.Char> name;
@@ -4130,6 +4342,56 @@ enum mln_feature_state_selector_field {
       };
 }
 
+final class mln_frame_demand extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Uint32()
+  external int flags;
+
+  @ffi.Uint64()
+  external int token;
+
+  @ffi.Uint64()
+  external int coalescing_boundary;
+
+  @ffi.Int64()
+  external int presentation_time_ns;
+
+  @ffi.Int64()
+  external int deadline_ns;
+
+  static ffi.Pointer<mln_frame_demand> $allocate(
+    ffi.Allocator $allocator, {
+    required int size,
+    required int flags,
+    required int token,
+    required int coalescing_boundary,
+    required int presentation_time_ns,
+    required int deadline_ns,
+  }) => $allocator<mln_frame_demand>()
+    ..ref.size = size
+    ..ref.flags = flags
+    ..ref.token = token
+    ..ref.coalescing_boundary = coalescing_boundary
+    ..ref.presentation_time_ns = presentation_time_ns
+    ..ref.deadline_ns = deadline_ns;
+}
+
+enum mln_frame_demand_flag {
+  MLN_FRAME_DEMAND_IF_NEEDED(1),
+  MLN_FRAME_DEMAND_PRESENT(2);
+
+  final int value;
+  const mln_frame_demand_flag(this.value);
+
+  static mln_frame_demand_flag fromValue(int value) => switch (value) {
+    1 => MLN_FRAME_DEMAND_IF_NEEDED,
+    2 => MLN_FRAME_DEMAND_PRESENT,
+    _ => throw ArgumentError('Unknown value for mln_frame_demand_flag: $value'),
+  };
+}
+
 enum mln_free_camera_option_field {
   MLN_FREE_CAMERA_OPTION_POSITION(1),
   MLN_FREE_CAMERA_OPTION_ORIENTATION(2);
@@ -4255,6 +4517,51 @@ enum mln_gesture_phase {
     3 => MLN_GESTURE_PHASE_END,
     4 => MLN_GESTURE_PHASE_CANCEL,
     _ => throw ArgumentError('Unknown value for mln_gesture_phase: $value'),
+  };
+}
+
+final class mln_gpu_sync extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Uint32()
+  external int kind;
+
+  external ffi.Pointer<ffi.Void> object;
+
+  @ffi.Uint64()
+  external int value;
+
+  static ffi.Pointer<mln_gpu_sync> $allocate(
+    ffi.Allocator $allocator, {
+    required int size,
+    required int kind,
+    required ffi.Pointer<ffi.Void> object,
+    required int value,
+  }) => $allocator<mln_gpu_sync>()
+    ..ref.size = size
+    ..ref.kind = kind
+    ..ref.object = object
+    ..ref.value = value;
+}
+
+enum mln_gpu_sync_kind {
+  MLN_GPU_SYNC_CPU_COMPLETE(0),
+  MLN_GPU_SYNC_METAL_SHARED_EVENT(1),
+  MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE(2),
+  MLN_GPU_SYNC_OPENGL_FENCE(3),
+  MLN_GPU_SYNC_WEBGPU_TOKEN(4);
+
+  final int value;
+  const mln_gpu_sync_kind(this.value);
+
+  static mln_gpu_sync_kind fromValue(int value) => switch (value) {
+    0 => MLN_GPU_SYNC_CPU_COMPLETE,
+    1 => MLN_GPU_SYNC_METAL_SHARED_EVENT,
+    2 => MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE,
+    3 => MLN_GPU_SYNC_OPENGL_FENCE,
+    4 => MLN_GPU_SYNC_WEBGPU_TOKEN,
+    _ => throw ArgumentError('Unknown value for mln_gpu_sync_kind: $value'),
   };
 }
 
@@ -5425,6 +5732,48 @@ final class mln_ready_endpoint extends ffi.Struct {
     ..ref.id = id;
 }
 
+enum mln_render_abandon_disposition {
+  MLN_RENDER_ABANDON_DISPOSITION_CLEAN(0),
+  MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED(1);
+
+  final int value;
+  const mln_render_abandon_disposition(this.value);
+
+  static mln_render_abandon_disposition fromValue(int value) => switch (value) {
+    0 => MLN_RENDER_ABANDON_DISPOSITION_CLEAN,
+    1 => MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED,
+    _ => throw ArgumentError(
+      'Unknown value for mln_render_abandon_disposition: $value',
+    ),
+  };
+}
+
+final class mln_render_abandon_result extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Uint32()
+  external int disposition;
+
+  @ffi.Uint32()
+  external int quarantined_resource_count;
+
+  @ffi.Uint32()
+  external int reserved;
+
+  static ffi.Pointer<mln_render_abandon_result> $allocate(
+    ffi.Allocator $allocator, {
+    required int size,
+    required int disposition,
+    required int quarantined_resource_count,
+    required int reserved,
+  }) => $allocator<mln_render_abandon_result>()
+    ..ref.size = size
+    ..ref.disposition = disposition
+    ..ref.quarantined_resource_count = quarantined_resource_count
+    ..ref.reserved = reserved;
+}
+
 enum mln_render_backend_flag {
   MLN_RENDER_BACKEND_FLAG_METAL(1),
   MLN_RENDER_BACKEND_FLAG_VULKAN(2),
@@ -5445,6 +5794,66 @@ enum mln_render_backend_flag {
   };
 }
 
+enum mln_render_driver_kind {
+  MLN_RENDER_DRIVER_CORE_WORKER(1),
+  MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD(2);
+
+  final int value;
+  const mln_render_driver_kind(this.value);
+
+  static mln_render_driver_kind fromValue(int value) => switch (value) {
+    1 => MLN_RENDER_DRIVER_CORE_WORKER,
+    2 => MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD,
+    _ => throw ArgumentError(
+      'Unknown value for mln_render_driver_kind: $value',
+    ),
+  };
+}
+
+typedef mln_render_frame_batch = ffi.Uint64;
+typedef Dartmln_render_frame_batch = int;
+
+final class mln_render_frame_result extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Uint32()
+  external int disposition;
+
+  @ffi.Uint64()
+  external int token;
+
+  @ffi.Uint64()
+  external int map_update_generation;
+
+  @ffi.Uint64()
+  external int extent_generation;
+
+  @ffi.Uint64()
+  external int frame_generation;
+
+  @ffi.Int64()
+  external int presentation_time_ns;
+
+  static ffi.Pointer<mln_render_frame_result> $allocate(
+    ffi.Allocator $allocator, {
+    required int size,
+    required int disposition,
+    required int token,
+    required int map_update_generation,
+    required int extent_generation,
+    required int frame_generation,
+    required int presentation_time_ns,
+  }) => $allocator<mln_render_frame_result>()
+    ..ref.size = size
+    ..ref.disposition = disposition
+    ..ref.token = token
+    ..ref.map_update_generation = map_update_generation
+    ..ref.extent_generation = extent_generation
+    ..ref.frame_generation = frame_generation
+    ..ref.presentation_time_ns = presentation_time_ns;
+}
+
 enum mln_render_mode {
   MLN_RENDER_MODE_PARTIAL(0),
   MLN_RENDER_MODE_FULL(1);
@@ -5463,7 +5872,9 @@ enum mln_render_result {
   MLN_RENDER_RESULT_RENDERED(0),
   MLN_RENDER_RESULT_NO_UPDATE(1),
   MLN_RENDER_RESULT_SIZE_PENDING(2),
-  MLN_RENDER_RESULT_TARGET_NOT_READY(3);
+  MLN_RENDER_RESULT_TARGET_NOT_READY(3),
+  MLN_RENDER_RESULT_SUPERSEDED(4),
+  MLN_RENDER_RESULT_DEADLINE_MISSED(5);
 
   final int value;
   const mln_render_result(this.value);
@@ -5473,12 +5884,172 @@ enum mln_render_result {
     1 => MLN_RENDER_RESULT_NO_UPDATE,
     2 => MLN_RENDER_RESULT_SIZE_PENDING,
     3 => MLN_RENDER_RESULT_TARGET_NOT_READY,
+    4 => MLN_RENDER_RESULT_SUPERSEDED,
+    5 => MLN_RENDER_RESULT_DEADLINE_MISSED,
     _ => throw ArgumentError('Unknown value for mln_render_result: $value'),
   };
 }
 
 typedef mln_render_session = ffi.Uint64;
 typedef Dartmln_render_session = int;
+
+final class mln_render_session_attach_options extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Uint32()
+  external int driver;
+
+  @ffi.Uint32()
+  external int requested_texture_ring_depth;
+
+  @ffi.Uint32()
+  external int reserved;
+
+  @mln_notification_source()
+  external int operation_source;
+
+  @mln_notification_source()
+  external int frame_source;
+
+  @mln_notification_source()
+  external int driver_work_source;
+
+  static ffi.Pointer<mln_render_session_attach_options> $allocate(
+    ffi.Allocator $allocator, {
+    required int size,
+    required int driver,
+    required int requested_texture_ring_depth,
+    required int reserved,
+    required int operation_source,
+    required int frame_source,
+    required int driver_work_source,
+  }) => $allocator<mln_render_session_attach_options>()
+    ..ref.size = size
+    ..ref.driver = driver
+    ..ref.requested_texture_ring_depth = requested_texture_ring_depth
+    ..ref.reserved = reserved
+    ..ref.operation_source = operation_source
+    ..ref.frame_source = frame_source
+    ..ref.driver_work_source = driver_work_source;
+}
+
+final class mln_render_session_capabilities extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Uint32()
+  external int driver;
+
+  @ffi.Uint32()
+  external int texture_ring_depth;
+
+  @ffi.Uint32()
+  external int flags;
+
+  static ffi.Pointer<mln_render_session_capabilities> $allocate(
+    ffi.Allocator $allocator, {
+    required int size,
+    required int driver,
+    required int texture_ring_depth,
+    required int flags,
+  }) => $allocator<mln_render_session_capabilities>()
+    ..ref.size = size
+    ..ref.driver = driver
+    ..ref.texture_ring_depth = texture_ring_depth
+    ..ref.flags = flags;
+}
+
+enum mln_render_session_capability_flag {
+  MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION(1),
+  MLN_RENDER_SESSION_CAPABILITY_READBACK(2),
+  MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC(4),
+  MLN_RENDER_SESSION_CAPABILITY_PRESENTATION(8);
+
+  final int value;
+  const mln_render_session_capability_flag(this.value);
+
+  static mln_render_session_capability_flag fromValue(int value) =>
+      switch (value) {
+        1 => MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION,
+        2 => MLN_RENDER_SESSION_CAPABILITY_READBACK,
+        4 => MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC,
+        8 => MLN_RENDER_SESSION_CAPABILITY_PRESENTATION,
+        _ => throw ArgumentError(
+          'Unknown value for mln_render_session_capability_flag: $value',
+        ),
+      };
+}
+
+final class mln_render_session_snapshot extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Uint32()
+  external int state;
+
+  @ffi.Uint32()
+  external int driver;
+
+  @ffi.Uint32()
+  external int latest_result;
+
+  external mln_render_target_extent extent;
+
+  @ffi.Uint64()
+  external int generation;
+
+  @ffi.Uint64()
+  external int map_update_generation;
+
+  @ffi.Uint64()
+  external int rendered_update_generation;
+
+  @ffi.Uint64()
+  external int extent_generation;
+
+  @ffi.Uint64()
+  external int frame_generation;
+
+  @ffi.Uint64()
+  external int latest_demand_token;
+
+  @ffi.Uint32()
+  external int pending_demand_count;
+
+  @ffi.Uint32()
+  external int acquired_frame_count;
+
+  @ffi.Bool()
+  external bool target_ready;
+
+  @ffi.Bool()
+  external bool pending_changes;
+}
+
+enum mln_render_session_state {
+  MLN_RENDER_SESSION_STATE_ATTACHING(1),
+  MLN_RENDER_SESSION_STATE_ATTACHED(2),
+  MLN_RENDER_SESSION_STATE_DETACHING(3),
+  MLN_RENDER_SESSION_STATE_DETACHED(4),
+  MLN_RENDER_SESSION_STATE_TARGET_LOST(5),
+  MLN_RENDER_SESSION_STATE_ABANDONED(6);
+
+  final int value;
+  const mln_render_session_state(this.value);
+
+  static mln_render_session_state fromValue(int value) => switch (value) {
+    1 => MLN_RENDER_SESSION_STATE_ATTACHING,
+    2 => MLN_RENDER_SESSION_STATE_ATTACHED,
+    3 => MLN_RENDER_SESSION_STATE_DETACHING,
+    4 => MLN_RENDER_SESSION_STATE_DETACHED,
+    5 => MLN_RENDER_SESSION_STATE_TARGET_LOST,
+    6 => MLN_RENDER_SESSION_STATE_ABANDONED,
+    _ => throw ArgumentError(
+      'Unknown value for mln_render_session_state: $value',
+    ),
+  };
+}
 
 final class mln_render_target_extent extends ffi.Struct {
   @ffi.Uint32()
@@ -6507,6 +7078,9 @@ sealed class mln_status {
   static const MLN_STATUS_UNSUPPORTED = -4;
   static const MLN_STATUS_NATIVE_ERROR = -5;
   static const MLN_STATUS_CANCELLED = -6;
+  static const MLN_STATUS_BUSY = -7;
+  static const MLN_STATUS_TARGET_LOST = -8;
+  static const MLN_STATUS_NOT_READY = -9;
 }
 
 typedef mln_style_id_list = ffi.Uint64;
@@ -7226,16 +7800,29 @@ final class mln_webgl_context_descriptor extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
+  @ffi.Uint32()
+  external int kind;
+
   @ffi.Int32()
   external int context;
 
-  static ffi.Pointer<mln_webgl_context_descriptor> $allocate(
-    ffi.Allocator $allocator, {
-    required int size,
-    required int context,
-  }) => $allocator<mln_webgl_context_descriptor>()
-    ..ref.size = size
-    ..ref.context = context;
+  external mln_buffer_view canvas_selector;
+}
+
+enum mln_webgl_context_kind {
+  MLN_WEBGL_CONTEXT_EXISTING(0),
+  MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS(1);
+
+  final int value;
+  const mln_webgl_context_kind(this.value);
+
+  static mln_webgl_context_kind fromValue(int value) => switch (value) {
+    0 => MLN_WEBGL_CONTEXT_EXISTING,
+    1 => MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS,
+    _ => throw ArgumentError(
+      'Unknown value for mln_webgl_context_kind: $value',
+    ),
+  };
 }
 
 final class mln_webgpu_borrowed_texture_descriptor extends ffi.Struct {

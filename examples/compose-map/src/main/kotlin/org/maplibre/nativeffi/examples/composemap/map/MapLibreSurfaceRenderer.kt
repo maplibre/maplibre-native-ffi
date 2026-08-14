@@ -1,6 +1,7 @@
 package org.maplibre.nativeffi.examples.composemap.map
 
 import java.util.concurrent.atomic.AtomicBoolean
+import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceFrame
 import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceRenderResult
 import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceRenderer
@@ -9,8 +10,10 @@ import org.maplibre.nativeffi.examples.composemap.surface.ProducerBackend
 import org.maplibre.nativeffi.examples.composemap.surface.SurfaceExtent
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.map.MapHandle
+import org.maplibre.nativeffi.render.FrameDemand
 import org.maplibre.nativeffi.render.RenderResult
 import org.maplibre.nativeffi.render.RenderSessionHandle
+import org.maplibre.nativeffi.runtime.OperationHandle
 
 /**
  * The native-surface render loop.
@@ -67,7 +70,9 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
     if (!renderRequest.consume()) {
       return NativeSurfaceRenderResult.Skipped
     }
-    if (attached.session.renderUpdate() == RenderResult.RENDERED) {
+    attached.session.requestFrame(FrameDemand())
+    attached.session.serviceDriverWork()
+    if (attached.session.drainFrameResults().lastOrNull()?.disposition == RenderResult.RENDERED) {
       return NativeSurfaceRenderResult.Rendered
     }
     // A newly accepted map or target update may not have reached the render session yet.
@@ -93,6 +98,9 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
         closeRenderSession()
         stopMapState()
       }
+    } else if (renderSession != null) {
+      abandonRenderSession()
+      stopMapState()
     } else {
       stopMapState()
     }
@@ -186,7 +194,7 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
           return existing
         }
         try {
-          borrowed.setTarget(existing.session)
+          completeDriverOperation(existing.session, borrowed.setTarget(existing.session))
         } catch (error: RuntimeException) {
           // A failed handover leaves it unknown which texture the session holds, and Skiko frees
           // the outgoing one as soon as it moves on, so close the session.
@@ -205,8 +213,16 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
     }
 
     closeRenderSession()
+    val attachment = borrowed.attach(map)
+    try {
+      completeDriverOperation(attachment.session, attachment.operation)
+    } catch (error: Throwable) {
+      runCatching { attachment.session.abandon() }
+      runCatching { attachment.session.close() }
+      throw error
+    }
     val attached =
-      AttachedRenderSession(borrowed.sessionKey, borrowed.targetKey, borrowed.attach(map))
+      AttachedRenderSession(borrowed.sessionKey, borrowed.targetKey, attachment.session)
     renderSession = attached
     renderRequest.set()
     return attached
@@ -215,7 +231,26 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
   private fun closeRenderSession() {
     val closing = renderSession
     renderSession = null
-    closing?.session?.close()
+    closing?.session?.let { session ->
+      completeDriverOperation(session, session.startDetach())
+      session.close()
+    }
+  }
+
+  private fun abandonRenderSession() {
+    val closing = renderSession
+    renderSession = null
+    closing?.session?.let { session ->
+      session.abandon()
+      session.close()
+    }
+  }
+
+  private fun completeDriverOperation(session: RenderSessionHandle, operation: OperationHandle<*>) {
+    operation.use {
+      while (!it.poll()) session.serviceDriverWork()
+      check(it.terminalStatus() == MaplibreStatus.OK) { it.diagnostic() }
+    }
   }
 
   private fun viewportCenter(): ScreenPoint {

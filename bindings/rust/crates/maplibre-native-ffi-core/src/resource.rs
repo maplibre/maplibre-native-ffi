@@ -340,6 +340,10 @@ pub fn status_for_error(error: &Error) -> sys::mln_status {
         ErrorKind::InvalidState => sys::MLN_STATUS_INVALID_STATE,
         ErrorKind::WrongThread => sys::MLN_STATUS_WRONG_THREAD,
         ErrorKind::Unsupported => sys::MLN_STATUS_UNSUPPORTED,
+        ErrorKind::Cancelled => sys::MLN_STATUS_CANCELLED,
+        ErrorKind::Busy => sys::MLN_STATUS_BUSY,
+        ErrorKind::TargetLost => sys::MLN_STATUS_TARGET_LOST,
+        ErrorKind::NotReady => sys::MLN_STATUS_NOT_READY,
         ErrorKind::NativeError | ErrorKind::AbiVersionMismatch | ErrorKind::UnknownStatus => {
             sys::MLN_STATUS_NATIVE_ERROR
         }

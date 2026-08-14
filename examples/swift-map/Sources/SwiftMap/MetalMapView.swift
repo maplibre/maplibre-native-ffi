@@ -16,10 +16,13 @@ final class MetalMapView: NSView {
   private var renderTarget: MetalRenderTarget?
   private var mapTask: MapTask?
   private var timer: Timer?
+  private var frameTask: Task<Void, Never>?
+  private var shutdownTask: Task<Void, Never>?
   private var currentViewport: Viewport?
   private var consecutiveRenderFailures = 0
   private var didLogStartupStatus = false
   private var isShutDown = false
+  private var terminateAfterShutdown = false
   private var setupError: Error?
   private var errorLabel: NSTextField?
 
@@ -71,24 +74,42 @@ final class MetalMapView: NSView {
   /// Closes the session before the map task closes the map; a map with an
   /// attached session cannot be destroyed.
   @objc private func shutdown() {
+    beginShutdown()
+  }
+
+  private func beginShutdown(terminate: Bool = false) {
+    terminateAfterShutdown = terminateAfterShutdown || terminate
     guard !isShutDown else { return }
     isShutDown = true
     timer?.invalidate()
     timer = nil
-    do {
-      try renderTarget?.close()
-    } catch {
-      print(error)
+    if frameTask == nil {
+      finishShutdown()
     }
+  }
+
+  private func finishShutdown() {
+    guard shutdownTask == nil else { return }
+    let target = renderTarget
     renderTarget = nil
-    if mapTask != nil {
-      channels.requestShutdown()
-      if !channels.waitForMapTaskExit(timeout: 5.0) {
-        print("map task did not finish before the shutdown deadline")
+    shutdownTask = Task { @MainActor in
+      do {
+        try await target?.close()
+      } catch {
+        print(error)
       }
-      mapTask = nil
+      if self.mapTask != nil {
+        self.channels.requestShutdown()
+        if !self.channels.waitForMapTaskExit(timeout: 5.0) {
+          print("map task did not finish before the shutdown deadline")
+        }
+        self.mapTask = nil
+      }
+      NotificationCenter.default.removeObserver(self)
+      if self.terminateAfterShutdown {
+        NSApp.terminate(nil)
+      }
     }
-    NotificationCenter.default.removeObserver(self)
   }
 
   override func layout() {
@@ -148,13 +169,11 @@ final class MetalMapView: NSView {
 
   private func startTimerIfNeeded() {
     guard timer == nil else { return }
-    // TODO(map-example-spec): Replace fixed NSTimer with a display-paced host
-    // loop.
     timer = Timer
       .scheduledTimer(withTimeInterval: 1.0 / 60.0,
                       repeats: true)
       { [weak self] _ in
-        Task { @MainActor in self?.tick() }
+        Task { @MainActor in self?.scheduleFrame() }
       }
     RunLoop.main.add(timer!, forMode: .common)
   }
@@ -181,32 +200,22 @@ final class MetalMapView: NSView {
       return
     }
 
-    do {
-      graphics.resize(viewport)
-      try renderTarget?.resize(graphics: graphics, viewport: viewport)
-      currentViewport = viewport
-      if mapTask != nil {
-        channels.push(.resize(MapLogicalExtent(
-          width: viewport.logicalWidth,
-          height: viewport.logicalHeight,
-          scaleFactor: viewport.scaleFactor
-        )))
-      }
-      channels.setRenderRequest()
-      startMapTaskIfNeeded(viewport: viewport)
-    } catch {
-      // A failed resize leaves the render target detached, so stop the timer
-      // rather than render through a detached session.
-      print(error)
-      timer?.invalidate()
-      timer = nil
-      showError(String(describing: error))
+    graphics.resize(viewport)
+    currentViewport = viewport
+    if mapTask != nil {
+      channels.push(.resize(MapLogicalExtent(
+        width: viewport.logicalWidth,
+        height: viewport.logicalHeight,
+        scaleFactor: viewport.scaleFactor
+      )))
     }
+    channels.setRenderRequest()
+    startMapTaskIfNeeded(viewport: viewport)
   }
 
   /// Attaches the render session on this thread. Attach records the calling
   /// thread as the session's owner, and every later session call runs here.
-  private func attachIfNeeded() {
+  private func attachIfNeeded() async {
     guard renderTarget == nil,
           let graphics,
           let viewport = currentViewport,
@@ -215,7 +224,7 @@ final class MetalMapView: NSView {
     else { return }
 
     do {
-      renderTarget = try MetalRenderTarget.attach(
+      renderTarget = try await MetalRenderTarget.attach(
         mode: mode,
         map: renderMap,
         graphics: graphics,
@@ -231,27 +240,42 @@ final class MetalMapView: NSView {
     }
   }
 
-  private func tick() {
+  private func scheduleFrame() {
+    guard frameTask == nil, !isShutDown else { return }
+    frameTask = Task { @MainActor in
+      await tick()
+      frameTask = nil
+      if isShutDown {
+        finishShutdown()
+      }
+    }
+  }
+
+  private func tick() async {
     guard !isShutDown else { return }
     if let failureMessage = channels.failureMessage {
       fail(failureMessage)
       return
     }
-    attachIfNeeded()
-    guard let renderTarget,
+    await attachIfNeeded()
+    guard !isShutDown,
+          var renderTarget,
+          let graphics,
           let viewport = currentViewport,
           !viewport.isEmpty
     else { return }
 
     do {
-      // Consume first, so a request published during the render survives.
+      if try renderTargetNeedsResize(renderTarget, viewport: viewport) {
+        try await renderTarget.resize(graphics: graphics, viewport: viewport)
+        self.renderTarget = renderTarget
+      }
       if channels.consumeRenderRequest() {
-        let rendered = try renderTarget.renderUpdate()
+        let rendered = try await renderTarget.renderFrame()
         if !rendered {
           channels.setRenderRequest()
         }
       }
-      try renderTarget.finishFrame()
       consecutiveRenderFailures = 0
     } catch {
       print(error)
@@ -262,11 +286,22 @@ final class MetalMapView: NSView {
     }
   }
 
+  private func renderTargetNeedsResize(
+    _ target: MetalRenderTarget,
+    viewport: Viewport
+  ) throws -> Bool {
+    switch target {
+    case let .ownedTexture(session, _),
+         let .borrowedTexture(session, _, _),
+         let .nativeSurface(session):
+      return try session.snapshot().extent != viewport.extent
+    }
+  }
+
   private func fail(_ message: String) {
     print(message)
     showError(message)
-    shutdown()
-    NSApp.terminate(nil)
+    beginShutdown(terminate: true)
   }
 
   private func readViewport() -> Viewport {

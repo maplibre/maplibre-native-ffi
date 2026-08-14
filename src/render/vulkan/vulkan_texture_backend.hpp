@@ -29,7 +29,8 @@ class VulkanTextureBackend final : public mbgl::vulkan::RendererBackend,
 
  public:
   VulkanTextureBackend(
-    const mln_vulkan_owned_texture_descriptor& descriptor, mbgl::Size size
+    const mln_vulkan_owned_texture_descriptor& descriptor, mbgl::Size size,
+    std::size_t ring_depth = 1
   );
   VulkanTextureBackend(
     const mln_vulkan_borrowed_texture_descriptor& descriptor, mbgl::Size size
@@ -63,7 +64,8 @@ class VulkanTextureBackend final : public mbgl::vulkan::RendererBackend,
   void deactivate() override;
 
   void prepareRenderResources();
-  auto frame_resources() -> VulkanTextureFrameResources;
+  auto frame_resources(std::size_t slot) -> VulkanTextureFrameResources;
+  auto select_slot(std::size_t slot) -> bool;
 
  protected:
   void initInstance() override;
@@ -78,6 +80,9 @@ class VulkanTextureBackend final : public mbgl::vulkan::RendererBackend,
   mln_vulkan_owned_texture_descriptor descriptor_;
   mln_vulkan_borrowed_texture_descriptor borrowed_descriptor_{};
   bool uses_borrowed_texture_ = false;
+  std::vector<std::unique_ptr<mbgl::gfx::RenderableResource>> slot_resources_;
+  std::size_t selected_slot_ = 0;
+  std::vector<mbgl::Size> slot_sizes_;
 };
 
 }  // namespace mln::core

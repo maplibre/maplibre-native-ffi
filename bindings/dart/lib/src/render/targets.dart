@@ -387,6 +387,23 @@ final class EglContextDescriptor extends OpenGLContextDescriptor {
   final NativePointer getProcAddress;
 }
 
+/// Existing or transferred browser WebGL context.
+final class WebGLContextDescriptor extends OpenGLContextDescriptor {
+  /// Uses a host-created WebGL context on the caller graphics thread.
+  const WebGLContextDescriptor.existing(this.context)
+    : canvasSelector = null,
+      super(ownership: OpenGLContextOwnership.shared);
+
+  /// Creates WebGL 2 on a core worker from a transferred canvas.
+  const WebGLContextDescriptor.transferredCanvas(this.canvasSelector)
+    : context = 0,
+      super(ownership: OpenGLContextOwnership.dedicated);
+
+  final int context;
+  final String? canvasSelector;
+  bool get isTransferredCanvas => canvasSelector != null;
+}
+
 /// Metal native surface session attachment options.
 final class MetalSurfaceDescriptor {
   /// Creates a Metal surface descriptor.
@@ -584,4 +601,64 @@ final class OpenGLBorrowedTextureDescriptor {
 
   /// Backend-native OpenGL texture target, such as `GL_TEXTURE_2D`.
   final int target;
+}
+
+/// WebGPU device, instance, and queue used by a render target.
+final class WebGPUContextDescriptor {
+  const WebGPUContextDescriptor({
+    this.instance = NativePointer.nullPointer,
+    required this.device,
+    this.queue = NativePointer.nullPointer,
+  });
+
+  final NativePointer instance;
+  final NativePointer device;
+  final NativePointer queue;
+}
+
+/// WebGPU native-surface attachment options.
+final class WebGPUSurfaceDescriptor {
+  const WebGPUSurfaceDescriptor({
+    required this.extent,
+    required this.context,
+    required this.surface,
+    required this.format,
+  });
+
+  final RenderTargetExtent extent;
+  final WebGPUContextDescriptor context;
+  final NativePointer surface;
+  final int format;
+}
+
+/// WebGPU session-owned texture-ring attachment options.
+final class WebGPUOwnedTextureDescriptor {
+  const WebGPUOwnedTextureDescriptor({
+    required this.extent,
+    required this.context,
+  });
+
+  final RenderTargetExtent extent;
+  final WebGPUContextDescriptor context;
+}
+
+/// WebGPU caller-owned texture attachment options.
+final class WebGPUBorrowedTextureDescriptor {
+  const WebGPUBorrowedTextureDescriptor({
+    required this.extent,
+    required this.physicalWidth,
+    required this.physicalHeight,
+    required this.context,
+    required this.texture,
+    required this.textureView,
+    required this.format,
+  });
+
+  final RenderTargetExtent extent;
+  final int physicalWidth;
+  final int physicalHeight;
+  final WebGPUContextDescriptor context;
+  final NativePointer texture;
+  final NativePointer textureView;
+  final int format;
 }

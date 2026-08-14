@@ -253,7 +253,7 @@ const VulkanTextureCompositor = struct {
 const VulkanOwnedTextureBackend = struct {
     compositor: VulkanTextureCompositor,
     session: render_target.Session,
-    pending_frame: ?maplibre.VulkanOwnedTextureFrameHandle,
+    pending_frame: ?maplibre.AcquiredFrame,
 
     fn init(
         allocator: std.mem.Allocator,
@@ -303,11 +303,11 @@ const VulkanOwnedTextureBackend = struct {
         const texture = maplibre.attachVulkanOwnedTexture(map, .{
             .extent = render_target.extent(viewport),
             .context = vulkanContextDescriptor(&self.compositor.context),
-        }) catch |err| {
+        }, .{ .driver = .caller_graphics_thread, .requested_texture_ring_depth = 2 }) catch |err| {
             diagnostics.logError("Vulkan texture attach failed", err, null);
             return types.AppError.TextureAttachFailed;
         };
-        return .{ .texture = texture };
+        return render_target.textureSession(texture);
     }
 
     fn renderUpdate(
@@ -321,28 +321,43 @@ const VulkanOwnedTextureBackend = struct {
             .texture => |*texture| texture,
             else => return false,
         };
-        var frame = texture.acquireVulkanOwnedTextureFrame() catch |err| switch (err) {
+        var frame = texture.acquireFrame() catch |err| switch (err) {
             error.InvalidState => return false,
             else => {
                 diagnostics.logError("Vulkan texture acquire failed", err, null);
                 return types.AppError.BackendDrawFailed;
             },
         };
-        errdefer frame.release() catch |err| diagnostics.logError("Vulkan texture release failed", err, null);
-
-        const info = try frame.info();
+        var frame_owned = true;
+        errdefer if (frame_owned) {
+            var cleanup = frame.releaseStart(.cpu_complete) catch null;
+            if (cleanup) |*operation| {
+                defer operation.release();
+                render_target.serviceUntilComplete(texture, operation.*) catch {};
+            }
+        };
+        const info = try frame.vulkanTexture();
         const image_view: c.VkImageView = @ptrCast(info.image_view.toPtr());
         if (!try self.compositor.presentImageView(image_view)) {
-            frame.release() catch |err| diagnostics.logError("Vulkan texture release failed", err, null);
+            var release = try frame.releaseStart(.cpu_complete);
+            frame_owned = false;
+            defer release.release();
+            try render_target.serviceUntilComplete(texture, release);
             return false;
         }
 
+        frame_owned = false;
         self.pending_frame = frame;
         return true;
     }
 
     fn releasePendingFrame(self: *VulkanOwnedTextureBackend) void {
-        if (self.pending_frame) |*frame| frame.release() catch |err| diagnostics.logError("Vulkan texture release failed", err, null);
+        if (self.pending_frame) |*frame| {
+            var operation = frame.releaseStart(.cpu_complete) catch return;
+            defer operation.release();
+            const session = self.session.textureHandle() catch return;
+            render_target.serviceUntilComplete(session, operation) catch |err| diagnostics.logError("Vulkan texture release failed", err, null);
+        }
         self.pending_frame = null;
     }
 };
@@ -471,7 +486,7 @@ const VulkanBorrowedTextureBackend = struct {
 
         var replacement = try BorrowedImage.init(&self.compositor.context, viewport);
         errdefer replacement.deinit(self.compositor.context.device);
-        session.setVulkanBorrowedTextureTarget(.{
+        var operation = session.setVulkanBorrowedTextureTargetStart(.{
             .extent = render_target.extent(viewport),
             .physical_width = viewport.physical_width,
             .physical_height = viewport.physical_height,
@@ -482,10 +497,12 @@ const VulkanBorrowedTextureBackend = struct {
             .initial_layout = c.VK_IMAGE_LAYOUT_UNDEFINED,
             .final_layout = c.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         }) catch |err| {
-            // The session may have taken the replacement before failing, so
-            // detach before either image is released.
-            session.detach() catch {};
             diagnostics.logError("Vulkan borrowed texture set target failed", err, null);
+            return types.AppError.TextureResizeFailed;
+        };
+        defer operation.release();
+        render_target.serviceUntilComplete(session, operation) catch |err| {
+            diagnostics.logError("Vulkan borrowed texture replacement failed", err, null);
             return types.AppError.TextureResizeFailed;
         };
         // Released only once the session has taken the replacement.
@@ -512,11 +529,11 @@ const VulkanBorrowedTextureBackend = struct {
             .format = c.VK_FORMAT_R8G8B8A8_UNORM,
             .initial_layout = c.VK_IMAGE_LAYOUT_UNDEFINED,
             .final_layout = c.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        }) catch |err| {
+        }, .{ .driver = .caller_graphics_thread }) catch |err| {
             diagnostics.logError("Vulkan borrowed texture attach failed", err, null);
             return types.AppError.TextureAttachFailed;
         };
-        return .{ .texture = texture };
+        return render_target.textureSession(texture);
     }
 
     fn renderUpdate(
@@ -581,11 +598,11 @@ const VulkanSurfaceBackend = struct {
             .extent = render_target.extent(viewport),
             .context = vulkanContextDescriptor(&self.context),
             .surface = maplibre.NativePointer.fromPtr(@ptrCast(self.context.surface.?)),
-        }) catch |err| {
+        }, .{ .driver = .caller_graphics_thread }) catch |err| {
             diagnostics.logError("Vulkan surface attach failed", err, null);
             return types.AppError.SurfaceAttachFailed;
         };
-        return .{ .surface = surface };
+        return render_target.surfaceSession(surface);
     }
 };
 

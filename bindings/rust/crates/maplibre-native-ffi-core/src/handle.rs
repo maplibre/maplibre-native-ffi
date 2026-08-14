@@ -42,6 +42,8 @@ native_handle!(
     sys::mln_notification_source,
     sys::mln_event_batch,
     sys::mln_ready_batch,
+    sys::mln_render_frame_batch,
+    sys::mln_acquired_frame,
     sys::mln_resource_request_handle,
     sys::mln_offline_region_snapshot,
     sys::mln_offline_region_list,

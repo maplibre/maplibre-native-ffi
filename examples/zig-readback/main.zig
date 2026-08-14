@@ -20,30 +20,12 @@ fn waitForOperation(operation: maplibre.OperationHandle) !void {
     if (!try operation.wait(-1)) return error.OperationWaitTimedOut;
     if (try operation.resultStatus() != 0) return error.NativeOperationFailed;
 }
-
-fn drainRuntime(
-    allocator: std.mem.Allocator,
-    runtime: *maplibre.RuntimeHandle,
-    map_id: maplibre.MapId,
-    still_image_done: *bool,
-) !void {
-    var ready = try runtime.drainReady(allocator);
-    defer ready.deinit();
-
-    var batch = try runtime.drainEvents(allocator, 0);
-    defer batch.deinit();
-    for (0..batch.len()) |index| {
-        const event = try batch.at(index);
-        if (event.source_type != .map or event.source_id == null or
-            !std.meta.eql(event.source_id.?, map_id)) continue;
-        switch (event.event_type) {
-            .map_still_image_finished => still_image_done.* = true,
-            .map_loading_failed => return error.MapLoadingFailed,
-            .map_render_error => return error.MapRenderFailed,
-            .map_still_image_failed => return error.StillImageFailed,
-            else => {},
-        }
+fn waitForSessionOperation(session: *maplibre.RenderSessionHandle, operation: maplibre.OperationHandle) !void {
+    if (!build_options.supports_opengl or build_options.supports_vulkan or build_options.supports_metal) {
+        return waitForOperation(operation);
     }
+    while (!try operation.poll()) _ = try session.serviceDriverWork(0);
+    if (try operation.resultStatus() != 0) return error.NativeOperationFailed;
 }
 
 pub fn main(init_args: std.process.Init) !void {
@@ -80,63 +62,123 @@ pub fn main(init_args: std.process.Init) !void {
     defer barrier.release();
     try waitForOperation(barrier);
 
-    const still_image = try map.requestStillImage();
-    defer still_image.release();
-
-    // The graphics context and render session stay on this thread for their
-    // complete lifetime.
     var context = try OwnedTextureContext.init();
     defer context.deinit();
-    try renderOnThisThread(
+    try renderWithDriver(
         init_args.io,
         allocator,
-        &runtime,
         &map,
-        still_image,
         &context,
         output_path,
     );
 }
 
-/// Attaches, renders until the still image is complete, then reads back and
-/// writes the file. The graphics-thread-affine session never leaves this call.
-fn renderOnThisThread(
+/// Uses the native core worker when the backend can transfer graphics state.
+/// OpenGL explicitly services the caller driver on this graphics thread.
+fn renderWithDriver(
     io: std.Io,
     allocator: std.mem.Allocator,
-    runtime: *maplibre.RuntimeHandle,
     map: *maplibre.MapHandle,
-    still_image: maplibre.OperationHandle,
     context: *OwnedTextureContext,
     output_path: []const u8,
 ) !void {
-    var session = try attachOwnedTexture(context, map, .{
+    var attachment = try attachOwnedTexture(context, map, .{
         .extent = .{ .width = width, .height = height, .scale_factor = 1.0 },
     });
-    defer session.close() catch {};
+    var attachment_needs_cleanup = true;
+    errdefer if (attachment_needs_cleanup) {
+        _ = attachment.session.abandon() catch {};
+        attachment.session.destroy() catch {};
+    };
+    defer attachment.operation.release();
+    try waitForSessionOperation(&attachment.session, attachment.operation);
 
-    const map_id = try map.id();
-    var rendered_frame = false;
-    var still_image_done = false;
-    const started = std.Io.Clock.awake.now(io);
-    while (started.durationTo(std.Io.Clock.awake.now(io)).toNanoseconds() < 5 * std.time.ns_per_s) {
-        try drainRuntime(allocator, runtime, map_id, &still_image_done);
-        switch (try session.renderUpdate()) {
-            .rendered => rendered_frame = true,
-            else => {},
+    var session = attachment.session;
+    defer {
+        const detach = session.detachStart() catch null;
+        if (detach) |operation| {
+            defer operation.release();
+            waitForSessionOperation(&session, operation) catch {
+                _ = session.abandon() catch {};
+            };
+        } else {
+            _ = session.abandon() catch {};
         }
-        if (still_image_done and try still_image.poll() and rendered_frame) break;
-        try io.sleep(.fromMilliseconds(2), .awake);
-    } else {
-        return error.RenderTimedOut;
+        session.destroy() catch {};
     }
-    try waitForOperation(still_image);
+    attachment_needs_cleanup = false;
 
-    const image_data = try allocator.alloc(u8, @as(usize, width) * @as(usize, height) * 4);
-    defer allocator.free(image_data);
-    const image_info = try session.readPremultipliedRgba8Into(image_data);
+    const still_image = try map.requestStillImage();
+    defer still_image.release();
 
-    try writePpm(io, allocator, output_path, image_data, image_info);
-    std.debug.print("wrote {s} ({d}x{d})\n", .{ output_path, image_info.width, image_info.height });
+    try session.requestFrame(.{ .token = 1, .if_needed = false });
+    try waitForRenderedFrame(io, &session, still_image, 1);
+
+    var frame = try session.acquireFrame();
+    var frame_owned = true;
+    errdefer if (frame_owned) {
+        var cleanup = frame.releaseStart(.cpu_complete) catch null;
+        if (cleanup) |*operation| {
+            defer operation.release();
+            waitForSessionOperation(&session, operation.*) catch {};
+        }
+    };
+    _ = try frame.producerSync();
+    const release = try frame.releaseStart(.cpu_complete);
+    frame_owned = false;
+    defer release.release();
+    try waitForSessionOperation(&session, release);
+
+    const readback = try session.readbackStart();
+    defer readback.release();
+    try waitForSessionOperation(&session, readback);
+    var image = try session.takeReadback(allocator, readback);
+    defer image.deinit();
+
+    try writePpm(io, allocator, output_path, image.data, image.info);
+    std.debug.print("wrote {s} ({d}x{d})\n", .{ output_path, image.info.width, image.info.height });
+}
+
+fn waitForRenderedFrame(
+    io: std.Io,
+    session: *maplibre.RenderSessionHandle,
+    still_image: maplibre.OperationHandle,
+    token: u64,
+) !void {
+    var rendered = false;
+    var demand_pending = true;
+    for (0..10_000) |_| {
+        if (build_options.supports_opengl and !build_options.supports_vulkan and !build_options.supports_metal) {
+            _ = try session.serviceDriverWork(0);
+        }
+        var results = session.drainFrameResults(0) catch |err| {
+            if (err != error.NotReady) return err;
+            try io.sleep(.fromMilliseconds(1), .awake);
+            continue;
+        };
+        defer results.release();
+        for (0..try results.count()) |index| {
+            const result = try results.get(index);
+            if (result.token != token) continue;
+            demand_pending = false;
+            switch (result.disposition) {
+                .rendered => rendered = true,
+                .no_update, .size_pending, .target_not_ready => {},
+                else => return error.FrameNotRendered,
+            }
+        }
+        const still_completed = try still_image.poll();
+        if (still_completed) {
+            if (try still_image.resultStatus() != 0) return error.NativeOperationFailed;
+            if (rendered) return;
+        }
+        if (!demand_pending) {
+            try session.requestFrame(.{ .token = token, .if_needed = false });
+            demand_pending = true;
+        }
+        try io.sleep(.fromMilliseconds(1), .awake);
+    }
+    return error.FrameResultTimedOut;
 }
 
 fn logAndValidateRenderBackend() !void {
@@ -172,7 +214,7 @@ const OwnedTextureDescriptor = struct {
     extent: maplibre.RenderTargetExtent,
 };
 
-const OwnedTextureContext = if (build_options.supports_opengl) OpenGLAttachContext else if (build_options.supports_vulkan) VulkanAttachContext else if (build_options.supports_metal) struct {
+const OwnedTextureContext = if (build_options.supports_vulkan) VulkanAttachContext else if (build_options.supports_metal) struct {
     device: *anyopaque,
 
     fn init() !@This() {
@@ -184,32 +226,32 @@ const OwnedTextureContext = if (build_options.supports_opengl) OpenGLAttachConte
     fn descriptor(self: *const @This()) maplibre.MetalContextDescriptor {
         return .{ .device = maplibre.NativePointer.fromPtr(self.device) };
     }
-} else struct {};
+} else if (build_options.supports_opengl) OpenGLAttachContext else struct {};
 
-/// Attaches an owned-texture session on the calling thread, which becomes the
-/// session's owner thread.
+/// Supplies transferable state to a core worker or a thread-current OpenGL
+/// context to the explicit caller driver.
 fn attachOwnedTexture(
     context: *OwnedTextureContext,
     map: *maplibre.MapHandle,
     descriptor: OwnedTextureDescriptor,
-) !maplibre.RenderSessionHandle {
-    return if (build_options.supports_opengl)
-        try maplibre.attachOpenGLOwnedTexture(map, .{
-            .extent = descriptor.extent,
-            .context = context.descriptor(),
-        })
-    else if (build_options.supports_vulkan)
+) !maplibre.RenderSessionAttachment {
+    return if (build_options.supports_vulkan)
         try maplibre.attachVulkanOwnedTexture(map, .{
             .extent = descriptor.extent,
             .context = context.descriptor(),
-        })
+        }, .{ .driver = .core_worker, .requested_texture_ring_depth = 1 })
     else if (build_options.supports_metal)
         try maplibre.attachMetalOwnedTexture(map, .{
             .extent = descriptor.extent,
             .context = context.descriptor(),
-        })
+        }, .{ .driver = .core_worker, .requested_texture_ring_depth = 1 })
+    else if (build_options.supports_opengl)
+        try maplibre.attachOpenGLOwnedTexture(map, .{
+            .extent = descriptor.extent,
+            .context = context.descriptor(),
+        }, .{ .driver = .caller_graphics_thread, .requested_texture_ring_depth = 1 })
     else
-        unreachable;
+        return error.RenderBackendUnavailable;
 }
 
 const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag == .windows) struct {
@@ -560,14 +602,23 @@ fn writePpm(
     rgba: []const u8,
     info: maplibre.TextureImageInfo,
 ) !void {
-    const pixel_count = @as(usize, @intCast(info.width)) * @as(usize, @intCast(info.height));
-    const rgb = try allocator.alloc(u8, pixel_count * 3);
+    const image_width: usize = @intCast(info.width);
+    const image_height: usize = @intCast(info.height);
+    const stride: usize = @intCast(info.stride);
+    const row_bytes = image_width * 4;
+    const required_bytes = stride * image_height;
+    if (stride < row_bytes or info.byte_length < required_bytes or rgba.len < required_bytes) return error.InvalidReadbackLayout;
+    const rgb = try allocator.alloc(u8, image_width * image_height * 3);
     defer allocator.free(rgb);
 
-    for (0..pixel_count) |index| {
-        rgb[index * 3 + 0] = rgba[index * 4 + 0];
-        rgb[index * 3 + 1] = rgba[index * 4 + 1];
-        rgb[index * 3 + 2] = rgba[index * 4 + 2];
+    for (0..image_height) |row| {
+        const source = rgba[row * stride ..][0..row_bytes];
+        const destination = rgb[row * image_width * 3 ..][0 .. image_width * 3];
+        for (0..image_width) |column| {
+            destination[column * 3 + 0] = source[column * 4 + 0];
+            destination[column * 3 + 1] = source[column * 4 + 1];
+            destination[column * 3 + 2] = source[column * 4 + 2];
+        }
     }
 
     var file = try std.Io.Dir.cwd().createFile(io, output_path, .{});

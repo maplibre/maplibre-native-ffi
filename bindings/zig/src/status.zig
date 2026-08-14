@@ -11,6 +11,9 @@ pub const NativeStatusError = error{
     WrongThread,
     Unsupported,
     Cancelled,
+    Busy,
+    TargetLost,
+    NotReady,
     NativeError,
     UnknownStatus,
 };
@@ -80,6 +83,9 @@ fn nativeStatusError(raw_status: i32) NativeStatusError {
         c.MLN_STATUS_INVALID_STATE => error.InvalidState,
         c.MLN_STATUS_WRONG_THREAD => error.WrongThread,
         c.MLN_STATUS_UNSUPPORTED => error.Unsupported,
+        c.MLN_STATUS_BUSY => error.Busy,
+        c.MLN_STATUS_TARGET_LOST => error.TargetLost,
+        c.MLN_STATUS_NOT_READY => error.NotReady,
         c.MLN_STATUS_NATIVE_ERROR => error.NativeError,
         c.MLN_STATUS_CANCELLED => error.Cancelled,
         else => error.UnknownStatus,
@@ -92,6 +98,9 @@ test "native status values map to stable Zig errors" {
     try std.testing.expectError(error.WrongThread, checkStatus(c.MLN_STATUS_WRONG_THREAD, null));
     try std.testing.expectError(error.Unsupported, checkStatus(c.MLN_STATUS_UNSUPPORTED, null));
     try std.testing.expectError(error.Cancelled, checkStatus(c.MLN_STATUS_CANCELLED, null));
+    try std.testing.expectError(error.Busy, checkStatus(c.MLN_STATUS_BUSY, null));
+    try std.testing.expectError(error.TargetLost, checkStatus(c.MLN_STATUS_TARGET_LOST, null));
+    try std.testing.expectError(error.NotReady, checkStatus(c.MLN_STATUS_NOT_READY, null));
     try std.testing.expectError(error.NativeError, checkStatus(c.MLN_STATUS_NATIVE_ERROR, null));
     try checkStatus(c.MLN_STATUS_OK, null);
 }

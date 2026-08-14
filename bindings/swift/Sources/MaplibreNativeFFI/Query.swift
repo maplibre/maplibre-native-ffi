@@ -80,35 +80,40 @@ public extension RenderSessionHandle {
   func queryRenderedFeatures(
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions = RenderedFeatureQueryOptions()
-  ) throws -> Data {
-    try mapNativeFailure {
-      try geometry.nativeGeometry.withNativeGeometry { nativeGeometry in
-        try options.nativeOptions.withNativeOptions { nativeOptions in
-          try NativeQuery.renderedFeatures(
-            session: requireLiveHandle(),
-            geometry: nativeGeometry,
-            options: nativeOptions
-          )
+  ) async throws -> Data {
+    let operation = try mapNativeFailure {
+      try geometry.nativeGeometry.withNativeGeometry { geometry in
+        try options.nativeOptions.withNativeOptions { options in
+          try startOperation { session, operation in
+            mln_render_session_query_rendered_features_start(
+              session, geometry, options, operation
+            )
+          }
         }
       }
     }
+    return try await takeRenderQuery(operation)
   }
 
   func querySourceFeatures(
     sourceId: String,
     options: SourceFeatureQueryOptions = SourceFeatureQueryOptions()
-  ) throws -> Data {
-    try mapNativeFailure {
+  ) async throws -> Data {
+    let operation = try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      return try options.nativeOptions.withNativeOptions { nativeOptions in
-        try NativeQuery.sourceFeatures(
-          session: self.requireLiveHandle(),
-          sourceId: arena.view(sourceId),
-          options: nativeOptions
-        )
+      return try options.nativeOptions.withNativeOptions { options in
+        try startOperation { session, operation in
+          mln_render_session_query_source_features_start(
+            session,
+            arena.view(sourceId),
+            options,
+            operation
+          )
+        }
       }
     }
+    return try await takeRenderQuery(operation)
   }
 
   func queryFeatureExtension(
@@ -117,56 +122,111 @@ public extension RenderSessionHandle {
     extensionName: String,
     extensionField: String,
     arguments: Data? = nil
-  ) throws -> Data {
-    try mapNativeFailure {
+  ) async throws -> Data {
+    let operation = try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      let call = { (arguments: UnsafePointer<mln_buffer_view>?) throws in
-        try NativeQuery.featureExtensions(
-          session: self.requireLiveHandle(),
-          sourceId: arena.view(sourceId),
-          feature: arena.view(feature),
-          extensionName: arena.view(extensionName),
-          extensionField: arena.view(extensionField),
-          arguments: arguments
-        )
+      let start = {
+        (arguments: UnsafePointer<mln_buffer_view>?) throws
+        -> NativeOperationHandle in
+        try self.startOperation { session, operation in
+          mln_render_session_query_feature_extensions_start(
+            session,
+            arena.view(sourceId),
+            arena.view(feature),
+            arena.view(extensionName),
+            arena.view(extensionField),
+            arguments,
+            operation
+          )
+        }
       }
-      guard let arguments else { return try call(nil) }
-      var argumentsView = arena.view(arguments)
-      return try withUnsafePointer(to: &argumentsView, call)
+      if let arguments {
+        var view = arena.view(arguments)
+        return try withUnsafePointer(to: &view, start)
+      }
+      return try start(nil)
     }
+    return try await takeRenderQuery(operation)
   }
 
-  func setFeatureState(selector: FeatureStateSelector, state: Data) throws {
-    try mapNativeFailure {
+  func setFeatureState(
+    selector: FeatureStateSelector,
+    state: Data
+  ) async throws {
+    let operation = try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try selector.nativeSelector.withNativeSelector { selector in
-        try checkStatus(mln_render_session_set_feature_state(
-          requireLiveHandle().raw,
-          selector,
-          arena.view(state)
-        ))
+      return try selector.nativeSelector.withNativeSelector { selector in
+        try startOperation { session, operation in
+          mln_render_session_set_feature_state_start(
+            session,
+            selector.pointee.source_id,
+            selector.pointee.source_layer_id,
+            selector.pointee.feature_id,
+            arena.view(state),
+            operation
+          )
+        }
       }
+    }
+    defer { mln_operation_release(operation.raw) }
+    try await waitForOperation(operation)
+  }
+
+  func featureState(selector: FeatureStateSelector) async throws -> Data {
+    let operation = try mapNativeFailure {
+      try selector.nativeSelector.withNativeSelector { selector in
+        try startOperation { session, operation in
+          mln_render_session_get_feature_state_start(
+            session,
+            selector.pointee.source_id,
+            selector.pointee.source_layer_id,
+            selector.pointee.feature_id,
+            operation
+          )
+        }
+      }
+    }
+    defer { mln_operation_release(operation.raw) }
+    try await waitForOperation(operation)
+    return try mapNativeFailure {
+      var buffer: mln_buffer = 0
+      try checkStatus(mln_render_session_get_feature_state_take_result(
+        operation.raw, &buffer
+      ))
+      return try NativeMemory.copyBuffer(NativeBufferHandle(raw: buffer))
     }
   }
 
-  func featureState(selector: FeatureStateSelector) throws -> Data {
-    try mapNativeFailure {
+  func removeFeatureState(selector: FeatureStateSelector) async throws {
+    let operation = try mapNativeFailure {
       try selector.nativeSelector.withNativeSelector { selector in
-        try NativeQuery.featureState(requireLiveHandle(), selector: selector)
+        try startOperation { session, operation in
+          mln_render_session_remove_feature_state_start(
+            session,
+            selector.pointee.source_id,
+            selector.pointee.source_layer_id,
+            selector.pointee.feature_id,
+            selector.pointee.state_key,
+            operation
+          )
+        }
       }
     }
+    defer { mln_operation_release(operation.raw) }
+    try await waitForOperation(operation)
   }
 
-  func removeFeatureState(selector: FeatureStateSelector) throws {
-    try mapNativeFailure {
-      try selector.nativeSelector.withNativeSelector { selector in
-        try checkStatus(mln_render_session_remove_feature_state(
-          requireLiveHandle().raw,
-          selector
-        ))
-      }
+  private func takeRenderQuery(
+    _ operation: NativeOperationHandle
+  ) async throws -> Data {
+    defer { mln_operation_release(operation.raw) }
+    try await waitForOperation(operation)
+    return try mapNativeFailure {
+      var buffer: mln_buffer = 0
+      try checkStatus(mln_render_query_take_result(operation.raw, &buffer))
+      return try NativeMemory.copyBuffer(NativeBufferHandle(raw: buffer))
     }
   }
 }

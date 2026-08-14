@@ -5,6 +5,7 @@
 
 #include <Metal/MTLDevice.hpp>
 #include <Metal/MTLTexture.hpp>
+#include <vector>
 
 namespace mln::core {
 
@@ -14,7 +15,9 @@ class MetalTextureBackend final : public mbgl::mtl::RendererBackend,
   class MetalTextureRenderableResource;
 
  public:
-  MetalTextureBackend(MTL::Device* host_device, mbgl::Size size);
+  MetalTextureBackend(
+    MTL::Device* host_device, mbgl::Size size, std::size_t ring_depth = 1
+  );
   MetalTextureBackend(MTL::Texture* borrowed_texture, mbgl::Size size);
   MetalTextureBackend(const MetalTextureBackend&) = delete;
   auto operator=(const MetalTextureBackend&) -> MetalTextureBackend& = delete;
@@ -30,6 +33,9 @@ class MetalTextureBackend final : public mbgl::mtl::RendererBackend,
   void updateAssumedState() override;
 
   auto metal_texture() -> MTL::Texture*;
+  auto metal_texture_at(std::size_t slot) -> MTL::Texture*;
+  auto select_slot(std::size_t slot) -> bool;
+  void set_ring_size(mbgl::Size size);
 
   [[nodiscard]] auto has_device(const MTL::Device* other) const -> bool;
   // Whether a replacement texture has the pixel format this session's cached
@@ -45,6 +51,9 @@ class MetalTextureBackend final : public mbgl::mtl::RendererBackend,
   // Recorded when this session took borrowed_texture_, which it does not
   // retain and the host may already have released.
   MTL::PixelFormat borrowed_pixel_format_ = MTL::PixelFormatInvalid;
+  std::vector<std::unique_ptr<mbgl::gfx::RenderableResource>> slot_resources_;
+  std::size_t selected_slot_ = 0;
+  std::vector<mbgl::Size> slot_sizes_;
 };
 
 }  // namespace mln::core

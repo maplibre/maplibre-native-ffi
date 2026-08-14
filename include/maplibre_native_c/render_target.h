@@ -25,6 +25,95 @@ typedef struct mln_render_target_extent {
   double scale_factor;
 } mln_render_target_extent;
 
+/** Execution placement for one render session. */
+typedef enum mln_render_driver_kind : uint32_t {
+  /**
+   * Native code owns a serial worker that initializes, drives, and tears down
+   * transferable graphics state.
+   */
+  MLN_RENDER_DRIVER_CORE_WORKER = 1U,
+  /**
+   * The host explicitly calls the narrow driver API from the thread or realm
+   * where its graphics context is current.
+   */
+  MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD = 2U,
+} mln_render_driver_kind;
+
+/** Optional render-session capabilities. */
+typedef enum mln_render_session_capability_flag : uint32_t {
+  MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION = 1U << 0U,
+  MLN_RENDER_SESSION_CAPABILITY_READBACK = 1U << 1U,
+  MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC = 1U << 2U,
+  MLN_RENDER_SESSION_CAPABILITY_PRESENTATION = 1U << 3U,
+} mln_render_session_capability_flag;
+
+/**
+ * Common attachment policy copied before an attach call returns.
+ *
+ * operation_source is the receiver for attach and later session-operation
+ * completions. A null operation_source inherits the map runtime's source.
+ * Null frame_source and driver_work_source values inherit operation_source.
+ * The receiver roles may use one source or independent sources.
+ *
+ * A successful backend attach-start call publishes a session in ATTACHING
+ * state and its completion operation together. Hosts may service caller-driver
+ * work through that session before attachment completes. A failed completion
+ * still requires normal detach or abandonment before session destruction.
+ */
+typedef struct mln_render_session_attach_options {
+  uint32_t size;
+  /** One mln_render_driver_kind value. */
+  uint32_t driver;
+  /** Requested owned-texture slot count. Ignored by other targets. */
+  uint32_t requested_texture_ring_depth;
+  uint32_t reserved;
+  mln_notification_source operation_source;
+  mln_notification_source frame_source;
+  mln_notification_source driver_work_source;
+} mln_render_session_attach_options;
+
+/** Driver and target capabilities fixed for one attached render session. */
+typedef struct mln_render_session_capabilities {
+  uint32_t size;
+  /** One mln_render_driver_kind value. */
+  uint32_t driver;
+  /** Granted owned-texture slot count, or zero for a target without a ring. */
+  uint32_t texture_ring_depth;
+  /** A bitwise OR of mln_render_session_capability_flag values. */
+  uint32_t flags;
+} mln_render_session_capabilities;
+
+/** Synchronization payload kind for acquired texture frames. */
+typedef enum mln_gpu_sync_kind : uint32_t {
+  /** The producer or consumer has completed before the API call returns. */
+  MLN_GPU_SYNC_CPU_COMPLETE = 0U,
+  /** id<MTLSharedEvent> plus a monotonically increasing signal value. */
+  MLN_GPU_SYNC_METAL_SHARED_EVENT = 1U,
+  /** VkSemaphore plus a timeline value. */
+  MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE = 2U,
+  /** GLsync, used only by a caller-graphics-thread driver. */
+  MLN_GPU_SYNC_OPENGL_FENCE = 3U,
+  /** A backend-defined WebGPU completion token. */
+  MLN_GPU_SYNC_WEBGPU_TOKEN = 4U,
+} mln_gpu_sync_kind;
+
+/**
+ * Backend synchronization copied by frame access and release calls.
+ *
+ * object is retained only for Metal. Vulkan, OpenGL, and WebGPU objects remain
+ * borrowed until the release operation completes.
+ */
+typedef struct mln_gpu_sync {
+  uint32_t size;
+  /** One mln_gpu_sync_kind value. */
+  uint32_t kind;
+  void* object;
+  uint64_t value;
+} mln_gpu_sync;
+
+/** Returns CPU-complete synchronization for this C API version. */
+MLN_API mln_gpu_sync mln_gpu_sync_default(void) MLN_NOEXCEPT;
+
 /** Metal backend context fields shared by Metal render targets. */
 typedef struct mln_metal_context_descriptor {
   uint32_t size;
@@ -157,23 +246,41 @@ typedef struct mln_egl_context_descriptor {
   void* get_proc_address;
 } mln_egl_context_descriptor;
 
+/** WebGL context placement. */
+typedef enum mln_webgl_context_kind : uint32_t {
+  /** Use a host-created context on its current browser agent. */
+  MLN_WEBGL_CONTEXT_EXISTING = 0U,
+  /**
+   * Create a WebGL 2 context on a native worker whose pthread creation claims
+   * canvas_selector through Emscripten's transferred-canvases attribute.
+   */
+  MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS = 1U,
+} mln_webgl_context_kind;
+
 /** WebGL context fields shared by OpenGL render targets in the browser. */
 typedef struct mln_webgl_context_descriptor {
   uint32_t size;
-  /** Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE. Must be positive. */
+  /** One mln_webgl_context_kind value. */
+  uint32_t kind;
+  /** Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive.
+   */
   int32_t context;
+  /**
+   * Copied UTF-8 Emscripten target selector for TRANSFERRED_CANVAS. The HTML
+   * canvas must still be transferable when attachment starts.
+   */
+  mln_buffer_view canvas_selector;
 } mln_webgl_context_descriptor;
 
 /** OpenGL backend context fields shared by OpenGL render targets. */
 typedef struct mln_opengl_context_descriptor {
   uint32_t size;
-  /** WGL or EGL context provider. */
+  /** WGL, EGL, or WebGL context provider. */
   mln_opengl_context_platform platform;
   /**
-   * Whether the session shares its thread with host graphics work. WGL and EGL
-   * surface sessions support both. A WebGL session renders through the host's
-   * own context and a texture session hands its texture to the host, so both
-   * are shared only.
+   * Whether the session shares its thread with host graphics work. WGL, EGL,
+   * and existing WebGL contexts preserve this policy independently of driver
+   * selection. A transferred WebGL canvas is dedicated to its core worker.
    */
   mln_opengl_context_ownership ownership;
   union {
@@ -182,6 +289,10 @@ typedef struct mln_opengl_context_descriptor {
     mln_webgl_context_descriptor webgl;
   } data;
 } mln_opengl_context_descriptor;
+
+/** Returns default core-worker attachment policy with inherited completions. */
+MLN_API mln_render_session_attach_options
+mln_render_session_attach_options_default(void) MLN_NOEXCEPT;
 
 /**
  * Computes the physical device-pixel size of a logical render target extent.

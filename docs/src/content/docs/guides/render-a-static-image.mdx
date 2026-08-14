@@ -1,6 +1,6 @@
 ---
 title: Render a static image
-description: Create a map in static mode, request one image, and read the finished pixels into host memory.
+description: Attach an owned texture target, request one frame, and read the finished pixels.
 sidebar:
   order: 7
 ---
@@ -10,39 +10,37 @@ import { region } from "../../../snippets";
 
 import stillImage from "../../../../snippets/c/still-image.c?raw";
 
-A static map renders one image per request. Use it for a tile service, thumbnail
-job, or image export that waits for completion and reads pixels into host
-memory.
-
-Static mode is fixed when the map is created. Create a dedicated static map, as
-[Create a map](/maplibre-native-ffi/guides/create-a-map/) describes. Reading
-pixels also requires a session-owned texture. The render session allocates this
-target and can copy its contents into host memory.
+A still-image job uses a session-owned texture target with a ring depth of one.
+The host requests a frame, waits for its terminal result, and starts readback of
+the completed texture.
 
 ## Request one image
 
-Create the map at the render target's size. If the attached session uses a
-different extent, submit a map resize command before starting the still-image
-operation.
+Create the map and target with the required logical extent. Start attachment and
+retain both the returned attaching session and operation. This snippet uses
+OpenGL through EGL, so it services caller-driver work on the graphics thread
+until attachment completes.
 
 <Code code={region(stillImage, "create")} lang="c" title="still-image.c" />
 
-The render session allocates the texture at the extent that the descriptor
-names. Each render backend has its own descriptor type and attach function, and
-this snippet uses OpenGL through EGL.
-
 <Code code={region(stillImage, "attach")} lang="c" title="still-image.c" />
 
-Render on every turn while the still-image operation is pending. A static map
-advances loading through render calls. Completion can arrive before or after
-the render call that produced the pixels. Read pixels only after the operation
-completed successfully and a frame rendered.
+Submit one frame demand with a token that identifies the job. Service a caller
+driver whenever its work endpoint is ready. A core-worker target needs no host
+graphics service.
+
+Drain frame results until the matching token reaches a terminal disposition. A
+rendered disposition supplies the frame generation for readback. Handle target
+not ready according to the target's readiness source. No update and size pending
+wait for a newer map update or matching extent generation.
 
 <Code code={region(stillImage, "await")} lang="c" title="still-image.c" />
 
 ## Read the pixels
 
-Probe for the size first. The scale factor determines the physical extent. The
-copy uses premultiplied RGBA8 with the row stride that the probe reports.
+Start readback after the rendered result. Readback is an operation routed through
+the selected driver, so continue servicing caller-driver work until it
+completes. Taking the result transfers owned premultiplied RGBA8 bytes and their
+width, height, row stride, and byte length.
 
 <Code code={region(stillImage, "read")} lang="c" title="still-image.c" />

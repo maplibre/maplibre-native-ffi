@@ -75,9 +75,11 @@ Most hosts begin with four event kinds.
 A style-loaded event means that the style parsed and its sources exist. Add
 host-owned sources and layers after this event.
 
-A render-update-available event means that the map published a new frame. A
-render-frame-finished event carries a repaint flag. Draw another frame when the
-flag is set. Additional frames advance camera animations and label placement.
+A render-update-available event means that the map published new render state.
+The session wakes its core worker or caller-driver mailbox directly, so this
+event is observational rather than a requirement for frame progress. Submit
+frame demand according to the host's cadence. Drain the session's frame-result
+source for terminal demand outcomes and pending-changes state.
 
 A loading-failed event carries the failure text for a style or resource request.
 A command-finished event carries the command ID, terminal disposition, final

@@ -35,6 +35,8 @@ enum class HandleKind : std::uint8_t {
   ReadyBatch = 17,
   AdapterResourceRequestQueue = 18,
   AdapterLogQueue = 19,
+  AcquiredFrame = 20,
+  RenderFrameBatch = 21,
 };
 
 inline constexpr auto handle_generation_bits = std::uint32_t{36};

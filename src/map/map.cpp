@@ -724,15 +724,20 @@ class HeadlessFrontend final : public mbgl::RendererFrontend {
   // Store render state before publishing it to sessions and event consumers.
   void update(std::shared_ptr<mbgl::UpdateParameters> update) override {
     std::function<void()> publish;
+    std::function<void()> publish_session;
     {
       const std::scoped_lock lock(latest_update_mutex_);
       latest_update_ = std::move(update);
       ++latest_update_generation_;
       repaint_demand_ = true;
       publish = publish_;
+      publish_session = session_publish_;
     }
     if (publish) {
       publish();
+    }
+    if (publish_session) {
+      publish_session();
     }
     if (
       mln::core::event_selected(
@@ -753,6 +758,10 @@ class HeadlessFrontend final : public mbgl::RendererFrontend {
   auto set_publish_callback(std::function<void()> publish) -> void {
     const std::scoped_lock lock(latest_update_mutex_);
     publish_ = std::move(publish);
+  }
+  auto set_session_publish_callback(std::function<void()> publish) -> void {
+    const std::scoped_lock lock(latest_update_mutex_);
+    session_publish_ = std::move(publish);
   }
 
   [[nodiscard]] auto latest_update_generation() const -> uint64_t {
@@ -801,6 +810,7 @@ class HeadlessFrontend final : public mbgl::RendererFrontend {
   mutable std::mutex latest_update_mutex_;
   std::shared_ptr<mbgl::UpdateParameters> latest_update_;
   std::function<void()> publish_;
+  std::function<void()> session_publish_;
   uint64_t latest_update_generation_ = 0;
   bool repaint_demand_ = false;
 };
@@ -3199,6 +3209,21 @@ auto map_post_trigger_repaint(mln_map map) -> mln_status {
 auto map_latest_update(mln_map map) -> std::shared_ptr<mbgl::UpdateParameters> {
   auto* live = handle_table<MapObject>().try_resolve(map);
   return live == nullptr ? nullptr : live->frontend->latest_update();
+}
+auto map_latest_update_generation(mln_map map) noexcept -> uint64_t {
+  auto* live = handle_table<MapObject>().try_resolve(map);
+  return live == nullptr ? 0 : live->frontend->latest_update_generation();
+}
+
+auto map_set_render_session_publish_callback(
+  mln_map map, std::function<void()> callback
+) -> mln_status {
+  const auto live = handle_table<MapObject>().lease(map);
+  if (live == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  live->frontend->set_session_publish_callback(std::move(callback));
+  return MLN_STATUS_OK;
 }
 
 auto map_renderer_observer(mln_map map) -> mbgl::RendererObserver* {

@@ -1,11 +1,3 @@
-// The surface and texture session entry points for the backends this build does
-// not carry.
-//
-// The validation order is part of what a host sees, so it matches the
-// backend-native attach paths step for step: the map, the descriptor, the
-// output handle, then the scaled extent. Only once all of those pass does the
-// caller hear that the backend is missing.
-
 #include "diagnostics/diagnostics.hpp"
 #include "map/map.hpp"
 #include "maplibre_native_c.h"
@@ -16,635 +8,436 @@
 namespace mln::core {
 namespace {
 
-auto validate_attach_map(mln_map map) -> mln_status {
-  MapObject* live_map = nullptr;
-  return validate_map_live(map, live_map);
-}
-
-auto validate_attach_out_session(mln_render_session* out_session)
-  -> mln_status {
-  return validate_attach_output(
-    out_session, "out_session must not be null",
-    "out_session must point to a null handle"
-  );
-}
-
-auto validate_surface_extent(const mln_render_target_extent& extent)
-  -> mln_status {
-  return validate_physical_size(
-    extent.width, extent.height, extent.scale_factor,
-    "scaled surface dimensions are too large"
-  );
-}
-
-auto validate_owned_texture_extent(const mln_render_target_extent& extent)
-  -> mln_status {
-  return validate_physical_size(
-    extent.width, extent.height, extent.scale_factor,
-    "scaled texture dimensions are too large"
-  );
-}
-
-// A frame belongs to a session rather than a descriptor, so this checks the
-// session handle and the frame's own size.
-template <typename Frame>
-auto validate_texture_frame(
-  mln_render_session texture, const Frame* frame, const char* message
+auto validate_unsupported_attach(
+  mln_map map, const mln_render_session_attach_options* options,
+  mln_render_session* out_session, mln_operation* out_operation
 ) -> mln_status {
-  mln_render_session_object* live = nullptr;
-  const auto status = validate_texture(texture, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
+  MapObject* live_map = nullptr;
+  const auto map_status = validate_map_live(map, live_map);
+  if (map_status != MLN_STATUS_OK) {
+    return map_status;
   }
-  if (frame == nullptr || frame->size < sizeof(Frame)) {
-    set_thread_error(message);
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
+  return validate_render_session_attach_request(
+    options, out_session, out_operation
+  );
+}
+
+auto unsupported(const char* message) -> mln_status {
+  set_thread_error(message);
+  return MLN_STATUS_UNSUPPORTED;
 }
 
 }  // namespace
 
 #if !defined(MLN_RENDER_BACKEND_METAL)
-
-auto metal_surface_attach(
+auto metal_surface_attach_start(
   mln_map map, const mln_metal_surface_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, mln_operation* out_operation
 ) -> mln_status {
-  const auto map_status = validate_attach_map(map);
-  if (map_status != MLN_STATUS_OK) {
-    return map_status;
-  }
-  const auto descriptor_status = validate_metal_surface_descriptor(descriptor);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
-  }
-  const auto output_status = validate_attach_out_session(out_session);
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
-  }
-  const auto extent_status = validate_surface_extent(descriptor->extent);
-  if (extent_status != MLN_STATUS_OK) {
-    return extent_status;
-  }
-  set_thread_error("Metal surface sessions are not supported by this build");
-  return MLN_STATUS_UNSUPPORTED;
+  if (
+    const auto status = validate_metal_surface_descriptor(descriptor);
+    status != MLN_STATUS_OK
+  )
+    return status;
+  if (
+    const auto status = validate_physical_size(
+      descriptor->extent.width, descriptor->extent.height,
+      descriptor->extent.scale_factor, "scaled surface dimensions are too large"
+    );
+    status != MLN_STATUS_OK
+  )
+    return status;
+  if (
+    const auto status =
+      validate_unsupported_attach(map, options, out_session, out_operation);
+    status != MLN_STATUS_OK
+  )
+    return status;
+  return unsupported("Metal surface sessions are not supported by this build");
 }
-
-auto metal_owned_texture_attach(
+auto metal_owned_texture_attach_start(
   mln_map map, const mln_metal_owned_texture_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, mln_operation* out_operation
 ) -> mln_status {
-  const auto map_status = validate_attach_map(map);
-  if (map_status != MLN_STATUS_OK) {
-    return map_status;
-  }
-  const auto descriptor_status =
-    validate_metal_owned_texture_descriptor(descriptor);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
-  }
-  const auto output_status = validate_attach_out_session(out_session);
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
-  }
-  const auto extent_status = validate_owned_texture_extent(descriptor->extent);
-  if (extent_status != MLN_STATUS_OK) {
-    return extent_status;
-  }
-  set_thread_error("Metal texture sessions are not supported by this build");
-  return MLN_STATUS_UNSUPPORTED;
+  if (
+    const auto status = validate_metal_owned_texture_descriptor(descriptor);
+    status != MLN_STATUS_OK
+  )
+    return status;
+  if (
+    const auto status = validate_physical_size(
+      descriptor->extent.width, descriptor->extent.height,
+      descriptor->extent.scale_factor, "scaled texture dimensions are too large"
+    );
+    status != MLN_STATUS_OK
+  )
+    return status;
+  if (
+    const auto status =
+      validate_unsupported_attach(map, options, out_session, out_operation);
+    status != MLN_STATUS_OK
+  )
+    return status;
+  return unsupported("Metal texture sessions are not supported by this build");
 }
-
-auto metal_borrowed_texture_attach(
+auto metal_borrowed_texture_attach_start(
   mln_map map, const mln_metal_borrowed_texture_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, mln_operation* out_operation
 ) -> mln_status {
-  const auto map_status = validate_attach_map(map);
-  if (map_status != MLN_STATUS_OK) {
-    return map_status;
-  }
-  const auto descriptor_status =
-    validate_metal_borrowed_texture_descriptor(descriptor);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
-  }
-  const auto output_status = validate_attach_out_session(out_session);
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
-  }
-  const auto physical_status = validate_borrowed_physical_size(
-    descriptor->physical_width, descriptor->physical_height
-  );
-  if (physical_status != MLN_STATUS_OK) {
-    return physical_status;
-  }
-  set_thread_error("Metal texture sessions are not supported by this build");
-  return MLN_STATUS_UNSUPPORTED;
-}
-
-auto metal_owned_texture_acquire_frame(
-  mln_render_session texture, mln_metal_owned_texture_frame* out_frame
-) -> mln_status {
-  const auto status = validate_texture_frame(
-    texture, out_frame, "out_frame must not be null and must have a valid size"
-  );
-  if (status != MLN_STATUS_OK) {
+  if (
+    const auto status = validate_metal_borrowed_texture_descriptor(descriptor);
+    status != MLN_STATUS_OK
+  )
     return status;
-  }
-  set_thread_error("Metal texture sessions are not supported by this build");
-  return MLN_STATUS_UNSUPPORTED;
-}
-
-auto metal_owned_texture_release_frame(
-  mln_render_session texture, const mln_metal_owned_texture_frame* frame
-) -> mln_status {
-  const auto status = validate_texture_frame(
-    texture, frame, "frame must not be null and must have a valid size"
-  );
-  if (status != MLN_STATUS_OK) {
+  if (
+    const auto status = validate_borrowed_physical_size(
+      descriptor->physical_width, descriptor->physical_height
+    );
+    status != MLN_STATUS_OK
+  )
     return status;
-  }
-  set_thread_error("Metal texture sessions are not supported by this build");
-  return MLN_STATUS_UNSUPPORTED;
+  if (
+    const auto status =
+      validate_unsupported_attach(map, options, out_session, out_operation);
+    status != MLN_STATUS_OK
+  )
+    return status;
+  return unsupported("Metal texture sessions are not supported by this build");
 }
-
-auto metal_borrowed_texture_set_target(
-  mln_render_session session,
-  const mln_metal_borrowed_texture_descriptor* descriptor
+auto metal_borrowed_texture_set_target_start(
+  mln_render_session, const mln_metal_borrowed_texture_descriptor* descriptor,
+  mln_operation*
 ) -> mln_status {
-  mln_render_session_object* live = nullptr;
-  const auto session_status = validate_render_session_retarget(
-    session, RetargetTargetKind::BorrowedTexture, live
-  );
-  if (session_status != MLN_STATUS_OK) {
-    return session_status;
-  }
-  const auto descriptor_status =
-    validate_metal_borrowed_texture_descriptor(descriptor);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
-  }
-  set_thread_error("Metal texture sessions are not supported by this build");
-  return MLN_STATUS_UNSUPPORTED;
+  if (
+    const auto status = validate_metal_borrowed_texture_descriptor(descriptor);
+    status != MLN_STATUS_OK
+  )
+    return status;
+  return unsupported("Metal texture sessions are not supported by this build");
 }
-
-auto metal_surface_set_target(
-  mln_render_session session, const mln_metal_surface_descriptor* descriptor
+auto metal_surface_set_target_start(
+  mln_render_session, const mln_metal_surface_descriptor* descriptor,
+  mln_operation*
 ) -> mln_status {
-  mln_render_session_object* live = nullptr;
-  const auto session_status = validate_render_session_retarget(
-    session, RetargetTargetKind::Surface, live
-  );
-  if (session_status != MLN_STATUS_OK) {
-    return session_status;
-  }
-  const auto descriptor_status = validate_metal_surface_descriptor(descriptor);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
-  }
-  set_thread_error("Metal surface sessions are not supported by this build");
-  return MLN_STATUS_UNSUPPORTED;
+  if (
+    const auto status = validate_metal_surface_descriptor(descriptor);
+    status != MLN_STATUS_OK
+  )
+    return status;
+  return unsupported("Metal surface sessions are not supported by this build");
 }
-
 #endif
 
 #if !defined(MLN_RENDER_BACKEND_VULKAN)
-
-auto vulkan_surface_attach(
+auto vulkan_surface_attach_start(
   mln_map map, const mln_vulkan_surface_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, mln_operation* out_operation
 ) -> mln_status {
-  const auto map_status = validate_attach_map(map);
-  if (map_status != MLN_STATUS_OK) {
-    return map_status;
-  }
-  const auto descriptor_status = validate_vulkan_surface_descriptor(descriptor);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
-  }
-  const auto output_status = validate_attach_out_session(out_session);
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
-  }
-  const auto extent_status = validate_surface_extent(descriptor->extent);
-  if (extent_status != MLN_STATUS_OK) {
-    return extent_status;
-  }
-  set_thread_error("Vulkan surface sessions are not supported by this build");
-  return MLN_STATUS_UNSUPPORTED;
+  if (
+    const auto status = validate_vulkan_surface_descriptor(descriptor);
+    status != MLN_STATUS_OK
+  )
+    return status;
+  if (
+    const auto status = validate_physical_size(
+      descriptor->extent.width, descriptor->extent.height,
+      descriptor->extent.scale_factor, "scaled surface dimensions are too large"
+    );
+    status != MLN_STATUS_OK
+  )
+    return status;
+  if (
+    const auto status =
+      validate_unsupported_attach(map, options, out_session, out_operation);
+    status != MLN_STATUS_OK
+  )
+    return status;
+  return unsupported("Vulkan surface sessions are not supported by this build");
 }
-
-auto vulkan_owned_texture_attach(
+auto vulkan_owned_texture_attach_start(
   mln_map map, const mln_vulkan_owned_texture_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, mln_operation* out_operation
 ) -> mln_status {
-  const auto map_status = validate_attach_map(map);
-  if (map_status != MLN_STATUS_OK) {
-    return map_status;
-  }
-  const auto descriptor_status =
-    validate_vulkan_owned_texture_descriptor(descriptor);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
-  }
-  const auto output_status = validate_attach_out_session(out_session);
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
-  }
-  const auto extent_status = validate_owned_texture_extent(descriptor->extent);
-  if (extent_status != MLN_STATUS_OK) {
-    return extent_status;
-  }
-  set_thread_error("Vulkan texture sessions are not supported by this build");
-  return MLN_STATUS_UNSUPPORTED;
+  if (
+    const auto status = validate_vulkan_owned_texture_descriptor(descriptor);
+    status != MLN_STATUS_OK
+  )
+    return status;
+  if (
+    const auto status = validate_physical_size(
+      descriptor->extent.width, descriptor->extent.height,
+      descriptor->extent.scale_factor, "scaled texture dimensions are too large"
+    );
+    status != MLN_STATUS_OK
+  )
+    return status;
+  if (
+    const auto status =
+      validate_unsupported_attach(map, options, out_session, out_operation);
+    status != MLN_STATUS_OK
+  )
+    return status;
+  return unsupported("Vulkan texture sessions are not supported by this build");
 }
-
-auto vulkan_borrowed_texture_attach(
+auto vulkan_borrowed_texture_attach_start(
   mln_map map, const mln_vulkan_borrowed_texture_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, mln_operation* out_operation
 ) -> mln_status {
-  const auto map_status = validate_attach_map(map);
-  if (map_status != MLN_STATUS_OK) {
-    return map_status;
-  }
-  const auto descriptor_status =
-    validate_vulkan_borrowed_texture_descriptor(descriptor);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
-  }
-  const auto output_status = validate_attach_out_session(out_session);
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
-  }
-  const auto physical_status = validate_borrowed_physical_size(
-    descriptor->physical_width, descriptor->physical_height
-  );
-  if (physical_status != MLN_STATUS_OK) {
-    return physical_status;
-  }
-  set_thread_error("Vulkan texture sessions are not supported by this build");
-  return MLN_STATUS_UNSUPPORTED;
-}
-
-auto vulkan_owned_texture_acquire_frame(
-  mln_render_session texture, mln_vulkan_owned_texture_frame* out_frame
-) -> mln_status {
-  const auto status = validate_texture_frame(
-    texture, out_frame, "out_frame must not be null and must have a valid size"
-  );
-  if (status != MLN_STATUS_OK) {
+  if (
+    const auto status = validate_vulkan_borrowed_texture_descriptor(descriptor);
+    status != MLN_STATUS_OK
+  )
     return status;
-  }
-  set_thread_error("Vulkan texture sessions are not supported by this build");
-  return MLN_STATUS_UNSUPPORTED;
-}
-
-auto vulkan_owned_texture_release_frame(
-  mln_render_session texture, const mln_vulkan_owned_texture_frame* frame
-) -> mln_status {
-  const auto status = validate_texture_frame(
-    texture, frame, "frame must not be null and must have a valid size"
-  );
-  if (status != MLN_STATUS_OK) {
+  if (
+    const auto status = validate_borrowed_physical_size(
+      descriptor->physical_width, descriptor->physical_height
+    );
+    status != MLN_STATUS_OK
+  )
     return status;
-  }
-  set_thread_error("Vulkan texture sessions are not supported by this build");
-  return MLN_STATUS_UNSUPPORTED;
+  if (
+    const auto status =
+      validate_unsupported_attach(map, options, out_session, out_operation);
+    status != MLN_STATUS_OK
+  )
+    return status;
+  return unsupported("Vulkan texture sessions are not supported by this build");
 }
-
-auto vulkan_borrowed_texture_set_target(
-  mln_render_session session,
-  const mln_vulkan_borrowed_texture_descriptor* descriptor
+auto vulkan_borrowed_texture_set_target_start(
+  mln_render_session, const mln_vulkan_borrowed_texture_descriptor* descriptor,
+  mln_operation*
 ) -> mln_status {
-  mln_render_session_object* live = nullptr;
-  const auto session_status = validate_render_session_retarget(
-    session, RetargetTargetKind::BorrowedTexture, live
-  );
-  if (session_status != MLN_STATUS_OK) {
-    return session_status;
-  }
-  const auto descriptor_status =
-    validate_vulkan_borrowed_texture_descriptor(descriptor);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
-  }
-  set_thread_error("Vulkan texture sessions are not supported by this build");
-  return MLN_STATUS_UNSUPPORTED;
+  if (
+    const auto status = validate_vulkan_borrowed_texture_descriptor(descriptor);
+    status != MLN_STATUS_OK
+  )
+    return status;
+  return unsupported("Vulkan texture sessions are not supported by this build");
 }
-
-auto vulkan_surface_set_target(
-  mln_render_session session, const mln_vulkan_surface_descriptor* descriptor
+auto vulkan_surface_set_target_start(
+  mln_render_session, const mln_vulkan_surface_descriptor* descriptor,
+  mln_operation*
 ) -> mln_status {
-  mln_render_session_object* live = nullptr;
-  const auto session_status = validate_render_session_retarget(
-    session, RetargetTargetKind::Surface, live
-  );
-  if (session_status != MLN_STATUS_OK) {
-    return session_status;
-  }
-  const auto descriptor_status = validate_vulkan_surface_descriptor(descriptor);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
-  }
-  set_thread_error("Vulkan surface sessions are not supported by this build");
-  return MLN_STATUS_UNSUPPORTED;
+  if (
+    const auto status = validate_vulkan_surface_descriptor(descriptor);
+    status != MLN_STATUS_OK
+  )
+    return status;
+  return unsupported("Vulkan surface sessions are not supported by this build");
 }
-
 #endif
 
 #if !defined(MLN_RENDER_BACKEND_OPENGL)
-
-auto opengl_surface_attach(
+auto opengl_surface_attach_start(
   mln_map map, const mln_opengl_surface_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, mln_operation* out_operation
 ) -> mln_status {
-  const auto map_status = validate_attach_map(map);
-  if (map_status != MLN_STATUS_OK) {
-    return map_status;
-  }
-  const auto descriptor_status =
-    validate_opengl_surface_descriptor(descriptor, false);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
-  }
-  const auto output_status = validate_attach_out_session(out_session);
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
-  }
-  const auto extent_status = validate_surface_extent(descriptor->extent);
-  if (extent_status != MLN_STATUS_OK) {
-    return extent_status;
-  }
-  set_thread_error("OpenGL surface sessions are not supported by this build");
-  return MLN_STATUS_UNSUPPORTED;
+  if (
+    const auto status = validate_opengl_surface_descriptor(descriptor, false);
+    status != MLN_STATUS_OK
+  )
+    return status;
+  if (
+    const auto status = validate_physical_size(
+      descriptor->extent.width, descriptor->extent.height,
+      descriptor->extent.scale_factor, "scaled surface dimensions are too large"
+    );
+    status != MLN_STATUS_OK
+  )
+    return status;
+  if (
+    const auto status =
+      validate_unsupported_attach(map, options, out_session, out_operation);
+    status != MLN_STATUS_OK
+  )
+    return status;
+  return unsupported("OpenGL surface sessions are not supported by this build");
 }
-
-auto opengl_surface_set_target(
-  mln_render_session session, const mln_opengl_surface_descriptor* descriptor
-) -> mln_status {
-  mln_render_session_object* live = nullptr;
-  const auto session_status = validate_render_session_retarget(
-    session, RetargetTargetKind::Surface, live
-  );
-  if (session_status != MLN_STATUS_OK) {
-    return session_status;
-  }
-  const auto descriptor_status =
-    validate_opengl_surface_descriptor(descriptor, false);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
-  }
-  set_thread_error("OpenGL surface sessions are not supported by this build");
-  return MLN_STATUS_UNSUPPORTED;
-}
-
-#endif
-
-#if !defined(MLN_RENDER_BACKEND_OPENGL)
-
-auto opengl_owned_texture_attach(
+auto opengl_owned_texture_attach_start(
   mln_map map, const mln_opengl_owned_texture_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, mln_operation* out_operation
 ) -> mln_status {
-  const auto map_status = validate_attach_map(map);
-  if (map_status != MLN_STATUS_OK) {
-    return map_status;
-  }
-  const auto descriptor_status =
-    validate_opengl_owned_texture_descriptor(descriptor, false);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
-  }
-  const auto output_status = validate_attach_out_session(out_session);
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
-  }
-  const auto extent_status = validate_owned_texture_extent(descriptor->extent);
-  if (extent_status != MLN_STATUS_OK) {
-    return extent_status;
-  }
-  set_thread_error("OpenGL texture sessions are not supported by this build");
-  return MLN_STATUS_UNSUPPORTED;
+  if (
+    const auto status =
+      validate_opengl_owned_texture_descriptor(descriptor, false);
+    status != MLN_STATUS_OK
+  )
+    return status;
+  if (
+    const auto status = validate_physical_size(
+      descriptor->extent.width, descriptor->extent.height,
+      descriptor->extent.scale_factor, "scaled texture dimensions are too large"
+    );
+    status != MLN_STATUS_OK
+  )
+    return status;
+  if (
+    const auto status =
+      validate_unsupported_attach(map, options, out_session, out_operation);
+    status != MLN_STATUS_OK
+  )
+    return status;
+  return unsupported("OpenGL texture sessions are not supported by this build");
 }
-
-auto opengl_borrowed_texture_attach(
+auto opengl_borrowed_texture_attach_start(
   mln_map map, const mln_opengl_borrowed_texture_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, mln_operation* out_operation
 ) -> mln_status {
-  const auto map_status = validate_attach_map(map);
-  if (map_status != MLN_STATUS_OK) {
-    return map_status;
-  }
-  const auto descriptor_status =
-    validate_opengl_borrowed_texture_descriptor(descriptor, false);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
-  }
-  const auto output_status = validate_attach_out_session(out_session);
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
-  }
-  const auto physical_status = validate_borrowed_physical_size(
-    descriptor->physical_width, descriptor->physical_height
-  );
-  if (physical_status != MLN_STATUS_OK) {
-    return physical_status;
-  }
-  set_thread_error("OpenGL texture sessions are not supported by this build");
-  return MLN_STATUS_UNSUPPORTED;
-}
-
-auto opengl_owned_texture_acquire_frame(
-  mln_render_session texture, mln_opengl_owned_texture_frame* out_frame
-) -> mln_status {
-  const auto status = validate_texture_frame(
-    texture, out_frame, "out_frame must not be null and must have a valid size"
-  );
-  if (status != MLN_STATUS_OK) {
+  if (
+    const auto status =
+      validate_opengl_borrowed_texture_descriptor(descriptor, false);
+    status != MLN_STATUS_OK
+  )
     return status;
-  }
-  set_thread_error("OpenGL texture sessions are not supported by this build");
-  return MLN_STATUS_UNSUPPORTED;
-}
-
-auto opengl_owned_texture_release_frame(
-  mln_render_session texture, const mln_opengl_owned_texture_frame* frame
-) -> mln_status {
-  const auto status = validate_texture_frame(
-    texture, frame, "frame must not be null and must have a valid size"
-  );
-  if (status != MLN_STATUS_OK) {
+  if (
+    const auto status = validate_borrowed_physical_size(
+      descriptor->physical_width, descriptor->physical_height
+    );
+    status != MLN_STATUS_OK
+  )
     return status;
-  }
-  set_thread_error("OpenGL texture sessions are not supported by this build");
-  return MLN_STATUS_UNSUPPORTED;
+  if (
+    const auto status =
+      validate_unsupported_attach(map, options, out_session, out_operation);
+    status != MLN_STATUS_OK
+  )
+    return status;
+  return unsupported("OpenGL texture sessions are not supported by this build");
 }
-
-auto opengl_borrowed_texture_set_target(
-  mln_render_session session,
-  const mln_opengl_borrowed_texture_descriptor* descriptor
+auto opengl_surface_set_target_start(
+  mln_render_session, const mln_opengl_surface_descriptor* descriptor,
+  mln_operation*
 ) -> mln_status {
-  mln_render_session_object* live = nullptr;
-  const auto session_status = validate_render_session_retarget(
-    session, RetargetTargetKind::BorrowedTexture, live
-  );
-  if (session_status != MLN_STATUS_OK) {
-    return session_status;
-  }
-  const auto descriptor_status =
-    validate_opengl_borrowed_texture_descriptor(descriptor, false);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
-  }
-  set_thread_error("OpenGL texture sessions are not supported by this build");
-  return MLN_STATUS_UNSUPPORTED;
+  if (
+    const auto status = validate_opengl_surface_descriptor(descriptor, false);
+    status != MLN_STATUS_OK
+  )
+    return status;
+  return unsupported("OpenGL surface sessions are not supported by this build");
 }
-
+auto opengl_borrowed_texture_set_target_start(
+  mln_render_session, const mln_opengl_borrowed_texture_descriptor* descriptor,
+  mln_operation*
+) -> mln_status {
+  if (
+    const auto status =
+      validate_opengl_borrowed_texture_descriptor(descriptor, false);
+    status != MLN_STATUS_OK
+  )
+    return status;
+  return unsupported("OpenGL texture sessions are not supported by this build");
+}
 #endif
 
 #if !defined(MLN_RENDER_BACKEND_WEBGPU)
-
-auto webgpu_owned_texture_attach(
+auto webgpu_owned_texture_attach_start(
   mln_map map, const mln_webgpu_owned_texture_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, mln_operation* out_operation
 ) -> mln_status {
-  const auto map_status = validate_attach_map(map);
-  if (map_status != MLN_STATUS_OK) {
-    return map_status;
-  }
-  const auto descriptor_status =
-    validate_webgpu_owned_texture_descriptor(descriptor);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
-  }
-  const auto output_status = validate_attach_out_session(out_session);
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
-  }
-  const auto extent_status = validate_owned_texture_extent(descriptor->extent);
-  if (extent_status != MLN_STATUS_OK) {
-    return extent_status;
-  }
-  set_thread_error("WebGPU texture sessions are not supported by this build");
-  return MLN_STATUS_UNSUPPORTED;
+  if (
+    const auto status = validate_webgpu_owned_texture_descriptor(descriptor);
+    status != MLN_STATUS_OK
+  )
+    return status;
+  if (
+    const auto status = validate_physical_size(
+      descriptor->extent.width, descriptor->extent.height,
+      descriptor->extent.scale_factor, "scaled texture dimensions are too large"
+    );
+    status != MLN_STATUS_OK
+  )
+    return status;
+  if (
+    const auto status =
+      validate_unsupported_attach(map, options, out_session, out_operation);
+    status != MLN_STATUS_OK
+  )
+    return status;
+  return unsupported("WebGPU texture sessions are not supported by this build");
 }
-
-auto webgpu_borrowed_texture_attach(
+auto webgpu_borrowed_texture_attach_start(
   mln_map map, const mln_webgpu_borrowed_texture_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, mln_operation* out_operation
 ) -> mln_status {
-  const auto map_status = validate_attach_map(map);
-  if (map_status != MLN_STATUS_OK) {
-    return map_status;
-  }
-  const auto descriptor_status =
-    validate_webgpu_borrowed_texture_descriptor(descriptor);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
-  }
-  const auto output_status = validate_attach_out_session(out_session);
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
-  }
-  const auto physical_status = validate_borrowed_physical_size(
-    descriptor->physical_width, descriptor->physical_height
-  );
-  if (physical_status != MLN_STATUS_OK) {
-    return physical_status;
-  }
-  set_thread_error("WebGPU texture sessions are not supported by this build");
-  return MLN_STATUS_UNSUPPORTED;
-}
-
-auto webgpu_owned_texture_acquire_frame(
-  mln_render_session texture, mln_webgpu_owned_texture_frame* out_frame
-) -> mln_status {
-  const auto status = validate_texture_frame(
-    texture, out_frame, "out_frame must not be null and must have a valid size"
-  );
-  if (status != MLN_STATUS_OK) {
+  if (
+    const auto status = validate_webgpu_borrowed_texture_descriptor(descriptor);
+    status != MLN_STATUS_OK
+  )
     return status;
-  }
-  set_thread_error("WebGPU texture sessions are not supported by this build");
-  return MLN_STATUS_UNSUPPORTED;
-}
-
-auto webgpu_owned_texture_release_frame(
-  mln_render_session texture, const mln_webgpu_owned_texture_frame* frame
-) -> mln_status {
-  const auto status = validate_texture_frame(
-    texture, frame, "frame must not be null and must have a valid size"
-  );
-  if (status != MLN_STATUS_OK) {
+  if (
+    const auto status = validate_borrowed_physical_size(
+      descriptor->physical_width, descriptor->physical_height
+    );
+    status != MLN_STATUS_OK
+  )
     return status;
-  }
-  set_thread_error("WebGPU texture sessions are not supported by this build");
-  return MLN_STATUS_UNSUPPORTED;
+  if (
+    const auto status =
+      validate_unsupported_attach(map, options, out_session, out_operation);
+    status != MLN_STATUS_OK
+  )
+    return status;
+  return unsupported("WebGPU texture sessions are not supported by this build");
 }
-
-auto webgpu_borrowed_texture_set_target(
-  mln_render_session session,
-  const mln_webgpu_borrowed_texture_descriptor* descriptor
+auto webgpu_borrowed_texture_set_target_start(
+  mln_render_session, const mln_webgpu_borrowed_texture_descriptor* descriptor,
+  mln_operation*
 ) -> mln_status {
-  mln_render_session_object* live = nullptr;
-  const auto session_status = validate_render_session_retarget(
-    session, RetargetTargetKind::BorrowedTexture, live
-  );
-  if (session_status != MLN_STATUS_OK) {
-    return session_status;
-  }
-  const auto descriptor_status =
-    validate_webgpu_borrowed_texture_descriptor(descriptor);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
-  }
-  set_thread_error("WebGPU texture sessions are not supported by this build");
-  return MLN_STATUS_UNSUPPORTED;
+  if (
+    const auto status = validate_webgpu_borrowed_texture_descriptor(descriptor);
+    status != MLN_STATUS_OK
+  )
+    return status;
+  return unsupported("WebGPU texture sessions are not supported by this build");
 }
-
-auto webgpu_surface_attach(
+auto webgpu_surface_attach_start(
   mln_map map, const mln_webgpu_surface_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, mln_operation* out_operation
 ) -> mln_status {
-  const auto map_status = validate_attach_map(map);
-  if (map_status != MLN_STATUS_OK) {
-    return map_status;
-  }
-  const auto descriptor_status = validate_webgpu_surface_descriptor(descriptor);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
-  }
-  const auto output_status = validate_attach_out_session(out_session);
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
-  }
-  const auto extent_status = validate_surface_extent(descriptor->extent);
-  if (extent_status != MLN_STATUS_OK) {
-    return extent_status;
-  }
-  set_thread_error("WebGPU surface sessions are not supported by this build");
-  return MLN_STATUS_UNSUPPORTED;
+  if (
+    const auto status = validate_webgpu_surface_descriptor(descriptor);
+    status != MLN_STATUS_OK
+  )
+    return status;
+  if (
+    const auto status = validate_physical_size(
+      descriptor->extent.width, descriptor->extent.height,
+      descriptor->extent.scale_factor, "scaled surface dimensions are too large"
+    );
+    status != MLN_STATUS_OK
+  )
+    return status;
+  if (
+    const auto status =
+      validate_unsupported_attach(map, options, out_session, out_operation);
+    status != MLN_STATUS_OK
+  )
+    return status;
+  return unsupported("WebGPU surface sessions are not supported by this build");
 }
-
-auto webgpu_surface_set_target(
-  mln_render_session session, const mln_webgpu_surface_descriptor* descriptor
+auto webgpu_surface_set_target_start(
+  mln_render_session, const mln_webgpu_surface_descriptor* descriptor,
+  mln_operation*
 ) -> mln_status {
-  mln_render_session_object* live = nullptr;
-  const auto session_status = validate_render_session_retarget(
-    session, RetargetTargetKind::Surface, live
-  );
-  if (session_status != MLN_STATUS_OK) {
-    return session_status;
-  }
-  const auto descriptor_status = validate_webgpu_surface_descriptor(descriptor);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
-  }
-  set_thread_error("WebGPU surface sessions are not supported by this build");
-  return MLN_STATUS_UNSUPPORTED;
+  if (
+    const auto status = validate_webgpu_surface_descriptor(descriptor);
+    status != MLN_STATUS_OK
+  )
+    return status;
+  return unsupported("WebGPU surface sessions are not supported by this build");
 }
-
 #endif
 
 }  // namespace mln::core

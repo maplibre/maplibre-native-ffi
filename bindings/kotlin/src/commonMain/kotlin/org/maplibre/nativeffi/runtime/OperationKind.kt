@@ -18,6 +18,12 @@ internal value class OperationKind(internal val nativeValue: Int) {
     internal val REGION_INVALIDATE: OperationKind = OperationKind(10)
     internal val REGION_DELETE: OperationKind = OperationKind(11)
     internal val SET_MAXIMUM_AMBIENT_CACHE_SIZE: OperationKind = OperationKind(12)
+    internal val RENDER_ATTACH: OperationKind = OperationKind(20)
+    internal val RENDER_CONTROL: OperationKind = OperationKind(21)
+    internal val RENDER_QUERY: OperationKind = OperationKind(22)
+    internal val RENDER_READBACK: OperationKind = OperationKind(23)
+    internal val FRAME_RELEASE: OperationKind = OperationKind(24)
+    internal val RENDER_FEATURE_STATE_GET: OperationKind = OperationKind(25)
 
     internal fun fromNative(nativeValue: UInt): OperationKind = fromNative(nativeValue.toInt())
 

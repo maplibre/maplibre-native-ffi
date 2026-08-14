@@ -1,15 +1,5 @@
 part of 'runtime.dart';
 
-final class _TextureFrameLease {
-  _TextureFrameLease(Object owner, this.release)
-    : owner = WeakReference<Object>(owner);
-
-  _TextureFrameLease.orphaned(this.release) : owner = null;
-
-  final WeakReference<Object>? owner;
-  final void Function() release;
-}
-
 /// Standalone projection helper snapshot from a map transform.
 final class MapProjectionHandle {
   MapProjectionHandle._(this._runtime, NativeMapProjection handle)
@@ -179,35 +169,28 @@ final class MapProjectionHandle {
   }
 }
 
-/// Outcome reported by [RenderSessionHandle.renderUpdate].
+/// Outcome of one accepted frame demand.
 final class RenderResult {
   const RenderResult._(this.rawValue, this.name);
 
-  /// The render target holds a new frame.
   static const rendered = RenderResult._(0, 'rendered');
-
-  /// The call produced no frame.
   static const noUpdate = RenderResult._(1, 'noUpdate');
-
-  /// The map has not applied the session's current size yet.
   static const sizePending = RenderResult._(2, 'sizePending');
-
-  /// The render target had no frame to draw into.
   static const targetNotReady = RenderResult._(3, 'targetNotReady');
+  static const superseded = RenderResult._(4, 'superseded');
+  static const deadlineMissed = RenderResult._(5, 'deadlineMissed');
 
-  /// Creates a render result while preserving unknown native values.
-  factory RenderResult.fromRawValue(int rawValue) => switch (rawValue) {
+  factory RenderResult.fromRawValue(int value) => switch (value) {
     0 => rendered,
     1 => noUpdate,
     2 => sizePending,
     3 => targetNotReady,
-    _ => RenderResult._(rawValue, 'unknown($rawValue)'),
+    4 => superseded,
+    5 => deadlineMissed,
+    _ => RenderResult._(value, 'unknown($value)'),
   };
 
-  /// Raw native value.
   final int rawValue;
-
-  /// Human-readable name.
   final String name;
 
   @override
@@ -218,536 +201,625 @@ final class RenderResult {
   int get hashCode => rawValue.hashCode;
 }
 
-/// Owner-thread render session handle attached to a retained map.
-final class RenderSessionHandle {
-  RenderSessionHandle._(NativeRenderSession handle)
-    : _state = NativeHandleState(handle, 'RenderSessionHandle');
+/// Render execution placement selected during attachment.
+enum RenderDriver {
+  coreWorker(1),
+  callerGraphicsThread(2);
 
+  const RenderDriver(this.rawValue);
+  final int rawValue;
+}
+
+/// Common policy for a render-session attachment.
+final class RenderSessionAttachOptions {
+  const RenderSessionAttachOptions({
+    this.driver = RenderDriver.coreWorker,
+    this.requestedTextureRingDepth = 1,
+  });
+
+  final RenderDriver driver;
+  final int requestedTextureRingDepth;
+}
+
+/// One nonblocking request for a rendered frame.
+final class FrameDemand {
+  const FrameDemand({
+    this.renderIfNeeded = true,
+    this.present = false,
+    this.token = 0,
+    this.coalescingBoundary = 0,
+    this.presentationTimeNanoseconds = 0,
+    this.deadlineNanoseconds = 0,
+  });
+
+  final bool renderIfNeeded;
+  final bool present;
+  final int token;
+  final int coalescingBoundary;
+  final int presentationTimeNanoseconds;
+  final int deadlineNanoseconds;
+}
+
+/// Immutable terminal result for one accepted frame demand.
+final class RenderFrameResult {
+  const RenderFrameResult._({
+    required this.disposition,
+    required this.token,
+    required this.mapUpdateGeneration,
+    required this.extentGeneration,
+    required this.frameGeneration,
+    required this.presentationTimeNanoseconds,
+  });
+
+  factory RenderFrameResult._fromNative(raw.mln_render_frame_result value) =>
+      RenderFrameResult._(
+        disposition: RenderResult.fromRawValue(value.disposition),
+        token: value.token,
+        mapUpdateGeneration: value.map_update_generation,
+        extentGeneration: value.extent_generation,
+        frameGeneration: value.frame_generation,
+        presentationTimeNanoseconds: value.presentation_time_ns,
+      );
+
+  final RenderResult disposition;
+  final int token;
+  final int mapUpdateGeneration;
+  final int extentGeneration;
+  final int frameGeneration;
+  final int presentationTimeNanoseconds;
+}
+
+/// Immutable capabilities fixed during attachment.
+final class RenderSessionCapabilities {
+  const RenderSessionCapabilities._(
+    this.driver,
+    this.textureRingDepth,
+    this.flags,
+  );
+
+  final RenderDriver driver;
+  final int textureRingDepth;
+  final int flags;
+  bool get supportsFrameAcquisition => flags & 1 != 0;
+  bool get supportsReadback => flags & 2 != 0;
+  bool get supportsConsumerSync => flags & 4 != 0;
+  bool get supportsPresentation => flags & 8 != 0;
+}
+
+/// Latest any-thread render-session state and generations.
+final class RenderSessionSnapshot {
+  const RenderSessionSnapshot._({
+    required this.state,
+    required this.driver,
+    required this.latestResult,
+    required this.extent,
+    required this.generation,
+    required this.mapUpdateGeneration,
+    required this.renderedUpdateGeneration,
+    required this.extentGeneration,
+    required this.frameGeneration,
+    required this.latestDemandToken,
+    required this.pendingDemandCount,
+    required this.acquiredFrameCount,
+    required this.targetReady,
+    required this.pendingChanges,
+  });
+
+  final int state;
+  final RenderDriver driver;
+  final RenderResult latestResult;
+  final RenderTargetExtent extent;
+  final int generation;
+  final int mapUpdateGeneration;
+  final int renderedUpdateGeneration;
+  final int extentGeneration;
+  final int frameGeneration;
+  final int latestDemandToken;
+  final int pendingDemandCount;
+  final int acquiredFrameCount;
+  final bool targetReady;
+  final bool pendingChanges;
+}
+
+/// Result of irreversible target abandonment.
+final class RenderAbandonResult {
+  const RenderAbandonResult._(this.quarantined, this.quarantinedResourceCount);
+
+  final bool quarantined;
+  final int quarantinedResourceCount;
+}
+
+/// Synchronization that protects an acquired texture frame.
+final class GpuSync {
+  const GpuSync.cpuComplete() : kind = 0, object = null, value = 0;
+  const GpuSync.native({
+    required this.kind,
+    required this.object,
+    required this.value,
+  });
+
+  final int kind;
+  final NativePointer? object;
+  final int value;
+}
+
+/// An attachment that exposes the session while graphics initialization runs.
+final class RenderSessionAttachment {
+  const RenderSessionAttachment(this.session, this.completed);
+
+  final RenderSessionHandle session;
+  final Future<void> completed;
+}
+
+/// A render session attached to one map and render target.
+final class RenderSessionHandle implements Finalizable {
+  RenderSessionHandle._(this._runtime, NativeRenderSession handle)
+    : _state = NativeHandleState(handle, 'RenderSessionHandle') {
+    _runtime._renderSessions[handle.raw] = WeakReference(this);
+  }
+
+  final RuntimeHandle _runtime;
   final NativeHandleState<NativeRenderSession> _state;
-  _TextureFrameLease? _activeTextureFrame;
+  final _frameResultsReady = StreamController<void>.broadcast(sync: true);
+  final _driverWorkReady = StreamController<void>.broadcast(sync: true);
 
-  /// Whether this render session has been closed by the Dart binding.
+  /// Notifications that frame results are available to drain.
+  Stream<void> get frameResultsReady => _frameResultsReady.stream;
+
+  /// Notifications that caller-graphics-thread work is ready to service.
+  Stream<void> get driverWorkReady => _driverWorkReady.stream;
+
+  void _notifyFramesReady() => _frameResultsReady.add(null);
+  void _notifyDriverWorkReady() => _driverWorkReady.add(null);
   bool get isClosed => _state.isClosed;
+  Future<void> _completeWhileRetained(Future<void> completion) async {
+    await completion;
+  }
 
-  /// The session belongs to the isolate that attached it, which need not be the
-  /// map's. It holds no Dart reference to the map; native reports an
-  /// invalid-state status for destroying a map that still has a session.
   NativeRenderSession get _handle => _state.handle;
 
-  /// Resizes an attached render session.
-  ///
-  /// Surface and session-owned texture targets resize in place. A caller-owned
-  /// texture is rejected here: allocate one at the new size and hand it over
-  /// with [setMetalBorrowedTextureTarget] or its Vulkan or OpenGL counterpart.
-  ///
-  /// The session keeps its renderer across a resize, so renderer-held state
-  /// such as feature state carries over. A scale factor that differs from the
-  /// session's current one starts a new renderer with that state empty, because
-  /// a renderer compiles its shaders for one pixel ratio; the same applies to
-  /// every `setTarget` method.
-  void resize(int width, int height, {double scaleFactor = 1}) {
-    _checkNoActiveTextureFrame('resize render session');
-    _check(
-      raw.mln_render_session_resize(_handle.raw, width, height, scaleFactor),
+  RenderSessionCapabilities get capabilities => withNativeArena((arena) {
+    final out = arena<raw.mln_render_session_capabilities>()
+      ..ref.size = sizeOf<raw.mln_render_session_capabilities>();
+    _check(raw.mln_render_session_get_capabilities(_handle.raw, out));
+    return RenderSessionCapabilities._(
+      RenderDriver.values.firstWhere(
+        (value) => value.rawValue == out.ref.driver,
+      ),
+      out.ref.texture_ring_depth,
+      out.ref.flags,
     );
-  }
+  });
 
-  /// Presents this attached surface session through a new Metal surface.
-  ///
-  /// Replacing the surface in place keeps this session's renderer and the state
-  /// it holds, such as the tile pyramid, atlases, and feature state.
-  ///
-  /// [descriptor] names the same graphics context this session attached with,
-  /// and its extent applies as [resize] applies one. A descriptor whose context
-  /// device is neither null nor this session's device throws an
-  /// [InvalidArgumentException] and leaves this session rendering into the
-  /// surface it has. The session assigns the layer its own device and pixel
-  /// format.
-  void setMetalSurfaceTarget(MetalSurfaceDescriptor descriptor) {
-    _checkNoActiveTextureFrame('set Metal surface target');
+  RenderSessionSnapshot get snapshot => withNativeArena((arena) {
+    final out = arena<raw.mln_render_session_snapshot>()
+      ..ref.size = sizeOf<raw.mln_render_session_snapshot>();
+    _check(raw.mln_render_session_get_snapshot(_handle.raw, out));
+    final value = out.ref;
+    return RenderSessionSnapshot._(
+      state: value.state,
+      driver: RenderDriver.values.firstWhere(
+        (driver) => driver.rawValue == value.driver,
+      ),
+      latestResult: RenderResult.fromRawValue(value.latest_result),
+      extent: RenderTargetExtent(
+        width: value.extent.width,
+        height: value.extent.height,
+        scaleFactor: value.extent.scale_factor,
+      ),
+      generation: value.generation,
+      mapUpdateGeneration: value.map_update_generation,
+      renderedUpdateGeneration: value.rendered_update_generation,
+      extentGeneration: value.extent_generation,
+      frameGeneration: value.frame_generation,
+      latestDemandToken: value.latest_demand_token,
+      pendingDemandCount: value.pending_demand_count,
+      acquiredFrameCount: value.acquired_frame_count,
+      targetReady: value.target_ready,
+      pendingChanges: value.pending_changes,
+    );
+  });
+
+  void requestFrame([FrameDemand demand = const FrameDemand()]) {
     withNativeArena((arena) {
-      final nativeDescriptor = arena<raw.mln_metal_surface_descriptor>();
-      nativeDescriptor.ref = _metalSurfaceDescriptorToNative(descriptor);
-      _check(raw.mln_metal_surface_set_target(_handle.raw, nativeDescriptor));
+      final native = arena<raw.mln_frame_demand>()
+        ..ref = raw.mln_frame_demand_default();
+      native.ref.flags =
+          (demand.renderIfNeeded ? 1 : 0) | (demand.present ? 2 : 0);
+      native.ref.token = demand.token;
+      native.ref.coalescing_boundary = demand.coalescingBoundary;
+      native.ref.presentation_time_ns = demand.presentationTimeNanoseconds;
+      native.ref.deadline_ns = demand.deadlineNanoseconds;
+      _check(raw.mln_render_session_request_frame(_handle.raw, native));
     });
   }
 
-  /// Presents this attached surface session through a new Vulkan surface.
-  ///
-  /// See [setMetalSurfaceTarget] for what replacing a surface preserves. The
-  /// outgoing `VkSurfaceKHR` must still be valid: this session holds a
-  /// swapchain built from it, and Vulkan destroys every swapchain before its
-  /// surface.
-  void setVulkanSurfaceTarget(VulkanSurfaceDescriptor descriptor) {
-    _checkNoActiveTextureFrame('set Vulkan surface target');
-    withNativeArena((arena) {
-      final nativeDescriptor = arena<raw.mln_vulkan_surface_descriptor>();
-      nativeDescriptor.ref = _vulkanSurfaceDescriptorToNative(descriptor);
-      _check(raw.mln_vulkan_surface_set_target(_handle.raw, nativeDescriptor));
+  List<RenderFrameResult> drainFrameResults({int maxResults = 0}) {
+    if (maxResults < 0) {
+      throwInvalidArgument('maxResults must not be negative');
+    }
+    return withNativeArena((arena) {
+      final outBatch = arena<Uint64>()..value = 0;
+      _check(
+        raw.mln_render_session_drain_frame_results(
+          _handle.raw,
+          maxResults,
+          outBatch,
+        ),
+      );
+      final batch = outBatch.value;
+      if (batch == 0) return const <RenderFrameResult>[];
+      try {
+        final count = arena<Size>();
+        _check(raw.mln_render_frame_batch_count(batch, count));
+        return List<RenderFrameResult>.generate(count.value, (index) {
+          final out = arena<raw.mln_render_frame_result>()
+            ..ref.size = sizeOf<raw.mln_render_frame_result>();
+          _check(raw.mln_render_frame_batch_get(batch, index, out));
+          return RenderFrameResult._fromNative(out.ref);
+        }, growable: false);
+      } finally {
+        raw.mln_render_frame_batch_release(batch);
+      }
     });
   }
 
-  /// Presents this attached surface session through a new OpenGL surface.
-  ///
-  /// See [setMetalSurfaceTarget] for what replacing a surface preserves. The
-  /// new surface is made current on the next render, so a host may hand over a
-  /// replacement for one it has already destroyed, and an unusable surface is
-  /// reported by the next [renderUpdate] rather than by this call.
-  void setOpenGLSurfaceTarget(OpenGLSurfaceDescriptor descriptor) {
-    _checkNoActiveTextureFrame('set OpenGL surface target');
-    withNativeArena((arena) {
-      final nativeDescriptor = arena<raw.mln_opengl_surface_descriptor>();
-      nativeDescriptor.ref = _openglSurfaceDescriptorToNative(descriptor);
-      _check(raw.mln_opengl_surface_set_target(_handle.raw, nativeDescriptor));
+  int serviceDriverWork({int maxWork = 0}) {
+    if (maxWork < 0) {
+      throwInvalidArgument('maxWork must not be negative');
+    }
+    return withNativeArena((arena) {
+      final serviced = arena<Size>();
+      _check(
+        raw.mln_render_session_service_driver_work(
+          _handle.raw,
+          maxWork,
+          serviced,
+        ),
+      );
+      return serviced.value;
     });
   }
 
-  /// Renders this attached texture session into a new caller-owned Metal
-  /// texture.
-  ///
-  /// Handing a reallocated texture over here keeps this session's renderer,
-  /// where [resize] rejects a caller-owned texture outright.
-  ///
-  /// The replacement belongs to the device this session attached with, which
-  /// throws an [InvalidArgumentException] otherwise, and carries the pixel
-  /// format it attached with, which throws an [UnsupportedFeatureException]
-  /// otherwise; both leave this session rendering into the texture it has. The
-  /// caller owns the replacement and keeps it valid until the next replacement,
-  /// [detach], or [close]. The outgoing texture is neither read nor released
-  /// here, so a host that already released it may still hand over a
-  /// replacement.
-  void setMetalBorrowedTextureTarget(
+  Future<void> resize(RenderTargetExtent extent) => _voidOperation(
+    (out) => withNativeArena((arena) {
+      final native = arena<raw.mln_render_target_extent>()
+        ..ref = _renderTargetExtentToNative(extent);
+      return raw.mln_render_session_resize_start(_handle.raw, native, out);
+    }),
+  );
+
+  Future<void> setMetalSurfaceTarget(MetalSurfaceDescriptor descriptor) =>
+      _voidOperation(
+        (out) => withNativeArena((arena) {
+          final native = arena<raw.mln_metal_surface_descriptor>()
+            ..ref = _metalSurfaceDescriptorToNative(descriptor);
+          return raw.mln_metal_surface_set_target_start(
+            _handle.raw,
+            native,
+            out,
+          );
+        }),
+      );
+
+  Future<void> setVulkanSurfaceTarget(VulkanSurfaceDescriptor descriptor) =>
+      _voidOperation(
+        (out) => withNativeArena((arena) {
+          final native = arena<raw.mln_vulkan_surface_descriptor>()
+            ..ref = _vulkanSurfaceDescriptorToNative(descriptor);
+          return raw.mln_vulkan_surface_set_target_start(
+            _handle.raw,
+            native,
+            out,
+          );
+        }),
+      );
+
+  Future<void> setOpenGLSurfaceTarget(OpenGLSurfaceDescriptor descriptor) =>
+      _voidOperation(
+        (out) => withNativeArena((arena) {
+          final native = arena<raw.mln_opengl_surface_descriptor>()
+            ..ref = _openglSurfaceDescriptorToNative(descriptor, arena);
+          return raw.mln_opengl_surface_set_target_start(
+            _handle.raw,
+            native,
+            out,
+          );
+        }),
+      );
+
+  Future<void> setWebGPUSurfaceTarget(WebGPUSurfaceDescriptor descriptor) =>
+      _voidOperation(
+        (out) => withNativeArena((arena) {
+          final native = arena<raw.mln_webgpu_surface_descriptor>()
+            ..ref = _webGPUSurfaceDescriptorToNative(descriptor);
+          return raw.mln_webgpu_surface_set_target_start(
+            _handle.raw,
+            native,
+            out,
+          );
+        }),
+      );
+
+  Future<void> setMetalBorrowedTextureTarget(
     MetalBorrowedTextureDescriptor descriptor,
-  ) {
-    _checkNoActiveTextureFrame('set Metal borrowed texture target');
-    withNativeArena((arena) {
-      final nativeDescriptor =
-          arena<raw.mln_metal_borrowed_texture_descriptor>();
-      nativeDescriptor.ref = _metalBorrowedTextureDescriptorToNative(
-        descriptor,
+  ) => _voidOperation(
+    (out) => withNativeArena((arena) {
+      final native = arena<raw.mln_metal_borrowed_texture_descriptor>()
+        ..ref = _metalBorrowedTextureDescriptorToNative(descriptor);
+      return raw.mln_metal_borrowed_texture_set_target_start(
+        _handle.raw,
+        native,
+        out,
       );
-      _check(
-        raw.mln_metal_borrowed_texture_set_target(
-          _handle.raw,
-          nativeDescriptor,
-        ),
-      );
-    });
-  }
+    }),
+  );
 
-  /// Renders this attached texture session into a new caller-owned Vulkan
-  /// image.
-  ///
-  /// See [setMetalBorrowedTextureTarget] for what replacing a target preserves.
-  /// The replacement carries the format and both layouts this session attached
-  /// with, since its render pass was built around them.
-  void setVulkanBorrowedTextureTarget(
+  Future<void> setVulkanBorrowedTextureTarget(
     VulkanBorrowedTextureDescriptor descriptor,
-  ) {
-    _checkNoActiveTextureFrame('set Vulkan borrowed texture target');
-    withNativeArena((arena) {
-      final nativeDescriptor =
-          arena<raw.mln_vulkan_borrowed_texture_descriptor>();
-      nativeDescriptor.ref = _vulkanBorrowedTextureDescriptorToNative(
-        descriptor,
+  ) => _voidOperation(
+    (out) => withNativeArena((arena) {
+      final native = arena<raw.mln_vulkan_borrowed_texture_descriptor>()
+        ..ref = _vulkanBorrowedTextureDescriptorToNative(descriptor);
+      return raw.mln_vulkan_borrowed_texture_set_target_start(
+        _handle.raw,
+        native,
+        out,
       );
-      _check(
-        raw.mln_vulkan_borrowed_texture_set_target(
-          _handle.raw,
-          nativeDescriptor,
-        ),
-      );
-    });
-  }
+    }),
+  );
 
-  /// Renders this attached texture session into a new caller-owned OpenGL
-  /// texture.
-  ///
-  /// See [setMetalBorrowedTextureTarget] for what replacing a target preserves.
-  /// The replacement belongs to the context this session attached with, or one
-  /// in its share group, and that context must be current on this isolate's
-  /// thread.
-  void setOpenGLBorrowedTextureTarget(
+  Future<void> setOpenGLBorrowedTextureTarget(
     OpenGLBorrowedTextureDescriptor descriptor,
-  ) {
-    _checkNoActiveTextureFrame('set OpenGL borrowed texture target');
-    withNativeArena((arena) {
-      final nativeDescriptor =
-          arena<raw.mln_opengl_borrowed_texture_descriptor>();
-      nativeDescriptor.ref = _openglBorrowedTextureDescriptorToNative(
-        descriptor,
+  ) => _voidOperation(
+    (out) => withNativeArena((arena) {
+      final native = arena<raw.mln_opengl_borrowed_texture_descriptor>()
+        ..ref = _openglBorrowedTextureDescriptorToNative(descriptor, arena);
+      return raw.mln_opengl_borrowed_texture_set_target_start(
+        _handle.raw,
+        native,
+        out,
       );
-      _check(
-        raw.mln_opengl_borrowed_texture_set_target(
-          _handle.raw,
-          nativeDescriptor,
-        ),
+    }),
+  );
+
+  Future<void> setWebGPUBorrowedTextureTarget(
+    WebGPUBorrowedTextureDescriptor descriptor,
+  ) => _voidOperation(
+    (out) => withNativeArena((arena) {
+      final native = arena<raw.mln_webgpu_borrowed_texture_descriptor>()
+        ..ref = _webGPUBorrowedTextureDescriptorToNative(descriptor);
+      return raw.mln_webgpu_borrowed_texture_set_target_start(
+        _handle.raw,
+        native,
+        out,
       );
-    });
-  }
+    }),
+  );
 
-  /// Renders the latest map update into this session's render target.
-  ///
-  /// The returned [RenderResult] names the wake to wait for before calling
-  /// again:
-  ///
-  /// - [RenderResult.rendered]: the target holds a new frame. The map retains
-  ///   its latest update, so a host redraws on demand after a resize or a
-  ///   surface expose, and gates a frame loop on
-  ///   [RuntimeEventType.mapRenderUpdateAvailable].
-  /// - [RenderResult.noUpdate]: the call produced no frame. The map either has
-  ///   no update yet, or the Metal backend has not created an owned texture
-  ///   because content is not ready. Wait for
-  ///   [RuntimeEventType.mapRenderUpdateAvailable].
-  /// - [RenderResult.sizePending]: this session resized and the map, which
-  ///   applies its size on its own thread, is still behind. The map publishes
-  ///   an update for the new size on its own, so wait for the next
-  ///   [RuntimeEventType.mapRenderUpdateAvailable].
-  /// - [RenderResult.targetNotReady]: the render target had no frame
-  ///   available, such as a Metal surface whose next drawable is nil. Wait for
-  ///   a host event that changes the target, or back off and retry.
-  RenderResult renderUpdate() {
-    _checkNoActiveTextureFrame('render update');
-    return withNativeArena((arena) {
-      final result = arena<Uint32>();
-      _check(raw.mln_render_session_render_update(_handle.raw, result));
-      return RenderResult.fromRawValue(result.value);
-    });
-  }
+  Future<void> barrier({int minUpdateGeneration = 0}) => _voidOperation(
+    (out) => raw.mln_render_session_barrier_start(
+      _handle.raw,
+      minUpdateGeneration,
+      out,
+    ),
+  );
 
-  /// Detaches backend-bound render resources while keeping the handle live.
-  void detach() {
-    _checkNoActiveTextureFrame('detach render session');
-    _check(raw.mln_render_session_detach(_handle.raw));
-  }
+  Future<void> reduceMemoryUse() => _voidOperation(
+    (out) => raw.mln_render_session_reduce_memory_use_start(_handle.raw, out),
+  );
+  Future<void> clearData() => _voidOperation(
+    (out) => raw.mln_render_session_clear_data_start(_handle.raw, out),
+  );
+  Future<void> dumpDebugLogs() => _voidOperation(
+    (out) => raw.mln_render_session_dump_debug_logs_start(_handle.raw, out),
+  );
 
-  /// Asks the session renderer to release cached resources where possible.
-  void reduceMemoryUse() {
-    _check(raw.mln_render_session_reduce_memory_use(_handle.raw));
-  }
-
-  /// Clears renderer data for the session.
-  void clearData() {
-    _check(raw.mln_render_session_clear_data(_handle.raw));
-  }
-
-  /// Dumps renderer debug logs through MapLibre Native logging.
-  void dumpDebugLogs() {
-    _check(raw.mln_render_session_dump_debug_logs(_handle.raw));
-  }
-
-  /// Sets per-feature state on a render source.
-  void setFeatureState(FeatureStateSelector selector, Uint8List state) {
-    withNativeArena((arena) {
-      final nativeSelector = _featureStateSelectorToNative(selector, arena);
-      final nativeState = nativeBufferView(state, arena);
-      _check(
-        raw.mln_render_session_set_feature_state(
-          _handle.raw,
-          nativeSelector,
-          nativeState,
-        ),
-      );
-    });
-  }
-
-  /// Copies per-feature state from a render source.
-  Uint8List getFeatureState(FeatureStateSelector selector) {
-    return withNativeArena((arena) {
-      final nativeSelector = _featureStateSelectorToNative(selector, arena);
-      final outState = arena<Uint64>();
-      outState.value = 0;
-      _check(
-        raw.mln_render_session_get_feature_state(
-          _handle.raw,
-          nativeSelector,
-          outState,
-        ),
-      );
-      return copyOwnedBuffer(NativeOwnedBufferHandle(outState.value));
-    });
-  }
-
-  /// Removes per-feature state from a render source.
-  void removeFeatureState(FeatureStateSelector selector) {
-    withNativeArena((arena) {
-      final nativeSelector = _featureStateSelectorToNative(selector, arena);
-      _check(
-        raw.mln_render_session_remove_feature_state(
-          _handle.raw,
-          nativeSelector,
-        ),
-      );
-    });
-  }
-
-  /// Queries rendered features from the latest render session state.
-  Uint8List queryRenderedFeatures(
+  Future<Uint8List> queryRenderedFeatures(
     RenderedQueryGeometry geometry, {
     RenderedFeatureQueryOptions? options,
-  }) {
-    final resolvedOptions = options ?? RenderedFeatureQueryOptions();
-    return withNativeArena((arena) {
-      final nativeGeometry = arena<raw.mln_rendered_query_geometry>();
-      nativeGeometry.ref = _renderedQueryGeometryToNative(geometry, arena);
-      final nativeOptions = _renderedFeatureQueryOptionsToNative(
-        resolvedOptions,
-        arena,
-      );
-      final outResult = arena<Uint64>();
-      outResult.value = 0;
-      _check(
-        raw.mln_render_session_query_rendered_features(
-          _handle.raw,
-          nativeGeometry,
-          nativeOptions,
-          outResult,
-        ),
-      );
-      return copyOwnedBuffer(NativeOwnedBufferHandle(outResult.value));
-    });
-  }
+  }) => withNativeArena((arena) {
+    final nativeGeometry = arena<raw.mln_rendered_query_geometry>()
+      ..ref = _renderedQueryGeometryToNative(geometry, arena);
+    final nativeOptions = _renderedFeatureQueryOptionsToNative(
+      options ?? RenderedFeatureQueryOptions(),
+      arena,
+    );
+    final operation = arena<Uint64>()..value = 0;
+    _check(
+      raw.mln_render_session_query_rendered_features_start(
+        _handle.raw,
+        nativeGeometry,
+        nativeOptions,
+        operation,
+      ),
+    );
+    final id = operation.value;
+    return _runtime._takeOperation(
+      id,
+      () => withNativeArena((resultArena) {
+        final result = resultArena<Uint64>()..value = 0;
+        _check(raw.mln_render_query_take_result(id, result));
+        return copyOwnedBuffer(NativeOwnedBufferHandle(result.value));
+      }),
+    );
+  });
 
-  /// Queries source features from the latest render session state.
-  Uint8List querySourceFeatures(
+  Future<Uint8List> querySourceFeatures(
     String sourceId, {
     SourceFeatureQueryOptions? options,
-  }) {
-    final resolvedOptions = options ?? SourceFeatureQueryOptions();
-    return withNativeArena((arena) {
-      final nativeSourceId = nativeStringView(sourceId, arena);
-      final nativeOptions = _sourceFeatureQueryOptionsToNative(
-        resolvedOptions,
-        arena,
-      );
-      final outResult = arena<Uint64>();
-      outResult.value = 0;
-      _check(
-        raw.mln_render_session_query_source_features(
-          _handle.raw,
-          nativeSourceId.value,
-          nativeOptions,
-          outResult,
-        ),
-      );
-      return copyOwnedBuffer(NativeOwnedBufferHandle(outResult.value));
-    });
-  }
+  }) => withNativeArena((arena) {
+    final nativeOptions = _sourceFeatureQueryOptionsToNative(
+      options ?? SourceFeatureQueryOptions(),
+      arena,
+    );
+    final operation = arena<Uint64>()..value = 0;
+    _check(
+      raw.mln_render_session_query_source_features_start(
+        _handle.raw,
+        nativeStringView(sourceId, arena).value,
+        nativeOptions,
+        operation,
+      ),
+    );
+    return _takeBufferOperation(
+      operation.value,
+      raw.mln_render_query_take_result,
+    );
+  });
 
-  /// Queries a feature extension from the latest render session state.
-  Uint8List queryFeatureExtensions({
+  Future<Uint8List> queryFeatureExtensions({
     required String sourceId,
     required Uint8List feature,
     required String extension,
     required String extensionField,
     Uint8List? arguments,
-  }) {
-    return withNativeArena((arena) {
-      final nativeSourceId = nativeStringView(sourceId, arena);
-      final nativeFeature = nativeBufferView(feature, arena);
-      final nativeExtension = nativeStringView(extension, arena);
-      final nativeExtensionField = nativeStringView(extensionField, arena);
-      final nativeArguments = arguments == null
-          ? nullptr.cast<raw.mln_buffer_view>()
-          : (arena<raw.mln_buffer_view>()
-              ..ref = nativeBufferView(arguments, arena));
-      final outResult = arena<Uint64>();
-      outResult.value = 0;
-      _check(
-        raw.mln_render_session_query_feature_extensions(
-          _handle.raw,
-          nativeSourceId.value,
-          nativeFeature,
-          nativeExtension.value,
-          nativeExtensionField.value,
-          nativeArguments,
-          outResult,
-        ),
-      );
-      return copyOwnedBuffer(NativeOwnedBufferHandle(outResult.value));
-    });
-  }
-
-  /// Reads the latest rendered session-owned texture as premultiplied RGBA8.
-  TextureImageInfo textureImageInfo() {
-    _checkNoActiveTextureFrame('read texture image info');
-    return withNativeArena((arena) {
-      final info = arena<raw.mln_texture_image_info>();
-      info.ref = raw.mln_texture_image_info_default();
-      // A null buffer with zero capacity is a size probe that reports the
-      // required byte length.
-      _check(
-        raw.mln_texture_read_premultiplied_rgba8(
-          _handle.raw,
-          nullptr.cast<Uint8>(),
-          0,
-          info,
-        ),
-      );
-      return TextureImageInfo._fromNative(info.ref);
-    });
-  }
-
-  /// Reads the latest texture into caller-owned native [buffer].
-  TextureImageInfo readPremultipliedRgba8Into(NativeBuffer buffer) {
-    _checkNoActiveTextureFrame('read texture image');
-    final expectedInfo = textureImageInfo();
-    if (buffer.byteLength < expectedInfo.byteLength) {
-      throwInvalidArgument(
-        'native buffer length ${buffer.byteLength} is smaller than required '
-        '${expectedInfo.byteLength}',
-      );
-    }
-    return withNativeArena((arena) {
-      final info = arena<raw.mln_texture_image_info>();
-      info.ref = raw.mln_texture_image_info_default();
-      _check(
-        raw.mln_texture_read_premultiplied_rgba8(
-          _handle.raw,
-          Pointer<Uint8>.fromAddress(buffer.unsafePointer.address),
-          buffer.byteLength,
-          info,
-        ),
-      );
-      return TextureImageInfo._fromNative(info.ref);
-    });
-  }
-
-  /// Reads the latest rendered session-owned texture as premultiplied RGBA8.
-  TextureImage readPremultipliedRgba8() {
-    _checkNoActiveTextureFrame('read texture image');
-    final info = textureImageInfo();
-    return withNativeArena((arena) {
-      final data = arena<Uint8>(info.byteLength);
-      final readInfo = arena<raw.mln_texture_image_info>();
-      readInfo.ref = raw.mln_texture_image_info_default();
-      _check(
-        raw.mln_texture_read_premultiplied_rgba8(
-          _handle.raw,
-          data,
-          info.byteLength,
-          readInfo,
-        ),
-      );
-      final copiedInfo = TextureImageInfo._fromNative(readInfo.ref);
-      return TextureImage(
-        info: copiedInfo,
-        bytes: Uint8List.fromList(data.asTypedList(copiedInfo.byteLength)),
-      );
-    });
-  }
-
-  /// Acquires the latest Metal texture frame until [MetalOwnedTextureFrame.close].
-  MetalOwnedTextureFrame acquireMetalTextureFrame() {
-    _checkNoActiveTextureFrame('acquire Metal texture frame');
-    final outFrame = calloc<raw.mln_metal_owned_texture_frame>();
-    try {
-      outFrame.ref.size = sizeOf<raw.mln_metal_owned_texture_frame>();
-      _check(raw.mln_metal_owned_texture_acquire_frame(_handle.raw, outFrame));
-    } catch (_) {
-      calloc.free(outFrame);
-      rethrow;
-    }
-    return _constructAcquiredTextureFrame(
-      outFrame,
-      () => raw.mln_metal_owned_texture_release_frame(_handle.raw, outFrame),
-      () => MetalOwnedTextureFrame._(this, outFrame),
+  }) => withNativeArena((arena) {
+    final operation = arena<Uint64>()..value = 0;
+    final nativeArguments = arguments == null
+        ? nullptr.cast<raw.mln_buffer_view>()
+        : (arena<raw.mln_buffer_view>()
+            ..ref = nativeBufferView(arguments, arena));
+    _check(
+      raw.mln_render_session_query_feature_extensions_start(
+        _handle.raw,
+        nativeStringView(sourceId, arena).value,
+        nativeBufferView(feature, arena),
+        nativeStringView(extension, arena).value,
+        nativeStringView(extensionField, arena).value,
+        nativeArguments,
+        operation,
+      ),
     );
-  }
-
-  /// Acquires the latest Vulkan texture frame until [VulkanOwnedTextureFrame.close].
-  VulkanOwnedTextureFrame acquireVulkanTextureFrame() {
-    _checkNoActiveTextureFrame('acquire Vulkan texture frame');
-    final outFrame = calloc<raw.mln_vulkan_owned_texture_frame>();
-    try {
-      outFrame.ref.size = sizeOf<raw.mln_vulkan_owned_texture_frame>();
-      _check(raw.mln_vulkan_owned_texture_acquire_frame(_handle.raw, outFrame));
-    } catch (_) {
-      calloc.free(outFrame);
-      rethrow;
-    }
-    return _constructAcquiredTextureFrame(
-      outFrame,
-      () => raw.mln_vulkan_owned_texture_release_frame(_handle.raw, outFrame),
-      () => VulkanOwnedTextureFrame._(this, outFrame),
+    return _takeBufferOperation(
+      operation.value,
+      raw.mln_render_query_take_result,
     );
-  }
+  });
 
-  /// Acquires the latest OpenGL texture frame until [OpenGLOwnedTextureFrame.close].
-  OpenGLOwnedTextureFrame acquireOpenGLTextureFrame() {
-    _checkNoActiveTextureFrame('acquire OpenGL texture frame');
-    final outFrame = calloc<raw.mln_opengl_owned_texture_frame>();
-    try {
-      outFrame.ref.size = sizeOf<raw.mln_opengl_owned_texture_frame>();
-      _check(raw.mln_opengl_owned_texture_acquire_frame(_handle.raw, outFrame));
-    } catch (_) {
-      calloc.free(outFrame);
-      rethrow;
-    }
-    return _constructAcquiredTextureFrame(
-      outFrame,
-      () => raw.mln_opengl_owned_texture_release_frame(_handle.raw, outFrame),
-      () => OpenGLOwnedTextureFrame._(this, outFrame),
+  Future<Uint8List> _takeBufferOperation(
+    int operation,
+    int Function(int, Pointer<raw.mln_buffer>) take,
+  ) => _runtime._takeOperation(operation, () {
+    return withNativeArena((arena) {
+      final result = arena<Uint64>()..value = 0;
+      _check(take(operation, result.cast<raw.mln_buffer>()));
+      return copyOwnedBuffer(NativeOwnedBufferHandle(result.value));
+    });
+  });
+
+  Future<void> setFeatureState(
+    FeatureStateSelector selector,
+    Uint8List state,
+  ) => withNativeArena((arena) {
+    final operation = arena<Uint64>()..value = 0;
+    _check(
+      raw.mln_render_session_set_feature_state_start(
+        _handle.raw,
+        nativeStringView(selector.sourceId, arena).value,
+        nativeStringView(selector.sourceLayerId ?? '', arena).value,
+        nativeStringView(selector.featureId ?? '', arena).value,
+        nativeBufferView(state, arena),
+        operation,
+      ),
     );
-  }
+    return _runtime._finishOperation(operation.value);
+  });
 
-  /// Explicitly destroys this render session.
+  Future<Uint8List> getFeatureState(FeatureStateSelector selector) =>
+      withNativeArena((arena) {
+        final operation = arena<Uint64>()..value = 0;
+        _check(
+          raw.mln_render_session_get_feature_state_start(
+            _handle.raw,
+            nativeStringView(selector.sourceId, arena).value,
+            nativeStringView(selector.sourceLayerId ?? '', arena).value,
+            nativeStringView(selector.featureId ?? '', arena).value,
+            operation,
+          ),
+        );
+        return _takeBufferOperation(
+          operation.value,
+          raw.mln_render_session_get_feature_state_take_result,
+        );
+      });
+
+  Future<void> removeFeatureState(FeatureStateSelector selector) =>
+      withNativeArena((arena) {
+        final operation = arena<Uint64>()..value = 0;
+        _check(
+          raw.mln_render_session_remove_feature_state_start(
+            _handle.raw,
+            nativeStringView(selector.sourceId, arena).value,
+            nativeStringView(selector.sourceLayerId ?? '', arena).value,
+            nativeStringView(selector.featureId ?? '', arena).value,
+            nativeStringView(selector.stateKey ?? '', arena).value,
+            operation,
+          ),
+        );
+        return _runtime._finishOperation(operation.value);
+      });
+
+  Future<TextureImage> readPremultipliedRgba8() => withNativeArena((arena) {
+    final operation = arena<Uint64>()..value = 0;
+    _check(
+      raw.mln_texture_read_premultiplied_rgba8_start(_handle.raw, operation),
+    );
+    final id = operation.value;
+    return _runtime._takeOperation(
+      id,
+      () => withNativeArena((resultArena) {
+        final data = resultArena<Uint64>()..value = 0;
+        final info = resultArena<raw.mln_texture_image_info>()
+          ..ref = raw.mln_texture_image_info_default();
+        _check(
+          raw.mln_texture_read_premultiplied_rgba8_take_result(id, data, info),
+        );
+        return TextureImage(
+          info: TextureImageInfo._fromNative(info.ref),
+          bytes: copyOwnedBuffer(NativeOwnedBufferHandle(data.value)),
+        );
+      }),
+    );
+  });
+
+  AcquiredFrame acquireFrame() => withNativeArena((arena) {
+    final out = arena<Uint64>()..value = 0;
+    _check(raw.mln_render_session_acquire_frame(_handle.raw, out));
+    return AcquiredFrame._(_runtime, out.value);
+  });
+
+  Future<void> detach() => _voidOperation(
+    (out) => raw.mln_render_session_detach_start(_handle.raw, out),
+  );
+
+  RenderAbandonResult abandon() => withNativeArena((arena) {
+    final out = arena<raw.mln_render_abandon_result>()
+      ..ref.size = sizeOf<raw.mln_render_abandon_result>();
+    _check(raw.mln_render_session_abandon(_handle.raw, out));
+    return RenderAbandonResult._(
+      out.ref.disposition == 1,
+      out.ref.quarantined_resource_count,
+    );
+  });
+
+  Future<void> _voidOperation(
+    int Function(Pointer<Uint64> outOperation) start,
+  ) => withNativeArena((arena) {
+    final out = arena<Uint64>()..value = 0;
+    _check(start(out));
+    return _runtime._finishOperation(out.value);
+  });
+
   void close() {
-    _checkNoActiveTextureFrame('close render session');
+    final id = _state.handleId;
     _state.close(
       (handle) => raw.mln_render_session_destroy(handle.raw),
       _c.threadLastErrorMessage,
     );
-  }
-
-  void _registerTextureFrame(Object frame, void Function() release) {
-    _checkNoActiveTextureFrame('acquire texture frame');
-    _activeTextureFrame = _TextureFrameLease(frame, release);
-  }
-
-  T _constructAcquiredTextureFrame<T, F extends NativeType>(
-    Pointer<F> descriptor,
-    int Function() release,
-    T Function() construct,
-  ) {
-    try {
-      return construct();
-    } catch (error, stackTrace) {
-      cleanupFailedFrameConstruction(
-        release: release,
-        releaseSucceeded: () => calloc.free(descriptor),
-        releaseFailed: () {
-          _activeTextureFrame = _TextureFrameLease.orphaned(() {
-            _check(release());
-            calloc.free(descriptor);
-          });
-        },
-      );
-      Error.throwWithStackTrace(error, stackTrace);
-    }
-  }
-
-  void _releaseTextureFrame(Object frame) {
-    final lease = _activeTextureFrame;
-    if (lease == null || !identical(lease.owner?.target, frame)) {
-      return;
-    }
-    lease.release();
-    _activeTextureFrame = null;
-  }
-
-  void _checkNoActiveTextureFrame(String operation) {
-    final lease = _activeTextureFrame;
-    if (lease == null) {
-      return;
-    }
-    if (lease.owner?.target != null) {
-      throwInvalidState(
-        '$operation requires releasing the active texture frame',
-      );
-    }
-    lease.release();
-    _activeTextureFrame = null;
+    _runtime._renderSessions.remove(id);
+    _frameResultsReady.close();
+    _driverWorkReady.close();
   }
 }
 
@@ -854,593 +926,554 @@ final class TextureImage {
   final Uint8List bytes;
 }
 
-/// Scoped Metal texture frame borrowed from a session-owned texture target.
-final class MetalOwnedTextureFrame implements Finalizable {
-  MetalOwnedTextureFrame._(this._session, this._frame) {
-    final frame = _frame.ref;
-    _generation = uint64FromNative(frame.generation);
-    _width = frame.width;
-    _height = frame.height;
-    _scaleFactor = frame.scale_factor;
-    _frameId = uint64FromNative(frame.frame_id);
-    _pixelFormat = uint64FromNative(frame.pixel_format);
-    _textureAddress = frame.texture.address;
-    _deviceAddress = frame.device.address;
-    _leakReporter = NativeLeakReporter(
-      this,
-      'MetalOwnedTextureFrame',
-      NativeHandle(_frame.address),
-    );
-    try {
-      final session = _session;
-      final descriptor = _frame;
-      _session._registerTextureFrame(this, () {
-        _check(
-          raw.mln_metal_owned_texture_release_frame(
-            session._handle.raw,
-            descriptor,
-          ),
-        );
-        calloc.free(descriptor);
-      });
-    } catch (_) {
-      _leakReporter.close();
-      rethrow;
+/// Scoped lease on one rendered texture-ring slot.
+final class AcquiredFrame {
+  AcquiredFrame._(this._runtime, this._handle);
+
+  final RuntimeHandle _runtime;
+  int _handle;
+
+  void _checkOpen() {
+    if (_handle == 0) {
+      throwInvalidState('acquired frame has already been released');
     }
   }
 
-  final RenderSessionHandle _session;
-  final Pointer<raw.mln_metal_owned_texture_frame> _frame;
-  late final BigInt _generation;
-  late final int _width;
-  late final int _height;
-  late final double _scaleFactor;
-  late final BigInt _frameId;
-  late final BigInt _pixelFormat;
-  late final int _textureAddress;
-  late final int _deviceAddress;
-  late final NativeLeakReporter _leakReporter;
-  var _closed = false;
-
-  /// Session-owned target generation that produced this frame.
-  BigInt get generation {
+  RenderFrameResult get result => withNativeArena((arena) {
     _checkOpen();
-    return _generation;
-  }
+    final out = arena<raw.mln_render_frame_result>()
+      ..ref.size = sizeOf<raw.mln_render_frame_result>();
+    _check(raw.mln_acquired_frame_get_result(_handle, out));
+    return RenderFrameResult._fromNative(out.ref);
+  });
 
-  /// Physical texture width in device pixels.
-  int get width {
+  GpuSync get producerSync => withNativeArena((arena) {
     _checkOpen();
-    return _width;
-  }
+    final out = arena<raw.mln_gpu_sync>()
+      ..ref.size = sizeOf<raw.mln_gpu_sync>();
+    _check(raw.mln_acquired_frame_get_producer_sync(_handle, out));
+    return GpuSync.native(
+      kind: out.ref.kind,
+      object: out.ref.object == nullptr
+          ? null
+          : NativePointer(out.ref.object.address),
+      value: out.ref.value,
+    );
+  });
 
-  /// Physical texture height in device pixels.
-  int get height {
+  WebGPUOwnedTextureFrame get webGPUTexture => withNativeArena((arena) {
     _checkOpen();
-    return _height;
-  }
+    final out = arena<raw.mln_webgpu_owned_texture_frame>()
+      ..ref.size = sizeOf<raw.mln_webgpu_owned_texture_frame>();
+    _check(raw.mln_acquired_frame_get_webgpu_texture(_handle, out));
+    return WebGPUOwnedTextureFrame._fromNative(out.ref, this);
+  });
 
-  /// UI-to-device pixel scale used for this frame.
-  double get scaleFactor {
+  MetalOwnedTextureFrame get metalTexture => withNativeArena((arena) {
     _checkOpen();
-    return _scaleFactor;
-  }
+    final out = arena<raw.mln_metal_owned_texture_frame>()
+      ..ref.size = sizeOf<raw.mln_metal_owned_texture_frame>();
+    _check(raw.mln_acquired_frame_get_metal_texture(_handle, out));
+    return MetalOwnedTextureFrame._fromNative(out.ref, this);
+  });
 
-  /// Backend frame identity within [generation].
-  BigInt get frameId {
+  VulkanOwnedTextureFrame get vulkanTexture => withNativeArena((arena) {
     _checkOpen();
-    return _frameId;
-  }
+    final out = arena<raw.mln_vulkan_owned_texture_frame>()
+      ..ref.size = sizeOf<raw.mln_vulkan_owned_texture_frame>();
+    _check(raw.mln_acquired_frame_get_vulkan_texture(_handle, out));
+    return VulkanOwnedTextureFrame._fromNative(out.ref, this);
+  });
 
-  /// Backend-native Metal pixel format value.
-  BigInt get pixelFormat {
+  OpenGLOwnedTextureFrame get openGLTexture => withNativeArena((arena) {
     _checkOpen();
-    return _pixelFormat;
-  }
+    final out = arena<raw.mln_opengl_owned_texture_frame>()
+      ..ref.size = sizeOf<raw.mln_opengl_owned_texture_frame>();
+    _check(raw.mln_acquired_frame_get_opengl_texture(_handle, out));
+    return OpenGLOwnedTextureFrame._fromNative(out.ref, this);
+  });
 
-  /// Unsafe borrowed `id<MTLTexture>` / `MTL::Texture*` pointer.
-  ///
-  /// The pointer is valid only until [close] releases this frame.
+  Future<void> release({GpuSync sync = const GpuSync.cpuComplete()}) =>
+      withNativeArena((arena) {
+        _checkOpen();
+        final frame = arena<Uint64>()..value = _handle;
+        final nativeSync = arena<raw.mln_gpu_sync>()
+          ..ref = raw.mln_gpu_sync_default()
+          ..ref.kind = sync.kind
+          ..ref.object = Pointer<Void>.fromAddress(sync.object?.address ?? 0)
+          ..ref.value = sync.value;
+        final operation = arena<Uint64>()..value = 0;
+        _check(
+          raw.mln_acquired_frame_release_start(frame, nativeSync, operation),
+        );
+        _handle = 0;
+        return _runtime._finishOperation(operation.value);
+      });
+}
+
+/// Scoped Metal metadata from an [AcquiredFrame].
+final class MetalOwnedTextureFrame {
+  const MetalOwnedTextureFrame._(
+    this.generation,
+    this.width,
+    this.height,
+    this.scaleFactor,
+    this.frameId,
+    this.pixelFormat,
+    this._textureAddress,
+    this._deviceAddress,
+    this._owner,
+  );
+
+  factory MetalOwnedTextureFrame._fromNative(
+    raw.mln_metal_owned_texture_frame value,
+    AcquiredFrame owner,
+  ) => MetalOwnedTextureFrame._(
+    value.generation,
+    value.width,
+    value.height,
+    value.scale_factor,
+    value.frame_id,
+    value.pixel_format,
+    value.texture.address,
+    value.device.address,
+    owner,
+  );
+
+  final int generation;
+  final int width;
+  final int height;
+  final double scaleFactor;
+  final int frameId;
+  final int pixelFormat;
+  final int _textureAddress;
+  final int _deviceAddress;
+  final AcquiredFrame _owner;
   ScopedNativePointer get unsafeTexture =>
-      _borrowedPointer(_textureAddress, 'Metal texture');
-
-  /// Unsafe borrowed `id<MTLDevice>` / `MTL::Device*` pointer.
-  ///
-  /// The pointer is valid only until [close] releases this frame.
+      _scopedPointer(_textureAddress, 'Metal texture', _owner);
   ScopedNativePointer get unsafeDevice =>
-      _borrowedPointer(_deviceAddress, 'Metal device');
-
-  /// Releases this frame. The unsafe backend pointers become invalid.
-  void close() {
-    if (_closed) {
-      return;
-    }
-    _session._releaseTextureFrame(this);
-    _leakReporter.close();
-    _closed = true;
-  }
-
-  ScopedNativePointer _borrowedPointer(int address, String name) {
-    _checkOpen();
-    return ScopedNativePointer(
-      address,
-      checkValid: _checkOpen,
-      debugName: name,
-    );
-  }
-
-  void _checkOpen() {
-    if (_closed) {
-      throwInvalidArgument('Metal texture frame has already been released');
-    }
-    final _ = _session._handle.raw;
-  }
+      _scopedPointer(_deviceAddress, 'Metal device', _owner);
 }
 
-/// Scoped Vulkan texture frame borrowed from a session-owned texture target.
-final class VulkanOwnedTextureFrame implements Finalizable {
-  VulkanOwnedTextureFrame._(this._session, this._frame) {
-    final frame = _frame.ref;
-    _generation = uint64FromNative(frame.generation);
-    _width = frame.width;
-    _height = frame.height;
-    _scaleFactor = frame.scale_factor;
-    _frameId = uint64FromNative(frame.frame_id);
-    _format = frame.format;
-    _layout = frame.layout;
-    _imageAddress = frame.image.address;
-    _imageViewAddress = frame.image_view.address;
-    _deviceAddress = frame.device.address;
-    _leakReporter = NativeLeakReporter(
-      this,
-      'VulkanOwnedTextureFrame',
-      NativeHandle(_frame.address),
-    );
-    try {
-      final session = _session;
-      final descriptor = _frame;
-      _session._registerTextureFrame(this, () {
-        _check(
-          raw.mln_vulkan_owned_texture_release_frame(
-            session._handle.raw,
-            descriptor,
-          ),
-        );
-        calloc.free(descriptor);
-      });
-    } catch (_) {
-      _leakReporter.close();
-      rethrow;
-    }
-  }
+/// Scoped Vulkan metadata from an [AcquiredFrame].
+final class VulkanOwnedTextureFrame {
+  const VulkanOwnedTextureFrame._(
+    this.generation,
+    this.width,
+    this.height,
+    this.scaleFactor,
+    this.frameId,
+    this.format,
+    this.layout,
+    this._imageAddress,
+    this._imageViewAddress,
+    this._deviceAddress,
+    this._owner,
+  );
 
-  final RenderSessionHandle _session;
-  final Pointer<raw.mln_vulkan_owned_texture_frame> _frame;
-  late final BigInt _generation;
-  late final int _width;
-  late final int _height;
-  late final double _scaleFactor;
-  late final BigInt _frameId;
-  late final int _format;
-  late final int _layout;
-  late final int _imageAddress;
-  late final int _imageViewAddress;
-  late final int _deviceAddress;
-  late final NativeLeakReporter _leakReporter;
-  var _closed = false;
+  factory VulkanOwnedTextureFrame._fromNative(
+    raw.mln_vulkan_owned_texture_frame value,
+    AcquiredFrame owner,
+  ) => VulkanOwnedTextureFrame._(
+    value.generation,
+    value.width,
+    value.height,
+    value.scale_factor,
+    value.frame_id,
+    value.format,
+    value.layout,
+    value.image.address,
+    value.image_view.address,
+    value.device.address,
+    owner,
+  );
 
-  /// Session-owned target generation that produced this frame.
-  BigInt get generation {
-    _checkOpen();
-    return _generation;
-  }
-
-  /// Physical image width in device pixels.
-  int get width {
-    _checkOpen();
-    return _width;
-  }
-
-  /// Physical image height in device pixels.
-  int get height {
-    _checkOpen();
-    return _height;
-  }
-
-  /// UI-to-device pixel scale used for this frame.
-  double get scaleFactor {
-    _checkOpen();
-    return _scaleFactor;
-  }
-
-  /// Backend frame identity within [generation].
-  BigInt get frameId {
-    _checkOpen();
-    return _frameId;
-  }
-
-  /// Backend-native Vulkan format value.
-  int get format {
-    _checkOpen();
-    return _format;
-  }
-
-  /// Backend-native Vulkan image layout value.
-  int get layout {
-    _checkOpen();
-    return _layout;
-  }
-
-  /// Unsafe borrowed VkImage pointer.
-  ///
-  /// The pointer is valid only until [close] releases this frame.
+  final int generation;
+  final int width;
+  final int height;
+  final double scaleFactor;
+  final int frameId;
+  final int format;
+  final int layout;
+  final int _imageAddress;
+  final int _imageViewAddress;
+  final int _deviceAddress;
+  final AcquiredFrame _owner;
   ScopedNativePointer get unsafeImage =>
-      _borrowedPointer(_imageAddress, 'Vulkan image');
-
-  /// Unsafe borrowed VkImageView pointer.
-  ///
-  /// The pointer is valid only until [close] releases this frame.
+      _scopedPointer(_imageAddress, 'Vulkan image', _owner);
   ScopedNativePointer get unsafeImageView =>
-      _borrowedPointer(_imageViewAddress, 'Vulkan image view');
-
-  /// Unsafe borrowed VkDevice pointer.
-  ///
-  /// The pointer is valid only until [close] releases this frame.
+      _scopedPointer(_imageViewAddress, 'Vulkan image view', _owner);
   ScopedNativePointer get unsafeDevice =>
-      _borrowedPointer(_deviceAddress, 'Vulkan device');
-
-  /// Releases this frame. The unsafe backend pointers become invalid.
-  void close() {
-    if (_closed) {
-      return;
-    }
-    _session._releaseTextureFrame(this);
-    _leakReporter.close();
-    _closed = true;
-  }
-
-  ScopedNativePointer _borrowedPointer(int address, String name) {
-    _checkOpen();
-    return ScopedNativePointer(
-      address,
-      checkValid: _checkOpen,
-      debugName: name,
-    );
-  }
-
-  void _checkOpen() {
-    if (_closed) {
-      throwInvalidArgument('Vulkan texture frame has already been released');
-    }
-    final _ = _session._handle.raw;
-  }
+      _scopedPointer(_deviceAddress, 'Vulkan device', _owner);
 }
 
-/// Scoped OpenGL texture frame borrowed from a session-owned texture target.
-final class OpenGLOwnedTextureFrame implements Finalizable {
-  OpenGLOwnedTextureFrame._(this._session, this._frame) {
-    final frame = _frame.ref;
-    _generation = uint64FromNative(frame.generation);
-    _width = frame.width;
-    _height = frame.height;
-    _scaleFactor = frame.scale_factor;
-    _frameId = uint64FromNative(frame.frame_id);
-    _texture = frame.texture;
-    _target = frame.target;
-    _internalFormat = frame.internal_format;
-    _format = frame.format;
-    _type = frame.type;
-    _leakReporter = NativeLeakReporter(
-      this,
-      'OpenGLOwnedTextureFrame',
-      NativeHandle(_frame.address),
-    );
-    try {
-      final session = _session;
-      final descriptor = _frame;
-      _session._registerTextureFrame(this, () {
-        _check(
-          raw.mln_opengl_owned_texture_release_frame(
-            session._handle.raw,
-            descriptor,
-          ),
-        );
-        calloc.free(descriptor);
-      });
-    } catch (_) {
-      _leakReporter.close();
-      rethrow;
-    }
-  }
+/// Scoped WebGPU metadata from an [AcquiredFrame].
+final class WebGPUOwnedTextureFrame {
+  const WebGPUOwnedTextureFrame._(
+    this.generation,
+    this.width,
+    this.height,
+    this.scaleFactor,
+    this.frameId,
+    this.format,
+    this._textureAddress,
+    this._textureViewAddress,
+    this._deviceAddress,
+    this._owner,
+  );
 
-  final RenderSessionHandle _session;
-  final Pointer<raw.mln_opengl_owned_texture_frame> _frame;
-  late final BigInt _generation;
-  late final int _width;
-  late final int _height;
-  late final double _scaleFactor;
-  late final BigInt _frameId;
-  late final int _texture;
-  late final int _target;
-  late final int _internalFormat;
-  late final int _format;
-  late final int _type;
-  late final NativeLeakReporter _leakReporter;
-  var _closed = false;
+  factory WebGPUOwnedTextureFrame._fromNative(
+    raw.mln_webgpu_owned_texture_frame value,
+    AcquiredFrame owner,
+  ) => WebGPUOwnedTextureFrame._(
+    value.generation,
+    value.width,
+    value.height,
+    value.scale_factor,
+    value.frame_id,
+    value.format,
+    value.texture.address,
+    value.texture_view.address,
+    value.device.address,
+    owner,
+  );
 
-  /// Session-owned target generation that produced this frame.
-  BigInt get generation {
-    _checkOpen();
-    return _generation;
-  }
-
-  /// Physical texture width in device pixels.
-  int get width {
-    _checkOpen();
-    return _width;
-  }
-
-  /// Physical texture height in device pixels.
-  int get height {
-    _checkOpen();
-    return _height;
-  }
-
-  /// UI-to-device pixel scale used for this frame.
-  double get scaleFactor {
-    _checkOpen();
-    return _scaleFactor;
-  }
-
-  /// Backend frame identity within [generation].
-  BigInt get frameId {
-    _checkOpen();
-    return _frameId;
-  }
-
-  /// Borrowed OpenGL texture name.
-  ScopedNativeInt get texture {
-    _checkOpen();
-    return ScopedNativeInt(
-      _texture,
-      checkValid: _checkOpen,
-      debugName: 'OpenGL texture',
-    );
-  }
-
-  /// Backend-native OpenGL texture target.
-  int get target {
-    _checkOpen();
-    return _target;
-  }
-
-  /// Backend-native OpenGL internal format.
-  int get internalFormat {
-    _checkOpen();
-    return _internalFormat;
-  }
-
-  /// Backend-native OpenGL pixel format.
-  int get format {
-    _checkOpen();
-    return _format;
-  }
-
-  /// Backend-native OpenGL pixel type.
-  int get type {
-    _checkOpen();
-    return _type;
-  }
-
-  /// Releases this frame. The borrowed texture name becomes invalid.
-  void close() {
-    if (_closed) {
-      return;
-    }
-    _session._releaseTextureFrame(this);
-    _leakReporter.close();
-    _closed = true;
-  }
-
-  void _checkOpen() {
-    if (_closed) {
-      throwInvalidArgument('OpenGL texture frame has already been released');
-    }
-    final _ = _session._handle.raw;
-  }
+  final int generation;
+  final int width;
+  final int height;
+  final double scaleFactor;
+  final int frameId;
+  final int format;
+  final int _textureAddress;
+  final int _textureViewAddress;
+  final int _deviceAddress;
+  final AcquiredFrame _owner;
+  ScopedNativePointer get unsafeTexture =>
+      _scopedPointer(_textureAddress, 'WebGPU texture', _owner);
+  ScopedNativePointer get unsafeTextureView =>
+      _scopedPointer(_textureViewAddress, 'WebGPU texture view', _owner);
+  ScopedNativePointer get unsafeDevice =>
+      _scopedPointer(_deviceAddress, 'WebGPU device', _owner);
 }
+
+/// Scoped OpenGL metadata from an [AcquiredFrame].
+final class OpenGLOwnedTextureFrame {
+  const OpenGLOwnedTextureFrame._(
+    this.generation,
+    this.width,
+    this.height,
+    this.scaleFactor,
+    this.frameId,
+    this.texture,
+    this.target,
+    this.internalFormat,
+    this.format,
+    this.type,
+    this._owner,
+  );
+
+  factory OpenGLOwnedTextureFrame._fromNative(
+    raw.mln_opengl_owned_texture_frame value,
+    AcquiredFrame owner,
+  ) => OpenGLOwnedTextureFrame._(
+    value.generation,
+    value.width,
+    value.height,
+    value.scale_factor,
+    value.frame_id,
+    value.texture,
+    value.target,
+    value.internal_format,
+    value.format,
+    value.type,
+    owner,
+  );
+
+  final int generation;
+  final int width;
+  final int height;
+  final double scaleFactor;
+  final int frameId;
+  final int texture;
+  final int target;
+  final int internalFormat;
+  final int format;
+  final int type;
+  final AcquiredFrame _owner;
+
+  void ensureValid() => _owner._checkOpen();
+}
+
+ScopedNativePointer _scopedPointer(
+  int address,
+  String name,
+  AcquiredFrame owner,
+) =>
+    ScopedNativePointer(address, checkValid: owner._checkOpen, debugName: name);
 
 /// Render-session attachment operations on an any-thread map handle.
-///
-/// Attach on the isolate and native thread that will own the graphics session.
-/// Every attach opens with [ensureAbiVersion], because it may be the first
-/// native call made by that isolate.
 extension MapRenderAttachments on MapHandle {
-  /// Attaches a Metal native surface render target to the map.
-  RenderSessionHandle attachMetalSurface(MetalSurfaceDescriptor descriptor) {
-    ensureAbiVersion();
-    return withNativeArena((arena) {
-      final nativeDescriptor = arena<raw.mln_metal_surface_descriptor>();
-      nativeDescriptor.ref = _metalSurfaceDescriptorToNative(descriptor);
-      final outSession = arena<Uint64>();
-      outSession.value = 0;
-      _check(
-        raw.mln_metal_surface_attach(_handle.raw, nativeDescriptor, outSession),
-      );
-      return RenderSessionHandle._(NativeRenderSession(outSession.value));
-    });
-  }
+  RenderSessionAttachment attachMetalSurface(
+    MetalSurfaceDescriptor descriptor, {
+    RenderSessionAttachOptions options = const RenderSessionAttachOptions(),
+  }) => withNativeArena((arena) {
+    final native = arena<raw.mln_metal_surface_descriptor>()
+      ..ref = _metalSurfaceDescriptorToNative(descriptor);
+    return _startRenderAttachment(
+      options,
+      (policy, session, operation) => raw.mln_metal_surface_attach_start(
+        _handle.raw,
+        native,
+        policy,
+        session,
+        operation,
+      ),
+    );
+  });
 
-  /// Attaches a Vulkan native surface render target to the map.
-  RenderSessionHandle attachVulkanSurface(VulkanSurfaceDescriptor descriptor) {
-    ensureAbiVersion();
-    return withNativeArena((arena) {
-      final nativeDescriptor = arena<raw.mln_vulkan_surface_descriptor>();
-      nativeDescriptor.ref = _vulkanSurfaceDescriptorToNative(descriptor);
-      final outSession = arena<Uint64>();
-      outSession.value = 0;
-      _check(
-        raw.mln_vulkan_surface_attach(
-          _handle.raw,
-          nativeDescriptor,
-          outSession,
-        ),
-      );
-      return RenderSessionHandle._(NativeRenderSession(outSession.value));
-    });
-  }
+  RenderSessionAttachment attachVulkanSurface(
+    VulkanSurfaceDescriptor descriptor, {
+    RenderSessionAttachOptions options = const RenderSessionAttachOptions(),
+  }) => withNativeArena((arena) {
+    final native = arena<raw.mln_vulkan_surface_descriptor>()
+      ..ref = _vulkanSurfaceDescriptorToNative(descriptor);
+    return _startRenderAttachment(
+      options,
+      (policy, session, operation) => raw.mln_vulkan_surface_attach_start(
+        _handle.raw,
+        native,
+        policy,
+        session,
+        operation,
+      ),
+    );
+  });
 
-  /// Attaches an OpenGL native surface render target to the map.
-  RenderSessionHandle attachOpenGLSurface(OpenGLSurfaceDescriptor descriptor) {
-    ensureAbiVersion();
-    return withNativeArena((arena) {
-      final nativeDescriptor = arena<raw.mln_opengl_surface_descriptor>();
-      nativeDescriptor.ref = _openglSurfaceDescriptorToNative(descriptor);
-      final outSession = arena<Uint64>();
-      outSession.value = 0;
-      _check(
-        raw.mln_opengl_surface_attach(
-          _handle.raw,
-          nativeDescriptor,
-          outSession,
-        ),
-      );
-      return RenderSessionHandle._(NativeRenderSession(outSession.value));
-    });
-  }
+  RenderSessionAttachment attachOpenGLSurface(
+    OpenGLSurfaceDescriptor descriptor, {
+    RenderSessionAttachOptions options = const RenderSessionAttachOptions(
+      driver: RenderDriver.callerGraphicsThread,
+    ),
+  }) => withNativeArena((arena) {
+    final native = arena<raw.mln_opengl_surface_descriptor>()
+      ..ref = _openglSurfaceDescriptorToNative(descriptor, arena);
+    return _startRenderAttachment(
+      options,
+      (policy, session, operation) => raw.mln_opengl_surface_attach_start(
+        _handle.raw,
+        native,
+        policy,
+        session,
+        operation,
+      ),
+    );
+  });
 
-  /// Attaches a Metal texture render target owned by the render session.
-  RenderSessionHandle attachMetalOwnedTexture(
-    MetalOwnedTextureDescriptor descriptor,
+  RenderSessionAttachment attachMetalOwnedTexture(
+    MetalOwnedTextureDescriptor descriptor, {
+    RenderSessionAttachOptions options = const RenderSessionAttachOptions(),
+  }) => withNativeArena((arena) {
+    final native = arena<raw.mln_metal_owned_texture_descriptor>()
+      ..ref = _metalOwnedTextureDescriptorToNative(descriptor);
+    return _startRenderAttachment(
+      options,
+      (policy, session, operation) => raw.mln_metal_owned_texture_attach_start(
+        _handle.raw,
+        native,
+        policy,
+        session,
+        operation,
+      ),
+    );
+  });
+
+  RenderSessionAttachment attachMetalBorrowedTexture(
+    MetalBorrowedTextureDescriptor descriptor, {
+    RenderSessionAttachOptions options = const RenderSessionAttachOptions(),
+  }) => withNativeArena((arena) {
+    final native = arena<raw.mln_metal_borrowed_texture_descriptor>()
+      ..ref = _metalBorrowedTextureDescriptorToNative(descriptor);
+    return _startRenderAttachment(
+      options,
+      (policy, session, operation) =>
+          raw.mln_metal_borrowed_texture_attach_start(
+            _handle.raw,
+            native,
+            policy,
+            session,
+            operation,
+          ),
+    );
+  });
+
+  RenderSessionAttachment attachVulkanOwnedTexture(
+    VulkanOwnedTextureDescriptor descriptor, {
+    RenderSessionAttachOptions options = const RenderSessionAttachOptions(),
+  }) => withNativeArena((arena) {
+    final native = arena<raw.mln_vulkan_owned_texture_descriptor>()
+      ..ref = _vulkanOwnedTextureDescriptorToNative(descriptor);
+    return _startRenderAttachment(
+      options,
+      (policy, session, operation) => raw.mln_vulkan_owned_texture_attach_start(
+        _handle.raw,
+        native,
+        policy,
+        session,
+        operation,
+      ),
+    );
+  });
+
+  RenderSessionAttachment attachVulkanBorrowedTexture(
+    VulkanBorrowedTextureDescriptor descriptor, {
+    RenderSessionAttachOptions options = const RenderSessionAttachOptions(),
+  }) => withNativeArena((arena) {
+    final native = arena<raw.mln_vulkan_borrowed_texture_descriptor>()
+      ..ref = _vulkanBorrowedTextureDescriptorToNative(descriptor);
+    return _startRenderAttachment(
+      options,
+      (policy, session, operation) =>
+          raw.mln_vulkan_borrowed_texture_attach_start(
+            _handle.raw,
+            native,
+            policy,
+            session,
+            operation,
+          ),
+    );
+  });
+
+  RenderSessionAttachment attachOpenGLOwnedTexture(
+    OpenGLOwnedTextureDescriptor descriptor, {
+    RenderSessionAttachOptions options = const RenderSessionAttachOptions(
+      driver: RenderDriver.callerGraphicsThread,
+    ),
+  }) => withNativeArena((arena) {
+    final native = arena<raw.mln_opengl_owned_texture_descriptor>()
+      ..ref = _openglOwnedTextureDescriptorToNative(descriptor, arena);
+    return _startRenderAttachment(
+      options,
+      (policy, session, operation) => raw.mln_opengl_owned_texture_attach_start(
+        _handle.raw,
+        native,
+        policy,
+        session,
+        operation,
+      ),
+    );
+  });
+
+  RenderSessionAttachment attachOpenGLBorrowedTexture(
+    OpenGLBorrowedTextureDescriptor descriptor, {
+    RenderSessionAttachOptions options = const RenderSessionAttachOptions(
+      driver: RenderDriver.callerGraphicsThread,
+    ),
+  }) => withNativeArena((arena) {
+    final native = arena<raw.mln_opengl_borrowed_texture_descriptor>()
+      ..ref = _openglBorrowedTextureDescriptorToNative(descriptor, arena);
+    return _startRenderAttachment(
+      options,
+      (policy, session, operation) =>
+          raw.mln_opengl_borrowed_texture_attach_start(
+            _handle.raw,
+            native,
+            policy,
+            session,
+            operation,
+          ),
+    );
+  });
+
+  RenderSessionAttachment attachWebGPUSurface(
+    WebGPUSurfaceDescriptor descriptor, {
+    RenderSessionAttachOptions options = const RenderSessionAttachOptions(
+      driver: RenderDriver.callerGraphicsThread,
+    ),
+  }) => withNativeArena((arena) {
+    final native = arena<raw.mln_webgpu_surface_descriptor>()
+      ..ref = _webGPUSurfaceDescriptorToNative(descriptor);
+    return _startRenderAttachment(
+      options,
+      (policy, session, operation) => raw.mln_webgpu_surface_attach_start(
+        _handle.raw,
+        native,
+        policy,
+        session,
+        operation,
+      ),
+    );
+  });
+
+  RenderSessionAttachment attachWebGPUOwnedTexture(
+    WebGPUOwnedTextureDescriptor descriptor, {
+    RenderSessionAttachOptions options = const RenderSessionAttachOptions(
+      driver: RenderDriver.callerGraphicsThread,
+    ),
+  }) => withNativeArena((arena) {
+    final native = arena<raw.mln_webgpu_owned_texture_descriptor>()
+      ..ref = _webGPUOwnedTextureDescriptorToNative(descriptor);
+    return _startRenderAttachment(
+      options,
+      (policy, session, operation) => raw.mln_webgpu_owned_texture_attach_start(
+        _handle.raw,
+        native,
+        policy,
+        session,
+        operation,
+      ),
+    );
+  });
+
+  RenderSessionAttachment attachWebGPUBorrowedTexture(
+    WebGPUBorrowedTextureDescriptor descriptor, {
+    RenderSessionAttachOptions options = const RenderSessionAttachOptions(
+      driver: RenderDriver.callerGraphicsThread,
+    ),
+  }) => withNativeArena((arena) {
+    final native = arena<raw.mln_webgpu_borrowed_texture_descriptor>()
+      ..ref = _webGPUBorrowedTextureDescriptorToNative(descriptor);
+    return _startRenderAttachment(
+      options,
+      (policy, session, operation) =>
+          raw.mln_webgpu_borrowed_texture_attach_start(
+            _handle.raw,
+            native,
+            policy,
+            session,
+            operation,
+          ),
+    );
+  });
+
+  RenderSessionAttachment _startRenderAttachment(
+    RenderSessionAttachOptions options,
+    int Function(
+      Pointer<raw.mln_render_session_attach_options>,
+      Pointer<Uint64>,
+      Pointer<Uint64>,
+    )
+    start,
   ) {
     ensureAbiVersion();
     return withNativeArena((arena) {
-      final nativeDescriptor = arena<raw.mln_metal_owned_texture_descriptor>();
-      nativeDescriptor.ref = _metalOwnedTextureDescriptorToNative(descriptor);
-      final outSession = arena<Uint64>();
-      outSession.value = 0;
-      _check(
-        raw.mln_metal_owned_texture_attach(
-          _handle.raw,
-          nativeDescriptor,
-          outSession,
+      final policy = arena<raw.mln_render_session_attach_options>()
+        ..ref = raw.mln_render_session_attach_options_default();
+      policy.ref.driver = options.driver.rawValue;
+      policy.ref.requested_texture_ring_depth =
+          options.requestedTextureRingDepth;
+      final session = arena<Uint64>()..value = 0;
+      final operation = arena<Uint64>()..value = 0;
+      _check(start(policy, session, operation));
+      final renderSession = RenderSessionHandle._(
+        _runtime,
+        NativeRenderSession(session.value),
+      );
+      return RenderSessionAttachment(
+        renderSession,
+        renderSession._completeWhileRetained(
+          _runtime._finishOperation(operation.value),
         ),
       );
-      return RenderSessionHandle._(NativeRenderSession(outSession.value));
-    });
-  }
-
-  /// Attaches a Metal caller-owned texture render target to the map.
-  RenderSessionHandle attachMetalBorrowedTexture(
-    MetalBorrowedTextureDescriptor descriptor,
-  ) {
-    ensureAbiVersion();
-    return withNativeArena((arena) {
-      final nativeDescriptor =
-          arena<raw.mln_metal_borrowed_texture_descriptor>();
-      nativeDescriptor.ref = _metalBorrowedTextureDescriptorToNative(
-        descriptor,
-      );
-      final outSession = arena<Uint64>();
-      outSession.value = 0;
-      _check(
-        raw.mln_metal_borrowed_texture_attach(
-          _handle.raw,
-          nativeDescriptor,
-          outSession,
-        ),
-      );
-      return RenderSessionHandle._(NativeRenderSession(outSession.value));
-    });
-  }
-
-  /// Attaches a Vulkan texture render target owned by the render session.
-  RenderSessionHandle attachVulkanOwnedTexture(
-    VulkanOwnedTextureDescriptor descriptor,
-  ) {
-    ensureAbiVersion();
-    return withNativeArena((arena) {
-      final nativeDescriptor = arena<raw.mln_vulkan_owned_texture_descriptor>();
-      nativeDescriptor.ref = _vulkanOwnedTextureDescriptorToNative(descriptor);
-      final outSession = arena<Uint64>();
-      outSession.value = 0;
-      _check(
-        raw.mln_vulkan_owned_texture_attach(
-          _handle.raw,
-          nativeDescriptor,
-          outSession,
-        ),
-      );
-      return RenderSessionHandle._(NativeRenderSession(outSession.value));
-    });
-  }
-
-  /// Attaches a Vulkan caller-owned texture render target to the map.
-  RenderSessionHandle attachVulkanBorrowedTexture(
-    VulkanBorrowedTextureDescriptor descriptor,
-  ) {
-    ensureAbiVersion();
-    return withNativeArena((arena) {
-      final nativeDescriptor =
-          arena<raw.mln_vulkan_borrowed_texture_descriptor>();
-      nativeDescriptor.ref = _vulkanBorrowedTextureDescriptorToNative(
-        descriptor,
-      );
-      final outSession = arena<Uint64>();
-      outSession.value = 0;
-      _check(
-        raw.mln_vulkan_borrowed_texture_attach(
-          _handle.raw,
-          nativeDescriptor,
-          outSession,
-        ),
-      );
-      return RenderSessionHandle._(NativeRenderSession(outSession.value));
-    });
-  }
-
-  /// Attaches an OpenGL texture render target owned by the render session.
-  RenderSessionHandle attachOpenGLOwnedTexture(
-    OpenGLOwnedTextureDescriptor descriptor,
-  ) {
-    ensureAbiVersion();
-    return withNativeArena((arena) {
-      final nativeDescriptor = arena<raw.mln_opengl_owned_texture_descriptor>();
-      nativeDescriptor.ref = _openglOwnedTextureDescriptorToNative(descriptor);
-      final outSession = arena<Uint64>();
-      outSession.value = 0;
-      _check(
-        raw.mln_opengl_owned_texture_attach(
-          _handle.raw,
-          nativeDescriptor,
-          outSession,
-        ),
-      );
-      return RenderSessionHandle._(NativeRenderSession(outSession.value));
-    });
-  }
-
-  /// Attaches an OpenGL caller-owned texture render target to the map.
-  RenderSessionHandle attachOpenGLBorrowedTexture(
-    OpenGLBorrowedTextureDescriptor descriptor,
-  ) {
-    ensureAbiVersion();
-    return withNativeArena((arena) {
-      final nativeDescriptor =
-          arena<raw.mln_opengl_borrowed_texture_descriptor>();
-      nativeDescriptor.ref = _openglBorrowedTextureDescriptorToNative(
-        descriptor,
-      );
-      final outSession = arena<Uint64>();
-      outSession.value = 0;
-      _check(
-        raw.mln_opengl_borrowed_texture_attach(
-          _handle.raw,
-          nativeDescriptor,
-          outSession,
-        ),
-      );
-      return RenderSessionHandle._(NativeRenderSession(outSession.value));
     });
   }
 }

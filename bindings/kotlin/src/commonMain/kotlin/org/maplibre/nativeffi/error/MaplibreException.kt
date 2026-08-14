@@ -38,5 +38,9 @@ private fun statusLabel(status: MaplibreStatus): String =
     MaplibreStatus.WRONG_THREAD -> "WRONG_THREAD"
     MaplibreStatus.UNSUPPORTED -> "UNSUPPORTED"
     MaplibreStatus.NATIVE_ERROR -> "NATIVE_ERROR"
+    MaplibreStatus.CANCELLED -> "CANCELLED"
+    MaplibreStatus.BUSY -> "BUSY"
+    MaplibreStatus.TARGET_LOST -> "TARGET_LOST"
+    MaplibreStatus.NOT_READY -> "NOT_READY"
     else -> "MaplibreStatus(${status.nativeCode})"
   }

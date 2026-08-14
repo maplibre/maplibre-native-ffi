@@ -46,6 +46,20 @@ internal readonly struct MlnRenderSession(ulong value) : IMlnHandle
     public bool IsNull => Value == 0;
 }
 
+internal readonly struct MlnRenderFrameBatch(ulong value) : IMlnHandle
+{
+    public ulong Value { get; } = value;
+
+    public bool IsNull => Value == 0;
+}
+
+internal readonly struct MlnAcquiredFrame(ulong value) : IMlnHandle
+{
+    public ulong Value { get; } = value;
+
+    public bool IsNull => Value == 0;
+}
+
 internal readonly struct MlnOperation(ulong value) : IMlnHandle
 {
     public ulong Value { get; } = value;

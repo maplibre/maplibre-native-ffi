@@ -43,6 +43,27 @@ internal static unsafe class RenderStructs
                 : (void*)context.GetDeviceProcAddr.Address,
         };
 
+    internal static mln_webgpu_context_descriptor ToNative(WebGpuContextDescriptor? context) =>
+        new()
+        {
+            size = (uint)sizeof(mln_webgpu_context_descriptor),
+            instance = context is null ? null : (void*)context.Instance.Address,
+            device = context is null ? null : (void*)context.Device.Address,
+            queue = context is null ? null : (void*)context.Queue.Address,
+        };
+
+    internal static mln_render_session_attach_options ToNative(RenderSessionAttachOptions? options)
+    {
+        NativeLibraryLoader.EnsureLoaded();
+        var native = NativeMethods.mln_render_session_attach_options_default();
+        if (options is not null)
+        {
+            native.driver = (uint)options.Driver;
+            native.requested_texture_ring_depth = options.RequestedTextureRingDepth;
+        }
+        return native;
+    }
+
     internal static mln_opengl_context_descriptor ToNative(OpenGLContextDescriptor context)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -74,6 +95,15 @@ internal static unsafe class RenderStructs
                     share_context = (void*)egl.ShareContext.Address,
                     client_api = (mln_opengl_client_api)egl.ClientApi,
                     get_proc_address = (void*)egl.GetProcAddress.Address,
+                };
+                break;
+            case WebGLContextDescriptor webgl:
+                native.platform = mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_WEBGL;
+                native.data.webgl = new mln_webgl_context_descriptor
+                {
+                    size = (uint)sizeof(mln_webgl_context_descriptor),
+                    kind = (uint)webgl.Kind,
+                    context = webgl.Context,
                 };
                 break;
             default:
@@ -218,6 +248,61 @@ internal static unsafe class RenderStructs
         return native;
     }
 
+    internal static mln_webgpu_surface_descriptor ToNative(WebGpuSurfaceDescriptor descriptor)
+    {
+        ArgumentNullException.ThrowIfNull(descriptor);
+        var native = NativeMethods.mln_webgpu_surface_descriptor_default();
+        native.extent = ToNative(descriptor.Extent);
+        native.context = ToNative(descriptor.Context);
+        native.surface = (void*)descriptor.Surface.Address;
+        native.format = descriptor.Format;
+        return native;
+    }
+
+    internal static mln_webgpu_owned_texture_descriptor ToNative(
+        WebGpuOwnedTextureDescriptor descriptor
+    )
+    {
+        ArgumentNullException.ThrowIfNull(descriptor);
+        var native = NativeMethods.mln_webgpu_owned_texture_descriptor_default();
+        native.extent = ToNative(descriptor.Extent);
+        native.context = ToNative(descriptor.Context);
+        return native;
+    }
+
+    internal static mln_webgpu_borrowed_texture_descriptor ToNative(
+        WebGpuBorrowedTextureDescriptor descriptor
+    )
+    {
+        ArgumentNullException.ThrowIfNull(descriptor);
+        var native = NativeMethods.mln_webgpu_borrowed_texture_descriptor_default();
+        native.extent = ToNative(descriptor.Extent);
+        native.physical_width = descriptor.PhysicalWidth;
+        native.physical_height = descriptor.PhysicalHeight;
+        native.context = ToNative(descriptor.Context);
+        native.texture = (void*)descriptor.Texture.Address;
+        native.texture_view = (void*)descriptor.TextureView.Address;
+        native.format = descriptor.Format;
+        return native;
+    }
+
+    internal static WebGpuOwnedTextureFrame FromNative(
+        mln_webgpu_owned_texture_frame frame,
+        FrameScope scope
+    ) =>
+        new(
+            scope,
+            frame.generation,
+            frame.width,
+            frame.height,
+            frame.scale_factor,
+            frame.frame_id,
+            NativePointer.FromNativeAddress((nint)frame.texture),
+            NativePointer.FromNativeAddress((nint)frame.texture_view),
+            NativePointer.FromNativeAddress((nint)frame.device),
+            frame.format
+        );
+
     internal static TextureImageInfo FromNative(mln_texture_image_info info) =>
         new(info.width, info.height, info.stride, (ulong)info.byte_length);
 
@@ -272,92 +357,4 @@ internal static unsafe class RenderStructs
             frame.format,
             frame.type
         );
-}
-
-internal sealed class NativeFeatureStateSelector : IDisposable
-{
-    private readonly NativeStringView sourceId;
-    private readonly NativeStringView? sourceLayerId;
-    private readonly NativeStringView? featureId;
-    private readonly NativeStringView? stateKey;
-
-    private NativeFeatureStateSelector(
-        mln_feature_state_selector value,
-        NativeStringView sourceId,
-        NativeStringView? sourceLayerId,
-        NativeStringView? featureId,
-        NativeStringView? stateKey
-    )
-    {
-        Value = value;
-        this.sourceId = sourceId;
-        this.sourceLayerId = sourceLayerId;
-        this.featureId = featureId;
-        this.stateKey = stateKey;
-    }
-
-    internal mln_feature_state_selector Value { get; }
-
-    internal static NativeFeatureStateSelector From(FeatureStateSelector selector)
-    {
-        ArgumentNullException.ThrowIfNull(selector);
-        var sourceId = NativeStringView.From(selector.SourceId, nameof(selector.SourceId));
-        NativeStringView? sourceLayerId = null;
-        NativeStringView? featureId = null;
-        NativeStringView? stateKey = null;
-        try
-        {
-            var value = new mln_feature_state_selector
-            {
-                size = (uint)
-                    System.Runtime.CompilerServices.Unsafe.SizeOf<mln_feature_state_selector>(),
-                source_id = sourceId.Value,
-            };
-            if (selector.SourceLayerId is { } sourceLayer)
-            {
-                sourceLayerId = NativeStringView.From(sourceLayer, nameof(selector.SourceLayerId));
-                value.fields |= (uint)
-                    mln_feature_state_selector_field.MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID;
-                value.source_layer_id = sourceLayerId.Value;
-            }
-            if (selector.FeatureId is { } feature)
-            {
-                featureId = NativeStringView.From(feature, nameof(selector.FeatureId));
-                value.fields |= (uint)
-                    mln_feature_state_selector_field.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID;
-                value.feature_id = featureId.Value;
-            }
-            if (selector.StateKey is { } state)
-            {
-                stateKey = NativeStringView.From(state, nameof(selector.StateKey));
-                value.fields |= (uint)
-                    mln_feature_state_selector_field.MLN_FEATURE_STATE_SELECTOR_STATE_KEY;
-                value.state_key = stateKey.Value;
-            }
-
-            return new NativeFeatureStateSelector(
-                value,
-                sourceId,
-                sourceLayerId,
-                featureId,
-                stateKey
-            );
-        }
-        catch
-        {
-            sourceId.Dispose();
-            sourceLayerId?.Dispose();
-            featureId?.Dispose();
-            stateKey?.Dispose();
-            throw;
-        }
-    }
-
-    public void Dispose()
-    {
-        sourceId.Dispose();
-        sourceLayerId?.Dispose();
-        featureId?.Dispose();
-        stateKey?.Dispose();
-    }
 }

@@ -15,9 +15,10 @@ A source query reports the loaded features in a source, including features that
 no layer draws. To find features at a screen position, use
 [Query a map](/maplibre-native-ffi/guides/query-a-map/).
 
-The query belongs to the render session and runs on the session's owner thread.
-Source queries become available after the first render update. An earlier query
-reports an invalid-state status.
+The query belongs to the render session and is an operation callable from any
+thread. The selected driver executes it after preceding render work. A caller
+driver therefore needs graphics-thread service while the operation is pending.
+Source queries become available after the first rendered frame.
 
 ## Run the query
 

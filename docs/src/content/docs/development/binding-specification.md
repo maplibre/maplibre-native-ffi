@@ -277,12 +277,11 @@ binding's own closed-handle error rather than surfacing the C API's rejection of
 an id retired underneath the call. The mechanism belongs to the shared handle
 state, so every handle of that kind gets the same ordering.
 
-Deterministic cleanup hooks follow the same release or lifecycle-close operation
-when they can report failure through the target language's normal error path.
-Non-deterministic cleanup may start asynchronous close only when the binding can
-retain every callback root and native dependency until completion. Otherwise it
-reports a leak and preserves the state that native code can still reach.
-Thread-affine render-session cleanup runs only on the owning graphics thread.
+Deterministic cleanup hooks follow the same release or lifecycle operation when
+they can report failure through the target language's normal error path.
+Non-deterministic cleanup may start detach only when the binding can retain
+every dependency and can keep a caller driver serviced until completion. It may
+otherwise abandon and report any quarantine, then destroy CPU-only.
 
 ### Stale and mismatched handles
 
@@ -691,26 +690,27 @@ argument, so one request handle type covers both the owning and the moved use.
 
 ## Execution
 
-Runtime, map, projection, operation, notification-source, and event-batch
-handles are callable from any native thread. The C API owns the runtime's
-scheduler thread. A binding MUST NOT create an owner thread, expose a pump, or
-pin a task to a native thread for runtime or map progress.
+Runtime, map, projection, render-session control, operation,
+notification-source, ready-batch, event-batch, and frame-result-batch handles
+are callable from any native thread. The C API owns the runtime scheduler and
+any core-worker graphics thread. A binding MUST NOT create an owner thread,
+expose a pump, or pin a task to a native thread for native progress.
 
 Bindings preserve the C execution category:
 
 1. Immediate functions return synchronously in the language's ordinary result or
    error shape.
 2. Commands return after native code accepts and copies the input. The binding
-   exposes the command ID and preserves terminal command dispositions in its
-   event model.
-3. Published snapshots return synchronous language-owned copies. A binding does
-   not relabel an ordered query as a snapshot.
+   exposes the command ID and preserves terminal command dispositions.
+3. Published snapshots return synchronous language-owned copies. A binding MUST
+   NOT relabel an ordered query as a snapshot.
 4. Operations use the language's future, promise, task, suspension, or explicit
    wait idiom. Cooperative and UI executors suspend instead of blocking.
-5. Event batches drain after notification and become language-owned event
+5. Event and result batches drain after notification and become language-owned
    sequences.
-6. Render-driver calls preserve the graphics-thread requirement documented by
-   the target.
+6. A caller-driver service call and graphics accessor preserve the target's
+   graphics-thread requirement. A binding MUST NOT apply that requirement to
+   render-session control calls.
 
 Lifecycle wrappers start and observe native lifecycle operations. A constructor
 does not publish its runtime or map wrapper until typed result take transfers
@@ -813,112 +813,148 @@ The subscription follows this design:
 
 ### Attaching a render session
 
-A render session's owner thread is the thread that attached it, fixed for the
-session's lifetime. Runtime and map handles have no host-thread affinity.
+Attachment selects a driver and returns both an attaching render-session handle
+and an operation.
 
-1. Attach requires the map to be live.
-2. The session a binding returns is affine to the attaching thread. Every
-   session operation from another thread reports the binding's wrong-thread
-   error, including close.
-3. The binding retains the map until session close. Map close preflight reports
-   invalid state and leaves the map open while a session is attached.
-4. Attach is exposed directly on the map handle. A binding MUST NOT add an
-   attach-only reference or owner-thread adapter for the map.
+1. The binding MUST retain the map while the session is live.
+2. The binding MUST publish the returned session immediately in an attaching
+   state, because a caller driver needs that handle to service initialization
+   work before the attach operation can complete.
+3. The binding MUST NOT expose ordinary attached-session operations until the
+   attach operation succeeds. Driver service, snapshots, abandonment, and
+   destruction remain available according to their C lifecycle contract.
+4. Map close preflight reports invalid state and leaves the map open while a
+   session is attached or attaching.
+5. The binding MUST expose attach directly on the map handle. It MUST NOT add an
+   attach-only map reference, owner-thread adapter, driver thread, mailbox, or
+   queue.
 
 ### Transferability
 
-Runtime, map, projection, operation, notification-source, ready-batch, and
-event-batch handles are safe to move between native threads. A binding may
-declare them transferable when its wrapper synchronizes close, release, and
-in-flight calls. Render sessions and their frame handles remain bound to the
-graphics thread that attached the session. Copied immutable values can be
-transferable when their contents are independent of native handles.
+Runtime, map, projection, render-session control, operation,
+notification-source, ready-batch, event-batch, frame-result-batch, and acquired
+frame handles are safe to move between native threads. A binding may declare
+them transferable when its wrapper synchronizes close, release, and in-flight
+calls. Backend accessors on acquired frames preserve their documented graphics
+context requirement.
 
 Unchecked or unsafe concurrency conformance MUST name the wrapper
 synchronization invariant that makes concurrent use and close sound.
 
 ## Rendering
 
-Rendering bindings expose render sessions, frame lifetimes, and readback without
-taking ownership of caller-owned backend resources.
+Rendering bindings expose the two native driver contracts, frame demand and
+results, texture-slot lifetimes, and readback without taking ownership of
+caller-owned backend resources.
 
-Render session calls run on the graphics thread that attached the session.
-Runtime and map work progresses on the core-owned scheduler independently.
-Events produced by rendering are delivered by a runtime event drain from any
-thread.
+### Drivers and notification
+
+A binding MUST expose core-worker and caller-graphics-thread placement as the
+common attach option. WGL, EGL, and existing browser WebGL contexts use the
+caller driver. A transferred `OffscreenCanvas` WebGL target may use a core
+worker, which creates and uses its WebGL2 context there. Browser WebGPU uses the
+caller driver. Transferable Metal and Vulkan targets may support the core
+worker.
+
+The core worker owns a native serial graphics worker. The binding MUST NOT add a
+thread, executor, mailbox, or queue around it. The caller driver stores typed
+native work and progresses only when the host calls driver service with the
+target context usable. The first successful service call fixes the graphics
+thread identity. The binding MUST keep later calls affine to that thread and
+serialize them against other driver calls.
+
+Attach options expose receiver-scoped notification sources for operations, frame
+results, and driver work. A null operation source inherits the map runtime's
+source. Null frame and driver-work sources inherit the operation source.
+Bindings MUST reuse their common notification adapter for all three roles.
+
+Driver-work readiness is independent of frame cadence. A binding MUST let the
+host service ready driver work while presentation callbacks are paused. It MUST
+NOT teach a runtime pump or use runtime events as the trigger for render
+progress.
 
 ### Render sessions
 
-Render-session attach APIs cover the C API session families:
-
-- Surface sessions render and present through a host surface.
-- Session-owned texture sessions render into a texture or image created by the
-  session.
-- Caller-owned texture sessions render into a host-owned texture or image.
-
-Attach follows this operation:
-
-1. Materialize the backend-specific public descriptor into the matching C
-   descriptor.
-2. Pass backend-native host resources as `NativePointer` values.
-3. Call the matching C attach function on the thread that will drive the
-   session, which for a host graphics API with a thread-current context is the
-   thread where that context is current.
-4. Return a distinct `RenderSessionHandle`, bound to the calling thread, for the
-   map's one live render session.
-5. Surface unsupported backend, unsupported render-target mode,
-   existing-session, and native errors through the binding's status mapping.
-
-For host-owned backend resources, the binding does not release or synchronize
-those resources. The caller keeps them valid for the C API's documented borrow
-window.
+Render-session attach APIs cover native surfaces, session-owned textures, and
+caller-owned borrowed textures. They materialize the backend descriptor, common
+attach options, and `NativePointer` fields without taking ownership of borrowed
+resources.
 
 The public handle exposes:
 
-- `resize` for session kinds that support resize;
-- `set_target` for session kinds whose target the host owns, which is surface
-  sessions and caller-owned texture sessions;
-- `render_update` for the latest available map render update, reporting the
-  render result as a public enum;
-- `detach`, which keeps the public handle live after backend resources detach;
-- `close` or `destroy`, using the owned-handle release operation, on the thread
-  that attached the session.
+- immutable negotiated capabilities;
+- any-thread snapshots, frame demand, result drains, resize, barriers,
+  maintenance, feature state, readback, detach, abandon, and destroy;
+- driver service and backend accessors with their graphics-thread requirement;
+- target replacement for native surfaces and borrowed textures.
 
-`set_target` takes the same public descriptor type its attach function takes, so
-a host builds a replacement target the way it built the first one. It is exposed
-per backend and target kind, matching the C API's `mln_*_surface_set_target()`
-and `mln_*_borrowed_texture_set_target()` functions, and it is bound to the
-thread that attached the session like every other session operation. The C API
-rejects a descriptor whose graphics context differs from the session's, so
-bindings pass the descriptor through.
+Resize, replacement, queries, maintenance, readback, detach, and barriers are
+operations routed through the selected driver. A binding MUST use its common
+operation adapter and MUST keep servicing a caller driver while such an
+operation is pending.
+
+Normal detach runs graphics destruction on the selected owner and detaches the
+map. The binding retains the session until detach completes, then permits
+CPU-only destruction from any thread. Abandon performs no graphics calls,
+returns busy during an in-flight driver call, invalidates accessors, detaches
+the map in CPU state, and reports whether resources entered process-lifetime
+quarantine. A binding MUST expose abandon as the failure path for an owner that
+cannot service graphics work again.
+
+Target loss is a distinct snapshot state. A binding MUST preserve target-not-
+ready and target-lost outcomes rather than retrying them in a busy loop.
+
+### Frame demand and results
+
+A binding MUST expose frame demand as a nonblocking any-thread call. It carries
+flags, token, coalescing boundary, presentation time, and optional deadline.
+Every accepted demand produces exactly one terminal result record, including a
+superseded or deadline-missed demand.
+
+Frame results preserve disposition, token, presentation time, map-update
+generation, extent generation, and frame generation. A binding MUST preserve
+rendered, no-update, size-pending, target-not-ready, superseded, and
+deadline-missed as distinct outcomes. A positive monotonic deadline terminates
+the demand as deadline missed when it expires before work begins. Presentation
+time selects state and neither timestamp supplies cadence.
+
+Frame readiness is level-triggered until drained. A binding MUST hold at most
+one live native frame-result batch per session, copy records before release
+unless its type system bounds the borrow, and drain until empty after
+notification.
+
+A session barrier completes after all preceding accepted render work is terminal
+and the driver observed the requested minimum map-update generation. A binding
+MUST NOT represent a barrier as a frame request or a runtime pump.
 
 ### Texture frames
 
-Session-owned texture frames are scoped borrows.
+Session-owned targets negotiate a ring depth from one to three. Acquisition is
+nonblocking and returns an acquired-frame handle that leases one slot. The
+binding copies common metadata and exposes backend handles only through
+active-handle accessors.
 
-Frame acquisition follows this operation:
+The binding MUST expose producer-completion synchronization and accept optional
+consumer-completion synchronization on release. CPU-complete synchronization is
+valid when the relevant GPU producer or consumer completed before publication.
+The release operation consumes the frame handle and completes only when the slot
+is reusable. A binding MUST NOT release a slot merely because the CPU wrapper
+closed while host GPU reads remain pending.
 
-1. Acquire the native frame and create an explicit frame handle.
-2. Copy public metadata from the native frame.
-3. Expose backend handles only through active-frame checked accessors.
-4. While the frame is active, reject nested frame acquisition and every exposed
-   session operation whose C contract forbids execution during an active frame.
-5. Release follows the owned-handle release operation. Failed native frame
-   release leaves the frame live for retry.
-6. If wrapper construction fails after native frame acquisition, release the
-   acquired native frame.
+After abandonment, releasing an acquired frame still consumes its handle
+CPU-only. Its operation terminates with target lost. The binding MUST surface
+that terminal status and MUST NOT call a backend accessor after abandonment.
 
-Copyable frame handles include stale-handle protection so old frame copies
-cannot expose backend handles after release or after a later frame reuses the
-same storage.
+Backpressure is the absence of an acquirable or reusable slot. Bindings MUST
+surface not ready without blocking, replacing an acquired frame, or silently
+expanding the negotiated ring.
 
 ### Readback
 
-CPU texture readback accepts caller-owned mutable storage.
-
-Readback returns copied `TextureImageInfo` metadata. Buffer-capacity failures
-preserve the caller's buffer ownership and map to the binding's error mechanism.
-Public buffer reads return copied or read-only views unless the binding proves
+Texture readback is an operation through the selected driver. Taking its result
+transfers owned premultiplied RGBA8 bytes and copied image metadata. A caller
+driver needs graphics-thread service until the operation completes. Public
+buffer reads return copied or read-only views unless the binding proves
 exclusive mutable access.
 
 ---
@@ -1092,25 +1128,29 @@ When the binding routes provider requests through
 
 ### Rendering
 
-| ID      | Test                                                                                                                                                      |
-| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-160 | Supported render-backend queries gate configured workflows and unsupported backend/mode errors.                                                           |
-| BND-161 | Render-target descriptors materialize extents and `NativePointer` backend handles without taking ownership.                                               |
-| BND-162 | Surface, session-owned texture, and caller-owned texture attach paths call the matching C session family and report the same public session handle shape. |
-| BND-163 | Attaching a second render session to the same map reports invalid state.                                                                                  |
-| BND-164 | `render_update` reports a result other than a rendered frame without closing the session.                                                                 |
-| BND-165 | Resize updates extent through the public render session API.                                                                                              |
-| BND-175 | `set_target` replaces a host-owned render target through the public render session API and updates the session's extent.                                  |
-| BND-176 | `set_target` reports unsupported for a target kind the session does not have, covering a session-owned texture and a mismatched surface/texture pairing.  |
-| BND-166 | CPU readback copies metadata; undersized buffers fail without losing ownership, and sufficiently sized reusable buffers receive image bytes.              |
-| BND-167 | Owned texture frame acquire returns an explicit frame handle with copied metadata and active-checked backend handles.                                     |
-| BND-168 | Owned texture frame access after release fails before exposing backend handles.                                                                           |
-| BND-169 | Failed frame release leaves the frame live and a later successful release closes it.                                                                      |
-| BND-170 | Nested frame acquisition and every exposed session operation forbidden during an active frame fail while a frame is active.                               |
-| BND-171 | Caller-owned texture descriptors do not release or mutate caller-owned backend handles during session close.                                              |
-| BND-172 | Bindings with fallible owned-frame wrapper construction release the native frame when construction fails after native frame acquisition.                  |
-| BND-173 | Stale frame handles cannot expose backend handles after release or reuse.                                                                                 |
-| BND-174 | Closing a map whose render session was attached on another thread reports the C API's invalid-state error and leaves both handles live.                   |
+| ID      | Test                                                                                                                                                                                                    |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-160 | Backend and target capabilities gate driver and target combinations, including caller-driver WGL/EGL/WebGL and browser WebGPU, and core-worker transferable Metal, Vulkan, and `OffscreenCanvas` WebGL. |
+| BND-161 | Render-target descriptors copy extents and `NativePointer` backend handles without taking ownership.                                                                                                    |
+| BND-162 | Every supported target attach returns an attaching session and operation; caller-driver service can complete attachment without a deadlock.                                                             |
+| BND-163 | Attaching a second session to one map reports invalid state and leaves the first session usable.                                                                                                        |
+| BND-164 | Every accepted demand yields one result, preserving all dispositions, tokens, timestamps, and generation fields.                                                                                        |
+| BND-165 | Resize and target replacement complete through the selected driver and update the extent generation.                                                                                                    |
+| BND-166 | Readback transfers owned bytes and copied metadata through an operation.                                                                                                                                |
+| BND-167 | Owned texture capability negotiation grants a one-to-three-slot ring, and acquisition leases a slot with copied metadata and active-checked backend handles.                                            |
+| BND-168 | Frame access after release fails before exposing backend handles.                                                                                                                                       |
+| BND-169 | Frame release consumes the handle and its operation completes only after consumer GPU completion makes the slot reusable.                                                                               |
+| BND-170 | Ring exhaustion reports not ready without blocking or replacing an acquired frame.                                                                                                                      |
+| BND-171 | Borrowed target descriptors do not release or mutate host backend handles during detach.                                                                                                                |
+| BND-172 | A fallible wrapper releases a natively acquired frame when wrapper construction fails.                                                                                                                  |
+| BND-173 | Stale acquired-frame handles cannot expose backend handles after slot reuse.                                                                                                                            |
+| BND-174 | Render-session control, operation, snapshot, demand, abandon, and destroy calls work from a thread other than the graphics service thread.                                                              |
+| BND-175 | Frame-result readiness stays level-triggered until every record drains, and a second live batch is rejected.                                                                                            |
+| BND-176 | A barrier waits for preceding render work and its minimum map-update generation without requesting a frame.                                                                                             |
+| BND-177 | A positive expired deadline yields deadline missed before graphics work begins.                                                                                                                         |
+| BND-178 | Normal detach performs graphics destruction through the selected owner and permits any-thread CPU-only destroy afterward.                                                                               |
+| BND-179 | Abandon returns busy during a driver call, performs no graphics calls, invalidates accessors, detaches the map, and reports quarantine.                                                                 |
+| BND-180 | Target loss is preserved in snapshots and does not enter a busy retry loop.                                                                                                                             |
 
 ### Conditional tests
 
@@ -1121,10 +1161,10 @@ mechanic, helper, or test fixture.
 
 When the host language can run cleanup outside explicit release, include:
 
-| ID      | Test                                                                                                                             |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| BND-044 | Non-deterministic cleanup hooks report leaked thread-affine handles rather than destroying them.                                 |
-| BND-048 | Best-effort cleanup failure is reported through the binding's documented leak or failure channel and explicit release can retry. |
+| ID      | Test                                                                                                                      |
+| ------- | ------------------------------------------------------------------------------------------------------------------------- |
+| BND-044 | Non-deterministic cleanup either retains service and dependencies through detach or abandons before CPU-only destruction. |
+| BND-048 | Quarantine or cleanup failure reaches the binding's documented leak or failure channel.                                   |
 
 #### Cross-thread public handle use
 
@@ -1142,17 +1182,17 @@ A binding that orders the race by holding one lock across the native call
 satisfies BND-197 by construction. A binding that counts in-flight uses and
 drains them exercises the counter directly.
 
-#### Render sessions on a second thread
+#### Caller-driver graphics threads
 
-When the binding's test suite attaches a render session on a configured render
-backend and the host language can start a native thread, include:
+When a configured target uses a caller driver and the host language can start a
+native thread, include:
 
-| ID      | Test                                                                                                                                                  |
-| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-193 | A native thread attaches its own render session against a map and renders while the map progresses on the core-owned scheduler thread.                |
-| BND-194 | Every render-session operation reports the binding's wrong-thread error on a thread other than the one that attached the session, leaving it usable.  |
-| BND-195 | A session attached and closed on a second native thread destroys the native handle exactly once, after which the map closes successfully.             |
-| BND-196 | Attaching through a reference to a released map reports the binding's invalid-argument error naming the map stale, including once a later map exists. |
+| ID      | Test                                                                                                                                         |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-193 | The graphics thread services attachment, frames, ordered operations, and detach while map work progresses on the native scheduler.           |
+| BND-194 | Driver service and thread-current accessors report the binding's wrong-thread error elsewhere, while any-thread control calls remain usable. |
+| BND-195 | A session detached by its graphics-thread service is destroyed exactly once from another thread, after which map close succeeds.             |
+| BND-196 | Attaching through a released map wrapper reports the binding's stale-handle error before crossing into C.                                    |
 
 #### Live render session queries
 

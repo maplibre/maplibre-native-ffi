@@ -245,9 +245,9 @@ func (state *renderMapState) finishFrame() error {
 	return state.target.FinishFrame()
 }
 
-func (state *renderMapState) renderUpdate() (bool, error) {
+func (state *renderMapState) driveFrame() (bool, error) {
 	if state.target == nil {
 		return false, nil
 	}
-	return state.target.RenderUpdate()
+	return state.target.DriveFrame()
 }

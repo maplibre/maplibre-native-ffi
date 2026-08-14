@@ -1,9 +1,9 @@
 //! Autonomous runtime and any-thread map state.
 
 use std::error::Error;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
+
+use winit::event_loop::EventLoopProxy;
 
 use maplibre_native_ffi::{
     AnimationOptions, CameraOptions, CameraUpdate, CameraUpdateMode, GesturePhase, LatLng,
@@ -66,21 +66,21 @@ pub struct MapState {
     projection: Option<MapProjectionHandle>,
     map: MapHandle,
     runtime: RuntimeHandle,
-    notification_ready: Arc<AtomicBool>,
     gesture_id: u64,
 }
 
 impl MapState {
-    pub fn new(viewport: Viewport) -> Result<Self, Box<dyn Error>> {
+    pub fn new(
+        viewport: Viewport,
+        event_loop_proxy: EventLoopProxy<()>,
+    ) -> Result<Self, Box<dyn Error>> {
         let mut runtime_options = RuntimeOptions::default();
         runtime_options.cache_path = Some(":memory:".into());
         let runtime = RuntimeHandle::with_options(&runtime_options)
             .map_err(|error| format!("runtime creation failed: {error}"))?;
 
-        let notification_ready = Arc::new(AtomicBool::new(true));
-        let scheduled = Arc::clone(&notification_ready);
         if let Err(error) = runtime.set_notification_callback(move || {
-            scheduled.store(true, Ordering::Release);
+            let _ = event_loop_proxy.send_event(());
         }) {
             let mut message = format!("notification callback installation failed: {error}");
             append_cleanup_result(&mut message, "runtime", runtime.close());
@@ -122,7 +122,6 @@ impl MapState {
             projection: Some(projection),
             map,
             runtime,
-            notification_ready,
             gesture_id: 0,
         };
         if let Err(error) = state.configure() {
@@ -230,19 +229,21 @@ impl MapState {
     }
 
     pub fn drain_notifications(&self) -> maplibre_native_ffi::Result<bool> {
-        if !self.notification_ready.swap(false, Ordering::AcqRel) {
-            return Ok(false);
-        }
-        let runtime_events_ready = self
-            .runtime
-            .drain_ready()?
+        let ready = self.runtime.drain_ready()?;
+        let mut render_requested = ready.iter().any(|endpoint| {
+            matches!(
+                endpoint.kind,
+                ReadyEndpointKind::RenderFrames | ReadyEndpointKind::DriverWork
+            )
+        });
+        if !ready
             .iter()
-            .any(|endpoint| endpoint.kind == ReadyEndpointKind::RuntimeEvents);
-        if !runtime_events_ready {
-            return Ok(false);
+            .any(|endpoint| endpoint.kind == ReadyEndpointKind::RuntimeEvents)
+        {
+            return Ok(render_requested);
         }
+
         let source = RuntimeEventSource::Map(self.map.id());
-        let mut render_requested = false;
         let batch = self.runtime.drain_events(0)?;
         for event in batch.iter().filter(|event| event.source() == source) {
             match event.event_type() {

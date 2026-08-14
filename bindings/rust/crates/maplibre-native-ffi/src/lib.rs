@@ -50,27 +50,27 @@ pub use maplibre_core::{
     LogSeverity, LogSeverityMask, MapDebugOptions, MapMode, MapOptions, MapTileOptions,
     MapViewportOptions, NetworkStatus, NorthOrientation, OfflineRegionDownloadState,
     OpenGLClientApi, OpenGLContextOwnership, OpenGLContextProviderMask, RasterDemEncoding,
-    RenderBackendMask, RenderMode, RenderResult, ResourceErrorReason, ResourceKind,
-    ResourceLoadingMethod, ResourcePriority, ResourceResponseStatus, ResourceStoragePolicy,
-    ResourceUsage, Result, RuntimeEventMask, RuntimeEventType, TileLodMode, TileOperation,
-    ViewportMode,
+    RenderBackendMask, RenderMode, ResourceErrorReason, ResourceKind, ResourceLoadingMethod,
+    ResourcePriority, ResourceResponseStatus, ResourceStoragePolicy, ResourceUsage, Result,
+    RuntimeEventMask, RuntimeEventType, TileLodMode, TileOperation, ViewportMode,
 };
 pub use maplibre_native_ffi_core::handle::{NativeHandleLeak, set_leak_reporter};
 pub use projection::MapProjectionHandle;
 pub use render::{
-    DetachedRenderSessionHandle, EglContextDescriptor, FeatureStateSelector, FrameNativePointer,
-    FrameOpenGLTextureName, MetalBorrowedTextureDescriptor, MetalContextDescriptor,
-    MetalOwnedTextureDescriptor, MetalOwnedTextureFrame, MetalOwnedTextureFrameHandle,
-    MetalSurfaceDescriptor, NativePointer, OpenGLBorrowedTextureDescriptor,
+    AcquiredFrameHandle, EglContextDescriptor, FeatureStateSelector, FrameDemand, FrameDisposition,
+    FrameGpuSync, FrameNativePointer, FrameOpenGLTextureName, GpuSync, GpuSyncKind,
+    MetalBorrowedTextureDescriptor, MetalContextDescriptor, MetalOwnedTextureDescriptor,
+    MetalOwnedTextureFrame, MetalSurfaceDescriptor, NativePointer, OpenGLBorrowedTextureDescriptor,
     OpenGLContextDescriptor, OpenGLOwnedTextureDescriptor, OpenGLOwnedTextureFrame,
-    OpenGLOwnedTextureFrameHandle, OpenGLSurfaceDescriptor, PremultipliedRgba8Image,
-    RenderSessionHandle, RenderTargetExtent, RenderedFeatureQueryOptions, RenderedQueryGeometry,
+    OpenGLSurfaceDescriptor, PremultipliedRgba8Image, RenderAbandonResult, RenderDriverKind,
+    RenderFrameBatch, RenderFrameResult, RenderSessionAttachOptions, RenderSessionAttachment,
+    RenderSessionCapabilities, RenderSessionHandle, RenderSessionLifecycle, RenderSessionSnapshot,
+    RenderTargetExtent, RenderedFeatureQueryOptions, RenderedQueryGeometry,
     SourceFeatureQueryOptions, TextureImageInfo, VulkanBorrowedTextureDescriptor,
     VulkanContextDescriptor, VulkanOwnedTextureDescriptor, VulkanOwnedTextureFrame,
-    VulkanOwnedTextureFrameHandle, VulkanSurfaceDescriptor, WebGlContextDescriptor,
-    WebGpuBorrowedTextureDescriptor, WebGpuContextDescriptor, WebGpuOwnedTextureDescriptor,
-    WebGpuOwnedTextureFrame, WebGpuOwnedTextureFrameHandle, WebGpuSurfaceDescriptor,
-    WglContextDescriptor,
+    VulkanSurfaceDescriptor, WebGlContextDescriptor, WebGpuBorrowedTextureDescriptor,
+    WebGpuContextDescriptor, WebGpuOwnedTextureDescriptor, WebGpuOwnedTextureFrame,
+    WebGpuSurfaceDescriptor, WglContextDescriptor,
 };
 pub use resource::{
     ByteRange, HttpHeader, HttpHeaderTransformRequest, ResourceProviderDecision, ResourceRequest,
@@ -217,10 +217,13 @@ mod tests {
     assert_impl_all!(RuntimeHandle: Send, Sync);
     assert_impl_all!(MapHandle: Send, Sync);
     assert_impl_all!(MapProjectionHandle: Send, Sync);
+    assert_impl_all!(RenderSessionHandle: Send, Sync);
+    assert_impl_all!(AcquiredFrameHandle: Send, Sync);
     assert_not_impl_any!(NativePointer: Send, Sync);
     assert_not_impl_any!(FrameNativePointer<'static>: Send, Sync);
-    assert_not_impl_any!(RenderSessionHandle: Send, Sync);
-    assert_not_impl_any!(DetachedRenderSessionHandle: Send, Sync);
+    assert_not_impl_any!(FrameOpenGLTextureName<'static>: Send, Sync);
+    assert_not_impl_any!(GpuSync: Send, Sync);
+    assert_not_impl_any!(FrameGpuSync<'static>: Send, Sync);
 
     #[test]
     // Spec coverage: BND-103.

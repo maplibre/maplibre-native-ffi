@@ -17,21 +17,28 @@ typedef enum render_session_kind : uint8_t {
 typedef struct render_session {
   render_session_kind kind;
   mln_render_session handle;
+  uint64_t next_frame_token;
 } render_session;
 
 void render_session_close(render_session* session);
+
+/// Services a caller-driver operation to completion and releases the operation.
+[[nodiscard]] app_error render_session_complete_operation(
+  render_session* session, mln_operation operation, app_error error,
+  const char* message
+);
 
 [[nodiscard]] app_error render_session_resize(
   render_session* session, viewport current_viewport
 );
 
-/// Renders the latest map update. Reports true only for
-/// MLN_RENDER_RESULT_RENDERED, so the render loop sets the render request again
-/// for a map that has no update yet, a size the map has not applied yet, and a
-/// target that had no frame to draw into.
+/// Submits one frame demand, services caller-driver work, and drains its
+/// result.
 [[nodiscard]] app_error render_session_render_update(
   render_session* session, bool* out_rendered
 );
+
+mln_render_session_attach_options render_session_attach_options(void);
 
 mln_render_target_extent render_target_extent(viewport current_viewport);
 

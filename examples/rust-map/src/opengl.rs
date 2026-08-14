@@ -10,7 +10,7 @@ use glutin::display::{GetGlDisplay, GlDisplay};
 use glutin::prelude::*;
 use glutin::surface::{Surface, SurfaceAttributesBuilder, WindowSurface};
 use glutin_winit::DisplayBuilder;
-use maplibre_native_ffi::{NativePointer, OpenGLContextDescriptor, OpenGLOwnedTextureFrameHandle};
+use maplibre_native_ffi::{AcquiredFrameHandle, NativePointer, OpenGLContextDescriptor};
 use raw_window_handle::HasWindowHandle;
 use winit::event_loop::ActiveEventLoop;
 use winit::window::{Window, WindowAttributes};
@@ -188,9 +188,9 @@ impl OpenGLTextureCompositor {
     pub fn draw_frame(
         &self,
         context: &OpenGLContext,
-        frame: &OpenGLOwnedTextureFrameHandle,
+        frame: &AcquiredFrameHandle,
     ) -> maplibre_native_ffi::Result<()> {
-        let metadata = frame.frame()?;
+        let (metadata, texture) = frame.opengl_texture()?;
         if metadata.width == 0 || metadata.height == 0 {
             return Err(compositor_error("owned OpenGL frame has an empty extent"));
         }
@@ -200,7 +200,7 @@ impl OpenGLTextureCompositor {
                 metadata.target
             )));
         }
-        let texture = unsafe { frame.texture()?.value() };
+        let texture = unsafe { texture.value() };
         self.draw_texture(context, texture)
     }
 
@@ -246,6 +246,9 @@ impl OpenGLTextureCompositor {
             self.gl.bind_texture(TEXTURE_TARGET, None);
             self.gl.bind_vertex_array(None);
             self.gl.use_program(None);
+            // This example releases the acquired texture with CPU-complete
+            // synchronization, so finish all sampling before that release.
+            self.gl.finish();
         }
         check_gl_error(&self.gl, "draw OpenGL texture")
             .map_err(|error| compositor_error(error.to_string()))?;

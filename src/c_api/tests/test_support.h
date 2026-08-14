@@ -24,6 +24,10 @@ static inline mln_buffer_view mln_test_buffer_view(
 typedef struct mln_test_render_fixture {
   mln_render_session session;
   void* backend_state;
+  uint32_t driver;
+  mln_notification_source source;
+  bool observed_attaching;
+  bool observed_driver_ready;
 } mln_test_render_fixture;
 
 // Opaque host thread used by tests that need a second native thread.
@@ -58,6 +62,10 @@ unsigned int mln_test_operation_cancel_count(
 void mln_test_operation_block_cancel(
   mln_test_operation_control* control, atomic_bool* entered,
   const atomic_bool* release
+);
+mln_status mln_test_render_session_blocking_operation_create(
+  mln_render_session session, atomic_bool* entered, const atomic_bool* release,
+  mln_operation* out_operation
 );
 void mln_test_operation_control_destroy(mln_test_operation_control* control);
 
@@ -119,7 +127,16 @@ uint8_t* mln_test_read_fixture(const char* relative_path, size_t* out_size);
 bool mln_test_render_fixture_create(
   mln_map map, mln_test_render_fixture* fixture
 );
+#if defined(MLN_FFI_TEST_BACKEND_OPENGL) && defined(MLN_FFI_TEST_OPENGL_WEBGL)
+// Transfers an OffscreenCanvas into a core-worker WebGL surface session.
+bool mln_test_transferred_webgl_surface_create(
+  mln_map map, mln_test_render_fixture* fixture
+);
+#endif
 void mln_test_render_fixture_destroy(mln_test_render_fixture* fixture);
+mln_status mln_test_render_fixture_finish_operation(
+  const mln_test_render_fixture* fixture, mln_operation operation
+);
 
 // Outcome of building the dedicated EGL surface fixture. Unavailable is a skip;
 // a failed attach is a failure, because it is the behavior under test.

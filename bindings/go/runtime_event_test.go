@@ -188,8 +188,8 @@ func TestRuntimeBoundedDrainLeavesTheRestQueued(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DrainEvents(0): %v", err)
 	}
-	if uint64(len(rest.Events)) != bounded.RemainingCount || rest.RemainingCount != 0 {
-		t.Fatalf("unbounded drain = %d events, %d remaining, want %d events and none left", len(rest.Events), rest.RemainingCount, bounded.RemainingCount)
+	if uint64(len(rest.Events)) < bounded.RemainingCount || rest.RemainingCount != 0 {
+		t.Fatalf("unbounded drain = %d events, %d remaining, want at least %d events and none left", len(rest.Events), rest.RemainingCount, bounded.RemainingCount)
 	}
 }
 

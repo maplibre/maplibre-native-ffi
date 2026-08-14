@@ -13,17 +13,18 @@ static void feature_query_validation_rejects_raw_descriptor_shapes(void) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
 
-  mln_buffer result = MLN_HANDLE_NULL;
+  mln_operation operation = MLN_HANDLE_NULL;
   mln_rendered_query_geometry geometry = mln_rendered_query_geometry_point(
     (mln_screen_point){.x = 256.0, .y = 256.0}
   );
   geometry.size = sizeof(mln_rendered_query_geometry) - 1;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_render_session_query_rendered_features(
-                                   fixture.session, &geometry, NULL, &result
-                                 )
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_render_session_query_rendered_features_start(
+      fixture.session, &geometry, NULL, &operation
+    )
   );
-  mln_buffer_destroy(result);
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, operation);
 
   mln_rendered_feature_query_options options =
     mln_rendered_feature_query_options_default();
@@ -32,18 +33,18 @@ static void feature_query_validation_rejects_raw_descriptor_shapes(void) {
     (mln_screen_point){.x = 256.0, .y = 256.0}
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_render_session_query_rendered_features(
-                                   fixture.session, &geometry, &options, &result
-                                 )
-  );
-  mln_buffer_destroy(result);
-  TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_render_session_query_source_features(
-      fixture.session, (mln_buffer_view){.data = NULL, .size = 1}, NULL, &result
+    mln_render_session_query_rendered_features_start(
+      fixture.session, &geometry, &options, &operation
     )
   );
-  mln_buffer_destroy(result);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_render_session_query_source_features_start(
+      fixture.session, (mln_buffer_view){.data = NULL, .size = 1}, NULL,
+      &operation
+    )
+  );
 
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
@@ -62,30 +63,44 @@ static void feature_query_bytes_are_owned_by_one_generic_buffer(void) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
 
-  mln_render_result render_result = MLN_RENDER_RESULT_NO_UPDATE;
-  for (unsigned int attempt = 0;
-       attempt < 500 && render_result != MLN_RENDER_RESULT_RENDERED;
-       attempt += 1) {
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
-      mln_render_session_render_update(fixture.session, &render_result)
-    );
-    if (render_result != MLN_RENDER_RESULT_RENDERED) {
-      mln_test_sleep_millisecond();
-    }
-  }
-  TEST_ASSERT_EQUAL_INT(MLN_RENDER_RESULT_RENDERED, render_result);
+  mln_frame_demand demand = mln_frame_demand_default();
+  demand.flags = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_render_session_request_frame(fixture.session, &demand)
+  );
+  mln_operation barrier = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_render_session_barrier_start(fixture.session, 0, &barrier)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, barrier)
+  );
+  mln_operation_release(barrier);
+  mln_render_frame_batch frame_batch = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_render_session_drain_frame_results(
+                     fixture.session, SIZE_MAX, &frame_batch
+                   )
+  );
+  mln_render_frame_batch_release(frame_batch);
 
   const mln_rendered_query_geometry geometry =
     mln_rendered_query_geometry_point((mln_screen_point){0});
-  mln_buffer result = MLN_HANDLE_NULL;
+  mln_operation query = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_render_session_query_rendered_features(
-                     fixture.session, &geometry, NULL, &result
+    MLN_STATUS_OK, mln_render_session_query_rendered_features_start(
+                     fixture.session, &geometry, NULL, &query
                    )
   );
-  TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, result);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, query)
+  );
+  mln_buffer result = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_render_query_take_result(query, &result)
+  );
+  mln_operation_release(query);
 
   mln_buffer_view bytes = {0};
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_buffer_get(result, &bytes));

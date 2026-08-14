@@ -837,18 +837,12 @@ mln_map_request_repaint(mln_map map, uint64_t* out_command_id) MLN_NOEXCEPT;
 /**
  * Requests one still image for a static or tile map.
  *
- * Drain runtime events for this map until
- * MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED or
- * MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED is reported. Those two types are the
- * only observer completion reports, so select both in the map's event mask.
- * While the operation is pending, process each
- * MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE event from this map. Render
- * targets use mln_render_session_render_update(). Surface targets present
- * directly. A render-update call can report a result other than
- * MLN_RENDER_RESULT_RENDERED before the next update is available; continue
- * draining events in that case. After
- * MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED, use the latest successful texture
- * update when the host needs image bytes or a backend texture.
+ * Keep servicing the selected render driver while this operation is pending.
+ * Submit frame demands with mln_render_session_request_frame() and drain their
+ * terminal results with mln_render_session_drain_frame_results(). A
+ * caller-graphics-thread driver also requires calls to
+ * mln_render_session_service_driver_work() on its graphics thread. A rendered
+ * frame may be acquired or read back after this operation completes.
  *
  * Returns:
  * - MLN_STATUS_OK when the request was accepted.

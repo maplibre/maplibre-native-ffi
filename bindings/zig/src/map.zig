@@ -28,6 +28,7 @@ const MapState = struct {
 pub const RenderSessionRegistration = struct {
     native: c.mln_map,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
+    runtime: RuntimeHandle,
 };
 
 var custom_geometry_state_registry_lock = std.Io.Mutex.init;
@@ -2227,6 +2228,7 @@ pub fn registerRenderSession(handle: *MapHandle) status.BindingError!RenderSessi
     return .{
         .native = @intFromEnum(handle.*),
         .diagnostic_store = map_state.diagnostic_store,
+        .runtime = map_state.runtime,
     };
 }
 
@@ -2405,26 +2407,6 @@ fn waitForRuntimeEventForTesting(runtime: *RuntimeHandle, event_type: runtime_mo
     return false;
 }
 
-// A map whose mask clears style-loaded reaches a loaded style with no event to
-// wait for, so the style's own sources report the load instead.
-fn waitForStyleSourceForTesting(
-    runtime: *RuntimeHandle,
-    map: *MapHandle,
-    source_id: []const u8,
-) !bool {
-    var attempts: usize = 0;
-    while (attempts < 200) : (attempts += 1) {
-        var batch = try runtime.drainEvents(std.testing.allocator, 0);
-        batch.deinit();
-        const operation = try map.styleSourceExistsStart(std.testing.allocator, source_id);
-        defer operation.release();
-        if (!try operation.wait(-1)) return error.NativeError;
-        if (try map.styleSourceExistsTakeResult(operation)) return true;
-        try std.testing.io.sleep(.fromMilliseconds(10), .awake);
-    }
-    return false;
-}
-
 fn testStyleJsonProvider(
     context: ?*anyopaque,
     request: runtime_module.ResourceRequest,
@@ -2478,10 +2460,12 @@ test "a style load that drops a source releases the callback state unsubscribed"
     defer runtime.close() catch @panic("runtime close failed");
     _ = try runtime.setResourceProvider(.{ .handler = testStyleJsonProvider });
 
-    var map = try MapHandle.create(&runtime, .{ .event_mask = narrowed });
+    var map = try createLoadedMapForTesting(&runtime);
     defer map.close() catch @panic("map close failed");
-    _ = try map.setStyleJson(std.testing.allocator, test_style_json);
-    try std.testing.expect(try waitForStyleSourceForTesting(&runtime, &map, "point"));
+    _ = try map.setEventMask(narrowed);
+    const mask_barrier = try runtime.barrierStart();
+    defer mask_barrier.release();
+    try std.testing.expect(try mask_barrier.wait(-1));
 
     const baseline = liveCustomGeometrySourceCountForTesting();
     var state = TestCustomGeometryCallbackState{};

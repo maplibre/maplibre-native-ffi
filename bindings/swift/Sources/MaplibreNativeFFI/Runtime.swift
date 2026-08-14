@@ -685,6 +685,24 @@ public final class RuntimeHandle: @unchecked Sendable {
     }
   }
 
+  var notificationSourceForOperations: mln_notification_source {
+    notificationReceiver.source
+  }
+
+  func setRenderFramesHandler(
+    for session: NativeRenderSessionHandle,
+    _ handler: (@Sendable () -> Void)?
+  ) {
+    notificationReceiver.setRenderFramesHandler(for: session, handler)
+  }
+
+  func setDriverWorkHandler(
+    for session: NativeRenderSessionHandle,
+    _ handler: (@Sendable () -> Void)?
+  ) {
+    notificationReceiver.setDriverWorkHandler(for: session, handler)
+  }
+
   func registerOperation() throws {
     try operationLock.withLock {
       guard !handle.isClosed else {

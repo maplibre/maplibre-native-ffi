@@ -28,10 +28,24 @@ void list_source_features(mln_render_session session) {
   // #endregion options
 
   // #region query
-  mln_buffer result = MLN_HANDLE_NULL;
-  const mln_status queried = mln_render_session_query_source_features(
-    session, view("places"), &options, &result
+  mln_operation operation = MLN_HANDLE_NULL;
+  mln_status queried = mln_render_session_query_source_features_start(
+    session, view("places"), &options, &operation
   );
+  bool completed = false;
+  if (queried == MLN_STATUS_OK) {
+    queried = mln_operation_wait(operation, -1, &completed);
+  }
+  mln_status terminal = MLN_STATUS_INVALID_STATE;
+  if (queried == MLN_STATUS_OK && completed) {
+    queried = mln_operation_get_status(operation, &terminal);
+  }
+  mln_buffer result = MLN_HANDLE_NULL;
+  if (queried == MLN_STATUS_OK) queried = terminal;
+  if (queried == MLN_STATUS_OK) {
+    queried = mln_render_query_take_result(operation, &result);
+  }
+  mln_operation_release(operation);
   if (queried != MLN_STATUS_OK) return;
 
   read_features(result);

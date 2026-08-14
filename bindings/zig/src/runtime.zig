@@ -214,6 +214,20 @@ pub const OperationKind = enum {
     region_invalidate,
     region_delete,
     set_maximum_ambient_cache_size,
+    render_attach,
+    render_resize,
+    render_barrier,
+    render_reduce_memory_use,
+    render_clear_data,
+    render_dump_debug_logs,
+    render_set_feature_state,
+    render_get_feature_state,
+    render_remove_feature_state,
+    render_query,
+    render_readback,
+    render_set_target,
+    render_detach,
+    acquired_frame_release,
 };
 
 pub const OperationResultKind = enum {
@@ -235,6 +249,8 @@ pub const OperationResultKind = enum {
     optional_region,
     region_list,
     region_status,
+    render_session,
+    render_readback,
 };
 
 pub const OfflineTilePyramidRegionDefinition = struct {
@@ -1189,7 +1205,7 @@ pub const OperationHandle = enum(u128) {
     _,
 
     pub fn init(
-        runtime: *RuntimeHandle,
+        runtime: *const RuntimeHandle,
         operation_id: c.mln_operation,
         operation_kind: OperationKind,
         result_kind: OperationResultKind,
@@ -1219,7 +1235,7 @@ pub const OperationHandle = enum(u128) {
 
     pub fn require(
         self: OperationHandle,
-        expected_runtime: *RuntimeHandle,
+        expected_runtime: *const RuntimeHandle,
         operation_kind: OperationKind,
         result_kind: OperationResultKind,
     ) status.Error!RequiredOperation {

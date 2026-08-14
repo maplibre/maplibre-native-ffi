@@ -1,16 +1,18 @@
-use std::cell::Cell;
 use std::fmt;
 use std::marker::PhantomData;
 use std::mem;
 use std::rc::Rc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 
 pub use maplibre_core::{PremultipliedRgba8Image, TextureImageInfo};
 use maplibre_native_ffi_core as maplibre_core;
-use maplibre_native_ffi_core::{OpenGLClientApi, OpenGLContextOwnership, RenderResult};
+use maplibre_native_ffi_core::{OpenGLClientApi, OpenGLContextOwnership};
 use maplibre_native_ffi_sys as sys;
 
-use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
+use crate::handle::{ConcurrentNativeHandle, closed_handle_error, out_handle};
 use crate::map::MapHandle;
+use crate::runtime::{OperationHandle, OperationKind, OperationRegistry};
 use crate::{HandleOperationError, Result};
 
 /// Borrowed opaque native address used for backend interop handles. It does not
@@ -455,26 +457,43 @@ impl Default for EglContextDescriptor {
     }
 }
 
-/// Browser WebGL context a session renders into.
-///
-/// The host creates the context and keeps owning it; a session shares it rather
-/// than holding it exclusively. `context` is an
-/// `EMSCRIPTEN_WEBGL_CONTEXT_HANDLE`, which the native library requires to be
-/// positive.
+/// Browser WebGL context placement.
 #[derive(Debug, Clone, PartialEq)]
-#[non_exhaustive]
-pub struct WebGlContextDescriptor {
-    pub context: i32,
+pub enum WebGlContextDescriptor {
+    /// A host-created WebGL context on the caller graphics thread.
+    Existing { context: i32 },
+    /// A transferable canvas selector whose WebGL2 context is created on the
+    /// native core worker.
+    TransferredCanvas { canvas_selector: String },
 }
 
 impl WebGlContextDescriptor {
-    pub fn new(context: i32) -> Self {
-        Self { context }
+    pub fn existing(context: i32) -> Self {
+        Self::Existing { context }
+    }
+
+    pub fn transferred_canvas(canvas_selector: impl Into<String>) -> Self {
+        Self::TransferredCanvas {
+            canvas_selector: canvas_selector.into(),
+        }
     }
 
     pub(crate) fn to_core(&self) -> maplibre_core::render::WebGlContextDescriptorFields {
-        maplibre_core::render::WebGlContextDescriptorFields {
-            context: self.context,
+        match self {
+            Self::Existing { context } => maplibre_core::render::WebGlContextDescriptorFields {
+                kind: sys::MLN_WEBGL_CONTEXT_EXISTING,
+                context: *context,
+                canvas_selector_data: std::ptr::null(),
+                canvas_selector_size: 0,
+            },
+            Self::TransferredCanvas { canvas_selector } => {
+                maplibre_core::render::WebGlContextDescriptorFields {
+                    kind: sys::MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS,
+                    context: 0,
+                    canvas_selector_data: canvas_selector.as_ptr(),
+                    canvas_selector_size: canvas_selector.len(),
+                }
+            }
         }
     }
 }
@@ -928,37 +947,223 @@ impl OpenGLBorrowedTextureDescriptor {
     }
 }
 
+/// Native execution placement for a render session.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RenderDriverKind {
+    CoreWorker,
+    CallerGraphicsThread,
+    Unknown(u32),
+}
+
+impl RenderDriverKind {
+    fn to_native(self) -> u32 {
+        match self {
+            Self::CoreWorker => sys::MLN_RENDER_DRIVER_CORE_WORKER,
+            Self::CallerGraphicsThread => sys::MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD,
+            Self::Unknown(value) => value,
+        }
+    }
+
+    fn from_native(value: u32) -> Self {
+        match value {
+            sys::MLN_RENDER_DRIVER_CORE_WORKER => Self::CoreWorker,
+            sys::MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD => Self::CallerGraphicsThread,
+            value => Self::Unknown(value),
+        }
+    }
+}
+
+/// Attachment policy. Notification roles inherit the map runtime's native
+/// receiver-scoped source.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RenderSessionAttachOptions {
+    pub driver: RenderDriverKind,
+    pub requested_texture_ring_depth: u32,
+}
+
+impl RenderSessionAttachOptions {
+    pub fn core_worker(requested_texture_ring_depth: u32) -> Self {
+        Self {
+            driver: RenderDriverKind::CoreWorker,
+            requested_texture_ring_depth,
+        }
+    }
+
+    pub fn caller_graphics_thread(requested_texture_ring_depth: u32) -> Self {
+        Self {
+            driver: RenderDriverKind::CallerGraphicsThread,
+            requested_texture_ring_depth,
+        }
+    }
+
+    fn to_native(self) -> sys::mln_render_session_attach_options {
+        let mut raw = unsafe { sys::mln_render_session_attach_options_default() };
+        raw.driver = self.driver.to_native();
+        raw.requested_texture_ring_depth = self.requested_texture_ring_depth;
+        raw
+    }
+}
+
+impl Default for RenderSessionAttachOptions {
+    fn default() -> Self {
+        Self::core_worker(1)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RenderSessionCapabilities {
+    pub driver: RenderDriverKind,
+    pub texture_ring_depth: u32,
+    pub frame_acquisition: bool,
+    pub readback: bool,
+    pub consumer_sync: bool,
+    pub presentation: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RenderSessionLifecycle {
+    Attaching,
+    Attached,
+    Detaching,
+    Detached,
+    TargetLost,
+    Abandoned,
+    Unknown(u32),
+}
+
+fn lifecycle_from_native(value: u32) -> RenderSessionLifecycle {
+    match value {
+        sys::MLN_RENDER_SESSION_STATE_ATTACHING => RenderSessionLifecycle::Attaching,
+        sys::MLN_RENDER_SESSION_STATE_ATTACHED => RenderSessionLifecycle::Attached,
+        sys::MLN_RENDER_SESSION_STATE_DETACHING => RenderSessionLifecycle::Detaching,
+        sys::MLN_RENDER_SESSION_STATE_DETACHED => RenderSessionLifecycle::Detached,
+        sys::MLN_RENDER_SESSION_STATE_TARGET_LOST => RenderSessionLifecycle::TargetLost,
+        sys::MLN_RENDER_SESSION_STATE_ABANDONED => RenderSessionLifecycle::Abandoned,
+        value => RenderSessionLifecycle::Unknown(value),
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FrameDisposition {
+    Rendered,
+    NoUpdate,
+    SizePending,
+    TargetNotReady,
+    Superseded,
+    DeadlineMissed,
+    Unknown(u32),
+}
+
+fn disposition_from_native(value: u32) -> FrameDisposition {
+    match value {
+        sys::MLN_RENDER_RESULT_RENDERED => FrameDisposition::Rendered,
+        sys::MLN_RENDER_RESULT_NO_UPDATE => FrameDisposition::NoUpdate,
+        sys::MLN_RENDER_RESULT_SIZE_PENDING => FrameDisposition::SizePending,
+        sys::MLN_RENDER_RESULT_TARGET_NOT_READY => FrameDisposition::TargetNotReady,
+        sys::MLN_RENDER_RESULT_SUPERSEDED => FrameDisposition::Superseded,
+        sys::MLN_RENDER_RESULT_DEADLINE_MISSED => FrameDisposition::DeadlineMissed,
+        value => FrameDisposition::Unknown(value),
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FrameDemand {
+    pub if_needed: bool,
+    pub present: bool,
+    pub token: u64,
+    pub coalescing_boundary: u64,
+    pub presentation_time_ns: i64,
+    pub deadline_ns: i64,
+}
+
+impl Default for FrameDemand {
+    fn default() -> Self {
+        Self {
+            if_needed: true,
+            present: false,
+            token: 0,
+            coalescing_boundary: 0,
+            presentation_time_ns: 0,
+            deadline_ns: 0,
+        }
+    }
+}
+
+impl FrameDemand {
+    fn to_native(self) -> sys::mln_frame_demand {
+        let mut flags = 0;
+        if self.if_needed {
+            flags |= sys::MLN_FRAME_DEMAND_IF_NEEDED;
+        }
+        if self.present {
+            flags |= sys::MLN_FRAME_DEMAND_PRESENT;
+        }
+        sys::mln_frame_demand {
+            size: mem::size_of::<sys::mln_frame_demand>() as u32,
+            flags,
+            token: self.token,
+            coalescing_boundary: self.coalescing_boundary,
+            presentation_time_ns: self.presentation_time_ns,
+            deadline_ns: self.deadline_ns,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RenderFrameResult {
+    pub disposition: FrameDisposition,
+    pub token: u64,
+    pub map_update_generation: u64,
+    pub extent_generation: u64,
+    pub frame_generation: u64,
+    pub presentation_time_ns: i64,
+}
+
+fn frame_result_from_native(raw: sys::mln_render_frame_result) -> RenderFrameResult {
+    RenderFrameResult {
+        disposition: disposition_from_native(raw.disposition),
+        token: raw.token,
+        map_update_generation: raw.map_update_generation,
+        extent_generation: raw.extent_generation,
+        frame_generation: raw.frame_generation,
+        presentation_time_ns: raw.presentation_time_ns,
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RenderSessionSnapshot {
+    pub state: RenderSessionLifecycle,
+    pub driver: RenderDriverKind,
+    pub latest_result: FrameDisposition,
+    pub extent: RenderTargetExtent,
+    pub generation: u64,
+    pub map_update_generation: u64,
+    pub rendered_update_generation: u64,
+    pub extent_generation: u64,
+    pub frame_generation: u64,
+    pub latest_demand_token: u64,
+    pub pending_demand_count: u32,
+    pub acquired_frame_count: u32,
+    pub target_ready: bool,
+    pub pending_changes: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RenderAbandonResult {
+    pub quarantined: bool,
+    pub quarantined_resource_count: u32,
+}
+
 #[derive(Debug)]
 struct RenderSessionState {
-    handle: ThreadAffineNativeHandle<sys::mln_render_session>,
-    detached: Cell<bool>,
-    frame_acquired: Cell<bool>,
+    handle: ConcurrentNativeHandle<sys::mln_render_session>,
+    operations: Arc<OperationRegistry>,
 }
 
 impl RenderSessionState {
-    fn new(native: sys::mln_render_session) -> Result<Self> {
-        // SAFETY: native came from a successful render-session attach call and is
-        // paired with the matching render-session destroy function.
-        let handle = unsafe {
-            ThreadAffineNativeHandle::from_handle(
-                native,
-                sys::mln_render_session_destroy,
-                "mln_render_session",
-            )
-        }?;
-        Ok(Self {
-            handle,
-            detached: Cell::new(false),
-            frame_acquired: Cell::new(false),
-        })
-    }
-
-    fn ensure_no_frame_acquired(&self) -> Result<()> {
-        if self.frame_acquired.get() {
-            Err(frame_acquired_error())
-        } else {
-            Ok(())
-        }
+    fn new(native: sys::mln_render_session, operations: Arc<OperationRegistry>) -> Result<Self> {
+        let handle = unsafe { ConcurrentNativeHandle::from_handle(native, "mln_render_session") }?;
+        Ok(Self { handle, operations })
     }
 
     fn native(&self) -> Result<sys::mln_render_session> {
@@ -967,68 +1172,463 @@ impl RenderSessionState {
             .ok_or_else(|| closed_handle_error("RenderSessionHandle"))
     }
 
-    fn close(&self) -> Result<()> {
-        self.handle.close()
+    fn operation<T>(
+        &self,
+        operation: sys::mln_operation,
+        kind: OperationKind,
+    ) -> Result<OperationHandle<T>> {
+        OperationHandle::new(operation, kind, Arc::clone(&self.operations))
+    }
+
+    fn destroy(&self) -> Result<()> {
+        let Some(session) = self.handle.live_handle() else {
+            return Ok(());
+        };
+        maplibre_core::check(unsafe { sys::mln_render_session_destroy(session) })?;
+        self.handle.mark_closed();
+        Ok(())
     }
 }
 
-/// Render session handle bound to the thread that attached it.
-///
-/// The session holds no Rust-level retention of its map. Native keeps the map
-/// alive instead: destroying a map fails while a session is attached to it.
+impl Drop for RenderSessionState {
+    fn drop(&mut self) {
+        if self.destroy().is_err() {
+            self.handle.leak_for_report();
+        }
+    }
+}
+
+/// Send-safe render-session control handle.
+#[derive(Clone)]
 pub struct RenderSessionHandle {
-    inner: Rc<RenderSessionState>,
+    inner: Arc<RenderSessionState>,
 }
 
 impl fmt::Debug for RenderSessionHandle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RenderSessionHandle")
             .field("closed", &self.inner.handle.is_closed())
-            .field("detached", &self.inner.detached.get())
             .finish()
     }
 }
 
-/// Render session after backend resources have been detached.
-///
-/// A detached session holds no reference to its former map, so it stays
-/// destroyable after that map closes.
-pub struct DetachedRenderSessionHandle {
-    inner: Rc<RenderSessionState>,
+/// Attaching session and the operation that reports attachment completion.
+#[derive(Debug)]
+pub struct RenderSessionAttachment {
+    pub session: RenderSessionHandle,
+    pub operation: OperationHandle<()>,
 }
 
-impl fmt::Debug for DetachedRenderSessionHandle {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("DetachedRenderSessionHandle")
-            .field("closed", &self.inner.handle.is_closed())
-            .finish()
+impl RenderSessionHandle {
+    pub(crate) fn attach<F>(
+        map: &MapHandle,
+        options: RenderSessionAttachOptions,
+        attach: F,
+    ) -> Result<RenderSessionAttachment>
+    where
+        F: FnOnce(
+            sys::mln_map,
+            *const sys::mln_render_session_attach_options,
+            *mut sys::mln_render_session,
+            *mut sys::mln_operation,
+        ) -> sys::mln_status,
+    {
+        let map_native = map.inner.native()?;
+        let raw_options = options.to_native();
+        let mut session = maplibre_core::ptr::OutHandle::<sys::mln_render_session>::new();
+        let mut operation = sys::mln_operation(0);
+        maplibre_core::check(attach(
+            map_native,
+            &raw_options,
+            session.as_mut_ptr(),
+            &mut operation,
+        ))?;
+        let session = out_handle(session, "mln_render_session")?;
+        let operations = map.operation_registry()?;
+        Ok(RenderSessionAttachment {
+            session: Self {
+                inner: Arc::new(RenderSessionState::new(session, Arc::clone(&operations))?),
+            },
+            operation: OperationHandle::new(operation, OperationKind::RenderAttach, operations)?,
+        })
     }
-}
 
-impl DetachedRenderSessionHandle {
-    /// Explicitly destroys the detached render session.
-    pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
-        if let Err(error) = self.inner.close() {
+    fn start_unit(
+        &self,
+        kind: OperationKind,
+        start: impl FnOnce(sys::mln_render_session, *mut sys::mln_operation) -> sys::mln_status,
+    ) -> Result<OperationHandle<()>> {
+        let mut operation = sys::mln_operation(0);
+        maplibre_core::check(start(self.inner.native()?, &mut operation))?;
+        self.inner.operation(operation, kind)
+    }
+
+    pub fn capabilities(&self) -> Result<RenderSessionCapabilities> {
+        let mut raw: sys::mln_render_session_capabilities = unsafe { mem::zeroed() };
+        raw.size = mem::size_of::<sys::mln_render_session_capabilities>() as u32;
+        maplibre_core::check(unsafe {
+            sys::mln_render_session_get_capabilities(self.inner.native()?, &mut raw)
+        })?;
+        Ok(RenderSessionCapabilities {
+            driver: RenderDriverKind::from_native(raw.driver),
+            texture_ring_depth: raw.texture_ring_depth,
+            frame_acquisition: raw.flags & sys::MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION
+                != 0,
+            readback: raw.flags & sys::MLN_RENDER_SESSION_CAPABILITY_READBACK != 0,
+            consumer_sync: raw.flags & sys::MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC != 0,
+            presentation: raw.flags & sys::MLN_RENDER_SESSION_CAPABILITY_PRESENTATION != 0,
+        })
+    }
+
+    pub fn snapshot(&self) -> Result<RenderSessionSnapshot> {
+        let mut raw: sys::mln_render_session_snapshot = unsafe { mem::zeroed() };
+        raw.size = mem::size_of::<sys::mln_render_session_snapshot>() as u32;
+        maplibre_core::check(unsafe {
+            sys::mln_render_session_get_snapshot(self.inner.native()?, &mut raw)
+        })?;
+        Ok(RenderSessionSnapshot {
+            state: lifecycle_from_native(raw.state),
+            driver: RenderDriverKind::from_native(raw.driver),
+            latest_result: disposition_from_native(raw.latest_result),
+            extent: RenderTargetExtent::new(
+                raw.extent.width,
+                raw.extent.height,
+                raw.extent.scale_factor,
+            ),
+            generation: raw.generation,
+            map_update_generation: raw.map_update_generation,
+            rendered_update_generation: raw.rendered_update_generation,
+            extent_generation: raw.extent_generation,
+            frame_generation: raw.frame_generation,
+            latest_demand_token: raw.latest_demand_token,
+            pending_demand_count: raw.pending_demand_count,
+            acquired_frame_count: raw.acquired_frame_count,
+            target_ready: raw.target_ready,
+            pending_changes: raw.pending_changes,
+        })
+    }
+
+    pub fn request_frame(&self, demand: FrameDemand) -> Result<()> {
+        let raw = demand.to_native();
+        maplibre_core::check(unsafe {
+            sys::mln_render_session_request_frame(self.inner.native()?, &raw)
+        })
+    }
+
+    pub fn drain_frame_results(&self, max_results: usize) -> Result<RenderFrameBatch> {
+        let mut batch = sys::mln_render_frame_batch(0);
+        maplibre_core::check(unsafe {
+            sys::mln_render_session_drain_frame_results(
+                self.inner.native()?,
+                max_results,
+                &mut batch,
+            )
+        })?;
+        RenderFrameBatch::new(batch)
+    }
+
+    pub fn acquire_frame(&self) -> Result<AcquiredFrameHandle> {
+        let mut frame = sys::mln_acquired_frame(0);
+        maplibre_core::check(unsafe {
+            sys::mln_render_session_acquire_frame(self.inner.native()?, &mut frame)
+        })?;
+        AcquiredFrameHandle::new(frame, Arc::clone(&self.inner.operations))
+    }
+
+    pub fn resize(&self, extent: &RenderTargetExtent) -> Result<OperationHandle<()>> {
+        let raw = maplibre_core::render::render_target_extent_to_native(extent.to_core());
+        self.start_unit(OperationKind::RenderResize, |session, operation| unsafe {
+            sys::mln_render_session_resize_start(session, &raw, operation)
+        })
+    }
+
+    pub fn barrier(&self, min_update_generation: u64) -> Result<OperationHandle<()>> {
+        self.start_unit(OperationKind::RenderBarrier, |session, operation| unsafe {
+            sys::mln_render_session_barrier_start(session, min_update_generation, operation)
+        })
+    }
+
+    pub fn reduce_memory_use(&self) -> Result<OperationHandle<()>> {
+        self.start_unit(
+            OperationKind::RenderMaintenance,
+            |session, operation| unsafe {
+                sys::mln_render_session_reduce_memory_use_start(session, operation)
+            },
+        )
+    }
+
+    pub fn clear_data(&self) -> Result<OperationHandle<()>> {
+        self.start_unit(
+            OperationKind::RenderMaintenance,
+            |session, operation| unsafe {
+                sys::mln_render_session_clear_data_start(session, operation)
+            },
+        )
+    }
+
+    pub fn dump_debug_logs(&self) -> Result<OperationHandle<()>> {
+        self.start_unit(
+            OperationKind::RenderMaintenance,
+            |session, operation| unsafe {
+                sys::mln_render_session_dump_debug_logs_start(session, operation)
+            },
+        )
+    }
+
+    pub fn read_premultiplied_rgba8(&self) -> Result<OperationHandle<PremultipliedRgba8Image>> {
+        let mut operation = sys::mln_operation(0);
+        maplibre_core::check(unsafe {
+            sys::mln_texture_read_premultiplied_rgba8_start(self.inner.native()?, &mut operation)
+        })?;
+        self.inner
+            .operation(operation, OperationKind::RenderReadback)
+    }
+
+    /// Services typed native work on the caller driver's graphics thread.
+    ///
+    /// The first successful call fixes the graphics-thread identity. Later
+    /// calls from another thread return a wrong-thread error.
+    pub fn service_driver_work(&self, max_work: usize) -> Result<usize> {
+        let mut serviced = 0;
+        maplibre_core::check(unsafe {
+            sys::mln_render_session_service_driver_work(
+                self.inner.native()?,
+                max_work,
+                &mut serviced,
+            )
+        })?;
+        Ok(serviced)
+    }
+
+    pub fn detach(&self) -> Result<OperationHandle<()>> {
+        self.start_unit(OperationKind::RenderDetach, |session, operation| unsafe {
+            sys::mln_render_session_detach_start(session, operation)
+        })
+    }
+
+    pub fn abandon(&self) -> Result<RenderAbandonResult> {
+        let mut raw: sys::mln_render_abandon_result = unsafe { mem::zeroed() };
+        raw.size = mem::size_of::<sys::mln_render_abandon_result>() as u32;
+        maplibre_core::check(unsafe {
+            sys::mln_render_session_abandon(self.inner.native()?, &mut raw)
+        })?;
+        Ok(RenderAbandonResult {
+            quarantined: raw.disposition == sys::MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED,
+            quarantined_resource_count: raw.quarantined_resource_count,
+        })
+    }
+
+    pub fn destroy(self) -> std::result::Result<(), HandleOperationError<Self>> {
+        if let Err(error) = self.inner.destroy() {
             return Err(HandleOperationError::new(error, self));
         }
         Ok(())
     }
+
+    fn set_target<D>(
+        &self,
+        raw: &D,
+        start: unsafe extern "C" fn(
+            sys::mln_render_session,
+            *const D,
+            *mut sys::mln_operation,
+        ) -> sys::mln_status,
+    ) -> Result<OperationHandle<()>> {
+        self.start_unit(
+            OperationKind::RenderSetTarget,
+            |session, operation| unsafe { start(session, raw, operation) },
+        )
+    }
+
+    pub fn set_metal_surface_target(
+        &self,
+        value: &MetalSurfaceDescriptor,
+    ) -> Result<OperationHandle<()>> {
+        self.set_target(&value.to_native(), sys::mln_metal_surface_set_target_start)
+    }
+
+    pub fn set_vulkan_surface_target(
+        &self,
+        value: &VulkanSurfaceDescriptor,
+    ) -> Result<OperationHandle<()>> {
+        self.set_target(&value.to_native(), sys::mln_vulkan_surface_set_target_start)
+    }
+
+    pub fn set_webgpu_surface_target(
+        &self,
+        value: &WebGpuSurfaceDescriptor,
+    ) -> Result<OperationHandle<()>> {
+        self.set_target(&value.to_native(), sys::mln_webgpu_surface_set_target_start)
+    }
+
+    pub fn set_opengl_surface_target(
+        &self,
+        value: &OpenGLSurfaceDescriptor,
+    ) -> Result<OperationHandle<()>> {
+        self.set_target(&value.to_native(), sys::mln_opengl_surface_set_target_start)
+    }
+
+    pub fn set_metal_borrowed_texture_target(
+        &self,
+        value: &MetalBorrowedTextureDescriptor,
+    ) -> Result<OperationHandle<()>> {
+        self.set_target(
+            &value.to_native(),
+            sys::mln_metal_borrowed_texture_set_target_start,
+        )
+    }
+
+    pub fn set_vulkan_borrowed_texture_target(
+        &self,
+        value: &VulkanBorrowedTextureDescriptor,
+    ) -> Result<OperationHandle<()>> {
+        self.set_target(
+            &value.to_native(),
+            sys::mln_vulkan_borrowed_texture_set_target_start,
+        )
+    }
+
+    pub fn set_webgpu_borrowed_texture_target(
+        &self,
+        value: &WebGpuBorrowedTextureDescriptor,
+    ) -> Result<OperationHandle<()>> {
+        self.set_target(
+            &value.to_native(),
+            sys::mln_webgpu_borrowed_texture_set_target_start,
+        )
+    }
+
+    pub fn set_opengl_borrowed_texture_target(
+        &self,
+        value: &OpenGLBorrowedTextureDescriptor,
+    ) -> Result<OperationHandle<()>> {
+        self.set_target(
+            &value.to_native(),
+            sys::mln_opengl_borrowed_texture_set_target_start,
+        )
+    }
 }
 
-fn frame_acquired_error() -> crate::Error {
-    crate::Error::new(
-        crate::ErrorKind::InvalidState,
-        None,
-        "render session has an acquired texture frame",
-    )
+pub struct RenderFrameBatch {
+    raw: sys::mln_render_frame_batch,
 }
 
-/// Copied metadata for an acquired Metal session-owned texture frame.
+impl RenderFrameBatch {
+    fn new(raw: sys::mln_render_frame_batch) -> Result<Self> {
+        if raw.0 == 0 {
+            return Err(crate::Error::invalid_argument(
+                "frame batch must not be zero",
+            ));
+        }
+        Ok(Self { raw })
+    }
+
+    pub fn len(&self) -> Result<usize> {
+        let mut count = 0;
+        maplibre_core::check(unsafe { sys::mln_render_frame_batch_count(self.raw, &mut count) })?;
+        Ok(count)
+    }
+
+    pub fn is_empty(&self) -> Result<bool> {
+        Ok(self.len()? == 0)
+    }
+
+    pub fn get(&self, index: usize) -> Result<RenderFrameResult> {
+        let mut raw: sys::mln_render_frame_result = unsafe { mem::zeroed() };
+        raw.size = mem::size_of::<sys::mln_render_frame_result>() as u32;
+        maplibre_core::check(unsafe {
+            sys::mln_render_frame_batch_get(self.raw, index, &mut raw)
+        })?;
+        Ok(frame_result_from_native(raw))
+    }
+
+    pub fn copy_results(&self) -> Result<Vec<RenderFrameResult>> {
+        (0..self.len()?).map(|index| self.get(index)).collect()
+    }
+}
+
+impl Drop for RenderFrameBatch {
+    fn drop(&mut self) {
+        unsafe { sys::mln_render_frame_batch_release(self.raw) };
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GpuSyncKind {
+    CpuComplete,
+    MetalSharedEvent,
+    VulkanTimelineSemaphore,
+    OpenGlFence,
+    WebGpuToken,
+    Unknown(u32),
+}
+
+/// Consumer completion passed when releasing an acquired frame.
 ///
-/// Backend pointers are exposed by [`MetalOwnedTextureFrameHandle`] so their
-/// lifetime stays tied to the open frame handle.
+/// A non-CPU backend object remains caller-owned and must stay valid until the
+/// returned frame-release operation completes. Constructing its
+/// [`NativePointer`] is unsafe because Rust cannot verify that lifetime.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GpuSync {
+    pub kind: GpuSyncKind,
+    pub object: NativePointer,
+    pub value: u64,
+}
+
+impl GpuSync {
+    pub const CPU_COMPLETE: Self = Self {
+        kind: GpuSyncKind::CpuComplete,
+        object: NativePointer::NULL,
+        value: 0,
+    };
+}
+
+/// Producer synchronization borrowed from an acquired frame.
+///
+/// Backend objects remain valid only while the frame lease is live.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FrameGpuSync<'frame> {
+    pub kind: GpuSyncKind,
+    pub object: FrameNativePointer<'frame>,
+    pub value: u64,
+}
+
+impl FrameGpuSync<'_> {
+    fn from_native(raw: sys::mln_gpu_sync) -> Self {
+        let kind = match raw.kind {
+            sys::MLN_GPU_SYNC_CPU_COMPLETE => GpuSyncKind::CpuComplete,
+            sys::MLN_GPU_SYNC_METAL_SHARED_EVENT => GpuSyncKind::MetalSharedEvent,
+            sys::MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE => GpuSyncKind::VulkanTimelineSemaphore,
+            sys::MLN_GPU_SYNC_OPENGL_FENCE => GpuSyncKind::OpenGlFence,
+            sys::MLN_GPU_SYNC_WEBGPU_TOKEN => GpuSyncKind::WebGpuToken,
+            value => GpuSyncKind::Unknown(value),
+        };
+        Self {
+            kind,
+            object: unsafe { FrameNativePointer::from_ptr(raw.object) },
+            value: raw.value,
+        }
+    }
+}
+
+impl GpuSync {
+    fn to_native(self) -> sys::mln_gpu_sync {
+        let mut raw = unsafe { sys::mln_gpu_sync_default() };
+        raw.kind = match self.kind {
+            GpuSyncKind::CpuComplete => sys::MLN_GPU_SYNC_CPU_COMPLETE,
+            GpuSyncKind::MetalSharedEvent => sys::MLN_GPU_SYNC_METAL_SHARED_EVENT,
+            GpuSyncKind::VulkanTimelineSemaphore => sys::MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE,
+            GpuSyncKind::OpenGlFence => sys::MLN_GPU_SYNC_OPENGL_FENCE,
+            GpuSyncKind::WebGpuToken => sys::MLN_GPU_SYNC_WEBGPU_TOKEN,
+            GpuSyncKind::Unknown(value) => value,
+        };
+        raw.object = self.object.as_void_ptr();
+        raw.value = self.value;
+        raw
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
-#[non_exhaustive]
 pub struct MetalOwnedTextureFrame {
     pub generation: u64,
     pub width: u32,
@@ -1038,25 +1638,7 @@ pub struct MetalOwnedTextureFrame {
     pub pixel_format: u64,
 }
 
-impl MetalOwnedTextureFrame {
-    fn from_native(raw: &sys::mln_metal_owned_texture_frame) -> Self {
-        Self {
-            generation: raw.generation,
-            width: raw.width,
-            height: raw.height,
-            scale_factor: raw.scale_factor,
-            frame_id: raw.frame_id,
-            pixel_format: raw.pixel_format,
-        }
-    }
-}
-
-/// Copied metadata for an acquired Vulkan session-owned texture frame.
-///
-/// Backend pointers are exposed by [`VulkanOwnedTextureFrameHandle`] so their
-/// lifetime stays tied to the open frame handle.
 #[derive(Debug, Clone, Copy, PartialEq)]
-#[non_exhaustive]
 pub struct VulkanOwnedTextureFrame {
     pub generation: u64,
     pub width: u32,
@@ -1067,26 +1649,7 @@ pub struct VulkanOwnedTextureFrame {
     pub layout: u32,
 }
 
-impl VulkanOwnedTextureFrame {
-    fn from_native(raw: &sys::mln_vulkan_owned_texture_frame) -> Self {
-        Self {
-            generation: raw.generation,
-            width: raw.width,
-            height: raw.height,
-            scale_factor: raw.scale_factor,
-            frame_id: raw.frame_id,
-            format: raw.format,
-            layout: raw.layout,
-        }
-    }
-}
-
-/// Copied metadata for an acquired WebGPU session-owned texture frame.
-///
-/// Backend pointers are exposed by [`WebGpuOwnedTextureFrameHandle`] so their
-/// lifetime stays tied to the open frame handle.
 #[derive(Debug, Clone, Copy, PartialEq)]
-#[non_exhaustive]
 pub struct WebGpuOwnedTextureFrame {
     pub generation: u64,
     pub width: u32,
@@ -1096,25 +1659,7 @@ pub struct WebGpuOwnedTextureFrame {
     pub format: u32,
 }
 
-impl WebGpuOwnedTextureFrame {
-    fn from_native(raw: &sys::mln_webgpu_owned_texture_frame) -> Self {
-        Self {
-            generation: raw.generation,
-            width: raw.width,
-            height: raw.height,
-            scale_factor: raw.scale_factor,
-            frame_id: raw.frame_id,
-            format: raw.format,
-        }
-    }
-}
-
-/// Copied metadata for an acquired OpenGL session-owned texture frame.
-///
-/// The texture object name is exposed by [`OpenGLOwnedTextureFrameHandle`] so
-/// its lifetime stays tied to the open frame handle.
 #[derive(Debug, Clone, Copy, PartialEq)]
-#[non_exhaustive]
 pub struct OpenGLOwnedTextureFrame {
     pub generation: u64,
     pub width: u32,
@@ -1127,875 +1672,244 @@ pub struct OpenGLOwnedTextureFrame {
     pub type_: u32,
 }
 
-impl OpenGLOwnedTextureFrame {
-    fn from_native(raw: &sys::mln_opengl_owned_texture_frame) -> Self {
-        Self {
-            generation: raw.generation,
-            width: raw.width,
-            height: raw.height,
-            scale_factor: raw.scale_factor,
-            frame_id: raw.frame_id,
-            target: raw.target,
-            internal_format: raw.internal_format,
-            format: raw.format,
-            type_: raw.type_,
-        }
-    }
-}
-
-/// RAII guard for an acquired Metal session-owned texture frame.
+/// Owned lease for one session-owned texture-ring slot.
 ///
-/// Releasing the guard ends the borrow of the backend Metal texture and device.
-pub struct MetalOwnedTextureFrameHandle {
-    session: Rc<RenderSessionState>,
-    raw: sys::mln_metal_owned_texture_frame,
-    frame: MetalOwnedTextureFrame,
-    closed: Cell<bool>,
-    _thread_affine: PhantomData<Rc<()>>,
+/// Call [`AcquiredFrameHandle::release`] with the completion of every consumer
+/// GPU access. Dropping an untouched frame releases it as CPU-complete.
+/// Dropping a frame after exposing backend handles leaks the lease rather than
+/// allowing the session to reuse resources that the GPU may still access.
+#[must_use = "an acquired frame must be released with the consumer's GPU completion"]
+pub struct AcquiredFrameHandle {
+    raw: Mutex<Option<sys::mln_acquired_frame>>,
+    backend_exposed: AtomicBool,
+    operations: Arc<OperationRegistry>,
 }
 
-impl fmt::Debug for MetalOwnedTextureFrameHandle {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("MetalOwnedTextureFrameHandle")
-            .field("closed", &self.closed.get())
-            .field("frame", &self.frame)
-            .finish()
-    }
-}
-
-impl MetalOwnedTextureFrameHandle {
-    /// Returns copied metadata for this acquired frame.
-    pub fn frame(&self) -> Result<&MetalOwnedTextureFrame> {
-        if self.closed.get() {
-            Err(closed_handle_error("MetalOwnedTextureFrameHandle"))
-        } else {
-            Ok(&self.frame)
+impl AcquiredFrameHandle {
+    fn new(raw: sys::mln_acquired_frame, operations: Arc<OperationRegistry>) -> Result<Self> {
+        if raw.0 == 0 {
+            return Err(crate::Error::invalid_argument(
+                "acquired frame must not be zero",
+            ));
         }
-    }
-    /// Returns the borrowed Metal texture pointer for backend interop.
-    ///
-    /// # Safety
-    ///
-    /// The returned pointer is valid only while this frame handle remains open.
-    /// The caller must not store or use it after frame release and must satisfy
-    /// Metal synchronization and thread-affinity requirements.
-    pub unsafe fn texture(&self) -> Result<FrameNativePointer<'_>> {
-        if self.closed.get() {
-            Err(closed_handle_error("MetalOwnedTextureFrameHandle"))
-        } else {
-            // SAFETY: The active native frame owns the validity contract for
-            // this borrowed backend handle until release.
-            Ok(unsafe { FrameNativePointer::from_ptr(self.raw.texture) })
-        }
-    }
-
-    /// Returns the borrowed Metal device pointer for backend interop.
-    ///
-    /// # Safety
-    ///
-    /// The returned pointer has the same lifetime and synchronization
-    /// requirements as [`MetalOwnedTextureFrameHandle::texture`].
-    pub unsafe fn device(&self) -> Result<FrameNativePointer<'_>> {
-        if self.closed.get() {
-            Err(closed_handle_error("MetalOwnedTextureFrameHandle"))
-        } else {
-            // SAFETY: See texture above.
-            Ok(unsafe { FrameNativePointer::from_ptr(self.raw.device) })
-        }
-    }
-
-    /// Explicitly releases this frame.
-    #[allow(clippy::result_large_err)]
-    pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
-        self.close_with_release(sys::mln_metal_owned_texture_release_frame)
-    }
-
-    #[allow(clippy::result_large_err)]
-    fn close_with_release(
-        self,
-        release: unsafe extern "C" fn(
-            sys::mln_render_session,
-            *const sys::mln_metal_owned_texture_frame,
-        ) -> sys::mln_status,
-    ) -> std::result::Result<(), HandleOperationError<Self>> {
-        if self.closed.get() {
-            return Ok(());
-        }
-        let session = match self.session.native() {
-            Ok(session) => session,
-            Err(error) => return Err(HandleOperationError::new(error, self)),
-        };
-        // SAFETY: session is live, and raw is the active frame returned by a
-        // successful acquire for this session until release succeeds.
-        if let Err(error) = maplibre_core::check(unsafe { release(session, &self.raw) }) {
-            return Err(HandleOperationError::new(error, self));
-        }
-        self.closed.set(true);
-        self.session.frame_acquired.set(false);
-        Ok(())
-    }
-}
-
-impl Drop for MetalOwnedTextureFrameHandle {
-    fn drop(&mut self) {
-        if self.closed.get() {
-            return;
-        }
-        if let Ok(session) = self.session.native() {
-            // SAFETY: Best-effort release of the active frame. Drop cannot
-            // report errors and never panics.
-            let status = unsafe { sys::mln_metal_owned_texture_release_frame(session, &self.raw) };
-            if status == sys::MLN_STATUS_OK {
-                self.closed.set(true);
-                self.session.frame_acquired.set(false);
-            }
-        }
-    }
-}
-
-/// RAII guard for an acquired Vulkan session-owned texture frame.
-///
-/// Releasing the guard ends the borrow of the backend Vulkan image, image view,
-/// and device.
-pub struct VulkanOwnedTextureFrameHandle {
-    session: Rc<RenderSessionState>,
-    raw: sys::mln_vulkan_owned_texture_frame,
-    frame: VulkanOwnedTextureFrame,
-    closed: Cell<bool>,
-    _thread_affine: PhantomData<Rc<()>>,
-}
-
-impl fmt::Debug for VulkanOwnedTextureFrameHandle {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("VulkanOwnedTextureFrameHandle")
-            .field("closed", &self.closed.get())
-            .field("frame", &self.frame)
-            .finish()
-    }
-}
-
-impl VulkanOwnedTextureFrameHandle {
-    /// Returns copied metadata for this acquired frame.
-    pub fn frame(&self) -> Result<&VulkanOwnedTextureFrame> {
-        if self.closed.get() {
-            Err(closed_handle_error("VulkanOwnedTextureFrameHandle"))
-        } else {
-            Ok(&self.frame)
-        }
-    }
-    /// Returns the borrowed Vulkan image pointer for backend interop.
-    ///
-    /// # Safety
-    ///
-    /// The returned pointer is valid only while this frame handle remains open.
-    /// The caller must not store or use it after frame release and must satisfy
-    /// Vulkan synchronization and thread-affinity requirements.
-    pub unsafe fn image(&self) -> Result<FrameNativePointer<'_>> {
-        if self.closed.get() {
-            Err(closed_handle_error("VulkanOwnedTextureFrameHandle"))
-        } else {
-            // SAFETY: The active native frame owns the validity contract for
-            // this borrowed backend handle until release.
-            Ok(unsafe { FrameNativePointer::from_ptr(self.raw.image) })
-        }
-    }
-
-    /// Returns the borrowed Vulkan image view pointer for backend interop.
-    ///
-    /// # Safety
-    ///
-    /// The returned pointer has the same lifetime and synchronization
-    /// requirements as [`VulkanOwnedTextureFrameHandle::image`].
-    pub unsafe fn image_view(&self) -> Result<FrameNativePointer<'_>> {
-        if self.closed.get() {
-            Err(closed_handle_error("VulkanOwnedTextureFrameHandle"))
-        } else {
-            // SAFETY: See image above.
-            Ok(unsafe { FrameNativePointer::from_ptr(self.raw.image_view) })
-        }
-    }
-
-    /// Returns the borrowed Vulkan device pointer for backend interop.
-    ///
-    /// # Safety
-    ///
-    /// The returned pointer has the same lifetime and synchronization
-    /// requirements as [`VulkanOwnedTextureFrameHandle::image`].
-    pub unsafe fn device(&self) -> Result<FrameNativePointer<'_>> {
-        if self.closed.get() {
-            Err(closed_handle_error("VulkanOwnedTextureFrameHandle"))
-        } else {
-            // SAFETY: See image above.
-            Ok(unsafe { FrameNativePointer::from_ptr(self.raw.device) })
-        }
-    }
-
-    /// Explicitly releases this frame.
-    #[allow(clippy::result_large_err)]
-    pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
-        if self.closed.get() {
-            return Ok(());
-        }
-        let session = match self.session.native() {
-            Ok(session) => session,
-            Err(error) => return Err(HandleOperationError::new(error, self)),
-        };
-        // SAFETY: session is live, and raw is the active frame returned by a
-        // successful acquire for this session until release succeeds.
-        if let Err(error) = maplibre_core::check(unsafe {
-            sys::mln_vulkan_owned_texture_release_frame(session, &self.raw)
-        }) {
-            return Err(HandleOperationError::new(error, self));
-        }
-        self.closed.set(true);
-        self.session.frame_acquired.set(false);
-        Ok(())
-    }
-}
-
-impl Drop for VulkanOwnedTextureFrameHandle {
-    fn drop(&mut self) {
-        if self.closed.get() {
-            return;
-        }
-        if let Ok(session) = self.session.native() {
-            // SAFETY: Best-effort release of the active frame. Drop cannot
-            // report errors and never panics.
-            let status = unsafe { sys::mln_vulkan_owned_texture_release_frame(session, &self.raw) };
-            if status == sys::MLN_STATUS_OK {
-                self.closed.set(true);
-                self.session.frame_acquired.set(false);
-            }
-        }
-    }
-}
-
-/// RAII guard for an acquired WebGPU session-owned texture frame.
-///
-/// Releasing the guard ends the borrow of the backend WebGPU texture, texture
-/// view, and device.
-pub struct WebGpuOwnedTextureFrameHandle {
-    session: Rc<RenderSessionState>,
-    raw: sys::mln_webgpu_owned_texture_frame,
-    frame: WebGpuOwnedTextureFrame,
-    closed: Cell<bool>,
-    _thread_affine: PhantomData<Rc<()>>,
-}
-
-impl fmt::Debug for WebGpuOwnedTextureFrameHandle {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("WebGpuOwnedTextureFrameHandle")
-            .field("closed", &self.closed.get())
-            .field("frame", &self.frame)
-            .finish()
-    }
-}
-
-impl WebGpuOwnedTextureFrameHandle {
-    /// Returns copied metadata for this acquired frame.
-    pub fn frame(&self) -> Result<&WebGpuOwnedTextureFrame> {
-        if self.closed.get() {
-            Err(closed_handle_error("WebGpuOwnedTextureFrameHandle"))
-        } else {
-            Ok(&self.frame)
-        }
-    }
-
-    /// Returns the borrowed WebGPU texture pointer for backend interop.
-    ///
-    /// # Safety
-    ///
-    /// The returned pointer is valid only while this frame handle remains open.
-    /// The caller must not store or use it after frame release and must satisfy
-    /// WebGPU synchronization and thread-affinity requirements.
-    pub unsafe fn texture(&self) -> Result<FrameNativePointer<'_>> {
-        if self.closed.get() {
-            Err(closed_handle_error("WebGpuOwnedTextureFrameHandle"))
-        } else {
-            // SAFETY: The active native frame owns the validity contract for
-            // this borrowed backend handle until release.
-            Ok(unsafe { FrameNativePointer::from_ptr(self.raw.texture) })
-        }
-    }
-
-    /// Returns the borrowed WebGPU texture view pointer for backend interop.
-    ///
-    /// # Safety
-    ///
-    /// The returned pointer has the same lifetime and synchronization
-    /// requirements as [`WebGpuOwnedTextureFrameHandle::texture`].
-    pub unsafe fn texture_view(&self) -> Result<FrameNativePointer<'_>> {
-        if self.closed.get() {
-            Err(closed_handle_error("WebGpuOwnedTextureFrameHandle"))
-        } else {
-            // SAFETY: See texture above.
-            Ok(unsafe { FrameNativePointer::from_ptr(self.raw.texture_view) })
-        }
-    }
-
-    /// Returns the borrowed WebGPU device pointer for backend interop.
-    ///
-    /// # Safety
-    ///
-    /// The returned pointer has the same lifetime and synchronization
-    /// requirements as [`WebGpuOwnedTextureFrameHandle::texture`].
-    pub unsafe fn device(&self) -> Result<FrameNativePointer<'_>> {
-        if self.closed.get() {
-            Err(closed_handle_error("WebGpuOwnedTextureFrameHandle"))
-        } else {
-            // SAFETY: See texture above.
-            Ok(unsafe { FrameNativePointer::from_ptr(self.raw.device) })
-        }
-    }
-
-    /// Explicitly releases this frame.
-    #[allow(clippy::result_large_err)]
-    pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
-        if self.closed.get() {
-            return Ok(());
-        }
-        let session = match self.session.native() {
-            Ok(session) => session,
-            Err(error) => return Err(HandleOperationError::new(error, self)),
-        };
-        // SAFETY: session is live, and raw is the active frame returned by a
-        // successful acquire for this session until release succeeds.
-        if let Err(error) = maplibre_core::check(unsafe {
-            sys::mln_webgpu_owned_texture_release_frame(session, &self.raw)
-        }) {
-            return Err(HandleOperationError::new(error, self));
-        }
-        self.closed.set(true);
-        self.session.frame_acquired.set(false);
-        Ok(())
-    }
-}
-
-impl Drop for WebGpuOwnedTextureFrameHandle {
-    fn drop(&mut self) {
-        if self.closed.get() {
-            return;
-        }
-        if let Ok(session) = self.session.native() {
-            // SAFETY: Best-effort release of the active frame. Drop cannot
-            // report errors and never panics.
-            let status = unsafe { sys::mln_webgpu_owned_texture_release_frame(session, &self.raw) };
-            if status == sys::MLN_STATUS_OK {
-                self.closed.set(true);
-                self.session.frame_acquired.set(false);
-            }
-        }
-    }
-}
-
-/// RAII guard for an acquired OpenGL session-owned texture frame.
-///
-/// Releasing the guard ends the borrow of the backend OpenGL texture object.
-pub struct OpenGLOwnedTextureFrameHandle {
-    session: Rc<RenderSessionState>,
-    raw: sys::mln_opengl_owned_texture_frame,
-    frame: OpenGLOwnedTextureFrame,
-    closed: Cell<bool>,
-    _thread_affine: PhantomData<Rc<()>>,
-}
-
-impl fmt::Debug for OpenGLOwnedTextureFrameHandle {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("OpenGLOwnedTextureFrameHandle")
-            .field("closed", &self.closed.get())
-            .field("frame", &self.frame)
-            .finish()
-    }
-}
-
-impl OpenGLOwnedTextureFrameHandle {
-    /// Returns copied metadata for this acquired frame.
-    pub fn frame(&self) -> Result<&OpenGLOwnedTextureFrame> {
-        if self.closed.get() {
-            Err(closed_handle_error("OpenGLOwnedTextureFrameHandle"))
-        } else {
-            Ok(&self.frame)
-        }
-    }
-    /// Returns the borrowed OpenGL texture object name for backend interop.
-    pub fn texture(&self) -> Result<FrameOpenGLTextureName<'_>> {
-        if self.closed.get() {
-            Err(closed_handle_error("OpenGLOwnedTextureFrameHandle"))
-        } else {
-            Ok(FrameOpenGLTextureName::new(self.raw.texture))
-        }
-    }
-
-    /// Explicitly releases this frame.
-    #[allow(clippy::result_large_err)]
-    pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
-        if self.closed.get() {
-            return Ok(());
-        }
-        let session = match self.session.native() {
-            Ok(session) => session,
-            Err(error) => return Err(HandleOperationError::new(error, self)),
-        };
-        // SAFETY: session is live, and raw is the active frame returned by a
-        // successful acquire for this session until release succeeds.
-        if let Err(error) = maplibre_core::check(unsafe {
-            sys::mln_opengl_owned_texture_release_frame(session, &self.raw)
-        }) {
-            return Err(HandleOperationError::new(error, self));
-        }
-        self.closed.set(true);
-        self.session.frame_acquired.set(false);
-        Ok(())
-    }
-}
-
-impl Drop for OpenGLOwnedTextureFrameHandle {
-    fn drop(&mut self) {
-        if self.closed.get() {
-            return;
-        }
-        if let Ok(session) = self.session.native() {
-            // SAFETY: Best-effort release of the active frame. Drop cannot
-            // report errors and never panics.
-            let status = unsafe { sys::mln_opengl_owned_texture_release_frame(session, &self.raw) };
-            if status == sys::MLN_STATUS_OK {
-                self.closed.set(true);
-                self.session.frame_acquired.set(false);
-            }
-        }
-    }
-}
-
-impl RenderSessionHandle {
-    pub(crate) fn attach<F>(map: &MapHandle, attach: F) -> Result<Self>
-    where
-        F: FnOnce(sys::mln_map, *mut sys::mln_render_session) -> sys::mln_status,
-    {
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_render_session>::new();
-        let map = map.inner.native()?;
-        let status = attach(map, out.as_mut_ptr());
-        maplibre_core::check(status)?;
-        let ptr = out_handle(out, "mln_render_session")?;
         Ok(Self {
-            inner: Rc::new(RenderSessionState::new(ptr)?),
+            raw: Mutex::new(Some(raw)),
+            backend_exposed: AtomicBool::new(false),
+            operations,
         })
     }
 
-    /// Explicitly destroys the render session.
-    ///
-    /// Native destruction errors are returned. When destruction fails, the
-    /// underlying native handle remains live so a later `close` can retry.
-    pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
-        if let Err(error) = self.inner.ensure_no_frame_acquired() {
-            return Err(HandleOperationError::new(error, self));
-        }
-        if let Err(error) = self.inner.close() {
-            return Err(HandleOperationError::new(error, self));
-        }
-        Ok(())
+    fn native(&self) -> Result<sys::mln_acquired_frame> {
+        self.raw
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .ok_or_else(|| closed_handle_error("AcquiredFrameHandle"))
     }
-    /// Resizes this attached render session.
-    ///
-    /// Surface and owned-texture sessions resize in place, keeping the
-    /// renderer and its state. A scale factor change starts a new renderer with
-    /// renderer-held state empty. Borrowed texture targets report an
-    /// unsupported-feature error; hand over a new texture with the backend's
-    /// `set_*_borrowed_texture_target` method instead.
-    pub fn resize(&self, width: u32, height: u32, scale_factor: f64) -> Result<()> {
-        self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.native()?;
-        // SAFETY: session is a live render session handle owned by this wrapper.
+
+    pub fn result(&self) -> Result<RenderFrameResult> {
+        let mut raw: sys::mln_render_frame_result = unsafe { mem::zeroed() };
+        raw.size = mem::size_of::<sys::mln_render_frame_result>() as u32;
         maplibre_core::check(unsafe {
-            sys::mln_render_session_resize(session, width, height, scale_factor)
-        })
-    }
-
-    /// Presents this attached surface session through a new surface, keeping
-    /// this session's renderer and its state.
-    ///
-    /// The descriptor's extent applies as a resize does. A `context.device`
-    /// that is neither null nor this session's device reports an
-    /// invalid-argument error and leaves the current surface in place.
-    pub fn set_metal_surface_target(&self, descriptor: &MetalSurfaceDescriptor) -> Result<()> {
-        self.set_target(descriptor.to_native(), |session, raw| {
-            // SAFETY: session is a live render session handle owned by this
-            // wrapper, and raw is a materialized descriptor valid for this call.
-            unsafe { sys::mln_metal_surface_set_target(session, raw) }
-        })
-    }
-
-    /// Presents this attached surface session through a new surface.
-    ///
-    /// See [`RenderSessionHandle::set_metal_surface_target`] for what replacing
-    /// a surface preserves. The outgoing `VkSurfaceKHR` must still be valid:
-    /// this session holds a swapchain built from it, and Vulkan destroys every
-    /// swapchain before its surface.
-    pub fn set_vulkan_surface_target(&self, descriptor: &VulkanSurfaceDescriptor) -> Result<()> {
-        self.set_target(descriptor.to_native(), |session, raw| {
-            // SAFETY: session is a live render session handle owned by this
-            // wrapper, and raw is a materialized descriptor valid for this call.
-            unsafe { sys::mln_vulkan_surface_set_target(session, raw) }
-        })
-    }
-
-    /// Presents this attached surface session through a new WebGPU surface.
-    ///
-    /// See [`RenderSessionHandle::set_metal_surface_target`] for what replacing
-    /// a surface preserves. The replacement names the same device and format as
-    /// the session attached with.
-    pub fn set_webgpu_surface_target(&self, descriptor: &WebGpuSurfaceDescriptor) -> Result<()> {
-        self.set_target(descriptor.to_native(), |session, raw| {
-            // SAFETY: session is a live render session handle owned by this
-            // wrapper, and raw is a materialized descriptor valid for this call.
-            unsafe { sys::mln_webgpu_surface_set_target(session, raw) }
-        })
-    }
-
-    /// Presents this attached surface session through a new surface.
-    ///
-    /// See [`RenderSessionHandle::set_metal_surface_target`] for what replacing
-    /// a surface preserves. The new surface is made current on the next render,
-    /// so a host may hand over a replacement for one it has already destroyed.
-    /// A surface accepted here can still prove unusable, which the next
-    /// `render_update` reports rather than this call.
-    pub fn set_opengl_surface_target(&self, descriptor: &OpenGLSurfaceDescriptor) -> Result<()> {
-        self.set_target(descriptor.to_native(), |session, raw| {
-            // SAFETY: session is a live render session handle owned by this
-            // wrapper, and raw is a materialized descriptor valid for this call.
-            unsafe { sys::mln_opengl_surface_set_target(session, raw) }
-        })
-    }
-
-    /// Renders this attached texture session into a new caller-owned texture,
-    /// keeping this session's renderer. A scale factor change starts a new
-    /// renderer, as [`RenderSessionHandle::resize`] does.
-    ///
-    /// The replacement must belong to the device this session attached with and
-    /// carry the pixel format it attached with; otherwise this reports an error
-    /// and leaves the current texture in place. The caller owns the replacement
-    /// and keeps it valid until the next replacement, detach, or close. The
-    /// outgoing texture is neither retained nor read here.
-    pub fn set_metal_borrowed_texture_target(
-        &self,
-        descriptor: &MetalBorrowedTextureDescriptor,
-    ) -> Result<()> {
-        self.set_target(descriptor.to_native(), |session, raw| {
-            // SAFETY: session is a live render session handle owned by this
-            // wrapper, and raw is a materialized descriptor valid for this call.
-            unsafe { sys::mln_metal_borrowed_texture_set_target(session, raw) }
-        })
-    }
-
-    /// Renders this attached texture session into a new caller-owned image.
-    ///
-    /// See [`RenderSessionHandle::set_metal_borrowed_texture_target`] for what
-    /// replacing a target preserves. The replacement carries the format and
-    /// both layouts this session attached with, since its render pass was built
-    /// around them.
-    pub fn set_vulkan_borrowed_texture_target(
-        &self,
-        descriptor: &VulkanBorrowedTextureDescriptor,
-    ) -> Result<()> {
-        self.set_target(descriptor.to_native(), |session, raw| {
-            // SAFETY: session is a live render session handle owned by this
-            // wrapper, and raw is a materialized descriptor valid for this call.
-            unsafe { sys::mln_vulkan_borrowed_texture_set_target(session, raw) }
-        })
-    }
-
-    /// Renders this attached texture session into a new caller-owned texture.
-    ///
-    /// See [`RenderSessionHandle::set_metal_borrowed_texture_target`] for what
-    /// replacing a target preserves. The replacement carries the format this
-    /// session attached with, and belongs to the device it attached with.
-    pub fn set_webgpu_borrowed_texture_target(
-        &self,
-        descriptor: &WebGpuBorrowedTextureDescriptor,
-    ) -> Result<()> {
-        self.set_target(descriptor.to_native(), |session, raw| {
-            // SAFETY: session is a live render session handle owned by this
-            // wrapper, and raw is a materialized descriptor valid for this call.
-            unsafe { sys::mln_webgpu_borrowed_texture_set_target(session, raw) }
-        })
-    }
-
-    /// Renders this attached texture session into a new caller-owned texture.
-    ///
-    /// See [`RenderSessionHandle::set_metal_borrowed_texture_target`] for what
-    /// replacing a target preserves. The replacement belongs to the context
-    /// this session attached with, or one in its share group, and the host
-    /// context must be current on this thread.
-    pub fn set_opengl_borrowed_texture_target(
-        &self,
-        descriptor: &OpenGLBorrowedTextureDescriptor,
-    ) -> Result<()> {
-        self.set_target(descriptor.to_native(), |session, raw| {
-            // SAFETY: session is a live render session handle owned by this
-            // wrapper, and raw is a materialized descriptor valid for this call.
-            unsafe { sys::mln_opengl_borrowed_texture_set_target(session, raw) }
-        })
-    }
-
-    /// Shared body for the `set_*_target` methods. The caller-materialized
-    /// descriptor lives for the whole call, which is all the C API borrows it
-    /// for.
-    fn set_target<D>(
-        &self,
-        raw: D,
-        set_target: impl FnOnce(sys::mln_render_session, &D) -> sys::mln_status,
-    ) -> Result<()> {
-        self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.native()?;
-        maplibre_core::check(set_target(session, &raw))
-    }
-
-    /// Processes the latest map render update for this render target.
-    ///
-    /// The map retains its latest update, so repeated calls re-render it and
-    /// report [`RenderResult::Rendered`] again. Every other result names the
-    /// wake to wait for: [`RenderResult::NoUpdate`] and
-    /// [`RenderResult::SizePending`] resolve on a render-update-available
-    /// event, and [`RenderResult::TargetNotReady`] resolves when the host
-    /// changes the render target.
-    pub fn render_update(&self) -> Result<RenderResult> {
-        self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.native()?;
-        let mut result = sys::MLN_RENDER_RESULT_NO_UPDATE;
-        // SAFETY: session is a live render session handle owned by this wrapper,
-        // and result points to caller-owned output storage.
-        maplibre_core::check(unsafe {
-            sys::mln_render_session_render_update(session, &raw mut result)
+            sys::mln_acquired_frame_get_result(self.native()?, &mut raw)
         })?;
-        Ok(RenderResult::from_raw(result))
+        Ok(frame_result_from_native(raw))
     }
 
-    /// Detaches backend-bound render resources from the map, consuming this
-    /// handle and returning a close-only handle.
-    ///
-    /// A detached session no longer reaches its map, so the map is free to
-    /// close and the detached session stays destroyable afterwards.
-    pub fn detach(
+    pub fn producer_sync(&self) -> Result<FrameGpuSync<'_>> {
+        let mut raw = unsafe { sys::mln_gpu_sync_default() };
+        maplibre_core::check(unsafe {
+            sys::mln_acquired_frame_get_producer_sync(self.native()?, &mut raw)
+        })?;
+        Ok(FrameGpuSync::from_native(raw))
+    }
+
+    pub fn release(
         self,
-    ) -> std::result::Result<DetachedRenderSessionHandle, HandleOperationError<Self>> {
-        if let Err(error) = self.inner.ensure_no_frame_acquired() {
+        consumer_completion: GpuSync,
+    ) -> std::result::Result<OperationHandle<()>, HandleOperationError<Self>> {
+        let mut guard = self.raw.lock().unwrap_or_else(|p| p.into_inner());
+        let Some(mut frame) = *guard else {
+            drop(guard);
+            return Err(HandleOperationError::new(
+                closed_handle_error("AcquiredFrameHandle"),
+                self,
+            ));
+        };
+        let sync = consumer_completion.to_native();
+        let mut operation = sys::mln_operation(0);
+        if let Err(error) = maplibre_core::check(unsafe {
+            sys::mln_acquired_frame_release_start(&mut frame, &sync, &mut operation)
+        }) {
+            drop(guard);
             return Err(HandleOperationError::new(error, self));
         }
-        let session = match self.inner.native() {
-            Ok(session) => session,
-            Err(error) => return Err(HandleOperationError::new(error, self)),
-        };
-        // SAFETY: session is a live render session handle owned by this wrapper.
-        if let Err(error) = maplibre_core::check(unsafe { sys::mln_render_session_detach(session) })
-        {
-            return Err(HandleOperationError::new(error, self));
+        *guard = None;
+        drop(guard);
+        match OperationHandle::new(
+            operation,
+            OperationKind::RenderFrameRelease,
+            Arc::clone(&self.operations),
+        ) {
+            Ok(operation) => Ok(operation),
+            Err(error) => Err(HandleOperationError::new(error, self)),
         }
-        self.inner.detached.set(true);
-        Ok(DetachedRenderSessionHandle {
-            inner: Rc::clone(&self.inner),
-        })
     }
+}
 
-    /// Asks the session renderer to release cached resources where possible.
-    pub fn reduce_memory_use(&self) -> Result<()> {
-        self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.native()?;
-        // SAFETY: session is a live render session handle owned by this wrapper.
-        maplibre_core::check(unsafe { sys::mln_render_session_reduce_memory_use(session) })
-    }
-
-    /// Clears renderer data for the session.
-    pub fn clear_data(&self) -> Result<()> {
-        self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.native()?;
-        // SAFETY: session is a live render session handle owned by this wrapper.
-        maplibre_core::check(unsafe { sys::mln_render_session_clear_data(session) })
-    }
-
-    /// Dumps renderer debug logs through MapLibre Native logging.
-    pub fn dump_debug_logs(&self) -> Result<()> {
-        self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.native()?;
-        // SAFETY: session is a live render session handle owned by this wrapper.
-        maplibre_core::check(unsafe { sys::mln_render_session_dump_debug_logs(session) })
-    }
-
-    /// Returns CPU readback metadata for the most recently rendered texture frame.
-    pub fn texture_image_info(&self) -> Result<TextureImageInfo> {
-        self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.native()?;
-        // SAFETY: Default constructor takes no arguments and initializes size.
-        let mut info = unsafe { sys::mln_texture_image_info_default() };
-        // SAFETY: session is live. Passing a null buffer with zero capacity is
-        // the documented metadata probe path; out_info points to initialized storage.
-        maplibre_core::check(unsafe {
-            sys::mln_texture_read_premultiplied_rgba8(session, std::ptr::null_mut(), 0, &mut info)
-        })?;
-        Ok(maplibre_core::values::texture_image_info_from_native(&info))
-    }
-
-    /// Reads the most recently rendered texture frame as premultiplied RGBA8.
-    pub fn read_premultiplied_rgba8_into(&self, data: &mut [u8]) -> Result<TextureImageInfo> {
-        self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.native()?;
-        // SAFETY: Default constructor takes no arguments and initializes size.
-        let mut info = unsafe { sys::mln_texture_image_info_default() };
-        let data_ptr = if data.is_empty() {
-            std::ptr::null_mut()
-        } else {
-            data.as_mut_ptr()
+impl Drop for AcquiredFrameHandle {
+    fn drop(&mut self) {
+        let Some(mut frame) = self
+            .raw
+            .get_mut()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take()
+        else {
+            return;
         };
-        // SAFETY: session is live, data_ptr either points to data's mutable
-        // storage for data.len() bytes or is null for an empty buffer, and info
-        // points to initialized writable storage.
-        maplibre_core::check(unsafe {
-            sys::mln_texture_read_premultiplied_rgba8(session, data_ptr, data.len(), &mut info)
-        })?;
-        // An empty destination reaches native code as the size probe, which
-        // succeeds without copying, so report it as too small here.
-        if data.is_empty() && info.byte_length > 0 {
-            return Err(crate::Error::invalid_argument(format!(
-                "buffer length 0 is smaller than the required {} bytes",
-                info.byte_length
-            )));
+        if self.backend_exposed.load(Ordering::Acquire) {
+            maplibre_core::handle::report_leak(maplibre_core::handle::NativeHandleLeak {
+                type_name: "mln_acquired_frame",
+                id: frame.0,
+            });
+            return;
         }
-        Ok(maplibre_core::values::texture_image_info_from_native(&info))
-    }
-
-    /// Acquires a borrowed Metal frame from a session-owned texture target.
-    pub fn acquire_metal_owned_texture_frame(&self) -> Result<MetalOwnedTextureFrameHandle> {
-        self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.native()?;
-        let mut raw = empty_metal_owned_texture_frame();
-        // SAFETY: session is live and raw points to initialized writable frame storage.
-        maplibre_core::check(unsafe {
-            sys::mln_metal_owned_texture_acquire_frame(session, &mut raw)
-        })?;
-        self.inner.frame_acquired.set(true);
-        Ok(MetalOwnedTextureFrameHandle {
-            session: Rc::clone(&self.inner),
-            frame: MetalOwnedTextureFrame::from_native(&raw),
-            raw,
-            closed: Cell::new(false),
-            _thread_affine: PhantomData,
-        })
-    }
-
-    /// Acquires a borrowed Vulkan frame from a session-owned texture target.
-    pub fn acquire_vulkan_owned_texture_frame(&self) -> Result<VulkanOwnedTextureFrameHandle> {
-        self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.native()?;
-        let mut raw = empty_vulkan_owned_texture_frame();
-        // SAFETY: session is live and raw points to initialized writable frame storage.
-        maplibre_core::check(unsafe {
-            sys::mln_vulkan_owned_texture_acquire_frame(session, &mut raw)
-        })?;
-        self.inner.frame_acquired.set(true);
-        Ok(VulkanOwnedTextureFrameHandle {
-            session: Rc::clone(&self.inner),
-            frame: VulkanOwnedTextureFrame::from_native(&raw),
-            raw,
-            closed: Cell::new(false),
-            _thread_affine: PhantomData,
-        })
-    }
-
-    /// Acquires a borrowed WebGPU frame from a session-owned texture target.
-    pub fn acquire_webgpu_owned_texture_frame(&self) -> Result<WebGpuOwnedTextureFrameHandle> {
-        self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.native()?;
-        let mut raw = empty_webgpu_owned_texture_frame();
-        // SAFETY: session is live and raw points to initialized writable frame storage.
-        maplibre_core::check(unsafe {
-            sys::mln_webgpu_owned_texture_acquire_frame(session, &mut raw)
-        })?;
-        self.inner.frame_acquired.set(true);
-        Ok(WebGpuOwnedTextureFrameHandle {
-            session: Rc::clone(&self.inner),
-            frame: WebGpuOwnedTextureFrame::from_native(&raw),
-            raw,
-            closed: Cell::new(false),
-            _thread_affine: PhantomData,
-        })
-    }
-
-    /// Acquires a borrowed OpenGL frame from a session-owned texture target.
-    pub fn acquire_opengl_owned_texture_frame(&self) -> Result<OpenGLOwnedTextureFrameHandle> {
-        self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.native()?;
-        let mut raw = empty_opengl_owned_texture_frame();
-        // SAFETY: session is live and raw points to initialized writable frame storage.
-        maplibre_core::check(unsafe {
-            sys::mln_opengl_owned_texture_acquire_frame(session, &mut raw)
-        })?;
-        self.inner.frame_acquired.set(true);
-        Ok(OpenGLOwnedTextureFrameHandle {
-            session: Rc::clone(&self.inner),
-            frame: OpenGLOwnedTextureFrame::from_native(&raw),
-            raw,
-            closed: Cell::new(false),
-            _thread_affine: PhantomData,
-        })
+        let sync = GpuSync::CPU_COMPLETE.to_native();
+        let mut operation = sys::mln_operation(0);
+        let status =
+            unsafe { sys::mln_acquired_frame_release_start(&mut frame, &sync, &mut operation) };
+        if status == sys::MLN_STATUS_OK && operation.0 != 0 {
+            unsafe { sys::mln_operation_release(operation) };
+        }
     }
 }
 
-fn empty_metal_owned_texture_frame() -> sys::mln_metal_owned_texture_frame {
-    sys::mln_metal_owned_texture_frame {
-        size: mem::size_of::<sys::mln_metal_owned_texture_frame>() as u32,
-        generation: 0,
-        width: 0,
-        height: 0,
-        scale_factor: 0.0,
-        frame_id: 0,
-        texture: std::ptr::null_mut(),
-        device: std::ptr::null_mut(),
-        pixel_format: 0,
+impl AcquiredFrameHandle {
+    pub fn metal_texture(
+        &self,
+    ) -> Result<(
+        MetalOwnedTextureFrame,
+        FrameNativePointer<'_>,
+        FrameNativePointer<'_>,
+    )> {
+        let mut raw: sys::mln_metal_owned_texture_frame = unsafe { mem::zeroed() };
+        raw.size = mem::size_of::<sys::mln_metal_owned_texture_frame>() as u32;
+        maplibre_core::check(unsafe {
+            sys::mln_acquired_frame_get_metal_texture(self.native()?, &mut raw)
+        })?;
+        self.backend_exposed.store(true, Ordering::Release);
+        Ok((
+            MetalOwnedTextureFrame {
+                generation: raw.generation,
+                width: raw.width,
+                height: raw.height,
+                scale_factor: raw.scale_factor,
+                frame_id: raw.frame_id,
+                pixel_format: raw.pixel_format,
+            },
+            unsafe { FrameNativePointer::from_ptr(raw.texture) },
+            unsafe { FrameNativePointer::from_ptr(raw.device) },
+        ))
+    }
+
+    pub fn vulkan_texture(
+        &self,
+    ) -> Result<(
+        VulkanOwnedTextureFrame,
+        FrameNativePointer<'_>,
+        FrameNativePointer<'_>,
+        FrameNativePointer<'_>,
+    )> {
+        let mut raw: sys::mln_vulkan_owned_texture_frame = unsafe { mem::zeroed() };
+        raw.size = mem::size_of::<sys::mln_vulkan_owned_texture_frame>() as u32;
+        maplibre_core::check(unsafe {
+            sys::mln_acquired_frame_get_vulkan_texture(self.native()?, &mut raw)
+        })?;
+        self.backend_exposed.store(true, Ordering::Release);
+        Ok((
+            VulkanOwnedTextureFrame {
+                generation: raw.generation,
+                width: raw.width,
+                height: raw.height,
+                scale_factor: raw.scale_factor,
+                frame_id: raw.frame_id,
+                format: raw.format,
+                layout: raw.layout,
+            },
+            unsafe { FrameNativePointer::from_ptr(raw.image) },
+            unsafe { FrameNativePointer::from_ptr(raw.image_view) },
+            unsafe { FrameNativePointer::from_ptr(raw.device) },
+        ))
+    }
+
+    pub fn webgpu_texture(
+        &self,
+    ) -> Result<(
+        WebGpuOwnedTextureFrame,
+        FrameNativePointer<'_>,
+        FrameNativePointer<'_>,
+        FrameNativePointer<'_>,
+    )> {
+        let mut raw: sys::mln_webgpu_owned_texture_frame = unsafe { mem::zeroed() };
+        raw.size = mem::size_of::<sys::mln_webgpu_owned_texture_frame>() as u32;
+        maplibre_core::check(unsafe {
+            sys::mln_acquired_frame_get_webgpu_texture(self.native()?, &mut raw)
+        })?;
+        self.backend_exposed.store(true, Ordering::Release);
+        Ok((
+            WebGpuOwnedTextureFrame {
+                generation: raw.generation,
+                width: raw.width,
+                height: raw.height,
+                scale_factor: raw.scale_factor,
+                frame_id: raw.frame_id,
+                format: raw.format,
+            },
+            unsafe { FrameNativePointer::from_ptr(raw.texture) },
+            unsafe { FrameNativePointer::from_ptr(raw.texture_view) },
+            unsafe { FrameNativePointer::from_ptr(raw.device) },
+        ))
+    }
+
+    /// Copies OpenGL texture data on the fixed caller graphics thread.
+    pub fn opengl_texture(&self) -> Result<(OpenGLOwnedTextureFrame, FrameOpenGLTextureName<'_>)> {
+        let mut raw: sys::mln_opengl_owned_texture_frame = unsafe { mem::zeroed() };
+        raw.size = mem::size_of::<sys::mln_opengl_owned_texture_frame>() as u32;
+        maplibre_core::check(unsafe {
+            sys::mln_acquired_frame_get_opengl_texture(self.native()?, &mut raw)
+        })?;
+        self.backend_exposed.store(true, Ordering::Release);
+        Ok((
+            OpenGLOwnedTextureFrame {
+                generation: raw.generation,
+                width: raw.width,
+                height: raw.height,
+                scale_factor: raw.scale_factor,
+                frame_id: raw.frame_id,
+                target: raw.target,
+                internal_format: raw.internal_format,
+                format: raw.format,
+                type_: raw.type_,
+            },
+            FrameOpenGLTextureName::new(raw.texture),
+        ))
     }
 }
 
-fn empty_webgpu_owned_texture_frame() -> sys::mln_webgpu_owned_texture_frame {
-    sys::mln_webgpu_owned_texture_frame {
-        size: mem::size_of::<sys::mln_webgpu_owned_texture_frame>() as u32,
-        generation: 0,
-        width: 0,
-        height: 0,
-        scale_factor: 0.0,
-        frame_id: 0,
-        texture: std::ptr::null_mut(),
-        texture_view: std::ptr::null_mut(),
-        device: std::ptr::null_mut(),
-        format: 0,
-    }
-}
-
-fn empty_vulkan_owned_texture_frame() -> sys::mln_vulkan_owned_texture_frame {
-    sys::mln_vulkan_owned_texture_frame {
-        size: mem::size_of::<sys::mln_vulkan_owned_texture_frame>() as u32,
-        generation: 0,
-        width: 0,
-        height: 0,
-        scale_factor: 0.0,
-        frame_id: 0,
-        image: std::ptr::null_mut(),
-        image_view: std::ptr::null_mut(),
-        device: std::ptr::null_mut(),
-        format: 0,
-        layout: 0,
-    }
-}
-
-fn empty_opengl_owned_texture_frame() -> sys::mln_opengl_owned_texture_frame {
-    sys::mln_opengl_owned_texture_frame {
-        size: mem::size_of::<sys::mln_opengl_owned_texture_frame>() as u32,
-        generation: 0,
-        width: 0,
-        height: 0,
-        scale_factor: 0.0,
-        frame_id: 0,
-        texture: 0,
-        target: 0,
-        internal_format: 0,
-        format: 0,
-        type_: 0,
+impl OperationHandle<PremultipliedRgba8Image> {
+    pub fn take(&self) -> Result<PremultipliedRgba8Image> {
+        let mut data = sys::mln_buffer(0);
+        let mut info = unsafe { sys::mln_texture_image_info_default() };
+        self.with_result_operation(|operation| {
+            maplibre_core::check(unsafe {
+                sys::mln_texture_read_premultiplied_rgba8_take_result(
+                    operation, &mut data, &mut info,
+                )
+            })
+        })?;
+        Ok(PremultipliedRgba8Image::new(
+            maplibre_core::values::texture_image_info_from_native(&info),
+            unsafe { maplibre_core::string::copy_owned_buffer(data) }?,
+        ))
     }
 }
 

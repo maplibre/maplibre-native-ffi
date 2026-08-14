@@ -208,7 +208,7 @@ func run(mode renderTargetMode) (result error) {
 		}
 
 		if shared.consumeRenderRequest() && !view.empty() && running {
-			rendered, err := state.renderUpdate()
+			rendered, err := state.driveFrame()
 			if err != nil {
 				return err
 			}

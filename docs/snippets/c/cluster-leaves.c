@@ -22,13 +22,27 @@ void list_cluster_leaves(mln_render_session session, mln_buffer_view cluster) {
   // #endregion arguments
 
   // #region query
+  mln_operation operation = MLN_HANDLE_NULL;
   mln_buffer result = MLN_HANDLE_NULL;
-  const mln_status queried = mln_render_session_query_feature_extensions(
+  mln_status queried = mln_render_session_query_feature_extensions_start(
     session, view("places"), cluster, view("supercluster"), view("leaves"),
-    &arguments, &result
+    &arguments, &operation
   );
+  bool completed = false;
+  if (queried == MLN_STATUS_OK) {
+    queried = mln_operation_wait(operation, -1, &completed);
+  }
+  mln_status terminal = MLN_STATUS_INVALID_STATE;
+  if (queried == MLN_STATUS_OK && completed) {
+    queried = mln_operation_get_status(operation, &terminal);
+  }
+  if (queried == MLN_STATUS_OK) queried = terminal;
+  if (queried == MLN_STATUS_OK) {
+    queried = mln_render_query_take_result(operation, &result);
+  }
   if (queried == MLN_STATUS_OK) read_leaves(result);
 
+  mln_operation_release(operation);
   mln_buffer_destroy(result);
   // #endregion query
 }

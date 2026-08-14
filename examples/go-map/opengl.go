@@ -18,12 +18,62 @@ type renderTarget interface {
 	// handing the session a replacement.
 	Resize(viewport) error
 	FinishFrame() error
-	// RenderUpdate renders the latest map update, and reports whether a frame
-	// reached the screen. It reports true only for a rendered frame, so the
-	// render loop asks for another one when the map has no update yet, the map
-	// has not applied the session's size yet, or the target had no frame to
-	// draw into.
-	RenderUpdate() (bool, error)
+	// DriveFrame submits demand and services the caller graphics-thread driver.
+	// It reports true only when a frame reaches the screen.
+	DriveFrame() (bool, error)
+}
+
+func serviceOperation(session *maplibre.RenderSessionHandle, operation *maplibre.OperationHandle[struct{}]) error {
+	defer operation.Release()
+	for {
+		done, err := operation.Poll()
+		if err != nil {
+			return err
+		}
+		if done {
+			return operation.Discard()
+		}
+		if _, err := session.ServiceDriverWork(16); err != nil {
+			return err
+		}
+	}
+}
+
+func detachCallerSession(session *maplibre.RenderSessionHandle) error {
+	operation, err := session.DetachStart()
+	if err != nil {
+		return err
+	}
+	return serviceOperation(session, operation)
+}
+
+func closeCallerSession(session *maplibre.RenderSessionHandle) error {
+	if err := detachCallerSession(session); err == nil {
+		return session.Close()
+	}
+	if _, err := session.Abandon(); err != nil {
+		return err
+	}
+	return session.Close()
+}
+
+func renderCallerFrame(session *maplibre.RenderSessionHandle) (maplibre.RenderResult, error) {
+	if err := session.RequestFrame(maplibre.NewFrameDemand()); err != nil {
+		return 0, err
+	}
+	if _, err := session.ServiceDriverWork(16); err != nil {
+		return 0, err
+	}
+	batch, err := session.DrainFrameResults(1)
+	if err != nil {
+		return 0, err
+	}
+	defer batch.Close()
+	results, err := batch.Results()
+	if err != nil || len(results) == 0 {
+		return 0, err
+	}
+	return results[0].Disposition, nil
 }
 
 type openGLContext struct {
@@ -305,19 +355,33 @@ func newOpenGLOwnedTextureTarget(context *openGLContext, v viewport, m *maplibre
 		_ = target.Close()
 		return nil, err
 	}
-	session, err := m.AttachOpenGLOwnedTexture(maplibre.OpenGLOwnedTextureDescriptor{Extent: v.extent(), Context: descriptor})
+	options := maplibre.NewRenderSessionAttachOptions()
+	options.Driver = maplibre.RenderDriverCallerGraphicsThread
+	options.RequestedTextureRingDepth = 2
+	session, operation, err := m.AttachOpenGLOwnedTexture(
+		maplibre.OpenGLOwnedTextureDescriptor{
+			Extent:  v.extent(),
+			Context: descriptor,
+		},
+		options,
+	)
+	if err == nil {
+		target.session = session
+		err = serviceOperation(session, operation)
+	}
 	if err != nil {
 		_ = target.Close()
 		return nil, fmt.Errorf("OpenGL texture attach failed: %w", err)
 	}
-	target.session = session
 	return target, nil
 }
 
 func (target *openGLOwnedTextureTarget) Close() error {
 	var result error
 	if target.session != nil {
-		result = errors.Join(result, target.session.Close())
+		if err := closeCallerSession(target.session); err != nil {
+			return err
+		}
 		target.session = nil
 	}
 	if target.compositor != nil {
@@ -331,36 +395,41 @@ func (target *openGLOwnedTextureTarget) Resize(v viewport) error {
 	if err := target.compositor.Resize(v); err != nil {
 		return err
 	}
-	return target.session.Resize(v.extent())
+	operation, err := target.session.ResizeStart(v.extent())
+	if err != nil {
+		return err
+	}
+	return serviceOperation(target.session, operation)
 }
 
-func (target *openGLOwnedTextureTarget) FinishFrame() error { return target.compositor.FinishFrame() }
+func (target *openGLOwnedTextureTarget) FinishFrame() error {
+	return target.compositor.FinishFrame()
+}
 
-func (target *openGLOwnedTextureTarget) RenderUpdate() (bool, error) {
-	result, err := target.session.RenderUpdate()
+func (target *openGLOwnedTextureTarget) DriveFrame() (bool, error) {
+	result, err := renderCallerFrame(target.session)
 	if err != nil {
 		return false, fmt.Errorf("OpenGL texture render failed: %w", err)
 	}
 	if result != maplibre.RenderResultRendered {
 		return false, nil
 	}
-	frame, err := target.session.AcquireOpenGLTextureFrame()
-	if err != nil {
-		if errors.Is(err, maplibre.ErrInvalidState) {
-			return false, nil
-		}
-		return false, fmt.Errorf("OpenGL texture acquire failed: %w", err)
-	}
-	defer func() { _ = frame.Close() }()
-	texture, err := frame.Texture()
+	frame, err := target.session.AcquireFrame()
 	if err != nil {
 		return false, err
 	}
-	textureTarget, err := frame.Target()
-	if err != nil {
-		return false, err
+	info, accessErr := frame.OpenGLTexture()
+	var drawErr error
+	if accessErr == nil {
+		drawErr = target.compositor.DrawTexture(info.Target, info.Texture)
 	}
-	return true, target.compositor.DrawTexture(textureTarget, texture)
+	release, releaseErr := frame.ReleaseStart(maplibre.GPUSync{
+		Kind: maplibre.GPUSyncCPUComplete,
+	})
+	if releaseErr == nil {
+		releaseErr = serviceOperation(target.session, release)
+	}
+	return accessErr == nil, errors.Join(accessErr, drawErr, releaseErr)
 }
 
 type openGLBorrowedTextureTarget struct {
@@ -386,30 +455,39 @@ func newOpenGLBorrowedTextureTarget(context *openGLContext, v viewport, m *mapli
 		_ = target.Close()
 		return nil, err
 	}
-	session, err := m.AttachOpenGLBorrowedTexture(maplibre.OpenGLBorrowedTextureDescriptor{
+	options := maplibre.NewRenderSessionAttachOptions()
+	options.Driver = maplibre.RenderDriverCallerGraphicsThread
+	session, operation, err := m.AttachOpenGLBorrowedTexture(maplibre.OpenGLBorrowedTextureDescriptor{
 		Extent:         v.extent(),
 		PhysicalWidth:  v.physicalWidth,
 		PhysicalHeight: v.physicalHeight,
 		Context:        descriptor,
 		Texture:        texture,
 		Target:         glTexture2D,
-	})
+	}, options)
+	if err == nil {
+		target.session = session
+		err = serviceOperation(session, operation)
+	}
 	if err != nil {
 		_ = target.Close()
 		return nil, fmt.Errorf("OpenGL borrowed texture attach failed: %w", err)
 	}
-	target.session = session
 	return target, nil
 }
 
 func (target *openGLBorrowedTextureTarget) Close() error {
 	var result error
 	if target.session != nil {
-		result = errors.Join(result, target.session.Close())
+		if err := closeCallerSession(target.session); err != nil {
+			return err
+		}
 		target.session = nil
 	}
 	if target.texture != 0 {
-		result = errors.Join(result, target.compositor.context.MakeCurrent())
+		if err := target.compositor.context.MakeCurrent(); err != nil {
+			return errors.Join(result, err)
+		}
 		glDeleteTexture(target.texture)
 		target.texture = 0
 	}
@@ -431,17 +509,18 @@ func (target *openGLBorrowedTextureTarget) Resize(v viewport) error {
 	if err != nil {
 		return err
 	}
-	if err := target.session.SetOpenGLBorrowedTextureTarget(maplibre.OpenGLBorrowedTextureDescriptor{
+	operation, err := target.session.SetOpenGLBorrowedTextureTargetStart(maplibre.OpenGLBorrowedTextureDescriptor{
 		Extent:         v.extent(),
 		PhysicalWidth:  v.physicalWidth,
 		PhysicalHeight: v.physicalHeight,
 		Context:        descriptor,
 		Texture:        replacement,
 		Target:         glTexture2D,
-	}); err != nil {
-		// The session may have taken the replacement before failing, so detach
-		// before either texture is deleted.
-		_ = target.session.Detach()
+	})
+	if err == nil {
+		err = serviceOperation(target.session, operation)
+	}
+	if err != nil {
 		glDeleteTexture(replacement)
 		return fmt.Errorf("OpenGL borrowed texture set target failed: %w", err)
 	}
@@ -457,8 +536,8 @@ func (target *openGLBorrowedTextureTarget) FinishFrame() error {
 	return target.compositor.FinishFrame()
 }
 
-func (target *openGLBorrowedTextureTarget) RenderUpdate() (bool, error) {
-	result, err := target.session.RenderUpdate()
+func (target *openGLBorrowedTextureTarget) DriveFrame() (bool, error) {
+	result, err := renderCallerFrame(target.session)
 	if err != nil {
 		return false, fmt.Errorf("OpenGL borrowed texture render failed: %w", err)
 	}
@@ -501,22 +580,36 @@ func newOpenGLSurfaceTarget(context *openGLContext, v viewport, m *maplibre.MapH
 	if err != nil {
 		return nil, err
 	}
-	session, err := m.AttachOpenGLSurface(maplibre.OpenGLSurfaceDescriptor{Extent: v.extent(), Context: descriptor, Surface: context.surface()})
+	options := maplibre.NewRenderSessionAttachOptions()
+	options.Driver = maplibre.RenderDriverCallerGraphicsThread
+	session, operation, err := m.AttachOpenGLSurface(
+		maplibre.OpenGLSurfaceDescriptor{
+			Extent:  v.extent(),
+			Context: descriptor,
+			Surface: context.surface(),
+		},
+		options,
+	)
+	if err == nil {
+		target.session = session
+		err = serviceOperation(session, operation)
+	}
 	if err != nil {
 		_ = target.Close()
 		return nil, fmt.Errorf("OpenGL surface attach failed: %w", err)
 	}
-	target.session = session
 	return target, nil
 }
 
 func (target *openGLSurfaceTarget) Close() error {
-	var result error
-	if target.session != nil {
-		result = errors.Join(result, target.session.Close())
-		target.session = nil
+	if target.session == nil {
+		return nil
 	}
-	return result
+	if err := closeCallerSession(target.session); err != nil {
+		return err
+	}
+	target.session = nil
+	return nil
 }
 
 // Resize handles SDL returning a different EGL window surface for the resized
@@ -526,24 +619,30 @@ func (target *openGLSurfaceTarget) Resize(v viewport) error {
 	if err := target.context.refreshPlatformSurface(); err != nil {
 		// SDL may already have dropped the surface the session presents
 		// through, so detach rather than leave it naming a dead surface.
-		_ = target.session.Detach()
+		_ = detachCallerSession(target.session)
 		return err
 	}
 	if target.context.surface() == outgoing {
-		return target.session.Resize(v.extent())
+		operation, err := target.session.ResizeStart(v.extent())
+		if err != nil {
+			return err
+		}
+		return serviceOperation(target.session, operation)
 	}
 	descriptor, err := target.context.descriptor(false)
 	if err != nil {
 		return err
 	}
-	if err := target.session.SetOpenGLSurfaceTarget(maplibre.OpenGLSurfaceDescriptor{
+	operation, err := target.session.SetOpenGLSurfaceTargetStart(maplibre.OpenGLSurfaceDescriptor{
 		Extent:  v.extent(),
 		Context: descriptor,
 		Surface: target.context.surface(),
-	}); err != nil {
-		// SDL already dropped the outgoing surface, so on failure the session
-		// may hold a dead surface; detach to stop it naming either.
-		_ = target.session.Detach()
+	})
+	if err == nil {
+		err = serviceOperation(target.session, operation)
+	}
+	if err != nil {
+		_ = detachCallerSession(target.session)
 		return fmt.Errorf("OpenGL surface set target failed: %w", err)
 	}
 	return nil
@@ -557,8 +656,8 @@ func (target *openGLSurfaceTarget) FinishFrame() error {
 	return nil
 }
 
-func (target *openGLSurfaceTarget) RenderUpdate() (bool, error) {
-	result, err := target.session.RenderUpdate()
+func (target *openGLSurfaceTarget) DriveFrame() (bool, error) {
+	result, err := renderCallerFrame(target.session)
 	if err != nil {
 		return false, fmt.Errorf("OpenGL surface render failed: %w", err)
 	}

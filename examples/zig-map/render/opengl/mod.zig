@@ -537,11 +537,11 @@ const OpenGLOwnedTextureBackend = struct {
         const texture = maplibre.attachOpenGLOwnedTexture(map, .{
             .extent = render_target.extent(viewport),
             .context = self.compositor.context.descriptor(),
-        }) catch |err| {
+        }, .{ .driver = .caller_graphics_thread, .requested_texture_ring_depth = 2 }) catch |err| {
             diagnostics.logError("OpenGL texture attach failed", err, null);
             return types.AppError.TextureAttachFailed;
         };
-        return .{ .texture = texture };
+        return render_target.textureSession(texture);
     }
 
     fn renderUpdate(
@@ -555,17 +555,29 @@ const OpenGLOwnedTextureBackend = struct {
             .texture => |*texture| texture,
             else => return false,
         };
-        var frame = texture.acquireOpenGLOwnedTextureFrame() catch |err| switch (err) {
+        var frame = texture.acquireFrame() catch |err| switch (err) {
             error.InvalidState => return false,
             else => {
                 diagnostics.logError("OpenGL texture acquire failed", err, null);
                 return types.AppError.BackendDrawFailed;
             },
         };
-        defer frame.release() catch |err| diagnostics.logError("OpenGL texture release failed", err, null);
-
-        const info = try frame.info();
-        return try self.compositor.drawTexture(info.texture);
+        var frame_owned = true;
+        errdefer if (frame_owned) {
+            var cleanup = frame.releaseStart(.cpu_complete) catch null;
+            if (cleanup) |*operation| {
+                defer operation.release();
+                render_target.serviceUntilComplete(texture, operation.*) catch {};
+            }
+        };
+        const info = try frame.openGLTexture();
+        const drawn = try self.compositor.drawTexture(info.texture);
+        try self.compositor.finishFrame();
+        var release = try frame.releaseStart(.cpu_complete);
+        frame_owned = false;
+        defer release.release();
+        try render_target.serviceUntilComplete(texture, release);
+        return drawn;
     }
 };
 
@@ -647,7 +659,7 @@ const OpenGLBorrowedTextureBackend = struct {
             viewport,
         );
         errdefer replacement.deinit(&self.compositor.context, self.compositor.procs);
-        session.setOpenGLBorrowedTextureTarget(.{
+        var operation = session.setOpenGLBorrowedTextureTargetStart(.{
             .extent = render_target.extent(viewport),
             .physical_width = viewport.physical_width,
             .physical_height = viewport.physical_height,
@@ -655,10 +667,12 @@ const OpenGLBorrowedTextureBackend = struct {
             .texture = replacement.texture,
             .target = gl_texture_target,
         }) catch |err| {
-            // The session may have taken the replacement before failing, so
-            // detach before either texture is released.
-            session.detach() catch {};
             diagnostics.logError("OpenGL borrowed texture set target failed", err, null);
+            return types.AppError.TextureResizeFailed;
+        };
+        defer operation.release();
+        render_target.serviceUntilComplete(session, operation) catch |err| {
+            diagnostics.logError("OpenGL borrowed texture replacement failed", err, null);
             return types.AppError.TextureResizeFailed;
         };
         // Released only once the session has taken the replacement.
@@ -682,11 +696,11 @@ const OpenGLBorrowedTextureBackend = struct {
             .context = self.compositor.context.descriptor(),
             .texture = self.borrowed_texture.texture,
             .target = gl_texture_target,
-        }) catch |err| {
+        }, .{ .driver = .caller_graphics_thread }) catch |err| {
             diagnostics.logError("OpenGL borrowed texture attach failed", err, null);
             return types.AppError.TextureAttachFailed;
         };
-        return .{ .texture = texture };
+        return render_target.textureSession(texture);
     }
 
     fn renderUpdate(
@@ -748,15 +762,17 @@ const OpenGLSurfaceBackend = struct {
             return;
         }
         const handle = try self.session.surfaceHandle();
-        handle.setOpenGLSurfaceTarget(.{
+        var operation = handle.setOpenGLSurfaceTargetStart(.{
             .extent = render_target.extent(viewport),
             .context = self.context.descriptor(),
             .surface = self.context.surface(),
         }) catch |err| {
-            // SDL already dropped the outgoing surface and the session may have
-            // taken the replacement before failing, so detach.
-            handle.detach() catch {};
             diagnostics.logError("OpenGL surface set target failed", err, null);
+            return types.AppError.SurfaceAttachFailed;
+        };
+        defer operation.release();
+        render_target.serviceUntilComplete(handle, operation) catch |err| {
+            diagnostics.logError("OpenGL surface replacement failed", err, null);
             return types.AppError.SurfaceAttachFailed;
         };
     }
@@ -765,7 +781,9 @@ const OpenGLSurfaceBackend = struct {
     /// failure.
     fn detachSuppressed(self: *OpenGLSurfaceBackend) void {
         const handle = self.session.surfaceHandle() catch return;
-        handle.detach() catch {};
+        var operation = handle.detachStart() catch return;
+        defer operation.release();
+        render_target.serviceUntilComplete(handle, operation) catch {};
     }
 
     fn finishFrame(self: *OpenGLSurfaceBackend) !void {
@@ -782,11 +800,11 @@ const OpenGLSurfaceBackend = struct {
             .extent = render_target.extent(viewport),
             .context = self.context.descriptor(),
             .surface = self.context.surface(),
-        }) catch |err| {
+        }, .{ .driver = .caller_graphics_thread }) catch |err| {
             diagnostics.logError("OpenGL surface attach failed", err, null);
             return types.AppError.SurfaceAttachFailed;
         };
-        return .{ .surface = surface };
+        return render_target.surfaceSession(surface);
     }
 
     fn renderUpdate(

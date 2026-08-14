@@ -33,7 +33,7 @@ NotificationEndpoint::NotificationEndpoint(
   std::shared_ptr<NotificationSourceObject> source, std::uint64_t id,
   std::uint32_t kind, bool sticky
 )
-    : source_(std::move(source)), id_(id) {
+    : source_(std::move(source)), kind_(kind), id_(id) {
   if (!valid_endpoint_kind(kind)) {
     throw std::invalid_argument{"notification endpoint kind is invalid"};
   }
@@ -48,19 +48,19 @@ NotificationEndpoint::~NotificationEndpoint() { detach(); }
 
 auto NotificationEndpoint::mark_ready() const noexcept -> void {
   if (active_.load(std::memory_order_acquire)) {
-    source_->mark_ready(id_, this);
+    source_->mark_ready(id_, kind_, this);
   }
 }
 
 auto NotificationEndpoint::clear_ready() const noexcept -> void {
   if (active_.load(std::memory_order_acquire)) {
-    source_->clear_ready(id_, this);
+    source_->clear_ready(id_, kind_, this);
   }
 }
 
 auto NotificationEndpoint::detach() const noexcept -> void {
   if (active_.exchange(false, std::memory_order_acq_rel)) {
-    source_->detach(id_, this);
+    source_->detach(id_, kind_, this);
   }
 }
 
@@ -85,17 +85,18 @@ auto NotificationSourceObject::associate(
       set_thread_error("notification source is closing");
       return nullptr;
     }
-    if (endpoints_.contains(id)) {
+    const auto key = EndpointKey{.id = id, .kind = kind};
+    if (endpoints_.contains(key)) {
       set_thread_error("notification endpoint is already associated");
       return nullptr;
     }
     endpoints_.emplace(
-      id, EndpointState{
-            .kind = kind,
-            .sticky = sticky,
-            .owner = endpoint.get(),
-            .ready = false,
-          }
+      key, EndpointState{
+             .kind = kind,
+             .sticky = sticky,
+             .owner = endpoint.get(),
+             .ready = false,
+           }
     );
   }
   endpoint->active_.store(true, std::memory_order_release);
@@ -103,10 +104,10 @@ auto NotificationSourceObject::associate(
 }
 
 auto NotificationSourceObject::detach(
-  std::uint64_t id, const NotificationEndpoint* owner
+  std::uint64_t id, std::uint32_t kind, const NotificationEndpoint* owner
 ) noexcept -> void {
   const std::scoped_lock lock(mutex_);
-  const auto found = endpoints_.find(id);
+  const auto found = endpoints_.find(EndpointKey{.id = id, .kind = kind});
   if (found != endpoints_.end() && found->second.owner == owner) {
     endpoints_.erase(found);
     recompute_signaled_locked();
@@ -153,12 +154,12 @@ auto NotificationSourceObject::recompute_signaled_locked() noexcept -> void {
 }
 
 auto NotificationSourceObject::mark_ready(
-  std::uint64_t id, const NotificationEndpoint* owner
+  std::uint64_t id, std::uint32_t kind, const NotificationEndpoint* owner
 ) noexcept -> void {
   auto invocation = CallbackInvocation{};
   {
     const std::scoped_lock lock(mutex_);
-    const auto found = endpoints_.find(id);
+    const auto found = endpoints_.find(EndpointKey{.id = id, .kind = kind});
     if (found == endpoints_.end() || found->second.owner != owner || closing_) {
       return;
     }
@@ -172,10 +173,10 @@ auto NotificationSourceObject::mark_ready(
 }
 
 auto NotificationSourceObject::clear_ready(
-  std::uint64_t id, const NotificationEndpoint* owner
+  std::uint64_t id, std::uint32_t kind, const NotificationEndpoint* owner
 ) noexcept -> void {
   const std::scoped_lock lock(mutex_);
-  const auto found = endpoints_.find(id);
+  const auto found = endpoints_.find(EndpointKey{.id = id, .kind = kind});
   if (
     found == endpoints_.end() || found->second.owner != owner ||
     !found->second.sticky
@@ -268,11 +269,13 @@ auto NotificationSourceObject::begin_ready_drain(
   ready_drain_active_ = true;
   try {
     out_endpoints.reserve(endpoints_.size());
-    for (const auto& [id, endpoint] : endpoints_) {
+    for (const auto& [key, endpoint] : endpoints_) {
       if (endpoint.ready) {
         out_endpoints.push_back(
           mln_ready_endpoint{
-            .size = sizeof(mln_ready_endpoint), .kind = endpoint.kind, .id = id
+            .size = sizeof(mln_ready_endpoint),
+            .kind = endpoint.kind,
+            .id = key.id
           }
         );
       }
@@ -289,7 +292,8 @@ auto NotificationSourceObject::commit_ready_drain(
 ) noexcept -> void {
   const std::scoped_lock lock(mutex_);
   for (const auto& endpoint : endpoints) {
-    const auto found = endpoints_.find(endpoint.id);
+    const auto found =
+      endpoints_.find(EndpointKey{.id = endpoint.id, .kind = endpoint.kind});
     if (
       found != endpoints_.end() && found->second.kind == endpoint.kind &&
       !found->second.sticky

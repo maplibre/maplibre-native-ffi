@@ -140,50 +140,6 @@ def test_native_pointer_is_opaque_value() -> None:
     assert pointer == mln.NativePointer.null()
 
 
-def test_frame_backend_values_are_scoped_to_open_frame_handle() -> None:
-    class FakeMetalFrame:
-        closed = False
-
-        def texture_address(self) -> int:
-            return 0x1234
-
-        def device_address(self) -> int:
-            return 0x5678
-
-        def close(self) -> None:
-            self.closed = True
-
-    with pytest.raises(TypeError, match="created by RenderSessionHandle"):
-        render.MetalOwnedTextureFrameHandle(FakeMetalFrame())
-
-    metal = render.MetalOwnedTextureFrameHandle._from_native(FakeMetalFrame())
-    texture = metal.texture
-    device = metal.device
-    assert texture.address == 0x1234
-    assert device.address == 0x5678
-    metal.close()
-    with pytest.raises(mln.InvalidStateError):
-        _ = texture.address
-    with pytest.raises(mln.InvalidStateError):
-        _ = device.address
-
-    class FakeOpenGLFrame:
-        closed = False
-
-        def texture(self) -> int:
-            return 42
-
-        def close(self) -> None:
-            self.closed = True
-
-    opengl = render.OpenGLOwnedTextureFrameHandle._from_native(FakeOpenGLFrame())
-    opengl_texture = opengl.texture
-    assert int(opengl_texture) == 42
-    opengl.close()
-    with pytest.raises(mln.InvalidStateError):
-        _ = opengl_texture.value
-
-
 def test_network_status_round_trips_through_public_api() -> None:
     original = mln.network_status()
     try:
@@ -239,6 +195,10 @@ def test_native_status_conversion_preserves_status_and_diagnostic() -> None:
         (mln.MaplibreStatus.WRONG_THREAD, mln.WrongThreadError),
         (mln.MaplibreStatus.UNSUPPORTED, mln.UnsupportedFeatureError),
         (mln.MaplibreStatus.NATIVE_ERROR, mln.NativeError),
+        (mln.MaplibreStatus.CANCELLED, mln.CancelledError),
+        (mln.MaplibreStatus.BUSY, mln.BusyError),
+        (mln.MaplibreStatus.TARGET_LOST, mln.TargetLostError),
+        (mln.MaplibreStatus.NOT_READY, mln.NotReadyError),
     ),
 )
 def test_native_status_categories_map_to_public_errors(
@@ -381,7 +341,8 @@ def test_public_type_hints_are_resolvable() -> None:
         render.RenderSessionHandle.query_feature_extensions
     )
     assert extension_hints["feature"] is bytes
-    assert extension_hints["return"] is bytes
+    assert typing.get_origin(extension_hints["return"]) is offline.OperationHandle
+    assert typing.get_args(extension_hints["return"]) == (bytes,)
     assert extension_hints["arguments"] == bytes | None
 
     rendered_hints = typing.get_type_hints(
@@ -541,227 +502,11 @@ def assert_wrong_thread_error(
         assert error.diagnostic == diagnostic
 
 
-def test_render_session_methods_propagate_wrong_thread_errors() -> None:
-    diagnostics = {
-        "close": "wrong thread while closing render session",
-        "resize": "wrong thread while resizing render session",
-        "render_update": "wrong thread while rendering update",
-        "detach": "wrong thread while detaching render session",
-        "reduce_memory_use": "wrong thread while reducing memory use",
-        "clear_data": "wrong thread while clearing data",
-        "dump_debug_logs": "wrong thread while dumping debug logs",
-        "texture_image_info": "wrong thread while reading texture info",
-        "read_premultiplied_rgba8_into": "wrong thread while reading into buffer",
-        "acquire_metal_owned_texture_frame": "wrong thread while acquiring Metal frame",
-        "acquire_vulkan_owned_texture_frame": (
-            "wrong thread while acquiring Vulkan frame"
-        ),
-        "acquire_opengl_owned_texture_frame": (
-            "wrong thread while acquiring OpenGL frame"
-        ),
-        "query_rendered_features": "wrong thread while querying rendered features",
-        "query_source_features": "wrong thread while querying source features",
-        "query_feature_extensions": "wrong thread while querying feature extensions",
-        "set_feature_state": "wrong thread while setting feature state",
-        "get_feature_state": "wrong thread while getting feature state",
-        "remove_feature_state": "wrong thread while removing feature state",
-    }
-
-    class FakeNativeRenderSession:
-        closed = False
-        detached = False
-
-        def _wrong_thread(self, method: str) -> None:
-            raise mln.WrongThreadError(
-                mln.MaplibreStatus.WRONG_THREAD.native_code,
-                diagnostics[method],
-            )
-
-        def close(self) -> None:
-            self._wrong_thread("close")
-
-        def resize(self, width: int, height: int, scale_factor: float) -> None:
-            self._wrong_thread("resize")
-
-        def render_update(self) -> None:
-            self._wrong_thread("render_update")
-
-        def detach(self) -> None:
-            self._wrong_thread("detach")
-
-        def reduce_memory_use(self) -> None:
-            self._wrong_thread("reduce_memory_use")
-
-        def clear_data(self) -> None:
-            self._wrong_thread("clear_data")
-
-        def dump_debug_logs(self) -> None:
-            self._wrong_thread("dump_debug_logs")
-
-        def texture_image_info(self) -> None:
-            self._wrong_thread("texture_image_info")
-
-        def read_premultiplied_rgba8_into(self, buffer: object) -> None:
-            self._wrong_thread("read_premultiplied_rgba8_into")
-
-        def acquire_metal_owned_texture_frame(self) -> None:
-            self._wrong_thread("acquire_metal_owned_texture_frame")
-
-        def acquire_vulkan_owned_texture_frame(self) -> None:
-            self._wrong_thread("acquire_vulkan_owned_texture_frame")
-
-        def acquire_opengl_owned_texture_frame(self) -> None:
-            self._wrong_thread("acquire_opengl_owned_texture_frame")
-
-        def query_rendered_features(
-            self,
-            geometry: object,
-            layer_ids: tuple[str, ...] | None,
-            filter_: object,
-        ) -> None:
-            self._wrong_thread("query_rendered_features")
-
-        def query_source_features(
-            self,
-            source_id: str,
-            source_layer_ids: tuple[str, ...] | None,
-            filter_: object,
-        ) -> None:
-            self._wrong_thread("query_source_features")
-
-        def query_feature_extensions(
-            self,
-            source_id: str,
-            feature: object,
-            extension: str,
-            extension_field: str,
-            arguments: object,
-        ) -> None:
-            self._wrong_thread("query_feature_extensions")
-
-        def set_feature_state(
-            self,
-            source_id: str,
-            source_layer_id: str | None,
-            feature_id: str | None,
-            state_key: str | None,
-            state: object,
-        ) -> None:
-            self._wrong_thread("set_feature_state")
-
-        def get_feature_state(
-            self,
-            source_id: str,
-            source_layer_id: str | None,
-            feature_id: str | None,
-            state_key: str | None,
-        ) -> None:
-            self._wrong_thread("get_feature_state")
-
-        def remove_feature_state(
-            self,
-            source_id: str,
-            source_layer_id: str | None,
-            feature_id: str | None,
-            state_key: str | None,
-        ) -> None:
-            self._wrong_thread("remove_feature_state")
-
-    session = render.RenderSessionHandle._from_native(
-        FakeNativeRenderSession(), object()
-    )
-    point_query = query.RenderedQueryGeometry.point_geometry(
-        camera.ScreenPoint(1.0, 2.0)
-    )
-    feature = _json_object(
-        {
-            "type": "Feature",
-            "geometry": {"type": "Point", "coordinates": [2.0, 1.0]},
-            "properties": {},
-        }
-    )
-    selector = query.FeatureStateSelector(source_id="points", feature_id="feature-1")
-    calls = {
-        "close": session.close,
-        "resize": lambda: session.resize(128, 64, 1.0),
-        "render_update": session.render_update,
-        "detach": session.detach,
-        "reduce_memory_use": session.reduce_memory_use,
-        "clear_data": session.clear_data,
-        "dump_debug_logs": session.dump_debug_logs,
-        "texture_image_info": session.texture_image_info,
-        "read_premultiplied_rgba8_into": (
-            lambda: session.read_premultiplied_rgba8_into(bytearray(4))
-        ),
-        "acquire_metal_owned_texture_frame": session.acquire_metal_owned_texture_frame,
-        "acquire_vulkan_owned_texture_frame": (
-            session.acquire_vulkan_owned_texture_frame
-        ),
-        "acquire_opengl_owned_texture_frame": (
-            session.acquire_opengl_owned_texture_frame
-        ),
-        "query_rendered_features": lambda: session.query_rendered_features(point_query),
-        "query_source_features": lambda: session.query_source_features("points"),
-        "query_feature_extensions": (
-            lambda: session.query_feature_extensions(
-                "points",
-                feature,
-                "supercluster",
-                "leaves",
-                _json_object({"limit": 10}),
-            )
-        ),
-        "set_feature_state": (
-            lambda: session.set_feature_state(
-                selector,
-                _json_object({"hover": True}),
-            )
-        ),
-        "get_feature_state": lambda: session.get_feature_state(selector),
-        "remove_feature_state": lambda: session.remove_feature_state(selector),
-    }
-    raised_errors: dict[str, BaseException] = {}
-
-    def call_render_session_methods() -> None:
-        for name, call in calls.items():
-            try:
-                call()
-            except mln.WrongThreadError as error:
-                raised_errors[name] = error
-
-    thread = threading.Thread(target=call_render_session_methods)
-    thread.start()
-    thread.join()
-
-    assert set(raised_errors) == set(calls)
-    for name, error in raised_errors.items():
-        assert_wrong_thread_error(error, diagnostics[name])
-
-
-def test_render_session_detach_releases_python_map_reference() -> None:
-    class FakeDetachedSession:
-        closed = False
-
-        def close(self) -> None:
-            self.closed = True
-
-    class FakeNativeRenderSession:
-        closed = False
-        detached = False
-
-        def detach(self) -> FakeDetachedSession:
-            self.detached = True
-            return FakeDetachedSession()
-
-    session = render.RenderSessionHandle._from_native(
-        FakeNativeRenderSession(), object()
-    )
-
-    detached = session.detach()
-
-    assert session.detached
-    assert session._map is None
-    detached.close()
+def test_phase_three_render_values_preserve_unknown_dispositions() -> None:
+    assert render.RenderDriver.CORE_WORKER.native_code == 1
+    assert render.RenderDriver.CALLER_GRAPHICS_THREAD.native_code == 2
+    assert render.RenderResult.DEADLINE_MISSED.native_code == 5
+    assert render.RenderResult(777).native_code == 777
 
 
 def test_map_handle_context_manager_closes_once() -> None:
@@ -2166,6 +1911,19 @@ def test_render_descriptors_are_public_python_values() -> None:
         texture=5,
         target=0x0DE1,
     )
+    webgpu = render.WebGPUBorrowedTextureDescriptor(
+        extent=extent,
+        physical_width=641,
+        physical_height=481,
+        context=render.WebGPUContextDescriptor(
+            instance=pointer,
+            device=render.NativePointer(0x2345),
+            queue=render.NativePointer(0x3456),
+        ),
+        texture=render.NativePointer(0x4567),
+        texture_view=render.NativePointer(0x5678),
+        format=44,
+    )
 
     # Odd sizes no logical extent maps onto, so these must survive as stated.
     assert (vulkan.physical_width, vulkan.physical_height) == (641, 481)
@@ -2180,257 +1938,10 @@ def test_render_descriptors_are_public_python_values() -> None:
     assert opengl_wgl.context.device_context.address == 0x1234
     assert opengl_wgl.texture == 5
     assert opengl_wgl.target == 0x0DE1
-
-
-def test_render_session_query_public_api_uses_json_buffers() -> None:
-    class FakeNativeRenderSession:
-        closed = False
-        detached = False
-
-        def __init__(self) -> None:
-            self.rendered_call = None
-            self.source_call = None
-            self.extension_call = None
-
-        def query_rendered_features(
-            self,
-            geometry: object,
-            layer_ids: tuple[str, ...] | None,
-            filter_: object,
-        ) -> bytes:
-            self.rendered_call = (geometry, layer_ids, filter_)
-            return queried_features
-
-        def query_source_features(
-            self,
-            source_id: str,
-            source_layer_ids: tuple[str, ...] | None,
-            filter_: object,
-        ) -> bytes:
-            self.source_call = (source_id, source_layer_ids, filter_)
-            return queried_features
-
-        def query_feature_extensions(
-            self,
-            source_id: str,
-            feature: object,
-            extension: str,
-            extension_field: str,
-            arguments: object,
-        ) -> bytes:
-            self.extension_call = (
-                source_id,
-                feature,
-                extension,
-                extension_field,
-                arguments,
-            )
-            return _json_value(7)
-
-    feature = _json_object(
-        {
-            "type": "Feature",
-            "geometry": {"type": "Point", "coordinates": [2.0, 1.0]},
-            "properties": {"name": "one"},
-            "id": "feature-1",
-        }
-    )
-    queried_features = _json_object(
-        [
-            {
-                "feature": json.loads(feature),
-                "source": "points",
-                "sourceLayer": None,
-                "state": {"hover": True},
-            }
-        ]
-    )
-
-    fake_native = FakeNativeRenderSession()
-    with pytest.raises(TypeError, match="created by MapHandle"):
-        render.RenderSessionHandle(fake_native, object())
-
-    session = render.RenderSessionHandle._from_native(fake_native, object())
-    geometry = query.RenderedQueryGeometry.point_geometry(camera.ScreenPoint(1.0, 2.0))
-    rendered_options = query.RenderedFeatureQueryOptions(
-        layer_ids=("circle",),
-        filter=_json_value(["==", ["get", "kind"], "park"]),
-    )
-    source_options = query.SourceFeatureQueryOptions(
-        source_layer_ids=("landuse",),
-        filter=_json_value(["==", ["get", "kind"], "park"]),
-    )
-    rendered = session.query_rendered_features(geometry, rendered_options)
-    source = session.query_source_features("points", source_options)
-    leaves_arguments = _json_object({"limit": 10})
-    extension = session.query_feature_extensions(
-        "points",
-        feature,
-        "supercluster",
-        "leaves",
-        leaves_arguments,
-    )
-
-    assert fake_native.rendered_call == (
-        {"type": "point", "point": (1.0, 2.0)},
-        ("circle",),
-        _json_value(["==", ["get", "kind"], "park"]),
-    )
-    assert fake_native.source_call[0] == "points"
-    assert fake_native.source_call[1] == ("landuse",)
-    assert rendered == queried_features
-    assert source == queried_features
-    assert fake_native.extension_call == (
-        "points",
-        feature,
-        "supercluster",
-        "leaves",
-        leaves_arguments,
-    )
-    assert extension == _json_value(7)
-
-
-def test_opengl_owned_texture_frame_public_api_uses_native_values() -> None:
-    class FakeNativeFrame:
-        closed = False
-
-        def frame(self) -> dict[str, object]:
-            return {
-                "generation": 1,
-                "width": 64,
-                "height": 32,
-                "scale_factor": 2.0,
-                "frame_id": 3,
-                "target": 0x0DE1,
-                "internal_format": 0x8058,
-                "format": 0x1908,
-                "type": 0x1401,
-            }
-
-        def texture(self) -> int:
-            return 5
-
-        def close(self) -> None:
-            self.closed = True
-
-    frame = render.OpenGLOwnedTextureFrameHandle._from_native(FakeNativeFrame())
-
-    assert frame.frame == render.OpenGLOwnedTextureFrame(
-        generation=1,
-        width=64,
-        height=32,
-        scale_factor=2.0,
-        frame_id=3,
-        target=0x0DE1,
-        internal_format=0x8058,
-        format=0x1908,
-        type=0x1401,
-    )
-    assert frame.texture == 5
-    frame.close()
-    assert frame.closed
-
-
-def test_render_session_feature_state_public_api_uses_json_buffers() -> None:
-    class FakeNativeRenderSession:
-        closed = False
-        detached = False
-
-        def __init__(self) -> None:
-            self.set_call = None
-            self.remove_call = None
-
-        def set_feature_state(
-            self,
-            source_id: str,
-            source_layer_id: str | None,
-            feature_id: str | None,
-            state_key: str | None,
-            state: object,
-        ) -> None:
-            self.set_call = (
-                source_id,
-                source_layer_id,
-                feature_id,
-                state_key,
-                state,
-            )
-
-        def get_feature_state(
-            self,
-            source_id: str,
-            source_layer_id: str | None,
-            feature_id: str | None,
-            state_key: str | None,
-        ) -> bytes:
-            assert (source_id, source_layer_id, feature_id, state_key) == (
-                "points",
-                "symbols",
-                "feature-1",
-                "hover",
-            )
-            return _json_object({"hover": True})
-
-        def remove_feature_state(
-            self,
-            source_id: str,
-            source_layer_id: str | None,
-            feature_id: str | None,
-            state_key: str | None,
-        ) -> None:
-            self.remove_call = (source_id, source_layer_id, feature_id, state_key)
-
-    fake_native = FakeNativeRenderSession()
-    session = render.RenderSessionHandle._from_native(fake_native, object())
-    selector = query.FeatureStateSelector(
-        source_id="points",
-        source_layer_id="symbols",
-        feature_id="feature-1",
-        state_key="hover",
-    )
-    state = _json_object({"hover": True})
-
-    session.set_feature_state(selector, state)
-    returned = session.get_feature_state(selector)
-    session.remove_feature_state(selector)
-
-    assert fake_native.set_call == (
-        "points",
-        "symbols",
-        "feature-1",
-        "hover",
-        state,
-    )
-    assert json.loads(returned) == {"hover": True}
-    assert fake_native.remove_call == ("points", "symbols", "feature-1", "hover")
-
-
-def test_render_session_feature_state_empty_result_is_empty_object() -> None:
-    class FakeNativeRenderSession:
-        closed = False
-        detached = False
-
-        def get_feature_state(
-            self,
-            source_id: str,
-            source_layer_id: str | None,
-            feature_id: str | None,
-            state_key: str | None,
-        ) -> bytes:
-            assert (source_id, source_layer_id, feature_id, state_key) == (
-                "points",
-                None,
-                "feature-1",
-                None,
-            )
-            return b"{}"
-
-    session = render.RenderSessionHandle._from_native(
-        FakeNativeRenderSession(), object()
-    )
-    selector = query.FeatureStateSelector(source_id="points", feature_id="feature-1")
-
-    assert json.loads(session.get_feature_state(selector)) == {}
+    assert (webgpu.physical_width, webgpu.physical_height) == (641, 481)
+    assert webgpu.context.device.address == 0x2345
+    assert webgpu.texture_view.address == 0x5678
+    assert webgpu.format == 44
 
 
 def test_invalid_render_target_attach_reports_native_status() -> None:
@@ -2453,6 +1964,21 @@ def test_invalid_opengl_render_target_attach_reports_native_status() -> None:
         ) as raised:
             map_handle.attach_opengl_owned_texture(
                 render.OpenGLOwnedTextureDescriptor()
+            )
+
+        assert raised.value.status in {
+            mln.MaplibreStatus.INVALID_ARGUMENT,
+            mln.MaplibreStatus.UNSUPPORTED,
+        }
+
+
+def test_invalid_webgpu_render_target_attach_reports_native_status() -> None:
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        with pytest.raises(
+            (mln.InvalidArgumentError, mln.UnsupportedFeatureError)
+        ) as raised:
+            map_handle.attach_webgpu_owned_texture(
+                render.WebGPUOwnedTextureDescriptor()
             )
 
         assert raised.value.status in {

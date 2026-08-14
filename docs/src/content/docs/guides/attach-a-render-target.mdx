@@ -1,6 +1,6 @@
 ---
 title: Attach a render target
-description: Choose a render target, attach it on its owner thread, and replace it when the host allocation changes.
+description: Choose a render target and execution placement, then replace or release it safely.
 sidebar:
   order: 3
 ---
@@ -11,82 +11,80 @@ import { region } from "../../../snippets";
 import renderTarget from "../../../../snippets/c/render-target.c?raw";
 
 A render session draws one map into one render target. A map has at most one
-live render session. Its style, sources, layers, and camera exist independently
-of that session and remain after the session is released.
+live render session. Its style, sources, layers, and camera remain after the
+session detaches.
 
-The thread that attaches a session becomes its owner thread for the session's
-lifetime. Attach on the thread that will draw frames. Runtime and map work
-continues independently on the native scheduler thread.
+## Choose a target and driver
 
-## Choose the kind of target
+A native surface draws and presents each frame to a window or view. A
+session-owned texture draws into a ring that the session allocates. A borrowed
+texture draws into a host allocation. [Render a static
+image](/maplibre-native-ffi/guides/render-a-static-image/) covers texture
+readback.
 
-A native surface draws and presents each frame to a window or view. The host
-creates the window, graphics context, and surface. Use this target for an
-on-screen map.
+Execution placement is a separate choice. A core-worker driver owns a native
+serial graphics worker and requires transferable graphics state. A
+caller-graphics-thread driver stores work until the host services it where the
+graphics context is usable. WGL, EGL, existing WebGL contexts, and browser
+WebGPU require the caller driver. Transferable Metal, Vulkan, and
+`OffscreenCanvas` WebGL targets can use a core worker.
 
-A session-owned texture draws offscreen into a texture that the session
-allocates. Use it for image generation or when compositing into a scene without
-a host-owned destination texture. The host can acquire the last frame for GPU
-sampling or copy it into host memory. [Render a static
-image](/maplibre-native-ffi/guides/render-a-static-image/) covers readback and
-static map mode.
+The common attach options select the driver and request an owned-texture ring
+depth from one to three. They also name notification sources for operation
+completion, frame-result readiness, and caller-driver work. A null operation
+source inherits the map runtime's source. Null frame and driver-work sources
+inherit the operation source.
 
-A borrowed texture draws offscreen into a host-owned texture, such as a material
-in a 3D scene, a compositor frame, or an XR swapchain image. The host controls
-the format and lifetime. Use this target when the destination already exists.
+Each backend attach function copies its descriptor and options, returns a render
+session in the attaching state, and starts an operation. A caller driver must
+service ready driver work before that operation can complete. Await the operation
+before using the attached session for ordinary work.
 
-## Attach to a window
+## Attach to a target
 
-Each render backend has its own descriptor type and attach function. This
-snippet uses OpenGL through EGL. The descriptor contains the logical extent,
-scale factor, graphics context, and presentation surface.
+This snippet uses OpenGL through EGL and therefore selects the caller driver.
+The descriptor contains the logical extent, graphics context, and presentation
+surface.
 
 <Code code={region(renderTarget, "surface")} lang="c" title="render-target.c" />
 
-An OpenGL surface target also chooses context ownership. The default shares the
-thread with the host's own context. A dedicated session instead creates its own
-context and keeps it current, for a thread that draws one map and nothing else.
-[Concepts](/maplibre-native-ffi/concepts/) explains both modes.
-
-## Attach to a texture
-
-A session-owned target takes an extent and a context. The session allocates the
-texture in the context's share group. The host can then sample it.
+A session-owned texture descriptor contains an extent and context. Capability
+negotiation reports the granted ring depth and whether acquisition, readback,
+consumer synchronization, and presentation are available.
 
 <Code code={region(renderTarget, "owned")} lang="c" title="render-target.c" />
 
-A borrowed target also contains the texture and its physical size in device
-pixels. The physical size is separate from the logical extent. OpenGL ES cannot
-verify the texture dimensions. The descriptor values must match the actual
-texture to prevent clipped or corrupt output.
+A borrowed texture descriptor also states its physical device-pixel size. The
+values must match the host allocation, including on graphics APIs that cannot
+query them.
 
 <Code code={region(renderTarget, "borrowed")} lang="c" title="render-target.c" />
 
-## Resize, replace, and release
+## Replace, detach, or abandon
 
-Resize surface and session-owned texture targets in place on the session's owner
-thread. Submit the same logical extent through the map resize command. This
-preserves the target and session while making map resize the sole authority for
-logical width, height, and scale factor.
+Resize and target replacement are ordered operations. They may start from any
+thread. A caller driver applies them when the host next services ready work on
+the graphics thread. Resize assigns a new extent generation; later frame demands
+capture that generation.
 
 <Code code={region(renderTarget, "resize")} lang="c" title="render-target.c" />
 
-A borrowed texture gets its size from the host allocation. Resizing reports an
-unsupported status. Allocate a texture at the new size and replace the target.
-
-A host can recreate a surface while the map remains live. Android rotation,
-Flutter surface lifecycle changes, and reallocating resizes use this path.
-Replacing the target in place preserves the session's rendering resources,
-including loaded tiles and feature state. Use the same operation after
-allocating a replacement borrowed texture.
+A borrowed texture gets its allocation from the host, so replacement supplies a
+new descriptor. A host can replace a native surface after recreating a window or
+view allocation. Both paths preserve the session's rendering resources.
 
 <Code code={region(renderTarget, "set-target")} lang="c" title="render-target.c" />
 
-Changing the scale factor recreates the session's rendering resources because
-its shaders use a fixed pixel ratio. Feature state then starts empty.
+Normal detach is an operation. The selected driver destroys graphics resources
+on its owner and detaches the map. Continue servicing a caller driver until the
+operation completes, then destroy the detached session handle from any thread.
 
-Close the session before the map. A map close preflight reports invalid state
-and leaves the map open while a session is attached. Close the session on its
-owner thread, then start and await map close.
+Abandon is the failure path for an owner that can no longer service graphics
+work. It closes control and mailboxes, invalidates graphics accessors, detaches
+the map in CPU state, and performs no graphics calls. It returns busy while a
+driver call is in flight. Resources that require graphics access enter a
+process-lifetime quarantine and the result reports their count. Releasing an
+acquired frame after abandon remains CPU-only, consumes the frame handle, and
+completes with target lost. Destroy the abandoned session afterward.
 
 <Code code={region(renderTarget, "teardown")} lang="c" title="render-target.c" />

@@ -346,11 +346,14 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
 };
 
 VulkanTextureBackend::VulkanTextureBackend(
-  const mln_vulkan_owned_texture_descriptor& descriptor, mbgl::Size size
+  const mln_vulkan_owned_texture_descriptor& descriptor, mbgl::Size size,
+  std::size_t ring_depth
 )
     : mbgl::vulkan::RendererBackend(mbgl::gfx::ContextMode::Unique),
       mbgl::gfx::HeadlessBackend(size),
-      descriptor_(descriptor) {
+      descriptor_(descriptor),
+      slot_resources_(ring_depth),
+      slot_sizes_(ring_depth) {
   initSharedDevice();
 }
 
@@ -361,13 +364,16 @@ VulkanTextureBackend::VulkanTextureBackend(
       mbgl::gfx::HeadlessBackend(size),
       descriptor_(owned_descriptor_from_borrowed(descriptor)),
       borrowed_descriptor_(descriptor),
-      uses_borrowed_texture_(true) {
+      uses_borrowed_texture_(true),
+      slot_resources_(1),
+      slot_sizes_(1) {
   initSharedDevice();
 }
 
 VulkanTextureBackend::~VulkanTextureBackend() {
   auto guard = mbgl::gfx::BackendScope{*this};
   resource.reset();
+  slot_resources_.clear();
   getThreadPool().runRenderJobs(true);
 }
 
@@ -387,6 +393,7 @@ void VulkanTextureBackend::initSharedDevice() {
 auto VulkanTextureBackend::getDefaultRenderable() -> mbgl::gfx::Renderable& {
   if (!resource) {
     resource = std::make_unique<VulkanTextureRenderableResource>(*this);
+    slot_sizes_[selected_slot_] = size;
   }
   return *this;
 }
@@ -408,15 +415,11 @@ void VulkanTextureBackend::set_borrowed_target(
 ) {
   const auto new_size =
     mbgl::Size{descriptor.physical_width, descriptor.physical_height};
-  // Nothing is built yet, so the lazy path already takes the new image.
   if (!resource) {
     borrowed_descriptor_ = descriptor;
     setSize(new_size);
     return;
   }
-  // The resource first, then this backend's own view of the target, so a
-  // framebuffer that fails to build cannot leave the backend naming an image it
-  // does not render into.
   getResource<VulkanTextureRenderableResource>().set_borrowed(
     descriptor, new_size.width, new_size.height
   );
@@ -425,17 +428,9 @@ void VulkanTextureBackend::set_borrowed_target(
 }
 
 void VulkanTextureBackend::resize(mbgl::Size new_size) {
-  // Nothing is built yet, so the lazy path already produces the new size. A
-  // borrowed texture is sized by its owner and never reaches here; the session
-  // rejects resizing one.
-  if (!resource || uses_borrowed_texture_) {
-    setSize(new_size);
-    return;
-  }
+  // Slots keep their old resources until the common ring selects a released
+  // slot for rendering at the new extent.
   size = new_size;
-  getResource<VulkanTextureRenderableResource>().resize_sampled(
-    vk::Extent2D{new_size.width, new_size.height}
-  );
 }
 
 auto VulkanTextureBackend::readStillImage() -> mbgl::PremultipliedImage {
@@ -556,14 +551,45 @@ void VulkanTextureBackend::prepareRenderResources() {
   }
 }
 
-auto VulkanTextureBackend::frame_resources() -> VulkanTextureFrameResources {
-  auto& rendered = getResource<VulkanTextureRenderableResource>();
+auto VulkanTextureBackend::frame_resources(std::size_t slot)
+  -> VulkanTextureFrameResources {
+  if (slot >= slot_resources_.size()) {
+    return {};
+  }
+  if (slot == selected_slot_) {
+    prepareRenderResources();
+  } else if (slot_resources_[slot] == nullptr) {
+    const auto previous = selected_slot_;
+    if (!select_slot(slot)) return {};
+    prepareRenderResources();
+    static_cast<void>(select_slot(previous));
+  }
+  auto* rendered = slot == selected_slot_
+                     ? &getResource<VulkanTextureRenderableResource>()
+                     : static_cast<VulkanTextureRenderableResource*>(
+                         slot_resources_[slot].get()
+                       );
   return VulkanTextureFrameResources{
-    .image = rendered.image(),
-    .image_view = rendered.image_view(),
+    .image = rendered->image(),
+    .image_view = rendered->image_view(),
     .device = device.get(),
-    .format = rendered.format(),
+    .format = rendered->format(),
   };
+}
+
+auto VulkanTextureBackend::select_slot(std::size_t slot) -> bool {
+  if (slot >= slot_resources_.size()) return false;
+  if (slot == selected_slot_) {
+    if (resource != nullptr && slot_sizes_[slot] != size) resource.reset();
+    return true;
+  }
+  slot_resources_[selected_slot_] = std::move(resource);
+  if (slot_resources_[slot] != nullptr && slot_sizes_[slot] != size) {
+    slot_resources_[slot].reset();
+  }
+  resource = std::move(slot_resources_[slot]);
+  selected_slot_ = slot;
+  return true;
 }
 
 void VulkanTextureBackend::initInstance() {

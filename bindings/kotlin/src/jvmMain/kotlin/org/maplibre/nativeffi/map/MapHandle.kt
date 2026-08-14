@@ -16,6 +16,8 @@ import org.maplibre.nativeffi.render.OpenGLBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.OpenGLOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.OpenGLSurfaceDescriptor
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
+import org.maplibre.nativeffi.render.RenderSessionAttachOptions
+import org.maplibre.nativeffi.render.RenderSessionAttachment
 import org.maplibre.nativeffi.render.RenderSessionHandle
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
@@ -594,88 +596,55 @@ private constructor(
   }
 
   public actual fun attachMetalOwnedTexture(
-    descriptor: MetalOwnedTextureDescriptor
-  ): RenderSessionHandle {
-    NativeAccess.ensureLoaded()
-    return RenderSessionHandle(
-      this,
-      NativeAccess.attachMetalOwnedTexture(requireLiveHandle(), descriptor),
-    )
-  }
+    descriptor: MetalOwnedTextureDescriptor,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionAttachment =
+    RenderSessionHandle.attachMetalOwnedTexture(this, descriptor, options)
 
   public actual fun attachMetalBorrowedTexture(
-    descriptor: MetalBorrowedTextureDescriptor
-  ): RenderSessionHandle {
-    NativeAccess.ensureLoaded()
-    return RenderSessionHandle(
-      this,
-      NativeAccess.attachMetalBorrowedTexture(requireLiveHandle(), descriptor),
-    )
-  }
+    descriptor: MetalBorrowedTextureDescriptor,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionAttachment =
+    RenderSessionHandle.attachMetalBorrowedTexture(this, descriptor, options)
 
   public actual fun attachVulkanOwnedTexture(
-    descriptor: VulkanOwnedTextureDescriptor
-  ): RenderSessionHandle {
-    NativeAccess.ensureLoaded()
-    return RenderSessionHandle(
-      this,
-      NativeAccess.attachVulkanOwnedTexture(requireLiveHandle(), descriptor),
-    )
-  }
+    descriptor: VulkanOwnedTextureDescriptor,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionAttachment =
+    RenderSessionHandle.attachVulkanOwnedTexture(this, descriptor, options)
 
   public actual fun attachVulkanBorrowedTexture(
-    descriptor: VulkanBorrowedTextureDescriptor
-  ): RenderSessionHandle {
-    NativeAccess.ensureLoaded()
-    return RenderSessionHandle(
-      this,
-      NativeAccess.attachVulkanBorrowedTexture(requireLiveHandle(), descriptor),
-    )
-  }
+    descriptor: VulkanBorrowedTextureDescriptor,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionAttachment =
+    RenderSessionHandle.attachVulkanBorrowedTexture(this, descriptor, options)
 
   public actual fun attachOpenGLOwnedTexture(
-    descriptor: OpenGLOwnedTextureDescriptor
-  ): RenderSessionHandle {
-    NativeAccess.ensureLoaded()
-    return RenderSessionHandle(
-      this,
-      NativeAccess.attachOpenGLOwnedTexture(requireLiveHandle(), descriptor),
-    )
-  }
+    descriptor: OpenGLOwnedTextureDescriptor,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionAttachment =
+    RenderSessionHandle.attachOpenGLOwnedTexture(this, descriptor, options)
 
   public actual fun attachOpenGLBorrowedTexture(
-    descriptor: OpenGLBorrowedTextureDescriptor
-  ): RenderSessionHandle {
-    NativeAccess.ensureLoaded()
-    return RenderSessionHandle(
-      this,
-      NativeAccess.attachOpenGLBorrowedTexture(requireLiveHandle(), descriptor),
-    )
-  }
+    descriptor: OpenGLBorrowedTextureDescriptor,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionAttachment =
+    RenderSessionHandle.attachOpenGLBorrowedTexture(this, descriptor, options)
 
-  public actual fun attachMetalSurface(descriptor: MetalSurfaceDescriptor): RenderSessionHandle {
-    NativeAccess.ensureLoaded()
-    return RenderSessionHandle(
-      this,
-      NativeAccess.attachMetalSurface(requireLiveHandle(), descriptor),
-    )
-  }
+  public actual fun attachMetalSurface(
+    descriptor: MetalSurfaceDescriptor,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionAttachment = RenderSessionHandle.attachMetalSurface(this, descriptor, options)
 
-  public actual fun attachVulkanSurface(descriptor: VulkanSurfaceDescriptor): RenderSessionHandle {
-    NativeAccess.ensureLoaded()
-    return RenderSessionHandle(
-      this,
-      NativeAccess.attachVulkanSurface(requireLiveHandle(), descriptor),
-    )
-  }
+  public actual fun attachVulkanSurface(
+    descriptor: VulkanSurfaceDescriptor,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionAttachment = RenderSessionHandle.attachVulkanSurface(this, descriptor, options)
 
-  public actual fun attachOpenGLSurface(descriptor: OpenGLSurfaceDescriptor): RenderSessionHandle {
-    NativeAccess.ensureLoaded()
-    return RenderSessionHandle(
-      this,
-      NativeAccess.attachOpenGLSurface(requireLiveHandle(), descriptor),
-    )
-  }
+  public actual fun attachOpenGLSurface(
+    descriptor: OpenGLSurfaceDescriptor,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionAttachment = RenderSessionHandle.attachOpenGLSurface(this, descriptor, options)
 
   public actual suspend fun createProjection(): MapProjectionHandle {
     NativeAccess.ensureLoaded()
@@ -727,6 +696,8 @@ private constructor(
   }
 
   internal fun nativeHandleId(): Long = handle.raw
+
+  internal fun nativeHandle(): NativeMap = requireLiveHandle()
 
   internal fun retainChild(childTypeName: String): HandleStateCore.ChildRetention =
     core.retainChild(childTypeName)

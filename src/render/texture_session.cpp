@@ -1,14 +1,19 @@
+#include <any>
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <string>
+#include <utility>
 
 #include <mbgl/gfx/backend_scope.hpp>
 #include <mbgl/util/image.hpp>
 
 #include "render/texture_session.hpp"
 
+#include "bytes/buffer.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "maplibre_native_c.h"
+#include "operation/operation.hpp"
 #include "render/render_session_common.hpp"
 
 namespace mln::core {
@@ -439,10 +444,6 @@ auto texture_read_premultiplied_rgba8(
     set_thread_error("out_info must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (live->texture.acquired) {
-    set_thread_error("cannot read while a texture frame is acquired");
-    return MLN_STATUS_INVALID_STATE;
-  }
   if (live->texture.mode != TextureSessionMode::Owned) {
     set_thread_error("texture session does not support CPU readback");
     return MLN_STATUS_UNSUPPORTED;
@@ -451,7 +452,7 @@ auto texture_read_premultiplied_rgba8(
     set_thread_error("render backend does not support CPU readback");
     return MLN_STATUS_UNSUPPORTED;
   }
-  if (live->rendered_generation != live->generation) {
+  if (live->rendered_target_generation != live->generation) {
     set_thread_error("no rendered frame is available for this generation");
     return MLN_STATUS_INVALID_STATE;
   }
@@ -511,6 +512,111 @@ auto texture_read_premultiplied_rgba8(
 
   std::memcpy(out_data, image.data.get(), image.bytes());
   return MLN_STATUS_OK;
+}
+
+struct TextureReadbackResult {
+  std::string bytes;
+  mln_texture_image_info info{};
+};
+
+auto texture_read_premultiplied_rgba8_start(
+  mln_render_session texture, mln_operation* out_operation
+) -> mln_status {
+  return enqueue_driver_result_operation(
+    texture, RENDER_OPERATION_READBACK,
+    [](mln_render_session_object& target, std::any& result) {
+      auto readback = TextureReadbackResult{
+        .bytes = {},
+        .info = texture_image_info_default(),
+      };
+      auto status = texture_read_premultiplied_rgba8(
+        target.self, nullptr, 0, &readback.info
+      );
+      if (status != MLN_STATUS_OK) return status;
+      readback.bytes.resize(readback.info.byte_length);
+      status = texture_read_premultiplied_rgba8(
+        target.self, reinterpret_cast<uint8_t*>(readback.bytes.data()),
+        readback.bytes.size(), &readback.info
+      );
+      if (status == MLN_STATUS_OK) result = std::move(readback);
+      return status;
+    },
+    out_operation
+  );
+}
+
+auto texture_read_premultiplied_rgba8_take_result(
+  mln_operation operation, mln_buffer* out_data,
+  mln_texture_image_info* out_info
+) -> mln_status {
+  if (
+    out_data == nullptr || *out_data != MLN_HANDLE_NULL ||
+    out_info == nullptr || out_info->size < sizeof(*out_info)
+  ) {
+    set_thread_error("readback outputs must be valid and initially null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return take_operation_result<TextureReadbackResult>(
+    operation, RENDER_OPERATION_READBACK,
+    [out_data, out_info](TextureReadbackResult& result) {
+      const auto status = create_buffer(std::move(result.bytes), out_data);
+      if (status == MLN_STATUS_OK) *out_info = result.info;
+      return status;
+    }
+  );
+}
+
+template <typename Frame>
+auto acquired_frame_get_backend(mln_acquired_frame handle, Frame* out_frame)
+  -> mln_status {
+  if (out_frame == nullptr || out_frame->size < sizeof(Frame)) {
+    set_thread_error("out_frame must not be null and must have a valid size");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto frame = handle_table<mln_acquired_frame_object>().lease(handle);
+  if (frame == nullptr || !frame->valid.load()) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  {
+    const auto lock = std::scoped_lock{frame->session->control_mutex};
+    if (
+      frame->session->state == MLN_RENDER_SESSION_STATE_ABANDONED ||
+      frame->session->state == MLN_RENDER_SESSION_STATE_TARGET_LOST
+    ) {
+      return MLN_STATUS_TARGET_LOST;
+    }
+  }
+  const auto* metadata = std::any_cast<Frame>(&frame->backend_metadata);
+  if (metadata == nullptr) {
+    set_thread_error("acquired frame belongs to a different render backend");
+    return MLN_STATUS_UNSUPPORTED;
+  }
+  *out_frame = *metadata;
+  return MLN_STATUS_OK;
+}
+
+auto acquired_frame_get_metal_texture(
+  mln_acquired_frame frame, mln_metal_owned_texture_frame* out_frame
+) -> mln_status {
+  return acquired_frame_get_backend(frame, out_frame);
+}
+
+auto acquired_frame_get_vulkan_texture(
+  mln_acquired_frame frame, mln_vulkan_owned_texture_frame* out_frame
+) -> mln_status {
+  return acquired_frame_get_backend(frame, out_frame);
+}
+
+auto acquired_frame_get_opengl_texture(
+  mln_acquired_frame frame, mln_opengl_owned_texture_frame* out_frame
+) -> mln_status {
+  return acquired_frame_get_backend(frame, out_frame);
+}
+
+auto acquired_frame_get_webgpu_texture(
+  mln_acquired_frame frame, mln_webgpu_owned_texture_frame* out_frame
+) -> mln_status {
+  return acquired_frame_get_backend(frame, out_frame);
 }
 
 }  // namespace mln::core

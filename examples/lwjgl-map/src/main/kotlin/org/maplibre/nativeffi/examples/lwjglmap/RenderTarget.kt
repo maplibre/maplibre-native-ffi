@@ -1,14 +1,19 @@
 package org.maplibre.nativeffi.examples.lwjglmap
 
+import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.map.MapHandle
+import org.maplibre.nativeffi.render.FrameDemand
+import org.maplibre.nativeffi.render.RenderDriver
+import org.maplibre.nativeffi.render.RenderFrameResult
+import org.maplibre.nativeffi.render.RenderSessionAttachOptions
+import org.maplibre.nativeffi.render.RenderSessionAttachment
 import org.maplibre.nativeffi.render.RenderSessionHandle
 import org.maplibre.nativeffi.render.RenderTargetExtent
+import org.maplibre.nativeffi.runtime.OperationHandle
 
 /**
- * The render session and its mode-specific resources.
- *
- * Attaching records the calling thread as the session's owner, so every render target is created,
- * driven, and closed on the render loop thread, where the host graphics context lives.
+ * The render loop explicitly services caller-driver work on its graphics thread. Native code owns
+ * the typed work mailbox and completion state.
  */
 internal interface RenderTarget : AutoCloseable {
   fun needsMetalAutoreleasePool(): Boolean = false
@@ -53,10 +58,44 @@ internal interface RenderTarget : AutoCloseable {
      */
     fun detachSuppressed(error: RuntimeException, session: RenderSessionHandle) {
       try {
-        session.detach()
+        completeDriverOperation(session, session.startDetach())
       } catch (cleanupError: Exception) {
         error.addSuppressed(cleanupError)
       }
+    }
+
+    val callerDriverOptions: RenderSessionAttachOptions =
+      RenderSessionAttachOptions(driver = RenderDriver.CALLER_GRAPHICS_THREAD)
+
+    fun completeAttachment(attachment: RenderSessionAttachment): RenderSessionHandle {
+      try {
+        completeDriverOperation(attachment.session, attachment.operation)
+        return attachment.session
+      } catch (error: Throwable) {
+        runCatching { attachment.session.abandon() }
+        runCatching { attachment.session.close() }
+        throw error
+      }
+    }
+
+    fun completeDriverOperation(session: RenderSessionHandle, operation: OperationHandle<*>) {
+      operation.use {
+        while (!it.poll()) {
+          session.serviceDriverWork()
+        }
+        check(it.terminalStatus() == MaplibreStatus.OK) { it.diagnostic() }
+      }
+    }
+
+    fun renderFrame(session: RenderSessionHandle): RenderFrameResult? {
+      session.requestFrame(FrameDemand(present = true))
+      session.serviceDriverWork()
+      return session.drainFrameResults().lastOrNull()
+    }
+
+    fun closeSession(session: RenderSessionHandle) {
+      completeDriverOperation(session, session.startDetach())
+      session.close()
     }
 
     fun closeSuppressed(error: RuntimeException, closeable: AutoCloseable?) {
@@ -64,7 +103,7 @@ internal interface RenderTarget : AutoCloseable {
         return
       }
       try {
-        closeable.close()
+        if (closeable is RenderSessionHandle) closeSession(closeable) else closeable.close()
       } catch (cleanupError: Exception) {
         error.addSuppressed(cleanupError)
       }

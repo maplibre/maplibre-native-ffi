@@ -90,6 +90,10 @@ unsafe extern "C" fn notification_callback(user_data: *mut std::ffi::c_void) {
 pub enum ReadyEndpointKind {
     RuntimeEvents,
     Operation,
+    ResourceRequests,
+    LogRecords,
+    RenderFrames,
+    DriverWork,
     Unknown(u32),
 }
 
@@ -104,6 +108,12 @@ fn ready_endpoint_kind(raw: u32) -> ReadyEndpointKind {
     match raw {
         sys::MLN_NOTIFICATION_ENDPOINT_RUNTIME_EVENTS => ReadyEndpointKind::RuntimeEvents,
         sys::MLN_NOTIFICATION_ENDPOINT_OPERATION => ReadyEndpointKind::Operation,
+        sys::MLN_NOTIFICATION_ENDPOINT_ADAPTER_RESOURCE_REQUESTS => {
+            ReadyEndpointKind::ResourceRequests
+        }
+        sys::MLN_NOTIFICATION_ENDPOINT_ADAPTER_LOG_RECORDS => ReadyEndpointKind::LogRecords,
+        sys::MLN_NOTIFICATION_ENDPOINT_RENDER_FRAMES => ReadyEndpointKind::RenderFrames,
+        sys::MLN_NOTIFICATION_ENDPOINT_DRIVER_WORK => ReadyEndpointKind::DriverWork,
         value => ReadyEndpointKind::Unknown(value),
     }
 }
@@ -506,6 +516,16 @@ pub(crate) enum OperationKind {
     LayerVisibility,
     RegionDelete,
     SetMaximumAmbientCacheSize,
+    RenderAttach,
+    RenderResize,
+    RenderBarrier,
+    RenderMaintenance,
+    RenderReadback,
+    RenderDetach,
+    RenderSetTarget,
+    RenderFrameRelease,
+    RenderQuery,
+    RenderFeatureState,
 }
 
 /// Common asynchronous operation handle with a typed result.
@@ -1995,8 +2015,12 @@ mod tests {
             bounded.remaining() > 0,
             "a style load should queue more than one event"
         );
+        let remaining = bounded.remaining();
         let rest = runtime.drain_events(0).unwrap();
-        assert!(rest.len() > 1, "one drain should report the whole queue");
+        assert!(
+            rest.len() >= remaining,
+            "the unbounded drain should include every event previously reported queued"
+        );
         assert_eq!(rest.remaining(), 0);
         let first = rest.iter().next().unwrap();
         assert_eq!(first.source(), RuntimeEventSource::Map(map.id()));

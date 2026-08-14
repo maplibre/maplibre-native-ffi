@@ -13,6 +13,10 @@ pub enum ErrorKind {
     InvalidState,
     WrongThread,
     Unsupported,
+    Cancelled,
+    Busy,
+    TargetLost,
+    NotReady,
     NativeError,
     AbiVersionMismatch,
     UnknownStatus,
@@ -98,6 +102,10 @@ pub fn kind_for_status(status: i32) -> ErrorKind {
         sys::MLN_STATUS_INVALID_STATE => ErrorKind::InvalidState,
         sys::MLN_STATUS_WRONG_THREAD => ErrorKind::WrongThread,
         sys::MLN_STATUS_UNSUPPORTED => ErrorKind::Unsupported,
+        sys::MLN_STATUS_CANCELLED => ErrorKind::Cancelled,
+        sys::MLN_STATUS_BUSY => ErrorKind::Busy,
+        sys::MLN_STATUS_TARGET_LOST => ErrorKind::TargetLost,
+        sys::MLN_STATUS_NOT_READY => ErrorKind::NotReady,
         sys::MLN_STATUS_NATIVE_ERROR => ErrorKind::NativeError,
         _ => ErrorKind::UnknownStatus,
     }
@@ -127,6 +135,23 @@ mod tests {
         assert_eq!(error.kind(), ErrorKind::UnknownStatus);
         assert_eq!(error.raw_status(), Some(-123_456));
         assert_eq!(error.diagnostic(), "future status");
+    }
+
+    #[test]
+    fn maps_operation_and_nonblocking_statuses() {
+        assert_eq!(
+            kind_for_status(sys::MLN_STATUS_CANCELLED),
+            ErrorKind::Cancelled
+        );
+        assert_eq!(kind_for_status(sys::MLN_STATUS_BUSY), ErrorKind::Busy);
+        assert_eq!(
+            kind_for_status(sys::MLN_STATUS_TARGET_LOST),
+            ErrorKind::TargetLost
+        );
+        assert_eq!(
+            kind_for_status(sys::MLN_STATUS_NOT_READY),
+            ErrorKind::NotReady
+        );
     }
 
     #[test]

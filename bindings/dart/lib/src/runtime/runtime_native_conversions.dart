@@ -465,49 +465,6 @@ raw.mln_rendered_query_geometry _renderedQueryGeometryToNative(
   }
 }
 
-Pointer<raw.mln_feature_state_selector> _featureStateSelectorToNative(
-  FeatureStateSelector selector,
-  Allocator allocator,
-) {
-  final nativeSelector = allocator<raw.mln_feature_state_selector>();
-  nativeSelector.ref.size = sizeOf<raw.mln_feature_state_selector>();
-  nativeSelector.ref.source_id = nativeStringView(
-    selector.sourceId,
-    allocator,
-  ).value;
-  final sourceLayerId = selector.sourceLayerId;
-  if (sourceLayerId != null) {
-    nativeSelector.ref.fields |= raw
-        .mln_feature_state_selector_field
-        .MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID
-        .value;
-    nativeSelector.ref.source_layer_id = nativeStringView(
-      sourceLayerId,
-      allocator,
-    ).value;
-  }
-  final featureId = selector.featureId;
-  if (featureId != null) {
-    nativeSelector.ref.fields |= raw
-        .mln_feature_state_selector_field
-        .MLN_FEATURE_STATE_SELECTOR_FEATURE_ID
-        .value;
-    nativeSelector.ref.feature_id = nativeStringView(
-      featureId,
-      allocator,
-    ).value;
-  }
-  final stateKey = selector.stateKey;
-  if (stateKey != null) {
-    nativeSelector.ref.fields |= raw
-        .mln_feature_state_selector_field
-        .MLN_FEATURE_STATE_SELECTOR_STATE_KEY
-        .value;
-    nativeSelector.ref.state_key = nativeStringView(stateKey, allocator).value;
-  }
-  return nativeSelector;
-}
-
 Pointer<raw.mln_rendered_feature_query_options>
 _renderedFeatureQueryOptionsToNative(
   RenderedFeatureQueryOptions options,
@@ -827,6 +784,7 @@ raw.mln_vulkan_context_descriptor _vulkanContextDescriptorToNative(
 
 raw.mln_opengl_context_descriptor _openglContextDescriptorToNative(
   OpenGLContextDescriptor value,
+  Allocator arena,
 ) {
   final result = Struct.create<raw.mln_opengl_context_descriptor>();
   result.size = sizeOf<raw.mln_opengl_context_descriptor>();
@@ -860,6 +818,17 @@ raw.mln_opengl_context_descriptor _openglContextDescriptorToNative(
       result.data.egl.get_proc_address = Pointer<Void>.fromAddress(
         value.getProcAddress.address,
       );
+    case WebGLContextDescriptor():
+      result.platformAsInt = raw
+          .mln_opengl_context_platform
+          .MLN_OPENGL_CONTEXT_PLATFORM_WEBGL
+          .value;
+      result.data.webgl.size = sizeOf<raw.mln_webgl_context_descriptor>();
+      result.data.webgl.kind = value.isTransferredCanvas ? 1 : 0;
+      result.data.webgl.context = value.context;
+      result.data.webgl.canvas_selector = value.canvasSelector == null
+          ? Struct.create<raw.mln_buffer_view>()
+          : nativeStringView(value.canvasSelector!, arena).value;
   }
   return result;
 }
@@ -886,10 +855,11 @@ raw.mln_vulkan_surface_descriptor _vulkanSurfaceDescriptorToNative(
 
 raw.mln_opengl_surface_descriptor _openglSurfaceDescriptorToNative(
   OpenGLSurfaceDescriptor value,
+  Allocator arena,
 ) {
   final result = raw.mln_opengl_surface_descriptor_default();
   result.extent = _renderTargetExtentToNative(value.extent);
-  result.context = _openglContextDescriptorToNative(value.context);
+  result.context = _openglContextDescriptorToNative(value.context, arena);
   result.surface = Pointer<Void>.fromAddress(value.surface.address);
   return result;
 }
@@ -953,16 +923,18 @@ _vulkanBorrowedTextureDescriptorToNative(
 
 raw.mln_opengl_owned_texture_descriptor _openglOwnedTextureDescriptorToNative(
   OpenGLOwnedTextureDescriptor value,
+  Allocator arena,
 ) {
   final result = raw.mln_opengl_owned_texture_descriptor_default();
   result.extent = _renderTargetExtentToNative(value.extent);
-  result.context = _openglContextDescriptorToNative(value.context);
+  result.context = _openglContextDescriptorToNative(value.context, arena);
   return result;
 }
 
 raw.mln_opengl_borrowed_texture_descriptor
 _openglBorrowedTextureDescriptorToNative(
   OpenGLBorrowedTextureDescriptor value,
+  Allocator arena,
 ) {
   final result = raw.mln_opengl_borrowed_texture_descriptor_default();
   result.extent = _renderTargetExtentToNative(value.extent);
@@ -974,9 +946,61 @@ _openglBorrowedTextureDescriptorToNative(
     value.physicalHeight,
     'physical texture height',
   );
-  result.context = _openglContextDescriptorToNative(value.context);
+  result.context = _openglContextDescriptorToNative(value.context, arena);
   result.texture = value.texture;
   result.target = value.target;
+  return result;
+}
+
+raw.mln_webgpu_context_descriptor _webGPUContextDescriptorToNative(
+  WebGPUContextDescriptor value,
+) {
+  final result = Struct.create<raw.mln_webgpu_context_descriptor>();
+  result.size = sizeOf<raw.mln_webgpu_context_descriptor>();
+  result.instance = Pointer<Void>.fromAddress(value.instance.address);
+  result.device = Pointer<Void>.fromAddress(value.device.address);
+  result.queue = Pointer<Void>.fromAddress(value.queue.address);
+  return result;
+}
+
+raw.mln_webgpu_surface_descriptor _webGPUSurfaceDescriptorToNative(
+  WebGPUSurfaceDescriptor value,
+) {
+  final result = raw.mln_webgpu_surface_descriptor_default();
+  result.extent = _renderTargetExtentToNative(value.extent);
+  result.context = _webGPUContextDescriptorToNative(value.context);
+  result.surface = Pointer<Void>.fromAddress(value.surface.address);
+  result.format = value.format;
+  return result;
+}
+
+raw.mln_webgpu_owned_texture_descriptor _webGPUOwnedTextureDescriptorToNative(
+  WebGPUOwnedTextureDescriptor value,
+) {
+  final result = raw.mln_webgpu_owned_texture_descriptor_default();
+  result.extent = _renderTargetExtentToNative(value.extent);
+  result.context = _webGPUContextDescriptorToNative(value.context);
+  return result;
+}
+
+raw.mln_webgpu_borrowed_texture_descriptor
+_webGPUBorrowedTextureDescriptorToNative(
+  WebGPUBorrowedTextureDescriptor value,
+) {
+  final result = raw.mln_webgpu_borrowed_texture_descriptor_default();
+  result.extent = _renderTargetExtentToNative(value.extent);
+  result.physical_width = _positiveUint32(
+    value.physicalWidth,
+    'physical texture width',
+  );
+  result.physical_height = _positiveUint32(
+    value.physicalHeight,
+    'physical texture height',
+  );
+  result.context = _webGPUContextDescriptorToNative(value.context);
+  result.texture = Pointer<Void>.fromAddress(value.texture.address);
+  result.texture_view = Pointer<Void>.fromAddress(value.textureView.address);
+  result.format = value.format;
   return result;
 }
 

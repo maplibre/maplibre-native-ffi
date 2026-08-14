@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <memory>
 
 #include <mbgl/util/size.hpp>
@@ -57,8 +58,10 @@ auto validate_borrowed_texture(
 class MetalTextureSessionBackend final
     : public mln::core::TextureSessionBackend {
  public:
-  MetalTextureSessionBackend(MTL::Device* host_device, mbgl::Size size)
-      : backend_(host_device, size) {}
+  MetalTextureSessionBackend(
+    MTL::Device* host_device, mbgl::Size size, std::size_t ring_depth
+  )
+      : backend_(host_device, size, ring_depth) {}
 
   MetalTextureSessionBackend(MTL::Texture* borrowed_texture, mbgl::Size size)
       : backend_(borrowed_texture, size) {}
@@ -66,6 +69,7 @@ class MetalTextureSessionBackend final
   auto headless_backend() -> mbgl::gfx::HeadlessBackend& override {
     return backend_;
   }
+  void resize(mbgl::Size size) override { backend_.set_ring_size(size); }
 
   auto set_metal_borrowed_target(
     const mln_metal_borrowed_texture_descriptor& descriptor
@@ -104,34 +108,37 @@ class MetalTextureSessionBackend final
     out_rendered = true;
     return MLN_STATUS_OK;
   }
+  auto select_render_slot(std::size_t slot) -> mln_status override {
+    return backend_.select_slot(slot) ? MLN_STATUS_OK
+                                      : MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto copy_slot_metadata(
+    const mln_render_session_object& texture, std::size_t slot,
+    std::any& out_metadata
+  ) -> mln_status override {
+    auto* metal_texture = backend_.metal_texture_at(slot);
+    if (metal_texture == nullptr) {
+      mln::core::set_thread_error("rendered Metal texture is not available");
+      return MLN_STATUS_NOT_READY;
+    }
+    out_metadata = mln_metal_owned_texture_frame{
+      .size = sizeof(mln_metal_owned_texture_frame),
+      .generation = texture.generation,
+      .width = static_cast<uint32_t>(metal_texture->width()),
+      .height = static_cast<uint32_t>(metal_texture->height()),
+      .scale_factor = texture.scale_factor,
+      .frame_id = texture.frame_generation,
+      .texture = metal_texture,
+      .device = metal_texture->device(),
+      .pixel_format = static_cast<uint64_t>(metal_texture->pixelFormat())
+    };
+    return MLN_STATUS_OK;
+  }
 
  private:
   mln::core::MetalTextureBackend backend_;
 };
 
-auto fill_frame(
-  mln_render_session_object* texture, mln_metal_owned_texture_frame* out_frame
-) -> mln_status {
-  auto* metal_texture =
-    static_cast<MTL::Texture*>(texture->texture.rendered_native_texture);
-  if (metal_texture == nullptr) {
-    mln::core::set_thread_error("rendered Metal texture is not available");
-    return MLN_STATUS_NATIVE_ERROR;
-  }
-
-  *out_frame = mln_metal_owned_texture_frame{
-    .size = sizeof(mln_metal_owned_texture_frame),
-    .generation = texture->generation,
-    .width = texture->physical_width,
-    .height = texture->physical_height,
-    .scale_factor = texture->scale_factor,
-    .frame_id = texture->texture.next_frame_id,
-    .texture = metal_texture,
-    .device = metal_texture->device(),
-    .pixel_format = static_cast<uint64_t>(metal_texture->pixelFormat())
-  };
-  return MLN_STATUS_OK;
-}
 }  // namespace
 
 namespace mln::core {
@@ -140,9 +147,10 @@ auto supported_render_backend_mask() noexcept -> uint32_t {
   return MLN_RENDER_BACKEND_FLAG_METAL;
 }
 
-auto metal_owned_texture_attach(
+auto metal_owned_texture_attach_start(
   mln_map map, const mln_metal_owned_texture_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, mln_operation* out_operation
 ) -> mln_status {
   MapObject* live_map = nullptr;
   const auto map_status = validate_map_live(map, live_map);
@@ -154,13 +162,6 @@ auto metal_owned_texture_attach(
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
-  const auto output_status = validate_attach_output(
-    out_session, "out_session must not be null",
-    "out_session must point to a null handle"
-  );
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
-  }
   const auto physical_status = validate_physical_size(
     descriptor->extent.width, descriptor->extent.height,
     descriptor->extent.scale_factor, "scaled texture dimensions are too large"
@@ -168,29 +169,49 @@ auto metal_owned_texture_attach(
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
   }
+  const auto request_status =
+    validate_render_session_attach_request(options, out_session, out_operation);
+  if (request_status != MLN_STATUS_OK) {
+    return request_status;
+  }
 
   auto session = std::make_shared<mln_render_session_object>();
   session->map = map;
   set_session_extent(*session, descriptor->extent);
   session->texture.api_kind = TextureSessionApi::Metal;
   session->texture.mode = TextureSessionMode::Owned;
-  session->texture.backend = std::make_unique<MetalTextureSessionBackend>(
-    static_cast<MTL::Device*>(descriptor->context.device),
-    mbgl::Size{session->physical_width, session->physical_height}
+  auto device =
+    NS::RetainPtr(static_cast<MTL::Device*>(descriptor->context.device));
+  const auto ring_depth = std::clamp(
+    options == nullptr ? 1u : options->requested_texture_ring_depth, 1u, 3u
   );
-  return attach_render_session(
-    std::move(session), out_session, RenderSessionKind::Texture,
-    RenderSessionAttachMessages{
-      .null_session = "texture session must not be null",
-      .null_output = "out_session must not be null",
-      .non_null_output = "out_session must point to a null handle"
-    }
+  session->initialize_backend = [device = std::move(device), ring_depth](
+                                  mln_render_session_object& target
+                                ) mutable {
+    target.texture.backend = std::make_unique<MetalTextureSessionBackend>(
+      device.get(), mbgl::Size{target.physical_width, target.physical_height},
+      ring_depth
+    );
+    return MLN_STATUS_OK;
+  };
+  const auto capabilities = mln_render_session_capabilities{
+    .size = sizeof(mln_render_session_capabilities),
+    .driver = options == nullptr ? 0u : options->driver,
+    .texture_ring_depth = ring_depth,
+    .flags = MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION |
+             MLN_RENDER_SESSION_CAPABILITY_READBACK |
+             MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC
+  };
+  return start_attach_render_session(
+    std::move(session), RenderSessionKind::Texture, options, capabilities,
+    out_session, out_operation
   );
 }
 
-auto metal_borrowed_texture_attach(
+auto metal_borrowed_texture_attach_start(
   mln_map map, const mln_metal_borrowed_texture_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, mln_operation* out_operation
 ) -> mln_status {
   MapObject* live_map = nullptr;
   const auto map_status = validate_map_live(map, live_map);
@@ -201,12 +222,10 @@ auto metal_borrowed_texture_attach(
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
-  const auto output_status = validate_attach_output(
-    out_session, "out_session must not be null",
-    "out_session must point to a null handle"
-  );
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
+  const auto request_status =
+    validate_render_session_attach_request(options, out_session, out_operation);
+  if (request_status != MLN_STATUS_OK) {
+    return request_status;
   }
 
   auto session = std::make_shared<mln_render_session_object>();
@@ -217,123 +236,50 @@ auto metal_borrowed_texture_attach(
   );
   session->texture.api_kind = TextureSessionApi::Metal;
   session->texture.mode = TextureSessionMode::Borrowed;
-  session->texture.backend = std::make_unique<MetalTextureSessionBackend>(
-    static_cast<MTL::Texture*>(descriptor->texture),
-    mbgl::Size{session->physical_width, session->physical_height}
+  auto* const borrowed_texture =
+    static_cast<MTL::Texture*>(descriptor->texture);
+  session->initialize_backend =
+    [borrowed_texture](mln_render_session_object& target) {
+      target.texture.backend = std::make_unique<MetalTextureSessionBackend>(
+        borrowed_texture,
+        mbgl::Size{target.physical_width, target.physical_height}
+      );
+      return MLN_STATUS_OK;
+    };
+  const auto capabilities = mln_render_session_capabilities{
+    .size = sizeof(mln_render_session_capabilities),
+    .driver = options == nullptr ? 0u : options->driver,
+    .texture_ring_depth = 0,
+    .flags = MLN_RENDER_SESSION_CAPABILITY_READBACK
+  };
+  return start_attach_render_session(
+    std::move(session), RenderSessionKind::Texture, options, capabilities,
+    out_session, out_operation
   );
-  return attach_render_session(
-    std::move(session), out_session, RenderSessionKind::Texture,
-    RenderSessionAttachMessages{
-      .null_session = "texture session must not be null",
-      .null_output = "out_session must not be null",
-      .non_null_output = "out_session must point to a null handle"
-    }
-  );
 }
 
-auto metal_owned_texture_acquire_frame(
-  mln_render_session texture, mln_metal_owned_texture_frame* out_frame
-) -> mln_status {
-  mln_render_session_object* live = nullptr;
-  const auto status = validate_live_attached_texture(texture, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (
-    out_frame == nullptr ||
-    out_frame->size < sizeof(mln_metal_owned_texture_frame)
-  ) {
-    set_thread_error("out_frame must not be null and must have a valid size");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (live->texture.acquired) {
-    set_thread_error("a texture frame is already acquired");
-    return MLN_STATUS_INVALID_STATE;
-  }
-  if (live->rendered_generation != live->generation) {
-    set_thread_error("no rendered frame is available for this generation");
-    return MLN_STATUS_INVALID_STATE;
-  }
-  if (
-    live->texture.mode != TextureSessionMode::Owned ||
-    live->texture.api_kind != TextureSessionApi::Metal
-  ) {
-    set_thread_error("texture session cannot expose a Metal texture frame");
-    return MLN_STATUS_UNSUPPORTED;
-  }
-
-  const auto frame_status = fill_frame(live, out_frame);
-  if (frame_status != MLN_STATUS_OK) {
-    return frame_status;
-  }
-  live->texture.acquired_native_texture = live->texture.rendered_native_texture;
-  live->texture.acquired = true;
-  live->texture.acquired_frame_id = out_frame->frame_id;
-  live->texture.acquired_frame_kind = TextureSessionFrameKind::MetalOwned;
-  ++live->texture.next_frame_id;
-  return MLN_STATUS_OK;
-}
-
-auto metal_owned_texture_release_frame(
-  mln_render_session texture, const mln_metal_owned_texture_frame* frame
-) -> mln_status {
-  mln_render_session_object* live = nullptr;
-  const auto status = validate_texture(texture, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (frame == nullptr || frame->size < sizeof(mln_metal_owned_texture_frame)) {
-    set_thread_error("frame must not be null and must have a valid size");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (
-    !live->texture.acquired ||
-    live->texture.acquired_frame_kind != TextureSessionFrameKind::MetalOwned
-  ) {
-    set_thread_error("no texture frame is currently acquired");
-    return MLN_STATUS_INVALID_STATE;
-  }
-  if (frame->generation != live->generation) {
-    set_thread_error("frame generation does not match acquired frame");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (frame->frame_id != live->texture.acquired_frame_id) {
-    set_thread_error("frame identity does not match acquired frame");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  live->texture.acquired = false;
-  live->texture.acquired_frame_id = 0;
-  live->texture.acquired_frame_kind = TextureSessionFrameKind::None;
-  live->texture.acquired_native_texture = nullptr;
-  return MLN_STATUS_OK;
-}
-
-auto metal_borrowed_texture_set_target(
+auto metal_borrowed_texture_set_target_start(
   mln_render_session session,
-  const mln_metal_borrowed_texture_descriptor* descriptor
+  const mln_metal_borrowed_texture_descriptor* descriptor,
+  mln_operation* out_operation
 ) -> mln_status {
-  mln_render_session_object* live = nullptr;
-  const auto session_status = validate_render_session_retarget(
-    session, RetargetTargetKind::BorrowedTexture, live
-  );
-  if (session_status != MLN_STATUS_OK) {
-    return session_status;
-  }
-  // The same validator attach uses. The shape-only shared one would admit a
-  // texture that fails only on the next render, once the outgoing target is
-  // already discarded.
   const auto descriptor_status = validate_borrowed_texture(descriptor);
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
-  return render_session_set_target(
-    session, RetargetTargetKind::BorrowedTexture, descriptor->extent,
-    descriptor->physical_width, descriptor->physical_height,
-    [descriptor](mln_render_session_object& target_session) -> mln_status {
-      return target_session.texture.backend->set_metal_borrowed_target(
-        *descriptor
+  const auto copied = *descriptor;
+  return enqueue_driver_operation(
+    session, RENDER_OPERATION_MAINTENANCE,
+    [copied](mln_render_session_object& target) {
+      return render_session_set_target(
+        target.self, RetargetTargetKind::BorrowedTexture, copied.extent,
+        copied.physical_width, copied.physical_height,
+        [&copied](mln_render_session_object& live) {
+          return live.texture.backend->set_metal_borrowed_target(copied);
+        }
       );
-    }
+    },
+    out_operation
   );
 }
 

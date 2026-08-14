@@ -1455,13 +1455,17 @@ impl StyleImageOperation {
 
 impl OperationHandle<Vec<u8>> {
     pub fn take(&self) -> Result<Vec<u8>> {
-        if self.operation_kind != OperationKind::LoadedStyleJson {
-            return Err(Error::invalid_argument(
-                "operation does not contain byte data",
-            ));
-        }
         take_buffer(self, |operation, out| unsafe {
-            sys::mln_map_loaded_style_json_take_result(operation, out)
+            match self.operation_kind {
+                OperationKind::LoadedStyleJson => {
+                    sys::mln_map_loaded_style_json_take_result(operation, out)
+                }
+                OperationKind::RenderQuery => sys::mln_render_query_take_result(operation, out),
+                OperationKind::RenderFeatureState => {
+                    sys::mln_render_session_get_feature_state_take_result(operation, out)
+                }
+                _ => sys::MLN_STATUS_INVALID_STATE,
+            }
         })
     }
 }

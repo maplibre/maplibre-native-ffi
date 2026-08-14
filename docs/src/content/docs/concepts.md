@@ -74,29 +74,47 @@ Vulkan, so a macOS host loads an EGL implementation such as ANGLE for the OpenGL
 backend, or MoltenVK for the Vulkan backend. That implementation brings the
 headers to build against.
 
-The thread that attaches a render session becomes its owner thread for the
-session's lifetime. A host attaches on the thread that owns its graphics context
-and draws frames. The runtime and map continue on the runtime's native worker,
-independently of that graphics thread. A session call from any other thread
-reports an owner-thread status.
+Execution placement is fixed when attachment starts. A core-worker session owns
+a native serial graphics worker for transferable Metal, Vulkan, or transferred
+`OffscreenCanvas` WebGL state. A caller-graphics-thread session stores typed
+work until the host services it where the graphics context is usable. WGL, EGL,
+existing WebGL contexts, and browser WebGPU use the caller driver.
+
+Session control is separate from graphics execution. Any host thread may request
+a frame, read a snapshot, start an operation, abandon a target, or destroy a
+detached session. The first successful caller-driver service fixes its graphics
+thread identity. Later service calls and thread-current backend accessors remain
+affine to that thread. The host services ready work even while presentation
+callbacks are paused.
+
+A frame demand carries a host token, presentation time, optional deadline, and
+coalescing boundary. Every accepted demand produces one terminal result. Result
+records identify the token and the map-update, extent, and frame generations
+that the driver used. A notification source remains ready until the host drains
+all frame results, so coalesced notifications do not lose results.
+
+Owned texture targets negotiate a ring of one to three slots. Acquiring a frame
+leases one slot and returns producer-completion synchronization. Releasing the
+frame starts an operation and supplies consumer-completion synchronization when
+the host submitted GPU reads. The driver reuses the slot only after the host
+released the handle and those reads completed.
 
 ### OpenGL context ownership
 
 OpenGL binds a context to a thread, so an OpenGL render target names how the
-session and the host divide the thread's context.
+session and the host divide the thread's context. This policy is independent of
+the caller-graphics-thread driver.
 
-A shared session leaves the thread as it found it. Each render makes the
-session's context current and restores whatever was current before, and that
-context joins the host share group, so the host draws its own graphics on the
-same thread and samples session textures from its own context. Texture targets
-and WebGL work this way.
+A shared session leaves the thread as it found it. Each driver-service call
+makes the session's context current and restores whatever was current before,
+and that context joins the host share group. Texture targets and WebGL use this
+mode.
 
-A dedicated session owns the thread's context. It creates a context of its own
-from the display or device the host already presents through, joins no share
-group, and keeps that context current between renders. Choose it for a surface
-target on a thread that exists to draw one map, such as an Android host
-rendering into a `SurfaceView`. The host then builds no context of its own, and
-each frame saves and restores nothing.
+A dedicated session owns the thread's context. It creates a context from the
+display or device that the host presents through, joins no host share group, and
+keeps that context current between service calls. Choose it for a surface target
+on a thread that exists to draw one map, such as an Android host rendering into
+a `SurfaceView`.
 
 ## Events
 

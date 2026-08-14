@@ -1,195 +1,172 @@
 internal import CMaplibreNativeC
 
 enum NativeRender {
-  static func metalSurfaceAttach(
-    map: NativeMapHandle,
-    descriptor: UnsafePointer<mln_metal_surface_descriptor>
-  ) throws -> NativeRenderSessionHandle {
-    try NativeHandleFactory
-      .create(
-        nullDiagnostic: "mln_metal_surface_attach returned a null session"
-      ) { outHandle in
-        try checkStatus(mln_metal_surface_attach(
-          map.raw,
-          descriptor,
-          outHandle
-        ))
-      }
-  }
-
-  static func vulkanSurfaceAttach(
-    map: NativeMapHandle,
-    descriptor: UnsafePointer<mln_vulkan_surface_descriptor>
-  ) throws -> NativeRenderSessionHandle {
-    try NativeHandleFactory
-      .create(
-        nullDiagnostic: "mln_vulkan_surface_attach returned a null session"
-      ) { outHandle in
-        try checkStatus(mln_vulkan_surface_attach(
-          map.raw,
-          descriptor,
-          outHandle
-        ))
-      }
-  }
-
-  static func openGLSurfaceAttach(
-    map: NativeMapHandle,
-    descriptor: UnsafePointer<mln_opengl_surface_descriptor>
-  ) throws -> NativeRenderSessionHandle {
-    try NativeHandleFactory
-      .create(
-        nullDiagnostic: "mln_opengl_surface_attach returned a null session"
-      ) { outHandle in
-        try checkStatus(mln_opengl_surface_attach(
-          map.raw,
-          descriptor,
-          outHandle
-        ))
-      }
-  }
-
-  static func textureReadPremultipliedRGBA8(
+  typealias Attachment = (
     session: NativeRenderSessionHandle,
-    data: UnsafeMutablePointer<UInt8>?,
-    capacity: Int
-  ) throws -> mln_texture_image_info {
-    var info = mln_texture_image_info_default()
-    try checkStatus(mln_texture_read_premultiplied_rgba8(
-      session.raw,
-      data,
-      capacity,
-      &info
-    ))
-    return info
+    operation: NativeOperationHandle
+  )
+
+  private static func attachment(
+    _ body: (UnsafeMutablePointer<mln_render_session>,
+             UnsafeMutablePointer<mln_operation>) throws -> Void
+  ) throws -> Attachment {
+    var session: mln_render_session = 0
+    var operation: mln_operation = 0
+    try body(&session, &operation)
+    guard session != 0, operation != 0 else {
+      if operation != 0 { mln_operation_release(operation) }
+      if session != 0 { _ = mln_render_session_destroy(session) }
+      throw NativeStatusFailure.swiftNativeError(
+        "render attachment returned a null session or operation"
+      )
+    }
+    return (
+      NativeRenderSessionHandle(raw: session),
+      NativeOperationHandle(raw: operation)
+    )
   }
 
-  static func metalOwnedTextureAttach(
+  static func metalSurfaceAttachStart(
     map: NativeMapHandle,
-    descriptor: UnsafePointer<mln_metal_owned_texture_descriptor>
-  ) throws -> NativeRenderSessionHandle {
-    try NativeHandleFactory
-      .create(
-        nullDiagnostic: "mln_metal_owned_texture_attach returned a null session"
-      ) { outHandle in
-        try checkStatus(mln_metal_owned_texture_attach(
-          map.raw,
-          descriptor,
-          outHandle
-        ))
-      }
+    descriptor: UnsafePointer<mln_metal_surface_descriptor>,
+    options: UnsafePointer<mln_render_session_attach_options>
+  ) throws -> Attachment {
+    try attachment { session, operation in
+      try checkStatus(mln_metal_surface_attach_start(
+        map.raw, descriptor, options, session, operation
+      ))
+    }
   }
 
-  static func metalBorrowedTextureAttach(
+  static func vulkanSurfaceAttachStart(
     map: NativeMapHandle,
-    descriptor: UnsafePointer<mln_metal_borrowed_texture_descriptor>
-  ) throws -> NativeRenderSessionHandle {
-    try NativeHandleFactory
-      .create(
-        nullDiagnostic: "mln_metal_borrowed_texture_attach returned a null session"
-      ) { outHandle in
-        try checkStatus(mln_metal_borrowed_texture_attach(
-          map.raw,
-          descriptor,
-          outHandle
-        ))
-      }
+    descriptor: UnsafePointer<mln_vulkan_surface_descriptor>,
+    options: UnsafePointer<mln_render_session_attach_options>
+  ) throws -> Attachment {
+    try attachment { session, operation in
+      try checkStatus(mln_vulkan_surface_attach_start(
+        map.raw, descriptor, options, session, operation
+      ))
+    }
   }
 
-  static func vulkanOwnedTextureAttach(
+  static func openGLSurfaceAttachStart(
     map: NativeMapHandle,
-    descriptor: UnsafePointer<mln_vulkan_owned_texture_descriptor>
-  ) throws -> NativeRenderSessionHandle {
-    try NativeHandleFactory
-      .create(
-        nullDiagnostic: "mln_vulkan_owned_texture_attach returned a null session"
-      ) { outHandle in
-        try checkStatus(mln_vulkan_owned_texture_attach(
-          map.raw,
-          descriptor,
-          outHandle
-        ))
-      }
+    descriptor: UnsafePointer<mln_opengl_surface_descriptor>,
+    options: UnsafePointer<mln_render_session_attach_options>
+  ) throws -> Attachment {
+    try attachment { session, operation in
+      try checkStatus(mln_opengl_surface_attach_start(
+        map.raw, descriptor, options, session, operation
+      ))
+    }
   }
 
-  static func vulkanBorrowedTextureAttach(
+  static func metalOwnedTextureAttachStart(
     map: NativeMapHandle,
-    descriptor: UnsafePointer<mln_vulkan_borrowed_texture_descriptor>
-  ) throws -> NativeRenderSessionHandle {
-    try NativeHandleFactory
-      .create(
-        nullDiagnostic: "mln_vulkan_borrowed_texture_attach returned a null session"
-      ) { outHandle in
-        try checkStatus(mln_vulkan_borrowed_texture_attach(
-          map.raw,
-          descriptor,
-          outHandle
-        ))
-      }
+    descriptor: UnsafePointer<mln_metal_owned_texture_descriptor>,
+    options: UnsafePointer<mln_render_session_attach_options>
+  ) throws -> Attachment {
+    try attachment { session, operation in
+      try checkStatus(mln_metal_owned_texture_attach_start(
+        map.raw, descriptor, options, session, operation
+      ))
+    }
   }
 
-  static func openGLOwnedTextureAttach(
+  static func metalBorrowedTextureAttachStart(
     map: NativeMapHandle,
-    descriptor: UnsafePointer<mln_opengl_owned_texture_descriptor>
-  ) throws -> NativeRenderSessionHandle {
-    try NativeHandleFactory
-      .create(
-        nullDiagnostic: "mln_opengl_owned_texture_attach returned a null session"
-      ) { outHandle in
-        try checkStatus(mln_opengl_owned_texture_attach(
-          map.raw,
-          descriptor,
-          outHandle
-        ))
-      }
+    descriptor: UnsafePointer<mln_metal_borrowed_texture_descriptor>,
+    options: UnsafePointer<mln_render_session_attach_options>
+  ) throws -> Attachment {
+    try attachment { session, operation in
+      try checkStatus(mln_metal_borrowed_texture_attach_start(
+        map.raw, descriptor, options, session, operation
+      ))
+    }
   }
 
-  static func openGLBorrowedTextureAttach(
+  static func vulkanOwnedTextureAttachStart(
     map: NativeMapHandle,
-    descriptor: UnsafePointer<mln_opengl_borrowed_texture_descriptor>
-  ) throws -> NativeRenderSessionHandle {
-    try NativeHandleFactory
-      .create(
-        nullDiagnostic: "mln_opengl_borrowed_texture_attach returned a null session"
-      ) { outHandle in
-        try checkStatus(mln_opengl_borrowed_texture_attach(
-          map.raw,
-          descriptor,
-          outHandle
-        ))
-      }
+    descriptor: UnsafePointer<mln_vulkan_owned_texture_descriptor>,
+    options: UnsafePointer<mln_render_session_attach_options>
+  ) throws -> Attachment {
+    try attachment { session, operation in
+      try checkStatus(mln_vulkan_owned_texture_attach_start(
+        map.raw, descriptor, options, session, operation
+      ))
+    }
   }
 
-  static func metalOwnedTextureAcquireFrame(
-    _ session: NativeRenderSessionHandle
-  ) throws
-    -> mln_metal_owned_texture_frame
-  {
-    var frame = mln_metal_owned_texture_frame()
-    frame.size = UInt32(MemoryLayout<mln_metal_owned_texture_frame>.size)
-    try checkStatus(mln_metal_owned_texture_acquire_frame(session.raw, &frame))
-    return frame
+  static func vulkanBorrowedTextureAttachStart(
+    map: NativeMapHandle,
+    descriptor: UnsafePointer<mln_vulkan_borrowed_texture_descriptor>,
+    options: UnsafePointer<mln_render_session_attach_options>
+  ) throws -> Attachment {
+    try attachment { session, operation in
+      try checkStatus(mln_vulkan_borrowed_texture_attach_start(
+        map.raw, descriptor, options, session, operation
+      ))
+    }
   }
 
-  static func vulkanOwnedTextureAcquireFrame(
-    _ session: NativeRenderSessionHandle
-  ) throws
-    -> mln_vulkan_owned_texture_frame
-  {
-    var frame = mln_vulkan_owned_texture_frame()
-    frame.size = UInt32(MemoryLayout<mln_vulkan_owned_texture_frame>.size)
-    try checkStatus(mln_vulkan_owned_texture_acquire_frame(session.raw, &frame))
-    return frame
+  static func openGLOwnedTextureAttachStart(
+    map: NativeMapHandle,
+    descriptor: UnsafePointer<mln_opengl_owned_texture_descriptor>,
+    options: UnsafePointer<mln_render_session_attach_options>
+  ) throws -> Attachment {
+    try attachment { session, operation in
+      try checkStatus(mln_opengl_owned_texture_attach_start(
+        map.raw, descriptor, options, session, operation
+      ))
+    }
   }
 
-  static func openGLOwnedTextureAcquireFrame(
-    _ session: NativeRenderSessionHandle
-  ) throws
-    -> mln_opengl_owned_texture_frame
-  {
-    var frame = mln_opengl_owned_texture_frame()
-    frame.size = UInt32(MemoryLayout<mln_opengl_owned_texture_frame>.size)
-    try checkStatus(mln_opengl_owned_texture_acquire_frame(session.raw, &frame))
-    return frame
+  static func openGLBorrowedTextureAttachStart(
+    map: NativeMapHandle,
+    descriptor: UnsafePointer<mln_opengl_borrowed_texture_descriptor>,
+    options: UnsafePointer<mln_render_session_attach_options>
+  ) throws -> Attachment {
+    try attachment { session, operation in
+      try checkStatus(mln_opengl_borrowed_texture_attach_start(
+        map.raw, descriptor, options, session, operation
+      ))
+    }
+  }
+
+  static func webGPUSurfaceAttachStart(
+    map: NativeMapHandle,
+    descriptor: UnsafePointer<mln_webgpu_surface_descriptor>,
+    options: UnsafePointer<mln_render_session_attach_options>
+  ) throws -> Attachment {
+    try attachment { session, operation in
+      try checkStatus(mln_webgpu_surface_attach_start(
+        map.raw, descriptor, options, session, operation
+      ))
+    }
+  }
+
+  static func webGPUOwnedTextureAttachStart(
+    map: NativeMapHandle,
+    descriptor: UnsafePointer<mln_webgpu_owned_texture_descriptor>,
+    options: UnsafePointer<mln_render_session_attach_options>
+  ) throws -> Attachment {
+    try attachment { session, operation in
+      try checkStatus(mln_webgpu_owned_texture_attach_start(
+        map.raw, descriptor, options, session, operation
+      ))
+    }
+  }
+
+  static func webGPUBorrowedTextureAttachStart(
+    map: NativeMapHandle,
+    descriptor: UnsafePointer<mln_webgpu_borrowed_texture_descriptor>,
+    options: UnsafePointer<mln_render_session_attach_options>
+  ) throws -> Attachment {
+    try attachment { session, operation in
+      try checkStatus(mln_webgpu_borrowed_texture_attach_start(
+        map.raw, descriptor, options, session, operation
+      ))
+    }
   }
 }

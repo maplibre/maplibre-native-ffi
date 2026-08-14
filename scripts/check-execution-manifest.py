@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Checks execution classifications for the runtime and map API surface."""
+"""Checks execution classifications for the runtime, map, and render API."""
 
 from __future__ import annotations
 
@@ -23,6 +23,28 @@ FUNCTION = re.compile(
     r"MLN_API\s+[^;]*?\b(mln_[A-Za-z0-9_]+)\s*\([^;]*?\)\s*MLN_NOEXCEPT\s*;",
     re.DOTALL,
 )
+
+PHASE3_HEADERS = (
+    "base.h",
+    "render_target.h",
+    "render_session.h",
+    "surface.h",
+    "texture.h",
+)
+
+
+def complete_header_set(headers: list[pathlib.Path]) -> list[pathlib.Path]:
+    """Adds the render contract headers beside the explicitly selected headers."""
+    completed = list(headers)
+    seen = {header.resolve() for header in completed}
+    include_directories = {header.parent for header in headers}
+    for directory in sorted(include_directories):
+        for name in PHASE3_HEADERS:
+            candidate = directory / name
+            if candidate.exists() and candidate.resolve() not in seen:
+                completed.append(candidate)
+                seen.add(candidate.resolve())
+    return completed
 
 
 def exported_functions(
@@ -80,7 +102,12 @@ def boundary_convention_errors(
     elif category == "render_driver_call":
         if not re.search(r"\bmln_render_session\s+session\b", declaration):
             errors.append(f"render-driver call has no session boundary: {name}")
-        if "MLN_STATUS_WRONG_THREAD" not in documentation:
+        thread_contract = documentation.lower()
+        if not (
+            "graphics thread" in thread_contract
+            or "graphics-thread" in thread_contract
+            or "context must be current" in thread_contract
+        ):
             errors.append(f"render-driver call does not document its thread: {name}")
     return errors
 
@@ -126,7 +153,9 @@ def main() -> int:
         errors.append("function classifications must be sorted by function name")
 
     try:
-        exports, declarations, documentation = exported_functions(arguments.headers)
+        exports, declarations, documentation = exported_functions(
+            complete_header_set(arguments.headers)
+        )
     except (OSError, ValueError) as error:
         errors.append(str(error))
         exports, declarations, documentation = {}, {}, {}

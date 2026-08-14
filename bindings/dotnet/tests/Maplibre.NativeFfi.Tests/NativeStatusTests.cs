@@ -81,6 +81,14 @@ public sealed class NativeStatusTests
         Assert.Equal("future status", error.Diagnostic);
     }
 
+    [Fact]
+    public void RenderDriverStatusesRemainDistinct()
+    {
+        Assert.Equal(MaplibreStatus.Busy, NativeStatus.StatusFromRaw(-7));
+        Assert.Equal(MaplibreStatus.TargetLost, NativeStatus.StatusFromRaw(-8));
+        Assert.Equal(MaplibreStatus.NotReady, NativeStatus.StatusFromRaw(-9));
+    }
+
     [BindingSpecTest("BND-022")]
     [Fact]
     public void DiagnosticIsCopiedBeforeLaterFailureChangesThreadLocalMessage()

@@ -108,97 +108,35 @@ MLN_API mln_rendered_query_geometry mln_rendered_query_geometry_line_string(
 ) MLN_NOEXCEPT;
 
 /**
- * Queries rendered features from the latest render session state.
+ * Starts a rendered-feature query against the session's latest driver state.
  *
- * The session renderer must already exist. geometry and options are borrowed
- * for the duration of the call. Passing null for options uses default options.
- * On success, *out_result receives an owned buffer containing a JSON
- * array. Each element has a GeoJSON Feature in `feature` and may have
- * `sourceId`, `sourceLayerId`, and `state` members. Destroy the buffer with
- * mln_buffer_destroy().
- *
- * Box geometry is normalized and clipped to the viewport, so a box that
- * over-covers the viewport queries everything visible. A box that lies entirely
- * outside the viewport yields an empty result. Point and line-string geometry
- * are queried as given.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, geometry is
- *   null or invalid, options are invalid, out_result is null, or *out_result is
- *   not null.
- * - MLN_STATUS_INVALID_STATE when the session is detached or no renderer has
- *   been created for the session yet.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when the render backend reports no renderer
- *   backend, or when an internal exception is converted to status.
+ * All inputs are copied before return. Core-worker sessions execute on their
+ * worker. Caller-driver sessions publish driver work and complete only after
+ * the host services it on the graphics thread.
  */
-MLN_API mln_status mln_render_session_query_rendered_features(
+MLN_API mln_status mln_render_session_query_rendered_features_start(
   mln_render_session session, const mln_rendered_query_geometry* geometry,
-  const mln_rendered_feature_query_options* options, mln_buffer* out_result
+  const mln_rendered_feature_query_options* options,
+  mln_operation* out_operation
 ) MLN_NOEXCEPT;
 
-/**
- * Queries source features from the latest render session state.
- *
- * The session renderer must already exist. source_id and options are borrowed
- * for the duration of the call. Passing null for options uses default options.
- * On success, *out_result receives an owned buffer using the same JSON
- * envelope as rendered feature queries. Destroy it with
- * mln_buffer_destroy().
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, source_id is
- *   invalid or empty, options are invalid, out_result is null, or *out_result
- * is not null.
- * - MLN_STATUS_INVALID_STATE when the session is detached or no renderer has
- *   been created for the session yet.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when the render backend reports no renderer
- *   backend, or when an internal exception is converted to status.
- */
-MLN_API mln_status mln_render_session_query_source_features(
+/** Starts a source-feature query against the session's latest driver state. */
+MLN_API mln_status mln_render_session_query_source_features_start(
   mln_render_session session, mln_buffer_view source_id,
-  const mln_source_feature_query_options* options, mln_buffer* out_result
+  const mln_source_feature_query_options* options, mln_operation* out_operation
 ) MLN_NOEXCEPT;
 
-/**
- * Queries a feature extension from the latest render session state.
- *
- * The session renderer must already exist. source_id, feature, extension,
- * extension_field, and arguments are borrowed for the duration of the call.
- * feature contains one UTF-8 GeoJSON Feature. arguments may be null; when
- * present, it contains a UTF-8 JSON object. On success, *out_result receives an
- * owned buffer containing either a JSON value or a GeoJSON Feature
- * Collection. Destroy it with mln_buffer_destroy().
- *
- * The "supercluster" extension requires "cluster_id" feature properties and
- * "limit" and "offset" arguments to be nonnegative integer JSON literals.
- * Floating-point or negative representations are treated as absent and still
- * produce MLN_STATUS_OK. An absent cluster ID produces JSON null. Absent limit
- * and offset values use the native defaults of ten leaves at offset zero. The
- * result buffer preserves integer JSON representations.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, source_id,
- *   feature, extension, extension_field, or arguments are invalid, out_result
- *   is null, or *out_result is not null.
- * - MLN_STATUS_INVALID_STATE when the session is detached or no renderer has
- *   been created for the session yet.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when the render backend reports no renderer
- *   backend, or when an internal exception is converted to status.
- */
-MLN_API mln_status mln_render_session_query_feature_extensions(
+/** Starts a feature-extension query against the latest driver state. */
+MLN_API mln_status mln_render_session_query_feature_extensions_start(
   mln_render_session session, mln_buffer_view source_id,
   mln_buffer_view feature, mln_buffer_view extension,
   mln_buffer_view extension_field, const mln_buffer_view* arguments,
-  mln_buffer* out_result
+  mln_operation* out_operation
+) MLN_NOEXCEPT;
+
+/** Takes the owned JSON bytes from a completed render query operation. */
+MLN_API mln_status mln_render_query_take_result(
+  mln_operation operation, mln_buffer* out_result
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

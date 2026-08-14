@@ -262,72 +262,81 @@ func (options *cSourceFeatureQueryOptions) free() {
 	}
 }
 
-// SetFeatureState sets per-feature state on a render source. The state value is
-// copied before the call returns.
-func (session *RenderSessionHandle) SetFeatureState(selector FeatureStateSelector, state []byte) error {
-	ptr, release, err := session.ptr()
-	if err != nil {
-		return err
+func renderJSONOperation(
+	session *RenderSessionHandle,
+	raw C.mln_operation,
+	take func(C.mln_operation, *C.mln_buffer) int32,
+) (*OperationHandle[[]byte], error) {
+	if raw == 0 {
+		return nil, newBindingError(ErrInvalidState, "render query did not return an operation")
 	}
-	defer release()
-	defer session.state.KeepAlive()
-	rawSelector := newCFeatureStateSelector(selector)
-	defer rawSelector.free()
+	operation := newOwnedOperationHandle[[]byte](
+		session.parent.runtime,
+		session.state.AddChild(),
+		uint64(raw),
+		0,
+		0,
+	)
+	operation.takeResult = func(id uint64) ([]byte, bool, error) {
+		var buffer C.mln_buffer
+		if err := checkNative(func() int32 {
+			return take(C.mln_operation(id), &buffer)
+		}); err != nil {
+			return nil, false, err
+		}
+		result, err := goOwnedBuffer(buffer)
+		return result, true, err
+	}
+	return operation, nil
+}
+
+// SetFeatureStateStart starts an ordered feature-state update.
+func (session *RenderSessionHandle) SetFeatureStateStart(selector FeatureStateSelector, state []byte) (*OperationHandle[struct{}], error) {
+	raw := newCFeatureStateSelector(selector)
+	defer raw.free()
 	rawState := newCBufferView(state)
 	defer rawState.free()
-	return session.withNoAcquiredFrame(func() error {
-		return checkNative(func() int32 {
-			return int32(C.mln_render_session_set_feature_state(C.mln_render_session(ptr), &rawSelector.raw, rawState.raw()))
-		})
+	return session.startOperation(func(s C.mln_render_session, operation *C.mln_operation) int32 {
+		return int32(C.mln_render_session_set_feature_state_start(s, raw.sourceID.raw(), raw.sourceLayerID.raw(), raw.featureID.raw(), rawState.raw(), operation))
 	})
 }
 
-// FeatureState returns copied per-feature state from a render source.
-func (session *RenderSessionHandle) FeatureState(selector FeatureStateSelector) ([]byte, error) {
+// FeatureStateStart starts a renderer-affine feature-state query.
+func (session *RenderSessionHandle) FeatureStateStart(selector FeatureStateSelector) (*OperationHandle[[]byte], error) {
 	ptr, release, err := session.ptr()
 	if err != nil {
 		return nil, err
 	}
 	defer release()
-	defer session.state.KeepAlive()
-	rawSelector := newCFeatureStateSelector(selector)
-	defer rawSelector.free()
-	var buffer C.mln_buffer
-	if err := session.withNoAcquiredFrame(func() error {
-		return checkNative(func() int32 {
-			return int32(C.mln_render_session_get_feature_state(C.mln_render_session(ptr), &rawSelector.raw, &buffer))
-		})
+	raw := newCFeatureStateSelector(selector)
+	defer raw.free()
+	var operation C.mln_operation
+	if err := checkNative(func() int32 {
+		return int32(C.mln_render_session_get_feature_state_start(C.mln_render_session(ptr), raw.sourceID.raw(), raw.sourceLayerID.raw(), raw.featureID.raw(), &operation))
 	}); err != nil {
 		return nil, err
 	}
-	return goOwnedBuffer(buffer)
-}
-
-// RemoveFeatureState removes per-feature state from a render source.
-func (session *RenderSessionHandle) RemoveFeatureState(selector FeatureStateSelector) error {
-	ptr, release, err := session.ptr()
-	if err != nil {
-		return err
-	}
-	defer release()
-	defer session.state.KeepAlive()
-	rawSelector := newCFeatureStateSelector(selector)
-	defer rawSelector.free()
-	return session.withNoAcquiredFrame(func() error {
-		return checkNative(func() int32 {
-			return int32(C.mln_render_session_remove_feature_state(C.mln_render_session(ptr), &rawSelector.raw))
-		})
+	return renderJSONOperation(session, operation, func(op C.mln_operation, out *C.mln_buffer) int32 {
+		return int32(C.mln_render_session_get_feature_state_take_result(op, out))
 	})
 }
 
-// QueryRenderedFeatures queries rendered features from the latest render session state.
-func (session *RenderSessionHandle) QueryRenderedFeatures(geometry RenderedQueryGeometry, options *RenderedFeatureQueryOptions) ([]byte, error) {
+// RemoveFeatureStateStart starts an ordered feature-state removal.
+func (session *RenderSessionHandle) RemoveFeatureStateStart(selector FeatureStateSelector) (*OperationHandle[struct{}], error) {
+	raw := newCFeatureStateSelector(selector)
+	defer raw.free()
+	return session.startOperation(func(s C.mln_render_session, operation *C.mln_operation) int32 {
+		return int32(C.mln_render_session_remove_feature_state_start(s, raw.sourceID.raw(), raw.sourceLayerID.raw(), raw.featureID.raw(), raw.stateKey.raw(), operation))
+	})
+}
+
+// QueryRenderedFeaturesStart starts a query against the latest driver state.
+func (session *RenderSessionHandle) QueryRenderedFeaturesStart(geometry RenderedQueryGeometry, options *RenderedFeatureQueryOptions) (*OperationHandle[[]byte], error) {
 	ptr, release, err := session.ptr()
 	if err != nil {
 		return nil, err
 	}
 	defer release()
-	defer session.state.KeepAlive()
 	rawGeometry := newCRenderedQueryGeometry(geometry)
 	defer rawGeometry.free()
 	rawOptions, err := newCRenderedFeatureQueryOptions(options)
@@ -335,85 +344,87 @@ func (session *RenderSessionHandle) QueryRenderedFeatures(geometry RenderedQuery
 		return nil, newBindingError(ErrInvalidArgument, err.Error())
 	}
 	defer rawOptions.free()
-	var result C.mln_buffer
-	if err := session.withNoAcquiredFrame(func() error {
-		return checkNative(func() int32 {
-			return int32(C.mln_render_session_query_rendered_features(C.mln_render_session(ptr), rawGeometry.ptr(), rawOptions.ptr(), &result))
-		})
+	var operation C.mln_operation
+	if err := checkNative(func() int32 {
+		return int32(C.mln_render_session_query_rendered_features_start(
+			C.mln_render_session(ptr),
+			rawGeometry.ptr(),
+			rawOptions.ptr(),
+			&operation,
+		))
 	}); err != nil {
 		return nil, err
 	}
-	return goOwnedBuffer(result)
+	return renderJSONOperation(session, operation, func(op C.mln_operation, out *C.mln_buffer) int32 {
+		return int32(C.mln_render_query_take_result(op, out))
+	})
 }
 
-// QuerySourceFeatures queries source features from the latest render session state.
-func (session *RenderSessionHandle) QuerySourceFeatures(sourceID string, options *SourceFeatureQueryOptions) ([]byte, error) {
+// QuerySourceFeaturesStart starts a source query against the latest driver state.
+func (session *RenderSessionHandle) QuerySourceFeaturesStart(sourceID string, options *SourceFeatureQueryOptions) (*OperationHandle[[]byte], error) {
 	ptr, release, err := session.ptr()
 	if err != nil {
 		return nil, err
 	}
 	defer release()
-	defer session.state.KeepAlive()
-	sourceView := newCStringView(sourceID)
-	defer sourceView.free()
+	source := newCStringView(sourceID)
+	defer source.free()
 	rawOptions, err := newCSourceFeatureQueryOptions(options)
 	if err != nil {
 		return nil, newBindingError(ErrInvalidArgument, err.Error())
 	}
 	defer rawOptions.free()
-	var result C.mln_buffer
-	if err := session.withNoAcquiredFrame(func() error {
-		return checkNative(func() int32 {
-			return int32(C.mln_render_session_query_source_features(C.mln_render_session(ptr), sourceView.raw(), rawOptions.ptr(), &result))
-		})
+	var operation C.mln_operation
+	if err := checkNative(func() int32 {
+		return int32(C.mln_render_session_query_source_features_start(
+			C.mln_render_session(ptr),
+			source.raw(),
+			rawOptions.ptr(),
+			&operation,
+		))
 	}); err != nil {
 		return nil, err
 	}
-	return goOwnedBuffer(result)
+	return renderJSONOperation(session, operation, func(op C.mln_operation, out *C.mln_buffer) int32 {
+		return int32(C.mln_render_query_take_result(op, out))
+	})
 }
 
-// QueryFeatureExtensions queries a feature extension from the latest render
-// session state.
-//
-// feature contains one UTF-8 GeoJSON Feature. arguments, when present, contains
-// a UTF-8 JSON object. The result contains either JSON or GeoJSON bytes.
-func (session *RenderSessionHandle) QueryFeatureExtensions(sourceID string, feature []byte, extension string, extensionField string, arguments []byte) ([]byte, error) {
+// QueryFeatureExtensionsStart starts a feature-extension query.
+func (session *RenderSessionHandle) QueryFeatureExtensionsStart(sourceID string, feature []byte, extension, extensionField string, arguments []byte) (*OperationHandle[[]byte], error) {
 	ptr, release, err := session.ptr()
 	if err != nil {
 		return nil, err
 	}
 	defer release()
-	defer session.state.KeepAlive()
-	sourceView := newCStringView(sourceID)
-	defer sourceView.free()
-	extensionView := newCStringView(extension)
-	defer extensionView.free()
-	extensionFieldView := newCStringView(extensionField)
-	defer extensionFieldView.free()
+	source, ext, field := newCStringView(sourceID), newCStringView(extension), newCStringView(extensionField)
+	defer source.free()
+	defer ext.free()
+	defer field.free()
 	featureView := newCBufferView(feature)
 	defer featureView.free()
-	var argumentsView cBufferView
-	var rawArguments *C.mln_buffer_view
+	var argumentView cBufferView
+	var argument *C.mln_buffer_view
 	if arguments != nil {
-		argumentsView = newCBufferView(arguments)
-		defer argumentsView.free()
-		rawArguments = argumentsView.ptr()
+		argumentView = newCBufferView(arguments)
+		defer argumentView.free()
+		argument = argumentView.ptr()
 	}
-	var result C.mln_buffer
-	if err := session.withNoAcquiredFrame(func() error {
-		return checkNative(func() int32 {
-			return int32(C.mln_render_session_query_feature_extensions(
-				C.mln_render_session(ptr),
-				sourceView.raw(),
-				featureView.raw(),
-				extensionView.raw(),
-				extensionFieldView.raw(),
-				rawArguments,
-				&result,
-			))
-		})
+	var operation C.mln_operation
+	if err := checkNative(func() int32 {
+		return int32(C.mln_render_session_query_feature_extensions_start(
+			C.mln_render_session(ptr),
+			source.raw(),
+			featureView.raw(),
+			ext.raw(),
+			field.raw(),
+			argument,
+			&operation,
+		))
 	}); err != nil {
 		return nil, err
 	}
-	return goOwnedBuffer(result)
+	return renderJSONOperation(session, operation, func(op C.mln_operation, out *C.mln_buffer) int32 {
+		return int32(C.mln_render_query_take_result(op, out))
+	})
 }

@@ -1,10 +1,14 @@
 use std::error::Error as StdError;
+use std::time::Duration;
 
-use maplibre_native_ffi::{Error, ErrorKind, MapHandle, RenderResult, RenderSessionHandle};
+use maplibre_native_ffi::{
+    Error, ErrorKind, GpuSync, MapHandle, RenderSessionAttachOptions, RenderSessionAttachment,
+    RenderSessionHandle,
+};
 
 use crate::graphics::GraphicsContext;
-use crate::metal::{MetalBorrowedTexture, MetalContext, MetalTextureCompositor};
-use crate::render_target::{Mode, extent};
+use crate::metal::{MetalBorrowedTexture, MetalTextureCompositor};
+use crate::render_target::{Mode, extent, request_render_frame, require_cpu_complete_producer};
 use crate::viewport::Viewport;
 
 pub enum RenderTarget {
@@ -30,15 +34,55 @@ impl RenderTarget {
         viewport: Viewport,
     ) -> maplibre_native_ffi::Result<Self> {
         let metal = graphics.metal();
+        let options =
+            RenderSessionAttachOptions::core_worker(if mode == Mode::OwnedTexture { 2 } else { 0 });
         match mode {
-            Mode::OwnedTexture => attach_owned_texture(map, metal, viewport),
-            Mode::BorrowedTexture => attach_borrowed_texture(map, metal, viewport),
-            Mode::NativeSurface => attach_surface(map, metal, viewport),
+            Mode::OwnedTexture => {
+                let descriptor = maplibre_native_ffi::MetalOwnedTextureDescriptor::new(
+                    extent(viewport),
+                    metal.context_descriptor(),
+                );
+                let session = finish_attach(map.attach_metal_owned_texture(&descriptor, options)?)?;
+                let compositor = MetalTextureCompositor::new(metal).map_err(|error| {
+                    compositor_error(format!("Metal compositor creation failed: {error:?}"))
+                })?;
+                Ok(Self::OwnedTexture {
+                    session,
+                    compositor: Box::new(compositor),
+                })
+            }
+            Mode::BorrowedTexture => {
+                let texture = MetalBorrowedTexture::new(metal, viewport)?;
+                let descriptor = maplibre_native_ffi::MetalBorrowedTextureDescriptor::new(
+                    extent(viewport),
+                    viewport.physical_width,
+                    viewport.physical_height,
+                    texture.pointer(),
+                );
+                let session =
+                    finish_attach(map.attach_metal_borrowed_texture(&descriptor, options)?)?;
+                let compositor = MetalTextureCompositor::new(metal).map_err(|error| {
+                    compositor_error(format!("Metal compositor creation failed: {error:?}"))
+                })?;
+                Ok(Self::BorrowedTexture {
+                    session,
+                    compositor: Box::new(compositor),
+                    texture: Box::new(texture),
+                })
+            }
+            Mode::NativeSurface => {
+                let descriptor = maplibre_native_ffi::MetalSurfaceDescriptor::new(
+                    extent(viewport),
+                    metal.context_descriptor(),
+                    metal.layer_pointer(),
+                );
+                Ok(Self::Surface {
+                    session: finish_attach(map.attach_metal_surface(&descriptor, options)?)?,
+                })
+            }
         }
     }
 
-    /// Resizes without closing the session; a caller-owned texture is replaced
-    /// with one at the new size and handed over.
     pub fn resize(
         &mut self,
         graphics: &GraphicsContext,
@@ -55,21 +99,16 @@ impl RenderTarget {
                     viewport.physical_height,
                     replacement.pointer(),
                 );
-                if let Err(error) = session.set_metal_borrowed_texture_target(&descriptor) {
-                    // On failure the session may already hold the replacement,
-                    // so keep it alive rather than hand over a dangling
-                    // texture.
-                    std::mem::forget(replacement);
-                    return Err(error);
-                }
+                let operation = session.set_metal_borrowed_texture_target(&descriptor)?;
+                wait_core(&operation, "Metal target replacement")?;
+                operation.release();
                 **texture = replacement;
                 Ok(())
             }
-            Self::OwnedTexture { session, .. } | Self::Surface { session } => session.resize(
-                viewport.logical_width,
-                viewport.logical_height,
-                viewport.scale_factor,
-            ),
+            Self::OwnedTexture { session, .. } | Self::Surface { session } => {
+                session.resize(&extent(viewport))?.release();
+                Ok(())
+            }
         }
     }
 
@@ -77,39 +116,36 @@ impl RenderTarget {
         &mut self,
         _graphics: &GraphicsContext,
     ) -> maplibre_native_ffi::Result<bool> {
+        let present = matches!(self, Self::Surface { .. });
+        let session = match self {
+            Self::OwnedTexture { session, .. }
+            | Self::BorrowedTexture { session, .. }
+            | Self::Surface { session } => session,
+        };
+        let rendered = request_render_frame(session, present, false)?;
+        if !rendered {
+            return Ok(false);
+        }
         match self {
             Self::OwnedTexture {
                 session,
                 compositor,
             } => {
-                if session.render_update()? != RenderResult::Rendered {
-                    return Ok(false);
-                }
-                let frame = session.acquire_metal_owned_texture_frame()?;
-                let draw_result = compositor.draw(&frame);
-                let close_result = frame.close().map_err(|error| error.into_error());
-                match (draw_result, close_result) {
-                    (Ok(presented), Ok(())) => Ok(presented),
-                    (Err(draw_error), Ok(())) => Err(draw_error),
-                    (Ok(_), Err(close_error)) => Err(close_error),
-                    (Err(draw_error), Err(close_error)) => Err(Error::new(
-                        draw_error.kind(),
-                        draw_error.raw_status(),
-                        format!("{draw_error}; frame cleanup failed: {close_error}"),
-                    )),
-                }
+                let frame = session.acquire_frame()?;
+                require_cpu_complete_producer(&frame)?;
+                let presented = compositor.draw(&frame)?;
+                frame
+                    .release(GpuSync::CPU_COMPLETE)
+                    .map_err(|error| error.into_error())?
+                    .release();
+                Ok(presented)
             }
             Self::BorrowedTexture {
-                session,
                 compositor,
                 texture,
-            } => {
-                if session.render_update()? != RenderResult::Rendered {
-                    return Ok(false);
-                }
-                compositor.draw_texture(texture.texture())
-            }
-            Self::Surface { session } => Ok(session.render_update()? == RenderResult::Rendered),
+                ..
+            } => compositor.draw_texture(texture.texture()),
+            Self::Surface { .. } => Ok(true),
         }
     }
 
@@ -119,9 +155,10 @@ impl RenderTarget {
                 session,
                 compositor,
             } => {
+                detach_core(&session)?;
                 drop(compositor);
                 session
-                    .close()
+                    .destroy()
                     .map_err(|error| Box::new(error) as Box<dyn StdError>)
             }
             Self::BorrowedTexture {
@@ -129,89 +166,60 @@ impl RenderTarget {
                 compositor,
                 texture,
             } => {
+                detach_core(&session)?;
                 drop(compositor);
-                let result = session
-                    .close()
-                    .map_err(|error| Box::new(error) as Box<dyn StdError>);
                 drop(texture);
-                result
+                session
+                    .destroy()
+                    .map_err(|error| Box::new(error) as Box<dyn StdError>)
             }
-            Self::Surface { session } => session
-                .close()
-                .map_err(|error| Box::new(error) as Box<dyn StdError>),
+            Self::Surface { session } => {
+                detach_core(&session)?;
+                session
+                    .destroy()
+                    .map_err(|error| Box::new(error) as Box<dyn StdError>)
+            }
         }
     }
 }
 
-fn attach_owned_texture(
-    map: &MapHandle,
-    metal: &MetalContext,
-    viewport: Viewport,
-) -> maplibre_native_ffi::Result<RenderTarget> {
-    let descriptor = maplibre_native_ffi::MetalOwnedTextureDescriptor::new(
-        extent(viewport),
-        metal.context_descriptor(),
-    );
-    let session = map.attach_metal_owned_texture(&descriptor)?;
-    let compositor = match MetalTextureCompositor::new(metal) {
-        Ok(compositor) => compositor,
-        Err(error) => {
-            let mut message = format!("Metal texture compositor creation failed: {error:?}");
-            if let Err(close_error) = session.close() {
-                message.push_str(&format!("; render session cleanup failed: {close_error}"));
-            }
-            return Err(compositor_error(message));
-        }
-    };
-    Ok(RenderTarget::OwnedTexture {
-        session,
-        compositor: Box::new(compositor),
-    })
+fn finish_attach(
+    attachment: RenderSessionAttachment,
+) -> maplibre_native_ffi::Result<RenderSessionHandle> {
+    if !attachment.operation.wait(Duration::from_secs(30))? {
+        return Err(compositor_error("render attachment timed out"));
+    }
+    if attachment.operation.terminal_status()? != 0 {
+        return Err(compositor_error(attachment.operation.diagnostic()?));
+    }
+    let session = attachment.session;
+    attachment.operation.release();
+    Ok(session)
 }
 
-fn attach_borrowed_texture(
-    map: &MapHandle,
-    metal: &MetalContext,
-    viewport: Viewport,
-) -> maplibre_native_ffi::Result<RenderTarget> {
-    let texture = MetalBorrowedTexture::new(metal, viewport)?;
-    let descriptor = maplibre_native_ffi::MetalBorrowedTextureDescriptor::new(
-        extent(viewport),
-        viewport.physical_width,
-        viewport.physical_height,
-        texture.pointer(),
-    );
-    let session = map.attach_metal_borrowed_texture(&descriptor)?;
-    let compositor = match MetalTextureCompositor::new(metal) {
-        Ok(compositor) => compositor,
-        Err(error) => {
-            let mut message = format!("Metal texture compositor creation failed: {error:?}");
-            if let Err(close_error) = session.close() {
-                message.push_str(&format!("; render session cleanup failed: {close_error}"));
-            }
-            return Err(compositor_error(message));
-        }
-    };
-    Ok(RenderTarget::BorrowedTexture {
-        session,
-        compositor: Box::new(compositor),
-        texture: Box::new(texture),
-    })
+fn wait_core(
+    operation: &maplibre_native_ffi::OperationHandle<()>,
+    name: &str,
+) -> maplibre_native_ffi::Result<()> {
+    if !operation.wait(Duration::from_secs(30))? {
+        return Err(compositor_error(format!("{name} timed out")));
+    }
+    if operation.terminal_status()? != 0 {
+        return Err(compositor_error(operation.diagnostic()?));
+    }
+    Ok(())
 }
 
-fn attach_surface(
-    map: &MapHandle,
-    metal: &MetalContext,
-    viewport: Viewport,
-) -> maplibre_native_ffi::Result<RenderTarget> {
-    let descriptor = maplibre_native_ffi::MetalSurfaceDescriptor::new(
-        extent(viewport),
-        metal.context_descriptor(),
-        metal.layer_pointer(),
-    );
-    Ok(RenderTarget::Surface {
-        session: map.attach_metal_surface(&descriptor)?,
-    })
+fn detach_core(session: &RenderSessionHandle) -> Result<(), Box<dyn StdError>> {
+    let operation = session.detach()?;
+    if !operation.wait(Duration::from_secs(30))? {
+        return Err("render detach timed out".into());
+    }
+    if operation.terminal_status()? != 0 {
+        return Err(operation.diagnostic()?.into());
+    }
+    operation.release();
+    Ok(())
 }
 
 fn compositor_error(message: impl Into<String>) -> Error {

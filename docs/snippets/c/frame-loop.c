@@ -1,5 +1,5 @@
-// One turn of a display-paced host loop: drain scheduled notifications and draw
-// a published render update. Call it from the frame callback.
+// One turn of a display-paced host loop: drain scheduled notifications, service
+// caller-driver work, and submit a frame demand when the map invalidates.
 
 #include <maplibre_native_c.h>
 #include <stdatomic.h>
@@ -11,9 +11,9 @@ typedef struct frame_receiver {
   atomic_bool scheduled;
   void (*schedule)(void* user_data);
   void* schedule_user_data;
+  uint64_t next_frame_token;
 } frame_receiver;
 
-// This callback may run on any native thread. It only schedules the receiver.
 void schedule_frame_receiver(void* user_data) {
   frame_receiver* receiver = user_data;
   atomic_store_explicit(&receiver->scheduled, true, memory_order_release);
@@ -55,6 +55,29 @@ static void drain_runtime_events(frame_receiver* receiver, bool* pending) {
   mln_event_batch_release(batch);
 }
 
+static void drain_frame_results(mln_render_session session, bool* pending) {
+  mln_render_frame_batch batch = MLN_HANDLE_NULL;
+  if (
+    mln_render_session_drain_frame_results(session, 0, &batch) != MLN_STATUS_OK
+  )
+    return;
+  size_t count = 0;
+  if (mln_render_frame_batch_count(batch, &count) == MLN_STATUS_OK) {
+    for (size_t index = 0; index < count; index++) {
+      mln_render_frame_result result = {
+        .size = sizeof(mln_render_frame_result)
+      };
+      if (
+        mln_render_frame_batch_get(batch, index, &result) == MLN_STATUS_OK &&
+        result.disposition != MLN_RENDER_RESULT_RENDERED
+      ) {
+        *pending = true;
+      }
+    }
+  }
+  mln_render_frame_batch_release(batch);
+}
+
 void run_one_frame(
   frame_receiver* receiver, mln_render_session session, bool* pending
 ) {
@@ -74,10 +97,23 @@ void run_one_frame(
             (const char*)view.endpoints + index * view.endpoint_size;
           const mln_ready_endpoint* endpoint = (const mln_ready_endpoint*)bytes;
           if (
-            endpoint->kind == MLN_NOTIFICATION_ENDPOINT_RUNTIME_EVENTS &&
-            endpoint->id == receiver->runtime
+            endpoint->id == receiver->runtime &&
+            endpoint->kind == MLN_NOTIFICATION_ENDPOINT_RUNTIME_EVENTS
           ) {
             drain_runtime_events(receiver, pending);
+          } else if (
+            endpoint->id == session &&
+            endpoint->kind == MLN_NOTIFICATION_ENDPOINT_DRIVER_WORK
+          ) {
+            size_t serviced = 0;
+            (void)mln_render_session_service_driver_work(
+              session, 64, &serviced
+            );
+          } else if (
+            endpoint->id == session &&
+            endpoint->kind == MLN_NOTIFICATION_ENDPOINT_RENDER_FRAMES
+          ) {
+            drain_frame_results(session, pending);
           }
         }
       }
@@ -89,9 +125,10 @@ void run_one_frame(
   // #region render
   if (!*pending) return;
   *pending = false;
-  mln_render_result result = MLN_RENDER_RESULT_NO_UPDATE;
-  const mln_status status = mln_render_session_render_update(session, &result);
-  if (status != MLN_STATUS_OK || result != MLN_RENDER_RESULT_RENDERED) {
+  mln_frame_demand demand = mln_frame_demand_default();
+  demand.flags = MLN_FRAME_DEMAND_IF_NEEDED | MLN_FRAME_DEMAND_PRESENT;
+  demand.token = ++receiver->next_frame_token;
+  if (mln_render_session_request_frame(session, &demand) != MLN_STATUS_OK) {
     *pending = true;
   }
   // #endregion render

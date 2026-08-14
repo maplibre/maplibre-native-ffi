@@ -653,6 +653,10 @@ auto map_native(MapObject* map) -> mbgl::Map*;
 auto map_post_resize(mln_map map, mln_logical_extent extent) -> mln_status;
 auto map_post_trigger_repaint(mln_map map) -> mln_status;
 auto map_latest_update(mln_map map) -> std::shared_ptr<mbgl::UpdateParameters>;
+auto map_latest_update_generation(mln_map map) noexcept -> uint64_t;
+auto map_set_render_session_publish_callback(
+  mln_map map, std::function<void()> callback
+) -> mln_status;
 auto map_renderer_observer(mln_map map) -> mbgl::RendererObserver*;
 auto map_run_render_jobs(mln_map map) -> void;
 auto map_attach_render_target_session(mln_map map, void* session) -> mln_status;

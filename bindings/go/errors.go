@@ -26,6 +26,14 @@ var (
 	ErrUnsupported = errors.New("maplibre: unsupported")
 	// ErrNative reports a MapLibre Native error converted to a C status.
 	ErrNative = errors.New("maplibre: native error")
+	// ErrCancelled reports a terminal cancelled operation.
+	ErrCancelled = errors.New("maplibre: cancelled")
+	// ErrBusy reports a conflicting driver or lifecycle call.
+	ErrBusy = errors.New("maplibre: busy")
+	// ErrTargetLost reports irreversible render-target loss.
+	ErrTargetLost = errors.New("maplibre: target lost")
+	// ErrNotReady reports that a nonblocking call has no result yet.
+	ErrNotReady = errors.New("maplibre: not ready")
 	// ErrABIVersionMismatch reports that the loaded C ABI version is
 	// incompatible with this binding.
 	ErrABIVersionMismatch = errors.New("maplibre: ABI version mismatch")
@@ -121,6 +129,14 @@ func kindForStatus(status int32) error {
 		return ErrUnsupported
 	case int32(C.MLN_STATUS_NATIVE_ERROR):
 		return ErrNative
+	case int32(C.MLN_STATUS_CANCELLED):
+		return ErrCancelled
+	case int32(C.MLN_STATUS_BUSY):
+		return ErrBusy
+	case int32(C.MLN_STATUS_TARGET_LOST):
+		return ErrTargetLost
+	case int32(C.MLN_STATUS_NOT_READY):
+		return ErrNotReady
 	default:
 		return ErrUnknownStatus
 	}

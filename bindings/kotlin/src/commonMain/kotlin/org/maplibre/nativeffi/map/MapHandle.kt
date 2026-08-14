@@ -12,7 +12,9 @@ import org.maplibre.nativeffi.render.OpenGLBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.OpenGLOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.OpenGLSurfaceDescriptor
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
-import org.maplibre.nativeffi.render.RenderSessionHandle
+import org.maplibre.nativeffi.render.RenderDriver
+import org.maplibre.nativeffi.render.RenderSessionAttachOptions
+import org.maplibre.nativeffi.render.RenderSessionAttachment
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
@@ -311,39 +313,57 @@ public expect class MapHandle {
   public suspend fun queryCamera(): CameraSnapshot
 
   /**
-   * Attaches a render target to this map, returning the map's one live render session.
-   *
-   * The calling thread becomes the session's owner thread for the session's lifetime. For a
-   * graphics API with a thread-current context, call this on the thread where that context is
-   * current. Every session call, including close, throws `WrongThreadException` from any other
-   * thread.
-   *
-   * Close the session before closing the map. Native map execution continues independently on the
-   * runtime worker.
+   * Starts attaching a render target and returns its immediately usable session plus completion
+   * operation. A caller-graphics-thread session can service attachment work while the operation is
+   * pending.
    */
-  public fun attachMetalOwnedTexture(descriptor: MetalOwnedTextureDescriptor): RenderSessionHandle
+  public fun attachMetalOwnedTexture(
+    descriptor: MetalOwnedTextureDescriptor,
+    options: RenderSessionAttachOptions = RenderSessionAttachOptions(),
+  ): RenderSessionAttachment
 
   public fun attachMetalBorrowedTexture(
-    descriptor: MetalBorrowedTextureDescriptor
-  ): RenderSessionHandle
+    descriptor: MetalBorrowedTextureDescriptor,
+    options: RenderSessionAttachOptions = RenderSessionAttachOptions(),
+  ): RenderSessionAttachment
 
-  public fun attachVulkanOwnedTexture(descriptor: VulkanOwnedTextureDescriptor): RenderSessionHandle
+  public fun attachVulkanOwnedTexture(
+    descriptor: VulkanOwnedTextureDescriptor,
+    options: RenderSessionAttachOptions = RenderSessionAttachOptions(),
+  ): RenderSessionAttachment
 
   public fun attachVulkanBorrowedTexture(
-    descriptor: VulkanBorrowedTextureDescriptor
-  ): RenderSessionHandle
+    descriptor: VulkanBorrowedTextureDescriptor,
+    options: RenderSessionAttachOptions = RenderSessionAttachOptions(),
+  ): RenderSessionAttachment
 
-  public fun attachOpenGLOwnedTexture(descriptor: OpenGLOwnedTextureDescriptor): RenderSessionHandle
+  public fun attachOpenGLOwnedTexture(
+    descriptor: OpenGLOwnedTextureDescriptor,
+    options: RenderSessionAttachOptions =
+      RenderSessionAttachOptions(driver = RenderDriver.CALLER_GRAPHICS_THREAD),
+  ): RenderSessionAttachment
 
   public fun attachOpenGLBorrowedTexture(
-    descriptor: OpenGLBorrowedTextureDescriptor
-  ): RenderSessionHandle
+    descriptor: OpenGLBorrowedTextureDescriptor,
+    options: RenderSessionAttachOptions =
+      RenderSessionAttachOptions(driver = RenderDriver.CALLER_GRAPHICS_THREAD),
+  ): RenderSessionAttachment
 
-  public fun attachMetalSurface(descriptor: MetalSurfaceDescriptor): RenderSessionHandle
+  public fun attachMetalSurface(
+    descriptor: MetalSurfaceDescriptor,
+    options: RenderSessionAttachOptions = RenderSessionAttachOptions(),
+  ): RenderSessionAttachment
 
-  public fun attachVulkanSurface(descriptor: VulkanSurfaceDescriptor): RenderSessionHandle
+  public fun attachVulkanSurface(
+    descriptor: VulkanSurfaceDescriptor,
+    options: RenderSessionAttachOptions = RenderSessionAttachOptions(),
+  ): RenderSessionAttachment
 
-  public fun attachOpenGLSurface(descriptor: OpenGLSurfaceDescriptor): RenderSessionHandle
+  public fun attachOpenGLSurface(
+    descriptor: OpenGLSurfaceDescriptor,
+    options: RenderSessionAttachOptions =
+      RenderSessionAttachOptions(driver = RenderDriver.CALLER_GRAPHICS_THREAD),
+  ): RenderSessionAttachment
 
   public suspend fun createProjection(): MapProjectionHandle
 

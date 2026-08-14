@@ -64,6 +64,7 @@ class OperationHandle(
         operation: int,
         take_result: Callable[[int], object] | None,
         adapt_result: Callable[[object], _T] | None,
+        retained_owner: object | None = None,
         _create_key: object | None = None,
     ) -> None:
         if _create_key is not _OPERATION_HANDLE_CREATE_KEY:
@@ -73,6 +74,7 @@ class OperationHandle(
         self._operation = operation
         self._take_result = take_result
         self._adapt_result = adapt_result
+        self._retained_owner = retained_owner
         self._state_lock = RLock()
         self._idle = Condition(self._state_lock)
         self._active_uses = 0
@@ -88,12 +90,14 @@ class OperationHandle(
         operation: int,
         take_result: Callable[[int], object] | None = None,
         adapt_result: Callable[[object], U] | None = None,
+        retained_owner: object | None = None,
     ) -> OperationHandle[U]:
         return OperationHandle(
             runtime,
             operation,
             take_result,
             adapt_result,
+            retained_owner,
             _create_key=_OPERATION_HANDLE_CREATE_KEY,
         )
 
@@ -137,6 +141,7 @@ class OperationHandle(
             self._closing = False
             self._idle.notify_all()
         self._runtime._unregister_operation(self)
+        self._retained_owner = None
 
     def __del__(self) -> None:
         super().__del__()

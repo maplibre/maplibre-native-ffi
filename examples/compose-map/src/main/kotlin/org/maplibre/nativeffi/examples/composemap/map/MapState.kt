@@ -153,8 +153,11 @@ internal class MapState(
   fun drainNotifications() {
     if (!notificationPending.getAndSet(false)) return
     do {
-      val eventsReady = runtime.drainReady().any { it.kind == ReadyEndpoint.Kind.RUNTIME_EVENTS }
-      if (eventsReady && drainEvents()) requestRender()
+      val ready = runtime.drainReady()
+      if (ready.any { it.kind == ReadyEndpoint.Kind.DRIVER_WORK }) requestRender()
+      if (ready.any { it.kind == ReadyEndpoint.Kind.RUNTIME_EVENTS } && drainEvents()) {
+        requestRender()
+      }
     } while (notificationPending.getAndSet(false))
   }
 

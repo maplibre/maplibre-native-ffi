@@ -18,6 +18,9 @@ public value class MaplibreStatus(public val nativeCode: Int) {
     public val UNSUPPORTED: MaplibreStatus = MaplibreStatus(-4)
     public val NATIVE_ERROR: MaplibreStatus = MaplibreStatus(-5)
     public val CANCELLED: MaplibreStatus = MaplibreStatus(-6)
+    public val BUSY: MaplibreStatus = MaplibreStatus(-7)
+    public val TARGET_LOST: MaplibreStatus = MaplibreStatus(-8)
+    public val NOT_READY: MaplibreStatus = MaplibreStatus(-9)
 
     /** Returns the Kotlin status category for a C ABI status value. */
     internal fun fromNative(nativeCode: Int): MaplibreStatus = MaplibreStatus(nativeCode)

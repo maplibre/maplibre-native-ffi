@@ -139,10 +139,35 @@ struct NativeEglContextDescriptor: Equatable {
   }
 }
 
+struct NativeWebGLContextDescriptor: Equatable {
+  enum Kind: UInt32, Equatable {
+    case existing = 0
+    case transferredCanvas = 1
+  }
+
+  let kind: Kind
+  let context: Int32
+  let canvasSelector: String
+
+  func withNative<Result>(
+    _ body: (mln_webgl_context_descriptor) throws -> Result
+  ) throws -> Result {
+    try NativeString.withStringView(canvasSelector) { selector in
+      try body(mln_webgl_context_descriptor(
+        size: UInt32(MemoryLayout<mln_webgl_context_descriptor>.size),
+        kind: kind.rawValue,
+        context: context,
+        canvas_selector: selector
+      ))
+    }
+  }
+}
+
 struct NativeOpenGLContextDescriptor: Equatable {
   enum Platform: Equatable {
     case wgl(NativeWglContextDescriptor)
     case egl(NativeEglContextDescriptor)
+    case webGL(NativeWebGLContextDescriptor)
   }
 
   let platform: Platform
@@ -156,7 +181,9 @@ struct NativeOpenGLContextDescriptor: Equatable {
     self.ownershipRawValue = ownershipRawValue
   }
 
-  var native: mln_opengl_context_descriptor {
+  func withNative<Result>(
+    _ body: (mln_opengl_context_descriptor) throws -> Result
+  ) throws -> Result {
     var descriptor = mln_opengl_context_descriptor()
     descriptor.size = UInt32(MemoryLayout<mln_opengl_context_descriptor>.size)
     descriptor.ownership = mln_opengl_context_ownership(
@@ -166,11 +193,18 @@ struct NativeOpenGLContextDescriptor: Equatable {
     case let .wgl(context):
       descriptor.platform = MLN_OPENGL_CONTEXT_PLATFORM_WGL
       descriptor.data.wgl = context.native
+      return try body(descriptor)
     case let .egl(context):
       descriptor.platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL
       descriptor.data.egl = context.native
+      return try body(descriptor)
+    case let .webGL(context):
+      return try context.withNative { context in
+        descriptor.platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL
+        descriptor.data.webgl = context
+        return try body(descriptor)
+      }
     }
-    return descriptor
   }
 }
 
@@ -214,11 +248,13 @@ struct NativeOpenGLSurfaceDescriptorInput: Equatable {
   func withNativeDescriptor<Result>(
     _ body: (UnsafePointer<mln_opengl_surface_descriptor>) throws -> Result
   ) throws -> Result {
-    var descriptor = mln_opengl_surface_descriptor_default()
-    descriptor.extent = extent.native
-    descriptor.context = context.native
-    descriptor.surface = UnsafeMutableRawPointer(bitPattern: surfaceAddress)
-    return try withUnsafePointer(to: &descriptor, body)
+    try context.withNative { context in
+      var descriptor = mln_opengl_surface_descriptor_default()
+      descriptor.extent = extent.native
+      descriptor.context = context
+      descriptor.surface = UnsafeMutableRawPointer(bitPattern: surfaceAddress)
+      return try withUnsafePointer(to: &descriptor, body)
+    }
   }
 }
 
@@ -322,10 +358,12 @@ struct NativeOpenGLOwnedTextureDescriptorInput: Equatable {
     _ body: (UnsafePointer<mln_opengl_owned_texture_descriptor>) throws
       -> Result
   ) throws -> Result {
-    var descriptor = mln_opengl_owned_texture_descriptor_default()
-    descriptor.extent = extent.native
-    descriptor.context = context.native
-    return try withUnsafePointer(to: &descriptor, body)
+    try context.withNative { context in
+      var descriptor = mln_opengl_owned_texture_descriptor_default()
+      descriptor.extent = extent.native
+      descriptor.context = context
+      return try withUnsafePointer(to: &descriptor, body)
+    }
   }
 }
 
@@ -341,14 +379,16 @@ struct NativeOpenGLBorrowedTextureDescriptorInput: Equatable {
     _ body: (UnsafePointer<mln_opengl_borrowed_texture_descriptor>) throws
       -> Result
   ) throws -> Result {
-    var descriptor = mln_opengl_borrowed_texture_descriptor_default()
-    descriptor.extent = extent.native
-    descriptor.physical_width = physicalWidth
-    descriptor.physical_height = physicalHeight
-    descriptor.context = context.native
-    descriptor.texture = texture
-    descriptor.target = target
-    return try withUnsafePointer(to: &descriptor, body)
+    try context.withNative { context in
+      var descriptor = mln_opengl_borrowed_texture_descriptor_default()
+      descriptor.extent = extent.native
+      descriptor.physical_width = physicalWidth
+      descriptor.physical_height = physicalHeight
+      descriptor.context = context
+      descriptor.texture = texture
+      descriptor.target = target
+      return try withUnsafePointer(to: &descriptor, body)
+    }
   }
 }
 
@@ -373,5 +413,78 @@ struct NativeOpenGLOwnedTextureFrame {
 
   init(_ raw: mln_opengl_owned_texture_frame) {
     self.raw = raw
+  }
+}
+
+struct NativeWebGPUContextDescriptor: Equatable {
+  let instanceAddress: UInt
+  let deviceAddress: UInt
+  let queueAddress: UInt
+
+  var native: mln_webgpu_context_descriptor {
+    mln_webgpu_context_descriptor(
+      size: UInt32(MemoryLayout<mln_webgpu_context_descriptor>.size),
+      instance: UnsafeMutableRawPointer(bitPattern: instanceAddress),
+      device: UnsafeMutableRawPointer(bitPattern: deviceAddress),
+      queue: UnsafeMutableRawPointer(bitPattern: queueAddress)
+    )
+  }
+}
+
+struct NativeWebGPUSurfaceDescriptorInput: Equatable {
+  let extent: NativeRenderTargetExtent
+  let context: NativeWebGPUContextDescriptor
+  let surfaceAddress: UInt
+  let format: UInt32
+
+  func withNativeDescriptor<Result>(
+    _ body: (UnsafePointer<mln_webgpu_surface_descriptor>) throws -> Result
+  ) throws -> Result {
+    var value = mln_webgpu_surface_descriptor_default()
+    value.extent = extent.native
+    value.context = context.native
+    value.surface = UnsafeMutableRawPointer(bitPattern: surfaceAddress)
+    value.format = format
+    return try withUnsafePointer(to: &value, body)
+  }
+}
+
+struct NativeWebGPUOwnedTextureDescriptorInput: Equatable {
+  let extent: NativeRenderTargetExtent
+  let context: NativeWebGPUContextDescriptor
+
+  func withNativeDescriptor<Result>(
+    _ body: (UnsafePointer<mln_webgpu_owned_texture_descriptor>) throws
+      -> Result
+  ) throws -> Result {
+    var value = mln_webgpu_owned_texture_descriptor_default()
+    value.extent = extent.native
+    value.context = context.native
+    return try withUnsafePointer(to: &value, body)
+  }
+}
+
+struct NativeWebGPUBorrowedTextureDescriptorInput: Equatable {
+  let extent: NativeRenderTargetExtent
+  let physicalWidth: UInt32
+  let physicalHeight: UInt32
+  let context: NativeWebGPUContextDescriptor
+  let textureAddress: UInt
+  let textureViewAddress: UInt
+  let format: UInt32
+
+  func withNativeDescriptor<Result>(
+    _ body: (UnsafePointer<mln_webgpu_borrowed_texture_descriptor>) throws
+      -> Result
+  ) throws -> Result {
+    var value = mln_webgpu_borrowed_texture_descriptor_default()
+    value.extent = extent.native
+    value.physical_width = physicalWidth
+    value.physical_height = physicalHeight
+    value.context = context.native
+    value.texture = UnsafeMutableRawPointer(bitPattern: textureAddress)
+    value.texture_view = UnsafeMutableRawPointer(bitPattern: textureViewAddress)
+    value.format = format
+    return try withUnsafePointer(to: &value, body)
   }
 }

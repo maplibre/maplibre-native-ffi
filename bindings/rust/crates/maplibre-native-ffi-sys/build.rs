@@ -55,7 +55,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         .header(header.display().to_string())
         .clang_arg("-xc")
         .clang_arg("-std=c23")
-        .clang_arg(format!("-I{}", include_dir.display()));
+        .clang_arg(format!("-I{}", include_dir.display()))
+        .prepend_enum_name(false);
 
     // Cross-build frontends such as cibuildwheel expose the NDK compiler but
     // do not know bindgen's target-specific environment variable. Derive the
@@ -103,10 +104,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         .new_type_alias(concat!(
             "^mln_(buffer|runtime|map|map_projection|render_session",
             "|operation|notification_source|event_batch|ready_batch",
+            "|render_frame_batch|acquired_frame",
             "|resource_request_handle|offline_region_snapshot",
             "|offline_region_list|style_id_list|style_string_list)$"
         ))
-        .prepend_enum_name(false)
         .layout_tests(true)
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         .generate()?;

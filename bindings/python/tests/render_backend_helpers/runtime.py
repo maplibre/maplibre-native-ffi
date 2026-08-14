@@ -8,6 +8,9 @@ import maplibre_native_ffi as mln
 import pytest
 from maplibre_native_ffi import camera, geo, query, render, style
 
+_DEFAULT_GPU_SYNC = render.GpuSync()
+
+
 EMPTY_STYLE_JSON = '{"version":8,"sources":{},"layers":[]}'
 
 RED_BACKGROUND_STYLE_JSON = (
@@ -104,6 +107,85 @@ def wait_for_runtime_event(
     raise AssertionError(f"runtime event {event_type!r} was not observed")
 
 
+def finish_attach(
+    session: render.RenderSessionHandle,
+    operation: mln.OperationHandle[None],
+    *,
+    iterations: int = 5000,
+) -> None:
+    """Complete attachment through its selected native driver."""
+    if session.snapshot.driver == render.RenderDriver.CALLER_GRAPHICS_THREAD:
+        for _ in range(iterations):
+            session.service_driver_work(16)
+            if operation.poll():
+                break
+            time.sleep(0.001)
+    else:
+        operation.wait()
+    operation.raise_for_status()
+    operation.close()
+
+
+def request_and_finish_frame(
+    session: render.RenderSessionHandle,
+    *,
+    token: int = 1,
+    iterations: int = 5000,
+) -> render.RenderFrameResult:
+    """Request one frame and return its owned terminal result."""
+    session.request_frame(render.FrameDemand(token=token))
+    for _ in range(iterations):
+        if session.snapshot.driver == render.RenderDriver.CALLER_GRAPHICS_THREAD:
+            session.service_driver_work(16)
+        try:
+            results = session.drain_frame_results()
+        except mln.NotReadyError:
+            results = []
+        if results:
+            return results[-1]
+        time.sleep(0.001)
+    raise AssertionError("frame demand did not produce a terminal result")
+
+
+def finish_render_operation(
+    session: render.RenderSessionHandle,
+    operation: mln.OperationHandle[object],
+    *,
+    take_result: bool = False,
+    iterations: int = 5000,
+) -> object:
+    """Complete renderer-affine work through either driver."""
+    for _ in range(iterations):
+        if session.snapshot.driver == render.RenderDriver.CALLER_GRAPHICS_THREAD:
+            session.service_driver_work(16)
+        if operation.poll():
+            try:
+                operation.raise_for_status()
+                return operation.take() if take_result else None
+            finally:
+                operation.close()
+        time.sleep(0.001)
+    operation.close()
+    raise AssertionError("render operation did not complete")
+
+
+def close_session(session: render.RenderSessionHandle) -> None:
+    """Detach graphics resources, then destroy CPU-side session state."""
+    if session.closed:
+        return
+    finish_render_operation(session, session.detach())
+    session.close()
+
+
+def release_frame(
+    session: render.RenderSessionHandle,
+    frame: object,
+    sync: render.GpuSync = _DEFAULT_GPU_SYNC,
+) -> None:
+    """Release an acquired texture slot and observe its operation."""
+    finish_render_operation(session, frame.release(sync))
+
+
 def render_until_update(
     runtime: mln.RuntimeHandle,
     session: render.RenderSessionHandle,
@@ -116,7 +198,7 @@ def render_until_update(
         iterations=iterations,
     )
     assert event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE
-    assert session.render_update() == render.RenderResult.RENDERED
+    assert request_and_finish_frame(session).disposition == render.RenderResult.RENDERED
 
 
 def render_until(
@@ -130,9 +212,8 @@ def render_until(
     """Render until `condition` holds, failing with `description`."""
     for _ in range(iterations):
         time.sleep(0.001)
-        for event in runtime.drain_events().events:
-            if event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE:
-                session.render_update()
+        runtime.drain_events()
+        request_and_finish_frame(session)
         if condition():
             return
         time.sleep(0.001)
@@ -162,11 +243,16 @@ def wait_for_rendered_layer_feature(
         time.sleep(0.001)
         runtime.drain_events()
         try:
-            session.render_update()
-        except mln.InvalidStateError:
-            pass
-        try:
-            features = json.loads(session.query_rendered_features(geometry, options))
+            result = request_and_finish_frame(session)
+            if result.disposition != render.RenderResult.RENDERED:
+                continue
+            features = json.loads(
+                finish_render_operation(
+                    session,
+                    session.query_rendered_features(geometry, options),
+                    take_result=True,
+                )
+            )
         except mln.InvalidStateError:
             features = ()
         if features:

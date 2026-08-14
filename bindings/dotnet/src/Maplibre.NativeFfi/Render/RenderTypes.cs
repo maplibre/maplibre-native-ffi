@@ -12,30 +12,132 @@ public enum RenderMode : uint
 }
 
 /// <summary>
-/// Outcome of a successful render-update call. This is an open domain: a value may have no named
-/// member here, so a switch over it needs a default case. Unknown values keep their raw value.
+/// Terminal disposition of one accepted frame demand. Unknown values keep their raw value.
 /// </summary>
 public enum RenderResult : uint
 {
-    /// <summary>The call rendered a frame into the render target.</summary>
+    /// <summary>The session rendered a frame into the render target.</summary>
     Rendered = 0,
 
-    /// <summary>
-    /// The call produced no frame. Wait for a render-update-available event.
-    /// </summary>
+    /// <summary>No newer map update was available.</summary>
     NoUpdate = 1,
 
-    /// <summary>
-    /// The map has not applied the session's current size yet. Wait for the next
-    /// render-update-available event.
-    /// </summary>
+    /// <summary>An ordered extent change had not reached the driver.</summary>
     SizePending = 2,
 
-    /// <summary>
-    /// The render target had no frame to draw into. Wait for a host event that changes the render
-    /// target, or back off and retry.
-    /// </summary>
+    /// <summary>The target could not produce a frame.</summary>
     TargetNotReady = 3,
+
+    /// <summary>A newer demand replaced this demand in its coalescing boundary.</summary>
+    Superseded = 4,
+
+    /// <summary>The positive monotonic deadline elapsed before work began.</summary>
+    DeadlineMissed = 5,
+}
+
+public enum RenderSessionState : uint
+{
+    Attaching = 1,
+    Attached = 2,
+    Detaching = 3,
+    Detached = 4,
+    TargetLost = 5,
+    Abandoned = 6,
+}
+
+public enum RenderDriverKind : uint
+{
+    CoreWorker = 1,
+    CallerGraphicsThread = 2,
+}
+
+[Flags]
+public enum RenderSessionCapabilities : uint
+{
+    None = 0,
+    FrameAcquisition = 1u << 0,
+    Readback = 1u << 1,
+    ConsumerSync = 1u << 2,
+    Presentation = 1u << 3,
+}
+
+[Flags]
+public enum FrameDemandFlags : uint
+{
+    None = 0,
+    IfNeeded = 1u << 0,
+    Present = 1u << 1,
+}
+
+public readonly record struct FrameDemand(
+    FrameDemandFlags Flags,
+    ulong Token,
+    ulong CoalescingBoundary,
+    long PresentationTimeNanoseconds,
+    long DeadlineNanoseconds
+);
+
+public readonly record struct RenderFrameResult(
+    RenderResult Disposition,
+    ulong Token,
+    ulong MapUpdateGeneration,
+    ulong ExtentGeneration,
+    ulong FrameGeneration,
+    long PresentationTimeNanoseconds
+);
+
+public readonly record struct RenderSessionSnapshot(
+    RenderSessionState State,
+    RenderDriverKind Driver,
+    RenderResult LatestResult,
+    RenderTargetExtent Extent,
+    ulong Generation,
+    ulong MapUpdateGeneration,
+    ulong RenderedUpdateGeneration,
+    ulong ExtentGeneration,
+    ulong FrameGeneration,
+    ulong LatestDemandToken,
+    uint PendingDemandCount,
+    uint AcquiredFrameCount,
+    bool TargetReady,
+    bool PendingChanges
+);
+
+public readonly record struct RenderSessionCapabilityInfo(
+    RenderDriverKind Driver,
+    uint TextureRingDepth,
+    RenderSessionCapabilities Flags
+);
+
+public enum GpuSyncKind : uint
+{
+    CpuComplete = 0,
+    MetalSharedEvent = 1,
+    VulkanTimelineSemaphore = 2,
+    OpenGLFence = 3,
+    WebGpuToken = 4,
+}
+
+public readonly record struct GpuSync(GpuSyncKind Kind, NativePointer Object, ulong Value)
+{
+    public static GpuSync CpuComplete => new(GpuSyncKind.CpuComplete, default, 0);
+}
+
+public enum RenderAbandonDisposition : uint
+{
+    Clean = 0,
+    Quarantined = 1,
+}
+
+public readonly record struct RenderAbandonResult(
+    RenderAbandonDisposition Disposition,
+    uint QuarantinedResourceCount
+);
+
+public sealed record RenderSessionAttachOptions
+{
+    public RenderDriverKind Driver { get; init; } = RenderDriverKind.CoreWorker;
+    public uint RequestedTextureRingDepth { get; init; }
 }
 
 /// <summary>Render backend support flags reported by the native library.</summary>
@@ -211,6 +313,26 @@ public sealed class EglContextDescriptor : OpenGLContextDescriptor
     public NativePointer GetProcAddress { get; set; }
 }
 
+public enum WebGLContextKind : uint
+{
+    Existing = 0,
+    TransferredCanvas = 1,
+}
+
+public sealed class WebGLContextDescriptor : OpenGLContextDescriptor
+{
+    public WebGLContextKind Kind { get; set; }
+    public int Context { get; set; }
+    public string CanvasSelector { get; set; } = string.Empty;
+}
+
+public sealed class WebGpuContextDescriptor
+{
+    public NativePointer Instance { get; set; }
+    public NativePointer Device { get; set; }
+    public NativePointer Queue { get; set; }
+}
+
 public sealed class MetalSurfaceDescriptor
 {
     public RenderTargetExtent Extent { get; set; }
@@ -230,6 +352,14 @@ public sealed class OpenGLSurfaceDescriptor
     public RenderTargetExtent Extent { get; set; }
     public NativePointer Surface { get; set; }
     public OpenGLContextDescriptor? Context { get; set; }
+}
+
+public sealed class WebGpuSurfaceDescriptor
+{
+    public RenderTargetExtent Extent { get; set; }
+    public WebGpuContextDescriptor? Context { get; set; }
+    public NativePointer Surface { get; set; }
+    public uint Format { get; set; }
 }
 
 public sealed class MetalOwnedTextureDescriptor
@@ -294,6 +424,135 @@ public sealed class OpenGLBorrowedTextureDescriptor
     public OpenGLContextDescriptor? Context { get; set; }
     public uint Texture { get; set; }
     public uint Target { get; set; }
+}
+
+public sealed class WebGpuOwnedTextureDescriptor
+{
+    public RenderTargetExtent Extent { get; set; }
+    public WebGpuContextDescriptor? Context { get; set; }
+}
+
+public sealed class WebGpuBorrowedTextureDescriptor
+{
+    public RenderTargetExtent Extent { get; set; }
+    public uint PhysicalWidth { get; set; }
+    public uint PhysicalHeight { get; set; }
+    public WebGpuContextDescriptor? Context { get; set; }
+    public NativePointer Texture { get; set; }
+    public NativePointer TextureView { get; set; }
+    public uint Format { get; set; }
+}
+
+public sealed class WebGpuOwnedTextureFrame
+{
+    private readonly FrameScope scope;
+    private readonly ulong generation;
+    private readonly uint width;
+    private readonly uint height;
+    private readonly double scaleFactor;
+    private readonly ulong frameId;
+    private readonly NativePointer texture;
+    private readonly NativePointer textureView;
+    private readonly NativePointer device;
+    private readonly uint format;
+
+    internal WebGpuOwnedTextureFrame(
+        FrameScope scope,
+        ulong generation,
+        uint width,
+        uint height,
+        double scaleFactor,
+        ulong frameId,
+        NativePointer texture,
+        NativePointer textureView,
+        NativePointer device,
+        uint format
+    )
+    {
+        this.scope = scope;
+        this.generation = generation;
+        this.width = width;
+        this.height = height;
+        this.scaleFactor = scaleFactor;
+        this.frameId = frameId;
+        this.texture = texture;
+        this.textureView = textureView;
+        this.device = device;
+        this.format = format;
+    }
+
+    public ulong Generation
+    {
+        get
+        {
+            scope.EnsureActive();
+            return generation;
+        }
+    }
+    public uint Width
+    {
+        get
+        {
+            scope.EnsureActive();
+            return width;
+        }
+    }
+    public uint Height
+    {
+        get
+        {
+            scope.EnsureActive();
+            return height;
+        }
+    }
+    public double ScaleFactor
+    {
+        get
+        {
+            scope.EnsureActive();
+            return scaleFactor;
+        }
+    }
+    public ulong FrameId
+    {
+        get
+        {
+            scope.EnsureActive();
+            return frameId;
+        }
+    }
+    public NativePointer Texture
+    {
+        get
+        {
+            scope.EnsureActive();
+            return texture;
+        }
+    }
+    public NativePointer TextureView
+    {
+        get
+        {
+            scope.EnsureActive();
+            return textureView;
+        }
+    }
+    public NativePointer Device
+    {
+        get
+        {
+            scope.EnsureActive();
+            return device;
+        }
+    }
+    public uint Format
+    {
+        get
+        {
+            scope.EnsureActive();
+            return format;
+        }
+    }
 }
 
 public sealed class MetalOwnedTextureFrame

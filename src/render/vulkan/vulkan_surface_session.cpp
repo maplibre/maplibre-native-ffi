@@ -515,9 +515,10 @@ class VulkanSurfaceSessionBackend final
 
 namespace mln::core {
 
-auto vulkan_surface_attach(
+auto vulkan_surface_attach_start(
   mln_map map, const mln_vulkan_surface_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, mln_operation* out_operation
 ) -> mln_status {
   MapObject* live_map = nullptr;
   const auto map_status = validate_map_live(map, live_map);
@@ -528,13 +529,6 @@ auto vulkan_surface_attach(
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
-  const auto output_status = validate_attach_output(
-    out_session, "out_session must not be null",
-    "out_session must point to a null handle"
-  );
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
-  }
   const auto physical_status = validate_physical_size(
     descriptor->extent.width, descriptor->extent.height,
     descriptor->extent.scale_factor, "scaled surface dimensions are too large"
@@ -542,46 +536,56 @@ auto vulkan_surface_attach(
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
   }
-  const auto vulkan_status = validate_vulkan_handles(*descriptor);
-  if (vulkan_status != MLN_STATUS_OK) {
-    return vulkan_status;
-  }
 
   auto session = std::make_shared<mln_render_session_object>();
   session->map = map;
   set_session_extent(*session, descriptor->extent);
-  session->surface.backend = std::make_unique<VulkanSurfaceSessionBackend>(
-    *descriptor, mbgl::Size{session->physical_width, session->physical_height}
-  );
-  return attach_render_session(
-    std::move(session), out_session, RenderSessionKind::Surface,
-    RenderSessionAttachMessages{
-      .null_session = "surface session must not be null",
-      .null_output = "out_session must not be null",
-      .non_null_output = "out_session must point to a null handle"
+  const auto copied = *descriptor;
+  session->initialize_backend = [copied](mln_render_session_object& target) {
+    const auto handles_status = validate_vulkan_handles(copied);
+    if (handles_status != MLN_STATUS_OK) {
+      return handles_status;
     }
+    target.surface.backend = std::make_unique<VulkanSurfaceSessionBackend>(
+      copied, mbgl::Size{target.physical_width, target.physical_height}
+    );
+    return MLN_STATUS_OK;
+  };
+  const auto capabilities = mln_render_session_capabilities{
+    .size = sizeof(mln_render_session_capabilities),
+    .driver = options == nullptr ? 0u : options->driver,
+    .texture_ring_depth = 0,
+    .flags = MLN_RENDER_SESSION_CAPABILITY_PRESENTATION
+  };
+  return start_attach_render_session(
+    std::move(session), RenderSessionKind::Surface, options, capabilities,
+    out_session, out_operation
   );
 }
 
-auto vulkan_surface_set_target(
-  mln_render_session session, const mln_vulkan_surface_descriptor* descriptor
+auto vulkan_surface_set_target_start(
+  mln_render_session session, const mln_vulkan_surface_descriptor* descriptor,
+  mln_operation* out_operation
 ) -> mln_status {
-  mln_render_session_object* live = nullptr;
-  const auto session_status = validate_render_session_retarget(
-    session, RetargetTargetKind::Surface, live
-  );
-  if (session_status != MLN_STATUS_OK) {
-    return session_status;
-  }
   const auto descriptor_status = validate_vulkan_surface_descriptor(descriptor);
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
-  return surface_session_set_target(
-    session, descriptor->extent,
-    [descriptor](mln_render_session_object& target_session) -> mln_status {
-      return target_session.surface.backend->set_vulkan_target(*descriptor);
-    }
+  const auto copied = *descriptor;
+  return enqueue_driver_operation(
+    session, RENDER_OPERATION_MAINTENANCE,
+    [copied](mln_render_session_object& target) {
+      const auto handles_status = validate_vulkan_handles(copied);
+      if (handles_status != MLN_STATUS_OK) {
+        return handles_status;
+      }
+      return surface_session_set_target(
+        target.self, copied.extent, [&copied](mln_render_session_object& live) {
+          return live.surface.backend->set_vulkan_target(copied);
+        }
+      );
+    },
+    out_operation
   );
 }
 

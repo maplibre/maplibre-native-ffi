@@ -13,6 +13,8 @@ final class NativeNotificationReceiver: @unchecked Sendable {
   private var waiters: [mln_operation: CheckedContinuation<Void, Error>] = [:]
   private var terminalError: Error?
   private var runtimeEventsHandler: (@Sendable () -> Void)?
+  private var renderFramesHandlers: [UInt64: @Sendable () -> Void] = [:]
+  private var driverWorkHandlers: [UInt64: @Sendable () -> Void] = [:]
 
   init() throws {
     var source: mln_notification_source = 0
@@ -69,6 +71,22 @@ final class NativeNotificationReceiver: @unchecked Sendable {
     }
   }
 
+  func setRenderFramesHandler(
+    for session: NativeRenderSessionHandle,
+    _ handler: (@Sendable () -> Void)?
+  ) {
+    lock.withLock { renderFramesHandlers[session.raw] = handler }
+    if handler != nil { scheduleDrain() }
+  }
+
+  func setDriverWorkHandler(
+    for session: NativeRenderSessionHandle,
+    _ handler: (@Sendable () -> Void)?
+  ) {
+    lock.withLock { driverWorkHandlers[session.raw] = handler }
+    if handler != nil { scheduleDrain() }
+  }
+
   func forget(_ operation: NativeOperationHandle) {
     _ = lock.withLock { completed.remove(operation.raw) }
   }
@@ -78,6 +96,8 @@ final class NativeNotificationReceiver: @unchecked Sendable {
     drainLock.withLock {}
     lock.withLock {
       runtimeEventsHandler = nil
+      renderFramesHandlers.removeAll()
+      driverWorkHandlers.removeAll()
       drainScheduled = false
       drainRequested = false
     }
@@ -87,6 +107,7 @@ final class NativeNotificationReceiver: @unchecked Sendable {
   private func scheduleDrain() {
     let shouldSchedule = lock.withLock { () -> Bool in
       guard !waiters.isEmpty || runtimeEventsHandler != nil
+        || !renderFramesHandlers.isEmpty || !driverWorkHandlers.isEmpty
       else { return false }
       if drainScheduled {
         drainRequested = true
@@ -100,7 +121,10 @@ final class NativeNotificationReceiver: @unchecked Sendable {
       while true {
         self.drainLock.withLock { self.drainReadyLocked() }
         let drainAgain = self.lock.withLock { () -> Bool in
-          guard !self.waiters.isEmpty || self.runtimeEventsHandler != nil else {
+          guard !self.waiters.isEmpty || self.runtimeEventsHandler != nil
+            || !self.renderFramesHandlers.isEmpty
+            || !self.driverWorkHandlers.isEmpty
+          else {
             self.drainScheduled = false
             self.drainRequested = false
             return false
@@ -141,6 +165,14 @@ final class NativeNotificationReceiver: @unchecked Sendable {
           MLN_NOTIFICATION_ENDPOINT_RUNTIME_EVENTS.rawValue
         {
           lock.withLock { runtimeEventsHandler }?()
+        } else if endpoint.kind ==
+          MLN_NOTIFICATION_ENDPOINT_RENDER_FRAMES.rawValue
+        {
+          lock.withLock { renderFramesHandlers[endpoint.id] }?()
+        } else if endpoint.kind ==
+          MLN_NOTIFICATION_ENDPOINT_DRIVER_WORK.rawValue
+        {
+          lock.withLock { driverWorkHandlers[endpoint.id] }?()
         }
       }
     } catch {

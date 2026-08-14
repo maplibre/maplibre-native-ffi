@@ -21,11 +21,14 @@ final class MetalMapView: UIView {
   private var renderTarget: MetalRenderTarget?
   private var mapTask: MapTask?
   private var displayLink: CADisplayLink?
+  private var frameTask: Task<Void, Never>?
+  private var shutdownTask: Task<Void, Never>?
   private var currentViewport: Viewport?
   private var didLogStartupStatus = false
   private var viewVisible = false
   private var appForeground = true
   private var isShutDown = false
+  private var pendingResize = false
 
   /// The recognizers with a gesture still open. Pinch, rotation, and shove
   /// recognize simultaneously and report to the map as one gesture.
@@ -60,7 +63,7 @@ final class MetalMapView: UIView {
     NotificationCenter.default.removeObserver(self)
     MainActor.assumeIsolated {
       stopHostLoop()
-      teardown()
+      renderTarget?.abandon()
     }
   }
 
@@ -91,65 +94,84 @@ final class MetalMapView: UIView {
 
   @objc private func closeMap() {
     stopHostLoop()
-    teardown()
+    beginTeardown()
   }
 
   /// Closes the session before the map task closes the map; a map with an
   /// attached session cannot be destroyed.
-  private func teardown() {
+  private func beginTeardown() {
     guard !isShutDown else { return }
     isShutDown = true
-    do {
-      try renderTarget?.close()
-    } catch {
-      log.error("\(String(describing: error), privacy: .public)")
+    stopHostLoop()
+    if frameTask == nil {
+      finishTeardown()
     }
+  }
+
+  private func finishTeardown() {
+    guard shutdownTask == nil else { return }
+    let target = renderTarget
     renderTarget = nil
-    guard mapTask != nil else { return }
-    channels.requestShutdown()
-    if !channels.waitForMapTaskExit(timeout: 5.0) {
-      log.error("map task did not finish before the shutdown deadline")
+    shutdownTask = Task { @MainActor in
+      do {
+        try await target?.close()
+      } catch {
+        self.log.error("\(String(describing: error), privacy: .public)")
+      }
+      guard self.mapTask != nil else { return }
+      self.channels.requestShutdown()
+      if !self.channels.waitForMapTaskExit(timeout: 5.0) {
+        self.log.error("map task did not finish before the shutdown deadline")
+      }
+      self.mapTask = nil
     }
-    mapTask = nil
   }
 
   @objc private func displayLinkTick() {
+    guard frameTask == nil, !isShutDown else { return }
+    frameTask = Task { @MainActor in
+      await renderDisplayFrame()
+      frameTask = nil
+      if isShutDown {
+        finishTeardown()
+      }
+    }
+  }
+
+  private func renderDisplayFrame() async {
     guard !isShutDown else { return }
     if let failureMessage = channels.failureMessage {
       log.error("\(failureMessage, privacy: .public)")
-      // The map task waits for the session to close before destroying the
-      // map, so tear down rather than only stopping the display link.
-      stopHostLoop()
-      teardown()
+      beginTeardown()
       return
     }
-    attachIfNeeded()
-    guard let renderTarget,
+    await attachIfNeeded()
+    guard !isShutDown,
+          let renderTarget,
           let viewport = currentViewport,
           !viewport.isEmpty
     else { return }
 
     do {
-      // Consume first, so a request published during the render survives.
+      if pendingResize {
+        try await renderTarget.resize(viewport)
+        pendingResize = false
+      }
       if channels.consumeRenderRequest() {
-        let rendered = try renderTarget.renderUpdate()
+        let rendered = try renderTarget.renderFrame()
         if !rendered {
           channels.setRenderRequest()
         }
       }
-      try renderTarget.finishFrame()
     } catch {
       showError(error)
-      // Stopping the display link alone leaves the session attached, and the
-      // map task would hold a map it can never destroy.
-      stopHostLoop()
-      teardown()
+      beginTeardown()
     }
   }
 
   /// Attaches the render session on this thread. Attach records the calling
   /// thread as the session's owner, and every later session call runs here.
-  private func attachIfNeeded() {
+  private func attachIfNeeded() async {
     guard renderTarget == nil,
           let graphics,
           let viewport = currentViewport,
@@ -158,11 +180,12 @@ final class MetalMapView: UIView {
     else { return }
 
     do {
-      renderTarget = try MetalRenderTarget.attach(
+      renderTarget = try await MetalRenderTarget.attach(
         map: renderMap,
         graphics: graphics,
         viewport: viewport
       )
+      pendingResize = false
       if !didLogStartupStatus {
         log.info("render target: native-surface")
         log.info(
@@ -173,10 +196,7 @@ final class MetalMapView: UIView {
       channels.setRenderRequest()
     } catch {
       showError(error)
-      // The map task waits for the session to close before destroying the map,
-      // so tear down rather than only stopping the display link.
-      stopHostLoop()
-      teardown()
+      beginTeardown()
     }
   }
 
@@ -221,22 +241,18 @@ final class MetalMapView: UIView {
       return
     }
 
-    do {
-      graphics.resize(viewport)
-      try renderTarget?.resize(viewport)
-      currentViewport = viewport
-      if mapTask != nil {
-        channels.push(.resize(MapLogicalExtent(
-          width: viewport.logicalWidth,
-          height: viewport.logicalHeight,
-          scaleFactor: viewport.scaleFactor
-        )))
-      }
-      channels.setRenderRequest()
-      startMapTaskIfNeeded(viewport: viewport)
-    } catch {
-      showError(error)
+    graphics.resize(viewport)
+    currentViewport = viewport
+    pendingResize = renderTarget != nil
+    if mapTask != nil {
+      channels.push(.resize(MapLogicalExtent(
+        width: viewport.logicalWidth,
+        height: viewport.logicalHeight,
+        scaleFactor: viewport.scaleFactor
+      )))
     }
+    channels.setRenderRequest()
+    startMapTaskIfNeeded(viewport: viewport)
   }
 
   private func readViewport() -> Viewport {

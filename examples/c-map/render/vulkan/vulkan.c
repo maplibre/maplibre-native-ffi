@@ -333,7 +333,7 @@ struct render_target {
   union {
     struct {
       vulkan_compositor compositor;
-      mln_vulkan_owned_texture_frame pending_frame;
+      mln_acquired_frame pending_frame;
       bool has_pending_frame;
     } owned;
     struct {
@@ -407,10 +407,17 @@ static void release_pending_frame(render_target* target) {
   if (!target->as.owned.has_pending_frame) {
     return;
   }
-  const mln_status status = mln_vulkan_owned_texture_release_frame(
-    target->session.handle, &target->as.owned.pending_frame
+  mln_gpu_sync sync = mln_gpu_sync_default();
+  mln_operation operation = MLN_HANDLE_NULL;
+  const mln_status status = mln_acquired_frame_release_start(
+    &target->as.owned.pending_frame, &sync, &operation
   );
-  if (status != MLN_STATUS_OK) {
+  if (status == MLN_STATUS_OK) {
+    (void)render_session_complete_operation(
+      &target->session, operation, APP_ERROR_BACKEND_DRAW_FAILED,
+      "Vulkan texture release failed"
+    );
+  } else {
     diagnostics_log_status("Vulkan texture release failed", status);
   }
   target->as.owned.has_pending_frame = false;
@@ -438,6 +445,12 @@ app_error render_target_attach(
   render_target* target, mln_map map, viewport current_viewport
 ) {
   mln_render_session session = MLN_HANDLE_NULL;
+  mln_operation operation = MLN_HANDLE_NULL;
+  const mln_render_session_attach_options options =
+    render_session_attach_options();
+  render_session_kind kind = RENDER_SESSION_TEXTURE;
+  app_error error = APP_ERROR_TEXTURE_ATTACH_FAILED;
+  mln_status status = MLN_STATUS_INVALID_STATE;
   switch (target->mode) {
     case RENDER_TARGET_MODE_OWNED_TEXTURE: {
       mln_vulkan_owned_texture_descriptor descriptor =
@@ -445,28 +458,18 @@ app_error render_target_attach(
       descriptor.extent = render_target_extent(current_viewport);
       descriptor.context =
         vulkan_context_descriptor(&target->as.owned.compositor.context);
-      const mln_status status =
-        mln_vulkan_owned_texture_attach(map, &descriptor, &session);
-      if (status != MLN_STATUS_OK) {
-        diagnostics_log_status("Vulkan texture attach failed", status);
-        return APP_ERROR_TEXTURE_ATTACH_FAILED;
-      }
-      target->session =
-        (render_session){.kind = RENDER_SESSION_TEXTURE, .handle = session};
-      return APP_OK;
+      status = mln_vulkan_owned_texture_attach_start(
+        map, &descriptor, &options, &session, &operation
+      );
+      break;
     }
     case RENDER_TARGET_MODE_BORROWED_TEXTURE: {
       const mln_vulkan_borrowed_texture_descriptor descriptor =
         borrowed_image_descriptor(target, current_viewport);
-      const mln_status status =
-        mln_vulkan_borrowed_texture_attach(map, &descriptor, &session);
-      if (status != MLN_STATUS_OK) {
-        diagnostics_log_status("Vulkan borrowed texture attach failed", status);
-        return APP_ERROR_TEXTURE_ATTACH_FAILED;
-      }
-      target->session =
-        (render_session){.kind = RENDER_SESSION_TEXTURE, .handle = session};
-      return APP_OK;
+      status = mln_vulkan_borrowed_texture_attach_start(
+        map, &descriptor, &options, &session, &operation
+      );
+      break;
     }
     case RENDER_TARGET_MODE_NATIVE_SURFACE: {
       mln_vulkan_surface_descriptor descriptor =
@@ -475,18 +478,22 @@ app_error render_target_attach(
       descriptor.context =
         vulkan_context_descriptor(&target->as.surface.context);
       descriptor.surface = target->as.surface.context.surface;
-      const mln_status status =
-        mln_vulkan_surface_attach(map, &descriptor, &session);
-      if (status != MLN_STATUS_OK) {
-        diagnostics_log_status("Vulkan surface attach failed", status);
-        return APP_ERROR_SURFACE_ATTACH_FAILED;
-      }
-      target->session =
-        (render_session){.kind = RENDER_SESSION_SURFACE, .handle = session};
-      return APP_OK;
+      kind = RENDER_SESSION_SURFACE;
+      error = APP_ERROR_SURFACE_ATTACH_FAILED;
+      status = mln_vulkan_surface_attach_start(
+        map, &descriptor, &options, &session, &operation
+      );
+      break;
     }
   }
-  return APP_ERROR_BACKEND_SETUP_FAILED;
+  if (status != MLN_STATUS_OK) {
+    diagnostics_log_status("Vulkan render target attach failed", status);
+    return error;
+  }
+  target->session = (render_session){.kind = kind, .handle = session};
+  return render_session_complete_operation(
+    &target->session, operation, error, "Vulkan render target attach failed"
+  );
 }
 
 void render_target_deinit(render_target* target) {
@@ -537,12 +544,11 @@ static app_error resize_borrowed(
   target->as.borrowed.image = replacement;
   const mln_vulkan_borrowed_texture_descriptor descriptor =
     borrowed_image_descriptor(target, current_viewport);
-  const mln_status status =
-    mln_vulkan_borrowed_texture_set_target(target->session.handle, &descriptor);
+  mln_operation operation = MLN_HANDLE_NULL;
+  const mln_status status = mln_vulkan_borrowed_texture_set_target_start(
+    target->session.handle, &descriptor, &operation
+  );
   if (status != MLN_STATUS_OK) {
-    // The session may have taken the replacement before failing, so detach
-    // before either image is released.
-    mln_render_session_detach(target->session.handle);
     diagnostics_log_status("Vulkan borrowed texture set target failed", status);
     target->as.borrowed.image = previous;
     borrowed_image_deinit(
@@ -550,7 +556,13 @@ static app_error resize_borrowed(
     );
     return APP_ERROR_TEXTURE_RESIZE_FAILED;
   }
-  // Released only once the session has taken the replacement.
+  const app_error completed = render_session_complete_operation(
+    &target->session, operation, APP_ERROR_TEXTURE_RESIZE_FAILED,
+    "Vulkan borrowed texture set target failed"
+  );
+  if (completed != APP_OK) {
+    return completed;
+  }
   borrowed_image_deinit(
     &previous, target->as.borrowed.compositor.context.device
   );
@@ -600,33 +612,50 @@ static app_error render_update_owned(
     return APP_OK;
   }
 
-  mln_vulkan_owned_texture_frame frame = {.size = sizeof(frame)};
-  const mln_status status =
-    mln_vulkan_owned_texture_acquire_frame(target->session.handle, &frame);
-  if (status == MLN_STATUS_INVALID_STATE) {
+  mln_acquired_frame acquired = MLN_HANDLE_NULL;
+  mln_status status =
+    mln_render_session_acquire_frame(target->session.handle, &acquired);
+  if (status == MLN_STATUS_NOT_READY) {
     return APP_OK;
   }
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status("Vulkan texture acquire failed", status);
     return APP_ERROR_BACKEND_DRAW_FAILED;
   }
-
+  mln_vulkan_owned_texture_frame frame = {.size = sizeof(frame)};
+  status = mln_acquired_frame_get_vulkan_texture(acquired, &frame);
+  if (status != MLN_STATUS_OK) {
+    diagnostics_log_status("Vulkan texture access failed", status);
+    mln_gpu_sync sync = mln_gpu_sync_default();
+    mln_operation operation = MLN_HANDLE_NULL;
+    if (
+      mln_acquired_frame_release_start(&acquired, &sync, &operation) ==
+      MLN_STATUS_OK
+    ) {
+      (void)render_session_complete_operation(
+        &target->session, operation, APP_ERROR_BACKEND_DRAW_FAILED,
+        "Vulkan texture release failed"
+      );
+    }
+    return APP_ERROR_BACKEND_DRAW_FAILED;
+  }
   bool presented = false;
   const app_error error = vulkan_compositor_present_image_view(
     &target->as.owned.compositor, frame.image_view, &presented
   );
   if (error != APP_OK || !presented) {
-    const mln_status release_status =
-      mln_vulkan_owned_texture_release_frame(target->session.handle, &frame);
-    if (release_status != MLN_STATUS_OK) {
-      diagnostics_log_status("Vulkan texture release failed", release_status);
+    mln_gpu_sync sync = mln_gpu_sync_default();
+    mln_operation operation = MLN_HANDLE_NULL;
+    status = mln_acquired_frame_release_start(&acquired, &sync, &operation);
+    if (status == MLN_STATUS_OK) {
+      (void)render_session_complete_operation(
+        &target->session, operation, APP_ERROR_BACKEND_DRAW_FAILED,
+        "Vulkan texture release failed"
+      );
     }
     return error;
   }
-
-  // The frame stays acquired until the compositor's fence proves the sampling
-  // pass finished; finish_frame releases it.
-  target->as.owned.pending_frame = frame;
+  target->as.owned.pending_frame = acquired;
   target->as.owned.has_pending_frame = true;
   *out_rendered = true;
   return APP_OK;

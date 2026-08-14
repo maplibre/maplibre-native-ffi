@@ -11,8 +11,11 @@ class MaplibreStatus(Enum):
     INVALID_STATE = -2
     WRONG_THREAD = -3
     UNSUPPORTED = -4
-    CANCELLED = -6
     NATIVE_ERROR = -5
+    CANCELLED = -6
+    BUSY = -7
+    TARGET_LOST = -8
+    NOT_READY = -9
     UNKNOWN = None
 
     @property
@@ -101,6 +104,33 @@ class CancelledError(MaplibreError):
         super().__init__(MaplibreStatus.CANCELLED, native_status_code, diagnostic)
 
 
+class BusyError(MaplibreError):
+    """Error for a conflicting driver call or lifecycle transition."""
+
+    def __init__(
+        self, native_status_code: int | None = -7, diagnostic: str = ""
+    ) -> None:
+        super().__init__(MaplibreStatus.BUSY, native_status_code, diagnostic)
+
+
+class TargetLostError(MaplibreError):
+    """Error for an irreversibly lost render target or graphics receiver."""
+
+    def __init__(
+        self, native_status_code: int | None = -8, diagnostic: str = ""
+    ) -> None:
+        super().__init__(MaplibreStatus.TARGET_LOST, native_status_code, diagnostic)
+
+
+class NotReadyError(MaplibreError):
+    """Error for a nonblocking call that has no result yet."""
+
+    def __init__(
+        self, native_status_code: int | None = -9, diagnostic: str = ""
+    ) -> None:
+        super().__init__(MaplibreStatus.NOT_READY, native_status_code, diagnostic)
+
+
 class UnknownStatusError(MaplibreError):
     """Error for future native status values unknown to this binding."""
 
@@ -120,6 +150,9 @@ def _from_native_status(native_status_code: int, diagnostic: str) -> MaplibreErr
         MaplibreStatus.UNSUPPORTED: UnsupportedFeatureError,
         MaplibreStatus.NATIVE_ERROR: NativeError,
         MaplibreStatus.CANCELLED: CancelledError,
+        MaplibreStatus.BUSY: BusyError,
+        MaplibreStatus.TARGET_LOST: TargetLostError,
+        MaplibreStatus.NOT_READY: NotReadyError,
     }
     status = MaplibreStatus._from_native(native_status_code)
     error_type = error_types.get(status)
@@ -129,12 +162,15 @@ def _from_native_status(native_status_code: int, diagnostic: str) -> MaplibreErr
 
 
 __all__ = [
+    "BusyError",
     "CancelledError",
     "InvalidArgumentError",
     "InvalidStateError",
     "MaplibreError",
     "MaplibreStatus",
     "NativeError",
+    "NotReadyError",
+    "TargetLostError",
     "UnknownStatusError",
     "UnsupportedFeatureError",
     "WrongThreadError",

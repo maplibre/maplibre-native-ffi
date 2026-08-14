@@ -40,9 +40,9 @@ final class MetalGraphicsContext {
   }
 }
 
-/// The render session for the host `CAMetalLayer`. Attach records the calling
-/// thread as the session's owner, so every call here runs on the render loop
-/// thread that owns the view and its layer.
+/// The render session for the host `CAMetalLayer`. The display link services
+/// driver work on the graphics thread. Every operation remains isolated to the
+/// main actor.
 @MainActor
 final class MetalRenderTarget {
   private let session: RenderSessionHandle
@@ -56,36 +56,45 @@ final class MetalRenderTarget {
     map: MapHandle,
     graphics: MetalGraphicsContext,
     viewport: Viewport
-  ) throws -> MetalRenderTarget {
-    let session = try map.attachMetalSurface(MetalSurfaceDescriptor(
-      extent: viewport.extent,
-      context: graphics.contextDescriptor,
-      layer: graphics.layerPointer
-    ))
+  ) async throws -> MetalRenderTarget {
+    let session = try await map.attachMetalSurface(
+      MetalSurfaceDescriptor(
+        extent: viewport.extent,
+        context: graphics.contextDescriptor,
+        layer: graphics.layerPointer
+      ),
+      options: .init(driver: .callerGraphicsThread)
+    )
     return MetalRenderTarget(session: session)
   }
 
-  func resize(_ viewport: Viewport) throws {
-    try session.resize(
-      width: viewport.logicalWidth,
-      height: viewport.logicalHeight,
-      scaleFactor: viewport.scaleFactor
-    )
+  func resize(_ viewport: Viewport) async throws {
+    try await session.resize(viewport.extent)
   }
 
-  /// Renders the latest map update, reporting whether a frame was drawn. For a
-  /// few iterations after attach or resize the session reports a pending size,
-  /// because the map applies a new logical size on the scheduler's next turn.
-  func renderUpdate() throws -> Bool {
-    try session.renderUpdate() == .rendered
+  /// Services graphics work and submits one display-link-paced frame demand.
+  func renderFrame() throws -> Bool {
+    try session.requestFrame(FrameDemand(options: [.ifNeeded, .present]))
+    try session.serviceDriverWork()
+    let results = try session.drainFrameResults()
+    guard let result = results.last else { return false }
+    return result.result != .sizePending &&
+      result.result != .targetNotReady
   }
 
-  func finishFrame() throws {
-    // The Metal surface path needs no per-iteration host upkeep here.
+  func close() async throws {
+    do {
+      try await session.detach()
+      try session.close()
+    } catch {
+      abandon()
+      throw error
+    }
   }
 
-  func close() throws {
-    try session.close()
+  func abandon() {
+    _ = try? session.abandon()
+    try? session.close()
   }
 }
 

@@ -2,6 +2,7 @@
 #include <memory>
 #include <optional>
 #include <stdexcept>
+#include <string>
 #include <utility>
 
 #include <mbgl/gfx/backend_scope.hpp>
@@ -20,6 +21,8 @@
 #include <EGL/egl.h>
 #elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
 #include <emscripten/html5.h>
+#include <emscripten/threading.h>
+#include <pthread.h>
 #endif
 
 #include "diagnostics/diagnostics.hpp"
@@ -33,6 +36,53 @@
 #include "render/surface_session.hpp"
 
 namespace {
+
+#if defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
+struct WebGLWorkerCall {
+  std::function<void()> function;
+};
+
+auto run_webgl_worker(void* opaque) -> void* {
+  auto call =
+    std::unique_ptr<WebGLWorkerCall>{static_cast<WebGLWorkerCall*>(opaque)};
+  call->function();
+  return nullptr;
+}
+
+auto configure_transferred_webgl_worker(
+  mln_render_session_object& session, std::string selector
+) -> void {
+  auto thread = std::make_shared<pthread_t>();
+  session.start_worker =
+    [thread, selector = std::move(selector)](std::function<void()> function) {
+      auto attributes = pthread_attr_t{};
+      if (
+        pthread_attr_init(&attributes) != 0 ||
+        emscripten_pthread_attr_settransferredcanvases(
+          &attributes, selector.c_str()
+        ) != 0
+      ) {
+        pthread_attr_destroy(&attributes);
+        mln::core::set_thread_error("transferring the WebGL canvas failed");
+        return MLN_STATUS_NATIVE_ERROR;
+      }
+      auto call =
+        std::make_unique<WebGLWorkerCall>(WebGLWorkerCall{std::move(function)});
+      const auto result =
+        pthread_create(thread.get(), &attributes, run_webgl_worker, call.get());
+      pthread_attr_destroy(&attributes);
+      if (result != 0) {
+        mln::core::set_thread_error("creating the WebGL worker failed");
+        return MLN_STATUS_NATIVE_ERROR;
+      }
+      static_cast<void>(call.release());
+      return MLN_STATUS_OK;
+    };
+  session.join_worker = [thread]() {
+    static_cast<void>(pthread_join(*thread, nullptr));
+  };
+}
+#endif
 
 class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
                                    public mbgl::gfx::Renderable {
@@ -407,8 +457,16 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
 #elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
   void destroy_native_context() { egl_context_.reset(); }
 #elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
-  // The host owns the context this session borrowed.
-  void destroy_native_context() {}
+  void destroy_native_context() {
+    if (
+      descriptor_.context.data.webgl.kind ==
+        MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS &&
+      descriptor_.context.data.webgl.context > 0
+    ) {
+      emscripten_webgl_destroy_context(descriptor_.context.data.webgl.context);
+      descriptor_.context.data.webgl.context = 0;
+    }
+  }
 #else
   void destroy_native_context() {}
 #endif
@@ -472,9 +530,10 @@ class OpenGLSurfaceSessionBackend final
 
 namespace mln::core {
 
-auto opengl_surface_attach(
+auto opengl_surface_attach_start(
   mln_map map, const mln_opengl_surface_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, mln_operation* out_operation
 ) -> mln_status {
   MapObject* live_map = nullptr;
   const auto map_status = validate_map_live(map, live_map);
@@ -485,13 +544,6 @@ auto opengl_surface_attach(
     validate_opengl_surface_descriptor(descriptor, true);
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
-  }
-  const auto output_status = validate_attach_output(
-    out_session, "out_session must not be null",
-    "out_session must point to a null handle"
-  );
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
   }
   const auto physical_status = validate_physical_size(
     descriptor->extent.width, descriptor->extent.height,
@@ -504,39 +556,87 @@ auto opengl_surface_attach(
   auto session = std::make_shared<mln_render_session_object>();
   session->map = map;
   set_session_extent(*session, descriptor->extent);
-  session->surface.backend = std::make_unique<OpenGLSurfaceSessionBackend>(
-    *descriptor, mbgl::Size{session->physical_width, session->physical_height}
-  );
-  return attach_render_session(
-    std::move(session), out_session, RenderSessionKind::Surface,
-    RenderSessionAttachMessages{
-      .null_session = "surface session must not be null",
-      .null_output = "out_session must not be null",
-      .non_null_output = "out_session must point to a null handle"
-    }
+  auto copied = *descriptor;
+#if defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
+  const auto transferred =
+    copied.context.platform == MLN_OPENGL_CONTEXT_PLATFORM_WEBGL &&
+    copied.context.data.webgl.kind == MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS;
+  auto selector = std::string{};
+  if (transferred) {
+    const auto view = copied.context.data.webgl.canvas_selector;
+    selector.assign(static_cast<const char*>(view.data), view.size);
+    configure_transferred_webgl_worker(*session, selector);
+  }
+#else
+  constexpr auto transferred = false;
+  auto selector = std::string{};
+#endif
+  if (
+    options != nullptr &&
+    options->driver != (transferred ? MLN_RENDER_DRIVER_CORE_WORKER
+                                    : MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD)
+  ) {
+    set_thread_error("OpenGL driver does not match its context placement");
+    return MLN_STATUS_UNSUPPORTED;
+  }
+  session->initialize_backend =
+    [copied, selector = std::move(selector),
+     transferred](mln_render_session_object& target) mutable {
+      (void)selector;
+      (void)transferred;
+#if defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
+      if (transferred) {
+        auto attributes = EmscriptenWebGLContextAttributes{};
+        emscripten_webgl_init_context_attributes(&attributes);
+        attributes.majorVersion = 2;
+        attributes.proxyContextToMainThread =
+          EMSCRIPTEN_WEBGL_CONTEXT_PROXY_DISALLOW;
+        const auto context =
+          emscripten_webgl_create_context(selector.c_str(), &attributes);
+        if (context <= 0) {
+          set_thread_error("creating the transferred WebGL 2 context failed");
+          return MLN_STATUS_NATIVE_ERROR;
+        }
+        copied.context.data.webgl.context = context;
+      }
+#endif
+      target.surface.backend = std::make_unique<OpenGLSurfaceSessionBackend>(
+        copied, mbgl::Size{target.physical_width, target.physical_height}
+      );
+      return MLN_STATUS_OK;
+    };
+  const auto capabilities = mln_render_session_capabilities{
+    .size = sizeof(mln_render_session_capabilities),
+    .driver = options == nullptr ? 0u : options->driver,
+    .texture_ring_depth = 0,
+    .flags = MLN_RENDER_SESSION_CAPABILITY_PRESENTATION
+  };
+  return start_attach_render_session(
+    std::move(session), RenderSessionKind::Surface, options, capabilities,
+    out_session, out_operation
   );
 }
 
-auto opengl_surface_set_target(
-  mln_render_session session, const mln_opengl_surface_descriptor* descriptor
+auto opengl_surface_set_target_start(
+  mln_render_session session, const mln_opengl_surface_descriptor* descriptor,
+  mln_operation* out_operation
 ) -> mln_status {
-  mln_render_session_object* live = nullptr;
-  const auto session_status = validate_render_session_retarget(
-    session, RetargetTargetKind::Surface, live
-  );
-  if (session_status != MLN_STATUS_OK) {
-    return session_status;
-  }
   const auto descriptor_status =
     validate_opengl_surface_descriptor(descriptor, true);
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
-  return surface_session_set_target(
-    session, descriptor->extent,
-    [descriptor](mln_render_session_object& target_session) -> mln_status {
-      return target_session.surface.backend->set_opengl_target(*descriptor);
-    }
+  const auto copied = *descriptor;
+  return enqueue_driver_operation(
+    session, RENDER_OPERATION_MAINTENANCE,
+    [copied](mln_render_session_object& target) {
+      return surface_session_set_target(
+        target.self, copied.extent, [&copied](mln_render_session_object& live) {
+          return live.surface.backend->set_opengl_target(copied);
+        }
+      );
+    },
+    out_operation
   );
 }
 
