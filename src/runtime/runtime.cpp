@@ -1158,6 +1158,10 @@ auto create_runtime(
         return true;
       }
       live->pump_budget_exhausted = true;
+      // Denying disarms the gate: a task inside the drain can wait for this
+      // same run loop to empty, and that nested drain must run to completion
+      // rather than spin against an expired budget.
+      live->pump_deadline.reset();
       return false;
     }
   );
@@ -3012,8 +3016,15 @@ auto pump_runtime(mln_runtime runtime, int64_t timeout_ms, int64_t budget_ms)
   }
 
   if (budget_ms >= 0) {
-    live->pump_deadline =
-      std::chrono::steady_clock::now() + std::chrono::milliseconds{budget_ms};
+    // A budget past the clock's range would overflow the addition, so it
+    // saturates to an unbounded drain.
+    const auto now = std::chrono::steady_clock::now();
+    const auto headroom = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::steady_clock::time_point::max() - now
+    );
+    live->pump_deadline = std::chrono::milliseconds{budget_ms} < headroom
+                            ? now + std::chrono::milliseconds{budget_ms}
+                            : std::chrono::steady_clock::time_point::max();
   } else {
     live->pump_deadline.reset();
   }
