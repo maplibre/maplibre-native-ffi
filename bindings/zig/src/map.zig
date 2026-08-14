@@ -123,8 +123,13 @@ pub const GeoJsonSourceDataHandle = enum(c.mln_geojson_source_data) {
     ///
     /// Callable from any thread and free of any runtime or map, so a host
     /// prepares data on a worker thread and installs it on the map owner
-    /// thread. The prepared value is immutable and safe to share across
-    /// threads.
+    /// thread. The prepared value is immutable, and reads and installs may
+    /// run concurrently from any thread. As with every handle in this
+    /// binding, the host orders `release()` after the installs that use the
+    /// handle; a release that races an install makes the install report an
+    /// invalid-argument status for a stale handle, and never touches freed
+    /// memory, because the C API resolves ids under its own lock and never
+    /// reuses one.
     pub fn create(
         allocator: std.mem.Allocator,
         data: []const u8,
