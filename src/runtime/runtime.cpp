@@ -1144,8 +1144,7 @@ auto create_runtime(
     [state = owned_runtime->wake_state]() -> void { signal_wake(state); }
   );
   // The gate runs on the owner thread inside the drain, and the runtime owns
-  // the run loop, so the raw pointer cannot outlive it. The first task of a
-  // bounded drain always passes, so a bounded pump always makes progress.
+  // the run loop, so the raw pointer cannot outlive it.
   owned_runtime->run_loop->setProcessGate(
     [live = owned_runtime.get()]() -> bool {
       if (!live->pump_deadline.has_value()) {
@@ -3023,8 +3022,7 @@ auto pump_runtime(mln_runtime runtime, int64_t timeout_ms, int64_t budget_ms)
   live->run_loop->runOnce();
   live->pump_deadline.reset();
   // The gate only denies while a task is queued, so an exhausted budget means
-  // work remains. Re-arming the wake flag makes the next pump return without
-  // parking and continue that work.
+  // work remains.
   if (live->pump_budget_exhausted) {
     signal_wake(live->wake_state);
   }
