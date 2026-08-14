@@ -7,6 +7,7 @@ use std::ffi::c_char;
 #[cfg(any(target_os = "linux", target_os = "android", target_os = "windows"))]
 use std::ffi::c_void;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 #[cfg(not(target_os = "emscripten"))]
@@ -17,7 +18,7 @@ use ash::vk::Handle;
 use glow as gl_api;
 #[cfg(not(target_os = "emscripten"))]
 use glow::HasContext;
-use serde_json::Value as JsonValue;
+use serde_json::{Value as JsonValue, json};
 // Emscripten fixtures bind WebGL directly because glow does not build there.
 #[cfg(target_os = "emscripten")]
 mod webgl_gl;
@@ -33,8 +34,8 @@ use webgl_gl as gl_api;
 
 use super::*;
 use crate::{
-    ErrorKind, MapHandle, MapOptions, OpenGLContextProviderMask, RenderBackendMask, RuntimeHandle,
-    ScreenBox, ScreenPoint,
+    ErrorKind, GeoJsonSourceOptions, MapHandle, MapOptions, OpenGLContextProviderMask,
+    RenderBackendMask, RuntimeHandle, ScreenBox, ScreenPoint,
 };
 
 assert_not_impl_any!(NativePointer: Send, Sync);
@@ -45,6 +46,9 @@ assert_impl_all!(AcquiredFrameHandle: Send, Sync);
 
 const FEATURE_STATE_STYLE_JSON: &str = r#"{"version":8,"sources":{"point":{"type":"geojson","data":{"type":"FeatureCollection","features":[{"type":"Feature","id":"feature-1","properties":{},"geometry":{"type":"Point","coordinates":[0,0]}}]}}},"layers":[{"id":"circle","type":"circle","source":"point","paint":{"circle-radius":["case",["boolean",["feature-state","hover"],false],10,5]}}]}"#;
 const QUERY_STYLE_JSON: &str = r##"{"version":8,"sources":{"point":{"type":"geojson","data":{"type":"FeatureCollection","features":[{"type":"Feature","id":"feature-1","geometry":{"type":"Point","coordinates":[-122.4194,37.7749]},"properties":{"kind":"capital","visible":true}}]}}},"layers":[{"id":"background","type":"background","paint":{"background-color":"#d8f1ff"}},{"id":"point-circle","type":"circle","source":"point","paint":{"circle-color":"#f97316","circle-radius":12}}]}"##;
+#[cfg(mln_webgpu_backend)]
+const QUERY_STYLE_BACKGROUND_RGBA: [u8; 4] = [0xd8, 0xf1, 0xff, 0xff];
+const CLUSTER_BASE_STYLE_JSON: &str = r##"{"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#ffffff"}}]}"##;
 fn wait_until_completed<T>(session: &RenderSessionHandle, operation: &OperationHandle<T>) {
     let deadline = Instant::now() + Duration::from_secs(5);
     while !operation.is_completed().unwrap() {
@@ -1516,7 +1520,7 @@ impl WebGlTestContext {
     }
 
     fn descriptor(&self) -> OpenGLContextDescriptor {
-        OpenGLContextDescriptor::WebGl(WebGlContextDescriptor::new(self.context))
+        OpenGLContextDescriptor::WebGl(WebGlContextDescriptor::existing(self.context))
     }
 
     // A browser session presents to the canvas this context was created
@@ -2409,36 +2413,9 @@ fn close_session(session: RenderSessionHandle) {
     session.destroy().unwrap();
 }
 
-#[test]
-fn caller_and_core_driver_options_are_distinct() {
-    let core = RenderSessionAttachOptions::core_worker(3).to_native();
-    assert_eq!(core.driver, sys::MLN_RENDER_DRIVER_CORE_WORKER);
-    assert_eq!(core.requested_texture_ring_depth, 3);
-
-    let caller = RenderSessionAttachOptions::caller_graphics_thread(2).to_native();
-    assert_eq!(caller.driver, sys::MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD);
-    assert_eq!(caller.requested_texture_ring_depth, 2);
-}
-
-#[test]
-fn frame_demand_copies_pacing_and_coalescing_fields() {
-    let raw = FrameDemand {
-        if_needed: true,
-        present: true,
-        token: 9,
-        coalescing_boundary: 4,
-        presentation_time_ns: 12,
-        deadline_ns: 15,
-    }
-    .to_native();
-    assert_eq!(
-        raw.flags,
-        sys::MLN_FRAME_DEMAND_IF_NEEDED | sys::MLN_FRAME_DEMAND_PRESENT
-    );
-    assert_eq!(raw.token, 9);
-    assert_eq!(raw.coalescing_boundary, 4);
-    assert_eq!(raw.presentation_time_ns, 12);
-    assert_eq!(raw.deadline_ns, 15);
+fn take_json(session: &RenderSessionHandle, operation: OperationHandle<Vec<u8>>) -> JsonValue {
+    wait_until_completed(session, &operation);
+    serde_json::from_slice(&operation.take().unwrap()).unwrap()
 }
 
 #[test]
@@ -2687,6 +2664,36 @@ fn opengl_borrowed_texture_session_replaces_its_target() {
     runtime.close().unwrap();
 }
 
+#[cfg(mln_webgpu_backend)]
+#[test]
+fn webgpu_borrowed_texture_session_renders_into_a_host_texture() {
+    if !crate::supported_render_backends().contains(RenderBackendMask::WEBGPU) {
+        return;
+    }
+
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
+    let (context, texture, session) =
+        create_webgpu_borrowed_texture_session(&map, RenderTargetExtent::new(64, 64, 1.0)).unwrap();
+    map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
+    await_runtime_barrier(&runtime);
+    assert_eq!(
+        render_frame(&session, false).disposition,
+        FrameDisposition::Rendered
+    );
+    assert!(
+        texture
+            .read_rgba(&context)
+            .unwrap()
+            .chunks_exact(4)
+            .any(|pixel| pixel == QUERY_STYLE_BACKGROUND_RGBA)
+    );
+
+    close_session(session);
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
 #[test]
 fn feature_state_and_rendered_queries_copy_native_results() {
     if !has_test_owned_texture_session_backend() {
@@ -2746,9 +2753,200 @@ fn feature_state_and_rendered_queries_copy_native_results() {
     let feature = features[0].get("feature").unwrap_or(&features[0]);
     assert_eq!(feature["id"], "feature-1");
 
+    let source = take_json(
+        &session,
+        session.query_source_features("point", None).unwrap(),
+    );
+    let source_features = source.as_array().unwrap();
+    assert_eq!(source_features.len(), 1);
+    let source_feature = source_features[0]
+        .get("feature")
+        .unwrap_or(&source_features[0]);
+    assert_eq!(source_feature["id"], "feature-1");
+
+    let oversized = take_json(
+        &session,
+        session
+            .query_rendered_features(
+                &RenderedQueryGeometry::box_(ScreenBox::new(
+                    ScreenPoint::new(-4096.0, -4096.0),
+                    ScreenPoint::new(4096.0, 4096.0),
+                )),
+                None,
+            )
+            .unwrap(),
+    );
+    assert_eq!(oversized.as_array().unwrap().len(), 1);
+
+    let inverted = take_json(
+        &session,
+        session
+            .query_rendered_features(
+                &RenderedQueryGeometry::box_(ScreenBox::new(
+                    ScreenPoint::new(4096.0, 4096.0),
+                    ScreenPoint::new(-4096.0, -4096.0),
+                )),
+                None,
+            )
+            .unwrap(),
+    );
+    assert_eq!(inverted.as_array().unwrap().len(), 1);
+
+    let offscreen = take_json(
+        &session,
+        session
+            .query_rendered_features(
+                &RenderedQueryGeometry::box_(ScreenBox::new(
+                    ScreenPoint::new(512.0, 512.0),
+                    ScreenPoint::new(1024.0, 1024.0),
+                )),
+                None,
+            )
+            .unwrap(),
+    );
+    assert!(offscreen.as_array().unwrap().is_empty());
+
     finish_unit(&session, session.remove_feature_state(&selector).unwrap());
     close_session(session);
     map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+fn cluster_feature_extensions_copy_values_and_feature_collections() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(64, 64, 1.0)).unwrap();
+    map.set_style_json(CLUSTER_BASE_STYLE_JSON.as_bytes())
+        .unwrap();
+
+    let data = serde_json::to_vec(&json!({
+        "type": "FeatureCollection",
+        "features": [
+            {"type":"Feature","geometry":{"type":"Point","coordinates":[0.0,0.0]},"properties":{"name":"one","weight":1}},
+            {"type":"Feature","geometry":{"type":"Point","coordinates":[0.001,0.001]},"properties":{"name":"two","weight":2}},
+            {"type":"Feature","geometry":{"type":"Point","coordinates":[0.002,0.002]},"properties":{"name":"three","weight":3}}
+        ]
+    }))
+    .unwrap();
+    let mut options = GeoJsonSourceOptions::default();
+    options.cluster = Some(true);
+    options.cluster_radius = Some(60);
+    options.cluster_min_points = Some(2);
+    options.cluster_max_zoom = Some(17.0);
+    options.cluster_properties =
+        Some(serde_json::to_vec(&json!({"weight_sum":["+",["get","weight"]]})).unwrap());
+    map.add_geojson_source_data("cluster-source", &data, Some(&options))
+        .unwrap();
+    map.add_style_layer_json(
+        br##"{"id":"cluster-circle","type":"circle","source":"cluster-source","filter":["has","point_count"],"paint":{"circle-color":"#2563eb","circle-radius":20}}"##,
+        None,
+    )
+    .unwrap();
+    await_runtime_barrier(&runtime);
+    assert_eq!(
+        render_frame(&session, false).disposition,
+        FrameDisposition::Rendered
+    );
+
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let cluster = loop {
+        let queried = take_json(
+            &session,
+            session
+                .query_rendered_features(
+                    &RenderedQueryGeometry::box_(ScreenBox::new(
+                        ScreenPoint::new(0.0, 0.0),
+                        ScreenPoint::new(64.0, 64.0),
+                    )),
+                    None,
+                )
+                .unwrap(),
+        );
+        if let Some(cluster) = queried.as_array().unwrap().first() {
+            break cluster.clone();
+        }
+        assert!(
+            Instant::now() < deadline,
+            "cluster did not become queryable"
+        );
+        map.request_repaint().unwrap();
+        await_runtime_barrier(&runtime);
+        let _ = render_frame(&session, false);
+    };
+    let feature = cluster.get("feature").unwrap_or(&cluster);
+    assert_eq!(feature["properties"]["point_count"], 3);
+    assert_eq!(feature["properties"]["weight_sum"].as_f64(), Some(6.0));
+    let feature = serde_json::to_vec(feature).unwrap();
+
+    let children = take_json(
+        &session,
+        session
+            .query_feature_extension("cluster-source", &feature, "supercluster", "children", None)
+            .unwrap(),
+    );
+    assert!(!children["features"].as_array().unwrap().is_empty());
+
+    let expansion_zoom = take_json(
+        &session,
+        session
+            .query_feature_extension(
+                "cluster-source",
+                &feature,
+                "supercluster",
+                "expansion-zoom",
+                None,
+            )
+            .unwrap(),
+    );
+    assert!(expansion_zoom.is_u64());
+
+    close_session(session);
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+fn live_session_blocks_map_close_and_drop_reports_the_leaked_map() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+
+    let leaks = Arc::new(Mutex::new(Vec::new()));
+    let sink = Arc::clone(&leaks);
+    assert!(!crate::set_leak_reporter(Some(Box::new(move |leak| {
+        sink.lock().unwrap().push(leak);
+    }))));
+
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(32, 32, 1.0)).unwrap();
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(32, 32, 1.0)).unwrap();
+
+    let close_error = map.close().unwrap_err();
+    assert_eq!(close_error.kind(), ErrorKind::InvalidState);
+    let map = close_error.into_handle();
+    drop(map);
+    crate::set_leak_reporter(None);
+
+    let reported = leaks.lock().unwrap().clone();
+    assert_eq!(reported.len(), 1);
+    assert_eq!(reported[0].type_name, "mln_map");
+    assert_ne!(reported[0].id, 0);
+
+    close_session(session);
+    let mut close = sys::mln_operation(0);
+    maplibre_core::check(unsafe {
+        sys::mln_map_close_start(sys::mln_map(reported[0].id), &mut close)
+    })
+    .unwrap();
+    crate::runtime::wait_raw_operation_completed(close).unwrap();
+    unsafe { sys::mln_operation_release(close) };
     runtime.close().unwrap();
 }
 

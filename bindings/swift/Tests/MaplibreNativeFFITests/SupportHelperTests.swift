@@ -249,3 +249,18 @@ private final class LockedBox<Value>: @unchecked Sendable {
     )])
   }
 }
+
+@Test func droppedNotificationReceiverClosesItsNativeSource() throws {
+  var receiver: NativeNotificationReceiver? = try NativeNotificationReceiver()
+  let source = try #require(receiver).source
+  weak let releasedReceiver = receiver
+
+  receiver = nil
+
+  #expect(releasedReceiver == nil)
+  var batch: mln_ready_batch = 0
+  #expect(
+    mln_notification_source_drain_ready(source, &batch) ==
+      MLN_STATUS_INVALID_ARGUMENT
+  )
+}

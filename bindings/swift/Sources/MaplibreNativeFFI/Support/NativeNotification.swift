@@ -1,10 +1,15 @@
 internal import CMaplibreNativeC
 import Foundation
 
+private final class NativeNotificationContext: @unchecked Sendable {
+  weak var receiver: NativeNotificationReceiver?
+}
+
 /// Bridges one receiver-scoped native notification source to Swift tasks.
 final class NativeNotificationReceiver: @unchecked Sendable {
   let source: mln_notification_source
 
+  private let callbackContext: NativeNotificationContext
   private let lock = NSLock()
   private let drainLock = NSLock()
   private var drainScheduled = false
@@ -20,16 +25,20 @@ final class NativeNotificationReceiver: @unchecked Sendable {
     var source: mln_notification_source = 0
     try checkStatus(mln_notification_source_create(&source))
     self.source = source
+    let callbackContext = NativeNotificationContext()
+    self.callbackContext = callbackContext
+    callbackContext.receiver = self
 
-    let context = Unmanaged.passUnretained(self).toOpaque()
+    let context = Unmanaged.passUnretained(callbackContext).toOpaque()
     do {
       try checkStatus(mln_notification_source_set_callback(
         source,
         { context in
           guard let context else { return }
-          let receiver = Unmanaged<NativeNotificationReceiver>
+          let receiver = Unmanaged<NativeNotificationContext>
             .fromOpaque(context).takeUnretainedValue()
-          receiver.scheduleDrain()
+            .receiver
+          receiver?.scheduleDrain()
         },
         context
       ))
@@ -37,6 +46,13 @@ final class NativeNotificationReceiver: @unchecked Sendable {
       _ = mln_notification_source_close(source)
       throw error
     }
+  }
+
+  deinit {
+    // A dropped runtime intentionally leaves its native handle live for the
+    // leak reporter, but this receiver must not leave that runtime pointing at
+    // freed Swift storage.
+    try? close()
   }
 
   func wait(for operation: NativeOperationHandle) async throws {
