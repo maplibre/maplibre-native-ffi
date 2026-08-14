@@ -572,6 +572,12 @@ fn finishOperation(session: maplibre.RenderSessionHandle, operation: maplibre.Op
     try operation.discard();
 }
 
+fn takeQueryResult(session: maplibre.RenderSessionHandle, operation: maplibre.OperationHandle) !maplibre.OwnedString {
+    defer operation.release();
+    try waitOperationSuccess(session, operation);
+    return session.takeQueryResult(testing.allocator, operation);
+}
+
 fn finishAttachment(attachment: maplibre.RenderSessionAttachment) !maplibre.RenderSessionHandle {
     errdefer {
         var session = attachment.session;
@@ -1121,9 +1127,138 @@ test "texture readback before a frame completes with invalid state" {
     }
 }
 
+test "live render session blocks map close until detached" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
+    var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
+    defer diagnostics.deinit();
+
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, &diagnostics);
+    errdefer runtime.close() catch {};
+    var map = try maplibre.MapHandle.create(&runtime, .{ .width = 32, .height = 32 });
+    errdefer map.close() catch {};
+    var owned = try attachTestOwnedTexture(&map, .{ .extent = .{ .width = 32, .height = 32 } });
+    errdefer owned.close() catch {};
+
+    try testing.expectError(error.InvalidState, map.close());
+    try testing.expectEqualStrings("map has an attached render session", diagnostics.get().?.message);
+
+    try owned.close();
+    try map.close();
+    try runtime.close();
+}
+
+test "still-image map modes complete owned texture renders" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
+    inline for (.{ maplibre.MapMode.static, maplibre.MapMode.tile }) |mode| {
+        var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+        defer runtime.close() catch @panic("runtime close failed");
+        var map = try maplibre.MapHandle.create(&runtime, .{ .width = 32, .height = 32, .mode = mode });
+        defer map.close() catch @panic("map close failed");
+        var owned = try attachTestOwnedTexture(&map, .{ .extent = .{ .width = 32, .height = 32 } });
+        defer owned.close() catch @panic("render session close failed");
+
+        _ = try map.setStyleJson(testing.allocator, support.style_json);
+        try awaitRuntimeBarrier(&runtime);
+        const operation = try map.requestStillImage();
+        defer operation.release();
+        for (0..1000) |_| {
+            _ = try renderFrame(owned.session, false);
+            if (try operation.poll()) break;
+            try std.Thread.yield();
+        } else return error.StillImageDidNotComplete;
+        try waitOperationSuccess(owned.session, operation);
+        try operation.discard();
+        try expectOwnedFrameExtent(owned.session, .{ .width = 32, .height = 32 });
+    }
+}
+
 const feature_state_style_json =
     \\{"version":8,"sources":{"point":{"type":"geojson","data":{"type":"FeatureCollection","features":[{"type":"Feature","id":"feature-1","properties":{},"geometry":{"type":"Point","coordinates":[0,0]}}]}}},"layers":[{"id":"circle","type":"circle","source":"point","paint":{"circle-radius":8}}]}
 ;
+
+const cluster_style_json =
+    \\{"version":8,"sources":{"cluster-source":{"type":"geojson","cluster":true,"data":{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[0.0,0.0]},"properties":{"name":"one"}},{"type":"Feature","geometry":{"type":"Point","coordinates":[0.001,0.001]},"properties":{"name":"two"}},{"type":"Feature","geometry":{"type":"Point","coordinates":[0.002,0.002]},"properties":{"name":"three"}}]}}},"layers":[{"id":"cluster-circle","type":"circle","source":"cluster-source","filter":["has","point_count"],"paint":{"circle-radius":20}}]}
+;
+
+fn skipJsonWhitespace(json: []const u8, start: usize) usize {
+    var cursor = start;
+    while (cursor < json.len and std.ascii.isWhitespace(json[cursor])) cursor += 1;
+    return cursor;
+}
+
+fn jsonStringEnd(json: []const u8, start: usize) ?usize {
+    var escaped = false;
+    var cursor = start + 1;
+    while (cursor < json.len) : (cursor += 1) {
+        if (escaped) escaped = false else if (json[cursor] == '\\') escaped = true else if (json[cursor] == '"') return cursor + 1;
+    }
+    return null;
+}
+
+fn jsonValueEnd(json: []const u8, start: usize) ?usize {
+    if (start >= json.len) return null;
+    if (json[start] == '"') return jsonStringEnd(json, start);
+    if (json[start] != '{' and json[start] != '[') {
+        var cursor = start;
+        while (cursor < json.len and !std.ascii.isWhitespace(json[cursor]) and json[cursor] != ',' and json[cursor] != '}' and json[cursor] != ']') cursor += 1;
+        return cursor;
+    }
+    var depth: usize = 0;
+    var cursor = start;
+    while (cursor < json.len) {
+        if (json[cursor] == '"') {
+            cursor = jsonStringEnd(json, cursor) orelse return null;
+            continue;
+        }
+        if (json[cursor] == '{' or json[cursor] == '[') depth += 1;
+        if (json[cursor] == '}' or json[cursor] == ']') {
+            depth -= 1;
+            if (depth == 0) return cursor + 1;
+        }
+        cursor += 1;
+    }
+    return null;
+}
+
+fn rawJsonMember(json: []const u8, key: []const u8) ?[]const u8 {
+    var cursor = skipJsonWhitespace(json, 0);
+    if (cursor >= json.len or json[cursor] != '{') return null;
+    cursor += 1;
+    while (true) {
+        cursor = skipJsonWhitespace(json, cursor);
+        if (cursor >= json.len or json[cursor] == '}') return null;
+        const key_end = jsonStringEnd(json, cursor) orelse return null;
+        const member_name = json[cursor + 1 .. key_end - 1];
+        cursor = skipJsonWhitespace(json, key_end);
+        if (cursor >= json.len or json[cursor] != ':') return null;
+        const value_start = skipJsonWhitespace(json, cursor + 1);
+        const value_end = jsonValueEnd(json, value_start) orelse return null;
+        if (std.mem.eql(u8, member_name, key)) return json[value_start..value_end];
+        cursor = skipJsonWhitespace(json, value_end);
+        if (cursor >= json.len or json[cursor] != ',') return null;
+        cursor += 1;
+    }
+}
+
+fn firstJsonArrayElement(json: []const u8) ?[]const u8 {
+    var cursor = skipJsonWhitespace(json, 0);
+    if (cursor >= json.len or json[cursor] != '[') return null;
+    cursor = skipJsonWhitespace(json, cursor + 1);
+    if (cursor >= json.len or json[cursor] == ']') return null;
+    return json[cursor .. jsonValueEnd(json, cursor) orelse return null];
+}
+
+fn queriedFeature(result: []const u8) ?[]const u8 {
+    const queried = firstJsonArrayElement(result) orelse return null;
+    return rawJsonMember(queried, "feature") orelse queried;
+}
+
+fn firstLeafName(collection: []const u8) ?[]const u8 {
+    const features = rawJsonMember(collection, "features") orelse return null;
+    const feature = firstJsonArrayElement(features) orelse return null;
+    const properties = rawJsonMember(feature, "properties") orelse return null;
+    return rawJsonMember(properties, "name");
+}
 
 test "feature state and rendered queries copy operation results" {
     if (!supports_test_owned_texture) return error.SkipZigTest;
@@ -1173,6 +1308,103 @@ test "feature state and rendered queries copy operation results" {
         owned.session,
         try owned.session.removeFeatureStateStart(testing.allocator, selector),
     );
+}
+
+test "cluster feature extensions copy values and feature collections" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try maplibre.MapHandle.create(&runtime, .{ .width = 64, .height = 64 });
+    defer map.close() catch @panic("map close failed");
+    var owned = try attachTestOwnedTexture(&map, .{ .extent = .{ .width = 64, .height = 64 } });
+    defer owned.close() catch @panic("render session close failed");
+
+    _ = try map.setStyleJson(testing.allocator, cluster_style_json);
+    try awaitRuntimeBarrier(&runtime);
+    _ = try renderFrame(owned.session, false);
+
+    var cluster_result: ?maplibre.OwnedString = null;
+    for (0..1000) |_| {
+        var result = try takeQueryResult(
+            owned.session,
+            try owned.session.queryRenderedFeaturesStart(
+                testing.allocator,
+                .{ .box = .{
+                    .min = .{ .x = 0, .y = 0 },
+                    .max = .{ .x = 64, .y = 64 },
+                } },
+                null,
+            ),
+        );
+        if (queriedFeature(result.value) != null) {
+            cluster_result = result;
+            break;
+        }
+        result.deinit();
+        _ = try map.requestRepaint();
+        try awaitRuntimeBarrier(&runtime);
+        _ = try renderFrame(owned.session, false);
+    }
+    var clusters = cluster_result orelse return error.ClusterFeatureNotQueryable;
+    defer clusters.deinit();
+    const feature = queriedFeature(clusters.value).?;
+    const properties = rawJsonMember(feature, "properties").?;
+    _ = try std.fmt.parseInt(u64, rawJsonMember(properties, "cluster_id").?, 10);
+    try testing.expectEqualStrings("3", rawJsonMember(properties, "point_count").?);
+
+    var children = try takeQueryResult(
+        owned.session,
+        try owned.session.queryFeatureExtensionStart(
+            testing.allocator,
+            "cluster-source",
+            feature,
+            "supercluster",
+            "children",
+            null,
+        ),
+    );
+    defer children.deinit();
+    try testing.expect(firstJsonArrayElement(rawJsonMember(children.value, "features").?) != null);
+
+    var expansion_zoom = try takeQueryResult(
+        owned.session,
+        try owned.session.queryFeatureExtensionStart(
+            testing.allocator,
+            "cluster-source",
+            feature,
+            "supercluster",
+            "expansion-zoom",
+            null,
+        ),
+    );
+    defer expansion_zoom.deinit();
+    _ = try std.fmt.parseInt(u64, expansion_zoom.value, 10);
+
+    var first_leaf = try takeQueryResult(
+        owned.session,
+        try owned.session.queryFeatureExtensionStart(
+            testing.allocator,
+            "cluster-source",
+            feature,
+            "supercluster",
+            "leaves",
+            "{\"limit\":1,\"offset\":0}",
+        ),
+    );
+    defer first_leaf.deinit();
+    var second_leaf = try takeQueryResult(
+        owned.session,
+        try owned.session.queryFeatureExtensionStart(
+            testing.allocator,
+            "cluster-source",
+            feature,
+            "supercluster",
+            "leaves",
+            "{\"limit\":1,\"offset\":1}",
+        ),
+    );
+    defer second_leaf.deinit();
+    try testing.expect(!std.mem.eql(u8, firstLeafName(first_leaf.value).?, firstLeafName(second_leaf.value).?));
 }
 
 test "sustained frame demands outlast the texture ring depth" {
