@@ -1822,9 +1822,8 @@ test "GeoJSON source options cluster nearby points and aggregate cluster propert
     try testing.expect(try support.waitForEvent(&runtime, .map_style_loaded));
 
     const features = "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[0,0]},\"properties\":{\"rank\":1}},{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[0.001,0.001]},\"properties\":{\"rank\":2}},{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[0.002,0.002]},\"properties\":{\"rank\":3}}]}";
-    try map.addGeoJsonSourceData(
+    const cluster_data = try maplibre.GeoJsonSourceDataHandle.create(
         testing.allocator,
-        "cluster-options-source",
         features,
         .{
             .cluster = true,
@@ -1833,6 +1832,12 @@ test "GeoJSON source options cluster nearby points and aggregate cluster propert
             .cluster_max_zoom = 14,
             .cluster_properties = "{\"total\":[\"+\",[\"get\",\"rank\"]]}",
         },
+    );
+    defer cluster_data.release();
+    try map.addGeoJsonSourceData(
+        testing.allocator,
+        "cluster-options-source",
+        cluster_data,
     );
 
     try map.addStyleLayerJson(testing.allocator, "{\"id\":\"cluster-options-circle\",\"type\":\"circle\",\"source\":\"cluster-options-source\",\"filter\":[\"has\",\"point_count\"],\"paint\":{\"circle-radius\":20}}", "");

@@ -40,6 +40,7 @@ native_handle!(
     sys::mln_render_session,
     sys::mln_wake_source,
     sys::mln_resource_request_handle,
+    sys::mln_geojson_source_data,
     sys::mln_offline_region_snapshot,
     sys::mln_offline_region_list,
     sys::mln_style_id_list,

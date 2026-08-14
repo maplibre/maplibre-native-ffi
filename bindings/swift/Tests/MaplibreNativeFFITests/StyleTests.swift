@@ -108,10 +108,11 @@ import Testing
     sourceId: "remote",
     url: "https://example.com/source.json"
   )
-  try map.addGeoJSONSourceData(
-    sourceId: "data",
+  let emptyCollection = try GeoJSONSourceDataHandle(
     data: jsonData(#"{"type":"FeatureCollection","features":[]}"#)
   )
+  defer { try? emptyCollection.close() }
+  try map.addGeoJSONSourceData(sourceId: "data", data: emptyCollection)
 
   let inline = try #require(try map.styleSourceInfo("inline"))
   #expect(inline.type == .vector)
@@ -648,7 +649,7 @@ private func addSourceReportingItsRelease(
     clusterMinPoints: 3,
     lineMetrics: true,
     cluster: true,
-    synchronousUpdate: true
+    synchronousTiling: true
   )
 
   try options.nativeOptions.withNativeOptions { native in
@@ -670,9 +671,9 @@ private func addSourceReportingItsRelease(
     #expect(native.pointee.line_metrics)
     #expect(native.pointee.cluster)
     #expect(
-      (fields & MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE.rawValue) != 0
+      (fields & MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING.rawValue) != 0
     )
-    #expect(native.pointee.synchronous_update)
+    #expect(native.pointee.synchronous_tiling)
 
     let clusterProperties = native.pointee.cluster_properties
     let data = try #require(clusterProperties.data)
@@ -687,7 +688,44 @@ private func addSourceReportingItsRelease(
   }
 }
 
-@Test func clusteredGeoJSONSourceOptionsParseThroughNativeMap() throws {
+/// Preparation parses, tiles, and validates without a runtime or map, so bad
+/// documents and bad cluster options fail at the prepare step.
+@Test func geoJSONSourceDataPreparationValidatesWithoutARuntime() throws {
+  let prepared = try GeoJSONSourceDataHandle(
+    data: nearbyPoints(),
+    options: clusterOptions()
+  )
+  try prepared.close()
+
+  // The cluster aggregation graph is parsed by MapLibre Native at
+  // preparation, so an unparseable expression fails the prepare.
+  var invalid = clusterOptions()
+  invalid.clusterProperties = jsonData(
+    #"{"weight_sum":"not-an-expression"}"#
+  )
+  #expect(throws: MaplibreError.self) {
+    try GeoJSONSourceDataHandle(data: nearbyPoints(), options: invalid)
+  }
+
+  // Clustering rejects a single feature at preparation.
+  #expect(throws: MaplibreError.self) {
+    try GeoJSONSourceDataHandle(
+      data: jsonData(
+        #"{"type":"Feature","geometry":{"type":"Point","coordinates":[0,0]},"properties":{}}"#
+      ),
+      options: clusterOptions()
+    )
+  }
+
+  // An unparseable document fails the prepare.
+  #expect(throws: MaplibreError.self) {
+    try GeoJSONSourceDataHandle(data: jsonData("not geojson"))
+  }
+}
+
+/// One prepared handle installs on any number of sources, and the source
+/// adopts the options the data was prepared with.
+@Test func preparedGeoJSONSourceDataAddsAndUpdatesAcrossSources() throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.close() }
@@ -701,36 +739,161 @@ private func addSourceReportingItsRelease(
   {"version":8,"sources":{},"layers":[]}
   """))
 
-  try map.addGeoJSONSourceData(
-    sourceId: "clustered",
+  let clustered = try GeoJSONSourceDataHandle(
     data: nearbyPoints(),
     options: clusterOptions()
   )
+  defer { try? clustered.close() }
 
-  #expect(try map.styleSourceExists("clustered"))
-  #expect(try map.styleSourceType("clustered") == .geoJSON)
+  try map.addGeoJSONSourceData(sourceId: "first", data: clustered)
+  try map.addGeoJSONSourceData(sourceId: "second", data: clustered)
+  #expect(try map.styleSourceType("first") == .geoJSON)
+  #expect(try map.styleSourceType("second") == .geoJSON)
 
-  // The cluster aggregation graph is borrowed for the call and parsed by
-  // MapLibre Native, so an unparseable expression fails the add.
-  var invalid = clusterOptions()
-  invalid.clusterProperties = jsonData(
-    #"{"weight_sum":"not-an-expression"}"#
+  // A cheap install of already-prepared data updates both sources, because
+  // the sources adopted the options the data was prepared with.
+  let replacement = try GeoJSONSourceDataHandle(
+    data: nearbyPoints(),
+    options: clusterOptions()
   )
+  defer { try? replacement.close() }
+  try map.setGeoJSONSourceData(sourceId: "first", data: replacement)
+  try map.setGeoJSONSourceData(sourceId: "second", data: replacement)
+
+  // Cluster aggregations are part of the options-equality requirement, so
+  // data prepared with different cluster_properties is rejected.
+  var reaggregated = clusterOptions()
+  reaggregated.clusterProperties = jsonData(
+    #"{"weight_max":["max",["get","weight"]]}"#
+  )
+  let differentAggregation = try GeoJSONSourceDataHandle(
+    data: nearbyPoints(),
+    options: reaggregated
+  )
+  defer { try? differentAggregation.close() }
+  do {
+    try map.setGeoJSONSourceData(sourceId: "first", data: differentAggregation)
+    Issue.record("different cluster aggregations should throw")
+  } catch let error as MaplibreError {
+    #expect(error.kind == .invalidArgument)
+  }
+}
+
+/// A set rejects data whose baked-in options differ from the options the
+/// source was added with, because they would tile inconsistently.
+@Test func setGeoJSONSourceDataRejectsMismatchedOptions() throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  let map = try MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 512, height: 512)
+  )
+  defer { try? map.close() }
+  try map.setStyleJSON(jsonData("""
+  {"version":8,"sources":{},"layers":[]}
+  """))
+
+  let clustered = try GeoJSONSourceDataHandle(
+    data: nearbyPoints(),
+    options: clusterOptions()
+  )
+  defer { try? clustered.close() }
+  try map.addGeoJSONSourceData(sourceId: "clustered", data: clustered)
+
+  let unclustered = try GeoJSONSourceDataHandle(data: nearbyPoints())
+  defer { try? unclustered.close() }
 
   do {
-    try map.addGeoJSONSourceData(
-      sourceId: "clustered-invalid",
-      data: nearbyPoints(),
-      options: invalid
-    )
-    Issue.record("unparseable cluster properties should throw")
+    try map.setGeoJSONSourceData(sourceId: "clustered", data: unclustered)
+    Issue.record("mismatched options should throw")
   } catch let error as MaplibreError {
     #expect(error.kind == .invalidArgument)
   } catch {
     Issue.record("unexpected error: \(error)")
   }
+}
 
-  #expect(try !map.styleSourceExists("clustered-invalid"))
+/// Sources keep their own reference, so closing the handle never invalidates
+/// a source, while the closed handle itself stops installing.
+@Test func closedGeoJSONSourceDataStopsInstallingButKeepsSources() throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  let map = try MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 512, height: 512)
+  )
+  defer { try? map.close() }
+  try map.setStyleJSON(jsonData("""
+  {"version":8,"sources":{},"layers":[]}
+  """))
+
+  let prepared = try GeoJSONSourceDataHandle(data: nearbyPoints())
+  try map.addGeoJSONSourceData(sourceId: "kept", data: prepared)
+
+  #expect(!prepared.isClosed)
+  try prepared.close()
+  #expect(prepared.isClosed)
+  // A second close is a no-op success.
+  try prepared.close()
+
+  // The source outlives the handle that seeded it.
+  #expect(try map.styleSourceExists("kept"))
+  #expect(try map.styleSourceType("kept") == .geoJSON)
+
+  // The closed handle fails in Swift handle state before reaching native.
+  do {
+    try map.addGeoJSONSourceData(sourceId: "late", data: prepared)
+    Issue.record("closed prepared data should throw")
+  } catch let error as MaplibreError {
+    #expect(error.kind == .invalidState)
+    #expect(error.rawStatus == nil)
+  } catch {
+    Issue.record("unexpected error: \(error)")
+  }
+  #expect(try !map.styleSourceExists("late"))
+}
+
+/// The runtime override slices tiles inline while enabled and restores the
+/// source's own option when disabled.
+@Test func synchronousTilingOverrideTogglesPerSource() throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  let map = try MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 512, height: 512)
+  )
+  defer { try? map.close() }
+  try map.setStyleJSON(jsonData("""
+  {"version":8,"sources":{},"layers":[]}
+  """))
+
+  let prepared = try GeoJSONSourceDataHandle(data: nearbyPoints())
+  defer { try? prepared.close() }
+  try map.addGeoJSONSourceData(sourceId: "tracked", data: prepared)
+
+  try map.setGeoJSONSourceSynchronousTiling(sourceId: "tracked", enabled: true)
+  // Installs under the override still take prepared data.
+  try map.setGeoJSONSourceData(sourceId: "tracked", data: prepared)
+  try map.setGeoJSONSourceSynchronousTiling(
+    sourceId: "tracked",
+    enabled: false
+  )
+
+  // A source that does not exist is rejected.
+  do {
+    try map.setGeoJSONSourceSynchronousTiling(
+      sourceId: "missing",
+      enabled: true
+    )
+    Issue.record("missing source should throw")
+  } catch let error as MaplibreError {
+    #expect(error.kind == .invalidArgument)
+  } catch {
+    Issue.record("unexpected error: \(error)")
+  }
 }
 
 @Test func styleTransitionOptionsRoundTripThroughTheCAPI() throws {

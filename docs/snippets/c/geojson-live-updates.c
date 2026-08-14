@@ -11,17 +11,16 @@ static mln_buffer_view view(const char* text) {
 }
 
 mln_status add_vehicle_source(mln_map map) {
-  // #region options
-  mln_geojson_source_options options = mln_geojson_source_options_default();
-  options.fields |= MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE;
-  options.synchronous_update = true;
-  // #endregion options
-
   // #region add
-  return mln_map_add_geojson_source_data(
-    map, view("vehicles"),
-    view("{\"type\":\"FeatureCollection\",\"features\":[]}"), &options
+  mln_geojson_source_data empty = MLN_HANDLE_NULL;
+  mln_status status = mln_geojson_source_data_create(
+    view("{\"type\":\"FeatureCollection\",\"features\":[]}"), NULL, &empty
   );
+  if (status != MLN_STATUS_OK) return status;
+
+  status = mln_map_add_geojson_source_data(map, view("vehicles"), empty);
+  mln_geojson_source_data_destroy(empty);
+  return status;
   // #endregion add
 }
 
@@ -56,7 +55,27 @@ mln_status publish_vehicles(
   memcpy(json + used, "]}", 3);
   // #endregion features
 
+  // #region prepare
+  // Preparation parses and tiles the collection, and runs on any thread. The
+  // data carries the same default options the source was added with.
+  mln_geojson_source_data prepared = MLN_HANDLE_NULL;
+  mln_status status =
+    mln_geojson_source_data_create(view(json), NULL, &prepared);
+  if (status != MLN_STATUS_OK) return status;
+  // #endregion prepare
+
   // #region publish
-  return mln_map_set_geojson_source_data(map, view("vehicles"), view(json));
+  // The install is cheap and runs on the map owner thread.
+  status = mln_map_set_geojson_source_data(map, view("vehicles"), prepared);
+  mln_geojson_source_data_destroy(prepared);
+  return status;
   // #endregion publish
+}
+
+mln_status track_position_closely(mln_map map, bool tracking) {
+  // #region synchronous-tiling
+  return mln_map_set_geojson_source_synchronous_tiling(
+    map, view("vehicles"), tracking
+  );
+  // #endregion synchronous-tiling
 }

@@ -27,6 +27,7 @@ import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 import org.maplibre.nativeffi.runtime.RuntimeEventMask
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.GeoJsonSourceDataHandle
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.ImageStretch
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
@@ -127,13 +128,11 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     NativeAccess.addGeoJsonSourceUrl(requireLiveHandle(), sourceId, url, options)
   }
 
-  public actual fun addGeoJsonSourceData(
-    sourceId: String,
-    data: ByteArray,
-    options: GeoJsonSourceOptions?,
-  ) {
+  public actual fun addGeoJsonSourceData(sourceId: String, data: GeoJsonSourceDataHandle) {
     NativeAccess.ensureLoaded()
-    NativeAccess.addGeoJsonSourceData(requireLiveHandle(), sourceId, data, options)
+    data.withNativeHandle { nativeData ->
+      NativeAccess.addGeoJsonSourceData(requireLiveHandle(), sourceId, nativeData)
+    }
   }
 
   public actual fun setGeoJsonSourceUrl(sourceId: String, url: String) {
@@ -141,9 +140,16 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     NativeAccess.setGeoJsonSourceUrl(requireLiveHandle(), sourceId, url)
   }
 
-  public actual fun setGeoJsonSourceData(sourceId: String, data: ByteArray) {
+  public actual fun setGeoJsonSourceData(sourceId: String, data: GeoJsonSourceDataHandle) {
     NativeAccess.ensureLoaded()
-    NativeAccess.setGeoJsonSourceData(requireLiveHandle(), sourceId, data)
+    data.withNativeHandle { nativeData ->
+      NativeAccess.setGeoJsonSourceData(requireLiveHandle(), sourceId, nativeData)
+    }
+  }
+
+  public actual fun setGeoJsonSourceSynchronousTiling(sourceId: String, enabled: Boolean) {
+    NativeAccess.ensureLoaded()
+    NativeAccess.setGeoJsonSourceSynchronousTiling(requireLiveHandle(), sourceId, enabled)
   }
 
   public actual fun addCustomGeometrySource(

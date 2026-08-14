@@ -49,6 +49,10 @@ struct NativeStyleStringListHandle: NativeHandle {
   let raw: UInt64
 }
 
+struct NativeGeoJSONSourceDataHandle: NativeHandle {
+  let raw: UInt64
+}
+
 struct NativeWakeSourceHandle: NativeHandle {
   let raw: UInt64
 }

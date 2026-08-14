@@ -30,6 +30,7 @@ enum class HandleKind : std::uint8_t {
   WakeSource = 11,
   ResourceRequest = 12,
   StyleStringList = 13,
+  GeoJsonSourceData = 14,
 };
 
 inline constexpr auto handle_generation_bits = std::uint32_t{36};

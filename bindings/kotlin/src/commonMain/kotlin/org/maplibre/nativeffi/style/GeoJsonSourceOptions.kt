@@ -62,8 +62,12 @@ public class GeoJsonSourceOptions {
 
   public var cluster: Boolean? = null
 
-  /** Tiles data updates inline, so a data update reaches the next rendered frame. */
-  public var synchronousUpdate: Boolean? = null
+  /**
+   * Slices requested tiles inline during the update pass, so an installed data update reaches the
+   * next rendered frame. [org.maplibre.nativeffi.map.MapHandle.setGeoJsonSourceSynchronousTiling]
+   * overrides this at runtime.
+   */
+  public var synchronousTiling: Boolean? = null
 
   /** Returns an independent copy of this descriptor with [block] applied to the copy. */
   public fun copy(block: GeoJsonSourceOptions.() -> Unit = {}): GeoJsonSourceOptions =
@@ -80,7 +84,7 @@ public class GeoJsonSourceOptions {
         it.clusterMinPoints = clusterMinPoints
         it.lineMetrics = lineMetrics
         it.cluster = cluster
-        it.synchronousUpdate = synchronousUpdate
+        it.synchronousTiling = synchronousTiling
       }
       .apply(block)
 
@@ -98,7 +102,7 @@ public class GeoJsonSourceOptions {
         clusterMinPoints,
         lineMetrics,
         cluster,
-        synchronousUpdate,
+        synchronousTiling,
       )
 
   override fun equals(other: Any?): Boolean =
@@ -114,7 +118,7 @@ public class GeoJsonSourceOptions {
       clusterMinPoints == other.clusterMinPoints &&
       lineMetrics == other.lineMetrics &&
       cluster == other.cluster &&
-      synchronousUpdate == other.synchronousUpdate
+      synchronousTiling == other.synchronousTiling
 
   override fun hashCode(): Int = fields.hashCode()
 }

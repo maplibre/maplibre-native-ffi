@@ -23,6 +23,7 @@ import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.geo.Vec3
 import org.maplibre.nativeffi.internal.callback.CallbackGate
 import org.maplibre.nativeffi.internal.javacpp.ByteArrayViewScope
+import org.maplibre.nativeffi.internal.javacpp.GeoJsonSourceOptionsScope
 import org.maplibre.nativeffi.internal.javacpp.JavaCppSupport
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 import org.maplibre.nativeffi.internal.javacpp.ownedBuffer
@@ -43,6 +44,7 @@ import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 import org.maplibre.nativeffi.runtime.RuntimeEventMask
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.GeoJsonSourceDataHandle
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.ImageContent
 import org.maplibre.nativeffi.style.ImageStretch
@@ -270,24 +272,17 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
     }
   }
 
-  public actual fun addGeoJsonSourceData(
-    sourceId: String,
-    data: ByteArray,
-    options: GeoJsonSourceOptions?,
-  ) {
+  public actual fun addGeoJsonSourceData(sourceId: String, data: GeoJsonSourceDataHandle) {
     NativeAccess.ensureLoaded()
-    StringViewScope(sourceId).use { nativeSourceId ->
-      ByteArrayViewScope(data).use { nativeData ->
-        GeoJsonSourceOptionsScope(options).use { nativeOptions ->
-          Status.check(
-            MaplibreNativeC.mln_map_add_geojson_source_data(
-              requireLiveHandle(),
-              nativeSourceId.view,
-              nativeData.view,
-              nativeOptions.options,
-            )
+    data.withNativeHandle { nativeData ->
+      StringViewScope(sourceId).use { nativeSourceId ->
+        Status.check(
+          MaplibreNativeC.mln_map_add_geojson_source_data(
+            requireLiveHandle(),
+            nativeSourceId.view,
+            nativeData,
           )
-        }
+        )
       }
     }
   }
@@ -307,18 +302,31 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
     }
   }
 
-  public actual fun setGeoJsonSourceData(sourceId: String, data: ByteArray) {
+  public actual fun setGeoJsonSourceData(sourceId: String, data: GeoJsonSourceDataHandle) {
     NativeAccess.ensureLoaded()
-    StringViewScope(sourceId).use { nativeSourceId ->
-      ByteArrayViewScope(data).use { nativeData ->
+    data.withNativeHandle { nativeData ->
+      StringViewScope(sourceId).use { nativeSourceId ->
         Status.check(
           MaplibreNativeC.mln_map_set_geojson_source_data(
             requireLiveHandle(),
             nativeSourceId.view,
-            nativeData.view,
+            nativeData,
           )
         )
       }
+    }
+  }
+
+  public actual fun setGeoJsonSourceSynchronousTiling(sourceId: String, enabled: Boolean) {
+    NativeAccess.ensureLoaded()
+    StringViewScope(sourceId).use { nativeSourceId ->
+      Status.check(
+        MaplibreNativeC.mln_map_set_geojson_source_synchronous_tiling(
+          requireLiveHandle(),
+          nativeSourceId.view,
+          enabled,
+        )
+      )
     }
   }
 
@@ -2643,71 +2651,6 @@ private class TileSourceOptionsScope(value: TileSourceOptions?) : AutoCloseable 
   override fun close() {
     options.close()
     attribution?.close()
-  }
-}
-
-private class GeoJsonSourceOptionsScope(value: GeoJsonSourceOptions?) : AutoCloseable {
-  private val clusterProperties: ByteArrayViewScope? =
-    value?.clusterPropertiesTransit?.let(::ByteArrayViewScope)
-  val options: MaplibreNativeC.mln_geojson_source_options =
-    MaplibreNativeC.mln_geojson_source_options_default()
-
-  init {
-    var fields = 0
-    value?.minZoom?.let {
-      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM
-      options.min_zoom(it)
-    }
-    value?.maxZoom?.let {
-      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM
-      options.max_zoom(it)
-    }
-    value?.tolerance?.let {
-      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE
-      options.tolerance(it)
-    }
-    value?.clusterMaxZoom?.let {
-      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM
-      options.cluster_max_zoom(it)
-    }
-    clusterProperties?.let {
-      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES
-      options.cluster_properties(it.view)
-    }
-    value?.tileSize?.let {
-      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE
-      options.tile_size(it)
-    }
-    value?.buffer?.let {
-      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_BUFFER
-      options.buffer(it)
-    }
-    value?.clusterRadius?.let {
-      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS
-      options.cluster_radius(it)
-    }
-    value?.clusterMinPoints?.let {
-      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS
-      options.cluster_min_points(it)
-    }
-    value?.lineMetrics?.let {
-      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS
-      options.line_metrics(it)
-    }
-    value?.cluster?.let {
-      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_CLUSTER
-      options.cluster(it)
-    }
-    value?.synchronousUpdate?.let {
-      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE
-      options.synchronous_update(it)
-    }
-    options.fields(fields)
-  }
-
-  override fun close() {
-    options.close()
-    clusterProperties?.close()
   }
 }
 

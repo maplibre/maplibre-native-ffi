@@ -123,6 +123,7 @@ pub const MetalOwnedTextureFrameHandle = render.MetalOwnedTextureFrameHandle;
 pub const VulkanOwnedTextureFrameHandle = render.VulkanOwnedTextureFrameHandle;
 pub const OpenGLOwnedTextureFrameHandle = render.OpenGLOwnedTextureFrameHandle;
 
+pub const GeoJsonSourceDataHandle = map.GeoJsonSourceDataHandle;
 pub const MapHandle = map.MapHandle;
 pub const MapOptions = map.MapOptions;
 pub const MapMode = map.MapMode;

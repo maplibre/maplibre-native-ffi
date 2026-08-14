@@ -128,10 +128,12 @@ public struct StyleGeoJSONSourceOptions: Equatable, Sendable {
   public var clusterMinPoints: UInt32?
   public var lineMetrics: Bool?
   public var cluster: Bool?
-  /// Applies data set through
-  /// ``MapHandle/setGeoJSONSourceData(sourceId:data:)`` synchronously, so it
-  /// reaches the next rendered frame.
-  public var synchronousUpdate: Bool?
+  /// Slices requested tiles inline during the update pass, so data installed
+  /// through ``MapHandle/setGeoJSONSourceData(sourceId:data:)`` reaches the
+  /// next rendered frame.
+  /// ``MapHandle/setGeoJSONSourceSynchronousTiling(sourceId:enabled:)``
+  /// overrides this at runtime.
+  public var synchronousTiling: Bool?
 
   public init(
     minZoom: Double? = nil,
@@ -145,7 +147,7 @@ public struct StyleGeoJSONSourceOptions: Equatable, Sendable {
     clusterMinPoints: UInt32? = nil,
     lineMetrics: Bool? = nil,
     cluster: Bool? = nil,
-    synchronousUpdate: Bool? = nil
+    synchronousTiling: Bool? = nil
   ) {
     self.minZoom = minZoom
     self.maxZoom = maxZoom
@@ -158,7 +160,7 @@ public struct StyleGeoJSONSourceOptions: Equatable, Sendable {
     self.clusterMinPoints = clusterMinPoints
     self.lineMetrics = lineMetrics
     self.cluster = cluster
-    self.synchronousUpdate = synchronousUpdate
+    self.synchronousTiling = synchronousTiling
   }
 
   var nativeOptions: NativeGeoJSONSourceOptions {
@@ -174,7 +176,7 @@ public struct StyleGeoJSONSourceOptions: Equatable, Sendable {
       clusterMinPoints: clusterMinPoints,
       lineMetrics: lineMetrics,
       cluster: cluster,
-      synchronousUpdate: synchronousUpdate
+      synchronousTiling: synchronousTiling
     )
   }
 }
@@ -509,6 +511,62 @@ public struct CustomGeometrySourceOptions: Sendable {
   }
 }
 
+/// Prepared GeoJSON source data: one UTF-8 GeoJSON document parsed and tiled
+/// into an immutable index that map calls install when adding or updating a
+/// GeoJSON source.
+///
+/// Preparation needs no runtime or map and is callable from any thread, so a
+/// host can prepare data off the map owner thread. Install calls borrow the
+/// handle, so one prepared value may be installed on any number of sources and
+/// closed at any time afterward; closing never invalidates a source the data
+/// was installed on.
+///
+/// The prepared native value is immutable and every operation on this handle
+/// is callable from any thread, with the lock-guarded handle state carrying
+/// the shared mutable state, so the handle is safe to share across threads.
+public final class GeoJSONSourceDataHandle: @unchecked Sendable {
+  private let handle: NativeHandleBox<NativeGeoJSONSourceDataHandle>
+
+  /// Parses and tiles one complete GeoJSON document under `options`, which
+  /// bake into the prepared data; a source added with it adopts them.
+  public init(
+    data: Data,
+    options: StyleGeoJSONSourceOptions = StyleGeoJSONSourceOptions()
+  ) throws {
+    let prepared = try mapNativeFailure {
+      let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
+      return try NativeStyle.createGeoJSONSourceData(
+        data: arena.view(data),
+        options: options.nativeOptions
+      )
+    }
+    handle = try NativeHandleBox(
+      typeName: "GeoJSONSourceDataHandle",
+      handle: prepared
+    )
+  }
+
+  public var isClosed: Bool {
+    handle.isClosed
+  }
+
+  public func close() throws {
+    try handle.closeOnce { data in
+      mln_geojson_source_data_destroy(data.raw)
+    }
+  }
+
+  /// Borrows the live handle for the duration of `use`, so a concurrent
+  /// `close()` waits for in-flight installs instead of retiring the native
+  /// handle under them.
+  func withLiveHandle<T>(
+    _ use: (NativeGeoJSONSourceDataHandle) throws -> T
+  ) throws -> T {
+    try handle.withLive(use)
+  }
+}
+
 public extension MapHandle {
   func addStyleSourceJSON(sourceId: String, sourceJSON: Data) throws {
     try mapNativeFailure {
@@ -602,22 +660,21 @@ public extension MapHandle {
     }
   }
 
-  /// Adds a GeoJSON source with inline data. `options` is fixed when the source
-  /// is created.
+  /// Adds a GeoJSON source with prepared inline data. The call borrows the
+  /// handle, and the source adopts the options the data was prepared with,
+  /// fixed for the lifetime of the source.
   func addGeoJSONSourceData(
     sourceId: String,
-    data: Data,
-    options: StyleGeoJSONSourceOptions = StyleGeoJSONSourceOptions()
+    data: GeoJSONSourceDataHandle
   ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try options.nativeOptions.withNativeOptions { options in
+      try data.withLiveHandle { prepared in
         try checkStatus(mln_map_add_geojson_source_data(
           requireLiveHandle().raw,
           arena.view(sourceId),
-          arena.view(data),
-          options
+          prepared.raw
         ))
       }
     }
@@ -635,14 +692,46 @@ public extension MapHandle {
     }
   }
 
-  func setGeoJSONSourceData(sourceId: String, data: Data) throws {
+  /// Updates one GeoJSON source with prepared inline data. The call borrows
+  /// the handle, which makes this a cheap install: the expensive parse and
+  /// tiling already happened when the data was prepared.
+  ///
+  /// The data must have been prepared with options equal to the options the
+  /// source was added with; cluster aggregation expressions compare by parsed
+  /// equality. A mismatch is rejected.
+  func setGeoJSONSourceData(
+    sourceId: String,
+    data: GeoJSONSourceDataHandle
+  ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try checkStatus(mln_map_set_geojson_source_data(
+      try data.withLiveHandle { prepared in
+        try checkStatus(mln_map_set_geojson_source_data(
+          requireLiveHandle().raw,
+          arena.view(sourceId),
+          prepared.raw
+        ))
+      }
+    }
+  }
+
+  /// Overrides one GeoJSON source's synchronous tiling at runtime. While
+  /// enabled, the source slices requested tiles inline during the update pass,
+  /// as if its options had set
+  /// ``StyleGeoJSONSourceOptions/synchronousTiling``; disabling it restores
+  /// the option the source was added with.
+  func setGeoJSONSourceSynchronousTiling(
+    sourceId: String,
+    enabled: Bool
+  ) throws {
+    try mapNativeFailure {
+      let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
+      try checkStatus(mln_map_set_geojson_source_synchronous_tiling(
         requireLiveHandle().raw,
         arena.view(sourceId),
-        arena.view(data)
+        enabled
       ))
     }
   }

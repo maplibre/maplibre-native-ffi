@@ -18,15 +18,20 @@ class NativeHandleBox<Handle: NativeHandle>: @unchecked Sendable {
   }
 
   /// Runs `use` with release held off. See `NativeHandleState.withLive`.
+  /// Only the box's own liveness failure translates to an invalid-state
+  /// error; a native status thrown inside `use` keeps its own status.
   func withLive<T>(_ use: (Handle) throws -> T) throws -> T {
     do {
       return try state.withLive(use)
     } catch let failure as NativeStatusFailure {
-      throw MaplibreError(
-        kind: .invalidState,
-        rawStatus: nil,
-        diagnostic: failure.diagnostic
-      )
+      if failure.rawStatus == 0 {
+        throw MaplibreError(
+          kind: .invalidState,
+          rawStatus: nil,
+          diagnostic: failure.diagnostic
+        )
+      }
+      throw failure
     }
   }
 
