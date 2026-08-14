@@ -361,7 +361,9 @@ def test_detached_session_leaves_the_map_free_to_close(
 def test_render_update_without_pending_update_reports_no_update_and_keeps_session_live(
     opengl_owned_session: OpenGLOwnedSession,
 ) -> None:
-    assert opengl_owned_session.session.render_update() == render.RenderResult.NO_UPDATE
+    update = opengl_owned_session.session.render_update()
+    assert update.result == render.RenderResult.NO_UPDATE
+    assert update.needs_repaint is False
 
     assert not opengl_owned_session.session.closed
     opengl_owned_session.session.resize(32, 16, 1.0)
@@ -376,7 +378,8 @@ def test_resize_updates_opengl_owned_texture_frame_extent(
     # The map applies the new logical size on its own thread, so a render
     # before the next pump reports the pending size.
     assert (
-        opengl_owned_session.session.render_update() == render.RenderResult.SIZE_PENDING
+        opengl_owned_session.session.render_update().result
+        == render.RenderResult.SIZE_PENDING
     )
     frame = wait_for_opengl_frame(
         opengl_owned_session,
@@ -681,7 +684,9 @@ def test_egl_borrowed_texture_set_target_hands_over_a_replacement() -> None:
                         ),
                         "the replacement texture was never rendered into",
                     )
-                    assert session.render_update() == render.RenderResult.RENDERED
+                    assert (
+                        session.render_update().result == render.RenderResult.RENDERED
+                    )
 
                     # Both textures belong to their owner: the session
                     # neither released the outgoing one nor took over

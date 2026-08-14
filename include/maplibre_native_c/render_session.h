@@ -100,10 +100,18 @@ typedef enum mln_render_result : uint32_t {
  * still image requested before that lands reports
  * MLN_RENDER_RESULT_SIZE_PENDING.
  *
+ * *out_needs_repaint reports whether the map asked for another frame while it
+ * rendered this one, as during an ongoing camera transition. It is set only
+ * when *out_result is MLN_RENDER_RESULT_RENDERED, and reads false for every
+ * other outcome. This is the same signal that
+ * MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED carries in its needs_repaint
+ * field, delivered here without the event round trip, so a host can re-arm its
+ * frame loop before it drains events.
+ *
  * Returns:
- * - MLN_STATUS_OK on success, with *out_result set.
+ * - MLN_STATUS_OK on success, with *out_result and *out_needs_repaint set.
  * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, or
- *   out_result is null.
+ *   out_result or out_needs_repaint is null.
  * - MLN_STATUS_INVALID_STATE when the session is detached or a texture frame
  *   is currently acquired.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
@@ -112,7 +120,8 @@ typedef enum mln_render_result : uint32_t {
  *   backend, or when an internal exception is converted to status.
  */
 MLN_API mln_status mln_render_session_render_update(
-  mln_render_session session, mln_render_result* out_result
+  mln_render_session session, mln_render_result* out_result,
+  bool* out_needs_repaint
 ) MLN_NOEXCEPT;
 
 /**

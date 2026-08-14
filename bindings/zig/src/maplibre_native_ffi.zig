@@ -90,6 +90,7 @@ pub const LogCallback = logging.LogCallback;
 
 pub const NativePointer = render.NativePointer;
 pub const RenderResult = render.RenderResult;
+pub const RenderUpdate = render.RenderUpdate;
 pub const RenderBackendSupport = render.RenderBackendSupport;
 pub const OpenGLContextProviderSupport = render.OpenGLContextProviderSupport;
 pub const RenderTargetExtent = render.RenderTargetExtent;

@@ -96,8 +96,11 @@ public expect class RenderSessionHandle : AutoCloseable {
    * [RenderResult.RENDERED] again. Every other result names the wake to wait for:
    * [RenderResult.NO_UPDATE] and [RenderResult.SIZE_PENDING] resolve on a render-update-available
    * event, and [RenderResult.TARGET_NOT_READY] resolves when the host changes the render target.
+   *
+   * [RenderUpdate.needsRepaint] reports whether the map asked for another frame while rendering
+   * this one, so a host can re-arm its frame loop before it drains events.
    */
-  public fun renderUpdate(): RenderResult
+  public fun renderUpdate(): RenderUpdate
 
   public fun detach()
 

@@ -426,7 +426,7 @@ public sealed unsafe class RenderSessionTests
                 resizeCalls++;
                 return mln_status.MLN_STATUS_OK;
             },
-            (_, _) =>
+            (_, _, _) =>
             {
                 renderUpdateCalls++;
                 return mln_status.MLN_STATUS_OK;
@@ -604,7 +604,7 @@ public sealed unsafe class RenderSessionTests
         );
         using var sessionMethods = RenderSessionHandle.UseSessionMethodsForTest(
             (_, _, _, _) => mln_status.MLN_STATUS_OK,
-            (_, _) => mln_status.MLN_STATUS_OK,
+            (_, _, _) => mln_status.MLN_STATUS_OK,
             (_, _, _, _) => mln_status.MLN_STATUS_OK,
             session =>
             {
@@ -696,7 +696,7 @@ public sealed unsafe class RenderSessionTests
         );
         using var sessionMethods = RenderSessionHandle.UseSessionMethodsForTest(
             (_, _, _, _) => mln_status.MLN_STATUS_OK,
-            (_, _) => mln_status.MLN_STATUS_OK,
+            (_, _, _) => mln_status.MLN_STATUS_OK,
             (_, _, _, _) => mln_status.MLN_STATUS_OK,
             _ => mln_status.MLN_STATUS_OK
         );
@@ -730,6 +730,7 @@ public sealed unsafe class RenderSessionTests
         uint resizedWidth = 0;
         uint resizedHeight = 0;
         double resizedScale = 0;
+        var renderUpdateCalls = 0;
         using var methods = RenderSessionHandle.UseSessionMethodsForTest(
             (_, width, height, scale) =>
             {
@@ -738,9 +739,19 @@ public sealed unsafe class RenderSessionTests
                 resizedScale = scale;
                 return mln_status.MLN_STATUS_OK;
             },
-            (_, outResult) =>
+            (_, outResult, outNeedsRepaint) =>
             {
-                *outResult = mln_render_result.MLN_RENDER_RESULT_SIZE_PENDING;
+                renderUpdateCalls++;
+                if (renderUpdateCalls == 1)
+                {
+                    *outResult = mln_render_result.MLN_RENDER_RESULT_SIZE_PENDING;
+                    *outNeedsRepaint = false;
+                }
+                else
+                {
+                    *outResult = mln_render_result.MLN_RENDER_RESULT_RENDERED;
+                    *outNeedsRepaint = true;
+                }
                 return mln_status.MLN_STATUS_OK;
             },
             (_, _, _, _) => mln_status.MLN_STATUS_OK,
@@ -749,8 +760,13 @@ public sealed unsafe class RenderSessionTests
         var session = RenderSessionHandle.CreateForTest(SyntheticHandles.RenderSession(1234));
 
         session.Resize(320, 240, 2);
-        Assert.Equal(RenderResult.SizePending, session.RenderUpdate());
+        var sizePending = session.RenderUpdate();
+        var rendered = session.RenderUpdate();
 
+        Assert.Equal(RenderResult.SizePending, sizePending.Result);
+        Assert.False(sizePending.NeedsRepaint);
+        Assert.Equal(RenderResult.Rendered, rendered.Result);
+        Assert.True(rendered.NeedsRepaint);
         Assert.Equal(320u, resizedWidth);
         Assert.Equal(240u, resizedHeight);
         Assert.Equal(2, resizedScale);

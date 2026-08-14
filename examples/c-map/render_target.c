@@ -39,8 +39,9 @@ app_error render_session_render_update(
   }
   const bool is_surface = session->kind == RENDER_SESSION_SURFACE;
   mln_render_result result = MLN_RENDER_RESULT_RENDERED;
+  bool needs_repaint = false;
   const mln_status status =
-    mln_render_session_render_update(session->handle, &result);
+    mln_render_session_render_update(session->handle, &result, &needs_repaint);
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status(
       is_surface ? "surface render failed" : "texture render failed", status

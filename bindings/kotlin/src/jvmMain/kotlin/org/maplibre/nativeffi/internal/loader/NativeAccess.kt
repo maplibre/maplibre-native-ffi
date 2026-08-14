@@ -153,6 +153,7 @@ import org.maplibre.nativeffi.render.PremultipliedRgba8Image
 import org.maplibre.nativeffi.render.RenderMode
 import org.maplibre.nativeffi.render.RenderResult
 import org.maplibre.nativeffi.render.RenderTargetExtent
+import org.maplibre.nativeffi.render.RenderUpdate
 import org.maplibre.nativeffi.render.TextureImageInfo
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanContextDescriptor
@@ -2161,11 +2162,17 @@ internal object NativeAccess {
     )
   }
 
-  internal fun renderUpdate(session: NativeRenderSession): RenderResult =
+  internal fun renderUpdate(session: NativeRenderSession): RenderUpdate =
     Arena.ofConfined().use { arena ->
       val outResult = arena.allocate(ValueLayout.JAVA_INT)
-      Status.check(renderSessionRenderUpdateFunction().invokeNative(session, outResult) as Int)
-      RenderResult.fromNative(outResult.get(ValueLayout.JAVA_INT, 0))
+      val outNeedsRepaint = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+      Status.check(
+        renderSessionRenderUpdateFunction().invokeNative(session, outResult, outNeedsRepaint) as Int
+      )
+      RenderUpdate(
+        RenderResult.fromNative(outResult.get(ValueLayout.JAVA_INT, 0)),
+        outNeedsRepaint.get(ValueLayout.JAVA_BOOLEAN, 0),
+      )
     }
 
   internal fun detachRenderSession(session: NativeRenderSession) {

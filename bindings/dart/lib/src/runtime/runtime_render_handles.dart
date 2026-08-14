@@ -164,6 +164,26 @@ final class RenderResult {
   int get hashCode => rawValue.hashCode;
 }
 
+/// Outcome of [RenderSessionHandle.renderUpdate]: the render result plus the
+/// repaint request the map raised while rendering.
+final class RenderUpdate {
+  const RenderUpdate._({required this.result, required this.needsRepaint});
+
+  /// What the call produced; names the wake to wait for before calling again.
+  final RenderResult result;
+
+  /// Whether the map asked for another frame while it rendered this one, as
+  /// during an ongoing camera transition.
+  ///
+  /// This is the same signal that
+  /// [RuntimeEventType.mapRenderFrameFinished] carries in its
+  /// [RuntimeEventRenderFrame.needsRepaint] field, delivered here without the
+  /// event round trip, so a host can re-arm its frame loop before it drains
+  /// events. It is true only when [result] is [RenderResult.rendered] and
+  /// reads false for every other outcome.
+  final bool needsRepaint;
+}
+
 /// Owner-thread render session handle attached to a retained map.
 final class RenderSessionHandle {
   RenderSessionHandle._(NativeRenderSession handle)
@@ -334,8 +354,7 @@ final class RenderSessionHandle {
 
   /// Renders the latest map update into this session's render target.
   ///
-  /// The returned [RenderResult] names the wake to wait for before calling
-  /// again:
+  /// [RenderUpdate.result] names the wake to wait for before calling again:
   ///
   /// - [RenderResult.rendered]: the target holds a new frame. The map retains
   ///   its latest update, so a host redraws on demand after a resize or a
@@ -352,12 +371,22 @@ final class RenderSessionHandle {
   /// - [RenderResult.targetNotReady]: the render target had no frame
   ///   available, such as a Metal surface whose next drawable is nil. Wait for
   ///   a host event that changes the target, or back off and retry.
-  RenderResult renderUpdate() {
+  ///
+  /// [RenderUpdate.needsRepaint] reports whether the map asked for another
+  /// frame while it rendered this one, so a host can re-arm its frame loop
+  /// before it drains events.
+  RenderUpdate renderUpdate() {
     _checkNoActiveTextureFrame('render update');
     return withNativeArena((arena) {
       final result = arena<Uint32>();
-      _check(raw.mln_render_session_render_update(_handle.raw, result));
-      return RenderResult.fromRawValue(result.value);
+      final needsRepaint = arena<Bool>();
+      _check(
+        raw.mln_render_session_render_update(_handle.raw, result, needsRepaint),
+      );
+      return RenderUpdate._(
+        result: RenderResult.fromRawValue(result.value),
+        needsRepaint: needsRepaint.value,
+      );
     });
   }
 

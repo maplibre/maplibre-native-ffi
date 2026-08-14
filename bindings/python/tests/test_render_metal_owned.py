@@ -220,7 +220,9 @@ def test_attach_returns_public_render_session_and_rejects_second_session(
 def test_render_update_without_pending_update_reports_no_update_and_keeps_session_live(
     metal_owned_session: MetalOwnedSession,
 ) -> None:
-    assert metal_owned_session.session.render_update() == render.RenderResult.NO_UPDATE
+    update = metal_owned_session.session.render_update()
+    assert update.result == render.RenderResult.NO_UPDATE
+    assert update.needs_repaint is False
 
     assert not metal_owned_session.session.closed
     metal_owned_session.session.resize(32, 16, 1.0)
@@ -236,7 +238,8 @@ def test_resize_updates_metal_owned_texture_frame_extent(
     # renders only on request, so pump the resize through before requesting the
     # still image. A render before that pump reports the pending size.
     assert (
-        metal_owned_session.session.render_update() == render.RenderResult.SIZE_PENDING
+        metal_owned_session.session.render_update().result
+        == render.RenderResult.SIZE_PENDING
     )
     metal_owned_session.runtime.pump()
     frame = wait_for_metal_frame(

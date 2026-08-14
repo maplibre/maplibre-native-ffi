@@ -433,8 +433,10 @@ static void dedicated_egl_surface_renders_and_keeps_its_context_current(void) {
   for (unsigned int attempt = 0;
        attempt < 500 && result != MLN_RENDER_RESULT_RENDERED; attempt += 1) {
     mln_runtime_pump(runtime, 0, -1);
+    bool needs_repaint = false;
     TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_render_session_render_update(fixture.session, &result)
+      MLN_STATUS_OK,
+      mln_render_session_render_update(fixture.session, &result, &needs_repaint)
     );
     if (result != MLN_RENDER_RESULT_RENDERED) {
       mln_test_sleep_millisecond();
@@ -446,6 +448,71 @@ static void dedicated_egl_surface_renders_and_keeps_its_context_current(void) {
   mln_test_dedicated_egl_surface_destroy(&fixture);
   // Destroying the session releases the thread it had taken over.
   TEST_ASSERT_FALSE(mln_test_egl_context_is_current());
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// The repaint flag a rendered frame carries: a settled static map reports
+// false, and a running camera transition reports true.
+static void render_update_reports_whether_the_map_needs_another_frame(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_style_json(
+                     map, MLN_BUFFER_LITERAL(dedicated_background_style_json)
+                   )
+  );
+
+  // The session owns this thread, which is also the map's, so the map only
+  // reaches the style and the extent when this loop pumps the runtime. Render
+  // until the map settles: the last frame asks for no repaint.
+  mln_render_result result = MLN_RENDER_RESULT_NO_UPDATE;
+  bool needs_repaint = true;
+  for (unsigned int attempt = 0;
+       attempt < 500 && (result != MLN_RENDER_RESULT_RENDERED || needs_repaint);
+       attempt += 1) {
+    mln_runtime_pump(runtime, 0, -1);
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK,
+      mln_render_session_render_update(fixture.session, &result, &needs_repaint)
+    );
+    if (result != MLN_RENDER_RESULT_RENDERED || needs_repaint) {
+      mln_test_sleep_millisecond();
+    }
+  }
+  TEST_ASSERT_EQUAL_INT(MLN_RENDER_RESULT_RENDERED, result);
+  TEST_ASSERT_FALSE(needs_repaint);
+
+  mln_camera_options camera = mln_camera_options_default();
+  camera.fields = MLN_CAMERA_OPTION_ZOOM;
+  camera.zoom = 4.0;
+  mln_animation_options animation = mln_animation_options_default();
+  animation.fields = MLN_ANIMATION_OPTION_DURATION;
+  animation.duration_ms = 60000.0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_ease_to(map, &camera, &animation)
+  );
+
+  bool saw_repaint_request = false;
+  for (unsigned int attempt = 0; attempt < 500 && !saw_repaint_request;
+       attempt += 1) {
+    mln_runtime_pump(runtime, 0, -1);
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK,
+      mln_render_session_render_update(fixture.session, &result, &needs_repaint)
+    );
+    if (result == MLN_RENDER_RESULT_RENDERED && needs_repaint) {
+      saw_repaint_request = true;
+    } else {
+      mln_test_sleep_millisecond();
+    }
+  }
+  TEST_ASSERT_TRUE(saw_repaint_request);
+
+  mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -585,6 +652,7 @@ void run_render_backend_abi_tests(void) {
   RUN_TEST(opengl_dedicated_context_rejects_shared_session_fields);
   RUN_TEST(opengl_owned_texture_attach_rejects_a_dedicated_context);
   RUN_TEST(dedicated_egl_surface_renders_and_keeps_its_context_current);
+  RUN_TEST(render_update_reports_whether_the_map_needs_another_frame);
   RUN_TEST(opengl_owned_texture_attach_rejects_unsafe_raw_inputs);
   RUN_TEST(opengl_borrowed_texture_rejects_unsafe_raw_descriptors);
   RUN_TEST(vulkan_surface_attach_rejects_unsafe_raw_inputs);

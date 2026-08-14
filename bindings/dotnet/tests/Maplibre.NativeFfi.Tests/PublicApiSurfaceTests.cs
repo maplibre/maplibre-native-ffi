@@ -96,6 +96,7 @@ public sealed class PublicApiSurfaceTests
             "Maplibre.NativeFfi.Render.RenderResult",
             "Maplibre.NativeFfi.Render.RenderSessionHandle",
             "Maplibre.NativeFfi.Render.RenderTargetExtent",
+            "Maplibre.NativeFfi.Render.RenderUpdate",
             "Maplibre.NativeFfi.Render.TextureImageInfo",
             "Maplibre.NativeFfi.Render.VulkanBorrowedTextureDescriptor",
             "Maplibre.NativeFfi.Render.VulkanContextDescriptor",

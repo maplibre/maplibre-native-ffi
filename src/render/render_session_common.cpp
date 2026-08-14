@@ -1255,7 +1255,8 @@ auto surface_session_set_target(
 }
 
 auto render_session_render_update(
-  mln_render_session session, mln_render_result* out_result
+  mln_render_session session, mln_render_result* out_result,
+  bool* out_needs_repaint
 ) -> mln_status {
   mln_render_session_object* live = nullptr;
   const auto status = validate_live_attached_render_session(session, live);
@@ -1266,7 +1267,12 @@ auto render_session_render_update(
     set_thread_error("out_result must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  if (out_needs_repaint == nullptr) {
+    set_thread_error("out_needs_repaint must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
   *out_result = MLN_RENDER_RESULT_NO_UPDATE;
+  *out_needs_repaint = false;
   if (live->kind == RenderSessionKind::Texture && live->texture.acquired) {
     set_thread_error("cannot render while a texture frame is acquired");
     return MLN_STATUS_INVALID_STATE;
@@ -1328,7 +1334,8 @@ auto render_session_render_update(
       live->renderer = std::make_unique<mbgl::Renderer>(
         *backend, static_cast<float>(live->scale_factor)
       );
-      live->renderer->setObserver(map_renderer_observer(live->map));
+      live->frame_observer.set_delegate(map_renderer_observer(live->map));
+      live->renderer->setObserver(&live->frame_observer);
     } catch (const std::exception& exception) {
       set_native_stage_error("creating renderer", exception);
       return MLN_STATUS_NATIVE_ERROR;
@@ -1360,6 +1367,7 @@ auto render_session_render_update(
   }
   live->rendered_generation = live->generation;
   *out_result = MLN_RENDER_RESULT_RENDERED;
+  *out_needs_repaint = live->frame_observer.needs_repaint();
   return MLN_STATUS_OK;
 }
 

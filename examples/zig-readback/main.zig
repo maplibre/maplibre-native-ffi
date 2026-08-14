@@ -165,7 +165,7 @@ fn renderOnThisThread(
         // asks: in a still-image map the render attempts themselves advance
         // loading.
         _ = shared.consumeRenderRequest();
-        switch (try session.renderUpdate()) {
+        switch ((try session.renderUpdate()).result) {
             .rendered => rendered_frame = true,
             else => {},
         }

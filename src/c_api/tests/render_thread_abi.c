@@ -24,7 +24,8 @@ static mln_status render_until_frame(
   for (unsigned int attempt = 0; attempt < 500 && !*out_rendered;
        attempt += 1) {
     mln_render_result result = MLN_RENDER_RESULT_NO_UPDATE;
-    status = mln_render_session_render_update(session, &result);
+    bool needs_repaint = false;
+    status = mln_render_session_render_update(session, &result, &needs_repaint);
     if (status != MLN_STATUS_OK) {
       return status;
     }
@@ -123,8 +124,9 @@ typedef struct foreign_call_probe {
 static void call_session_from_a_foreign_thread(void* argument) {
   foreign_call_probe* probe = (foreign_call_probe*)argument;
   mln_render_result result = MLN_RENDER_RESULT_NO_UPDATE;
+  bool needs_repaint = false;
   probe->render_status =
-    mln_render_session_render_update(probe->session, &result);
+    mln_render_session_render_update(probe->session, &result, &needs_repaint);
   probe->resize_status = mln_render_session_resize(probe->session, 32, 32, 1.0);
   probe->detach_status = mln_render_session_detach(probe->session);
   probe->destroy_status = mln_render_session_destroy(probe->session);
@@ -300,9 +302,11 @@ static void attach_resize_render(void* argument) {
   // previous extent, so rendering must report a pending size rather than
   // project that update into the new target.
   mln_render_result immediate = MLN_RENDER_RESULT_RENDERED;
+  bool needs_repaint = false;
   if (
-    mln_render_session_render_update(fixture.session, &immediate) !=
-    MLN_STATUS_OK
+    mln_render_session_render_update(
+      fixture.session, &immediate, &needs_repaint
+    ) != MLN_STATUS_OK
   ) {
     immediate = MLN_RENDER_RESULT_RENDERED;
   }

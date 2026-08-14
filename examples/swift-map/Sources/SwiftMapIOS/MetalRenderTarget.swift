@@ -78,7 +78,7 @@ final class MetalRenderTarget {
   /// because the map applies a new logical size on the runtime loop's next
   /// pump.
   func renderUpdate() throws -> Bool {
-    try session.renderUpdate() == .rendered
+    try session.renderUpdate().result == .rendered
   }
 
   func finishFrame() throws {

@@ -70,10 +70,13 @@ auto mln_render_session_resize(
 }
 
 auto mln_render_session_render_update(
-  mln_render_session session, mln_render_result* out_result
+  mln_render_session session, mln_render_result* out_result,
+  bool* out_needs_repaint
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::render_session_render_update(session, out_result);
+    return mln::core::render_session_render_update(
+      session, out_result, out_needs_repaint
+    );
   });
 }
 

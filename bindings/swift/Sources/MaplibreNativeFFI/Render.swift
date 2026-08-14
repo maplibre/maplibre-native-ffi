@@ -555,6 +555,19 @@ public enum RenderResult: Sendable, Hashable {
   }
 }
 
+/// The outcome of a ``RenderSessionHandle/renderUpdate()`` call, with the
+/// repaint signal the render carried.
+public struct RenderUpdate: Equatable, Sendable {
+  /// Which outcome the call reached.
+  public let result: RenderResult
+  /// Whether the map asked for another frame while it rendered this one, as
+  /// during an ongoing camera transition. True only when ``result`` is
+  /// ``RenderResult/rendered``; the same signal the map
+  /// render-frame-finished event carries in ``RenderFrameEvent/needsRepaint``,
+  /// delivered here without the event round trip.
+  public let needsRepaint: Bool
+}
+
 /// A render session, affine to the thread that attached it.
 ///
 /// The session holds no Swift-level retention of its map. Native keeps the map
@@ -736,15 +749,24 @@ public final class RenderSessionHandle {
   ///   available, such as a Metal surface whose next drawable is nil. No map
   ///   update resolves this, so wait for a host event that changes the target,
   ///   or retry after a delay.
+  ///
+  /// The returned ``RenderUpdate/needsRepaint`` reports whether the map asked
+  /// for another frame while it rendered this one, so a host can re-arm its
+  /// frame loop before it drains events.
   @discardableResult
-  public func renderUpdate() throws -> RenderResult {
+  public func renderUpdate() throws -> RenderUpdate {
     try mapNativeFailure {
       var result = MLN_RENDER_RESULT_RENDERED
+      var needsRepaint = false
       try checkStatus(mln_render_session_render_update(
         handle.requireLive().raw,
-        &result
+        &result,
+        &needsRepaint
       ))
-      return RenderResult.fromNative(result.rawValue)
+      return RenderUpdate(
+        result: RenderResult.fromNative(result.rawValue),
+        needsRepaint: needsRepaint
+      )
     }
   }
 

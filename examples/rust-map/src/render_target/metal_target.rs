@@ -82,7 +82,7 @@ impl RenderTarget {
                 session,
                 compositor,
             } => {
-                if session.render_update()? != RenderResult::Rendered {
+                if session.render_update()?.result != RenderResult::Rendered {
                     return Ok(false);
                 }
                 let frame = session.acquire_metal_owned_texture_frame()?;
@@ -104,12 +104,14 @@ impl RenderTarget {
                 compositor,
                 texture,
             } => {
-                if session.render_update()? != RenderResult::Rendered {
+                if session.render_update()?.result != RenderResult::Rendered {
                     return Ok(false);
                 }
                 compositor.draw_texture(texture.texture())
             }
-            Self::Surface { session } => Ok(session.render_update()? == RenderResult::Rendered),
+            Self::Surface { session } => {
+                Ok(session.render_update()?.result == RenderResult::Rendered)
+            }
         }
     }
 

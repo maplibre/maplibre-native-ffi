@@ -150,7 +150,7 @@ internal sealed class OwnedTextureRenderTarget : IRenderTarget
 
     public bool Render()
     {
-        if (session.RenderUpdate() != RenderResult.Rendered)
+        if (session.RenderUpdate().Result != RenderResult.Rendered)
         {
             return false;
         }
@@ -264,7 +264,7 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
 
     public bool Render()
     {
-        if (session.RenderUpdate() != RenderResult.Rendered)
+        if (session.RenderUpdate().Result != RenderResult.Rendered)
         {
             return false;
         }
@@ -610,7 +610,7 @@ internal sealed class NativeSurfaceRenderTarget : IRenderTarget
 
     public bool Render()
     {
-        return session.RenderUpdate() == RenderResult.Rendered;
+        return session.RenderUpdate().Result == RenderResult.Rendered;
     }
 
     public void Resize(Viewport viewport)
