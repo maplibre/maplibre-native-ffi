@@ -14,7 +14,6 @@
 #include <optional>
 #include <string>
 #include <thread>
-#include <variant>
 #include <vector>
 
 #include <mbgl/actor/scheduler.hpp>
@@ -244,8 +243,8 @@ class RenderSessionScheduler final : public mbgl::Scheduler {
   auto makeWeakPtr() -> mapbox::base::WeakPtr<mbgl::Scheduler> override {
     return weak_factory_.makeWeakPtr();
   }
-  // Only the owner thread may run this queue, so a caller on any other thread
-  // gets a no-op rather than tasks running off the owner thread.
+  // Only the graphics thread may run this queue, so another caller gets a
+  // no-op rather than tasks running off the graphics thread.
   void waitForEmpty(
     const mbgl::util::SimpleIdentity = mbgl::util::SimpleIdentity::Empty
   ) override {
@@ -254,8 +253,8 @@ class RenderSessionScheduler final : public mbgl::Scheduler {
     }
   }
 
-  // Runs queued work on the calling thread, which must be the session's owner
-  // thread. Loops until the queue is empty, because a task may enqueue more.
+  // Runs queued work on the calling graphics thread. Loops until the queue is
+  // empty, because a task may enqueue more.
   auto drain() -> void;
 
   // Drops queued work without running it, for detach.
@@ -344,58 +343,10 @@ struct RenderTextureState {
   std::vector<RenderTextureSlot> slots;
 };
 
-enum class RenderDriverWorkKind : std::uint8_t {
-  Attach,
-  FrameDemand,
-  Resize,
-  Barrier,
-  Query,
-  Maintenance,
-  FeatureState,
-  Retarget,
-  FrameRelease,
-  Detach,
-};
-
-struct DriverWorkCallbacks {
+struct RenderDriverWork {
   std::function<void()> execute;
   std::function<void()> abandon;
 };
-struct AttachDriverWork {
-  DriverWorkCallbacks callbacks;
-};
-struct FrameDemandDriverWork {
-  DriverWorkCallbacks callbacks;
-};
-struct ResizeDriverWork {
-  DriverWorkCallbacks callbacks;
-};
-struct BarrierDriverWork {
-  DriverWorkCallbacks callbacks;
-};
-struct QueryDriverWork {
-  DriverWorkCallbacks callbacks;
-};
-struct MaintenanceDriverWork {
-  DriverWorkCallbacks callbacks;
-};
-struct FeatureStateDriverWork {
-  DriverWorkCallbacks callbacks;
-};
-struct RetargetDriverWork {
-  std::any backend_payload;
-  DriverWorkCallbacks callbacks;
-};
-struct FrameReleaseDriverWork {
-  DriverWorkCallbacks callbacks;
-};
-struct DetachDriverWork {
-  DriverWorkCallbacks callbacks;
-};
-using RenderDriverWorkItem = std::variant<
-  AttachDriverWork, FrameDemandDriverWork, ResizeDriverWork, BarrierDriverWork,
-  QueryDriverWork, MaintenanceDriverWork, FeatureStateDriverWork,
-  RetargetDriverWork, FrameReleaseDriverWork, DetachDriverWork>;
 
 struct PendingFrameDemand {
   mln_frame_demand demand;
@@ -439,8 +390,8 @@ struct mln_render_session_object
 
   std::deque<mln_render_frame_result> frame_results;
   std::deque<mln::core::PendingFrameDemand> demands;
-  std::deque<mln::core::RenderDriverWorkItem> waiting_update_work;
-  std::deque<mln::core::RenderDriverWorkItem> driver_work;
+  std::deque<mln::core::RenderDriverWork> waiting_update_work;
+  std::deque<mln::core::RenderDriverWork> driver_work;
   std::condition_variable worker_condition;
   std::thread worker;
   // Backends with transfer-time thread attributes may replace the default

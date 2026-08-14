@@ -88,7 +88,7 @@ class OwnedTextureFrameHandleCoreTest {
       assertEquals("TestFrameHandle is already closed", error.diagnostic)
       assertEquals(
         listOf(
-          "Leaked TestFrameHandle; close frame handles explicitly on the render session owner thread."
+          "Leaked TestFrameHandle; close frame handles explicitly on the render session graphics thread."
         ),
         leaks,
       )

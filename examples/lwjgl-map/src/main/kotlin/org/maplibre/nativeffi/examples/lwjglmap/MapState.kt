@@ -36,7 +36,6 @@ private constructor(
   private val scheduleNotificationDrain: () -> Unit,
 ) : AutoCloseable {
   private val notificationPending = AtomicBoolean(false)
-  private val cameraLock = Any()
   private var desiredCamera = initialCamera.copy()
   private var gestureId = 0L
 
@@ -50,39 +49,36 @@ private constructor(
 
   /** Submits a camera command directly from the GLFW receiver thread. */
   fun submit(command: CameraCommand) {
-    synchronized(cameraLock) {
-      when (command) {
-        CameraCommand.CancelTransitions -> submit(CameraUpdate())
-        is CameraCommand.SetGestureInProgress -> {
-          if (command.inProgress) gestureId += 1
-          submit(
-            CameraUpdate(
-              gesturePhase = if (command.inProgress) GesturePhase.BEGIN else GesturePhase.END,
-              gestureId = gestureId,
-            )
+    when (command) {
+      CameraCommand.CancelTransitions -> submit(CameraUpdate())
+      is CameraCommand.SetGestureInProgress -> {
+        if (command.inProgress) gestureId += 1
+        submit(
+          CameraUpdate(
+            gesturePhase = if (command.inProgress) GesturePhase.BEGIN else GesturePhase.END,
+            gestureId = gestureId,
           )
-        }
-        is CameraCommand.MoveBy -> moveBy(command.dx, command.dy, null)
-        is CameraCommand.MoveByAnimated -> moveBy(command.dx, command.dy, command.durationMs)
-        is CameraCommand.ScaleBy -> scaleBy(command.scale, command.anchor, null)
-        is CameraCommand.ScaleByAnimated ->
-          scaleBy(command.scale, command.anchor, command.durationMs)
-        is CameraCommand.PitchBy -> update(CameraOptions().apply { pitch = pitch(command.delta) })
-        is CameraCommand.AdjustBearing ->
-          update(CameraOptions().apply { bearing = bearing(command.delta) })
-        is CameraCommand.AdjustBearingAnimated ->
-          update(CameraOptions().apply { bearing = bearing(command.delta) }, command.durationMs)
-        is CameraCommand.AdjustPitchAnimated ->
-          update(CameraOptions().apply { pitch = pitch(command.delta) }, command.durationMs)
-        is CameraCommand.ResetOrientation ->
-          update(
-            CameraOptions().apply {
-              bearing = 0.0
-              pitch = 0.0
-            },
-            command.durationMs,
-          )
+        )
       }
+      is CameraCommand.MoveBy -> moveBy(command.dx, command.dy, null)
+      is CameraCommand.MoveByAnimated -> moveBy(command.dx, command.dy, command.durationMs)
+      is CameraCommand.ScaleBy -> scaleBy(command.scale, command.anchor, null)
+      is CameraCommand.ScaleByAnimated -> scaleBy(command.scale, command.anchor, command.durationMs)
+      is CameraCommand.PitchBy -> update(CameraOptions().apply { pitch = pitch(command.delta) })
+      is CameraCommand.AdjustBearing ->
+        update(CameraOptions().apply { bearing = bearing(command.delta) })
+      is CameraCommand.AdjustBearingAnimated ->
+        update(CameraOptions().apply { bearing = bearing(command.delta) }, command.durationMs)
+      is CameraCommand.AdjustPitchAnimated ->
+        update(CameraOptions().apply { pitch = pitch(command.delta) }, command.durationMs)
+      is CameraCommand.ResetOrientation ->
+        update(
+          CameraOptions().apply {
+            bearing = 0.0
+            pitch = 0.0
+          },
+          command.durationMs,
+        )
     }
   }
 

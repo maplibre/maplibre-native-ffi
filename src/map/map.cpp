@@ -2943,6 +2943,8 @@ auto map_close_start(mln_map map, mln_operation* out_operation) -> mln_status {
   };
   auto waiter = std::thread{};
   try {
+    // Map teardown waits for active submissions and calls back into the runtime
+    // executor, so it cannot run on that executor or the initiating caller.
     waiter = std::thread([gate]() mutable -> void {
       {
         auto lock = std::unique_lock{gate->mutex};

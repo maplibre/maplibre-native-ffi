@@ -21,17 +21,15 @@ internal static class Shell
             backends
         );
         using var state = MapState.Create(graphics.ReadViewport());
-        var commands = new CommandQueue(state);
         var renderRequest = new RenderRequest();
 
-        RenderLoop(graphics, mode, state, commands, renderRequest);
+        RenderLoop(graphics, mode, state, renderRequest);
     }
 
     private static void RenderLoop(
         IGraphicsContext graphics,
         RenderTargetMode mode,
         MapState state,
-        CommandQueue commands,
         RenderRequest renderRequest
     )
     {
@@ -43,7 +41,7 @@ internal static class Shell
             Console.WriteLine($"render target: {mode.CliName}");
             Console.WriteLine($"render target status: {mode.Status}");
             InputController.PrintControls();
-            using var input = new InputController(graphics.Window, commands, renderRequest);
+            using var input = new InputController(graphics.Window, state, renderRequest);
 
             while (!graphics.ShouldClose)
             {

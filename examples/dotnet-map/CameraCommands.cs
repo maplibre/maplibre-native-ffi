@@ -26,27 +26,20 @@ internal sealed record AdjustPitchCommand(double Delta, AnimationOptions? Animat
 
 internal sealed record ResetOrientationCommand(AnimationOptions Animation) : CameraCommand;
 
-/// <summary>Submits decoded input directly through the map's any-thread command API.</summary>
-internal sealed class CommandQueue(MapState state)
-{
-    public void Push(CameraCommand command)
-    {
-        _ = state.Apply(command);
-    }
-}
-
 /// <summary>One-bit signal that a frame is worth drawing.</summary>
 internal sealed class RenderRequest
 {
-    private int value = 1;
+    private bool requested = true;
 
     public void Set()
     {
-        Volatile.Write(ref value, 1);
+        requested = true;
     }
 
     public bool Consume()
     {
-        return Interlocked.Exchange(ref value, 0) == 1;
+        var current = requested;
+        requested = false;
+        return current;
     }
 }

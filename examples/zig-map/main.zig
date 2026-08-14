@@ -16,6 +16,21 @@ const RenderTarget = render.RenderTarget;
 const uses_egl = build_options.supports_opengl and
     (builtin.os.tag == .linux or builtin.os.tag == .macos);
 
+const NotificationReceiver = struct {
+    scheduled: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
+    wake_failed: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
+    event_type: u32,
+
+    fn schedule(user_data: ?*anyopaque) callconv(.c) void {
+        const self: *NotificationReceiver = @ptrCast(@alignCast(user_data.?));
+        if (self.scheduled.swap(true, .acq_rel)) return;
+
+        var event = std.mem.zeroes(c.SDL_Event);
+        event.type = self.event_type;
+        if (!c.SDL_PushEvent(&event)) self.wake_failed.store(true, .release);
+    }
+};
+
 pub fn main(init_args: std.process.Init) !void {
     const target_mode = (try parseRenderTargetMode(init_args)) orelse return;
     try validateNativeRenderBackend();
@@ -63,12 +78,23 @@ pub fn main(init_args: std.process.Init) !void {
     var current_viewport = viewport.get(window_handle);
     viewport.log("initial viewport", current_viewport);
 
+    const notification_event_type = c.SDL_RegisterEvents(1);
+    if (notification_event_type == 0) return types.AppError.EventDrainFailed;
+    var notification_receiver = NotificationReceiver{
+        .event_type = notification_event_type,
+    };
+
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     var state = try map_state.MapState.init(allocator, current_viewport);
     defer state.deinit();
+    try state.runtime.setNotificationCallback(
+        NotificationReceiver.schedule,
+        &notification_receiver,
+    );
+    defer state.runtime.clearNotificationCallback() catch {};
 
     // The graphics context, render session, and presentation resources remain
     // on the window-owning thread.
@@ -83,6 +109,7 @@ pub fn main(init_args: std.process.Init) !void {
         &target,
         &current_viewport,
         &state,
+        &notification_receiver,
     );
 }
 
@@ -95,6 +122,7 @@ fn renderLoop(
     target: *RenderTarget,
     current_viewport: *types.Viewport,
     state: *map_state.MapState,
+    notification_receiver: *NotificationReceiver,
 ) !void {
     printStartupStatus(target_mode);
     input.logControls();
@@ -106,10 +134,18 @@ fn renderLoop(
         const pool = if (build_options.supports_metal) objc.AutoreleasePool.init() else {};
         defer if (build_options.supports_metal) pool.deinit();
 
-        if (try map_state.drainNotifications(state)) render_requested = true;
+        if (notification_receiver.wake_failed.swap(false, .acq_rel)) {
+            notification_receiver.scheduled.store(false, .release);
+            if (try map_state.drainNotifications(state)) render_requested = true;
+        }
 
         var event: c.SDL_Event = undefined;
         while (c.SDL_PollEvent(&event)) {
+            if (event.type == notification_receiver.event_type) {
+                notification_receiver.scheduled.store(false, .release);
+                if (try map_state.drainNotifications(state)) render_requested = true;
+                continue;
+            }
             switch (event.type) {
                 c.SDL_EVENT_QUIT => running = false,
                 c.SDL_EVENT_WINDOW_CLOSE_REQUESTED => running = false,

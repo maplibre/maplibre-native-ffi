@@ -173,7 +173,7 @@ class RuntimeEventsTest : org.maplibre.nativeffi.NativeTestBase() {
             "the host's own mask changed",
           )
 
-          // A URL load drops the source in the pump that completes it, and native
+          // A URL load drops the source when the asynchronous load completes, and native
           // reports that through the release callback rather than through an event.
           map.setStyleUrl(SERVED_STYLE_URL)
           val types = drainUntil(runtime) { map.customGeometrySourceCountForTesting() == 0 }

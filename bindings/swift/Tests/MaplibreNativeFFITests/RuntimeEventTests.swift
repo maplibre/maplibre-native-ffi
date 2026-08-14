@@ -182,6 +182,7 @@ private func makeMap(_ runtime: RuntimeHandle) async throws -> MapHandle {
 /// bits this build does not name included, and a mask the host writes reaches
 /// the struct as it stands.
 @Test func mapAndRuntimeOptionsAlwaysEncodeAnEventMask() throws {
+  #expect(RuntimeEventMask.allRuntimeEvents.contains(.commandFinished))
   try MapOptions(width: 8, height: 8).nativeInput.withNativeOptions { native in
     #expect(native.pointee.event_mask == mln_map_options_default().event_mask)
   }

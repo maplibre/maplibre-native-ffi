@@ -57,7 +57,7 @@ enum MetalRenderTarget {
   )
   case nativeSurface(session: RenderSessionHandle)
 
-  /// Attaches a session against the map the map task published.
+  /// Attaches a session against the map owned by the view.
   static func attach(
     mode: RenderTargetMode,
     map: MapHandle,

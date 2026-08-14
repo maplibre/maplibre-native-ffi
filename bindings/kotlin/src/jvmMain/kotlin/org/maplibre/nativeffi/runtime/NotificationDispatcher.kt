@@ -7,7 +7,7 @@ internal class NotificationDispatcher(val source: Long) : AutoCloseable {
   private val core =
     NotificationDispatcherCore(
       drainNative = { NativeAccess.drainReady(source) },
-      operationCompleted = NativeAccess::pollOfflineOperation,
+      operationCompleted = NativeAccess::pollOperation,
       checkOperation = NativeAccess::checkOperationStatus,
     )
   private val nativeCallback = NativeAccess.NotificationCallback(core::schedule)

@@ -3,22 +3,24 @@ import MaplibreNativeFFI
 import QuartzCore
 
 /// The display-paced render loop. This view runs on the main thread and owns
-/// the window, input decoding, the Metal objects, and the render session. The
-/// runtime and the map live on the asynchronous runtime task it starts, reached
-/// through ``Channels``.
+/// the window, input decoding, the runtime, the map, the Metal objects, and the
+/// render session.
 @MainActor
 final class MetalMapView: NSView {
   private let metalLayer = CAMetalLayer()
   private let input = InputController()
   private let mode: RenderTargetMode
-  private let channels = Channels()
   private var graphics: MetalGraphicsContext?
+  private var mapState: MapState?
   private var renderTarget: MetalRenderTarget?
-  private var mapTask: MapTask?
+  private var setupTask: Task<Void, Never>?
+  private var cameraTask: Task<Void, Never>?
   private var timer: Timer?
   private var frameTask: Task<Void, Never>?
   private var shutdownTask: Task<Void, Never>?
   private var currentViewport: Viewport?
+  private var renderRequested = true
+  private var nextCameraSequence = 0
   private var consecutiveRenderFailures = 0
   private var didLogStartupStatus = false
   private var isShutDown = false
@@ -71,7 +73,7 @@ final class MetalMapView: NSView {
     }
   }
 
-  /// Closes the session before the map task closes the map; a map with an
+  /// Closes the session before closing the map; a map with an
   /// attached session cannot be destroyed.
   @objc private func shutdown() {
     beginShutdown()
@@ -92,19 +94,18 @@ final class MetalMapView: NSView {
     guard shutdownTask == nil else { return }
     let target = renderTarget
     renderTarget = nil
+    let setup = setupTask
+    let camera = cameraTask
     shutdownTask = Task { @MainActor in
+      await setup?.value
+      await camera?.value
       do {
         try await target?.close()
+        try await self.mapState?.close()
       } catch {
         print(error)
       }
-      if self.mapTask != nil {
-        self.channels.requestShutdown()
-        if !self.channels.waitForMapTaskExit(timeout: 5.0) {
-          print("map task did not finish before the shutdown deadline")
-        }
-        self.mapTask = nil
-      }
+      self.mapState = nil
       NotificationCenter.default.removeObserver(self)
       if self.terminateAfterShutdown {
         NSApp.terminate(nil)
@@ -123,47 +124,74 @@ final class MetalMapView: NSView {
   }
 
   override func mouseDown(with event: NSEvent) {
-    requestRenderIfCameraChanged(input.mouseDown(event, commands: channels))
+    requestRenderIfCameraChanged(input.mouseDown(event, submit: submit))
   }
 
   override func rightMouseDown(with event: NSEvent) {
     requestRenderIfCameraChanged(
-      input.rightMouseDown(event, commands: channels)
+      input.rightMouseDown(event, submit: submit)
     )
   }
 
   override func mouseUp(with event: NSEvent) {
-    requestRenderIfCameraChanged(input.mouseUp(event, commands: channels))
+    requestRenderIfCameraChanged(input.mouseUp(event, submit: submit))
   }
 
   override func rightMouseUp(with event: NSEvent) {
-    requestRenderIfCameraChanged(input.rightMouseUp(event, commands: channels))
+    requestRenderIfCameraChanged(input.rightMouseUp(event, submit: submit))
   }
 
   override func mouseDragged(with event: NSEvent) {
-    requestRenderIfCameraChanged(input.mouseDragged(event, commands: channels))
+    requestRenderIfCameraChanged(input.mouseDragged(event, submit: submit))
   }
 
   override func rightMouseDragged(with event: NSEvent) {
-    requestRenderIfCameraChanged(input.mouseDragged(event, commands: channels))
+    requestRenderIfCameraChanged(input.mouseDragged(event, submit: submit))
   }
 
   override func scrollWheel(with event: NSEvent) {
     requestRenderIfCameraChanged(
-      input.scrollWheel(event, commands: channels, in: self)
+      input.scrollWheel(event, submit: submit, in: self)
     )
   }
 
   override func keyDown(with event: NSEvent) {
     guard let viewport = currentViewport else { return }
     requestRenderIfCameraChanged(
-      input.keyDown(event, commands: channels, viewport: viewport)
+      input.keyDown(event, submit: submit, viewport: viewport)
     )
   }
 
   private func requestRenderIfCameraChanged(_ cameraChanged: Bool) {
     if cameraChanged {
-      channels.setRenderRequest()
+      renderRequested = true
+    }
+  }
+
+  /// Serializes camera queries without moving map ownership off the render
+  /// loop. Each task inherits the main actor and waits for its predecessor.
+  private func submit(_ command: CameraCommand) {
+    guard !isShutDown else { return }
+    renderRequested = true
+    nextCameraSequence += 1
+    let sequence = nextCameraSequence
+    let predecessor = cameraTask
+    cameraTask = Task { @MainActor [weak self] in
+      await predecessor?.value
+      guard let self, !self.isShutDown,
+            let state = self.mapState else { return }
+      var commandError: Error?
+      do {
+        try await state.apply(command)
+      } catch {
+        commandError = error
+      }
+      if self.nextCameraSequence == sequence {
+        self.cameraTask = nil
+      }
+      if let commandError {
+        self.fail(String(describing: commandError))
+      }
     }
   }
 
@@ -178,13 +206,46 @@ final class MetalMapView: NSView {
     RunLoop.main.add(timer!, forMode: .common)
   }
 
-  /// Starts the map task once a non-empty viewport is known, because the map
-  /// takes its initial extent from it.
-  private func startMapTaskIfNeeded(viewport: Viewport) {
-    guard mapTask == nil, !isShutDown else { return }
-    let task = MapTask(channels: channels, viewport: viewport)
-    mapTask = task
-    task.start()
+  /// Creates the map once a non-empty viewport is known, because the map takes
+  /// its initial extent from it.
+  private func startMapStateIfNeeded(viewport: Viewport) {
+    guard mapState == nil, setupTask == nil, !isShutDown else { return }
+    setupTask = Task { @MainActor [weak self] in
+      guard let self else { return }
+      var setupFailure: Error?
+      do {
+        let state = try await MapState(viewport: viewport)
+        if self.isShutDown {
+          try await state.close()
+        } else {
+          if let latest = self.currentViewport, !latest.isEmpty,
+             latest != viewport
+          {
+            try await state.apply(.resize(MapLogicalExtent(
+              width: latest.logicalWidth,
+              height: latest.logicalHeight,
+              scaleFactor: latest.scaleFactor
+            )))
+          }
+          self.mapState = state
+          state.scheduleEventDrains(
+            onRenderRequested: { [weak self] in
+              self?.renderRequested = true
+            },
+            onFailure: { [weak self] error in
+              self?.fail(String(describing: error))
+            }
+          )
+          self.renderRequested = true
+        }
+      } catch {
+        setupFailure = error
+      }
+      self.setupTask = nil
+      if let setupFailure {
+        self.fail(String(describing: setupFailure))
+      }
+    }
   }
 
   private func updateViewport() {
@@ -202,25 +263,24 @@ final class MetalMapView: NSView {
 
     graphics.resize(viewport)
     currentViewport = viewport
-    if mapTask != nil {
-      channels.push(.resize(MapLogicalExtent(
+    if mapState != nil {
+      submit(.resize(MapLogicalExtent(
         width: viewport.logicalWidth,
         height: viewport.logicalHeight,
         scaleFactor: viewport.scaleFactor
       )))
     }
-    channels.setRenderRequest()
-    startMapTaskIfNeeded(viewport: viewport)
+    renderRequested = true
+    startMapStateIfNeeded(viewport: viewport)
   }
 
-  /// Attaches the render session on this thread. Attach records the calling
-  /// thread as the session's owner, and every later session call runs here.
+  /// Attaches the render session on the graphics thread that services it.
   private func attachIfNeeded() async {
     guard renderTarget == nil,
           let graphics,
           let viewport = currentViewport,
           !viewport.isEmpty,
-          let renderMap = channels.map()
+          let renderMap = mapState?.mapHandle
     else { return }
 
     do {
@@ -234,7 +294,7 @@ final class MetalMapView: NSView {
         logStartupStatus(mode: mode)
         didLogStartupStatus = true
       }
-      channels.setRenderRequest()
+      renderRequested = true
     } catch {
       fail(String(describing: error))
     }
@@ -253,10 +313,6 @@ final class MetalMapView: NSView {
 
   private func tick() async {
     guard !isShutDown else { return }
-    if let failureMessage = channels.failureMessage {
-      fail(failureMessage)
-      return
-    }
     await attachIfNeeded()
     guard !isShutDown,
           var renderTarget,
@@ -270,10 +326,11 @@ final class MetalMapView: NSView {
         try await renderTarget.resize(graphics: graphics, viewport: viewport)
         self.renderTarget = renderTarget
       }
-      if channels.consumeRenderRequest() {
+      if renderRequested {
+        renderRequested = false
         let rendered = try await renderTarget.renderFrame()
         if !rendered {
-          channels.setRenderRequest()
+          renderRequested = true
         }
       }
       consecutiveRenderFailures = 0

@@ -811,18 +811,21 @@ impl RuntimeHandle {
             .notification_callback
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        let mut source = self
+        let source = *self
             .notification_source
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         let close_source_result = if source.0 == 0 {
             Ok(())
         } else {
-            maplibre_core::check(unsafe { sys::mln_notification_source_close(*source) })
-                .map_err(map_error)
+            let status = py.detach(|| unsafe { sys::mln_notification_source_close(source) });
+            maplibre_core::check(status).map_err(map_error)
         };
         if close_source_result.is_ok() {
-            *source = sys::mln_notification_source(0);
+            *self
+                .notification_source
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()) = sys::mln_notification_source(0);
             callback.take();
             self.operation_gate.finish_successful_close();
         } else {
@@ -843,10 +846,10 @@ impl RuntimeHandle {
         wait_operation(py, operation.0)
     }
 
-    fn set_notification_callback(&self, callback: Py<PyAny>) -> PyResult<()> {
+    fn set_notification_callback(&self, py: Python<'_>, callback: Py<PyAny>) -> PyResult<()> {
         self.operation_gate.ensure_open()?;
         let replacement = Box::new(PyNotificationCallbackState { callback });
-        let user_data = ptr::from_ref(&*replacement).cast_mut().cast::<c_void>();
+        let user_data = ptr::from_ref(&*replacement).cast_mut().cast::<c_void>() as usize;
         let mut callback_slot = self
             .notification_callback
             .lock()
@@ -855,19 +858,19 @@ impl RuntimeHandle {
             .notification_source
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        maplibre_core::check(unsafe {
+        let status = py.detach(|| unsafe {
             sys::mln_notification_source_set_callback(
                 source,
                 Some(notification_callback_trampoline),
-                user_data,
+                user_data as *mut c_void,
             )
-        })
-        .map_err(map_error)?;
+        });
+        maplibre_core::check(status).map_err(map_error)?;
         callback_slot.replace(replacement);
         Ok(())
     }
 
-    fn clear_notification_callback(&self) -> PyResult<()> {
+    fn clear_notification_callback(&self, py: Python<'_>) -> PyResult<()> {
         self.operation_gate.ensure_open()?;
         let mut callback_slot = self
             .notification_callback
@@ -877,8 +880,8 @@ impl RuntimeHandle {
             .notification_source
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        maplibre_core::check(unsafe { sys::mln_notification_source_clear_callback(source) })
-            .map_err(map_error)?;
+        let status = py.detach(|| unsafe { sys::mln_notification_source_clear_callback(source) });
+        maplibre_core::check(status).map_err(map_error)?;
         callback_slot.take();
         Ok(())
     }

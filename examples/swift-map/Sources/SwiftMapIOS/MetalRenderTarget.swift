@@ -51,7 +51,7 @@ final class MetalRenderTarget {
     self.session = session
   }
 
-  /// Attaches a session against the map the map task published.
+  /// Attaches a session against the map owned by the view.
   static func attach(
     map: MapHandle,
     graphics: MetalGraphicsContext,

@@ -45,4 +45,23 @@ public sealed class RuntimeExecutorTests
 
         Assert.NotEqual(0ul, commandId);
     }
+
+    [Fact]
+    public async Task TaskOnlyOperationWaitsDoNotAccumulateReadyEndpoints()
+    {
+        using var runtime = await RuntimeHandle.CreateAsync(
+            new RuntimeOptions(),
+            TestContext.Current.CancellationToken
+        );
+
+        for (var index = 0; index < 256; index++)
+        {
+            await runtime.BarrierAsync(TestContext.Current.CancellationToken);
+        }
+
+        Assert.DoesNotContain(
+            runtime.DrainReadyEndpoints(),
+            endpoint => endpoint.Kind == NotificationEndpointKind.Operation
+        );
+    }
 }

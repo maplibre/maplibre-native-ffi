@@ -7,6 +7,7 @@ pub const AppError = error{
     RuntimeCreateFailed,
     MapCreateFailed,
     EventMaskFailed,
+    EventDrainFailed,
     TextureAttachFailed,
     StyleLoadFailed,
     CameraJumpFailed,

@@ -92,7 +92,7 @@ pub fn report_leak(leak: NativeHandleLeak) {
 
 /// Tracks whether a native handle is still live and centralizes close-once
 /// behavior. Public handle policy such as `!Send`, parent retention, and
-/// owner-thread checks lives above this.
+/// thread-affinity checks lives above this.
 #[derive(Debug)]
 pub struct NativeHandleState<T> {
     id: Cell<Option<NonZeroU64>>,
@@ -151,7 +151,7 @@ impl<T: NativeHandle> NativeHandleState<T> {
     /// Closes the handle with a status-returning destroy function.
     ///
     /// The state remains live when the destroy function reports an error, which
-    /// lets callers retry an owner-thread close later.
+    /// lets callers retry a graphics-thread-affine close later.
     ///
     /// # Safety
     ///

@@ -89,7 +89,7 @@ private final class ResourceHandleStateCapture: @unchecked Sendable {
   try runtime.clearResourceTransform()
 }
 
-/// Requests a style URL whose scheme no file source serves, pumps until the
+/// Requests a style URL whose scheme no file source serves, drains until the
 /// matching loading failure arrives, and returns its message. The failure
 /// proves the request reached the network file source, where the
 /// runtime-scoped resource provider applies.
@@ -106,7 +106,7 @@ private func loadProbeStyle(
   styleURL: String
 ) async throws -> String? {
   _ = try map.setStyleURL(styleURL)
-  return try await pumpUntilEvent(
+  return try await drainUntilEvent(
     runtime,
     waitingFor: "a loading failure for \(styleURL)"
   ) { $0.type == .mapLoadingFailed }?.message
@@ -209,7 +209,7 @@ private final class ResolvedURLCapture: @unchecked Sendable {
   defer { try? map.closeBlockingForTests() }
 
   try map.setStyleURL("maplibre://maps/style")
-  let loaded = try await pumpUntilEvent(
+  let loaded = try await drainUntilEvent(
     runtime,
     waitingFor: "the provider-served style to load"
   ) { $0.type == .mapStyleLoaded }

@@ -27,7 +27,7 @@ internal class OwnedTextureFrameHandleCore(private val typeName: String) {
   fun reportLeak(writeLine: (String) -> Unit = { message -> println(message) }) {
     if (!isClosed()) {
       writeLine(
-        "Leaked $typeName; close frame handles explicitly on the render session owner thread."
+        "Leaked $typeName; close frame handles explicitly on the render session graphics thread."
       )
     }
   }

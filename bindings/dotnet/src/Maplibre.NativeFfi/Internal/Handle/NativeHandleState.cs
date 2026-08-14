@@ -55,7 +55,7 @@ internal sealed class NativeHandleState<T>
                     typeName,
                     current,
                     null,
-                    $"Leaked {typeName} native handle 0x{current:x}; call Close() on the owner thread before releasing the wrapper."
+                    $"Leaked {typeName} native handle 0x{current:x}; call Close() before releasing the wrapper."
                 )
             );
         }
@@ -114,10 +114,10 @@ internal sealed class NativeHandleState<T>
     /// <remarks>
     /// Handles the host may use and release from different threads go through this, so a release
     /// that begins mid-call waits for the call to finish and a losing race reports this wrapper's
-    /// closed-handle error rather than the C API's rejection of a retired id. Owner-thread-only
-    /// handles get that ordering from the owner-thread rule and can read <see cref="Handle" />
-    /// directly. <paramref name="use" /> runs outside the lock; calling <see cref="Close" /> from
-    /// inside it on the same thread deadlocks.
+    /// closed-handle error rather than the C API's rejection of a retired id. Graphics-thread-affine
+    /// handles get that ordering from their thread rule and can read <see cref="Handle" /> directly.
+    /// <paramref name="use" /> runs outside the lock; calling <see cref="Close" /> from inside it on
+    /// the same thread deadlocks.
     /// </remarks>
     internal TResult WithLive<TResult>(Func<T, TResult> use)
     {
@@ -215,7 +215,7 @@ internal sealed class NativeHandleState<T>
                     typeName,
                     current,
                     status,
-                    $"Dispose could not close {typeName} native handle 0x{current:x}; native destroy returned {status}. Call Close() on the owner thread to observe the error and retry."
+                    $"Dispose could not close {typeName} native handle 0x{current:x}; native destroy returned {status}. Call Close() to observe the error and retry."
                 )
             );
             return false;

@@ -9,8 +9,8 @@ namespace Maplibre.NativeFfi.Runtime;
 internal sealed unsafe class NotificationReceiver : IDisposable
 {
     private readonly Dictionary<ulong, TaskCompletionSource> operations = [];
-    private readonly ConcurrentQueue<ReadyEndpoint> observedEndpoints = new();
     private readonly ConcurrentDictionary<ulong, ReadyEndpoint> observedOperations = new();
+    private readonly HashSet<ulong> ignoredOperations = [];
     private readonly object drainGate = new();
     private readonly object operationGate = new();
     private readonly GCHandle callbackRoot;
@@ -52,6 +52,7 @@ internal sealed unsafe class NotificationReceiver : IDisposable
         ObjectDisposedException.ThrowIf(closed, this);
         if (IsOperationCompleted(operation))
         {
+            IgnoreCompletedOperation(operation.Value);
             return Task.CompletedTask;
         }
         var completion = new TaskCompletionSource(
@@ -71,6 +72,7 @@ internal sealed unsafe class NotificationReceiver : IDisposable
 
         if (IsOperationCompleted(operation))
         {
+            IgnoreCompletedOperation(operation.Value);
             lock (operationGate)
             {
                 if (
@@ -98,6 +100,14 @@ internal sealed unsafe class NotificationReceiver : IDisposable
     internal IReadOnlyList<ReadyEndpoint> DrainReadyEndpoints() =>
         DrainNativeReadyEndpoints(returnObserved: true);
 
+    internal void ForgetOperation(ulong operation)
+    {
+        lock (drainGate)
+        {
+            observedOperations.TryRemove(operation, out _);
+        }
+    }
+
     private IReadOnlyList<ReadyEndpoint> DrainNativeReadyEndpoints(bool returnObserved)
     {
         lock (drainGate)
@@ -123,6 +133,7 @@ internal sealed unsafe class NotificationReceiver : IDisposable
                     );
                 }
 
+                var endpoints = new List<ReadyEndpoint>();
                 var cursor = (byte*)view.endpoints;
                 for (nuint index = 0; index < view.endpoint_count; index++)
                 {
@@ -133,34 +144,41 @@ internal sealed unsafe class NotificationReceiver : IDisposable
                     var observed = new ReadyEndpoint(kind, endpoint->kind, endpoint->id);
                     if (kind == NotificationEndpointKind.Operation)
                     {
+                        if (ignoredOperations.Remove(endpoint->id))
+                        {
+                            cursor += view.endpoint_size;
+                            continue;
+                        }
                         TaskCompletionSource? completion;
                         lock (operationGate)
                         {
-                            if (operations.Remove(endpoint->id, out completion))
+                            if (!operations.Remove(endpoint->id, out completion))
                             {
-                                observedEndpoints.Enqueue(observed);
+                                if (returnObserved)
+                                {
+                                    endpoints.Add(observed);
+                                }
+                                else
+                                {
+                                    observedOperations[endpoint->id] = observed;
+                                }
                             }
-                            else
-                            {
-                                observedOperations[endpoint->id] = observed;
-                            }
+                        }
+                        if (completion is not null && returnObserved)
+                        {
+                            endpoints.Add(observed);
                         }
                         completion?.TrySetResult();
                     }
-                    else
+                    else if (returnObserved)
                     {
-                        observedEndpoints.Enqueue(observed);
+                        endpoints.Add(observed);
                     }
                     cursor += view.endpoint_size;
                 }
 
-                var endpoints = new List<ReadyEndpoint>();
                 if (returnObserved)
                 {
-                    while (observedEndpoints.TryDequeue(out var observed))
-                    {
-                        endpoints.Add(observed);
-                    }
                     foreach (var operation in observedOperations)
                     {
                         if (observedOperations.TryRemove(operation.Key, out var observed))
@@ -207,6 +225,18 @@ internal sealed unsafe class NotificationReceiver : IDisposable
         bool completed;
         NativeStatus.Check(NativeMethods.mln_operation_poll(operation, &completed));
         return completed;
+    }
+
+    private void IgnoreCompletedOperation(ulong operation)
+    {
+        lock (drainGate)
+        {
+            if (!observedOperations.TryRemove(operation, out _))
+            {
+                ignoredOperations.Add(operation);
+            }
+            _ = DrainNativeReadyEndpoints(returnObserved: false);
+        }
     }
 
     private void CancelWait(

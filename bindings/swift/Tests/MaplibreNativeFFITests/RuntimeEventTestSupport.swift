@@ -5,7 +5,7 @@ import Testing
 
 /// Drains until an event `isMatch` accepts arrives, and returns it.
 /// Records an issue naming `subject` and returns `nil` at the deadline.
-func pumpUntilEvent(
+func drainUntilEvent(
   _ runtime: RuntimeHandle,
   waitingFor subject: String,
   timeout: TimeInterval = 10,
@@ -27,7 +27,7 @@ func commandDisposition(
   _ commandId: UInt64,
   runtime: RuntimeHandle
 ) async throws -> UInt32? {
-  try await pumpUntilEvent(
+  try await drainUntilEvent(
     runtime,
     waitingFor: "command \(commandId) to finish"
   ) { event in
@@ -44,7 +44,7 @@ func commandDisposition(
 }
 
 /// Drains until autonomous execution stops producing events.
-func pumpUntilQuiet(
+func drainUntilQuiet(
   _ runtime: RuntimeHandle,
   iterations: Int = 100
 ) async throws {

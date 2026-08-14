@@ -30,13 +30,25 @@ struct Viewport: Equatable {
   }
 }
 
-/// Runtime and map state used from resumable Swift tasks. Render sessions
-/// remain
-/// owned by the main UIKit/CADisplayLink receiver.
-final class MapState: @unchecked Sendable {
+/// A camera change decoded and applied on the main render loop.
+enum CameraCommand {
+  case resize(MapLogicalExtent)
+  case setGestureInProgress(Bool)
+  case moveBy(dx: Double, dy: Double)
+  case scaleBy(scale: Double, anchor: ScreenPoint)
+  /// Adds `delta` degrees to the current bearing, pivoting on `anchor`.
+  case adjustBearing(delta: Double, anchor: ScreenPoint)
+  /// Adds `delta` degrees to the current pitch, clamped to `[0, 60]`.
+  case adjustPitch(delta: Double)
+  /// Zooms to `round(zoom) + 1` about `anchor`, the double-tap step.
+  case zoomToNextStep(anchor: ScreenPoint, animation: AnimationOptions)
+}
+
+/// Runtime and map state owned by the main render loop.
+@MainActor
+final class MapState {
   private let runtime: RuntimeHandle
   private let map: MapHandle
-  private let closeLock = NSLock()
   private var isClosed = false
 
   init(viewport: Viewport) async throws {
@@ -77,30 +89,29 @@ final class MapState: @unchecked Sendable {
     try await runtime.barrier()
   }
 
-  func mapHandle() -> MapHandle {
+  var mapHandle: MapHandle {
     map
   }
 
-  func scheduleEventDrains(on channels: Channels) {
-    runtime.setEventReadyHandler { [weak self, weak channels] in
+  func scheduleEventDrains(
+    onRenderRequested: @escaping @MainActor @Sendable () -> Void,
+    onFailure: @escaping @MainActor @Sendable (Error) -> Void
+  ) {
+    runtime.setEventReadyHandler { [weak self] in
       Task { @MainActor in
-        guard let self, let channels else { return }
+        guard let self, !self.isClosed else { return }
         do {
-          if try self.drainEvents() { channels.setRenderRequest() }
+          if try self.drainEvents() { onRenderRequested() }
         } catch {
-          channels.fail(error)
+          onFailure(error)
         }
       }
     }
   }
 
   func close() async throws {
-    let shouldClose = closeLock.withLock { () -> Bool in
-      guard !isClosed else { return false }
-      isClosed = true
-      return true
-    }
-    guard shouldClose else { return }
+    guard !isClosed else { return }
+    isClosed = true
     runtime.setEventReadyHandler(nil)
     try await map.close()
     try await runtime.close()

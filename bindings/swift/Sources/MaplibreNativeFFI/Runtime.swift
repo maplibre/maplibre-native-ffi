@@ -149,6 +149,8 @@ public struct RuntimeEventMask: OptionSet, Sendable, Hashable {
     native(MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR)
   public static let offlineRegionTileCountLimitExceeded =
     native(MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED)
+  public static let commandFinished =
+    native(MLN_RUNTIME_EVENT_MASK_COMMAND_FINISHED)
 
   /// Every map-originated event type, which is what
   /// ``MapHandle/setEventMask(_:)`` reads.
@@ -759,6 +761,10 @@ public final class RuntimeHandle: @unchecked Sendable {
   }
 
   /// Selects which runtime-originated event types this runtime queues.
+  ///
+  /// Keep ``RuntimeEventMask/commandFinished`` selected while a resource
+  /// transform, HTTP header transform, or resource provider is installed.
+  /// Those events retire callback state replaced by later commands.
   public func setEventMask(_ mask: RuntimeEventMask) throws {
     try mapNativeFailure { try NativeRuntime.setEventMask(
       handle.requireLive(),

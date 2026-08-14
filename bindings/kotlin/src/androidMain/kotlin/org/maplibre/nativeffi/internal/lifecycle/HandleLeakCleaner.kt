@@ -8,7 +8,7 @@ import org.maplibre.nativeffi.runtime.OperationLeakReport
  * Reports native handles that become unreachable before explicit release.
  *
  * Cleanup remains explicit so failures are observable. Render sessions also require their graphics
- * owner thread, which an unreachable-action thread cannot provide.
+ * thread, which an unreachable-action thread cannot provide.
  *
  * Registered actions must capture leak-report state only. Capturing the wrapper would keep it
  * reachable and suppress every report.

@@ -486,6 +486,46 @@ internal object NativeAccess {
     MapLibreNativeC.mln_operation_release(operation)
   }
 
+  internal fun discardOperation(operation: Long): Int =
+    MapLibreNativeC.mln_operation_discard_result(operation)
+
+  internal fun pollOperation(operation: Long): Boolean =
+    Arena.ofConfined().use { arena ->
+      val completed = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+      Status.check(MapLibreNativeC.mln_operation_poll(operation, completed))
+      completed.get(ValueLayout.JAVA_BOOLEAN, 0)
+    }
+
+  internal fun waitOperation(operation: Long, timeoutMillis: Long): Boolean =
+    Arena.ofConfined().use { arena ->
+      val completed = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+      Status.check(MapLibreNativeC.mln_operation_wait(operation, timeoutMillis, completed))
+      completed.get(ValueLayout.JAVA_BOOLEAN, 0)
+    }
+
+  internal fun operationTerminalStatus(operation: Long): Int =
+    Arena.ofConfined().use { arena ->
+      val outStatus = arena.allocate(ValueLayout.JAVA_INT)
+      Status.check(MapLibreNativeC.mln_operation_get_status(operation, outStatus))
+      outStatus.get(ValueLayout.JAVA_INT, 0)
+    }
+
+  internal fun operationDiagnostic(operation: Long): String =
+    Arena.ofConfined().use { arena ->
+      val outSize = arena.allocate(ValueLayout.JAVA_LONG)
+      Status.check(
+        MapLibreNativeC.mln_operation_copy_diagnostic(operation, MemorySegment.NULL, 0, outSize)
+      )
+      val size = outSize.get(ValueLayout.JAVA_LONG, 0)
+      if (size == 0L) return@use ""
+      val bytes = arena.allocate(size)
+      Status.check(MapLibreNativeC.mln_operation_copy_diagnostic(operation, bytes, size, outSize))
+      String(bytes.toArray(ValueLayout.JAVA_BYTE), StandardCharsets.UTF_8)
+    }
+
+  internal fun cancelOperation(operation: Long): Int =
+    MapLibreNativeC.mln_operation_cancel(operation)
+
   private inline fun startOperation(call: (MemorySegment) -> Int): Long =
     Arena.ofConfined().use { arena ->
       val outOperation = arena.allocate(ValueLayout.JAVA_LONG)
@@ -639,50 +679,6 @@ internal object NativeAccess {
 
   internal fun startDeleteOfflineRegion(runtime: NativeRuntime, regionId: Long): Long =
     startRuntimeLongOperation("mln_runtime_offline_region_delete_start", runtime, regionId)
-
-  internal fun discardOfflineOperation(operationId: Long): Int =
-    MapLibreNativeC.mln_operation_discard_result(operationId)
-
-  internal fun releaseOfflineOperation(operationId: Long) {
-    MapLibreNativeC.mln_operation_release(operationId)
-  }
-
-  internal fun pollOfflineOperation(operationId: Long): Boolean =
-    Arena.ofConfined().use { arena ->
-      val completed = arena.allocate(ValueLayout.JAVA_BOOLEAN)
-      Status.check(MapLibreNativeC.mln_operation_poll(operationId, completed))
-      completed.get(ValueLayout.JAVA_BOOLEAN, 0)
-    }
-
-  internal fun waitOfflineOperation(operationId: Long, timeoutMillis: Long): Boolean =
-    Arena.ofConfined().use { arena ->
-      val completed = arena.allocate(ValueLayout.JAVA_BOOLEAN)
-      Status.check(MapLibreNativeC.mln_operation_wait(operationId, timeoutMillis, completed))
-      completed.get(ValueLayout.JAVA_BOOLEAN, 0)
-    }
-
-  internal fun offlineOperationTerminalStatus(operationId: Long): Int =
-    Arena.ofConfined().use { arena ->
-      val outStatus = arena.allocate(ValueLayout.JAVA_INT)
-      Status.check(MapLibreNativeC.mln_operation_get_status(operationId, outStatus))
-      outStatus.get(ValueLayout.JAVA_INT, 0)
-    }
-
-  internal fun offlineOperationDiagnostic(operationId: Long): String =
-    Arena.ofConfined().use { arena ->
-      val outSize = arena.allocate(ValueLayout.JAVA_LONG)
-      Status.check(
-        MapLibreNativeC.mln_operation_copy_diagnostic(operationId, MemorySegment.NULL, 0, outSize)
-      )
-      val size = outSize.get(ValueLayout.JAVA_LONG, 0)
-      if (size == 0L) return@use ""
-      val bytes = arena.allocate(size)
-      Status.check(MapLibreNativeC.mln_operation_copy_diagnostic(operationId, bytes, size, outSize))
-      String(bytes.toArray(ValueLayout.JAVA_BYTE), StandardCharsets.UTF_8)
-    }
-
-  internal fun cancelOfflineOperation(operationId: Long): Int =
-    MapLibreNativeC.mln_operation_cancel(operationId)
 
   internal fun setResourceTransform(runtime: NativeRuntime, descriptor: MemorySegment): Long =
     command { outCommandId ->
@@ -2325,7 +2321,7 @@ internal object NativeAccess {
     )
 
   internal fun destroyRenderSession(session: NativeRenderSession): Int =
-    phase3StatusDowncall("mln_render_session_destroy", ValueLayout.JAVA_LONG).invokeNative(session)
+    dynamicStatusDowncall("mln_render_session_destroy", ValueLayout.JAVA_LONG).invokeNative(session)
       as Int
 
   internal fun renderSessionCapabilities(session: NativeRenderSession): RenderSessionCapabilities =
@@ -2333,7 +2329,7 @@ internal object NativeAccess {
       val out = arena.allocate(RENDER_SESSION_CAPABILITIES_SIZE)
       out.set(ValueLayout.JAVA_INT, 0, RENDER_SESSION_CAPABILITIES_SIZE.toInt())
       Status.check(
-        phase3StatusDowncall(
+        dynamicStatusDowncall(
             "mln_render_session_get_capabilities",
             ValueLayout.JAVA_LONG,
             ValueLayout.ADDRESS,
@@ -2356,7 +2352,7 @@ internal object NativeAccess {
       val out = arena.allocate(RENDER_SESSION_SNAPSHOT_SIZE)
       out.set(ValueLayout.JAVA_INT, 0, RENDER_SESSION_SNAPSHOT_SIZE.toInt())
       Status.check(
-        phase3StatusDowncall(
+        dynamicStatusDowncall(
             "mln_render_session_get_snapshot",
             ValueLayout.JAVA_LONG,
             ValueLayout.ADDRESS,
@@ -2400,7 +2396,7 @@ internal object NativeAccess {
       nativeDemand.set(ValueLayout.JAVA_LONG, 24, demand.presentationTimeNanoseconds)
       nativeDemand.set(ValueLayout.JAVA_LONG, 32, demand.deadlineNanoseconds)
       Status.check(
-        phase3StatusDowncall(
+        dynamicStatusDowncall(
             "mln_render_session_request_frame",
             ValueLayout.JAVA_LONG,
             ValueLayout.ADDRESS,
@@ -2417,7 +2413,7 @@ internal object NativeAccess {
     Arena.ofConfined().use { arena ->
       val outBatch = zeroHandle(arena)
       Status.check(
-        phase3StatusDowncall(
+        dynamicStatusDowncall(
             "mln_render_session_drain_frame_results",
             ValueLayout.JAVA_LONG,
             ValueLayout.JAVA_LONG,
@@ -2430,7 +2426,7 @@ internal object NativeAccess {
       try {
         val outCount = arena.allocate(ValueLayout.JAVA_LONG)
         Status.check(
-          phase3StatusDowncall(
+          dynamicStatusDowncall(
               "mln_render_frame_batch_count",
               ValueLayout.JAVA_LONG,
               ValueLayout.ADDRESS,
@@ -2442,7 +2438,7 @@ internal object NativeAccess {
           val outResult = arena.allocate(RENDER_FRAME_RESULT_SIZE)
           outResult.set(ValueLayout.JAVA_INT, 0, RENDER_FRAME_RESULT_SIZE.toInt())
           Status.check(
-            phase3StatusDowncall(
+            dynamicStatusDowncall(
                 "mln_render_frame_batch_get",
                 ValueLayout.JAVA_LONG,
                 ValueLayout.JAVA_LONG,
@@ -2453,7 +2449,7 @@ internal object NativeAccess {
           renderFrameResult(outResult)
         }
       } finally {
-        phase3Downcall(
+        dynamicDowncall(
             "mln_render_frame_batch_release",
             FunctionDescriptor.ofVoid(ValueLayout.JAVA_LONG),
           )
@@ -2465,7 +2461,7 @@ internal object NativeAccess {
     Arena.ofConfined().use { arena ->
       val outServiced = arena.allocate(ValueLayout.JAVA_LONG)
       Status.check(
-        phase3StatusDowncall(
+        dynamicStatusDowncall(
             "mln_render_session_service_driver_work",
             ValueLayout.JAVA_LONG,
             ValueLayout.JAVA_LONG,
@@ -2480,7 +2476,7 @@ internal object NativeAccess {
     Arena.ofConfined().use { arena ->
       val outFrame = zeroHandle(arena)
       val status =
-        phase3StatusDowncall(
+        dynamicStatusDowncall(
             "mln_render_session_acquire_frame",
             ValueLayout.JAVA_LONG,
             ValueLayout.ADDRESS,
@@ -2498,7 +2494,7 @@ internal object NativeAccess {
       val out = arena.allocate(RENDER_FRAME_RESULT_SIZE)
       out.set(ValueLayout.JAVA_INT, 0, RENDER_FRAME_RESULT_SIZE.toInt())
       Status.check(
-        phase3StatusDowncall(
+        dynamicStatusDowncall(
             "mln_acquired_frame_get_result",
             ValueLayout.JAVA_LONG,
             ValueLayout.ADDRESS,
@@ -2512,7 +2508,7 @@ internal object NativeAccess {
     Arena.ofConfined().use { arena ->
       val out = gpuSync(arena, GpuSync())
       Status.check(
-        phase3StatusDowncall(
+        dynamicStatusDowncall(
             "mln_acquired_frame_get_producer_sync",
             ValueLayout.JAVA_LONG,
             ValueLayout.ADDRESS,
@@ -2527,7 +2523,7 @@ internal object NativeAccess {
       val out = mln_metal_owned_texture_frame.allocate(arena)
       mln_metal_owned_texture_frame.size(out, mln_metal_owned_texture_frame.sizeof().toInt())
       Status.check(
-        phase3StatusDowncall(
+        dynamicStatusDowncall(
             "mln_acquired_frame_get_metal_texture",
             ValueLayout.JAVA_LONG,
             ValueLayout.ADDRESS,
@@ -2542,7 +2538,7 @@ internal object NativeAccess {
       val out = mln_vulkan_owned_texture_frame.allocate(arena)
       mln_vulkan_owned_texture_frame.size(out, mln_vulkan_owned_texture_frame.sizeof().toInt())
       Status.check(
-        phase3StatusDowncall(
+        dynamicStatusDowncall(
             "mln_acquired_frame_get_vulkan_texture",
             ValueLayout.JAVA_LONG,
             ValueLayout.ADDRESS,
@@ -2557,7 +2553,7 @@ internal object NativeAccess {
       val out = mln_opengl_owned_texture_frame.allocate(arena)
       mln_opengl_owned_texture_frame.size(out, mln_opengl_owned_texture_frame.sizeof().toInt())
       Status.check(
-        phase3StatusDowncall(
+        dynamicStatusDowncall(
             "mln_acquired_frame_get_opengl_texture",
             ValueLayout.JAVA_LONG,
             ValueLayout.ADDRESS,
@@ -2573,7 +2569,7 @@ internal object NativeAccess {
       inOutFrame.set(ValueLayout.JAVA_LONG, 0, frame)
       val outOperation = zeroHandle(arena)
       Status.check(
-        phase3StatusDowncall(
+        dynamicStatusDowncall(
             "mln_acquired_frame_release_start",
             ValueLayout.ADDRESS,
             ValueLayout.ADDRESS,
@@ -2658,7 +2654,7 @@ internal object NativeAccess {
     Arena.ofConfined().use { arena ->
       val outOperation = zeroHandle(arena)
       Status.check(
-        phase3StatusDowncall(
+        dynamicStatusDowncall(
             "mln_render_session_barrier_start",
             ValueLayout.JAVA_LONG,
             ValueLayout.JAVA_LONG,
@@ -2711,7 +2707,7 @@ internal object NativeAccess {
     Arena.ofConfined().use { arena ->
       val outOperation = zeroHandle(arena)
       Status.check(
-        phase3StatusDowncall(
+        dynamicStatusDowncall(
             "mln_render_session_remove_feature_state_start",
             ValueLayout.JAVA_LONG,
             stringViewLayout,
@@ -2740,7 +2736,7 @@ internal object NativeAccess {
     Arena.ofConfined().use { arena ->
       val outOperation = zeroHandle(arena)
       Status.check(
-        phase3StatusDowncall(
+        dynamicStatusDowncall(
             "mln_render_session_query_rendered_features_start",
             ValueLayout.JAVA_LONG,
             ValueLayout.ADDRESS,
@@ -2765,7 +2761,7 @@ internal object NativeAccess {
     Arena.ofConfined().use { arena ->
       val outOperation = zeroHandle(arena)
       Status.check(
-        phase3StatusDowncall(
+        dynamicStatusDowncall(
             "mln_render_session_query_source_features_start",
             ValueLayout.JAVA_LONG,
             stringViewLayout,
@@ -2793,7 +2789,7 @@ internal object NativeAccess {
     Arena.ofConfined().use { arena ->
       val outOperation = zeroHandle(arena)
       Status.check(
-        phase3StatusDowncall(
+        dynamicStatusDowncall(
             "mln_render_session_query_feature_extensions_start",
             ValueLayout.JAVA_LONG,
             stringViewLayout,
@@ -2827,7 +2823,7 @@ internal object NativeAccess {
       val outBuffer = zeroHandle(arena)
       val outInfo = textureImageInfo(arena)
       Status.check(
-        phase3StatusDowncall(
+        dynamicStatusDowncall(
             "mln_texture_read_premultiplied_rgba8_take_result",
             ValueLayout.JAVA_LONG,
             ValueLayout.ADDRESS,
@@ -2846,7 +2842,7 @@ internal object NativeAccess {
       val out = arena.allocate(RENDER_ABANDON_RESULT_SIZE)
       out.set(ValueLayout.JAVA_INT, 0, RENDER_ABANDON_RESULT_SIZE.toInt())
       Status.check(
-        phase3StatusDowncall(
+        dynamicStatusDowncall(
             "mln_render_session_abandon",
             ValueLayout.JAVA_LONG,
             ValueLayout.ADDRESS,
@@ -3145,7 +3141,7 @@ internal object NativeAccess {
       val outSession = zeroHandle(arena)
       val outOperation = zeroHandle(arena)
       Status.check(
-        phase3StatusDowncall(
+        dynamicStatusDowncall(
             functionName,
             ValueLayout.JAVA_LONG,
             ValueLayout.ADDRESS,
@@ -3181,10 +3177,10 @@ internal object NativeAccess {
       val outOperation = zeroHandle(arena)
       val status =
         if (argument == null) {
-          phase3StatusDowncall(functionName, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS)
+          dynamicStatusDowncall(functionName, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS)
             .invokeNative(session, outOperation) as Int
         } else {
-          phase3StatusDowncall(
+          dynamicStatusDowncall(
               functionName,
               ValueLayout.JAVA_LONG,
               ValueLayout.ADDRESS,
@@ -3222,7 +3218,7 @@ internal object NativeAccess {
       add(ValueLayout.ADDRESS)
     }
     Status.check(
-      phase3StatusDowncall(functionName, *layouts.toTypedArray())
+      dynamicStatusDowncall(functionName, *layouts.toTypedArray())
         .invokeNative(*arguments.toTypedArray()) as Int
     )
     return outOperation.get(ValueLayout.JAVA_LONG, 0)
@@ -3232,7 +3228,7 @@ internal object NativeAccess {
     Arena.ofConfined().use { arena ->
       val outBuffer = zeroHandle(arena)
       Status.check(
-        phase3StatusDowncall(functionName, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS)
+        dynamicStatusDowncall(functionName, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS)
           .invokeNative(operation, outBuffer) as Int
       )
       ownedBuffer(NativeOwnedBuffer(outBuffer.get(ValueLayout.JAVA_LONG, 0)))!!
@@ -5759,15 +5755,15 @@ internal object NativeAccess {
   private fun downcall(name: String): MethodHandle =
     MapLibreNativeC::class.java.getMethod("${name}\$handle").invoke(null) as MethodHandle
 
-  private fun phase3StatusDowncall(
+  private fun dynamicStatusDowncall(
     name: String,
     vararg argumentLayouts: MemoryLayout,
   ): MethodHandle =
-    phase3DowncallCache[name]
-      ?: phase3Downcall(name, FunctionDescriptor.of(ValueLayout.JAVA_INT, *argumentLayouts))
+    dynamicDowncallCache[name]
+      ?: dynamicDowncall(name, FunctionDescriptor.of(ValueLayout.JAVA_INT, *argumentLayouts))
 
-  private fun phase3Downcall(name: String, descriptor: FunctionDescriptor): MethodHandle {
-    phase3DowncallCache[name]?.let {
+  private fun dynamicDowncall(name: String, descriptor: FunctionDescriptor): MethodHandle {
+    dynamicDowncallCache[name]?.let {
       return it
     }
     ensureLoaded()
@@ -5776,7 +5772,7 @@ internal object NativeAccess {
         UnsatisfiedLinkError("Loaded native library does not expose $name.")
       }
     val handle = Linker.nativeLinker().downcallHandle(address, descriptor)
-    return phase3DowncallCache.putIfAbsent(name, handle) ?: handle
+    return dynamicDowncallCache.putIfAbsent(name, handle) ?: handle
   }
 
   private fun nativeAccessFailure(cause: Throwable): IllegalStateException =
@@ -5810,7 +5806,7 @@ internal object NativeAccess {
   private val unitBezierLayout = mln_unit_bezier.layout()
 
   private const val RENDER_SESSION_ATTACH_OPTIONS_SIZE: Long = 40
-  private val phase3DowncallCache = ConcurrentHashMap<String, MethodHandle>()
+  private val dynamicDowncallCache = ConcurrentHashMap<String, MethodHandle>()
 
   private const val RENDER_SESSION_CAPABILITIES_SIZE: Long = 16
   private const val FRAME_DEMAND_SIZE: Long = 40

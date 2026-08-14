@@ -153,7 +153,7 @@ class RuntimeOfflineConformanceTest {
   }
 
   /**
-   * Pumps once and keeps every event this test has drained. One offline step drains the events of
+   * Drains once and keeps every event this test has observed. One offline step drains the events of
    * the steps before it, so the waiters below scan what the whole test has seen rather than one
    * batch.
    */

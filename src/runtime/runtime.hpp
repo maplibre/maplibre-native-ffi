@@ -7,6 +7,7 @@
 #include <cstring>
 #include <deque>
 #include <functional>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -195,6 +196,8 @@ struct RuntimeObject {
   std::condition_variable terminal_condition;
   uint64_t next_submission_sequence = 1;
   std::set<uint64_t> pending_submissions;
+  std::map<uint64_t, std::shared_ptr<mln::core::OperationObject>>
+    pending_barriers;
   std::string asset_path;
   std::string cache_path;
   std::shared_ptr<mbgl::DatabaseFileSource> database_source;

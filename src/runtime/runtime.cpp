@@ -804,7 +804,7 @@ auto schedule_registered_offline_operation(
   );
   const auto operation_id = *out_operation_id;
   try {
-    std::forward<Schedule>(schedule)(state, operation_id);
+    std::forward<Schedule>(schedule)(state);
   } catch (...) {
     state->complete(
       MLN_STATUS_NATIVE_ERROR,
@@ -823,11 +823,8 @@ auto schedule_registered_offline_operation(
 template <typename Result>
 auto complete_offline_operation(
   const std::shared_ptr<mln::core::OperationObject>& state,
-  mln_operation operation_id, int32_t result_status, Result result,
-  bool found = false, std::string message = {}
+  int32_t result_status, Result result, std::string message = {}
 ) -> void {
-  static_cast<void>(operation_id);
-  static_cast<void>(found);
   state->complete(
     static_cast<mln_status>(result_status), std::move(message),
     std::any{std::move(result)}
@@ -835,28 +832,25 @@ auto complete_offline_operation(
 }
 
 auto complete_offline_operation_error(
-  const std::shared_ptr<mln::core::OperationObject>& state,
-  mln_operation operation_id, int32_t status, std::string message
+  const std::shared_ptr<mln::core::OperationObject>& state, int32_t status,
+  std::string message
 ) -> void {
   complete_offline_operation(
-    state, operation_id, status, std::monostate{}, false, std::move(message)
+    state, status, std::monostate{}, std::move(message)
   );
 }
 
 auto complete_from_exception(
   const std::shared_ptr<mln::core::OperationObject>& state,
-  mln_operation operation_id, std::exception_ptr exception, const char* fallback
+  std::exception_ptr exception, const char* fallback
 ) -> void {
   if (exception) {
     complete_offline_operation_error(
-      state, operation_id, MLN_STATUS_NATIVE_ERROR,
-      exception_message(exception, fallback)
+      state, MLN_STATUS_NATIVE_ERROR, exception_message(exception, fallback)
     );
     return;
   }
-  complete_offline_operation(
-    state, operation_id, MLN_STATUS_OK, std::monostate{}
-  );
+  complete_offline_operation(state, MLN_STATUS_OK, std::monostate{});
 }
 
 auto validate_runtime_options(const mln_runtime_options* options)
@@ -946,7 +940,7 @@ auto current_runtime_submission() noexcept -> CurrentRuntimeSubmission*& {
   return submission;
 }
 
-auto finish_tracked_submission(
+auto erase_tracked_submission(
   const std::shared_ptr<RuntimeObject>& runtime, uint64_t sequence
 ) noexcept -> void {
   {
@@ -954,6 +948,46 @@ auto finish_tracked_submission(
     runtime->pending_submissions.erase(sequence);
   }
   runtime->terminal_condition.notify_all();
+}
+
+auto erase_runtime_barrier(
+  const std::shared_ptr<RuntimeObject>& runtime, uint64_t sequence
+) noexcept -> void {
+  {
+    const std::scoped_lock lock(runtime->terminal_mutex);
+    runtime->pending_barriers.erase(sequence);
+    runtime->pending_submissions.erase(sequence);
+  }
+  runtime->terminal_condition.notify_all();
+}
+
+auto complete_ready_runtime_barriers(
+  const std::shared_ptr<RuntimeObject>& runtime
+) noexcept -> void {
+  while (true) {
+    auto barrier = std::shared_ptr<OperationObject>{};
+    {
+      const std::scoped_lock lock(runtime->terminal_mutex);
+      const auto pending = runtime->pending_barriers.begin();
+      if (
+        pending == runtime->pending_barriers.end() ||
+        (!runtime->pending_submissions.empty() &&
+         *runtime->pending_submissions.begin() < pending->first)
+      ) {
+        return;
+      }
+      barrier = std::move(pending->second);
+      runtime->pending_barriers.erase(pending);
+    }
+    barrier->complete(MLN_STATUS_OK, {}, std::any{std::monostate{}});
+  }
+}
+
+auto finish_tracked_submission(
+  const std::shared_ptr<RuntimeObject>& runtime, uint64_t sequence
+) noexcept -> void {
+  erase_tracked_submission(runtime, sequence);
+  complete_ready_runtime_barriers(runtime);
 }
 
 }  // namespace
@@ -1740,11 +1774,10 @@ auto run_ambient_cache_operation_start(
 
   return schedule_registered_offline_operation(
     live, MLN_OFFLINE_OPERATION_AMBIENT_CACHE, out_operation_id,
-    [&](auto state, auto operation_id) -> void {
-      auto callback = [state,
-                       operation_id](std::exception_ptr exception) -> void {
+    [&](auto state) -> void {
+      auto callback = [state](std::exception_ptr exception) -> void {
         complete_from_exception(
-          state, operation_id, exception, "ambient cache operation failed"
+          state, exception, "ambient cache operation failed"
         );
       };
 
@@ -1790,12 +1823,11 @@ auto set_maximum_ambient_cache_size_start(
 
   return schedule_registered_offline_operation(
     live, MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE,
-    out_operation_id, [&](auto state, auto operation_id) -> void {
+    out_operation_id, [&](auto state) -> void {
       database->setMaximumAmbientCacheSize(
-        size, [state, operation_id](std::exception_ptr exception) -> void {
+        size, [state](std::exception_ptr exception) -> void {
           complete_from_exception(
-            state, operation_id, exception,
-            "setting the maximum ambient cache size failed"
+            state, exception, "setting the maximum ambient cache size failed"
           );
         }
       );
@@ -1840,15 +1872,14 @@ auto offline_region_create_start(
   }
   return schedule_registered_offline_operation(
     live, MLN_OFFLINE_OPERATION_REGION_CREATE, out_operation_id,
-    [&](auto state, auto operation_id) -> void {
+    [&](auto state) -> void {
       database->createOfflineRegion(
         native_definition, native_metadata,
-        [state, operation_id](
-          mbgl::expected<mbgl::OfflineRegion, std::exception_ptr> result
-        ) -> void {
+        [state](mbgl::expected<mbgl::OfflineRegion, std::exception_ptr> result)
+          -> void {
           if (!result) {
             complete_offline_operation_error(
-              state, operation_id, MLN_STATUS_NATIVE_ERROR,
+              state, MLN_STATUS_NATIVE_ERROR,
               exception_message(
                 result.error(), "offline region creation failed"
               )
@@ -1858,14 +1889,12 @@ auto offline_region_create_start(
           auto data = to_c_region_data(result.value());
           if (!data) {
             complete_offline_operation_error(
-              state, operation_id, MLN_STATUS_UNSUPPORTED,
+              state, MLN_STATUS_UNSUPPORTED,
               "offline region definition type is unsupported"
             );
             return;
           }
-          complete_offline_operation(
-            state, operation_id, MLN_STATUS_OK, std::move(*data), true
-          );
+          complete_offline_operation(state, MLN_STATUS_OK, std::move(*data));
         }
       );
     }
@@ -1894,16 +1923,16 @@ auto offline_region_get_start(
 
   return schedule_registered_offline_operation(
     live, MLN_OFFLINE_OPERATION_REGION_GET, out_operation_id,
-    [&](auto state, auto operation_id) -> void {
+    [&](auto state) -> void {
       database->getOfflineRegion(
         region_id,
-        [state, operation_id](
+        [state](
           mbgl::expected<std::optional<mbgl::OfflineRegion>, std::exception_ptr>
             result
         ) -> void {
           if (!result) {
             complete_offline_operation_error(
-              state, operation_id, MLN_STATUS_NATIVE_ERROR,
+              state, MLN_STATUS_NATIVE_ERROR,
               exception_message(result.error(), "offline region get failed")
             );
             return;
@@ -1911,22 +1940,19 @@ auto offline_region_get_start(
           const auto& region = result.value();
           if (!region.has_value()) {
             complete_offline_operation(
-              state, operation_id, MLN_STATUS_OK,
-              std::optional<OfflineRegionData>{}, false
+              state, MLN_STATUS_OK, std::optional<OfflineRegionData>{}
             );
             return;
           }
           auto data = to_c_region_data(region.value());
           if (!data) {
             complete_offline_operation_error(
-              state, operation_id, MLN_STATUS_UNSUPPORTED,
+              state, MLN_STATUS_UNSUPPORTED,
               "offline region definition type is unsupported"
             );
             return;
           }
-          complete_offline_operation(
-            state, operation_id, MLN_STATUS_OK, std::move(data), true
-          );
+          complete_offline_operation(state, MLN_STATUS_OK, std::move(data));
         }
       );
     }
@@ -1954,14 +1980,14 @@ auto offline_regions_list_start(
 
   return schedule_registered_offline_operation(
     live, MLN_OFFLINE_OPERATION_REGIONS_LIST, out_operation_id,
-    [&](auto state, auto operation_id) -> void {
+    [&](auto state) -> void {
       database->listOfflineRegions(
-        [state, operation_id](
+        [state](
           mbgl::expected<mbgl::OfflineRegions, std::exception_ptr> result
         ) -> void {
           if (!result) {
             complete_offline_operation_error(
-              state, operation_id, MLN_STATUS_NATIVE_ERROR,
+              state, MLN_STATUS_NATIVE_ERROR,
               exception_message(result.error(), "offline region list failed")
             );
             return;
@@ -1969,14 +1995,12 @@ auto offline_regions_list_start(
           auto regions = to_c_region_data_list(result.value());
           if (!regions) {
             complete_offline_operation_error(
-              state, operation_id, MLN_STATUS_UNSUPPORTED,
+              state, MLN_STATUS_UNSUPPORTED,
               "offline region definition type is unsupported"
             );
             return;
           }
-          complete_offline_operation(
-            state, operation_id, MLN_STATUS_OK, std::move(*regions), true
-          );
+          complete_offline_operation(state, MLN_STATUS_OK, std::move(*regions));
         }
       );
     }
@@ -2010,15 +2034,14 @@ auto offline_regions_merge_database_start(
   const auto path = std::string{side_database_path};
   return schedule_registered_offline_operation(
     live, MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE, out_operation_id,
-    [&](auto state, auto operation_id) -> void {
+    [&](auto state) -> void {
       database->mergeOfflineRegions(
         path,
-        [state, operation_id](
-          mbgl::expected<mbgl::OfflineRegions, std::exception_ptr> result
-        ) -> void {
+        [state](mbgl::expected<mbgl::OfflineRegions, std::exception_ptr> result)
+          -> void {
           if (!result) {
             complete_offline_operation_error(
-              state, operation_id, MLN_STATUS_NATIVE_ERROR,
+              state, MLN_STATUS_NATIVE_ERROR,
               exception_message(
                 result.error(), "offline region database merge failed"
               )
@@ -2028,14 +2051,12 @@ auto offline_regions_merge_database_start(
           auto regions = to_c_region_data_list(result.value());
           if (!regions) {
             complete_offline_operation_error(
-              state, operation_id, MLN_STATUS_UNSUPPORTED,
+              state, MLN_STATUS_UNSUPPORTED,
               "offline region definition type is unsupported"
             );
             return;
           }
-          complete_offline_operation(
-            state, operation_id, MLN_STATUS_OK, std::move(*regions), true
-          );
+          complete_offline_operation(state, MLN_STATUS_OK, std::move(*regions));
         }
       );
     }
@@ -2073,15 +2094,15 @@ auto offline_region_update_metadata_start(
   }
   return schedule_registered_offline_operation(
     live, MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA, out_operation_id,
-    [&](auto state, auto operation_id) -> void {
+    [&](auto state) -> void {
       database->updateOfflineMetadata(
         region_id, native_metadata,
-        [database, state, operation_id, region_id](
+        [database, state, region_id](
           mbgl::expected<mbgl::OfflineRegionMetadata, std::exception_ptr> result
         ) -> void {
           if (!result) {
             complete_offline_operation_error(
-              state, operation_id, MLN_STATUS_NATIVE_ERROR,
+              state, MLN_STATUS_NATIVE_ERROR,
               exception_message(
                 result.error(), "offline region metadata update failed"
               )
@@ -2090,14 +2111,14 @@ auto offline_region_update_metadata_start(
           }
           database->getOfflineRegion(
             region_id,
-            [state, operation_id](
+            [state](
               mbgl::expected<
                 std::optional<mbgl::OfflineRegion>, std::exception_ptr>
                 result
             ) -> void {
               if (!result) {
                 complete_offline_operation_error(
-                  state, operation_id, MLN_STATUS_NATIVE_ERROR,
+                  state, MLN_STATUS_NATIVE_ERROR,
                   exception_message(result.error(), "offline region get failed")
                 );
                 return;
@@ -2105,21 +2126,20 @@ auto offline_region_update_metadata_start(
               const auto& region = result.value();
               if (!region.has_value()) {
                 complete_offline_operation_error(
-                  state, operation_id, MLN_STATUS_INVALID_ARGUMENT,
-                  "offline region not found"
+                  state, MLN_STATUS_INVALID_ARGUMENT, "offline region not found"
                 );
                 return;
               }
               auto data = to_c_region_data(region.value());
               if (!data) {
                 complete_offline_operation_error(
-                  state, operation_id, MLN_STATUS_UNSUPPORTED,
+                  state, MLN_STATUS_UNSUPPORTED,
                   "offline region definition type is unsupported"
                 );
                 return;
               }
               complete_offline_operation(
-                state, operation_id, MLN_STATUS_OK, std::move(*data), true
+                state, MLN_STATUS_OK, std::move(*data)
               );
             }
           );
@@ -2151,16 +2171,16 @@ auto offline_region_get_status_start(
 
   return schedule_registered_offline_operation(
     live, MLN_OFFLINE_OPERATION_REGION_GET_STATUS, out_operation_id,
-    [&](auto state, auto operation_id) -> void {
+    [&](auto state) -> void {
       database->getOfflineRegion(
         region_id,
-        [database, state, operation_id](
+        [database, state](
           mbgl::expected<std::optional<mbgl::OfflineRegion>, std::exception_ptr>
             result
         ) -> void {
           if (!result) {
             complete_offline_operation_error(
-              state, operation_id, MLN_STATUS_NATIVE_ERROR,
+              state, MLN_STATUS_NATIVE_ERROR,
               exception_message(result.error(), "offline region get failed")
             );
             return;
@@ -2168,20 +2188,19 @@ auto offline_region_get_status_start(
           const auto& region = result.value();
           if (!region.has_value()) {
             complete_offline_operation_error(
-              state, operation_id, MLN_STATUS_INVALID_ARGUMENT,
-              "offline region not found"
+              state, MLN_STATUS_INVALID_ARGUMENT, "offline region not found"
             );
             return;
           }
           database->getOfflineRegionStatus(
             region.value(),
-            [state, operation_id](
+            [state](
               mbgl::expected<mbgl::OfflineRegionStatus, std::exception_ptr>
                 result
             ) -> void {
               if (!result) {
                 complete_offline_operation_error(
-                  state, operation_id, MLN_STATUS_NATIVE_ERROR,
+                  state, MLN_STATUS_NATIVE_ERROR,
                   exception_message(
                     result.error(), "offline region status query failed"
                   )
@@ -2189,8 +2208,7 @@ auto offline_region_get_status_start(
                 return;
               }
               complete_offline_operation(
-                state, operation_id, MLN_STATUS_OK, to_c_status(result.value()),
-                true
+                state, MLN_STATUS_OK, to_c_status(result.value())
               );
             }
           );
@@ -2223,17 +2241,16 @@ auto offline_region_set_observed_start(
 
   return schedule_registered_offline_operation(
     live, MLN_OFFLINE_OPERATION_REGION_SET_OBSERVED, out_operation_id,
-    [&, offline_event_state](auto state, auto operation_id) -> void {
+    [&, offline_event_state](auto state) -> void {
       database->getOfflineRegion(
         region_id,
-        [database, state, operation_id, region_id, observed,
-         offline_event_state](
+        [database, state, region_id, observed, offline_event_state](
           mbgl::expected<std::optional<mbgl::OfflineRegion>, std::exception_ptr>
             result
         ) -> void {
           if (!result) {
             complete_offline_operation_error(
-              state, operation_id, MLN_STATUS_NATIVE_ERROR,
+              state, MLN_STATUS_NATIVE_ERROR,
               exception_message(result.error(), "offline region get failed")
             );
             return;
@@ -2241,8 +2258,7 @@ auto offline_region_set_observed_start(
           const auto& region = result.value();
           if (!region.has_value()) {
             complete_offline_operation_error(
-              state, operation_id, MLN_STATUS_INVALID_ARGUMENT,
-              "offline region not found"
+              state, MLN_STATUS_INVALID_ARGUMENT, "offline region not found"
             );
             return;
           }
@@ -2253,7 +2269,7 @@ auto offline_region_set_observed_start(
               offline_event_state->runtime == nullptr
             ) {
               complete_offline_operation(
-                state, operation_id, MLN_STATUS_OK, std::monostate{}
+                state, MLN_STATUS_OK, std::monostate{}
               );
               return;
             }
@@ -2269,9 +2285,7 @@ auto offline_region_set_observed_start(
           database->setOfflineRegionObserver(
             region.value(), std::move(observer)
           );
-          complete_offline_operation(
-            state, operation_id, MLN_STATUS_OK, std::monostate{}
-          );
+          complete_offline_operation(state, MLN_STATUS_OK, std::monostate{});
         }
       );
     }
@@ -2305,16 +2319,16 @@ auto offline_region_set_download_state_start(
 
   return schedule_registered_offline_operation(
     live, MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE, out_operation_id,
-    [&](auto state, auto operation_id) -> void {
+    [&](auto state) -> void {
       database->getOfflineRegion(
         request.region_id,
-        [database, state, operation_id, native_state](
+        [database, state, native_state](
           mbgl::expected<std::optional<mbgl::OfflineRegion>, std::exception_ptr>
             result
         ) -> void {
           if (!result) {
             complete_offline_operation_error(
-              state, operation_id, MLN_STATUS_NATIVE_ERROR,
+              state, MLN_STATUS_NATIVE_ERROR,
               exception_message(result.error(), "offline region get failed")
             );
             return;
@@ -2322,17 +2336,14 @@ auto offline_region_set_download_state_start(
           const auto& region = result.value();
           if (!region.has_value()) {
             complete_offline_operation_error(
-              state, operation_id, MLN_STATUS_INVALID_ARGUMENT,
-              "offline region not found"
+              state, MLN_STATUS_INVALID_ARGUMENT, "offline region not found"
             );
             return;
           }
           database->setOfflineRegionDownloadState(
             region.value(), *native_state
           );
-          complete_offline_operation(
-            state, operation_id, MLN_STATUS_OK, std::monostate{}
-          );
+          complete_offline_operation(state, MLN_STATUS_OK, std::monostate{});
         }
       );
     }
@@ -2361,16 +2372,16 @@ auto offline_region_invalidate_start(
 
   return schedule_registered_offline_operation(
     live, MLN_OFFLINE_OPERATION_REGION_INVALIDATE, out_operation_id,
-    [&](auto state, auto operation_id) -> void {
+    [&](auto state) -> void {
       database->getOfflineRegion(
         region_id,
-        [database, state, operation_id](
+        [database, state](
           mbgl::expected<std::optional<mbgl::OfflineRegion>, std::exception_ptr>
             result
         ) -> void {
           if (!result) {
             complete_offline_operation_error(
-              state, operation_id, MLN_STATUS_NATIVE_ERROR,
+              state, MLN_STATUS_NATIVE_ERROR,
               exception_message(result.error(), "offline region get failed")
             );
             return;
@@ -2378,17 +2389,14 @@ auto offline_region_invalidate_start(
           const auto& region = result.value();
           if (!region.has_value()) {
             complete_offline_operation_error(
-              state, operation_id, MLN_STATUS_INVALID_ARGUMENT,
-              "offline region not found"
+              state, MLN_STATUS_INVALID_ARGUMENT, "offline region not found"
             );
             return;
           }
           database->invalidateOfflineRegion(
-            region.value(),
-            [state, operation_id](std::exception_ptr exception) -> void {
+            region.value(), [state](std::exception_ptr exception) -> void {
               complete_from_exception(
-                state, operation_id, exception,
-                "offline region invalidation failed"
+                state, exception, "offline region invalidation failed"
               );
             }
           );
@@ -2421,16 +2429,16 @@ auto offline_region_delete_start(
 
   return schedule_registered_offline_operation(
     live, MLN_OFFLINE_OPERATION_REGION_DELETE, out_operation_id,
-    [&, offline_event_state](auto state, auto operation_id) -> void {
+    [&, offline_event_state](auto state) -> void {
       database->getOfflineRegion(
         region_id,
-        [database, state, operation_id, region_id, offline_event_state](
+        [database, state, region_id, offline_event_state](
           mbgl::expected<std::optional<mbgl::OfflineRegion>, std::exception_ptr>
             result
         ) -> void {
           if (!result) {
             complete_offline_operation_error(
-              state, operation_id, MLN_STATUS_NATIVE_ERROR,
+              state, MLN_STATUS_NATIVE_ERROR,
               exception_message(result.error(), "offline region get failed")
             );
             return;
@@ -2438,8 +2446,7 @@ auto offline_region_delete_start(
           const auto& region = result.value();
           if (!region.has_value()) {
             complete_offline_operation_error(
-              state, operation_id, MLN_STATUS_INVALID_ARGUMENT,
-              "offline region not found"
+              state, MLN_STATUS_INVALID_ARGUMENT, "offline region not found"
             );
             return;
           }
@@ -2459,10 +2466,9 @@ auto offline_region_delete_start(
             region.value(), mbgl::OfflineRegionDownloadState::Inactive
           );
           database->deleteOfflineRegion(
-            region.value(),
-            [state, operation_id](std::exception_ptr exception) -> void {
+            region.value(), [state](std::exception_ptr exception) -> void {
               complete_from_exception(
-                state, operation_id, exception, "offline region deletion failed"
+                state, exception, "offline region deletion failed"
               );
             }
           );
@@ -2830,26 +2836,25 @@ auto runtime_barrier_start(mln_runtime runtime, mln_operation* out_operation)
     {
       const std::scoped_lock terminal_lock(live->terminal_mutex);
       live->pending_submissions.insert(sequence);
+      live->pending_barriers.emplace(sequence, state);
     }
     state->set_terminal_callback([live, sequence]() noexcept -> void {
-      mark_runtime_submission_terminal(live, sequence);
+      erase_runtime_barrier(live, sequence);
     });
-    live->executor.invoke([lease = std::move(lease)]() mutable -> void {
-      static_cast<void>(lease);
-    });
+    try {
+      live->executor.invoke([lease = std::move(lease)]() mutable -> void {
+        static_cast<void>(lease);
+      });
+    } catch (...) {
+      state->complete(
+        MLN_STATUS_NATIVE_ERROR,
+        exception_message(std::current_exception(), "runtime barrier failed"),
+        std::any{std::monostate{}}
+      );
+      return MLN_STATUS_OK;
+    }
   }
-  try {
-    std::thread([live, state, sequence]() -> void {
-      wait_for_prior_runtime_submissions(live, sequence);
-      state->complete(MLN_STATUS_OK, {}, std::any{std::monostate{}});
-    }).detach();
-  } catch (...) {
-    state->complete(
-      MLN_STATUS_NATIVE_ERROR,
-      exception_message(std::current_exception(), "runtime barrier failed"),
-      std::any{std::monostate{}}
-    );
-  }
+  complete_ready_runtime_barriers(live);
   return MLN_STATUS_OK;
 }
 
@@ -2907,6 +2912,8 @@ auto close_runtime_start(mln_runtime runtime, mln_operation* out_operation)
     state->complete(status, std::move(diagnostic), std::any{std::monostate{}});
   };
   try {
+    // Closing stops and joins the runtime executor, so it cannot run on that
+    // executor or on the caller that may also service host callbacks.
     std::thread(close_work).detach();
   } catch (...) {
     close_work();
@@ -3022,39 +3029,6 @@ auto drain_runtime_events(
   }
   *out_batch = batch_handle;
   return MLN_STATUS_OK;
-}
-
-extern "C" void mln_test_hold_runtime_event_drain(
-  mln_runtime runtime, std::atomic_bool* entered,
-  const std::atomic_bool* release
-) {
-  auto queue = std::shared_ptr<RuntimeEventQueueState>{};
-  {
-    auto& table = handle_table<RuntimeObject>();
-    const std::scoped_lock table_lock(table.mutex());
-    const auto* live = table.resolve_locked(runtime);
-    if (live == nullptr) {
-      entered->store(true, std::memory_order_release);
-      return;
-    }
-    queue = live->event_queue;
-    const std::scoped_lock queue_lock(queue->mutex);
-    if (queue->drain_active) {
-      entered->store(true, std::memory_order_release);
-      return;
-    }
-    queue->drain_active = true;
-  }
-
-  entered->store(true, std::memory_order_release);
-  while (!release->load(std::memory_order_acquire)) {
-    std::this_thread::yield();
-  }
-  {
-    const std::scoped_lock queue_lock(queue->mutex);
-    queue->drain_active = false;
-  }
-  queue->drain_condition.notify_all();
 }
 
 auto get_event_batch(

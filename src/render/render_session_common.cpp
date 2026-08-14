@@ -1026,72 +1026,11 @@ auto publish_driver_work_locked(mln_render_session_object& session) noexcept
     session.driver_endpoint->mark_ready();
   }
 }
-auto driver_work_kind(std::uint32_t operation_kind) noexcept
-  -> RenderDriverWorkKind {
-  switch (operation_kind) {
-    case RENDER_OPERATION_RESIZE:
-      return RenderDriverWorkKind::Resize;
-    case RENDER_OPERATION_BARRIER:
-      return RenderDriverWorkKind::Barrier;
-    case RENDER_OPERATION_QUERY:
-    case RENDER_OPERATION_READBACK:
-      return RenderDriverWorkKind::Query;
-    case RENDER_OPERATION_FEATURE_STATE_GET:
-    case RENDER_OPERATION_FEATURE_STATE_SET:
-    case RENDER_OPERATION_FEATURE_STATE_REMOVE:
-      return RenderDriverWorkKind::FeatureState;
-    case RENDER_OPERATION_FRAME_RELEASE:
-      return RenderDriverWorkKind::FrameRelease;
-    case RENDER_OPERATION_DETACH:
-      return RenderDriverWorkKind::Detach;
-    default:
-      return RenderDriverWorkKind::Maintenance;
-  }
-}
-auto make_driver_work(
-  RenderDriverWorkKind kind, std::function<void()> execute,
-  std::function<void()> abandon
-) -> RenderDriverWorkItem {
-  const auto callbacks =
-    DriverWorkCallbacks{std::move(execute), std::move(abandon)};
-  switch (kind) {
-    case RenderDriverWorkKind::Attach:
-      return AttachDriverWork{callbacks};
-    case RenderDriverWorkKind::FrameDemand:
-      return FrameDemandDriverWork{callbacks};
-    case RenderDriverWorkKind::Resize:
-      return ResizeDriverWork{callbacks};
-    case RenderDriverWorkKind::Barrier:
-      return BarrierDriverWork{callbacks};
-    case RenderDriverWorkKind::Query:
-      return QueryDriverWork{callbacks};
-    case RenderDriverWorkKind::FeatureState:
-      return FeatureStateDriverWork{callbacks};
-    case RenderDriverWorkKind::Retarget:
-      return RetargetDriverWork{{}, callbacks};
-    case RenderDriverWorkKind::FrameRelease:
-      return FrameReleaseDriverWork{callbacks};
-    case RenderDriverWorkKind::Detach:
-      return DetachDriverWork{callbacks};
-    case RenderDriverWorkKind::Maintenance:
-      return MaintenanceDriverWork{callbacks};
-  }
-  return MaintenanceDriverWork{callbacks};
-}
-
-auto driver_work_callbacks(RenderDriverWorkItem& item) noexcept
-  -> DriverWorkCallbacks& {
-  return std::visit(
-    [](auto& payload) -> DriverWorkCallbacks& { return payload.callbacks; },
-    item
-  );
-}
-
 auto run_core_worker(
   const std::shared_ptr<mln_render_session_object>& session
 ) noexcept -> void {
   while (true) {
-    auto work = RenderDriverWorkItem{};
+    auto work = RenderDriverWork{};
     {
       auto lock = std::unique_lock{session->control_mutex};
       session->worker_condition.wait(lock, [&]() noexcept {
@@ -1102,15 +1041,14 @@ auto run_core_worker(
       session->driver_work.pop_front();
       session->driver_call_in_flight = true;
     }
-    auto& callbacks = driver_work_callbacks(work);
     try {
       auto execute = [&]() -> mln_status {
-        if (callbacks.execute) callbacks.execute();
+        if (work.execute) work.execute();
         return MLN_STATUS_OK;
       };
       static_cast<void>(mln::c_api::with_autorelease_pool(execute));
     } catch (...) {
-      if (callbacks.abandon) callbacks.abandon();
+      if (work.abandon) work.abandon();
     }
     {
       const auto lock = std::scoped_lock{session->control_mutex};
@@ -1121,7 +1059,7 @@ auto run_core_worker(
 
 auto enqueue_work(
   const std::shared_ptr<mln_render_session_object>& session,
-  RenderDriverWorkItem work
+  RenderDriverWork work
 ) -> void {
   const auto lock = std::scoped_lock{session->control_mutex};
   auto& queue = session->waiting_update_work.empty()
@@ -1166,8 +1104,7 @@ auto enqueue_driver_operation(
     return status;
   }
   enqueue_work(
-    live, make_driver_work(
-            driver_work_kind(operation_kind),
+    live, RenderDriverWork{
             [live, operation, work = std::move(work)]() {
               finish_driver_work(operation, work, live);
             },
@@ -1176,7 +1113,7 @@ auto enqueue_driver_operation(
                 MLN_STATUS_TARGET_LOST, "render target was abandoned", {}
               );
             }
-          )
+          }
   );
   return MLN_STATUS_OK;
 }
@@ -1207,8 +1144,7 @@ auto enqueue_driver_result_operation(
     return status;
   }
   enqueue_work(
-    live, make_driver_work(
-            driver_work_kind(operation_kind),
+    live, RenderDriverWork{
             [live, operation, work = std::move(work)]() {
               try {
                 auto result = std::any{};
@@ -1232,7 +1168,7 @@ auto enqueue_driver_result_operation(
                 std::any{}
               );
             }
-          )
+          }
   );
   return MLN_STATUS_OK;
 }
@@ -1431,8 +1367,7 @@ auto start_attach_render_session(
     }
     enqueue_work(
       session,
-      make_driver_work(
-        RenderDriverWorkKind::Attach,
+      RenderDriverWork{
         [session, attach_operation]() {
           try {
             if (session->initialize_backend) {
@@ -1481,7 +1416,7 @@ auto start_attach_render_session(
             MLN_STATUS_TARGET_LOST, "render target was abandoned", {}
           );
         }
-      )
+      }
     );
   } catch (...) {
     {
@@ -2507,11 +2442,7 @@ auto render_session_request_frame(
     );
   }
   if (superseded) publish_frame_result(s, *superseded);
-  enqueue_work(
-    s, make_driver_work(
-         RenderDriverWorkKind::FrameDemand, [s]() { run_frame_demand(s); }, {}
-       )
-  );
+  enqueue_work(s, RenderDriverWork{[s]() { run_frame_demand(s); }, {}});
   return MLN_STATUS_OK;
 }
 
@@ -2546,15 +2477,14 @@ auto render_session_service_driver_work(
     }
   } guard{s};
   while (maximum == 0 || *serviced < maximum) {
-    auto item = RenderDriverWorkItem{};
+    auto item = RenderDriverWork{};
     {
       const auto lock = std::scoped_lock{s->control_mutex};
       if (s->driver_work.empty()) break;
       item = std::move(s->driver_work.front());
       s->driver_work.pop_front();
     }
-    auto& callbacks = driver_work_callbacks(item);
-    if (callbacks.execute) callbacks.execute();
+    if (item.execute) item.execute();
     ++*serviced;
   }
   return MLN_STATUS_OK;
@@ -2776,10 +2706,9 @@ auto acquired_frame_release_start(
     if (resume_demand) {
       enqueue_work(
         consumed->session,
-        make_driver_work(
-          RenderDriverWorkKind::FrameDemand,
+        RenderDriverWork{
           [session = consumed->session]() { run_frame_demand(session); }, {}
-        )
+        }
       );
     }
   };
@@ -2791,10 +2720,7 @@ auto acquired_frame_release_start(
   if (abandoned)
     release();
   else
-    enqueue_work(
-      frame->session,
-      make_driver_work(RenderDriverWorkKind::FrameRelease, release, release)
-    );
+    enqueue_work(frame->session, RenderDriverWork{release, release});
   return MLN_STATUS_OK;
 }
 
@@ -2803,9 +2729,8 @@ auto make_ordered_resize_work(
   const std::shared_ptr<mln_render_session_object>& session,
   const std::shared_ptr<OperationObject>& operation,
   mln_render_target_extent extent
-) -> RenderDriverWorkItem {
-  return make_driver_work(
-    RenderDriverWorkKind::Resize,
+) -> RenderDriverWork {
+  return RenderDriverWork{
     [session, operation, extent]() {
       auto update = map_latest_update(session->map);
       if (
@@ -2856,15 +2781,14 @@ auto make_ordered_resize_work(
     [operation]() {
       operation->complete(MLN_STATUS_TARGET_LOST, "target abandoned", {});
     }
-  );
+  };
 }
 
 auto make_ordered_barrier_work(
   const std::shared_ptr<mln_render_session_object>& session, uint64_t minimum,
   const std::shared_ptr<OperationObject>& operation
-) -> RenderDriverWorkItem {
-  return make_driver_work(
-    RenderDriverWorkKind::Barrier,
+) -> RenderDriverWork {
+  return RenderDriverWork{
     [session, minimum, operation]() {
       if (map_latest_update_generation(session->map) < minimum) {
         auto lock = std::unique_lock{session->control_mutex};
@@ -2886,7 +2810,7 @@ auto make_ordered_barrier_work(
     [operation]() {
       operation->complete(MLN_STATUS_TARGET_LOST, "target abandoned", {});
     }
-  );
+  };
 }
 }  // namespace
 
@@ -3026,8 +2950,7 @@ auto render_session_detach_start(mln_render_session handle, mln_operation* out)
   }
   enqueue_work(
     s,
-    make_driver_work(
-      RenderDriverWorkKind::Detach,
+    RenderDriverWork{
       [s, operation]() {
         static_cast<void>(map_set_render_session_publish_callback(s->map, {}));
         const auto status = render_session_detach(s->self);
@@ -3043,7 +2966,7 @@ auto render_session_detach_start(mln_render_session handle, mln_operation* out)
       [operation]() {
         operation->complete(MLN_STATUS_TARGET_LOST, "target abandoned", {});
       }
-    )
+    }
   );
   return MLN_STATUS_OK;
 }
@@ -3054,7 +2977,7 @@ auto render_session_abandon(
   if (!out || out->size < sizeof(*out)) return MLN_STATUS_INVALID_ARGUMENT;
   const auto s = lease_render_session(handle);
   if (!s) return MLN_STATUS_INVALID_ARGUMENT;
-  auto discarded = std::deque<RenderDriverWorkItem>{};
+  auto discarded = std::deque<RenderDriverWork>{};
   auto pending_demands = std::deque<PendingFrameDemand>{};
   {
     const auto lock = std::scoped_lock{s->control_mutex};
@@ -3080,8 +3003,7 @@ auto render_session_abandon(
   static_cast<void>(map_set_render_session_publish_callback(s->map, {}));
   static_cast<void>(map_detach_render_target_session(s->map, s.get()));
   for (auto& item : discarded) {
-    auto& callbacks = driver_work_callbacks(item);
-    if (callbacks.abandon) callbacks.abandon();
+    if (item.abandon) item.abandon();
   }
   for (const auto& pending : pending_demands) {
     publish_frame_result(
@@ -3196,8 +3118,7 @@ auto render_session_get_feature_state_start(
   const auto a = string_from_view(source), b = string_from_view(layer);
   const auto c = string_from_view(feature);
   enqueue_work(
-    s, make_driver_work(
-         RenderDriverWorkKind::FeatureState,
+    s, RenderDriverWork{
          [s, operation, a, b, c]() {
            auto selector = mln_feature_state_selector{
              sizeof(mln_feature_state_selector),
@@ -3229,7 +3150,7 @@ auto render_session_get_feature_state_start(
          [operation]() {
            operation->complete(MLN_STATUS_TARGET_LOST, "target abandoned", {});
          }
-       )
+       }
   );
   return MLN_STATUS_OK;
 }

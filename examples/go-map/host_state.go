@@ -1,9 +1,6 @@
 package main
 
 import (
-	"sync"
-	"sync/atomic"
-
 	maplibre "github.com/maplibre/maplibre-native-ffi/bindings/go"
 )
 
@@ -51,38 +48,33 @@ func (commands *cameraController) submit(command cameraCommand) bool {
 // sharedState carries render requests and the first failure observed by the
 // host loop.
 type sharedState struct {
-	renderRequested atomic.Bool
-	failureMu       sync.Mutex
+	renderRequested bool
 	failure         error
 }
 
 func newSharedState() *sharedState {
-	shared := &sharedState{}
-	shared.renderRequested.Store(true)
-	return shared
+	return &sharedState{renderRequested: true}
 }
 
 func (shared *sharedState) requestRender() {
-	shared.renderRequested.Store(true)
+	shared.renderRequested = true
 }
 
 func (shared *sharedState) consumeRenderRequest() bool {
-	return shared.renderRequested.Swap(false)
+	requested := shared.renderRequested
+	shared.renderRequested = false
+	return requested
 }
 
 func (shared *sharedState) fail(err error) {
 	if err == nil {
 		return
 	}
-	shared.failureMu.Lock()
-	defer shared.failureMu.Unlock()
 	if shared.failure == nil {
 		shared.failure = err
 	}
 }
 
 func (shared *sharedState) firstFailure() error {
-	shared.failureMu.Lock()
-	defer shared.failureMu.Unlock()
 	return shared.failure
 }

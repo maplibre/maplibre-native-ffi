@@ -599,6 +599,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
         {
             liveOperations.Remove(operation);
         }
+        notificationReceiver.ForgetOperation(operation.NativeId);
     }
 
     internal void RegisterMap(Map.MapHandle map)

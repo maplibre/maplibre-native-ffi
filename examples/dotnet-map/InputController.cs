@@ -18,7 +18,7 @@ internal sealed unsafe class InputController : IDisposable
     private static readonly AnimationOptions ResetAnimation = new() { Duration = 220 };
 
     private readonly GlfwWindow window;
-    private readonly CommandQueue commands;
+    private readonly MapState state;
     private readonly RenderRequest renderRequest;
     private readonly GlfwCallbacks.CursorPosCallback cursorCallback;
     private readonly GlfwCallbacks.MouseButtonCallback mouseButtonCallback;
@@ -33,11 +33,11 @@ internal sealed unsafe class InputController : IDisposable
     private double cursorY;
     private bool closed;
 
-    public InputController(GlfwWindow window, CommandQueue commands, RenderRequest renderRequest)
+    public InputController(GlfwWindow window, MapState state, RenderRequest renderRequest)
     {
         ArgumentNullException.ThrowIfNull(window);
         this.window = window;
-        this.commands = commands;
+        this.state = state;
         this.renderRequest = renderRequest;
         cursorCallback = OnCursor;
         mouseButtonCallback = OnMouseButton;
@@ -91,14 +91,12 @@ internal sealed unsafe class InputController : IDisposable
         lastY = y;
         if (rightDown || (leftDown && ctrlDown))
         {
-            commands.Push(new AdjustBearingCommand(dx * DragRotateFactor, null));
-            commands.Push(new AdjustPitchCommand(-dy * DragPitchFactor, null));
-            renderRequest.Set();
+            Submit(new AdjustBearingCommand(dx * DragRotateFactor, null));
+            Submit(new AdjustPitchCommand(-dy * DragPitchFactor, null));
         }
         else if (leftDown)
         {
-            commands.Push(new MoveByCommand(dx, dy, null));
-            renderRequest.Set();
+            Submit(new MoveByCommand(dx, dy, null));
         }
     }
 
@@ -133,14 +131,14 @@ internal sealed unsafe class InputController : IDisposable
             lastX = cursorX;
             lastY = cursorY;
 
-            // Queued ahead of the drag's own commands, so the transition stops before the first
+            // Submitted before the drag's own commands, so the transition stops before the first
             // delta lands.
-            commands.Push(new CancelTransitionsCommand());
+            Submit(new CancelTransitionsCommand());
         }
 
         if (Dragging != wasDragging)
         {
-            commands.Push(new SetGestureInProgressCommand(Dragging));
+            Submit(new SetGestureInProgressCommand(Dragging));
         }
     }
 
@@ -151,8 +149,7 @@ internal sealed unsafe class InputController : IDisposable
         _ = handle;
         _ = xOffset;
         var scale = Math.Pow(2.0, yOffset * 0.25);
-        commands.Push(new ScaleByCommand(scale, new ScreenPoint(cursorX, cursorY), null));
-        renderRequest.Set();
+        Submit(new ScaleByCommand(scale, new ScreenPoint(cursorX, cursorY), null));
     }
 
     private void OnKey(
@@ -171,55 +168,54 @@ internal sealed unsafe class InputController : IDisposable
             return;
         }
 
-        var changed = true;
         switch (key)
         {
             case Keys.Left:
             case Keys.A:
-                commands.Push(new MoveByCommand(KeyboardPan, 0.0, KeyboardAnimation));
+                Submit(new MoveByCommand(KeyboardPan, 0.0, KeyboardAnimation));
                 break;
             case Keys.Right:
             case Keys.D:
-                commands.Push(new MoveByCommand(-KeyboardPan, 0.0, KeyboardAnimation));
+                Submit(new MoveByCommand(-KeyboardPan, 0.0, KeyboardAnimation));
                 break;
             case Keys.Up:
             case Keys.W:
-                commands.Push(new MoveByCommand(0.0, KeyboardPan, KeyboardAnimation));
+                Submit(new MoveByCommand(0.0, KeyboardPan, KeyboardAnimation));
                 break;
             case Keys.Down:
             case Keys.S:
-                commands.Push(new MoveByCommand(0.0, -KeyboardPan, KeyboardAnimation));
+                Submit(new MoveByCommand(0.0, -KeyboardPan, KeyboardAnimation));
                 break;
             case Keys.Equal:
             case Keys.KeypadEqual:
-                commands.Push(new ScaleByCommand(KeyboardZoom, null, KeyboardAnimation));
+                Submit(new ScaleByCommand(KeyboardZoom, null, KeyboardAnimation));
                 break;
             case Keys.Minus:
-                commands.Push(new ScaleByCommand(1.0 / KeyboardZoom, null, KeyboardAnimation));
+                Submit(new ScaleByCommand(1.0 / KeyboardZoom, null, KeyboardAnimation));
                 break;
             case Keys.Q:
-                commands.Push(new AdjustBearingCommand(-KeyboardBearing, KeyboardAnimation));
+                Submit(new AdjustBearingCommand(-KeyboardBearing, KeyboardAnimation));
                 break;
             case Keys.E:
-                commands.Push(new AdjustBearingCommand(KeyboardBearing, KeyboardAnimation));
+                Submit(new AdjustBearingCommand(KeyboardBearing, KeyboardAnimation));
                 break;
             case Keys.RightBracket:
-                commands.Push(new AdjustPitchCommand(KeyboardPitch, KeyboardAnimation));
+                Submit(new AdjustPitchCommand(KeyboardPitch, KeyboardAnimation));
                 break;
             case Keys.LeftBracket:
-                commands.Push(new AdjustPitchCommand(-KeyboardPitch, KeyboardAnimation));
+                Submit(new AdjustPitchCommand(-KeyboardPitch, KeyboardAnimation));
                 break;
             case Keys.Number0:
-                commands.Push(new ResetOrientationCommand(ResetAnimation));
+                Submit(new ResetOrientationCommand(ResetAnimation));
                 break;
             default:
-                changed = false;
-                break;
+                return;
         }
+    }
 
-        if (changed)
-        {
-            renderRequest.Set();
-        }
+    private void Submit(CameraCommand command)
+    {
+        _ = state.Apply(command);
+        renderRequest.Set();
     }
 }

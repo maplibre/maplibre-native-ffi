@@ -41,25 +41,25 @@ internal constructor(
     core.markResultConsumed()
   }
 
-  public actual fun poll(): Boolean = withUse(NativeAccess::pollOfflineOperation)
+  public actual fun poll(): Boolean = withUse(NativeAccess::pollOperation)
 
   public actual fun waitForCompletion(timeoutMillis: Long): Boolean = withUse {
-    NativeAccess.waitOfflineOperation(it, timeoutMillis)
+    NativeAccess.waitOperation(it, timeoutMillis)
   }
 
   public actual fun cancel() {
-    withUse { Status.check(NativeAccess.cancelOfflineOperation(it)) }
+    withUse { Status.check(NativeAccess.cancelOperation(it)) }
   }
 
   public actual fun terminalStatus(): MaplibreStatus = withUse {
-    MaplibreStatus.fromNative(NativeAccess.offlineOperationTerminalStatus(it))
+    MaplibreStatus.fromNative(NativeAccess.operationTerminalStatus(it))
   }
 
-  public actual fun diagnostic(): String = withUse(NativeAccess::offlineOperationDiagnostic)
+  public actual fun diagnostic(): String = withUse(NativeAccess::operationDiagnostic)
 
   public actual fun discard() {
     withUse {
-      Status.check(NativeAccess.discardOfflineOperation(it))
+      Status.check(NativeAccess.discardOperation(it))
       core.markResultConsumed()
     }
   }
@@ -67,7 +67,7 @@ internal constructor(
   public actual override fun close() {
     if (!core.beginClose()) return
     runtime.forgetOperation(core.id)
-    NativeAccess.releaseOfflineOperation(core.id)
+    NativeAccess.releaseOperation(core.id)
     core.finishClose()
   }
 }

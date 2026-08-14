@@ -90,8 +90,8 @@ impl super::MapHandle {
     /// The callback state is scoped to this map's current style. The C API
     /// frees it once it stops referencing it, whether the source is removed,
     /// dropped by a style load, or retired with the map. Native may invoke
-    /// callbacks from worker threads, so queue owner-thread work before calling
-    /// map APIs.
+    /// callbacks from worker threads, so schedule host-context work before
+    /// calling map APIs.
     pub fn add_custom_geometry_source(
         &self,
         source_id: &str,
