@@ -14,7 +14,7 @@ OUTPUT = ROOT / ".github" / "workflows" / "ci.yml"
 sys.path.insert(0, str(ROOT))
 
 from ci.action_pins import load_pins  # noqa: E402
-from ci.workflow import load_configuration, target_rows  # noqa: E402
+from ci.workflow import load_configuration, platform, target_rows  # noqa: E402
 
 # Pins come from `.github/workflows/action-pins.yml` so Dependabot updates them.
 PINS = load_pins(ROOT)
@@ -105,6 +105,26 @@ def run_step(command: str, *, env: dict[str, str] | None = None) -> list[str]:
 
 
 CONSUMER_ENV = {"MISE_TASK_SKIP": '"//:build"'}
+
+# Platforms whose native packages the Kotlin Maven staging partitions extract;
+# see `prepare_native_inputs` in `.mise/tasks/kotlin/publish`. A partition that
+# gains a platform missing from this set fails loudly: `extract_preset` reports
+# the absent native package.
+KOTLIN_MAVEN_PLATFORMS = {
+    "android",
+    "linux",
+    "macos",
+    "ios",
+    "ios-simulator",
+    "tvos",
+    "tvos-simulator",
+    "windows",
+}
+
+# The Kotlin snapshot version; see `.github/workflows/publish-snapshots.yml`.
+# CI stages at this version so that snapshot publication can reuse the verified
+# repository from the CI run on `main` instead of staging again.
+KOTLIN_SNAPSHOT_VERSION = "0.1.0-SNAPSHOT"
 
 
 def target_job(row: dict[str, object]) -> list[str]:
@@ -280,6 +300,41 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
             "          mise run //:kotlin:verify-android-multi-abi",
             "          build/packages/native/android-multi-input",
             "",
+        ]
+    )
+
+    # The publishing workflow stages and verifies here against this run's
+    # native packages, so a pull request that breaks the publish pipeline fails
+    # before merge. Snapshot publication reuses the verified repository that
+    # this job uploads on `main`; only tagged releases stage again, because
+    # their calendar version differs.
+    kotlin_maven_needs = [
+        job_id(str(row["preset"]))
+        for row in rows
+        if row["package"] and platform(str(row["preset"])) in KOTLIN_MAVEN_PLATFORMS
+    ]
+    lines.extend(
+        [
+            "  kotlin-maven:",
+            "    name: Kotlin Maven",
+            "    permissions:",
+            "      actions: read",
+            "      contents: read",
+            *gate(),
+            "    needs:",
+            *[f"      - {job}" for job in kotlin_maven_needs],
+            "    uses: ./.github/workflows/_kotlin-maven.yml",
+            "    with:",
+            "      publish: false",
+            "      run_id: ${{ github.run_id }}",
+            "      sha: ${{ github.sha }}",
+            f"      version: {KOTLIN_SNAPSHOT_VERSION}",
+            "",
+        ]
+    )
+
+    lines.extend(
+        [
             "  required:",
             "    name: ci-required",
             "    runs-on: ubuntu-slim",
@@ -290,6 +345,7 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
             "      - docs",
             *[f"      - {job}" for job in target_ids],
             "      - android-multi",
+            "      - kotlin-maven",
             "    steps:",
             "      - name: Fail if required jobs failed",
             "        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}",

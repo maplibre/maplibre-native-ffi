@@ -167,7 +167,7 @@ static void load_style_and_pump(mln_runtime runtime, mln_map map) {
     mln_map_set_style_json(map, MLN_BUFFER_LITERAL(background_style_json))
   );
   for (size_t attempt = 0; attempt < style_pump_attempts; attempt += 1) {
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 2));
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 2, -1));
   }
 }
 
@@ -437,15 +437,15 @@ static void a_suppressed_producer_leaves_a_pump_parked(void) {
     mln_runtime_set_event_mask(runtime, MLN_RUNTIME_EVENT_MASK_NONE)
   );
   // Two zero pumps and a drain leave the wake flag clear and the queue empty.
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0, -1));
   TEST_ASSERT_EQUAL_size_t(0, mln_test_drain_all(runtime));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0, -1));
   TEST_ASSERT_EQUAL_size_t(0, mln_test_drain_all(runtime));
 
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_request_repaint(map));
   const uint64_t started = mln_test_monotonic_milliseconds();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_pump(runtime, park_timeout_milliseconds)
+    MLN_STATUS_OK, mln_runtime_pump(runtime, park_timeout_milliseconds, -1)
   );
   const uint64_t elapsed = mln_test_monotonic_milliseconds() - started;
   TEST_ASSERT_TRUE_MESSAGE(
@@ -658,7 +658,7 @@ static void a_take_result_reports_the_operations_failure_text(void) {
   bool completed = false;
   for (size_t attempt = 0; attempt < take_result_attempts && !completed;
        attempt += 1) {
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 2));
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 2, -1));
     completed = mln_test_drain_find(
       runtime, MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED, MLN_HANDLE_NULL,
       &event, event_message, sizeof(event_message)
@@ -703,7 +703,7 @@ static void a_take_result_reports_the_operations_failure_text(void) {
   bool reported = false;
   for (size_t attempt = 0; attempt < take_result_attempts && !reported;
        attempt += 1) {
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 2));
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 2, -1));
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_INVALID_STATE,
       mln_runtime_offline_regions_merge_database_take_result(

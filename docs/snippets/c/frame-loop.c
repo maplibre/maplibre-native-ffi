@@ -23,7 +23,7 @@ void run_one_frame(
   mln_runtime runtime, mln_map map, mln_render_session session, bool* pending
 ) {
   // #region pump
-  mln_runtime_pump(runtime, 0);
+  mln_runtime_pump(runtime, 0, 8);
 
   mln_runtime_event_batch batch = mln_runtime_event_batch_default();
   if (mln_runtime_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) return;

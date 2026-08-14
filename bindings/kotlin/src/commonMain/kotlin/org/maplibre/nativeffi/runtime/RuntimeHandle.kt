@@ -22,10 +22,15 @@ public expect class RuntimeHandle : AutoCloseable {
    * are queued. Timers and ready I/O set the flag only when they queue owner-thread work, so pass a
    * bounded timeout to cap how long a call waits.
    *
+   * [budgetMillis] bounds the drain. A negative value drains without a bound, and zero or a
+   * positive value stops the drain at the first task boundary after that many milliseconds. The
+   * first queued task always runs, so a bounded pump always makes progress, and tasks left behind
+   * set the wake flag so the next pump returns without parking and continues them.
+   *
    * A non-zero timeout blocks the calling thread and ignores interruption. Call it outside any lock
    * that a thread signalling a [WakeSource] takes.
    */
-  public fun pump(timeoutMillis: Long)
+  public fun pump(timeoutMillis: Long, budgetMillis: Long = -1)
 
   /**
    * Acquires a [WakeSource] that releases this runtime's parked owner thread. The returned source

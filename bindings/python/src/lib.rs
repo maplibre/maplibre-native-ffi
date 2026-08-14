@@ -829,7 +829,8 @@ impl RuntimeHandle {
         Ok(())
     }
 
-    fn pump(&self, py: Python<'_>, timeout_ms: i64) -> PyResult<()> {
+    #[pyo3(signature = (timeout_ms, budget_ms = -1))]
+    fn pump(&self, py: Python<'_>, timeout_ms: i64, budget_ms: i64) -> PyResult<()> {
         let _operation = self.operation_gate.begin_detached_operation()?;
         let runtime_handle = {
             let state = self.state_for_operation()?;
@@ -842,7 +843,8 @@ impl RuntimeHandle {
         // API validates that it is live and on the owner thread. The call parks,
         // so it runs without the GIL or the state mutex: another Python thread
         // signalling a wake source is what ends the park.
-        let status = py.detach(|| unsafe { sys::mln_runtime_pump(runtime_handle, timeout_ms) });
+        let status =
+            py.detach(|| unsafe { sys::mln_runtime_pump(runtime_handle, timeout_ms, budget_ms) });
         maplibre_core::check(status).map_err(map_error)
     }
 
@@ -7003,7 +7005,7 @@ fn map_size_by_id_for_test(py: Python<'_>, id: u64) -> PyResult<(u32, u32, f64)>
 fn pump_runtime_with_map_id_for_test(py: Python<'_>, id: u64) -> PyResult<()> {
     py.detach(|| {
         // SAFETY: the value is well-formed; the C API rejects it on its kind tag.
-        let status = unsafe { sys::mln_runtime_pump(sys::mln_runtime(id), 0) };
+        let status = unsafe { sys::mln_runtime_pump(sys::mln_runtime(id), 0, -1) };
         if status == sys::MLN_STATUS_OK {
             Ok(())
         } else {

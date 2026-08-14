@@ -2734,6 +2734,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_LONG
         );
 
@@ -2745,7 +2746,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_pump(mln_runtime runtime, int64_t timeout_ms)
+     * mln_status mln_runtime_pump(mln_runtime runtime, int64_t timeout_ms, int64_t budget_ms)
      * }
      */
     public static FunctionDescriptor mln_runtime_pump$descriptor() {
@@ -2755,7 +2756,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_pump(mln_runtime runtime, int64_t timeout_ms)
+     * mln_status mln_runtime_pump(mln_runtime runtime, int64_t timeout_ms, int64_t budget_ms)
      * }
      */
     public static MethodHandle mln_runtime_pump$handle() {
@@ -2765,7 +2766,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_pump(mln_runtime runtime, int64_t timeout_ms)
+     * mln_status mln_runtime_pump(mln_runtime runtime, int64_t timeout_ms, int64_t budget_ms)
      * }
      */
     public static MemorySegment mln_runtime_pump$address() {
@@ -2774,16 +2775,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_runtime_pump(mln_runtime runtime, int64_t timeout_ms)
+     * mln_status mln_runtime_pump(mln_runtime runtime, int64_t timeout_ms, int64_t budget_ms)
      * }
      */
-    public static int mln_runtime_pump(long runtime, long timeout_ms) {
+    public static int mln_runtime_pump(long runtime, long timeout_ms, long budget_ms) {
         var mh$ = mln_runtime_pump.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_runtime_pump", runtime, timeout_ms);
+                traceDowncall("mln_runtime_pump", runtime, timeout_ms, budget_ms);
             }
-            return (int)mh$.invokeExact(runtime, timeout_ms);
+            return (int)mh$.invokeExact(runtime, timeout_ms, budget_ms);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {

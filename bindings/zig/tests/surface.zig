@@ -107,7 +107,7 @@ test "Metal surface set target presents through a replacement layer" {
     // Replacing the surface enqueues the new size for the map's owner thread,
     // so the map publishes a matching update only once pumped.
     try testing.expectEqual(@as(maplibre.RenderResult, .size_pending), (try surface.renderUpdate()).result);
-    try runtime.pump(0);
+    try runtime.pump(0, null);
     const resized = try map.getSize();
     try testing.expectEqual(@as(u32, 48), resized.width);
     try testing.expectEqual(@as(u32, 32), resized.height);

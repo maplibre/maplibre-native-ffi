@@ -688,11 +688,33 @@ public sealed unsafe class RuntimeHandle : IDisposable
     /// thread signalling a <see cref="WakeSource" /> takes. A queued event releases a
     /// park, so a host that pumps and drains in a loop keeps making progress.
     /// </para>
+    /// <para>
+    /// <paramref name="budget" /> bounds the drain. Null or a negative value drains
+    /// without a bound. Zero or a positive value stops the drain at the first task
+    /// boundary after that long, measured from the start of the drain. The first
+    /// queued task always runs, so a bounded pump always makes progress, and tasks
+    /// left behind set the wake flag, so the next pump returns without parking and
+    /// continues them. The budget bounds the task queues alone: expired timers and
+    /// ready file descriptors are serviced regardless, and a single task runs to
+    /// completion once started, so one long task can overrun the budget.
+    /// </para>
     /// </remarks>
-    public void Pump(TimeSpan timeout)
+    public void Pump(TimeSpan timeout, TimeSpan? budget)
     {
         var timeoutMilliseconds = timeout < TimeSpan.Zero ? -1L : (long)timeout.TotalMilliseconds;
-        NativeStatus.Check(NativeMethods.mln_runtime_pump(Handle, timeoutMilliseconds));
+        var budgetMilliseconds =
+            budget is not { } budgetValue || budgetValue < TimeSpan.Zero
+                ? -1L
+                : (long)budgetValue.TotalMilliseconds;
+        NativeStatus.Check(
+            NativeMethods.mln_runtime_pump(Handle, timeoutMilliseconds, budgetMilliseconds)
+        );
+    }
+
+    /// <inheritdoc cref="Pump(TimeSpan, TimeSpan?)" />
+    public void Pump(TimeSpan timeout)
+    {
+        Pump(timeout, null);
     }
 
     /// <summary>

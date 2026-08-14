@@ -9,16 +9,7 @@ fi
 test_executable=$1
 timeout_seconds=${2:-120}
 if [[ ! -x "$test_executable" ]]; then
-  echo "iOS simulator test executable is not executable: $test_executable" >&2
-  exit 2
-fi
-
-device=$(
-  xcrun simctl list devices available iOS |
-    awk -F '[()]' '/ iPhone / && /Booted/ { print $2; exit }'
-)
-if [[ -z "$device" ]]; then
-  echo "No booted iOS simulator device found. Run 'mise run //:ios-simulator:boot' first." >&2
+  echo "Simulator test executable is not executable: $test_executable" >&2
   exit 2
 fi
 
@@ -26,6 +17,10 @@ if [[ ! "$timeout_seconds" =~ ^[0-9]+$ ]]; then
   echo "Invalid timeout: $timeout_seconds" >&2
   exit 2
 fi
+
+script_dir=$(cd "$(dirname "$0")" && pwd)
+runtime=${MLN_FFI_SIMULATOR_RUNTIME:-iOS}
+device=$("$script_dir/apple-simulator.sh" find-booted "$runtime")
 
 # simctl hands the spawned process the variables named SIMCTL_CHILD_<NAME>, with
 # the prefix removed, so the fixture directory travels under that spelling. The

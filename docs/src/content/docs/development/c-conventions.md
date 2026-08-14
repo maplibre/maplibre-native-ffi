@@ -193,8 +193,11 @@ keeps them valid after the entry point that produced them returns.
 MapLibre's `RunLoop` is owner-thread scheduler state. Each owner thread may hold
 one live runtime. `mln_runtime_pump()` advances that runtime: it parks the owner
 thread when asked, then drains the queued tasks, expired timers, and ready I/O
-it finds, including work enqueued while it runs. Document pump entry points as
-draining rather than as a bounded per-call budget.
+it finds, including work enqueued while it runs. The budget bounds one pump's
+drain at a task boundary: the first queued task always runs, a task runs to
+completion once started, and tasks left behind re-arm the wake flag so the next
+pump continues them without parking. Document a budgeted pump as bounding the
+task queues alone, because timers and ready I/O are serviced regardless.
 
 One entry point carries both cadence sources: the timeout selects the cadence,
 with zero for hosts driven by a callback they do not own and a positive value

@@ -40,8 +40,19 @@ case "$usage_preset" in
       --sdk "$(xcrun --sdk iphoneos --show-sdk-path)" \
       --triple arm64-apple-ios14.3
     ;;
+  tvos-arm64-metal)
+    exec swift build \
+      --product MaplibreNativeFFI \
+      --scratch-path .build/tvos \
+      --sdk "$(xcrun --sdk appletvos --show-sdk-path)" \
+      --triple arm64-apple-tvos14.3
+    ;;
   ios-*)
     echo "The Swift binding builds for an iOS device with ios-arm64-metal; simulator coverage comes from //bindings/swift:test." >&2
+    exit 2
+    ;;
+  tvos-*)
+    echo "The Swift binding builds for a tvOS device with tvos-arm64-metal; simulator coverage comes from //bindings/swift:test." >&2
     exit 2
     ;;
 esac
@@ -53,8 +64,8 @@ swift build --target MaplibreNativeFFI "${swift_args[@]}"
 [tasks.test]
 dir = "../.."
 extends = "ffi:preset"
-# The preset selects the runner: an iOS simulator preset builds the test bundle
-# and spawns it on a simulator, and host presets run in process.
+# The preset selects the runner: an iOS or tvOS simulator preset builds the test
+# bundle and spawns it on a simulator, and host presets run in process.
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
@@ -76,8 +87,25 @@ case "$usage_preset" in
       .build/ios-simulator/arm64-apple-ios-simulator/debug/MaplibreNativeFFIIOSSimulatorTests \
       120
     ;;
-  ios-*)
-    echo "The Swift binding tests need a runnable target; test an ios-simulator preset instead of $usage_preset." >&2
+  tvos-simulator-*)
+    swift build \
+      --product MaplibreNativeFFIIOSSimulatorTests \
+      --scratch-path .build/tvos-simulator \
+      --sdk "$(xcrun --sdk appletvsimulator --show-sdk-path)" \
+      --triple arm64-apple-tvos14.3-simulator \
+      -Xswiftc -enable-testing \
+      -Xlinker -rpath \
+      -Xlinker "$native_install_dir/lib" \
+      -Xlinker -rpath \
+      -Xlinker "$(xcode-select -p)/Platforms/AppleTVSimulator.platform/Developer/Library/Frameworks"
+    mise run //:tvos-simulator:boot
+    export MLN_FFI_SIMULATOR_RUNTIME=tvOS
+    exec "$MISE_MONOREPO_ROOT/scripts/run-ios-simulator-test.sh" \
+      .build/tvos-simulator/arm64-apple-tvos-simulator/debug/MaplibreNativeFFIIOSSimulatorTests \
+      120
+    ;;
+  ios-* | tvos-*)
+    echo "The Swift binding tests need a runnable target; test an ios-simulator or tvos-simulator preset instead of $usage_preset." >&2
     exit 2
     ;;
 esac

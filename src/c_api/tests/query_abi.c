@@ -66,7 +66,7 @@ static void feature_query_bytes_are_owned_by_one_generic_buffer(void) {
   for (unsigned int attempt = 0;
        attempt < 500 && render_result != MLN_RENDER_RESULT_RENDERED;
        attempt += 1) {
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0));
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0, -1));
     bool needs_repaint = false;
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK, mln_render_session_render_update(

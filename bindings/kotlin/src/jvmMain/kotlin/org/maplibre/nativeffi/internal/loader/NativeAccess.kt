@@ -344,8 +344,8 @@ internal object NativeAccess {
       }
     }
 
-  internal fun pumpRuntime(runtime: NativeRuntime, timeoutMillis: Long) {
-    Status.check(runtimePumpFunction().invokeNative(runtime, timeoutMillis) as Int)
+  internal fun pumpRuntime(runtime: NativeRuntime, timeoutMillis: Long, budgetMillis: Long) {
+    Status.check(runtimePumpFunction().invokeNative(runtime, timeoutMillis, budgetMillis) as Int)
   }
 
   internal fun acquireWakeSource(runtime: NativeRuntime): NativeWakeSource =
@@ -2817,35 +2817,27 @@ internal object NativeAccess {
       FEATURE_STATE_SELECTOR_SIZE_OFFSET,
       FEATURE_STATE_SELECTOR_SIZE.toInt(),
     )
-    segment.set(
-      ValueLayout.ADDRESS,
-      FEATURE_STATE_SELECTOR_SOURCE_ID_OFFSET,
-      stringView(arena, selector.sourceId),
-    )
+    segment
+      .asSlice(FEATURE_STATE_SELECTOR_SOURCE_ID_OFFSET, STRING_VIEW_SIZE)
+      .copyFrom(stringView(arena, selector.sourceId))
     var fields = 0
     selector.sourceLayerId?.let {
       fields = fields or FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID
-      segment.set(
-        ValueLayout.ADDRESS,
-        FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID_OFFSET,
-        stringView(arena, it),
-      )
+      segment
+        .asSlice(FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID_OFFSET, STRING_VIEW_SIZE)
+        .copyFrom(stringView(arena, it))
     }
     selector.featureId?.let {
       fields = fields or FEATURE_STATE_SELECTOR_FEATURE_ID
-      segment.set(
-        ValueLayout.ADDRESS,
-        FEATURE_STATE_SELECTOR_FEATURE_ID_OFFSET,
-        stringView(arena, it),
-      )
+      segment
+        .asSlice(FEATURE_STATE_SELECTOR_FEATURE_ID_OFFSET, STRING_VIEW_SIZE)
+        .copyFrom(stringView(arena, it))
     }
     selector.stateKey?.let {
       fields = fields or FEATURE_STATE_SELECTOR_STATE_KEY
-      segment.set(
-        ValueLayout.ADDRESS,
-        FEATURE_STATE_SELECTOR_STATE_KEY_OFFSET,
-        stringView(arena, it),
-      )
+      segment
+        .asSlice(FEATURE_STATE_SELECTOR_STATE_KEY_OFFSET, STRING_VIEW_SIZE)
+        .copyFrom(stringView(arena, it))
     }
     segment.set(ValueLayout.JAVA_INT, FEATURE_STATE_SELECTOR_FIELDS_OFFSET, fields)
     return segment
@@ -5856,6 +5848,35 @@ internal object NativeAccess {
         val native = renderedQueryGeometry(arena, value)
         native.get(ValueLayout.JAVA_INT, RENDERED_QUERY_GEOMETRY_TYPE_OFFSET)
       }
+
+    fun featureStateSelectorSnapshot(value: FeatureStateSelector): FeatureStateSelectorSnapshot =
+      Arena.ofConfined().use { arena ->
+        val native = featureStateSelector(arena, value)
+        val fields = native.get(ValueLayout.JAVA_INT, FEATURE_STATE_SELECTOR_FIELDS_OFFSET)
+        FeatureStateSelectorSnapshot(
+          fields,
+          stringView(native.asSlice(FEATURE_STATE_SELECTOR_SOURCE_ID_OFFSET, STRING_VIEW_SIZE)),
+          if ((fields and FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID) != 0)
+            stringView(
+              native.asSlice(FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID_OFFSET, STRING_VIEW_SIZE)
+            )
+          else null,
+          if ((fields and FEATURE_STATE_SELECTOR_FEATURE_ID) != 0)
+            stringView(native.asSlice(FEATURE_STATE_SELECTOR_FEATURE_ID_OFFSET, STRING_VIEW_SIZE))
+          else null,
+          if ((fields and FEATURE_STATE_SELECTOR_STATE_KEY) != 0)
+            stringView(native.asSlice(FEATURE_STATE_SELECTOR_STATE_KEY_OFFSET, STRING_VIEW_SIZE))
+          else null,
+        )
+      }
+
+    data class FeatureStateSelectorSnapshot(
+      val fields: Int,
+      val sourceId: String,
+      val sourceLayerId: String?,
+      val featureId: String?,
+      val stateKey: String?,
+    )
 
     fun offlineRegionDefinitionRoundTrip(value: OfflineRegionDefinition): OfflineRegionDefinition =
       Arena.ofConfined().use { arena ->

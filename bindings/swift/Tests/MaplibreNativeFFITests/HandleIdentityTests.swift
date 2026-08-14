@@ -80,7 +80,7 @@ private func mapSize(_ map: NativeMapHandle) throws {
   // has no expression in the safe API and needs the raw id.
   let wrongKind = try map.requireLiveHandle().raw
   do {
-    try checkStatus(mln_runtime_pump(wrongKind, 0))
+    try checkStatus(mln_runtime_pump(wrongKind, 0, -1))
     Issue.record("a map id should not name a runtime")
   } catch let failure as NativeStatusFailure {
     #expect(failure.rawStatus == MLN_STATUS_INVALID_ARGUMENT.rawValue)

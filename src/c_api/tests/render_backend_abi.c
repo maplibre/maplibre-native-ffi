@@ -432,7 +432,7 @@ static void dedicated_egl_surface_renders_and_keeps_its_context_current(void) {
   // reaches the style and the extent when this loop pumps the runtime.
   for (unsigned int attempt = 0;
        attempt < 500 && result != MLN_RENDER_RESULT_RENDERED; attempt += 1) {
-    mln_runtime_pump(runtime, 0);
+    mln_runtime_pump(runtime, 0, -1);
     bool needs_repaint = false;
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK,
@@ -474,7 +474,7 @@ static void render_update_reports_whether_the_map_needs_another_frame(void) {
   for (unsigned int attempt = 0;
        attempt < 500 && (result != MLN_RENDER_RESULT_RENDERED || needs_repaint);
        attempt += 1) {
-    mln_runtime_pump(runtime, 0);
+    mln_runtime_pump(runtime, 0, -1);
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK,
       mln_render_session_render_update(fixture.session, &result, &needs_repaint)
@@ -499,7 +499,7 @@ static void render_update_reports_whether_the_map_needs_another_frame(void) {
   bool saw_repaint_request = false;
   for (unsigned int attempt = 0; attempt < 500 && !saw_repaint_request;
        attempt += 1) {
-    mln_runtime_pump(runtime, 0);
+    mln_runtime_pump(runtime, 0, -1);
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK,
       mln_render_session_render_update(fixture.session, &result, &needs_repaint)

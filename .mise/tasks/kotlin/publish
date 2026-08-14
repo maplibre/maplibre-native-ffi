@@ -46,7 +46,14 @@ prepare_native_inputs() {
       )
       ;;
     apple)
+      # macOS enables every Kotlin/Native target, so cinterop commonization can
+      # schedule cinterop tasks for the Android and Linux targets even though
+      # the Linux partition publishes them; their install dirs must exist here.
       presets=(
+        android-arm64-egl
+        android-arm64-vulkan
+        android-x64-egl
+        android-x64-vulkan
         linux-x64-egl
         linux-arm64-egl
         linux-x64-vulkan
@@ -56,6 +63,8 @@ prepare_native_inputs() {
         macos-arm64-metal
         ios-arm64-metal
         ios-simulator-arm64-metal
+        tvos-arm64-metal
+        tvos-simulator-arm64-metal
         windows-x64-wgl
         windows-arm64-wgl
         windows-x64-vulkan
@@ -96,28 +105,46 @@ publish_linux_leaves() {
     -Pmaplibre.android.prebuiltInstallRoot="$install_root"
     "-Pmaplibre.android.abis=arm64-v8a,x86_64"
   )
+  # Cinterop commonization can schedule cinterop tasks for every Kotlin/Native
+  # target of a runtime module that the host supports, not just the
+  # publications named on the command line, so each invocation configures
+  # install dirs for all of them.
+  local opengl=(
+    -Pmaplibre.runtime.opengl.androidNativeArm64.installDir="$install_root/android-arm64-egl"
+    -Pmaplibre.runtime.opengl.androidNativeX64.installDir="$install_root/android-x64-egl"
+    -Pmaplibre.runtime.opengl.linuxArm64.installDir="$install_root/linux-arm64-egl"
+    -Pmaplibre.runtime.opengl.linuxX64.installDir="$install_root/linux-x64-egl"
+  )
+  local vulkan=(
+    -Pmaplibre.runtime.vulkan.androidNativeArm64.installDir="$install_root/android-arm64-vulkan"
+    -Pmaplibre.runtime.vulkan.androidNativeX64.installDir="$install_root/android-x64-vulkan"
+    -Pmaplibre.runtime.vulkan.linuxArm64.installDir="$install_root/linux-arm64-vulkan"
+    -Pmaplibre.runtime.vulkan.linuxX64.installDir="$install_root/linux-x64-vulkan"
+  )
 
   publish_tasks \
     :bindings:kotlin \
     "$repository" \
-    Android -- \
+    Android AndroidNativeArm64 AndroidNativeX64 -- \
     "$@" \
     "${common[@]}"
 
   publish_tasks \
     :bindings:kotlin:runtimes:opengl \
     "$repository" \
-    Android -- \
+    Android AndroidNativeArm64 AndroidNativeX64 -- \
     "$@" \
     "${common[@]}" \
+    "${opengl[@]}" \
     -Pmaplibre.android.backend=opengl
 
   publish_tasks \
     :bindings:kotlin:runtimes:vulkan \
     "$repository" \
-    Android -- \
+    Android AndroidNativeArm64 AndroidNativeX64 -- \
     "$@" \
     "${common[@]}" \
+    "${vulkan[@]}" \
     -Pmaplibre.android.backend=vulkan
 
   publish_tasks \
@@ -139,7 +166,7 @@ publish_linux_leaves() {
     "$repository" \
     LinuxX64 -- \
     "$@" \
-    -Pmaplibre.runtime.opengl.linuxX64.installDir="$install_root/linux-x64-egl"
+    "${opengl[@]}"
 
   publish_tasks \
     :bindings:kotlin:runtimes:opengl \
@@ -147,14 +174,14 @@ publish_linux_leaves() {
     LinuxArm64 -- \
     "$@" \
     -Pkotlin.native.enableKlibsCrossCompilation=true \
-    -Pmaplibre.runtime.opengl.linuxArm64.installDir="$install_root/linux-arm64-egl"
+    "${opengl[@]}"
 
   publish_tasks \
     :bindings:kotlin:runtimes:vulkan \
     "$repository" \
     LinuxX64 -- \
     "$@" \
-    -Pmaplibre.runtime.vulkan.linuxX64.installDir="$install_root/linux-x64-vulkan"
+    "${vulkan[@]}"
 
   publish_tasks \
     :bindings:kotlin:runtimes:vulkan \
@@ -162,7 +189,7 @@ publish_linux_leaves() {
     LinuxArm64 -- \
     "$@" \
     -Pkotlin.native.enableKlibsCrossCompilation=true \
-    -Pmaplibre.runtime.vulkan.linuxArm64.installDir="$install_root/linux-arm64-vulkan"
+    "${vulkan[@]}"
 
   ./gradlew \
     -Pkotlin.native.enableKlibsCrossCompilation=true \
@@ -173,7 +200,14 @@ publish_linux_leaves() {
 publish_apple_leaves() {
   local repository="$1"
   shift
+  # Cinterop commonization can schedule cinterop tasks for every Kotlin/Native
+  # target of a runtime module, not just the publications named on the command
+  # line, so each invocation configures install dirs for all of them.
   local opengl=(
+    -Pmaplibre.runtime.opengl.androidNativeArm64.installDir="$install_root/android-arm64-egl"
+    -Pmaplibre.runtime.opengl.androidNativeX64.installDir="$install_root/android-x64-egl"
+    -Pmaplibre.runtime.opengl.linuxArm64.installDir="$install_root/linux-arm64-egl"
+    -Pmaplibre.runtime.opengl.linuxX64.installDir="$install_root/linux-x64-egl"
     -Pmaplibre.runtime.opengl.macosArm64.installDir="$install_root/macos-arm64-egl"
     -Pmaplibre.runtime.opengl.jvm.natives-linux-x64.installDir="$install_root/linux-x64-egl"
     -Pmaplibre.runtime.opengl.jvm.natives-linux-arm64.installDir="$install_root/linux-arm64-egl"
@@ -182,6 +216,10 @@ publish_apple_leaves() {
     -Pmaplibre.runtime.opengl.jvm.natives-windows-arm64.installDir="$install_root/windows-arm64-wgl"
   )
   local vulkan=(
+    -Pmaplibre.runtime.vulkan.androidNativeArm64.installDir="$install_root/android-arm64-vulkan"
+    -Pmaplibre.runtime.vulkan.androidNativeX64.installDir="$install_root/android-x64-vulkan"
+    -Pmaplibre.runtime.vulkan.linuxArm64.installDir="$install_root/linux-arm64-vulkan"
+    -Pmaplibre.runtime.vulkan.linuxX64.installDir="$install_root/linux-x64-vulkan"
     -Pmaplibre.runtime.vulkan.macosArm64.installDir="$install_root/macos-arm64-vulkan"
     -Pmaplibre.runtime.vulkan.jvm.natives-linux-x64.installDir="$install_root/linux-x64-vulkan"
     -Pmaplibre.runtime.vulkan.jvm.natives-linux-arm64.installDir="$install_root/linux-arm64-vulkan"
@@ -192,6 +230,8 @@ publish_apple_leaves() {
   local metal=(
     -Pmaplibre.runtime.metal.iosArm64.installDir="$install_root/ios-arm64-metal"
     -Pmaplibre.runtime.metal.iosSimulatorArm64.installDir="$install_root/ios-simulator-arm64-metal"
+    -Pmaplibre.runtime.metal.tvosArm64.installDir="$install_root/tvos-arm64-metal"
+    -Pmaplibre.runtime.metal.tvosSimulatorArm64.installDir="$install_root/tvos-simulator-arm64-metal"
     -Pmaplibre.runtime.metal.macosArm64.installDir="$install_root/macos-arm64-metal"
     -Pmaplibre.runtime.metal.jvm.natives-macos-arm64.installDir="$install_root/macos-arm64-metal"
   )
@@ -199,7 +239,7 @@ publish_apple_leaves() {
   publish_tasks \
     :bindings:kotlin \
     "$repository" \
-    Jvm MacosArm64 IosArm64 IosSimulatorArm64 -- \
+    Jvm MacosArm64 IosArm64 IosSimulatorArm64 TvosArm64 TvosSimulatorArm64 -- \
     "$@"
 
   publish_tasks \
@@ -219,7 +259,7 @@ publish_apple_leaves() {
   publish_tasks \
     :bindings:kotlin:runtimes:metal \
     "$repository" \
-    Jvm MacosArm64 IosArm64 IosSimulatorArm64 -- \
+    Jvm MacosArm64 IosArm64 IosSimulatorArm64 TvosArm64 TvosSimulatorArm64 -- \
     "$@" \
     "${metal[@]}"
 }
@@ -228,11 +268,15 @@ publish_apple_roots() {
   local repository="$1"
   shift
   local opengl=(
+    -Pmaplibre.runtime.opengl.androidNativeArm64.installDir="$install_root/android-arm64-egl"
+    -Pmaplibre.runtime.opengl.androidNativeX64.installDir="$install_root/android-x64-egl"
     -Pmaplibre.runtime.opengl.linuxArm64.installDir="$install_root/linux-arm64-egl"
     -Pmaplibre.runtime.opengl.linuxX64.installDir="$install_root/linux-x64-egl"
     -Pmaplibre.runtime.opengl.macosArm64.installDir="$install_root/macos-arm64-egl"
   )
   local vulkan=(
+    -Pmaplibre.runtime.vulkan.androidNativeArm64.installDir="$install_root/android-arm64-vulkan"
+    -Pmaplibre.runtime.vulkan.androidNativeX64.installDir="$install_root/android-x64-vulkan"
     -Pmaplibre.runtime.vulkan.linuxArm64.installDir="$install_root/linux-arm64-vulkan"
     -Pmaplibre.runtime.vulkan.linuxX64.installDir="$install_root/linux-x64-vulkan"
     -Pmaplibre.runtime.vulkan.macosArm64.installDir="$install_root/macos-arm64-vulkan"
@@ -240,6 +284,8 @@ publish_apple_roots() {
   local metal=(
     -Pmaplibre.runtime.metal.iosArm64.installDir="$install_root/ios-arm64-metal"
     -Pmaplibre.runtime.metal.iosSimulatorArm64.installDir="$install_root/ios-simulator-arm64-metal"
+    -Pmaplibre.runtime.metal.tvosArm64.installDir="$install_root/tvos-arm64-metal"
+    -Pmaplibre.runtime.metal.tvosSimulatorArm64.installDir="$install_root/tvos-simulator-arm64-metal"
     -Pmaplibre.runtime.metal.macosArm64.installDir="$install_root/macos-arm64-metal"
   )
 

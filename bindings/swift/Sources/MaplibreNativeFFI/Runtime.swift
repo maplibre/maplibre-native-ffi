@@ -92,7 +92,7 @@ public enum RuntimeEventType: Sendable, Hashable {
 /// accept and a handle reports every bit last set.
 ///
 /// An unselected event type is never built and never queued, so it neither
-/// reaches a batch nor wakes a parked ``RuntimeHandle/pump(timeout:)``.
+/// reaches a batch nor wakes a parked ``RuntimeHandle/pump(timeout:budget:)``.
 public struct RuntimeEventMask: OptionSet, Sendable, Hashable {
   public let rawValue: UInt64
 
@@ -551,10 +551,22 @@ public final class RuntimeHandle {
   /// ready file descriptors wake the runtime only when they queue owner-thread
   /// work, so pass a bounded timeout to cap how long a call waits.
   ///
+  /// `budget` bounds the drain, in seconds. `nil` drains without a bound. Zero
+  /// or a positive value stops the drain at the first task boundary after that
+  /// long, measured from the start of the drain. The first queued task always
+  /// runs, so a bounded pump always makes progress, and tasks left behind set
+  /// the wake flag, so the next pump returns without parking and continues
+  /// them. The budget bounds the task queues alone: expired timers and ready
+  /// file descriptors are serviced regardless, and a task runs to completion
+  /// once started, so one long task can overrun the budget.
+  ///
   /// A non-zero timeout blocks the calling thread. Call it outside any lock
   /// that a thread signalling a `WakeSource` takes. A call never parks while
   /// this runtime holds undrained events.
-  public func pump(timeout: TimeInterval? = 0) throws {
+  public func pump(
+    timeout: TimeInterval? = 0,
+    budget: TimeInterval? = nil
+  ) throws {
     try mapNativeFailure {
       let timeoutMilliseconds: Int64
       if let timeout {
@@ -566,8 +578,22 @@ public final class RuntimeHandle {
       } else {
         timeoutMilliseconds = -1
       }
+      let budgetMilliseconds: Int64
+      if let budget {
+        // A negative or non-finite budget collapses to zero; `nil` is the
+        // spelling for an unbounded drain. The upper clamp keeps the
+        // conversion inside Int64.
+        let milliseconds = budget.isFinite ? (budget * 1000).rounded() : 0
+        budgetMilliseconds = Int64(min(max(milliseconds, 0), 9.0e18))
+      } else {
+        budgetMilliseconds = -1
+      }
       try checkStatus(
-        mln_runtime_pump(handle.requireLive().raw, timeoutMilliseconds)
+        mln_runtime_pump(
+          handle.requireLive().raw,
+          timeoutMilliseconds,
+          budgetMilliseconds
+        )
       )
     }
   }
@@ -594,7 +620,8 @@ public final class RuntimeHandle {
   /// ``RuntimeEventBatch/remainingCount``.
   ///
   /// Draining is a queue operation that runs no owner-thread work. Call
-  /// ``pump(timeout:)`` to advance the runtime, then drain what it produced.
+  /// ``pump(timeout:budget:)`` to advance the runtime, then drain what it
+  /// produced.
   public func drainEvents(maxEvents: Int = 0) throws -> RuntimeEventBatch {
     try mapNativeFailure {
       guard maxEvents >= 0 else {

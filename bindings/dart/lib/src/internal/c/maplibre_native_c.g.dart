@@ -2214,8 +2214,8 @@ external int mln_runtime_offline_regions_merge_database_take_result(
 @ffi.Native<mln_runtime_options Function()>()
 external mln_runtime_options mln_runtime_options_default();
 
-@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Int64)>()
-external int mln_runtime_pump(int runtime, int timeout_ms);
+@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Int64, ffi.Int64)>()
+external int mln_runtime_pump(int runtime, int timeout_ms, int budget_ms);
 
 @ffi.Native<
   ffi.Int32 Function(

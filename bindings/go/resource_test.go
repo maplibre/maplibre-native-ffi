@@ -25,7 +25,7 @@ func loadProbeStyle(t *testing.T, runtime *RuntimeHandle, m *MapHandle, styleURL
 		t.Fatalf("SetStyleURL(%q): %v", styleURL, err)
 	}
 	for range make([]struct{}, 5000) {
-		if err := runtime.Pump(0); err != nil {
+		if err := runtime.Pump(0, -1); err != nil {
 			t.Fatalf("Pump(): %v", err)
 		}
 		batch, err := runtime.DrainEvents(0)

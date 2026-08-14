@@ -14,7 +14,7 @@ func drainAllRuntimeEvents(t *testing.T, runtime *RuntimeHandle) []RuntimeEvent 
 	t.Helper()
 	var events []RuntimeEvent
 	for range make([]struct{}, 100) {
-		if err := runtime.Pump(0); err != nil {
+		if err := runtime.Pump(0, -1); err != nil {
 			t.Fatalf("Pump(): %v", err)
 		}
 		batch, err := runtime.DrainEvents(0)
@@ -37,7 +37,7 @@ func collectRuntimeEventsUntil(t *testing.T, runtime *RuntimeHandle, wanted ...R
 	var events []RuntimeEvent
 	seen := make(map[RuntimeEventType]bool, len(wanted))
 	for range make([]struct{}, 5000) {
-		if err := runtime.Pump(0); err != nil {
+		if err := runtime.Pump(0, -1); err != nil {
 			t.Fatalf("Pump(): %v", err)
 		}
 		batch, err := runtime.DrainEvents(0)
@@ -127,7 +127,7 @@ func TestRuntimeDrainReportsOneStyleLoadAsOneBatch(t *testing.T) {
 	// queue order.
 	var loaded RuntimeEventBatch
 	for range make([]struct{}, 5000) {
-		if err := runtime.Pump(0); err != nil {
+		if err := runtime.Pump(0, -1); err != nil {
 			t.Fatalf("Pump(): %v", err)
 		}
 		batch, err := runtime.DrainEvents(0)
@@ -346,7 +346,7 @@ func TestRuntimeEventCopiesSurviveTheNextDrain(t *testing.T) {
 	}
 	var kept RuntimeEventBatch
 	for range make([]struct{}, 5000) {
-		if err := runtime.Pump(0); err != nil {
+		if err := runtime.Pump(0, -1); err != nil {
 			t.Fatalf("Pump(): %v", err)
 		}
 		batch, err := runtime.DrainEvents(0)

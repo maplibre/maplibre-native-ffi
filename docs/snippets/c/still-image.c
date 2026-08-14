@@ -67,7 +67,7 @@ static bool await_still_image(
 
   // #region await
   while (!(finished && rendered) && time(NULL) < deadline) {
-    mln_runtime_pump(runtime, 10);
+    mln_runtime_pump(runtime, 10, -1);
     const still_image_state state = drain_still_image_events(runtime, map);
     if (state == STILL_IMAGE_FAILED) return false;
     if (state == STILL_IMAGE_FINISHED) finished = true;

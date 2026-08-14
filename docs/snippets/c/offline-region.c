@@ -11,7 +11,7 @@ static mln_status await_operation(
   mln_runtime runtime, mln_offline_operation_id operation_id
 ) {
   for (;;) {
-    mln_runtime_pump(runtime, 100);
+    mln_runtime_pump(runtime, 100, -1);
 
     mln_runtime_event_batch batch = mln_runtime_event_batch_default();
     if (mln_runtime_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) {

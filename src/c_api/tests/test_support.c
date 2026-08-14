@@ -1323,7 +1323,7 @@ bool mln_test_pump_until(mln_runtime runtime, atomic_bool* flag) {
     }
     // A short park rather than zero: this waits on another thread's flag, so
     // spinning would burn the whole loop budget before that thread ran.
-    if (mln_runtime_pump(runtime, 2) != MLN_STATUS_OK) {
+    if (mln_runtime_pump(runtime, 2, -1) != MLN_STATUS_OK) {
       return false;
     }
     // Drain so the queue does not grow without bound while we wait.

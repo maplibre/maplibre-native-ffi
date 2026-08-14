@@ -573,7 +573,12 @@ impl MapHandle {
         Ok(CameraOptions::from_native(raw_camera))
     }
 
-    /// Computes wrapped geographic bounds for a camera in the current viewport.
+    /// Computes geographic bounds for a camera from two viewport corners.
+    ///
+    /// The box is the hull of the top-left and bottom-right screen corners for
+    /// that camera in the current viewport. When bearing and pitch are zero, the
+    /// box equals the visible area. Those corners are the northwest and
+    /// southeast of the viewport. Longitudes stay in -180 to 180.
     pub fn lat_lng_bounds_for_camera(&self, camera: &CameraOptions) -> Result<LatLngBounds> {
         let map = self.inner.native()?;
         let raw_camera = camera.to_native();
@@ -586,7 +591,12 @@ impl MapHandle {
         Ok(LatLngBounds::from_native(raw_bounds))
     }
 
-    /// Computes unwrapped geographic bounds for a camera in the current viewport.
+    /// Computes geographic bounds for a camera from the four viewport corners.
+    ///
+    /// The axis-aligned hull of all four screen corners and the center
+    /// encompasses the projected viewport. Longitudes unwrap onto the shortest
+    /// path through the center. A viewport that crosses the antimeridian reports
+    /// values outside -180 to 180.
     pub fn lat_lng_bounds_for_camera_unwrapped(
         &self,
         camera: &CameraOptions,

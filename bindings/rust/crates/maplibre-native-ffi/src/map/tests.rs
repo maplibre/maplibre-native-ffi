@@ -734,7 +734,7 @@ fn custom_geometry_source_state_releases_after_url_style_replacement() {
     map.set_style_url("custom://style.json").unwrap();
     let mut style_loaded_events = 0;
     for _ in 0..1000 {
-        runtime.pump(Some(Duration::ZERO)).unwrap();
+        runtime.pump(Some(Duration::ZERO), None).unwrap();
         for event in runtime.drain_events(0).unwrap().iter() {
             if event.event_type() == RuntimeEventType::MapStyleLoaded {
                 style_loaded_events += 1;
@@ -767,7 +767,7 @@ fn custom_geometry_source_state_releases_after_url_style_replacement() {
 
 fn drain_runtime_events(runtime: &mut RuntimeHandle) {
     for _ in 0..20 {
-        runtime.pump(Some(Duration::ZERO)).unwrap();
+        runtime.pump(Some(Duration::ZERO), None).unwrap();
         let _ = runtime.drain_events(0).unwrap();
     }
 }
@@ -782,7 +782,7 @@ fn collect_style_load_event_types(
     let mut types = Vec::new();
     map.set_style_json(style_json.as_bytes()).unwrap();
     for _ in 0..20 {
-        runtime.pump(Some(Duration::ZERO)).unwrap();
+        runtime.pump(Some(Duration::ZERO), None).unwrap();
         for event in runtime.drain_events(0).unwrap().iter() {
             if event.source() == RuntimeEventSource::Map(map.id()) {
                 types.push(event.event_type());
@@ -1289,7 +1289,7 @@ fn a_map_id_passed_to_a_runtime_operation_reports_invalid_argument() {
     // expression in the safe API.
     let wrong_kind = sys::mln_runtime(map.inner.native().unwrap().0);
     // SAFETY: the value is well-formed; the C API rejects it on its kind tag.
-    let status = unsafe { sys::mln_runtime_pump(wrong_kind, 0) };
+    let status = unsafe { sys::mln_runtime_pump(wrong_kind, 0, -1) };
 
     assert_eq!(status, sys::MLN_STATUS_INVALID_ARGUMENT);
     let message = maplibre_native_ffi_core::error::capture_thread_diagnostic();

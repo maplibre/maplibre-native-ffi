@@ -77,7 +77,7 @@ fn waitForRenderedFeatureQuery(
         var result = try session.queryRenderedFeatures(testing.allocator, geometry, options);
         if (firstArrayElement(result.value) != null) return result;
         result.deinit();
-        try runtime.pump(0);
+        try runtime.pump(0, null);
         _ = try session.renderUpdate();
         try std.Thread.yield();
     }
@@ -94,7 +94,7 @@ fn waitForSourceFeatureQuery(
         });
         if (firstArrayElement(result.value) != null) return result;
         result.deinit();
-        try runtime.pump(0);
+        try runtime.pump(0, null);
         _ = try session.renderUpdate();
         try std.Thread.yield();
     }
@@ -196,7 +196,7 @@ fn pumpTransitionFrame(
     defer if (build_options.supports_metal) pool.deinit();
 
     try map.requestRepaint();
-    try runtime.pump(0);
+    try runtime.pump(0, null);
 
     var result = TransitionFramePump{};
     var render_update_available = false;
@@ -1413,14 +1413,14 @@ test "map size follows attach and resize and keeps the creation scale factor" {
     try testing.expectEqual(@as(u32, 64), before_pump.width);
     try testing.expectEqual(@as(u32, 32), before_pump.height);
 
-    try runtime.pump(0);
+    try runtime.pump(0, null);
     const attached = try map.getSize();
     try testing.expectEqual(@as(u32, 32), attached.width);
     try testing.expectEqual(@as(u32, 16), attached.height);
     try testing.expectEqual(@as(f64, 2.0), attached.scale_factor);
 
     try owned.session.resize(.{ .width = 48, .height = 24, .scale_factor = 1.0 });
-    try runtime.pump(0);
+    try runtime.pump(0, null);
     const resized = try map.getSize();
     try testing.expectEqual(@as(u32, 48), resized.width);
     try testing.expectEqual(@as(u32, 24), resized.height);
@@ -2069,7 +2069,7 @@ test "OpenGL borrowed texture set target renders into a replacement texture" {
     const size_pending_update = try session.renderUpdate();
     try testing.expectEqual(@as(maplibre.RenderResult, .size_pending), size_pending_update.result);
     try testing.expect(!size_pending_update.needs_repaint);
-    try runtime.pump(0);
+    try runtime.pump(0, null);
     const resized = try map.getSize();
     try testing.expectEqual(@as(u32, 64), resized.width);
     try testing.expectEqual(@as(u32, 96), resized.height);
@@ -2143,7 +2143,7 @@ test "dedicated OpenGL surface renders through a context it owns" {
     // the style and the extent only while this loop pumps the runtime.
     var result: maplibre.RenderResult = .no_update;
     for (0..1000) |_| {
-        try runtime.pump(0);
+        try runtime.pump(0, null);
         result = (try session.renderUpdate()).result;
         if (result == .rendered) break;
         try std.Thread.yield();
@@ -2208,7 +2208,7 @@ test "Metal owned texture frame handle scopes native pointers" {
     // the map publishes a matching update only once pumped.
     try session.resize(.{ .width = 16, .height = 8, .scale_factor = 2.0 });
     try testing.expectEqual(@as(maplibre.RenderResult, .size_pending), (try session.renderUpdate()).result);
-    try runtime.pump(0);
+    try runtime.pump(0, null);
     try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
     var resized_frame = try session.acquireMetalOwnedTextureFrame();
     const resized_info = try resized_frame.info();
@@ -2353,7 +2353,7 @@ test "Metal borrowed texture set target renders into a replacement texture" {
     // Replacing the target enqueues the new size for the map's owner thread,
     // so the map publishes a matching update only once pumped.
     try testing.expectEqual(@as(maplibre.RenderResult, .size_pending), (try session.renderUpdate()).result);
-    try runtime.pump(0);
+    try runtime.pump(0, null);
     const resized = try map.getSize();
     try testing.expectEqual(@as(u32, 64), resized.width);
     try testing.expectEqual(@as(u32, 96), resized.height);
@@ -2413,7 +2413,7 @@ test "Vulkan owned texture frame handle scopes native pointers" {
     // the map publishes a matching update only once pumped.
     try session.resize(.{ .width = 16, .height = 8, .scale_factor = 2.0 });
     try testing.expectEqual(@as(maplibre.RenderResult, .size_pending), (try session.renderUpdate()).result);
-    try runtime.pump(0);
+    try runtime.pump(0, null);
     try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
     var resized_frame = try session.acquireVulkanOwnedTextureFrame();
     const resized_info = try resized_frame.info();
@@ -2490,7 +2490,7 @@ test "Vulkan borrowed texture set target renders into a replacement image" {
     // Replacing the target enqueues the new size for the map's owner thread,
     // so the map publishes a matching update only once pumped.
     try testing.expectEqual(@as(maplibre.RenderResult, .size_pending), (try session.renderUpdate()).result);
-    try runtime.pump(0);
+    try runtime.pump(0, null);
     const resized = try map.getSize();
     try testing.expectEqual(@as(u32, 64), resized.width);
     try testing.expectEqual(@as(u32, 96), resized.height);

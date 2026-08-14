@@ -3,6 +3,11 @@ name: "↳ Kotlin Maven"
 on:
   workflow_call:
     inputs:
+      publish:
+        description: Deploy the verified repository to Maven Central
+        default: true
+        required: false
+        type: boolean
       release:
         description: Publish an immutable tagged release
         default: false
@@ -15,6 +20,14 @@ on:
       sha:
         description: Source commit and artifact suffix
         required: true
+        type: string
+      verified_run_id:
+        description: >-
+          Run that already staged and verified this commit at this version.
+          When set, staging and verification are skipped and the publish job
+          reuses that run's verified repository.
+        default: ""
+        required: false
         type: string
       version:
         description: Kotlin package version
@@ -30,6 +43,7 @@ env:
 jobs:
   stage:
     name: Kotlin Maven staging / ${{ matrix.partition }}
+    if: ${{ inputs.verified_run_id == '' }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 240
     permissions:
@@ -85,6 +99,7 @@ jobs:
 
   verify:
     name: Kotlin Maven verification
+    if: ${{ inputs.verified_run_id == '' }}
     needs:
       - stage
     runs-on: macos-26
@@ -115,15 +130,21 @@ jobs:
       - run: >-
           mise run //:kotlin:publish verify
           build/packages/kotlin/maven-staging "$KOTLIN_VERSION"
+      # Publishing runs reuse this artifact through `verified_run_id`, so it
+      # outlives the run long enough for a delayed or retried publish.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: kotlin-maven-verified-${{ env.PACKAGE_SHA }}
           path: build/packages/kotlin/maven-staging
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 30
 
   publish:
     name: Kotlin Maven publish
+    # A publish that reuses a verified repository runs with `verify` skipped.
+    if: >-
+      !cancelled() && inputs.publish
+      && (inputs.verified_run_id != '' || needs.verify.result == 'success')
     needs:
       - verify
     runs-on: ubuntu-latest
@@ -149,6 +170,8 @@ jobs:
           install_args: python
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.verified_run_id || github.run_id }}
           name: kotlin-maven-verified-${{ env.PUBLISH_SHA }}
           path: build/packages/kotlin/maven
       - name: Sign the snapshot

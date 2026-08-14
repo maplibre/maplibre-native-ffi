@@ -27,7 +27,7 @@ static bool wait_for_offline_completion(
   mln_runtime runtime, mln_offline_operation_id operation_id
 ) {
   for (size_t attempt = 0; attempt < 5000; attempt += 1) {
-    if (mln_runtime_pump(runtime, 0) != MLN_STATUS_OK) {
+    if (mln_runtime_pump(runtime, 0, -1) != MLN_STATUS_OK) {
       return false;
     }
     while (true) {
@@ -67,7 +67,7 @@ static bool wait_for_map_loading_failure(
   size_t out_message_capacity
 ) {
   for (size_t attempt = 0; attempt < 5000; attempt += 1) {
-    if (mln_runtime_pump(runtime, 0) != MLN_STATUS_OK) {
+    if (mln_runtime_pump(runtime, 0, -1) != MLN_STATUS_OK) {
       return false;
     }
     mln_runtime_event event = {0};
@@ -532,7 +532,7 @@ static void other_runtime_entry(void* argument) {
   wait_for_flag(&probe->teardown_started);
   // Give the owner thread time to reach the transform wait inside teardown.
   mln_test_sleep_milliseconds(teardown_call_delay_milliseconds);
-  atomic_store(&probe->other_runtime_status, mln_runtime_pump(runtime, 0));
+  atomic_store(&probe->other_runtime_status, mln_runtime_pump(runtime, 0, -1));
   atomic_store(&probe->other_runtime_call_done, true);
   mln_runtime_destroy(runtime);
 }
@@ -592,7 +592,7 @@ static bool pump_until_flag(mln_runtime runtime, atomic_bool* flag) {
     if (atomic_load(flag)) {
       return true;
     }
-    if (mln_runtime_pump(runtime, 0) != MLN_STATUS_OK) {
+    if (mln_runtime_pump(runtime, 0, -1) != MLN_STATUS_OK) {
       return false;
     }
     mln_test_sleep_millisecond();
@@ -736,7 +736,7 @@ static void lookup_other_runtime_entry(void* argument) {
   wait_for_flag(&probe->lookup_reached);
   // Give the file source thread time to reach the lookup itself.
   mln_test_sleep_milliseconds(teardown_call_delay_milliseconds);
-  atomic_store(&probe->other_runtime_status, mln_runtime_pump(runtime, 0));
+  atomic_store(&probe->other_runtime_status, mln_runtime_pump(runtime, 0, -1));
   atomic_store(&probe->other_runtime_call_done, true);
   mln_runtime_destroy(runtime);
 }
@@ -902,7 +902,7 @@ static bool wait_for_clear_provider_callback(
     if (atomic_load(&probe->entered)) {
       return true;
     }
-    if (mln_runtime_pump(runtime, 0) != MLN_STATUS_OK) {
+    if (mln_runtime_pump(runtime, 0, -1) != MLN_STATUS_OK) {
       return false;
     }
     mln_test_sleep_millisecond();
@@ -1021,7 +1021,7 @@ static void resource_provider_defers_inline_release_until_callback_returns(
   );
   for (size_t attempt = 0;
        attempt < 5000 && !atomic_load(&state.callback_finished); attempt += 1) {
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0));
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0, -1));
     mln_test_sleep_millisecond();
   }
   TEST_ASSERT_TRUE(atomic_load(&state.callback_finished));
@@ -1117,7 +1117,7 @@ static bool wait_for_provider_callback(
     if (atomic_load(&probe->entered)) {
       return true;
     }
-    if (mln_runtime_pump(runtime, 0) != MLN_STATUS_OK) {
+    if (mln_runtime_pump(runtime, 0, -1) != MLN_STATUS_OK) {
       return false;
     }
     mln_test_sleep_millisecond();

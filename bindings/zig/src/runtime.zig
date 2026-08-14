@@ -1298,19 +1298,31 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
     /// arrives. Timers and ready file descriptors only wake the runtime when
     /// they queue owner-thread work, so pass a bounded timeout to cap the wait.
     ///
+    /// `budget_ms` bounds the drain: null drains without a bound, and zero or
+    /// a positive value stops the drain at the first task boundary after that
+    /// many milliseconds, measured from the start of the drain. The first
+    /// queued task always runs, so a bounded pump always makes progress, and
+    /// tasks left behind set the wake flag so the next pump returns without
+    /// parking and continues them. The budget bounds the task queues alone: a
+    /// task runs to completion once started, so one long task can overrun it.
+    ///
     /// A non-zero timeout blocks the calling thread. Call it outside any lock
     /// that a thread signalling a wake source takes. An undrained event never
     /// parks the owner thread, so a host that pumps and drains in a loop keeps
     /// draining.
-    pub fn pump(self: *RuntimeHandle, timeout_ms: ?u64) status.Error!void {
+    pub fn pump(self: *RuntimeHandle, timeout_ms: ?u64, budget_ms: ?u64) status.Error!void {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
         const native_timeout: i64 = if (timeout_ms) |value|
             std.math.cast(i64, value) orelse std.math.maxInt(i64)
         else
             -1;
+        const native_budget: i64 = if (budget_ms) |value|
+            std.math.cast(i64, value) orelse std.math.maxInt(i64)
+        else
+            -1;
         try status.checkStatus(
-            c.mln_runtime_pump(runtime_lease.native, native_timeout),
+            c.mln_runtime_pump(runtime_lease.native, native_timeout, native_budget),
             runtime_lease.diagnostic_store,
         );
     }
@@ -2648,7 +2660,7 @@ fn offlineTileDefinitionForTesting() OfflineRegionDefinition {
 fn waitForOfflineOperationForTesting(runtime: *RuntimeHandle, operation: OfflineOperationHandle) !void {
     const operation_id = try operation.operationId();
     for (0..5000) |_| {
-        try runtime.pump(0);
+        try runtime.pump(0, null);
         // One event per drain, so an event this wait is not looking for stays
         // queued rather than being dropped with the batch that carried it.
         while (true) {

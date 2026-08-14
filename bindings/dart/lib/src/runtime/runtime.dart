@@ -154,12 +154,24 @@ final class RuntimeHandle {
   /// for, so a host that stopped draining before the queue emptied keeps making
   /// progress.
   ///
+  /// The default null [budget] drains without a bound. A non-null budget stops
+  /// the drain at the first task boundary after that long, measured from the
+  /// start of the drain; the first queued task always runs, so a bounded pump
+  /// always makes progress. Tasks left behind set the wake flag, so the next
+  /// pump returns without parking and continues them. The budget bounds the
+  /// task queues alone: expired timers and ready file descriptors are serviced
+  /// regardless, and a single task runs to completion once started.
+  ///
   /// A non-null, non-zero [timeout] blocks the calling isolate's event loop for
   /// the duration of the park. Acquire a [WakeSource] with [acquireWakeSource]
   /// so another isolate can release this one.
-  void pump({Duration? timeout = Duration.zero}) {
+  void pump({Duration? timeout = Duration.zero, Duration? budget}) {
     _check(
-      raw.mln_runtime_pump(_handle.raw, _pumpTimeoutMilliseconds(timeout)),
+      raw.mln_runtime_pump(
+        _handle.raw,
+        _pumpTimeoutMilliseconds(timeout),
+        _pumpBudgetMilliseconds(budget),
+      ),
     );
   }
 
@@ -640,6 +652,14 @@ int _pumpTimeoutMilliseconds(Duration? timeout) {
     return -1;
   }
   final milliseconds = timeout.inMilliseconds;
+  return milliseconds < 0 ? 0 : milliseconds;
+}
+
+int _pumpBudgetMilliseconds(Duration? budget) {
+  if (budget == null) {
+    return -1;
+  }
+  final milliseconds = budget.inMilliseconds;
   return milliseconds < 0 ? 0 : milliseconds;
 }
 
@@ -2195,11 +2215,21 @@ final class MapHandle {
     });
   }
 
-  /// Computes wrapped geographic bounds for a camera.
+  /// Computes geographic bounds for a camera from two viewport corners.
+  ///
+  /// The box is the hull of the top-left and bottom-right screen corners for
+  /// that camera in the current viewport. When bearing and pitch are zero, the
+  /// box equals the visible area. Those corners are the northwest and southeast
+  /// of the viewport. Longitudes stay in -180 to 180.
   LatLngBounds latLngBoundsForCamera(CameraOptions camera) =>
       _latLngBoundsForCamera(camera, unwrapped: false);
 
-  /// Computes unwrapped geographic bounds for a camera.
+  /// Computes geographic bounds for a camera from the four viewport corners.
+  ///
+  /// The axis-aligned hull of all four screen corners and the center encompasses
+  /// the projected viewport. Longitudes unwrap onto the shortest path through
+  /// the center. A viewport that crosses the antimeridian reports values outside
+  /// -180 to 180.
   LatLngBounds latLngBoundsForCameraUnwrapped(CameraOptions camera) =>
       _latLngBoundsForCamera(camera, unwrapped: true);
 

@@ -500,7 +500,7 @@ class RuntimeHandle(NativeHandleMixin):
             return None
         return map_handle
 
-    def pump(self, timeout: float | None = 0.0) -> None:
+    def pump(self, timeout: float | None = 0.0, budget: float | None = None) -> None:
         """Advance this runtime.
 
         The call parks the owner thread when ``timeout`` allows it, then drains
@@ -513,13 +513,25 @@ class RuntimeHandle(NativeHandleMixin):
         when they queue owner-thread work, so pass a bounded timeout to cap how
         long a call waits.
 
+        ``budget`` is in seconds and bounds the drain: ``None`` drains without
+        a bound, and a value stops the drain at the first task boundary after
+        that long, measured from the start of the drain. The first queued task
+        always runs, so a bounded pump always makes progress, and tasks left
+        behind set the wake flag so the next pump returns without parking and
+        continues them. The budget bounds the task queues alone: expired
+        timers and ready file descriptors are serviced regardless, and a
+        single task runs to completion once started, so one long task can
+        overrun the budget.
+
         A non-zero timeout releases the GIL while it parks. Call it outside any
         lock that a signalling thread takes.
         """
         # A negative timeout collapses to no wait; ``None`` spells an unbounded
         # park.
         timeout_ms = -1 if timeout is None else max(0, int(timeout * 1000))
-        self._native.pump(timeout_ms)
+        # ``None`` spells an unbounded drain.
+        budget_ms = -1 if budget is None else max(0, int(budget * 1000))
+        self._native.pump(timeout_ms, budget_ms)
 
     def wake_source(self) -> WakeSource:
         """Acquire a wake source for this runtime, usable from any thread."""

@@ -5,7 +5,7 @@ const maplibre = @import("maplibre_native_ffi");
 const support = @import("support.zig");
 
 fn runRuntimeOnThread(runtime: *maplibre.RuntimeHandle, out_error: *?anyerror) void {
-    runtime.pump(0) catch |err| {
+    runtime.pump(0, null) catch |err| {
         out_error.* = err;
         return;
     };
@@ -75,7 +75,7 @@ fn expectOnlySelectedTypes(
     rejected: maplibre.RuntimeEventType,
 ) !void {
     // Narrowing gates later events and keeps queued ones, so start empty.
-    try runtime.pump(0);
+    try runtime.pump(0, null);
     _ = try support.drainEvents(runtime);
 
     try map.setStyleJson(testing.allocator, support.style_json);
@@ -83,7 +83,7 @@ fn expectOnlySelectedTypes(
 
     var saw_style_loaded = false;
     for (0..1000) |_| {
-        try runtime.pump(0);
+        try runtime.pump(0, null);
         var batch = try runtime.drainEvents(testing.allocator, 0);
         defer batch.deinit();
         for (0..batch.len()) |index| {
@@ -137,7 +137,7 @@ test "wrong-thread runtime failures propagate diagnostics" {
     try testing.expectEqual(error.WrongThread, close_error.?);
     try testing.expect(diagnostics.get().?.message.len > 0);
 
-    try runtime.pump(0);
+    try runtime.pump(0, null);
     try runtime.close();
     runtime_open = false;
 }
@@ -191,7 +191,7 @@ test "one drain reports the events a style load queued together" {
     var largest_batch: usize = 0;
     var saw_style_loaded = false;
     for (0..1000) |_| {
-        try runtime.pump(0);
+        try runtime.pump(0, null);
         var batch = try runtime.drainEvents(testing.allocator, 0);
         defer batch.deinit();
         // An unbounded drain takes the whole queue.
@@ -267,7 +267,7 @@ test "a drained batch outlives its runtime" {
     var kept_index: usize = 0;
     var found = false;
     for (0..1000) |_| {
-        try runtime.pump(0);
+        try runtime.pump(0, null);
         var batch = try runtime.drainEvents(testing.allocator, 0);
         for (0..batch.len()) |index| {
             const event = try batch.at(index);
@@ -381,7 +381,7 @@ test "masks passed as create options narrow both handles" {
 // signal the test raises.
 fn quiesce(runtime: *maplibre.RuntimeHandle) !void {
     for (0..100) |_| {
-        try runtime.pump(0);
+        try runtime.pump(0, null);
         if ((try support.drainEvents(runtime)) == 0) return;
     }
     return error.RuntimeKeptProducingEvents;
@@ -420,7 +420,7 @@ test "a parked owner thread wakes for native work and for a wake source" {
     var loading_failed = false;
     const load_started = std.Io.Clock.awake.now(testing.io);
     for (0..20) |_| {
-        try runtime.pump(10_000);
+        try runtime.pump(10_000, null);
         if (elapsedMilliseconds(load_started) > 5_000) return error.ParkTimedOut;
         var batch = try runtime.drainEvents(testing.allocator, 0);
         defer batch.deinit();
@@ -440,7 +440,7 @@ test "a parked owner thread wakes for native work and for a wake source" {
     var thread_error: ?anyerror = error.Unexpected;
     const thread = try std.Thread.spawn(.{}, signalWakeSourceOnThread, .{ source, &thread_error });
     const park_started = std.Io.Clock.awake.now(testing.io);
-    try runtime.pump(10_000);
+    try runtime.pump(10_000, null);
     try testing.expect(elapsedMilliseconds(park_started) < 5_000);
     thread.join();
     try testing.expect(thread_error == null);
@@ -465,12 +465,12 @@ test "a pump clears the wake flag it returns on" {
 
     try source.signal();
     const signalled_started = std.Io.Clock.awake.now(testing.io);
-    try runtime.pump(10_000);
+    try runtime.pump(10_000, null);
     try testing.expect(elapsedMilliseconds(signalled_started) < 5_000);
 
     // The pump above cleared the wake flag, so this one waits its full timeout.
     const idle_started = std.Io.Clock.awake.now(testing.io);
-    try runtime.pump(200);
+    try runtime.pump(200, null);
     try testing.expect(elapsedMilliseconds(idle_started) >= 100);
 }
 
