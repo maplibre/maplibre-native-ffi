@@ -150,7 +150,7 @@ func TestRuntimeOptionsEventMaskSuppressesCompletionEventsNotResults(t *testing.
 	var completions int
 	took := false
 	for range make([]struct{}, 5000) {
-		if err := runtime.Pump(0); err != nil {
+		if err := runtime.Pump(0, -1); err != nil {
 			t.Fatalf("Pump(): %v", err)
 		}
 		batch, err := runtime.DrainEvents(0)
@@ -181,7 +181,7 @@ func TestRuntimeOptionsEventMaskSuppressesCompletionEventsNotResults(t *testing.
 func waitTakeOfflineOperation[T any](t *testing.T, runtime *RuntimeHandle, operation *OfflineOperationHandle[T]) T {
 	t.Helper()
 	for range make([]struct{}, 5000) {
-		if err := runtime.Pump(0); err != nil {
+		if err := runtime.Pump(0, -1); err != nil {
 			t.Fatalf("Pump(): %v", err)
 		}
 		result, err := operation.Take()
@@ -264,7 +264,7 @@ func TestOfflineOperationCompletedEventCopiesPayload(t *testing.T) {
 		t.Fatalf("StartOfflineRegions(): %v", err)
 	}
 	for range make([]struct{}, 5000) {
-		if err := runtime.Pump(0); err != nil {
+		if err := runtime.Pump(0, -1); err != nil {
 			t.Fatalf("Pump(): %v", err)
 		}
 		batch, err := runtime.DrainEvents(0)
@@ -308,7 +308,7 @@ func TestSetMaximumAmbientCacheSizeReportsCompletion(t *testing.T) {
 		t.Fatalf("StartSetMaximumAmbientCacheSize(): %v", err)
 	}
 	for range make([]struct{}, 5000) {
-		if err := runtime.Pump(0); err != nil {
+		if err := runtime.Pump(0, -1); err != nil {
 			t.Fatalf("Pump(): %v", err)
 		}
 		batch, err := runtime.DrainEvents(0)

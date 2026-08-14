@@ -343,8 +343,8 @@ internal object NativeAccess {
       }
     }
 
-  internal fun pumpRuntime(runtime: NativeRuntime, timeoutMillis: Long) {
-    Status.check(runtimePumpFunction().invokeNative(runtime, timeoutMillis) as Int)
+  internal fun pumpRuntime(runtime: NativeRuntime, timeoutMillis: Long, budgetMillis: Long) {
+    Status.check(runtimePumpFunction().invokeNative(runtime, timeoutMillis, budgetMillis) as Int)
   }
 
   internal fun acquireWakeSource(runtime: NativeRuntime): NativeWakeSource =

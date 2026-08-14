@@ -72,7 +72,7 @@ void main() {
     // id; the C API rejects it on its kind tag.
     expect(
       () => checkNativeStatus(
-        raw.mln_runtime_pump(mapAttachRefIdForTesting(map.attachRef()), 0),
+        raw.mln_runtime_pump(mapAttachRefIdForTesting(map.attachRef()), 0, -1),
         _c.threadLastErrorMessage,
       ),
       throwsA(

@@ -32,7 +32,7 @@ fn waitForOfflineOperation(
 ) !maplibre.OfflineOperationCompletedPayload {
     const operation_id = try operation.operationId();
     for (0..5000) |_| {
-        try runtime.pump(0);
+        try runtime.pump(0, null);
         // One event per drain, so an event this wait is not looking for stays
         // queued for the wait that is. See support.waitForEvent.
         while (true) {
@@ -549,7 +549,7 @@ test "resource transform rewrites network style URL" {
 
     try map.setStyleUrl(testing.allocator, original_url);
     for (0..1000) |_| {
-        try runtime.pump(0);
+        try runtime.pump(0, null);
         _ = try support.drainEvents(&runtime);
         if (replacement_state.calls.load(.seq_cst) > 0) break;
         try sleepOneMillisecond();
@@ -589,7 +589,7 @@ test "failed resource transform replacement keeps previous callback" {
 
     try map.setStyleUrl(testing.allocator, "http://example.invalid/original-style.json");
     for (0..1000) |_| {
-        try runtime.pump(0);
+        try runtime.pump(0, null);
         _ = try support.drainEvents(&runtime);
         if (state.calls.load(.seq_cst) > 0) break;
         try sleepOneMillisecond();
@@ -717,7 +717,7 @@ fn pmtilesRangeProvider(
 
 fn waitForPmtilesRangeRequest(runtime: *maplibre.RuntimeHandle, state: *PmtilesRangeProviderState) !void {
     for (0..1000) |_| {
-        try runtime.pump(0);
+        try runtime.pump(0, null);
         if (state.recorded_pmtiles_request.load(.seq_cst)) return;
         try sleepOneMillisecond();
     }
@@ -1150,7 +1150,7 @@ fn delayedStyleProvider(
 
 fn waitForProviderHandle(runtime: *maplibre.RuntimeHandle, state: *AsyncProviderState) !maplibre.ResourceRequestHandle {
     for (0..1000) |_| {
-        try runtime.pump(0);
+        try runtime.pump(0, null);
         if (state.takeHandle()) |handle| return handle;
         try sleepOneMillisecond();
     }
@@ -1378,7 +1378,7 @@ test "offline region download errors are runtime events" {
 fn waitForRequestCancellation(runtime: *maplibre.RuntimeHandle, handle: maplibre.ResourceRequestHandle) !void {
     for (0..5000) |_| {
         if (try handle.cancelled()) return;
-        try runtime.pump(0);
+        try runtime.pump(0, null);
         try sleepOneMillisecond();
     }
     return error.RequestNotCancelled;
@@ -1432,7 +1432,7 @@ test "offline region download control emits copied status events" {
 
     var observed = false;
     for (0..5000) |_| {
-        try runtime.pump(0);
+        try runtime.pump(0, null);
         var batch = try runtime.drainEvents(testing.allocator, 0);
         defer batch.deinit();
         for (0..batch.len()) |index| {

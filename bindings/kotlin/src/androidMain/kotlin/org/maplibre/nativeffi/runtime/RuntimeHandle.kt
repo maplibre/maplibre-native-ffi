@@ -62,9 +62,9 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
   public actual val isClosed: Boolean
     get() = core.isReleased()
 
-  public actual fun pump(timeoutMillis: Long) {
+  public actual fun pump(timeoutMillis: Long, budgetMillis: Long) {
     NativeAccess.ensureLoaded()
-    Status.check(MaplibreNativeC.mln_runtime_pump(requireLiveHandle(), timeoutMillis))
+    Status.check(MaplibreNativeC.mln_runtime_pump(requireLiveHandle(), timeoutMillis, budgetMillis))
   }
 
   public actual fun acquireWakeSource(): WakeSource {

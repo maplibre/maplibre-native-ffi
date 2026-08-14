@@ -25,7 +25,7 @@ static bool render_until_frame(
     if (result == MLN_RENDER_RESULT_RENDERED) {
       return true;
     }
-    if (mln_runtime_pump(runtime, 0) != MLN_STATUS_OK) {
+    if (mln_runtime_pump(runtime, 0, -1) != MLN_STATUS_OK) {
       return false;
     }
     mln_test_sleep_millisecond();

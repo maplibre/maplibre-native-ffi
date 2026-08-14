@@ -32,7 +32,7 @@ func loadStyleAndCollect(t *testing.T, runtime *RuntimeHandle, m *MapHandle, sty
 	}
 	var events []RuntimeEvent
 	for range make([]struct{}, 200) {
-		if err := runtime.Pump(2 * time.Millisecond); err != nil {
+		if err := runtime.Pump(2*time.Millisecond, -1); err != nil {
 			t.Fatalf("Pump(): %v", err)
 		}
 		batch, err := runtime.DrainEvents(0)

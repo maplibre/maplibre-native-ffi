@@ -43,13 +43,13 @@ static void runtime_rejects_stale_handles(void) {
     MLN_STATUS_INVALID_ARGUMENT, mln_runtime_destroy(runtime)
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_pump(runtime, 0)
+    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_pump(runtime, 0, -1)
   );
 }
 
 static void runtime_pump_rejects_null_runtime(void) {
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_pump(MLN_HANDLE_NULL, 0)
+    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_pump(MLN_HANDLE_NULL, 0, -1)
   );
 }
 

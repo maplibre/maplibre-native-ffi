@@ -10,6 +10,11 @@ canonical Windows drive paths and opens UTF-8 filenames through wide filesystem
 APIs. This lets the local file source load percent-encoded `file:///C:/...`
 resources whose paths contain spaces or non-ASCII characters.
 
+`0003-run-loop-process-gate.patch` adds an optional gate callback to
+`RunLoop::process()`, consulted before each queued task is dequeued. The C API
+uses it to bound one pump's drain; the budget logic stays on the C API side, and
+an unset gate keeps upstream behavior.
+
 Drop a patch once the pin moves to a commit that carries it. Applying is
 idempotent, and the sync restores the files a patch touches before moving the
 submodule, so a pin bump and an edit to a patch both take effect on a worktree

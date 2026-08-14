@@ -1143,6 +1143,28 @@ auto create_runtime(
   owned_runtime->run_loop->setPlatformCallback(
     [state = owned_runtime->wake_state]() -> void { signal_wake(state); }
   );
+  // The gate runs on the owner thread inside the drain, and the runtime owns
+  // the run loop, so the raw pointer cannot outlive it.
+  owned_runtime->run_loop->setProcessGate(
+    [live = owned_runtime.get()]() -> bool {
+      if (!live->pump_deadline.has_value()) {
+        return true;
+      }
+      if (!live->pump_ran_task) {
+        live->pump_ran_task = true;
+        return true;
+      }
+      if (std::chrono::steady_clock::now() < *live->pump_deadline) {
+        return true;
+      }
+      live->pump_budget_exhausted = true;
+      // Denying disarms the gate: a task inside the drain can wait for this
+      // same run loop to empty, and that nested drain must run to completion
+      // rather than spin against an expired budget.
+      live->pump_deadline.reset();
+      return false;
+    }
+  );
   owned_runtime->asset_path =
     options == nullptr || options->asset_path == nullptr
       ? std::string{}
@@ -2959,7 +2981,8 @@ auto signal_wake(const std::shared_ptr<WakeState>& state) noexcept -> void {
   state->condition.notify_all();
 }
 
-auto pump_runtime(mln_runtime runtime, int64_t timeout_ms) -> mln_status {
+auto pump_runtime(mln_runtime runtime, int64_t timeout_ms, int64_t budget_ms)
+  -> mln_status {
   mln::core::RuntimeObject* live = nullptr;
   const auto status = validate_runtime(runtime, live);
   if (status != MLN_STATUS_OK) {
@@ -2992,7 +3015,28 @@ auto pump_runtime(mln_runtime runtime, int64_t timeout_ms) -> mln_status {
     wake.signaled = false;
   }
 
+  if (budget_ms >= 0) {
+    // A budget past the clock's range would overflow the addition, so it
+    // saturates to an unbounded drain.
+    const auto now = std::chrono::steady_clock::now();
+    const auto headroom = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::steady_clock::time_point::max() - now
+    );
+    live->pump_deadline = std::chrono::milliseconds{budget_ms} < headroom
+                            ? now + std::chrono::milliseconds{budget_ms}
+                            : std::chrono::steady_clock::time_point::max();
+  } else {
+    live->pump_deadline.reset();
+  }
+  live->pump_ran_task = false;
+  live->pump_budget_exhausted = false;
   live->run_loop->runOnce();
+  live->pump_deadline.reset();
+  // The gate only denies while a task is queued, so an exhausted budget means
+  // work remains.
+  if (live->pump_budget_exhausted) {
+    signal_wake(live->wake_state);
+  }
   return MLN_STATUS_OK;
 }
 

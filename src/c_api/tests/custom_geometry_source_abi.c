@@ -51,7 +51,7 @@ static void load_style_and_pump(
 ) {
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_set_style_json(map, style_json));
   for (size_t attempt = 0; attempt < style_pump_attempts; attempt += 1) {
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 2));
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 2, -1));
   }
 }
 

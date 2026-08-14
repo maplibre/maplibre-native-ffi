@@ -49,7 +49,7 @@ public sealed unsafe class NativeHandleIdentityTests
         var wrongKind = new MlnRuntime(map.Handle.Value);
 
         var error = Assert.Throws<InvalidArgumentException>(() =>
-            NativeStatus.Check(NativeMethods.mln_runtime_pump(wrongKind, 0))
+            NativeStatus.Check(NativeMethods.mln_runtime_pump(wrongKind, 0, -1))
         );
 
         Assert.Equal(MaplibreStatus.InvalidArgument, error.Status);

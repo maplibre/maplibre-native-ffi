@@ -115,7 +115,7 @@ static void a_runtime_sourced_event_names_its_runtime_handle(void) {
 
   bool saw_completion = false;
   for (int attempt = 0; attempt < 200 && !saw_completion; ++attempt) {
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 50));
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 50, -1));
     mln_runtime_event_batch batch = mln_runtime_event_batch_default();
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK, mln_runtime_drain_events(runtime, 0, &batch)

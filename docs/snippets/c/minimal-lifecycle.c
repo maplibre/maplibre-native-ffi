@@ -41,7 +41,7 @@ int main(void) {
   const time_t deadline = time(NULL) + 30;
   while (!settled && time(NULL) < deadline) {
     // A positive timeout parks the thread until work arrives or it expires.
-    mln_runtime_pump(runtime, 100);
+    mln_runtime_pump(runtime, 100, -1);
 
     mln_runtime_event_batch batch = mln_runtime_event_batch_default();
     mln_runtime_drain_events(runtime, 0, &batch);

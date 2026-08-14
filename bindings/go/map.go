@@ -1070,6 +1070,6 @@ func mapSizeByIDForTest(id nativeMap) error {
 // the distinct Go types make unexpressible in the safe API.
 func pumpRuntimeWithMapIDForTest(id nativeMap) error {
 	return checkNative(func() int32 {
-		return int32(C.mln_runtime_pump(C.mln_runtime(id), 0))
+		return int32(C.mln_runtime_pump(C.mln_runtime(id), 0, -1))
 	})
 }

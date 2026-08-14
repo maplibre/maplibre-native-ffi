@@ -46,7 +46,7 @@ func runRuntimeLoop(v viewport, commands *commandQueue, published chan<- runtime
 			shared.fail(err)
 			break
 		}
-		if err := state.runtime.Pump(runtimeParkTimeout); err != nil {
+		if err := state.runtime.Pump(runtimeParkTimeout, -1); err != nil {
 			shared.fail(fmt.Errorf("runtime pump failed: %w", err))
 			break
 		}

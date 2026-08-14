@@ -26,16 +26,16 @@ test "runtime and map vertical slice" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, &diagnostics);
     defer runtime.close() catch @panic("runtime close failed");
 
-    try runtime.pump(0);
+    try runtime.pump(0, null);
     try testing.expectEqual(@as(usize, 0), try support.drainEvents(&runtime));
 
     var map = try maplibre.MapHandle.create(&runtime, .{});
 
     try map.setStyleJson(testing.allocator, support.style_json);
-    try runtime.pump(0);
+    try runtime.pump(0, null);
 
     try map.close();
-    try runtime.pump(0);
+    try runtime.pump(0, null);
 
     var map_after_close = try maplibre.MapHandle.create(&runtime, .{});
     defer map_after_close.close() catch @panic("map close failed");
@@ -100,7 +100,7 @@ test "copied runtime and map handles share closed state" {
 
     try runtime.close();
     try runtime_alias.close();
-    try testing.expectError(error.ClosedHandle, runtime_alias.pump(0));
+    try testing.expectError(error.ClosedHandle, runtime_alias.pump(0, null));
 }
 
 test "successful close releases lifecycle handles" {
@@ -197,7 +197,7 @@ test "runtime supports multiple maps" {
     var second = try maplibre.MapHandle.create(&runtime, .{});
     defer second.close() catch @panic("second map close failed");
 
-    try runtime.pump(0);
+    try runtime.pump(0, null);
 }
 
 test "style JSON buffers preserve embedded NUL for native validation" {

@@ -28,7 +28,7 @@ static bool wait_for_style_loaded(
 ) {
   out_message[0] = '\0';
   for (unsigned int attempt = 0; attempt < 600; attempt += 1) {
-    if (mln_runtime_pump(runtime, 10) != MLN_STATUS_OK) {
+    if (mln_runtime_pump(runtime, 10, -1) != MLN_STATUS_OK) {
       return false;
     }
     while (true) {
