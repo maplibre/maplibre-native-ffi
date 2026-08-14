@@ -1822,6 +1822,12 @@ pub const MapHandle = enum(c.mln_map) {
         return values.cameraOptionsFromNative(camera);
     }
 
+    /// Computes geographic bounds for a camera from two viewport corners.
+    ///
+    /// The box is the hull of the top-left and bottom-right screen corners for
+    /// that camera in the current viewport. When bearing and pitch are zero, the
+    /// box equals the visible area. Those corners are the northwest and
+    /// southeast of the viewport. Longitudes stay in -180 to 180.
     pub fn latLngBoundsForCamera(self: *MapHandle, camera: values.CameraOptions) status.Error!values.LatLngBounds {
         var raw_camera = values.cameraOptionsToNative(camera);
         var bounds: c.mln_lat_lng_bounds = undefined;
@@ -1829,6 +1835,12 @@ pub const MapHandle = enum(c.mln_map) {
         return values.latLngBoundsFromNative(bounds);
     }
 
+    /// Computes geographic bounds for a camera from the four viewport corners.
+    ///
+    /// The axis-aligned hull of all four screen corners and the center
+    /// encompasses the projected viewport. Longitudes unwrap onto the shortest
+    /// path through the center. A viewport that crosses the antimeridian reports
+    /// values outside -180 to 180.
     pub fn latLngBoundsForCameraUnwrapped(self: *MapHandle, camera: values.CameraOptions) status.Error!values.LatLngBounds {
         var raw_camera = values.cameraOptionsToNative(camera);
         var bounds: c.mln_lat_lng_bounds = undefined;

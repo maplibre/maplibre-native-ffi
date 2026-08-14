@@ -416,7 +416,12 @@ public sealed unsafe class MapHandle : IDisposable
         return MapStructs.CameraOptionsFromNative(camera);
     }
 
-    /// <summary>Calculates geographic bounds for a camera.</summary>
+    /// <summary>Computes geographic bounds for a camera from two viewport corners.</summary>
+    /// <remarks>
+    /// The box is the hull of the top-left and bottom-right screen corners for that camera in the
+    /// current viewport. When bearing and pitch are zero, the box equals the visible area. Those
+    /// corners are the northwest and southeast of the viewport. Longitudes stay in -180 to 180.
+    /// </remarks>
     public LatLngBounds LatLngBoundsForCamera(CameraOptions camera)
     {
         var nativeCamera = MapStructs.ToNative(camera);
@@ -427,7 +432,12 @@ public sealed unsafe class MapHandle : IDisposable
         return MapStructs.FromNative(bounds);
     }
 
-    /// <summary>Calculates unwrapped geographic bounds for a camera.</summary>
+    /// <summary>Computes geographic bounds for a camera from the four viewport corners.</summary>
+    /// <remarks>
+    /// The axis-aligned hull of all four screen corners and the center encompasses the projected
+    /// viewport. Longitudes unwrap onto the shortest path through the center. A viewport that
+    /// crosses the antimeridian reports values outside -180 to 180.
+    /// </remarks>
     public LatLngBounds LatLngBoundsForCameraUnwrapped(CameraOptions camera)
     {
         var nativeCamera = MapStructs.ToNative(camera);
