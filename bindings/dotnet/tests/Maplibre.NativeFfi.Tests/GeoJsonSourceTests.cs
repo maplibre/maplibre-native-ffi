@@ -102,11 +102,15 @@ public sealed class GeoJsonSourceTests
         );
         Assert.Equal(MaplibreStatus.InvalidArgument, error.Status);
 
-        // Cluster properties are exempt from the options match.
+        // Cluster aggregations are part of the options match, so data
+        // prepared with different cluster properties is rejected too.
         var reaggregated = ClusterOptions();
         reaggregated.ClusterProperties = """{"weight_max":["max",["get","weight"]]}"""u8.ToArray();
-        using var compatible = GeoJsonSourceDataHandle.Create(NearbyPoints, reaggregated);
-        map.SetGeoJsonSourceData("clustered", compatible);
+        using var mismatched = GeoJsonSourceDataHandle.Create(NearbyPoints, reaggregated);
+        var propertiesError = Assert.Throws<InvalidArgumentException>(() =>
+            map.SetGeoJsonSourceData("clustered", mismatched)
+        );
+        Assert.Equal(MaplibreStatus.InvalidArgument, propertiesError.Status);
     }
 
     [BindingSpecTest("BND-023", "BND-040")]

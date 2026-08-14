@@ -557,8 +557,13 @@ public final class GeoJSONSourceDataHandle: @unchecked Sendable {
     }
   }
 
-  func requireLiveHandle() throws -> NativeGeoJSONSourceDataHandle {
-    try handle.requireLive()
+  /// Borrows the live handle for the duration of `use`, so a concurrent
+  /// `close()` waits for in-flight installs instead of retiring the native
+  /// handle under them.
+  func withLiveHandle<T>(
+    _ use: (NativeGeoJSONSourceDataHandle) throws -> T
+  ) throws -> T {
+    try handle.withLive(use)
   }
 }
 
@@ -665,11 +670,13 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try checkStatus(mln_map_add_geojson_source_data(
-        requireLiveHandle().raw,
-        arena.view(sourceId),
-        data.requireLiveHandle().raw
-      ))
+      try data.withLiveHandle { prepared in
+        try checkStatus(mln_map_add_geojson_source_data(
+          requireLiveHandle().raw,
+          arena.view(sourceId),
+          prepared.raw
+        ))
+      }
     }
   }
 
@@ -690,8 +697,8 @@ public extension MapHandle {
   /// tiling already happened when the data was prepared.
   ///
   /// The data must have been prepared with options equal to the options the
-  /// source was added with, `clusterProperties` excepted; a mismatch is
-  /// rejected.
+  /// source was added with; cluster aggregation expressions compare by parsed
+  /// equality. A mismatch is rejected.
   func setGeoJSONSourceData(
     sourceId: String,
     data: GeoJSONSourceDataHandle
@@ -699,11 +706,13 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try checkStatus(mln_map_set_geojson_source_data(
-        requireLiveHandle().raw,
-        arena.view(sourceId),
-        data.requireLiveHandle().raw
-      ))
+      try data.withLiveHandle { prepared in
+        try checkStatus(mln_map_set_geojson_source_data(
+          requireLiveHandle().raw,
+          arena.view(sourceId),
+          prepared.raw
+        ))
+      }
     }
   }
 

@@ -856,8 +856,9 @@ MLN_API mln_status mln_map_set_geojson_source_url(
  * still sliced out of the index on a worker unless synchronous tiling is on.
  *
  * The data must have been prepared with options equal to the options the
- * source was added with, cluster_properties excepted, which this call does not
- * compare. A mismatch is rejected, because MapLibre Native fixes a source's
+ * source was added with. Cluster aggregation expressions compare by parsed
+ * equality, so equivalent cluster_properties JSON matches regardless of
+ * formatting. A mismatch is rejected, because MapLibre Native fixes a source's
  * options at creation and data prepared under different options would tile
  * inconsistently with them.
  *

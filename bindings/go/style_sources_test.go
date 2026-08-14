@@ -478,15 +478,15 @@ func TestGeoJSONSourceClusterOptions(t *testing.T) {
 	if !found || sourceType != StyleSourceTypeGeoJSON {
 		t.Fatalf("StyleSourceType(cluster-source) = (%v, %v), want GeoJSON true", sourceType, found)
 	}
-	// Cluster properties are excepted from the options match, so an update
-	// prepared with different aggregations installs on the source.
+	// Different cluster aggregations would change cluster feature properties
+	// under the source's layers, so the options match rejects them.
 	updatedProperties := options.WithClusterProperties([]byte(`{"top":["max",["get","rank"]]}`))
 	update, err := NewGeoJSONSourceData(points, &updatedProperties)
 	if err != nil {
 		t.Fatalf("NewGeoJSONSourceData(updated cluster properties): %v", err)
 	}
-	if err := m.SetGeoJSONSourceData("cluster-source", update); err != nil {
-		t.Fatalf("SetGeoJSONSourceData(updated cluster properties): %v", err)
+	if err := m.SetGeoJSONSourceData("cluster-source", update); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("SetGeoJSONSourceData(updated cluster properties) error = %v, want ErrInvalidArgument", err)
 	}
 	if err := update.Close(); err != nil {
 		t.Fatalf("update Close(): %v", err)

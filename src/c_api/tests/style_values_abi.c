@@ -401,6 +401,55 @@ static void prepared_geojson_data_installs_and_checks_options(void) {
     MLN_STATUS_OK,
     mln_map_set_geojson_source_data(map, clustered_id, clustered_data)
   );
+
+  // Cluster aggregations are part of the options match: a different
+  // expression is rejected, while equivalent JSON with different formatting
+  // compares equal by parsed expression.
+  mln_geojson_source_options aggregated = clustered;
+  aggregated.fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
+  aggregated.cluster_properties =
+    MLN_BUFFER_LITERAL("{\"total\":[\"+\",[\"get\",\"rank\"]]}");
+  const mln_buffer_view aggregated_id = {.data = "aggregated", .size = 10};
+  mln_geojson_source_data aggregated_data = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_geojson_source_data_create(
+                     MLN_BUFFER_LITERAL(points), &aggregated, &aggregated_data
+                   )
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_add_geojson_source_data(map, aggregated_id, aggregated_data)
+  );
+  mln_geojson_source_options reaggregated = aggregated;
+  reaggregated.cluster_properties =
+    MLN_BUFFER_LITERAL("{\"total\":[\"max\",[\"get\",\"rank\"]]}");
+  mln_geojson_source_data reaggregated_data = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_geojson_source_data_create(
+      MLN_BUFFER_LITERAL(points), &reaggregated, &reaggregated_data
+    )
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_geojson_source_data(map, aggregated_id, reaggregated_data)
+  );
+  mln_geojson_source_data_destroy(reaggregated_data);
+  mln_geojson_source_options reformatted = aggregated;
+  reformatted.cluster_properties =
+    MLN_BUFFER_LITERAL(" { \"total\" : [\"+\", [\"get\", \"rank\"]] } ");
+  mln_geojson_source_data reformatted_data = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_geojson_source_data_create(
+                     MLN_BUFFER_LITERAL(points), &reformatted, &reformatted_data
+                   )
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_set_geojson_source_data(map, aggregated_id, reformatted_data)
+  );
+  mln_geojson_source_data_destroy(reformatted_data);
+  mln_geojson_source_data_destroy(aggregated_data);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_set_geojson_source_data(map, plain_id, plain_data)
   );

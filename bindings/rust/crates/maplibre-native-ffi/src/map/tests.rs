@@ -449,14 +449,17 @@ fn set_geojson_source_data_rejects_mismatched_prepared_options() {
         .unwrap_err();
     assert_eq!(error.kind(), ErrorKind::InvalidArgument);
 
-    // cluster_properties is excepted from the comparison.
+    // Cluster aggregations are part of the comparison, so data prepared with
+    // different cluster_properties is rejected too.
     let mut properties_only = options.clone();
     properties_only.cluster_properties =
         Some(serde_json::to_vec(&json!({"weight_sum": ["+", ["get", "weight"]]})).unwrap());
     let properties_only =
         crate::GeoJsonSourceDataHandle::new(bytes, Some(&properties_only)).unwrap();
-    map.set_geojson_source_data("points", &properties_only)
-        .unwrap();
+    let error = map
+        .set_geojson_source_data("points", &properties_only)
+        .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
 
     // The rejected install left the source usable with matching data.
     let matching = crate::GeoJsonSourceDataHandle::new(bytes, Some(&options)).unwrap();

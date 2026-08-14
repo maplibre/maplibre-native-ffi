@@ -1099,15 +1099,30 @@ def test_set_geojson_source_data_rejects_mismatched_baked_in_options() -> None:
         ):
             map_handle.set_geojson_source_data("points", plain)
 
-        # cluster_properties is the one baked-in option allowed to differ.
+        # Different cluster aggregations would change cluster feature
+        # properties under the source's layers, so they are rejected too.
+        with (
+            style.GeoJsonSourceDataHandle(
+                document,
+                style.GeoJsonSourceOptions(
+                    cluster=True,
+                    cluster_properties=_json_object({"renamed": ["+", 1]}),
+                ),
+            ) as reclustered,
+            pytest.raises(mln.InvalidArgumentError),
+        ):
+            map_handle.set_geojson_source_data("points", reclustered)
+
+        # Aggregations compare by parsed expression equality, so equivalent
+        # cluster_properties JSON matches regardless of formatting.
         with style.GeoJsonSourceDataHandle(
             document,
             style.GeoJsonSourceOptions(
                 cluster=True,
-                cluster_properties=_json_object({"renamed": ["+", 1]}),
+                cluster_properties=b' { "names" : ["+", 1] } ',
             ),
-        ) as reclustered:
-            map_handle.set_geojson_source_data("points", reclustered)
+        ) as matching:
+            map_handle.set_geojson_source_data("points", matching)
 
 
 def test_set_geojson_source_synchronous_tiling_overrides_at_runtime() -> None:

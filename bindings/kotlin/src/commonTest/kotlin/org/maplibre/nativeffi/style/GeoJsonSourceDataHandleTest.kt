@@ -79,14 +79,17 @@ class GeoJsonSourceDataHandleTest {
           .use { mismatched -> map.setGeoJsonSourceData("places", mismatched) }
       }
 
-      // clusterProperties is excepted from the options comparison.
-      GeoJsonSourceDataHandle.create(
-          featureCollection(),
-          baseOptions().copy {
-            clusterProperties = "{\"total\":[\"+\",[\"get\",\"rank\"]]}".encodeToByteArray()
-          },
-        )
-        .use { compatible -> map.setGeoJsonSourceData("places", compatible) }
+      // Cluster aggregations are part of the options comparison, so data
+      // prepared with different clusterProperties is rejected too.
+      assertFailsWith<InvalidArgumentException> {
+        GeoJsonSourceDataHandle.create(
+            featureCollection(),
+            baseOptions().copy {
+              clusterProperties = "{\"total\":[\"+\",[\"get\",\"rank\"]]}".encodeToByteArray()
+            },
+          )
+          .use { mismatched -> map.setGeoJsonSourceData("places", mismatched) }
+      }
     }
   }
 

@@ -1,6 +1,8 @@
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -10,7 +12,9 @@
 #include <mbgl/style/conversion/geojson_options.hpp>  // IWYU pragma: keep
 #include <mbgl/style/conversion/json.hpp>
 #include <mbgl/style/conversion_impl.hpp>
+#include <mbgl/tile/tile_id.hpp>
 #include <mbgl/util/geometry.hpp>
+#include <mbgl/util/identity.hpp>
 #include <mbgl/util/rapidjson.hpp>
 
 #include "geojson/geojson_source_data.hpp"
@@ -97,6 +101,70 @@ auto validate_clustered_geojson(const mbgl::GeoJSON& geojson) -> bool {
   }
   return true;
 }
+
+// Serializes tile slicing over a geojson-vt index. The index caches sliced
+// tiles lazily and unguarded, which is safe upstream because one source's
+// requests either all run inline or all run on the data's one sequenced
+// scheduler. A prepared handle installed on several sources, or a synchronous
+// tiling toggle with async slices in flight, mixes those modes on one index,
+// so every slice takes this wrapper's lock instead.
+class SerializedGeoJsonData final : public mbgl::style::GeoJSONData {
+ public:
+  SerializedGeoJsonData(
+    std::shared_ptr<mbgl::style::GeoJSONData> inner,
+    std::shared_ptr<mbgl::Scheduler> scheduler
+  )
+      : inner_(std::move(inner)),
+        scheduler_(std::move(scheduler)),
+        mutex_(std::make_shared<std::mutex>()) {}
+
+  void getTile(
+    const mbgl::CanonicalTileID& id,
+    const std::function<void(TileFeatures)>& fn, bool run_synchronously
+  ) final {
+    if (run_synchronously) {
+      const std::scoped_lock lock(*mutex_);
+      inner_->getTile(id, fn, true);
+      return;
+    }
+    scheduler_->scheduleAndReplyValue(
+      mbgl::util::SimpleIdentity::Empty,
+      [inner = inner_, mutex = mutex_, id]() -> TileFeatures {
+        auto features = TileFeatures{};
+        const std::scoped_lock lock(*mutex);
+        inner->getTile(
+          id,
+          [&features](TileFeatures result) { features = std::move(result); },
+          true
+        );
+        return features;
+      },
+      fn
+    );
+  }
+
+  auto getChildren(std::uint32_t cluster_id) -> Features final {
+    const std::scoped_lock lock(*mutex_);
+    return inner_->getChildren(cluster_id);
+  }
+
+  auto getLeaves(
+    std::uint32_t cluster_id, std::uint32_t limit, std::uint32_t offset
+  ) -> Features final {
+    const std::scoped_lock lock(*mutex_);
+    return inner_->getLeaves(cluster_id, limit, offset);
+  }
+
+  auto getClusterExpansionZoom(std::uint32_t cluster_id) -> std::uint8_t final {
+    const std::scoped_lock lock(*mutex_);
+    return inner_->getClusterExpansionZoom(cluster_id);
+  }
+
+ private:
+  std::shared_ptr<mbgl::style::GeoJSONData> inner_;
+  std::shared_ptr<mbgl::Scheduler> scheduler_;
+  std::shared_ptr<std::mutex> mutex_;
+};
 
 }  // namespace
 
@@ -301,6 +369,41 @@ auto to_native_geojson_source_options(const mln_geojson_source_options& options)
   return mbgl::makeMutable<mbgl::style::GeoJSONOptions>(std::move(native));
 }
 
+namespace {
+
+// Cluster aggregations parse into expression pairs, which carry deep equality,
+// so options prepared from equivalent cluster_properties JSON compare equal.
+auto cluster_properties_equal(
+  const mbgl::style::GeoJSONOptions::ClusterProperties& left,
+  const mbgl::style::GeoJSONOptions::ClusterProperties& right
+) -> bool {
+  if (left.size() != right.size()) {
+    return false;
+  }
+  for (const auto& [key, expressions] : left) {
+    const auto found = right.find(key);
+    if (found == right.end()) {
+      return false;
+    }
+    const auto& [map_expression, reduce_expression] = expressions;
+    const auto& [other_map, other_reduce] = found->second;
+    if (
+      map_expression == nullptr || reduce_expression == nullptr ||
+      other_map == nullptr || other_reduce == nullptr
+    ) {
+      return false;
+    }
+    if (
+      !(*map_expression == *other_map) || !(*reduce_expression == *other_reduce)
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+}  // namespace
+
 auto geojson_source_options_equal(
   const mbgl::style::GeoJSONOptions& left,
   const mbgl::style::GeoJSONOptions& right
@@ -313,7 +416,10 @@ auto geojson_source_options_equal(
          left.clusterRadius == right.clusterRadius &&
          left.clusterMaxZoom == right.clusterMaxZoom &&
          left.clusterMinPoints == right.clusterMinPoints &&
-         left.synchronousUpdate == right.synchronousUpdate;
+         left.synchronousUpdate == right.synchronousUpdate &&
+         cluster_properties_equal(
+           left.clusterProperties, right.clusterProperties
+         );
 }
 
 auto geojson_source_data_create(
@@ -348,9 +454,20 @@ auto geojson_source_data_create(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto index = mbgl::style::GeoJSONData::create(
-    *geojson, mbgl::Scheduler::GetSequenced(), *native_options
-  );
+  auto scheduler = mbgl::Scheduler::GetSequenced();
+  auto index =
+    mbgl::style::GeoJSONData::create(*geojson, scheduler, *native_options);
+  // Supercluster indexes are immutable after construction and always slice
+  // inline, so only the geojson-vt path needs the serializing wrapper. This
+  // mirrors the dispatch inside GeoJSONData::create.
+  const auto clustered = (*native_options)->cluster &&
+                         geojson->is<mbgl::FeatureCollection>() &&
+                         !geojson->get<mbgl::FeatureCollection>().empty();
+  if (!clustered) {
+    index = std::make_shared<SerializedGeoJsonData>(
+      std::move(index), std::move(scheduler)
+    );
+  }
   auto object =
     std::make_shared<GeoJsonSourceDataObject>(GeoJsonSourceDataObject{
       .data = std::move(index),

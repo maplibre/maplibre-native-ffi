@@ -113,7 +113,7 @@ test "GeoJSON preparation bakes in options and validates clustering" {
     ));
 
     // A set rejects data prepared with options that differ from the source's,
-    // cluster_properties excepted.
+    // cluster aggregation expressions included.
     const unclustered = try maplibre.GeoJsonSourceDataHandle.create(testing.allocator, features, null);
     defer unclustered.release();
     try testing.expectError(error.InvalidArgument, map.setGeoJsonSourceData(testing.allocator, "clustered", unclustered));
@@ -122,7 +122,15 @@ test "GeoJSON preparation bakes in options and validates clustering" {
     reproperty_options.cluster_properties = "{\"total\":[\"max\",[\"get\",\"rank\"]]}";
     const repropertied = try maplibre.GeoJsonSourceDataHandle.create(testing.allocator, features, reproperty_options);
     defer repropertied.release();
-    try map.setGeoJsonSourceData(testing.allocator, "clustered", repropertied);
+    try testing.expectError(error.InvalidArgument, map.setGeoJsonSourceData(testing.allocator, "clustered", repropertied));
+
+    // Aggregations compare by parsed equality, so equivalent JSON with
+    // different formatting still matches.
+    var reformatted_options = cluster_options;
+    reformatted_options.cluster_properties = " { \"total\" : [\"+\", [\"get\", \"rank\"]] } ";
+    const reformatted = try maplibre.GeoJsonSourceDataHandle.create(testing.allocator, features, reformatted_options);
+    defer reformatted.release();
+    try map.setGeoJsonSourceData(testing.allocator, "clustered", reformatted);
 }
 
 test "prepared GeoJSON data installs on many sources and outlives release" {

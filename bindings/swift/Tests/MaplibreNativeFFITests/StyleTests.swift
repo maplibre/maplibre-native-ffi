@@ -760,7 +760,8 @@ private func addSourceReportingItsRelease(
   try map.setGeoJSONSourceData(sourceId: "first", data: replacement)
   try map.setGeoJSONSourceData(sourceId: "second", data: replacement)
 
-  // cluster_properties is excepted from the options-equality requirement.
+  // Cluster aggregations are part of the options-equality requirement, so
+  // data prepared with different cluster_properties is rejected.
   var reaggregated = clusterOptions()
   reaggregated.clusterProperties = jsonData(
     #"{"weight_max":["max",["get","weight"]]}"#
@@ -770,7 +771,12 @@ private func addSourceReportingItsRelease(
     options: reaggregated
   )
   defer { try? differentAggregation.close() }
-  try map.setGeoJSONSourceData(sourceId: "first", data: differentAggregation)
+  do {
+    try map.setGeoJSONSourceData(sourceId: "first", data: differentAggregation)
+    Issue.record("different cluster aggregations should throw")
+  } catch let error as MaplibreError {
+    #expect(error.kind == .invalidArgument)
+  }
 }
 
 /// A set rejects data whose baked-in options differ from the options the
