@@ -23,7 +23,9 @@ void run_one_frame(
   mln_runtime runtime, mln_map map, mln_render_session session, bool* pending
 ) {
   // #region pump
-  mln_runtime_pump(runtime, 0);
+  // No park: the display sets the pace. The budget leaves the rest of the
+  // frame to drawing; deferred work re-arms the pump for the next callback.
+  mln_runtime_pump(runtime, 0, 8);
 
   mln_runtime_event_batch batch = mln_runtime_event_batch_default();
   if (mln_runtime_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) return;

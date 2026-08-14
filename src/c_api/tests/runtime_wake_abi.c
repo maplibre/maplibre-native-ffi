@@ -28,16 +28,19 @@ static const size_t idle_quiesce_attempts = 100;
 // for many more pumps than an idle map does, so that one site gets a larger
 // budget instead of a weaker idle check.
 static const size_t session_quiesce_attempts = 500;
+// Each zero-budget pump runs at most one task, and three parses plus their
+// follow-on tasks need well under this many turns.
+static const size_t budget_pump_attempts = 5000;
 
 // Pumps until the runtime is idle: the wake flag is clear and no events are
 // queued. The count is every event the runtime produced, so an idle runtime
 // that keeps producing fails here rather than passing on the first attempt.
 static void quiesce_within(mln_runtime runtime, size_t attempts) {
   for (size_t attempt = 0; attempt < attempts; attempt += 1) {
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0));
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0, -1));
     if (mln_test_drain_all(runtime) == 0) {
       // One more zero pump clears the flag the drained events set.
-      TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0));
+      TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0, -1));
       if (mln_test_drain_all(runtime) == 0) {
         return;
       }
@@ -72,7 +75,7 @@ typedef struct wrong_thread_probe {
 
 static void foreign_thread_entry(void* argument) {
   wrong_thread_probe* probe = argument;
-  atomic_store(&probe->pump_status, mln_runtime_pump(probe->runtime, 0));
+  atomic_store(&probe->pump_status, mln_runtime_pump(probe->runtime, 0, -1));
   mln_wake_source source = MLN_HANDLE_NULL;
   atomic_store(
     &probe->acquire_status,
@@ -114,7 +117,7 @@ static void a_wake_source_releases_a_parked_owner_thread(void) {
 
   const uint64_t started = mln_test_monotonic_milliseconds();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_pump(runtime, park_timeout_milliseconds)
+    MLN_STATUS_OK, mln_runtime_pump(runtime, park_timeout_milliseconds, -1)
   );
   const uint64_t elapsed = mln_test_monotonic_milliseconds() - started;
   // Elapsed time is what separates a signalled wake from an expired timeout.
@@ -143,7 +146,7 @@ static void a_signal_before_the_pump_sets_the_wake_flag(void) {
 
   uint64_t started = mln_test_monotonic_milliseconds();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_pump(runtime, park_timeout_milliseconds)
+    MLN_STATUS_OK, mln_runtime_pump(runtime, park_timeout_milliseconds, -1)
   );
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_monotonic_milliseconds() - started < prompt_return_milliseconds,
@@ -153,7 +156,7 @@ static void a_signal_before_the_pump_sets_the_wake_flag(void) {
   // The pump above cleared the wake flag, so this one waits its full timeout.
   started = mln_test_monotonic_milliseconds();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_pump(runtime, idle_park_milliseconds)
+    MLN_STATUS_OK, mln_runtime_pump(runtime, idle_park_milliseconds, -1)
   );
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_monotonic_milliseconds() - started >=
@@ -188,7 +191,7 @@ static void a_style_response_wakes_a_parked_owner_thread(void) {
   for (size_t attempt = 0; attempt < style_load_attempts && !style_loaded;
        attempt += 1) {
     TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_runtime_pump(runtime, park_timeout_milliseconds)
+      MLN_STATUS_OK, mln_runtime_pump(runtime, park_timeout_milliseconds, -1)
     );
     mln_runtime_event_batch batch = mln_runtime_event_batch_default();
     TEST_ASSERT_EQUAL_INT(
@@ -274,7 +277,7 @@ static void a_session_resize_releases_a_parked_owner_thread(void) {
 
   const uint64_t started = mln_test_monotonic_milliseconds();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_pump(runtime, park_timeout_milliseconds)
+    MLN_STATUS_OK, mln_runtime_pump(runtime, park_timeout_milliseconds, -1)
   );
   const uint64_t elapsed = mln_test_monotonic_milliseconds() - started;
   TEST_ASSERT_TRUE_MESSAGE(
@@ -311,13 +314,13 @@ static void queued_events_return_from_the_pump_immediately(void) {
       map, mln_test_buffer_view(wake_style_json, sizeof(wake_style_json) - 1)
     )
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0, -1));
 
   // The queue holds unread events and the wake flag is clear, so the queued
   // events are what return the pump.
   const uint64_t started = mln_test_monotonic_milliseconds();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_pump(runtime, park_timeout_milliseconds)
+    MLN_STATUS_OK, mln_runtime_pump(runtime, park_timeout_milliseconds, -1)
   );
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_monotonic_milliseconds() - started < prompt_return_milliseconds,
@@ -420,7 +423,7 @@ static void a_released_wake_source_rejects_a_foreign_thread_signal(void) {
 
 static void pump_and_wake_sources_reject_raw_invalid_arguments(void) {
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_pump(MLN_HANDLE_NULL, 0)
+    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_pump(MLN_HANDLE_NULL, 0, -1)
   );
   mln_wake_source source = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
@@ -458,6 +461,51 @@ static void pump_and_wake_sources_reject_raw_invalid_arguments(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// Three style responses, one owner-thread task each, and each task parses its
+// style and queues that map's loaded event. A zero budget grants one task per
+// pump, so no single drain may deliver two style-loaded events, and the
+// deferred tasks must re-arm the pump until every response ran.
+static void a_budgeted_pump_defers_queued_tasks(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  const mln_resource_provider provider = {
+    .size = sizeof(mln_resource_provider),
+    .callback = wake_style_provider,
+    .user_data = NULL,
+  };
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_set_resource_provider(runtime, &provider)
+  );
+  mln_map maps[3];
+  for (size_t index = 0; index < 3; index += 1) {
+    maps[index] = mln_test_create_map(runtime);
+  }
+  quiesce(runtime);
+  for (size_t index = 0; index < 3; index += 1) {
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK, mln_map_set_style_url(maps[index], wake_style_url)
+    );
+  }
+
+  size_t loaded = 0;
+  for (size_t attempt = 0; attempt < budget_pump_attempts; attempt += 1) {
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0, 0));
+    const size_t drained =
+      mln_test_drain_counting(runtime, MLN_RUNTIME_EVENT_MAP_STYLE_LOADED);
+    TEST_ASSERT_LESS_OR_EQUAL_size_t(1, drained);
+    loaded += drained;
+    if (loaded == 3) {
+      break;
+    }
+    mln_test_sleep_millisecond();
+  }
+  TEST_ASSERT_EQUAL_size_t(3, loaded);
+
+  for (size_t index = 0; index < 3; index += 1) {
+    mln_test_destroy_map(maps[index]);
+  }
+  mln_test_destroy_runtime(runtime);
+}
+
 void run_runtime_wake_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(a_wake_source_releases_a_parked_owner_thread);
@@ -469,4 +517,5 @@ void run_runtime_wake_abi_tests(void) {
   RUN_TEST(a_wake_source_outlives_its_runtime);
   RUN_TEST(a_released_wake_source_rejects_a_foreign_thread_signal);
   RUN_TEST(pump_and_wake_sources_reject_raw_invalid_arguments);
+  RUN_TEST(a_budgeted_pump_defers_queued_tasks);
 }

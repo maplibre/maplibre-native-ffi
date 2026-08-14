@@ -2397,7 +2397,7 @@ fn createLoadedMapForTesting(runtime: *RuntimeHandle) !MapHandle {
 fn waitForRuntimeEventForTesting(runtime: *RuntimeHandle, event_type: runtime_module.RuntimeEventType) !bool {
     var attempts: usize = 0;
     while (attempts < 200) : (attempts += 1) {
-        try runtime.pump(0);
+        try runtime.pump(0, null);
         // One event per drain, so an event this wait is not looking for stays
         // queued rather than being dropped with the batch that carried it.
         while (true) {
@@ -2421,7 +2421,7 @@ fn waitForStyleSourceForTesting(
 ) !bool {
     var attempts: usize = 0;
     while (attempts < 200) : (attempts += 1) {
-        try runtime.pump(0);
+        try runtime.pump(0, null);
         var batch = try runtime.drainEvents(std.testing.allocator, 0);
         batch.deinit();
         if (try map.styleSourceExists(std.testing.allocator, source_id)) return true;
@@ -2500,7 +2500,7 @@ test "a style load that drops a source releases the callback state unsubscribed"
     try map.setStyleUrl(std.testing.allocator, "custom://style.json");
     var released = false;
     for (0..200) |_| {
-        try runtime.pump(0);
+        try runtime.pump(0, null);
         var batch = try runtime.drainEvents(std.testing.allocator, 0);
         defer batch.deinit();
         for (0..batch.len()) |index| {
@@ -2606,7 +2606,7 @@ test "a map id passed to a runtime operation is rejected on its kind" {
     // expression in the safe API and needs the raw id.
     try std.testing.expectError(
         error.InvalidArgument,
-        status.checkStatus(c.mln_runtime_pump(@intFromEnum(map), 0), null),
+        status.checkStatus(c.mln_runtime_pump(@intFromEnum(map), 0, -1), null),
     );
     const message = std.mem.span(c.mln_thread_last_error_message());
     try std.testing.expect(std.mem.indexOf(u8, message, "map") != null);

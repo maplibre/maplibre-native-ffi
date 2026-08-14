@@ -701,18 +701,21 @@ submission time.
 
 ### Parking and wake
 
-The pump is one method taking a timeout. Bindings expose it alongside a wake
-source handle.
+The pump is one method taking a timeout and a drain budget. Bindings expose it
+alongside a wake source handle.
 
 The pump wrapper follows this design:
 
 1. It takes the host language's duration or timeout type, maps zero to a
    non-blocking drain, and maps the language's "no timeout" spelling to an
    unbounded park.
-2. It releases the host runtime's blocking-call machinery for the duration of
+2. It takes the budget the same way, maps the language's "no budget" spelling to
+   an unbounded drain, and defaults to unbounded where the language has default
+   arguments.
+3. It releases the host runtime's blocking-call machinery for the duration of
    the call, including any interpreter lock, so other host threads run while the
    owner thread parks.
-3. Its documentation states that a wake signal sets a flag the pump clears, and
+4. Its documentation states that a wake signal sets a flag the pump clears, and
    that callers drain events after every return.
 
 The wake source follows this design:

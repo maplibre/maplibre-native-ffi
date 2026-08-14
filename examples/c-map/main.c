@@ -49,7 +49,7 @@ static app_error runtime_loop_body(runtime_loop_args* args, map_state* state) {
       break;
     }
     const mln_status pump_status =
-      mln_runtime_pump(state->runtime, park_timeout_milliseconds);
+      mln_runtime_pump(state->runtime, park_timeout_milliseconds, -1);
     if (pump_status != MLN_STATUS_OK) {
       diagnostics_log_status("runtime pump failed", pump_status);
       error = APP_ERROR_RUNTIME_PUMP_FAILED;

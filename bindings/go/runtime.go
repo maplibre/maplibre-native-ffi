@@ -636,9 +636,18 @@ func (runtime *RuntimeHandle) ptr() (nativeRuntime, func(), error) {
 // and ready file descriptors set the flag only when they queue owner-thread
 // work, so pass a bounded timeout to cap how long a call waits.
 //
+// budget bounds the drain: a negative value drains without a bound, and zero
+// or a positive value stops the drain at the first task boundary after that
+// long, measured from the start of the drain. The first queued task always
+// runs, so a bounded pump always makes progress, and tasks left behind set the
+// wake flag so the next Pump returns without parking and continues them. The
+// budget bounds the task queues alone: expired timers and ready file
+// descriptors are serviced regardless, and a task runs to completion once
+// started, so one long task can overrun the budget.
+//
 // A non-zero timeout blocks the calling goroutine and its OS thread. Call it
 // outside any lock that a goroutine signalling a WakeSource takes.
-func (runtime *RuntimeHandle) Pump(timeout time.Duration) error {
+func (runtime *RuntimeHandle) Pump(timeout time.Duration, budget time.Duration) error {
 	ptr, release, err := runtime.ptr()
 	if err != nil {
 		return err
@@ -650,8 +659,14 @@ func (runtime *RuntimeHandle) Pump(timeout time.Duration) error {
 	if timeout >= 0 {
 		timeoutMS = int64(timeout / time.Millisecond)
 	}
+	budgetMS := int64(-1)
+	if budget >= 0 {
+		budgetMS = int64(budget / time.Millisecond)
+	}
 	return checkNative(func() int32 {
-		return int32(C.mln_runtime_pump(C.mln_runtime(ptr), C.int64_t(timeoutMS)))
+		return int32(C.mln_runtime_pump(
+			C.mln_runtime(ptr), C.int64_t(timeoutMS), C.int64_t(budgetMS),
+		))
 	})
 }
 

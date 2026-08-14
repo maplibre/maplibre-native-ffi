@@ -2322,7 +2322,7 @@ fn pick_vulkan_physical_device(
 fn wait_for_runtime_event(runtime: &mut RuntimeHandle, event_type: RuntimeEventType) -> bool {
     let deadline = Instant::now() + Duration::from_secs(5);
     while Instant::now() < deadline {
-        let _ = runtime.pump(Some(Duration::ZERO));
+        let _ = runtime.pump(Some(Duration::ZERO), None);
         let found = runtime
             .drain_events(0)
             .map(|batch| batch.iter().any(|event| event.event_type() == event_type))
@@ -2431,7 +2431,7 @@ fn render_available_updates(
 }
 
 fn render_pending_updates(runtime: &mut RuntimeHandle, session: &RenderSessionHandle) {
-    let _ = runtime.pump(Some(Duration::ZERO));
+    let _ = runtime.pump(Some(Duration::ZERO), None);
     let updates = runtime
         .drain_events(0)
         .map(|batch| {
@@ -2709,7 +2709,7 @@ fn dedicated_opengl_surface_session_renders_and_keeps_its_context_current() {
     let deadline = Instant::now() + Duration::from_secs(5);
     let mut result = RenderResult::NoUpdate;
     while result != RenderResult::Rendered && Instant::now() < deadline {
-        let _ = runtime.pump(Some(Duration::ZERO));
+        let _ = runtime.pump(Some(Duration::ZERO), None);
         result = session.render_update().unwrap();
         if result != RenderResult::Rendered {
             std::thread::sleep(Duration::from_millis(10));
@@ -2951,7 +2951,7 @@ fn set_target_hands_a_live_session_a_new_borrowed_texture() {
     let deadline = Instant::now() + Duration::from_secs(5);
     let mut rendered_into_replacement = false;
     while Instant::now() < deadline && !rendered_into_replacement {
-        let _ = runtime.pump(Some(Duration::ZERO));
+        let _ = runtime.pump(Some(Duration::ZERO), None);
         let _ = runtime.drain_events(0);
         if session.render_update().unwrap() == RenderResult::Rendered {
             rendered_into_replacement = texture
@@ -3570,7 +3570,7 @@ fn sustained_render_loop_outlasts_the_graphics_queue_depth() {
         camera.center = Some(LatLng::new(37.0, -122.0));
         camera.zoom = Some(10.0 + f64::from(step % 8) * 0.25);
         map.jump_to(&camera).unwrap();
-        let _ = runtime.pump(Some(Duration::ZERO));
+        let _ = runtime.pump(Some(Duration::ZERO), None);
         let updates = runtime
             .drain_events(0)
             .map(|batch| {
@@ -3684,7 +3684,7 @@ fn resize_updates_owned_texture_frame_extent() {
     // A static map renders only on request, and the map applies the new logical
     // size on its next pump. Requesting the still image first spends it on an
     // update the session's size gate discards, so pump the resize through.
-    runtime.pump(Some(Duration::ZERO)).unwrap();
+    runtime.pump(Some(Duration::ZERO), None).unwrap();
     map.request_still_image().unwrap();
     let deadline = Instant::now() + Duration::from_secs(5);
     while Instant::now() < deadline {
@@ -3730,7 +3730,7 @@ fn render_update_reports_size_pending_until_the_map_applies_a_resize() {
     let deadline = Instant::now() + Duration::from_secs(5);
     let mut result = RenderResult::SizePending;
     while Instant::now() < deadline && result != RenderResult::Rendered {
-        let _ = runtime.pump(Some(Duration::ZERO));
+        let _ = runtime.pump(Some(Duration::ZERO), None);
         let _ = runtime.drain_events(0);
         result = session.render_update().unwrap();
         if result != RenderResult::Rendered {
@@ -3763,11 +3763,11 @@ fn map_size_follows_attach_and_resize_and_keeps_the_creation_scale_factor() {
     )
     .expect("Metal or Vulkan owned texture test session should attach when supported");
     assert_eq!(map.size().unwrap(), (64, 32, 2.0));
-    runtime.pump(Some(Duration::ZERO)).unwrap();
+    runtime.pump(Some(Duration::ZERO), None).unwrap();
     assert_eq!(map.size().unwrap(), (32, 16, 2.0));
 
     session.resize(48, 24, 1.0).unwrap();
-    runtime.pump(Some(Duration::ZERO)).unwrap();
+    runtime.pump(Some(Duration::ZERO), None).unwrap();
     assert_eq!(map.size().unwrap(), (48, 24, 2.0));
 
     session.close().unwrap();
@@ -3909,7 +3909,7 @@ fn a_second_thread_attaches_a_session_and_renders() {
         while !worker.is_finished() && Instant::now() < deadline {
             // A short park rather than zero: spinning would burn the deadline
             // before the worker made progress.
-            runtime.pump(Some(Duration::from_millis(2))).unwrap();
+            runtime.pump(Some(Duration::from_millis(2)), None).unwrap();
             let _ = runtime.drain_events(0).unwrap();
         }
         worker.join().expect("worker thread should not panic");
@@ -4132,7 +4132,7 @@ fn texture_readback_copies_metadata_and_fills_reusable_buffers_when_supported() 
     let content_deadline = Instant::now() + Duration::from_secs(5);
     let mut rendered_the_style = false;
     while Instant::now() < content_deadline && !rendered_the_style {
-        let _ = runtime.pump(Some(Duration::ZERO));
+        let _ = runtime.pump(Some(Duration::ZERO), None);
         let _ = runtime.drain_events(0);
         let _ = session.render_update();
         session
@@ -4329,7 +4329,7 @@ fn identified_camera_transition_reports_its_end_once_when_it_runs_to_completion(
     let mut finished_at: Option<Instant> = None;
     let deadline = Instant::now() + Duration::from_secs(10);
     while Instant::now() < deadline {
-        let _ = runtime.pump(Some(Duration::ZERO));
+        let _ = runtime.pump(Some(Duration::ZERO), None);
         let mut updates = 0;
         for event in runtime.drain_events(0).unwrap().iter() {
             match event.event_type() {

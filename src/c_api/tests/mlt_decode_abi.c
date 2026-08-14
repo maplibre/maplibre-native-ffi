@@ -73,7 +73,7 @@ static size_t query_admin_feature_count(
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK, mln_render_session_render_update(session, &render_result)
     );
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0));
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0, -1));
 
     mln_buffer result = MLN_HANDLE_NULL;
     const mln_status status = mln_render_session_query_source_features(

@@ -1153,9 +1153,21 @@ MLN_API mln_status mln_runtime_destroy(mln_runtime runtime) MLN_NOEXCEPT;
  *
  * The drain runs every task queued when it begins plus every task those tasks
  * enqueue, and services expired timers and ready file descriptors for the
- * runtime's own network and database work. Its duration follows the work it
- * finds and can span a full style parse, so it is not a fixed-cost per-frame
- * slice.
+ * runtime's own network and database work.
+ *
+ * budget_ms bounds the drain:
+ *
+ * - A negative value drains without a bound. One unbounded drain can span a
+ *   full style parse, so budget for it as variable work.
+ * - Zero or a positive value stops the drain at the first task boundary after
+ *   that many milliseconds, measured from the start of the drain. The first
+ *   queued task always runs, so a bounded pump always makes progress. Tasks
+ *   left behind set the wake flag, so the next pump returns without parking
+ *   and continues them.
+ *
+ * The budget bounds the task queues alone. Expired timers and ready file
+ * descriptors are serviced regardless, and a single task runs to completion
+ * once started, so one long task can overrun the budget.
  *
  * The runtime holds a wake flag. These set it:
  *
@@ -1190,8 +1202,9 @@ MLN_API mln_status mln_runtime_destroy(mln_runtime runtime) MLN_NOEXCEPT;
  *   owner thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status
-mln_runtime_pump(mln_runtime runtime, int64_t timeout_ms) MLN_NOEXCEPT;
+MLN_API mln_status mln_runtime_pump(
+  mln_runtime runtime, int64_t timeout_ms, int64_t budget_ms
+) MLN_NOEXCEPT;
 
 /**
  * Acquires a wake source that releases this runtime's parked owner thread.

@@ -61,7 +61,7 @@ void pump_until_stopped(
 
   // #region loop
   while (!atomic_load(&channel->stop_requested)) {
-    mln_runtime_pump(runtime, park_timeout_ms);
+    mln_runtime_pump(runtime, park_timeout_ms, -1);
     drain_events(runtime, map, channel);
   }
   // #endregion loop
