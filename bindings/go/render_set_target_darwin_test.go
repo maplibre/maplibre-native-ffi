@@ -69,11 +69,14 @@ func TestSetTargetRejectsOtherTargetKindsDarwin(t *testing.T) {
 
 	// Both rejections leave the session rendering into the target it has, which
 	// holds no style yet.
-	result, err := session.RenderUpdate()
+	update, err := session.RenderUpdate()
 	if err != nil {
 		t.Fatalf("RenderUpdate() after rejected target replacement: %v", err)
 	}
-	if result != RenderResultNoUpdate {
-		t.Fatalf("RenderUpdate() after rejected target replacement = %v, want RenderResultNoUpdate", result)
+	if update.Result != RenderResultNoUpdate {
+		t.Fatalf("RenderUpdate() after rejected target replacement = %v, want RenderResultNoUpdate", update.Result)
+	}
+	if update.NeedsRepaint {
+		t.Fatal("RenderUpdate() NeedsRepaint = true, want false when Result is not RenderResultRendered")
 	}
 }

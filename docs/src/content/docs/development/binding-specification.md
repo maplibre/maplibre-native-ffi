@@ -864,8 +864,9 @@ The public handle exposes:
 - `resize` for session kinds that support resize;
 - `set_target` for session kinds whose target the host owns, which is surface
   sessions and caller-owned texture sessions;
-- `render_update` for the latest available map render update, reporting the
-  render result as a public enum;
+- `render_update` for the latest available map render update, reporting a public
+  `RenderUpdate` value that pairs the render result enum with the frame's
+  repaint flag;
 - `detach`, which keeps the public handle live after backend resources detach;
 - `close` or `destroy`, using the owned-handle release operation, on the thread
   that attached the session.

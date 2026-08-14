@@ -19,7 +19,11 @@ static bool render_until_frame(
 ) {
   for (unsigned int attempt = 0; attempt < 200; attempt += 1) {
     mln_render_result result = MLN_RENDER_RESULT_NO_UPDATE;
-    if (mln_render_session_render_update(session, &result) != MLN_STATUS_OK) {
+    bool needs_repaint = false;
+    if (
+      mln_render_session_render_update(session, &result, &needs_repaint) !=
+      MLN_STATUS_OK
+    ) {
       return false;
     }
     if (result == MLN_RENDER_RESULT_RENDERED) {

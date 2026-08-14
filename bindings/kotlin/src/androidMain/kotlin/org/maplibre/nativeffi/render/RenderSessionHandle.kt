@@ -114,12 +114,19 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
     )
   }
 
-  public actual fun renderUpdate(): RenderResult {
+  public actual fun renderUpdate(): RenderUpdate {
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("render")
     val outResult = intArrayOf(0)
-    Status.check(MaplibreNativeC.mln_render_session_render_update(requireLiveHandle(), outResult))
-    return RenderResult.fromNative(outResult[0])
+    val outNeedsRepaint = booleanArrayOf(false)
+    Status.check(
+      MaplibreNativeC.mln_render_session_render_update(
+        requireLiveHandle(),
+        outResult,
+        outNeedsRepaint,
+      )
+    )
+    return RenderUpdate(RenderResult.fromNative(outResult[0]), outNeedsRepaint[0])
   }
 
   public actual fun detach() {

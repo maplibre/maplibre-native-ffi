@@ -26,6 +26,7 @@ import kotlinx.cinterop.staticCFunction
 import kotlinx.cinterop.toLong
 import kotlinx.cinterop.usePinned
 import org.maplibre.nativeffi.Maplibre
+import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
@@ -93,8 +94,73 @@ class RenderSessionHandleTest {
             )
           )
         try {
-          assertEquals(RenderResult.NO_UPDATE, session.renderUpdate())
+          assertEquals(RenderResult.NO_UPDATE, session.renderUpdate().result)
           session.resize(32, 16, 1.0)
+        } finally {
+          session.close()
+        }
+      } finally {
+        map.close()
+      }
+    } finally {
+      runtime.close()
+    }
+  }
+
+  @Test
+  fun renderUpdateReportsNeedsRepaintDuringCameraTransition() {
+    if (!metalSupportedOrInapplicable()) return
+    val device =
+      MTLCreateSystemDefaultDevice() ?: error("MTLCreateSystemDefaultDevice returned nil")
+    val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
+    try {
+      val map =
+        MapHandle.create(
+          runtime,
+          MapOptions().apply {
+            width = 64
+            height = 64
+          },
+        )
+      try {
+        val session =
+          map.attachMetalOwnedTexture(
+            MetalOwnedTextureDescriptor(
+              extent = RenderTargetExtent(32, 16, 1.0),
+              context = MetalContextDescriptor(NativePointer.ofAddress(device.address())),
+            )
+          )
+        try {
+          map.setStyleJson(QUERY_STYLE_JSON.encodeToByteArray())
+          assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE))
+
+          // Render until the map settles: the last frame asks for no repaint.
+          var update = session.renderUpdate()
+          for (attempt in 0 until 500) {
+            if (update.result == RenderResult.RENDERED && !update.needsRepaint) break
+            runtime.pump(0)
+            update = session.renderUpdate()
+            usleep(1_000U)
+          }
+          assertEquals(RenderResult.RENDERED, update.result)
+          assertFalse(update.needsRepaint)
+
+          map.easeTo(
+            CameraOptions().apply { zoom = 4.0 },
+            AnimationOptions().apply { durationMs = 60_000.0 },
+          )
+
+          var sawRepaintRequest = false
+          for (attempt in 0 until 500) {
+            runtime.pump(0)
+            update = session.renderUpdate()
+            if (update.result == RenderResult.RENDERED && update.needsRepaint) {
+              sawRepaintRequest = true
+              break
+            }
+            usleep(1_000U)
+          }
+          assertTrue(sawRepaintRequest)
         } finally {
           session.close()
         }
@@ -154,7 +220,7 @@ class RenderSessionHandleTest {
 
           map.setStyleJson(QUERY_STYLE_JSON.encodeToByteArray())
           assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE))
-          assertEquals(RenderResult.RENDERED, session.renderUpdate())
+          assertEquals(RenderResult.RENDERED, session.renderUpdate().result)
 
           val sessionCallError = AtomicReference<Throwable?>(null)
           spawnSessionRenderOnNativeThread(session, sessionCallError)
@@ -166,7 +232,7 @@ class RenderSessionHandleTest {
           assertEquals(MaplibreStatus.WRONG_THREAD, sessionCallWrongThread.status)
           assertTrue(sessionCallDiagnostic.isNotBlank())
 
-          assertEquals(RenderResult.RENDERED, session.renderUpdate())
+          assertEquals(RenderResult.RENDERED, session.renderUpdate().result)
 
           assertEquals(sessionCallDiagnostic, sessionCallWrongThread.diagnostic)
 
@@ -327,9 +393,9 @@ class RenderSessionHandleTest {
           // the map publishes an update matching the new target only once
           // pumped.
           session.resize(16, 8, 2.0)
-          assertEquals(RenderResult.SIZE_PENDING, session.renderUpdate())
+          assertEquals(RenderResult.SIZE_PENDING, session.renderUpdate().result)
           runtime.pump(0)
-          assertEquals(RenderResult.RENDERED, session.renderUpdate())
+          assertEquals(RenderResult.RENDERED, session.renderUpdate().result)
           session.detach()
           assertFailsWith<InvalidStateException> { session.renderUpdate() }
           assertFalse(session.isClosed)
@@ -384,7 +450,7 @@ class RenderSessionHandleTest {
             assertTrue(
               waitForMapEvent(runtime, borrowedMap, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE)
             )
-            assertEquals(RenderResult.RENDERED, session.renderUpdate())
+            assertEquals(RenderResult.RENDERED, session.renderUpdate().result)
             assertFailsWith<UnsupportedFeatureException> { session.acquireMetalOwnedTextureFrame() }
             assertFailsWith<UnsupportedFeatureException> { session.textureImageInfo() }
           } finally {
@@ -419,7 +485,7 @@ class RenderSessionHandleTest {
             assertTrue(
               waitForMapEvent(runtime, surfaceMap, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE)
             )
-            assertEquals(RenderResult.RENDERED, session.renderUpdate())
+            assertEquals(RenderResult.RENDERED, session.renderUpdate().result)
             assertFailsWith<UnsupportedFeatureException> { session.acquireMetalOwnedTextureFrame() }
             assertFailsWith<UnsupportedFeatureException> { session.textureImageInfo() }
           } finally {
@@ -475,7 +541,7 @@ class RenderSessionHandleTest {
             assertTrue(
               waitForMapEvent(runtime, borrowedMap, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE)
             )
-            assertEquals(RenderResult.RENDERED, session.renderUpdate())
+            assertEquals(RenderResult.RENDERED, session.renderUpdate().result)
 
             // A caller-owned texture is sized by its owner, so the host
             // reallocates and hands the replacement over instead of resizing.
@@ -496,9 +562,9 @@ class RenderSessionHandleTest {
             )
             session.setMetalBorrowedTextureTarget(replacement)
             assertSame(borrowedMap, session.map())
-            assertEquals(RenderResult.SIZE_PENDING, session.renderUpdate())
+            assertEquals(RenderResult.SIZE_PENDING, session.renderUpdate().result)
             runtime.pump(0)
-            assertEquals(RenderResult.RENDERED, session.renderUpdate())
+            assertEquals(RenderResult.RENDERED, session.renderUpdate().result)
             // The session paints the texture it was handed, not the one it had.
             assertTrue(
               readMetalTextureRgba(device, replacementTexture, 16, 8).any { it != 0.toByte() },
@@ -539,7 +605,7 @@ class RenderSessionHandleTest {
             assertTrue(
               waitForMapEvent(runtime, surfaceMap, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE)
             )
-            assertEquals(RenderResult.RENDERED, session.renderUpdate())
+            assertEquals(RenderResult.RENDERED, session.renderUpdate().result)
 
             // A recreated host surface replaces the presentation target while
             // the session and its renderer go on living.
@@ -551,9 +617,9 @@ class RenderSessionHandleTest {
               )
             )
             assertSame(surfaceMap, session.map())
-            assertEquals(RenderResult.SIZE_PENDING, session.renderUpdate())
+            assertEquals(RenderResult.SIZE_PENDING, session.renderUpdate().result)
             runtime.pump(0)
-            assertEquals(RenderResult.RENDERED, session.renderUpdate())
+            assertEquals(RenderResult.RENDERED, session.renderUpdate().result)
           } finally {
             session.close()
           }
@@ -692,7 +758,7 @@ class RenderSessionHandleTest {
           map.addGeoJsonSourceData("cluster-source", clusterPoints(), clusterSourceOptions())
           map.addStyleLayerJson(clusterCircleLayer(), "")
           assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE))
-          assertEquals(RenderResult.RENDERED, session.renderUpdate())
+          assertEquals(RenderResult.RENDERED, session.renderUpdate().result)
 
           val queryPoint = map.pixelForLatLng(LatLng(0.0, 0.0))
           val queryGeometry =
@@ -880,7 +946,7 @@ class RenderSessionHandleTest {
     runtime.pump(0)
     for (event in runtime.drainEvents().events) {
       if (event.type == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE && event.mapSource == map) {
-        assertEquals(RenderResult.RENDERED, session.renderUpdate())
+        assertEquals(RenderResult.RENDERED, session.renderUpdate().result)
         return
       }
     }

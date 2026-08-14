@@ -54,11 +54,15 @@ A display-paced host stops pumping when it stops requesting frames. Request a
 frame after every map change. This lets an idle loop process the change.
 
 Draw a pending frame after draining events. The render call reports which
-outcome it reached, and only a rendered frame clears the pending flag. A
-no-update result and a pending-size result both mean that the map has not
-published an update for the session's extent, which is expected at startup and
-after an attach or resize. A target-not-ready result means that the render
-target had no frame to draw into, so the next turn tries again.
+outcome it reached. A no-update result and a pending-size result both mean that
+the map has not published an update for the session's extent, which is expected
+at startup and after an attach or resize. A target-not-ready result means that
+the render target had no frame to draw into, so the next turn tries again.
+
+A rendered frame clears the pending flag, unless the map asked for another
+frame while rendering this one, as during a camera transition. The render call
+returns that repaint flag directly, so the loop re-arms in the same turn
+instead of waiting for the frame's events to arrive.
 
 <Code code={region(frameLoop, "render")} lang="c" title="frame-loop.c" />
 

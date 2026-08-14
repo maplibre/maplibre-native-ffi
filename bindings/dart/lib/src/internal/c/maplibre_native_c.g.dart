@@ -1837,10 +1837,17 @@ external int mln_render_session_remove_feature_state(
   ffi.Pointer<mln_feature_state_selector> selector,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_render_session, ffi.Pointer<ffi.Uint32>)>()
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_render_session,
+    ffi.Pointer<ffi.Uint32>,
+    ffi.Pointer<ffi.Bool>,
+  )
+>()
 external int mln_render_session_render_update(
   int session,
   ffi.Pointer<ffi.Uint32> out_result,
+  ffi.Pointer<ffi.Bool> out_needs_repaint,
 );
 
 @ffi.Native<

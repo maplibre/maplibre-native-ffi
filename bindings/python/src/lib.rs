@@ -4026,20 +4026,25 @@ impl RenderSessionHandle {
         })
     }
 
-    fn render_update(&self) -> PyResult<u32> {
+    fn render_update(&self) -> PyResult<(u32, bool)> {
         let state = self
             .state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         state.ensure_no_frame_acquired()?;
         let mut result = sys::MLN_RENDER_RESULT_NO_UPDATE;
+        let mut needs_repaint = false;
         // SAFETY: The C API validates the render-session pointer and state, and
-        // result points to caller-owned output storage.
+        // result and needs_repaint point to caller-owned output storage.
         maplibre_core::check(unsafe {
-            sys::mln_render_session_render_update(state.native(), &raw mut result)
+            sys::mln_render_session_render_update(
+                state.native(),
+                &raw mut result,
+                &raw mut needs_repaint,
+            )
         })
         .map_err(map_error)?;
-        Ok(result)
+        Ok((result, needs_repaint))
     }
 
     fn detach(&self) -> PyResult<DetachedRenderSessionHandle> {

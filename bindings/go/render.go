@@ -68,6 +68,22 @@ const (
 	RenderResultTargetNotReady RenderResult = RenderResult(C.MLN_RENDER_RESULT_TARGET_NOT_READY)
 )
 
+// RenderUpdate is the outcome of a successful RenderSessionHandle.RenderUpdate
+// call.
+type RenderUpdate struct {
+	// Result is what the call produced; each value names the wake a host
+	// waits for before it calls again.
+	Result RenderResult
+	// NeedsRepaint reports whether the map asked for another frame while it
+	// rendered this one, as during an ongoing camera transition. It is true
+	// only when Result is RenderResultRendered and reads false for every other
+	// outcome. This is the same signal a RuntimeEventMapRenderFrameFinished
+	// event carries in its NeedsRepaint field, delivered here without the
+	// event round trip, so a host can re-arm its frame loop before it drains
+	// events.
+	NeedsRepaint bool
+}
+
 // OpenGLContextOwnership names how a session's OpenGL context relates to the
 // thread that attached it.
 type OpenGLContextOwnership uint32
@@ -943,24 +959,25 @@ func (session *RenderSessionHandle) setTarget(call func(nativeRenderSession) int
 // RenderResultNoUpdate and RenderResultSizePending resolve on a
 // RuntimeEventMapRenderUpdateAvailable event, and RenderResultTargetNotReady
 // resolves when the host changes the render target.
-func (session *RenderSessionHandle) RenderUpdate() (RenderResult, error) {
+func (session *RenderSessionHandle) RenderUpdate() (RenderUpdate, error) {
 	ptr, release, err := session.ptr()
 	if err != nil {
-		return RenderResultNoUpdate, err
+		return RenderUpdate{}, err
 	}
 	defer release()
 	defer session.state.KeepAlive()
 	defer session.parent.state.KeepAlive()
 	var result C.mln_render_result
+	var needsRepaint C.bool
 	err = session.withNoAcquiredFrame(func() error {
 		return checkNative(func() int32 {
-			return int32(C.mln_render_session_render_update(C.mln_render_session(ptr), &result))
+			return int32(C.mln_render_session_render_update(C.mln_render_session(ptr), &result, &needsRepaint))
 		})
 	})
 	if err != nil {
-		return RenderResultNoUpdate, err
+		return RenderUpdate{}, err
 	}
-	return RenderResult(result), nil
+	return RenderUpdate{Result: RenderResult(result), NeedsRepaint: bool(needsRepaint)}, nil
 }
 
 // Detach detaches the render target from the session. The session stays live

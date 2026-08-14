@@ -10419,6 +10419,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -10430,7 +10431,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_render_update(mln_render_session session, mln_render_result *out_result)
+     * mln_status mln_render_session_render_update(mln_render_session session, mln_render_result *out_result, bool *out_needs_repaint)
      * }
      */
     public static FunctionDescriptor mln_render_session_render_update$descriptor() {
@@ -10440,7 +10441,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_render_update(mln_render_session session, mln_render_result *out_result)
+     * mln_status mln_render_session_render_update(mln_render_session session, mln_render_result *out_result, bool *out_needs_repaint)
      * }
      */
     public static MethodHandle mln_render_session_render_update$handle() {
@@ -10450,7 +10451,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_render_update(mln_render_session session, mln_render_result *out_result)
+     * mln_status mln_render_session_render_update(mln_render_session session, mln_render_result *out_result, bool *out_needs_repaint)
      * }
      */
     public static MemorySegment mln_render_session_render_update$address() {
@@ -10459,16 +10460,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_render_session_render_update(mln_render_session session, mln_render_result *out_result)
+     * mln_status mln_render_session_render_update(mln_render_session session, mln_render_result *out_result, bool *out_needs_repaint)
      * }
      */
-    public static int mln_render_session_render_update(long session, MemorySegment out_result) {
+    public static int mln_render_session_render_update(long session, MemorySegment out_result, MemorySegment out_needs_repaint) {
         var mh$ = mln_render_session_render_update.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_render_session_render_update", session, out_result);
+                traceDowncall("mln_render_session_render_update", session, out_result, out_needs_repaint);
             }
-            return (int)mh$.invokeExact(session, out_result);
+            return (int)mh$.invokeExact(session, out_result, out_needs_repaint);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {

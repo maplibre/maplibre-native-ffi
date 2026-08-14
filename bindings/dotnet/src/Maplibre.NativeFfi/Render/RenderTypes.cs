@@ -38,6 +38,15 @@ public enum RenderResult : uint
     TargetNotReady = 3,
 }
 
+/// <summary>
+/// Outcome of a successful render-update call. <see cref="NeedsRepaint"/> is true only when
+/// <see cref="Result"/> is <see cref="RenderResult.Rendered"/> and the map asked for another
+/// frame while it rendered this one, as during an ongoing camera transition. This is the same
+/// signal that a map-render-frame-finished event carries in its repaint flag, delivered without
+/// the event round trip.
+/// </summary>
+public readonly record struct RenderUpdate(RenderResult Result, bool NeedsRepaint);
+
 /// <summary>Render backend support flags reported by the native library.</summary>
 [Flags]
 public enum RenderBackend : uint
