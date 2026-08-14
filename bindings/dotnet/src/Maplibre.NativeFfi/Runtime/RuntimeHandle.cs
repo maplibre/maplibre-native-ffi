@@ -699,7 +699,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
     /// completion once started, so one long task can overrun the budget.
     /// </para>
     /// </remarks>
-    public void Pump(TimeSpan timeout, TimeSpan? budget = null)
+    public void Pump(TimeSpan timeout, TimeSpan? budget)
     {
         var timeoutMilliseconds = timeout < TimeSpan.Zero ? -1L : (long)timeout.TotalMilliseconds;
         var budgetMilliseconds =
@@ -709,6 +709,12 @@ public sealed unsafe class RuntimeHandle : IDisposable
         NativeStatus.Check(
             NativeMethods.mln_runtime_pump(Handle, timeoutMilliseconds, budgetMilliseconds)
         );
+    }
+
+    /// <inheritdoc cref="Pump(TimeSpan, TimeSpan?)" />
+    public void Pump(TimeSpan timeout)
+    {
+        Pump(timeout, null);
     }
 
     /// <summary>

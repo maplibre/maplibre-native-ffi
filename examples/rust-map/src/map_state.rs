@@ -83,7 +83,7 @@ fn pump(
         state.apply_commands(commands)?;
         // No display paces this thread, so it parks in the pump until the
         // runtime has work or the render loop signals the wake source.
-        state.runtime.pump(Some(PARK_TIMEOUT))?;
+        state.runtime.pump(Some(PARK_TIMEOUT), None)?;
         if state.drain_events()? {
             shared.request_render();
         }
