@@ -53,9 +53,9 @@ from .style import (
     StyleImage,
     StyleImageInfo,
     StyleImageOptions,
+    StyleLayerInfo,
     StyleLayerVisibility,
     StyleSourceInfo,
-    StyleSourceType,
     StyleTransitionOptions,
     TileSourceOptions,
 )
@@ -225,7 +225,12 @@ class CameraSnapshot:
 
 @dataclass(frozen=True, slots=True)
 class MapSnapshot:
-    """Latest immutable state published by the map worker."""
+    """Latest immutable state published by the map worker.
+
+    Every committed map command publishes a snapshot, so a snapshot whose
+    ``generation`` is at or past a command's reported generation observes that
+    commit.
+    """
 
     generation: int
     camera: CameraOptions
@@ -234,11 +239,16 @@ class MapSnapshot:
     scale_factor: float
     projection_mode: ProjectionMode
     viewport: MapViewportOptions
-    loading: bool
-    fully_rendered: bool
+    debug_options: MapDebugOptions
+    fully_loaded: bool
+    """Whether every requested style and tile resource finished loading."""
+    rendering_stats_view_enabled: bool
     repaint_demand: bool
     event_mask: RuntimeEventMask
     latest_render_update_generation: int
+    tile: MapTileOptions
+    bounds: BoundOptions
+    free_camera: FreeCameraOptions
 
     @classmethod
     def _from_native(cls, raw: dict[str, object]) -> MapSnapshot:
@@ -250,11 +260,15 @@ class MapSnapshot:
             scale_factor=raw["scale_factor"],
             projection_mode=ProjectionMode._from_native(raw["projection_mode"]),
             viewport=MapViewportOptions._from_native(raw["viewport"]),
-            loading=raw["loading"],
-            fully_rendered=raw["fully_rendered"],
+            debug_options=MapDebugOptions(raw["debug_options"]),
+            fully_loaded=raw["fully_loaded"],
+            rendering_stats_view_enabled=raw["rendering_stats_view_enabled"],
             repaint_demand=raw["repaint_demand"],
             event_mask=RuntimeEventMask(raw["event_mask"]),
             latest_render_update_generation=raw["latest_render_update_generation"],
+            tile=MapTileOptions._from_native(raw["tile"]),
+            bounds=BoundOptions._from_native(raw["bounds"]),
+            free_camera=FreeCameraOptions._from_native(raw["free_camera"]),
         )
 
 
@@ -508,7 +522,14 @@ def lat_lng_for_projected_meters(meters: ProjectedMeters) -> LatLng:
 
 
 class MapProjectionHandle(NativeHandleMixin):
-    """Any-thread standalone projection helper."""
+    """Any-thread standalone projection helper.
+
+    Every method is synchronous, thread-safe, and internally serialized. A
+    projection copies the map transform once at creation and never observes
+    map changes made after that, while its own setters apply before they
+    return, so a later read or conversion observes them. A live projection
+    prevents its map from closing.
+    """
 
     _handle_name = "MapProjectionHandle"
 
@@ -522,24 +543,24 @@ class MapProjectionHandle(NativeHandleMixin):
     def _from_native(cls, native: object) -> MapProjectionHandle:
         return cls(native, _create_key=_MAP_PROJECTION_HANDLE_CREATE_KEY)
 
-    def set_camera(self, camera: CameraOptions) -> int:
-        """Submit camera fields and return the command ID."""
-        return self._native.set_camera(*_camera_parts(camera))
+    def set_camera(self, camera: CameraOptions) -> None:
+        """Apply camera fields to this projection before returning."""
+        self._native.set_camera(*_camera_parts(camera))
 
     def set_visible_coordinates(
         self,
         coordinates: list[LatLng] | tuple[LatLng, ...],
         padding: EdgeInsets,
-    ) -> int:
-        """Submit a visible-coordinate fit and return its command ID."""
-        return self._native.set_visible_coordinates(
+    ) -> None:
+        """Apply a visible-coordinate camera fit before returning."""
+        self._native.set_visible_coordinates(
             [(coordinate.latitude, coordinate.longitude) for coordinate in coordinates],
             (padding.top, padding.left, padding.bottom, padding.right),
         )
 
-    def set_visible_geometry(self, geometry: bytes, padding: EdgeInsets) -> int:
-        """Submit a visible-geometry fit and return its command ID."""
-        return self._native.set_visible_geometry(
+    def set_visible_geometry(self, geometry: bytes, padding: EdgeInsets) -> None:
+        """Apply a visible-geometry camera fit before returning."""
+        self._native.set_visible_geometry(
             geometry,
             (padding.top, padding.left, padding.bottom, padding.right),
         )
@@ -550,15 +571,20 @@ class MapProjectionHandle(NativeHandleMixin):
         return self._native.closed
 
     def close(self) -> None:
-        """Release this projection handle exactly once."""
+        """Release this projection handle exactly once.
+
+        The close is synchronous: it waits for projection calls already
+        running on other threads and releases the projection's map child
+        reservation before it returns.
+        """
         self._native.close()
 
     def get_camera(self) -> CameraOptions:
-        """Return an ordered camera snapshot."""
+        """Return the projection camera, observing every earlier setter."""
         return CameraOptions._from_native(self._native.get_camera())
 
     def pixel_for_lat_lng(self, coordinate: LatLng) -> ScreenPoint:
-        """Convert a geographic coordinate to a screen-space point in order."""
+        """Convert a geographic coordinate to a screen-space point."""
         raw = self._native.pixel_for_lat_lng(
             coordinate.latitude,
             coordinate.longitude,
@@ -566,7 +592,7 @@ class MapProjectionHandle(NativeHandleMixin):
         return ScreenPoint(x=raw["x"], y=raw["y"])
 
     def lat_lng_for_pixel(self, point: ScreenPoint) -> LatLng:
-        """Convert a screen-space point to a geographic coordinate in order."""
+        """Convert a screen-space point to a geographic coordinate."""
         raw = self._native.lat_lng_for_pixel(point.x, point.y)
         return LatLng(latitude=raw["latitude"], longitude=raw["longitude"])
 
@@ -665,24 +691,19 @@ class MapHandle(NativeHandleMixin):
         return RuntimeEventMask(self._native.get_event_mask())
 
     def set_debug_options(self, options: MapDebugOptions) -> int:
-        """Submit debug overlay mask bits and return the command ID."""
+        """Submit debug overlay mask bits and return the command ID.
+
+        Read the committed value back from :attr:`MapSnapshot.debug_options`.
+        """
         return self._native.set_debug_options(int(options))
 
-    def get_debug_options(self) -> MapDebugOptions:
-        """Return the current MapLibre debug overlay mask bits."""
-        return MapDebugOptions(self._native.get_debug_options())
-
     def set_rendering_stats_view_enabled(self, enabled: bool) -> int:
-        """Submit rendering-stats visibility and return the command ID."""
+        """Submit rendering-stats visibility and return the command ID.
+
+        Read the committed value back from
+        :attr:`MapSnapshot.rendering_stats_view_enabled`.
+        """
         return self._native.set_rendering_stats_view_enabled(enabled)
-
-    def get_rendering_stats_view_enabled(self) -> bool:
-        """Return whether MapLibre's rendering stats overlay view is enabled."""
-        return self._native.get_rendering_stats_view_enabled()
-
-    def is_fully_loaded(self) -> bool:
-        """Return whether MapLibre currently considers the map fully loaded."""
-        return self._native.is_fully_loaded()
 
     def dump_debug_logs(self) -> int:
         """Submit a debug-log command and return its command ID."""
@@ -704,12 +725,11 @@ class MapHandle(NativeHandleMixin):
         """Copy the latest immutable map-state generation."""
         return MapSnapshot._from_native(self._native.snapshot())
 
-    def get_viewport_options(self) -> MapViewportOptions:
-        """Return live map viewport and render-transform controls."""
-        return MapViewportOptions._from_native(self._native.get_viewport_options())
-
     def set_viewport_options(self, options: MapViewportOptions) -> int:
-        """Submit viewport controls and return the command ID."""
+        """Submit viewport controls and return the command ID.
+
+        Read the committed values back from :attr:`MapSnapshot.viewport`.
+        """
         frustum_offset = (
             (
                 options.frustum_offset.top,
@@ -729,12 +749,11 @@ class MapHandle(NativeHandleMixin):
             frustum_offset,
         )
 
-    def get_tile_options(self) -> MapTileOptions:
-        """Return tile prefetch and LOD tuning controls."""
-        return MapTileOptions._from_native(self._native.get_tile_options())
-
     def set_tile_options(self, options: MapTileOptions) -> int:
-        """Submit tile prefetch and LOD controls and return the command ID."""
+        """Submit tile prefetch and LOD controls and return the command ID.
+
+        Read the committed values back from :attr:`MapSnapshot.tile`.
+        """
         return self._native.set_tile_options(
             options.prefetch_zoom_delta,
             options.lod_min_radius,
@@ -901,23 +920,23 @@ class MapHandle(NativeHandleMixin):
             self._native.add_raster_dem_source_tiles, source_id, tiles, options
         )
 
-    def remove_style_source(self, source_id: str) -> bool:
-        """Remove a style source by ID and report whether it existed."""
+    def remove_style_source(self, source_id: str) -> int:
+        """Submit a style source removal and return the command ID.
+
+        The command's terminal event reports ``FAILED`` with
+        :attr:`MaplibreStatus.NOT_FOUND` when no style source has the ID and
+        ``FAILED`` with :attr:`MaplibreStatus.INVALID_STATE` while a layer
+        still uses the source. Re-check existence through
+        :meth:`get_style_source_info`.
+        """
         return self._native.remove_style_source(source_id)
 
-    def style_source_exists(self, source_id: str) -> bool:
-        """Return whether a style source ID exists."""
-        return self._native.style_source_exists(source_id)
-
-    def get_style_source_type(self, source_id: str) -> StyleSourceType | None:
-        """Return a style source type, or None when the source is missing."""
-        from .style import StyleSourceType
-
-        raw = self._native.get_style_source_type(source_id)
-        return StyleSourceType(raw) if raw is not None else None
-
     def get_style_source_info(self, source_id: str) -> StyleSourceInfo | None:
-        """Return copied retained metadata for one style source."""
+        """Return copied retained metadata for one style source.
+
+        The result is None when the source is missing, so this is also the
+        existence check.
+        """
         from .style import StyleSourceInfo
 
         raw = self._native.get_style_source_info(source_id)
@@ -992,17 +1011,25 @@ class MapHandle(NativeHandleMixin):
             image_id,
         )
 
-    def remove_style_layer(self, layer_id: str) -> bool:
-        """Remove a style layer by ID and report whether it existed."""
+    def remove_style_layer(self, layer_id: str) -> int:
+        """Submit a style layer removal and return the command ID.
+
+        The command's terminal event reports ``FAILED`` with
+        :attr:`MaplibreStatus.NOT_FOUND` when no style layer has the ID.
+        Re-check existence through :meth:`get_style_layer_info`.
+        """
         return self._native.remove_style_layer(layer_id)
 
-    def style_layer_exists(self, layer_id: str) -> bool:
-        """Return whether a style layer ID exists."""
-        return self._native.style_layer_exists(layer_id)
+    def get_style_layer_info(self, layer_id: str) -> StyleLayerInfo | None:
+        """Return copied fixed metadata for one style layer.
 
-    def get_style_layer_type(self, layer_id: str) -> str | None:
-        """Return a style layer type string, or None when the layer is missing."""
-        return self._native.get_style_layer_type(layer_id)
+        The result is None when the layer is missing, so this is also the
+        existence check.
+        """
+        from .style import StyleLayerInfo
+
+        raw = self._native.get_style_layer_info(layer_id)
+        return StyleLayerInfo._from_native(raw) if raw is not None else None
 
     def list_style_layer_ids(self) -> tuple[str, ...]:
         """Return style layer IDs in style order."""
@@ -1106,40 +1133,27 @@ class MapHandle(NativeHandleMixin):
     def set_layer_min_zoom(self, layer_id: str, min_zoom: float) -> int:
         """Set the lowest zoom at which one layer draws.
 
-        Pass ``-math.inf`` for no lower bound.
+        Pass ``-math.inf`` for no lower bound. Read the value back from
+        :attr:`StyleLayerInfo.min_zoom`.
         """
         return self._native.set_layer_min_zoom(layer_id, min_zoom)
-
-    def get_layer_min_zoom(self, layer_id: str) -> float:
-        """Return the lowest zoom at which one layer draws.
-
-        A layer with no lower bound reports ``-math.inf``.
-        """
-        return self._native.get_layer_min_zoom(layer_id)
 
     def set_layer_max_zoom(self, layer_id: str, max_zoom: float) -> int:
         """Set the highest zoom at which one layer draws.
 
-        Pass ``math.inf`` for no upper bound.
+        Pass ``math.inf`` for no upper bound. Read the value back from
+        :attr:`StyleLayerInfo.max_zoom`.
         """
         return self._native.set_layer_max_zoom(layer_id, max_zoom)
-
-    def get_layer_max_zoom(self, layer_id: str) -> float:
-        """Return the highest zoom at which one layer draws.
-
-        A layer with no upper bound reports ``math.inf``.
-        """
-        return self._native.get_layer_max_zoom(layer_id)
 
     def set_layer_visibility(
         self, layer_id: str, visibility: StyleLayerVisibility
     ) -> int:
-        """Set whether one layer draws."""
-        return self._native.set_layer_visibility(layer_id, int(visibility))
+        """Set whether one layer draws.
 
-    def get_layer_visibility(self, layer_id: str) -> StyleLayerVisibility:
-        """Return whether one layer draws."""
-        return StyleLayerVisibility(self._native.get_layer_visibility(layer_id))
+        Read the value back from :attr:`StyleLayerInfo.visibility`.
+        """
+        return self._native.set_layer_visibility(layer_id, int(visibility))
 
     def set_style_image(
         self,
@@ -1196,16 +1210,21 @@ class MapHandle(NativeHandleMixin):
             tuple(ImageStretch(from_, to) for from_, to in stretch_y),
         )
 
-    def remove_style_image(self, image_id: str) -> bool:
-        """Remove a runtime style image by ID and report whether it existed."""
+    def remove_style_image(self, image_id: str) -> int:
+        """Submit a runtime style image removal and return the command ID.
+
+        The command's terminal event reports ``FAILED`` with
+        :attr:`MaplibreStatus.NOT_FOUND` when no runtime style image has the
+        ID. Re-check existence through :meth:`get_style_image_info`.
+        """
         return self._native.remove_style_image(image_id)
 
-    def style_image_exists(self, image_id: str) -> bool:
-        """Return whether a runtime style image ID exists."""
-        return self._native.style_image_exists(image_id)
-
     def get_style_image_info(self, image_id: str) -> StyleImageInfo | None:
-        """Return fixed metadata for one runtime style image."""
+        """Return fixed metadata for one runtime style image.
+
+        The result is None when the image is missing, so this is also the
+        existence check.
+        """
         from .style import StyleImageInfo
 
         raw = self._native.get_style_image_info(image_id)
@@ -1387,24 +1406,18 @@ class MapHandle(NativeHandleMixin):
             northeast=LatLng(**raw["northeast"]),
         )
 
-    def get_bounds(self) -> BoundOptions:
-        """Return map camera constraint options."""
-        from .camera import BoundOptions
-
-        return BoundOptions._from_native(self._native.get_bounds())
-
     def set_bounds(self, bounds: BoundOptions) -> int:
-        """Submit map camera constraints and return the command ID."""
+        """Submit map camera constraints and return the command ID.
+
+        Read the committed values back from :attr:`MapSnapshot.bounds`.
+        """
         return self._native.set_bounds(*_bounds_parts(bounds))
 
-    def get_free_camera_options(self) -> FreeCameraOptions:
-        """Return the current free camera position and orientation."""
-        from .camera import FreeCameraOptions
-
-        return FreeCameraOptions._from_native(self._native.get_free_camera_options())
-
     def set_free_camera_options(self, options: FreeCameraOptions) -> int:
-        """Submit free-camera fields and return the command ID."""
+        """Submit free-camera fields and return the command ID.
+
+        Read the committed values back from :attr:`MapSnapshot.free_camera`.
+        """
         position = (
             (options.position.x, options.position.y, options.position.z)
             if options.position is not None

@@ -33,12 +33,9 @@ public sealed class StyleLayerTests
             "missing-image-name"
         );
 
-        Assert.True(await map.StyleLayerExistsAsync("hillshade"));
-        Assert.Equal("hillshade", await map.StyleLayerTypeAsync("hillshade"));
-        Assert.True(await map.StyleLayerExistsAsync("relief"));
-        Assert.Equal("color-relief", await map.StyleLayerTypeAsync("relief"));
-        Assert.True(await map.StyleLayerExistsAsync("location"));
-        Assert.Equal("location-indicator", await map.StyleLayerTypeAsync("location"));
+        Assert.Equal("hillshade", (await map.StyleLayerInfoAsync("hillshade"))?.Type);
+        Assert.Equal("color-relief", (await map.StyleLayerInfoAsync("relief"))?.Type);
+        Assert.Equal("location-indicator", (await map.StyleLayerInfoAsync("location"))?.Type);
     }
 
     [BindingSpecTest("BND-105")]
@@ -66,23 +63,38 @@ public sealed class StyleLayerTests
         Assert.Equal(string.Empty, await map.GetLayerSourceIdAsync("bg"));
 
         // An unset zoom range crosses the boundary as infinities.
-        Assert.Equal(double.NegativeInfinity, await map.GetLayerMinZoomAsync("fill"));
-        Assert.Equal(double.PositiveInfinity, await map.GetLayerMaxZoomAsync("fill"));
+        var unset = Assert.IsType<LayerInfo>(await map.StyleLayerInfoAsync("fill"));
+        Assert.Equal(double.NegativeInfinity, unset.MinZoom);
+        Assert.Equal(double.PositiveInfinity, unset.MaxZoom);
         Assert.NotEqual(0ul, map.SetLayerMinZoom("fill", 4));
         Assert.NotEqual(0ul, map.SetLayerMaxZoom("fill", 12.5));
-        Assert.Equal(4, await map.GetLayerMinZoomAsync("fill"));
-        Assert.Equal(12.5, await map.GetLayerMaxZoomAsync("fill"));
 
-        Assert.Equal(StyleLayerVisibility.Visible, await map.GetLayerVisibilityAsync("fill"));
+        Assert.Equal(StyleLayerVisibility.Visible, unset.Visibility);
         Assert.NotEqual(0ul, map.SetLayerVisibility("fill", StyleLayerVisibility.None));
-        Assert.Equal(StyleLayerVisibility.None, await map.GetLayerVisibilityAsync("fill"));
+
+        // The layer-info aggregate reports everything at once, and its source ID and
+        // source layer match the dedicated copy operations.
+        var info = Assert.IsType<LayerInfo>(await map.StyleLayerInfoAsync("fill"));
+        Assert.Equal("fill", info.Id);
+        Assert.Equal("fill", info.Type);
+        Assert.Equal(4, info.MinZoom);
+        Assert.Equal(12.5, info.MaxZoom);
+        Assert.Equal(StyleLayerVisibility.None, info.Visibility);
+        Assert.Equal((uint)StyleLayerVisibility.None, info.RawVisibility);
+        Assert.Equal("geo", info.SourceId);
+        Assert.Equal("roads", info.SourceLayer);
+        Assert.Equal(await map.GetLayerSourceIdAsync("fill"), info.SourceId);
+        Assert.Equal(await map.GetLayerSourceLayerAsync("fill"), info.SourceLayer);
 
         // An unknown raw visibility is accepted as a command, then leaves the value unchanged.
         Assert.NotEqual(0ul, map.SetLayerVisibility("fill", (StyleLayerVisibility)900));
-        Assert.Equal(StyleLayerVisibility.None, await map.GetLayerVisibilityAsync("fill"));
-        await Assert.ThrowsAsync<InvalidArgumentException>(() =>
-            map.GetLayerMinZoomAsync("missing")
+        Assert.Equal(
+            StyleLayerVisibility.None,
+            (await map.StyleLayerInfoAsync("fill"))?.Visibility
         );
+
+        // A missing layer reports not found rather than throwing.
+        Assert.Null(await map.StyleLayerInfoAsync("missing"));
     }
 
     [BindingSpecTest("BND-061")]

@@ -1,6 +1,5 @@
 package org.maplibre.nativeffi.map
 
-import org.bytedeco.javacpp.LongPointer
 import org.maplibre.nativeffi.NativeAccess
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.EdgeInsets
@@ -11,54 +10,39 @@ import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
-import org.maplibre.nativeffi.runtime.RuntimeHandle
-import org.maplibre.nativeffi.runtime.startOperation
 
-/** Owned Android JNI standalone projection snapshot. */
-public actual class MapProjectionHandle
-internal constructor(private val runtime: RuntimeHandle, private val handleId: Long) {
+/**
+ * Owned Android JNI standalone projection snapshot.
+ *
+ * Every call is synchronous, runs on the calling thread, is internally serialized, and may be made
+ * from any thread. A projection copies the map's transform state at creation and never observes map
+ * changes made after that; a live projection prevents its map from closing.
+ */
+public actual class MapProjectionHandle internal constructor(private val handleId: Long) {
   private val core = HandleStateCore("MapProjectionHandle", handleId)
 
   init {
     HandleLeakCleaner.register(this, core.leakReport)
   }
 
-  public actual suspend fun camera(): CameraOptions {
+  public actual fun camera(): CameraOptions {
     NativeAccess.ensureLoaded()
-    val operation = startOperation { outOperation ->
-      MaplibreNativeC.mln_map_projection_get_camera_start(requireLiveHandle(), outOperation)
-    }
-    try {
-      runtime.awaitOperation(operation)
-      MaplibreNativeC.mln_camera_options_default().use { outCamera ->
-        Status.check(
-          MaplibreNativeC.mln_map_projection_get_camera_take_result(operation, outCamera)
-        )
-        return projectionCameraOptions(outCamera)
-      }
-    } finally {
-      MaplibreNativeC.mln_operation_release(operation)
+    MaplibreNativeC.mln_camera_options_default().use { outCamera ->
+      Status.check(MaplibreNativeC.mln_map_projection_get_camera(requireLiveHandle(), outCamera))
+      return projectionCameraOptions(outCamera)
     }
   }
 
-  public actual fun setCamera(camera: CameraOptions): Long {
+  public actual fun setCamera(camera: CameraOptions) {
     NativeAccess.ensureLoaded()
     ProjectionCameraOptionsScope(camera).use { nativeCamera ->
-      LongPointer(1).use { outCommandId ->
-        outCommandId.put(0, 0L)
-        Status.check(
-          MaplibreNativeC.mln_map_projection_set_camera(
-            requireLiveHandle(),
-            nativeCamera.options,
-            outCommandId,
-          )
-        )
-        return outCommandId.get()
-      }
+      Status.check(
+        MaplibreNativeC.mln_map_projection_set_camera(requireLiveHandle(), nativeCamera.options)
+      )
     }
   }
 
-  public actual fun setVisibleCoordinates(coordinates: List<LatLng>, padding: EdgeInsets): Long {
+  public actual fun setVisibleCoordinates(coordinates: List<LatLng>, padding: EdgeInsets) {
     NativeAccess.ensureLoaded()
     ProjectionLatLngArrayScope(coordinates).use { nativeCoordinates ->
       MaplibreNativeC.mln_edge_insets()
@@ -67,24 +51,19 @@ internal constructor(private val runtime: RuntimeHandle, private val handleId: L
         .bottom(padding.bottom)
         .right(padding.right)
         .use { nativePadding ->
-          LongPointer(1).use { outCommandId ->
-            outCommandId.put(0, 0L)
-            Status.check(
-              MaplibreNativeC.mln_map_projection_set_visible_coordinates(
-                requireLiveHandle(),
-                nativeCoordinates.coordinates,
-                nativeCoordinates.count,
-                nativePadding,
-                outCommandId,
-              )
+          Status.check(
+            MaplibreNativeC.mln_map_projection_set_visible_coordinates(
+              requireLiveHandle(),
+              nativeCoordinates.coordinates,
+              nativeCoordinates.count,
+              nativePadding,
             )
-            return outCommandId.get()
-          }
+          )
         }
     }
   }
 
-  public actual fun setVisibleGeometry(geometry: ByteArray, padding: EdgeInsets): Long {
+  public actual fun setVisibleGeometry(geometry: ByteArray, padding: EdgeInsets) {
     NativeAccess.ensureLoaded()
     ByteArrayViewScope(geometry).use { nativeGeometry ->
       MaplibreNativeC.mln_edge_insets()
@@ -93,87 +72,57 @@ internal constructor(private val runtime: RuntimeHandle, private val handleId: L
         .bottom(padding.bottom)
         .right(padding.right)
         .use { nativePadding ->
-          LongPointer(1).use { outCommandId ->
-            outCommandId.put(0, 0L)
-            Status.check(
-              MaplibreNativeC.mln_map_projection_set_visible_geometry(
-                requireLiveHandle(),
-                nativeGeometry.view,
-                nativePadding,
-                outCommandId,
-              )
+          Status.check(
+            MaplibreNativeC.mln_map_projection_set_visible_geometry(
+              requireLiveHandle(),
+              nativeGeometry.view,
+              nativePadding,
             )
-            return outCommandId.get()
-          }
+          )
         }
     }
   }
 
-  public actual suspend fun pixelForLatLng(coordinate: LatLng): ScreenPoint {
+  public actual fun pixelForLatLng(coordinate: LatLng): ScreenPoint {
     NativeAccess.ensureLoaded()
-    val operation = startOperation { outOperation ->
-      MaplibreNativeC.mln_map_projection_pixel_for_lat_lng_start(
-        requireLiveHandle(),
-        MaplibreNativeC.mln_lat_lng().latitude(coordinate.latitude).longitude(coordinate.longitude),
-        outOperation,
-      )
-    }
-    try {
-      runtime.awaitOperation(operation)
-      MaplibreNativeC.mln_screen_point().use { outPoint ->
-        Status.check(
-          MaplibreNativeC.mln_map_projection_pixel_for_lat_lng_take_result(operation, outPoint)
+    MaplibreNativeC.mln_screen_point().use { outPoint ->
+      Status.check(
+        MaplibreNativeC.mln_map_projection_pixel_for_lat_lng(
+          requireLiveHandle(),
+          MaplibreNativeC.mln_lat_lng()
+            .latitude(coordinate.latitude)
+            .longitude(coordinate.longitude),
+          outPoint,
         )
-        return ScreenPoint(outPoint.x(), outPoint.y())
-      }
-    } finally {
-      MaplibreNativeC.mln_operation_release(operation)
+      )
+      return ScreenPoint(outPoint.x(), outPoint.y())
     }
   }
 
-  public actual suspend fun latLngForPixel(point: ScreenPoint): LatLng {
+  public actual fun latLngForPixel(point: ScreenPoint): LatLng {
     NativeAccess.ensureLoaded()
-    val operation = startOperation { outOperation ->
-      MaplibreNativeC.mln_map_projection_lat_lng_for_pixel_start(
-        requireLiveHandle(),
-        MaplibreNativeC.mln_screen_point().x(point.x).y(point.y),
-        outOperation,
-      )
-    }
-    try {
-      runtime.awaitOperation(operation)
-      MaplibreNativeC.mln_lat_lng().use { outCoordinate ->
-        Status.check(
-          MaplibreNativeC.mln_map_projection_lat_lng_for_pixel_take_result(operation, outCoordinate)
+    MaplibreNativeC.mln_lat_lng().use { outCoordinate ->
+      Status.check(
+        MaplibreNativeC.mln_map_projection_lat_lng_for_pixel(
+          requireLiveHandle(),
+          MaplibreNativeC.mln_screen_point().x(point.x).y(point.y),
+          outCoordinate,
         )
-        return LatLng(outCoordinate.latitude(), outCoordinate.longitude())
-      }
-    } finally {
-      MaplibreNativeC.mln_operation_release(operation)
+      )
+      return LatLng(outCoordinate.latitude(), outCoordinate.longitude())
     }
   }
 
   public actual val isClosed: Boolean
     get() = core.isReleased()
 
-  public actual suspend fun close() {
+  public actual fun close() {
     if (!core.beginClose()) return
-    val operation =
-      try {
-        startOperation { outOperation ->
-          MaplibreNativeC.mln_map_projection_close_start(handleId, outOperation)
-        }
-      } catch (error: Throwable) {
-        core.abortClose()
-        throw error
-      }
     try {
-      runtime.awaitOperation(operation)
+      Status.check(MaplibreNativeC.mln_map_projection_close(handleId))
     } catch (error: Throwable) {
       core.abortClose()
       throw error
-    } finally {
-      MaplibreNativeC.mln_operation_release(operation)
     }
     core.completeClose()
   }

@@ -1,7 +1,9 @@
 package org.maplibre.nativeffi.map
 
+import org.maplibre.nativeffi.camera.BoundOptions
 import org.maplibre.nativeffi.camera.CameraSnapshot
 import org.maplibre.nativeffi.camera.CameraUpdate
+import org.maplibre.nativeffi.camera.FreeCameraOptions
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
@@ -27,9 +29,9 @@ import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.ImageStretch
+import org.maplibre.nativeffi.style.LayerInfo
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.SourceInfo
-import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImage
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
@@ -96,19 +98,9 @@ private constructor(
       NativeAccess.addStyleSourceJson(requireLiveHandle(), sourceId, sourceJson)
     }
 
-  public actual suspend fun removeStyleSource(sourceId: String): Boolean {
+  public actual fun removeStyleSource(sourceId: String): ULong = command { outCommandId ->
     NativeAccess.ensureLoaded()
-    return NativeAccess.removeStyleSource(requireLiveHandle(), sourceId, runtime::awaitOperation)
-  }
-
-  public actual suspend fun styleSourceExists(sourceId: String): Boolean {
-    NativeAccess.ensureLoaded()
-    return NativeAccess.styleSourceExists(requireLiveHandle(), sourceId, runtime::awaitOperation)
-  }
-
-  public actual suspend fun styleSourceType(sourceId: String): SourceType? {
-    NativeAccess.ensureLoaded()
-    return NativeAccess.styleSourceType(requireLiveHandle(), sourceId, runtime::awaitOperation)
+    NativeAccess.removeStyleSource(requireLiveHandle(), sourceId)
   }
 
   public actual suspend fun styleSourceInfo(sourceId: String): SourceInfo? {
@@ -259,14 +251,9 @@ private constructor(
     NativeAccess.setStyleImage(requireLiveHandle(), imageId, image, options)
   }
 
-  public actual suspend fun removeStyleImage(imageId: String): Boolean {
+  public actual fun removeStyleImage(imageId: String): ULong = command { outCommandId ->
     NativeAccess.ensureLoaded()
-    return NativeAccess.removeStyleImage(requireLiveHandle(), imageId, runtime::awaitOperation)
-  }
-
-  public actual suspend fun styleImageExists(imageId: String): Boolean {
-    NativeAccess.ensureLoaded()
-    return NativeAccess.styleImageExists(requireLiveHandle(), imageId, runtime::awaitOperation)
+    NativeAccess.removeStyleImage(requireLiveHandle(), imageId)
   }
 
   public actual suspend fun styleImageInfo(imageId: String): StyleImageInfo? {
@@ -388,19 +375,14 @@ private constructor(
     NativeAccess.setLocationIndicatorImageName(requireLiveHandle(), layerId, imageKind, imageId)
   }
 
-  public actual suspend fun removeStyleLayer(layerId: String): Boolean {
+  public actual fun removeStyleLayer(layerId: String): ULong = command { outCommandId ->
     NativeAccess.ensureLoaded()
-    return NativeAccess.removeStyleLayer(requireLiveHandle(), layerId, runtime::awaitOperation)
+    NativeAccess.removeStyleLayer(requireLiveHandle(), layerId)
   }
 
-  public actual suspend fun styleLayerExists(layerId: String): Boolean {
+  public actual suspend fun styleLayerInfo(layerId: String): LayerInfo? {
     NativeAccess.ensureLoaded()
-    return NativeAccess.styleLayerExists(requireLiveHandle(), layerId, runtime::awaitOperation)
-  }
-
-  public actual suspend fun styleLayerType(layerId: String): String? {
-    NativeAccess.ensureLoaded()
-    return NativeAccess.styleLayerType(requireLiveHandle(), layerId, runtime::awaitOperation)
+    return NativeAccess.styleLayerInfo(requireLiveHandle(), layerId, runtime::awaitOperation)
   }
 
   public actual suspend fun styleLayerIds(): List<String> {
@@ -520,34 +502,17 @@ private constructor(
       NativeAccess.setLayerMinZoom(requireLiveHandle(), layerId, minZoom)
     }
 
-  public actual suspend fun layerMinZoom(layerId: String): Double {
-    NativeAccess.ensureLoaded()
-    return NativeAccess.layerMinZoom(requireLiveHandle(), layerId, runtime::awaitOperation)
-  }
-
   public actual fun setLayerMaxZoom(layerId: String, maxZoom: Double): ULong =
     command { outCommandId ->
       NativeAccess.ensureLoaded()
       NativeAccess.setLayerMaxZoom(requireLiveHandle(), layerId, maxZoom)
     }
 
-  public actual suspend fun layerMaxZoom(layerId: String): Double {
-    NativeAccess.ensureLoaded()
-    return NativeAccess.layerMaxZoom(requireLiveHandle(), layerId, runtime::awaitOperation)
-  }
-
   public actual fun setLayerVisibility(layerId: String, visibility: StyleLayerVisibility): ULong =
     command { outCommandId ->
       NativeAccess.ensureLoaded()
       NativeAccess.setLayerVisibility(requireLiveHandle(), layerId, visibility.nativeValue)
     }
-
-  public actual suspend fun layerVisibility(layerId: String): StyleLayerVisibility {
-    NativeAccess.ensureLoaded()
-    return StyleLayerVisibility.fromNative(
-      NativeAccess.layerVisibility(requireLiveHandle(), layerId, runtime::awaitOperation)
-    )
-  }
 
   public actual fun requestRepaint(): Long {
     NativeAccess.ensureLoaded()
@@ -567,6 +532,36 @@ private constructor(
   public actual fun snapshot(): MapSnapshot {
     NativeAccess.ensureLoaded()
     return NativeAccess.mapSnapshot(requireLiveHandle())
+  }
+
+  public actual fun setDebugOptions(options: Set<DebugOption>): Long {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.setDebugOptions(requireLiveHandle(), options)
+  }
+
+  public actual fun setRenderingStatsViewEnabled(enabled: Boolean): Long {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.setRenderingStatsViewEnabled(requireLiveHandle(), enabled)
+  }
+
+  public actual fun setViewportOptions(options: ViewportOptions): Long {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.setViewportOptions(requireLiveHandle(), options)
+  }
+
+  public actual fun setTileOptions(options: TileOptions): Long {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.setTileOptions(requireLiveHandle(), options)
+  }
+
+  public actual fun setBounds(options: BoundOptions): Long {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.setBounds(requireLiveHandle(), options)
+  }
+
+  public actual fun setFreeCameraOptions(options: FreeCameraOptions): Long {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.setFreeCameraOptions(requireLiveHandle(), options)
   }
 
   public actual fun resize(size: MapSize): Long {
@@ -651,7 +646,7 @@ private constructor(
     val operation = NativeAccess.startCreateMapProjection(requireLiveHandle())
     try {
       runtime.awaitOperation(operation)
-      return MapProjectionHandle(runtime, NativeAccess.takeCreatedMapProjection(operation))
+      return MapProjectionHandle(NativeAccess.takeCreatedMapProjection(operation))
     } finally {
       NativeAccess.releaseOperation(operation)
     }

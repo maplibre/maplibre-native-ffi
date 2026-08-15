@@ -201,6 +201,7 @@ pub const StyleSourceType = values.StyleSourceType;
 pub const StyleTileJsonInfo = values.StyleTileJsonInfo;
 pub const StyleSourceInfo = values.StyleSourceInfo;
 pub const StyleSourceMetadata = map.StyleSourceMetadata;
+pub const StyleLayerInfo = map.StyleLayerInfo;
 pub const OwnedString = values.OwnedString;
 
 pub const projectedMetersForLatLng = projection.projectedMetersForLatLng;

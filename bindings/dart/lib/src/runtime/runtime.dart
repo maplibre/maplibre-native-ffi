@@ -1668,7 +1668,11 @@ final class RuntimeEventCommandFinished extends RuntimeEventPayload {
   /// Raw terminal disposition.
   final int rawDisposition;
 
-  /// Committed generation, or zero when no generation was committed.
+  /// The map snapshot generation the commit published, or zero when the
+  /// command committed no generation.
+  ///
+  /// A later [MapHandle.snapshot] whose generation is at or past this value
+  /// observes the commit.
   final BigInt generation;
 
   final int commandIdNative;
@@ -1941,24 +1945,36 @@ final class CameraSnapshot {
   final BigInt generation;
 }
 
-/// Immutable map state copied from the native snapshot.
+/// Immutable map state copied from the latest published generation.
+///
+/// Every committed map command publishes a new map snapshot and reports the
+/// published generation in its terminal [RuntimeEventCommandFinished] event,
+/// so a snapshot whose [generation] is at or past a commit's observes that
+/// commit.
 final class MapSnapshot {
   /// Creates a copied map snapshot.
   const MapSnapshot({
     required this.generation,
+    required this.debugOptions,
     required this.camera,
     required this.size,
     required this.projectionMode,
     required this.viewportOptions,
-    required this.loading,
-    required this.fullyRendered,
+    required this.fullyLoaded,
+    required this.renderingStatsViewEnabled,
     required this.repaintDemand,
     required this.eventMask,
     required this.latestRenderUpdateGeneration,
+    required this.tileOptions,
+    required this.bounds,
+    required this.freeCameraOptions,
   });
 
   /// Generation of every field in this snapshot.
   final BigInt generation;
+
+  /// Debug overlay options copied from the snapshot.
+  final MapDebugOptions debugOptions;
 
   /// Camera copied from the snapshot.
   final CameraOptions camera;
@@ -1972,11 +1988,11 @@ final class MapSnapshot {
   /// Viewport options copied from the snapshot.
   final MapViewportOptions viewportOptions;
 
-  /// Whether a style or resource load is active.
-  final bool loading;
+  /// Whether every requested style and tile resource finished loading.
+  final bool fullyLoaded;
 
-  /// Whether the current map state has rendered completely.
-  final bool fullyRendered;
+  /// Whether the rendering stats overlay is enabled.
+  final bool renderingStatsViewEnabled;
 
   /// Whether the map currently requests a repaint.
   final bool repaintDemand;
@@ -1986,6 +2002,15 @@ final class MapSnapshot {
 
   /// Generation of the latest render update.
   final BigInt latestRenderUpdateGeneration;
+
+  /// Tile prefetch and LOD tuning controls copied from the snapshot.
+  final MapTileOptions tileOptions;
+
+  /// Map camera constraints copied from the snapshot.
+  final BoundOptions bounds;
+
+  /// Free camera position and orientation copied from the snapshot.
+  final FreeCameraOptions freeCameraOptions;
 }
 
 /// Map handle bound to a retained runtime.
@@ -2140,6 +2165,7 @@ final class MapHandle {
       final value = outSnapshot.ref;
       return MapSnapshot(
         generation: uint64FromNative(value.generation),
+        debugOptions: MapDebugOptions(value.debug_options),
         camera: native_struct.cameraOptionsFromNative(value.camera),
         size: MapSize(
           width: value.logical_extent.width,
@@ -2152,12 +2178,17 @@ final class MapHandle {
         viewportOptions: native_struct.mapViewportOptionsFromNative(
           value.viewport,
         ),
-        loading: value.loading,
-        fullyRendered: value.fully_rendered,
+        fullyLoaded: value.fully_loaded,
+        renderingStatsViewEnabled: value.rendering_stats_view_enabled,
         repaintDemand: value.repaint_demand,
         eventMask: RuntimeEventMask(value.event_mask),
         latestRenderUpdateGeneration: uint64FromNative(
           value.latest_render_update_generation,
+        ),
+        tileOptions: native_struct.mapTileOptionsFromNative(value.tile),
+        bounds: native_struct.boundOptionsFromNative(value.bounds),
+        freeCameraOptions: native_struct.freeCameraOptionsFromNative(
+          value.free_camera,
         ),
       );
     });
@@ -2205,16 +2236,6 @@ final class MapHandle {
       return uint64FromNative(outCommandId.value);
     });
   }
-
-  /// Reads current debug overlay options after prior commands.
-  Future<MapDebugOptions> debugOptions() => _mapQuery(
-    raw.mln_map_get_debug_options_start,
-    (operation, arena) {
-      final outOptions = arena<Uint32>();
-      _check(raw.mln_map_get_debug_options_take_result(operation, outOptions));
-      return MapDebugOptions(outOptions.value);
-    },
-  );
 
   /// Dumps map debug logs through MapLibre Native logging.
   BigInt dumpDebugLogs() {
@@ -2293,21 +2314,6 @@ final class MapHandle {
     });
   }
 
-  Future<T> _mapQuery<T>(
-    int Function(int, Pointer<Uint64>) start,
-    T Function(int, Arena) take,
-  ) {
-    final operation = withNativeArena((arena) {
-      final outOperation = arena<Uint64>()..value = 0;
-      _check(start(_handle.raw, outOperation));
-      return outOperation.value;
-    });
-    return _runtime._takeOperation(
-      operation,
-      () => withNativeArena((arena) => take(operation, arena)),
-    );
-  }
-
   /// Enables or disables the rendering stats overlay.
   BigInt setRenderingStatsViewEnabled(bool enabled) {
     return withNativeArena<BigInt>((arena) {
@@ -2322,40 +2328,6 @@ final class MapHandle {
       return uint64FromNative(outCommandId.value);
     });
   }
-
-  /// Reads whether the rendering stats overlay is enabled.
-  Future<bool> renderingStatsViewEnabled() => _mapQuery(
-    raw.mln_map_get_rendering_stats_view_enabled_start,
-    (operation, arena) {
-      final outEnabled = arena<Bool>();
-      _check(
-        raw.mln_map_get_rendering_stats_view_enabled_take_result(
-          operation,
-          outEnabled,
-        ),
-      );
-      return outEnabled.value;
-    },
-  );
-
-  /// Reads whether MapLibre considers the map fully loaded.
-  Future<bool> isFullyLoaded() =>
-      _mapQuery(raw.mln_map_is_fully_loaded_start, (operation, arena) {
-        final outLoaded = arena<Bool>();
-        _check(raw.mln_map_is_fully_loaded_take_result(operation, outLoaded));
-        return outLoaded.value;
-      });
-
-  /// Reads live viewport controls after prior commands.
-  Future<MapViewportOptions> viewportOptions() =>
-      _mapQuery(raw.mln_map_get_viewport_options_start, (operation, arena) {
-        final outOptions = arena<raw.mln_map_viewport_options>();
-        outOptions.ref.size = sizeOf<raw.mln_map_viewport_options>();
-        _check(
-          raw.mln_map_get_viewport_options_take_result(operation, outOptions),
-        );
-        return native_struct.mapViewportOptionsFromNative(outOptions.ref);
-      });
 
   /// Applies selected live map viewport and render-transform controls.
   BigInt setViewportOptions(MapViewportOptions options) {
@@ -2377,15 +2349,6 @@ final class MapHandle {
     });
   }
 
-  /// Reads tile tuning controls after prior commands.
-  Future<MapTileOptions> tileOptions() =>
-      _mapQuery(raw.mln_map_get_tile_options_start, (operation, arena) {
-        final outOptions = arena<raw.mln_map_tile_options>();
-        outOptions.ref.size = sizeOf<raw.mln_map_tile_options>();
-        _check(raw.mln_map_get_tile_options_take_result(operation, outOptions));
-        return native_struct.mapTileOptionsFromNative(outOptions.ref);
-      });
-
   /// Applies selected tile prefetch and LOD tuning controls.
   BigInt setTileOptions(MapTileOptions options) {
     return withNativeArena<BigInt>((arena) {
@@ -2402,15 +2365,6 @@ final class MapHandle {
     });
   }
 
-  /// Reads map camera constraints after prior commands.
-  Future<BoundOptions> bounds() =>
-      _mapQuery(raw.mln_map_get_bounds_start, (operation, arena) {
-        final outOptions = arena<raw.mln_bound_options>();
-        outOptions.ref.size = sizeOf<raw.mln_bound_options>();
-        _check(raw.mln_map_get_bounds_take_result(operation, outOptions));
-        return native_struct.boundOptionsFromNative(outOptions.ref);
-      });
-
   /// Applies selected map camera constraint options.
   BigInt setBounds(BoundOptions options) {
     return withNativeArena<BigInt>((arena) {
@@ -2424,19 +2378,6 @@ final class MapHandle {
       return uint64FromNative(outCommandId.value);
     });
   }
-
-  /// Reads the free camera after prior commands.
-  Future<FreeCameraOptions> freeCameraOptions() => _mapQuery(
-    raw.mln_map_get_free_camera_options_start,
-    (operation, arena) {
-      final outOptions = arena<raw.mln_free_camera_options>();
-      outOptions.ref.size = sizeOf<raw.mln_free_camera_options>();
-      _check(
-        raw.mln_map_get_free_camera_options_take_result(operation, outOptions),
-      );
-      return native_struct.freeCameraOptionsFromNative(outOptions.ref);
-    },
-  );
 
   /// Applies selected free camera position and orientation fields.
   BigInt setFreeCameraOptions(FreeCameraOptions options) {
@@ -2743,6 +2684,10 @@ final class MapHandle {
   }
 
   /// Creates a projection helper without blocking the calling isolate.
+  ///
+  /// The projection copies this map's transform state after every earlier map
+  /// command and never observes map changes made after its creation. Every
+  /// later projection call is synchronous.
   Future<MapProjectionHandle> createProjection() {
     final operation = withNativeArena((arena) {
       final outOperation = arena<Uint64>()..value = 0;
@@ -2755,10 +2700,7 @@ final class MapHandle {
         _check(
           raw.mln_map_projection_create_take_result(operation, outProjection),
         );
-        return MapProjectionHandle._(
-          _runtime,
-          NativeMapProjection(outProjection.value),
-        );
+        return MapProjectionHandle._(NativeMapProjection(outProjection.value));
       });
     });
   }
@@ -2860,50 +2802,23 @@ final class MapHandle {
     );
   }
 
-  /// Removes one runtime style image and returns whether one was removed.
-  Future<bool> removeStyleImage(String imageId) {
-    return _styleOperation(
-      (arena, outOperation) {
-        final nativeId = nativeStringView(imageId, arena);
-        _check(
-          raw.mln_map_remove_style_image_start(
-            _handle.raw,
-            nativeId.value,
-            outOperation,
-          ),
-        );
-      },
-      (operation, arena) {
-        final outRemoved = arena<Bool>();
-        _check(
-          raw.mln_map_remove_style_image_take_result(operation, outRemoved),
-        );
-        return outRemoved.value;
-      },
-    );
-  }
-
-  /// Reports whether one runtime style image exists.
-  Future<bool> styleImageExists(String imageId) {
-    return _styleOperation(
-      (arena, outOperation) {
-        final nativeId = nativeStringView(imageId, arena);
-        _check(
-          raw.mln_map_style_image_exists_start(
-            _handle.raw,
-            nativeId.value,
-            outOperation,
-          ),
-        );
-      },
-      (operation, arena) {
-        final outExists = arena<Bool>();
-        _check(
-          raw.mln_map_style_image_exists_take_result(operation, outExists),
-        );
-        return outExists.value;
-      },
-    );
+  /// Removes one runtime style image and returns the accepted command ID.
+  ///
+  /// The command fails with [MaplibreStatus.notFound] when no runtime style
+  /// image has [imageId].
+  BigInt removeStyleImage(String imageId) {
+    return withNativeArena<BigInt>((arena) {
+      final nativeId = nativeStringView(imageId, arena);
+      final outCommandId = arena<Uint64>()..value = 0;
+      _check(
+        raw.mln_map_remove_style_image(
+          _handle.raw,
+          nativeId.value,
+          outCommandId,
+        ),
+      );
+      return uint64FromNative(outCommandId.value);
+    });
   }
 
   /// Copies fixed metadata for one runtime style image.
@@ -3523,78 +3438,24 @@ final class MapHandle {
     });
   }
 
-  /// Reports whether a style source ID exists after prior commands.
-  Future<bool> styleSourceExists(String sourceId) {
-    return _styleOperation(
-      (arena, outOperation) {
-        final nativeId = nativeStringView(sourceId, arena);
-        _check(
-          raw.mln_map_style_source_exists_start(
-            _handle.raw,
-            nativeId.value,
-            outOperation,
-          ),
-        );
-      },
-      (operation, arena) {
-        final outExists = arena<Bool>();
-        _check(
-          raw.mln_map_style_source_exists_take_result(operation, outExists),
-        );
-        return outExists.value;
-      },
-    );
-  }
-
-  /// Removes one style source by ID after prior commands.
-  Future<bool> removeStyleSource(String sourceId) {
-    return _styleOperation(
-      (arena, outOperation) {
-        final nativeId = nativeStringView(sourceId, arena);
-        _check(
-          raw.mln_map_remove_style_source_start(
-            _handle.raw,
-            nativeId.value,
-            outOperation,
-          ),
-        );
-      },
-      (operation, arena) {
-        final outRemoved = arena<Bool>();
-        _check(
-          raw.mln_map_remove_style_source_take_result(operation, outRemoved),
-        );
-        return outRemoved.value;
-      },
-    );
-  }
-
-  /// Reads one style source type after prior commands.
-  Future<SourceType?> getStyleSourceType(String sourceId) {
-    return _styleOperation(
-      (arena, outOperation) {
-        final nativeId = nativeStringView(sourceId, arena);
-        _check(
-          raw.mln_map_get_style_source_type_start(
-            _handle.raw,
-            nativeId.value,
-            outOperation,
-          ),
-        );
-      },
-      (operation, arena) {
-        final outType = arena<Uint32>();
-        final outFound = arena<Bool>();
-        _check(
-          raw.mln_map_get_style_source_type_take_result(
-            operation,
-            outType,
-            outFound,
-          ),
-        );
-        return outFound.value ? SourceType.fromRaw(outType.value) : null;
-      },
-    );
+  /// Removes one style source by ID and returns the accepted command ID.
+  ///
+  /// The command fails with [MaplibreStatus.notFound] when no style source
+  /// has [sourceId], and with [MaplibreStatus.invalidState] when a layer
+  /// still uses the source.
+  BigInt removeStyleSource(String sourceId) {
+    return withNativeArena<BigInt>((arena) {
+      final nativeId = nativeStringView(sourceId, arena);
+      final outCommandId = arena<Uint64>()..value = 0;
+      _check(
+        raw.mln_map_remove_style_source(
+          _handle.raw,
+          nativeId.value,
+          outCommandId,
+        ),
+      );
+      return uint64FromNative(outCommandId.value);
+    });
   }
 
   /// Copies fixed style source metadata after prior commands.
@@ -4243,29 +4104,6 @@ final class MapHandle {
     });
   }
 
-  /// Reads the lowest zoom at which one layer draws.
-  ///
-  /// A layer with no lower bound reports `double.negativeInfinity`.
-  Future<double> getLayerMinZoom(String layerId) {
-    return _styleOperation(
-      (arena, outOperation) {
-        final nativeLayerId = nativeStringView(layerId, arena);
-        _check(
-          raw.mln_map_get_layer_min_zoom_start(
-            _handle.raw,
-            nativeLayerId.value,
-            outOperation,
-          ),
-        );
-      },
-      (operation, arena) {
-        final outZoom = arena<Double>();
-        _check(raw.mln_map_get_layer_min_zoom_take_result(operation, outZoom));
-        return outZoom.value;
-      },
-    );
-  }
-
   /// Sets the highest zoom at which one layer draws.
   ///
   /// Pass `double.infinity` for no upper bound.
@@ -4285,29 +4123,6 @@ final class MapHandle {
     });
   }
 
-  /// Reads the highest zoom at which one layer draws.
-  ///
-  /// A layer with no upper bound reports `double.infinity`.
-  Future<double> getLayerMaxZoom(String layerId) {
-    return _styleOperation(
-      (arena, outOperation) {
-        final nativeLayerId = nativeStringView(layerId, arena);
-        _check(
-          raw.mln_map_get_layer_max_zoom_start(
-            _handle.raw,
-            nativeLayerId.value,
-            outOperation,
-          ),
-        );
-      },
-      (operation, arena) {
-        final outZoom = arena<Double>();
-        _check(raw.mln_map_get_layer_max_zoom_take_result(operation, outZoom));
-        return outZoom.value;
-      },
-    );
-  }
-
   /// Sets whether one layer draws.
   BigInt setLayerVisibility(String layerId, StyleLayerVisibility visibility) {
     return withNativeArena<BigInt>((arena) {
@@ -4325,39 +4140,19 @@ final class MapHandle {
     });
   }
 
-  /// Reads whether one layer draws.
-  Future<StyleLayerVisibility> getLayerVisibility(String layerId) {
-    return _styleOperation(
-      (arena, outOperation) {
-        final nativeLayerId = nativeStringView(layerId, arena);
-        _check(
-          raw.mln_map_get_layer_visibility_start(
-            _handle.raw,
-            nativeLayerId.value,
-            outOperation,
-          ),
-        );
-      },
-      (operation, arena) {
-        final outVisibility = arena<Uint32>();
-        _check(
-          raw.mln_map_get_layer_visibility_take_result(
-            operation,
-            outVisibility,
-          ),
-        );
-        return StyleLayerVisibility.fromRawValue(outVisibility.value);
-      },
-    );
-  }
-
-  /// Reports whether a style layer ID exists.
-  Future<bool> styleLayerExists(String layerId) {
-    return _styleOperation(
+  /// Copies fixed style layer metadata, or null when no layer has [layerId].
+  Future<LayerInfo?> getStyleLayerInfo(String layerId) async {
+    late String type;
+    late double minZoom;
+    late double maxZoom;
+    late StyleLayerVisibility visibility;
+    late bool hasSourceId;
+    late bool hasSourceLayer;
+    final found = await _styleOperation(
       (arena, outOperation) {
         final nativeId = nativeStringView(layerId, arena);
         _check(
-          raw.mln_map_style_layer_exists_start(
+          raw.mln_map_get_style_layer_info_start(
             _handle.raw,
             nativeId.value,
             outOperation,
@@ -4365,44 +4160,57 @@ final class MapHandle {
         );
       },
       (operation, arena) {
-        final outExists = arena<Bool>();
-        _check(
-          raw.mln_map_style_layer_exists_take_result(operation, outExists),
-        );
-        return outExists.value;
-      },
-    );
-  }
-
-  /// Copies one style layer type string, or returns null when absent.
-  Future<String?> getStyleLayerType(String layerId) {
-    return _styleOperation(
-      (arena, outOperation) {
-        final nativeId = nativeStringView(layerId, arena);
-        _check(
-          raw.mln_map_get_style_layer_type_start(
-            _handle.raw,
-            nativeId.value,
-            outOperation,
-          ),
-        );
-      },
-      (operation, arena) {
-        final outLayerType = arena<Uint64>()..value = 0;
+        final outInfo = arena<raw.mln_style_layer_info>();
+        outInfo.ref.size = sizeOf<raw.mln_style_layer_info>();
         final outFound = arena<Bool>();
         _check(
-          raw.mln_map_get_style_layer_type_take_result(
+          raw.mln_map_get_style_layer_info_take_result(
             operation,
-            outLayerType,
+            outInfo,
             outFound,
           ),
         );
-        return outFound.value
-            ? utf8.decode(
-                copyOwnedBuffer(NativeOwnedBufferHandle(outLayerType.value)),
-              )
-            : null;
+        if (!outFound.value) {
+          return false;
+        }
+        final info = outInfo.ref;
+        // The type view names a static style-spec string that stays valid for
+        // the life of the process.
+        type = _copyStringView(info.type) ?? '';
+        minZoom = info.min_zoom;
+        maxZoom = info.max_zoom;
+        visibility = StyleLayerVisibility.fromRawValue(info.visibility);
+        hasSourceId =
+            info.fields &
+                raw
+                    .mln_style_layer_info_field
+                    .MLN_STYLE_LAYER_INFO_SOURCE_ID
+                    .value !=
+            0;
+        hasSourceLayer =
+            info.fields &
+                raw
+                    .mln_style_layer_info_field
+                    .MLN_STYLE_LAYER_INFO_SOURCE_LAYER
+                    .value !=
+            0;
+        return true;
       },
+    );
+    if (!found) {
+      return null;
+    }
+    final sourceId = hasSourceId ? await getLayerSourceId(layerId) : null;
+    final sourceLayer = hasSourceLayer
+        ? await getLayerSourceLayer(layerId)
+        : null;
+    return LayerInfo(
+      type: type,
+      minZoom: minZoom,
+      maxZoom: maxZoom,
+      visibility: visibility,
+      sourceId: sourceId,
+      sourceLayer: sourceLayer,
     );
   }
 
@@ -4424,27 +4232,23 @@ final class MapHandle {
     });
   }
 
-  /// Removes one style layer by ID and returns whether one was removed.
-  Future<bool> removeStyleLayer(String layerId) {
-    return _styleOperation(
-      (arena, outOperation) {
-        final nativeId = nativeStringView(layerId, arena);
-        _check(
-          raw.mln_map_remove_style_layer_start(
-            _handle.raw,
-            nativeId.value,
-            outOperation,
-          ),
-        );
-      },
-      (operation, arena) {
-        final outRemoved = arena<Bool>();
-        _check(
-          raw.mln_map_remove_style_layer_take_result(operation, outRemoved),
-        );
-        return outRemoved.value;
-      },
-    );
+  /// Removes one style layer by ID and returns the accepted command ID.
+  ///
+  /// The command fails with [MaplibreStatus.notFound] when no style layer has
+  /// [layerId].
+  BigInt removeStyleLayer(String layerId) {
+    return withNativeArena<BigInt>((arena) {
+      final nativeId = nativeStringView(layerId, arena);
+      final outCommandId = arena<Uint64>()..value = 0;
+      _check(
+        raw.mln_map_remove_style_layer(
+          _handle.raw,
+          nativeId.value,
+          outCommandId,
+        ),
+      );
+      return uint64FromNative(outCommandId.value);
+    });
   }
 
   /// Copies style layer IDs in style order.

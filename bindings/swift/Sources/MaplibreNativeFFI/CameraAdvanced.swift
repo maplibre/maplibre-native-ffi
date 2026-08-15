@@ -323,14 +323,6 @@ public extension MapHandle {
     }
   }
 
-  func debugOptions() async throws -> MapDebugOptions {
-    let raw = try await orderedResult(
-      start: NativeMap.debugOptionsStart,
-      take: NativeMap.debugOptionsTakeResult
-    )
-    return MapDebugOptions(rawValue: raw)
-  }
-
   @discardableResult
   func setRenderingStatsViewEnabled(_ enabled: Bool) throws -> UInt64 {
     try submitCommand { map, commandId in
@@ -338,20 +330,6 @@ public extension MapHandle {
         map.raw, enabled, commandId
       ))
     }
-  }
-
-  func renderingStatsViewEnabled() async throws -> Bool {
-    try await orderedResult(
-      start: NativeMap.renderingStatsViewEnabledStart,
-      take: NativeMap.renderingStatsViewEnabledTakeResult
-    )
-  }
-
-  func isFullyLoaded() async throws -> Bool {
-    try await orderedResult(
-      start: NativeMap.fullyLoadedStart,
-      take: NativeMap.fullyLoadedTakeResult
-    )
   }
 
   @discardableResult
@@ -367,14 +345,6 @@ public extension MapHandle {
     return (extent.width, extent.height, extent.scaleFactor)
   }
 
-  func viewportOptions() async throws -> MapViewportOptions {
-    let native = try await orderedResult(
-      start: NativeMap.viewportOptionsStart,
-      take: NativeMap.viewportOptionsTakeResult
-    )
-    return MapViewportOptions(native: NativeMapViewportOptionsInput(native))
-  }
-
   @discardableResult
   func setViewportOptions(_ options: MapViewportOptions) throws -> UInt64 {
     try options.nativeInput.withNativeOptions { native in
@@ -384,14 +354,6 @@ public extension MapHandle {
         ))
       }
     }
-  }
-
-  func tileOptions() async throws -> MapTileOptions {
-    let native = try await orderedResult(
-      start: NativeMap.tileOptionsStart,
-      take: NativeMap.tileOptionsTakeResult
-    )
-    return MapTileOptions(native: NativeMapTileOptionsInput(native))
   }
 
   @discardableResult
@@ -509,14 +471,6 @@ public extension MapHandle {
     }
   }
 
-  func bounds() async throws -> BoundOptions {
-    let native = try await orderedResult(
-      start: NativeMap.boundsStart,
-      take: NativeMap.boundsTakeResult
-    )
-    return BoundOptions(native: NativeBoundOptionsInput(native))
-  }
-
   @discardableResult
   func setBounds(_ bounds: BoundOptions) throws -> UInt64 {
     try bounds.nativeInput.withNativeOptions { native in
@@ -524,14 +478,6 @@ public extension MapHandle {
         try checkStatus(mln_map_set_bounds(map.raw, native, commandId))
       }
     }
-  }
-
-  func freeCameraOptions() async throws -> FreeCameraOptions {
-    let native = try await orderedResult(
-      start: NativeMap.freeCameraOptionsStart,
-      take: NativeMap.freeCameraOptionsTakeResult
-    )
-    return FreeCameraOptions(native: NativeFreeCameraOptionsInput(native))
   }
 
   @discardableResult

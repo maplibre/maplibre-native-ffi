@@ -8,84 +8,62 @@ import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.lifecycle.NativeMapProjection
 import org.maplibre.nativeffi.internal.loader.NativeAccess
-import org.maplibre.nativeffi.runtime.RuntimeHandle
 
-/** Owned JVM FFM standalone projection snapshot. */
+/**
+ * Owned JVM FFM standalone projection snapshot.
+ *
+ * Every call is synchronous, runs on the calling thread, is internally serialized, and may be made
+ * from any thread. A projection copies the map's transform state at creation and never observes map
+ * changes made after that; a live projection prevents its map from closing.
+ */
 public actual class MapProjectionHandle
-internal constructor(private val runtime: RuntimeHandle, private val handle: NativeMapProjection) {
+internal constructor(private val handle: NativeMapProjection) {
   private val core = HandleStateCore("MapProjectionHandle", handle.raw)
 
   init {
     HandleLeakCleaner.register(this, core.leakReport)
   }
 
-  public actual suspend fun camera(): CameraOptions {
+  public actual fun camera(): CameraOptions {
     NativeAccess.ensureLoaded()
-    val operation = NativeAccess.startProjectionCamera(requireLiveHandle())
-    try {
-      runtime.awaitOperation(operation)
-      return NativeAccess.takeProjectionCamera(operation)
-    } finally {
-      NativeAccess.releaseOperation(operation)
-    }
+    return NativeAccess.projectionCamera(requireLiveHandle())
   }
 
-  public actual fun setCamera(camera: CameraOptions): Long {
+  public actual fun setCamera(camera: CameraOptions) {
     NativeAccess.ensureLoaded()
-    return NativeAccess.setProjectionCamera(requireLiveHandle(), camera)
+    NativeAccess.setProjectionCamera(requireLiveHandle(), camera)
   }
 
-  public actual fun setVisibleCoordinates(coordinates: List<LatLng>, padding: EdgeInsets): Long {
+  public actual fun setVisibleCoordinates(coordinates: List<LatLng>, padding: EdgeInsets) {
     NativeAccess.ensureLoaded()
-    return NativeAccess.setProjectionVisibleCoordinates(requireLiveHandle(), coordinates, padding)
+    NativeAccess.setProjectionVisibleCoordinates(requireLiveHandle(), coordinates, padding)
   }
 
-  public actual fun setVisibleGeometry(geometry: ByteArray, padding: EdgeInsets): Long {
+  public actual fun setVisibleGeometry(geometry: ByteArray, padding: EdgeInsets) {
     NativeAccess.ensureLoaded()
-    return NativeAccess.setProjectionVisibleGeometry(requireLiveHandle(), geometry, padding)
+    NativeAccess.setProjectionVisibleGeometry(requireLiveHandle(), geometry, padding)
   }
 
-  public actual suspend fun pixelForLatLng(coordinate: LatLng): ScreenPoint {
+  public actual fun pixelForLatLng(coordinate: LatLng): ScreenPoint {
     NativeAccess.ensureLoaded()
-    val operation = NativeAccess.startProjectionPixelForLatLng(requireLiveHandle(), coordinate)
-    try {
-      runtime.awaitOperation(operation)
-      return NativeAccess.takeProjectionPixelForLatLng(operation)
-    } finally {
-      NativeAccess.releaseOperation(operation)
-    }
+    return NativeAccess.projectionPixelForLatLng(requireLiveHandle(), coordinate)
   }
 
-  public actual suspend fun latLngForPixel(point: ScreenPoint): LatLng {
+  public actual fun latLngForPixel(point: ScreenPoint): LatLng {
     NativeAccess.ensureLoaded()
-    val operation = NativeAccess.startProjectionLatLngForPixel(requireLiveHandle(), point)
-    try {
-      runtime.awaitOperation(operation)
-      return NativeAccess.takeProjectionLatLngForPixel(operation)
-    } finally {
-      NativeAccess.releaseOperation(operation)
-    }
+    return NativeAccess.projectionLatLngForPixel(requireLiveHandle(), point)
   }
 
   public actual val isClosed: Boolean
     get() = core.isReleased()
 
-  public actual suspend fun close() {
+  public actual fun close() {
     if (!core.beginClose()) return
-    val operation =
-      try {
-        NativeAccess.startProjectionClose(handle)
-      } catch (error: Throwable) {
-        core.abortClose()
-        throw error
-      }
     try {
-      runtime.awaitOperation(operation)
+      NativeAccess.closeProjection(handle)
     } catch (error: Throwable) {
       core.abortClose()
       throw error
-    } finally {
-      NativeAccess.releaseOperation(operation)
     }
     core.completeClose()
   }

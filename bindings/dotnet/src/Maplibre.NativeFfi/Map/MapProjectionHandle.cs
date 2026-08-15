@@ -10,26 +10,20 @@ using Maplibre.NativeFfi.Runtime;
 namespace Maplibre.NativeFfi.Map;
 
 /// <summary>Any-thread standalone projection handle.</summary>
+/// <remarks>
+/// Every call after creation is synchronous, runs on the calling thread, is internally serialized,
+/// and is thread-safe. A projection copies the map's transform state at creation and never
+/// observes map changes made after that; a live projection prevents its map from closing.
+/// </remarks>
 public sealed unsafe class MapProjectionHandle : IDisposable
 {
-    private unsafe delegate mln_status ProjectionOperationStart(MlnOperation* outOperation);
-
-    private static MlnOperation StartOperation(ProjectionOperationStart start)
-    {
-        MlnOperation operation = default;
-        NativeStatus.Check(start(&operation));
-        return operation;
-    }
-
-    private readonly RuntimeHandle runtime;
     private readonly NativeHandleState<MlnMapProjection> state;
 
-    private MapProjectionHandle(RuntimeHandle runtime, MlnMapProjection handle)
+    private MapProjectionHandle(MlnMapProjection handle)
     {
-        this.runtime = runtime;
         state = new NativeHandleState<MlnMapProjection>(
             handle,
-            static _ => mln_status.MLN_STATUS_OK,
+            static live => NativeMethods.mln_map_projection_close(live),
             nameof(MapProjectionHandle)
         );
     }
@@ -41,9 +35,7 @@ public sealed unsafe class MapProjectionHandle : IDisposable
     {
         ArgumentNullException.ThrowIfNull(map);
         cancellationToken.ThrowIfCancellationRequested();
-        var operation = StartOperation(outOperation =>
-            NativeMethods.mln_map_projection_create_start(map.Handle, outOperation)
-        );
+        var operation = StartCreate(map.Handle);
         return OperationAwaiter.WaitThen(
             map.Runtime.WaitForOperationAsync(operation, cancellationToken),
             () =>
@@ -52,46 +44,40 @@ public sealed unsafe class MapProjectionHandle : IDisposable
                 NativeStatus.Check(
                     NativeMethods.mln_map_projection_create_take_result(operation, &projection)
                 );
-                return new MapProjectionHandle(map.Runtime, projection);
+                return new MapProjectionHandle(projection);
             },
             () => NativeMethods.mln_operation_release(operation)
         );
+    }
+
+    private static MlnOperation StartCreate(MlnMap map)
+    {
+        MlnOperation operation = default;
+        NativeStatus.Check(NativeMethods.mln_map_projection_create_start(map, &operation));
+        return operation;
     }
 
     internal MlnMapProjection Handle => state.Handle;
 
     public bool IsClosed => state.IsClosed;
 
-    public Task<CameraOptions> GetCameraAsync(CancellationToken cancellationToken = default)
+    /// <summary>Copies the projection camera, observing every earlier projection setter.</summary>
+    public CameraOptions GetCamera()
     {
-        var operation = StartOperation(outOperation =>
-            NativeMethods.mln_map_projection_get_camera_start(Handle, outOperation)
-        );
-        return OperationAwaiter.WaitThen(
-            runtime.WaitForOperationAsync(operation, cancellationToken),
-            () =>
-            {
-                var camera = NativeMethods.mln_camera_options_default();
-                NativeStatus.Check(
-                    NativeMethods.mln_map_projection_get_camera_take_result(operation, &camera)
-                );
-                return MapStructs.CameraOptionsFromNative(camera);
-            },
-            () => NativeMethods.mln_operation_release(operation)
-        );
+        var camera = NativeMethods.mln_camera_options_default();
+        NativeStatus.Check(NativeMethods.mln_map_projection_get_camera(Handle, &camera));
+        return MapStructs.CameraOptionsFromNative(camera);
     }
 
-    public ulong SetCamera(CameraOptions camera)
+    /// <summary>Applies a camera update; only fields present on <paramref name="camera" /> apply.</summary>
+    public void SetCamera(CameraOptions camera)
     {
         var nativeCamera = MapStructs.ToNative(camera);
-        ulong commandId = 0;
-        NativeStatus.Check(
-            NativeMethods.mln_map_projection_set_camera(Handle, &nativeCamera, &commandId)
-        );
-        return commandId;
+        NativeStatus.Check(NativeMethods.mln_map_projection_set_camera(Handle, &nativeCamera));
     }
 
-    public ulong SetVisibleCoordinates(IReadOnlyList<LatLng> coordinates, EdgeInsets padding)
+    /// <summary>Applies a camera fit for the coordinates.</summary>
+    public void SetVisibleCoordinates(IReadOnlyList<LatLng> coordinates, EdgeInsets padding)
     {
         ArgumentNullException.ThrowIfNull(coordinates);
         var nativeCoordinates = new mln_lat_lng[coordinates.Count];
@@ -100,7 +86,6 @@ public sealed unsafe class MapProjectionHandle : IDisposable
             nativeCoordinates[index] = CoreStructs.ToNative(coordinates[index]);
         }
         var nativePadding = MapStructs.ToNative(padding);
-        ulong commandId = 0;
         fixed (mln_lat_lng* coordinatesPointer = nativeCoordinates)
         {
             NativeStatus.Check(
@@ -108,125 +93,54 @@ public sealed unsafe class MapProjectionHandle : IDisposable
                     Handle,
                     nativeCoordinates.Length == 0 ? null : coordinatesPointer,
                     (nuint)nativeCoordinates.Length,
-                    nativePadding,
-                    &commandId
+                    nativePadding
                 )
             );
         }
-        return commandId;
     }
 
-    public ulong SetVisibleGeometry(byte[] geometry, EdgeInsets padding)
+    /// <summary>Applies a camera fit for GeoJSON Geometry bytes.</summary>
+    public void SetVisibleGeometry(byte[] geometry, EdgeInsets padding)
     {
         ArgumentNullException.ThrowIfNull(geometry);
         using var nativeGeometry = NativeStringView.From(geometry, nameof(geometry));
         var nativePadding = MapStructs.ToNative(padding);
-        ulong commandId = 0;
         NativeStatus.Check(
             NativeMethods.mln_map_projection_set_visible_geometry(
                 Handle,
                 nativeGeometry.Value,
-                nativePadding,
-                &commandId
+                nativePadding
             )
         );
-        return commandId;
     }
 
-    public Task<ScreenPoint> PixelForLatLngAsync(
-        LatLng coordinate,
-        CancellationToken cancellationToken = default
-    )
+    /// <summary>Converts a geographic coordinate to a logical-pixel screen point.</summary>
+    public ScreenPoint PixelForLatLng(LatLng coordinate)
     {
         var nativeCoordinate = CoreStructs.ToNative(coordinate);
-        MlnOperation operation = default;
+        mln_screen_point point = default;
         NativeStatus.Check(
-            NativeMethods.mln_map_projection_pixel_for_lat_lng_start(
-                Handle,
-                nativeCoordinate,
-                &operation
-            )
+            NativeMethods.mln_map_projection_pixel_for_lat_lng(Handle, nativeCoordinate, &point)
         );
-        return TakePointAsync(operation, cancellationToken);
+        return MapStructs.FromNative(point);
     }
 
-    public Task<LatLng> LatLngForPixelAsync(
-        ScreenPoint point,
-        CancellationToken cancellationToken = default
-    )
+    /// <summary>Converts a logical-pixel screen point to a geographic coordinate.</summary>
+    public LatLng LatLngForPixel(ScreenPoint point)
     {
         var nativePoint = MapStructs.ToNative(point);
-        MlnOperation operation = default;
+        mln_lat_lng coordinate = default;
         NativeStatus.Check(
-            NativeMethods.mln_map_projection_lat_lng_for_pixel_start(
-                Handle,
-                nativePoint,
-                &operation
-            )
+            NativeMethods.mln_map_projection_lat_lng_for_pixel(Handle, nativePoint, &coordinate)
         );
-        return TakeCoordinateAsync(operation, cancellationToken);
+        return CoreStructs.FromNative(coordinate);
     }
 
-    public Task CloseAsync(CancellationToken cancellationToken = default)
-    {
-        if (IsClosed)
-        {
-            return Task.CompletedTask;
-        }
-        cancellationToken.ThrowIfCancellationRequested();
-        var operation = StartOperation(outOperation =>
-            NativeMethods.mln_map_projection_close_start(Handle, outOperation)
-        );
-        return OperationAwaiter.WaitThen(
-            runtime.WaitForOperationAsync(operation),
-            () =>
-            {
-                RuntimeHandle.CheckOperationCompletion(operation);
-                state.Close();
-            },
-            () => NativeMethods.mln_operation_release(operation)
-        );
-    }
+    /// <summary>
+    /// Closes the projection, waiting for projection calls already running on other threads, and
+    /// releases its map reservation before returning.
+    /// </summary>
+    public void Close() => state.Close();
 
-    public void Dispose() => CloseAsync().ConfigureAwait(false).GetAwaiter().GetResult();
-
-    private Task<ScreenPoint> TakePointAsync(
-        MlnOperation operation,
-        CancellationToken cancellationToken
-    ) =>
-        OperationAwaiter.WaitThen(
-            runtime.WaitForOperationAsync(operation, cancellationToken),
-            () =>
-            {
-                mln_screen_point point = default;
-                NativeStatus.Check(
-                    NativeMethods.mln_map_projection_pixel_for_lat_lng_take_result(
-                        operation,
-                        &point
-                    )
-                );
-                return MapStructs.FromNative(point);
-            },
-            () => NativeMethods.mln_operation_release(operation)
-        );
-
-    private Task<LatLng> TakeCoordinateAsync(
-        MlnOperation operation,
-        CancellationToken cancellationToken
-    ) =>
-        OperationAwaiter.WaitThen(
-            runtime.WaitForOperationAsync(operation, cancellationToken),
-            () =>
-            {
-                mln_lat_lng coordinate = default;
-                NativeStatus.Check(
-                    NativeMethods.mln_map_projection_lat_lng_for_pixel_take_result(
-                        operation,
-                        &coordinate
-                    )
-                );
-                return CoreStructs.FromNative(coordinate);
-            },
-            () => NativeMethods.mln_operation_release(operation)
-        );
+    public void Dispose() => Close();
 }

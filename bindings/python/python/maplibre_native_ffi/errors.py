@@ -16,6 +16,7 @@ class MaplibreStatus(Enum):
     BUSY = -7
     TARGET_LOST = -8
     NOT_READY = -9
+    NOT_FOUND = -10
     UNKNOWN = None
 
     @property
@@ -131,6 +132,15 @@ class NotReadyError(MaplibreError):
         super().__init__(MaplibreStatus.NOT_READY, native_status_code, diagnostic)
 
 
+class NotFoundError(MaplibreError):
+    """Error for a lookup whose ID names no object."""
+
+    def __init__(
+        self, native_status_code: int | None = -10, diagnostic: str = ""
+    ) -> None:
+        super().__init__(MaplibreStatus.NOT_FOUND, native_status_code, diagnostic)
+
+
 class UnknownStatusError(MaplibreError):
     """Error for future native status values unknown to this binding."""
 
@@ -153,6 +163,7 @@ def _from_native_status(native_status_code: int, diagnostic: str) -> MaplibreErr
         MaplibreStatus.BUSY: BusyError,
         MaplibreStatus.TARGET_LOST: TargetLostError,
         MaplibreStatus.NOT_READY: NotReadyError,
+        MaplibreStatus.NOT_FOUND: NotFoundError,
     }
     status = MaplibreStatus._from_native(native_status_code)
     error_type = error_types.get(status)
@@ -169,6 +180,7 @@ __all__ = [
     "MaplibreError",
     "MaplibreStatus",
     "NativeError",
+    "NotFoundError",
     "NotReadyError",
     "TargetLostError",
     "UnknownStatusError",

@@ -538,7 +538,7 @@ namespace Maplibre.NativeFfi.Internal.C
         public uint size;
 
         [NativeTypeName("uint32_t")]
-        public uint reserved;
+        public uint debug_options;
 
         [NativeTypeName("uint64_t")]
         public ulong generation;
@@ -552,10 +552,10 @@ namespace Maplibre.NativeFfi.Internal.C
         public mln_map_viewport_options viewport;
 
         [NativeTypeName("bool")]
-        public byte loading;
+        public byte fully_loaded;
 
         [NativeTypeName("bool")]
-        public byte fully_rendered;
+        public byte rendering_stats_view_enabled;
 
         [NativeTypeName("bool")]
         public byte repaint_demand;
@@ -568,6 +568,12 @@ namespace Maplibre.NativeFfi.Internal.C
 
         [NativeTypeName("uint64_t")]
         public ulong latest_render_update_generation;
+
+        public mln_map_tile_options tile;
+
+        public mln_bound_options bounds;
+
+        public mln_free_camera_options free_camera;
     }
 
     internal partial struct mln_camera_query_result

@@ -48,20 +48,22 @@ test "style layer JSON helpers manage lifecycle and order" {
     defer before_move.deinit();
     try testing.expect((try listIndexOf(before_move, "empty-circle")) < (try listIndexOf(before_move, "point-circle")));
 
-    var layer_type = (try support.styleLayerType(&map, "empty-circle")).?;
-    defer layer_type.deinit();
-    try testing.expectEqualStrings("circle", layer_type.value);
+    try testing.expectEqualStrings("circle", (try support.styleLayerType(&map, "empty-circle")).?);
 
     var layer_json = (try support.styleLayerJson(&map, "empty-circle")).?;
     defer layer_json.deinit();
     try testing.expect(std.mem.indexOf(u8, layer_json.value, "\"id\":\"empty-circle\"") != null);
 
     _ = try map.moveStyleLayer("empty-circle", "");
-    try testing.expectError(error.InvalidState, support.removeStyleSource(&map, "empty-layer-source"));
-    try testing.expect(try support.removeStyleLayer(&map, "empty-circle"));
+    // A source a layer still uses fails its removal with INVALID_STATE.
+    try testing.expectError(error.InvalidState, support.removeStyleSource(&runtime, &map, "empty-layer-source"));
+    try testing.expect(try support.removeStyleLayer(&runtime, &map, "empty-circle"));
     try testing.expect(!try support.styleLayerExists(&map, "empty-circle"));
-    try testing.expect(try support.removeStyleSource(&map, "empty-layer-source"));
+    try testing.expect(try support.removeStyleSource(&runtime, &map, "empty-layer-source"));
+    // A removal of a missing layer is accepted, then fails with NOT_FOUND.
+    try testing.expect(!try support.removeStyleLayer(&runtime, &map, "empty-circle"));
     try testing.expect((try support.styleLayerJson(&map, "empty-circle")) == null);
+    try testing.expect((try support.styleLayerInfo(&map, "empty-circle")) == null);
 }
 
 test "nine-patch style images round-trip stretch, content, and text fit" {
@@ -145,29 +147,35 @@ test "layer base accessors round-trip source, zoom range, and visibility" {
         try testing.expectEqualStrings("", background_source.value);
     }
 
-    // An unset zoom range crosses the boundary as infinities.
-    try testing.expectEqual(
-        -std.math.inf(f64),
-        try support.layerMinZoom(&map, "point-circle"),
-    );
-    try testing.expectEqual(
-        std.math.inf(f64),
-        try support.layerMaxZoom(&map, "point-circle"),
-    );
+    // The layer-info aggregate carries the type, zoom range, visibility, and
+    // string sizes for the copy operations. An unset zoom range crosses the
+    // boundary as infinities.
+    const unset = (try support.styleLayerInfo(&map, "point-circle")).?;
+    try testing.expectEqualStrings("circle", unset.layer_type);
+    try testing.expectEqual(-std.math.inf(f64), unset.min_zoom);
+    try testing.expectEqual(std.math.inf(f64), unset.max_zoom);
+    try testing.expectEqual(maplibre.StyleLayerVisibility.visible, unset.visibility);
+    // The reported sizes fit the strings the copy operations return.
+    try testing.expectEqual(@as(?usize, "point".len), unset.source_id_size);
+    try testing.expectEqual(@as(?usize, "roads".len), unset.source_layer_size);
+    {
+        var copied_source_id = try support.layerSourceId(&map, "point-circle");
+        defer copied_source_id.deinit();
+        try testing.expectEqual(unset.source_id_size.?, copied_source_id.value.len);
+    }
+
     _ = try map.setLayerMinZoom(testing.allocator, "point-circle", 4.0);
     _ = try map.setLayerMaxZoom(testing.allocator, "point-circle", 12.5);
-    try testing.expectEqual(@as(f64, 4.0), try support.layerMinZoom(&map, "point-circle"));
-    try testing.expectEqual(@as(f64, 12.5), try support.layerMaxZoom(&map, "point-circle"));
-
-    try testing.expectEqual(
-        maplibre.StyleLayerVisibility.visible,
-        try support.layerVisibility(&map, "point-circle"),
-    );
     _ = try map.setLayerVisibility(testing.allocator, "point-circle", .none);
-    try testing.expectEqual(
-        maplibre.StyleLayerVisibility.none,
-        try support.layerVisibility(&map, "point-circle"),
-    );
+    const tuned = (try support.styleLayerInfo(&map, "point-circle")).?;
+    try testing.expectEqual(@as(f64, 4.0), tuned.min_zoom);
+    try testing.expectEqual(@as(f64, 12.5), tuned.max_zoom);
+    try testing.expectEqual(maplibre.StyleLayerVisibility.none, tuned.visibility);
+
+    // A layer that names no source reports absent sizes.
+    const background = (try support.styleLayerInfo(&map, "background")).?;
+    try testing.expectEqualStrings("background", background.layer_type);
+    try testing.expectEqual(@as(?usize, null), background.source_layer_size);
 
     // An unknown raw visibility is accepted into the ordered queue, then fails.
     const rejected_visibility =
@@ -176,10 +184,8 @@ test "layer base accessors round-trip source, zoom range, and visibility" {
         try support.waitForCommandDisposition(&runtime, rejected_visibility),
         maplibre.CommandDisposition.failed,
     ));
-    try testing.expectError(
-        error.InvalidArgument,
-        support.layerMinZoom(&map, "missing"),
-    );
+    // A missing layer reports not-found through the info getter's found flag.
+    try testing.expect((try support.styleLayerInfo(&map, "missing")) == null);
 }
 
 test "layer properties accept semantic JSON values and return owned snapshots" {
@@ -275,9 +281,10 @@ test "runtime style images copy premultiplied RGBA8 pixels" {
     try testing.expectApproxEqAbs(@as(f32, 1.0), replacement_info.pixel_ratio, 0.000001);
     try testing.expect(!replacement_info.sdf);
 
-    try testing.expect(try support.removeStyleImage(&map, "runtime-icon"));
+    try testing.expect(try support.removeStyleImage(&runtime, &map, "runtime-icon"));
     try testing.expect(!try support.styleImageExists(&map, "runtime-icon"));
-    try testing.expect(!try support.removeStyleImage(&map, "runtime-icon"));
+    // A removal of a missing image is accepted, then fails with NOT_FOUND.
+    try testing.expect(!try support.removeStyleImage(&runtime, &map, "runtime-icon"));
 }
 
 test "location indicator helpers set focused properties" {
@@ -287,9 +294,7 @@ test "location indicator helpers set focused properties" {
     defer map.close() catch @panic("map close failed");
 
     _ = try map.addLocationIndicatorLayer(testing.allocator, "location", "point-circle");
-    var layer_type = (try support.styleLayerType(&map, "location")).?;
-    defer layer_type.deinit();
-    try testing.expectEqualStrings("location-indicator", layer_type.value);
+    try testing.expectEqualStrings("location-indicator", (try support.styleLayerType(&map, "location")).?);
 
     _ = try map.setLocationIndicatorLocation(testing.allocator, "location", .{ .latitude = 37.7749, .longitude = -122.4194 }, 12.0);
     var location = (try support.layerProperty(&map, "location", "location")).?;

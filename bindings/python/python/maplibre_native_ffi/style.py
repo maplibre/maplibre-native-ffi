@@ -166,6 +166,36 @@ class StyleSourceInfo:
 
 
 @dataclass(frozen=True, slots=True)
+class StyleLayerInfo:
+    """Copied fixed metadata for one style layer."""
+
+    layer_type: str
+    """Style-spec layer type string, such as ``"background"``."""
+    min_zoom: float
+    """Lowest zoom at which the layer draws; ``-math.inf`` with no lower
+    bound."""
+    max_zoom: float
+    """Highest zoom at which the layer draws; ``math.inf`` with no upper
+    bound."""
+    visibility: StyleLayerVisibility
+    source_id: str | None = None
+    """Source ID, or None for layer types that carry no source."""
+    source_layer: str | None = None
+    """Source-layer ID, or None for layer types that carry none."""
+
+    @classmethod
+    def _from_native(cls, raw: dict[str, Any]) -> StyleLayerInfo:
+        return cls(
+            layer_type=raw["layer_type"],
+            min_zoom=raw["min_zoom"],
+            max_zoom=raw["max_zoom"],
+            visibility=StyleLayerVisibility(raw["visibility"]),
+            source_id=raw["source_id"],
+            source_layer=raw["source_layer"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class ImageStretch:
     """One stretchable interval along an image axis, in image pixels."""
 
@@ -403,6 +433,7 @@ __all__ = [
     "StyleImage",
     "StyleImageInfo",
     "StyleImageOptions",
+    "StyleLayerInfo",
     "StyleSourceInfo",
     "StyleSourceType",
     "StyleTransitionOptions",

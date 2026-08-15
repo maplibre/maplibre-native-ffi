@@ -16,18 +16,21 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  * {@snippet lang=c :
  * struct mln_map_snapshot {
  *     uint32_t size;
- *     uint32_t reserved;
+ *     uint32_t debug_options;
  *     uint64_t generation;
  *     mln_camera_options camera;
  *     mln_logical_extent logical_extent;
  *     mln_projection_mode projection_mode;
  *     mln_map_viewport_options viewport;
- *     bool loading;
- *     bool fully_rendered;
+ *     bool fully_loaded;
+ *     bool rendering_stats_view_enabled;
  *     bool repaint_demand;
  *     uint8_t reserved_flags;
  *     uint64_t event_mask;
  *     uint64_t latest_render_update_generation;
+ *     mln_map_tile_options tile;
+ *     mln_bound_options bounds;
+ *     mln_free_camera_options free_camera;
  * }
  * }
  */
@@ -39,19 +42,22 @@ public class mln_map_snapshot {
 
     private static final GroupLayout $LAYOUT = MemoryLayout.structLayout(
         MapLibreNativeC.C_INT.withName("size"),
-        MapLibreNativeC.C_INT.withName("reserved"),
+        MapLibreNativeC.C_INT.withName("debug_options"),
         MapLibreNativeC.C_LONG.withName("generation"),
         mln_camera_options.layout().withName("camera"),
         mln_logical_extent.layout().withName("logical_extent"),
         mln_projection_mode.layout().withName("projection_mode"),
         mln_map_viewport_options.layout().withName("viewport"),
-        MapLibreNativeC.C_BOOL.withName("loading"),
-        MapLibreNativeC.C_BOOL.withName("fully_rendered"),
+        MapLibreNativeC.C_BOOL.withName("fully_loaded"),
+        MapLibreNativeC.C_BOOL.withName("rendering_stats_view_enabled"),
         MapLibreNativeC.C_BOOL.withName("repaint_demand"),
         MapLibreNativeC.C_CHAR.withName("reserved_flags"),
         MemoryLayout.paddingLayout(4),
         MapLibreNativeC.C_LONG.withName("event_mask"),
-        MapLibreNativeC.C_LONG.withName("latest_render_update_generation")
+        MapLibreNativeC.C_LONG.withName("latest_render_update_generation"),
+        mln_map_tile_options.layout().withName("tile"),
+        mln_bound_options.layout().withName("bounds"),
+        mln_free_camera_options.layout().withName("free_camera")
     ).withName("mln_map_snapshot");
 
     /**
@@ -105,48 +111,48 @@ public class mln_map_snapshot {
         struct.set(size$LAYOUT, size$OFFSET, fieldValue);
     }
 
-    private static final OfInt reserved$LAYOUT = (OfInt)$LAYOUT.select(groupElement("reserved"));
+    private static final OfInt debug_options$LAYOUT = (OfInt)$LAYOUT.select(groupElement("debug_options"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * uint32_t reserved
+     * uint32_t debug_options
      * }
      */
-    public static final OfInt reserved$layout() {
-        return reserved$LAYOUT;
+    public static final OfInt debug_options$layout() {
+        return debug_options$LAYOUT;
     }
 
-    private static final long reserved$OFFSET = $LAYOUT.byteOffset(groupElement("reserved"));
+    private static final long debug_options$OFFSET = $LAYOUT.byteOffset(groupElement("debug_options"));
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * uint32_t reserved
+     * uint32_t debug_options
      * }
      */
-    public static final long reserved$offset() {
-        return reserved$OFFSET;
+    public static final long debug_options$offset() {
+        return debug_options$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * uint32_t reserved
+     * uint32_t debug_options
      * }
      */
-    public static int reserved(MemorySegment struct) {
-        return struct.get(reserved$LAYOUT, reserved$OFFSET);
+    public static int debug_options(MemorySegment struct) {
+        return struct.get(debug_options$LAYOUT, debug_options$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * uint32_t reserved
+     * uint32_t debug_options
      * }
      */
-    public static void reserved(MemorySegment struct, int fieldValue) {
-        struct.set(reserved$LAYOUT, reserved$OFFSET, fieldValue);
+    public static void debug_options(MemorySegment struct, int fieldValue) {
+        struct.set(debug_options$LAYOUT, debug_options$OFFSET, fieldValue);
     }
 
     private static final OfLong generation$LAYOUT = (OfLong)$LAYOUT.select(groupElement("generation"));
@@ -369,92 +375,92 @@ public class mln_map_snapshot {
         MemorySegment.copy(fieldValue, 0L, struct, viewport$OFFSET, viewport$LAYOUT.byteSize());
     }
 
-    private static final OfBoolean loading$LAYOUT = (OfBoolean)$LAYOUT.select(groupElement("loading"));
+    private static final OfBoolean fully_loaded$LAYOUT = (OfBoolean)$LAYOUT.select(groupElement("fully_loaded"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * bool loading
+     * bool fully_loaded
      * }
      */
-    public static final OfBoolean loading$layout() {
-        return loading$LAYOUT;
+    public static final OfBoolean fully_loaded$layout() {
+        return fully_loaded$LAYOUT;
     }
 
-    private static final long loading$OFFSET = $LAYOUT.byteOffset(groupElement("loading"));
+    private static final long fully_loaded$OFFSET = $LAYOUT.byteOffset(groupElement("fully_loaded"));
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * bool loading
+     * bool fully_loaded
      * }
      */
-    public static final long loading$offset() {
-        return loading$OFFSET;
+    public static final long fully_loaded$offset() {
+        return fully_loaded$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * bool loading
+     * bool fully_loaded
      * }
      */
-    public static boolean loading(MemorySegment struct) {
-        return struct.get(loading$LAYOUT, loading$OFFSET);
+    public static boolean fully_loaded(MemorySegment struct) {
+        return struct.get(fully_loaded$LAYOUT, fully_loaded$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * bool loading
+     * bool fully_loaded
      * }
      */
-    public static void loading(MemorySegment struct, boolean fieldValue) {
-        struct.set(loading$LAYOUT, loading$OFFSET, fieldValue);
+    public static void fully_loaded(MemorySegment struct, boolean fieldValue) {
+        struct.set(fully_loaded$LAYOUT, fully_loaded$OFFSET, fieldValue);
     }
 
-    private static final OfBoolean fully_rendered$LAYOUT = (OfBoolean)$LAYOUT.select(groupElement("fully_rendered"));
+    private static final OfBoolean rendering_stats_view_enabled$LAYOUT = (OfBoolean)$LAYOUT.select(groupElement("rendering_stats_view_enabled"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * bool fully_rendered
+     * bool rendering_stats_view_enabled
      * }
      */
-    public static final OfBoolean fully_rendered$layout() {
-        return fully_rendered$LAYOUT;
+    public static final OfBoolean rendering_stats_view_enabled$layout() {
+        return rendering_stats_view_enabled$LAYOUT;
     }
 
-    private static final long fully_rendered$OFFSET = $LAYOUT.byteOffset(groupElement("fully_rendered"));
+    private static final long rendering_stats_view_enabled$OFFSET = $LAYOUT.byteOffset(groupElement("rendering_stats_view_enabled"));
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * bool fully_rendered
+     * bool rendering_stats_view_enabled
      * }
      */
-    public static final long fully_rendered$offset() {
-        return fully_rendered$OFFSET;
+    public static final long rendering_stats_view_enabled$offset() {
+        return rendering_stats_view_enabled$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * bool fully_rendered
+     * bool rendering_stats_view_enabled
      * }
      */
-    public static boolean fully_rendered(MemorySegment struct) {
-        return struct.get(fully_rendered$LAYOUT, fully_rendered$OFFSET);
+    public static boolean rendering_stats_view_enabled(MemorySegment struct) {
+        return struct.get(rendering_stats_view_enabled$LAYOUT, rendering_stats_view_enabled$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * bool fully_rendered
+     * bool rendering_stats_view_enabled
      * }
      */
-    public static void fully_rendered(MemorySegment struct, boolean fieldValue) {
-        struct.set(fully_rendered$LAYOUT, fully_rendered$OFFSET, fieldValue);
+    public static void rendering_stats_view_enabled(MemorySegment struct, boolean fieldValue) {
+        struct.set(rendering_stats_view_enabled$LAYOUT, rendering_stats_view_enabled$OFFSET, fieldValue);
     }
 
     private static final OfBoolean repaint_demand$LAYOUT = (OfBoolean)$LAYOUT.select(groupElement("repaint_demand"));
@@ -631,6 +637,138 @@ public class mln_map_snapshot {
      */
     public static void latest_render_update_generation(MemorySegment struct, long fieldValue) {
         struct.set(latest_render_update_generation$LAYOUT, latest_render_update_generation$OFFSET, fieldValue);
+    }
+
+    private static final GroupLayout tile$LAYOUT = (GroupLayout)$LAYOUT.select(groupElement("tile"));
+
+    /**
+     * Layout for field:
+     * {@snippet lang=c :
+     * mln_map_tile_options tile
+     * }
+     */
+    public static final GroupLayout tile$layout() {
+        return tile$LAYOUT;
+    }
+
+    private static final long tile$OFFSET = $LAYOUT.byteOffset(groupElement("tile"));
+
+    /**
+     * Offset for field:
+     * {@snippet lang=c :
+     * mln_map_tile_options tile
+     * }
+     */
+    public static final long tile$offset() {
+        return tile$OFFSET;
+    }
+
+    /**
+     * Getter for field:
+     * {@snippet lang=c :
+     * mln_map_tile_options tile
+     * }
+     */
+    public static MemorySegment tile(MemorySegment struct) {
+        return struct.asSlice(tile$OFFSET, tile$LAYOUT.byteSize());
+    }
+
+    /**
+     * Setter for field:
+     * {@snippet lang=c :
+     * mln_map_tile_options tile
+     * }
+     */
+    public static void tile(MemorySegment struct, MemorySegment fieldValue) {
+        MemorySegment.copy(fieldValue, 0L, struct, tile$OFFSET, tile$LAYOUT.byteSize());
+    }
+
+    private static final GroupLayout bounds$LAYOUT = (GroupLayout)$LAYOUT.select(groupElement("bounds"));
+
+    /**
+     * Layout for field:
+     * {@snippet lang=c :
+     * mln_bound_options bounds
+     * }
+     */
+    public static final GroupLayout bounds$layout() {
+        return bounds$LAYOUT;
+    }
+
+    private static final long bounds$OFFSET = $LAYOUT.byteOffset(groupElement("bounds"));
+
+    /**
+     * Offset for field:
+     * {@snippet lang=c :
+     * mln_bound_options bounds
+     * }
+     */
+    public static final long bounds$offset() {
+        return bounds$OFFSET;
+    }
+
+    /**
+     * Getter for field:
+     * {@snippet lang=c :
+     * mln_bound_options bounds
+     * }
+     */
+    public static MemorySegment bounds(MemorySegment struct) {
+        return struct.asSlice(bounds$OFFSET, bounds$LAYOUT.byteSize());
+    }
+
+    /**
+     * Setter for field:
+     * {@snippet lang=c :
+     * mln_bound_options bounds
+     * }
+     */
+    public static void bounds(MemorySegment struct, MemorySegment fieldValue) {
+        MemorySegment.copy(fieldValue, 0L, struct, bounds$OFFSET, bounds$LAYOUT.byteSize());
+    }
+
+    private static final GroupLayout free_camera$LAYOUT = (GroupLayout)$LAYOUT.select(groupElement("free_camera"));
+
+    /**
+     * Layout for field:
+     * {@snippet lang=c :
+     * mln_free_camera_options free_camera
+     * }
+     */
+    public static final GroupLayout free_camera$layout() {
+        return free_camera$LAYOUT;
+    }
+
+    private static final long free_camera$OFFSET = $LAYOUT.byteOffset(groupElement("free_camera"));
+
+    /**
+     * Offset for field:
+     * {@snippet lang=c :
+     * mln_free_camera_options free_camera
+     * }
+     */
+    public static final long free_camera$offset() {
+        return free_camera$OFFSET;
+    }
+
+    /**
+     * Getter for field:
+     * {@snippet lang=c :
+     * mln_free_camera_options free_camera
+     * }
+     */
+    public static MemorySegment free_camera(MemorySegment struct) {
+        return struct.asSlice(free_camera$OFFSET, free_camera$LAYOUT.byteSize());
+    }
+
+    /**
+     * Setter for field:
+     * {@snippet lang=c :
+     * mln_free_camera_options free_camera
+     * }
+     */
+    public static void free_camera(MemorySegment struct, MemorySegment fieldValue) {
+        MemorySegment.copy(fieldValue, 0L, struct, free_camera$OFFSET, free_camera$LAYOUT.byteSize());
     }
 
     /**

@@ -161,10 +161,12 @@ struct NativeOfflineRegionTileCountLimitEvent: Equatable {
 struct NativeCommandFinishedEvent: Equatable {
   let commandId: UInt64
   let disposition: UInt32
+  let generation: UInt64
 
   init(_ raw: mln_runtime_event_command_finished) {
     commandId = raw.command_id
     disposition = raw.disposition
+    generation = raw.generation
   }
 }
 

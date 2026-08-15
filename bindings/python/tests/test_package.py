@@ -199,6 +199,7 @@ def test_native_status_conversion_preserves_status_and_diagnostic() -> None:
         (mln.MaplibreStatus.BUSY, mln.BusyError),
         (mln.MaplibreStatus.TARGET_LOST, mln.TargetLostError),
         (mln.MaplibreStatus.NOT_READY, mln.NotReadyError),
+        (mln.MaplibreStatus.NOT_FOUND, mln.NotFoundError),
     ),
 )
 def test_native_status_categories_map_to_public_errors(
@@ -582,23 +583,32 @@ def test_map_create_from_closed_runtime_reports_invalid_state() -> None:
     assert raised.value.diagnostic != stale
 
 
-def test_map_debug_and_status_options_round_trip_public_values() -> None:
+def test_map_debug_and_status_options_round_trip_the_snapshot() -> None:
     with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
         debug_options = (
             map_module.MapDebugOptions.TILE_BORDERS
             | map_module.MapDebugOptions.PARSE_STATUS
         )
-        map_handle.set_debug_options(debug_options)
+        command_id = map_handle.set_debug_options(debug_options)
         map_handle.set_rendering_stats_view_enabled(True)
+        runtime.barrier()
 
-        assert map_handle.get_debug_options() == debug_options
-        assert map_handle.get_rendering_stats_view_enabled() is True
-        assert isinstance(map_handle.is_fully_loaded(), bool)
+        # Snapshot fence: the commit reports the generation that published its
+        # effect, and a snapshot at or past that generation observes it.
+        finished = _command_finished_payload(runtime, command_id)
+        assert finished.disposition == mln.CommandDisposition.COMMITTED
+        snapshot = map_handle.snapshot()
+        assert snapshot.generation >= finished.generation
+        assert snapshot.debug_options == debug_options
+        assert snapshot.rendering_stats_view_enabled is True
+        assert isinstance(snapshot.fully_loaded, bool)
 
         map_handle.set_debug_options(map_module.MapDebugOptions.NONE)
         map_handle.set_rendering_stats_view_enabled(False)
-        assert map_handle.get_debug_options() == map_module.MapDebugOptions.NONE
-        assert map_handle.get_rendering_stats_view_enabled() is False
+        runtime.barrier()
+        snapshot = map_handle.snapshot()
+        assert snapshot.debug_options == map_module.MapDebugOptions.NONE
+        assert snapshot.rendering_stats_view_enabled is False
 
 
 def test_style_url_rejects_embedded_nul_before_native_call() -> None:
@@ -765,44 +775,22 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
             ("https://example.test/dem/{z}/{x}/{y}.png",),
         )
 
-        assert map_handle.style_source_exists("points") is True
-        assert map_handle.style_source_exists("missing") is False
-        assert (
-            map_handle.get_style_source_type("style-json-points")
-            == style.StyleSourceType.GEOJSON
-        )
-        assert (
-            map_handle.get_style_source_type("points") == style.StyleSourceType.GEOJSON
-        )
-        assert (
-            map_handle.get_style_source_type("inline-points")
-            == style.StyleSourceType.GEOJSON
-        )
-        assert (
-            map_handle.get_style_source_type("vector-tiles")
-            == style.StyleSourceType.VECTOR
-        )
-        assert (
-            map_handle.get_style_source_type("raster-tiles")
-            == style.StyleSourceType.RASTER
-        )
-        assert (
-            map_handle.get_style_source_type("dem-tiles")
-            == style.StyleSourceType.RASTER_DEM
-        )
-        assert (
-            map_handle.get_style_source_type("vector-inline")
-            == style.StyleSourceType.VECTOR
-        )
-        assert (
-            map_handle.get_style_source_type("raster-inline")
-            == style.StyleSourceType.RASTER
-        )
-        assert (
-            map_handle.get_style_source_type("dem-inline")
-            == style.StyleSourceType.RASTER_DEM
-        )
-        assert map_handle.get_style_source_type("missing") is None
+        def source_type(source_id: str) -> style.StyleSourceType | None:
+            info = map_handle.get_style_source_info(source_id)
+            return info.source_type if info is not None else None
+
+        # The info getter's found flag is the existence check.
+        assert map_handle.get_style_source_info("points") is not None
+        assert map_handle.get_style_source_info("missing") is None
+        assert source_type("style-json-points") == style.StyleSourceType.GEOJSON
+        assert source_type("points") == style.StyleSourceType.GEOJSON
+        assert source_type("inline-points") == style.StyleSourceType.GEOJSON
+        assert source_type("vector-tiles") == style.StyleSourceType.VECTOR
+        assert source_type("raster-tiles") == style.StyleSourceType.RASTER
+        assert source_type("dem-tiles") == style.StyleSourceType.RASTER_DEM
+        assert source_type("vector-inline") == style.StyleSourceType.VECTOR
+        assert source_type("raster-inline") == style.StyleSourceType.RASTER
+        assert source_type("dem-inline") == style.StyleSourceType.RASTER_DEM
         source_ids = map_handle.list_style_source_ids()
         assert "style-json-points" in source_ids
         assert "points" in source_ids
@@ -845,16 +833,33 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
             geo.LatLng(-5.0, -10.0), geo.LatLng(15.0, 20.0)
         )
 
-        assert map_handle.remove_style_source("style-json-points") is True
-        assert map_handle.remove_style_source("points") is True
-        assert map_handle.remove_style_source("points") is False
-        assert map_handle.remove_style_source("inline-points") is True
-        assert map_handle.remove_style_source("vector-tiles") is True
-        assert map_handle.remove_style_source("raster-tiles") is True
-        assert map_handle.remove_style_source("dem-tiles") is True
-        assert map_handle.remove_style_source("vector-inline") is True
-        assert map_handle.remove_style_source("raster-inline") is True
-        assert map_handle.remove_style_source("dem-inline") is True
+        removed_id = map_handle.remove_style_source("points")
+        runtime.barrier()
+        removed = _command_finished_event(runtime, removed_id)
+        assert isinstance(removed.payload, mln.CommandFinishedPayload)
+        assert removed.payload.disposition == mln.CommandDisposition.COMMITTED
+        assert map_handle.get_style_source_info("points") is None
+
+        # Removing the missing source again fails the command with NOT_FOUND.
+        missing_id = map_handle.remove_style_source("points")
+        runtime.barrier()
+        missing = _command_finished_event(runtime, missing_id)
+        assert isinstance(missing.payload, mln.CommandFinishedPayload)
+        assert missing.payload.disposition == mln.CommandDisposition.FAILED
+        assert missing.code == mln.MaplibreStatus.NOT_FOUND.native_code
+
+        for source_id in (
+            "style-json-points",
+            "inline-points",
+            "vector-tiles",
+            "raster-tiles",
+            "dem-tiles",
+            "vector-inline",
+            "raster-inline",
+            "dem-inline",
+        ):
+            map_handle.remove_style_source(source_id)
+        runtime.barrier()
         source_ids = map_handle.list_style_source_ids()
         assert "style-json-points" not in source_ids
         assert "points" not in source_ids
@@ -896,14 +901,12 @@ def test_image_source_url_image_and_coordinates_public_api() -> None:
         )
         map_handle.add_image_source_image("overlay-inline", coordinates, image)
 
-        assert (
-            map_handle.get_style_source_type("overlay-url")
-            == style.StyleSourceType.IMAGE
-        )
-        assert (
-            map_handle.get_style_source_type("overlay-inline")
-            == style.StyleSourceType.IMAGE
-        )
+        url_info = map_handle.get_style_source_info("overlay-url")
+        inline_info = map_handle.get_style_source_info("overlay-inline")
+        assert url_info is not None
+        assert url_info.source_type == style.StyleSourceType.IMAGE
+        assert inline_info is not None
+        assert inline_info.source_type == style.StyleSourceType.IMAGE
         assert map_handle.get_image_source_coordinates("overlay-url") == coordinates
         assert map_handle.get_image_source_coordinates("missing") is None
 
@@ -918,8 +921,11 @@ def test_image_source_url_image_and_coordinates_public_api() -> None:
             == updated_coordinates
         )
 
-        assert map_handle.remove_style_source("overlay-url") is True
-        assert map_handle.remove_style_source("overlay-inline") is True
+        map_handle.remove_style_source("overlay-url")
+        map_handle.remove_style_source("overlay-inline")
+        runtime.barrier()
+        assert map_handle.get_style_source_info("overlay-url") is None
+        assert map_handle.get_style_source_info("overlay-inline") is None
 
 
 def test_style_json_light_layer_property_and_filter_public_api() -> None:
@@ -1003,8 +1009,6 @@ def test_style_image_metadata_copy_and_removal_public_api() -> None:
             style.StyleImageOptions(pixel_ratio=2.0, sdf=True),
         )
 
-        assert map_handle.style_image_exists("marker") is True
-        assert map_handle.style_image_exists("missing") is False
         info = map_handle.get_style_image_info("marker")
         assert info is not None
         assert info.width == 1
@@ -1022,8 +1026,20 @@ def test_style_image_metadata_copy_and_removal_public_api() -> None:
         assert copied.sdf is True
         assert map_handle.copy_style_image_premultiplied_rgba8("missing") is None
 
-        assert map_handle.remove_style_image("marker") is True
-        assert map_handle.remove_style_image("marker") is False
+        removed_id = map_handle.remove_style_image("marker")
+        runtime.barrier()
+        removed = _command_finished_event(runtime, removed_id)
+        assert isinstance(removed.payload, mln.CommandFinishedPayload)
+        assert removed.payload.disposition == mln.CommandDisposition.COMMITTED
+        assert map_handle.get_style_image_info("marker") is None
+
+        # Removing the missing image again fails the command with NOT_FOUND.
+        missing_id = map_handle.remove_style_image("marker")
+        runtime.barrier()
+        missing = _command_finished_event(runtime, missing_id)
+        assert isinstance(missing.payload, mln.CommandFinishedPayload)
+        assert missing.payload.disposition == mln.CommandDisposition.FAILED
+        assert missing.code == mln.MaplibreStatus.NOT_FOUND.native_code
 
 
 def test_builtin_style_layers_and_location_indicator_public_api() -> None:
@@ -1053,12 +1069,20 @@ def test_builtin_style_layers_and_location_indicator_public_api() -> None:
             "marker",
         )
 
-        assert map_handle.get_style_layer_type("hillshade") == "hillshade"
-        assert map_handle.get_style_layer_type("relief") == "color-relief"
-        assert map_handle.get_style_layer_type("location") == "location-indicator"
-        assert map_handle.remove_style_layer("hillshade") is True
-        assert map_handle.remove_style_layer("relief") is True
-        assert map_handle.remove_style_layer("location") is True
+        def layer_type(layer_id: str) -> str | None:
+            info = map_handle.get_style_layer_info(layer_id)
+            return info.layer_type if info is not None else None
+
+        assert layer_type("hillshade") == "hillshade"
+        assert layer_type("relief") == "color-relief"
+        assert layer_type("location") == "location-indicator"
+        map_handle.remove_style_layer("hillshade")
+        map_handle.remove_style_layer("relief")
+        map_handle.remove_style_layer("location")
+        runtime.barrier()
+        assert map_handle.get_style_layer_info("hillshade") is None
+        assert map_handle.get_style_layer_info("relief") is None
+        assert map_handle.get_style_layer_info("location") is None
 
 
 def test_nine_patch_style_image_round_trips_public_api() -> None:
@@ -1189,24 +1213,35 @@ def test_layer_base_accessors_round_trip_public_api() -> None:
         assert map_handle.get_layer_source_id("bg") == ""
 
         # An unset zoom range crosses the boundary as infinities.
-        assert map_handle.get_layer_min_zoom("fill") == -math.inf
-        assert map_handle.get_layer_max_zoom("fill") == math.inf
+        info = map_handle.get_style_layer_info("fill")
+        assert info is not None
+        assert info.layer_type == "fill"
+        assert info.min_zoom == -math.inf
+        assert info.max_zoom == math.inf
+        assert info.visibility is style.StyleLayerVisibility.VISIBLE
+        # The layer-info string sizes gate the source ID and source-layer
+        # copies, which agree with the scalar accessors.
+        assert info.source_id == map_handle.get_layer_source_id("fill") == "geo"
+        assert info.source_layer == map_handle.get_layer_source_layer("fill") == "roads"
+
         map_handle.set_layer_min_zoom("fill", 4.0)
         map_handle.set_layer_max_zoom("fill", 12.5)
-        assert map_handle.get_layer_min_zoom("fill") == 4.0
-        assert map_handle.get_layer_max_zoom("fill") == 12.5
-
-        assert (
-            map_handle.get_layer_visibility("fill")
-            is style.StyleLayerVisibility.VISIBLE
-        )
         map_handle.set_layer_visibility("fill", style.StyleLayerVisibility.NONE)
-        assert (
-            map_handle.get_layer_visibility("fill") is style.StyleLayerVisibility.NONE
-        )
+        info = map_handle.get_style_layer_info("fill")
+        assert info is not None
+        assert info.min_zoom == 4.0
+        assert info.max_zoom == 12.5
+        assert info.visibility is style.StyleLayerVisibility.NONE
 
-        with pytest.raises(mln.InvalidArgumentError):
-            map_handle.get_layer_min_zoom("missing")
+        # A sourceless layer type reports no source strings at all.
+        background = map_handle.get_style_layer_info("bg")
+        assert background is not None
+        assert background.layer_type == "background"
+        assert background.source_id is None
+        assert background.source_layer is None
+
+        # The info getter's found flag reports a missing layer as None.
+        assert map_handle.get_style_layer_info("missing") is None
 
 
 def test_style_layer_metadata_move_and_removal_public_api() -> None:
@@ -1227,18 +1262,30 @@ def test_style_layer_metadata_move_and_removal_public_api() -> None:
         assert "background-a" in layer_ids
         assert "background-b" in layer_ids
         assert layer_ids.index("background-a") < layer_ids.index("background-b")
-        assert map_handle.style_layer_exists("background-a") is True
-        assert map_handle.style_layer_exists("missing") is False
-        assert map_handle.get_style_layer_type("background-a") == "background"
-        assert map_handle.get_style_layer_type("missing") is None
+        info = map_handle.get_style_layer_info("background-a")
+        assert info is not None
+        assert info.layer_type == "background"
+        assert map_handle.get_style_layer_info("missing") is None
 
         map_handle.move_style_layer("background-b", "background-a")
         layer_ids = map_handle.list_style_layer_ids()
         assert layer_ids.index("background-b") < layer_ids.index("background-a")
 
-        assert map_handle.remove_style_layer("background-b") is True
-        assert map_handle.remove_style_layer("background-b") is False
+        removed_id = map_handle.remove_style_layer("background-b")
+        runtime.barrier()
+        removed = _command_finished_event(runtime, removed_id)
+        assert isinstance(removed.payload, mln.CommandFinishedPayload)
+        assert removed.payload.disposition == mln.CommandDisposition.COMMITTED
+        assert map_handle.get_style_layer_info("background-b") is None
         assert "background-b" not in map_handle.list_style_layer_ids()
+
+        # Removing the missing layer again fails the command with NOT_FOUND.
+        missing_id = map_handle.remove_style_layer("background-b")
+        runtime.barrier()
+        missing = _command_finished_event(runtime, missing_id)
+        assert isinstance(missing.payload, mln.CommandFinishedPayload)
+        assert missing.payload.disposition == mln.CommandDisposition.FAILED
+        assert missing.code == mln.MaplibreStatus.NOT_FOUND.native_code
 
 
 def test_map_viewport_and_tile_options_round_trip_public_values() -> None:
@@ -1258,11 +1305,23 @@ def test_map_viewport_and_tile_options_round_trip_public_values() -> None:
     )
 
     with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
-        map_handle.set_viewport_options(viewport)
-        map_handle.set_tile_options(tile)
+        viewport_command = map_handle.set_viewport_options(viewport)
+        tile_command = map_handle.set_tile_options(tile)
+        runtime.barrier()
 
-        assert map_handle.get_viewport_options() == viewport
-        assert map_handle.get_tile_options() == tile
+        # The new snapshot fields round-trip both committed set commands.
+        events = runtime.drain_events().events
+        finished = {
+            event.payload.command_id: event.payload
+            for event in events
+            if event.event_type == mln.RuntimeEventType.COMMAND_FINISHED
+            and isinstance(event.payload, mln.CommandFinishedPayload)
+        }
+        snapshot = map_handle.snapshot()
+        assert snapshot.viewport == viewport
+        assert snapshot.tile == tile
+        assert snapshot.generation >= finished[viewport_command].generation
+        assert snapshot.generation >= finished[tile_command].generation
 
 
 def test_camera_snapshot_and_jump_round_trip_public_values() -> None:
@@ -1289,8 +1348,15 @@ def test_camera_snapshot_and_jump_round_trip_public_values() -> None:
 
 def test_free_camera_and_projection_mode_round_trip_public_values() -> None:
     with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
-        free_camera = map_handle.get_free_camera_options()
+        free_camera = map_handle.snapshot().free_camera
         assert isinstance(free_camera, camera.FreeCameraOptions)
+        map_handle.set_free_camera_options(
+            camera.FreeCameraOptions(orientation=camera.Quaternion(0.0, 0.0, 0.0, 1.0))
+        )
+        runtime.barrier()
+        updated = map_handle.snapshot().free_camera
+        assert updated.position is not None
+        assert updated.orientation is not None
 
         projection = camera.ProjectionMode(
             axonometric=True,
@@ -1326,7 +1392,8 @@ def test_camera_fit_bounds_and_constraints_public_api() -> None:
                 max_zoom=10.0,
             )
         )
-        constraints = map_handle.get_bounds()
+        runtime.barrier()
+        constraints = map_handle.snapshot().bounds
         fit_bounds = map_handle.camera_for_lat_lng_bounds(bounds, fit)
         fit_coordinates = map_handle.camera_for_lat_lngs(
             (bounds.southwest, bounds.northeast),
@@ -1369,6 +1436,13 @@ def _jumped_longitude(map_handle: mln.MapHandle, longitude: float) -> float:
     return center.longitude
 
 
+def _settled_bounds(
+    runtime: mln.RuntimeHandle, map_handle: mln.MapHandle
+) -> camera.BoundsConstraint | None:
+    runtime.barrier()
+    return map_handle.snapshot().bounds.bounds
+
+
 def test_camera_bounds_distinguish_unbounded_from_world() -> None:
     world = geo.LatLngBounds(
         southwest=geo.LatLng(-90.0, -180.0),
@@ -1376,13 +1450,13 @@ def test_camera_bounds_distinguish_unbounded_from_world() -> None:
     )
 
     with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
-        assert map_handle.get_bounds().bounds == camera.Unbounded()
+        assert _settled_bounds(runtime, map_handle) == camera.Unbounded()
         # An unbounded map wraps across the antimeridian.
         assert _jumped_longitude(map_handle, 200.0) == pytest.approx(-160.0, abs=1e-6)
 
         map_handle.set_bounds(camera.BoundOptions(bounds=camera.Bounded(world)))
 
-        constrained = map_handle.get_bounds().bounds
+        constrained = _settled_bounds(runtime, map_handle)
         assert isinstance(constrained, camera.Bounded)
         assert constrained.bounds.northeast.longitude == pytest.approx(180.0)
         # World bounds clamp at the antimeridian instead of wrapping.
@@ -1390,7 +1464,7 @@ def test_camera_bounds_distinguish_unbounded_from_world() -> None:
 
         map_handle.set_bounds(camera.BoundOptions(bounds=camera.Unbounded()))
 
-        assert map_handle.get_bounds().bounds == camera.Unbounded()
+        assert _settled_bounds(runtime, map_handle) == camera.Unbounded()
         # Releasing the constraint restores antimeridian wrapping.
         assert _jumped_longitude(map_handle, 200.0) == pytest.approx(-160.0, abs=1e-6)
 
@@ -1423,11 +1497,11 @@ def _finished_transition_ids(events: list[mln.RuntimeEvent]) -> list[int]:
     return ids
 
 
-def _command_finished_payload(
+def _command_finished_event(
     runtime: mln.RuntimeHandle, command_id: int
-) -> mln.CommandFinishedPayload:
+) -> mln.RuntimeEvent:
     matches = [
-        event.payload
+        event
         for event in runtime.drain_events().events
         if event.event_type == mln.RuntimeEventType.COMMAND_FINISHED
         and isinstance(event.payload, mln.CommandFinishedPayload)
@@ -1435,6 +1509,14 @@ def _command_finished_payload(
     ]
     assert len(matches) == 1
     return matches[0]
+
+
+def _command_finished_payload(
+    runtime: mln.RuntimeHandle, command_id: int
+) -> mln.CommandFinishedPayload:
+    payload = _command_finished_event(runtime, command_id).payload
+    assert isinstance(payload, mln.CommandFinishedPayload)
+    return payload
 
 
 def _camera_change_modes(
@@ -2015,11 +2097,49 @@ def test_map_projection_converts_coordinates_and_closes() -> None:
     assert math.isclose(round_tripped.longitude, coordinate.longitude, abs_tol=1e-6)
 
     with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
-        map_handle.jump_to(camera.CameraOptions(center=coordinate, zoom=1.0))
+        map_handle.jump_to(
+            camera.CameraOptions(center=geo.LatLng(10.0, 20.0), zoom=3.0)
+        )
         with map_handle.create_projection() as projection:
+            # A projection created after a camera command observes it.
+            created_camera = projection.get_camera()
+            assert created_camera.center is not None
+            assert created_camera.center.latitude == pytest.approx(10.0)
+            assert created_camera.center.longitude == pytest.approx(20.0)
+            assert created_camera.zoom == pytest.approx(3.0)
+
+            # A synchronous conversion round-trips pixel -> latlng -> pixel.
             point = projection.pixel_for_lat_lng(coordinate)
             projected = projection.lat_lng_for_pixel(point)
+            replayed = projection.pixel_for_lat_lng(projected)
+            assert math.isclose(projected.latitude, coordinate.latitude, abs_tol=1e-6)
+            assert math.isclose(projected.longitude, coordinate.longitude, abs_tol=1e-6)
+            assert math.isclose(replayed.x, point.x, abs_tol=1e-6)
+            assert math.isclose(replayed.y, point.y, abs_tol=1e-6)
+
+            # A setter applies before returning, so it changes later
+            # conversions.
             projection.set_camera(camera.CameraOptions(center=coordinate, zoom=2.0))
+            recentered = projection.pixel_for_lat_lng(coordinate)
+            assert (recentered.x, recentered.y) != (point.x, point.y)
+            moved_camera = projection.get_camera()
+            assert moved_camera.center is not None
+            assert moved_camera.center.latitude == pytest.approx(0.0)
+            assert moved_camera.zoom == pytest.approx(2.0)
+
+            # The projection is usable from a second Python thread.
+            results: list[geo.LatLng] = []
+            thread = threading.Thread(
+                target=lambda: results.append(projection.lat_lng_for_pixel(recentered))
+            )
+            thread.start()
+            thread.join()
+            assert len(results) == 1
+            assert math.isclose(results[0].latitude, coordinate.latitude, abs_tol=1e-6)
+            assert math.isclose(
+                results[0].longitude, coordinate.longitude, abs_tol=1e-6
+            )
+
             projection.set_visible_coordinates(
                 (geo.LatLng(-1.0, -1.0), geo.LatLng(1.0, 1.0)),
                 camera.EdgeInsets(),
@@ -2033,14 +2153,14 @@ def test_map_projection_converts_coordinates_and_closes() -> None:
                 ),
                 camera.EdgeInsets(),
             )
-
             assert not projection.closed
             assert isinstance(projection.get_camera(), camera.CameraOptions)
-            assert isinstance(point, camera.ScreenPoint)
-            assert math.isfinite(projected.latitude)
-            assert math.isfinite(projected.longitude)
 
+        # The close is synchronous, so the handle is retired when it returns
+        # and a later call is rejected.
         assert projection.closed
+        with pytest.raises(mln.InvalidArgumentError):
+            projection.get_camera()
 
 
 def test_offline_region_operation_starts_return_public_handles(tmp_path: Path) -> None:
@@ -3525,7 +3645,12 @@ def test_remove_style_source_releases_custom_geometry_handle() -> None:
         )
         runtime.barrier()
 
-        assert map_handle.remove_style_source("custom-remove") is True
+        command_id = map_handle.remove_style_source("custom-remove")
+        runtime.barrier()
+        assert (
+            _command_finished_payload(runtime, command_id).disposition
+            == mln.CommandDisposition.COMMITTED
+        )
         assert source.closed
         source._native.push_fetch_for_test(1, 2, 3)
         assert source.poll_event() is None
@@ -3572,7 +3697,7 @@ def test_set_bounds_rejects_unsupported_constraint() -> None:
             map_handle.set_bounds(
                 camera.BoundOptions(bounds=world)  # type: ignore[arg-type]
             )
-        assert map_handle.get_bounds().bounds == camera.Unbounded()
+        assert map_handle.snapshot().bounds.bounds == camera.Unbounded()
 
 
 @pytest.mark.parametrize("transition_id", [-1, 2**64])

@@ -23,6 +23,9 @@ final class MaplibreStatus {
   /// The operation completed after cancellation was requested.
   static const cancelled = MaplibreStatus._('cancelled', -6);
 
+  /// No object has the requested ID.
+  static const notFound = MaplibreStatus._('notFound', -10);
+
   /// An unknown status value returned by a newer or incompatible native build.
   static MaplibreStatus unknown(int nativeStatusCode) =>
       MaplibreStatus._('unknown', nativeStatusCode);
@@ -43,6 +46,7 @@ final class MaplibreStatus {
         -4 => unsupported,
         -5 => nativeError,
         -6 => cancelled,
+        -10 => notFound,
         _ => unknown(nativeStatusCode),
       };
 
@@ -83,6 +87,7 @@ abstract final class MaplibreException implements Exception {
       -3 => WrongThreadException(nativeStatusCode, diagnostic),
       -4 => UnsupportedFeatureException(nativeStatusCode, diagnostic),
       -5 => NativeErrorException(nativeStatusCode, diagnostic),
+      -10 => NotFoundException(nativeStatusCode, diagnostic),
       _ => UnknownMaplibreException(status, nativeStatusCode, diagnostic),
     };
   }
@@ -151,6 +156,13 @@ final class NativeErrorException extends MaplibreException {
   /// Creates a native-error exception.
   const NativeErrorException(int? nativeStatusCode, String diagnostic)
     : super(MaplibreStatus.nativeError, nativeStatusCode, diagnostic);
+}
+
+/// Native not-found failure: no object has the requested ID.
+final class NotFoundException extends MaplibreException {
+  /// Creates a not-found exception.
+  const NotFoundException(int? nativeStatusCode, String diagnostic)
+    : super(MaplibreStatus.notFound, nativeStatusCode, diagnostic);
 }
 
 /// Loaded native library uses a different C ABI contract version.

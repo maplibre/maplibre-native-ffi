@@ -9,13 +9,17 @@ import "github.com/maplibre/maplibre-native-ffi/bindings/go/internal/handle"
 
 type nativeProjection uint64
 
-// MapProjectionHandle owns an any-thread standalone projection snapshot.
+// MapProjectionHandle owns an any-thread standalone projection snapshot. Every
+// call after creation is synchronous, runs on the calling goroutine, and is
+// internally serialized, so a projection is safe to share across goroutines. A
+// projection never observes map changes made after its creation.
 type MapProjectionHandle struct {
 	state *handle.State[nativeProjection]
 }
 
-// NewProjection creates a standalone projection helper from this map's ordered
-// transform state. Later map changes do not update the helper.
+// NewProjection creates a standalone projection helper that copies this map's
+// transform state after every earlier map command. Later map changes do not
+// update the helper.
 func (m *MapHandle) NewProjection() (*MapProjectionHandle, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
@@ -54,22 +58,18 @@ func (projection *MapProjectionHandle) ptr() (nativeProjection, func(), error) {
 	return borrow.Handle(), borrow.Release, nil
 }
 
-// Close waits for this projection helper's native close operation.
+// Close destroys this projection helper synchronously. It waits for projection
+// calls already running on other goroutines, then releases the projection's
+// map child reservation before it returns.
 func (projection *MapProjectionHandle) Close() error {
 	if projection == nil || projection.state == nil {
 		return newBindingError(ErrInvalidArgument, "MapProjectionHandle is nil")
 	}
 	var closeErr error
 	_, err := projection.state.CloseChecked(func(native nativeProjection) int32 {
-		var operation C.mln_operation
 		if err := checkNative(func() int32 {
-			return int32(C.mln_map_projection_close_start(C.mln_map_projection(native), &operation))
+			return int32(C.mln_map_projection_close(C.mln_map_projection(native)))
 		}); err != nil {
-			closeErr = err
-			return statusFromError(err)
-		}
-		defer C.mln_operation_release(operation)
-		if err := waitNativeOperation(operation); err != nil {
 			closeErr = err
 			return statusFromError(err)
 		}
@@ -81,7 +81,8 @@ func (projection *MapProjectionHandle) Close() error {
 	return closeErr
 }
 
-// Camera returns an ordered camera snapshot.
+// Camera returns a copy of the projection camera. The result observes every
+// earlier projection setter.
 func (projection *MapProjectionHandle) Camera() (CameraOptions, error) {
 	ptr, release, err := projection.ptr()
 	if err != nil {
@@ -89,45 +90,36 @@ func (projection *MapProjectionHandle) Camera() (CameraOptions, error) {
 	}
 	defer release()
 	defer projection.state.KeepAlive()
-	operation, err := waitMapOperation(func(out *C.mln_operation) int32 {
-		return int32(C.mln_map_projection_get_camera_start(C.mln_map_projection(ptr), out))
-	})
-	if err != nil {
-		return CameraOptions{}, err
-	}
-	defer C.mln_operation_release(operation)
 	camera := C.mln_camera_options_default()
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_projection_get_camera_take_result(operation, &camera))
+		return int32(C.mln_map_projection_get_camera(C.mln_map_projection(ptr), &camera))
 	}); err != nil {
 		return CameraOptions{}, err
 	}
 	return goCameraOptions(camera), nil
 }
 
-// SetCamera submits selected camera fields and returns the command ID.
-func (projection *MapProjectionHandle) SetCamera(camera CameraOptions) (uint64, error) {
+// SetCamera applies selected camera fields synchronously, so a later read or
+// conversion observes them. The map's camera is unaffected.
+func (projection *MapProjectionHandle) SetCamera(camera CameraOptions) error {
 	ptr, release, err := projection.ptr()
 	if err != nil {
-		return 0, err
+		return err
 	}
 	defer release()
 	defer projection.state.KeepAlive()
 	raw := cCameraOptions(camera)
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_projection_set_camera(C.mln_map_projection(ptr), &raw, &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return checkNative(func() int32 {
+		return int32(C.mln_map_projection_set_camera(C.mln_map_projection(ptr), &raw))
+	})
 }
 
-// SetVisibleCoordinates submits a fitted-camera command and returns its ID.
-func (projection *MapProjectionHandle) SetVisibleCoordinates(coordinates []LatLng, padding EdgeInsets) (uint64, error) {
+// SetVisibleCoordinates applies a camera fitted to geographic coordinates
+// synchronously, so a later read or conversion observes it.
+func (projection *MapProjectionHandle) SetVisibleCoordinates(coordinates []LatLng, padding EdgeInsets) error {
 	ptr, release, err := projection.ptr()
 	if err != nil {
-		return 0, err
+		return err
 	}
 	defer release()
 	defer projection.state.KeepAlive()
@@ -136,35 +128,29 @@ func (projection *MapProjectionHandle) SetVisibleCoordinates(coordinates []LatLn
 	if len(raw) > 0 {
 		data = &raw[0]
 	}
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_projection_set_visible_coordinates(C.mln_map_projection(ptr), data, C.size_t(len(raw)), cEdgeInsets(padding), &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return checkNative(func() int32 {
+		return int32(C.mln_map_projection_set_visible_coordinates(C.mln_map_projection(ptr), data, C.size_t(len(raw)), cEdgeInsets(padding)))
+	})
 }
 
-// SetVisibleGeometry submits a fitted-camera command and returns its ID.
-func (projection *MapProjectionHandle) SetVisibleGeometry(geometry []byte, padding EdgeInsets) (uint64, error) {
+// SetVisibleGeometry applies a camera fitted to GeoJSON Geometry bytes
+// synchronously, so a later read or conversion observes it.
+func (projection *MapProjectionHandle) SetVisibleGeometry(geometry []byte, padding EdgeInsets) error {
 	ptr, release, err := projection.ptr()
 	if err != nil {
-		return 0, err
+		return err
 	}
 	defer release()
 	defer projection.state.KeepAlive()
 	raw := newCBufferView(geometry)
 	defer raw.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_projection_set_visible_geometry(C.mln_map_projection(ptr), raw.raw(), cEdgeInsets(padding), &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return checkNative(func() int32 {
+		return int32(C.mln_map_projection_set_visible_geometry(C.mln_map_projection(ptr), raw.raw(), cEdgeInsets(padding)))
+	})
 }
 
-// PixelForLatLng performs an ordered coordinate conversion.
+// PixelForLatLng converts a geographic coordinate to a logical screen point.
+// The result observes every earlier projection setter.
 func (projection *MapProjectionHandle) PixelForLatLng(coordinate LatLng) (ScreenPoint, error) {
 	ptr, release, err := projection.ptr()
 	if err != nil {
@@ -172,23 +158,17 @@ func (projection *MapProjectionHandle) PixelForLatLng(coordinate LatLng) (Screen
 	}
 	defer release()
 	defer projection.state.KeepAlive()
-	operation, err := waitMapOperation(func(out *C.mln_operation) int32 {
-		return int32(C.mln_map_projection_pixel_for_lat_lng_start(C.mln_map_projection(ptr), cLatLng(coordinate), out))
-	})
-	if err != nil {
-		return ScreenPoint{}, err
-	}
-	defer C.mln_operation_release(operation)
 	var point C.mln_screen_point
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_projection_pixel_for_lat_lng_take_result(operation, &point))
+		return int32(C.mln_map_projection_pixel_for_lat_lng(C.mln_map_projection(ptr), cLatLng(coordinate), &point))
 	}); err != nil {
 		return ScreenPoint{}, err
 	}
 	return goScreenPoint(point), nil
 }
 
-// LatLngForPixel performs an ordered coordinate conversion.
+// LatLngForPixel converts a logical screen point to a geographic coordinate.
+// The result observes every earlier projection setter.
 func (projection *MapProjectionHandle) LatLngForPixel(point ScreenPoint) (LatLng, error) {
 	ptr, release, err := projection.ptr()
 	if err != nil {
@@ -196,16 +176,9 @@ func (projection *MapProjectionHandle) LatLngForPixel(point ScreenPoint) (LatLng
 	}
 	defer release()
 	defer projection.state.KeepAlive()
-	operation, err := waitMapOperation(func(out *C.mln_operation) int32 {
-		return int32(C.mln_map_projection_lat_lng_for_pixel_start(C.mln_map_projection(ptr), cScreenPoint(point), out))
-	})
-	if err != nil {
-		return LatLng{}, err
-	}
-	defer C.mln_operation_release(operation)
 	var coordinate C.mln_lat_lng
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_projection_lat_lng_for_pixel_take_result(operation, &coordinate))
+		return int32(C.mln_map_projection_lat_lng_for_pixel(C.mln_map_projection(ptr), cScreenPoint(point), &coordinate))
 	}); err != nil {
 		return LatLng{}, err
 	}

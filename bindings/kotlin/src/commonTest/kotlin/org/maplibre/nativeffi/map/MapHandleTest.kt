@@ -8,13 +8,20 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import org.maplibre.nativeffi.camera.BoundOptions
+import org.maplibre.nativeffi.camera.BoundsConstraint
+import org.maplibre.nativeffi.camera.FreeCameraOptions
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
+import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
+import org.maplibre.nativeffi.geo.Quaternion
+import org.maplibre.nativeffi.geo.Vec3
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
 import org.maplibre.nativeffi.runtime.CommandDisposition
+import org.maplibre.nativeffi.runtime.RuntimeEvent
 import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
@@ -71,26 +78,41 @@ class MapHandleTest {
             assertEquals("", map.layerSourceLayer("bg"))
 
             // An unset zoom range crosses the boundary as infinities.
-            assertEquals(Double.NEGATIVE_INFINITY, map.layerMinZoom("fill"))
-            assertEquals(Double.POSITIVE_INFINITY, map.layerMaxZoom("fill"))
+            val unbounded = assertNotNull(map.styleLayerInfo("fill"))
+            assertEquals("fill", unbounded.type)
+            assertEquals(Double.NEGATIVE_INFINITY, unbounded.minZoom)
+            assertEquals(Double.POSITIVE_INFINITY, unbounded.maxZoom)
+            assertEquals(StyleLayerVisibility.VISIBLE, unbounded.visibility)
+            // The info's source flags feed the copy operations.
+            assertEquals("geo", unbounded.sourceId)
+            assertEquals("roads", unbounded.sourceLayer)
+
             assertCommandCommitted(runtime, map.setLayerMinZoom("fill", 4.0))
             assertCommandCommitted(runtime, map.setLayerMaxZoom("fill", 12.5))
-            assertEquals(4.0, map.layerMinZoom("fill"))
-            assertEquals(12.5, map.layerMaxZoom("fill"))
-
-            assertEquals(StyleLayerVisibility.VISIBLE, map.layerVisibility("fill"))
             assertCommandCommitted(
               runtime,
               map.setLayerVisibility("fill", StyleLayerVisibility.NONE),
             )
-            assertEquals(StyleLayerVisibility.NONE, map.layerVisibility("fill"))
+            val bounded = assertNotNull(map.styleLayerInfo("fill"))
+            assertEquals(4.0, bounded.minZoom)
+            assertEquals(12.5, bounded.maxZoom)
+            assertEquals(StyleLayerVisibility.NONE, bounded.visibility)
+
+            // A sourceless layer reports no source fields.
+            val background = assertNotNull(map.styleLayerInfo("bg"))
+            assertEquals("background", background.type)
+            assertNull(background.sourceId)
+            assertNull(background.sourceLayer)
+
+            // No layer carries this ID.
+            assertNull(map.styleLayerInfo("missing"))
 
             assertCommandFinished(
               runtime,
               map.setLayerVisibility("fill", StyleLayerVisibility(900)),
               CommandDisposition.FAILED,
             )
-            assertEquals(StyleLayerVisibility.NONE, map.layerVisibility("fill"))
+            assertEquals(StyleLayerVisibility.NONE, map.styleLayerInfo("fill")?.visibility)
           }
       }
     }
@@ -255,13 +277,11 @@ class MapHandleTest {
         map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
         map.addStyleSourceJson("places", geoJsonSource())
 
-        assertTrue(map.styleSourceExists("places"))
-        assertEquals(SourceType.GEOJSON, map.styleSourceType("places"))
         assertEquals(SourceType.GEOJSON, map.styleSourceInfo("places")?.type)
         assertTrue(map.styleSourceIds().contains("places"))
-        assertTrue(map.removeStyleSource("places"))
-        assertFalse(map.styleSourceExists("places"))
-        assertFalse(map.removeStyleSource("places"))
+        assertCommandCommitted(runtime, map.removeStyleSource("places"))
+        assertNull(map.styleSourceInfo("places"))
+        assertCommandNotFound(runtime, map.removeStyleSource("places"))
       } finally {
         map.close()
         runtime.close()
@@ -328,7 +348,7 @@ class MapHandleTest {
         assertEquals(512, retainedInfo.tileSize)
         assertEquals(VectorTileEncoding.MLT, retainedInfo.vectorEncoding)
         assertNull(retainedInfo.rasterDemEncoding)
-        assertTrue(map.removeStyleSource("inline"))
+        assertCommandCommitted(runtime, map.removeStyleSource("inline"))
       } finally {
         map.close()
         runtime.close()
@@ -361,7 +381,7 @@ class MapHandleTest {
           runtime,
           map.addGeoJsonSourceUrl("remote-places", "https://example.com/places.geojson", null),
         )
-        assertEquals(SourceType.GEOJSON, map.styleSourceType("remote-places"))
+        assertEquals(SourceType.GEOJSON, map.styleSourceInfo("remote-places")?.type)
         assertCommandCommitted(
           runtime,
           map.setGeoJsonSourceUrl("remote-places", "https://example.com/updated.geojson"),
@@ -382,7 +402,7 @@ class MapHandleTest {
             },
           ),
         )
-        assertEquals(SourceType.GEOJSON, map.styleSourceType("inline-places"))
+        assertEquals(SourceType.GEOJSON, map.styleSourceInfo("inline-places")?.type)
         assertCommandCommitted(
           runtime,
           map.setGeoJsonSourceData(
@@ -395,7 +415,7 @@ class MapHandleTest {
           runtime,
           map.addGeoJsonSourceData("clustered-places", nearbyPoints(), clusterOptions()),
         )
-        assertEquals(SourceType.GEOJSON, map.styleSourceType("clustered-places"))
+        assertEquals(SourceType.GEOJSON, map.styleSourceInfo("clustered-places")?.type)
 
         assertFailsWith<InvalidArgumentException> {
           map.addGeoJsonSourceUrl(
@@ -407,7 +427,7 @@ class MapHandleTest {
             },
           )
         }
-        assertFalse(map.styleSourceExists("invalid-zooms"))
+        assertNull(map.styleSourceInfo("invalid-zooms"))
         assertCommandFinished(
           runtime,
           map.addGeoJsonSourceUrl(
@@ -419,7 +439,7 @@ class MapHandleTest {
           ),
           CommandDisposition.FAILED,
         )
-        assertFalse(map.styleSourceExists("invalid-cluster-properties"))
+        assertNull(map.styleSourceInfo("invalid-cluster-properties"))
       } finally {
         map.close()
         runtime.close()
@@ -460,8 +480,7 @@ class MapHandleTest {
             },
         )
 
-        assertTrue(map.styleSourceExists("custom-places"))
-        assertEquals(SourceType.CUSTOM_VECTOR, map.styleSourceType("custom-places"))
+        assertEquals(SourceType.CUSTOM_VECTOR, map.styleSourceInfo("custom-places")?.type)
 
         val tileId = CanonicalTileId(0, 0, 0)
         map.setCustomGeometrySourceTileData("custom-places", tileId, geoJsonData())
@@ -471,8 +490,8 @@ class MapHandleTest {
           LatLngBounds(LatLng(-1.0, -1.0), LatLng(1.0, 1.0)),
         )
 
-        assertTrue(map.removeStyleSource("custom-places"))
-        assertFalse(map.styleSourceExists("custom-places"))
+        assertCommandCommitted(runtime, map.removeStyleSource("custom-places"))
+        assertNull(map.styleSourceInfo("custom-places"))
       } finally {
         map.close()
         runtime.close()
@@ -532,11 +551,11 @@ class MapHandleTest {
           ),
         )
 
-        assertEquals(SourceType.VECTOR, map.styleSourceType("roads"))
+        assertEquals(SourceType.VECTOR, map.styleSourceInfo("roads")?.type)
         val rasterInfo = assertNotNull(map.styleSourceInfo("satellite"))
         assertEquals(SourceType.RASTER, rasterInfo.type)
         assertEquals(256, rasterInfo.tileSize)
-        assertEquals(SourceType.RASTER_DEM, map.styleSourceType("terrain"))
+        assertEquals(SourceType.RASTER_DEM, map.styleSourceInfo("terrain")?.type)
         assertEquals(RasterDemEncoding.TERRARIUM, map.styleSourceInfo("terrain")?.rasterDemEncoding)
         assertTrue(map.styleSourceIds().containsAll(listOf("roads", "satellite", "terrain")))
       } finally {
@@ -574,9 +593,8 @@ class MapHandleTest {
         assertCommandCommitted(runtime, map.setLocationIndicatorAccuracyRadius("puck", 9.0))
         assertCommandCommitted(runtime, map.moveStyleLayer("puck", "background"))
 
-        assertTrue(map.styleLayerExists("background"))
-        assertEquals("background", map.styleLayerType("background"))
-        assertTrue(map.styleLayerExists("puck"))
+        assertEquals("background", map.styleLayerInfo("background")?.type)
+        assertNotNull(map.styleLayerInfo("puck"))
         assertTrue(map.styleLayerIds().contains("background"))
         assertTrue(map.styleLayerIds().contains("puck"))
         assertTrue(
@@ -592,10 +610,10 @@ class MapHandleTest {
           map.setStyleLightProperty("anchor", "\"viewport\"".encodeToByteArray()),
         )
         assertEquals("\"viewport\"", map.styleLightProperty("anchor")?.decodeToString())
-        assertTrue(map.removeStyleLayer("background"))
-        assertTrue(map.removeStyleLayer("puck"))
-        assertFalse(map.styleLayerExists("background"))
-        assertFalse(map.removeStyleLayer("background"))
+        assertCommandCommitted(runtime, map.removeStyleLayer("background"))
+        assertCommandCommitted(runtime, map.removeStyleLayer("puck"))
+        assertNull(map.styleLayerInfo("background"))
+        assertCommandNotFound(runtime, map.removeStyleLayer("background"))
       } finally {
         map.close()
         runtime.close()
@@ -627,7 +645,6 @@ class MapHandleTest {
         map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
         map.setStyleImage("dot", image, options)
 
-        assertTrue(map.styleImageExists("dot"))
         val info = map.styleImageInfo("dot")
         assertEquals(1, info?.width)
         assertEquals(1, info?.height)
@@ -638,9 +655,9 @@ class MapHandleTest {
         assertEquals(image, map.copyStyleImagePremultipliedRgba8("dot")?.image)
         assertEquals(2.0f, map.copyStyleImagePremultipliedRgba8("dot")?.pixelRatio)
         assertEquals(true, map.copyStyleImagePremultipliedRgba8("dot")?.sdf)
-        assertTrue(map.removeStyleImage("dot"))
-        assertFalse(map.styleImageExists("dot"))
-        assertFalse(map.removeStyleImage("dot"))
+        assertCommandCommitted(runtime, map.removeStyleImage("dot"))
+        assertNull(map.styleImageInfo("dot"))
+        assertCommandNotFound(runtime, map.removeStyleImage("dot"))
       } finally {
         map.close()
         runtime.close()
@@ -669,7 +686,7 @@ class MapHandleTest {
         map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
         map.addImageSourceUrl("overlay", coordinates, "https://example.com/image.png")
 
-        assertEquals(SourceType.IMAGE, map.styleSourceType("overlay"))
+        assertEquals(SourceType.IMAGE, map.styleSourceInfo("overlay")?.type)
         assertEquals(coordinates, map.imageSourceCoordinates("overlay"))
         map.setImageSourceUrl("overlay", "https://example.com/updated-image.png")
         map.setImageSourceImage("overlay", image)
@@ -720,6 +737,95 @@ class MapHandleTest {
       }
     }
 
+  // The COMMAND_FINISHED generation fences a later snapshot: a snapshot at or past it
+  // observes the commit.
+  @Test
+  fun committedCommandGenerationFencesTheSnapshot(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+        MapHandle.create(
+            runtime,
+            MapOptions().apply {
+              width = 64
+              height = 64
+            },
+          )
+          .use { map ->
+            val debug = setOf(DebugOption.TILE_BORDERS, DebugOption.OVERDRAW)
+            val event =
+              assertCommandFinished(
+                runtime,
+                map.setDebugOptions(debug).toULong(),
+                CommandDisposition.COMMITTED,
+              )
+            val generation =
+              (event.payload as RuntimeEventPayload.CommandFinished).generation.toLong()
+            assertTrue(generation > 0L, "committed command must publish a generation")
+            val snapshot = map.snapshot()
+            assertTrue(snapshot.generation >= generation)
+            assertEquals(debug, snapshot.debugOptions)
+          }
+      }
+    }
+
+  @Test
+  fun snapshotFieldsRoundTripThroughTheirSetCommands(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+        MapHandle.create(
+            runtime,
+            MapOptions().apply {
+              width = 64
+              height = 64
+            },
+          )
+          .use { map ->
+            assertEquals(emptySet<DebugOption>(), map.snapshot().debugOptions)
+            assertFalse(map.snapshot().renderingStatsViewEnabled)
+
+            assertCommandCommitted(runtime, map.setRenderingStatsViewEnabled(true).toULong())
+            assertTrue(map.snapshot().renderingStatsViewEnabled)
+
+            val viewport = ViewportOptions().apply { northOrientation = NorthOrientation.DOWN }
+            assertCommandCommitted(runtime, map.setViewportOptions(viewport).toULong())
+            assertEquals(NorthOrientation.DOWN, map.snapshot().viewportOptions.northOrientation)
+
+            val tile =
+              TileOptions().apply {
+                prefetchZoomDelta = 3
+                lodScale = 1.5
+              }
+            assertCommandCommitted(runtime, map.setTileOptions(tile).toULong())
+            val tileSnapshot = map.snapshot().tileOptions
+            assertEquals(3, tileSnapshot.prefetchZoomDelta)
+            assertEquals(1.5, tileSnapshot.lodScale)
+
+            val bounds =
+              BoundOptions().apply {
+                minZoom = 2.0
+                maxZoom = 15.0
+                this.bounds =
+                  BoundsConstraint.Bounded(LatLngBounds(LatLng(-10.0, -10.0), LatLng(10.0, 10.0)))
+              }
+            assertCommandCommitted(runtime, map.setBounds(bounds).toULong())
+            val boundsSnapshot = map.snapshot().bounds
+            assertEquals(2.0, boundsSnapshot.minZoom)
+            assertEquals(15.0, boundsSnapshot.maxZoom)
+            assertEquals(bounds.bounds, boundsSnapshot.bounds)
+
+            val freeCamera =
+              FreeCameraOptions().apply {
+                position = Vec3(0.5, 0.5, 0.5)
+                orientation = Quaternion(0.0, 0.0, 0.0, 1.0)
+              }
+            assertCommandCommitted(runtime, map.setFreeCameraOptions(freeCamera).toULong())
+            val freeCameraSnapshot = map.snapshot().freeCameraOptions
+            kotlin.test.assertNotNull(freeCameraSnapshot.position)
+            kotlin.test.assertNotNull(freeCameraSnapshot.orientation)
+          }
+      }
+    }
+
   private fun geoJsonSource(): ByteArray =
     "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\",\"features\":[]}}"
       .encodeToByteArray()
@@ -764,20 +870,29 @@ class MapHandleTest {
     assertCommandFinished(runtime, commandId, CommandDisposition.COMMITTED)
   }
 
+  /** Asserts a FAILED terminal outcome whose status detail is NOT_FOUND. */
+  private suspend fun assertCommandNotFound(runtime: RuntimeHandle, commandId: ULong) {
+    val event = assertCommandFinished(runtime, commandId, CommandDisposition.FAILED)
+    assertEquals(MaplibreStatus.NOT_FOUND.nativeCode, event.code)
+  }
+
   private suspend fun assertCommandFinished(
     runtime: RuntimeHandle,
     commandId: ULong,
     expectedDisposition: CommandDisposition,
-  ) {
+  ): RuntimeEvent {
     runtime.barrier()
     val matches =
-      runtime
-        .drainEvents()
-        .events
-        .mapNotNull { it.payload as? RuntimeEventPayload.CommandFinished }
-        .filter { it.commandId == commandId }
+      runtime.drainEvents().events.filter {
+        (it.payload as? RuntimeEventPayload.CommandFinished)?.commandId == commandId
+      }
     assertEquals(1, matches.size, "terminal outcome count for command $commandId")
-    assertEquals(expectedDisposition, matches.single().disposition)
+    val event = matches.single()
+    assertEquals(
+      expectedDisposition,
+      (event.payload as RuntimeEventPayload.CommandFinished).disposition,
+    )
+    return event
   }
 
   private fun assertNear(expected: LatLng, actual: LatLng) {

@@ -109,16 +109,26 @@ pub const CameraSnapshot = struct {
     camera: values.CameraOptions,
 };
 
+/// Immutable map state copied from the latest published generation.
+///
+/// Every committed map command publishes a new generation and reports it in
+/// its command-finished event, so a snapshot whose generation is at or past a
+/// commit's observes that commit.
 pub const MapSnapshot = struct {
     generation: u64,
     camera: values.CameraOptions,
     width: u32,
-    projection_mode: values.ProjectionMode,
-    viewport: values.ViewportOptions,
     height: u32,
     scale_factor: f64,
-    loading: bool,
-    fully_rendered: bool,
+    debug_options: values.DebugOptions,
+    projection_mode: values.ProjectionMode,
+    viewport: values.ViewportOptions,
+    tile: values.TileOptions,
+    bounds: values.BoundOptions,
+    free_camera: values.FreeCameraOptions,
+    /// True once every requested style and tile resource finished loading.
+    fully_loaded: bool,
+    rendering_stats_view_enabled: bool,
     repaint_demand: bool,
     event_mask: runtime_module.RuntimeEventMask,
     latest_render_update_generation: u64,
@@ -144,6 +154,24 @@ pub const StyleSourceMetadata = struct {
     tile_size: ?u32,
     vector_encoding: ?values.StyleVectorTileEncoding,
     raster_encoding: ?values.StyleRasterDemEncoding,
+};
+
+/// Fixed layer metadata returned by `MapHandle.getStyleLayerInfoTakeResult`.
+pub const StyleLayerInfo = struct {
+    /// Style-spec layer type name. It views a static native string that stays
+    /// valid for the life of the process.
+    layer_type: []const u8,
+    /// Lowest zoom at which the layer draws; -inf with no lower bound.
+    min_zoom: f64,
+    /// Highest zoom at which the layer draws; +inf with no upper bound.
+    max_zoom: f64,
+    visibility: values.StyleLayerVisibility,
+    /// Source ID byte length, null when the layer names no source. It sizes
+    /// buffers for `copyLayerSourceId`.
+    source_id_size: ?usize,
+    /// Source-layer byte length, null when the layer names no source layer. It
+    /// sizes buffers for `copyLayerSourceLayer`.
+    source_layer_size: ?usize,
 };
 
 pub const CustomGeometrySourceTileCallback = *const fn (
@@ -406,24 +434,8 @@ pub const MapHandle = enum(c.mln_map) {
         return self.setLayerNumberCommand(allocator, layer_id, value, c.mln_map_set_layer_min_zoom);
     }
 
-    pub fn getLayerMinZoomStart(self: *MapHandle, allocator: std.mem.Allocator, layer_id: []const u8) status.Error!runtime_module.OperationHandle {
-        return self.startStyleOperationWithId(allocator, layer_id, c.mln_map_get_layer_min_zoom_start, .map_get_layer_min_zoom, .number);
-    }
-
-    pub fn getLayerMinZoomTakeResult(self: *MapHandle, operation: runtime_module.OperationHandle) status.Error!f64 {
-        return self.takeStyleNumber(operation, .map_get_layer_min_zoom, c.mln_map_get_layer_min_zoom_take_result);
-    }
-
     pub fn setLayerMaxZoom(self: *MapHandle, allocator: std.mem.Allocator, layer_id: []const u8, value: f64) status.Error!u64 {
         return self.setLayerNumberCommand(allocator, layer_id, value, c.mln_map_set_layer_max_zoom);
-    }
-
-    pub fn getLayerMaxZoomStart(self: *MapHandle, allocator: std.mem.Allocator, layer_id: []const u8) status.Error!runtime_module.OperationHandle {
-        return self.startStyleOperationWithId(allocator, layer_id, c.mln_map_get_layer_max_zoom_start, .map_get_layer_max_zoom, .number);
-    }
-
-    pub fn getLayerMaxZoomTakeResult(self: *MapHandle, operation: runtime_module.OperationHandle) status.Error!f64 {
-        return self.takeStyleNumber(operation, .map_get_layer_max_zoom, c.mln_map_get_layer_max_zoom_take_result);
     }
 
     pub fn setLayerVisibility(
@@ -444,20 +456,31 @@ pub const MapHandle = enum(c.mln_map) {
         return command_id;
     }
 
-    pub fn getLayerVisibilityStart(self: *MapHandle, allocator: std.mem.Allocator, layer_id: []const u8) status.Error!runtime_module.OperationHandle {
-        return self.startStyleOperationWithId(allocator, layer_id, c.mln_map_get_layer_visibility_start, .map_get_layer_visibility, .style_layer_visibility);
+    pub fn getStyleLayerInfoStart(self: *MapHandle, allocator: std.mem.Allocator, layer_id: []const u8) status.Error!runtime_module.OperationHandle {
+        return self.startStyleOperationWithId(allocator, layer_id, c.mln_map_get_style_layer_info_start, .map_get_style_layer_info, .optional_style_layer_info);
     }
 
-    pub fn getLayerVisibilityTakeResult(
+    pub fn getStyleLayerInfoTakeResult(
         self: *MapHandle,
         operation: runtime_module.OperationHandle,
-    ) status.Error!values.StyleLayerVisibility {
+    ) status.Error!?StyleLayerInfo {
         const state = try mapStateForHandle(self);
-        const required = try operation.require(&state.runtime, .map_get_layer_visibility, .style_layer_visibility);
+        const required = try operation.require(&state.runtime, .map_get_style_layer_info, .optional_style_layer_info);
         defer required.lease.release();
-        var raw: u32 = 0;
-        try status.checkStatus(c.mln_map_get_layer_visibility_take_result(required.lease.native, &raw), state.diagnostic_store);
-        return values.StyleLayerVisibility.fromRaw(raw);
+        var raw = std.mem.zeroes(c.mln_style_layer_info);
+        raw.size = @sizeOf(c.mln_style_layer_info);
+        var found = false;
+        try status.checkStatus(c.mln_map_get_style_layer_info_take_result(required.lease.native, &raw, &found), state.diagnostic_store);
+        if (!found) return null;
+        const type_data: [*]const u8 = @ptrCast(raw.type.data orelse return error.NativeError);
+        return .{
+            .layer_type = type_data[0..raw.type.size],
+            .min_zoom = raw.min_zoom,
+            .max_zoom = raw.max_zoom,
+            .visibility = values.StyleLayerVisibility.fromRaw(raw.visibility),
+            .source_id_size = if ((raw.fields & c.MLN_STYLE_LAYER_INFO_SOURCE_ID) != 0) raw.source_id_size else null,
+            .source_layer_size = if ((raw.fields & c.MLN_STYLE_LAYER_INFO_SOURCE_LAYER) != 0) raw.source_layer_size else null,
+        };
     }
 
     pub fn listStyleSourceIdsStart(self: *MapHandle) status.Error!runtime_module.OperationHandle {
@@ -514,37 +537,12 @@ pub const MapHandle = enum(c.mln_map) {
         return command_id;
     }
 
-    pub fn removeStyleSourceStart(self: *MapHandle, allocator: std.mem.Allocator, source_id: []const u8) status.Error!runtime_module.OperationHandle {
-        return self.startStyleOperationWithId(allocator, source_id, c.mln_map_remove_style_source_start, .map_remove_style_source, .boolean);
-    }
-
-    pub fn removeStyleSourceTakeResult(self: *MapHandle, operation: runtime_module.OperationHandle) status.Error!bool {
-        return self.takeStyleBoolean(operation, .map_remove_style_source, c.mln_map_remove_style_source_take_result);
-    }
-
-    pub fn styleSourceExistsStart(self: *MapHandle, allocator: std.mem.Allocator, source_id: []const u8) status.Error!runtime_module.OperationHandle {
-        return self.startStyleOperationWithId(allocator, source_id, c.mln_map_style_source_exists_start, .map_style_source_exists, .boolean);
-    }
-
-    pub fn styleSourceExistsTakeResult(self: *MapHandle, operation: runtime_module.OperationHandle) status.Error!bool {
-        return self.takeStyleBoolean(operation, .map_style_source_exists, c.mln_map_style_source_exists_take_result);
-    }
-
-    pub fn getStyleSourceTypeStart(self: *MapHandle, allocator: std.mem.Allocator, source_id: []const u8) status.Error!runtime_module.OperationHandle {
-        return self.startStyleOperationWithId(allocator, source_id, c.mln_map_get_style_source_type_start, .map_get_style_source_type, .optional_style_source_type);
-    }
-
-    pub fn getStyleSourceTypeTakeResult(
-        self: *MapHandle,
-        operation: runtime_module.OperationHandle,
-    ) status.Error!?values.StyleSourceType {
-        const state = try mapStateForHandle(self);
-        const required = try operation.require(&state.runtime, .map_get_style_source_type, .optional_style_source_type);
-        defer required.lease.release();
-        var raw_type: u32 = c.MLN_STYLE_SOURCE_TYPE_UNKNOWN;
-        var found = false;
-        try status.checkStatus(c.mln_map_get_style_source_type_take_result(required.lease.native, &raw_type, &found), state.diagnostic_store);
-        return if (found) values.styleSourceTypeFromNative(raw_type) else null;
+    /// Accepts an ordered source-removal command and returns its runtime-wide
+    /// ID. The command's finished event reports a committed removal, a
+    /// `NotFound` failure when no source has the ID, and an `InvalidState`
+    /// failure when a layer still uses the source.
+    pub fn removeStyleSource(self: *MapHandle, allocator: std.mem.Allocator, source_id: []const u8) status.Error!u64 {
+        return self.removeStyleObjectCommand(allocator, source_id, c.mln_map_remove_style_source);
     }
 
     pub fn getStyleSourceInfoStart(self: *MapHandle, allocator: std.mem.Allocator, source_id: []const u8) status.Error!runtime_module.OperationHandle {
@@ -635,20 +633,11 @@ pub const MapHandle = enum(c.mln_map) {
         return command_id;
     }
 
-    pub fn removeStyleLayerStart(self: *MapHandle, allocator: std.mem.Allocator, layer_id: []const u8) status.Error!runtime_module.OperationHandle {
-        return self.startStyleOperationWithId(allocator, layer_id, c.mln_map_remove_style_layer_start, .map_remove_style_layer, .boolean);
-    }
-
-    pub fn removeStyleLayerTakeResult(self: *MapHandle, operation: runtime_module.OperationHandle) status.Error!bool {
-        return self.takeStyleBoolean(operation, .map_remove_style_layer, c.mln_map_remove_style_layer_take_result);
-    }
-
-    pub fn styleLayerExistsStart(self: *MapHandle, allocator: std.mem.Allocator, layer_id: []const u8) status.Error!runtime_module.OperationHandle {
-        return self.startStyleOperationWithId(allocator, layer_id, c.mln_map_style_layer_exists_start, .map_style_layer_exists, .boolean);
-    }
-
-    pub fn styleLayerExistsTakeResult(self: *MapHandle, operation: runtime_module.OperationHandle) status.Error!bool {
-        return self.takeStyleBoolean(operation, .map_style_layer_exists, c.mln_map_style_layer_exists_take_result);
+    /// Accepts an ordered layer-removal command and returns its runtime-wide
+    /// ID. The command's finished event reports a committed removal, and a
+    /// `NotFound` failure when no layer has the ID.
+    pub fn removeStyleLayer(self: *MapHandle, allocator: std.mem.Allocator, layer_id: []const u8) status.Error!u64 {
+        return self.removeStyleObjectCommand(allocator, layer_id, c.mln_map_remove_style_layer);
     }
 
     pub fn moveStyleLayer(self: *MapHandle, layer_id: []const u8, before_layer_id: []const u8) status.Error!u64 {
@@ -668,14 +657,6 @@ pub const MapHandle = enum(c.mln_map) {
 
     pub fn getStyleLayerJsonTakeResult(self: *MapHandle, allocator: std.mem.Allocator, operation: runtime_module.OperationHandle) status.Error!?values.OwnedString {
         return self.takeFoundStyleBuffer(allocator, operation, .map_get_style_layer_json, c.mln_map_get_style_layer_json_take_result);
-    }
-
-    pub fn getStyleLayerTypeStart(self: *MapHandle, allocator: std.mem.Allocator, layer_id: []const u8) status.Error!runtime_module.OperationHandle {
-        return self.startStyleOperationWithId(allocator, layer_id, c.mln_map_get_style_layer_type_start, .map_get_style_layer_type, .optional_string);
-    }
-
-    pub fn getStyleLayerTypeTakeResult(self: *MapHandle, allocator: std.mem.Allocator, operation: runtime_module.OperationHandle) status.Error!?values.OwnedString {
-        return self.takeFoundStyleBuffer(allocator, operation, .map_get_style_layer_type, c.mln_map_get_style_layer_type_take_result);
     }
 
     pub fn setStyleLightJson(self: *MapHandle, allocator: std.mem.Allocator, value: []const u8) status.Error!u64 {
@@ -954,20 +935,11 @@ pub const MapHandle = enum(c.mln_map) {
         return .{ .allocator = allocator, .stretch_x = stretch_x, .stretch_y = stretch_y };
     }
 
-    pub fn removeStyleImageStart(self: *MapHandle, allocator: std.mem.Allocator, image_id: []const u8) status.Error!runtime_module.OperationHandle {
-        return self.startStyleOperationWithId(allocator, image_id, c.mln_map_remove_style_image_start, .map_remove_style_image, .boolean);
-    }
-
-    pub fn removeStyleImageTakeResult(self: *MapHandle, operation: runtime_module.OperationHandle) status.Error!bool {
-        return self.takeStyleBoolean(operation, .map_remove_style_image, c.mln_map_remove_style_image_take_result);
-    }
-
-    pub fn styleImageExistsStart(self: *MapHandle, allocator: std.mem.Allocator, image_id: []const u8) status.Error!runtime_module.OperationHandle {
-        return self.startStyleOperationWithId(allocator, image_id, c.mln_map_style_image_exists_start, .map_style_image_exists, .boolean);
-    }
-
-    pub fn styleImageExistsTakeResult(self: *MapHandle, operation: runtime_module.OperationHandle) status.Error!bool {
-        return self.takeStyleBoolean(operation, .map_style_image_exists, c.mln_map_style_image_exists_take_result);
+    /// Accepts an ordered image-removal command and returns its runtime-wide
+    /// ID. The command's finished event reports a committed removal, and a
+    /// `NotFound` failure when no runtime style image has the ID.
+    pub fn removeStyleImage(self: *MapHandle, allocator: std.mem.Allocator, image_id: []const u8) status.Error!u64 {
+        return self.removeStyleObjectCommand(allocator, image_id, c.mln_map_remove_style_image);
     }
 
     pub fn getStyleImageInfoStart(self: *MapHandle, allocator: std.mem.Allocator, image_id: []const u8) status.Error!runtime_module.OperationHandle {
@@ -1389,40 +1361,10 @@ pub const MapHandle = enum(c.mln_map) {
         return command_id;
     }
 
-    pub fn getDebugOptions(self: *MapHandle) status.Error!values.DebugOptions {
-        var operation: c.mln_operation = 0;
-        try status.checkStatus(c.mln_map_get_debug_options_start(try native(self), &operation), diagnosticStore(self));
-        defer c.mln_operation_release(operation);
-        try runtime_module.waitNativeOperation(operation, diagnosticStore(self));
-        var options: u32 = 0;
-        try status.checkStatus(c.mln_map_get_debug_options_take_result(operation, &options), diagnosticStore(self));
-        return values.debugOptionsFromNative(options);
-    }
-
     pub fn setRenderingStatsViewEnabled(self: *MapHandle, enabled: bool) status.Error!u64 {
         var command_id: u64 = 0;
         try status.checkStatus(c.mln_map_set_rendering_stats_view_enabled(try native(self), enabled, &command_id), diagnosticStore(self));
         return command_id;
-    }
-
-    pub fn getRenderingStatsViewEnabled(self: *MapHandle) status.Error!bool {
-        var operation: c.mln_operation = 0;
-        try status.checkStatus(c.mln_map_get_rendering_stats_view_enabled_start(try native(self), &operation), diagnosticStore(self));
-        defer c.mln_operation_release(operation);
-        try runtime_module.waitNativeOperation(operation, diagnosticStore(self));
-        var enabled = false;
-        try status.checkStatus(c.mln_map_get_rendering_stats_view_enabled_take_result(operation, &enabled), diagnosticStore(self));
-        return enabled;
-    }
-
-    pub fn isFullyLoaded(self: *MapHandle) status.Error!bool {
-        var operation: c.mln_operation = 0;
-        try status.checkStatus(c.mln_map_is_fully_loaded_start(try native(self), &operation), diagnosticStore(self));
-        defer c.mln_operation_release(operation);
-        try runtime_module.waitNativeOperation(operation, diagnosticStore(self));
-        var loaded = false;
-        try status.checkStatus(c.mln_map_is_fully_loaded_take_result(operation, &loaded), diagnosticStore(self));
-        return loaded;
     }
 
     pub fn snapshot(self: *MapHandle) status.Error!MapSnapshot {
@@ -1435,10 +1377,14 @@ pub const MapHandle = enum(c.mln_map) {
             .width = raw.logical_extent.width,
             .height = raw.logical_extent.height,
             .scale_factor = raw.logical_extent.scale_factor,
-            .loading = raw.loading,
-            .fully_rendered = raw.fully_rendered,
+            .debug_options = values.debugOptionsFromNative(raw.debug_options),
             .projection_mode = values.projectionModeFromNative(raw.projection_mode),
             .viewport = try values.viewportOptionsFromNative(raw.viewport),
+            .tile = try values.tileOptionsFromNative(raw.tile),
+            .bounds = values.boundOptionsFromNative(raw.bounds),
+            .free_camera = values.freeCameraOptionsFromNative(raw.free_camera),
+            .fully_loaded = raw.fully_loaded,
+            .rendering_stats_view_enabled = raw.rendering_stats_view_enabled,
             .repaint_demand = raw.repaint_demand,
             .event_mask = runtime_module.eventMaskFromRaw(raw.event_mask),
             .latest_render_update_generation = raw.latest_render_update_generation,
@@ -1472,31 +1418,11 @@ pub const MapHandle = enum(c.mln_map) {
         return command_id;
     }
 
-    pub fn getViewportOptions(self: *MapHandle) status.Error!values.ViewportOptions {
-        var operation: c.mln_operation = 0;
-        try status.checkStatus(c.mln_map_get_viewport_options_start(try native(self), &operation), diagnosticStore(self));
-        defer c.mln_operation_release(operation);
-        try runtime_module.waitNativeOperation(operation, diagnosticStore(self));
-        var options = c.mln_map_viewport_options_default();
-        try status.checkStatus(c.mln_map_get_viewport_options_take_result(operation, &options), diagnosticStore(self));
-        return try values.viewportOptionsFromNative(options);
-    }
-
     pub fn setTileOptions(self: *MapHandle, options: values.TileOptions) status.Error!u64 {
         var raw_options = values.tileOptionsToNative(options);
         var command_id: u64 = 0;
         try status.checkStatus(c.mln_map_set_tile_options(try native(self), &raw_options, &command_id), diagnosticStore(self));
         return command_id;
-    }
-
-    pub fn getTileOptions(self: *MapHandle) status.Error!values.TileOptions {
-        var operation: c.mln_operation = 0;
-        try status.checkStatus(c.mln_map_get_tile_options_start(try native(self), &operation), diagnosticStore(self));
-        defer c.mln_operation_release(operation);
-        try runtime_module.waitNativeOperation(operation, diagnosticStore(self));
-        var options = c.mln_map_tile_options_default();
-        try status.checkStatus(c.mln_map_get_tile_options_take_result(operation, &options), diagnosticStore(self));
-        return try values.tileOptionsFromNative(options);
     }
 
     pub fn cameraSnapshot(self: *MapHandle) status.Error!CameraSnapshot {
@@ -1676,31 +1602,11 @@ pub const MapHandle = enum(c.mln_map) {
         return values.latLngBoundsFromNative(bounds);
     }
 
-    pub fn getBounds(self: *MapHandle) status.Error!values.BoundOptions {
-        var operation: c.mln_operation = 0;
-        try status.checkStatus(c.mln_map_get_bounds_start(try native(self), &operation), diagnosticStore(self));
-        defer c.mln_operation_release(operation);
-        try runtime_module.waitNativeOperation(operation, diagnosticStore(self));
-        var raw_options = c.mln_bound_options_default();
-        try status.checkStatus(c.mln_map_get_bounds_take_result(operation, &raw_options), diagnosticStore(self));
-        return values.boundOptionsFromNative(raw_options);
-    }
-
     pub fn setBounds(self: *MapHandle, options: values.BoundOptions) status.Error!u64 {
         var raw_options = values.boundOptionsToNative(options);
         var command_id: u64 = 0;
         try status.checkStatus(c.mln_map_set_bounds(try native(self), &raw_options, &command_id), diagnosticStore(self));
         return command_id;
-    }
-
-    pub fn getFreeCameraOptions(self: *MapHandle) status.Error!values.FreeCameraOptions {
-        var operation: c.mln_operation = 0;
-        try status.checkStatus(c.mln_map_get_free_camera_options_start(try native(self), &operation), diagnosticStore(self));
-        defer c.mln_operation_release(operation);
-        try runtime_module.waitNativeOperation(operation, diagnosticStore(self));
-        var raw_options = c.mln_free_camera_options_default();
-        try status.checkStatus(c.mln_map_get_free_camera_options_take_result(operation, &raw_options), diagnosticStore(self));
-        return values.freeCameraOptionsFromNative(raw_options);
     }
 
     pub fn setFreeCameraOptions(self: *MapHandle, options: values.FreeCameraOptions) status.Error!u64 {
@@ -1802,18 +1708,17 @@ pub const MapHandle = enum(c.mln_map) {
         return (try native_temp.copyOwnedBuffer(allocator, buffer, state.diagnostic_store)) orelse error.NativeError;
     }
 
-    fn takeStyleBoolean(
+    fn removeStyleObjectCommand(
         self: *MapHandle,
-        operation: runtime_module.OperationHandle,
-        operation_kind: runtime_module.OperationKind,
-        take: *const fn (c.mln_operation, *bool) callconv(.c) c.mln_status,
-    ) status.Error!bool {
-        const state = try mapStateForHandle(self);
-        const required = try operation.require(&state.runtime, operation_kind, .boolean);
-        defer required.lease.release();
-        var result = false;
-        try status.checkStatus(take(required.lease.native, &result), state.diagnostic_store);
-        return result;
+        allocator: std.mem.Allocator,
+        object_id: []const u8,
+        command: *const fn (c.mln_map, c.mln_buffer_view, *u64) callconv(.c) c.mln_status,
+    ) status.Error!u64 {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        var command_id: u64 = 0;
+        try status.checkStatus(command(try native(self), try temp.stringView(object_id), &command_id), diagnosticStore(self));
+        return command_id;
     }
 
     fn takeStyleBuffer(
@@ -1862,20 +1767,6 @@ pub const MapHandle = enum(c.mln_map) {
         var command_id: u64 = 0;
         try status.checkStatus(command(try native(self), try temp.stringView(layer_id), value, &command_id), diagnosticStore(self));
         return command_id;
-    }
-
-    fn takeStyleNumber(
-        self: *MapHandle,
-        operation: runtime_module.OperationHandle,
-        operation_kind: runtime_module.OperationKind,
-        take: *const fn (c.mln_operation, *f64) callconv(.c) c.mln_status,
-    ) status.Error!f64 {
-        const state = try mapStateForHandle(self);
-        const required = try operation.require(&state.runtime, operation_kind, .number);
-        defer required.lease.release();
-        var result: f64 = 0;
-        try status.checkStatus(take(required.lease.native, &result), state.diagnostic_store);
-        return result;
     }
 
     pub fn close(self: *MapHandle) status.Error!void {
@@ -2390,6 +2281,26 @@ fn createLoadedMapForTesting(runtime: *RuntimeHandle) !MapHandle {
     return map;
 }
 
+fn waitForCommandDispositionForTesting(runtime: *RuntimeHandle, command_id: u64) !runtime_module.CommandDisposition {
+    var attempts: usize = 0;
+    while (attempts < 200) : (attempts += 1) {
+        while (true) {
+            var batch = try runtime.drainEvents(std.testing.allocator, 1);
+            defer batch.deinit();
+            if (batch.len() == 0) break;
+            const event = try batch.at(0);
+            switch (event.payload) {
+                .command_finished => |payload| {
+                    if (payload.command_id == command_id) return payload.disposition;
+                },
+                else => {},
+            }
+        }
+        try std.testing.io.sleep(.fromMilliseconds(10), .awake);
+    }
+    return error.EventNotObserved;
+}
+
 fn waitForRuntimeEventForTesting(runtime: *RuntimeHandle, event_type: runtime_module.RuntimeEventType) !bool {
     var attempts: usize = 0;
     while (attempts < 200) : (attempts += 1) {
@@ -2439,10 +2350,9 @@ test "an explicit source removal releases the callback state" {
     });
     try std.testing.expectEqual(baseline + 1, liveCustomGeometrySourceCountForTesting());
 
-    const operation = try map.removeStyleSourceStart(std.testing.allocator, "custom");
-    defer operation.release();
-    try std.testing.expect(try operation.wait(-1));
-    try std.testing.expect(try map.removeStyleSourceTakeResult(operation));
+    const remove_id = try map.removeStyleSource(std.testing.allocator, "custom");
+    const disposition = try waitForCommandDispositionForTesting(&runtime, remove_id);
+    try std.testing.expect(std.meta.eql(disposition, runtime_module.CommandDisposition.committed));
     try std.testing.expectEqual(baseline, liveCustomGeometrySourceCountForTesting());
 }
 

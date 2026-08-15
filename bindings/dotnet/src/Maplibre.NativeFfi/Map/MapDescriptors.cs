@@ -46,17 +46,27 @@ public sealed record ProjectionModeOptions
 public readonly record struct LogicalExtent(uint Width, uint Height, double ScaleFactor);
 
 /// <summary>A synchronous copy of the map's committed executor state.</summary>
+/// <remarks>
+/// Every committed map command publishes a new snapshot and reports its generation in the
+/// command's terminal <see cref="Runtime.RuntimeEventPayload.CommandFinished" /> event, so a
+/// snapshot whose <see cref="Generation" /> is at or past a commit's observes that commit.
+/// </remarks>
+/// <param name="FullyLoaded">True once every requested style and tile resource finished loading.</param>
 public readonly record struct MapSnapshot(
     ulong Generation,
+    DebugOptions DebugOptions,
     CameraOptions Camera,
     LogicalExtent LogicalExtent,
     ProjectionModeOptions ProjectionMode,
     ViewportOptions Viewport,
-    bool Loading,
-    bool FullyRendered,
+    bool FullyLoaded,
+    bool RenderingStatsViewEnabled,
     bool RepaintDemand,
     RuntimeEventMask EventMask,
-    ulong LatestRenderUpdateGeneration
+    ulong LatestRenderUpdateGeneration,
+    TileOptions Tile,
+    BoundOptions Bounds,
+    FreeCameraOptions FreeCamera
 );
 
 /// <summary>Rendering statistics snapshot.</summary>

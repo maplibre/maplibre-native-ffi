@@ -887,44 +887,6 @@ external int mln_map_dump_debug_logs(
   ffi.Pointer<ffi.Uint64> out_command_id,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_operation>)>()
-external int mln_map_get_bounds_start(
-  int map,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<mln_bound_options>)>()
-external int mln_map_get_bounds_take_result(
-  int operation,
-  ffi.Pointer<mln_bound_options> out_options,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_operation>)>()
-external int mln_map_get_debug_options_start(
-  int map,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<ffi.Uint32>)>()
-external int mln_map_get_debug_options_take_result(
-  int operation,
-  ffi.Pointer<ffi.Uint32> out_options,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_operation>)>()
-external int mln_map_get_free_camera_options_start(
-  int map,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_operation, ffi.Pointer<mln_free_camera_options>)
->()
-external int mln_map_get_free_camera_options_take_result(
-  int operation,
-  ffi.Pointer<mln_free_camera_options> out_options,
-);
-
 @ffi.Native<
   ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_operation>)
 >()
@@ -967,36 +929,6 @@ external int mln_map_get_layer_filter_take_result(
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_operation>)
->()
-external int mln_map_get_layer_max_zoom_start(
-  int map,
-  mln_buffer_view layer_id,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<ffi.Double>)>()
-external int mln_map_get_layer_max_zoom_take_result(
-  int operation,
-  ffi.Pointer<ffi.Double> out_max_zoom,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_operation>)
->()
-external int mln_map_get_layer_min_zoom_start(
-  int map,
-  mln_buffer_view layer_id,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<ffi.Double>)>()
-external int mln_map_get_layer_min_zoom_take_result(
-  int operation,
-  ffi.Pointer<ffi.Double> out_min_zoom,
-);
-
-@ffi.Native<
   ffi.Int32 Function(
     mln_map,
     mln_buffer_view,
@@ -1015,33 +947,6 @@ external int mln_map_get_layer_property_start(
 external int mln_map_get_layer_property_take_result(
   int operation,
   ffi.Pointer<mln_buffer> out_value,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_operation>)
->()
-external int mln_map_get_layer_visibility_start(
-  int map,
-  mln_buffer_view layer_id,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<ffi.Uint32>)>()
-external int mln_map_get_layer_visibility_take_result(
-  int operation,
-  ffi.Pointer<ffi.Uint32> out_visibility,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_operation>)>()
-external int mln_map_get_rendering_stats_view_enabled_start(
-  int map,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<ffi.Bool>)>()
-external int mln_map_get_rendering_stats_view_enabled_take_result(
-  int operation,
-  ffi.Pointer<ffi.Bool> out_enabled,
 );
 
 @ffi.Native<
@@ -1069,6 +974,28 @@ external int mln_map_get_style_image_info_take_result(
 @ffi.Native<
   ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_operation>)
 >()
+external int mln_map_get_style_layer_info_start(
+  int map,
+  mln_buffer_view layer_id,
+  ffi.Pointer<mln_operation> out_operation,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_operation,
+    ffi.Pointer<mln_style_layer_info>,
+    ffi.Pointer<ffi.Bool>,
+  )
+>()
+external int mln_map_get_style_layer_info_take_result(
+  int operation,
+  ffi.Pointer<mln_style_layer_info> out_info,
+  ffi.Pointer<ffi.Bool> out_found,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_operation>)
+>()
 external int mln_map_get_style_layer_json_start(
   int map,
   mln_buffer_view layer_id,
@@ -1085,28 +1012,6 @@ external int mln_map_get_style_layer_json_start(
 external int mln_map_get_style_layer_json_take_result(
   int operation,
   ffi.Pointer<mln_buffer> out_layer,
-  ffi.Pointer<ffi.Bool> out_found,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_operation>)
->()
-external int mln_map_get_style_layer_type_start(
-  int map,
-  mln_buffer_view layer_id,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_operation,
-    ffi.Pointer<mln_buffer>,
-    ffi.Pointer<ffi.Bool>,
-  )
->()
-external int mln_map_get_style_layer_type_take_result(
-  int operation,
-  ffi.Pointer<mln_buffer> out_layer_type,
   ffi.Pointer<ffi.Bool> out_found,
 );
 
@@ -1169,28 +1074,6 @@ external int mln_map_get_style_source_tile_urls_take_result(
   ffi.Pointer<ffi.Bool> out_found,
 );
 
-@ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_operation>)
->()
-external int mln_map_get_style_source_type_start(
-  int map,
-  mln_buffer_view source_id,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_operation,
-    ffi.Pointer<ffi.Uint32>,
-    ffi.Pointer<ffi.Bool>,
-  )
->()
-external int mln_map_get_style_source_type_take_result(
-  int operation,
-  ffi.Pointer<ffi.Uint32> out_source_type,
-  ffi.Pointer<ffi.Bool> out_found,
-);
-
 @ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_operation>)>()
 external int mln_map_get_style_transition_options_start(
   int map,
@@ -1203,34 +1086,6 @@ external int mln_map_get_style_transition_options_start(
 external int mln_map_get_style_transition_options_take_result(
   int operation,
   ffi.Pointer<mln_style_transition_options> out_options,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_operation>)>()
-external int mln_map_get_tile_options_start(
-  int map,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_operation, ffi.Pointer<mln_map_tile_options>)
->()
-external int mln_map_get_tile_options_take_result(
-  int operation,
-  ffi.Pointer<mln_map_tile_options> out_options,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_operation>)>()
-external int mln_map_get_viewport_options_start(
-  int map,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_operation, ffi.Pointer<mln_map_viewport_options>)
->()
-external int mln_map_get_viewport_options_take_result(
-  int operation,
-  ffi.Pointer<mln_map_viewport_options> out_options,
 );
 
 @ffi.Native<
@@ -1261,18 +1116,6 @@ external int mln_map_invalidate_custom_geometry_source_tile(
   mln_buffer_view source_id,
   mln_canonical_tile_id tile_id,
   ffi.Pointer<ffi.Uint64> out_command_id,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_operation>)>()
-external int mln_map_is_fully_loaded_start(
-  int map,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<ffi.Bool>)>()
-external int mln_map_is_fully_loaded_take_result(
-  int operation,
-  ffi.Pointer<ffi.Bool> out_loaded,
 );
 
 @ffi.Native<
@@ -1461,13 +1304,8 @@ external int mln_map_pixels_for_lat_lngs_take_result(
   ffi.Pointer<ffi.Size> out_point_count,
 );
 
-@ffi.Native<
-  ffi.Int32 Function(mln_map_projection, ffi.Pointer<mln_operation>)
->()
-external int mln_map_projection_close_start(
-  int projection,
-  ffi.Pointer<mln_operation> out_operation,
-);
+@ffi.Native<ffi.Int32 Function(mln_map_projection)>()
+external int mln_map_projection_close(int projection);
 
 @ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_operation>)>()
 external int mln_map_projection_create_start(
@@ -1484,18 +1322,10 @@ external int mln_map_projection_create_take_result(
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map_projection, ffi.Pointer<mln_operation>)
+  ffi.Int32 Function(mln_map_projection, ffi.Pointer<mln_camera_options>)
 >()
-external int mln_map_projection_get_camera_start(
+external int mln_map_projection_get_camera(
   int projection,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_operation, ffi.Pointer<mln_camera_options>)
->()
-external int mln_map_projection_get_camera_take_result(
-  int operation,
   ffi.Pointer<mln_camera_options> out_camera,
 );
 
@@ -1503,18 +1333,12 @@ external int mln_map_projection_get_camera_take_result(
   ffi.Int32 Function(
     mln_map_projection,
     mln_screen_point,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_lat_lng>,
   )
 >()
-external int mln_map_projection_lat_lng_for_pixel_start(
+external int mln_map_projection_lat_lng_for_pixel(
   int projection,
   mln_screen_point point,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<mln_lat_lng>)>()
-external int mln_map_projection_lat_lng_for_pixel_take_result(
-  int operation,
   ffi.Pointer<mln_lat_lng> out_coordinate,
 );
 
@@ -1522,32 +1346,21 @@ external int mln_map_projection_lat_lng_for_pixel_take_result(
   ffi.Int32 Function(
     mln_map_projection,
     mln_lat_lng,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_screen_point>,
   )
 >()
-external int mln_map_projection_pixel_for_lat_lng_start(
+external int mln_map_projection_pixel_for_lat_lng(
   int projection,
   mln_lat_lng coordinate,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<mln_screen_point>)>()
-external int mln_map_projection_pixel_for_lat_lng_take_result(
-  int operation,
   ffi.Pointer<mln_screen_point> out_point,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_map_projection,
-    ffi.Pointer<mln_camera_options>,
-    ffi.Pointer<ffi.Uint64>,
-  )
+  ffi.Int32 Function(mln_map_projection, ffi.Pointer<mln_camera_options>)
 >()
 external int mln_map_projection_set_camera(
   int projection,
   ffi.Pointer<mln_camera_options> camera,
-  ffi.Pointer<ffi.Uint64> out_command_id,
 );
 
 @ffi.Native<
@@ -1556,7 +1369,6 @@ external int mln_map_projection_set_camera(
     ffi.Pointer<mln_lat_lng>,
     ffi.Size,
     mln_edge_insets,
-    ffi.Pointer<ffi.Uint64>,
   )
 >()
 external int mln_map_projection_set_visible_coordinates(
@@ -1564,67 +1376,42 @@ external int mln_map_projection_set_visible_coordinates(
   ffi.Pointer<mln_lat_lng> coordinates,
   int coordinate_count,
   mln_edge_insets padding,
-  ffi.Pointer<ffi.Uint64> out_command_id,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_map_projection,
-    mln_buffer_view,
-    mln_edge_insets,
-    ffi.Pointer<ffi.Uint64>,
-  )
+  ffi.Int32 Function(mln_map_projection, mln_buffer_view, mln_edge_insets)
 >()
 external int mln_map_projection_set_visible_geometry(
   int projection,
   mln_buffer_view geometry,
   mln_edge_insets padding,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<ffi.Uint64>)
+>()
+external int mln_map_remove_style_image(
+  int map,
+  mln_buffer_view image_id,
   ffi.Pointer<ffi.Uint64> out_command_id,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_operation>)
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<ffi.Uint64>)
 >()
-external int mln_map_remove_style_image_start(
-  int map,
-  mln_buffer_view image_id,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<ffi.Bool>)>()
-external int mln_map_remove_style_image_take_result(
-  int operation,
-  ffi.Pointer<ffi.Bool> out_removed,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_operation>)
->()
-external int mln_map_remove_style_layer_start(
+external int mln_map_remove_style_layer(
   int map,
   mln_buffer_view layer_id,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<ffi.Bool>)>()
-external int mln_map_remove_style_layer_take_result(
-  int operation,
-  ffi.Pointer<ffi.Bool> out_removed,
+  ffi.Pointer<ffi.Uint64> out_command_id,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_operation>)
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<ffi.Uint64>)
 >()
-external int mln_map_remove_style_source_start(
+external int mln_map_remove_style_source(
   int map,
   mln_buffer_view source_id,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<ffi.Bool>)>()
-external int mln_map_remove_style_source_take_result(
-  int operation,
-  ffi.Pointer<ffi.Bool> out_removed,
+  ffi.Pointer<ffi.Uint64> out_command_id,
 );
 
 @ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<ffi.Uint64>)>()
@@ -2075,51 +1862,6 @@ external int mln_map_set_viewport_options(
 external int mln_map_snapshot_get(
   int map,
   ffi.Pointer<mln_map_snapshot> out_snapshot,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_operation>)
->()
-external int mln_map_style_image_exists_start(
-  int map,
-  mln_buffer_view image_id,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<ffi.Bool>)>()
-external int mln_map_style_image_exists_take_result(
-  int operation,
-  ffi.Pointer<ffi.Bool> out_exists,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_operation>)
->()
-external int mln_map_style_layer_exists_start(
-  int map,
-  mln_buffer_view layer_id,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<ffi.Bool>)>()
-external int mln_map_style_layer_exists_take_result(
-  int operation,
-  ffi.Pointer<ffi.Bool> out_exists,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_operation>)
->()
-external int mln_map_style_source_exists_start(
-  int map,
-  mln_buffer_view source_id,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<ffi.Bool>)>()
-external int mln_map_style_source_exists_take_result(
-  int operation,
-  ffi.Pointer<ffi.Bool> out_exists,
 );
 
 @ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_operation>)>()
@@ -4886,7 +4628,7 @@ final class mln_map_snapshot extends ffi.Struct {
   external int size;
 
   @ffi.Uint32()
-  external int reserved;
+  external int debug_options;
 
   @ffi.Uint64()
   external int generation;
@@ -4900,10 +4642,10 @@ final class mln_map_snapshot extends ffi.Struct {
   external mln_map_viewport_options viewport;
 
   @ffi.Bool()
-  external bool loading;
+  external bool fully_loaded;
 
   @ffi.Bool()
-  external bool fully_rendered;
+  external bool rendering_stats_view_enabled;
 
   @ffi.Bool()
   external bool repaint_demand;
@@ -4916,6 +4658,12 @@ final class mln_map_snapshot extends ffi.Struct {
 
   @ffi.Uint64()
   external int latest_render_update_generation;
+
+  external mln_map_tile_options tile;
+
+  external mln_bound_options bounds;
+
+  external mln_free_camera_options free_camera;
 }
 
 enum mln_map_tile_option_field {
@@ -6874,8 +6622,7 @@ final class mln_runtime_event_render_map extends ffi.Struct {
 
 enum mln_runtime_event_source_type {
   MLN_RUNTIME_EVENT_SOURCE_RUNTIME(0),
-  MLN_RUNTIME_EVENT_SOURCE_MAP(1),
-  MLN_RUNTIME_EVENT_SOURCE_PROJECTION(2);
+  MLN_RUNTIME_EVENT_SOURCE_MAP(1);
 
   final int value;
   const mln_runtime_event_source_type(this.value);
@@ -6883,7 +6630,6 @@ enum mln_runtime_event_source_type {
   static mln_runtime_event_source_type fromValue(int value) => switch (value) {
     0 => MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
     1 => MLN_RUNTIME_EVENT_SOURCE_MAP,
-    2 => MLN_RUNTIME_EVENT_SOURCE_PROJECTION,
     _ => throw ArgumentError(
       'Unknown value for mln_runtime_event_source_type: $value',
     ),
@@ -7081,6 +6827,7 @@ sealed class mln_status {
   static const MLN_STATUS_BUSY = -7;
   static const MLN_STATUS_TARGET_LOST = -8;
   static const MLN_STATUS_NOT_READY = -9;
+  static const MLN_STATUS_NOT_FOUND = -10;
 }
 
 typedef mln_style_id_list = ffi.Uint64;
@@ -7204,6 +6951,47 @@ enum mln_style_image_text_fit {
     2 => MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL,
     _ => throw ArgumentError(
       'Unknown value for mln_style_image_text_fit: $value',
+    ),
+  };
+}
+
+final class mln_style_layer_info extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Uint32()
+  external int fields;
+
+  external mln_buffer_view type;
+
+  @ffi.Double()
+  external double min_zoom;
+
+  @ffi.Double()
+  external double max_zoom;
+
+  @ffi.Uint32()
+  external int visibility;
+
+  @ffi.Size()
+  external int source_id_size;
+
+  @ffi.Size()
+  external int source_layer_size;
+}
+
+enum mln_style_layer_info_field {
+  MLN_STYLE_LAYER_INFO_SOURCE_ID(1),
+  MLN_STYLE_LAYER_INFO_SOURCE_LAYER(2);
+
+  final int value;
+  const mln_style_layer_info_field(this.value);
+
+  static mln_style_layer_info_field fromValue(int value) => switch (value) {
+    1 => MLN_STYLE_LAYER_INFO_SOURCE_ID,
+    2 => MLN_STYLE_LAYER_INFO_SOURCE_LAYER,
+    _ => throw ArgumentError(
+      'Unknown value for mln_style_layer_info_field: $value',
     ),
   };
 }

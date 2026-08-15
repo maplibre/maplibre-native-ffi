@@ -351,6 +351,42 @@ final class GeoJsonSourceOptions {
   );
 }
 
+/// Layer metadata copied from retained native style state.
+///
+/// [sourceId] and [sourceLayer] are present when the layer carries them. The
+/// value remains valid after its layer or map closes.
+final class LayerInfo {
+  /// Creates copied layer metadata.
+  const LayerInfo({
+    required this.type,
+    required this.minZoom,
+    required this.maxZoom,
+    required this.visibility,
+    this.sourceId,
+    this.sourceLayer,
+  });
+
+  /// Style-spec layer type string, for example `"fill"` or `"background"`.
+  final String type;
+
+  /// Lowest zoom at which the layer draws; negative infinity with no lower
+  /// bound.
+  final double minZoom;
+
+  /// Highest zoom at which the layer draws; positive infinity with no upper
+  /// bound.
+  final double maxZoom;
+
+  /// Whether the layer draws.
+  final StyleLayerVisibility visibility;
+
+  /// Source ID, when the layer carries one.
+  final String? sourceId;
+
+  /// Source-layer ID, when the layer carries one.
+  final String? sourceLayer;
+}
+
 /// Whether a style layer draws.
 final class StyleLayerVisibility {
   const StyleLayerVisibility._(this.rawValue, this.name);

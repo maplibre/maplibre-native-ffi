@@ -64,10 +64,12 @@ pub fn waitForOwnedEvent(
     }
     return error.EventNotObserved;
 }
-pub fn waitForCommandDisposition(
+/// Waits for `command_id`'s terminal event and returns its payload. See
+/// `waitForEvent` for what a bounded drain keeps queued.
+pub fn waitForCommandFinished(
     runtime: *maplibre.RuntimeHandle,
     command_id: u64,
-) !maplibre.CommandDisposition {
+) !maplibre.CommandFinishedPayload {
     for (0..5000) |_| {
         while (true) {
             var batch = try runtime.drainEvents(testing.allocator, 1);
@@ -76,7 +78,7 @@ pub fn waitForCommandDisposition(
             const event = try batch.at(0);
             switch (event.payload) {
                 .command_finished => |payload| {
-                    if (payload.command_id == command_id) return payload.disposition;
+                    if (payload.command_id == command_id) return payload;
                 },
                 else => {},
             }
@@ -84,6 +86,30 @@ pub fn waitForCommandDisposition(
         try sleepOneMillisecond();
     }
     return error.EventNotObserved;
+}
+
+pub fn waitForCommandDisposition(
+    runtime: *maplibre.RuntimeHandle,
+    command_id: u64,
+) !maplibre.CommandDisposition {
+    return (try waitForCommandFinished(runtime, command_id)).disposition;
+}
+
+/// Awaits `command_id`'s commit and returns a map snapshot that observes it:
+/// the committed event reports the published generation, and a snapshot at or
+/// past that generation carries the committed state.
+pub fn snapshotAfterCommand(
+    runtime: *maplibre.RuntimeHandle,
+    map: *maplibre.MapHandle,
+    command_id: u64,
+) !maplibre.MapSnapshot {
+    const finished = try waitForCommandFinished(runtime, command_id);
+    try testing.expect(std.meta.eql(finished.disposition, maplibre.CommandDisposition.committed));
+    try finished.status;
+    try testing.expect(finished.generation != 0);
+    const snapshot = try map.snapshot();
+    try testing.expect(snapshot.generation >= finished.generation);
+    return snapshot;
 }
 
 /// Drains every queued event, reporting how many the batch carried.
@@ -111,39 +137,65 @@ pub fn waitForBarrier(runtime: *maplibre.RuntimeHandle) !void {
     try operation.discard();
 }
 
-pub fn styleSourceExists(map: *maplibre.MapHandle, source_id: []const u8) !bool {
-    const operation = try map.styleSourceExistsStart(testing.allocator, source_id);
+/// Copies fixed source metadata, reporting null when no source has the ID.
+pub fn styleSourceMetadata(map: *maplibre.MapHandle, source_id: []const u8) !?maplibre.StyleSourceMetadata {
+    const operation = try map.getStyleSourceInfoStart(testing.allocator, source_id);
     defer operation.release();
     try waitOperation(operation);
-    return map.styleSourceExistsTakeResult(operation);
+    return map.getStyleSourceInfoTakeResult(operation);
+}
+
+/// Existence via the info getter's found flag.
+pub fn styleSourceExists(map: *maplibre.MapHandle, source_id: []const u8) !bool {
+    return (try styleSourceMetadata(map, source_id)) != null;
 }
 
 pub fn styleSourceType(map: *maplibre.MapHandle, source_id: []const u8) !?maplibre.StyleSourceType {
-    const operation = try map.getStyleSourceTypeStart(testing.allocator, source_id);
-    defer operation.release();
-    try waitOperation(operation);
-    return map.getStyleSourceTypeTakeResult(operation);
+    const metadata = (try styleSourceMetadata(map, source_id)) orelse return null;
+    return metadata.source_type;
 }
 
-pub fn removeStyleSource(map: *maplibre.MapHandle, source_id: []const u8) !bool {
-    const operation = try map.removeStyleSourceStart(testing.allocator, source_id);
-    defer operation.release();
-    try waitOperation(operation);
-    return map.removeStyleSourceTakeResult(operation);
+/// Waits for a removal command's terminal event: true when the removal
+/// committed, false when the ID named nothing, and the command's reported
+/// failure otherwise.
+fn awaitRemoval(runtime: *maplibre.RuntimeHandle, command_id: u64) !bool {
+    const payload = try waitForCommandFinished(runtime, command_id);
+    switch (payload.disposition) {
+        .committed => return true,
+        .failed => {
+            payload.status catch |err| {
+                if (err == error.NotFound) return false;
+                return err;
+            };
+            return error.UnexpectedCommandStatus;
+        },
+        else => return error.UnexpectedCommandDisposition,
+    }
 }
 
+pub fn removeStyleSource(runtime: *maplibre.RuntimeHandle, map: *maplibre.MapHandle, source_id: []const u8) !bool {
+    return awaitRemoval(runtime, try map.removeStyleSource(testing.allocator, source_id));
+}
+
+pub fn removeStyleLayer(runtime: *maplibre.RuntimeHandle, map: *maplibre.MapHandle, layer_id: []const u8) !bool {
+    return awaitRemoval(runtime, try map.removeStyleLayer(testing.allocator, layer_id));
+}
+
+pub fn removeStyleImage(runtime: *maplibre.RuntimeHandle, map: *maplibre.MapHandle, image_id: []const u8) !bool {
+    return awaitRemoval(runtime, try map.removeStyleImage(testing.allocator, image_id));
+}
+
+/// Copies fixed layer metadata, reporting null when no layer has the ID.
+pub fn styleLayerInfo(map: *maplibre.MapHandle, layer_id: []const u8) !?maplibre.StyleLayerInfo {
+    const operation = try map.getStyleLayerInfoStart(testing.allocator, layer_id);
+    defer operation.release();
+    try waitOperation(operation);
+    return map.getStyleLayerInfoTakeResult(operation);
+}
+
+/// Existence via the info getter's found flag.
 pub fn styleLayerExists(map: *maplibre.MapHandle, layer_id: []const u8) !bool {
-    const operation = try map.styleLayerExistsStart(testing.allocator, layer_id);
-    defer operation.release();
-    try waitOperation(operation);
-    return map.styleLayerExistsTakeResult(operation);
-}
-
-pub fn removeStyleLayer(map: *maplibre.MapHandle, layer_id: []const u8) !bool {
-    const operation = try map.removeStyleLayerStart(testing.allocator, layer_id);
-    defer operation.release();
-    try waitOperation(operation);
-    return map.removeStyleLayerTakeResult(operation);
+    return (try styleLayerInfo(map, layer_id)) != null;
 }
 
 pub fn loadedStyleJson(map: *maplibre.MapHandle) !maplibre.OwnedString {
@@ -189,10 +241,7 @@ pub fn styleSourceUrl(map: *maplibre.MapHandle, source_id: []const u8) !?maplibr
 }
 
 pub fn styleSourceInfo(map: *maplibre.MapHandle, source_id: []const u8) !?maplibre.StyleSourceInfo {
-    const operation = try map.getStyleSourceInfoStart(testing.allocator, source_id);
-    defer operation.release();
-    try waitOperation(operation);
-    const metadata = (try map.getStyleSourceInfoTakeResult(operation)) orelse return null;
+    const metadata = (try styleSourceMetadata(map, source_id)) orelse return null;
     var attribution: ?[]const u8 = null;
     errdefer if (attribution) |value| testing.allocator.free(value);
     if (metadata.has_attribution) {
@@ -235,11 +284,10 @@ pub fn styleSourceInfo(map: *maplibre.MapHandle, source_id: []const u8) !?maplib
     };
 }
 
-pub fn styleLayerType(map: *maplibre.MapHandle, layer_id: []const u8) !?maplibre.OwnedString {
-    const operation = try map.getStyleLayerTypeStart(testing.allocator, layer_id);
-    defer operation.release();
-    try waitOperation(operation);
-    return map.getStyleLayerTypeTakeResult(testing.allocator, operation);
+/// The layer's style-spec type name, a static string the process owns.
+pub fn styleLayerType(map: *maplibre.MapHandle, layer_id: []const u8) !?[]const u8 {
+    const info = (try styleLayerInfo(map, layer_id)) orelse return null;
+    return info.layer_type;
 }
 
 pub fn styleLayerJson(map: *maplibre.MapHandle, layer_id: []const u8) !?maplibre.OwnedString {
@@ -284,27 +332,6 @@ pub fn layerSourceId(map: *maplibre.MapHandle, layer_id: []const u8) !maplibre.O
     return map.copyLayerSourceIdTakeResult(testing.allocator, operation);
 }
 
-pub fn layerMinZoom(map: *maplibre.MapHandle, layer_id: []const u8) !f64 {
-    const operation = try map.getLayerMinZoomStart(testing.allocator, layer_id);
-    defer operation.release();
-    try waitOperation(operation);
-    return map.getLayerMinZoomTakeResult(operation);
-}
-
-pub fn layerMaxZoom(map: *maplibre.MapHandle, layer_id: []const u8) !f64 {
-    const operation = try map.getLayerMaxZoomStart(testing.allocator, layer_id);
-    defer operation.release();
-    try waitOperation(operation);
-    return map.getLayerMaxZoomTakeResult(operation);
-}
-
-pub fn layerVisibility(map: *maplibre.MapHandle, layer_id: []const u8) !maplibre.StyleLayerVisibility {
-    const operation = try map.getLayerVisibilityStart(testing.allocator, layer_id);
-    defer operation.release();
-    try waitOperation(operation);
-    return map.getLayerVisibilityTakeResult(operation);
-}
-
 pub fn layerProperty(map: *maplibre.MapHandle, layer_id: []const u8, property_name: []const u8) !?maplibre.OwnedString {
     const operation = try map.getLayerPropertyStart(testing.allocator, layer_id, property_name);
     defer operation.release();
@@ -326,18 +353,9 @@ pub fn styleLightProperty(map: *maplibre.MapHandle, property_name: []const u8) !
     return map.getStyleLightPropertyTakeResult(testing.allocator, operation);
 }
 
+/// Existence via the info getter's found flag.
 pub fn styleImageExists(map: *maplibre.MapHandle, image_id: []const u8) !bool {
-    const operation = try map.styleImageExistsStart(testing.allocator, image_id);
-    defer operation.release();
-    try waitOperation(operation);
-    return map.styleImageExistsTakeResult(operation);
-}
-
-pub fn removeStyleImage(map: *maplibre.MapHandle, image_id: []const u8) !bool {
-    const operation = try map.removeStyleImageStart(testing.allocator, image_id);
-    defer operation.release();
-    try waitOperation(operation);
-    return map.removeStyleImageTakeResult(operation);
+    return (try styleImageInfo(map, image_id)) != null;
 }
 
 pub fn styleImagePixels(map: *maplibre.MapHandle, image_id: []const u8) !?maplibre.OwnedString {

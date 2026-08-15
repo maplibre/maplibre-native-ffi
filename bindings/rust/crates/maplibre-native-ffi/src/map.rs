@@ -32,16 +32,18 @@ use crate::runtime::{
 use crate::values::NativeValue;
 use crate::{
     BoundOptions, CameraFitOptions, CameraOptions, CameraSnapshot, CameraUpdate, Error, ErrorKind,
-    FreeCameraOptions, HandleOperationError, LatLng, LatLngBounds, MapOptions, MapProjectionHandle,
-    MapTileOptions, MapViewportOptions, ProjectionMode, Result, RuntimeEventMask, ScreenPoint,
+    FreeCameraOptions, HandleOperationError, LatLng, LatLngBounds, MapDebugOptions, MapOptions,
+    MapProjectionHandle, MapTileOptions, MapViewportOptions, ProjectionMode, Result,
+    RuntimeEventMask, ScreenPoint,
 };
 
 mod style;
 pub use style::{
     GeoJsonSourceOptions, ImageContent, ImageStretch, LocationIndicatorImageKind, SourceInfo,
     SourceType, StyleImage, StyleImageInfo, StyleImageOperation, StyleImageOptions,
-    StyleImageStretches, StyleImageTextFit, StyleLayerVisibility, StyleSourceInfoOperation,
-    StyleTransitionOptions, TileJsonInfo, TileScheme, TileSourceOptions, VectorTileEncoding,
+    StyleImageStretches, StyleImageTextFit, StyleLayerInfo, StyleLayerInfoOperation,
+    StyleLayerVisibility, StyleSourceInfoOperation, StyleTransitionOptions, TileJsonInfo,
+    TileScheme, TileSourceOptions, VectorTileEncoding,
 };
 
 #[derive(Debug)]
@@ -117,18 +119,28 @@ pub struct LogicalExtent {
 }
 
 /// Immutable map state copied from the latest worker publication.
+///
+/// Every committed map command publishes a new generation and reports it in
+/// its command-finished event, so a snapshot whose `generation` is at or past
+/// a commit's observes that commit.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MapSnapshot {
     pub generation: u64,
+    /// Debug overlay mask committed by [`MapHandle::set_debug_options`].
+    pub debug_options: MapDebugOptions,
     pub camera: CameraOptions,
     pub logical_extent: LogicalExtent,
     pub projection_mode: ProjectionMode,
     pub viewport: MapViewportOptions,
-    pub loading: bool,
-    pub fully_rendered: bool,
+    /// True once every requested style and tile resource finished loading.
+    pub fully_loaded: bool,
+    pub rendering_stats_view_enabled: bool,
     pub repaint_demand: bool,
     pub event_mask: RuntimeEventMask,
     pub latest_render_update_generation: u64,
+    pub tile: MapTileOptions,
+    pub bounds: BoundOptions,
+    pub free_camera: FreeCameraOptions,
 }
 
 impl fmt::Debug for MapHandle {
@@ -219,7 +231,7 @@ impl MapHandle {
         let map = self.inner.native()?;
         let mut raw = sys::mln_map_snapshot {
             size: std::mem::size_of::<sys::mln_map_snapshot>() as u32,
-            reserved: 0,
+            debug_options: 0,
             generation: 0,
             // SAFETY: these constructors initialize the nested ABI descriptors.
             camera: unsafe { sys::mln_camera_options_default() },
@@ -230,17 +242,21 @@ impl MapHandle {
             },
             projection_mode: unsafe { sys::mln_projection_mode_default() },
             viewport: unsafe { sys::mln_map_viewport_options_default() },
-            loading: false,
-            fully_rendered: false,
+            fully_loaded: false,
+            rendering_stats_view_enabled: false,
             repaint_demand: false,
             reserved_flags: 0,
             event_mask: 0,
             latest_render_update_generation: 0,
+            tile: unsafe { sys::mln_map_tile_options_default() },
+            bounds: unsafe { sys::mln_bound_options_default() },
+            free_camera: unsafe { sys::mln_free_camera_options_default() },
         };
         // SAFETY: map is live and raw is a size-tagged writable descriptor.
         maplibre_core::check(unsafe { sys::mln_map_snapshot_get(map, &mut raw) })?;
         Ok(MapSnapshot {
             generation: raw.generation,
+            debug_options: MapDebugOptions::from_bits_retain(raw.debug_options),
             camera: CameraOptions::from_native(raw.camera),
             logical_extent: LogicalExtent {
                 width: raw.logical_extent.width,
@@ -249,11 +265,14 @@ impl MapHandle {
             },
             projection_mode: ProjectionMode::from_native(raw.projection_mode),
             viewport: MapViewportOptions::from_native(raw.viewport),
-            loading: raw.loading,
-            fully_rendered: raw.fully_rendered,
+            fully_loaded: raw.fully_loaded,
+            rendering_stats_view_enabled: raw.rendering_stats_view_enabled,
             repaint_demand: raw.repaint_demand,
             event_mask: RuntimeEventMask::from_bits_retain(raw.event_mask),
             latest_render_update_generation: raw.latest_render_update_generation,
+            tile: MapTileOptions::from_native(raw.tile),
+            bounds: BoundOptions::from_native(raw.bounds),
+            free_camera: FreeCameraOptions::from_native(raw.free_camera),
         })
     }
 
@@ -364,15 +383,35 @@ impl MapHandle {
         Ok(command_id)
     }
 
-    pub fn start_viewport_options(&self) -> Result<OperationHandle<MapViewportOptions>> {
+    /// Submits a debug-overlay command and returns its command ID.
+    ///
+    /// The committed mask is visible as [`MapSnapshot::debug_options`].
+    pub fn set_debug_options(&self, options: MapDebugOptions) -> Result<u64> {
         let map = self.inner.native()?;
-        let mut operation = sys::mln_operation(0);
+        let mut command_id = 0;
+        // SAFETY: map is live and command_id is zero writable storage.
         maplibre_core::check(unsafe {
-            sys::mln_map_get_viewport_options_start(map, &mut operation)
+            sys::mln_map_set_debug_options(map, options.bits(), &mut command_id)
         })?;
-        self.start_operation(operation, OperationKind::ViewportOptions)
+        Ok(command_id)
     }
 
+    /// Submits a rendering-stats visibility command and returns its command ID.
+    ///
+    /// The committed value is visible as
+    /// [`MapSnapshot::rendering_stats_view_enabled`].
+    pub fn set_rendering_stats_view_enabled(&self, enabled: bool) -> Result<u64> {
+        let map = self.inner.native()?;
+        let mut command_id = 0;
+        // SAFETY: map is live and command_id is zero writable storage.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_rendering_stats_view_enabled(map, enabled, &mut command_id)
+        })?;
+        Ok(command_id)
+    }
+
+    /// Submits a viewport-options command; the committed options are visible
+    /// as [`MapSnapshot::viewport`].
     pub fn set_viewport_options(&self, options: &MapViewportOptions) -> Result<u64> {
         let map = self.inner.native()?;
         let mut command_id = 0;
@@ -382,13 +421,8 @@ impl MapHandle {
         Ok(command_id)
     }
 
-    pub fn start_tile_options(&self) -> Result<OperationHandle<MapTileOptions>> {
-        let map = self.inner.native()?;
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe { sys::mln_map_get_tile_options_start(map, &mut operation) })?;
-        self.start_operation(operation, OperationKind::TileOptions)
-    }
-
+    /// Submits a tile-options command; the committed options are visible as
+    /// [`MapSnapshot::tile`].
     pub fn set_tile_options(&self, options: &MapTileOptions) -> Result<u64> {
         let map = self.inner.native()?;
         let mut command_id = 0;
@@ -398,13 +432,8 @@ impl MapHandle {
         Ok(command_id)
     }
 
-    pub fn start_bounds(&self) -> Result<OperationHandle<BoundOptions>> {
-        let map = self.inner.native()?;
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe { sys::mln_map_get_bounds_start(map, &mut operation) })?;
-        self.start_operation(operation, OperationKind::Bounds)
-    }
-
+    /// Submits a camera-constraint command; the committed constraints are
+    /// visible as [`MapSnapshot::bounds`].
     pub fn set_bounds(&self, options: &BoundOptions) -> Result<u64> {
         let map = self.inner.native()?;
         let mut command_id = 0;
@@ -414,15 +443,8 @@ impl MapHandle {
         Ok(command_id)
     }
 
-    pub fn start_free_camera_options(&self) -> Result<OperationHandle<FreeCameraOptions>> {
-        let map = self.inner.native()?;
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_map_get_free_camera_options_start(map, &mut operation)
-        })?;
-        self.start_operation(operation, OperationKind::FreeCameraOptions)
-    }
-
+    /// Submits a free-camera command; the committed options are visible as
+    /// [`MapSnapshot::free_camera`].
     pub fn set_free_camera_options(&self, options: &FreeCameraOptions) -> Result<u64> {
         let map = self.inner.native()?;
         let mut command_id = 0;
@@ -610,82 +632,6 @@ impl MapHandle {
     /// Creates a standalone projection snapshot from the current map transform.
     pub fn create_projection(&self) -> Result<MapProjectionHandle> {
         MapProjectionHandle::new(self)
-    }
-}
-
-impl OperationHandle<MapViewportOptions> {
-    pub fn take(&self) -> Result<MapViewportOptions> {
-        let mut raw = unsafe { sys::mln_map_viewport_options_default() };
-        self.with_result_operation(|operation| {
-            if self.operation_kind != OperationKind::ViewportOptions {
-                return Err(Error::new(
-                    ErrorKind::InvalidState,
-                    None,
-                    "operation does not contain viewport options",
-                ));
-            }
-            maplibre_core::check(unsafe {
-                sys::mln_map_get_viewport_options_take_result(operation, &mut raw)
-            })
-        })?;
-        Ok(MapViewportOptions::from_native(raw))
-    }
-}
-
-impl OperationHandle<MapTileOptions> {
-    pub fn take(&self) -> Result<MapTileOptions> {
-        let mut raw = unsafe { sys::mln_map_tile_options_default() };
-        self.with_result_operation(|operation| {
-            if self.operation_kind != OperationKind::TileOptions {
-                return Err(Error::new(
-                    ErrorKind::InvalidState,
-                    None,
-                    "operation does not contain tile options",
-                ));
-            }
-            maplibre_core::check(unsafe {
-                sys::mln_map_get_tile_options_take_result(operation, &mut raw)
-            })
-        })?;
-        Ok(MapTileOptions::from_native(raw))
-    }
-}
-
-impl OperationHandle<BoundOptions> {
-    pub fn take(&self) -> Result<BoundOptions> {
-        let mut raw = unsafe { sys::mln_bound_options_default() };
-        self.with_result_operation(|operation| {
-            if self.operation_kind != OperationKind::Bounds {
-                return Err(Error::new(
-                    ErrorKind::InvalidState,
-                    None,
-                    "operation does not contain camera constraints",
-                ));
-            }
-            maplibre_core::check(unsafe {
-                sys::mln_map_get_bounds_take_result(operation, &mut raw)
-            })
-        })?;
-        Ok(BoundOptions::from_native(raw))
-    }
-}
-
-impl OperationHandle<FreeCameraOptions> {
-    pub fn take(&self) -> Result<FreeCameraOptions> {
-        let mut raw = unsafe { sys::mln_free_camera_options_default() };
-        self.with_result_operation(|operation| {
-            if self.operation_kind != OperationKind::FreeCameraOptions {
-                return Err(Error::new(
-                    ErrorKind::InvalidState,
-                    None,
-                    "operation does not contain free-camera options",
-                ));
-            }
-            maplibre_core::check(unsafe {
-                sys::mln_map_get_free_camera_options_take_result(operation, &mut raw)
-            })
-        })?;
-        Ok(FreeCameraOptions::from_native(raw))
     }
 }
 

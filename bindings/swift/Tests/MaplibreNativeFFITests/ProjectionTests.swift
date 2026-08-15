@@ -1,3 +1,4 @@
+import Foundation
 @testable import MaplibreNativeFFI
 import Testing
 
@@ -10,7 +11,10 @@ import Testing
   #expect(abs(roundTripped.longitude - coordinate.longitude) < 0.000001)
 }
 
-@Test func mapProjectionCameraAndCoordinateConversion() async throws {
+/// A projection created after a camera command observes that command, every
+/// later call is synchronous, a setter changes later conversions, and close is
+/// synchronous.
+@Test func mapProjectionIsSynchronousAfterCreation() async throws {
   let runtime =
     try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.closeBlockingForTests() }
@@ -18,29 +22,57 @@ import Testing
                                 options: MapOptions(width: 256, height: 256))
   defer { try? map.closeBlockingForTests() }
   _ = try map.updateCamera(CameraUpdate(camera: CameraOptions(
-    center: LatLng(latitude: 0, longitude: 0),
-    zoom: 1
+    center: LatLng(latitude: 10, longitude: 20),
+    zoom: 3
   )))
-  try await runtime.barrier()
 
+  // Creation is ordered after the accepted camera command, so the copied
+  // transform observes it without a barrier.
   let projection = try await MapProjectionHandle(map: map)
+  let created = try projection.camera()
+  #expect(abs((created.center?.latitude ?? 0) - 10) < 0.000001)
+  #expect(abs((created.center?.longitude ?? 0) - 20) < 0.000001)
+  #expect(abs((created.zoom ?? 0) - 3) < 0.000001)
+
+  // A synchronous conversion round-trips within tolerance.
+  let point = try projection.pixel(for: LatLng(latitude: 10, longitude: 20))
+  let coordinate = try projection.latLng(for: point)
+  #expect(abs(coordinate.latitude - 10) < 0.000001)
+  #expect(abs(coordinate.longitude - 20) < 0.000001)
+
+  // A setter applies before returning and changes later conversions.
   try projection.setCamera(CameraOptions(
     center: LatLng(latitude: 1, longitude: 2),
-    zoom: 2
+    zoom: 5
   ))
-  let camera = try await projection.camera()
-  #expect(abs((camera.center?.latitude ?? 0) - 1) < 0.000001)
-  #expect(abs((camera.center?.longitude ?? 0) - 2) < 0.000001)
+  let updated = try projection.camera()
+  #expect(abs((updated.center?.latitude ?? 0) - 1) < 0.000001)
+  #expect(abs((updated.center?.longitude ?? 0) - 2) < 0.000001)
+  let moved = try projection.pixel(for: LatLng(latitude: 10, longitude: 20))
+  #expect(abs(moved.x - point.x) > 1 || abs(moved.y - point.y) > 1)
 
-  let point = try await projection.pixel(
-    for: LatLng(latitude: 1, longitude: 2)
-  )
-  let coordinate = try await projection.latLng(for: point)
-  #expect(abs(coordinate.latitude - 1) < 0.000001)
-  #expect(abs(coordinate.longitude - 2) < 0.000001)
-
-  try await projection.close()
+  try projection.close()
   #expect(projection.isClosed)
+}
+
+/// Projection calls are internally serialized, so a second thread converts
+/// through the same live handle.
+@Test func mapProjectionIsUsableFromASecondThread() async throws {
+  let runtime =
+    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.closeBlockingForTests() }
+  let map = try await MapHandle(runtime: runtime,
+                                options: MapOptions(width: 256, height: 256))
+  defer { try? map.closeBlockingForTests() }
+  let projection = try await MapProjectionHandle(map: map)
+  defer { try? projection.close() }
+
+  let expected = try projection.pixel(for: LatLng(latitude: 5, longitude: 6))
+  let result = try await Task.detached {
+    try projection.pixel(for: LatLng(latitude: 5, longitude: 6))
+  }.value
+  #expect(abs(result.x - expected.x) < 0.000001)
+  #expect(abs(result.y - expected.y) < 0.000001)
 }
 
 @Test func mapProjectionSetVisibleCoordinatesRejectsEmptyInputBeforeCallingC(
@@ -52,7 +84,7 @@ import Testing
                                 options: MapOptions(width: 256, height: 256))
   defer { try? map.closeBlockingForTests() }
   let projection = try await MapProjectionHandle(map: map)
-  defer { try? projection.closeBlockingForTests() }
+  defer { try? projection.close() }
 
   do {
     try projection.setVisibleCoordinates([])

@@ -19,7 +19,7 @@ public sealed class MapCameraOptionsTests
 
     [BindingSpecTest("BND-100")]
     [Fact]
-    public async Task ViewportAndTileOptionsRoundTripThroughNativeMap()
+    public void ViewportAndTileOptionsRoundTripThroughNativeMap()
     {
         using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
         using var map = TestHandles.CreateMap(
@@ -36,7 +36,7 @@ public sealed class MapCameraOptionsTests
                 FrustumOffset = new EdgeInsets(1, 2, 3, 4),
             }
         );
-        map.SetTileOptions(
+        var commandId = map.SetTileOptions(
             new TileOptions
             {
                 PrefetchZoomDelta = 3,
@@ -47,20 +47,37 @@ public sealed class MapCameraOptionsTests
                 LodMode = TileLodMode.Distance,
             }
         );
+        RuntimeEventTestHelpers.WaitForCommand(runtime, commandId);
 
-        var viewport = await map.GetViewportOptionsAsync(TestContext.Current.CancellationToken);
+        var snapshot = map.GetSnapshot();
+        var viewport = snapshot.Viewport;
         Assert.Equal(NorthOrientation.Right, viewport.NorthOrientation);
         Assert.Equal(ConstrainMode.WidthAndHeight, viewport.ConstrainMode);
         Assert.Equal(ViewportMode.FlippedY, viewport.ViewportMode);
         Assert.Equal(new EdgeInsets(1, 2, 3, 4), viewport.FrustumOffset);
 
-        var tile = await map.GetTileOptionsAsync(TestContext.Current.CancellationToken);
+        var tile = snapshot.Tile;
         Assert.Equal(3u, tile.PrefetchZoomDelta);
         Assert.Equal(1.5, tile.LodMinimumRadius);
         Assert.Equal(2.5, tile.LodScale);
         Assert.Equal(45, tile.LodPitchThreshold);
         Assert.Equal(1.25, tile.LodZoomShift);
         Assert.Equal(TileLodMode.Distance, tile.LodMode);
+
+        var freeCameraCommandId = map.SetFreeCameraOptions(
+            new FreeCameraOptions
+            {
+                Position = new Vec3(0.5, 0.5, 0.125),
+                Orientation = new Quaternion(0, 0, 0, 1),
+            }
+        );
+        RuntimeEventTestHelpers.WaitForCommand(runtime, freeCameraCommandId);
+        var freeCamera = map.GetSnapshot().FreeCamera;
+        Assert.NotNull(freeCamera.Position);
+        Assert.Equal(0.5, freeCamera.Position.Value.X, 12);
+        Assert.Equal(0.5, freeCamera.Position.Value.Y, 12);
+        Assert.Equal(0.125, freeCamera.Position.Value.Z, 12);
+        Assert.NotNull(freeCamera.Orientation);
     }
 
     [BindingSpecTest("BND-102")]
@@ -125,7 +142,7 @@ public sealed class MapCameraOptionsTests
                 MaximumPitch = 60,
             }
         );
-        map.SetProjectionMode(
+        var commandId = map.SetProjectionMode(
             new ProjectionModeOptions
             {
                 Axonometric = true,
@@ -133,8 +150,9 @@ public sealed class MapCameraOptionsTests
                 YSkew = 0.2,
             }
         );
+        RuntimeEventTestHelpers.WaitForCommand(runtime, commandId);
 
-        var copiedBounds = await map.GetBoundsAsync(TestContext.Current.CancellationToken);
+        var copiedBounds = map.GetSnapshot().Bounds;
         Assert.Equal(new BoundsConstraint.Bounded(bounds), copiedBounds.Bounds);
         Assert.NotNull(copiedBounds.MinimumZoom);
         Assert.Equal(1, copiedBounds.MinimumZoom.Value, 12);
@@ -255,7 +273,7 @@ public sealed class MapCameraOptionsTests
 
     [BindingSpecTest("BND-103")]
     [Fact]
-    public async Task ProjectionOrderedQueriesCompleteAutonomously()
+    public async Task ProjectionConvertsSynchronouslyAndObservesItsOwnSetters()
     {
         using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
         using var map = TestHandles.CreateMap(
@@ -267,21 +285,71 @@ public sealed class MapCameraOptionsTests
         );
         var coordinate = new LatLng(12.5, 34.25);
 
-        var commandId = projection.SetCamera(
-            new CameraOptions { Center = new LatLng(0, 0), Zoom = 1 }
+        // Synchronous round trip: pixel -> latlng -> pixel.
+        var point = projection.PixelForLatLng(coordinate);
+        AssertClose(coordinate, projection.LatLngForPixel(point));
+
+        // A setter changes later conversions on the same handle.
+        projection.SetCamera(new CameraOptions { Center = new LatLng(40, -75), Zoom = 6 });
+        var camera = projection.GetCamera();
+        Assert.NotNull(camera.Center);
+        AssertClose(new LatLng(40, -75), camera.Center.Value);
+        var movedPoint = projection.PixelForLatLng(coordinate);
+        Assert.NotEqual(point, movedPoint);
+        AssertClose(coordinate, projection.LatLngForPixel(movedPoint));
+
+        projection.SetVisibleCoordinates(
+            [new LatLng(-10, -20), new LatLng(10, 20)],
+            new EdgeInsets(1, 1, 1, 1)
         );
-        var camera = await projection.GetCameraAsync(TestContext.Current.CancellationToken);
-        var point = await projection.PixelForLatLngAsync(
-            coordinate,
+        Assert.NotNull(projection.GetCamera().Center);
+
+        // A projection is usable from a second thread.
+        var threadRoundTrip = await Task.Run(
+            () => projection.LatLngForPixel(projection.PixelForLatLng(coordinate)),
             TestContext.Current.CancellationToken
         );
-        var roundTrip = await projection.LatLngForPixelAsync(
-            point,
-            TestContext.Current.CancellationToken
+        AssertClose(coordinate, threadRoundTrip);
+
+        // Close is synchronous and idempotent through Dispose.
+        projection.Close();
+        Assert.True(projection.IsClosed);
+    }
+
+    [BindingSpecTest("BND-103")]
+    [Fact]
+    public async Task ProjectionCreatedAfterCameraCommandObservesThatCommand()
+    {
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
+        var center = new LatLng(40, -75);
+        map.UpdateCamera(
+            new CameraUpdate
+            {
+                Mode = CameraUpdateMode.Jump,
+                Camera = new CameraOptions { Center = center, Zoom = 6 },
+            }
         );
 
-        Assert.NotEqual(0ul, commandId);
+        using var projection = await map.CreateProjectionAsync(
+            TestContext.Current.CancellationToken
+        );
+        var camera = projection.GetCamera();
         Assert.NotNull(camera.Center);
-        AssertClose(coordinate, roundTrip);
+        AssertClose(center, camera.Center.Value);
+
+        // The projection never observes map changes made after creation.
+        map.UpdateCamera(
+            new CameraUpdate
+            {
+                Mode = CameraUpdateMode.Jump,
+                Camera = new CameraOptions { Center = new LatLng(0, 0), Zoom = 1 },
+            }
+        );
+        await map.QueryCameraAsync(TestContext.Current.CancellationToken);
+        AssertClose(center, projection.GetCamera().Center!.Value);
     }
 }

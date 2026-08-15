@@ -1,3 +1,4 @@
+using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Geo;
 using Maplibre.NativeFfi.Map;
 using Maplibre.NativeFfi.Runtime;
@@ -44,10 +45,10 @@ public sealed class StyleJsonTests
             new TileSourceOptions { RasterEncoding = RasterDemEncoding.Mapbox }
         );
 
-        Assert.Equal(SourceType.GeoJson, await map.StyleSourceTypeAsync("geo-url"));
-        Assert.Equal(SourceType.Vector, await map.StyleSourceTypeAsync("vector-tiles"));
-        Assert.Equal(SourceType.Raster, await map.StyleSourceTypeAsync("raster-tiles"));
-        Assert.Equal(SourceType.RasterDem, await map.StyleSourceTypeAsync("dem-tiles"));
+        Assert.Equal(SourceType.GeoJson, (await map.StyleSourceInfoAsync("geo-url"))?.Type);
+        Assert.Equal(SourceType.Vector, (await map.StyleSourceInfoAsync("vector-tiles"))?.Type);
+        Assert.Equal(SourceType.Raster, (await map.StyleSourceInfoAsync("raster-tiles"))?.Type);
+        Assert.Equal(SourceType.RasterDem, (await map.StyleSourceInfoAsync("dem-tiles"))?.Type);
         Assert.Equal(
             "https://example.test/other.geojson",
             (await map.StyleSourceInfoAsync("geo-url"))?.Url
@@ -118,8 +119,12 @@ public sealed class StyleJsonTests
             Assert.Null(inlineInfo.RasterDemEncoding);
             Assert.Null(inlineInfo.RawRasterDemEncoding);
 
-            Assert.True(await map.RemoveStyleSourceAsync("url-vector"));
-            Assert.True(await map.RemoveStyleSourceAsync("inline-vector"));
+            Assert.NotEqual(0ul, map.RemoveStyleSource("url-vector"));
+            var removed = map.RemoveStyleSource("inline-vector");
+            var finished = RuntimeEventTestHelpers.WaitForCommand(runtime, removed);
+            var completion = Assert.IsType<RuntimeEventPayload.CommandFinished>(finished.Payload);
+            Assert.Equal(CommandDisposition.Committed, completion.Disposition);
+            Assert.Null(await map.StyleSourceInfoAsync("inline-vector"));
         }
 
         Assert.Equal("https://example.test/vector.json", urlInfo.Url);
@@ -146,7 +151,7 @@ public sealed class StyleJsonTests
                 VectorEncoding = inlineInfo.VectorEncoding,
             }
         );
-        Assert.True(await rebuiltMap.StyleSourceExistsAsync("rebuilt"));
+        Assert.NotNull(await rebuiltMap.StyleSourceInfoAsync("rebuilt"));
     }
 
     [BindingSpecTest("BND-101")]
@@ -242,8 +247,6 @@ public sealed class StyleJsonTests
         map.SetStyleJson(EmptyStyle());
 
         Assert.NotEqual(0ul, map.AddStyleSourceJson("geo", GeoJsonSource()));
-        Assert.True(await map.StyleSourceExistsAsync("geo"));
-        Assert.Equal(SourceType.GeoJson, await map.StyleSourceTypeAsync("geo"));
         Assert.Contains("geo", await map.StyleSourceIdsAsync());
         var sourceInfo = await map.StyleSourceInfoAsync("geo");
         Assert.NotNull(sourceInfo);
@@ -255,12 +258,65 @@ public sealed class StyleJsonTests
             0ul,
             map.AddStyleLayerJson("""{"id":"background","type":"background"}"""u8.ToArray(), "")
         );
-        Assert.True(await map.StyleLayerExistsAsync("background"));
-        Assert.Equal("background", await map.StyleLayerTypeAsync("background"));
+        Assert.Equal("background", (await map.StyleLayerInfoAsync("background"))?.Type);
         Assert.Contains("background", await map.StyleLayerIdsAsync());
 
-        Assert.True(await map.RemoveStyleLayerAsync("background"));
-        Assert.True(await map.RemoveStyleSourceAsync("geo"));
+        AssertCommandFinishes(runtime, map.RemoveStyleLayer("background"), MaplibreStatus.Ok);
+        AssertCommandFinishes(runtime, map.RemoveStyleSource("geo"), MaplibreStatus.Ok);
+        Assert.Null(await map.StyleLayerInfoAsync("background"));
+        Assert.Null(await map.StyleSourceInfoAsync("geo"));
+    }
+
+    [BindingSpecTest("BND-105")]
+    [Fact]
+    public async Task StyleRemovalCommandsReportNotFoundAndInUseFailures()
+    {
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
+        map.SetStyleJson(EmptyStyle());
+
+        // Removing a missing layer, source, or image finishes FAILED with NOT_FOUND.
+        AssertCommandFinishes(runtime, map.RemoveStyleLayer("missing"), MaplibreStatus.NotFound);
+        AssertCommandFinishes(runtime, map.RemoveStyleSource("missing"), MaplibreStatus.NotFound);
+        AssertCommandFinishes(runtime, map.RemoveStyleImage("missing"), MaplibreStatus.NotFound);
+
+        // Removing a source a layer still uses finishes FAILED with INVALID_STATE.
+        Assert.NotEqual(0ul, map.AddStyleSourceJson("geo", GeoJsonSource()));
+        Assert.NotEqual(
+            0ul,
+            map.AddStyleLayerJson("""{"id":"fill","type":"fill","source":"geo"}"""u8.ToArray(), "")
+        );
+        AssertCommandFinishes(runtime, map.RemoveStyleSource("geo"), MaplibreStatus.InvalidState);
+        Assert.NotNull(await map.StyleSourceInfoAsync("geo"));
+
+        // After the layer goes away the removal commits and the found flag clears.
+        AssertCommandFinishes(runtime, map.RemoveStyleLayer("fill"), MaplibreStatus.Ok);
+        AssertCommandFinishes(runtime, map.RemoveStyleSource("geo"), MaplibreStatus.Ok);
+        Assert.Null(await map.StyleSourceInfoAsync("geo"));
+    }
+
+    private static void AssertCommandFinishes(
+        RuntimeHandle runtime,
+        ulong commandId,
+        MaplibreStatus expectedStatus
+    )
+    {
+        Assert.NotEqual(0ul, commandId);
+        var finished = RuntimeEventTestHelpers.WaitForCommand(runtime, commandId);
+        var completion = Assert.IsType<RuntimeEventPayload.CommandFinished>(finished.Payload);
+        if (expectedStatus == MaplibreStatus.Ok)
+        {
+            Assert.Equal(CommandDisposition.Committed, completion.Disposition);
+            Assert.NotEqual(0ul, completion.Generation);
+        }
+        else
+        {
+            Assert.Equal(CommandDisposition.Failed, completion.Disposition);
+            Assert.Equal((int)expectedStatus, finished.Code);
+        }
     }
 
     private static byte[] EmptyStyle() => """{"version":8,"sources":{},"layers":[]}"""u8.ToArray();

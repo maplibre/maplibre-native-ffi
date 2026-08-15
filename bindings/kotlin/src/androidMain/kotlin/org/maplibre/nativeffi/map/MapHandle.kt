@@ -51,6 +51,7 @@ import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.ImageContent
 import org.maplibre.nativeffi.style.ImageStretch
+import org.maplibre.nativeffi.style.LayerInfo
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.RasterDemEncoding
 import org.maplibre.nativeffi.style.SourceInfo
@@ -155,71 +156,17 @@ private constructor(
       }
     }
 
-  public actual suspend fun removeStyleSource(sourceId: String): Boolean {
+  public actual fun removeStyleSource(sourceId: String): ULong = command { outCommandId ->
     NativeAccess.ensureLoaded()
-    val outRemoved = booleanArrayOf(false)
     StringViewScope(sourceId).use { nativeSourceId ->
       Status.check(
-        ordered(
-          { outOperation ->
-            MaplibreNativeC.mln_map_remove_style_source_start(
-              requireLiveHandle(),
-              nativeSourceId.view,
-              outOperation,
-            )
-          },
-          { operation ->
-            MaplibreNativeC.mln_map_remove_style_source_take_result(operation, outRemoved)
-          },
+        MaplibreNativeC.mln_map_remove_style_source(
+          requireLiveHandle(),
+          nativeSourceId.view,
+          outCommandId,
         )
       )
     }
-    return outRemoved[0]
-  }
-
-  public actual suspend fun styleSourceExists(sourceId: String): Boolean {
-    NativeAccess.ensureLoaded()
-    val outExists = booleanArrayOf(false)
-    StringViewScope(sourceId).use { nativeSourceId ->
-      Status.check(
-        ordered(
-          { outOperation ->
-            MaplibreNativeC.mln_map_style_source_exists_start(
-              requireLiveHandle(),
-              nativeSourceId.view,
-              outOperation,
-            )
-          },
-          { operation ->
-            MaplibreNativeC.mln_map_style_source_exists_take_result(operation, outExists)
-          },
-        )
-      )
-    }
-    return outExists[0]
-  }
-
-  public actual suspend fun styleSourceType(sourceId: String): SourceType? {
-    NativeAccess.ensureLoaded()
-    val outType = intArrayOf(0)
-    val outFound = booleanArrayOf(false)
-    StringViewScope(sourceId).use { nativeSourceId ->
-      Status.check(
-        ordered(
-          { outOperation ->
-            MaplibreNativeC.mln_map_get_style_source_type_start(
-              requireLiveHandle(),
-              nativeSourceId.view,
-              outOperation,
-            )
-          },
-          { operation ->
-            MaplibreNativeC.mln_map_get_style_source_type_take_result(operation, outType, outFound)
-          },
-        )
-      )
-    }
-    return if (outFound[0]) SourceType.fromNative(outType[0]) else null
   }
 
   public actual suspend fun styleSourceInfo(sourceId: String): SourceInfo? {
@@ -582,48 +529,17 @@ private constructor(
     }
   }
 
-  public actual suspend fun removeStyleImage(imageId: String): Boolean {
+  public actual fun removeStyleImage(imageId: String): ULong = command { outCommandId ->
     NativeAccess.ensureLoaded()
-    val outRemoved = booleanArrayOf(false)
     StringViewScope(imageId).use { nativeImageId ->
       Status.check(
-        ordered(
-          { outOperation ->
-            MaplibreNativeC.mln_map_remove_style_image_start(
-              requireLiveHandle(),
-              nativeImageId.view,
-              outOperation,
-            )
-          },
-          { operation ->
-            MaplibreNativeC.mln_map_remove_style_image_take_result(operation, outRemoved)
-          },
+        MaplibreNativeC.mln_map_remove_style_image(
+          requireLiveHandle(),
+          nativeImageId.view,
+          outCommandId,
         )
       )
     }
-    return outRemoved[0]
-  }
-
-  public actual suspend fun styleImageExists(imageId: String): Boolean {
-    NativeAccess.ensureLoaded()
-    val outExists = booleanArrayOf(false)
-    StringViewScope(imageId).use { nativeImageId ->
-      Status.check(
-        ordered(
-          { outOperation ->
-            MaplibreNativeC.mln_map_style_image_exists_start(
-              requireLiveHandle(),
-              nativeImageId.view,
-              outOperation,
-            )
-          },
-          { operation ->
-            MaplibreNativeC.mln_map_style_image_exists_take_result(operation, outExists)
-          },
-        )
-      )
-    }
-    return outExists[0]
   }
 
   public actual suspend fun styleImageInfo(imageId: String): StyleImageInfo? {
@@ -977,80 +893,63 @@ private constructor(
     }
   }
 
-  public actual suspend fun removeStyleLayer(layerId: String): Boolean {
+  public actual fun removeStyleLayer(layerId: String): ULong = command { outCommandId ->
     NativeAccess.ensureLoaded()
-    val outRemoved = booleanArrayOf(false)
     StringViewScope(layerId).use { nativeLayerId ->
       Status.check(
-        ordered(
-          { outOperation ->
-            MaplibreNativeC.mln_map_remove_style_layer_start(
-              requireLiveHandle(),
-              nativeLayerId.view,
-              outOperation,
-            )
-          },
-          { operation ->
-            MaplibreNativeC.mln_map_remove_style_layer_take_result(operation, outRemoved)
-          },
+        MaplibreNativeC.mln_map_remove_style_layer(
+          requireLiveHandle(),
+          nativeLayerId.view,
+          outCommandId,
         )
       )
     }
-    return outRemoved[0]
   }
 
-  public actual suspend fun styleLayerExists(layerId: String): Boolean {
+  public actual suspend fun styleLayerInfo(layerId: String): LayerInfo? {
     NativeAccess.ensureLoaded()
-    val outExists = booleanArrayOf(false)
+    var type = ""
+    var minZoom = 0.0
+    var maxZoom = 0.0
+    var visibility = StyleLayerVisibility.VISIBLE
+    var hasSourceId = false
+    var hasSourceLayer = false
     StringViewScope(layerId).use { nativeLayerId ->
-      Status.check(
-        ordered(
-          { outOperation ->
-            MaplibreNativeC.mln_map_style_layer_exists_start(
-              requireLiveHandle(),
-              nativeLayerId.view,
-              outOperation,
-            )
-          },
-          { operation ->
-            MaplibreNativeC.mln_map_style_layer_exists_take_result(operation, outExists)
-          },
-        )
-      )
-    }
-    return outExists[0]
-  }
-
-  public actual suspend fun styleLayerType(layerId: String): String? {
-    NativeAccess.ensureLoaded()
-    StringViewScope(layerId).use { nativeLayerId ->
-      LongPointer(1).use { outType ->
-        BoolPointer(1).use { outFound ->
-          outType.put(0, 0L)
-          Status.check(
-            ordered(
-              { outOperation ->
-                MaplibreNativeC.mln_map_get_style_layer_type_start(
-                  requireLiveHandle(),
-                  nativeLayerId.view,
-                  outOperation,
-                )
-              },
-              { operation ->
-                MaplibreNativeC.mln_map_get_style_layer_type_take_result(
-                  operation,
-                  outType,
-                  outFound,
-                )
-              },
-            )
+      MaplibreNativeC.mln_style_layer_info().use { outInfo ->
+        outInfo.size(outInfo.sizeof())
+        val outFound = booleanArrayOf(false)
+        Status.check(
+          ordered(
+            { outOperation ->
+              MaplibreNativeC.mln_map_get_style_layer_info_start(
+                requireLiveHandle(),
+                nativeLayerId.view,
+                outOperation,
+              )
+            },
+            { operation ->
+              MaplibreNativeC.mln_map_get_style_layer_info_take_result(operation, outInfo, outFound)
+            },
           )
-          return if (outFound.get())
-            String(ownedBuffer(outType.get()), java.nio.charset.StandardCharsets.UTF_8)
-          else null
-        }
+        )
+        if (!outFound[0]) return null
+        val fields = outInfo.fields()
+        type = stringView(outInfo.type())
+        minZoom = outInfo.min_zoom()
+        maxZoom = outInfo.max_zoom()
+        visibility = StyleLayerVisibility.fromNative(outInfo.visibility())
+        hasSourceId = (fields and MaplibreNativeC.MLN_STYLE_LAYER_INFO_SOURCE_ID) != 0
+        hasSourceLayer = (fields and MaplibreNativeC.MLN_STYLE_LAYER_INFO_SOURCE_LAYER) != 0
       }
     }
+    return LayerInfo(
+      type,
+      minZoom,
+      maxZoom,
+      visibility,
+      if (hasSourceId) layerSourceId(layerId) else null,
+      if (hasSourceLayer) layerSourceLayer(layerId) else null,
+    )
   }
 
   public actual suspend fun styleLayerIds(): List<String> {
@@ -1451,28 +1350,6 @@ private constructor(
       }
     }
 
-  public actual suspend fun layerMinZoom(layerId: String): Double {
-    NativeAccess.ensureLoaded()
-    StringViewScope(layerId).use { nativeLayerId ->
-      val outZoom = doubleArrayOf(0.0)
-      Status.check(
-        ordered(
-          { outOperation ->
-            MaplibreNativeC.mln_map_get_layer_min_zoom_start(
-              requireLiveHandle(),
-              nativeLayerId.view,
-              outOperation,
-            )
-          },
-          { operation ->
-            MaplibreNativeC.mln_map_get_layer_min_zoom_take_result(operation, outZoom)
-          },
-        )
-      )
-      return outZoom[0]
-    }
-  }
-
   public actual fun setLayerMaxZoom(layerId: String, maxZoom: Double): ULong =
     command { outCommandId ->
       NativeAccess.ensureLoaded()
@@ -1488,28 +1365,6 @@ private constructor(
       }
     }
 
-  public actual suspend fun layerMaxZoom(layerId: String): Double {
-    NativeAccess.ensureLoaded()
-    StringViewScope(layerId).use { nativeLayerId ->
-      val outZoom = doubleArrayOf(0.0)
-      Status.check(
-        ordered(
-          { outOperation ->
-            MaplibreNativeC.mln_map_get_layer_max_zoom_start(
-              requireLiveHandle(),
-              nativeLayerId.view,
-              outOperation,
-            )
-          },
-          { operation ->
-            MaplibreNativeC.mln_map_get_layer_max_zoom_take_result(operation, outZoom)
-          },
-        )
-      )
-      return outZoom[0]
-    }
-  }
-
   public actual fun setLayerVisibility(layerId: String, visibility: StyleLayerVisibility): ULong =
     command { outCommandId ->
       NativeAccess.ensureLoaded()
@@ -1524,28 +1379,6 @@ private constructor(
         )
       }
     }
-
-  public actual suspend fun layerVisibility(layerId: String): StyleLayerVisibility {
-    NativeAccess.ensureLoaded()
-    StringViewScope(layerId).use { nativeLayerId ->
-      val outVisibility = intArrayOf(0)
-      Status.check(
-        ordered(
-          { outOperation ->
-            MaplibreNativeC.mln_map_get_layer_visibility_start(
-              requireLiveHandle(),
-              nativeLayerId.view,
-              outOperation,
-            )
-          },
-          { operation ->
-            MaplibreNativeC.mln_map_get_layer_visibility_take_result(operation, outVisibility)
-          },
-        )
-      )
-      return StyleLayerVisibility.fromNative(outVisibility[0])
-    }
-  }
 
   public actual fun requestRepaint(): Long {
     NativeAccess.ensureLoaded()
@@ -1574,15 +1407,101 @@ private constructor(
       val extent = value.logical_extent()
       return MapSnapshot(
         value.generation(),
+        debugOptions(value.debug_options()),
         cameraOptions(value.camera()),
         MapSize(extent.width(), extent.height(), extent.scale_factor()),
         projectionModeOptions(value.projection_mode()),
         viewportOptions(value.viewport()),
-        value.loading(),
-        value.fully_rendered(),
+        value.fully_loaded(),
+        value.rendering_stats_view_enabled(),
         value.repaint_demand(),
         value.latest_render_update_generation(),
+        tileOptions(value.tile()),
+        boundOptions(value.bounds()),
+        freeCameraOptions(value.free_camera()),
       )
+    }
+  }
+
+  public actual fun setDebugOptions(options: Set<DebugOption>): Long {
+    NativeAccess.ensureLoaded()
+    val outCommand = longArrayOf(0L)
+    Status.check(
+      MaplibreNativeC.mln_map_set_debug_options(
+        requireLiveHandle(),
+        debugOptionMask(options),
+        outCommand,
+      )
+    )
+    return outCommand[0]
+  }
+
+  public actual fun setRenderingStatsViewEnabled(enabled: Boolean): Long {
+    NativeAccess.ensureLoaded()
+    val outCommand = longArrayOf(0L)
+    Status.check(
+      MaplibreNativeC.mln_map_set_rendering_stats_view_enabled(
+        requireLiveHandle(),
+        enabled,
+        outCommand,
+      )
+    )
+    return outCommand[0]
+  }
+
+  public actual fun setViewportOptions(options: ViewportOptions): Long {
+    NativeAccess.ensureLoaded()
+    ViewportOptionsScope(options).use { nativeOptions ->
+      val outCommand = longArrayOf(0L)
+      Status.check(
+        MaplibreNativeC.mln_map_set_viewport_options(
+          requireLiveHandle(),
+          nativeOptions.options,
+          outCommand,
+        )
+      )
+      return outCommand[0]
+    }
+  }
+
+  public actual fun setTileOptions(options: TileOptions): Long {
+    NativeAccess.ensureLoaded()
+    TileOptionsScope(options).use { nativeOptions ->
+      val outCommand = longArrayOf(0L)
+      Status.check(
+        MaplibreNativeC.mln_map_set_tile_options(
+          requireLiveHandle(),
+          nativeOptions.options,
+          outCommand,
+        )
+      )
+      return outCommand[0]
+    }
+  }
+
+  public actual fun setBounds(options: BoundOptions): Long {
+    NativeAccess.ensureLoaded()
+    BoundOptionsScope(options).use { nativeOptions ->
+      val outCommand = longArrayOf(0L)
+      Status.check(
+        MaplibreNativeC.mln_map_set_bounds(requireLiveHandle(), nativeOptions.options, outCommand)
+      )
+      return outCommand[0]
+    }
+  }
+
+  public actual fun setFreeCameraOptions(options: FreeCameraOptions): Long {
+    NativeAccess.ensureLoaded()
+    FreeCameraOptionsScope(options).use { nativeOptions ->
+      val outCommand = longArrayOf(0L)
+      Status.check(
+        MaplibreNativeC.mln_map_set_free_camera_options(
+          requireLiveHandle(),
+          nativeOptions.options,
+          outCommand,
+        )
+      )
+      return outCommand[0]
     }
   }
 
@@ -1713,7 +1632,7 @@ private constructor(
         require(address != 0L) {
           "mln_map_projection_create_take_result returned a null projection"
         }
-        return MapProjectionHandle(runtime, address)
+        return MapProjectionHandle(address)
       }
     } finally {
       MaplibreNativeC.mln_operation_release(operation)

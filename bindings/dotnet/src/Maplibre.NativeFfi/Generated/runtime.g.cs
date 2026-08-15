@@ -131,7 +131,6 @@ namespace Maplibre.NativeFfi.Internal.C
     {
         MLN_RUNTIME_EVENT_SOURCE_RUNTIME = 0,
         MLN_RUNTIME_EVENT_SOURCE_MAP = 1,
-        MLN_RUNTIME_EVENT_SOURCE_PROJECTION = 2,
     }
 
     [NativeTypeName("uint32_t")]

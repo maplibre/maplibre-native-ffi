@@ -2,6 +2,7 @@ package maplibre
 
 import (
 	"errors"
+	"math"
 	"testing"
 )
 
@@ -185,7 +186,10 @@ func TestMapReportsLoadedStyleDocumentAndURL(t *testing.T) {
 	}
 }
 
-func TestMapDebugAndStatusHelpersUseNativeABI(t *testing.T) {
+// A committed command's terminal event carries the published map snapshot
+// generation, so a snapshot at or past that generation shows the committed
+// value.
+func TestMapSnapshotObservesCommittedCommands(t *testing.T) {
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -205,27 +209,93 @@ func TestMapDebugAndStatusHelpersUseNativeABI(t *testing.T) {
 	}()
 
 	options := MapDebugTileBorders | MapDebugCollision
-	if _, err := m.SetDebugOptions(options); err != nil {
-		t.Fatalf("SetDebugOptions(): %v", err)
-	}
-	got, err := m.DebugOptions()
+	commandID, err := m.SetDebugOptions(options)
+	committed := requireCommandCommitted(t, runtime, commandID, err)
+	snapshot, err := m.Snapshot()
 	if err != nil {
-		t.Fatalf("DebugOptions(): %v", err)
+		t.Fatalf("Snapshot(): %v", err)
 	}
-	if !got.Has(options) {
-		t.Fatalf("DebugOptions() = %v, want bits %v", got, options)
+	if snapshot.Generation < committed {
+		t.Fatalf("Snapshot() generation = %d, want at least the committed %d", snapshot.Generation, committed)
 	}
-	if _, err := m.SetRenderingStatsViewEnabled(true); err != nil {
-		t.Fatalf("SetRenderingStatsViewEnabled(true): %v", err)
+	if !snapshot.DebugOptions.Has(options) {
+		t.Fatalf("Snapshot() DebugOptions = %v, want bits %v", snapshot.DebugOptions, options)
 	}
-	if got, err := m.RenderingStatsViewEnabled(); err != nil || !got {
-		t.Fatalf("RenderingStatsViewEnabled() = %v, %v; want true, nil", got, err)
+
+	commandID, err = m.SetRenderingStatsViewEnabled(true)
+	committed = requireCommandCommitted(t, runtime, commandID, err)
+	snapshot, err = m.Snapshot()
+	if err != nil {
+		t.Fatalf("Snapshot(): %v", err)
 	}
-	if _, err := m.IsFullyLoaded(); err != nil {
-		t.Fatalf("IsFullyLoaded(): %v", err)
+	if snapshot.Generation < committed || !snapshot.RenderingStatsViewEnabled {
+		t.Fatalf("Snapshot() = (generation %d, stats view %v), want at least %d and true",
+			snapshot.Generation, snapshot.RenderingStatsViewEnabled, committed)
 	}
 	if _, err := m.DumpDebugLogs(); err != nil {
 		t.Fatalf("DumpDebugLogs(): %v", err)
+	}
+}
+
+// The tile, bounds, and free-camera snapshot fields round-trip through their
+// set commands.
+func TestMapSnapshotRoundTripsOptionCommands(t *testing.T) {
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMapWithOptions(NewMapOptions(256, 256, 1))
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMapWithOptions(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	commandID, err := m.SetTileOptions(TileOptions{}.WithPrefetchZoomDelta(3))
+	committed := requireCommandCommitted(t, runtime, commandID, err)
+	snapshot, err := m.Snapshot()
+	if err != nil {
+		t.Fatalf("Snapshot(): %v", err)
+	}
+	if snapshot.Generation < committed {
+		t.Fatalf("Snapshot() generation = %d, want at least the committed %d", snapshot.Generation, committed)
+	}
+	if snapshot.Tile.PrefetchZoomDelta == nil || *snapshot.Tile.PrefetchZoomDelta != 3 {
+		t.Fatalf("Snapshot() Tile = %#v, want prefetch zoom delta 3", snapshot.Tile)
+	}
+
+	commandID, err = m.SetBounds(BoundOptions{}.WithMinZoom(2).WithMaxZoom(15))
+	committed = requireCommandCommitted(t, runtime, commandID, err)
+	snapshot, err = m.Snapshot()
+	if err != nil {
+		t.Fatalf("Snapshot(): %v", err)
+	}
+	if snapshot.Generation < committed ||
+		snapshot.Bounds.MinZoom == nil || *snapshot.Bounds.MinZoom != 2 ||
+		snapshot.Bounds.MaxZoom == nil || *snapshot.Bounds.MaxZoom != 15 {
+		t.Fatalf("Snapshot() Bounds = %#v, want zoom range 2 to 15", snapshot.Bounds)
+	}
+
+	position := Vec3{X: 0.25, Y: 0.25, Z: 0.1}
+	commandID, err = m.SetFreeCameraOptions(FreeCameraOptions{}.WithPosition(position))
+	committed = requireCommandCommitted(t, runtime, commandID, err)
+	snapshot, err = m.Snapshot()
+	if err != nil {
+		t.Fatalf("Snapshot(): %v", err)
+	}
+	if snapshot.Generation < committed || snapshot.FreeCamera.Position == nil {
+		t.Fatalf("Snapshot() FreeCamera = %#v, want a position", snapshot.FreeCamera)
+	}
+	got := *snapshot.FreeCamera.Position
+	if math.Abs(got.X-position.X) > 1e-6 || math.Abs(got.Y-position.Y) > 1e-6 || math.Abs(got.Z-position.Z) > 1e-6 {
+		t.Fatalf("Snapshot() FreeCamera position = %#v, want %#v", got, position)
 	}
 }
 

@@ -34,6 +34,7 @@ mod py_errors {
     pyo3::import_exception!(maplibre_native_ffi.errors, _OperationResultConsumedError);
     pyo3::import_exception!(maplibre_native_ffi.errors, InvalidStateError);
     pyo3::import_exception!(maplibre_native_ffi.errors, NativeError);
+    pyo3::import_exception!(maplibre_native_ffi.errors, NotFoundError);
     pyo3::import_exception!(maplibre_native_ffi.errors, NotReadyError);
     pyo3::import_exception!(maplibre_native_ffi.errors, TargetLostError);
     pyo3::import_exception!(maplibre_native_ffi.errors, UnknownStatusError);
@@ -1578,58 +1579,10 @@ impl MapHandle {
         })
     }
 
-    fn get_debug_options(&self, py: Python<'_>) -> PyResult<u32> {
-        self.run_style_operation(
-            py,
-            |map, out| unsafe { sys::mln_map_get_debug_options_start(map, out) },
-            |operation| {
-                let mut options = 0;
-                maplibre_core::check(unsafe {
-                    sys::mln_map_get_debug_options_take_result(operation, &mut options)
-                })
-                .map_err(map_error)?;
-                Ok(options)
-            },
-        )
-    }
-
     fn set_rendering_stats_view_enabled(&self, enabled: bool) -> PyResult<u64> {
         self.run_style_command(|map, out| unsafe {
             sys::mln_map_set_rendering_stats_view_enabled(map, enabled, out)
         })
-    }
-
-    fn get_rendering_stats_view_enabled(&self, py: Python<'_>) -> PyResult<bool> {
-        self.run_style_operation(
-            py,
-            |map, out| unsafe { sys::mln_map_get_rendering_stats_view_enabled_start(map, out) },
-            |operation| {
-                let mut enabled = false;
-                maplibre_core::check(unsafe {
-                    sys::mln_map_get_rendering_stats_view_enabled_take_result(
-                        operation,
-                        &mut enabled,
-                    )
-                })
-                .map_err(map_error)?;
-                Ok(enabled)
-            },
-        )
-    }
-
-    fn is_fully_loaded(&self, py: Python<'_>) -> PyResult<bool> {
-        self.run_style_operation(
-            py,
-            |map, out| unsafe { sys::mln_map_is_fully_loaded_start(map, out) },
-            |operation| {
-                let mut loaded = false;
-                maplibre_core::check(unsafe {
-                    sys::mln_map_is_fully_loaded_take_result(operation, &mut loaded)
-                })
-                .map_err(map_error)?;
-                Ok(loaded)
-            },
-        )
     }
 
     fn get_size(&self) -> PyResult<(u32, u32, f64)> {
@@ -1676,30 +1629,25 @@ impl MapHandle {
             projection_mode_to_py(py, &snapshot.projection_mode)?,
         )?;
         result.set_item("viewport", viewport_options_to_py(py, &snapshot.viewport)?)?;
-        result.set_item("loading", snapshot.loading)?;
-        result.set_item("fully_rendered", snapshot.fully_rendered)?;
+        result.set_item("debug_options", snapshot.debug_options)?;
+        result.set_item("fully_loaded", snapshot.fully_loaded)?;
+        result.set_item(
+            "rendering_stats_view_enabled",
+            snapshot.rendering_stats_view_enabled,
+        )?;
         result.set_item("repaint_demand", snapshot.repaint_demand)?;
         result.set_item("event_mask", snapshot.event_mask)?;
         result.set_item(
             "latest_render_update_generation",
             snapshot.latest_render_update_generation,
         )?;
+        result.set_item("tile", tile_options_to_py(py, &snapshot.tile)?)?;
+        result.set_item("bounds", bound_options_to_py(py, &snapshot.bounds)?)?;
+        result.set_item(
+            "free_camera",
+            free_camera_options_to_py(py, &snapshot.free_camera)?,
+        )?;
         Ok(result.into_any().unbind())
-    }
-
-    fn get_viewport_options(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        self.run_style_operation(
-            py,
-            |map, out| unsafe { sys::mln_map_get_viewport_options_start(map, out) },
-            |operation| {
-                let mut options = unsafe { sys::mln_map_viewport_options_default() };
-                maplibre_core::check(unsafe {
-                    sys::mln_map_get_viewport_options_take_result(operation, &mut options)
-                })
-                .map_err(map_error)?;
-                viewport_options_to_py(py, &options)
-            },
-        )
     }
 
     fn set_viewport_options(
@@ -1718,21 +1666,6 @@ impl MapHandle {
         self.run_style_command(|map, out| unsafe {
             sys::mln_map_set_viewport_options(map, &options, out)
         })
-    }
-
-    fn get_tile_options(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        self.run_style_operation(
-            py,
-            |map, out| unsafe { sys::mln_map_get_tile_options_start(map, out) },
-            |operation| {
-                let mut options = unsafe { sys::mln_map_tile_options_default() };
-                maplibre_core::check(unsafe {
-                    sys::mln_map_get_tile_options_take_result(operation, &mut options)
-                })
-                .map_err(map_error)?;
-                tile_options_to_py(py, &options)
-            },
-        )
     }
 
     fn set_tile_options(
@@ -2127,21 +2060,6 @@ impl MapHandle {
         lat_lng_bounds_to_py(py, bounds)
     }
 
-    fn get_bounds(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        self.run_style_operation(
-            py,
-            |map, out| unsafe { sys::mln_map_get_bounds_start(map, out) },
-            |operation| {
-                let mut bounds = unsafe { sys::mln_bound_options_default() };
-                maplibre_core::check(unsafe {
-                    sys::mln_map_get_bounds_take_result(operation, &mut bounds)
-                })
-                .map_err(map_error)?;
-                bound_options_to_py(py, &bounds)
-            },
-        )
-    }
-
     fn set_bounds(
         &self,
         bounds: Option<((f64, f64), (f64, f64))>,
@@ -2154,21 +2072,6 @@ impl MapHandle {
         let bounds =
             bound_options_from_parts(bounds, unbounded, min_zoom, max_zoom, min_pitch, max_pitch);
         self.run_style_command(|map, out| unsafe { sys::mln_map_set_bounds(map, &bounds, out) })
-    }
-
-    fn get_free_camera_options(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        self.run_style_operation(
-            py,
-            |map, out| unsafe { sys::mln_map_get_free_camera_options_start(map, out) },
-            |operation| {
-                let mut options = unsafe { sys::mln_free_camera_options_default() };
-                maplibre_core::check(unsafe {
-                    sys::mln_map_get_free_camera_options_take_result(operation, &mut options)
-                })
-                .map_err(map_error)?;
-                free_camera_options_to_py(py, &options)
-            },
-        )
     }
 
     fn set_free_camera_options(
@@ -2621,59 +2524,11 @@ impl MapHandle {
         )
     }
 
-    fn remove_style_source(&self, py: Python<'_>, source_id: String) -> PyResult<bool> {
+    fn remove_style_source(&self, source_id: String) -> PyResult<u64> {
         let source_id = maplibre_core::string::string_view(&source_id);
-        self.run_style_operation(
-            py,
-            |map, out| unsafe { sys::mln_map_remove_style_source_start(map, source_id.raw(), out) },
-            |operation| {
-                let mut removed = false;
-                maplibre_core::check(unsafe {
-                    sys::mln_map_remove_style_source_take_result(operation, &mut removed)
-                })
-                .map_err(map_error)?;
-                Ok(removed)
-            },
-        )
-    }
-
-    fn style_source_exists(&self, py: Python<'_>, source_id: String) -> PyResult<bool> {
-        let source_id = maplibre_core::string::string_view(&source_id);
-        self.run_style_operation(
-            py,
-            |map, out| unsafe { sys::mln_map_style_source_exists_start(map, source_id.raw(), out) },
-            |operation| {
-                let mut exists = false;
-                maplibre_core::check(unsafe {
-                    sys::mln_map_style_source_exists_take_result(operation, &mut exists)
-                })
-                .map_err(map_error)?;
-                Ok(exists)
-            },
-        )
-    }
-
-    fn get_style_source_type(&self, py: Python<'_>, source_id: String) -> PyResult<Option<u32>> {
-        let source_id = maplibre_core::string::string_view(&source_id);
-        self.run_style_operation(
-            py,
-            |map, out| unsafe {
-                sys::mln_map_get_style_source_type_start(map, source_id.raw(), out)
-            },
-            |operation| {
-                let mut source_type = 0;
-                let mut found = false;
-                maplibre_core::check(unsafe {
-                    sys::mln_map_get_style_source_type_take_result(
-                        operation,
-                        &mut source_type,
-                        &mut found,
-                    )
-                })
-                .map_err(map_error)?;
-                Ok(found.then_some(source_type))
-            },
-        )
+        self.run_style_command(|map, out| unsafe {
+            sys::mln_map_remove_style_source(map, source_id.raw(), out)
+        })
     }
 
     fn get_style_source_info(
@@ -3144,22 +2999,6 @@ impl MapHandle {
         })
     }
 
-    fn get_layer_min_zoom(&self, py: Python<'_>, layer_id: String) -> PyResult<f64> {
-        let layer_id = maplibre_core::string::string_view(&layer_id);
-        self.run_style_operation(
-            py,
-            |map, out| unsafe { sys::mln_map_get_layer_min_zoom_start(map, layer_id.raw(), out) },
-            |operation| {
-                let mut value = 0.0;
-                maplibre_core::check(unsafe {
-                    sys::mln_map_get_layer_min_zoom_take_result(operation, &mut value)
-                })
-                .map_err(map_error)?;
-                Ok(value)
-            },
-        )
-    }
-
     fn set_layer_max_zoom(&self, layer_id: String, max_zoom: f64) -> PyResult<u64> {
         let layer_id = maplibre_core::string::string_view(&layer_id);
         self.run_style_command(|map, out| unsafe {
@@ -3167,43 +3006,11 @@ impl MapHandle {
         })
     }
 
-    fn get_layer_max_zoom(&self, py: Python<'_>, layer_id: String) -> PyResult<f64> {
-        let layer_id = maplibre_core::string::string_view(&layer_id);
-        self.run_style_operation(
-            py,
-            |map, out| unsafe { sys::mln_map_get_layer_max_zoom_start(map, layer_id.raw(), out) },
-            |operation| {
-                let mut value = 0.0;
-                maplibre_core::check(unsafe {
-                    sys::mln_map_get_layer_max_zoom_take_result(operation, &mut value)
-                })
-                .map_err(map_error)?;
-                Ok(value)
-            },
-        )
-    }
-
     fn set_layer_visibility(&self, layer_id: String, visibility: u32) -> PyResult<u64> {
         let layer_id = maplibre_core::string::string_view(&layer_id);
         self.run_style_command(|map, out| unsafe {
             sys::mln_map_set_layer_visibility(map, layer_id.raw(), visibility, out)
         })
-    }
-
-    fn get_layer_visibility(&self, py: Python<'_>, layer_id: String) -> PyResult<u32> {
-        let layer_id = maplibre_core::string::string_view(&layer_id);
-        self.run_style_operation(
-            py,
-            |map, out| unsafe { sys::mln_map_get_layer_visibility_start(map, layer_id.raw(), out) },
-            |operation| {
-                let mut value = 0;
-                maplibre_core::check(unsafe {
-                    sys::mln_map_get_layer_visibility_take_result(operation, &mut value)
-                })
-                .map_err(map_error)?;
-                Ok(value)
-            },
-        )
     }
 
     fn set_layer_filter(
@@ -3243,57 +3050,77 @@ impl MapHandle {
         )
     }
 
-    fn remove_style_layer(&self, py: Python<'_>, layer_id: String) -> PyResult<bool> {
+    fn remove_style_layer(&self, layer_id: String) -> PyResult<u64> {
         let layer_id = maplibre_core::string::string_view(&layer_id);
-        self.run_style_operation(
-            py,
-            |map, out| unsafe { sys::mln_map_remove_style_layer_start(map, layer_id.raw(), out) },
-            |operation| {
-                let mut removed = false;
-                maplibre_core::check(unsafe {
-                    sys::mln_map_remove_style_layer_take_result(operation, &mut removed)
-                })
-                .map_err(map_error)?;
-                Ok(removed)
-            },
-        )
+        self.run_style_command(|map, out| unsafe {
+            sys::mln_map_remove_style_layer(map, layer_id.raw(), out)
+        })
     }
 
-    fn style_layer_exists(&self, py: Python<'_>, layer_id: String) -> PyResult<bool> {
-        let layer_id = maplibre_core::string::string_view(&layer_id);
-        self.run_style_operation(
+    fn get_style_layer_info(
+        &self,
+        py: Python<'_>,
+        layer_id: String,
+    ) -> PyResult<Option<Py<PyAny>>> {
+        let layer_id_view = maplibre_core::string::string_view(&layer_id);
+        let (info, found) = self.run_style_operation(
             py,
-            |map, out| unsafe { sys::mln_map_style_layer_exists_start(map, layer_id.raw(), out) },
-            |operation| {
-                let mut exists = false;
-                maplibre_core::check(unsafe {
-                    sys::mln_map_style_layer_exists_take_result(operation, &mut exists)
-                })
-                .map_err(map_error)?;
-                Ok(exists)
+            |map, out| unsafe {
+                sys::mln_map_get_style_layer_info_start(map, layer_id_view.raw(), out)
             },
-        )
-    }
-
-    fn get_style_layer_type(&self, py: Python<'_>, layer_id: String) -> PyResult<Option<String>> {
-        let layer_id = maplibre_core::string::string_view(&layer_id);
-        self.run_style_operation(
-            py,
-            |map, out| unsafe { sys::mln_map_get_style_layer_type_start(map, layer_id.raw(), out) },
             |operation| {
-                let mut buffer = sys::mln_buffer(0);
+                let mut info: sys::mln_style_layer_info = unsafe { std::mem::zeroed() };
+                info.size = std::mem::size_of::<sys::mln_style_layer_info>() as u32;
                 let mut found = false;
                 maplibre_core::check(unsafe {
-                    sys::mln_map_get_style_layer_type_take_result(
-                        operation,
-                        &mut buffer,
-                        &mut found,
-                    )
+                    sys::mln_map_get_style_layer_info_take_result(operation, &mut info, &mut found)
                 })
                 .map_err(map_error)?;
-                found.then(|| owned_buffer_to_string(buffer)).transpose()
+                Ok((info, found))
             },
-        )
+        )?;
+        if !found {
+            return Ok(None);
+        }
+        // The type view names a static style-spec string that stays valid for
+        // the life of the process; copy it into a Python-owned string.
+        let layer_type = if info.type_.data.is_null() || info.type_.size == 0 {
+            String::new()
+        } else {
+            let bytes = unsafe {
+                std::slice::from_raw_parts(info.type_.data.cast::<u8>(), info.type_.size)
+            };
+            String::from_utf8_lossy(bytes).into_owned()
+        };
+        // The field bits report whether the layer carries the strings and the
+        // sizes report their lengths; the unchanged copy operations transfer
+        // any non-empty contents.
+        let source_id = if info.fields & sys::MLN_STYLE_LAYER_INFO_SOURCE_ID != 0 {
+            Some(if info.source_id_size > 0 {
+                self.copy_layer_source_id(py, layer_id.clone())?
+            } else {
+                String::new()
+            })
+        } else {
+            None
+        };
+        let source_layer = if info.fields & sys::MLN_STYLE_LAYER_INFO_SOURCE_LAYER != 0 {
+            Some(if info.source_layer_size > 0 {
+                self.copy_layer_source_layer(py, layer_id.clone())?
+            } else {
+                String::new()
+            })
+        } else {
+            None
+        };
+        let dict = PyDict::new(py);
+        dict.set_item("layer_type", layer_type)?;
+        dict.set_item("min_zoom", info.min_zoom)?;
+        dict.set_item("max_zoom", info.max_zoom)?;
+        dict.set_item("visibility", info.visibility)?;
+        dict.set_item("source_id", source_id)?;
+        dict.set_item("source_layer", source_layer)?;
+        Ok(Some(dict.into_any().unbind()))
     }
 
     fn list_style_layer_ids(&self, py: Python<'_>) -> PyResult<Vec<String>> {
@@ -3362,36 +3189,11 @@ impl MapHandle {
         })
     }
 
-    fn remove_style_image(&self, py: Python<'_>, image_id: String) -> PyResult<bool> {
+    fn remove_style_image(&self, image_id: String) -> PyResult<u64> {
         let image_id = maplibre_core::string::string_view(&image_id);
-        self.run_style_operation(
-            py,
-            |map, out| unsafe { sys::mln_map_remove_style_image_start(map, image_id.raw(), out) },
-            |operation| {
-                let mut value = false;
-                maplibre_core::check(unsafe {
-                    sys::mln_map_remove_style_image_take_result(operation, &mut value)
-                })
-                .map_err(map_error)?;
-                Ok(value)
-            },
-        )
-    }
-
-    fn style_image_exists(&self, py: Python<'_>, image_id: String) -> PyResult<bool> {
-        let image_id = maplibre_core::string::string_view(&image_id);
-        self.run_style_operation(
-            py,
-            |map, out| unsafe { sys::mln_map_style_image_exists_start(map, image_id.raw(), out) },
-            |operation| {
-                let mut value = false;
-                maplibre_core::check(unsafe {
-                    sys::mln_map_style_image_exists_take_result(operation, &mut value)
-                })
-                .map_err(map_error)?;
-                Ok(value)
-            },
-        )
+        self.run_style_command(|map, out| unsafe {
+            sys::mln_map_remove_style_image(map, image_id.raw(), out)
+        })
     }
 
     fn copy_style_image_stretches(
@@ -3764,45 +3566,46 @@ impl MapHandle {
     }
 }
 
+// Every post-creation projection call is a synchronous immediate that takes
+// the projection's internal serialization mutex, so each call copies the raw
+// handle out of the binding's state lock and releases the GIL around the
+// native call. A stalled call on another thread therefore cannot deadlock the
+// interpreter, and a concurrent close is safe because retired handles report
+// MLN_STATUS_INVALID_ARGUMENT rather than dangling.
+impl MapProjectionHandle {
+    fn native_handle(&self) -> sys::mln_map_projection {
+        self.state().handle()
+    }
+}
+
 #[pymethods]
 impl MapProjectionHandle {
     fn close(&self, py: Python<'_>) -> PyResult<()> {
-        let state = self.state();
-        let Some(handle) = state.live_handle() else {
-            return Ok(());
+        let handle = {
+            let state = self.state();
+            let Some(handle) = state.live_handle() else {
+                return Ok(());
+            };
+            state.mark_closed();
+            handle
         };
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_map_projection_close_start(handle, &mut operation)
-        })
-        .map_err(map_error)?;
-        state.mark_closed();
-        drop(state);
-        let operation = OwnedOperation(operation);
-        wait_operation(py, operation.0)
+        let status = py.detach(|| unsafe { sys::mln_map_projection_close(handle) });
+        maplibre_core::check(status).map_err(map_error)
     }
 
     fn get_camera(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let state = self.state();
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_map_projection_get_camera_start(state.handle(), &mut operation)
-        })
-        .map_err(map_error)?;
-        drop(state);
-        let operation = OwnedOperation(operation);
-        wait_operation(py, operation.0)?;
+        let handle = self.native_handle();
         let mut camera = unsafe { sys::mln_camera_options_default() };
-        maplibre_core::check(unsafe {
-            sys::mln_map_projection_get_camera_take_result(operation.0, &mut camera)
-        })
-        .map_err(map_error)?;
+        let status =
+            py.detach(|| unsafe { sys::mln_map_projection_get_camera(handle, &mut camera) });
+        maplibre_core::check(status).map_err(map_error)?;
         camera_options_to_py(py, &camera)
     }
 
     #[allow(clippy::too_many_arguments)]
     fn set_camera(
         &self,
+        py: Python<'_>,
         center: Option<(f64, f64)>,
         zoom: Option<f64>,
         bearing: Option<f64>,
@@ -3812,8 +3615,8 @@ impl MapProjectionHandle {
         anchor: Option<(f64, f64)>,
         roll: Option<f64>,
         field_of_view: Option<f64>,
-    ) -> PyResult<u64> {
-        let state = self.state();
+    ) -> PyResult<()> {
+        let handle = self.native_handle();
         let camera = camera_options_from_parts(
             center,
             zoom,
@@ -3825,20 +3628,17 @@ impl MapProjectionHandle {
             roll,
             field_of_view,
         );
-        let mut command_id = 0;
-        maplibre_core::check(unsafe {
-            sys::mln_map_projection_set_camera(state.handle(), &camera, &mut command_id)
-        })
-        .map_err(map_error)?;
-        Ok(command_id)
+        let status = py.detach(|| unsafe { sys::mln_map_projection_set_camera(handle, &camera) });
+        maplibre_core::check(status).map_err(map_error)
     }
 
     fn set_visible_coordinates(
         &self,
+        py: Python<'_>,
         coordinates: Vec<(f64, f64)>,
         padding: (f64, f64, f64, f64),
-    ) -> PyResult<u64> {
-        let state = self.state();
+    ) -> PyResult<()> {
+        let handle = self.native_handle();
         let coordinates: Vec<sys::mln_lat_lng> = coordinates
             .into_iter()
             .map(|(latitude, longitude)| sys::mln_lat_lng {
@@ -3847,39 +3647,36 @@ impl MapProjectionHandle {
             })
             .collect();
         let padding = edge_insets_from_tuple(padding);
-        let mut command_id = 0;
-        maplibre_core::check(unsafe {
+        let status = py.detach(|| unsafe {
             sys::mln_map_projection_set_visible_coordinates(
-                state.handle(),
+                handle,
                 coordinates.as_ptr(),
                 coordinates.len(),
                 padding,
-                &mut command_id,
             )
-        })
-        .map_err(map_error)?;
-        Ok(command_id)
+        });
+        maplibre_core::check(status).map_err(map_error)
     }
 
     fn set_visible_geometry(
         &self,
+        py: Python<'_>,
         geometry: &Bound<'_, PyBytes>,
         padding: (f64, f64, f64, f64),
-    ) -> PyResult<u64> {
-        let state = self.state();
-        let geometry = maplibre_core::string::buffer_view(geometry.as_bytes());
+    ) -> PyResult<()> {
+        let handle = self.native_handle();
+        // Copy the bytes out so the borrowed buffer cannot move while the GIL
+        // is released.
+        let geometry = geometry.as_bytes().to_vec();
         let padding = edge_insets_from_tuple(padding);
-        let mut command_id = 0;
-        maplibre_core::check(unsafe {
+        let status = py.detach(|| unsafe {
             sys::mln_map_projection_set_visible_geometry(
-                state.handle(),
-                geometry,
+                handle,
+                maplibre_core::string::buffer_view(&geometry),
                 padding,
-                &mut command_id,
             )
-        })
-        .map_err(map_error)?;
-        Ok(command_id)
+        });
+        maplibre_core::check(status).map_err(map_error)
     }
 
     fn pixel_for_lat_lng(
@@ -3888,53 +3685,33 @@ impl MapProjectionHandle {
         latitude: f64,
         longitude: f64,
     ) -> PyResult<Py<PyAny>> {
-        let state = self.state();
+        let handle = self.native_handle();
         let coordinate = sys::mln_lat_lng {
             latitude,
             longitude,
         };
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_map_projection_pixel_for_lat_lng_start(
-                state.handle(),
-                coordinate,
-                &mut operation,
-            )
-        })
-        .map_err(map_error)?;
-        drop(state);
-        let operation = OwnedOperation(operation);
-        wait_operation(py, operation.0)?;
         let mut point = sys::mln_screen_point { x: 0.0, y: 0.0 };
-        maplibre_core::check(unsafe {
-            sys::mln_map_projection_pixel_for_lat_lng_take_result(operation.0, &mut point)
-        })
-        .map_err(map_error)?;
+        let status = py.detach(|| unsafe {
+            sys::mln_map_projection_pixel_for_lat_lng(handle, coordinate, &mut point)
+        });
+        maplibre_core::check(status).map_err(map_error)?;
         screen_point_to_py(py, point)
     }
 
     fn lat_lng_for_pixel(&self, py: Python<'_>, x: f64, y: f64) -> PyResult<Py<PyAny>> {
-        let state = self.state();
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_map_projection_lat_lng_for_pixel_start(
-                state.handle(),
-                sys::mln_screen_point { x, y },
-                &mut operation,
-            )
-        })
-        .map_err(map_error)?;
-        drop(state);
-        let operation = OwnedOperation(operation);
-        wait_operation(py, operation.0)?;
+        let handle = self.native_handle();
         let mut coordinate = sys::mln_lat_lng {
             latitude: 0.0,
             longitude: 0.0,
         };
-        maplibre_core::check(unsafe {
-            sys::mln_map_projection_lat_lng_for_pixel_take_result(operation.0, &mut coordinate)
-        })
-        .map_err(map_error)?;
+        let status = py.detach(|| unsafe {
+            sys::mln_map_projection_lat_lng_for_pixel(
+                handle,
+                sys::mln_screen_point { x, y },
+                &mut coordinate,
+            )
+        });
+        maplibre_core::check(status).map_err(map_error)?;
         lat_lng_to_py(py, coordinate)
     }
 
@@ -6804,6 +6581,7 @@ fn map_error(error: Error) -> PyErr {
     let raw_status = error.raw_status();
     let diagnostic = error.diagnostic().to_owned();
     match error.kind() {
+        ErrorKind::NotFound => py_errors::NotFoundError::new_err((raw_status, diagnostic)),
         ErrorKind::InvalidArgument => {
             py_errors::InvalidArgumentError::new_err((raw_status, diagnostic))
         }

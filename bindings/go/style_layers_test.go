@@ -60,12 +60,12 @@ func TestDedicatedStyleLayerHelpers(t *testing.T) {
 		"location":  "location-indicator",
 	}
 	for id, wantType := range checks {
-		gotType, found, err := takeOptionalStyleOperationForTest(m.StartStyleLayerType(id))
+		info, found, err := takeOptionalStyleOperationForTest(m.StartStyleLayerInfo(id))
 		if err != nil {
-			t.Fatalf("StyleLayerType(%s): %v", id, err)
+			t.Fatalf("StyleLayerInfo(%s): %v", id, err)
 		}
-		if !found || gotType != wantType {
-			t.Fatalf("StyleLayerType(%s) = (%q, %v), want %q true", id, gotType, found, wantType)
+		if !found || info.Type != wantType {
+			t.Fatalf("StyleLayerInfo(%s) type = (%q, %v), want %q true", id, info.Type, found, wantType)
 		}
 	}
 	ids, err := takeStyleOperationForTest(m.StartStyleLayerIDs())
@@ -132,12 +132,23 @@ func TestLayerBaseAccessorsRoundTrip(t *testing.T) {
 		t.Fatalf("LayerSourceID(bg) = %q, %v; want \"\", nil", got, err)
 	}
 
-	// An unset zoom range crosses the boundary as infinities.
-	if got, err := takeStyleOperationForTest(m.StartLayerMinZoom("fill")); err != nil || !math.IsInf(got, -1) {
-		t.Fatalf("LayerMinZoom(fill) = %v, %v; want -Inf, nil", got, err)
+	// An unset zoom range crosses the boundary as infinities, and the layer
+	// info reports the source-ID and source-layer sizes that feed the copies.
+	info, found, err := takeOptionalStyleOperationForTest(m.StartStyleLayerInfo("fill"))
+	if err != nil || !found {
+		t.Fatalf("StyleLayerInfo(fill) = (%#v, %v, %v), want found", info, found, err)
 	}
-	if got, err := takeStyleOperationForTest(m.StartLayerMaxZoom("fill")); err != nil || !math.IsInf(got, 1) {
-		t.Fatalf("LayerMaxZoom(fill) = %v, %v; want +Inf, nil", got, err)
+	if info.Type != "fill" {
+		t.Fatalf("StyleLayerInfo(fill) type = %q, want fill", info.Type)
+	}
+	if !math.IsInf(info.MinZoom, -1) || !math.IsInf(info.MaxZoom, 1) {
+		t.Fatalf("StyleLayerInfo(fill) zoom range = (%v, %v), want infinities", info.MinZoom, info.MaxZoom)
+	}
+	if !info.HasSourceID || info.SourceIDSize != uint64(len("geo")) {
+		t.Fatalf("StyleLayerInfo(fill) source ID size = (%v, %d), want (true, %d)", info.HasSourceID, info.SourceIDSize, len("geo"))
+	}
+	if !info.HasSourceLayer || info.SourceLayerSize != uint64(len("roads")) {
+		t.Fatalf("StyleLayerInfo(fill) source layer size = (%v, %d), want (true, %d)", info.HasSourceLayer, info.SourceLayerSize, len("roads"))
 	}
 	if _, err := m.SetLayerMinZoom("fill", 4); err != nil {
 		t.Fatalf("SetLayerMinZoom(): %v", err)
@@ -145,29 +156,35 @@ func TestLayerBaseAccessorsRoundTrip(t *testing.T) {
 	if _, err := m.SetLayerMaxZoom("fill", 12.5); err != nil {
 		t.Fatalf("SetLayerMaxZoom(): %v", err)
 	}
-	if got, err := takeStyleOperationForTest(m.StartLayerMinZoom("fill")); err != nil || got != 4 {
-		t.Fatalf("LayerMinZoom(fill) = %v, %v; want 4, nil", got, err)
-	}
-	if got, err := takeStyleOperationForTest(m.StartLayerMaxZoom("fill")); err != nil || got != 12.5 {
-		t.Fatalf("LayerMaxZoom(fill) = %v, %v; want 12.5, nil", got, err)
+	if info, found, err := takeOptionalStyleOperationForTest(m.StartStyleLayerInfo("fill")); err != nil || !found || info.MinZoom != 4 || info.MaxZoom != 12.5 {
+		t.Fatalf("StyleLayerInfo(fill) zoom range = (%v, %v, %v, %v); want 4 and 12.5", info.MinZoom, info.MaxZoom, found, err)
 	}
 
-	if got, err := takeStyleOperationForTest(m.StartLayerVisibility("fill")); err != nil || got != StyleLayerVisibilityVisible {
-		t.Fatalf("LayerVisibility(fill) = %v, %v; want visible, nil", got, err)
+	if info, found, err := takeOptionalStyleOperationForTest(m.StartStyleLayerInfo("fill")); err != nil || !found || info.Visibility != StyleLayerVisibilityVisible {
+		t.Fatalf("StyleLayerInfo(fill) visibility = (%v, %v, %v); want visible", info.Visibility, found, err)
 	}
 	if _, err := m.SetLayerVisibility("fill", StyleLayerVisibilityNone); err != nil {
 		t.Fatalf("SetLayerVisibility(): %v", err)
 	}
-	if got, err := takeStyleOperationForTest(m.StartLayerVisibility("fill")); err != nil || got != StyleLayerVisibilityNone {
-		t.Fatalf("LayerVisibility(fill) = %v, %v; want none, nil", got, err)
+	if info, found, err := takeOptionalStyleOperationForTest(m.StartStyleLayerInfo("fill")); err != nil || !found || info.Visibility != StyleLayerVisibilityNone {
+		t.Fatalf("StyleLayerInfo(fill) visibility = (%v, %v, %v); want none", info.Visibility, found, err)
 	}
 
 	// An unknown raw visibility passes through to C, which rejects it.
 	commandID, err = m.SetLayerVisibility("fill", StyleLayerVisibility(900))
 	requireStyleCommandFailed(t, runtime, commandID, err)
 
-	if _, err := takeStyleOperationForTest(m.StartLayerMinZoom("missing")); !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("LayerMinZoom(missing) error = %v; want ErrInvalidState", err)
+	// A background layer carries neither a source ID nor a source layer.
+	if info, found, err := takeOptionalStyleOperationForTest(m.StartStyleLayerInfo("bg")); err != nil || !found ||
+		info.HasSourceID || info.SourceIDSize != 0 || info.HasSourceLayer || info.SourceLayerSize != 0 {
+		t.Fatalf("StyleLayerInfo(bg) = (%#v, %v, %v), want found without source fields", info, found, err)
+	}
+
+	// Removing an existing layer commits, and the info getter stops finding it.
+	commandID, err = m.RemoveStyleLayer("fill")
+	requireCommandCommitted(t, runtime, commandID, err)
+	if _, found, err := takeOptionalStyleOperationForTest(m.StartStyleLayerInfo("fill")); err != nil || found {
+		t.Fatalf("StyleLayerInfo(fill) after removal = (%v, %v), want (false, nil)", found, err)
 	}
 }
 
@@ -201,12 +218,12 @@ func TestStyleLayerJSONAndPropertySnapshots(t *testing.T) {
 		t.Fatalf("AddStyleLayerJSON(): %v", err)
 	}
 	layerJSON[0] = 'x'
-	layerType, found, err := takeOptionalStyleOperationForTest(m.StartStyleLayerType("points-layer"))
+	info, found, err := takeOptionalStyleOperationForTest(m.StartStyleLayerInfo("points-layer"))
 	if err != nil {
-		t.Fatalf("StyleLayerType(): %v", err)
+		t.Fatalf("StyleLayerInfo(): %v", err)
 	}
-	if !found || layerType != "circle" {
-		t.Fatalf("StyleLayerType(points-layer) = (%q, %v), want circle true", layerType, found)
+	if !found || info.Type != "circle" {
+		t.Fatalf("StyleLayerInfo(points-layer) type = (%q, %v), want circle true", info.Type, found)
 	}
 	copiedLayer, found, err := takeOptionalStyleOperationForTest(m.StartStyleLayerJSON("points-layer"))
 	if err != nil {
@@ -326,31 +343,19 @@ func TestStyleLayerMetadataForMissingLayers(t *testing.T) {
 			t.Fatalf("StyleLayerIDs() unexpectedly contains missing layer: %v", ids)
 		}
 	}
-	exists, err := takeStyleOperationForTest(m.StartStyleLayerExists("missing"))
+	info, found, err := takeOptionalStyleOperationForTest(m.StartStyleLayerInfo("missing"))
 	if err != nil {
-		t.Fatalf("StyleLayerExists(): %v", err)
+		t.Fatalf("StyleLayerInfo(): %v", err)
 	}
-	if exists {
-		t.Fatalf("StyleLayerExists(missing) = true, want false")
+	if found || info.Type != "" {
+		t.Fatalf("StyleLayerInfo(missing) = (%#v, %v), want empty false", info, found)
 	}
-	layerType, found, err := takeOptionalStyleOperationForTest(m.StartStyleLayerType("missing"))
-	if err != nil {
-		t.Fatalf("StyleLayerType(): %v", err)
-	}
-	if found || layerType != "" {
-		t.Fatalf("StyleLayerType(missing) = (%q, %v), want empty false", layerType, found)
-	}
-	removed, err := takeStyleOperationForTest(m.StartRemoveStyleLayer("missing"))
-	if err != nil {
-		t.Fatalf("RemoveStyleLayer(): %v", err)
-	}
-	if removed {
-		t.Fatalf("RemoveStyleLayer(missing) = true, want false")
-	}
-	commandID, err := m.MoveStyleLayer("missing", "")
+	commandID, err := m.RemoveStyleLayer("missing")
+	requireCommandNotFound(t, runtime, commandID, err)
+	commandID, err = m.MoveStyleLayer("missing", "")
 	requireStyleCommandFailed(t, runtime, commandID, err)
-	if _, err := takeStyleOperationForTest(m.StartStyleLayerExists("")); !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("StyleLayerExists(empty) error = %v, want ErrInvalidState", err)
+	if _, _, err := takeOptionalStyleOperationForTest(m.StartStyleLayerInfo("")); !errors.Is(err, ErrInvalidState) {
+		t.Fatalf("StyleLayerInfo(empty) error = %v, want ErrInvalidState", err)
 	}
 }
 

@@ -35,43 +35,13 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_status mln_map_set_debug_options([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("uint32_t")] uint options, [NativeTypeName("uint64_t *")] ulong* out_command_id);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_get_debug_options_start([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_get_debug_options_take_result([NativeTypeName("mln_operation")] MlnOperation operation, [NativeTypeName("uint32_t *")] uint* out_options);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_set_rendering_stats_view_enabled([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("bool")] byte enabled, [NativeTypeName("uint64_t *")] ulong* out_command_id);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_get_rendering_stats_view_enabled_start([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_get_rendering_stats_view_enabled_take_result([NativeTypeName("mln_operation")] MlnOperation operation, bool* out_enabled);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_is_fully_loaded_start([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_is_fully_loaded_take_result([NativeTypeName("mln_operation")] MlnOperation operation, bool* out_loaded);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_dump_debug_logs([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("uint64_t *")] ulong* out_command_id);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_get_viewport_options_start([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_get_viewport_options_take_result([NativeTypeName("mln_operation")] MlnOperation operation, mln_map_viewport_options* out_options);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_set_viewport_options([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_map_viewport_options *")] mln_map_viewport_options* options, [NativeTypeName("uint64_t *")] ulong* out_command_id);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_get_tile_options_start([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_get_tile_options_take_result([NativeTypeName("mln_operation")] MlnOperation operation, mln_map_tile_options* out_options);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_set_tile_options([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_map_tile_options *")] mln_map_tile_options* options, [NativeTypeName("uint64_t *")] ulong* out_command_id);
@@ -119,19 +89,7 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_status mln_map_lat_lng_bounds_for_camera_unwrapped_take_result([NativeTypeName("mln_operation")] MlnOperation operation, mln_lat_lng_bounds* out_bounds);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_get_bounds_start([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_get_bounds_take_result([NativeTypeName("mln_operation")] MlnOperation operation, mln_bound_options* out_options);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_set_bounds([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_bound_options *")] mln_bound_options* options, [NativeTypeName("uint64_t *")] ulong* out_command_id);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_get_free_camera_options_start([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_get_free_camera_options_take_result([NativeTypeName("mln_operation")] MlnOperation operation, mln_free_camera_options* out_options);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_set_free_camera_options([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_free_camera_options *")] mln_free_camera_options* options, [NativeTypeName("uint64_t *")] ulong* out_command_id);

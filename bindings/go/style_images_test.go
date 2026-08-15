@@ -132,13 +132,6 @@ func TestStyleImageCopiesPixelsAndMetadata(t *testing.T) {
 		t.Fatalf("SetStyleImage(): %v", err)
 	}
 	pixels[0] = 0
-	exists, err := takeStyleOperationForTest(m.StartStyleImageExists("marker"))
-	if err != nil {
-		t.Fatalf("StyleImageExists(marker): %v", err)
-	}
-	if !exists {
-		t.Fatal("StyleImageExists(marker)=false, want true")
-	}
 	info, found, err := takeOptionalStyleOperationForTest(m.StartStyleImageInfo("marker"))
 	if err != nil {
 		t.Fatalf("StyleImageInfo(marker): %v", err)
@@ -153,13 +146,13 @@ func TestStyleImageCopiesPixelsAndMetadata(t *testing.T) {
 	if !found || len(copied) != 4 || copied[0] != 255 || copied[1] != 0 || copied[2] != 0 || copied[3] != 255 {
 		t.Fatalf("StyleImagePremultipliedRGBA8(marker) = (%v, %v), want original copied pixels", copied, found)
 	}
-	removed, err := takeStyleOperationForTest(m.StartRemoveStyleImage("marker"))
-	if err != nil {
-		t.Fatalf("RemoveStyleImage(marker): %v", err)
+	commandID, err := m.RemoveStyleImage("marker")
+	requireCommandCommitted(t, runtime, commandID, err)
+	if _, found, err := takeOptionalStyleOperationForTest(m.StartStyleImageInfo("marker")); err != nil || found {
+		t.Fatalf("StyleImageInfo(marker) after removal = (%v, %v), want (false, nil)", found, err)
 	}
-	if !removed {
-		t.Fatal("RemoveStyleImage(marker)=false, want true")
-	}
+	commandID, err = m.RemoveStyleImage("marker")
+	requireCommandNotFound(t, runtime, commandID, err)
 	if _, err := m.SetStyleImage("bad-marker", PremultipliedRGBA8Image{Width: 1, Height: 1, Stride: 4}, StyleImageOptions{}); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("SetStyleImage(empty pixels) error = %v, want ErrInvalidArgument", err)
 	}

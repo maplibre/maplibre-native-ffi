@@ -103,7 +103,8 @@ class RuntimeEventsTest : org.maplibre.nativeffi.NativeTestBase() {
   @Test
   fun maskBitOutsideEveryKnownTypeFailsEverySetterAndBothCreations(): Unit =
     org.maplibre.nativeffi.runtime
-      .runSuspendTest { // The bit sits above the low 32, so a mask this binding narrowed on the way
+      .runSuspendTest { // The bit sits above the low 32, so a mask this binding narrowed on the
+        // way
         // out would reach native as a value it accepts.
         val unknownBit = RuntimeEventMask.ALL + RuntimeEventMask(1L shl 63)
         assertFailsWith<InvalidArgumentException> {
@@ -198,7 +199,8 @@ class RuntimeEventsTest : org.maplibre.nativeffi.NativeTestBase() {
         runtime.barrier()
         assertEquals(2, map.customGeometrySourceCountForTesting())
 
-        assertTrue(map.removeStyleSource("removed"))
+        map.removeStyleSource("removed")
+        runtime.barrier()
         assertEquals(1, map.customGeometrySourceCountForTesting())
 
         map.setStyleJson(STYLE_JSON.encodeToByteArray())

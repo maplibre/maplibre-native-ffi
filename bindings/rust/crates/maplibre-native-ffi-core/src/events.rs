@@ -210,6 +210,9 @@ impl CommandDisposition {
 pub struct CommandFinishedEvent {
     pub command_id: u64,
     pub disposition: CommandDisposition,
+    /// The map snapshot generation the commit published, or zero when the
+    /// command committed no generation. A later map snapshot that reports
+    /// this generation or a newer one observes the commit.
     pub generation: u64,
 }
 

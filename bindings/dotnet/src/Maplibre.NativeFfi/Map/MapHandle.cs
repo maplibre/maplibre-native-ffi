@@ -117,6 +117,7 @@ public sealed unsafe partial class MapHandle : IDisposable
     }
 
     /// <summary>Sets native debug drawing options and returns its command ID.</summary>
+    /// <remarks>The committed mask is visible as <see cref="MapSnapshot.DebugOptions" />.</remarks>
     public ulong SetDebugOptions(DebugOptions options)
     {
         ulong commandId = 0;
@@ -126,22 +127,10 @@ public sealed unsafe partial class MapHandle : IDisposable
         return commandId;
     }
 
-    /// <summary>Gets native debug drawing options in runtime order.</summary>
-    public Task<DebugOptions> GetDebugOptionsAsync(CancellationToken cancellationToken = default) =>
-        RunMapOperationAsync(
-            operation => NativeMethods.mln_map_get_debug_options_start(Handle, operation),
-            operation =>
-            {
-                uint options = 0;
-                NativeStatus.Check(
-                    NativeMethods.mln_map_get_debug_options_take_result(operation, &options)
-                );
-                return (DebugOptions)options;
-            },
-            cancellationToken
-        );
-
     /// <summary>Shows or hides the built-in rendering statistics overlay and returns its command ID.</summary>
+    /// <remarks>
+    /// The committed value is visible as <see cref="MapSnapshot.RenderingStatsViewEnabled" />.
+    /// </remarks>
     public ulong SetRenderingStatsViewEnabled(bool enabled)
     {
         ulong commandId = 0;
@@ -154,42 +143,6 @@ public sealed unsafe partial class MapHandle : IDisposable
         );
         return commandId;
     }
-
-    /// <summary>Gets whether the built-in rendering statistics overlay is enabled in runtime order.</summary>
-    public Task<bool> GetRenderingStatsViewEnabledAsync(
-        CancellationToken cancellationToken = default
-    ) =>
-        RunMapOperationAsync(
-            operation =>
-                NativeMethods.mln_map_get_rendering_stats_view_enabled_start(Handle, operation),
-            operation =>
-            {
-                bool enabled = false;
-                NativeStatus.Check(
-                    NativeMethods.mln_map_get_rendering_stats_view_enabled_take_result(
-                        operation,
-                        &enabled
-                    )
-                );
-                return enabled;
-            },
-            cancellationToken
-        );
-
-    /// <summary>Gets whether the native map reports all required resources loaded in runtime order.</summary>
-    public Task<bool> IsFullyLoadedAsync(CancellationToken cancellationToken = default) =>
-        RunMapOperationAsync(
-            operation => NativeMethods.mln_map_is_fully_loaded_start(Handle, operation),
-            operation =>
-            {
-                bool loaded = false;
-                NativeStatus.Check(
-                    NativeMethods.mln_map_is_fully_loaded_take_result(operation, &loaded)
-                );
-                return loaded;
-            },
-            cancellationToken
-        );
 
     /// <summary>Asks the native map to write debug logs and returns its command ID.</summary>
     public ulong DumpDebugLogs()
@@ -206,6 +159,7 @@ public sealed unsafe partial class MapHandle : IDisposable
         NativeStatus.Check(NativeMethods.mln_map_snapshot_get(Handle, &snapshot));
         return new MapSnapshot(
             snapshot.generation,
+            (DebugOptions)snapshot.debug_options,
             MapStructs.CameraOptionsFromNative(snapshot.camera),
             new LogicalExtent(
                 snapshot.logical_extent.width,
@@ -214,11 +168,14 @@ public sealed unsafe partial class MapHandle : IDisposable
             ),
             MapStructs.ProjectionModeOptionsFromNative(snapshot.projection_mode),
             MapStructs.ViewportOptionsFromNative(snapshot.viewport),
-            snapshot.loading != 0,
-            snapshot.fully_rendered != 0,
+            snapshot.fully_loaded != 0,
+            snapshot.rendering_stats_view_enabled != 0,
             snapshot.repaint_demand != 0,
             (RuntimeEventMask)snapshot.event_mask,
-            snapshot.latest_render_update_generation
+            snapshot.latest_render_update_generation,
+            MapStructs.TileOptionsFromNative(snapshot.tile),
+            MapStructs.BoundOptionsFromNative(snapshot.bounds),
+            MapStructs.FreeCameraOptionsFromNative(snapshot.free_camera)
         );
     }
 
@@ -241,24 +198,8 @@ public sealed unsafe partial class MapHandle : IDisposable
         return commandId;
     }
 
-    /// <summary>Gets the map's viewport options in runtime order.</summary>
-    public Task<ViewportOptions> GetViewportOptionsAsync(
-        CancellationToken cancellationToken = default
-    ) =>
-        RunMapOperationAsync(
-            operation => NativeMethods.mln_map_get_viewport_options_start(Handle, operation),
-            operation =>
-            {
-                var options = NativeMethods.mln_map_viewport_options_default();
-                NativeStatus.Check(
-                    NativeMethods.mln_map_get_viewport_options_take_result(operation, &options)
-                );
-                return MapStructs.ViewportOptionsFromNative(options);
-            },
-            cancellationToken
-        );
-
     /// <summary>Sets viewport options and returns its command ID.</summary>
+    /// <remarks>The committed options are visible as <see cref="MapSnapshot.Viewport" />.</remarks>
     public ulong SetViewportOptions(ViewportOptions options)
     {
         var nativeOptions = MapStructs.ToNative(options);
@@ -269,22 +210,8 @@ public sealed unsafe partial class MapHandle : IDisposable
         return commandId;
     }
 
-    /// <summary>Gets tile tuning options in runtime order.</summary>
-    public Task<TileOptions> GetTileOptionsAsync(CancellationToken cancellationToken = default) =>
-        RunMapOperationAsync(
-            operation => NativeMethods.mln_map_get_tile_options_start(Handle, operation),
-            operation =>
-            {
-                var options = NativeMethods.mln_map_tile_options_default();
-                NativeStatus.Check(
-                    NativeMethods.mln_map_get_tile_options_take_result(operation, &options)
-                );
-                return MapStructs.TileOptionsFromNative(options);
-            },
-            cancellationToken
-        );
-
     /// <summary>Sets tile tuning options and returns its command ID.</summary>
+    /// <remarks>The committed options are visible as <see cref="MapSnapshot.Tile" />.</remarks>
     public ulong SetTileOptions(TileOptions options)
     {
         var nativeOptions = MapStructs.ToNative(options);
@@ -458,22 +385,8 @@ public sealed unsafe partial class MapHandle : IDisposable
         );
     }
 
-    /// <summary>Gets map bounds constraints in runtime order.</summary>
-    public Task<BoundOptions> GetBoundsAsync(CancellationToken cancellationToken = default) =>
-        RunMapOperationAsync(
-            operation => NativeMethods.mln_map_get_bounds_start(Handle, operation),
-            operation =>
-            {
-                var options = NativeMethods.mln_bound_options_default();
-                NativeStatus.Check(
-                    NativeMethods.mln_map_get_bounds_take_result(operation, &options)
-                );
-                return MapStructs.BoundOptionsFromNative(options);
-            },
-            cancellationToken
-        );
-
     /// <summary>Sets map bounds constraints and returns its command ID.</summary>
+    /// <remarks>The committed constraints are visible as <see cref="MapSnapshot.Bounds" />.</remarks>
     public ulong SetBounds(BoundOptions options)
     {
         var nativeOptions = MapStructs.ToNative(options);
@@ -482,24 +395,8 @@ public sealed unsafe partial class MapHandle : IDisposable
         return commandId;
     }
 
-    /// <summary>Gets free-camera options in runtime order.</summary>
-    public Task<FreeCameraOptions> GetFreeCameraOptionsAsync(
-        CancellationToken cancellationToken = default
-    ) =>
-        RunMapOperationAsync(
-            operation => NativeMethods.mln_map_get_free_camera_options_start(Handle, operation),
-            operation =>
-            {
-                var options = NativeMethods.mln_free_camera_options_default();
-                NativeStatus.Check(
-                    NativeMethods.mln_map_get_free_camera_options_take_result(operation, &options)
-                );
-                return MapStructs.FreeCameraOptionsFromNative(options);
-            },
-            cancellationToken
-        );
-
     /// <summary>Sets free-camera options and returns its command ID.</summary>
+    /// <remarks>The committed options are visible as <see cref="MapSnapshot.FreeCamera" />.</remarks>
     public ulong SetFreeCameraOptions(FreeCameraOptions options)
     {
         var nativeOptions = MapStructs.ToNative(options);
@@ -682,87 +579,20 @@ public sealed unsafe partial class MapHandle : IDisposable
         return commandId;
     }
 
-    /// <summary>Removes a style source and reports whether it existed.</summary>
-    public Task<bool> RemoveStyleSourceAsync(
-        string sourceId,
-        CancellationToken cancellationToken = default
-    )
+    /// <summary>Submits a command that removes one style source and returns its command ID.</summary>
+    /// <remarks>
+    /// The command's <c>COMMAND_FINISHED</c> event reports
+    /// <see cref="Error.MaplibreStatus.NotFound" /> when no source has <paramref name="sourceId" />
+    /// and <see cref="Error.MaplibreStatus.InvalidState" /> when a layer still uses the source.
+    /// </remarks>
+    public ulong RemoveStyleSource(string sourceId)
     {
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
-        return RunMapOperationAsync(
-            operation =>
-                NativeMethods.mln_map_remove_style_source_start(
-                    Handle,
-                    nativeSourceId.Value,
-                    operation
-                ),
-            operation =>
-            {
-                bool removed = false;
-                NativeStatus.Check(
-                    NativeMethods.mln_map_remove_style_source_take_result(operation, &removed)
-                );
-                return removed;
-            },
-            cancellationToken
+        ulong commandId = 0;
+        NativeStatus.Check(
+            NativeMethods.mln_map_remove_style_source(Handle, nativeSourceId.Value, &commandId)
         );
-    }
-
-    /// <summary>Reports whether a style source exists.</summary>
-    public Task<bool> StyleSourceExistsAsync(
-        string sourceId,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
-        return RunMapOperationAsync(
-            operation =>
-                NativeMethods.mln_map_style_source_exists_start(
-                    Handle,
-                    nativeSourceId.Value,
-                    operation
-                ),
-            operation =>
-            {
-                bool exists = false;
-                NativeStatus.Check(
-                    NativeMethods.mln_map_style_source_exists_take_result(operation, &exists)
-                );
-                return exists;
-            },
-            cancellationToken
-        );
-    }
-
-    /// <summary>Gets a style source type when the source exists.</summary>
-    public Task<SourceType?> StyleSourceTypeAsync(
-        string sourceId,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
-        return RunMapOperationAsync(
-            operation =>
-                NativeMethods.mln_map_get_style_source_type_start(
-                    Handle,
-                    nativeSourceId.Value,
-                    operation
-                ),
-            operation =>
-            {
-                uint sourceType = 0;
-                bool found = false;
-                NativeStatus.Check(
-                    NativeMethods.mln_map_get_style_source_type_take_result(
-                        operation,
-                        &sourceType,
-                        &found
-                    )
-                );
-                return found ? (SourceType?)sourceType : null;
-            },
-            cancellationToken
-        );
+        return commandId;
     }
 
     internal Task<(mln_style_source_info Info, bool Found)> QueryStyleSourceInfoAsync(
@@ -1179,56 +1009,19 @@ public sealed unsafe partial class MapHandle : IDisposable
         return commandId;
     }
 
-    /// <summary>Removes a style image and reports whether it existed.</summary>
-    public Task<bool> RemoveStyleImageAsync(
-        string imageId,
-        CancellationToken cancellationToken = default
-    )
+    /// <summary>Submits a command that removes one runtime style image and returns its command ID.</summary>
+    /// <remarks>
+    /// The command's <c>COMMAND_FINISHED</c> event reports
+    /// <see cref="Error.MaplibreStatus.NotFound" /> when no image has <paramref name="imageId" />.
+    /// </remarks>
+    public ulong RemoveStyleImage(string imageId)
     {
         using var nativeImageId = NativeStringView.From(imageId, nameof(imageId));
-        return RunMapOperationAsync(
-            operation =>
-                NativeMethods.mln_map_remove_style_image_start(
-                    Handle,
-                    nativeImageId.Value,
-                    operation
-                ),
-            operation =>
-            {
-                bool removed = false;
-                NativeStatus.Check(
-                    NativeMethods.mln_map_remove_style_image_take_result(operation, &removed)
-                );
-                return removed;
-            },
-            cancellationToken
+        ulong commandId = 0;
+        NativeStatus.Check(
+            NativeMethods.mln_map_remove_style_image(Handle, nativeImageId.Value, &commandId)
         );
-    }
-
-    /// <summary>Reports whether a style image exists.</summary>
-    public Task<bool> StyleImageExistsAsync(
-        string imageId,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var nativeImageId = NativeStringView.From(imageId, nameof(imageId));
-        return RunMapOperationAsync(
-            operation =>
-                NativeMethods.mln_map_style_image_exists_start(
-                    Handle,
-                    nativeImageId.Value,
-                    operation
-                ),
-            operation =>
-            {
-                bool exists = false;
-                NativeStatus.Check(
-                    NativeMethods.mln_map_style_image_exists_take_result(operation, &exists)
-                );
-                return exists;
-            },
-            cancellationToken
-        );
+        return commandId;
     }
 
     /// <summary>Gets style image metadata when the image exists.</summary>
@@ -1660,86 +1453,61 @@ public sealed unsafe partial class MapHandle : IDisposable
         return commandId;
     }
 
-    /// <summary>Removes a style layer and reports whether it existed.</summary>
-    public Task<bool> RemoveStyleLayerAsync(
-        string layerId,
-        CancellationToken cancellationToken = default
-    )
+    /// <summary>Submits a command that removes one style layer and returns its command ID.</summary>
+    /// <remarks>
+    /// The command's <c>COMMAND_FINISHED</c> event reports
+    /// <see cref="Error.MaplibreStatus.NotFound" /> when no layer has <paramref name="layerId" />.
+    /// </remarks>
+    public ulong RemoveStyleLayer(string layerId)
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
-        return RunMapOperationAsync(
-            operation =>
-                NativeMethods.mln_map_remove_style_layer_start(
-                    Handle,
-                    nativeLayerId.Value,
-                    operation
-                ),
-            operation =>
-            {
-                bool removed = false;
-                NativeStatus.Check(
-                    NativeMethods.mln_map_remove_style_layer_take_result(operation, &removed)
-                );
-                return removed;
-            },
-            cancellationToken
+        ulong commandId = 0;
+        NativeStatus.Check(
+            NativeMethods.mln_map_remove_style_layer(Handle, nativeLayerId.Value, &commandId)
         );
+        return commandId;
     }
 
-    /// <summary>Reports whether a style layer exists.</summary>
-    public Task<bool> StyleLayerExistsAsync(
-        string layerId,
-        CancellationToken cancellationToken = default
-    )
+    internal Task<(
+        LayerInfo Info,
+        bool HasSourceId,
+        bool HasSourceLayer
+    )?> QueryStyleLayerInfoAsync(string layerId, CancellationToken cancellationToken)
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         return RunMapOperationAsync(
             operation =>
-                NativeMethods.mln_map_style_layer_exists_start(
+                NativeMethods.mln_map_get_style_layer_info_start(
                     Handle,
                     nativeLayerId.Value,
                     operation
                 ),
             operation =>
             {
-                bool exists = false;
-                NativeStatus.Check(
-                    NativeMethods.mln_map_style_layer_exists_take_result(operation, &exists)
-                );
-                return exists;
-            },
-            cancellationToken
-        );
-    }
-
-    /// <summary>Gets a style layer type when the layer exists.</summary>
-    public Task<string?> StyleLayerTypeAsync(
-        string layerId,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
-        return RunMapOperationAsync(
-            operation =>
-                NativeMethods.mln_map_get_style_layer_type_start(
-                    Handle,
-                    nativeLayerId.Value,
-                    operation
-                ),
-            operation =>
-            {
-                MlnBuffer buffer = default;
+                var info = new mln_style_layer_info { size = (uint)sizeof(mln_style_layer_info) };
                 bool found = false;
                 NativeStatus.Check(
-                    NativeMethods.mln_map_get_style_layer_type_take_result(
-                        operation,
-                        &buffer,
-                        &found
-                    )
+                    NativeMethods.mln_map_get_style_layer_info_take_result(operation, &info, &found)
                 );
-                return found
-                    ? System.Text.Encoding.UTF8.GetString(ValueStructs.ReadBuffer(buffer))
-                    : null;
+                if (!found)
+                {
+                    return ((LayerInfo, bool, bool)?)null;
+                }
+                var fields = (mln_style_layer_info_field)info.fields;
+                return (
+                    new LayerInfo(
+                        layerId,
+                        RuntimeStructs.CopyUtf8((sbyte*)info.type.data, info.type.size),
+                        info.min_zoom,
+                        info.max_zoom,
+                        (StyleLayerVisibility)info.visibility,
+                        info.visibility,
+                        null,
+                        null
+                    ),
+                    fields.HasFlag(mln_style_layer_info_field.MLN_STYLE_LAYER_INFO_SOURCE_ID),
+                    fields.HasFlag(mln_style_layer_info_field.MLN_STYLE_LAYER_INFO_SOURCE_LAYER)
+                );
             },
             cancellationToken
         );
@@ -2049,32 +1817,6 @@ public sealed unsafe partial class MapHandle : IDisposable
         return commandId;
     }
 
-    /// <summary>Gets the lowest zoom at which one layer draws.</summary>
-    public Task<double> GetLayerMinZoomAsync(
-        string layerId,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
-        return RunMapOperationAsync(
-            operation =>
-                NativeMethods.mln_map_get_layer_min_zoom_start(
-                    Handle,
-                    nativeLayerId.Value,
-                    operation
-                ),
-            operation =>
-            {
-                double zoom = 0;
-                NativeStatus.Check(
-                    NativeMethods.mln_map_get_layer_min_zoom_take_result(operation, &zoom)
-                );
-                return zoom;
-            },
-            cancellationToken
-        );
-    }
-
     /// <summary>Sets the highest layer zoom and returns its command ID.</summary>
     public ulong SetLayerMaxZoom(string layerId, double maxZoom)
     {
@@ -2091,32 +1833,6 @@ public sealed unsafe partial class MapHandle : IDisposable
         return commandId;
     }
 
-    /// <summary>Gets the highest zoom at which one layer draws.</summary>
-    public Task<double> GetLayerMaxZoomAsync(
-        string layerId,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
-        return RunMapOperationAsync(
-            operation =>
-                NativeMethods.mln_map_get_layer_max_zoom_start(
-                    Handle,
-                    nativeLayerId.Value,
-                    operation
-                ),
-            operation =>
-            {
-                double zoom = 0;
-                NativeStatus.Check(
-                    NativeMethods.mln_map_get_layer_max_zoom_take_result(operation, &zoom)
-                );
-                return zoom;
-            },
-            cancellationToken
-        );
-    }
-
     /// <summary>Sets layer visibility and returns its command ID.</summary>
     public ulong SetLayerVisibility(string layerId, StyleLayerVisibility visibility)
     {
@@ -2131,32 +1847,6 @@ public sealed unsafe partial class MapHandle : IDisposable
             )
         );
         return commandId;
-    }
-
-    /// <summary>Gets whether one layer draws.</summary>
-    public Task<StyleLayerVisibility> GetLayerVisibilityAsync(
-        string layerId,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
-        return RunMapOperationAsync(
-            operation =>
-                NativeMethods.mln_map_get_layer_visibility_start(
-                    Handle,
-                    nativeLayerId.Value,
-                    operation
-                ),
-            operation =>
-            {
-                uint visibility = 0;
-                NativeStatus.Check(
-                    NativeMethods.mln_map_get_layer_visibility_take_result(operation, &visibility)
-                );
-                return (StyleLayerVisibility)visibility;
-            },
-            cancellationToken
-        );
     }
 
     private static MlnOperation StartCreate(MlnRuntime runtime, mln_map_options options)

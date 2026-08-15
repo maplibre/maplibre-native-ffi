@@ -82,13 +82,8 @@ func TestCustomGeometrySourceDescriptors(t *testing.T) {
 	if _, err := m.InvalidateCustomGeometrySourceRegion("custom", LatLngBounds{Southwest: LatLng{Latitude: -1, Longitude: -1}, Northeast: LatLng{Latitude: 1, Longitude: 1}}); err != nil {
 		t.Fatalf("InvalidateCustomGeometrySourceRegion(): %v", err)
 	}
-	removed, err := takeStyleOperationForTest(m.StartRemoveStyleSource("custom"))
-	if err != nil {
-		t.Fatalf("RemoveStyleSource(custom): %v", err)
-	}
-	if !removed {
-		t.Fatal("RemoveStyleSource(custom) removed=false, want true")
-	}
+	removeID, err := m.RemoveStyleSource("custom")
+	requireCommandCommitted(t, runtime, removeID, err)
 	if _, err := m.AddCustomGeometrySource("bad-custom", CustomGeometrySourceOptions{}); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("AddCustomGeometrySource(nil fetch) error = %v, want ErrInvalidArgument", err)
 	}
@@ -149,9 +144,8 @@ func TestCustomGeometrySourceReleasedByRemovalAndMapClose(t *testing.T) {
 			t.Fatalf("AddCustomGeometrySource(%s): %v", sourceID, err)
 		}
 	}
-	if removed, err := takeStyleOperationForTest(m.StartRemoveStyleSource("removed")); err != nil || !removed {
-		t.Fatalf("RemoveStyleSource(removed) = (%v, %v), want (true, nil)", removed, err)
-	}
+	removeID, err := m.RemoveStyleSource("removed")
+	requireCommandCommitted(t, runtime, removeID, err)
 	if live := liveCustomGeometrySources(t, baseline); live != 1 {
 		t.Fatalf("live callback states after the removal = %d, want 1", live)
 	}

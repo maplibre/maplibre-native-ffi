@@ -42,5 +42,6 @@ private fun statusLabel(status: MaplibreStatus): String =
     MaplibreStatus.BUSY -> "BUSY"
     MaplibreStatus.TARGET_LOST -> "TARGET_LOST"
     MaplibreStatus.NOT_READY -> "NOT_READY"
+    MaplibreStatus.NOT_FOUND -> "NOT_FOUND"
     else -> "MaplibreStatus(${status.nativeCode})"
   }

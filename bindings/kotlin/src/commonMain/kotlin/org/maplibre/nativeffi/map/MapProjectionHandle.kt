@@ -5,21 +5,37 @@ import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ScreenPoint
 
-/** Owned standalone projection snapshot created from a map. */
+/**
+ * Owned standalone projection snapshot created from a map.
+ *
+ * Every call is synchronous, runs on the calling thread, is internally serialized, and may be made
+ * from any thread. A projection copies the map's transform state at creation and never observes map
+ * changes made after that; a live projection prevents its map from closing.
+ */
 public expect class MapProjectionHandle {
-  public suspend fun camera(): CameraOptions
+  /** Copies the projection camera, observing every earlier projection setter. */
+  public fun camera(): CameraOptions
 
-  public fun setCamera(camera: CameraOptions): Long
+  /** Applies a camera update; only fields present on [camera] affect the projection. */
+  public fun setCamera(camera: CameraOptions)
 
-  public fun setVisibleCoordinates(coordinates: List<LatLng>, padding: EdgeInsets): Long
+  /** Applies a camera fit for [coordinates]. */
+  public fun setVisibleCoordinates(coordinates: List<LatLng>, padding: EdgeInsets)
 
-  public fun setVisibleGeometry(geometry: ByteArray, padding: EdgeInsets): Long
+  /** Applies a camera fit for GeoJSON Geometry bytes. */
+  public fun setVisibleGeometry(geometry: ByteArray, padding: EdgeInsets)
 
-  public suspend fun pixelForLatLng(coordinate: LatLng): ScreenPoint
+  /** Converts a geographic coordinate to a logical-pixel screen point. */
+  public fun pixelForLatLng(coordinate: LatLng): ScreenPoint
 
-  public suspend fun latLngForPixel(point: ScreenPoint): LatLng
+  /** Converts a logical-pixel screen point to a geographic coordinate. */
+  public fun latLngForPixel(point: ScreenPoint): LatLng
 
   public val isClosed: Boolean
 
-  public suspend fun close()
+  /**
+   * Closes the projection, waiting for projection calls already running on other threads, and
+   * releases its map reservation before returning.
+   */
+  public fun close()
 }

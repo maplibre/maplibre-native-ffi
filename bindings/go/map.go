@@ -100,15 +100,25 @@ type LogicalExtent struct {
 	ScaleFactor float64
 }
 
-// MapSnapshot is a copied immutable map state generation.
+// MapSnapshot is a copied immutable map state generation. Every committed map
+// command publishes a new generation and reports it in its command-finished
+// event, so a snapshot whose Generation is at or past a commit's observes that
+// commit.
 type MapSnapshot struct {
-	Generation                   uint64
-	Camera                       CameraOptions
-	LogicalExtent                LogicalExtent
-	ProjectionMode               ProjectionModeOptions
-	Viewport                     ViewportOptions
-	Loading                      bool
-	FullyRendered                bool
+	Generation uint64
+	// DebugOptions is the committed debug overlay mask.
+	DebugOptions   MapDebugOptions
+	Camera         CameraOptions
+	LogicalExtent  LogicalExtent
+	ProjectionMode ProjectionModeOptions
+	Viewport       ViewportOptions
+	Tile           TileOptions
+	Bounds         BoundOptions
+	FreeCamera     FreeCameraOptions
+	// FullyLoaded reports whether every requested style and tile resource
+	// finished loading.
+	FullyLoaded                  bool
+	RenderingStatsViewEnabled    bool
 	RepaintDemand                bool
 	EventMask                    RuntimeEventMask
 	LatestRenderUpdateGeneration uint64
@@ -341,7 +351,8 @@ func (m *MapHandle) StyleURL() (string, error) {
 	return string(bytes), err
 }
 
-// SetDebugOptions applies MapLibre debug overlay mask bits to a map.
+// SetDebugOptions applies MapLibre debug overlay mask bits to a map. The
+// committed mask is visible through Snapshot as MapSnapshot.DebugOptions.
 func (m *MapHandle) SetDebugOptions(options MapDebugOptions) (uint64, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
@@ -358,32 +369,9 @@ func (m *MapHandle) SetDebugOptions(options MapDebugOptions) (uint64, error) {
 	return uint64(commandID), nil
 }
 
-// DebugOptions returns the current MapLibre debug overlay mask bits.
-func (m *MapHandle) DebugOptions() (MapDebugOptions, error) {
-	ptr, release, err := m.ptr()
-	if err != nil {
-		return 0, err
-	}
-	defer release()
-	defer m.state.KeepAlive()
-	operation, err := waitMapOperation(func(out *C.mln_operation) int32 {
-		return int32(C.mln_map_get_debug_options_start(C.mln_map(ptr), out))
-	})
-	if err != nil {
-		return 0, err
-	}
-	defer C.mln_operation_release(operation)
-	var raw C.uint32_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_get_debug_options_take_result(operation, &raw))
-	}); err != nil {
-		return 0, err
-	}
-	return MapDebugOptions(raw), nil
-}
-
 // SetRenderingStatsViewEnabled enables or disables MapLibre's rendering stats
-// overlay view.
+// overlay view. The committed value is visible through Snapshot as
+// MapSnapshot.RenderingStatsViewEnabled.
 func (m *MapHandle) SetRenderingStatsViewEnabled(enabled bool) (uint64, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
@@ -398,56 +386,6 @@ func (m *MapHandle) SetRenderingStatsViewEnabled(enabled bool) (uint64, error) {
 		return 0, err
 	}
 	return uint64(commandID), nil
-}
-
-// RenderingStatsViewEnabled reports whether MapLibre's rendering stats overlay
-// view is enabled.
-func (m *MapHandle) RenderingStatsViewEnabled() (bool, error) {
-	ptr, release, err := m.ptr()
-	if err != nil {
-		return false, err
-	}
-	defer release()
-	defer m.state.KeepAlive()
-	operation, err := waitMapOperation(func(out *C.mln_operation) int32 {
-		return int32(C.mln_map_get_rendering_stats_view_enabled_start(C.mln_map(ptr), out))
-	})
-	if err != nil {
-		return false, err
-	}
-	defer C.mln_operation_release(operation)
-	var enabled C.bool
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_get_rendering_stats_view_enabled_take_result(operation, &enabled))
-	}); err != nil {
-		return false, err
-	}
-	return bool(enabled), nil
-}
-
-// IsFullyLoaded reports whether MapLibre currently considers the map fully
-// loaded.
-func (m *MapHandle) IsFullyLoaded() (bool, error) {
-	ptr, release, err := m.ptr()
-	if err != nil {
-		return false, err
-	}
-	defer release()
-	defer m.state.KeepAlive()
-	operation, err := waitMapOperation(func(out *C.mln_operation) int32 {
-		return int32(C.mln_map_is_fully_loaded_start(C.mln_map(ptr), out))
-	})
-	if err != nil {
-		return false, err
-	}
-	defer C.mln_operation_release(operation)
-	var loaded C.bool
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_is_fully_loaded_take_result(operation, &loaded))
-	}); err != nil {
-		return false, err
-	}
-	return bool(loaded), nil
 }
 
 // Snapshot returns a copy of the latest immutable map state.
@@ -465,8 +403,9 @@ func (m *MapHandle) Snapshot() (MapSnapshot, error) {
 		return MapSnapshot{}, err
 	}
 	return MapSnapshot{
-		Generation: uint64(raw.generation),
-		Camera:     goCameraOptions(raw.camera),
+		Generation:   uint64(raw.generation),
+		DebugOptions: MapDebugOptions(raw.debug_options),
+		Camera:       goCameraOptions(raw.camera),
 		LogicalExtent: LogicalExtent{
 			Width:       uint32(raw.logical_extent.width),
 			Height:      uint32(raw.logical_extent.height),
@@ -474,8 +413,11 @@ func (m *MapHandle) Snapshot() (MapSnapshot, error) {
 		},
 		ProjectionMode:               goProjectionModeOptions(raw.projection_mode),
 		Viewport:                     goViewportOptions(raw.viewport),
-		Loading:                      bool(raw.loading),
-		FullyRendered:                bool(raw.fully_rendered),
+		Tile:                         goTileOptions(raw.tile),
+		Bounds:                       goBoundOptions(raw.bounds),
+		FreeCamera:                   goFreeCameraOptions(raw.free_camera),
+		FullyLoaded:                  bool(raw.fully_loaded),
+		RenderingStatsViewEnabled:    bool(raw.rendering_stats_view_enabled),
 		RepaintDemand:                bool(raw.repaint_demand),
 		EventMask:                    RuntimeEventMask(raw.event_mask),
 		LatestRenderUpdateGeneration: uint64(raw.latest_render_update_generation),
@@ -752,31 +694,8 @@ func (m *MapHandle) LatLngBoundsForCameraUnwrapped(camera CameraOptions) (LatLng
 	return goLatLngBounds(raw), nil
 }
 
-// Bounds returns map camera constraint options.
-func (m *MapHandle) Bounds() (BoundOptions, error) {
-	ptr, release, err := m.ptr()
-	if err != nil {
-		return BoundOptions{}, err
-	}
-	defer release()
-	defer m.state.KeepAlive()
-	operation, err := waitMapOperation(func(out *C.mln_operation) int32 {
-		return int32(C.mln_map_get_bounds_start(C.mln_map(ptr), out))
-	})
-	if err != nil {
-		return BoundOptions{}, err
-	}
-	defer C.mln_operation_release(operation)
-	raw := C.mln_bound_options_default()
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_get_bounds_take_result(operation, &raw))
-	}); err != nil {
-		return BoundOptions{}, err
-	}
-	return goBoundOptions(raw), nil
-}
-
-// SetBounds applies selected map camera constraint options.
+// SetBounds applies selected map camera constraint options. The committed
+// constraints are visible through Snapshot as MapSnapshot.Bounds.
 func (m *MapHandle) SetBounds(options BoundOptions) (uint64, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
@@ -797,32 +716,9 @@ func (m *MapHandle) SetBounds(options BoundOptions) (uint64, error) {
 	return uint64(commandID), nil
 }
 
-// FreeCameraOptions returns current free camera position and orientation.
-func (m *MapHandle) FreeCameraOptions() (FreeCameraOptions, error) {
-	ptr, release, err := m.ptr()
-	if err != nil {
-		return FreeCameraOptions{}, err
-	}
-	defer release()
-	defer m.state.KeepAlive()
-	operation, err := waitMapOperation(func(out *C.mln_operation) int32 {
-		return int32(C.mln_map_get_free_camera_options_start(C.mln_map(ptr), out))
-	})
-	if err != nil {
-		return FreeCameraOptions{}, err
-	}
-	defer C.mln_operation_release(operation)
-	raw := C.mln_free_camera_options_default()
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_get_free_camera_options_take_result(operation, &raw))
-	}); err != nil {
-		return FreeCameraOptions{}, err
-	}
-	return goFreeCameraOptions(raw), nil
-}
-
 // SetFreeCameraOptions applies selected free camera position and orientation
-// fields.
+// fields. The committed options are visible through Snapshot as
+// MapSnapshot.FreeCamera.
 func (m *MapHandle) SetFreeCameraOptions(options FreeCameraOptions) (uint64, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
@@ -840,32 +736,9 @@ func (m *MapHandle) SetFreeCameraOptions(options FreeCameraOptions) (uint64, err
 	return uint64(commandID), nil
 }
 
-// ViewportOptions returns live map viewport and render-transform controls.
-func (m *MapHandle) ViewportOptions() (ViewportOptions, error) {
-	ptr, release, err := m.ptr()
-	if err != nil {
-		return ViewportOptions{}, err
-	}
-	defer release()
-	defer m.state.KeepAlive()
-	operation, err := waitMapOperation(func(out *C.mln_operation) int32 {
-		return int32(C.mln_map_get_viewport_options_start(C.mln_map(ptr), out))
-	})
-	if err != nil {
-		return ViewportOptions{}, err
-	}
-	defer C.mln_operation_release(operation)
-	raw := C.mln_map_viewport_options_default()
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_get_viewport_options_take_result(operation, &raw))
-	}); err != nil {
-		return ViewportOptions{}, err
-	}
-	return goViewportOptions(raw), nil
-}
-
 // SetViewportOptions applies selected live map viewport and render-transform
-// controls.
+// controls. The committed options are visible through Snapshot as
+// MapSnapshot.Viewport.
 func (m *MapHandle) SetViewportOptions(options ViewportOptions) (uint64, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
@@ -883,31 +756,8 @@ func (m *MapHandle) SetViewportOptions(options ViewportOptions) (uint64, error) 
 	return uint64(commandID), nil
 }
 
-// TileOptions returns tile prefetch and LOD tuning controls.
-func (m *MapHandle) TileOptions() (TileOptions, error) {
-	ptr, release, err := m.ptr()
-	if err != nil {
-		return TileOptions{}, err
-	}
-	defer release()
-	defer m.state.KeepAlive()
-	operation, err := waitMapOperation(func(out *C.mln_operation) int32 {
-		return int32(C.mln_map_get_tile_options_start(C.mln_map(ptr), out))
-	})
-	if err != nil {
-		return TileOptions{}, err
-	}
-	defer C.mln_operation_release(operation)
-	raw := C.mln_map_tile_options_default()
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_get_tile_options_take_result(operation, &raw))
-	}); err != nil {
-		return TileOptions{}, err
-	}
-	return goTileOptions(raw), nil
-}
-
-// SetTileOptions applies selected tile prefetch and LOD tuning controls.
+// SetTileOptions applies selected tile prefetch and LOD tuning controls. The
+// committed options are visible through Snapshot as MapSnapshot.Tile.
 func (m *MapHandle) SetTileOptions(options TileOptions) (uint64, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {

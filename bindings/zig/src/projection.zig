@@ -28,6 +28,12 @@ const ProjectionLease = struct {
 var projection_registry_lock = std.atomic.Value(bool).init(false);
 var projection_registry: std.AutoHashMapUnmanaged(c.mln_map_projection, *ProjectionState) = .empty;
 
+/// Standalone projection copied from a map's transform state at creation.
+///
+/// Creation is an operation ordered after every earlier map command; every
+/// later call is synchronous, callable from any thread, and internally
+/// serialized. A projection never observes map changes made after its
+/// creation, and a live projection prevents its map from closing.
 pub const MapProjectionHandle = enum(c.mln_map_projection) {
     _,
 
@@ -46,98 +52,93 @@ pub const MapProjectionHandle = enum(c.mln_map_projection) {
         return try registerProjectionState(projection, projection_state);
     }
 
+    /// Copies the projection camera. Synchronous, callable from any thread; the
+    /// result observes every earlier projection setter.
     pub fn getCamera(self: *MapProjectionHandle) status.Error!values.CameraOptions {
         const lease = try projectionLease(self.*);
         defer lease.release();
-        var operation: c.mln_operation = 0;
-        try status.checkStatus(c.mln_map_projection_get_camera_start(lease.native, &operation), lease.diagnostic_store);
-        defer c.mln_operation_release(operation);
-        try runtime_module.waitNativeOperation(operation, lease.diagnostic_store);
         var camera = c.mln_camera_options_default();
-        try status.checkStatus(c.mln_map_projection_get_camera_take_result(operation, &camera), lease.diagnostic_store);
+        try status.checkStatus(c.mln_map_projection_get_camera(lease.native, &camera), lease.diagnostic_store);
         return values.cameraOptionsFromNative(camera);
     }
 
-    pub fn setCamera(self: *MapProjectionHandle, camera: values.CameraOptions) status.Error!u64 {
+    /// Applies a camera update before returning, so a later read or conversion
+    /// observes it. Synchronous, callable from any thread; the map's camera is
+    /// unaffected.
+    pub fn setCamera(self: *MapProjectionHandle, camera: values.CameraOptions) status.Error!void {
         var raw_camera = values.cameraOptionsToNative(camera);
         const lease = try projectionLease(self.*);
         defer lease.release();
-        var command_id: u64 = 0;
-        try status.checkStatus(c.mln_map_projection_set_camera(lease.native, &raw_camera, &command_id), lease.diagnostic_store);
-        return command_id;
+        try status.checkStatus(c.mln_map_projection_set_camera(lease.native, &raw_camera), lease.diagnostic_store);
     }
 
+    /// Applies a camera fit for geographic coordinates before returning, so a
+    /// later read or conversion observes it. Synchronous, callable from any
+    /// thread.
     pub fn setVisibleCoordinates(
         self: *MapProjectionHandle,
         allocator: std.mem.Allocator,
         coordinates: []const values.LatLng,
         padding: values.EdgeInsets,
-    ) status.Error!u64 {
+    ) status.Error!void {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         const raw_coordinates = try temp.latLngs(coordinates);
         const coordinate_ptr = if (raw_coordinates.len == 0) null else raw_coordinates.ptr;
         const lease = try projectionLease(self.*);
         defer lease.release();
-        var command_id: u64 = 0;
         try status.checkStatus(
-            c.mln_map_projection_set_visible_coordinates(lease.native, coordinate_ptr, raw_coordinates.len, values.edgeInsetsToNative(padding), &command_id),
+            c.mln_map_projection_set_visible_coordinates(lease.native, coordinate_ptr, raw_coordinates.len, values.edgeInsetsToNative(padding)),
             lease.diagnostic_store,
         );
-        return command_id;
     }
 
+    /// Applies a camera fit for GeoJSON Geometry bytes before returning, so a
+    /// later read or conversion observes it. Synchronous, callable from any
+    /// thread.
     pub fn setVisibleGeometry(
         self: *MapProjectionHandle,
         allocator: std.mem.Allocator,
         geometry: []const u8,
         padding: values.EdgeInsets,
-    ) status.Error!u64 {
+    ) status.Error!void {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         const lease = try projectionLease(self.*);
         defer lease.release();
-        var command_id: u64 = 0;
         try status.checkStatus(
-            c.mln_map_projection_set_visible_geometry(lease.native, try temp.stringView(geometry), values.edgeInsetsToNative(padding), &command_id),
+            c.mln_map_projection_set_visible_geometry(lease.native, try temp.stringView(geometry), values.edgeInsetsToNative(padding)),
             lease.diagnostic_store,
         );
-        return command_id;
     }
 
+    /// Converts a geographic coordinate to a screen point. Synchronous,
+    /// callable from any thread; the result observes every earlier projection
+    /// setter, and never a map change made after creation.
     pub fn pixelForLatLng(self: *MapProjectionHandle, coordinate: values.LatLng) status.Error!values.ScreenPoint {
         const lease = try projectionLease(self.*);
         defer lease.release();
-        var operation: c.mln_operation = 0;
-        try status.checkStatus(c.mln_map_projection_pixel_for_lat_lng_start(lease.native, values.latLngToNative(coordinate), &operation), lease.diagnostic_store);
-        defer c.mln_operation_release(operation);
-        try runtime_module.waitNativeOperation(operation, lease.diagnostic_store);
         var point: c.mln_screen_point = undefined;
-        try status.checkStatus(c.mln_map_projection_pixel_for_lat_lng_take_result(operation, &point), lease.diagnostic_store);
+        try status.checkStatus(c.mln_map_projection_pixel_for_lat_lng(lease.native, values.latLngToNative(coordinate), &point), lease.diagnostic_store);
         return values.screenPointFromNative(point);
     }
 
+    /// Converts a screen point to a geographic coordinate. Synchronous,
+    /// callable from any thread; the result observes every earlier projection
+    /// setter, and never a map change made after creation.
     pub fn latLngForPixel(self: *MapProjectionHandle, point: values.ScreenPoint) status.Error!values.LatLng {
         const lease = try projectionLease(self.*);
         defer lease.release();
-        var operation: c.mln_operation = 0;
-        try status.checkStatus(c.mln_map_projection_lat_lng_for_pixel_start(lease.native, values.screenPointToNative(point), &operation), lease.diagnostic_store);
-        defer c.mln_operation_release(operation);
-        try runtime_module.waitNativeOperation(operation, lease.diagnostic_store);
         var coordinate: c.mln_lat_lng = undefined;
-        try status.checkStatus(c.mln_map_projection_lat_lng_for_pixel_take_result(operation, &coordinate), lease.diagnostic_store);
+        try status.checkStatus(c.mln_map_projection_lat_lng_for_pixel(lease.native, values.screenPointToNative(point), &coordinate), lease.diagnostic_store);
         return values.latLngFromNative(coordinate);
     }
 
+    /// Closes the projection before returning and releases the projection's
+    /// map child reservation. Synchronous, callable from any thread.
     pub fn close(self: *MapProjectionHandle) status.Error!void {
         const projection_close = try beginProjectionClose(self.*) orelse return;
-        var operation: c.mln_operation = 0;
-        status.checkStatus(c.mln_map_projection_close_start(projection_close.native, &operation), projection_close.diagnostic_store) catch |err| {
-            cancelProjectionClose(projection_close.state);
-            return err;
-        };
-        defer c.mln_operation_release(operation);
-        runtime_module.waitNativeOperation(operation, projection_close.diagnostic_store) catch |err| {
+        status.checkStatus(c.mln_map_projection_close(projection_close.native), projection_close.diagnostic_store) catch |err| {
             cancelProjectionClose(projection_close.state);
             return err;
         };

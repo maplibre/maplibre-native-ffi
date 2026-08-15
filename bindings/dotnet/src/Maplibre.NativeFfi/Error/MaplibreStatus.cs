@@ -33,6 +33,9 @@ public enum MaplibreStatus
     /// <summary>A nonblocking acquisition or service call has no result yet.</summary>
     NotReady = -9,
 
+    /// <summary>No style object carries the requested ID.</summary>
+    NotFound = -10,
+
     /// <summary>The loaded C ABI version is incompatible with this binding.</summary>
     AbiMismatch = -1000,
 

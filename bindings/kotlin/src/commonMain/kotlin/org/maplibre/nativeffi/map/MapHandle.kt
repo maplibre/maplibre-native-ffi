@@ -1,7 +1,9 @@
 package org.maplibre.nativeffi.map
 
+import org.maplibre.nativeffi.camera.BoundOptions
 import org.maplibre.nativeffi.camera.CameraSnapshot
 import org.maplibre.nativeffi.camera.CameraUpdate
+import org.maplibre.nativeffi.camera.FreeCameraOptions
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
@@ -23,9 +25,9 @@ import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.ImageStretch
+import org.maplibre.nativeffi.style.LayerInfo
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.SourceInfo
-import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImage
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
@@ -81,12 +83,14 @@ public expect class MapHandle {
 
   public fun addStyleSourceJson(sourceId: String, sourceJson: ByteArray): ULong
 
-  public suspend fun removeStyleSource(sourceId: String): Boolean
+  /**
+   * Submits a command that removes one style source. Its `COMMAND_FINISHED` event reports
+   * [org.maplibre.nativeffi.error.MaplibreStatus.NOT_FOUND] when no source has [sourceId] and
+   * [org.maplibre.nativeffi.error.MaplibreStatus.INVALID_STATE] when a layer still uses the source.
+   */
+  public fun removeStyleSource(sourceId: String): ULong
 
-  public suspend fun styleSourceExists(sourceId: String): Boolean
-
-  public suspend fun styleSourceType(sourceId: String): SourceType?
-
+  /** Returns one source's copied metadata, or null when no source carries [sourceId]. */
   public suspend fun styleSourceInfo(sourceId: String): SourceInfo?
 
   public suspend fun styleSourceIds(): List<String>
@@ -162,10 +166,13 @@ public expect class MapHandle {
     options: StyleImageOptions,
   ): ULong
 
-  public suspend fun removeStyleImage(imageId: String): Boolean
+  /**
+   * Submits a command that removes one runtime style image. Its `COMMAND_FINISHED` event reports
+   * [org.maplibre.nativeffi.error.MaplibreStatus.NOT_FOUND] when no image has [imageId].
+   */
+  public fun removeStyleImage(imageId: String): ULong
 
-  public suspend fun styleImageExists(imageId: String): Boolean
-
+  /** Returns one image's copied metadata, or null when no image carries [imageId]. */
   public suspend fun styleImageInfo(imageId: String): StyleImageInfo?
 
   /**
@@ -218,11 +225,14 @@ public expect class MapHandle {
     imageId: String,
   ): ULong
 
-  public suspend fun removeStyleLayer(layerId: String): Boolean
+  /**
+   * Submits a command that removes one style layer. Its `COMMAND_FINISHED` event reports
+   * [org.maplibre.nativeffi.error.MaplibreStatus.NOT_FOUND] when no layer has [layerId].
+   */
+  public fun removeStyleLayer(layerId: String): ULong
 
-  public suspend fun styleLayerExists(layerId: String): Boolean
-
-  public suspend fun styleLayerType(layerId: String): String?
+  /** Returns one layer's copied metadata, or null when no layer carries [layerId]. */
+  public suspend fun styleLayerInfo(layerId: String): LayerInfo?
 
   public suspend fun styleLayerIds(): List<String>
 
@@ -272,24 +282,10 @@ public expect class MapHandle {
   /** Sets the lowest zoom at which one layer draws. Pass negative infinity for no lower bound. */
   public fun setLayerMinZoom(layerId: String, minZoom: Double): ULong
 
-  /**
-   * Returns the lowest zoom at which one layer draws. A layer with no lower bound reports negative
-   * infinity.
-   */
-  public suspend fun layerMinZoom(layerId: String): Double
-
   /** Sets the highest zoom at which one layer draws. Pass positive infinity for no upper bound. */
   public fun setLayerMaxZoom(layerId: String, maxZoom: Double): ULong
 
-  /**
-   * Returns the highest zoom at which one layer draws. A layer with no upper bound reports positive
-   * infinity.
-   */
-  public suspend fun layerMaxZoom(layerId: String): Double
-
   public fun setLayerVisibility(layerId: String, visibility: StyleLayerVisibility): ULong
-
-  public suspend fun layerVisibility(layerId: String): StyleLayerVisibility
 
   /** Submits a repaint command and returns its runtime-wide command ID. */
   public fun requestRepaint(): Long
@@ -299,6 +295,42 @@ public expect class MapHandle {
 
   /** Copies the latest immutable state generation published by the map worker. */
   public fun snapshot(): MapSnapshot
+
+  /**
+   * Submits a debug-overlay command and returns its runtime-wide command ID. The committed mask is
+   * visible through [snapshot] as [MapSnapshot.debugOptions].
+   */
+  public fun setDebugOptions(options: Set<DebugOption>): Long
+
+  /**
+   * Submits a rendering-stats visibility command and returns its runtime-wide command ID. The
+   * committed value is visible through [snapshot] as [MapSnapshot.renderingStatsViewEnabled].
+   */
+  public fun setRenderingStatsViewEnabled(enabled: Boolean): Long
+
+  /**
+   * Submits a copied viewport-options command and returns its runtime-wide command ID. The
+   * committed options are visible through [snapshot] as [MapSnapshot.viewportOptions].
+   */
+  public fun setViewportOptions(options: ViewportOptions): Long
+
+  /**
+   * Submits a copied tile-options command and returns its runtime-wide command ID. The committed
+   * options are visible through [snapshot] as [MapSnapshot.tileOptions].
+   */
+  public fun setTileOptions(options: TileOptions): Long
+
+  /**
+   * Submits a copied camera-constraint command and returns its runtime-wide command ID. The
+   * committed constraints are visible through [snapshot] as [MapSnapshot.bounds].
+   */
+  public fun setBounds(options: BoundOptions): Long
+
+  /**
+   * Submits a copied free-camera command and returns its runtime-wide command ID. The committed
+   * options are visible through [snapshot] as [MapSnapshot.freeCameraOptions].
+   */
+  public fun setFreeCameraOptions(options: FreeCameraOptions): Long
 
   /** Submits the map's logical extent and returns its runtime-wide command ID. */
   public fun resize(size: MapSize): Long

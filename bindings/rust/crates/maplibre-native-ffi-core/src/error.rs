@@ -17,6 +17,7 @@ pub enum ErrorKind {
     Busy,
     TargetLost,
     NotReady,
+    NotFound,
     NativeError,
     AbiVersionMismatch,
     UnknownStatus,
@@ -106,6 +107,7 @@ pub fn kind_for_status(status: i32) -> ErrorKind {
         sys::MLN_STATUS_BUSY => ErrorKind::Busy,
         sys::MLN_STATUS_TARGET_LOST => ErrorKind::TargetLost,
         sys::MLN_STATUS_NOT_READY => ErrorKind::NotReady,
+        sys::MLN_STATUS_NOT_FOUND => ErrorKind::NotFound,
         sys::MLN_STATUS_NATIVE_ERROR => ErrorKind::NativeError,
         _ => ErrorKind::UnknownStatus,
     }
@@ -151,6 +153,10 @@ mod tests {
         assert_eq!(
             kind_for_status(sys::MLN_STATUS_NOT_READY),
             ErrorKind::NotReady
+        );
+        assert_eq!(
+            kind_for_status(sys::MLN_STATUS_NOT_FOUND),
+            ErrorKind::NotFound
         );
     }
 

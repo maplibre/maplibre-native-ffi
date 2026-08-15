@@ -142,7 +142,11 @@ import Testing
   #expect(data.rasterEncoding == nil)
   #expect(try await map.styleSourceInfo("missing") == nil)
 
-  #expect(try await map.removeStyleSource("inline"))
+  let removeCommand = try map.removeStyleSource("inline")
+  #expect(try await commandDisposition(
+    removeCommand, runtime: runtime
+  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+  #expect(try await map.styleSourceInfo("inline") == nil)
   try await map.close()
 
   // Every nested string and value remains valid after its native source and
@@ -418,7 +422,7 @@ private func addSourceReportingItsRelease(
   #expect(counter.value == 1)
   #expect(!styleLoadedReported)
   #expect(try map.eventMask == narrowed)
-  #expect(try await !map.styleSourceExists("custom"))
+  #expect(try await map.styleSourceInfo("custom") == nil)
 }
 
 /// Removing a custom geometry source releases its callback state, and does so
@@ -435,7 +439,10 @@ private func addSourceReportingItsRelease(
   let counter = ReleaseCounter()
   try addSourceReportingItsRelease(to: map, counter: counter)
 
-  #expect(try await map.removeStyleSource("custom"))
+  let removeCommand = try map.removeStyleSource("custom")
+  #expect(try await commandDisposition(
+    removeCommand, runtime: runtime
+  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
   #expect(counter.value == 1)
   try await map.close()
   #expect(counter.value == 1)
@@ -631,8 +638,21 @@ private func addSourceReportingItsRelease(
   #expect(try await map.layerSourceLayer("bg") == "")
   #expect(try await map.layerSourceId("bg") == "")
 
-  #expect(try await map.layerMinZoom("fill") == -Double.infinity)
-  #expect(try await map.layerMaxZoom("fill") == Double.infinity)
+  // The layer-info aggregate reports the unbounded zoom range, the layer
+  // type, the visibility, and the source strings its sizes describe.
+  let unbounded = try #require(try await map.styleLayerInfo("fill"))
+  #expect(unbounded.type == "fill")
+  #expect(unbounded.minZoom == -Double.infinity)
+  #expect(unbounded.maxZoom == Double.infinity)
+  #expect(unbounded.visibility == .visible)
+  #expect(unbounded.sourceId == "geo")
+  #expect(unbounded.sourceLayer == "roads")
+
+  let background = try #require(try await map.styleLayerInfo("bg"))
+  #expect(background.type == "background")
+  #expect(background.sourceId == nil)
+  #expect(background.sourceLayer == nil)
+
   let minZoomCommand = try map.setLayerMinZoom(layerId: "fill", minZoom: 4)
   #expect(try await commandDisposition(
     minZoomCommand, runtime: runtime
@@ -643,17 +663,16 @@ private func addSourceReportingItsRelease(
   #expect(try await commandDisposition(
     maxZoomCommand, runtime: runtime
   ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
-  #expect(try await map.layerMinZoom("fill") == 4)
-  #expect(try await map.layerMaxZoom("fill") == 12.5)
-
-  #expect(try await map.layerVisibility("fill") == .visible)
   let visibilityCommand = try map.setLayerVisibility(
     layerId: "fill", visibility: .none
   )
   #expect(try await commandDisposition(
     visibilityCommand, runtime: runtime
   ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
-  #expect(try await map.layerVisibility("fill") == .none)
+  let bounded = try #require(try await map.styleLayerInfo("fill"))
+  #expect(bounded.minZoom == 4)
+  #expect(bounded.maxZoom == 12.5)
+  #expect(bounded.visibility == .none)
 
   let rejectedVisibility = try map.setLayerVisibility(
     layerId: "fill",
@@ -662,12 +681,77 @@ private func addSourceReportingItsRelease(
   #expect(try await commandDisposition(
     rejectedVisibility, runtime: runtime
   ) == MLN_COMMAND_DISPOSITION_FAILED.rawValue)
-  #expect(try await map.layerVisibility("fill") == .none)
+  #expect(try await map.styleLayerInfo("fill")?
+    .visibility == StyleLayerVisibility.none)
 
-  do {
-    _ = try await map.layerMinZoom("missing")
-    Issue.record("missing layer should throw")
-  } catch is MaplibreError {}
+  #expect(try await map.styleLayerInfo("missing") == nil)
+}
+
+/// A removal command commits when the object existed, and fails with
+/// `MLN_STATUS_NOT_FOUND` when nothing has the ID. The info getters' found
+/// flag re-checks existence.
+@Test func styleRemovalsCommitOrFailWithNotFound() async throws {
+  let runtime =
+    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.closeBlockingForTests() }
+  let map = try await MapHandle(runtime: runtime,
+                                options: MapOptions(width: 1, height: 1))
+  defer { try? map.closeBlockingForTests() }
+
+  let styleCommand = try map.setStyleJSON(jsonData("""
+  {"version":8,"sources":{"geo":{"type":"geojson","data":{"type":"FeatureCollection","features":[]}}},"layers":[{"id":"fill","type":"fill","source":"geo"}]}
+  """))
+  #expect(try await commandDisposition(
+    styleCommand, runtime: runtime
+  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+  try map.setStyleImage(
+    imageId: "marker",
+    image: StyleRGBA8Image(width: 1, height: 1, stride: 4,
+                           pixels: [0, 0, 0, 0])
+  )
+
+  // A source still used by a layer fails with invalid-state.
+  let usedSource = try map.removeStyleSource("geo")
+  let usedResult = try #require(try await commandFinished(
+    usedSource, runtime: runtime
+  ))
+  #expect(usedResult.finished
+    .disposition == MLN_COMMAND_DISPOSITION_FAILED.rawValue)
+  #expect(usedResult.code == MLN_STATUS_INVALID_STATE.rawValue)
+  #expect(try await map.styleSourceInfo("geo") != nil)
+
+  // Existing objects commit their removal, re-checked through info getters.
+  // Each wait drains and discards unrelated events, so submit one at a time.
+  let removals: [(String, (MapHandle) throws -> UInt64)] = [
+    ("layer", { try $0.removeStyleLayer("fill") }),
+    ("source", { try $0.removeStyleSource("geo") }),
+    ("image", { try $0.removeStyleImage("marker") }),
+  ]
+  for (subject, remove) in removals {
+    let command = try remove(map)
+    #expect(try await commandDisposition(
+      command, runtime: runtime
+    ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue, "removing a \(subject)")
+  }
+  #expect(try await map.styleLayerInfo("fill") == nil)
+  #expect(try await map.styleSourceInfo("geo") == nil)
+  #expect(try await map.styleImageInfo("marker") == nil)
+
+  // Removing a missing object fails with NOT_FOUND, surfaced through the
+  // binding's error domain.
+  for (subject, remove) in removals {
+    let command = try remove(map)
+    let result = try #require(try await commandFinished(
+      command, runtime: runtime
+    ))
+    #expect(result.finished
+      .disposition == MLN_COMMAND_DISPOSITION_FAILED.rawValue,
+      "removing a missing \(subject)")
+    #expect(result.code == MLN_STATUS_NOT_FOUND.rawValue)
+    #expect(MaplibreError.fromNativeFailure(NativeStatusFailure(
+      rawStatus: result.code, diagnostic: ""
+    )).kind == .notFound)
+  }
 }
 
 @Test func geoJSONSourceOptionsMaterializeFieldMaskAndClusterProperties(
@@ -747,8 +831,8 @@ private func addSourceReportingItsRelease(
     clusteredCommand, runtime: runtime
   ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
 
-  #expect(try await map.styleSourceExists("clustered"))
-  #expect(try await map.styleSourceType("clustered") == .geoJSON)
+  let clustered = try #require(try await map.styleSourceInfo("clustered"))
+  #expect(clustered.type == .geoJSON)
 
   // The cluster aggregation graph is borrowed for the call and parsed by
   // MapLibre Native, so an unparseable expression fails the add.
@@ -766,7 +850,7 @@ private func addSourceReportingItsRelease(
     rejectedCommand, runtime: runtime
   ) == MLN_COMMAND_DISPOSITION_FAILED.rawValue)
 
-  #expect(try await !map.styleSourceExists("clustered-invalid"))
+  #expect(try await map.styleSourceInfo("clustered-invalid") == nil)
 }
 
 @Test func styleTransitionOptionsRoundTripThroughTheCAPI() async throws {

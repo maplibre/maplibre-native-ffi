@@ -85,88 +85,6 @@ enum NativeMap {
     }.value
   }
 
-  static func debugOptionsStart(_ map: NativeMapHandle) throws
-    -> NativeOperationHandle
-  {
-    try startOperation { mln_map_get_debug_options_start(map.raw, $0) }
-  }
-
-  static func debugOptionsTakeResult(_ operation: NativeOperationHandle) throws
-    -> UInt32
-  {
-    try NativeMemory.withTemporary(UInt32(0)) { options in
-      try checkStatus(mln_map_get_debug_options_take_result(
-        operation.raw, options
-      ))
-    }.value
-  }
-
-  static func renderingStatsViewEnabledStart(_ map: NativeMapHandle) throws
-    -> NativeOperationHandle
-  {
-    try startOperation {
-      mln_map_get_rendering_stats_view_enabled_start(map.raw, $0)
-    }
-  }
-
-  static func renderingStatsViewEnabledTakeResult(
-    _ operation: NativeOperationHandle
-  ) throws -> Bool {
-    try NativeMemory.withTemporary(false) { enabled in
-      try checkStatus(mln_map_get_rendering_stats_view_enabled_take_result(
-        operation.raw, enabled
-      ))
-    }.value
-  }
-
-  static func fullyLoadedStart(_ map: NativeMapHandle) throws
-    -> NativeOperationHandle
-  {
-    try startOperation { mln_map_is_fully_loaded_start(map.raw, $0) }
-  }
-
-  static func fullyLoadedTakeResult(_ operation: NativeOperationHandle) throws
-    -> Bool
-  {
-    try NativeMemory.withTemporary(false) { loaded in
-      try checkStatus(mln_map_is_fully_loaded_take_result(
-        operation.raw, loaded
-      ))
-    }.value
-  }
-
-  static func viewportOptionsStart(_ map: NativeMapHandle) throws
-    -> NativeOperationHandle
-  {
-    try startOperation { mln_map_get_viewport_options_start(map.raw, $0) }
-  }
-
-  static func viewportOptionsTakeResult(
-    _ operation: NativeOperationHandle
-  ) throws -> mln_map_viewport_options {
-    var options = mln_map_viewport_options_default()
-    try checkStatus(mln_map_get_viewport_options_take_result(
-      operation.raw, &options
-    ))
-    return options
-  }
-
-  static func tileOptionsStart(_ map: NativeMapHandle) throws
-    -> NativeOperationHandle
-  {
-    try startOperation { mln_map_get_tile_options_start(map.raw, $0) }
-  }
-
-  static func tileOptionsTakeResult(
-    _ operation: NativeOperationHandle
-  ) throws -> mln_map_tile_options {
-    var options = mln_map_tile_options_default()
-    try checkStatus(mln_map_get_tile_options_take_result(
-      operation.raw, &options
-    ))
-    return options
-  }
-
   static func cameraForLatLngBoundsStart(
     _ map: NativeMapHandle,
     bounds: NativeLatLngBounds,
@@ -268,36 +186,6 @@ enum NativeMap {
         }
       }
     return NativeLatLngBounds(output.value)
-  }
-
-  static func boundsStart(_ map: NativeMapHandle) throws
-    -> NativeOperationHandle
-  {
-    try startOperation { mln_map_get_bounds_start(map.raw, $0) }
-  }
-
-  static func boundsTakeResult(_ operation: NativeOperationHandle) throws
-    -> mln_bound_options
-  {
-    var bounds = mln_bound_options_default()
-    try checkStatus(mln_map_get_bounds_take_result(operation.raw, &bounds))
-    return bounds
-  }
-
-  static func freeCameraOptionsStart(_ map: NativeMapHandle) throws
-    -> NativeOperationHandle
-  {
-    try startOperation { mln_map_get_free_camera_options_start(map.raw, $0) }
-  }
-
-  static func freeCameraOptionsTakeResult(
-    _ operation: NativeOperationHandle
-  ) throws -> mln_free_camera_options {
-    var options = mln_free_camera_options_default()
-    try checkStatus(mln_map_get_free_camera_options_take_result(
-      operation.raw, &options
-    ))
-    return options
   }
 
   static func pixelForLatLngStart(

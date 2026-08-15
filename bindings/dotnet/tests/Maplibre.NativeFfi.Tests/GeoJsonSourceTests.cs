@@ -31,8 +31,7 @@ public sealed class GeoJsonSourceTests
             """{"type":"Point","coordinates":[2,1]}"""u8.ToArray()
         );
 
-        Assert.True(await map.StyleSourceExistsAsync("geo-data"));
-        Assert.Equal(SourceType.GeoJson, await map.StyleSourceTypeAsync("geo-data"));
+        Assert.Equal(SourceType.GeoJson, (await map.StyleSourceInfoAsync("geo-data"))?.Type);
     }
 
     [BindingSpecTest("BND-060", "BND-105")]
@@ -48,8 +47,7 @@ public sealed class GeoJsonSourceTests
 
         map.AddGeoJsonSourceData("clustered", NearbyPoints, ClusterOptions());
 
-        Assert.True(await map.StyleSourceExistsAsync("clustered"));
-        Assert.Equal(SourceType.GeoJson, await map.StyleSourceTypeAsync("clustered"));
+        Assert.Equal(SourceType.GeoJson, (await map.StyleSourceInfoAsync("clustered"))?.Type);
 
         var options = ClusterOptions();
         options.ClusterProperties = """{"weight_sum":"not-an-expression"}"""u8.ToArray();
@@ -60,7 +58,7 @@ public sealed class GeoJsonSourceTests
         Assert.Equal(CommandDisposition.Failed, completion.Disposition);
         Assert.Equal((int)MaplibreStatus.InvalidArgument, failure.Code);
         Assert.NotEmpty(failure.Message);
-        Assert.False(await map.StyleSourceExistsAsync("clustered-invalid"));
+        Assert.Null(await map.StyleSourceInfoAsync("clustered-invalid"));
     }
 
     private static GeoJsonSourceOptions ClusterOptions() =>

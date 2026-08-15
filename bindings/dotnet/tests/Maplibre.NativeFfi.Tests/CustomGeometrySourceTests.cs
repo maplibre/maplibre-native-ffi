@@ -188,8 +188,9 @@ public sealed class CustomGeometrySourceTests
             new LatLngBounds(new LatLng(-1, -1), new LatLng(1, 1))
         );
 
-        Assert.Equal(SourceType.CustomVector, await map.StyleSourceTypeAsync("custom"));
-        Assert.True(await map.RemoveStyleSourceAsync("custom"));
+        Assert.Equal(SourceType.CustomVector, (await map.StyleSourceInfoAsync("custom"))?.Type);
+        RuntimeEventTestHelpers.WaitForCommand(runtime, map.RemoveStyleSource("custom"));
+        Assert.Null(await map.StyleSourceInfoAsync("custom"));
     }
 
     [BindingSpecTest("BND-124")]
@@ -208,7 +209,8 @@ public sealed class CustomGeometrySourceTests
         map.AddCustomGeometrySource("custom", state);
         Assert.True(state.IsHandleAllocatedForTest);
 
-        Assert.True(await map.RemoveStyleSourceAsync("custom"));
+        RuntimeEventTestHelpers.WaitForCommand(runtime, map.RemoveStyleSource("custom"));
+        Assert.Null(await map.StyleSourceInfoAsync("custom"));
 
         Assert.False(state.IsHandleAllocatedForTest);
     }

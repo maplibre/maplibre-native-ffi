@@ -430,6 +430,21 @@ public struct StyleSourceInfo: Equatable, Sendable {
   }
 }
 
+/// A copied snapshot of the fixed metadata for one style layer.
+public struct StyleLayerInfo: Equatable, Sendable {
+  /// The layer's style-spec type string, such as `"fill"`.
+  public let type: String
+  /// Lowest zoom at which the layer draws; `-infinity` with no lower bound.
+  public let minZoom: Double
+  /// Highest zoom at which the layer draws; `infinity` with no upper bound.
+  public let maxZoom: Double
+  public let visibility: StyleLayerVisibility
+  /// The layer's source ID, absent when the layer has no source.
+  public let sourceId: String?
+  /// The layer's source-layer ID, absent when the layer carries none.
+  public let sourceLayer: String?
+}
+
 public enum LocationIndicatorImageKind: UInt32, Sendable, Hashable {
   case top = 0
   case bearing = 1
@@ -526,52 +541,14 @@ public extension MapHandle {
     }
   }
 
-  func removeStyleSource(_ sourceId: String) async throws -> Bool {
-    let operation = try mapNativeFailure {
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeStyle.removeSourceStart(
-        requireLiveHandle(),
-        sourceId: arena.view(sourceId)
-      )
-    }
-    defer { mln_operation_release(operation.raw) }
-    try await runtimeForOperations.waitForOperation(operation)
-    return try mapNativeFailure {
-      try NativeStyle.removeSourceTakeResult(operation)
-    }
-  }
-
-  func styleSourceExists(_ sourceId: String) async throws -> Bool {
-    let operation = try mapNativeFailure {
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeStyle.sourceExistsStart(
-        requireLiveHandle(),
-        sourceId: arena.view(sourceId)
-      )
-    }
-    defer { mln_operation_release(operation.raw) }
-    try await runtimeForOperations.waitForOperation(operation)
-    return try mapNativeFailure {
-      try NativeStyle.sourceExistsTakeResult(operation)
-    }
-  }
-
-  func styleSourceType(_ sourceId: String) async throws -> StyleSourceType? {
-    let operation = try mapNativeFailure {
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeStyle.sourceTypeStart(
-        requireLiveHandle(),
-        sourceId: arena.view(sourceId)
-      )
-    }
-    defer { mln_operation_release(operation.raw) }
-    try await runtimeForOperations.waitForOperation(operation)
-    return try mapNativeFailure {
-      try NativeStyle.sourceTypeTakeResult(operation)
-        .map(StyleSourceType.init(rawValue:))
+  /// Removes one style source by ID. The command commits when a source with
+  /// that ID existed and was removed; it fails with `MLN_STATUS_NOT_FOUND`
+  /// when none has the ID, and with invalid-state when a layer still uses the
+  /// source.
+  @discardableResult
+  func removeStyleSource(_ sourceId: String) throws -> UInt64 {
+    try styleCommand { map, arena, commandId in
+      mln_map_remove_style_source(map, arena.view(sourceId), commandId)
     }
   }
 
@@ -1025,20 +1002,14 @@ public extension MapHandle {
     }
   }
 
-  func removeStyleImage(_ imageId: String) async throws -> Bool {
-    try await imageBoolOperation(
-      imageId,
-      start: mln_map_remove_style_image_start,
-      take: mln_map_remove_style_image_take_result
-    )
-  }
-
-  func styleImageExists(_ imageId: String) async throws -> Bool {
-    try await imageBoolOperation(
-      imageId,
-      start: mln_map_style_image_exists_start,
-      take: mln_map_style_image_exists_take_result
-    )
+  /// Removes one runtime style image by ID. The command commits when an image
+  /// with that ID existed and was removed; it fails with
+  /// `MLN_STATUS_NOT_FOUND` when none has the ID.
+  @discardableResult
+  func removeStyleImage(_ imageId: String) throws -> UInt64 {
+    try styleCommand { map, arena, commandId in
+      mln_map_remove_style_image(map, arena.view(imageId), commandId)
+    }
   }
 
   func styleImageInfo(_ imageId: String) async throws -> StyleImageInfo? {
@@ -1090,18 +1061,6 @@ public extension MapHandle {
         start: start
       )
     }
-  }
-
-  private func imageBoolOperation(
-    _ imageId: String,
-    start: (mln_map, mln_buffer_view, UnsafeMutablePointer<mln_operation>)
-      -> mln_status,
-    take: (mln_operation, UnsafeMutablePointer<Bool>) -> mln_status
-  ) async throws -> Bool {
-    let operation = try imageOperation(imageId, start: start)
-    defer { mln_operation_release(operation.raw) }
-    try await runtimeForOperations.waitForOperation(operation)
-    return try NativeStyle.boolTakeResult(operation, take: take)
   }
 
   @discardableResult
@@ -1389,51 +1348,49 @@ public extension MapHandle {
     }
   }
 
-  func removeStyleLayer(_ layerId: String) async throws -> Bool {
-    let operation = try mapNativeFailure {
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeStyle.removeLayerStart(
-        requireLiveHandle(),
-        layerId: arena.view(layerId)
-      )
-    }
-    defer { mln_operation_release(operation.raw) }
-    try await runtimeForOperations.waitForOperation(operation)
-    return try mapNativeFailure {
-      try NativeStyle.removeLayerTakeResult(operation)
+  /// Removes one style layer by ID. The command commits when a layer with
+  /// that ID existed and was removed; it fails with `MLN_STATUS_NOT_FOUND`
+  /// when none has the ID.
+  @discardableResult
+  func removeStyleLayer(_ layerId: String) throws -> UInt64 {
+    try styleCommand { map, arena, commandId in
+      mln_map_remove_style_layer(map, arena.view(layerId), commandId)
     }
   }
 
-  func styleLayerExists(_ layerId: String) async throws -> Bool {
+  /// Copies fixed metadata for one style layer, or returns `nil` when no
+  /// layer has the ID.
+  func styleLayerInfo(_ layerId: String) async throws -> StyleLayerInfo? {
     let operation = try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      return try NativeStyle.layerExistsStart(
+      return try NativeStyle.layerInfoStart(
         requireLiveHandle(),
         layerId: arena.view(layerId)
       )
     }
     defer { mln_operation_release(operation.raw) }
     try await runtimeForOperations.waitForOperation(operation)
+    guard let info = try mapNativeFailure({
+      try NativeStyle.layerInfoTakeResult(operation)
+    }) else { return nil }
+    let sourceId = (info.fields & MLN_STYLE_LAYER_INFO_SOURCE_ID.rawValue) != 0
+      ? try await layerSourceId(layerId) : nil
+    let sourceLayer =
+      (info.fields & MLN_STYLE_LAYER_INFO_SOURCE_LAYER.rawValue) != 0
+        ? try await layerSourceLayer(layerId) : nil
     return try mapNativeFailure {
-      try NativeStyle.layerExistsTakeResult(operation)
-    }
-  }
-
-  func styleLayerType(_ layerId: String) async throws -> String? {
-    let operation = try mapNativeFailure {
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeStyle.layerTypeStart(
-        requireLiveHandle(),
-        layerId: arena.view(layerId)
+      try StyleLayerInfo(
+        type: NativeString.copyUTF8(
+          data: info.type.data,
+          size: info.type.size
+        ),
+        minZoom: info.min_zoom,
+        maxZoom: info.max_zoom,
+        visibility: StyleLayerVisibility(rawValue: info.visibility),
+        sourceId: sourceId,
+        sourceLayer: sourceLayer
       )
-    }
-    defer { mln_operation_release(operation.raw) }
-    try await runtimeForOperations.waitForOperation(operation)
-    return try mapNativeFailure {
-      try NativeStyle.layerTypeTakeResult(operation)
     }
   }
 
@@ -1689,25 +1646,11 @@ public extension MapHandle {
     }
   }
 
-  func layerMinZoom(_ layerId: String) async throws -> Double {
-    try await layerDouble(
-      layerId, start: mln_map_get_layer_min_zoom_start,
-      take: mln_map_get_layer_min_zoom_take_result
-    )
-  }
-
   @discardableResult
   func setLayerMaxZoom(layerId: String, maxZoom: Double) throws -> UInt64 {
     try styleCommand { map, arena, commandId in
       mln_map_set_layer_max_zoom(map, arena.view(layerId), maxZoom, commandId)
     }
-  }
-
-  func layerMaxZoom(_ layerId: String) async throws -> Double {
-    try await layerDouble(
-      layerId, start: mln_map_get_layer_max_zoom_start,
-      take: mln_map_get_layer_max_zoom_take_result
-    )
   }
 
   @discardableResult
@@ -1719,23 +1662,6 @@ public extension MapHandle {
       mln_map_set_layer_visibility(
         map, arena.view(layerId), visibility.rawValue, commandId
       )
-    }
-  }
-
-  func layerVisibility(_ layerId: String) async throws -> StyleLayerVisibility {
-    let operation = try mapNativeFailure {
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeStyle.layerTextStart(
-        requireLiveHandle(), layerId: arena.view(layerId),
-        start: mln_map_get_layer_visibility_start
-      )
-    }
-    defer { mln_operation_release(operation.raw) }
-    try await runtimeForOperations.waitForOperation(operation)
-    return try mapNativeFailure {
-      try StyleLayerVisibility(rawValue: NativeStyle
-        .visibilityTakeResult(operation))
     }
   }
 
@@ -1769,26 +1695,6 @@ public extension MapHandle {
     try await runtimeForOperations.waitForOperation(operation)
     return try mapNativeFailure {
       try NativeStyle.bufferStringTakeResult(operation, take: take)
-    }
-  }
-
-  private func layerDouble(
-    _ layerId: String,
-    start: (mln_map, mln_buffer_view, UnsafeMutablePointer<mln_operation>)
-      -> mln_status,
-    take: (mln_operation, UnsafeMutablePointer<Double>) -> mln_status
-  ) async throws -> Double {
-    let operation = try mapNativeFailure {
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      return try NativeStyle.layerTextStart(
-        requireLiveHandle(), layerId: arena.view(layerId), start: start
-      )
-    }
-    defer { mln_operation_release(operation.raw) }
-    try await runtimeForOperations.waitForOperation(operation)
-    return try mapNativeFailure {
-      try NativeStyle.doubleTakeResult(operation, take: take)
     }
   }
 }

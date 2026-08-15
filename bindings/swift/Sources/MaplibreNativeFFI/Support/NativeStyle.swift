@@ -59,73 +59,6 @@ enum NativeStyle {
     return NativeOperationHandle(raw: raw)
   }
 
-  static func removeSourceStart(
-    _ map: NativeMapHandle,
-    sourceId: mln_buffer_view
-  ) throws -> NativeOperationHandle {
-    try start {
-      try checkStatus(mln_map_remove_style_source_start(map.raw, sourceId, $0))
-    }
-  }
-
-  static func removeSourceTakeResult(
-    _ operation: NativeOperationHandle
-  ) throws -> Bool {
-    try NativeMemory.withTemporary(false) { removed in
-      try checkStatus(mln_map_remove_style_source_take_result(
-        operation.raw,
-        removed
-      ))
-    }.value
-  }
-
-  static func sourceExistsStart(
-    _ map: NativeMapHandle,
-    sourceId: mln_buffer_view
-  ) throws -> NativeOperationHandle {
-    try start {
-      try checkStatus(mln_map_style_source_exists_start(map.raw, sourceId, $0))
-    }
-  }
-
-  static func sourceExistsTakeResult(
-    _ operation: NativeOperationHandle
-  ) throws -> Bool {
-    try NativeMemory.withTemporary(false) { exists in
-      try checkStatus(mln_map_style_source_exists_take_result(
-        operation.raw,
-        exists
-      ))
-    }.value
-  }
-
-  static func sourceTypeStart(
-    _ map: NativeMapHandle,
-    sourceId: mln_buffer_view
-  ) throws -> NativeOperationHandle {
-    try start {
-      try checkStatus(mln_map_get_style_source_type_start(
-        map.raw,
-        sourceId,
-        $0
-      ))
-    }
-  }
-
-  static func sourceTypeTakeResult(
-    _ operation: NativeOperationHandle
-  ) throws -> UInt32? {
-    var type = UInt32(0)
-    let found = try NativeMemory.withTemporary(false) { found in
-      try checkStatus(mln_map_get_style_source_type_take_result(
-        operation.raw,
-        &type,
-        found
-      ))
-    }.value
-    return found ? type : nil
-  }
-
   static func sourceInfoStart(
     _ map: NativeMapHandle,
     sourceId: mln_buffer_view
@@ -297,15 +230,6 @@ enum NativeStyle {
     try self.start { try checkStatus(start(map.raw, imageId, $0)) }
   }
 
-  static func boolTakeResult(
-    _ operation: NativeOperationHandle,
-    take: (mln_operation, UnsafeMutablePointer<Bool>) -> mln_status
-  ) throws -> Bool {
-    try NativeMemory.withTemporary(false) {
-      try checkStatus(take(operation.raw, $0))
-    }.value
-  }
-
   static func setTransitionOptions(
     _ map: NativeMapHandle,
     options: NativeStyleTransitionOptions
@@ -448,70 +372,32 @@ enum NativeStyle {
     }
   }
 
-  static func removeLayerStart(
+  static func layerInfoStart(
     _ map: NativeMapHandle,
     layerId: mln_buffer_view
   ) throws -> NativeOperationHandle {
     try start {
-      try checkStatus(mln_map_remove_style_layer_start(map.raw, layerId, $0))
+      try checkStatus(mln_map_get_style_layer_info_start(
+        map.raw,
+        layerId,
+        $0
+      ))
     }
   }
 
-  static func removeLayerTakeResult(
+  static func layerInfoTakeResult(
     _ operation: NativeOperationHandle
-  ) throws -> Bool {
-    try NativeMemory.withTemporary(false) { removed in
-      try checkStatus(mln_map_remove_style_layer_take_result(
+  ) throws -> mln_style_layer_info? {
+    var info = mln_style_layer_info()
+    info.size = UInt32(MemoryLayout<mln_style_layer_info>.size)
+    let found = try NativeMemory.withTemporary(false) { found in
+      try checkStatus(mln_map_get_style_layer_info_take_result(
         operation.raw,
-        removed
+        &info,
+        found
       ))
     }.value
-  }
-
-  static func layerExistsStart(
-    _ map: NativeMapHandle,
-    layerId: mln_buffer_view
-  ) throws -> NativeOperationHandle {
-    try start {
-      try checkStatus(mln_map_style_layer_exists_start(map.raw, layerId, $0))
-    }
-  }
-
-  static func layerExistsTakeResult(
-    _ operation: NativeOperationHandle
-  ) throws -> Bool {
-    try NativeMemory.withTemporary(false) { exists in
-      try checkStatus(mln_map_style_layer_exists_take_result(
-        operation.raw,
-        exists
-      ))
-    }.value
-  }
-
-  static func layerTypeStart(
-    _ map: NativeMapHandle,
-    layerId: mln_buffer_view
-  ) throws -> NativeOperationHandle {
-    try start {
-      try checkStatus(mln_map_get_style_layer_type_start(map.raw, layerId, $0))
-    }
-  }
-
-  static func layerTypeTakeResult(
-    _ operation: NativeOperationHandle
-  ) throws -> String? {
-    var found = false
-    let raw = try NativeMemory.withTemporary(mln_buffer(0)) { buffer in
-      try NativeMemory.withTemporary(false) { outFound in
-        try checkStatus(mln_map_get_style_layer_type_take_result(
-          operation.raw,
-          buffer,
-          outFound
-        ))
-        found = outFound.pointee
-      }
-    }.value
-    return found ? try copyBufferString(NativeBufferHandle(raw: raw)) : nil
+    return found ? info : nil
   }
 
   static func layerIdsStart(_ map: NativeMapHandle) throws
@@ -629,26 +515,6 @@ enum NativeStyle {
       try checkStatus(take(operation.raw, buffer))
     }.value
     return try copyBufferString(NativeBufferHandle(raw: raw))
-  }
-
-  static func doubleTakeResult(
-    _ operation: NativeOperationHandle,
-    take: (mln_operation, UnsafeMutablePointer<Double>) -> mln_status
-  ) throws -> Double {
-    try NativeMemory.withTemporary(0.0) {
-      try checkStatus(take(operation.raw, $0))
-    }.value
-  }
-
-  static func visibilityTakeResult(
-    _ operation: NativeOperationHandle
-  ) throws -> UInt32 {
-    try NativeMemory.withTemporary(UInt32(0)) {
-      try checkStatus(mln_map_get_layer_visibility_take_result(
-        operation.raw,
-        $0
-      ))
-    }.value
   }
 
   /// Probes the required interval counts, then copies. Null arrays with zero

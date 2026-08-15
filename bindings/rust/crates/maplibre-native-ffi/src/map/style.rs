@@ -8,7 +8,7 @@ pub(crate) use maplibre_core::style::{
 };
 pub use maplibre_core::{
     GeoJsonSourceOptions, ImageContent, ImageStretch, LocationIndicatorImageKind, SourceInfo,
-    SourceType, StyleImage, StyleImageInfo, StyleImageOptions, StyleImageTextFit,
+    SourceType, StyleImage, StyleImageInfo, StyleImageOptions, StyleImageTextFit, StyleLayerInfo,
     StyleLayerVisibility, StyleTransitionOptions, TileJsonInfo, TileScheme, TileSourceOptions,
     VectorTileEncoding,
 };
@@ -526,29 +526,20 @@ impl super::MapHandle {
         self.start_operation(operation, OperationKind::ImageSourceCoordinates)
     }
 
-    /// Removes one style source by ID.
+    /// Removes one style source by ID and returns its command ID.
     ///
-    /// Returns whether a source existed and was removed. Native returns an
-    /// error when a layer still uses the source.
-    pub fn remove_style_source(&self, source_id: &str) -> Result<OperationHandle<bool>> {
+    /// The command's finished event reports `Failed` with a not-found status
+    /// code when no source has the ID, and `Failed` with an invalid-state
+    /// status code when a layer still uses the source.
+    pub fn remove_style_source(&self, source_id: &str) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
-        let mut operation = sys::mln_operation(0);
+        // SAFETY: map is live and source_id is valid for this call.
         maplibre_core::check(unsafe {
-            sys::mln_map_remove_style_source_start(map, source_id.raw(), &mut operation)
+            sys::mln_map_remove_style_source(map, source_id.raw(), &mut command_id)
         })?;
-        self.start_operation(operation, OperationKind::RemoveStyleSource)
-    }
-
-    /// Reports whether a style source ID exists.
-    pub fn style_source_exists(&self, source_id: &str) -> Result<OperationHandle<bool>> {
-        let map = self.inner.native()?;
-        let source_id = maplibre_core::string::string_view(source_id);
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_map_style_source_exists_start(map, source_id.raw(), &mut operation)
-        })?;
-        self.start_operation(operation, OperationKind::StyleSourceExists)
+        Ok(command_id)
     }
 
     /// Adds or replaces one runtime style image.
@@ -575,28 +566,19 @@ impl super::MapHandle {
         Ok(command_id)
     }
 
-    /// Removes one runtime style image by ID.
+    /// Removes one runtime style image by ID and returns its command ID.
     ///
-    /// Returns whether an image existed and was removed.
-    pub fn remove_style_image(&self, image_id: &str) -> Result<OperationHandle<bool>> {
+    /// The command's finished event reports `Failed` with a not-found status
+    /// code when no runtime image has the ID.
+    pub fn remove_style_image(&self, image_id: &str) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let image_id = maplibre_core::string::string_view(image_id);
-        let mut operation = sys::mln_operation(0);
+        // SAFETY: map is live and image_id is valid for this call.
         maplibre_core::check(unsafe {
-            sys::mln_map_remove_style_image_start(map, image_id.raw(), &mut operation)
+            sys::mln_map_remove_style_image(map, image_id.raw(), &mut command_id)
         })?;
-        self.start_operation(operation, OperationKind::RemoveStyleImage)
-    }
-
-    /// Reports whether a runtime style image ID exists.
-    pub fn style_image_exists(&self, image_id: &str) -> Result<OperationHandle<bool>> {
-        let map = self.inner.native()?;
-        let image_id = maplibre_core::string::string_view(image_id);
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_map_style_image_exists_start(map, image_id.raw(), &mut operation)
-        })?;
-        self.start_operation(operation, OperationKind::StyleImageExists)
+        Ok(command_id)
     }
 
     /// Copies fixed metadata for one runtime style image.
@@ -631,20 +613,6 @@ impl super::MapHandle {
         })?;
         let pixels = self.start_operation(pixels, OperationKind::StyleImagePixels)?;
         Ok(StyleImageOperation { info, pixels })
-    }
-
-    /// Gets one style source type.
-    pub fn style_source_type(
-        &self,
-        source_id: &str,
-    ) -> Result<OperationHandle<Option<SourceType>>> {
-        let map = self.inner.native()?;
-        let source_id = maplibre_core::string::string_view(source_id);
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_map_get_style_source_type_start(map, source_id.raw(), &mut operation)
-        })?;
-        self.start_operation(operation, OperationKind::StyleSourceType)
     }
 
     /// Copies retained metadata for one style source.
@@ -1198,19 +1166,6 @@ impl super::MapHandle {
         Ok(command_id)
     }
 
-    /// Reads the lowest zoom at which one layer draws.
-    ///
-    /// A layer with no lower bound reports `f64::NEG_INFINITY`.
-    pub fn layer_min_zoom(&self, layer_id: &str) -> Result<OperationHandle<f64>> {
-        let map = self.inner.native()?;
-        let layer_id = maplibre_core::string::string_view(layer_id);
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_map_get_layer_min_zoom_start(map, layer_id.raw(), &mut operation)
-        })?;
-        self.start_operation(operation, OperationKind::LayerMinZoom)
-    }
-
     /// Sets the highest zoom at which one layer draws.
     ///
     /// Pass `f64::INFINITY` for no upper bound.
@@ -1223,19 +1178,6 @@ impl super::MapHandle {
             sys::mln_map_set_layer_max_zoom(map, layer_id.raw(), max_zoom, &mut command_id)
         })?;
         Ok(command_id)
-    }
-
-    /// Reads the highest zoom at which one layer draws.
-    ///
-    /// A layer with no upper bound reports `f64::INFINITY`.
-    pub fn layer_max_zoom(&self, layer_id: &str) -> Result<OperationHandle<f64>> {
-        let map = self.inner.native()?;
-        let layer_id = maplibre_core::string::string_view(layer_id);
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_map_get_layer_max_zoom_start(map, layer_id.raw(), &mut operation)
-        })?;
-        self.start_operation(operation, OperationKind::LayerMaxZoom)
     }
 
     /// Sets whether one layer draws.
@@ -1259,20 +1201,6 @@ impl super::MapHandle {
         Ok(command_id)
     }
 
-    /// Reads whether one layer draws.
-    pub fn layer_visibility(
-        &self,
-        layer_id: &str,
-    ) -> Result<OperationHandle<StyleLayerVisibility>> {
-        let map = self.inner.native()?;
-        let layer_id = maplibre_core::string::string_view(layer_id);
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_map_get_layer_visibility_start(map, layer_id.raw(), &mut operation)
-        })?;
-        self.start_operation(operation, OperationKind::LayerVisibility)
-    }
-
     /// Copies current style source IDs into owned Rust strings.
     pub fn style_source_ids(&self) -> Result<OperationHandle<Vec<String>>> {
         let map = self.inner.native()?;
@@ -1292,34 +1220,49 @@ impl super::MapHandle {
         })?;
         self.start_operation(operation, OperationKind::StyleLayerIds)
     }
-    pub fn remove_style_layer(&self, layer_id: &str) -> Result<OperationHandle<bool>> {
+    /// Removes one style layer by ID and returns its command ID.
+    ///
+    /// The command's finished event reports `Failed` with a not-found status
+    /// code when no layer has the ID.
+    pub fn remove_style_layer(&self, layer_id: &str) -> Result<u64> {
+        let mut command_id = 0;
         let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
-        let mut operation = sys::mln_operation(0);
+        // SAFETY: map is live and layer_id is valid for this call.
         maplibre_core::check(unsafe {
-            sys::mln_map_remove_style_layer_start(map, layer_id.raw(), &mut operation)
+            sys::mln_map_remove_style_layer(map, layer_id.raw(), &mut command_id)
         })?;
-        self.start_operation(operation, OperationKind::RemoveStyleLayer)
+        Ok(command_id)
     }
 
-    pub fn style_layer_exists(&self, layer_id: &str) -> Result<OperationHandle<bool>> {
+    /// Copies fixed metadata for one style layer.
+    ///
+    /// The operation resolves the layer's type, zoom range, visibility, and
+    /// source IDs together; its take returns `None` when no layer carries
+    /// `layer_id`.
+    pub fn style_layer_info(&self, layer_id: &str) -> Result<StyleLayerInfoOperation> {
         let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
-        let mut operation = sys::mln_operation(0);
+        let mut info = sys::mln_operation(0);
         maplibre_core::check(unsafe {
-            sys::mln_map_style_layer_exists_start(map, layer_id.raw(), &mut operation)
+            sys::mln_map_get_style_layer_info_start(map, layer_id.raw(), &mut info)
         })?;
-        self.start_operation(operation, OperationKind::StyleLayerExists)
-    }
-
-    pub fn style_layer_type(&self, layer_id: &str) -> Result<OperationHandle<Option<String>>> {
-        let map = self.inner.native()?;
-        let layer_id = maplibre_core::string::string_view(layer_id);
-        let mut operation = sys::mln_operation(0);
+        let info = self.start_operation(info, OperationKind::StyleLayerInfo)?;
+        let mut source_id = sys::mln_operation(0);
         maplibre_core::check(unsafe {
-            sys::mln_map_get_style_layer_type_start(map, layer_id.raw(), &mut operation)
+            sys::mln_map_copy_layer_source_id_start(map, layer_id.raw(), &mut source_id)
         })?;
-        self.start_operation(operation, OperationKind::StyleLayerType)
+        let source_id = self.start_operation(source_id, OperationKind::LayerSourceId)?;
+        let mut source_layer = sys::mln_operation(0);
+        maplibre_core::check(unsafe {
+            sys::mln_map_copy_layer_source_layer_start(map, layer_id.raw(), &mut source_layer)
+        })?;
+        let source_layer = self.start_operation(source_layer, OperationKind::LayerSourceLayer)?;
+        Ok(StyleLayerInfoOperation {
+            info,
+            source_id,
+            source_layer,
+        })
     }
 
     pub fn move_style_layer(&self, layer_id: &str, before_layer_id: Option<&str>) -> Result<u64> {
@@ -1401,6 +1344,81 @@ impl StyleSourceInfoOperation {
             tile_json.tiles = tiles;
         }
         Ok(Some(info))
+    }
+}
+
+/// Ordered read of fixed metadata for one style layer.
+pub struct StyleLayerInfoOperation {
+    info: OperationHandle<Option<StyleLayerInfo>>,
+    source_id: OperationHandle<String>,
+    source_layer: OperationHandle<String>,
+}
+
+impl StyleLayerInfoOperation {
+    pub fn wait(&self, timeout: Duration) -> Result<bool> {
+        let deadline = Instant::now() + timeout;
+        for completed in [
+            self.info.wait(timeout)?,
+            self.source_id
+                .wait(deadline.saturating_duration_since(Instant::now()))?,
+            self.source_layer
+                .wait(deadline.saturating_duration_since(Instant::now()))?,
+        ] {
+            if !completed {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
+    pub fn is_completed(&self) -> Result<bool> {
+        Ok(self.info.is_completed()?
+            && self.source_id.is_completed()?
+            && self.source_layer.is_completed()?)
+    }
+
+    pub fn cancel(&self) -> Result<()> {
+        self.info.cancel()?;
+        self.source_id.cancel()?;
+        self.source_layer.cancel()
+    }
+
+    pub fn take(&self) -> Result<Option<StyleLayerInfo>> {
+        if !self.is_completed()? {
+            return Err(Error::new(
+                ErrorKind::InvalidState,
+                None,
+                "style layer info operation has not completed",
+            ));
+        }
+        let mut raw = maplibre_core::style::empty_style_layer_info();
+        let mut found = false;
+        self.info.with_result_operation(|operation| {
+            maplibre_core::check(unsafe {
+                sys::mln_map_get_style_layer_info_take_result(operation, &mut raw, &mut found)
+            })
+        })?;
+        if !found {
+            // The source-ID copies failed on the same missing layer, so they
+            // hold no results; dropping this wrapper releases them.
+            return Ok(None);
+        }
+        let source_id = if raw.fields & sys::MLN_STYLE_LAYER_INFO_SOURCE_ID != 0 {
+            Some(self.source_id.take()?)
+        } else {
+            self.source_id.discard()?;
+            None
+        };
+        let source_layer = if raw.fields & sys::MLN_STYLE_LAYER_INFO_SOURCE_LAYER != 0 {
+            Some(self.source_layer.take()?)
+        } else {
+            self.source_layer.discard()?;
+            None
+        };
+        // SAFETY: the take filled raw, whose type field views a style-spec
+        // string that stays valid for the process's life.
+        unsafe { maplibre_core::style::style_layer_info_from_native(&raw, source_id, source_layer) }
+            .map(Some)
     }
 }
 
@@ -1511,11 +1529,6 @@ impl OperationHandle<Option<String>> {
                             &mut found,
                         )
                     }
-                    OperationKind::StyleLayerType => sys::mln_map_get_style_layer_type_take_result(
-                        operation,
-                        out.as_mut_ptr(),
-                        &mut found,
-                    ),
                     _ => sys::MLN_STATUS_INVALID_STATE,
                 }
             };
@@ -1571,52 +1584,6 @@ impl OperationHandle<Option<Vec<u8>>> {
             return Ok(None);
         }
         unsafe { maplibre_core::string::copy_owned_buffer(out.get()) }.map(Some)
-    }
-}
-
-impl OperationHandle<bool> {
-    pub fn take(&self) -> Result<bool> {
-        let mut value = false;
-        self.with_result_operation(|operation| {
-            let status = unsafe {
-                match self.operation_kind {
-                    OperationKind::RemoveStyleSource => {
-                        sys::mln_map_remove_style_source_take_result(operation, &mut value)
-                    }
-                    OperationKind::StyleSourceExists => {
-                        sys::mln_map_style_source_exists_take_result(operation, &mut value)
-                    }
-                    OperationKind::RemoveStyleImage => {
-                        sys::mln_map_remove_style_image_take_result(operation, &mut value)
-                    }
-                    OperationKind::StyleImageExists => {
-                        sys::mln_map_style_image_exists_take_result(operation, &mut value)
-                    }
-                    OperationKind::RemoveStyleLayer => {
-                        sys::mln_map_remove_style_layer_take_result(operation, &mut value)
-                    }
-                    OperationKind::StyleLayerExists => {
-                        sys::mln_map_style_layer_exists_take_result(operation, &mut value)
-                    }
-                    _ => sys::MLN_STATUS_INVALID_STATE,
-                }
-            };
-            maplibre_core::check(status)
-        })?;
-        Ok(value)
-    }
-}
-
-impl OperationHandle<Option<SourceType>> {
-    pub fn take(&self) -> Result<Option<SourceType>> {
-        let mut raw = sys::MLN_STYLE_SOURCE_TYPE_UNKNOWN;
-        let mut found = false;
-        self.with_result_operation(|operation| {
-            maplibre_core::check(unsafe {
-                sys::mln_map_get_style_source_type_take_result(operation, &mut raw, &mut found)
-            })
-        })?;
-        Ok(found.then(|| SourceType::from_raw(raw)))
     }
 }
 
@@ -1792,39 +1759,6 @@ impl OperationHandle<StyleTransitionOptions> {
         Ok(maplibre_core::style::style_transition_options_from_native(
             &raw,
         ))
-    }
-}
-
-impl OperationHandle<f64> {
-    pub fn take(&self) -> Result<f64> {
-        let mut value = 0.0;
-        self.with_result_operation(|operation| {
-            let status = unsafe {
-                match self.operation_kind {
-                    OperationKind::LayerMinZoom => {
-                        sys::mln_map_get_layer_min_zoom_take_result(operation, &mut value)
-                    }
-                    OperationKind::LayerMaxZoom => {
-                        sys::mln_map_get_layer_max_zoom_take_result(operation, &mut value)
-                    }
-                    _ => sys::MLN_STATUS_INVALID_STATE,
-                }
-            };
-            maplibre_core::check(status)
-        })?;
-        Ok(value)
-    }
-}
-
-impl OperationHandle<StyleLayerVisibility> {
-    pub fn take(&self) -> Result<StyleLayerVisibility> {
-        let mut value = 0;
-        self.with_result_operation(|operation| {
-            maplibre_core::check(unsafe {
-                sys::mln_map_get_layer_visibility_take_result(operation, &mut value)
-            })
-        })?;
-        Ok(StyleLayerVisibility::from_raw(value))
     }
 }
 

@@ -164,7 +164,6 @@ class RuntimeEventSourceType(UnknownIntEnum):
 
     RUNTIME = 0
     MAP = 1
-    PROJECTION = 2
 
 
 class NotificationEndpointKind(UnknownIntEnum):
@@ -317,6 +316,11 @@ class CommandFinishedPayload:
     command_id: int
     disposition: CommandDisposition
     generation: int
+    """Map snapshot generation that published a committed command's effect.
+
+    Every committed map command publishes a map snapshot; a snapshot whose
+    generation is at or past this value observes the commit.
+    """
 
     @classmethod
     def _from_runtime_payload(

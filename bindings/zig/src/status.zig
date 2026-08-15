@@ -14,6 +14,7 @@ pub const NativeStatusError = error{
     Busy,
     TargetLost,
     NotReady,
+    NotFound,
     NativeError,
     UnknownStatus,
 };
@@ -77,6 +78,13 @@ fn copyThreadLastErrorMessage(
     return null;
 }
 
+/// Converts a raw native status into this binding's error set without touching
+/// diagnostics: void for MLN_STATUS_OK, the mapped error otherwise.
+pub fn errorFromRawStatus(raw_status: i32) NativeStatusError!void {
+    if (raw_status == c.MLN_STATUS_OK) return;
+    return nativeStatusError(raw_status);
+}
+
 fn nativeStatusError(raw_status: i32) NativeStatusError {
     return switch (raw_status) {
         c.MLN_STATUS_INVALID_ARGUMENT => error.InvalidArgument,
@@ -86,6 +94,7 @@ fn nativeStatusError(raw_status: i32) NativeStatusError {
         c.MLN_STATUS_BUSY => error.Busy,
         c.MLN_STATUS_TARGET_LOST => error.TargetLost,
         c.MLN_STATUS_NOT_READY => error.NotReady,
+        c.MLN_STATUS_NOT_FOUND => error.NotFound,
         c.MLN_STATUS_NATIVE_ERROR => error.NativeError,
         c.MLN_STATUS_CANCELLED => error.Cancelled,
         else => error.UnknownStatus,
@@ -101,6 +110,7 @@ test "native status values map to stable Zig errors" {
     try std.testing.expectError(error.Busy, checkStatus(c.MLN_STATUS_BUSY, null));
     try std.testing.expectError(error.TargetLost, checkStatus(c.MLN_STATUS_TARGET_LOST, null));
     try std.testing.expectError(error.NotReady, checkStatus(c.MLN_STATUS_NOT_READY, null));
+    try std.testing.expectError(error.NotFound, checkStatus(c.MLN_STATUS_NOT_FOUND, null));
     try std.testing.expectError(error.NativeError, checkStatus(c.MLN_STATUS_NATIVE_ERROR, null));
     try checkStatus(c.MLN_STATUS_OK, null);
 }

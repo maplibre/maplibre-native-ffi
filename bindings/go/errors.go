@@ -34,6 +34,9 @@ var (
 	ErrTargetLost = errors.New("maplibre: target lost")
 	// ErrNotReady reports that a nonblocking call has no result yet.
 	ErrNotReady = errors.New("maplibre: not ready")
+	// ErrNotFound reports a command or operation that named an ID with no live
+	// object behind it.
+	ErrNotFound = errors.New("maplibre: not found")
 	// ErrABIVersionMismatch reports that the loaded C ABI version is
 	// incompatible with this binding.
 	ErrABIVersionMismatch = errors.New("maplibre: ABI version mismatch")
@@ -137,6 +140,8 @@ func kindForStatus(status int32) error {
 		return ErrTargetLost
 	case int32(C.MLN_STATUS_NOT_READY):
 		return ErrNotReady
+	case int32(C.MLN_STATUS_NOT_FOUND):
+		return ErrNotFound
 	default:
 		return ErrUnknownStatus
 	}

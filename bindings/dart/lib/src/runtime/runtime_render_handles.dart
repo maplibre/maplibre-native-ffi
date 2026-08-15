@@ -1,11 +1,15 @@
 part of 'runtime.dart';
 
-/// Standalone projection helper snapshot from a map transform.
+/// Owned standalone projection snapshot created from a map.
+///
+/// Every method is synchronous, runs on the calling isolate's thread, is
+/// internally serialized, and may be called from any isolate. A projection
+/// copies the map's transform state at creation and never observes map
+/// changes made after that; a live projection prevents its map from closing.
 final class MapProjectionHandle {
-  MapProjectionHandle._(this._runtime, NativeMapProjection handle)
+  MapProjectionHandle._(NativeMapProjection handle)
     : _state = NativeHandleState(handle, 'MapProjectionHandle');
 
-  final RuntimeHandle _runtime;
   final NativeHandleState<NativeMapProjection> _state;
 
   /// Whether this projection helper has been closed by the Dart binding.
@@ -13,53 +17,35 @@ final class MapProjectionHandle {
 
   NativeMapProjection get _handle => _state.handle;
 
-  /// Reads the current projection camera after prior commands.
-  Future<CameraOptions> camera() {
-    final operation = withNativeArena((arena) {
-      final outOperation = arena<Uint64>()..value = 0;
-      _check(
-        raw.mln_map_projection_get_camera_start(_handle.raw, outOperation),
-      );
-      return outOperation.value;
-    });
-    return _runtime._takeOperation(operation, () {
-      return withNativeArena((arena) {
-        final outCamera = arena<raw.mln_camera_options>();
-        outCamera.ref.size = sizeOf<raw.mln_camera_options>();
-        _check(
-          raw.mln_map_projection_get_camera_take_result(operation, outCamera),
-        );
-        return native_struct.cameraOptionsFromNative(outCamera.ref);
-      });
+  /// Copies the projection camera, observing every earlier projection setter.
+  CameraOptions camera() {
+    return withNativeArena((arena) {
+      final outCamera = arena<raw.mln_camera_options>();
+      outCamera.ref.size = sizeOf<raw.mln_camera_options>();
+      _check(raw.mln_map_projection_get_camera(_handle.raw, outCamera));
+      return native_struct.cameraOptionsFromNative(outCamera.ref);
     });
   }
 
-  /// Applies camera fields and returns the accepted command ID.
-  BigInt setCamera(CameraOptions camera) {
-    return withNativeArena((arena) {
+  /// Applies camera fields before returning, so a later read or conversion
+  /// observes them. The map's camera is unaffected.
+  void setCamera(CameraOptions camera) {
+    withNativeArena((arena) {
       final nativeCamera = arena<raw.mln_camera_options>();
       nativeCamera.ref = native_struct.cameraOptionsToNative(
         camera,
         raw.mln_camera_options_default(),
       );
-      final outCommandId = arena<Uint64>();
-      _check(
-        raw.mln_map_projection_set_camera(
-          _handle.raw,
-          nativeCamera,
-          outCommandId,
-        ),
-      );
-      return uint64FromNative(outCommandId.value);
+      _check(raw.mln_map_projection_set_camera(_handle.raw, nativeCamera));
     });
   }
 
-  /// Fits coordinates and returns the accepted command ID.
-  BigInt setVisibleCoordinates(
+  /// Applies a camera fit for [coordinates] before returning.
+  void setVisibleCoordinates(
     List<LatLng> coordinates, {
     EdgeInsets padding = const EdgeInsets(),
   }) {
-    return withNativeArena((arena) {
+    withNativeArena((arena) {
       final nativeCoordinates = coordinates.isEmpty
           ? nullptr.cast<raw.mln_lat_lng>()
           : arena<raw.mln_lat_lng>(coordinates.length);
@@ -68,104 +54,71 @@ final class MapProjectionHandle {
           coordinates[index],
         );
       }
-      final outCommandId = arena<Uint64>();
       _check(
         raw.mln_map_projection_set_visible_coordinates(
           _handle.raw,
           nativeCoordinates,
           coordinates.length,
           native_struct.edgeInsetsToNative(padding),
-          outCommandId,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
-  /// Fits geometry and returns the accepted command ID.
-  BigInt setVisibleGeometry(
+  /// Applies a camera fit for GeoJSON Geometry bytes before returning.
+  void setVisibleGeometry(
     Uint8List geometry, {
     EdgeInsets padding = const EdgeInsets(),
   }) {
-    return withNativeArena((arena) {
+    withNativeArena((arena) {
       final nativeGeometry = nativeBufferView(geometry, arena);
-      final outCommandId = arena<Uint64>();
       _check(
         raw.mln_map_projection_set_visible_geometry(
           _handle.raw,
           nativeGeometry,
           native_struct.edgeInsetsToNative(padding),
-          outCommandId,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
-  /// Converts a geographic coordinate after prior commands.
-  Future<ScreenPoint> pixelForLatLng(LatLng coordinate) {
-    final operation = withNativeArena((arena) {
-      final outOperation = arena<Uint64>()..value = 0;
+  /// Converts a geographic coordinate to a logical-pixel screen point.
+  ScreenPoint pixelForLatLng(LatLng coordinate) {
+    return withNativeArena((arena) {
+      final outPoint = arena<raw.mln_screen_point>();
       _check(
-        raw.mln_map_projection_pixel_for_lat_lng_start(
+        raw.mln_map_projection_pixel_for_lat_lng(
           _handle.raw,
           native_struct.latLngToNative(coordinate),
-          outOperation,
+          outPoint,
         ),
       );
-      return outOperation.value;
-    });
-    return _runtime._takeOperation(operation, () {
-      return withNativeArena((arena) {
-        final outPoint = arena<raw.mln_screen_point>();
-        _check(
-          raw.mln_map_projection_pixel_for_lat_lng_take_result(
-            operation,
-            outPoint,
-          ),
-        );
-        return native_struct.screenPointFromNative(outPoint.ref);
-      });
+      return native_struct.screenPointFromNative(outPoint.ref);
     });
   }
 
-  /// Converts a screen point after prior commands.
-  Future<LatLng> latLngForPixel(ScreenPoint point) {
-    final operation = withNativeArena((arena) {
-      final outOperation = arena<Uint64>()..value = 0;
+  /// Converts a logical-pixel screen point to a geographic coordinate.
+  LatLng latLngForPixel(ScreenPoint point) {
+    return withNativeArena((arena) {
+      final outCoordinate = arena<raw.mln_lat_lng>();
       _check(
-        raw.mln_map_projection_lat_lng_for_pixel_start(
+        raw.mln_map_projection_lat_lng_for_pixel(
           _handle.raw,
           native_struct.screenPointToNative(point),
-          outOperation,
+          outCoordinate,
         ),
       );
-      return outOperation.value;
-    });
-    return _runtime._takeOperation(operation, () {
-      return withNativeArena((arena) {
-        final outCoordinate = arena<raw.mln_lat_lng>();
-        _check(
-          raw.mln_map_projection_lat_lng_for_pixel_take_result(
-            operation,
-            outCoordinate,
-          ),
-        );
-        return native_struct.latLngFromNative(outCoordinate.ref);
-      });
+      return native_struct.latLngFromNative(outCoordinate.ref);
     });
   }
 
-  /// Closes the projection helper after prior commands.
-  Future<void> close() async {
-    await _state.closeAsync((handle) async {
-      final operation = withNativeArena((arena) {
-        final outOperation = arena<Uint64>()..value = 0;
-        _check(raw.mln_map_projection_close_start(handle.raw, outOperation));
-        return outOperation.value;
-      });
-      await _runtime._finishOperation(operation);
-    });
+  /// Closes the projection, waiting for projection calls already running on
+  /// other threads, and releases its map reservation before returning.
+  void close() {
+    _state.close(
+      (handle) => raw.mln_map_projection_close(handle.raw),
+      _c.threadLastErrorMessage,
+    );
   }
 }
 

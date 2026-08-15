@@ -174,17 +174,12 @@ pub const OperationKind = enum {
     map_still_image,
     map_loaded_style_json,
     map_style_url,
-    map_remove_style_source,
-    map_style_source_exists,
-    map_get_style_source_type,
     map_get_style_source_info,
     map_copy_style_source_attribution,
     map_copy_style_source_url,
     map_get_style_source_tile_urls,
     map_list_style_source_ids,
-    map_remove_style_layer,
-    map_style_layer_exists,
-    map_get_style_layer_type,
+    map_get_style_layer_info,
     map_list_style_layer_ids,
     map_get_style_layer_json,
     map_get_style_light_property,
@@ -193,11 +188,6 @@ pub const OperationKind = enum {
     map_get_layer_filter,
     map_copy_layer_source_layer,
     map_copy_layer_source_id,
-    map_get_layer_min_zoom,
-    map_get_layer_max_zoom,
-    map_get_layer_visibility,
-    map_remove_style_image,
-    map_style_image_exists,
     map_get_style_image_info,
     map_copy_style_image_pixels,
     map_copy_style_image_stretches,
@@ -234,9 +224,8 @@ pub const OperationResultKind = enum {
     none,
     camera,
     region,
-    boolean,
-    optional_style_source_type,
     optional_style_source_info,
+    optional_style_layer_info,
     optional_string,
     string,
     string_list,
@@ -244,8 +233,6 @@ pub const OperationResultKind = enum {
     optional_style_image_info,
     optional_image_stretches,
     optional_coordinates,
-    number,
-    style_layer_visibility,
     optional_region,
     region_list,
     region_status,
@@ -651,8 +638,9 @@ pub const RuntimeEvent = struct {
     payload_type: RuntimeEventPayloadType,
     /// Secondary detail whose meaning `event_type` selects: a raw
     /// `CameraChangeMode` for camera change events, MapLibre Native's map load
-    /// error ordinal for `map_loading_failed`, and 0 for every other event
-    /// type.
+    /// error ordinal for `map_loading_failed`, the final raw status for
+    /// `command_finished` (also carried typed on the payload), and 0 for every
+    /// other event type.
     code: i32,
     message: []const u8,
     payload: RuntimeEventPayload,
@@ -939,6 +927,13 @@ pub const CommandDisposition = union(enum) {
 pub const CommandFinishedPayload = struct {
     command_id: u64,
     disposition: CommandDisposition,
+    /// The command's final status: void for a committed command, and the
+    /// failure a failed disposition reports otherwise (for example
+    /// `error.NotFound` for a style removal whose ID named nothing).
+    status: status.NativeStatusError!void,
+    /// The map snapshot generation the commit published, or zero when the
+    /// command committed no generation. A later snapshot that reports this
+    /// generation or a newer one observes the commit.
     generation: u64,
 };
 
@@ -2647,6 +2642,7 @@ fn payloadFromNative(native_event: c.mln_runtime_event, window: []const u8) Runt
             .command_finished = .{
                 .command_id = native_event.payload.command_finished.command_id,
                 .disposition = CommandDisposition.fromRaw(native_event.payload.command_finished.disposition),
+                .status = status.errorFromRawStatus(native_event.code),
                 .generation = native_event.payload.command_finished.generation,
             },
         },

@@ -2,8 +2,11 @@ const std = @import("std");
 const testing = std.testing;
 
 const maplibre = @import("maplibre_native_ffi");
+const support = @import("support.zig");
 
-test "map debug options round trip and diagnostics toggles" {
+// The committed event fences the snapshot: a snapshot whose generation is at
+// or past the commit's observes the committed value.
+test "map debug options fence and round trip through the snapshot" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try maplibre.MapHandle.create(&runtime, .{});
@@ -14,57 +17,56 @@ test "map debug options round trip and diagnostics toggles" {
         .collision = true,
         .depth_buffer = true,
     };
-    _ = try map.setDebugOptions(debug);
+    const command_id = try map.setDebugOptions(debug);
+    const snapshot = try support.snapshotAfterCommand(&runtime, &map, command_id);
+    try testing.expect(snapshot.debug_options.tile_borders);
+    try testing.expect(snapshot.debug_options.collision);
+    try testing.expect(snapshot.debug_options.depth_buffer);
+    try testing.expect(!snapshot.debug_options.overdraw);
 
-    const snapshot = try map.getDebugOptions();
-    try testing.expect(snapshot.tile_borders);
-    try testing.expect(snapshot.collision);
-    try testing.expect(snapshot.depth_buffer);
-    try testing.expect(!snapshot.overdraw);
+    try testing.expect(!snapshot.rendering_stats_view_enabled);
+    const stats_id = try map.setRenderingStatsViewEnabled(true);
+    const stats_snapshot = try support.snapshotAfterCommand(&runtime, &map, stats_id);
+    try testing.expect(stats_snapshot.rendering_stats_view_enabled);
 
-    try testing.expect(!try map.getRenderingStatsViewEnabled());
-    _ = try map.setRenderingStatsViewEnabled(true);
-    try testing.expect(try map.getRenderingStatsViewEnabled());
-
-    _ = try map.isFullyLoaded();
     _ = try map.dumpDebugLogs();
 }
 
-test "map viewport options update selected fields through public descriptors" {
+test "map viewport options update selected snapshot fields" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
 
-    _ = try map.setViewportOptions(.{
+    const command_id = try map.setViewportOptions(.{
         .north_orientation = .right,
         .constrain_mode = .width_and_height,
         .viewport_mode = .flipped_y,
         .frustum_offset = .{ .top = 1.0, .left = 2.0, .bottom = 3.0, .right = 4.0 },
     });
 
-    var snapshot = try map.getViewportOptions();
-    try testing.expectEqual(maplibre.NorthOrientation.right, snapshot.north_orientation.?);
-    try testing.expectEqual(maplibre.ConstrainMode.width_and_height, snapshot.constrain_mode.?);
-    try testing.expectEqual(maplibre.ViewportMode.flipped_y, snapshot.viewport_mode.?);
-    try testing.expectApproxEqAbs(@as(f64, 1.0), snapshot.frustum_offset.?.top, 0.000001);
-    try testing.expectApproxEqAbs(@as(f64, 2.0), snapshot.frustum_offset.?.left, 0.000001);
-    try testing.expectApproxEqAbs(@as(f64, 3.0), snapshot.frustum_offset.?.bottom, 0.000001);
-    try testing.expectApproxEqAbs(@as(f64, 4.0), snapshot.frustum_offset.?.right, 0.000001);
+    var snapshot = try support.snapshotAfterCommand(&runtime, &map, command_id);
+    try testing.expectEqual(maplibre.NorthOrientation.right, snapshot.viewport.north_orientation.?);
+    try testing.expectEqual(maplibre.ConstrainMode.width_and_height, snapshot.viewport.constrain_mode.?);
+    try testing.expectEqual(maplibre.ViewportMode.flipped_y, snapshot.viewport.viewport_mode.?);
+    try testing.expectApproxEqAbs(@as(f64, 1.0), snapshot.viewport.frustum_offset.?.top, 0.000001);
+    try testing.expectApproxEqAbs(@as(f64, 2.0), snapshot.viewport.frustum_offset.?.left, 0.000001);
+    try testing.expectApproxEqAbs(@as(f64, 3.0), snapshot.viewport.frustum_offset.?.bottom, 0.000001);
+    try testing.expectApproxEqAbs(@as(f64, 4.0), snapshot.viewport.frustum_offset.?.right, 0.000001);
 
-    _ = try map.setViewportOptions(.{ .north_orientation = .down });
-    snapshot = try map.getViewportOptions();
-    try testing.expectEqual(maplibre.NorthOrientation.down, snapshot.north_orientation.?);
-    try testing.expectEqual(maplibre.ConstrainMode.width_and_height, snapshot.constrain_mode.?);
+    const narrowed_id = try map.setViewportOptions(.{ .north_orientation = .down });
+    snapshot = try support.snapshotAfterCommand(&runtime, &map, narrowed_id);
+    try testing.expectEqual(maplibre.NorthOrientation.down, snapshot.viewport.north_orientation.?);
+    try testing.expectEqual(maplibre.ConstrainMode.width_and_height, snapshot.viewport.constrain_mode.?);
 }
 
-test "map tile options update selected fields through public descriptors" {
+test "map tile options update selected snapshot fields" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
 
-    _ = try map.setTileOptions(.{
+    const command_id = try map.setTileOptions(.{
         .prefetch_zoom_delta = 2,
         .lod_min_radius = 1.5,
         .lod_scale = 2.5,
@@ -73,18 +75,18 @@ test "map tile options update selected fields through public descriptors" {
         .lod_mode = .distance,
     });
 
-    var snapshot = try map.getTileOptions();
-    try testing.expectEqual(@as(u32, 2), snapshot.prefetch_zoom_delta.?);
-    try testing.expectApproxEqAbs(@as(f64, 1.5), snapshot.lod_min_radius.?, 0.000001);
-    try testing.expectApproxEqAbs(@as(f64, 2.5), snapshot.lod_scale.?, 0.000001);
-    try testing.expectApproxEqAbs(@as(f64, 0.75), snapshot.lod_pitch_threshold.?, 0.000001);
-    try testing.expectApproxEqAbs(@as(f64, -1.0), snapshot.lod_zoom_shift.?, 0.000001);
-    try testing.expectEqual(maplibre.TileLodMode.distance, snapshot.lod_mode.?);
+    var snapshot = try support.snapshotAfterCommand(&runtime, &map, command_id);
+    try testing.expectEqual(@as(u32, 2), snapshot.tile.prefetch_zoom_delta.?);
+    try testing.expectApproxEqAbs(@as(f64, 1.5), snapshot.tile.lod_min_radius.?, 0.000001);
+    try testing.expectApproxEqAbs(@as(f64, 2.5), snapshot.tile.lod_scale.?, 0.000001);
+    try testing.expectApproxEqAbs(@as(f64, 0.75), snapshot.tile.lod_pitch_threshold.?, 0.000001);
+    try testing.expectApproxEqAbs(@as(f64, -1.0), snapshot.tile.lod_zoom_shift.?, 0.000001);
+    try testing.expectEqual(maplibre.TileLodMode.distance, snapshot.tile.lod_mode.?);
 
-    _ = try map.setTileOptions(.{ .prefetch_zoom_delta = 7 });
-    snapshot = try map.getTileOptions();
-    try testing.expectEqual(@as(u32, 7), snapshot.prefetch_zoom_delta.?);
-    try testing.expectEqual(maplibre.TileLodMode.distance, snapshot.lod_mode.?);
+    const narrowed_id = try map.setTileOptions(.{ .prefetch_zoom_delta = 7 });
+    snapshot = try support.snapshotAfterCommand(&runtime, &map, narrowed_id);
+    try testing.expectEqual(@as(u32, 7), snapshot.tile.prefetch_zoom_delta.?);
+    try testing.expectEqual(maplibre.TileLodMode.distance, snapshot.tile.lod_mode.?);
 }
 
 test "map tuning public descriptors report invalid native arguments" {

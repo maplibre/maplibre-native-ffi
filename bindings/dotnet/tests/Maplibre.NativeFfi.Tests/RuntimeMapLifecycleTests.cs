@@ -84,7 +84,7 @@ public sealed class RuntimeMapLifecycleTests
 
     [BindingSpecTest("BND-100")]
     [Fact]
-    public async Task MapDebugSettingsRoundTripThroughNativeMap()
+    public void CommittedCommandIsVisibleInSnapshotsAtOrPastItsGeneration()
     {
         using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
         using var map = TestHandles.CreateMap(
@@ -93,18 +93,36 @@ public sealed class RuntimeMapLifecycleTests
         );
 
         var options = DebugOptions.TileBorders | DebugOptions.ParseStatus;
-        map.SetDebugOptions(options);
-        map.SetRenderingStatsViewEnabled(true);
+        var commandId = map.SetDebugOptions(options);
+        var finished = RuntimeEventTestHelpers.WaitForCommand(runtime, commandId);
+        var completion = Assert.IsType<RuntimeEventPayload.CommandFinished>(finished.Payload);
+        Assert.Equal(CommandDisposition.Committed, completion.Disposition);
 
-        Assert.Equal(
-            options,
-            await map.GetDebugOptionsAsync(TestContext.Current.CancellationToken)
-        );
-        Assert.True(
-            await map.GetRenderingStatsViewEnabledAsync(TestContext.Current.CancellationToken)
-        );
-        _ = await map.IsFullyLoadedAsync(TestContext.Current.CancellationToken);
+        // The published snapshot fence: a snapshot at or past the commit's generation
+        // observes the committed value.
+        var snapshot = map.GetSnapshot();
+        Assert.True(snapshot.Generation >= completion.Generation);
+        Assert.Equal(options, snapshot.DebugOptions);
+        Assert.False(snapshot.FullyLoaded);
         map.DumpDebugLogs();
+    }
+
+    [BindingSpecTest("BND-100")]
+    [Fact]
+    public void RenderingStatsViewEnabledRoundTripsThroughSnapshot()
+    {
+        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
+        using var map = TestHandles.CreateMap(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 }
+        );
+
+        Assert.False(map.GetSnapshot().RenderingStatsViewEnabled);
+        var commandId = map.SetRenderingStatsViewEnabled(true);
+        var finished = RuntimeEventTestHelpers.WaitForCommand(runtime, commandId);
+        var completion = Assert.IsType<RuntimeEventPayload.CommandFinished>(finished.Payload);
+        Assert.Equal(CommandDisposition.Committed, completion.Disposition);
+        Assert.True(map.GetSnapshot().RenderingStatsViewEnabled);
     }
 
     [Fact]

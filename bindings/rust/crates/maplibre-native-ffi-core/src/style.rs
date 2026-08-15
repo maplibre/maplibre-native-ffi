@@ -4,7 +4,8 @@ use std::ptr;
 use maplibre_native_ffi_sys as sys;
 
 use crate::enums::{
-    RasterDemEncoding, SourceType, StyleImageTextFit, TileScheme, VectorTileEncoding,
+    RasterDemEncoding, SourceType, StyleImageTextFit, StyleLayerVisibility, TileScheme,
+    VectorTileEncoding,
 };
 use crate::string::{StringView, buffer_view, string_view};
 use crate::values::{
@@ -380,6 +381,60 @@ pub fn style_source_info_from_native(
         raster_dem_encoding: has(sys::MLN_STYLE_SOURCE_INFO_RASTER_ENCODING)
             .then(|| RasterDemEncoding::from_raw(info.raster_encoding)),
     }
+}
+
+/// Copied fixed metadata for one style layer.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct StyleLayerInfo {
+    /// Style-spec layer type string, such as `fill` or `background`.
+    pub layer_type: String,
+    /// Lowest zoom at which the layer draws; `f64::NEG_INFINITY` with no lower
+    /// bound.
+    pub min_zoom: f64,
+    /// Highest zoom at which the layer draws; `f64::INFINITY` with no upper
+    /// bound.
+    pub max_zoom: f64,
+    pub visibility: StyleLayerVisibility,
+    /// Source ID; `None` for layer types that take no source.
+    pub source_id: Option<String>,
+    /// Source-layer ID; `None` when the layer carries none.
+    pub source_layer: Option<String>,
+}
+
+pub fn empty_style_layer_info() -> sys::mln_style_layer_info {
+    sys::mln_style_layer_info {
+        size: std::mem::size_of::<sys::mln_style_layer_info>() as u32,
+        fields: 0,
+        type_: buffer_view(&[]),
+        min_zoom: 0.0,
+        max_zoom: 0.0,
+        visibility: sys::MLN_STYLE_LAYER_VISIBILITY_VISIBLE,
+        source_id_size: 0,
+        source_layer_size: 0,
+    }
+}
+
+/// Converts a filled native layer-info struct plus separately copied strings.
+///
+/// # Safety
+///
+/// `info.type_` must view readable bytes for this call.
+pub unsafe fn style_layer_info_from_native(
+    info: &sys::mln_style_layer_info,
+    source_id: Option<String>,
+    source_layer: Option<String>,
+) -> crate::Result<StyleLayerInfo> {
+    // SAFETY: The caller promises the type view is readable.
+    let layer_type = unsafe { crate::string::copy_string_view(info.type_) }?;
+    Ok(StyleLayerInfo {
+        layer_type,
+        min_zoom: info.min_zoom,
+        max_zoom: info.max_zoom,
+        visibility: StyleLayerVisibility::from_raw(info.visibility),
+        source_id,
+        source_layer,
+    })
 }
 
 /// Copied runtime style image pixels with style-specific metadata.

@@ -2,6 +2,7 @@ const std = @import("std");
 const testing = std.testing;
 
 const maplibre = @import("maplibre_native_ffi");
+const support = @import("support.zig");
 
 const center = maplibre.LatLng{ .latitude = 37.7749, .longitude = -122.4194 };
 
@@ -131,16 +132,19 @@ test "camera constraints and free camera options round-trip public values" {
         .min_pitch = 0.0,
         .max_pitch = 45.0,
     };
-    _ = try map.setBounds(constraints);
-    const copied_constraints = try map.getBounds();
+    const bounds_id = try map.setBounds(constraints);
+    const bounded = try support.snapshotAfterCommand(&runtime, &map, bounds_id);
+    const copied_constraints = bounded.bounds;
     try testing.expect(copied_constraints.bounds != null);
     try testing.expectApproxEqAbs(constraints.min_zoom.?, copied_constraints.min_zoom.?, 0.000001);
     try testing.expectApproxEqAbs(constraints.max_pitch.?, copied_constraints.max_pitch.?, 0.000001);
 
-    const free_camera = try map.getFreeCameraOptions();
+    const free_camera = bounded.free_camera;
     try testing.expect(free_camera.position != null);
     try testing.expect(free_camera.orientation != null);
-    _ = try map.setFreeCameraOptions(.{ .orientation = free_camera.orientation });
+    const free_camera_id = try map.setFreeCameraOptions(.{ .orientation = free_camera.orientation });
+    const oriented = try support.snapshotAfterCommand(&runtime, &map, free_camera_id);
+    try testing.expect(oriented.free_camera.orientation != null);
 }
 
 fn jumpedLongitude(map: *maplibre.MapHandle, longitude: f64) !f64 {
@@ -157,24 +161,24 @@ test "camera bounds separate the unbounded constraint from world bounds" {
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
 
-    const pristine = try map.getBounds();
+    const pristine = (try map.snapshot()).bounds;
     try testing.expectEqual(.unbounded, std.meta.activeTag(pristine.bounds.?));
     try testing.expectApproxEqAbs(@as(f64, -160.0), try jumpedLongitude(&map, 200.0), 1e-6);
 
-    _ = try map.setBounds(.{ .bounds = .{ .bounded = .{
+    const world_id = try map.setBounds(.{ .bounds = .{ .bounded = .{
         .southwest = .{ .latitude = -90.0, .longitude = -180.0 },
         .northeast = .{ .latitude = 90.0, .longitude = 180.0 },
     } } });
 
-    const world = try map.getBounds();
+    const world = (try support.snapshotAfterCommand(&runtime, &map, world_id)).bounds;
     switch (world.bounds.?) {
         .bounded => |bounds| try testing.expectApproxEqAbs(@as(f64, 180.0), bounds.northeast.longitude, 1e-6),
         .unbounded => return error.TestExpectedBoundedConstraint,
     }
     try testing.expectApproxEqAbs(@as(f64, 180.0), try jumpedLongitude(&map, 200.0), 1e-6);
 
-    _ = try map.setBounds(.{ .bounds = .unbounded });
-    const released = try map.getBounds();
+    const released_id = try map.setBounds(.{ .bounds = .unbounded });
+    const released = (try support.snapshotAfterCommand(&runtime, &map, released_id)).bounds;
     try testing.expectEqual(.unbounded, std.meta.activeTag(released.bounds.?));
     try testing.expectApproxEqAbs(@as(f64, -160.0), try jumpedLongitude(&map, 200.0), 1e-6);
 }

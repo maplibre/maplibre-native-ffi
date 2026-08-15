@@ -1,3 +1,4 @@
+import CMaplibreNativeC
 import Foundation
 @testable import MaplibreNativeFFI
 import Testing
@@ -91,6 +92,69 @@ import Testing
   let ordered = try await map.queryCamera()
   #expect(ordered.generation >= before.generation)
   #expect(abs((ordered.camera.zoom ?? 0) - 6) < 0.000001)
+}
+
+/// A committed mutation's finished event reports the generation its commit
+/// published, and a snapshot at or past that generation observes the value.
+@Test func snapshotObservesACommittedCommandAtItsGeneration() async throws {
+  let runtime = try await RuntimeHandle(
+    options: RuntimeOptions(cachePath: ":memory:")
+  )
+  defer { try? runtime.closeBlockingForTests() }
+  let map = try await MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 64, height: 64)
+  )
+  defer { try? map.closeBlockingForTests() }
+
+  let command = try map.setDebugOptions([.tileBorders])
+  let result = try #require(try await commandFinished(
+    command, runtime: runtime
+  ))
+  #expect(result.finished
+    .disposition == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+  #expect(result.finished.generation > 0)
+
+  let snapshot = try map.snapshot()
+  #expect(snapshot.generation >= result.finished.generation)
+  #expect(snapshot.debugOptions == [.tileBorders])
+}
+
+/// The snapshot's tile, bound, and free-camera fields observe their set
+/// commands.
+@Test func snapshotFieldsRoundTripThroughTheirSetCommands() async throws {
+  let runtime = try await RuntimeHandle(
+    options: RuntimeOptions(cachePath: ":memory:")
+  )
+  defer { try? runtime.closeBlockingForTests() }
+  let map = try await MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 64, height: 64)
+  )
+  defer { try? map.closeBlockingForTests() }
+
+  _ = try map.setTileOptions(MapTileOptions(prefetchZoomDelta: 5, lodScale: 2))
+  _ = try map.setBounds(BoundOptions(minZoom: 2, maxZoom: 15, maxPitch: 45))
+  // The altitude sits inside the bound zoom range, so it is not clamped.
+  _ = try map.setFreeCameraOptions(FreeCameraOptions(
+    position: Vec3(x: 0.25, y: 0.5, z: 0.01)
+  ))
+  let statsCommand = try map.setRenderingStatsViewEnabled(true)
+  #expect(try await commandDisposition(
+    statsCommand, runtime: runtime
+  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+
+  let snapshot = try map.snapshot()
+  #expect(snapshot.tileOptions.prefetchZoomDelta == 5)
+  #expect(snapshot.tileOptions.lodScale == 2)
+  #expect(snapshot.bounds.minZoom == 2)
+  #expect(snapshot.bounds.maxZoom == 15)
+  #expect(snapshot.bounds.maxPitch == 45)
+  let position = try #require(snapshot.freeCameraOptions.position)
+  #expect(abs(position.x - 0.25) < 0.000001)
+  #expect(abs(position.y - 0.5) < 0.000001)
+  #expect(abs(position.z - 0.01) < 0.000001)
+  #expect(snapshot.renderingStatsViewEnabled)
 }
 
 @Test func requestRepaintReturnsACommandId() async throws {

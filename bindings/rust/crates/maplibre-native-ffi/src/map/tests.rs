@@ -6,7 +6,8 @@ use std::time::Duration;
 
 use crate::custom_geometry::CustomGeometrySourceOptions;
 use crate::events::{
-    CommandDisposition, RuntimeEventPayload, RuntimeEventSource, RuntimeEventType,
+    CommandDisposition, CommandFinishedEvent, RuntimeEventPayload, RuntimeEventSource,
+    RuntimeEventType,
 };
 use crate::{
     ErrorKind, RasterDemEncoding, ResourceKind, ResourceProviderDecision, ResourceResponse,
@@ -39,7 +40,7 @@ fn assert_command_disposition(
     runtime: &RuntimeHandle,
     command_id: u64,
     expected: CommandDisposition,
-) -> Option<String> {
+) -> (CommandFinishedEvent, i32, Option<String>) {
     await_runtime_barrier(runtime);
     let batch = runtime.drain_events(0).unwrap();
     let matches = batch
@@ -47,7 +48,8 @@ fn assert_command_disposition(
         .filter_map(|event| match event.payload() {
             RuntimeEventPayload::CommandFinished(finished) if finished.command_id == command_id => {
                 Some((
-                    finished.disposition,
+                    finished,
+                    event.code(),
                     event.message().unwrap().map(str::to_owned),
                 ))
             }
@@ -59,11 +61,8 @@ fn assert_command_disposition(
         1,
         "terminal outcome count for command {command_id}"
     );
-    assert_eq!(matches[0].0, expected);
-    matches
-        .into_iter()
-        .next()
-        .and_then(|(_, diagnostic)| diagnostic)
+    assert_eq!(matches[0].0.disposition, expected);
+    matches.into_iter().next().unwrap()
 }
 
 #[test]
@@ -160,45 +159,48 @@ fn layer_base_accessors_round_trip_through_real_c_abi() {
         ""
     );
 
-    // An unset zoom range crosses the boundary as infinities.
-    assert_eq!(
-        operation_result!(map.layer_min_zoom("geo-fill")).unwrap(),
-        f64::NEG_INFINITY
-    );
-    assert_eq!(
-        operation_result!(map.layer_max_zoom("geo-fill")).unwrap(),
-        f64::INFINITY
-    );
+    // An unset zoom range crosses the boundary as infinities, and the info
+    // aggregate resolves source IDs alongside the scalar fields.
+    let info = operation_result!(map.style_layer_info("geo-fill"))
+        .unwrap()
+        .expect("styled layer should report info");
+    assert_eq!(info.layer_type, "fill");
+    assert_eq!(info.min_zoom, f64::NEG_INFINITY);
+    assert_eq!(info.max_zoom, f64::INFINITY);
+    assert_eq!(info.visibility, StyleLayerVisibility::Visible);
+    assert_eq!(info.source_id.as_deref(), Some("geo"));
+    assert_eq!(info.source_layer.as_deref(), Some("roads"));
+
     map.set_layer_min_zoom("geo-fill", 4.0).unwrap();
     map.set_layer_max_zoom("geo-fill", 12.5).unwrap();
-    assert_eq!(
-        operation_result!(map.layer_min_zoom("geo-fill")).unwrap(),
-        4.0
-    );
-    assert_eq!(
-        operation_result!(map.layer_max_zoom("geo-fill")).unwrap(),
-        12.5
-    );
-
-    assert_eq!(
-        operation_result!(map.layer_visibility("geo-fill")).unwrap(),
-        StyleLayerVisibility::Visible
-    );
     map.set_layer_visibility("geo-fill", StyleLayerVisibility::None)
         .unwrap();
-    assert_eq!(
-        operation_result!(map.layer_visibility("geo-fill")).unwrap(),
-        StyleLayerVisibility::None
-    );
+    let info = operation_result!(map.style_layer_info("geo-fill"))
+        .unwrap()
+        .unwrap();
+    assert_eq!(info.min_zoom, 4.0);
+    assert_eq!(info.max_zoom, 12.5);
+    assert_eq!(info.visibility, StyleLayerVisibility::None);
+
+    // A sourceless layer reports absent source IDs rather than empty ones.
+    let info = operation_result!(map.style_layer_info("background"))
+        .unwrap()
+        .unwrap();
+    assert_eq!(info.layer_type, "background");
+    assert_eq!(info.source_id, None);
+    assert_eq!(info.source_layer, None);
 
     let rejected_command = map
         .set_layer_visibility("geo-fill", StyleLayerVisibility::Unknown(900))
         .unwrap();
     assert_command_disposition(&runtime, rejected_command, CommandDisposition::Failed);
 
-    let error = operation_result!(map.layer_min_zoom("missing")).unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidState);
-    assert!(error.diagnostic().contains("layer does not exist"));
+    // The not-found path reports None instead of an error.
+    assert!(
+        operation_result!(map.style_layer_info("missing"))
+            .unwrap()
+            .is_none()
+    );
 
     map.close().unwrap();
     runtime.close().unwrap();
@@ -303,10 +305,10 @@ fn loaded_style_document_and_url_read_back_what_was_loaded() {
 
 #[test]
 // Spec coverage: BND-105.
-fn style_source_exists_and_remove_call_real_c_api() {
+fn style_removals_commit_or_fail_with_not_found() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
+    map.set_style_json(STYLE_WITH_IDS_JSON.as_bytes()).unwrap();
 
     let source = serde_json::to_vec(&json!({
         "type": "geojson",
@@ -314,17 +316,58 @@ fn style_source_exists_and_remove_call_real_c_api() {
     }))
     .unwrap();
 
-    assert!(!operation_result!(map.style_source_exists("owned-source")).unwrap());
-    assert!(!operation_result!(map.remove_style_source("owned-source")).unwrap());
+    // Removing a missing source fails with the not-found status code.
+    let missing = map.remove_style_source("owned-source").unwrap();
+    let (finished, code, _) =
+        assert_command_disposition(&runtime, missing, CommandDisposition::Failed);
+    assert_eq!(code, sys::MLN_STATUS_NOT_FOUND);
+    assert_eq!(finished.generation, 0);
 
+    // Removing an existing source commits, and the info getter's found flag
+    // re-checks existence on both sides of the removal.
     map.add_style_source_json("owned-source", &source).unwrap();
-    assert!(operation_result!(map.style_source_exists("owned-source")).unwrap());
-    assert!(operation_result!(map.remove_style_source("owned-source")).unwrap());
-    assert!(!operation_result!(map.style_source_exists("owned-source")).unwrap());
-    assert!(!operation_result!(map.remove_style_source("owned-source")).unwrap());
+    assert!(
+        operation_result!(map.style_source_info("owned-source"))
+            .unwrap()
+            .is_some()
+    );
+    let removed = map.remove_style_source("owned-source").unwrap();
+    let (finished, _, _) =
+        assert_command_disposition(&runtime, removed, CommandDisposition::Committed);
+    assert_ne!(finished.generation, 0);
+    assert!(
+        operation_result!(map.style_source_info("owned-source"))
+            .unwrap()
+            .is_none()
+    );
+
+    // Removing a source a layer still uses fails with invalid state.
+    let in_use = map.remove_style_source("geo").unwrap();
+    let (_, code, diagnostic) =
+        assert_command_disposition(&runtime, in_use, CommandDisposition::Failed);
+    assert_eq!(code, sys::MLN_STATUS_INVALID_STATE);
+    assert!(diagnostic.unwrap().contains("used by a layer"));
+
+    // Layer removal commits and then reports not-found for the same ID.
+    let removed = map.remove_style_layer("geo-fill").unwrap();
+    assert_command_disposition(&runtime, removed, CommandDisposition::Committed);
+    assert!(
+        operation_result!(map.style_layer_info("geo-fill"))
+            .unwrap()
+            .is_none()
+    );
+    let missing = map.remove_style_layer("geo-fill").unwrap();
+    let (_, code, _) = assert_command_disposition(&runtime, missing, CommandDisposition::Failed);
+    assert_eq!(code, sys::MLN_STATUS_NOT_FOUND);
 
     map.close().unwrap();
     runtime.close().unwrap();
+}
+
+fn source_type_of(map: &MapHandle, source_id: &str) -> Option<SourceType> {
+    operation_result!(map.style_source_info(source_id))
+        .unwrap()
+        .map(|info| info.source_type)
 }
 
 fn test_style_image(data: Vec<u8>) -> PremultipliedRgba8Image {
@@ -345,7 +388,6 @@ fn style_image_copy_uses_rust_owned_buffer() {
 
     map.set_style_image("plain", &image, None).unwrap();
     image.data.fill(0);
-    assert!(operation_result!(map.style_image_exists("plain")).unwrap());
     let info = operation_result!(map.style_image_info("plain"))
         .unwrap()
         .expect("added image should have copied metadata");
@@ -367,9 +409,18 @@ fn style_image_copy_uses_rust_owned_buffer() {
             .data,
         original_pixels
     );
-    assert!(operation_result!(map.remove_style_image("plain")).unwrap());
-    assert!(!operation_result!(map.style_image_exists("plain")).unwrap());
-    assert!(!operation_result!(map.remove_style_image("plain")).unwrap());
+    // Image removal commits, the info getter's found flag reports the image
+    // gone, and a repeat removal fails with the not-found status code.
+    let removed = map.remove_style_image("plain").unwrap();
+    assert_command_disposition(&runtime, removed, CommandDisposition::Committed);
+    assert!(
+        operation_result!(map.style_image_info("plain"))
+            .unwrap()
+            .is_none()
+    );
+    let missing = map.remove_style_image("plain").unwrap();
+    let (_, code, _) = assert_command_disposition(&runtime, missing, CommandDisposition::Failed);
+    assert_eq!(code, sys::MLN_STATUS_NOT_FOUND);
 }
 
 fn image_source_coordinates() -> [LatLng; 4] {
@@ -400,7 +451,7 @@ fn image_source_helpers_accept_url_and_inline_images() {
     map.add_image_source_image("inline-image", &coordinates, &image)
         .unwrap();
     assert_eq!(
-        operation_result!(map.style_source_type("inline-image")).unwrap(),
+        source_type_of(&map, "inline-image"),
         Some(SourceType::Image)
     );
 }
@@ -414,10 +465,7 @@ fn tile_source_helpers_call_real_c_api() {
 
     map.add_vector_source_url("vector-url", "https://example.com/vector.json", None)
         .unwrap();
-    assert_eq!(
-        operation_result!(map.style_source_type("vector-url")).unwrap(),
-        Some(SourceType::Vector)
-    );
+    assert_eq!(source_type_of(&map, "vector-url"), Some(SourceType::Vector));
 
     let mut dem_options = TileSourceOptions::default();
     dem_options.raster_dem_encoding = Some(RasterDemEncoding::Terrarium);
@@ -428,7 +476,7 @@ fn tile_source_helpers_call_real_c_api() {
     )
     .unwrap();
     assert_eq!(
-        operation_result!(map.style_source_type("dem-tiles")).unwrap(),
+        source_type_of(&map, "dem-tiles"),
         Some(SourceType::RasterDem)
     );
 }
@@ -455,7 +503,7 @@ fn geojson_source_helpers_accept_options_and_keep_them_across_updates() {
     )
     .unwrap();
     assert_eq!(
-        operation_result!(map.style_source_type("geojson-url")).unwrap(),
+        source_type_of(&map, "geojson-url"),
         Some(SourceType::GeoJson)
     );
 
@@ -471,7 +519,7 @@ fn geojson_source_helpers_accept_options_and_keep_them_across_updates() {
     map.add_geojson_source_data("geojson-data", &data, None)
         .unwrap();
     assert_eq!(
-        operation_result!(map.style_source_type("geojson-data")).unwrap(),
+        source_type_of(&map, "geojson-data"),
         Some(SourceType::GeoJson)
     );
 
@@ -502,7 +550,7 @@ fn clustered_geojson_source_requires_a_feature_collection() {
         .unwrap();
     assert_ne!(bare_id, 0);
     await_runtime_barrier(&runtime);
-    assert!(!operation_result!(map.style_source_exists("quakes")).unwrap());
+    assert!(source_type_of(&map, "quakes").is_none());
 
     let single = br#"{"type":"Feature","geometry":{"type":"Point","coordinates":[0.0,0.0]},"properties":{}}"#;
     let single_id = map
@@ -510,7 +558,7 @@ fn clustered_geojson_source_requires_a_feature_collection() {
         .unwrap();
     assert_ne!(single_id, 0);
     await_runtime_barrier(&runtime);
-    assert!(!operation_result!(map.style_source_exists("quakes")).unwrap());
+    assert!(source_type_of(&map, "quakes").is_none());
 
     // The constraint belongs to clustering alone, and the rejected ID stays free.
     map.add_geojson_source_data("quakes", bare, None).unwrap();
@@ -543,7 +591,7 @@ fn clustered_geojson_source_reports_non_point_geometry() {
         .unwrap();
     assert_ne!(mixed_id, 0);
     await_runtime_barrier(&runtime);
-    assert!(!operation_result!(map.style_source_exists("quakes")).unwrap());
+    assert!(source_type_of(&map, "quakes").is_none());
 
     // The constraint belongs to clustering alone, and the rejected ID stays free.
     map.add_geojson_source_data("quakes", mixed, None).unwrap();
@@ -554,7 +602,7 @@ fn clustered_geojson_source_reports_non_point_geometry() {
 
 #[test]
 // Spec coverage: BND-105.
-fn style_source_type_and_info_call_real_c_api() {
+fn style_source_info_reports_type_and_found_flag() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
     map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
@@ -572,19 +620,11 @@ fn style_source_type_and_info_call_real_c_api() {
     .unwrap();
 
     assert_eq!(
-        operation_result!(map.style_source_type("missing-source")).unwrap(),
-        None
-    );
-    assert_eq!(
         operation_result!(map.style_source_info("missing-source")).unwrap(),
         None
     );
 
     map.add_style_source_json("empty", &geojson_source).unwrap();
-    assert_eq!(
-        operation_result!(map.style_source_type("empty")).unwrap(),
-        Some(SourceType::GeoJson)
-    );
     let info = operation_result!(map.style_source_info("empty"))
         .unwrap()
         .unwrap();
@@ -595,10 +635,6 @@ fn style_source_type_and_info_call_real_c_api() {
 
     map.add_style_source_json("vector-meta", &vector_source)
         .unwrap();
-    assert_eq!(
-        operation_result!(map.style_source_type("vector-meta")).unwrap(),
-        Some(SourceType::Vector)
-    );
     let info = operation_result!(map.style_source_info("vector-meta"))
         .unwrap()
         .unwrap();
@@ -658,7 +694,8 @@ fn style_source_info_copies_reconstructible_source_state() {
     assert_eq!(tile_json.scheme, TileScheme::Tms);
     assert_eq!(tile_json.bounds, options.bounds);
 
-    assert!(operation_result!(map.remove_style_source("inline")).unwrap());
+    let removed = map.remove_style_source("inline").unwrap();
+    assert_command_disposition(&runtime, removed, CommandDisposition::Committed);
     map.close().unwrap();
     runtime.close().unwrap();
 
@@ -729,9 +766,10 @@ fn custom_geometry_source_apis_call_real_c_api_and_style_replacement_releases_st
     )
     .unwrap();
     assert_eq!(releases.load(Ordering::SeqCst), 0);
-    assert!(operation_result!(map.remove_style_source("custom")).unwrap());
+    let removed = map.remove_style_source("custom").unwrap();
+    assert_command_disposition(&runtime, removed, CommandDisposition::Committed);
     assert_eq!(releases.load(Ordering::SeqCst), 1);
-    assert!(!operation_result!(map.style_source_exists("custom")).unwrap());
+    assert!(source_type_of(&map, "custom").is_none());
 
     let first_add = map
         .add_custom_geometry_source("custom", options_counting_releases(&releases))
@@ -779,7 +817,7 @@ fn custom_geometry_source_adds_to_current_style_after_url_style_request() {
     map.add_custom_geometry_source("custom", options_counting_releases(&releases))
         .unwrap();
 
-    assert!(operation_result!(map.style_source_exists("custom")).unwrap());
+    assert!(source_type_of(&map, "custom").is_some());
     assert_eq!(releases.load(Ordering::SeqCst), 0);
     map.close().unwrap();
     runtime.close().unwrap();
@@ -1010,7 +1048,7 @@ fn style_transition_options_round_trip_through_the_real_c_api() {
     let mut negative = StyleTransitionOptions::default();
     negative.delay_ms = Some(-1.0);
     let rejected_command = map.set_style_transition_options(&negative).unwrap();
-    let diagnostic =
+    let (_, _, diagnostic) =
         assert_command_disposition(&runtime, rejected_command, CommandDisposition::Failed);
     assert!(diagnostic.unwrap().contains("delay_ms"));
 
@@ -1123,6 +1161,82 @@ fn map_accepts_concurrent_commands_and_cross_thread_snapshots() {
         let snapshot = scope.spawn(|| map.snapshot().unwrap()).join().unwrap();
         assert_eq!(snapshot.logical_extent.width, MapOptions::default().width);
     });
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+// Spec coverage: BND-102.
+fn a_snapshot_at_the_committed_generation_observes_the_commit() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    assert_eq!(
+        map.snapshot().unwrap().debug_options,
+        MapDebugOptions::empty()
+    );
+
+    let command_id = map
+        .set_debug_options(MapDebugOptions::TILE_BORDERS)
+        .unwrap();
+    let (finished, _, _) =
+        assert_command_disposition(&runtime, command_id, CommandDisposition::Committed);
+    assert_ne!(finished.generation, 0);
+
+    // The commit fence: a snapshot at or past the reported generation shows
+    // the committed value.
+    let snapshot = map.snapshot().unwrap();
+    assert!(snapshot.generation >= finished.generation);
+    assert_eq!(snapshot.debug_options, MapDebugOptions::TILE_BORDERS);
+
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+// Spec coverage: BND-102.
+fn snapshot_fields_round_trip_through_their_set_commands() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+
+    let mut tile = crate::MapTileOptions::default();
+    tile.prefetch_zoom_delta = Some(3);
+    tile.lod_scale = Some(1.5);
+    map.set_tile_options(&tile).unwrap();
+
+    let mut bounds = BoundOptions::default();
+    bounds.min_zoom = Some(2.0);
+    bounds.max_zoom = Some(15.0);
+    map.set_bounds(&bounds).unwrap();
+
+    let mut viewport = crate::MapViewportOptions::default();
+    viewport.viewport_mode = Some(crate::ViewportMode::FlippedY);
+    map.set_viewport_options(&viewport).unwrap();
+
+    let mut free_camera = FreeCameraOptions::default();
+    free_camera.position = Some(crate::Vec3::new(0.25, 0.25, 0.5));
+    map.set_free_camera_options(&free_camera).unwrap();
+
+    let stats_command = map.set_rendering_stats_view_enabled(true).unwrap();
+    let (finished, _, _) =
+        assert_command_disposition(&runtime, stats_command, CommandDisposition::Committed);
+
+    let snapshot = map.snapshot().unwrap();
+    assert!(snapshot.generation >= finished.generation);
+    assert_eq!(snapshot.tile.prefetch_zoom_delta, Some(3));
+    assert_eq!(snapshot.tile.lod_scale, Some(1.5));
+    assert_eq!(snapshot.bounds.min_zoom, Some(2.0));
+    assert_eq!(snapshot.bounds.max_zoom, Some(15.0));
+    assert_eq!(
+        snapshot.viewport.viewport_mode,
+        Some(crate::ViewportMode::FlippedY)
+    );
+    // Native renormalizes altitude, so assert the committed ground position.
+    let position = snapshot.free_camera.position.unwrap();
+    assert!((position.x - 0.25).abs() < 1e-6);
+    assert!((position.y - 0.25).abs() < 1e-6);
+    assert!(position.z > 0.0);
+    assert!(snapshot.rendering_stats_view_enabled);
+
     map.close().unwrap();
     runtime.close().unwrap();
 }

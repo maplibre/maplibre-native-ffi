@@ -395,10 +395,15 @@ public struct CameraTransitionFinishedEvent: Equatable, Sendable {
 public struct CommandFinishedEvent: Equatable, Sendable {
   public let commandId: UInt64
   public let disposition: UInt32
+  /// The map snapshot generation the commit published, or zero when the
+  /// command committed no generation. A later ``MapHandle/snapshot()`` whose
+  /// ``MapSnapshot/generation`` is at or past this value observes the commit.
+  public let generation: UInt64
 
   init(native: NativeCommandFinishedEvent) {
     commandId = native.commandId
     disposition = native.disposition
+    generation = native.generation
   }
 }
 

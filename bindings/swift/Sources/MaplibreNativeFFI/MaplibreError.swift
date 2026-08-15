@@ -5,6 +5,8 @@ public enum MaplibreErrorKind: Sendable, Equatable {
   case wrongThread
   case unsupported
   case nativeError
+  /// No style object has the requested ID.
+  case notFound
   case unknownStatus
 }
 
@@ -54,6 +56,7 @@ public struct MaplibreError: Error, Sendable, Equatable,
     case -3: .wrongThread
     case -4: .unsupported
     case -5: .nativeError
+    case -10: .notFound
     default: .unknownStatus
     }
   }

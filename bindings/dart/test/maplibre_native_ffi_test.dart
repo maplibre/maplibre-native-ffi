@@ -772,23 +772,63 @@ void main() {
     await runtime.close();
   });
 
-  test('projection closes before its source map', () async {
-    final runtime = await RuntimeHandle.create();
-    final map = await runtime.createMap();
-    final projection = await map.createProjection();
-    try {
-      expect(
-        (await projection.pixelForLatLng(const LatLng(0, 0))).x.isFinite,
-        isTrue,
+  test(
+    'projection is synchronous and observes only earlier commands',
+    () async {
+      final runtime = await RuntimeHandle.create();
+      final map = await runtime.createMap(
+        options: const MapOptions(width: 256, height: 256),
       );
-      projection.setCamera(const CameraOptions(center: LatLng(1, 1), zoom: 2));
-      expect((await projection.camera()).zoom, closeTo(2, 0.0001));
-    } finally {
-      await projection.close();
-      await map.close();
-      await runtime.close();
-    }
-  });
+      // A projection created after a camera command observes that command.
+      map.updateCamera(const CameraOptions(center: LatLng(10, 20), zoom: 3));
+      final projection = await map.createProjection();
+      try {
+        final created = projection.camera();
+        expect(created.zoom, closeTo(3, 0.0001));
+        expect(created.center!.latitude, closeTo(10, 0.0001));
+        expect(created.center!.longitude, closeTo(20, 0.0001));
+
+        // A synchronous conversion round-trip returns to the same coordinate.
+        const coordinate = LatLng(10, 20);
+        final pixel = projection.pixelForLatLng(coordinate);
+        expect(pixel.x.isFinite, isTrue);
+        final roundTrip = projection.latLngForPixel(pixel);
+        expect(roundTrip.latitude, closeTo(coordinate.latitude, 1e-6));
+        expect(roundTrip.longitude, closeTo(coordinate.longitude, 1e-6));
+
+        // A setter is applied before it returns, so it changes later
+        // conversions, and the map's own camera stays untouched.
+        final before = projection.pixelForLatLng(const LatLng(0, 0));
+        projection.setCamera(
+          const CameraOptions(center: LatLng(1, 1), zoom: 2),
+        );
+        expect(projection.camera().zoom, closeTo(2, 0.0001));
+        final after = projection.pixelForLatLng(const LatLng(0, 0));
+        expect(after == before, isFalse);
+        expect((await map.queryCamera()).camera.zoom, closeTo(3, 0.0001));
+
+        // A later map command never reaches an existing projection.
+        map.updateCamera(const CameraOptions(zoom: 9));
+        await map.queryCamera();
+        expect(projection.camera().zoom, closeTo(2, 0.0001));
+
+        // Projection calls remain valid when Dart resumes the isolate on
+        // another native thread.
+        await Isolate.run(() {});
+        projection.setVisibleCoordinates(const [LatLng(-1, -1), LatLng(1, 1)]);
+        projection.setVisibleGeometry(
+          _jsonBytes('{"type":"Point","coordinates":[0,0]}'),
+        );
+        expect(projection.camera().center, isNotNull);
+      } finally {
+        // Close is synchronous and runs before the source map closes.
+        projection.close();
+        expect(projection.isClosed, isTrue);
+        await map.close();
+        await runtime.close();
+      }
+    },
+  );
 
   test('custom geometry tile callbacks reach their isolate', () async {
     final deliveredTiles = <CanonicalTileId>[];
@@ -854,7 +894,13 @@ void main() {
       CustomGeometrySourceOptions(fetchTile: (_) {}),
     );
     final removedProbe = customGeometryCallbackProbeForTesting(map, sourceId)!;
-    expect(await map.removeStyleSource(sourceId), isTrue);
+    expect(
+      await _waitForCommandDisposition(
+        runtime,
+        map.removeStyleSource(sourceId),
+      ),
+      CommandDisposition.committed,
+    );
     await _waitUntil(() => removedProbe.retirementQueued);
     expect(customGeometryCallbackProbeForTesting(map, sourceId), isNull);
 
@@ -958,25 +1004,32 @@ void main() {
       map.setLayerSourceLayer('bg', 'roads');
       expect(await map.getLayerSourceId('bg'), '');
 
-      // An unset zoom range crosses the boundary as infinities.
-      expect(await map.getLayerMinZoom('fill'), double.negativeInfinity);
-      expect(await map.getLayerMaxZoom('fill'), double.infinity);
+      // An unset zoom range crosses the boundary as infinities, and the
+      // reported source ID and source-layer sizes feed the copy operations.
+      var fillInfo = (await map.getStyleLayerInfo('fill'))!;
+      expect(fillInfo.type, 'fill');
+      expect(fillInfo.minZoom, double.negativeInfinity);
+      expect(fillInfo.maxZoom, double.infinity);
+      expect(fillInfo.visibility, StyleLayerVisibility.visible);
+      expect(fillInfo.sourceId, 'geo');
+      expect(fillInfo.sourceLayer, 'roads');
+
       map.setLayerMinZoom('fill', 4);
       map.setLayerMaxZoom('fill', 12.5);
-      expect(await map.getLayerMinZoom('fill'), 4);
-      expect(await map.getLayerMaxZoom('fill'), 12.5);
-
-      expect(
-        await map.getLayerVisibility('fill'),
-        StyleLayerVisibility.visible,
-      );
       map.setLayerVisibility('fill', StyleLayerVisibility.none);
-      expect(await map.getLayerVisibility('fill'), StyleLayerVisibility.none);
+      fillInfo = (await map.getStyleLayerInfo('fill'))!;
+      expect(fillInfo.minZoom, 4);
+      expect(fillInfo.maxZoom, 12.5);
+      expect(fillInfo.visibility, StyleLayerVisibility.none);
 
-      await expectLater(
-        map.getLayerMinZoom('missing'),
-        throwsA(isA<InvalidArgumentException>()),
-      );
+      // A layer that carries no source reports absent source fields.
+      final bgInfo = (await map.getStyleLayerInfo('bg'))!;
+      expect(bgInfo.type, 'background');
+      expect(bgInfo.sourceId, isNull);
+      expect(bgInfo.sourceLayer, isNull);
+
+      // A missing layer reports null rather than metadata.
+      expect(await map.getStyleLayerInfo('missing'), isNull);
     } finally {
       await map.close();
       await runtime.close();
@@ -1281,12 +1334,6 @@ void main() {
     runtime.clearResourceProvider();
     map.setStyleJson(_jsonBytes(_emptyStyleJson));
     map.requestRepaint();
-    map.setDebugOptions(MapDebugOptions.tileBorders);
-    expect(
-      (await map.debugOptions()).contains(MapDebugOptions.tileBorders),
-      isTrue,
-    );
-    map.setDebugOptions(MapDebugOptions.none);
     var throwingLogCalls = 0;
     Maplibre.setLogCallback((_) {
       throwingLogCalls += 1;
@@ -1295,6 +1342,33 @@ void main() {
     map.dumpDebugLogs();
     await _waitUntil(() => throwingLogCalls > 0);
     Maplibre.clearLogCallback();
+    final copiedEvents = runtime.drainEvents().events;
+    final styleLoadedEvent = copiedEvents.firstWhere(
+      (event) => event.eventType == RuntimeEventType.mapStyleLoaded,
+    );
+    expect(styleLoadedEvent.source, isA<MapRuntimeEventSource>());
+    expect((styleLoadedEvent.source as MapRuntimeEventSource).map, same(map));
+    expect(runtime.drainEvents().events, isEmpty);
+
+    // A committed command reports the published snapshot generation, and a
+    // snapshot at or past that generation observes the commit.
+    final debugCommand = map.setDebugOptions(MapDebugOptions.tileBorders);
+    final debugFinished = await _waitForCommandFinished(runtime, debugCommand);
+    expect(debugFinished.disposition, CommandDisposition.committed);
+    expect(debugFinished.generation, greaterThan(BigInt.zero));
+    final debugSnapshot = map.snapshot();
+    expect(
+      debugSnapshot.generation,
+      greaterThanOrEqualTo(debugFinished.generation),
+    );
+    expect(
+      debugSnapshot.debugOptions.contains(MapDebugOptions.tileBorders),
+      isTrue,
+    );
+    map.setDebugOptions(MapDebugOptions.none);
+
+    // Style image metadata answers existence, and a removal is a command that
+    // commits once and then fails with not-found.
     map.setStyleImage(
       'dart-image',
       PremultipliedRgba8Image(
@@ -1305,7 +1379,6 @@ void main() {
       ),
       options: StyleImageOptions(pixelRatio: 2, sdf: true),
     );
-    expect(await map.styleImageExists('dart-image'), isTrue);
     final styleImageInfo = await map.getStyleImageInfo('dart-image');
     expect(styleImageInfo, isNotNull);
     expect(styleImageInfo!.width, 1);
@@ -1315,15 +1388,27 @@ void main() {
     final styleImage = await map.copyStyleImagePremultipliedRgba8('dart-image');
     expect(styleImage, isNotNull);
     expect(styleImage!.bytes, [255, 0, 0, 255]);
-    expect(await map.removeStyleImage('dart-image'), isTrue);
-    expect(await map.styleImageExists('dart-image'), isFalse);
-    final copiedEvents = runtime.drainEvents().events;
-    final styleLoadedEvent = copiedEvents.firstWhere(
-      (event) => event.eventType == RuntimeEventType.mapStyleLoaded,
+    expect(
+      await _waitForCommandDisposition(
+        runtime,
+        map.removeStyleImage('dart-image'),
+      ),
+      CommandDisposition.committed,
     );
-    expect(styleLoadedEvent.source, isA<MapRuntimeEventSource>());
-    expect((styleLoadedEvent.source as MapRuntimeEventSource).map, same(map));
-    expect(runtime.drainEvents().events, isEmpty);
+    expect(await map.getStyleImageInfo('dart-image'), isNull);
+    final missingImageEvent = await _waitForCommandFinishedEvent(
+      runtime,
+      map.removeStyleImage('dart-image'),
+    );
+    expect(
+      (missingImageEvent.payload as RuntimeEventCommandFinished).disposition,
+      CommandDisposition.failed,
+    );
+    expect(
+      MaplibreStatus.fromNativeStatusCode(missingImageEvent.code),
+      MaplibreStatus.notFound,
+    );
+
     final jumpCommand = map.updateCamera(
       const CameraOptions(center: LatLng(0, 0), zoom: 1),
     );
@@ -1358,37 +1443,66 @@ void main() {
           .map((event) => CameraChangeMode.fromRawValue(event.code)),
       contains(CameraChangeMode.immediate),
     );
-    map.setRenderingStatsViewEnabled(true);
-    expect(await map.renderingStatsViewEnabled(), isTrue);
+    // Each new snapshot field round-trips through its set command.
+    final statsFinished = await _waitForCommandFinished(
+      runtime,
+      map.setRenderingStatsViewEnabled(true),
+    );
+    final statsSnapshot = map.snapshot();
+    expect(statsSnapshot.renderingStatsViewEnabled, isTrue);
+    expect(
+      statsSnapshot.generation,
+      greaterThanOrEqualTo(statsFinished.generation),
+    );
     map.setRenderingStatsViewEnabled(false);
-    expect(await map.isFullyLoaded(), isA<bool>());
+    await _waitForCommandFinished(
+      runtime,
+      map.setViewportOptions(
+        const MapViewportOptions(viewportMode: ViewportMode.flippedY),
+      ),
+    );
+    expect(map.snapshot().viewportOptions.viewportMode, ViewportMode.flippedY);
     map.setViewportOptions(
       const MapViewportOptions(viewportMode: ViewportMode.defaultMode),
     );
-    expect((await map.viewportOptions()).viewportMode, isNotNull);
-    map.setTileOptions(const MapTileOptions(prefetchZoomDelta: 0));
-    expect((await map.tileOptions()).prefetchZoomDelta, isNotNull);
+    await _waitForCommandFinished(
+      runtime,
+      map.setTileOptions(const MapTileOptions(prefetchZoomDelta: 0)),
+    );
+    expect(map.snapshot().tileOptions.prefetchZoomDelta, 0);
     const cameraBounds = LatLngBounds(
       southwest: LatLng(-10, -20),
       northeast: LatLng(10, 20),
     );
-    map.setBounds(
-      const BoundOptions(
-        bounds: BoundsConstraint.bounded(cameraBounds),
-        minZoom: 0,
-        maxZoom: 24,
+    await _waitForCommandFinished(
+      runtime,
+      map.setBounds(
+        const BoundOptions(
+          bounds: BoundsConstraint.bounded(cameraBounds),
+          minZoom: 0,
+          maxZoom: 24,
+        ),
       ),
     );
     expect(
-      (await map.bounds()).bounds,
+      map.snapshot().bounds.bounds,
       const BoundsConstraint.bounded(cameraBounds),
     );
-    map.setBounds(const BoundOptions(bounds: BoundsConstraint.unbounded()));
-    expect((await map.bounds()).bounds, const BoundsConstraint.unbounded());
+    await _waitForCommandFinished(
+      runtime,
+      map.setBounds(const BoundOptions(bounds: BoundsConstraint.unbounded())),
+    );
+    expect(map.snapshot().bounds.bounds, const BoundsConstraint.unbounded());
     final projectionMode = map.projectionMode();
     expect(projectionMode.axonometric, isNotNull);
     map.setProjectionMode(const ProjectionModeOptions(axonometric: false));
-    expect(await map.freeCameraOptions(), isA<FreeCameraOptions>());
+    await _waitForCommandFinished(
+      runtime,
+      map.setFreeCameraOptions(
+        const FreeCameraOptions(orientation: Quaternion(0, 0, 0, 1)),
+      ),
+    );
+    expect(map.snapshot().freeCameraOptions.orientation, isNotNull);
     expect(
       (await map.cameraForLatLngBounds(
         const LatLngBounds(southwest: LatLng(-1, -1), northeast: LatLng(1, 1)),
@@ -1411,21 +1525,16 @@ void main() {
     expect(await map.pixelsForLatLngs(const [LatLng(0, 0)]), hasLength(1));
     expect(await map.latLngsForPixels([centerPixel]), hasLength(1));
     final projection = await map.createProjection();
-    final projectionCamera = await projection.camera();
+    final projectionCamera = projection.camera();
     expect(projectionCamera.center, isNotNull);
+    expect(projection.pixelForLatLng(const LatLng(0, 0)).x.isFinite, isTrue);
     expect(
-      (await projection.pixelForLatLng(const LatLng(0, 0))).x.isFinite,
-      isTrue,
-    );
-    expect(
-      (await projection.latLngForPixel(
-        const ScreenPoint(0, 0),
-      )).latitude.isFinite,
+      projection.latLngForPixel(const ScreenPoint(0, 0)).latitude.isFinite,
       isTrue,
     );
     projection.setCamera(const CameraOptions(center: LatLng(1, 1), zoom: 2));
-    expect((await projection.camera()).zoom, closeTo(2, 0.0001));
-    await projection.close();
+    expect(projection.camera().zoom, closeTo(2, 0.0001));
+    projection.close();
     expect(projection.isClosed, isTrue);
     expect(
       () => map.attachMetalSurface(
@@ -1520,10 +1629,34 @@ void main() {
       await map.listStyleLayerIds(),
       contains('org.maplibre.annotations.points'),
     );
-    expect(await map.styleSourceExists('missing-source'), isFalse);
-    expect(await map.styleLayerExists('missing-layer'), isFalse);
-    expect(await map.removeStyleSource('missing-source'), isFalse);
-    expect(await map.removeStyleLayer('missing-layer'), isFalse);
+    // Existence is answered by the info getters' found flag, and removing a
+    // missing object fails with not-found.
+    expect(await map.getStyleSourceInfo('missing-source'), isNull);
+    expect(await map.getStyleLayerInfo('missing-layer'), isNull);
+    final missingSourceEvent = await _waitForCommandFinishedEvent(
+      runtime,
+      map.removeStyleSource('missing-source'),
+    );
+    expect(
+      (missingSourceEvent.payload as RuntimeEventCommandFinished).disposition,
+      CommandDisposition.failed,
+    );
+    expect(
+      MaplibreStatus.fromNativeStatusCode(missingSourceEvent.code),
+      MaplibreStatus.notFound,
+    );
+    final missingLayerEvent = await _waitForCommandFinishedEvent(
+      runtime,
+      map.removeStyleLayer('missing-layer'),
+    );
+    expect(
+      (missingLayerEvent.payload as RuntimeEventCommandFinished).disposition,
+      CommandDisposition.failed,
+    );
+    expect(
+      MaplibreStatus.fromNativeStatusCode(missingLayerEvent.code),
+      MaplibreStatus.notFound,
+    );
 
     map.addGeoJsonSourceUrl(
       'dart-geojson-url-source',
@@ -1537,7 +1670,10 @@ void main() {
       'dart-geojson-url-source',
       'https://example.com/b.geojson',
     );
-    expect(await map.removeStyleSource('dart-geojson-url-source'), isTrue);
+    await _expectCommandCommitted(
+      runtime,
+      map.removeStyleSource('dart-geojson-url-source'),
+    );
     expect(
       () => map.addGeoJsonSourceData(
         'dart-invalid-geojson-options',
@@ -1562,9 +1698,9 @@ void main() {
       await _waitForCommandDisposition(runtime, rejectedGeoJsonCommand),
       CommandDisposition.failed,
     );
-    expect(
-      await map.removeStyleSource('dart-clustered-geojson-source'),
-      isTrue,
+    await _expectCommandCommitted(
+      runtime,
+      map.removeStyleSource('dart-clustered-geojson-source'),
     );
     map.addVectorSourceUrl(
       'dart-vector-source',
@@ -1574,7 +1710,10 @@ void main() {
       (await map.getStyleSourceInfo('dart-vector-source'))!.type,
       SourceType.vector,
     );
-    expect(await map.removeStyleSource('dart-vector-source'), isTrue);
+    await _expectCommandCommitted(
+      runtime,
+      map.removeStyleSource('dart-vector-source'),
+    );
     expect(
       () => map.addVectorSourceTiles(
         'dart-vector-invalid-tiles-source',
@@ -1592,7 +1731,10 @@ void main() {
       (await map.getStyleSourceInfo('dart-vector-tiles-source'))!.type,
       SourceType.vector,
     );
-    expect(await map.removeStyleSource('dart-vector-tiles-source'), isTrue);
+    await _expectCommandCommitted(
+      runtime,
+      map.removeStyleSource('dart-vector-tiles-source'),
+    );
     map.addRasterSourceTiles('dart-raster-tiles-source', const [
       'https://example.com/{z}/{x}/{y}.png',
     ], options: const TileSourceOptions(tileSize: 256));
@@ -1600,7 +1742,10 @@ void main() {
       (await map.getStyleSourceInfo('dart-raster-tiles-source'))!.type,
       SourceType.raster,
     );
-    expect(await map.removeStyleSource('dart-raster-tiles-source'), isTrue);
+    await _expectCommandCommitted(
+      runtime,
+      map.removeStyleSource('dart-raster-tiles-source'),
+    );
     map.addRasterDemSourceTiles(
       'dart-raster-dem-tiles-source',
       const ['https://example.com/{z}/{x}/{y}.png'],
@@ -1617,25 +1762,37 @@ void main() {
       'dart-hillshade-layer',
       'dart-raster-dem-tiles-source',
     );
-    expect(await map.getStyleLayerType('dart-hillshade-layer'), 'hillshade');
+    expect(
+      (await map.getStyleLayerInfo('dart-hillshade-layer'))!.type,
+      'hillshade',
+    );
     map.addColorReliefLayer(
       'dart-color-relief-layer',
       'dart-raster-dem-tiles-source',
     );
     expect(
-      await map.getStyleLayerType('dart-color-relief-layer'),
+      (await map.getStyleLayerInfo('dart-color-relief-layer'))!.type,
       'color-relief',
     );
     map.moveStyleLayer(
       'dart-color-relief-layer',
       beforeLayerId: 'dart-hillshade-layer',
     );
-    expect(await map.removeStyleLayer('dart-color-relief-layer'), isTrue);
-    expect(await map.removeStyleLayer('dart-hillshade-layer'), isTrue);
-    expect(await map.removeStyleSource('dart-raster-dem-tiles-source'), isTrue);
+    await _expectCommandCommitted(
+      runtime,
+      map.removeStyleLayer('dart-color-relief-layer'),
+    );
+    await _expectCommandCommitted(
+      runtime,
+      map.removeStyleLayer('dart-hillshade-layer'),
+    );
+    await _expectCommandCommitted(
+      runtime,
+      map.removeStyleSource('dart-raster-dem-tiles-source'),
+    );
     map.addLocationIndicatorLayer('dart-location-layer');
     expect(
-      await map.getStyleLayerType('dart-location-layer'),
+      (await map.getStyleLayerInfo('dart-location-layer'))!.type,
       'location-indicator',
     );
     map.setLocationIndicatorLocation(
@@ -1664,7 +1821,10 @@ void main() {
       LocationIndicatorImageKind.top,
       'dart-location-image',
     );
-    expect(await map.removeStyleLayer('dart-location-layer'), isTrue);
+    await _expectCommandCommitted(
+      runtime,
+      map.removeStyleLayer('dart-location-layer'),
+    );
     const imageSourceCoordinates = [
       LatLng(1, -1),
       LatLng(1, 1),
@@ -1698,7 +1858,10 @@ void main() {
       await map.getImageSourceCoordinates('dart-image-source'),
       imageSourceCoordinates.reversed.toList(),
     );
-    expect(await map.removeStyleSource('dart-image-source'), isTrue);
+    await _expectCommandCommitted(
+      runtime,
+      map.removeStyleSource('dart-image-source'),
+    );
 
     final fetchedTiles = <CanonicalTileId>[];
     expect(
@@ -1757,12 +1920,18 @@ void main() {
       'dart-custom-source',
       const LatLngBounds(southwest: LatLng(-1, -1), northeast: LatLng(1, 1)),
     );
-    expect(await map.removeStyleSource('dart-custom-source'), isTrue);
+    await _expectCommandCommitted(
+      runtime,
+      map.removeStyleSource('dart-custom-source'),
+    );
     map.addCustomGeometrySource(
       'dart-custom-source',
       CustomGeometrySourceOptions(fetchTile: fetchedTiles.add),
     );
-    expect(await map.removeStyleSource('dart-custom-source'), isTrue);
+    await _expectCommandCommitted(
+      runtime,
+      map.removeStyleSource('dart-custom-source'),
+    );
 
     map.addGeoJsonSourceData(
       'dart-geojson-source',
@@ -1771,7 +1940,6 @@ void main() {
         '"properties":{"kind":"dart"}}',
       ),
     );
-    expect(await map.styleSourceExists('dart-geojson-source'), isTrue);
     final info = await map.getStyleSourceInfo('dart-geojson-source');
     expect(info, isNotNull);
     expect(info!.type, SourceType.geoJson);
@@ -1788,8 +1956,10 @@ void main() {
         '{"id":"dart-circle-layer","type":"circle","source":"dart-geojson-source"}',
       ),
     );
-    expect(await map.styleLayerExists('dart-circle-layer'), isTrue);
-    expect(await map.getStyleLayerType('dart-circle-layer'), 'circle');
+    final circleInfo = await map.getStyleLayerInfo('dart-circle-layer');
+    expect(circleInfo, isNotNull);
+    expect(circleInfo!.type, 'circle');
+    expect(circleInfo.sourceId, 'dart-geojson-source');
     expect(await map.listStyleLayerIds(), contains('dart-circle-layer'));
     final layerJson = await map.getStyleLayerJson('dart-circle-layer');
     expect(
@@ -1817,8 +1987,14 @@ void main() {
     map.setLayerFilter('dart-circle-layer', null);
     expect(await map.getLayerFilter('dart-circle-layer'), isNull);
 
-    expect(await map.removeStyleLayer('dart-circle-layer'), isTrue);
-    expect(await map.removeStyleSource('dart-geojson-source'), isTrue);
+    await _expectCommandCommitted(
+      runtime,
+      map.removeStyleLayer('dart-circle-layer'),
+    );
+    await _expectCommandCommitted(
+      runtime,
+      map.removeStyleSource('dart-geojson-source'),
+    );
 
     await map.close();
     expect(map.isClosed, isTrue);
@@ -1905,9 +2081,18 @@ void main() {
       expect(rasterDem.rasterDemEncoding, RasterDemEncoding.terrarium);
       expect(rasterDem.vectorEncoding, isNull);
 
-      expect(await map.removeStyleSource('inline-vector'), isTrue);
-      expect(await map.removeStyleSource('url-vector'), isTrue);
-      expect(await map.removeStyleSource('inline-dem'), isTrue);
+      await _expectCommandCommitted(
+        runtime,
+        map.removeStyleSource('inline-vector'),
+      );
+      await _expectCommandCommitted(
+        runtime,
+        map.removeStyleSource('url-vector'),
+      );
+      await _expectCommandCommitted(
+        runtime,
+        map.removeStyleSource('inline-dem'),
+      );
       await map.close();
       await runtime.close();
 
@@ -2090,16 +2275,38 @@ Future<void> _waitUntilCondition(
   }, timeout: timeout);
 }
 
-Future<CommandDisposition> _waitForCommandDisposition(
+Future<RuntimeEvent> _waitForCommandFinishedEvent(
   RuntimeHandle runtime,
   BigInt commandId,
-) async {
-  final event = await _waitUntilEvent(runtime, (candidate) {
+) {
+  return _waitUntilEvent(runtime, (candidate) {
     final payload = candidate.payload;
     return payload is RuntimeEventCommandFinished &&
         payload.commandId == commandId;
   });
-  return (event.payload as RuntimeEventCommandFinished).disposition;
+}
+
+Future<RuntimeEventCommandFinished> _waitForCommandFinished(
+  RuntimeHandle runtime,
+  BigInt commandId,
+) async {
+  final event = await _waitForCommandFinishedEvent(runtime, commandId);
+  return event.payload as RuntimeEventCommandFinished;
+}
+
+Future<CommandDisposition> _waitForCommandDisposition(
+  RuntimeHandle runtime,
+  BigInt commandId,
+) async => (await _waitForCommandFinished(runtime, commandId)).disposition;
+
+Future<void> _expectCommandCommitted(
+  RuntimeHandle runtime,
+  BigInt commandId,
+) async {
+  expect(
+    await _waitForCommandDisposition(runtime, commandId),
+    CommandDisposition.committed,
+  );
 }
 
 Future<RuntimeEvent> _waitUntilEvent(

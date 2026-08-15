@@ -78,20 +78,32 @@ public struct MapLogicalExtent: Equatable, Sendable {
   }
 }
 
+/// The latest immutable map state, published by every committed map command.
+///
+/// A command's finished event reports the generation its commit published, so
+/// a snapshot whose ``generation`` is at or past that value observes the
+/// commit.
 public struct MapSnapshot: Equatable, Sendable {
   public let generation: UInt64
+  /// Debug overlays currently drawn over the map.
+  public let debugOptions: MapDebugOptions
   public let camera: CameraOptions
   public let logicalExtent: MapLogicalExtent
   public let projectionMode: ProjectionMode
   public let viewportOptions: MapViewportOptions
-  public let isLoading: Bool
-  public let isFullyRendered: Bool
+  /// True once every requested style and tile resource finished loading.
+  public let isFullyLoaded: Bool
+  public let renderingStatsViewEnabled: Bool
   public let needsRepaint: Bool
   public let eventMask: RuntimeEventMask
   public let latestRenderUpdateGeneration: UInt64
+  public let tileOptions: MapTileOptions
+  public let bounds: BoundOptions
+  public let freeCameraOptions: FreeCameraOptions
 
   init(native: mln_map_snapshot) {
     generation = native.generation
+    debugOptions = MapDebugOptions(rawValue: native.debug_options)
     camera = CameraOptions(native: NativeCameraOptionsInput(native.camera))
     logicalExtent = MapLogicalExtent(native: native.logical_extent)
     projectionMode = ProjectionMode(
@@ -100,11 +112,16 @@ public struct MapSnapshot: Equatable, Sendable {
     viewportOptions = MapViewportOptions(
       native: NativeMapViewportOptionsInput(native.viewport)
     )
-    isLoading = native.loading
-    isFullyRendered = native.fully_rendered
+    isFullyLoaded = native.fully_loaded
+    renderingStatsViewEnabled = native.rendering_stats_view_enabled
     needsRepaint = native.repaint_demand
     eventMask = RuntimeEventMask(rawValue: native.event_mask)
     latestRenderUpdateGeneration = native.latest_render_update_generation
+    tileOptions = MapTileOptions(native: NativeMapTileOptionsInput(native.tile))
+    bounds = BoundOptions(native: NativeBoundOptionsInput(native.bounds))
+    freeCameraOptions = FreeCameraOptions(
+      native: NativeFreeCameraOptionsInput(native.free_camera)
+    )
   }
 }
 
@@ -171,16 +188,6 @@ public final class MapHandle: @unchecked Sendable {
     try NativeMemory.withTemporary(UInt64(0)) { commandId in
       try submit(requireLiveHandle(), commandId)
     }.value
-  }
-
-  func orderedResult<Result>(
-    start: (NativeMapHandle) throws -> NativeOperationHandle,
-    take: (NativeOperationHandle) throws -> Result
-  ) async throws -> Result {
-    let operation = try mapNativeFailure { try start(requireLiveHandle()) }
-    defer { mln_operation_release(operation.raw) }
-    try await mapNativeFailure { try await runtime.waitForOperation(operation) }
-    return try mapNativeFailure { try take(operation) }
   }
 
   /// Selects which map-originated event types this map queues.

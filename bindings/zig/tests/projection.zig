@@ -75,6 +75,8 @@ test "map converts between lat lngs and screen points" {
     try map.latLngsForPixels(testing.allocator, &.{}, &.{});
 }
 
+// Creation is ordered after every earlier map command, so a projection created
+// right after a camera command observes that command without an explicit wait.
 test "standalone projection converts and updates camera" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
@@ -82,7 +84,6 @@ test "standalone projection converts and updates camera" {
     defer map.close() catch @panic("map close failed");
 
     _ = try map.updateCamera(.{ .camera = .{ .center = center, .zoom = 10.0 } });
-    try waitForCameraCommands(&map);
     var projection = try maplibre.MapProjectionHandle.create(&map);
     defer projection.close() catch @panic("projection close failed");
 
@@ -92,25 +93,60 @@ test "standalone projection converts and updates camera" {
     const coordinate = try projection.latLngForPixel(point);
     try expectLatLngApprox(center, coordinate);
 
+    // A setter is applied before it returns, so later conversions observe it.
     const helper_camera = maplibre.CameraOptions{ .center = .{ .latitude = 0.0, .longitude = 0.0 }, .zoom = 3.0 };
-    _ = try projection.setCamera(helper_camera);
+    try projection.setCamera(helper_camera);
     const snapshot = try projection.getCamera();
     try expectLatLngApprox(helper_camera.center.?, snapshot.center.?);
     try testing.expectApproxEqAbs(helper_camera.zoom.?, snapshot.zoom.?, 0.000001);
+    const recentered = try projection.pixelForLatLng(helper_camera.center.?);
+    try expectCenterPoint(recentered);
 
     var visible = [_]maplibre.LatLng{
         .{ .latitude = -10.0, .longitude = -10.0 },
         .{ .latitude = 10.0, .longitude = 10.0 },
     };
-    _ = try projection.setVisibleCoordinates(testing.allocator, visible[0..], .{ .top = 10.0, .left = 20.0, .bottom = 10.0, .right = 20.0 });
+    try projection.setVisibleCoordinates(testing.allocator, visible[0..], .{ .top = 10.0, .left = 20.0, .bottom = 10.0, .right = 20.0 });
     const fitted = try projection.getCamera();
     try testing.expect(fitted.center != null);
     try testing.expect(fitted.zoom != null);
 
-    _ = try projection.setVisibleGeometry(testing.allocator, "{\"type\":\"LineString\",\"coordinates\":[[-10,-10],[10,10]]}", .{ .top = 0.0, .left = 0.0, .bottom = 0.0, .right = 0.0 });
+    try projection.setVisibleGeometry(testing.allocator, "{\"type\":\"LineString\",\"coordinates\":[[-10,-10],[10,10]]}", .{ .top = 0.0, .left = 0.0, .bottom = 0.0, .right = 0.0 });
     const geometry_fitted = try projection.getCamera();
     try testing.expect(geometry_fitted.center != null);
     try testing.expect(geometry_fitted.zoom != null);
+
+    // A later map camera command never reaches the projection.
+    _ = try map.updateCamera(.{ .camera = .{ .center = center, .zoom = 1.0 } });
+    try waitForCameraCommands(&map);
+    const frozen = try projection.getCamera();
+    try testing.expectApproxEqAbs(geometry_fitted.zoom.?, frozen.zoom.?, 0.000001);
+}
+
+fn convertOnThread(projection: *maplibre.MapProjectionHandle, out_point: *maplibre.ScreenPoint, out_error: *?anyerror) void {
+    out_point.* = projection.pixelForLatLng(center) catch |err| {
+        out_error.* = err;
+        return;
+    };
+    out_error.* = null;
+}
+
+test "standalone projection conversions run from another thread" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try maplibre.MapHandle.create(&runtime, .{ .width = viewport_extent, .height = viewport_extent });
+    defer map.close() catch @panic("map close failed");
+
+    _ = try map.updateCamera(.{ .camera = .{ .center = center, .zoom = 10.0 } });
+    var projection = try maplibre.MapProjectionHandle.create(&map);
+    defer projection.close() catch @panic("projection close failed");
+
+    var point = maplibre.ScreenPoint{ .x = 0.0, .y = 0.0 };
+    var thread_error: ?anyerror = error.Unexpected;
+    const thread = try std.Thread.spawn(.{}, convertOnThread, .{ &projection, &point, &thread_error });
+    thread.join();
+    try testing.expect(thread_error == null);
+    try expectCenterPoint(point);
 }
 
 test "projected meters convert to and from lat lng" {

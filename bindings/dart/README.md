@@ -69,11 +69,16 @@ copy of the same library.
 
 ## Ownership and execution
 
-Runtime, map, and projection handles have an idempotent asynchronous `close()`.
-Await close so that native execution finishes before dependencies and callback
-roots are released. Close child maps, render sessions, frames, snapshots,
-request handles, and offline operations before their parent runtime. Scoped
-backend values remain valid only until their frame or owner is closed.
+Runtime and map handles have an idempotent asynchronous `close()`. Await close
+so that native execution finishes before dependencies and callback roots are
+released. Close child maps, render sessions, frames, snapshots, request handles,
+and offline operations before their parent runtime. Scoped backend values remain
+valid only until their frame or owner is closed.
+
+Projection handles are created asynchronously and are synchronous after that:
+every projection call, `close()` included, runs on the calling isolate's thread,
+may be made from any isolate, and never observes map changes made after
+creation. A live projection prevents its map from closing.
 
 Create runtimes and maps with `await`. Runtime and map commands copy their input
 and return a command ID immediately. Snapshot methods synchronously copy

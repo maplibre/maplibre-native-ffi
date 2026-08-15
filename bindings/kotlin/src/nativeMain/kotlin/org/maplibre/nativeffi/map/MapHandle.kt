@@ -4,11 +4,9 @@ import kotlinx.cinterop.BooleanVar
 import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CValue
-import kotlinx.cinterop.DoubleVar
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.MemScope
 import kotlinx.cinterop.UByteVar
-import kotlinx.cinterop.UIntVar
 import kotlinx.cinterop.ULongVar
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.allocArray
@@ -21,11 +19,15 @@ import kotlinx.cinterop.readValue
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.value
+import org.maplibre.nativeffi.camera.BoundOptions
 import org.maplibre.nativeffi.camera.CameraSnapshot
 import org.maplibre.nativeffi.camera.CameraUpdate
+import org.maplibre.nativeffi.camera.FreeCameraOptions
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
+import org.maplibre.nativeffi.internal.c.MLN_STYLE_LAYER_INFO_SOURCE_ID
+import org.maplibre.nativeffi.internal.c.MLN_STYLE_LAYER_INFO_SOURCE_LAYER
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_SOURCE_INFO_TILEJSON
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_SOURCE_INFO_URL
 import org.maplibre.nativeffi.internal.c.mln_buffer_view
@@ -73,28 +75,20 @@ import org.maplibre.nativeffi.internal.c.mln_map_get_image_source_coordinates_st
 import org.maplibre.nativeffi.internal.c.mln_map_get_image_source_coordinates_take_result
 import org.maplibre.nativeffi.internal.c.mln_map_get_layer_filter_start
 import org.maplibre.nativeffi.internal.c.mln_map_get_layer_filter_take_result
-import org.maplibre.nativeffi.internal.c.mln_map_get_layer_max_zoom_start
-import org.maplibre.nativeffi.internal.c.mln_map_get_layer_max_zoom_take_result
-import org.maplibre.nativeffi.internal.c.mln_map_get_layer_min_zoom_start
-import org.maplibre.nativeffi.internal.c.mln_map_get_layer_min_zoom_take_result
 import org.maplibre.nativeffi.internal.c.mln_map_get_layer_property_start
 import org.maplibre.nativeffi.internal.c.mln_map_get_layer_property_take_result
-import org.maplibre.nativeffi.internal.c.mln_map_get_layer_visibility_start
-import org.maplibre.nativeffi.internal.c.mln_map_get_layer_visibility_take_result
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_image_info_start
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_image_info_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_layer_info_start
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_layer_info_take_result
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_layer_json_start
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_layer_json_take_result
-import org.maplibre.nativeffi.internal.c.mln_map_get_style_layer_type_start
-import org.maplibre.nativeffi.internal.c.mln_map_get_style_layer_type_take_result
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_light_property_start
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_light_property_take_result
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_info_start
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_info_take_result
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_tile_urls_start
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_tile_urls_take_result
-import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_type_start
-import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_type_take_result
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_transition_options_start
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_transition_options_take_result
 import org.maplibre.nativeffi.internal.c.mln_map_invalidate_custom_geometry_source_region
@@ -110,17 +104,17 @@ import org.maplibre.nativeffi.internal.c.mln_map_options
 import org.maplibre.nativeffi.internal.c.mln_map_options_default
 import org.maplibre.nativeffi.internal.c.mln_map_projection_create_start
 import org.maplibre.nativeffi.internal.c.mln_map_projection_create_take_result
-import org.maplibre.nativeffi.internal.c.mln_map_remove_style_image_start
-import org.maplibre.nativeffi.internal.c.mln_map_remove_style_image_take_result
-import org.maplibre.nativeffi.internal.c.mln_map_remove_style_layer_start
-import org.maplibre.nativeffi.internal.c.mln_map_remove_style_layer_take_result
-import org.maplibre.nativeffi.internal.c.mln_map_remove_style_source_start
-import org.maplibre.nativeffi.internal.c.mln_map_remove_style_source_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_remove_style_image
+import org.maplibre.nativeffi.internal.c.mln_map_remove_style_layer
+import org.maplibre.nativeffi.internal.c.mln_map_remove_style_source
 import org.maplibre.nativeffi.internal.c.mln_map_request_repaint
 import org.maplibre.nativeffi.internal.c.mln_map_request_still_image_start
 import org.maplibre.nativeffi.internal.c.mln_map_resize
+import org.maplibre.nativeffi.internal.c.mln_map_set_bounds
 import org.maplibre.nativeffi.internal.c.mln_map_set_custom_geometry_source_tile_data
+import org.maplibre.nativeffi.internal.c.mln_map_set_debug_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_event_mask
+import org.maplibre.nativeffi.internal.c.mln_map_set_free_camera_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_geojson_source_data
 import org.maplibre.nativeffi.internal.c.mln_map_set_geojson_source_url
 import org.maplibre.nativeffi.internal.c.mln_map_set_image_source_coordinates
@@ -137,25 +131,23 @@ import org.maplibre.nativeffi.internal.c.mln_map_set_location_indicator_accuracy
 import org.maplibre.nativeffi.internal.c.mln_map_set_location_indicator_bearing
 import org.maplibre.nativeffi.internal.c.mln_map_set_location_indicator_image_name
 import org.maplibre.nativeffi.internal.c.mln_map_set_location_indicator_location
+import org.maplibre.nativeffi.internal.c.mln_map_set_rendering_stats_view_enabled
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_image
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_json
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_light_json
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_light_property
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_transition_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_url
+import org.maplibre.nativeffi.internal.c.mln_map_set_tile_options
+import org.maplibre.nativeffi.internal.c.mln_map_set_viewport_options
 import org.maplibre.nativeffi.internal.c.mln_map_snapshot
 import org.maplibre.nativeffi.internal.c.mln_map_snapshot_get
-import org.maplibre.nativeffi.internal.c.mln_map_style_image_exists_start
-import org.maplibre.nativeffi.internal.c.mln_map_style_image_exists_take_result
-import org.maplibre.nativeffi.internal.c.mln_map_style_layer_exists_start
-import org.maplibre.nativeffi.internal.c.mln_map_style_layer_exists_take_result
-import org.maplibre.nativeffi.internal.c.mln_map_style_source_exists_start
-import org.maplibre.nativeffi.internal.c.mln_map_style_source_exists_take_result
 import org.maplibre.nativeffi.internal.c.mln_map_style_url_start
 import org.maplibre.nativeffi.internal.c.mln_map_style_url_take_result
 import org.maplibre.nativeffi.internal.c.mln_map_update_camera
 import org.maplibre.nativeffi.internal.c.mln_operation_release
 import org.maplibre.nativeffi.internal.c.mln_style_image_info_default
+import org.maplibre.nativeffi.internal.c.mln_style_layer_info
 import org.maplibre.nativeffi.internal.c.mln_style_source_info
 import org.maplibre.nativeffi.internal.c.mln_style_transition_options_default
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
@@ -193,9 +185,9 @@ import org.maplibre.nativeffi.runtime.startOperation
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.ImageStretch
+import org.maplibre.nativeffi.style.LayerInfo
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.SourceInfo
-import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImage
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
@@ -271,58 +263,16 @@ private constructor(
       }
     }
 
-  public actual suspend fun removeStyleSource(sourceId: String): Boolean = memScoped {
-    val outRemoved = alloc<BooleanVar>()
-    Status.check(
-      ordered(
-        { outOperation ->
-          mln_map_remove_style_source_start(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(sourceId, this),
-            outOperation,
-          )
-        },
-        { operation -> mln_map_remove_style_source_take_result(operation, outRemoved.ptr) },
+  public actual fun removeStyleSource(sourceId: String): ULong = command { outCommandId ->
+    memScoped {
+      Status.check(
+        mln_map_remove_style_source(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(sourceId, this),
+          outCommandId,
+        )
       )
-    )
-    outRemoved.value
-  }
-
-  public actual suspend fun styleSourceExists(sourceId: String): Boolean = memScoped {
-    val outExists = alloc<BooleanVar>()
-    Status.check(
-      ordered(
-        { outOperation ->
-          mln_map_style_source_exists_start(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(sourceId, this),
-            outOperation,
-          )
-        },
-        { operation -> mln_map_style_source_exists_take_result(operation, outExists.ptr) },
-      )
-    )
-    outExists.value
-  }
-
-  public actual suspend fun styleSourceType(sourceId: String): SourceType? = memScoped {
-    val outType = alloc<UIntVar>()
-    val outFound = alloc<BooleanVar>()
-    Status.check(
-      ordered(
-        { outOperation ->
-          mln_map_get_style_source_type_start(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(sourceId, this),
-            outOperation,
-          )
-        },
-        { operation ->
-          mln_map_get_style_source_type_take_result(operation, outType.ptr, outFound.ptr)
-        },
-      )
-    )
-    if (outFound.value) SourceType.fromNative(outType.value) else null
+    }
   }
 
   public actual suspend fun styleSourceInfo(sourceId: String): SourceInfo? = memScoped {
@@ -635,38 +585,16 @@ private constructor(
     }
   }
 
-  public actual suspend fun removeStyleImage(imageId: String): Boolean = memScoped {
-    val outRemoved = alloc<BooleanVar>()
-    Status.check(
-      ordered(
-        { outOperation ->
-          mln_map_remove_style_image_start(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(imageId, this),
-            outOperation,
-          )
-        },
-        { operation -> mln_map_remove_style_image_take_result(operation, outRemoved.ptr) },
+  public actual fun removeStyleImage(imageId: String): ULong = command { outCommandId ->
+    memScoped {
+      Status.check(
+        mln_map_remove_style_image(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(imageId, this),
+          outCommandId,
+        )
       )
-    )
-    outRemoved.value
-  }
-
-  public actual suspend fun styleImageExists(imageId: String): Boolean = memScoped {
-    val outExists = alloc<BooleanVar>()
-    Status.check(
-      ordered(
-        { outOperation ->
-          mln_map_style_image_exists_start(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(imageId, this),
-            outOperation,
-          )
-        },
-        { operation -> mln_map_style_image_exists_take_result(operation, outExists.ptr) },
-      )
-    )
-    outExists.value
+    }
   }
 
   public actual suspend fun styleImageInfo(imageId: String): StyleImageInfo? = memScoped {
@@ -1124,62 +1052,47 @@ private constructor(
     }
   }
 
-  public actual suspend fun removeStyleLayer(layerId: String): Boolean = memScoped {
-    val outRemoved = alloc<BooleanVar>()
-    Status.check(
-      ordered(
-        { outOperation ->
-          mln_map_remove_style_layer_start(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(layerId, this),
-            outOperation,
-          )
-        },
-        { operation -> mln_map_remove_style_layer_take_result(operation, outRemoved.ptr) },
+  public actual fun removeStyleLayer(layerId: String): ULong = command { outCommandId ->
+    memScoped {
+      Status.check(
+        mln_map_remove_style_layer(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(layerId, this),
+          outCommandId,
+        )
       )
-    )
-    outRemoved.value
+    }
   }
 
-  public actual suspend fun styleLayerExists(layerId: String): Boolean = memScoped {
-    val outExists = alloc<BooleanVar>()
-    Status.check(
-      ordered(
-        { outOperation ->
-          mln_map_style_layer_exists_start(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(layerId, this),
-            outOperation,
-          )
-        },
-        { operation -> mln_map_style_layer_exists_take_result(operation, outExists.ptr) },
-      )
-    )
-    outExists.value
-  }
-
-  public actual suspend fun styleLayerType(layerId: String): String? = memScoped {
-    val outType = alloc<ULongVar>()
-    outType.value = 0uL
+  public actual suspend fun styleLayerInfo(layerId: String): LayerInfo? = memScoped {
+    val outInfo = alloc<mln_style_layer_info>()
+    outInfo.size = sizeOf<mln_style_layer_info>().toUInt()
     val outFound = alloc<BooleanVar>()
     Status.check(
       ordered(
         { outOperation ->
-          mln_map_get_style_layer_type_start(
+          mln_map_get_style_layer_info_start(
             state.requireLive().rawHandleValue,
             CoreStructs.stringView(layerId, this),
             outOperation,
           )
         },
         { operation ->
-          mln_map_get_style_layer_type_take_result(operation, outType.ptr, outFound.ptr)
+          mln_map_get_style_layer_info_take_result(operation, outInfo.ptr, outFound.ptr)
         },
       )
     )
-    if (outFound.value)
-      ByteStructs.ownedBuffer(outType.value.asHandle("mln_buffer", ::ownedBufferHandle))
-        .decodeToString()
-    else null
+    if (!outFound.value) return@memScoped null
+    val hasSourceId = (outInfo.fields and MLN_STYLE_LAYER_INFO_SOURCE_ID.toUInt()) != 0u
+    val hasSourceLayer = (outInfo.fields and MLN_STYLE_LAYER_INFO_SOURCE_LAYER.toUInt()) != 0u
+    LayerInfo(
+      ByteStructs.copyBufferView(outInfo.type).decodeToString(),
+      outInfo.min_zoom,
+      outInfo.max_zoom,
+      StyleLayerVisibility.fromNative(outInfo.visibility),
+      if (hasSourceId) layerSourceId(layerId) else null,
+      if (hasSourceLayer) layerSourceLayer(layerId) else null,
+    )
   }
 
   public actual suspend fun styleLayerIds(): List<String> = memScoped {
@@ -1502,23 +1415,6 @@ private constructor(
       }
     }
 
-  public actual suspend fun layerMinZoom(layerId: String): Double = memScoped {
-    val outZoom = alloc<DoubleVar>()
-    Status.check(
-      ordered(
-        { outOperation ->
-          mln_map_get_layer_min_zoom_start(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(layerId, this),
-            outOperation,
-          )
-        },
-        { operation -> mln_map_get_layer_min_zoom_take_result(operation, outZoom.ptr) },
-      )
-    )
-    outZoom.value
-  }
-
   public actual fun setLayerMaxZoom(layerId: String, maxZoom: Double): ULong =
     command { outCommandId ->
       memScoped {
@@ -1533,23 +1429,6 @@ private constructor(
       }
     }
 
-  public actual suspend fun layerMaxZoom(layerId: String): Double = memScoped {
-    val outZoom = alloc<DoubleVar>()
-    Status.check(
-      ordered(
-        { outOperation ->
-          mln_map_get_layer_max_zoom_start(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(layerId, this),
-            outOperation,
-          )
-        },
-        { operation -> mln_map_get_layer_max_zoom_take_result(operation, outZoom.ptr) },
-      )
-    )
-    outZoom.value
-  }
-
   public actual fun setLayerVisibility(layerId: String, visibility: StyleLayerVisibility): ULong =
     command { outCommandId ->
       memScoped {
@@ -1563,23 +1442,6 @@ private constructor(
         )
       }
     }
-
-  public actual suspend fun layerVisibility(layerId: String): StyleLayerVisibility = memScoped {
-    val outVisibility = alloc<UIntVar>()
-    Status.check(
-      ordered(
-        { outOperation ->
-          mln_map_get_layer_visibility_start(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(layerId, this),
-            outOperation,
-          )
-        },
-        { operation -> mln_map_get_layer_visibility_take_result(operation, outVisibility.ptr) },
-      )
-    )
-    StyleLayerVisibility.fromNative(outVisibility.value)
-  }
 
   public actual fun requestRepaint(): Long = memScoped {
     val outCommand = alloc<ULongVar>()
@@ -1605,15 +1467,91 @@ private constructor(
     val extent = value.logical_extent
     MapSnapshot(
       value.generation.toLong(),
+      MapStructs.debugOptions(value.debug_options),
       MapStructs.cameraOptions(value.camera),
       MapSize(extent.width.toInt(), extent.height.toInt(), extent.scale_factor),
       MapStructs.projectionModeOptions(value.projection_mode),
       MapStructs.viewportOptions(value.viewport),
-      value.loading,
-      value.fully_rendered,
+      value.fully_loaded,
+      value.rendering_stats_view_enabled,
       value.repaint_demand,
       value.latest_render_update_generation.toLong(),
+      MapStructs.tileOptions(value.tile),
+      MapStructs.boundOptions(value.bounds),
+      MapStructs.freeCameraOptions(value.free_camera),
     )
+  }
+
+  public actual fun setDebugOptions(options: Set<DebugOption>): Long = memScoped {
+    val outCommand = alloc<ULongVar>()
+    Status.check(
+      mln_map_set_debug_options(
+        state.requireLive().rawHandleValue,
+        MapStructs.debugOptionMask(options),
+        outCommand.ptr,
+      )
+    )
+    outCommand.value.toLong()
+  }
+
+  public actual fun setRenderingStatsViewEnabled(enabled: Boolean): Long = memScoped {
+    val outCommand = alloc<ULongVar>()
+    Status.check(
+      mln_map_set_rendering_stats_view_enabled(
+        state.requireLive().rawHandleValue,
+        enabled,
+        outCommand.ptr,
+      )
+    )
+    outCommand.value.toLong()
+  }
+
+  public actual fun setViewportOptions(options: ViewportOptions): Long = memScoped {
+    val outCommand = alloc<ULongVar>()
+    Status.check(
+      mln_map_set_viewport_options(
+        state.requireLive().rawHandleValue,
+        MapStructs.viewportOptions(options, this),
+        outCommand.ptr,
+      )
+    )
+    outCommand.value.toLong()
+  }
+
+  public actual fun setTileOptions(options: TileOptions): Long = memScoped {
+    val outCommand = alloc<ULongVar>()
+    Status.check(
+      mln_map_set_tile_options(
+        state.requireLive().rawHandleValue,
+        MapStructs.tileOptions(options, this),
+        outCommand.ptr,
+      )
+    )
+    outCommand.value.toLong()
+  }
+
+  public actual fun setBounds(options: BoundOptions): Long = memScoped {
+    val outCommand = alloc<ULongVar>()
+    Status.check(
+      mln_map_set_bounds(
+        state.requireLive().rawHandleValue,
+        MapStructs.boundOptions(options, this),
+        outCommand.ptr,
+      )
+    )
+    outCommand.value.toLong()
+  }
+
+  public actual fun setFreeCameraOptions(options: FreeCameraOptions): Long = memScoped {
+    val outCommand = alloc<ULongVar>()
+    Status.check(
+      mln_map_set_free_camera_options(
+        state.requireLive().rawHandleValue,
+        MapStructs.freeCameraOptions(options, this),
+        outCommand.ptr,
+      )
+    )
+    outCommand.value.toLong()
   }
 
   public actual fun resize(size: MapSize): Long = memScoped {
@@ -1757,11 +1695,10 @@ private constructor(
         outProjection.value = 0uL
         Status.check(mln_map_projection_create_take_result(operation, outProjection.ptr))
         MapProjectionHandle(
-          runtime,
           outProjection.value.asHandle(
             "mln_map_projection_create_take_result",
             ::mapProjectionHandle,
-          ),
+          )
         )
       }
     } finally {

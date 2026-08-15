@@ -43,6 +43,30 @@ type StyleSourceInfo struct {
 	RasterEncoding  *StyleRasterDEMEncoding
 }
 
+// StyleLayerInfo contains copied metadata for one style layer.
+type StyleLayerInfo struct {
+	// Type is the style-spec layer type string.
+	Type string
+	// MinZoom is the lowest zoom at which the layer draws, math.Inf(-1) with no
+	// lower bound.
+	MinZoom float64
+	// MaxZoom is the highest zoom at which the layer draws, math.Inf(1) with no
+	// upper bound.
+	MaxZoom    float64
+	Visibility StyleLayerVisibility
+	// HasSourceID reports whether the layer carries a source ID. Copy it with
+	// StartLayerSourceID.
+	HasSourceID bool
+	// SourceIDSize is the source ID byte length, 0 when HasSourceID is false.
+	SourceIDSize uint64
+	// HasSourceLayer reports whether the layer carries a source-layer ID. Copy
+	// it with StartLayerSourceLayer.
+	HasSourceLayer bool
+	// SourceLayerSize is the source-layer byte length, 0 when HasSourceLayer is
+	// false.
+	SourceLayerSize uint64
+}
+
 // StyleSourceTileJSON contains the retained TileJSON fields of an inline tile source.
 type StyleSourceTileJSON struct {
 	TileURLs []string
@@ -841,6 +865,19 @@ func styleSourceInfoFromC(info C.mln_style_source_info) StyleSourceInfo {
 	return result
 }
 
+func styleLayerInfoFromC(info C.mln_style_layer_info) StyleLayerInfo {
+	return StyleLayerInfo{
+		Type:            goStringView(info._type),
+		MinZoom:         float64(info.min_zoom),
+		MaxZoom:         float64(info.max_zoom),
+		Visibility:      StyleLayerVisibility(info.visibility),
+		HasSourceID:     info.fields&C.MLN_STYLE_LAYER_INFO_SOURCE_ID != 0,
+		SourceIDSize:    uint64(info.source_id_size),
+		HasSourceLayer:  info.fields&C.MLN_STYLE_LAYER_INFO_SOURCE_LAYER != 0,
+		SourceLayerSize: uint64(info.source_layer_size),
+	}
+}
+
 // AddGeoJSONSourceURL adds a GeoJSON source that loads from a URL. Later
 // SetGeoJSONSourceURL and SetGeoJSONSourceData calls keep the options passed
 // here.
@@ -1029,9 +1066,27 @@ func (m *MapHandle) SetStyleImage(imageID string, image PremultipliedRGBA8Image,
 	return uint64(commandID), nil
 }
 
-// RemoveStyleImage removes one runtime style image and reports whether it existed.
-
-// StyleImageExists reports whether one runtime style image exists.
+// RemoveStyleImage submits a command that removes one runtime style image. The
+// command commits when an image with the ID existed and was removed, and fails
+// with ErrNotFound reported through its terminal event when none does. Check
+// existence with StartStyleImageInfo's found flag.
+func (m *MapHandle) RemoveStyleImage(imageID string) (uint64, error) {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return 0, err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	imageView := newCStringView(imageID)
+	defer imageView.free()
+	var commandID C.uint64_t
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_remove_style_image(C.mln_map(ptr), imageView.raw(), &commandID))
+	}); err != nil {
+		return 0, err
+	}
+	return uint64(commandID), nil
+}
 
 // StyleImageInfo returns copied metadata for one runtime style image.
 
@@ -1338,12 +1393,28 @@ func (m *MapHandle) AddStyleSourceJSON(sourceID string, sourceJSON []byte) (uint
 	return uint64(commandID), nil
 }
 
-// RemoveStyleSource removes one style source by ID and reports whether it was
-// present.
-
-// StyleSourceExists reports whether one style source ID exists.
-
-// StyleSourceType returns a source type and whether the source exists.
+// RemoveStyleSource submits a command that removes one style source by ID. The
+// command commits when a source with the ID existed and was removed. It fails
+// with ErrNotFound reported through its terminal event when none does, and
+// with ErrInvalidState when a layer still uses the source. Check existence
+// with StartStyleSourceInfo's found flag.
+func (m *MapHandle) RemoveStyleSource(sourceID string) (uint64, error) {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return 0, err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	sourceView := newCStringView(sourceID)
+	defer sourceView.free()
+	var commandID C.uint64_t
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_remove_style_source(C.mln_map(ptr), sourceView.raw(), &commandID))
+	}); err != nil {
+		return 0, err
+	}
+	return uint64(commandID), nil
+}
 
 // StyleSourceInfo returns copied source metadata and whether the source exists.
 
@@ -1558,12 +1629,29 @@ func (m *MapHandle) AddStyleLayerJSON(layerJSON []byte, beforeLayerID string) (u
 	return uint64(commandID), nil
 }
 
-// RemoveStyleLayer removes one style layer by ID and reports whether it was
-// present.
+// RemoveStyleLayer submits a command that removes one style layer by ID. The
+// command commits when a layer with the ID existed and was removed, and fails
+// with ErrNotFound reported through its terminal event when none does. Check
+// existence with StartStyleLayerInfo's found flag.
+func (m *MapHandle) RemoveStyleLayer(layerID string) (uint64, error) {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return 0, err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	layerView := newCStringView(layerID)
+	defer layerView.free()
+	var commandID C.uint64_t
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_remove_style_layer(C.mln_map(ptr), layerView.raw(), &commandID))
+	}); err != nil {
+		return 0, err
+	}
+	return uint64(commandID), nil
+}
 
-// StyleLayerExists reports whether one style layer ID exists.
-
-// StyleLayerType returns a layer type string and whether the layer exists.
+// StyleLayerInfo returns copied layer metadata and whether the layer exists.
 
 // StyleLayerIDs returns copied layer IDs in style order.
 
@@ -1706,18 +1794,15 @@ const (
 // none.
 
 // SetLayerMinZoom sets the lowest zoom at which one layer draws. Pass
-// math.Inf(-1) for no lower bound.
-
-// LayerMinZoom returns the lowest zoom at which one layer draws. A layer with no
-// lower bound reports math.Inf(-1).
+// math.Inf(-1) for no lower bound. Read the committed range with
+// StartStyleLayerInfo.
 
 // SetLayerMaxZoom sets the highest zoom at which one layer draws. Pass
-// math.Inf(1) for no upper bound.
+// math.Inf(1) for no upper bound. Read the committed range with
+// StartStyleLayerInfo.
 
-// LayerMaxZoom returns the highest zoom at which one layer draws. A layer with
-// no upper bound reports math.Inf(1).
-
-// SetLayerVisibility sets whether one layer draws.
+// SetLayerVisibility sets whether one layer draws. Read the committed value
+// with StartStyleLayerInfo.
 func (m *MapHandle) SetLayerVisibility(layerID string, visibility StyleLayerVisibility) (uint64, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
@@ -1735,8 +1820,6 @@ func (m *MapHandle) SetLayerVisibility(layerID string, visibility StyleLayerVisi
 	}
 	return uint64(commandID), nil
 }
-
-// LayerVisibility returns whether one layer draws.
 
 // copyMapText probes the required length, then copies. A null buffer with zero
 // capacity is a size probe the C API answers with OK.
@@ -1901,30 +1984,6 @@ func (m *MapHandle) AddCustomGeometrySource(sourceID string, options CustomGeome
 	return commandID, nil
 }
 
-func (m *MapHandle) StartRemoveStyleImage(imageID string) (*OperationHandle[bool], error) {
-	view := newCStringView(imageID)
-	defer view.free()
-	return startMapStyleOperation(m, func(raw C.mln_map, out *C.mln_operation) int32 {
-		return int32(C.mln_map_remove_style_image_start(raw, view.raw(), out))
-	}, func(op C.mln_operation) (bool, bool, error) {
-		var value C.bool
-		err := checkNative(func() int32 { return int32(C.mln_map_remove_style_image_take_result(op, &value)) })
-		return bool(value), err == nil, err
-	})
-}
-
-func (m *MapHandle) StartStyleImageExists(imageID string) (*OperationHandle[bool], error) {
-	view := newCStringView(imageID)
-	defer view.free()
-	return startMapStyleOperation(m, func(raw C.mln_map, out *C.mln_operation) int32 {
-		return int32(C.mln_map_style_image_exists_start(raw, view.raw(), out))
-	}, func(op C.mln_operation) (bool, bool, error) {
-		var value C.bool
-		err := checkNative(func() int32 { return int32(C.mln_map_style_image_exists_take_result(op, &value)) })
-		return bool(value), err == nil, err
-	})
-}
-
 func (m *MapHandle) StartStyleImageInfo(imageID string) (*OperationHandle[StyleOptional[StyleImageInfo]], error) {
 	view := newCStringView(imageID)
 	defer view.free()
@@ -2020,48 +2079,6 @@ func (m *MapHandle) StartImageSourceCoordinates(sourceID string) (*OperationHand
 	})
 }
 
-func (m *MapHandle) StartRemoveStyleSource(sourceID string) (*OperationHandle[bool], error) {
-	view := newCStringView(sourceID)
-	defer view.free()
-	return startMapStyleOperation(m, func(raw C.mln_map, out *C.mln_operation) int32 {
-		return int32(C.mln_map_remove_style_source_start(raw, view.raw(), out))
-	}, func(op C.mln_operation) (bool, bool, error) {
-		var v C.bool
-		err := checkNative(func() int32 { return int32(C.mln_map_remove_style_source_take_result(op, &v)) })
-		return bool(v), err == nil, err
-	})
-}
-
-func (m *MapHandle) StartStyleSourceExists(sourceID string) (*OperationHandle[bool], error) {
-	if sourceID == "" {
-		return nil, newBindingError(ErrInvalidArgument, "source ID is empty")
-	}
-	view := newCStringView(sourceID)
-	defer view.free()
-	return startMapStyleOperation(m, func(raw C.mln_map, out *C.mln_operation) int32 {
-		return int32(C.mln_map_style_source_exists_start(raw, view.raw(), out))
-	}, func(op C.mln_operation) (bool, bool, error) {
-		var value C.bool
-		err := checkNative(func() int32 {
-			return int32(C.mln_map_style_source_exists_take_result(op, &value))
-		})
-		return bool(value), err == nil, err
-	})
-}
-
-func (m *MapHandle) StartStyleSourceType(sourceID string) (*OperationHandle[StyleOptional[StyleSourceType]], error) {
-	view := newCStringView(sourceID)
-	defer view.free()
-	return startMapStyleOperation(m, func(raw C.mln_map, out *C.mln_operation) int32 {
-		return int32(C.mln_map_get_style_source_type_start(raw, view.raw(), out))
-	}, func(op C.mln_operation) (StyleOptional[StyleSourceType], bool, error) {
-		var v C.uint32_t
-		var found C.bool
-		err := checkNative(func() int32 { return int32(C.mln_map_get_style_source_type_take_result(op, &v, &found)) })
-		return StyleOptional[StyleSourceType]{Value: StyleSourceType(v), Found: bool(found)}, err == nil, err
-	})
-}
-
 func (m *MapHandle) StartStyleSourceInfo(sourceID string) (*OperationHandle[StyleOptional[StyleSourceInfo]], error) {
 	view := newCStringView(sourceID)
 	defer view.free()
@@ -2128,39 +2145,16 @@ func (m *MapHandle) StartStyleSourceIDs() (*OperationHandle[[]string], error) {
 	})
 }
 
-func (m *MapHandle) StartRemoveStyleLayer(layerID string) (*OperationHandle[bool], error) {
+func (m *MapHandle) StartStyleLayerInfo(layerID string) (*OperationHandle[StyleOptional[StyleLayerInfo]], error) {
 	view := newCStringView(layerID)
 	defer view.free()
 	return startMapStyleOperation(m, func(raw C.mln_map, out *C.mln_operation) int32 {
-		return int32(C.mln_map_remove_style_layer_start(raw, view.raw(), out))
-	}, func(op C.mln_operation) (bool, bool, error) {
-		var v C.bool
-		err := checkNative(func() int32 { return int32(C.mln_map_remove_style_layer_take_result(op, &v)) })
-		return bool(v), err == nil, err
-	})
-}
-
-func (m *MapHandle) StartStyleLayerExists(layerID string) (*OperationHandle[bool], error) {
-	view := newCStringView(layerID)
-	defer view.free()
-	return startMapStyleOperation(m, func(raw C.mln_map, out *C.mln_operation) int32 {
-		return int32(C.mln_map_style_layer_exists_start(raw, view.raw(), out))
-	}, func(op C.mln_operation) (bool, bool, error) {
-		var v C.bool
-		err := checkNative(func() int32 { return int32(C.mln_map_style_layer_exists_take_result(op, &v)) })
-		return bool(v), err == nil, err
-	})
-}
-
-func (m *MapHandle) StartStyleLayerType(layerID string) (*OperationHandle[StyleOptional[string]], error) {
-	view := newCStringView(layerID)
-	defer view.free()
-	return startMapStyleOperation(m, func(raw C.mln_map, out *C.mln_operation) int32 {
-		return int32(C.mln_map_get_style_layer_type_start(raw, view.raw(), out))
-	}, func(op C.mln_operation) (StyleOptional[string], bool, error) {
-		return takeOptionalStyleString(op, func(id C.mln_operation, out *C.mln_buffer, found *C.bool) int32 {
-			return int32(C.mln_map_get_style_layer_type_take_result(id, out, found))
-		})
+		return int32(C.mln_map_get_style_layer_info_start(raw, view.raw(), out))
+	}, func(op C.mln_operation) (StyleOptional[StyleLayerInfo], bool, error) {
+		v := C.mln_style_layer_info{size: C.uint32_t(unsafe.Sizeof(C.mln_style_layer_info{}))}
+		var found C.bool
+		err := checkNative(func() int32 { return int32(C.mln_map_get_style_layer_info_take_result(op, &v, &found)) })
+		return StyleOptional[StyleLayerInfo]{Value: styleLayerInfoFromC(v), Found: bool(found)}, err == nil, err
 	})
 }
 
@@ -2260,42 +2254,6 @@ func (m *MapHandle) StartLayerSourceID(layerID string) (*OperationHandle[string]
 			return int32(C.mln_map_copy_layer_source_id_take_result(id, out))
 		})
 		return string(value), transferred, err
-	})
-}
-
-func (m *MapHandle) StartLayerMinZoom(layerID string) (*OperationHandle[float64], error) {
-	view := newCStringView(layerID)
-	defer view.free()
-	return startMapStyleOperation(m, func(raw C.mln_map, out *C.mln_operation) int32 {
-		return int32(C.mln_map_get_layer_min_zoom_start(raw, view.raw(), out))
-	}, func(op C.mln_operation) (float64, bool, error) {
-		var value C.double
-		err := checkNative(func() int32 { return int32(C.mln_map_get_layer_min_zoom_take_result(op, &value)) })
-		return float64(value), err == nil, err
-	})
-}
-
-func (m *MapHandle) StartLayerMaxZoom(layerID string) (*OperationHandle[float64], error) {
-	view := newCStringView(layerID)
-	defer view.free()
-	return startMapStyleOperation(m, func(raw C.mln_map, out *C.mln_operation) int32 {
-		return int32(C.mln_map_get_layer_max_zoom_start(raw, view.raw(), out))
-	}, func(op C.mln_operation) (float64, bool, error) {
-		var value C.double
-		err := checkNative(func() int32 { return int32(C.mln_map_get_layer_max_zoom_take_result(op, &value)) })
-		return float64(value), err == nil, err
-	})
-}
-
-func (m *MapHandle) StartLayerVisibility(layerID string) (*OperationHandle[StyleLayerVisibility], error) {
-	view := newCStringView(layerID)
-	defer view.free()
-	return startMapStyleOperation(m, func(raw C.mln_map, out *C.mln_operation) int32 {
-		return int32(C.mln_map_get_layer_visibility_start(raw, view.raw(), out))
-	}, func(op C.mln_operation) (StyleLayerVisibility, bool, error) {
-		var value C.uint32_t
-		err := checkNative(func() int32 { return int32(C.mln_map_get_layer_visibility_take_result(op, &value)) })
-		return StyleLayerVisibility(value), err == nil, err
 	})
 }
 

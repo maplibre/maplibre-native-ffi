@@ -91,6 +91,39 @@ public sealed partial class MapHandle
         );
     }
 
+    /// <summary>Gets copied style layer metadata when the layer exists.</summary>
+    public async Task<LayerInfo?> StyleLayerInfoAsync(
+        string layerId,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var layer = await QueryStyleLayerInfoAsync(layerId, cancellationToken)
+            .ConfigureAwait(false);
+        if (layer is null)
+        {
+            return null;
+        }
+
+        var (info, hasSourceId, hasSourceLayer) = layer.Value;
+        if (hasSourceId)
+        {
+            info = info with
+            {
+                SourceId = await GetLayerSourceIdAsync(layerId, cancellationToken)
+                    .ConfigureAwait(false),
+            };
+        }
+        if (hasSourceLayer)
+        {
+            info = info with
+            {
+                SourceLayer = await GetLayerSourceLayerAsync(layerId, cancellationToken)
+                    .ConfigureAwait(false),
+            };
+        }
+        return info;
+    }
+
     /// <summary>Copies a style image's stretchable intervals when it exists.</summary>
     public async Task<(
         IReadOnlyList<ImageStretch> StretchX,

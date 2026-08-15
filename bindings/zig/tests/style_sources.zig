@@ -42,9 +42,15 @@ test "style source removal reports state and copies missing results" {
 
     _ = try map.addGeoJsonSourceData(testing.allocator, "remove-me", "{\"type\":\"FeatureCollection\",\"features\":[]}", null);
     try testing.expect(try support.styleSourceExists(&map, "remove-me"));
-    try testing.expect(try support.removeStyleSource(&map, "remove-me"));
+    try testing.expect(try support.removeStyleSource(&runtime, &map, "remove-me"));
     try testing.expect(!try support.styleSourceExists(&map, "remove-me"));
-    try testing.expect(!try support.removeStyleSource(&map, "remove-me"));
+
+    // A removal of a missing ID is accepted, then fails with NOT_FOUND.
+    const missing_id = try map.removeStyleSource(testing.allocator, "remove-me");
+    const missing = try support.waitForCommandFinished(&runtime, missing_id);
+    try testing.expect(std.meta.eql(missing.disposition, maplibre.CommandDisposition.failed));
+    try testing.expectError(error.NotFound, missing.status);
+
     try testing.expect((try support.styleSourceInfo(&map, "remove-me")) == null);
     try testing.expect((try support.styleSourceAttribution(&map, "remove-me")) == null);
     try testing.expect((try support.styleSourceUrl(&map, "remove-me")) == null);
@@ -125,19 +131,15 @@ test "tile source helpers expose copied reconstructible source information" {
 
     _ = try map.addHillshadeLayer(testing.allocator, "dem-hillshade", "dem", "point-circle");
     _ = try map.addColorReliefLayer(testing.allocator, "dem-relief", "dem", "");
-    var layer_type = (try support.styleLayerType(&map, "dem-hillshade")).?;
-    defer layer_type.deinit();
-    try testing.expectEqualStrings("hillshade", layer_type.value);
-    var relief_type = (try support.styleLayerType(&map, "dem-relief")).?;
-    defer relief_type.deinit();
-    try testing.expectEqualStrings("color-relief", relief_type.value);
+    try testing.expectEqualStrings("hillshade", (try support.styleLayerType(&map, "dem-hillshade")).?);
+    try testing.expectEqualStrings("color-relief", (try support.styleLayerType(&map, "dem-relief")).?);
 
     _ = try map.setLayerProperty(testing.allocator, "dem-relief", "color-relief-color", "[\"interpolate\",[\"linear\"],[\"elevation\"],0,\"black\",1000,\"white\"]");
     try testing.expect((try map.setLayerProperty(testing.allocator, "dem-relief", "color-relief-color", "[\"interpolate\",[\"linear\"],[\"zoom\"],0,\"black\",1,\"white\"]")) != 0);
     try testing.expect((try map.addHillshadeLayer(testing.allocator, "bad-hillshade", "point", "")) != 0);
     try testing.expectError(error.InvalidArgument, map.addRasterSourceTiles(testing.allocator, "bad-raster", raster_tiles[0..], .{ .raster_encoding = .mapbox }));
 
-    try testing.expect(try support.removeStyleSource(&map, "vector-helper"));
+    try testing.expect(try support.removeStyleSource(&runtime, &map, "vector-helper"));
     try map.close();
     try testing.expectEqualStrings(vector_tiles[0], vector_info.tile_json.?.tile_urls[0]);
     try testing.expectEqualStrings("https://example.com/vector.json", vector_url_info.url.?);
@@ -308,7 +310,7 @@ test "a custom geometry source releases its context once per lifetime end" {
         .context = &retained,
     });
 
-    try testing.expect(try support.removeStyleSource(&map, "removed"));
+    try testing.expect(try support.removeStyleSource(&runtime, &map, "removed"));
     try testing.expectEqual(@as(usize, 1), removed.release_count);
     try testing.expectEqual(@as(usize, 0), retained.release_count);
 

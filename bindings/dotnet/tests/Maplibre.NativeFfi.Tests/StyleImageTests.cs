@@ -56,8 +56,8 @@ public sealed class StyleImageTests
         map.AddImageSourceImage("image-inline", coordinates, image);
         map.SetImageSourceImage("image-inline", image);
 
-        Assert.Equal(SourceType.Image, await map.StyleSourceTypeAsync("image-url"));
-        Assert.Equal(SourceType.Image, await map.StyleSourceTypeAsync("image-inline"));
+        Assert.Equal(SourceType.Image, (await map.StyleSourceInfoAsync("image-url"))?.Type);
+        Assert.Equal(SourceType.Image, (await map.StyleSourceInfoAsync("image-inline"))?.Type);
         Assert.Equal(updatedCoordinates, await map.GetImageSourceCoordinatesAsync("image-url"));
         Assert.Equal(coordinates, await map.GetImageSourceCoordinatesAsync("image-inline"));
     }
@@ -77,7 +77,6 @@ public sealed class StyleImageTests
 
         Assert.NotEqual(0ul, map.SetStyleImage("dot", image, options));
 
-        Assert.True(await map.StyleImageExistsAsync("dot"));
         var info = await map.StyleImageInfoAsync("dot");
         Assert.NotNull(info);
         Assert.Equal(1u, info.Width);
@@ -94,8 +93,10 @@ public sealed class StyleImageTests
         Assert.Equal(2, copied.Options.PixelRatio);
         Assert.True(copied.Options.Sdf);
 
-        Assert.True(await map.RemoveStyleImageAsync("dot"));
-        Assert.False(await map.StyleImageExistsAsync("dot"));
+        var removed = map.RemoveStyleImage("dot");
+        var finished = RuntimeEventTestHelpers.WaitForCommand(runtime, removed);
+        var completion = Assert.IsType<RuntimeEventPayload.CommandFinished>(finished.Payload);
+        Assert.Equal(CommandDisposition.Committed, completion.Disposition);
         Assert.Null(await map.StyleImageInfoAsync("dot"));
         Assert.Null(await map.CopyStyleImagePremultipliedRgba8Async("dot"));
     }
