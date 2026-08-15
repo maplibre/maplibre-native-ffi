@@ -64,8 +64,12 @@ public sealed unsafe class MapProjectionHandle : IDisposable
     /// <summary>Copies the projection camera, observing every earlier projection setter.</summary>
     public CameraOptions GetCamera()
     {
-        var camera = NativeMethods.mln_camera_options_default();
-        NativeStatus.Check(NativeMethods.mln_map_projection_get_camera(Handle, &camera));
+        var camera = state.WithLive(live =>
+        {
+            var native = NativeMethods.mln_camera_options_default();
+            NativeStatus.Check(NativeMethods.mln_map_projection_get_camera(live, &native));
+            return native;
+        });
         return MapStructs.CameraOptionsFromNative(camera);
     }
 
@@ -73,7 +77,11 @@ public sealed unsafe class MapProjectionHandle : IDisposable
     public void SetCamera(CameraOptions camera)
     {
         var nativeCamera = MapStructs.ToNative(camera);
-        NativeStatus.Check(NativeMethods.mln_map_projection_set_camera(Handle, &nativeCamera));
+        state.WithLive(live =>
+        {
+            var native = nativeCamera;
+            NativeStatus.Check(NativeMethods.mln_map_projection_set_camera(live, &native));
+        });
     }
 
     /// <summary>Applies a camera fit for the coordinates.</summary>
@@ -86,17 +94,20 @@ public sealed unsafe class MapProjectionHandle : IDisposable
             nativeCoordinates[index] = CoreStructs.ToNative(coordinates[index]);
         }
         var nativePadding = MapStructs.ToNative(padding);
-        fixed (mln_lat_lng* coordinatesPointer = nativeCoordinates)
+        state.WithLive(live =>
         {
-            NativeStatus.Check(
-                NativeMethods.mln_map_projection_set_visible_coordinates(
-                    Handle,
-                    nativeCoordinates.Length == 0 ? null : coordinatesPointer,
-                    (nuint)nativeCoordinates.Length,
-                    nativePadding
-                )
-            );
-        }
+            fixed (mln_lat_lng* coordinatesPointer = nativeCoordinates)
+            {
+                NativeStatus.Check(
+                    NativeMethods.mln_map_projection_set_visible_coordinates(
+                        live,
+                        nativeCoordinates.Length == 0 ? null : coordinatesPointer,
+                        (nuint)nativeCoordinates.Length,
+                        nativePadding
+                    )
+                );
+            }
+        });
     }
 
     /// <summary>Applies a camera fit for GeoJSON Geometry bytes.</summary>
@@ -105,11 +116,13 @@ public sealed unsafe class MapProjectionHandle : IDisposable
         ArgumentNullException.ThrowIfNull(geometry);
         using var nativeGeometry = NativeStringView.From(geometry, nameof(geometry));
         var nativePadding = MapStructs.ToNative(padding);
-        NativeStatus.Check(
-            NativeMethods.mln_map_projection_set_visible_geometry(
-                Handle,
-                nativeGeometry.Value,
-                nativePadding
+        state.WithLive(live =>
+            NativeStatus.Check(
+                NativeMethods.mln_map_projection_set_visible_geometry(
+                    live,
+                    nativeGeometry.Value,
+                    nativePadding
+                )
             )
         );
     }
@@ -118,10 +131,14 @@ public sealed unsafe class MapProjectionHandle : IDisposable
     public ScreenPoint PixelForLatLng(LatLng coordinate)
     {
         var nativeCoordinate = CoreStructs.ToNative(coordinate);
-        mln_screen_point point = default;
-        NativeStatus.Check(
-            NativeMethods.mln_map_projection_pixel_for_lat_lng(Handle, nativeCoordinate, &point)
-        );
+        var point = state.WithLive(live =>
+        {
+            mln_screen_point native = default;
+            NativeStatus.Check(
+                NativeMethods.mln_map_projection_pixel_for_lat_lng(live, nativeCoordinate, &native)
+            );
+            return native;
+        });
         return MapStructs.FromNative(point);
     }
 
@@ -129,10 +146,14 @@ public sealed unsafe class MapProjectionHandle : IDisposable
     public LatLng LatLngForPixel(ScreenPoint point)
     {
         var nativePoint = MapStructs.ToNative(point);
-        mln_lat_lng coordinate = default;
-        NativeStatus.Check(
-            NativeMethods.mln_map_projection_lat_lng_for_pixel(Handle, nativePoint, &coordinate)
-        );
+        var coordinate = state.WithLive(live =>
+        {
+            mln_lat_lng native = default;
+            NativeStatus.Check(
+                NativeMethods.mln_map_projection_lat_lng_for_pixel(live, nativePoint, &native)
+            );
+            return native;
+        });
         return CoreStructs.FromNative(coordinate);
     }
 
@@ -142,5 +163,5 @@ public sealed unsafe class MapProjectionHandle : IDisposable
     /// </summary>
     public void Close() => state.Close();
 
-    public void Dispose() => Close();
+    public void Dispose() => state.TryClose();
 }

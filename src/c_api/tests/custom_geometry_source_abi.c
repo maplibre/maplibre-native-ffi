@@ -172,7 +172,12 @@ static void accepted_adds_release_their_callback_state(void) {
                      map, MLN_BUFFER_LITERAL(source_id), &options, &command_id
                    )
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  // The duplicate's release is not ordered before a single barrier, so poll
+  // barriers until the count lands.
+  for (size_t attempt = 0;
+       attempt < style_wait_attempts && probe.release_count < 1; attempt += 1) {
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  }
   TEST_ASSERT_EQUAL_size_t(1, probe.release_count);
 
   mln_test_destroy_map(map);

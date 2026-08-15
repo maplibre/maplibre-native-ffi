@@ -493,8 +493,10 @@ type RuntimeEvent struct {
 	Source     RuntimeEventSource
 	// Code is a secondary event detail whose meaning Type selects: a
 	// CameraChangeMode for the camera-will-change and camera-did-change events,
-	// or the ordinal of MapLibre Native's internal map load error kind for
-	// map-loading-failed. Every other event type reports 0.
+	// the ordinal of MapLibre Native's internal map load error kind for
+	// map-loading-failed, or the command's final raw status for
+	// command-finished (also carried as a typed error on the payload's Err
+	// field). Every other event type reports 0.
 	Code        int32
 	PayloadType RuntimeEventPayloadType
 	// Message is the event's text: a failure description, a missing style image
@@ -620,6 +622,11 @@ type RuntimeEventCommandFinishedPayload struct {
 	Disposition    CommandDisposition
 	RawDisposition uint32
 	Generation     uint64
+	// Err is the command's final status as a binding error: nil for a committed
+	// command, and the failure the terminal disposition reports otherwise (for
+	// example ErrNotFound for a style removal whose ID named nothing). Match it
+	// with errors.Is. The event's Code field carries the raw status value.
+	Err error
 }
 
 // RuntimeEventOfflineRegionStatusPayload is a copied offline status event payload.
@@ -1185,11 +1192,16 @@ func runtimeEventPayloadFromC(event *C.mln_runtime_event, window unsafe.Pointer,
 	case uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_COMMAND_FINISHED):
 		payload := C.mln_go_runtime_event_command_finished(event)
 		disposition := uint32(payload.disposition)
+		var terminalErr error
+		if status := int32(event.code); status != int32(C.MLN_STATUS_OK) {
+			terminalErr = kindForStatus(status)
+		}
 		return RuntimeEventCommandFinishedPayload{
 			CommandID:      uint64(payload.command_id),
 			Disposition:    CommandDisposition(disposition),
 			RawDisposition: disposition,
 			Generation:     uint64(payload.generation),
+			Err:            terminalErr,
 		}
 	default:
 		bytes, ok := goByteSlice(window, C.size_t(windowSize))

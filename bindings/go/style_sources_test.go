@@ -33,8 +33,8 @@ func takeStyleStretchesForTest(operation *OperationHandle[StyleOptional[StyleIma
 }
 
 // awaitCommandFinishedForTest drains runtime events until commandID's terminal
-// event arrives, returning its payload and the event's status code.
-func awaitCommandFinishedForTest(t *testing.T, runtime *RuntimeHandle, commandID uint64, err error) (RuntimeEventCommandFinishedPayload, int32) {
+// event arrives, returning its payload.
+func awaitCommandFinishedForTest(t *testing.T, runtime *RuntimeHandle, commandID uint64, err error) RuntimeEventCommandFinishedPayload {
 	t.Helper()
 	if err != nil {
 		t.Fatalf("command acceptance: %v", err)
@@ -50,20 +50,23 @@ func awaitCommandFinishedForTest(t *testing.T, runtime *RuntimeHandle, commandID
 		for _, event := range batch.Events {
 			finished, ok := event.Payload.(RuntimeEventCommandFinishedPayload)
 			if ok && finished.CommandID == commandID {
-				return finished, event.Code
+				return finished
 			}
 		}
 		time.Sleep(time.Millisecond)
 	}
 	t.Fatalf("command %d did not report a terminal event", commandID)
-	return RuntimeEventCommandFinishedPayload{}, 0
+	return RuntimeEventCommandFinishedPayload{}
 }
 
 func requireStyleCommandFailed(t *testing.T, runtime *RuntimeHandle, commandID uint64, err error) {
 	t.Helper()
-	finished, _ := awaitCommandFinishedForTest(t, runtime, commandID, err)
+	finished := awaitCommandFinishedForTest(t, runtime, commandID, err)
 	if finished.Disposition != CommandDispositionFailed {
 		t.Fatalf("command %d disposition = %v, want failed", commandID, finished.Disposition)
+	}
+	if finished.Err == nil {
+		t.Fatalf("command %d failed without a terminal error", commandID)
 	}
 }
 
@@ -71,9 +74,12 @@ func requireStyleCommandFailed(t *testing.T, runtime *RuntimeHandle, commandID u
 // map snapshot generation the commit published.
 func requireCommandCommitted(t *testing.T, runtime *RuntimeHandle, commandID uint64, err error) uint64 {
 	t.Helper()
-	finished, _ := awaitCommandFinishedForTest(t, runtime, commandID, err)
+	finished := awaitCommandFinishedForTest(t, runtime, commandID, err)
 	if finished.Disposition != CommandDispositionCommitted {
 		t.Fatalf("command %d disposition = %v, want committed", commandID, finished.Disposition)
+	}
+	if finished.Err != nil {
+		t.Fatalf("command %d committed with error %v, want nil", commandID, finished.Err)
 	}
 	if finished.Generation == 0 {
 		t.Fatalf("command %d committed without publishing a generation", commandID)
@@ -81,16 +87,16 @@ func requireCommandCommitted(t *testing.T, runtime *RuntimeHandle, commandID uin
 	return finished.Generation
 }
 
-// requireCommandNotFound waits for commandID's terminal event and asserts it
-// failed with the not-found status.
-func requireCommandNotFound(t *testing.T, runtime *RuntimeHandle, commandID uint64, err error) {
+// requireCommandFailedWith waits for commandID's terminal event and asserts it
+// failed with the given binding error.
+func requireCommandFailedWith(t *testing.T, runtime *RuntimeHandle, commandID uint64, err, want error) {
 	t.Helper()
-	finished, code := awaitCommandFinishedForTest(t, runtime, commandID, err)
+	finished := awaitCommandFinishedForTest(t, runtime, commandID, err)
 	if finished.Disposition != CommandDispositionFailed {
 		t.Fatalf("command %d disposition = %v, want failed", commandID, finished.Disposition)
 	}
-	if kindForStatus(code) != ErrNotFound {
-		t.Fatalf("command %d failure code = %d, want the not-found status", commandID, code)
+	if !errors.Is(finished.Err, want) {
+		t.Fatalf("command %d terminal error = %v, want %v", commandID, finished.Err, want)
 	}
 }
 
@@ -140,7 +146,7 @@ func TestStyleSourceMetadataForMissingSources(t *testing.T) {
 		t.Fatalf("StyleSourceAttribution(missing) = (%q, %v), want empty false", attribution, found)
 	}
 	commandID, err := m.RemoveStyleSource("missing")
-	requireCommandNotFound(t, runtime, commandID, err)
+	requireCommandFailedWith(t, runtime, commandID, err, ErrNotFound)
 	if _, _, err := takeOptionalStyleOperationForTest(m.StartStyleSourceInfo("")); !errors.Is(err, ErrInvalidState) {
 		t.Fatalf("StyleSourceInfo(empty) error = %v, want ErrInvalidState", err)
 	}
@@ -313,6 +319,13 @@ func TestStyleSourceInfoCopiesReconstructibleMetadata(t *testing.T) {
 		t.Fatalf("StyleSourceInfo(inline-vector) raster encoding = %v, want absent", info.RasterEncoding)
 	}
 
+	layerJSON := []byte(`{"id":"inline-vector-layer","type":"line","source":"inline-vector","source-layer":"lines"}`)
+	layerID, err := m.AddStyleLayerJSON(layerJSON, "")
+	requireCommandCommitted(t, runtime, layerID, err)
+	blockedID, err := m.RemoveStyleSource("inline-vector")
+	requireCommandFailedWith(t, runtime, blockedID, err, ErrInvalidState)
+	removeLayerID, err := m.RemoveStyleLayer("inline-vector-layer")
+	requireCommandCommitted(t, runtime, removeLayerID, err)
 	removeID, err := m.RemoveStyleSource("inline-vector")
 	requireCommandCommitted(t, runtime, removeID, err)
 	if _, found, err := takeOptionalStyleOperationForTest(m.StartStyleSourceInfo("inline-vector")); err != nil || found {

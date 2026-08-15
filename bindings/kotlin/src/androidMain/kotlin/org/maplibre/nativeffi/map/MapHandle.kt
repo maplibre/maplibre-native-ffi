@@ -17,6 +17,7 @@ import org.maplibre.nativeffi.camera.CameraSnapshot
 import org.maplibre.nativeffi.camera.CameraUpdate
 import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.camera.FreeCameraOptions
+import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
@@ -942,14 +943,23 @@ private constructor(
         hasSourceLayer = (fields and MaplibreNativeC.MLN_STYLE_LAYER_INFO_SOURCE_LAYER) != 0
       }
     }
-    return LayerInfo(
-      type,
-      minZoom,
-      maxZoom,
-      visibility,
-      if (hasSourceId) layerSourceId(layerId) else null,
-      if (hasSourceLayer) layerSourceLayer(layerId) else null,
-    )
+    val sourceId =
+      if (hasSourceId) {
+        try {
+          layerSourceId(layerId)
+        } catch (_: InvalidArgumentException) {
+          return null
+        }
+      } else null
+    val sourceLayer =
+      if (hasSourceLayer) {
+        try {
+          layerSourceLayer(layerId)
+        } catch (_: InvalidArgumentException) {
+          return null
+        }
+      } else null
+    return LayerInfo(type, minZoom, maxZoom, visibility, sourceId, sourceLayer)
   }
 
   public actual suspend fun styleLayerIds(): List<String> {

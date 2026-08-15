@@ -351,7 +351,7 @@ func TestStyleLayerMetadataForMissingLayers(t *testing.T) {
 		t.Fatalf("StyleLayerInfo(missing) = (%#v, %v), want empty false", info, found)
 	}
 	commandID, err := m.RemoveStyleLayer("missing")
-	requireCommandNotFound(t, runtime, commandID, err)
+	requireCommandFailedWith(t, runtime, commandID, err, ErrNotFound)
 	commandID, err = m.MoveStyleLayer("missing", "")
 	requireStyleCommandFailed(t, runtime, commandID, err)
 	if _, _, err := takeOptionalStyleOperationForTest(m.StartStyleLayerInfo("")); !errors.Is(err, ErrInvalidState) {

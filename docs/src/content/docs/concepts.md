@@ -53,8 +53,8 @@ a host that holds a command's terminal event can fence a snapshot read on it.
 
 A render session renders one map to one render target. A map carries at most one
 live render session. Feature state belongs to the render session, because
-MapLibre stores it in the renderer: the session's feature-state and query
-operations read and mutate it in session order.
+MapLibre stores it in the session's render state: the session's feature-state
+and query operations read and mutate it in session order.
 
 Render targets come in three kinds:
 

@@ -1,3 +1,4 @@
+#include <math.h>
 #include <string.h>
 
 #include "abi_tests.h"
@@ -503,6 +504,9 @@ static void layer_info_reports_scalars_and_sizes_the_source_id_copy(void) {
   TEST_ASSERT_EQUAL_UINT32(MLN_STYLE_LAYER_VISIBILITY_VISIBLE, info.visibility);
   TEST_ASSERT_EQUAL_UINT32(MLN_STYLE_LAYER_INFO_SOURCE_ID, info.fields);
   TEST_ASSERT_EQUAL_size_t(0, info.source_layer_size);
+  // Unbounded zooms report the documented infinities before bounds are set.
+  TEST_ASSERT_EQUAL_DOUBLE(-INFINITY, info.min_zoom);
+  TEST_ASSERT_EQUAL_DOUBLE(INFINITY, info.max_zoom);
 
   command = 0;
   TEST_ASSERT_EQUAL_INT(

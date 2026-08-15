@@ -59,12 +59,14 @@ public final class MapProjectionHandle: @unchecked Sendable {
   /// Copies the projection camera, observing every earlier setter.
   public func camera() throws -> CameraOptions {
     try mapNativeFailure {
-      let native = try NativeMemory
-        .withTemporary(mln_camera_options_default()) { camera in
-          try checkStatus(mln_map_projection_get_camera(
-            handle.requireLive().raw, camera
-          ))
-        }.value
+      let native = try handle.withLive { projection in
+        try NativeMemory
+          .withTemporary(mln_camera_options_default()) { camera in
+            try checkStatus(mln_map_projection_get_camera(
+              projection.raw, camera
+            ))
+          }.value
+      }
       return CameraOptions(native: NativeCameraOptionsInput(native))
     }
   }
@@ -74,9 +76,11 @@ public final class MapProjectionHandle: @unchecked Sendable {
   public func setCamera(_ camera: CameraOptions) throws {
     try mapNativeFailure {
       try camera.nativeInput.withNativeOptions { nativeCamera in
-        try checkStatus(mln_map_projection_set_camera(
-          handle.requireLive().raw, nativeCamera
-        ))
+        try handle.withLive { projection in
+          try checkStatus(mln_map_projection_set_camera(
+            projection.raw, nativeCamera
+          ))
+        }
       }
     }
   }
@@ -91,12 +95,14 @@ public final class MapProjectionHandle: @unchecked Sendable {
     try mapNativeFailure {
       let nativeCoordinates = coordinates.map(\.nativeInput.native)
       try nativeCoordinates.withUnsafeBufferPointer { buffer in
-        try checkStatus(mln_map_projection_set_visible_coordinates(
-          handle.requireLive().raw,
-          buffer.baseAddress,
-          buffer.count,
-          padding.nativeInput.native
-        ))
+        try handle.withLive { projection in
+          try checkStatus(mln_map_projection_set_visible_coordinates(
+            projection.raw,
+            buffer.baseAddress,
+            buffer.count,
+            padding.nativeInput.native
+          ))
+        }
       }
     }
   }
@@ -108,34 +114,40 @@ public final class MapProjectionHandle: @unchecked Sendable {
     try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try checkStatus(mln_map_projection_set_visible_geometry(
-        handle.requireLive().raw,
-        arena.view(geometry),
-        padding.nativeInput.native
-      ))
+      try handle.withLive { projection in
+        try checkStatus(mln_map_projection_set_visible_geometry(
+          projection.raw,
+          arena.view(geometry),
+          padding.nativeInput.native
+        ))
+      }
     }
   }
 
   public func pixel(for coordinate: LatLng) throws -> ScreenPoint {
     try mapNativeFailure {
-      let point = try NativeMemory
-        .withTemporary(mln_screen_point()) { point in
-          try checkStatus(mln_map_projection_pixel_for_lat_lng(
-            handle.requireLive().raw, coordinate.nativeInput.native, point
-          ))
-        }.value
+      let point = try handle.withLive { projection in
+        try NativeMemory
+          .withTemporary(mln_screen_point()) { point in
+            try checkStatus(mln_map_projection_pixel_for_lat_lng(
+              projection.raw, coordinate.nativeInput.native, point
+            ))
+          }.value
+      }
       return ScreenPoint(native: NativeScreenPoint(point))
     }
   }
 
   public func latLng(for point: ScreenPoint) throws -> LatLng {
     try mapNativeFailure {
-      let coordinate = try NativeMemory
-        .withTemporary(mln_lat_lng()) { coordinate in
-          try checkStatus(mln_map_projection_lat_lng_for_pixel(
-            handle.requireLive().raw, point.nativeInput.native, coordinate
-          ))
-        }.value
+      let coordinate = try handle.withLive { projection in
+        try NativeMemory
+          .withTemporary(mln_lat_lng()) { coordinate in
+            try checkStatus(mln_map_projection_lat_lng_for_pixel(
+              projection.raw, point.nativeInput.native, coordinate
+            ))
+          }.value
+      }
       return LatLng(native: NativeLatLng(coordinate))
     }
   }

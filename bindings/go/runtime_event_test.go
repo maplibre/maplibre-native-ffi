@@ -511,6 +511,9 @@ func TestRuntimeEventKnownPayloadsDecodeFromTheUnion(t *testing.T) {
 	if !ok || command.CommandID != 42 || command.Disposition != CommandDispositionFailed || command.Generation != 17 {
 		t.Fatalf("command-finished payload = %+v", decoded.Events[5].Payload)
 	}
+	if !errors.Is(command.Err, ErrNative) {
+		t.Fatalf("command-finished Err = %v, want ErrNative", command.Err)
+	}
 	// A style-image-missing event carries the image ID as its message, and its
 	// payload type of none carries no payload value at all.
 	missing := decoded.Events[6]

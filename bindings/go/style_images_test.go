@@ -152,7 +152,7 @@ func TestStyleImageCopiesPixelsAndMetadata(t *testing.T) {
 		t.Fatalf("StyleImageInfo(marker) after removal = (%v, %v), want (false, nil)", found, err)
 	}
 	commandID, err = m.RemoveStyleImage("marker")
-	requireCommandNotFound(t, runtime, commandID, err)
+	requireCommandFailedWith(t, runtime, commandID, err, ErrNotFound)
 	if _, err := m.SetStyleImage("bad-marker", PremultipliedRGBA8Image{Width: 1, Height: 1, Stride: 4}, StyleImageOptions{}); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("SetStyleImage(empty pixels) error = %v, want ErrInvalidArgument", err)
 	}

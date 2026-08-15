@@ -1171,12 +1171,12 @@ When the host language can run cleanup outside explicit release, include:
 When safe public code can use or close the same any-thread handle concurrently,
 include:
 
-| ID      | Test                                                                                                                                                               |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| BND-046 | Concurrent close or release attempts call the terminal native function at most once, and public calls fail while close or release is in progress.                  |
-| BND-190 | Runtime, map, projection, and operation calls from another native thread preserve validity and runtime submission order.                                           |
-| BND-191 | An operation's copied final diagnostic remains stable after unrelated native calls on another thread.                                                              |
-| BND-197 | A close or release racing a use of the same handle waits for the in-flight use, and a use starting after the transition begins reports the binding's closed error. |
+| ID      | Test                                                                                                                                                                                                  |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-046 | Concurrent close or release attempts call the terminal native function at most once, and public calls fail while close or release is in progress.                                                     |
+| BND-190 | Runtime, map, and operation calls from another native thread preserve validity and runtime submission order; projection calls from another thread preserve validity and per-projection serialization. |
+| BND-191 | An operation's copied final diagnostic remains stable after unrelated native calls on another thread.                                                                                                 |
+| BND-197 | A close or release racing a use of the same handle waits for the in-flight use, and a use starting after the transition begins reports the binding's closed error.                                    |
 
 A binding that orders the race by holding one lock across the native call
 satisfies BND-197 by construction. A binding that counts in-flight uses and

@@ -23,6 +23,7 @@ import org.maplibre.nativeffi.camera.BoundOptions
 import org.maplibre.nativeffi.camera.CameraSnapshot
 import org.maplibre.nativeffi.camera.CameraUpdate
 import org.maplibre.nativeffi.camera.FreeCameraOptions
+import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
@@ -1085,13 +1086,29 @@ private constructor(
     if (!outFound.value) return@memScoped null
     val hasSourceId = (outInfo.fields and MLN_STYLE_LAYER_INFO_SOURCE_ID.toUInt()) != 0u
     val hasSourceLayer = (outInfo.fields and MLN_STYLE_LAYER_INFO_SOURCE_LAYER.toUInt()) != 0u
+    val sourceId =
+      if (hasSourceId) {
+        try {
+          layerSourceId(layerId)
+        } catch (_: InvalidArgumentException) {
+          return@memScoped null
+        }
+      } else null
+    val sourceLayer =
+      if (hasSourceLayer) {
+        try {
+          layerSourceLayer(layerId)
+        } catch (_: InvalidArgumentException) {
+          return@memScoped null
+        }
+      } else null
     LayerInfo(
       ByteStructs.copyBufferView(outInfo.type).decodeToString(),
       outInfo.min_zoom,
       outInfo.max_zoom,
       StyleLayerVisibility.fromNative(outInfo.visibility),
-      if (hasSourceId) layerSourceId(layerId) else null,
-      if (hasSourceLayer) layerSourceLayer(layerId) else null,
+      sourceId,
+      sourceLayer,
     )
   }
 

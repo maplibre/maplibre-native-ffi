@@ -419,8 +419,13 @@ static void offline_operations_are_uncancellable(void) {
     )
   );
   TEST_ASSERT_NOT_EQUAL(MLN_HANDLE_NULL, operation);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_UNSUPPORTED, mln_operation_cancel(operation)
+  // The create may reach its terminal state before the cancel call, which
+  // reports invalid state instead of unsupported. Either status proves the
+  // cancel never took effect.
+  const mln_status cancel_status = mln_operation_cancel(operation);
+  TEST_ASSERT_TRUE(
+    cancel_status == MLN_STATUS_UNSUPPORTED ||
+    cancel_status == MLN_STATUS_INVALID_STATE
   );
   TEST_ASSERT_TRUE(wait_for_offline_completion(runtime, operation));
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_operation_discard_result(operation));

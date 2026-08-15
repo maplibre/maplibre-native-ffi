@@ -1068,8 +1068,8 @@ func (m *MapHandle) SetStyleImage(imageID string, image PremultipliedRGBA8Image,
 
 // RemoveStyleImage submits a command that removes one runtime style image. The
 // command commits when an image with the ID existed and was removed, and fails
-// with ErrNotFound reported through its terminal event when none does. Check
-// existence with StartStyleImageInfo's found flag.
+// with ErrNotFound reported through its terminal event's Err payload field when
+// none does. Check existence with StartStyleImageInfo's found flag.
 func (m *MapHandle) RemoveStyleImage(imageID string) (uint64, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
@@ -1395,9 +1395,9 @@ func (m *MapHandle) AddStyleSourceJSON(sourceID string, sourceJSON []byte) (uint
 
 // RemoveStyleSource submits a command that removes one style source by ID. The
 // command commits when a source with the ID existed and was removed. It fails
-// with ErrNotFound reported through its terminal event when none does, and
-// with ErrInvalidState when a layer still uses the source. Check existence
-// with StartStyleSourceInfo's found flag.
+// with ErrNotFound reported through its terminal event's Err payload field when
+// none does, and with ErrInvalidState when a layer still uses the source. Check
+// existence with StartStyleSourceInfo's found flag.
 func (m *MapHandle) RemoveStyleSource(sourceID string) (uint64, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
@@ -1631,8 +1631,8 @@ func (m *MapHandle) AddStyleLayerJSON(layerJSON []byte, beforeLayerID string) (u
 
 // RemoveStyleLayer submits a command that removes one style layer by ID. The
 // command commits when a layer with the ID existed and was removed, and fails
-// with ErrNotFound reported through its terminal event when none does. Check
-// existence with StartStyleLayerInfo's found flag.
+// with ErrNotFound reported through its terminal event's Err payload field when
+// none does. Check existence with StartStyleLayerInfo's found flag.
 func (m *MapHandle) RemoveStyleLayer(layerID string) (uint64, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {

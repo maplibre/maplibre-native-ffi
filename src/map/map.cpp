@@ -2459,18 +2459,26 @@ auto submit_map_command(
       clear_thread_error();
       auto status = MLN_STATUS_NATIVE_ERROR;
       auto message = std::string{};
+      auto generation = uint64_t{0};
       try {
         status = std::invoke(std::move(work));
         message = thread_last_error_message();
+        // Committed commands republish so snapshot reads observe the commit
+        // and COMMAND_FINISHED generations share the snapshot generation
+        // namespace. The publish stays inside the try so an escaped exception
+        // cannot skip the terminal event below.
+        if (status == MLN_STATUS_OK) {
+          generation = publish_map_snapshot(*live);
+        }
       } catch (const std::exception& exception) {
+        status = MLN_STATUS_NATIVE_ERROR;
+        generation = 0;
         message = exception.what();
       } catch (...) {
+        status = MLN_STATUS_NATIVE_ERROR;
+        generation = 0;
         message = "map command failed";
       }
-      // Committed commands republish so snapshot reads observe the commit and
-      // COMMAND_FINISHED generations share the snapshot generation namespace.
-      const auto generation =
-        status == MLN_STATUS_OK ? publish_map_snapshot(*live) : 0;
       push_runtime_command_finished(
         runtime->self, MLN_RUNTIME_EVENT_SOURCE_MAP, map, command_id,
         status == MLN_STATUS_OK ? MLN_COMMAND_DISPOSITION_COMMITTED

@@ -25,6 +25,7 @@ import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.camera.FreeCameraOptions
 import org.maplibre.nativeffi.camera.UnitBezier
 import org.maplibre.nativeffi.error.AbiVersionMismatchException
+import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.LatLng
@@ -1375,11 +1376,19 @@ internal object NativeAccess {
       val typeView = mln_style_layer_info.type(outInfo)
       val sourceId =
         if (fields and STYLE_LAYER_INFO_SOURCE_ID != 0) {
-          layerSourceId(map, layerId, awaitOperation)
+          try {
+            layerSourceId(map, layerId, awaitOperation)
+          } catch (_: InvalidArgumentException) {
+            return@use null
+          }
         } else null
       val sourceLayer =
         if (fields and STYLE_LAYER_INFO_SOURCE_LAYER != 0) {
-          layerSourceLayer(map, layerId, awaitOperation)
+          try {
+            layerSourceLayer(map, layerId, awaitOperation)
+          } catch (_: InvalidArgumentException) {
+            return@use null
+          }
         } else null
       LayerInfo(
         copyString(mln_buffer_view.data(typeView), mln_buffer_view.size(typeView)),
