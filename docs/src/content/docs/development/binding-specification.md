@@ -307,9 +307,9 @@ Child wrappers retain parent owner state whenever native validity depends on the
 parent. Parent close preflight rejects both live children and pending
 child-creation reservations without consuming or closing the parent.
 
-A `MapProjectionHandle` is a child of its source map. It remains usable from any
-thread until its close operation completes, and a live projection prevents map
-close.
+A `MapProjectionHandle` is a child of its source map. Every call after creation,
+including close, is synchronous and usable from any thread, and a live
+projection prevents map close.
 
 An `OperationHandle` retains its own result, diagnostic, notification endpoint,
 and internal work independently of the initiating runtime or map wrapper.

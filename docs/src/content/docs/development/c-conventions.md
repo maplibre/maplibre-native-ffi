@@ -153,9 +153,11 @@ failure. Document when scoped resource ownership begins, when it ends, and
 whether completion may happen inline or later.
 
 The runtime owns a native scheduler thread and one continuously running MapLibre
-`RunLoop`. Runtime, map, and map-projection entry points resolve a handle,
-acquire its control-state lease, copy the submission, and commit work to that
-run loop. They never make a host thread own or pump MapLibre scheduler state.
+`RunLoop`. Runtime and map entry points resolve a handle, acquire its
+control-state lease, copy the submission, and commit work to that run loop. They
+never make a host thread own or pump MapLibre scheduler state. Map-projection
+entry points after creation run on the calling thread over state that creation
+captured, serialized by the projection's internal lock.
 
 A render session selects one of two execution contracts at attachment. A
 core-worker driver owns a native serial graphics worker. A
@@ -174,6 +176,36 @@ Classify each public function as Immediate, Command, Published snapshot,
 Operation, Event batch, or Render-driver call. A binding maps that category to
 one target-language shape; it does not add another scheduler or asynchronous
 boundary.
+
+Pick the category from what the function reads or writes:
+
+- A read of unkeyed, fixed-size map state that changes only through the caller's
+  own commands or through load progress is a published-snapshot field. Every
+  committed map command publishes a snapshot and reports the published
+  generation in its terminal event, so a snapshot at or past that generation
+  observes the commit.
+- A keyed or parameterized read, a read with an unbounded payload, a read whose
+  value follows committed work that the caller did not author, and work whose
+  completion is the product are operations. Prefer one info aggregate with a
+  found flag over per-field scalar or existence operations, because each
+  operation costs every binding a start, wait, and take wrapper.
+- A mutation whose entire result is a disposition status is a command in the
+  domains that have a command channel: the runtime and the map. A missing id
+  reports a not-found status on the terminal event. A disposition-only mutation
+  in a domain without a command channel, such as the render session and the
+  offline database, stays an operation, because the operation's terminal status
+  is that domain's only asynchronous error channel. Add a command channel to
+  another domain only when its count of disposition-only mutations justifies a
+  new event source.
+- A call on state that creation captured into a detached object, which no worker
+  touches afterward, is immediate. This choice is per object: reads, setters,
+  and close become synchronous together, or their relative order breaks. The map
+  projection is the model.
+
+Offer a published snapshot and an ordered operation for the same state only when
+each form does distinct work, as camera does: the snapshot serves
+latest-published consumers, and the ordered query is the fence. Delete an
+ordered form that strictly duplicates the snapshot.
 
 Commands validate and deep-copy every input before returning acceptance. The
 runtime assigns an order and command ID at commit. Each accepted command reaches

@@ -1,5 +1,6 @@
 // Applying drag and pinch input within one gesture. The host derives absolute
-// camera targets from its input state and ordered camera or projection queries.
+// camera targets from its input state, ordered camera queries, or a
+// projection's synchronous conversions.
 
 #include <maplibre_native_c.h>
 

@@ -28,7 +28,7 @@ source to wait for events and operation completions without polling.
 ## Map
 
 A map belongs to a runtime. It owns style documents, sources, layers, images,
-camera state, feature state, observer events, and render invalidation.
+camera state, observer events, and render invalidation.
 
 A map is independent of a render target. The host can create, configure, query,
 and observe a map before the first frame.
@@ -45,12 +45,16 @@ Bindings expose those operations through their normal future, task, suspension,
 or explicit-wait idiom.
 
 Published snapshots provide synchronous copies of state needed by UI and display
-threads. Snapshot reads never call into mutable MapLibre map state.
+threads. Snapshot reads never call into mutable MapLibre map state. Each
+committed command reports the snapshot generation that its commit published, so
+a host that holds a command's terminal event can fence a snapshot read on it.
 
 ## Render session
 
 A render session renders one map to one render target. A map carries at most one
-live render session.
+live render session. Feature state belongs to the render session, because
+MapLibre stores it in the renderer: the session's feature-state and query
+operations read and mutate it in session order.
 
 Render targets come in three kinds:
 
