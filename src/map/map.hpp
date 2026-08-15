@@ -486,40 +486,28 @@ auto map_projection_create_start(mln_map map, mln_operation* out_operation)
 auto map_projection_create_take_result(
   mln_operation operation, mln_map_projection* out_projection
 ) -> mln_status;
-auto map_projection_close_start(
-  mln_map_projection projection, mln_operation* out_operation
-) -> mln_status;
-auto map_projection_get_camera_start(
-  mln_map_projection projection, mln_operation* out_operation
-) -> mln_status;
-auto map_projection_get_camera_take_result(
-  mln_operation operation, mln_camera_options* out_camera
+auto map_projection_close(mln_map_projection projection) -> mln_status;
+auto map_projection_get_camera(
+  mln_map_projection projection, mln_camera_options* out_camera
 ) -> mln_status;
 auto map_projection_set_camera(
-  mln_map_projection projection, const mln_camera_options* camera,
-  uint64_t* out_command_id
+  mln_map_projection projection, const mln_camera_options* camera
 ) -> mln_status;
 auto map_projection_set_visible_coordinates(
   mln_map_projection projection, const mln_lat_lng* coordinates,
-  size_t coordinate_count, mln_edge_insets padding, uint64_t* out_command_id
+  size_t coordinate_count, mln_edge_insets padding
 ) -> mln_status;
 auto map_projection_set_visible_geometry(
   mln_map_projection projection, mln_buffer_view geometry,
-  mln_edge_insets padding, uint64_t* out_command_id
+  mln_edge_insets padding
 ) -> mln_status;
-auto map_projection_pixel_for_lat_lng_start(
+auto map_projection_pixel_for_lat_lng(
   mln_map_projection projection, mln_lat_lng coordinate,
-  mln_operation* out_operation
+  mln_screen_point* out_point
 ) -> mln_status;
-auto map_projection_pixel_for_lat_lng_take_result(
-  mln_operation operation, mln_screen_point* out_point
-) -> mln_status;
-auto map_projection_lat_lng_for_pixel_start(
+auto map_projection_lat_lng_for_pixel(
   mln_map_projection projection, mln_screen_point point,
-  mln_operation* out_operation
-) -> mln_status;
-auto map_projection_lat_lng_for_pixel_take_result(
-  mln_operation operation, mln_lat_lng* out_coordinate
+  mln_lat_lng* out_coordinate
 ) -> mln_status;
 auto projected_meters_for_lat_lng(
   mln_lat_lng coordinate, mln_projected_meters* out_meters

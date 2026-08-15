@@ -225,6 +225,9 @@ MLN_API mln_status mln_map_set_projection_mode(
 
 /**
  * Starts an ordered conversion from a geographic coordinate to a screen point.
+ *
+ * Each conversion queues one map operation. Hot paths such as per-pointer-move
+ * conversion use a standalone projection, whose conversions are synchronous.
  */
 MLN_API mln_status mln_map_pixel_for_lat_lng_start(
   mln_map map, mln_lat_lng coordinate, mln_operation* out_operation
@@ -237,6 +240,9 @@ MLN_API mln_status mln_map_pixel_for_lat_lng_take_result(
 
 /**
  * Starts an ordered conversion from a screen point to a geographic coordinate.
+ *
+ * Each conversion queues one map operation. Hot paths such as per-pointer-move
+ * conversion use a standalone projection, whose conversions are synchronous.
  */
 MLN_API mln_status mln_map_lat_lng_for_pixel_start(
   mln_map map, mln_screen_point point, mln_operation* out_operation

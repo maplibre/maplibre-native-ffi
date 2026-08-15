@@ -1,5 +1,5 @@
-// Raw C ABI coverage for standalone projection lifecycle, ordered reads,
-// commands, input ownership, and any-thread handles.
+// Raw C ABI coverage for standalone projection lifecycle, ordered creation,
+// synchronous reads and setters, and any-thread handles.
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -35,30 +35,17 @@ static mln_map_projection create_projection(mln_map map) {
   return projection;
 }
 
-static void close_projection(mln_map_projection projection) {
-  mln_operation operation = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_projection_close_start(projection, &operation)
-  );
-  wait_completed(operation);
-  mln_operation_release(operation);
-}
-
 static mln_camera_options read_camera(mln_map_projection projection) {
-  mln_operation operation = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_projection_get_camera_start(projection, &operation)
-  );
-  wait_completed(operation);
   mln_camera_options camera = mln_camera_options_default();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_projection_get_camera_take_result(operation, &camera)
+    MLN_STATUS_OK, mln_map_projection_get_camera(projection, &camera)
   );
-  mln_operation_release(operation);
   return camera;
 }
 
-static void creation_and_close_have_synchronous_preflight(void) {
+static void creation_has_synchronous_preflight_and_close_retires_the_handle(
+  void
+) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
 
@@ -93,245 +80,179 @@ static void creation_and_close_have_synchronous_preflight(void) {
   );
   mln_operation_release(operation);
 
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_projection_close(projection));
+
+  // Every call with the retired handle reports an invalid argument.
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_projection_close_start(projection, NULL)
-  );
-  mln_operation close = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_projection_close_start(projection, &close)
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_projection_close(projection)
   );
   mln_camera_options camera = mln_camera_options_default();
-  uint64_t command_id = 0;
-  // Close may retire the handle before this thread reaches the next call.
-  const mln_status closing_command_status =
-    mln_map_projection_set_camera(projection, &camera, &command_id);
-  TEST_ASSERT_TRUE(
-    closing_command_status == MLN_STATUS_INVALID_STATE ||
-    closing_command_status == MLN_STATUS_INVALID_ARGUMENT
-  );
-  wait_completed(close);
-  mln_operation_release(close);
-
-  close = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_projection_close_start(projection, &close)
+    mln_map_projection_get_camera(projection, &camera)
   );
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
-static void commands_copy_inputs_and_preserve_runtime_order(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_runtime_set_event_mask(runtime, MLN_RUNTIME_EVENT_MASK_COMMAND_FINISHED)
-  );
-  mln_map map = mln_test_create_map(runtime);
-  mln_map_projection projection = create_projection(map);
-
-  mln_camera_options camera = mln_camera_options_default();
-  camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
-  camera.latitude = 12.0;
-  camera.longitude = 34.0;
-  camera.zoom = 4.0;
-  uint64_t first_id = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_projection_set_camera(projection, &camera, &first_id)
-  );
-  camera.latitude = -70.0;
-  camera.longitude = -150.0;
-  camera.zoom = 1.0;
-
-  camera.latitude = 20.0;
-  camera.longitude = 40.0;
-  camera.zoom = 6.0;
-  uint64_t second_id = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_projection_set_camera(projection, &camera, &second_id)
-  );
-  camera.latitude = 70.0;
-  camera.longitude = 150.0;
+  camera.fields = MLN_CAMERA_OPTION_ZOOM;
   camera.zoom = 2.0;
-  TEST_ASSERT_GREATER_THAN_UINT64(first_id, second_id);
-
-  const mln_camera_options result = read_camera(projection);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 20.0, result.latitude);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 40.0, result.longitude);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 6.0, result.zoom);
-
-  mln_lat_lng coordinates[] = {
-    {.latitude = 0.0, .longitude = -10.0},
-    {.latitude = 0.0, .longitude = 10.0},
-  };
-  uint64_t third_id = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_projection_set_visible_coordinates(
-                     projection, coordinates, 2, (mln_edge_insets){0}, &third_id
-                   )
-  );
-  coordinates[0] = (mln_lat_lng){.latitude = 70.0, .longitude = 150.0};
-  coordinates[1] = (mln_lat_lng){.latitude = 75.0, .longitude = 160.0};
-  TEST_ASSERT_GREATER_THAN_UINT64(second_id, third_id);
-  const mln_camera_options fitted = read_camera(projection);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 0.0, fitted.latitude);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 0.0, fitted.longitude);
-
-  mln_test_event_batch batch = mln_test_event_batch_default();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_drain_events(runtime, 0, &batch)
-  );
-  bool saw_first = false;
-  bool saw_second_after_first = false;
-  bool saw_third_after_second = false;
-  for (size_t index = 0; index < batch.event_count; index += 1) {
-    const mln_runtime_event* event = &batch.events[index];
-    if (
-      event->type != MLN_RUNTIME_EVENT_COMMAND_FINISHED ||
-      event->source_type != MLN_RUNTIME_EVENT_SOURCE_PROJECTION ||
-      event->source != projection
-    ) {
-      continue;
-    }
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, event->code);
-    TEST_ASSERT_EQUAL_UINT32(
-      MLN_COMMAND_DISPOSITION_COMMITTED,
-      event->payload.command_finished.disposition
-    );
-    if (event->payload.command_finished.command_id == first_id) {
-      saw_first = true;
-    }
-    if (event->payload.command_finished.command_id == second_id && saw_first) {
-      saw_second_after_first = true;
-    }
-    if (
-      event->payload.command_finished.command_id == third_id &&
-      saw_second_after_first
-    ) {
-      saw_third_after_second = true;
-    }
-  }
-  TEST_ASSERT_TRUE(saw_first);
-  TEST_ASSERT_TRUE(saw_second_after_first);
-  TEST_ASSERT_TRUE(saw_third_after_second);
-
-  close_projection(projection);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
-static void typed_reads_preserve_results_after_failed_transfers(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_map_projection projection = create_projection(map);
-
-  mln_operation camera_operation = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_projection_get_camera_start(projection, &camera_operation)
-  );
-  wait_completed(camera_operation);
-  mln_screen_point wrong_type = {0};
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_projection_pixel_for_lat_lng_take_result(
-      camera_operation, &wrong_type
+    mln_map_projection_set_camera(projection, &camera)
+  );
+  mln_screen_point point = {0};
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_projection_pixel_for_lat_lng(
+      projection, (mln_lat_lng){.latitude = 0.0, .longitude = 0.0}, &point
     )
   );
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+static void creation_observes_earlier_map_camera_commands(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+
+  mln_camera_update update = mln_camera_update_default();
+  update.mode = MLN_CAMERA_UPDATE_MODE_JUMP;
+  update.camera = mln_camera_options_default();
+  update.camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
+  update.camera.latitude = 12.0;
+  update.camera.longitude = 34.0;
+  update.camera.zoom = 4.0;
+  uint64_t command_id = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_update_camera(map, &update, &command_id)
+  );
+
+  // Creation is ordered after the accepted camera command, so the projection
+  // copies the committed transform state.
+  mln_map_projection projection = create_projection(map);
+  const mln_camera_options camera = read_camera(projection);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 12.0, camera.latitude);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 34.0, camera.longitude);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 4.0, camera.zoom);
+
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_projection_close(projection));
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+static void setters_apply_before_return_and_conversions_round_trip(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_map_projection projection = create_projection(map);
+
   mln_camera_options too_small = {.size = sizeof(mln_camera_options) - 1};
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_projection_get_camera_take_result(camera_operation, &too_small)
+    mln_map_projection_get_camera(projection, &too_small)
   );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_projection_get_camera(projection, NULL)
+  );
+
   mln_camera_options camera = mln_camera_options_default();
+  camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
+  camera.latitude = 20.0;
+  camera.longitude = 40.0;
+  camera.zoom = 6.0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_projection_set_camera(projection, &camera)
+  );
+  const mln_camera_options committed = read_camera(projection);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 20.0, committed.latitude);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 40.0, committed.longitude);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 6.0, committed.zoom);
+
+  // A committed camera changes what later conversions observe: the new center
+  // converts back to itself through a pixel round trip.
+  mln_screen_point center_pixel = {0};
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_map_projection_get_camera_take_result(camera_operation, &camera)
+    mln_map_projection_pixel_for_lat_lng(
+      projection, (mln_lat_lng){.latitude = 20.0, .longitude = 40.0},
+      &center_pixel
+    )
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_STATE,
-    mln_map_projection_get_camera_take_result(camera_operation, &camera)
-  );
-  mln_operation_release(camera_operation);
-
-  const mln_lat_lng input = {.latitude = 0.0, .longitude = 0.0};
-  mln_operation pixel_operation = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_projection_pixel_for_lat_lng_start(
-                     projection, input, &pixel_operation
-                   )
-  );
-  wait_completed(pixel_operation);
-  mln_screen_point pixel = {0};
+  mln_lat_lng round_trip = {0};
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_map_projection_pixel_for_lat_lng_take_result(pixel_operation, &pixel)
+    mln_map_projection_lat_lng_for_pixel(projection, center_pixel, &round_trip)
   );
-  mln_operation_release(pixel_operation);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 20.0, round_trip.latitude);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 40.0, round_trip.longitude);
 
-  mln_operation coordinate_operation = MLN_HANDLE_NULL;
+  const mln_lat_lng origin = {.latitude = 0.0, .longitude = 0.0};
+  mln_screen_point origin_before_fit = {0};
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_projection_lat_lng_for_pixel_start(
-                     projection, pixel, &coordinate_operation
+    MLN_STATUS_OK,
+    mln_map_projection_pixel_for_lat_lng(projection, origin, &origin_before_fit)
+  );
+
+  const mln_lat_lng coordinates[] = {
+    {.latitude = 0.0, .longitude = -10.0},
+    {.latitude = 0.0, .longitude = 10.0},
+  };
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_projection_set_visible_coordinates(
+                     projection, coordinates, 2, (mln_edge_insets){0}
                    )
   );
-  wait_completed(coordinate_operation);
-  mln_lat_lng coordinate = {0};
+  const mln_camera_options fitted = read_camera(projection);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 0.0, fitted.latitude);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 0.0, fitted.longitude);
+  mln_screen_point origin_after_fit = {0};
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_projection_lat_lng_for_pixel_take_result(
-                     coordinate_operation, &coordinate
-                   )
+    MLN_STATUS_OK,
+    mln_map_projection_pixel_for_lat_lng(projection, origin, &origin_after_fit)
   );
-  TEST_ASSERT_DOUBLE_WITHIN(1e-7, input.latitude, coordinate.latitude);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-7, input.longitude, coordinate.longitude);
-  mln_operation_release(coordinate_operation);
+  // The committed fit moved the camera, so the same coordinate lands on a
+  // different pixel than it did before the fit.
+  TEST_ASSERT_TRUE(origin_after_fit.x != origin_before_fit.x);
 
-  close_projection(projection);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_projection_close(projection));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
 
 typedef struct projection_thread_probe {
   mln_map_projection projection;
-  mln_status command_status;
-  mln_status read_start_status;
-  mln_status read_wait_status;
-  mln_status read_take_status;
-  mln_status close_start_status;
-  mln_status close_wait_status;
+  mln_status set_camera_status;
+  mln_status get_camera_status;
+  double observed_zoom;
+  mln_status pixel_status;
+  mln_status coordinate_status;
+  double round_trip_latitude;
+  mln_status close_status;
 } projection_thread_probe;
 
 static void projection_foreign_thread(void* argument) {
   projection_thread_probe* probe = argument;
   mln_camera_options camera = mln_camera_options_default();
-  camera.fields = MLN_CAMERA_OPTION_ZOOM;
+  camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
+  camera.latitude = 15.0;
+  camera.longitude = 25.0;
   camera.zoom = 3.0;
-  uint64_t command_id = 0;
-  probe->command_status =
-    mln_map_projection_set_camera(probe->projection, &camera, &command_id);
+  probe->set_camera_status =
+    mln_map_projection_set_camera(probe->projection, &camera);
 
-  mln_operation read = MLN_HANDLE_NULL;
-  probe->read_start_status =
-    mln_map_projection_get_camera_start(probe->projection, &read);
-  bool completed = false;
-  probe->read_wait_status = mln_operation_wait(read, 10000, &completed);
   camera = mln_camera_options_default();
-  probe->read_take_status =
-    completed ? mln_map_projection_get_camera_take_result(read, &camera)
-              : MLN_STATUS_INVALID_STATE;
-  mln_operation_release(read);
+  probe->get_camera_status =
+    mln_map_projection_get_camera(probe->projection, &camera);
+  probe->observed_zoom = camera.zoom;
 
-  mln_operation close = MLN_HANDLE_NULL;
-  probe->close_start_status =
-    mln_map_projection_close_start(probe->projection, &close);
-  completed = false;
-  probe->close_wait_status = mln_operation_wait(close, 10000, &completed);
-  if (!completed) {
-    probe->close_wait_status = MLN_STATUS_INVALID_STATE;
-  }
-  mln_operation_release(close);
+  mln_screen_point pixel = {0};
+  probe->pixel_status = mln_map_projection_pixel_for_lat_lng(
+    probe->projection, (mln_lat_lng){.latitude = 15.0, .longitude = 25.0},
+    &pixel
+  );
+  mln_lat_lng coordinate = {0};
+  probe->coordinate_status =
+    mln_map_projection_lat_lng_for_pixel(probe->projection, pixel, &coordinate);
+  probe->round_trip_latitude = coordinate.latitude;
+
+  probe->close_status = mln_map_projection_close(probe->projection);
 }
 
 static void projection_handles_are_callable_from_foreign_threads(void) {
@@ -339,23 +260,25 @@ static void projection_handles_are_callable_from_foreign_threads(void) {
   mln_map map = mln_test_create_map(runtime);
   projection_thread_probe probe = {
     .projection = create_projection(map),
-    .command_status = MLN_STATUS_INVALID_STATE,
-    .read_start_status = MLN_STATUS_INVALID_STATE,
-    .read_wait_status = MLN_STATUS_INVALID_STATE,
-    .read_take_status = MLN_STATUS_INVALID_STATE,
-    .close_start_status = MLN_STATUS_INVALID_STATE,
-    .close_wait_status = MLN_STATUS_INVALID_STATE,
+    .set_camera_status = MLN_STATUS_INVALID_STATE,
+    .get_camera_status = MLN_STATUS_INVALID_STATE,
+    .observed_zoom = 0.0,
+    .pixel_status = MLN_STATUS_INVALID_STATE,
+    .coordinate_status = MLN_STATUS_INVALID_STATE,
+    .round_trip_latitude = 0.0,
+    .close_status = MLN_STATUS_INVALID_STATE,
   };
   mln_test_thread* thread =
     mln_test_thread_start(projection_foreign_thread, &probe);
   mln_test_thread_join(thread);
 
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.command_status);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.read_start_status);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.read_wait_status);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.read_take_status);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.close_start_status);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.close_wait_status);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.set_camera_status);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.get_camera_status);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 3.0, probe.observed_zoom);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.pixel_status);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.coordinate_status);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 15.0, probe.round_trip_latitude);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.close_status);
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -363,8 +286,8 @@ static void projection_handles_are_callable_from_foreign_threads(void) {
 
 void run_projection_abi_tests(void) {
   UnitySetTestFile(__FILE__);
-  RUN_TEST(creation_and_close_have_synchronous_preflight);
-  RUN_TEST(commands_copy_inputs_and_preserve_runtime_order);
-  RUN_TEST(typed_reads_preserve_results_after_failed_transfers);
+  RUN_TEST(creation_has_synchronous_preflight_and_close_retires_the_handle);
+  RUN_TEST(creation_observes_earlier_map_camera_commands);
+  RUN_TEST(setters_apply_before_return_and_conversions_round_trip);
   RUN_TEST(projection_handles_are_callable_from_foreign_threads);
 }

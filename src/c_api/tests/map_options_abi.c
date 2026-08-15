@@ -558,11 +558,7 @@ static void map_close_preflight_rejects_live_projection(void) {
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, close);
 
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_projection_close_start(projection, &close)
-  );
-  wait_for_operation(close);
-  mln_operation_release(close);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_projection_close(projection));
   destroy_map_fixture(fixture);
 }
 

@@ -23,8 +23,12 @@ extern "C" {
  * The returned operation uses the map runtime's notification source. Creation
  * reserves a child before this function returns, so an accepted operation
  * prevents the map from closing. The operation result is a projection handle
- * that is independent of later map changes. This function may be called from
- * any thread.
+ * that copies the map's transform state after every earlier map command. This
+ * function may be called from any thread.
+ *
+ * Every later projection call is synchronous, runs on the calling thread, and
+ * is internally serialized. A projection never observes map changes made after
+ * its creation.
  */
 MLN_API mln_status mln_map_projection_create_start(
   mln_map map, mln_operation* out_operation
@@ -42,120 +46,86 @@ MLN_API mln_status mln_map_projection_create_take_result(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts closing a standalone projection.
+ * Closes a standalone projection.
  *
- * Synchronous preflight rejects an invalid or already-closing handle. After
- * acceptance, new projection submissions return an invalid-state status. The
- * operation completes after all accepted projection work and releases the
- * projection's map child reservation. This function may be called from any
+ * The close retires the handle, waits for projection calls already running on
+ * other threads, destroys the projection, and releases the projection's map
+ * child reservation before it returns. A later call with the retired handle
+ * returns MLN_STATUS_INVALID_ARGUMENT. This function may be called from any
  * thread.
  */
-MLN_API mln_status mln_map_projection_close_start(
-  mln_map_projection projection, mln_operation* out_operation
-) MLN_NOEXCEPT;
+MLN_API mln_status
+mln_map_projection_close(mln_map_projection projection) MLN_NOEXCEPT;
 
 /**
- * Starts an ordered read of the projection camera.
+ * Copies the projection camera into out_camera.
  *
- * The operation observes every projection command that was accepted before
- * this read. The operation uses the projection runtime's notification source.
- * This function may be called from any thread.
+ * out_camera->size must be at least sizeof(mln_camera_options). The result
+ * observes every earlier projection setter. This function may be called from
+ * any thread.
  */
-MLN_API mln_status mln_map_projection_get_camera_start(
-  mln_map_projection projection, mln_operation* out_operation
+MLN_API mln_status mln_map_projection_get_camera(
+  mln_map_projection projection, mln_camera_options* out_camera
 ) MLN_NOEXCEPT;
 
 /**
- * Takes the camera from a successful camera-read operation.
+ * Applies a camera update to a standalone projection.
  *
- * out_camera->size must be at least sizeof(mln_camera_options). A failed
- * transfer leaves the result available for another take call.
- */
-MLN_API mln_status mln_map_projection_get_camera_take_result(
-  mln_operation operation, mln_camera_options* out_camera
-) MLN_NOEXCEPT;
-
-/**
- * Submits a camera update to a standalone projection.
- *
- * Only fields selected by camera->fields affect the projection. The function
- * validates and copies the complete input before it returns. out_command_id
- * must point to zero. On success, it receives the command's monotonic runtime
- * order. A terminal disposition arrives through the runtime event stream. This
- * function may be called from any thread.
+ * Only fields selected by camera->fields affect the projection. The update is
+ * applied before this function returns, so a later read or conversion observes
+ * it. The map's camera is unaffected. This function may be called from any
+ * thread.
  */
 MLN_API mln_status mln_map_projection_set_camera(
-  mln_map_projection projection, const mln_camera_options* camera,
-  uint64_t* out_command_id
+  mln_map_projection projection, const mln_camera_options* camera
 ) MLN_NOEXCEPT;
 
 /**
- * Submits a camera fit for geographic coordinates.
+ * Applies a camera fit for geographic coordinates.
  *
- * The function validates and copies the coordinates and padding before it
- * returns. out_command_id must point to zero. On success, it receives the
- * command's monotonic runtime order. A terminal disposition arrives through
- * the runtime event stream. This function may be called from any thread.
+ * The fitted camera is applied before this function returns, so a later read
+ * or conversion observes it. This function may be called from any thread.
  */
 MLN_API mln_status mln_map_projection_set_visible_coordinates(
   mln_map_projection projection, const mln_lat_lng* coordinates,
-  size_t coordinate_count, mln_edge_insets padding, uint64_t* out_command_id
+  size_t coordinate_count, mln_edge_insets padding
 ) MLN_NOEXCEPT;
 
 /**
- * Submits a camera fit for GeoJSON Geometry bytes.
+ * Applies a camera fit for GeoJSON Geometry bytes.
  *
- * The function parses and copies the geometry and padding before it returns.
  * Empty geometry objects and geometry collections with no coordinates are
- * invalid. out_command_id must point to zero. On success, it receives the
- * command's monotonic runtime order. A terminal disposition arrives through
- * the runtime event stream. This function may be called from any thread.
+ * invalid. The fitted camera is applied before this function returns, so a
+ * later read or conversion observes it. This function may be called from any
+ * thread.
  */
 MLN_API mln_status mln_map_projection_set_visible_geometry(
   mln_map_projection projection, mln_buffer_view geometry,
-  mln_edge_insets padding, uint64_t* out_command_id
+  mln_edge_insets padding
 ) MLN_NOEXCEPT;
 
 /**
- * Starts an ordered conversion from a geographic coordinate to a screen point.
+ * Converts a geographic coordinate to a screen point.
  *
  * The output uses logical map pixels with an origin at the top-left of the
- * projection viewport. The operation observes every projection command that
- * was accepted before this read. This function may be called from any thread.
+ * projection viewport. The result observes every earlier projection setter.
+ * This function may be called from any thread.
  */
-MLN_API mln_status mln_map_projection_pixel_for_lat_lng_start(
+MLN_API mln_status mln_map_projection_pixel_for_lat_lng(
   mln_map_projection projection, mln_lat_lng coordinate,
-  mln_operation* out_operation
+  mln_screen_point* out_point
 ) MLN_NOEXCEPT;
 
 /**
- * Takes the screen point from a successful conversion operation.
- *
- * A failed transfer leaves the result available for another take call.
- */
-MLN_API mln_status mln_map_projection_pixel_for_lat_lng_take_result(
-  mln_operation operation, mln_screen_point* out_point
-) MLN_NOEXCEPT;
-
-/**
- * Starts an ordered conversion from a screen point to a geographic coordinate.
+ * Converts a screen point to a geographic coordinate.
  *
  * The input uses logical map pixels with an origin at the top-left of the
- * projection viewport. The operation observes every projection command that
- * was accepted before this read. This function may be called from any thread.
+ * projection viewport. The result observes every earlier projection setter.
+ * This function may be called from any thread.
  */
-MLN_API mln_status mln_map_projection_lat_lng_for_pixel_start(
+MLN_API mln_status mln_map_projection_lat_lng_for_pixel(
   mln_map_projection projection, mln_screen_point point,
-  mln_operation* out_operation
-) MLN_NOEXCEPT;
-
-/**
- * Takes the geographic coordinate from a successful conversion operation.
- *
- * A failed transfer leaves the result available for another take call.
- */
-MLN_API mln_status mln_map_projection_lat_lng_for_pixel_take_result(
-  mln_operation operation, mln_lat_lng* out_coordinate
+  mln_lat_lng* out_coordinate
 ) MLN_NOEXCEPT;
 
 /**

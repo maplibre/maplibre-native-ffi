@@ -2566,116 +2566,25 @@ namespace {
 
 enum : uint32_t {
   projection_operation_create = 0x50520001U,
-  projection_operation_close = 0x50520002U,
-  projection_operation_get_camera = 0x50520003U,
-  projection_operation_pixel_for_lat_lng = 0x50520004U,
-  projection_operation_lat_lng_for_pixel = 0x50520005U,
 };
 
-template <typename Result, typename Work>
-auto start_projection_result_operation(
-  mln_map_projection projection, uint32_t kind, mln_operation* out_operation,
-  Work work
-) -> mln_status {
-  auto& table = handle_table<MapProjectionObject>();
-  const std::scoped_lock lock(table.mutex());
-  auto live = table.lease_locked(projection);
-  if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (!live->control.acquire()) {
-    return MLN_STATUS_INVALID_STATE;
-  }
-  auto submission = std::shared_ptr<ControlLease>{};
-  try {
-    submission = std::make_shared<ControlLease>(&live->control);
-  } catch (...) {
-    live->control.release();
-    throw;
-  }
-  auto state = std::shared_ptr<OperationObject>{};
-  const auto register_status = register_operation(
-    live->runtime_state->event_queue->notification_source, kind, false, {},
-    out_operation, state
-  );
-  if (register_status != MLN_STATUS_OK) {
-    return register_status;
-  }
-  const auto operation = *out_operation;
-  const auto submit_status = submit_runtime_operation(
-    live->runtime_state, state,
-    [live = std::move(live), state, submission = std::move(submission),
-     work = std::move(work)]() mutable -> void {
-      try {
-        state->complete(
-          MLN_STATUS_OK, {}, std::any{Result{work(*live->projection)}}
-        );
-      } catch (...) {
-        state->complete(
-          MLN_STATUS_NATIVE_ERROR, exception_message(std::current_exception()),
-          {}
-        );
-      }
-    }
-  );
-  if (submit_status != MLN_STATUS_OK) {
-    abandon_operation(operation);
-    *out_operation = MLN_HANDLE_NULL;
-  }
-  return submit_status;
-}
-
+// Runs work against a live projection on the calling thread, serialized with
+// every other projection call, including close, by the per-projection mutex.
 template <typename Work>
-auto submit_projection_command(
-  mln_map_projection projection, uint64_t* out_command_id, Work work
-) -> mln_status {
-  if (out_command_id == nullptr || *out_command_id != 0) {
-    set_thread_error("out_command_id must point to zero");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  auto& table = handle_table<MapProjectionObject>();
-  const std::scoped_lock lock(table.mutex());
-  auto live = table.lease_locked(projection);
+auto with_projection(mln_map_projection projection, Work work) -> mln_status {
+  auto live = handle_table<MapProjectionObject>().lease(projection);
   if (live == nullptr) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (live->control.is_closing()) {
-    return MLN_STATUS_INVALID_STATE;
+  const std::scoped_lock call_lock(live->call_mutex);
+  if (live->projection == nullptr) {
+    set_handle_fault_error(
+      HandleTraits<MapProjectionObject>::kind, projection, HandleFault::Stale
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (!live->control.acquire()) {
-    return MLN_STATUS_INVALID_STATE;
-  }
-  auto submission = std::shared_ptr<ControlLease>{};
-  try {
-    submission = std::make_shared<ControlLease>(&live->control);
-  } catch (...) {
-    live->control.release();
-    throw;
-  }
-  const auto runtime_handle = live->runtime;
-  auto runtime = live->runtime_state;
-  return submit_runtime_command(
-    runtime,
-    [projection, runtime_handle, live = std::move(live),
-     submission = std::move(submission),
-     work = std::move(work)](uint64_t command_id) mutable -> void {
-      try {
-        work(*live->projection);
-        push_runtime_command_finished(
-          runtime_handle, MLN_RUNTIME_EVENT_SOURCE_PROJECTION, projection,
-          command_id, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, 0
-        );
-      } catch (...) {
-        const auto diagnostic = exception_message(std::current_exception());
-        push_runtime_command_finished(
-          runtime_handle, MLN_RUNTIME_EVENT_SOURCE_PROJECTION, projection,
-          command_id, MLN_COMMAND_DISPOSITION_FAILED, MLN_STATUS_NATIVE_ERROR,
-          0, diagnostic.c_str()
-        );
-      }
-    },
-    out_command_id
-  );
+  work(*live->projection);
+  return MLN_STATUS_OK;
 }
 
 }  // namespace
@@ -4119,14 +4028,10 @@ auto map_projection_create_start(mln_map map, mln_operation* out_operation)
     return register_status;
   }
   const auto operation = *out_operation;
-  const auto runtime_handle = parent->runtime;
   const auto submit_status = submit_runtime_operation(
-    runtime, state,
-    [map, runtime_handle, parent, runtime, state]() mutable -> void {
+    runtime, state, [parent, runtime, state]() mutable -> void {
       try {
         auto projection = std::make_shared<MapProjectionObject>();
-        projection->map = map;
-        projection->runtime = runtime_handle;
         projection->parent = parent;
         projection->runtime_state = runtime;
         projection->projection =
@@ -4180,109 +4085,64 @@ auto map_projection_create_take_result(
   );
 }
 
-auto map_projection_close_start(
-  mln_map_projection projection, mln_operation* out_operation
-) -> mln_status {
-  if (out_operation == nullptr) {
-    set_thread_error("out_operation must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (*out_operation != MLN_HANDLE_NULL) {
-    set_thread_error("out_operation must point to the null handle");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
+auto map_projection_close(mln_map_projection projection) -> mln_status {
   auto& table = handle_table<MapProjectionObject>();
-  const std::scoped_lock lock(table.mutex());
-  auto owned = table.lease_locked(projection);
-  if (owned == nullptr) {
+  std::shared_ptr<MapProjectionObject> owned;
+  {
+    const std::scoped_lock lock(table.mutex());
+    owned = table.lease_locked(projection);
+    if (owned == nullptr) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    static_cast<void>(table.remove_locked(projection));
+  }
+  {
+    // Waits for projection calls already running on other threads, then
+    // destroys the projection. A racing call that leased the handle before the
+    // removal observes the null projection and reports a stale handle.
+    const std::scoped_lock call_lock(owned->call_mutex);
+    owned->projection.reset();
+  }
+  // Drops this close's parent reference before releasing the child slot, so a
+  // concurrent map close never leaves this thread holding the last MapObject
+  // reference. The map cannot begin closing while the child slot is held, so
+  // the control state stays valid in between.
+  auto& parent_control = owned->parent->control;
+  owned->parent.reset();
+  parent_control.release_child();
+  return MLN_STATUS_OK;
+}
+
+auto map_projection_get_camera(
+  mln_map_projection projection, mln_camera_options* out_camera
+) -> mln_status {
+  if (out_camera == nullptr || out_camera->size < sizeof(mln_camera_options)) {
+    set_thread_error("out_camera must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto state = std::shared_ptr<OperationObject>{};
-  const auto register_status = register_operation(
-    owned->runtime_state->event_queue->notification_source,
-    projection_operation_close, false, {}, out_operation, state
-  );
-  if (register_status != MLN_STATUS_OK) {
-    return register_status;
-  }
-  const auto close_status = owned->control.begin_close();
-  if (close_status != MLN_STATUS_OK) {
-    abandon_operation(*out_operation);
-    *out_operation = MLN_HANDLE_NULL;
-    return close_status;
-  }
-  const auto operation = *out_operation;
-  const auto close_control = owned;
-  const auto submit_status = submit_runtime_operation(
-    owned->runtime_state, state,
-    [projection, owned = std::move(owned), state]() mutable -> void {
-      static_cast<void>(handle_table<MapProjectionObject>().remove(projection));
-      owned->projection.reset();
-      owned->parent->control.release_child();
-      owned->parent.reset();
-      owned.reset();
-      state->complete(MLN_STATUS_OK, {}, std::any{false});
-    }
-  );
-  if (submit_status != MLN_STATUS_OK) {
-    close_control->control.abort_close();
-    abandon_operation(operation);
-    *out_operation = MLN_HANDLE_NULL;
-  }
-  return submit_status;
-}
-
-auto map_projection_get_camera_start(
-  mln_map_projection projection, mln_operation* out_operation
-) -> mln_status {
-  return start_projection_result_operation<mln_camera_options>(
-    projection, projection_operation_get_camera, out_operation,
-    [](mbgl::MapProjection& value) -> mln_camera_options {
-      return from_native_camera(value.getCamera());
-    }
-  );
-}
-
-auto map_projection_get_camera_take_result(
-  mln_operation operation, mln_camera_options* out_camera
-) -> mln_status {
-  return take_operation_result<mln_camera_options>(
-    operation, projection_operation_get_camera,
-    [out_camera](mln_camera_options& result) -> mln_status {
-      if (
-        out_camera == nullptr || out_camera->size < sizeof(mln_camera_options)
-      ) {
-        set_thread_error(
-          "out_camera must not be null and must have a valid size"
-        );
-        return MLN_STATUS_INVALID_ARGUMENT;
-      }
-      *out_camera = result;
-      return MLN_STATUS_OK;
-    }
-  );
+  return with_projection(projection, [out_camera](mbgl::MapProjection& value) {
+    *out_camera = from_native_camera(value.getCamera());
+  });
 }
 
 auto map_projection_set_camera(
-  mln_map_projection projection, const mln_camera_options* camera,
-  uint64_t* out_command_id
+  mln_map_projection projection, const mln_camera_options* camera
 ) -> mln_status {
   const auto camera_status = validate_camera_options(camera);
   if (camera_status != MLN_STATUS_OK) {
     return camera_status;
   }
-  const auto copied_camera = to_native_camera(*camera);
-  return submit_projection_command(
-    projection, out_command_id, [copied_camera](mbgl::MapProjection& value) {
-      value.setCamera(copied_camera);
+  const auto native_camera = to_native_camera(*camera);
+  return with_projection(
+    projection, [&native_camera](mbgl::MapProjection& value) {
+      value.setCamera(native_camera);
     }
   );
 }
 
 auto map_projection_set_visible_coordinates(
   mln_map_projection projection, const mln_lat_lng* coordinates,
-  size_t coordinate_count, mln_edge_insets padding, uint64_t* out_command_id
+  size_t coordinate_count, mln_edge_insets padding
 ) -> mln_status {
   const auto coordinates_status =
     validate_lat_lng_array(coordinates, coordinate_count, false);
@@ -4293,106 +4153,79 @@ auto map_projection_set_visible_coordinates(
   if (padding_status != MLN_STATUS_OK) {
     return padding_status;
   }
-  auto copied_coordinates = to_native_lat_lngs(coordinates, coordinate_count);
-  const auto copied_padding = to_native_edge_insets(padding);
-  return submit_projection_command(
-    projection, out_command_id,
-    [coordinates = std::move(copied_coordinates),
-     copied_padding](mbgl::MapProjection& value) {
-      value.setVisibleCoordinates(coordinates, copied_padding);
+  const auto native_coordinates =
+    to_native_lat_lngs(coordinates, coordinate_count);
+  const auto native_padding = to_native_edge_insets(padding);
+  return with_projection(
+    projection,
+    [&native_coordinates, &native_padding](mbgl::MapProjection& value) {
+      value.setVisibleCoordinates(native_coordinates, native_padding);
     }
   );
 }
 
 auto map_projection_set_visible_geometry(
   mln_map_projection projection, mln_buffer_view geometry,
-  mln_edge_insets padding, uint64_t* out_command_id
+  mln_edge_insets padding
 ) -> mln_status {
   const auto padding_status = validate_edge_insets(padding);
   if (padding_status != MLN_STATUS_OK) {
     return padding_status;
   }
-  auto native_geometry = to_native_geometry(geometry);
+  const auto native_geometry = to_native_geometry(geometry);
   if (!native_geometry) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto coordinates = geometry_lat_lngs(*native_geometry);
+  const auto coordinates = geometry_lat_lngs(*native_geometry);
   if (coordinates.empty()) {
     set_thread_error("geometry must contain at least one coordinate");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto copied_padding = to_native_edge_insets(padding);
-  return submit_projection_command(
-    projection, out_command_id,
-    [coordinates = std::move(coordinates),
-     copied_padding](mbgl::MapProjection& value) {
-      value.setVisibleCoordinates(coordinates, copied_padding);
+  const auto native_padding = to_native_edge_insets(padding);
+  return with_projection(
+    projection, [&coordinates, &native_padding](mbgl::MapProjection& value) {
+      value.setVisibleCoordinates(coordinates, native_padding);
     }
   );
 }
 
-auto map_projection_pixel_for_lat_lng_start(
+auto map_projection_pixel_for_lat_lng(
   mln_map_projection projection, mln_lat_lng coordinate,
-  mln_operation* out_operation
+  mln_screen_point* out_point
 ) -> mln_status {
+  if (out_point == nullptr) {
+    set_thread_error("out_point must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
   const auto coordinate_status = validate_lat_lng(coordinate);
   if (coordinate_status != MLN_STATUS_OK) {
     return coordinate_status;
   }
-  const auto copied_coordinate = to_native_lat_lng(coordinate);
-  return start_projection_result_operation<mln_screen_point>(
-    projection, projection_operation_pixel_for_lat_lng, out_operation,
-    [copied_coordinate](mbgl::MapProjection& value) -> mln_screen_point {
-      return from_native_screen_point(value.pixelForLatLng(copied_coordinate));
+  const auto native_coordinate = to_native_lat_lng(coordinate);
+  return with_projection(
+    projection, [&native_coordinate, out_point](mbgl::MapProjection& value) {
+      *out_point =
+        from_native_screen_point(value.pixelForLatLng(native_coordinate));
     }
   );
 }
 
-auto map_projection_pixel_for_lat_lng_take_result(
-  mln_operation operation, mln_screen_point* out_point
-) -> mln_status {
-  return take_operation_result<mln_screen_point>(
-    operation, projection_operation_pixel_for_lat_lng,
-    [out_point](mln_screen_point& result) -> mln_status {
-      if (out_point == nullptr) {
-        set_thread_error("out_point must not be null");
-        return MLN_STATUS_INVALID_ARGUMENT;
-      }
-      *out_point = result;
-      return MLN_STATUS_OK;
-    }
-  );
-}
-
-auto map_projection_lat_lng_for_pixel_start(
+auto map_projection_lat_lng_for_pixel(
   mln_map_projection projection, mln_screen_point point,
-  mln_operation* out_operation
+  mln_lat_lng* out_coordinate
 ) -> mln_status {
+  if (out_coordinate == nullptr) {
+    set_thread_error("out_coordinate must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
   const auto point_status = validate_screen_point(point);
   if (point_status != MLN_STATUS_OK) {
     return point_status;
   }
-  const auto copied_point = to_native_screen_point(point);
-  return start_projection_result_operation<mln_lat_lng>(
-    projection, projection_operation_lat_lng_for_pixel, out_operation,
-    [copied_point](mbgl::MapProjection& value) -> mln_lat_lng {
-      return from_native_lat_lng(value.latLngForPixel(copied_point));
-    }
-  );
-}
-
-auto map_projection_lat_lng_for_pixel_take_result(
-  mln_operation operation, mln_lat_lng* out_coordinate
-) -> mln_status {
-  return take_operation_result<mln_lat_lng>(
-    operation, projection_operation_lat_lng_for_pixel,
-    [out_coordinate](mln_lat_lng& result) -> mln_status {
-      if (out_coordinate == nullptr) {
-        set_thread_error("out_coordinate must not be null");
-        return MLN_STATUS_INVALID_ARGUMENT;
-      }
-      *out_coordinate = result;
-      return MLN_STATUS_OK;
+  const auto native_point = to_native_screen_point(point);
+  return with_projection(
+    projection, [&native_point, out_coordinate](mbgl::MapProjection& value) {
+      *out_coordinate = from_native_lat_lng(value.latLngForPixel(native_point));
     }
   );
 }

@@ -222,11 +222,15 @@ typedef enum mln_runtime_event_mask : uint64_t {
                                MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS,
 } mln_runtime_event_mask;
 
-/** Source kinds used by mln_runtime_event.source_type. */
+/**
+ * Source kinds used by mln_runtime_event.source_type.
+ *
+ * Value 2 is retired and no version reuses it. It named a projection source;
+ * projection calls are now synchronous and emit no events.
+ */
 typedef enum mln_runtime_event_source_type : uint32_t {
   MLN_RUNTIME_EVENT_SOURCE_RUNTIME = 0,
   MLN_RUNTIME_EVENT_SOURCE_MAP = 1,
-  MLN_RUNTIME_EVENT_SOURCE_PROJECTION = 2,
 } mln_runtime_event_source_type;
 
 /**
@@ -541,8 +545,8 @@ typedef struct mln_runtime_event {
   /** One of mln_runtime_event_source_type. */
   uint32_t source_type;
   /**
-   * Source handle selected by source_type: an mln_runtime, mln_map, or
-   * mln_projection. Every handle type is uint64_t, so this needs no cast.
+   * Source handle selected by source_type: an mln_runtime or an mln_map.
+   * Every handle type is uint64_t, so this needs no cast.
    *
    * The value names one object for the life of the process, so a host may
    * compare it against a handle it holds even after that handle is released.
