@@ -82,6 +82,16 @@ typedef enum mln_style_source_info_field : uint32_t {
   MLN_STYLE_SOURCE_INFO_RASTER_ENCODING = 1U << 5U,
 } mln_style_source_info_field;
 
+/** Fields available in mln_style_layer_info. */
+typedef enum mln_style_layer_info_field : uint32_t {
+  /** The layer carries a source ID. Copy it with the layer-source-ID
+     operation. */
+  MLN_STYLE_LAYER_INFO_SOURCE_ID = 1U << 0U,
+  /** The layer carries a source-layer ID. Copy it with the layer-source-layer
+     operation. */
+  MLN_STYLE_LAYER_INFO_SOURCE_LAYER = 1U << 1U,
+} mln_style_layer_info_field;
+
 /** Field mask values for mln_style_tile_source_options. */
 typedef enum mln_style_tile_source_option_field : uint32_t {
   MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM = 1U << 0U,
@@ -145,7 +155,7 @@ typedef enum mln_style_image_text_fit : uint32_t {
   MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL = 2,
 } mln_style_image_text_fit;
 
-/** Layer visibility values used by the layer visibility accessors. */
+/** Layer visibility values used by the visibility setter and layer info. */
 typedef enum mln_style_layer_visibility : uint32_t {
   MLN_STYLE_LAYER_VISIBILITY_VISIBLE = 0,
   MLN_STYLE_LAYER_VISIBILITY_NONE = 1,
@@ -235,6 +245,28 @@ typedef struct mln_style_source_info {
   /** DEM encoding, meaningful when fields contains RASTER_ENCODING. */
   uint32_t raster_encoding;
 } mln_style_source_info;
+
+/** Fixed layer metadata returned by the layer-info operation take. */
+typedef struct mln_style_layer_info {
+  uint32_t size;
+  /** Bitwise combination of mln_style_layer_info_field values. */
+  uint32_t fields;
+  /** View of a static style-spec layer type string. It stays valid for the
+     life of the process. */
+  mln_buffer_view type;
+  /** Lowest zoom at which the layer draws; -INFINITY with no lower bound. */
+  double min_zoom;
+  /** Highest zoom at which the layer draws; INFINITY with no upper bound. */
+  double max_zoom;
+  /** One of mln_style_layer_visibility. */
+  uint32_t visibility;
+  /** Source ID byte length, excluding any null terminator; 0 when fields
+     lacks SOURCE_ID. */
+  size_t source_id_size;
+  /** Source-layer byte length, excluding any null terminator; 0 when fields
+     lacks SOURCE_LAYER. */
+  size_t source_layer_size;
+} mln_style_layer_info;
 
 /** Options for vector and raster tile sources. */
 typedef struct mln_style_tile_source_options {
@@ -1434,22 +1466,26 @@ MLN_API mln_status mln_map_remove_style_layer(
 ) MLN_NOEXCEPT;
 
 /**
- * Borrows one style layer type string.
+ * Copies fixed metadata for one style layer.
  *
- * On success, out_found reports whether layer_id exists. When found,
- * out_layer_type receives a view of a static style-spec layer type string.
+ * The returned struct contains the layer type, zoom range, visibility, and
+ * string lengths for the layer's source ID and source-layer ID, not their
+ * contents. Use the layer-source-ID and layer-source-layer operations to copy
+ * those strings. The layer ID is the lookup key and is also available through
+ * style layer ID lists. out_found reports whether layer_id exists.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
- *   invalid or empty, out_layer_type is null, or out_found is null.
+ *   invalid or empty, out_info is null, out_info->size is too small, or
+ *   out_found is null.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_get_style_layer_type_start(
+MLN_API mln_status mln_map_get_style_layer_info_start(
   mln_map map, mln_buffer_view layer_id, mln_operation* out_operation
 ) MLN_NOEXCEPT;
-MLN_API mln_status mln_map_get_style_layer_type_take_result(
-  mln_operation operation, mln_buffer* out_layer_type, bool* out_found
+MLN_API mln_status mln_map_get_style_layer_info_take_result(
+  mln_operation operation, mln_style_layer_info* out_info, bool* out_found
 ) MLN_NOEXCEPT;
 
 /**
@@ -1819,24 +1855,6 @@ MLN_API mln_status mln_map_set_layer_min_zoom(
 ) MLN_NOEXCEPT;
 
 /**
- * Reads the lowest zoom at which one layer draws.
- *
- * A layer with no lower bound reports -INFINITY.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
- *   invalid or empty, out_min_zoom is null, or the layer does not exist.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_map_get_layer_min_zoom_start(
-  mln_map map, mln_buffer_view layer_id, mln_operation* out_operation
-) MLN_NOEXCEPT;
-MLN_API mln_status mln_map_get_layer_min_zoom_take_result(
-  mln_operation operation, double* out_min_zoom
-) MLN_NOEXCEPT;
-
-/**
  * Sets the highest zoom at which one layer draws.
  *
  * Pass INFINITY for no upper bound. MapLibre Native stores the zoom range as
@@ -1854,24 +1872,6 @@ MLN_API mln_status mln_map_set_layer_max_zoom(
 ) MLN_NOEXCEPT;
 
 /**
- * Reads the highest zoom at which one layer draws.
- *
- * A layer with no upper bound reports INFINITY.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
- *   invalid or empty, out_max_zoom is null, or the layer does not exist.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_map_get_layer_max_zoom_start(
-  mln_map map, mln_buffer_view layer_id, mln_operation* out_operation
-) MLN_NOEXCEPT;
-MLN_API mln_status mln_map_get_layer_max_zoom_take_result(
-  mln_operation operation, double* out_max_zoom
-) MLN_NOEXCEPT;
-
-/**
  * Sets whether one layer draws.
  *
  * visibility is an mln_style_layer_visibility value.
@@ -1886,24 +1886,6 @@ MLN_API mln_status mln_map_get_layer_max_zoom_take_result(
 MLN_API mln_status mln_map_set_layer_visibility(
   mln_map map, mln_buffer_view layer_id, uint32_t visibility,
   uint64_t* out_command_id
-) MLN_NOEXCEPT;
-
-/**
- * Reads whether one layer draws.
- *
- * On success, *out_visibility receives an mln_style_layer_visibility value.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
- *   invalid or empty, out_visibility is null, or the layer does not exist.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_map_get_layer_visibility_start(
-  mln_map map, mln_buffer_view layer_id, mln_operation* out_operation
-) MLN_NOEXCEPT;
-MLN_API mln_status mln_map_get_layer_visibility_take_result(
-  mln_operation operation, uint32_t* out_visibility
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

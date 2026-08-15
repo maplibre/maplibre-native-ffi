@@ -449,6 +449,117 @@ static void remove_commands_commit_and_report_missing_ids(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// Takes one layer-info result for id after a runtime barrier, asserting the
+// operation itself succeeds, and returns whether the layer was found.
+static bool take_layer_info(
+  mln_runtime runtime, mln_map map, const char* id, mln_style_layer_info* info
+) {
+  mln_operation operation = MLN_HANDLE_NULL;
+  const mln_buffer_view view = {.data = id, .size = strlen(id)};
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_style_layer_info_start(map, view, &operation)
+  );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  memset(info, 0, sizeof(*info));
+  info->size = sizeof(*info);
+  bool found = false;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_get_style_layer_info_take_result(operation, info, &found)
+  );
+  mln_operation_release(operation);
+  return found;
+}
+
+static void layer_info_reports_scalars_and_sizes_the_source_id_copy(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_style_layer_info info = {.size = sizeof(mln_style_layer_info)};
+  TEST_ASSERT_FALSE(take_layer_info(runtime, map, "missing-layer", &info));
+
+  const mln_buffer_view json = VIEW(
+    "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\","
+    "\"features\":[]}}"
+  );
+  uint64_t command = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_add_style_source_json(map, VIEW("info-source"), json, &command)
+  );
+  command = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_add_style_layer_json(
+                     map,
+                     VIEW(
+                       "{\"id\":\"info-layer\",\"type\":\"circle\",\"source\":"
+                       "\"info-source\"}"
+                     ),
+                     VIEW(""), &command
+                   )
+  );
+  TEST_ASSERT_TRUE(take_layer_info(runtime, map, "info-layer", &info));
+  TEST_ASSERT_EQUAL_size_t(strlen("circle"), info.type.size);
+  TEST_ASSERT_EQUAL_MEMORY("circle", info.type.data, info.type.size);
+  TEST_ASSERT_EQUAL_UINT32(MLN_STYLE_LAYER_VISIBILITY_VISIBLE, info.visibility);
+  TEST_ASSERT_EQUAL_UINT32(MLN_STYLE_LAYER_INFO_SOURCE_ID, info.fields);
+  TEST_ASSERT_EQUAL_size_t(0, info.source_layer_size);
+
+  command = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_set_layer_min_zoom(map, VIEW("info-layer"), 3.0, &command)
+  );
+  command = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_set_layer_max_zoom(map, VIEW("info-layer"), 12.0, &command)
+  );
+  command = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_set_layer_visibility(
+      map, VIEW("info-layer"), MLN_STYLE_LAYER_VISIBILITY_NONE, &command
+    )
+  );
+  command = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_layer_source_layer(
+                     map, VIEW("info-layer"), VIEW("roads"), &command
+                   )
+  );
+  TEST_ASSERT_TRUE(take_layer_info(runtime, map, "info-layer", &info));
+  TEST_ASSERT_EQUAL_DOUBLE(3.0, info.min_zoom);
+  TEST_ASSERT_EQUAL_DOUBLE(12.0, info.max_zoom);
+  TEST_ASSERT_EQUAL_UINT32(MLN_STYLE_LAYER_VISIBILITY_NONE, info.visibility);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_STYLE_LAYER_INFO_SOURCE_ID | MLN_STYLE_LAYER_INFO_SOURCE_LAYER,
+    info.fields
+  );
+  TEST_ASSERT_EQUAL_size_t(strlen("info-source"), info.source_id_size);
+  TEST_ASSERT_EQUAL_size_t(strlen("roads"), info.source_layer_size);
+
+  // The reported source ID length sizes the copy operation's result exactly.
+  mln_operation operation = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_copy_layer_source_id_start(map, VIEW("info-layer"), &operation)
+  );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  mln_buffer source_id = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_copy_layer_source_id_take_result(operation, &source_id)
+  );
+  mln_buffer_view copied = {0};
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_buffer_get(source_id, &copied));
+  TEST_ASSERT_EQUAL_size_t(info.source_id_size, copied.size);
+  TEST_ASSERT_EQUAL_MEMORY("info-source", copied.data, copied.size);
+  mln_buffer_destroy(source_id);
+  mln_operation_release(operation);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 static void an_in_use_source_removal_fails_and_leaves_the_source(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -508,6 +619,7 @@ void run_style_values_abi_tests(void) {
   RUN_TEST(wrong_typed_take_does_not_consume_result);
   RUN_TEST(remove_commands_commit_and_report_missing_ids);
   RUN_TEST(an_in_use_source_removal_fails_and_leaves_the_source);
+  RUN_TEST(layer_info_reports_scalars_and_sizes_the_source_id_copy);
   RUN_TEST(coordinate_size_probe_preserves_typed_result);
   RUN_TEST(stretch_size_probe_preserves_typed_result);
 }

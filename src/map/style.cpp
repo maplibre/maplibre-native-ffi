@@ -1794,9 +1794,8 @@ StyleOperationResult::StyleOperationResult(
   StyleOperationResult&& other
 ) noexcept
     : found(other.found),
-      value_u32(other.value_u32),
-      value_double(other.value_double),
       source_info(other.source_info),
+      layer_info(other.layer_info),
       image_info(other.image_info),
       transition_options(other.transition_options),
       buffer(std::exchange(other.buffer, MLN_HANDLE_NULL)),
@@ -1817,9 +1816,8 @@ auto StyleOperationResult::operator=(StyleOperationResult&& other) noexcept
   style_id_list_destroy(id_list);
   style_string_list_destroy(string_list);
   found = other.found;
-  value_u32 = other.value_u32;
-  value_double = other.value_double;
   source_info = other.source_info;
+  layer_info = other.layer_info;
   image_info = other.image_info;
   transition_options = other.transition_options;
   buffer = std::exchange(other.buffer, MLN_HANDLE_NULL);
@@ -3781,8 +3779,8 @@ auto map_remove_style_layer(mln_map map, mln_buffer_view layer_id)
   return MLN_STATUS_OK;
 }
 
-auto map_get_style_layer_type(
-  mln_map map, mln_buffer_view layer_id, mln_buffer_view* out_layer_type,
+auto map_get_style_layer_info(
+  mln_map map, mln_buffer_view layer_id, mln_style_layer_info* out_info,
   bool* out_found
 ) -> mln_status {
   MapObject* live = nullptr;
@@ -3797,17 +3795,41 @@ auto map_get_style_layer_type(
     set_thread_error("layer_id must not be empty");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (out_layer_type == nullptr || out_found == nullptr) {
-    set_thread_error("out_layer_type and out_found must not be null");
+  if (out_info == nullptr || out_info->size < sizeof(mln_style_layer_info)) {
+    set_thread_error("out_info must not be null and must have a valid size");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (out_found == nullptr) {
+    set_thread_error("out_found must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
   const auto* layer =
     map_native(live)->getStyle().getLayer(string_from_view(layer_id));
   *out_found = layer != nullptr;
-  *out_layer_type = {};
-  if (layer != nullptr) {
-    *out_layer_type = string_view_from_literal(layer->getTypeInfo()->type);
+  *out_info = mln_style_layer_info{};
+  out_info->size = sizeof(mln_style_layer_info);
+  if (layer == nullptr) {
+    return MLN_STATUS_OK;
+  }
+
+  out_info->type = string_view_from_literal(layer->getTypeInfo()->type);
+  out_info->min_zoom = static_cast<double>(layer->getMinZoom());
+  out_info->max_zoom = static_cast<double>(layer->getMaxZoom());
+  out_info->visibility =
+    layer->getVisibility() == mbgl::style::VisibilityType::None
+      ? MLN_STYLE_LAYER_VISIBILITY_NONE
+      : MLN_STYLE_LAYER_VISIBILITY_VISIBLE;
+
+  const auto& source_id = layer->getSourceID();
+  if (!source_id.empty()) {
+    out_info->fields |= MLN_STYLE_LAYER_INFO_SOURCE_ID;
+    out_info->source_id_size = source_id.size();
+  }
+  const auto& source_layer = layer->getSourceLayer();
+  if (!source_layer.empty()) {
+    out_info->fields |= MLN_STYLE_LAYER_INFO_SOURCE_LAYER;
+    out_info->source_layer_size = source_layer.size();
   }
   return MLN_STATUS_OK;
 }
@@ -4399,23 +4421,6 @@ auto map_set_layer_min_zoom(
   return MLN_STATUS_OK;
 }
 
-auto map_get_layer_min_zoom(
-  mln_map map, mln_buffer_view layer_id, double* out_min_zoom
-) -> mln_status {
-  mbgl::style::Layer* layer = nullptr;
-  const auto status = resolve_layer_for_access(map, layer_id, layer);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (out_min_zoom == nullptr) {
-    set_thread_error("out_min_zoom must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  *out_min_zoom = static_cast<double>(layer->getMinZoom());
-  return MLN_STATUS_OK;
-}
-
 auto map_set_layer_max_zoom(
   mln_map map, mln_buffer_view layer_id, double max_zoom
 ) -> mln_status {
@@ -4429,23 +4434,6 @@ auto map_set_layer_max_zoom(
   }
 
   layer->setMaxZoom(static_cast<float>(max_zoom));
-  return MLN_STATUS_OK;
-}
-
-auto map_get_layer_max_zoom(
-  mln_map map, mln_buffer_view layer_id, double* out_max_zoom
-) -> mln_status {
-  mbgl::style::Layer* layer = nullptr;
-  const auto status = resolve_layer_for_access(map, layer_id, layer);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (out_max_zoom == nullptr) {
-    set_thread_error("out_max_zoom must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  *out_max_zoom = static_cast<double>(layer->getMaxZoom());
   return MLN_STATUS_OK;
 }
 
@@ -4471,25 +4459,6 @@ auto map_set_layer_visibility(
   }
 
   layer->setVisibility(native_visibility);
-  return MLN_STATUS_OK;
-}
-
-auto map_get_layer_visibility(
-  mln_map map, mln_buffer_view layer_id, uint32_t* out_visibility
-) -> mln_status {
-  mbgl::style::Layer* layer = nullptr;
-  const auto status = resolve_layer_for_access(map, layer_id, layer);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (out_visibility == nullptr) {
-    set_thread_error("out_visibility must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  *out_visibility = layer->getVisibility() == mbgl::style::VisibilityType::None
-                      ? MLN_STYLE_LAYER_VISIBILITY_NONE
-                      : MLN_STYLE_LAYER_VISIBILITY_VISIBLE;
   return MLN_STATUS_OK;
 }
 

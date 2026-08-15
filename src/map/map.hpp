@@ -52,7 +52,7 @@ enum class StyleOperationKind : uint32_t {
   ImageStretches,
   ImagePixels,
   ImageCoordinates,
-  LayerType,
+  LayerInfo,
   LayerIds,
   LayerJson,
   LightProperty,
@@ -60,17 +60,13 @@ enum class StyleOperationKind : uint32_t {
   LayerProperty,
   LayerFilter,
   LayerSourceLayer,
-  LayerSourceId,
-  LayerMinZoom,
-  LayerMaxZoom,
-  LayerVisibility
+  LayerSourceId
 };
 
 struct StyleOperationResult {
   bool found = false;
-  uint32_t value_u32 = 0;
-  double value_double = 0;
   mln_style_source_info source_info{};
+  mln_style_layer_info layer_info{};
   mln_style_image_info image_info{};
   mln_style_transition_options transition_options{};
   mln_buffer buffer = MLN_HANDLE_NULL;
@@ -337,8 +333,8 @@ auto map_add_style_layer_json(
 ) -> mln_status;
 auto map_remove_style_layer(mln_map map, mln_buffer_view layer_id)
   -> mln_status;
-auto map_get_style_layer_type(
-  mln_map map, mln_buffer_view layer_id, mln_buffer_view* out_layer_type,
+auto map_get_style_layer_info(
+  mln_map map, mln_buffer_view layer_id, mln_style_layer_info* out_info,
   bool* out_found
 ) -> mln_status;
 auto map_list_style_layer_ids(mln_map map, mln_style_id_list* out_layer_ids)
@@ -394,20 +390,11 @@ auto map_copy_layer_source_id(
 auto map_set_layer_min_zoom(
   mln_map map, mln_buffer_view layer_id, double min_zoom
 ) -> mln_status;
-auto map_get_layer_min_zoom(
-  mln_map map, mln_buffer_view layer_id, double* out_min_zoom
-) -> mln_status;
 auto map_set_layer_max_zoom(
   mln_map map, mln_buffer_view layer_id, double max_zoom
 ) -> mln_status;
-auto map_get_layer_max_zoom(
-  mln_map map, mln_buffer_view layer_id, double* out_max_zoom
-) -> mln_status;
 auto map_set_layer_visibility(
   mln_map map, mln_buffer_view layer_id, uint32_t visibility
-) -> mln_status;
-auto map_get_layer_visibility(
-  mln_map map, mln_buffer_view layer_id, uint32_t* out_visibility
 ) -> mln_status;
 auto map_camera_snapshot_get(
   mln_map map, mln_camera_options* out_camera, uint64_t* out_generation

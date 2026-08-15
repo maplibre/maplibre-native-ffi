@@ -1480,7 +1480,7 @@ auto mln_map_remove_style_layer(
   });
 }
 
-auto mln_map_get_style_layer_type_start(
+auto mln_map_get_style_layer_info_start(
   mln_map map, mln_buffer_view layer_id, mln_operation* out_operation
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -1489,22 +1489,13 @@ auto mln_map_get_style_layer_type_start(
     }
     auto id = OwnedView{layer_id};
     return operation(
-      map, mln::core::StyleOperationKind::LayerType,
+      map, mln::core::StyleOperationKind::LayerInfo,
       [map, id = std::move(id)](mln::core::StyleOperationResult& result)
         -> mln_status {
-        auto type = mln_buffer_view{};
-        const auto status = mln::core::map_get_style_layer_type(
-          map, id.view(), &type, &result.found
-        );
-        if (status != MLN_STATUS_OK || !result.found) {
-          return status;
-        }
-        return mln::core::create_buffer(
-          std::string{
-            static_cast<const char*>(type.data),
-            static_cast<const char*>(type.data) + type.size
-          },
-          &result.buffer
+        result.layer_info = {};
+        result.layer_info.size = sizeof(mln_style_layer_info);
+        return mln::core::map_get_style_layer_info(
+          map, id.view(), &result.layer_info, &result.found
         );
       },
       out_operation
@@ -1512,20 +1503,20 @@ auto mln_map_get_style_layer_type_start(
   });
 }
 
-auto mln_map_get_style_layer_type_take_result(
-  mln_operation operation_id, mln_buffer* out_layer_type, bool* out_found
+auto mln_map_get_style_layer_info_take_result(
+  mln_operation operation_id, mln_style_layer_info* out_info, bool* out_found
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (
-      out_layer_type == nullptr || *out_layer_type != MLN_HANDLE_NULL ||
+      out_info == nullptr || out_info->size < sizeof(mln_style_layer_info) ||
       out_found == nullptr
     ) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     return take(
-      operation_id, mln::core::StyleOperationKind::LayerType,
+      operation_id, mln::core::StyleOperationKind::LayerInfo,
       [=](mln::core::StyleOperationResult& result) -> mln_status {
-        *out_layer_type = std::exchange(result.buffer, MLN_HANDLE_NULL);
+        *out_info = result.layer_info;
         *out_found = result.found;
         return MLN_STATUS_OK;
       }
@@ -1806,43 +1797,6 @@ auto mln_map_get_style_transition_options_take_result(
     });                                                                      \
   }
 
-#define MLN_STYLE_SCALAR_OPERATION(NAME, CORE, KIND, TYPE, FIELD)            \
-  auto NAME##_start(                                                         \
-    mln_map map, mln_buffer_view id, mln_operation* out_operation            \
-  ) noexcept -> mln_status {                                                 \
-    return mln::c_api::status_boundary([&]() -> mln_status {                 \
-      if (!valid_view(id, "style ID is invalid")) {                          \
-        return MLN_STATUS_INVALID_ARGUMENT;                                  \
-      }                                                                      \
-      auto owned = OwnedView{id};                                            \
-      return operation(                                                      \
-        map, mln::core::StyleOperationKind::KIND,                            \
-        [map, owned = std::move(owned)](                                     \
-          mln::core::StyleOperationResult& result                            \
-        ) -> mln_status {                                                    \
-          return mln::core::CORE(map, owned.view(), &result.FIELD);          \
-        },                                                                   \
-        out_operation                                                        \
-      );                                                                     \
-    });                                                                      \
-  }                                                                          \
-  auto NAME##_take_result(                                                   \
-    mln_operation operation_id, TYPE* out_value                              \
-  ) noexcept -> mln_status {                                                 \
-    return mln::c_api::status_boundary([&]() -> mln_status {                 \
-      if (out_value == nullptr) {                                            \
-        return MLN_STATUS_INVALID_ARGUMENT;                                  \
-      }                                                                      \
-      return take(                                                           \
-        operation_id, mln::core::StyleOperationKind::KIND,                   \
-        [out_value](mln::core::StyleOperationResult& result) -> mln_status { \
-          *out_value = result.FIELD;                                         \
-          return MLN_STATUS_OK;                                              \
-        }                                                                    \
-      );                                                                     \
-    });                                                                      \
-  }
-
 #define MLN_STYLE_SCALAR_COMMAND(NAME, CORE, TYPE)                        \
   auto NAME(                                                              \
     mln_map map, mln_buffer_view id, TYPE value, uint64_t* out_command_id \
@@ -2016,21 +1970,8 @@ MLN_STYLE_SCALAR_COMMAND(
 MLN_STYLE_SCALAR_COMMAND(
   mln_map_set_layer_visibility, map_set_layer_visibility, uint32_t
 )
-MLN_STYLE_SCALAR_OPERATION(
-  mln_map_get_layer_min_zoom, map_get_layer_min_zoom, LayerMinZoom, double,
-  value_double
-)
-MLN_STYLE_SCALAR_OPERATION(
-  mln_map_get_layer_max_zoom, map_get_layer_max_zoom, LayerMaxZoom, double,
-  value_double
-)
-MLN_STYLE_SCALAR_OPERATION(
-  mln_map_get_layer_visibility, map_get_layer_visibility, LayerVisibility,
-  uint32_t, value_u32
-)
 
 #undef MLN_STYLE_SCALAR_COMMAND
-#undef MLN_STYLE_SCALAR_OPERATION
 #undef MLN_STYLE_BUFFER_OPERATION
 
 auto mln_map_copy_layer_source_layer_start(
