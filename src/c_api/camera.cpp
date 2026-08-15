@@ -108,29 +108,6 @@ auto mln_map_set_debug_options(
   });
 }
 
-auto mln_map_get_debug_options_start(
-  mln_map map, mln_operation* out_operation
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&] {
-    return mln::core::map_get_debug_options_start(map, out_operation);
-  });
-}
-
-auto mln_map_get_debug_options_take_result(
-  mln_operation operation, uint32_t* out_options
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&] {
-    if (out_options == nullptr) return MLN_STATUS_INVALID_ARGUMENT;
-    return mln::core::take_geometry_operation(
-      operation, mln::core::GeometryOperationKind::DebugOptions,
-      [out_options](mln::core::GeometryOperationResult& result) {
-        *out_options = result.value_u32;
-        return MLN_STATUS_OK;
-      }
-    );
-  });
-}
-
 auto mln_map_set_rendering_stats_view_enabled(
   mln_map map, bool enabled, uint64_t* out_command_id
 ) noexcept -> mln_status {
@@ -145,88 +122,11 @@ auto mln_map_set_rendering_stats_view_enabled(
   });
 }
 
-auto mln_map_get_rendering_stats_view_enabled_start(
-  mln_map map, mln_operation* out_operation
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&] {
-    return mln::core::map_get_rendering_stats_view_enabled_start(
-      map, out_operation
-    );
-  });
-}
-
-auto take_map_bool(
-  mln_operation operation, mln::core::GeometryOperationKind kind, bool* output
-) -> mln_status {
-  if (output == nullptr) return MLN_STATUS_INVALID_ARGUMENT;
-  return mln::core::take_geometry_operation(
-    operation, kind, [output](mln::core::GeometryOperationResult& result) {
-      *output = result.flag;
-      return MLN_STATUS_OK;
-    }
-  );
-}
-
-auto mln_map_get_rendering_stats_view_enabled_take_result(
-  mln_operation operation, bool* out_enabled
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&] {
-    return take_map_bool(
-      operation, mln::core::GeometryOperationKind::RenderingStats, out_enabled
-    );
-  });
-}
-
-auto mln_map_is_fully_loaded_start(
-  mln_map map, mln_operation* out_operation
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&] {
-    return mln::core::map_is_fully_loaded_start(map, out_operation);
-  });
-}
-
-auto mln_map_is_fully_loaded_take_result(
-  mln_operation operation, bool* out_loaded
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&] {
-    return take_map_bool(
-      operation, mln::core::GeometryOperationKind::FullyLoaded, out_loaded
-    );
-  });
-}
-
 auto mln_map_dump_debug_logs(mln_map map, uint64_t* out_command_id) noexcept
   -> mln_status {
   return mln::c_api::status_boundary([&] {
     return mln::core::submit_map_command(
       map, [map] { return mln::core::map_dump_debug_logs(map); }, out_command_id
-    );
-  });
-}
-
-auto mln_map_get_viewport_options_start(
-  mln_map map, mln_operation* out_operation
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&] {
-    return mln::core::map_get_viewport_options_start(map, out_operation);
-  });
-}
-
-auto mln_map_get_viewport_options_take_result(
-  mln_operation operation, mln_map_viewport_options* out_options
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&] {
-    if (
-      out_options == nullptr ||
-      out_options->size < sizeof(mln_map_viewport_options)
-    )
-      return MLN_STATUS_INVALID_ARGUMENT;
-    return mln::core::take_geometry_operation(
-      operation, mln::core::GeometryOperationKind::ViewportOptions,
-      [out_options](mln::core::GeometryOperationResult& result) {
-        *out_options = result.viewport;
-        return MLN_STATUS_OK;
-      }
     );
   });
 }
@@ -244,32 +144,6 @@ auto mln_map_set_viewport_options(
         return mln::core::map_set_viewport_options(map, &copied);
       },
       out_command_id
-    );
-  });
-}
-
-auto mln_map_get_tile_options_start(
-  mln_map map, mln_operation* out_operation
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&] {
-    return mln::core::map_get_tile_options_start(map, out_operation);
-  });
-}
-
-auto mln_map_get_tile_options_take_result(
-  mln_operation operation, mln_map_tile_options* out_options
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&] {
-    if (
-      out_options == nullptr || out_options->size < sizeof(mln_map_tile_options)
-    )
-      return MLN_STATUS_INVALID_ARGUMENT;
-    return mln::core::take_geometry_operation(
-      operation, mln::core::GeometryOperationKind::TileOptions,
-      [out_options](mln::core::GeometryOperationResult& result) {
-        *out_options = result.tile;
-        return MLN_STATUS_OK;
-      }
     );
   });
 }
@@ -472,30 +346,6 @@ auto mln_map_lat_lng_bounds_for_camera_unwrapped_take_result(
   });
 }
 
-auto mln_map_get_bounds_start(
-  mln_map map, mln_operation* out_operation
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&] {
-    return mln::core::map_get_bounds_start(map, out_operation);
-  });
-}
-
-auto mln_map_get_bounds_take_result(
-  mln_operation operation, mln_bound_options* out_options
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&] {
-    if (out_options == nullptr || out_options->size < sizeof(mln_bound_options))
-      return MLN_STATUS_INVALID_ARGUMENT;
-    return mln::core::take_geometry_operation(
-      operation, mln::core::GeometryOperationKind::Bounds,
-      [out_options](mln::core::GeometryOperationResult& result) {
-        *out_options = result.bound;
-        return MLN_STATUS_OK;
-      }
-    );
-  });
-}
-
 auto mln_map_set_bounds(
   mln_map map, const mln_bound_options* options, uint64_t* out_command_id
 ) noexcept -> mln_status {
@@ -506,33 +356,6 @@ auto mln_map_set_bounds(
     return mln::core::submit_map_command(
       map, [map, copied] { return mln::core::map_set_bounds(map, &copied); },
       out_command_id
-    );
-  });
-}
-
-auto mln_map_get_free_camera_options_start(
-  mln_map map, mln_operation* out_operation
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&] {
-    return mln::core::map_get_free_camera_options_start(map, out_operation);
-  });
-}
-
-auto mln_map_get_free_camera_options_take_result(
-  mln_operation operation, mln_free_camera_options* out_options
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&] {
-    if (
-      out_options == nullptr ||
-      out_options->size < sizeof(mln_free_camera_options)
-    )
-      return MLN_STATUS_INVALID_ARGUMENT;
-    return mln::core::take_geometry_operation(
-      operation, mln::core::GeometryOperationKind::FreeCamera,
-      [out_options](mln::core::GeometryOperationResult& result) {
-        *out_options = result.free_camera;
-        return MLN_STATUS_OK;
-      }
     );
   });
 }

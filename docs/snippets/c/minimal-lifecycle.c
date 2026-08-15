@@ -1,5 +1,7 @@
 // Creates a runtime and map, then waits for the asynchronous style outcome.
 
+#define _POSIX_C_SOURCE 199309L
+
 #include <maplibre_native_c.h>
 #include <stdatomic.h>
 #include <stdio.h>

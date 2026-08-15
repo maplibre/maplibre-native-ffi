@@ -2057,63 +2057,6 @@ auto map_remove_style_source(
   return MLN_STATUS_OK;
 }
 
-auto map_style_source_exists(
-  mln_map map, mln_buffer_view source_id, bool* out_exists
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (!validate_string_view(source_id, "source_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (source_id.size == 0) {
-    set_thread_error("source_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_exists == nullptr) {
-    set_thread_error("out_exists must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  *out_exists =
-    map_native(live)->getStyle().getSource(string_from_view(source_id)) !=
-    nullptr;
-  return MLN_STATUS_OK;
-}
-
-auto map_get_style_source_type(
-  mln_map map, mln_buffer_view source_id, uint32_t* out_source_type,
-  bool* out_found
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (!validate_string_view(source_id, "source_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (source_id.size == 0) {
-    set_thread_error("source_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_source_type == nullptr || out_found == nullptr) {
-    set_thread_error("out_source_type and out_found must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  const auto* source =
-    map_native(live)->getStyle().getSource(string_from_view(source_id));
-  *out_found = source != nullptr;
-  *out_source_type = MLN_STYLE_SOURCE_TYPE_UNKNOWN;
-  if (source != nullptr) {
-    *out_source_type = to_c_source_type(source->getType());
-  }
-  return MLN_STATUS_OK;
-}
-
 auto map_get_style_source_info(
   mln_map map, mln_buffer_view source_id, mln_style_source_info* out_info,
   bool* out_found
@@ -3063,30 +3006,6 @@ auto map_remove_style_image(
   return MLN_STATUS_OK;
 }
 
-auto map_style_image_exists(
-  mln_map map, mln_buffer_view image_id, bool* out_exists
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  const auto image_id_status = validate_image_id(image_id);
-  if (image_id_status != MLN_STATUS_OK) {
-    return image_id_status;
-  }
-  if (out_exists == nullptr) {
-    set_thread_error("out_exists must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  *out_exists = map_native(live)
-                  ->getStyle()
-                  .getImage(string_from_view(image_id))
-                  .has_value();
-  return MLN_STATUS_OK;
-}
-
 auto map_get_style_image_info(
   mln_map map, mln_buffer_view image_id, mln_style_image_info* out_info,
   bool* out_found
@@ -3873,32 +3792,6 @@ auto map_remove_style_layer(
   auto removed =
     map_native(live)->getStyle().removeLayer(string_from_view(layer_id));
   *out_removed = removed != nullptr;
-  return MLN_STATUS_OK;
-}
-
-auto map_style_layer_exists(
-  mln_map map, mln_buffer_view layer_id, bool* out_exists
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (!validate_string_view(layer_id, "layer_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (layer_id.size == 0) {
-    set_thread_error("layer_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_exists == nullptr) {
-    set_thread_error("out_exists must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  *out_exists =
-    map_native(live)->getStyle().getLayer(string_from_view(layer_id)) !=
-    nullptr;
   return MLN_STATUS_OK;
 }
 

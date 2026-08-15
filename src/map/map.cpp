@@ -2186,7 +2186,7 @@ auto publish_map_snapshot(MapObject& live) -> uint64_t {
   const auto options = live.map->getMapOptions();
   auto snapshot = mln_map_snapshot{
     .size = sizeof(mln_map_snapshot),
-    .reserved = 0,
+    .debug_options = from_native_debug_options(live.map->getDebug()),
     .generation = live.next_snapshot_generation++,
     .camera = from_native_camera(live.map->getCameraOptions()),
     .logical_extent = live.logical_extent,
@@ -2204,12 +2204,28 @@ auto publish_map_snapshot(MapObject& live) -> uint64_t {
        .constrain_mode = from_native_constrain_mode(options.constrainMode()),
        .viewport_mode = from_native_viewport_mode(options.viewportMode()),
        .frustum_offset = from_native_edge_insets(live.map->getFrustumOffset())},
-    .loading = !live.map->isFullyLoaded(),
-    .fully_rendered = live.map->isFullyLoaded(),
+    .fully_loaded = live.map->isFullyLoaded(),
+    .rendering_stats_view_enabled = live.map->isRenderingStatsViewEnabled(),
     .repaint_demand = live.frontend->repaint_demand(),
     .reserved_flags = 0,
     .event_mask = live.event_state->mask.load(std::memory_order_relaxed),
-    .latest_render_update_generation = live.frontend->latest_update_generation()
+    .latest_render_update_generation =
+      live.frontend->latest_update_generation(),
+    .tile =
+      {.size = sizeof(mln_map_tile_options),
+       .fields =
+         static_cast<uint32_t>(MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA) |
+         MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS | MLN_MAP_TILE_OPTION_LOD_SCALE |
+         MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD |
+         MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT | MLN_MAP_TILE_OPTION_LOD_MODE,
+       .prefetch_zoom_delta = live.map->getPrefetchZoomDelta(),
+       .lod_min_radius = live.map->getTileLodMinRadius(),
+       .lod_scale = live.map->getTileLodScale(),
+       .lod_pitch_threshold = live.map->getTileLodPitchThreshold(),
+       .lod_zoom_shift = live.map->getTileLodZoomShift(),
+       .lod_mode = from_native_tile_lod_mode(live.map->getTileLodMode())},
+    .bounds = from_native_bound_options(live.map->getBounds()),
+    .free_camera = from_native_free_camera(live.map->getFreeCameraOptions())
   };
   const auto generation = snapshot.generation;
   {
@@ -2451,12 +2467,15 @@ auto submit_map_command(
       } catch (...) {
         message = "map command failed";
       }
+      // Committed commands republish so snapshot reads observe the commit and
+      // COMMAND_FINISHED generations share the snapshot generation namespace.
+      const auto generation =
+        status == MLN_STATUS_OK ? publish_map_snapshot(*live) : 0;
       push_runtime_command_finished(
         runtime->self, MLN_RUNTIME_EVENT_SOURCE_MAP, map, command_id,
         status == MLN_STATUS_OK ? MLN_COMMAND_DISPOSITION_COMMITTED
                                 : MLN_COMMAND_DISPOSITION_FAILED,
-        status, status == MLN_STATUS_OK ? live->next_style_generation++ : 0,
-        message.empty() ? nullptr : message.c_str()
+        status, generation, message.empty() ? nullptr : message.c_str()
       );
     },
     out_command_id
@@ -3674,20 +3693,6 @@ auto map_set_debug_options(mln_map map, uint32_t options) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-auto map_get_debug_options(mln_map map, uint32_t* out_options) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (out_options == nullptr) {
-    set_thread_error("out_options must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  *out_options = from_native_debug_options(live->map->getDebug());
-  return MLN_STATUS_OK;
-}
-
 auto map_set_rendering_stats_view_enabled(mln_map map, bool enabled)
   -> mln_status {
   MapObject* live = nullptr;
@@ -3696,35 +3701,6 @@ auto map_set_rendering_stats_view_enabled(mln_map map, bool enabled)
     return status;
   }
   live->map->enableRenderingStatsView(enabled);
-  return MLN_STATUS_OK;
-}
-
-auto map_get_rendering_stats_view_enabled(mln_map map, bool* out_enabled)
-  -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (out_enabled == nullptr) {
-    set_thread_error("out_enabled must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  *out_enabled = live->map->isRenderingStatsViewEnabled();
-  return MLN_STATUS_OK;
-}
-
-auto map_is_fully_loaded(mln_map map, bool* out_loaded) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (out_loaded == nullptr) {
-    set_thread_error("out_loaded must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  *out_loaded = live->map->isFullyLoaded();
   return MLN_STATUS_OK;
 }
 
@@ -3762,38 +3738,6 @@ auto map_get_size(
   return MLN_STATUS_OK;
 }
 
-auto map_get_viewport_options(
-  mln_map map, mln_map_viewport_options* out_options
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (
-    out_options == nullptr ||
-    out_options->size < sizeof(mln_map_viewport_options)
-  ) {
-    set_thread_error("out_options must not be null and must have a valid size");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  const auto options = live->map->getMapOptions();
-  *out_options = mln_map_viewport_options{
-    .size = sizeof(mln_map_viewport_options),
-    .fields = static_cast<uint32_t>(MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION) |
-              MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE |
-              MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE |
-              MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET,
-    .north_orientation =
-      from_native_north_orientation(options.northOrientation()),
-    .constrain_mode = from_native_constrain_mode(options.constrainMode()),
-    .viewport_mode = from_native_viewport_mode(options.viewportMode()),
-    .frustum_offset = from_native_edge_insets(live->map->getFrustumOffset())
-  };
-  return MLN_STATUS_OK;
-}
-
 auto map_set_viewport_options(
   mln_map map, const mln_map_viewport_options* options
 ) -> mln_status {
@@ -3823,37 +3767,6 @@ auto map_set_viewport_options(
   if ((options->fields & MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET) != 0U) {
     live->map->setFrustumOffset(to_native_edge_insets(options->frustum_offset));
   }
-  return MLN_STATUS_OK;
-}
-
-auto map_get_tile_options(mln_map map, mln_map_tile_options* out_options)
-  -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (
-    out_options == nullptr || out_options->size < sizeof(mln_map_tile_options)
-  ) {
-    set_thread_error("out_options must not be null and must have a valid size");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  *out_options = mln_map_tile_options{
-    .size = sizeof(mln_map_tile_options),
-    .fields = static_cast<uint32_t>(MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA) |
-              MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS |
-              MLN_MAP_TILE_OPTION_LOD_SCALE |
-              MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD |
-              MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT | MLN_MAP_TILE_OPTION_LOD_MODE,
-    .prefetch_zoom_delta = live->map->getPrefetchZoomDelta(),
-    .lod_min_radius = live->map->getTileLodMinRadius(),
-    .lod_scale = live->map->getTileLodScale(),
-    .lod_pitch_threshold = live->map->getTileLodPitchThreshold(),
-    .lod_zoom_shift = live->map->getTileLodZoomShift(),
-    .lod_mode = from_native_tile_lod_mode(live->map->getTileLodMode())
-  };
   return MLN_STATUS_OK;
 }
 
@@ -4867,21 +4780,6 @@ auto map_lat_lng_bounds_for_camera_unwrapped_take_result(
   );
 }
 
-auto map_get_bounds(mln_map map, mln_bound_options* out_options) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (out_options == nullptr || out_options->size < sizeof(mln_bound_options)) {
-    set_thread_error("out_options must not be null and must have a valid size");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  *out_options = from_native_bound_options(live->map->getBounds());
-  return MLN_STATUS_OK;
-}
-
 auto map_set_bounds(mln_map map, const mln_bound_options* options)
   -> mln_status {
   MapObject* live = nullptr;
@@ -4897,26 +4795,6 @@ auto map_set_bounds(mln_map map, const mln_bound_options* options)
   // Native setBounds only applies optionals that are set, so this preserves
   // constraints omitted from options->fields.
   live->map->setBounds(to_native_bound_options(*options));
-  return MLN_STATUS_OK;
-}
-
-auto map_get_free_camera_options(
-  mln_map map, mln_free_camera_options* out_options
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (
-    out_options == nullptr ||
-    out_options->size < sizeof(mln_free_camera_options)
-  ) {
-    set_thread_error("out_options must not be null and must have a valid size");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  *out_options = from_native_free_camera(live->map->getFreeCameraOptions());
   return MLN_STATUS_OK;
 }
 
@@ -4986,93 +4864,4 @@ auto map_set_projection_mode(
   );
 }
 
-auto start_simple_map_read(
-  mln_map map, GeometryOperationKind kind, GeometryWork work,
-  mln_operation* out_operation
-) -> mln_status {
-  return start_geometry_operation(map, kind, std::move(work), out_operation);
-}
-
-auto map_get_debug_options_start(mln_map map, mln_operation* out_operation)
-  -> mln_status {
-  return start_simple_map_read(
-    map, GeometryOperationKind::DebugOptions,
-    [map](GeometryOperationResult& result) {
-      return map_get_debug_options(map, &result.value_u32);
-    },
-    out_operation
-  );
-}
-
-auto map_get_rendering_stats_view_enabled_start(
-  mln_map map, mln_operation* out_operation
-) -> mln_status {
-  return start_simple_map_read(
-    map, GeometryOperationKind::RenderingStats,
-    [map](GeometryOperationResult& result) {
-      return map_get_rendering_stats_view_enabled(map, &result.flag);
-    },
-    out_operation
-  );
-}
-
-auto map_is_fully_loaded_start(mln_map map, mln_operation* out_operation)
-  -> mln_status {
-  return start_simple_map_read(
-    map, GeometryOperationKind::FullyLoaded,
-    [map](GeometryOperationResult& result) {
-      return map_is_fully_loaded(map, &result.flag);
-    },
-    out_operation
-  );
-}
-
-auto map_get_viewport_options_start(mln_map map, mln_operation* out_operation)
-  -> mln_status {
-  return start_simple_map_read(
-    map, GeometryOperationKind::ViewportOptions,
-    [map](GeometryOperationResult& result) {
-      result.viewport = map_viewport_options_default();
-      return map_get_viewport_options(map, &result.viewport);
-    },
-    out_operation
-  );
-}
-
-auto map_get_tile_options_start(mln_map map, mln_operation* out_operation)
-  -> mln_status {
-  return start_simple_map_read(
-    map, GeometryOperationKind::TileOptions,
-    [map](GeometryOperationResult& result) {
-      result.tile = map_tile_options_default();
-      return map_get_tile_options(map, &result.tile);
-    },
-    out_operation
-  );
-}
-
-auto map_get_bounds_start(mln_map map, mln_operation* out_operation)
-  -> mln_status {
-  return start_simple_map_read(
-    map, GeometryOperationKind::Bounds,
-    [map](GeometryOperationResult& result) {
-      result.bound = bound_options_default();
-      return map_get_bounds(map, &result.bound);
-    },
-    out_operation
-  );
-}
-
-auto map_get_free_camera_options_start(
-  mln_map map, mln_operation* out_operation
-) -> mln_status {
-  return start_simple_map_read(
-    map, GeometryOperationKind::FreeCamera,
-    [map](GeometryOperationResult& result) {
-      result.free_camera = free_camera_options_default();
-      return map_get_free_camera_options(map, &result.free_camera);
-    },
-    out_operation
-  );
-}
 }  // namespace mln::core

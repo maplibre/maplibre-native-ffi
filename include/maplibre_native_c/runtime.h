@@ -468,7 +468,11 @@ typedef struct mln_runtime_event_command_finished {
   /** One of mln_command_disposition. */
   uint32_t disposition;
   uint32_t reserved;
-  /** Committed generation, or zero when the command committed no generation. */
+  /**
+   * The map snapshot generation the commit published, or zero when the command
+   * committed no generation. A later mln_map_snapshot_get() that reports this
+   * generation or a newer one observes the commit.
+   */
   uint64_t generation;
 } mln_runtime_event_command_finished;
 

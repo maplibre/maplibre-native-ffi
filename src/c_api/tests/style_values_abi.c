@@ -10,15 +10,17 @@ static bool source_exists(mln_runtime runtime, mln_map map, const char* id) {
   mln_operation operation = MLN_HANDLE_NULL;
   const mln_buffer_view view = {.data = id, .size = strlen(id)};
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_style_source_exists_start(map, view, &operation)
+    MLN_STATUS_OK, mln_map_get_style_source_info_start(map, view, &operation)
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
-  bool exists = false;
+  mln_style_source_info info = {.size = sizeof(mln_style_source_info)};
+  bool found = false;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_style_source_exists_take_result(operation, &exists)
+    MLN_STATUS_OK,
+    mln_map_get_style_source_info_take_result(operation, &info, &found)
   );
   mln_operation_release(operation);
-  return exists;
+  return found;
 }
 
 static const mln_runtime_event* event_at(

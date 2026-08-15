@@ -750,21 +750,34 @@ typedef struct mln_map_tile_options {
   /** One of mln_tile_lod_mode. */
   uint32_t lod_mode;
 } mln_map_tile_options;
-/** Immutable map state copied from the latest published generation. */
+/**
+ * Immutable map state copied from the latest published generation.
+ *
+ * Every field is unkeyed, fixed-size map state that changes only through this
+ * map's own commands or through load progress. Each committed map command
+ * publishes a new generation and reports it in
+ * MLN_RUNTIME_EVENT_COMMAND_FINISHED, so a snapshot whose generation is at or
+ * past a commit's observes that commit.
+ */
 typedef struct mln_map_snapshot {
   uint32_t size;
-  uint32_t reserved;
+  /** Debug overlay mask of mln_map_debug_option values. */
+  uint32_t debug_options;
   uint64_t generation;
   mln_camera_options camera;
   mln_logical_extent logical_extent;
   mln_projection_mode projection_mode;
   mln_map_viewport_options viewport;
-  bool loading;
-  bool fully_rendered;
+  /** True once every requested style and tile resource finished loading. */
+  bool fully_loaded;
+  bool rendering_stats_view_enabled;
   bool repaint_demand;
   uint8_t reserved_flags;
   uint64_t event_mask;
   uint64_t latest_render_update_generation;
+  mln_map_tile_options tile;
+  mln_bound_options bounds;
+  mln_free_camera_options free_camera;
 } mln_map_snapshot;
 
 /** Camera result produced by an ordered camera operation. */

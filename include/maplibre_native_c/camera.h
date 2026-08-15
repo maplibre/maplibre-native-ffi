@@ -50,62 +50,42 @@ mln_map_viewport_options_default(void) MLN_NOEXCEPT;
 /** Returns empty tile tuning options initialized for this C API version. */
 MLN_API mln_map_tile_options mln_map_tile_options_default(void) MLN_NOEXCEPT;
 
-/** Submits a debug-overlay command. */
+/**
+ * Submits a debug-overlay command.
+ *
+ * The committed mask is visible through mln_map_snapshot_get as
+ * snapshot.debug_options.
+ */
 MLN_API mln_status mln_map_set_debug_options(
   mln_map map, uint32_t options, uint64_t* out_command_id
 ) MLN_NOEXCEPT;
-/** Starts an ordered debug-overlay query. */
-MLN_API mln_status mln_map_get_debug_options_start(
-  mln_map map, mln_operation* out_operation
-) MLN_NOEXCEPT;
-/** Takes the debug-overlay mask exactly once. */
-MLN_API mln_status mln_map_get_debug_options_take_result(
-  mln_operation operation, uint32_t* out_options
-) MLN_NOEXCEPT;
-/** Submits a rendering-stats visibility command. */
+/**
+ * Submits a rendering-stats visibility command.
+ *
+ * The committed value is visible through mln_map_snapshot_get as
+ * snapshot.rendering_stats_view_enabled.
+ */
 MLN_API mln_status mln_map_set_rendering_stats_view_enabled(
   mln_map map, bool enabled, uint64_t* out_command_id
-) MLN_NOEXCEPT;
-/** Starts an ordered rendering-stats visibility query. */
-MLN_API mln_status mln_map_get_rendering_stats_view_enabled_start(
-  mln_map map, mln_operation* out_operation
-) MLN_NOEXCEPT;
-/** Takes the rendering-stats visibility exactly once. */
-MLN_API mln_status mln_map_get_rendering_stats_view_enabled_take_result(
-  mln_operation operation, bool* out_enabled
-) MLN_NOEXCEPT;
-/** Starts an ordered fully-loaded query. */
-MLN_API mln_status mln_map_is_fully_loaded_start(
-  mln_map map, mln_operation* out_operation
-) MLN_NOEXCEPT;
-/** Takes the fully-loaded result exactly once. */
-MLN_API mln_status mln_map_is_fully_loaded_take_result(
-  mln_operation operation, bool* out_loaded
 ) MLN_NOEXCEPT;
 /** Submits an ordered debug-log command. */
 MLN_API mln_status
 mln_map_dump_debug_logs(mln_map map, uint64_t* out_command_id) MLN_NOEXCEPT;
-/** Starts an ordered viewport-options query. */
-MLN_API mln_status mln_map_get_viewport_options_start(
-  mln_map map, mln_operation* out_operation
-) MLN_NOEXCEPT;
-/** Takes viewport options exactly once. */
-MLN_API mln_status mln_map_get_viewport_options_take_result(
-  mln_operation operation, mln_map_viewport_options* out_options
-) MLN_NOEXCEPT;
-/** Submits a copied viewport-options command. */
+/**
+ * Submits a copied viewport-options command.
+ *
+ * The committed options are visible through mln_map_snapshot_get as
+ * snapshot.viewport.
+ */
 MLN_API mln_status mln_map_set_viewport_options(
   mln_map map, const mln_map_viewport_options* options, uint64_t* out_command_id
 ) MLN_NOEXCEPT;
-/** Starts an ordered tile-options query. */
-MLN_API mln_status mln_map_get_tile_options_start(
-  mln_map map, mln_operation* out_operation
-) MLN_NOEXCEPT;
-/** Takes tile options exactly once. */
-MLN_API mln_status mln_map_get_tile_options_take_result(
-  mln_operation operation, mln_map_tile_options* out_options
-) MLN_NOEXCEPT;
-/** Submits a copied tile-options command. */
+/**
+ * Submits a copied tile-options command.
+ *
+ * The committed options are visible through mln_map_snapshot_get as
+ * snapshot.tile.
+ */
 MLN_API mln_status mln_map_set_tile_options(
   mln_map map, const mln_map_tile_options* options, uint64_t* out_command_id
 ) MLN_NOEXCEPT;
@@ -212,27 +192,21 @@ MLN_API mln_status mln_map_lat_lng_bounds_for_camera_unwrapped_take_result(
   mln_operation operation, mln_lat_lng_bounds* out_bounds
 ) MLN_NOEXCEPT;
 
-/** Starts an ordered camera-constraint query. */
-MLN_API mln_status mln_map_get_bounds_start(
-  mln_map map, mln_operation* out_operation
-) MLN_NOEXCEPT;
-/** Takes camera constraints exactly once. */
-MLN_API mln_status mln_map_get_bounds_take_result(
-  mln_operation operation, mln_bound_options* out_options
-) MLN_NOEXCEPT;
-/** Submits a copied camera-constraint command. */
+/**
+ * Submits a copied camera-constraint command.
+ *
+ * The committed constraints are visible through mln_map_snapshot_get as
+ * snapshot.bounds.
+ */
 MLN_API mln_status mln_map_set_bounds(
   mln_map map, const mln_bound_options* options, uint64_t* out_command_id
 ) MLN_NOEXCEPT;
-/** Starts an ordered free-camera query. */
-MLN_API mln_status mln_map_get_free_camera_options_start(
-  mln_map map, mln_operation* out_operation
-) MLN_NOEXCEPT;
-/** Takes free-camera options exactly once. */
-MLN_API mln_status mln_map_get_free_camera_options_take_result(
-  mln_operation operation, mln_free_camera_options* out_options
-) MLN_NOEXCEPT;
-/** Submits a copied free-camera command. */
+/**
+ * Submits a copied free-camera command.
+ *
+ * The committed options are visible through mln_map_snapshot_get as
+ * snapshot.free_camera.
+ */
 MLN_API mln_status mln_map_set_free_camera_options(
   mln_map map, const mln_free_camera_options* options, uint64_t* out_command_id
 ) MLN_NOEXCEPT;

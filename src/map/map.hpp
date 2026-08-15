@@ -44,21 +44,17 @@ auto style_transition_options_default() noexcept
 
 enum class StyleOperationKind : uint32_t {
   RemoveSource = 0x5301,
-  SourceExists,
-  SourceType,
   SourceInfo,
   SourceAttribution,
   SourceUrl,
   SourceTileUrls,
   SourceIds,
   RemoveImage,
-  ImageExists,
   ImageInfo,
   ImageStretches,
   ImagePixels,
   ImageCoordinates,
   RemoveLayer,
-  LayerExists,
   LayerType,
   LayerIds,
   LayerJson,
@@ -135,14 +131,7 @@ enum class GeometryOperationKind : uint32_t {
   PixelForCoordinate,
   CoordinateForPixel,
   PixelsForCoordinates,
-  CoordinatesForPixels,
-  DebugOptions,
-  RenderingStats,
-  FullyLoaded,
-  ViewportOptions,
-  TileOptions,
-  Bounds,
-  FreeCamera
+  CoordinatesForPixels
 };
 
 struct GeometryOperationResult {
@@ -152,12 +141,6 @@ struct GeometryOperationResult {
   mln_lat_lng coordinate{};
   std::vector<mln_screen_point> points;
   std::vector<mln_lat_lng> coordinates;
-  uint32_t value_u32 = 0;
-  bool flag = false;
-  mln_map_viewport_options viewport{};
-  mln_map_tile_options tile{};
-  mln_bound_options bound{};
-  mln_free_camera_options free_camera{};
 };
 
 using GeometryWork = std::function<mln_status(GeometryOperationResult&)>;
@@ -165,22 +148,6 @@ using GeometryWork = std::function<mln_status(GeometryOperationResult&)>;
 auto start_geometry_operation(
   mln_map map, GeometryOperationKind kind, GeometryWork work,
   mln_operation* out_operation
-) -> mln_status;
-auto map_get_debug_options_start(mln_map map, mln_operation* out_operation)
-  -> mln_status;
-auto map_get_rendering_stats_view_enabled_start(
-  mln_map map, mln_operation* out_operation
-) -> mln_status;
-auto map_is_fully_loaded_start(mln_map map, mln_operation* out_operation)
-  -> mln_status;
-auto map_get_viewport_options_start(mln_map map, mln_operation* out_operation)
-  -> mln_status;
-auto map_get_tile_options_start(mln_map map, mln_operation* out_operation)
-  -> mln_status;
-auto map_get_bounds_start(mln_map map, mln_operation* out_operation)
-  -> mln_status;
-auto map_get_free_camera_options_start(
-  mln_map map, mln_operation* out_operation
 ) -> mln_status;
 auto take_geometry_operation(
   mln_operation operation, GeometryOperationKind kind,
@@ -231,13 +198,6 @@ auto map_add_style_source_json(
 ) -> mln_status;
 auto map_remove_style_source(
   mln_map map, mln_buffer_view source_id, bool* out_removed
-) -> mln_status;
-auto map_style_source_exists(
-  mln_map map, mln_buffer_view source_id, bool* out_exists
-) -> mln_status;
-auto map_get_style_source_type(
-  mln_map map, mln_buffer_view source_id, uint32_t* out_source_type,
-  bool* out_found
 ) -> mln_status;
 auto map_get_style_source_info(
   mln_map map, mln_buffer_view source_id, mln_style_source_info* out_info,
@@ -317,9 +277,6 @@ auto map_set_style_image(
 auto map_remove_style_image(
   mln_map map, mln_buffer_view image_id, bool* out_removed
 ) -> mln_status;
-auto map_style_image_exists(
-  mln_map map, mln_buffer_view image_id, bool* out_exists
-) -> mln_status;
 auto map_get_style_image_info(
   mln_map map, mln_buffer_view image_id, mln_style_image_info* out_info,
   bool* out_found
@@ -386,9 +343,6 @@ auto map_add_style_layer_json(
 ) -> mln_status;
 auto map_remove_style_layer(
   mln_map map, mln_buffer_view layer_id, bool* out_removed
-) -> mln_status;
-auto map_style_layer_exists(
-  mln_map map, mln_buffer_view layer_id, bool* out_exists
 ) -> mln_status;
 auto map_get_style_layer_type(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view* out_layer_type,
@@ -474,25 +428,16 @@ auto map_camera_query_take_result(
   mln_operation operation, mln_camera_query_result* out_result
 ) -> mln_status;
 auto map_set_debug_options(mln_map map, uint32_t options) -> mln_status;
-auto map_get_debug_options(mln_map map, uint32_t* out_options) -> mln_status;
 auto map_set_rendering_stats_view_enabled(mln_map map, bool enabled)
   -> mln_status;
-auto map_get_rendering_stats_view_enabled(mln_map map, bool* out_enabled)
-  -> mln_status;
-auto map_is_fully_loaded(mln_map map, bool* out_loaded) -> mln_status;
 auto map_dump_debug_logs(mln_map map) -> mln_status;
 auto map_get_size(
   mln_map map, uint32_t* out_width, uint32_t* out_height,
   double* out_scale_factor
 ) -> mln_status;
-auto map_get_viewport_options(
-  mln_map map, mln_map_viewport_options* out_options
-) -> mln_status;
 auto map_set_viewport_options(
   mln_map map, const mln_map_viewport_options* options
 ) -> mln_status;
-auto map_get_tile_options(mln_map map, mln_map_tile_options* out_options)
-  -> mln_status;
 auto map_set_tile_options(mln_map map, const mln_map_tile_options* options)
   -> mln_status;
 auto map_pixel_for_lat_lng_start(
@@ -621,12 +566,8 @@ auto map_lat_lng_bounds_for_camera(
 auto map_lat_lng_bounds_for_camera_unwrapped(
   mln_map map, const mln_camera_options* camera, mln_lat_lng_bounds* out_bounds
 ) -> mln_status;
-auto map_get_bounds(mln_map map, mln_bound_options* out_options) -> mln_status;
 auto map_set_bounds(mln_map map, const mln_bound_options* options)
   -> mln_status;
-auto map_get_free_camera_options(
-  mln_map map, mln_free_camera_options* out_options
-) -> mln_status;
 auto map_set_free_camera_options(
   mln_map map, const mln_free_camera_options* options
 ) -> mln_status;

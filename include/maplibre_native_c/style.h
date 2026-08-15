@@ -32,8 +32,9 @@ typedef uint64_t mln_style_string_list;
  * zero and receives a monotonic runtime command ID. Application runs later in
  * runtime order. Exactly one `MLN_RUNTIME_EVENT_COMMAND_FINISHED` event reports
  * committed, superseded, failed, or cancelled disposition. Its code and copied
- * message report application failure; committed events carry the resulting
- * style generation.
+ * message report application failure; committed events carry the map snapshot
+ * generation the commit published, so a caller can fence a later
+ * mln_map_snapshot_get() on it.
  *
  * Every `_start` function is an ordered operation. It copies its inputs before
  * returning and observes all commands accepted earlier by the runtime. Output
@@ -613,47 +614,13 @@ MLN_API mln_status mln_map_remove_style_source_take_result(
 ) MLN_NOEXCEPT;
 
 /**
- * Reports whether a style source ID exists.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, or out_exists is null.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_map_style_source_exists_start(
-  mln_map map, mln_buffer_view source_id, mln_operation* out_operation
-) MLN_NOEXCEPT;
-MLN_API mln_status mln_map_style_source_exists_take_result(
-  mln_operation operation, bool* out_exists
-) MLN_NOEXCEPT;
-
-/**
- * Gets one style source type.
- *
- * On success, out_found reports whether source_id exists. When found,
- * out_source_type receives one of mln_style_source_type.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, out_source_type is null, or out_found is null.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_map_get_style_source_type_start(
-  mln_map map, mln_buffer_view source_id, mln_operation* out_operation
-) MLN_NOEXCEPT;
-MLN_API mln_status mln_map_get_style_source_type_take_result(
-  mln_operation operation, uint32_t* out_source_type, bool* out_found
-) MLN_NOEXCEPT;
-
-/**
  * Copies fixed metadata for one style source.
  *
- * The returned struct contains string lengths and fixed inline TileJSON
- * fields, not string contents. Use the source-attribution, source-URL, and
- * source-tile-URLs operations to copy their owned results. The source ID
- * is the lookup key and is also available through style source ID lists.
+ * The returned struct contains string lengths, the source type, and fixed
+ * inline TileJSON fields, not string contents. Use the source-attribution,
+ * source-URL, and source-tile-URLs operations to copy their owned results. The
+ * source ID is the lookup key and is also available through style source ID
+ * lists. out_found reports whether source_id exists.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -1095,22 +1062,6 @@ MLN_API mln_status mln_map_remove_style_image_take_result(
 ) MLN_NOEXCEPT;
 
 /**
- * Reports whether a runtime style image ID exists.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, image_id is
- *   invalid or empty, or out_exists is null.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_map_style_image_exists_start(
-  mln_map map, mln_buffer_view image_id, mln_operation* out_operation
-) MLN_NOEXCEPT;
-MLN_API mln_status mln_map_style_image_exists_take_result(
-  mln_operation operation, bool* out_exists
-) MLN_NOEXCEPT;
-
-/**
  * Copies fixed metadata for one runtime style image.
  *
  * On success, out_found reports whether image_id exists. When not found,
@@ -1486,22 +1437,6 @@ MLN_API mln_status mln_map_remove_style_layer_start(
 ) MLN_NOEXCEPT;
 MLN_API mln_status mln_map_remove_style_layer_take_result(
   mln_operation operation, bool* out_removed
-) MLN_NOEXCEPT;
-
-/**
- * Reports whether a style layer ID exists.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
- *   invalid or empty, or out_exists is null.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_map_style_layer_exists_start(
-  mln_map map, mln_buffer_view layer_id, mln_operation* out_operation
-) MLN_NOEXCEPT;
-MLN_API mln_status mln_map_style_layer_exists_take_result(
-  mln_operation operation, bool* out_exists
 ) MLN_NOEXCEPT;
 
 /**

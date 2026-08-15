@@ -430,81 +430,6 @@ auto mln_map_remove_style_source_take_result(
   });
 }
 
-auto mln_map_style_source_exists_start(
-  mln_map map, mln_buffer_view source_id, mln_operation* out_operation
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    if (!valid_view(source_id, "source_id is invalid")) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    auto id = OwnedView{source_id};
-    return operation(
-      map, mln::core::StyleOperationKind::SourceExists,
-      [map, id = std::move(id)](mln::core::StyleOperationResult& result)
-        -> mln_status {
-        return mln::core::map_style_source_exists(map, id.view(), &result.flag);
-      },
-      out_operation
-    );
-  });
-}
-
-auto mln_map_style_source_exists_take_result(
-  mln_operation operation_id, bool* out_exists
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    if (out_exists == nullptr) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    return take(
-      operation_id, mln::core::StyleOperationKind::SourceExists,
-      [out_exists](mln::core::StyleOperationResult& result) -> mln_status {
-        *out_exists = result.flag;
-        return MLN_STATUS_OK;
-      }
-    );
-  });
-}
-
-auto mln_map_get_style_source_type_start(
-  mln_map map, mln_buffer_view source_id, mln_operation* out_operation
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    if (!valid_view(source_id, "source_id is invalid")) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    auto id = OwnedView{source_id};
-    return operation(
-      map, mln::core::StyleOperationKind::SourceType,
-      [map, id = std::move(id)](mln::core::StyleOperationResult& result)
-        -> mln_status {
-        return mln::core::map_get_style_source_type(
-          map, id.view(), &result.value_u32, &result.found
-        );
-      },
-      out_operation
-    );
-  });
-}
-
-auto mln_map_get_style_source_type_take_result(
-  mln_operation operation_id, uint32_t* out_source_type, bool* out_found
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    if (out_source_type == nullptr || out_found == nullptr) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    return take(
-      operation_id, mln::core::StyleOperationKind::SourceType,
-      [=](mln::core::StyleOperationResult& result) -> mln_status {
-        *out_source_type = result.value_u32;
-        *out_found = result.found;
-        return MLN_STATUS_OK;
-      }
-    );
-  });
-}
-
 auto mln_map_get_style_source_info_start(
   mln_map map, mln_buffer_view source_id, mln_operation* out_operation
 ) noexcept -> mln_status {
@@ -1062,37 +987,6 @@ auto mln_map_remove_style_image_take_result(
   });
 }
 
-auto mln_map_style_image_exists_start(
-  mln_map map, mln_buffer_view image_id, mln_operation* out_operation
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    auto id = OwnedView{image_id};
-    return operation(
-      map, mln::core::StyleOperationKind::ImageExists,
-      [map, id = std::move(id)](mln::core::StyleOperationResult& result)
-        -> mln_status {
-        return mln::core::map_style_image_exists(map, id.view(), &result.flag);
-      },
-      out_operation
-    );
-  });
-}
-
-auto mln_map_style_image_exists_take_result(
-  mln_operation operation_id, bool* out_exists
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    if (out_exists == nullptr) return MLN_STATUS_INVALID_ARGUMENT;
-    return take(
-      operation_id, mln::core::StyleOperationKind::ImageExists,
-      [out_exists](mln::core::StyleOperationResult& result) -> mln_status {
-        *out_exists = result.flag;
-        return MLN_STATUS_OK;
-      }
-    );
-  });
-}
-
 auto mln_map_get_style_image_info_start(
   mln_map map, mln_buffer_view image_id, mln_operation* out_operation
 ) noexcept -> mln_status {
@@ -1629,42 +1523,6 @@ auto mln_map_remove_style_layer_take_result(
       operation_id, mln::core::StyleOperationKind::RemoveLayer,
       [out_removed](mln::core::StyleOperationResult& result) -> mln_status {
         *out_removed = result.flag;
-        return MLN_STATUS_OK;
-      }
-    );
-  });
-}
-
-auto mln_map_style_layer_exists_start(
-  mln_map map, mln_buffer_view layer_id, mln_operation* out_operation
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    if (!valid_view(layer_id, "layer_id is invalid")) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    auto id = OwnedView{layer_id};
-    return operation(
-      map, mln::core::StyleOperationKind::LayerExists,
-      [map, id = std::move(id)](mln::core::StyleOperationResult& result)
-        -> mln_status {
-        return mln::core::map_style_layer_exists(map, id.view(), &result.flag);
-      },
-      out_operation
-    );
-  });
-}
-
-auto mln_map_style_layer_exists_take_result(
-  mln_operation operation_id, bool* out_exists
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    if (out_exists == nullptr) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    return take(
-      operation_id, mln::core::StyleOperationKind::LayerExists,
-      [out_exists](mln::core::StyleOperationResult& result) -> mln_status {
-        *out_exists = result.flag;
         return MLN_STATUS_OK;
       }
     );
