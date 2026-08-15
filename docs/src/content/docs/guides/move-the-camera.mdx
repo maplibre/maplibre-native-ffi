@@ -22,21 +22,22 @@ other field at its committed value.
 
 ## Choose how the camera moves
 
-Three commands apply that camera, and they differ only in timing.
+One command, `mln_map_update_camera`, applies that camera. Its update mode
+selects the timing, and the three modes differ only in timing.
 
-`mln_map_jump_to` applies the camera immediately. Use it for the first position
+Jump mode applies the camera immediately. Use it for the first position
 of a session, a position restored from saved state, or a camera that the host
 recomputes every frame during a gesture.
 
 <Code code={region(cameraSnippet, "jump")} lang="c" title="camera.c" />
 
-`mln_map_ease_to` interpolates every field that you set along a cubic easing
+Ease mode interpolates every field that you set along a cubic easing
 curve. Use it for a short move that remains easy to follow. A duration of zero,
 the default, applies the camera immediately.
 
 <Code code={region(cameraSnippet, "ease")} lang="c" title="camera.c" />
 
-`mln_map_fly_to` takes the same animation options and follows a curved path. Use
+Fly mode takes the same animation options and follows a curved path. Use
 it for a long move. The zoom decreases through the middle of the transition to
 cross the distance without loading every high-zoom tile between the positions.
 When the duration is absent, MapLibre derives one from the distance and a
@@ -51,7 +52,7 @@ signals that more frames are required.
 
 ## Move by a gesture
 
-The three commands above take a destination. Gestures instead provide relative
+A camera update takes a destination. Gestures instead provide relative
 input: a drag provides a distance, and a pinch provides a scale factor and a
 screen position. Relative moves apply those values to the current camera.
 
@@ -91,7 +92,7 @@ viewport, inset by the padding that you pass in logical pixels.
 <Code code={region(fitBoundsSnippet, "padding")} lang="c" title="camera-fit-bounds.c" />
 
 The query reports a camera and leaves the map unchanged. Apply the result with
-the command that provides the required timing.
+the update mode that provides the required timing.
 
 <Code code={region(fitBoundsSnippet, "fit")} lang="c" title="camera-fit-bounds.c" />
 

@@ -93,10 +93,11 @@ public sealed class StyleImageTests
         Assert.Equal(2, copied.Options.PixelRatio);
         Assert.True(copied.Options.Sdf);
 
-        var removed = map.RemoveStyleImage("dot");
-        var finished = RuntimeEventTestHelpers.WaitForCommand(runtime, removed);
-        var completion = Assert.IsType<RuntimeEventPayload.CommandFinished>(finished.Payload);
-        Assert.Equal(CommandDisposition.Committed, completion.Disposition);
+        RuntimeEventTestHelpers.AssertCommandFinishes(
+            runtime,
+            map.RemoveStyleImage("dot"),
+            MaplibreStatus.Ok
+        );
         Assert.Null(await map.StyleImageInfoAsync("dot"));
         Assert.Null(await map.CopyStyleImagePremultipliedRgba8Async("dot"));
     }

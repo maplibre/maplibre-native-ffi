@@ -103,11 +103,6 @@ class ControlState {
     return closing_;
   }
 
-  [[nodiscard]] auto child_count() const noexcept -> std::size_t {
-    const std::scoped_lock lock(mutex_);
-    return children_;
-  }
-
  private:
   mutable std::mutex mutex_;
   std::condition_variable condition_;

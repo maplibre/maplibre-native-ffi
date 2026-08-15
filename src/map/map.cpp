@@ -3631,30 +3631,6 @@ auto map_dump_debug_logs(mln_map map) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-auto map_get_size(
-  mln_map map, uint32_t* out_width, uint32_t* out_height,
-  double* out_scale_factor
-) -> mln_status {
-  MapObject* live = nullptr;
-  const auto status = validate_map(map, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (
-    out_width == nullptr || out_height == nullptr || out_scale_factor == nullptr
-  ) {
-    set_thread_error(
-      "out_width, out_height, and out_scale_factor must not be null"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  *out_width = live->logical_extent.width;
-  *out_height = live->logical_extent.height;
-  *out_scale_factor = live->logical_extent.scale_factor;
-  return MLN_STATUS_OK;
-}
-
 auto map_set_viewport_options(
   mln_map map, const mln_map_viewport_options* options
 ) -> mln_status {

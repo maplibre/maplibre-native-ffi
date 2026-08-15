@@ -5,9 +5,16 @@ sidebar:
   order: 4
 ---
 
+import { Code } from "@astrojs/starlight/components";
+import { region } from "../../../snippets";
+
+import frameLoopSnippet from "../../../../snippets/c/frame-loop.c?raw";
+
 MapLibre Native advances runtime and map work on its native scheduler. A render
 session advances through either a native graphics worker or a narrow service
 call on the host graphics thread. Neither contract requires a host runtime pump.
+The snippets on this page come from one turn of a display-paced host loop over a
+caller-driver session.
 
 ## Submit frame demand
 
@@ -27,6 +34,16 @@ from another scheduler. A demand captures the current extent generation. Its
 result identifies the token and the map-update, extent, and frame generations
 that the driver used.
 
+A host that renders on demand derives that demand from runtime events: an
+update-available event, or a frame-finished event whose repaint flag is set.
+
+<Code code={region(frameLoopSnippet, "wants")} lang="c" title="frame-loop.c" />
+
+While a frame is pending, each loop turn submits one demand with the if-needed
+and present flags and a fresh host token.
+
+<Code code={region(frameLoopSnippet, "render")} lang="c" title="frame-loop.c" />
+
 ## Service a caller driver
 
 When the driver-work endpoint is ready, schedule the driver-service call on the
@@ -35,6 +52,8 @@ successful call fixes that graphics-thread identity. Service work in serialized
 calls until the endpoint drains. Continue service while presentation callbacks
 are paused, because attach, resize, queries, readback, barriers, and detach also
 use the mailbox.
+
+<Code code={region(frameLoopSnippet, "service")} lang="c" title="frame-loop.c" />
 
 A core-worker session rejects the service call because its native worker already
 owns execution. WGL, EGL, existing WebGL contexts, and browser WebGPU use caller
@@ -56,6 +75,8 @@ ready waits for host target readiness or paced retry. Superseded means that a
 newer demand replaced this demand within the same coalescing boundary. Deadline
 missed means that work did not begin before the positive deadline. These
 outcomes have different retry conditions, so preserve them in host pacing.
+
+<Code code={region(frameLoopSnippet, "results")} lang="c" title="frame-loop.c" />
 
 Owned texture acquisition is nonblocking and leases the oldest completed slot
 that is not already acquired. Wait for or submit work after its producer sync.

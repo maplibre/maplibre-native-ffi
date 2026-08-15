@@ -1366,25 +1366,6 @@ private constructor(
       )
       .decodeToString()
 
-  /**
-   * Probes the required length, then copies. A null buffer with zero capacity is a size probe the C
-   * API answers with OK.
-   */
-  private fun copyMapText(
-    copy: (ULong, CPointer<ByteVar>?, ULong, CPointer<ULongVar>) -> Int
-  ): String = memScoped {
-    val handle = state.requireLive().rawHandleValue
-    val outSize = alloc<ULongVar>()
-    Status.check(copy(handle, null, 0UL, outSize.ptr))
-    val required = checkedInt(outSize.value, "map text size")
-    if (required == 0) return@memScoped ""
-
-    val buffer = allocArray<ByteVar>(required)
-    val outCopied = alloc<ULongVar>()
-    Status.check(copy(handle, buffer, required.toULong(), outCopied.ptr))
-    buffer.readBytes(checkedInt(outCopied.value, "map copied text size")).decodeToString()
-  }
-
   private fun copyMapBytes(
     copy: (ULong, CPointer<UByteVar>?, ULong, CPointer<ULongVar>) -> Int
   ): ByteArray = memScoped {

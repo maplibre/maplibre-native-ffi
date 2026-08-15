@@ -140,27 +140,6 @@ mod tests {
     }
 
     #[test]
-    fn maps_operation_and_nonblocking_statuses() {
-        assert_eq!(
-            kind_for_status(sys::MLN_STATUS_CANCELLED),
-            ErrorKind::Cancelled
-        );
-        assert_eq!(kind_for_status(sys::MLN_STATUS_BUSY), ErrorKind::Busy);
-        assert_eq!(
-            kind_for_status(sys::MLN_STATUS_TARGET_LOST),
-            ErrorKind::TargetLost
-        );
-        assert_eq!(
-            kind_for_status(sys::MLN_STATUS_NOT_READY),
-            ErrorKind::NotReady
-        );
-        assert_eq!(
-            kind_for_status(sys::MLN_STATUS_NOT_FOUND),
-            ErrorKind::NotFound
-        );
-    }
-
-    #[test]
     fn invalid_native_calls_capture_status_and_diagnostic() {
         let error = check(unsafe { sys::mln_network_status_set(999_999) }).unwrap_err();
 

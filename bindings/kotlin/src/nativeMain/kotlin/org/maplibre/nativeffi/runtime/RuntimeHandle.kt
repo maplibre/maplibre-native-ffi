@@ -452,19 +452,6 @@ internal constructor(
     }
   }
 
-  internal fun setResourceProviderForTesting(
-    callback: ResourceProviderCallback,
-    install: (ResourceProviderState) -> Int,
-  ) {
-    val replacement = ResourceProviderState(callback)
-    val commandId =
-      resourceProviderCommands.set(replacement) {
-        Status.check(install(replacement))
-        1uL
-      }
-    resourceProviderCommands.finish(commandId, CommandDisposition.COMMITTED)
-  }
-
   public actual fun clearResourceProvider(): ULong = resourceProviderCommands.clear {
     command { outCommandId ->
       mln_runtime_clear_resource_provider(state.requireLive().rawHandleValue, outCommandId)
@@ -482,19 +469,6 @@ internal constructor(
         )
       }
     }
-  }
-
-  internal fun setResourceTransformForTesting(
-    callback: ResourceTransformCallback,
-    install: (ResourceTransformState) -> Int,
-  ) {
-    val replacement = ResourceTransformState(callback)
-    val commandId =
-      resourceTransformCommands.set(replacement) {
-        Status.check(install(replacement))
-        1uL
-      }
-    resourceTransformCommands.finish(commandId, CommandDisposition.COMMITTED)
   }
 
   public actual fun clearResourceTransform(): ULong = resourceTransformCommands.clear {
@@ -624,12 +598,6 @@ internal constructor(
 
   internal fun retainChild(childTypeName: String): HandleStateCore.ChildRetention =
     state.retainChild(childTypeName)
-
-  internal fun resourceProviderStateForTesting(): ResourceProviderState? =
-    resourceProviderCommands.currentForTesting()
-
-  internal fun resourceTransformStateForTesting(): ResourceTransformState? =
-    resourceTransformCommands.currentForTesting()
 
   internal fun copyEventForTesting(
     event: mln_runtime_event,

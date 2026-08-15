@@ -141,11 +141,10 @@ public sealed class StyleLayerTests
         map.SetStyleJson(System.Text.Encoding.UTF8.GetBytes(transitionStyleJson));
         Assert.Equal(declared, await map.GetStyleTransitionOptionsAsync());
 
-        var rejected = map.SetStyleTransitionOptions(new StyleTransitionOptions { Delay = -1 });
-        var failure = RuntimeEventTestHelpers.WaitForCommand(runtime, rejected);
-        var completion = Assert.IsType<RuntimeEventPayload.CommandFinished>(failure.Payload);
-        Assert.Equal(CommandDisposition.Failed, completion.Disposition);
-        Assert.Equal((int)MaplibreStatus.InvalidArgument, failure.Code);
-        Assert.NotEmpty(failure.Message);
+        RuntimeEventTestHelpers.AssertCommandFinishes(
+            runtime,
+            map.SetStyleTransitionOptions(new StyleTransitionOptions { Delay = -1 }),
+            MaplibreStatus.InvalidArgument
+        );
     }
 }

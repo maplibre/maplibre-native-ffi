@@ -15,7 +15,7 @@ import android.view.SurfaceView
  */
 internal class AndroidMapView(context: Context) :
   SurfaceView(context), SurfaceHolder.Callback2, Choreographer.FrameCallback, AutoCloseable {
-  private val input = InputController(context, ::enqueueCameraCommand)
+  private val input = InputController(context, ::submitCameraCommand)
   private var graphics: GraphicsContext? = null
   private var renderTarget: SurfaceRenderTarget? = null
   private var mapState: MapState? = null
@@ -125,7 +125,7 @@ internal class AndroidMapView(context: Context) :
     mapState = null
   }
 
-  private fun enqueueCameraCommand(command: CameraCommand) {
+  private fun submitCameraCommand(command: CameraCommand) {
     mapState?.submit(command)
     requestRender()
   }

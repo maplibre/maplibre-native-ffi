@@ -1131,42 +1131,6 @@ private class SourceFeatureQueryOptionsScope(value: SourceFeatureQueryOptions?) 
   }
 }
 
-private class FeatureStateSelectorScope(value: FeatureStateSelector) : AutoCloseable {
-  private val sourceId = StringViewScope(value.sourceId)
-  private val sourceLayerId = value.sourceLayerId?.let(::StringViewScope)
-  private val featureId = value.featureId?.let(::StringViewScope)
-  private val stateKey = value.stateKey?.let(::StringViewScope)
-  val selector: MaplibreNativeC.mln_feature_state_selector =
-    MaplibreNativeC.mln_feature_state_selector()
-
-  init {
-    selector.size(selector.sizeof())
-    selector.source_id(sourceId.view)
-    var fields = 0
-    sourceLayerId?.let {
-      fields = fields or MaplibreNativeC.MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID
-      selector.source_layer_id(it.view)
-    }
-    featureId?.let {
-      fields = fields or MaplibreNativeC.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID
-      selector.feature_id(it.view)
-    }
-    stateKey?.let {
-      fields = fields or MaplibreNativeC.MLN_FEATURE_STATE_SELECTOR_STATE_KEY
-      selector.state_key(it.view)
-    }
-    selector.fields(fields)
-  }
-
-  override fun close() {
-    selector.close()
-    stateKey?.close()
-    featureId?.close()
-    sourceLayerId?.close()
-    sourceId.close()
-  }
-}
-
 private class StringViewScope(value: String) : AutoCloseable {
   private val bytes: BytePointer
   val view: MaplibreNativeC.mln_buffer_view = MaplibreNativeC.mln_buffer_view()

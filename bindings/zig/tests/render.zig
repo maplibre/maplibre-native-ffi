@@ -4,9 +4,7 @@ const build_options = @import("build_options");
 const testing = std.testing;
 
 const maplibre = @import("maplibre_native_ffi");
-const metal_support = @import("metal_support.zig");
 const support = @import("support.zig");
-const test_hooks = @import("test_hooks.zig");
 
 extern "c" fn MTLCreateSystemDefaultDevice() ?*anyopaque;
 
@@ -617,28 +615,6 @@ fn attachTestOwnedTexture(map: *maplibre.MapHandle, descriptor: TestOwnedTexture
     }
 
     return .{ .context = context, .session = session };
-}
-
-fn expectInvalidOwnedTextureExtent(map: *maplibre.MapHandle, extent: maplibre.RenderTargetExtent) !void {
-    if (!supports_test_owned_texture) return error.SkipZigTest;
-    if (build_options.supports_vulkan) {
-        try testing.expectError(error.InvalidArgument, maplibre.attachVulkanOwnedTexture(map, .{
-            .extent = extent,
-            .context = fakeVulkanContext(),
-        }));
-    } else if (build_options.supports_opengl) {
-        try testing.expectError(error.InvalidArgument, maplibre.attachOpenGLOwnedTexture(map, .{
-            .extent = extent,
-            .context = fakeOpenGLContext(),
-        }));
-    } else if (build_options.supports_metal) {
-        try testing.expectError(error.InvalidArgument, maplibre.attachMetalOwnedTexture(map, .{
-            .extent = extent,
-            .context = .{ .device = fakeNativePointer() },
-        }));
-    } else {
-        unreachable;
-    }
 }
 
 const VulkanAttachContext = if (build_options.supports_vulkan) struct {

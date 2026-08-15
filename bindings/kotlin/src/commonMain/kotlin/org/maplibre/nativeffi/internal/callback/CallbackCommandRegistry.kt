@@ -68,8 +68,6 @@ internal class CallbackCommandRegistry<T : AutoCloseable>(
     roots.forEach(release)
   }
 
-  fun currentForTesting(): T? = locked { current }
-
   private inline fun <R> locked(block: () -> R): R {
     while (!lock.compareAndSet(0, 1)) {}
     try {

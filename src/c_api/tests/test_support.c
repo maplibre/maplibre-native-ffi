@@ -304,23 +304,6 @@ mln_status mln_test_map_close(mln_map map) {
   return status;
 }
 
-mln_status mln_test_map_get_size(
-  mln_map map, uint32_t* out_width, uint32_t* out_height,
-  double* out_scale_factor
-) {
-  if (out_width == NULL || out_height == NULL || out_scale_factor == NULL) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
-  const mln_status status = mln_map_snapshot_get(map, &snapshot);
-  if (status == MLN_STATUS_OK) {
-    *out_width = snapshot.logical_extent.width;
-    *out_height = snapshot.logical_extent.height;
-    *out_scale_factor = snapshot.logical_extent.scale_factor;
-  }
-  return status;
-}
-
 mln_status mln_test_map_get_event_mask(mln_map map, uint64_t* out_mask) {
   if (out_mask == NULL) {
     return MLN_STATUS_INVALID_ARGUMENT;

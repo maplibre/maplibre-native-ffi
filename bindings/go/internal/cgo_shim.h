@@ -44,16 +44,4 @@ static inline void mln_go_opengl_context_set_webgl(
   descriptor->data.webgl.canvas_selector.size = canvas_selector_size;
 }
 
-static inline mln_wgl_context_descriptor* mln_go_opengl_context_wgl(
-  mln_opengl_context_descriptor* descriptor
-) {
-  return &descriptor->data.wgl;
-}
-
-static inline mln_egl_context_descriptor* mln_go_opengl_context_egl(
-  mln_opengl_context_descriptor* descriptor
-) {
-  return &descriptor->data.egl;
-}
-
 #endif

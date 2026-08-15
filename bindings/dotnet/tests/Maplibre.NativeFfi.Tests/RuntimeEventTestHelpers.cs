@@ -1,10 +1,12 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Struct;
 using Maplibre.NativeFfi.Map;
 using Maplibre.NativeFfi.Runtime;
+using Xunit;
 
 namespace Maplibre.NativeFfi.Tests;
 
@@ -35,7 +37,6 @@ internal static unsafe class RuntimeEventTestHelpers
     {
         for (var attempt = 0; attempt < 1000; attempt++)
         {
-            Thread.Sleep(1);
             foreach (var runtimeEvent in runtime.DrainEvents().Events)
             {
                 if (
@@ -71,6 +72,34 @@ internal static unsafe class RuntimeEventTestHelpers
             Thread.Sleep(1);
         }
         throw new TimeoutException($"Timed out waiting for command {commandId}.");
+    }
+
+    /// <summary>
+    /// Waits for the command to finish, asserts its disposition matches the expected status
+    /// (committed for Ok with a nonzero generation, failed with the status code and a message
+    /// otherwise), and returns the payload.
+    /// </summary>
+    internal static RuntimeEventPayload.CommandFinished AssertCommandFinishes(
+        RuntimeHandle runtime,
+        ulong commandId,
+        MaplibreStatus expectedStatus
+    )
+    {
+        Assert.NotEqual(0ul, commandId);
+        var finished = WaitForCommand(runtime, commandId);
+        var completion = Assert.IsType<RuntimeEventPayload.CommandFinished>(finished.Payload);
+        if (expectedStatus == MaplibreStatus.Ok)
+        {
+            Assert.Equal(CommandDisposition.Committed, completion.Disposition);
+            Assert.NotEqual(0ul, completion.Generation);
+        }
+        else
+        {
+            Assert.Equal(CommandDisposition.Failed, completion.Disposition);
+            Assert.Equal((int)expectedStatus, finished.Code);
+            Assert.NotEmpty(finished.Message);
+        }
+        return completion;
     }
 
     /// <summary>Drains until one batch reports no events.</summary>

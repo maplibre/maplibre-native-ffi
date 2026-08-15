@@ -180,30 +180,6 @@ class TextureSessionBackend {
     out_rendered = true;
     return MLN_STATUS_OK;
   }
-  virtual auto acquire_vulkan_owned_frame(
-    const mln_render_session_object& session,
-    mln_vulkan_owned_texture_frame& out_frame
-  ) -> mln_status {
-    (void)session;
-    (void)out_frame;
-    return MLN_STATUS_UNSUPPORTED;
-  }
-  virtual auto acquire_opengl_owned_frame(
-    const mln_render_session_object& session,
-    mln_opengl_owned_texture_frame& out_frame
-  ) -> mln_status {
-    (void)session;
-    (void)out_frame;
-    return MLN_STATUS_UNSUPPORTED;
-  }
-  virtual auto acquire_webgpu_owned_frame(
-    const mln_render_session_object& session,
-    mln_webgpu_owned_texture_frame& out_frame
-  ) -> mln_status {
-    (void)session;
-    (void)out_frame;
-    return MLN_STATUS_UNSUPPORTED;
-  }
   virtual auto release_consumer_sync(const mln_gpu_sync& sync) -> mln_status {
     return sync.kind == MLN_GPU_SYNC_CPU_COMPLETE ? MLN_STATUS_OK
                                                   : MLN_STATUS_UNSUPPORTED;
@@ -499,8 +475,6 @@ auto validate_render_session(
 auto validate_live_attached_render_session(
   mln_render_session session, mln_render_session_object*& out_session
 ) -> mln_status;
-auto erase_render_session(mln_render_session session)
-  -> std::shared_ptr<mln_render_session_object>;
 
 inline auto physical_dimension(uint32_t logical, double scale_factor)
   -> uint32_t {

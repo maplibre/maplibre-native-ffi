@@ -391,8 +391,9 @@ final class MetalMapView: UIView {
     }
   }
 
-  /// Decodes a gesture and reports whether it changed the camera.
-  private func enqueue(_ decode: ((CameraCommand) -> Void) -> Bool) {
+  /// Decodes a gesture and requests a render when the decoded gesture changed
+  /// the camera.
+  private func submitGesture(_ decode: ((CameraCommand) -> Void) -> Bool) {
     if decode(submit) {
       renderRequested = true
     }
@@ -424,7 +425,7 @@ final class MetalMapView: UIView {
   }
 
   @objc private func handlePan(_ recognizer: UIPanGestureRecognizer) {
-    enqueue { submit in
+    submitGesture { submit in
       switch recognizer.state {
       case .began:
         self.beginGesture(recognizer, submit)
@@ -447,7 +448,7 @@ final class MetalMapView: UIView {
   }
 
   @objc private func handlePinch(_ recognizer: UIPinchGestureRecognizer) {
-    enqueue { submit in
+    submitGesture { submit in
       switch recognizer.state {
       case .began:
         self.beginGesture(recognizer, submit)
@@ -471,7 +472,7 @@ final class MetalMapView: UIView {
   }
 
   @objc private func handleRotation(_ recognizer: UIRotationGestureRecognizer) {
-    enqueue { submit in
+    submitGesture { submit in
       switch recognizer.state {
       case .began:
         self.beginGesture(recognizer, submit)
@@ -495,7 +496,7 @@ final class MetalMapView: UIView {
   }
 
   @objc private func handleShove(_ recognizer: UIPanGestureRecognizer) {
-    enqueue { submit in
+    submitGesture { submit in
       switch recognizer.state {
       case .began:
         guard recognizer.numberOfTouches == 2 else { return false }
@@ -517,7 +518,7 @@ final class MetalMapView: UIView {
   }
 
   @objc private func handleDoubleTap(_ recognizer: UITapGestureRecognizer) {
-    enqueue { submit in
+    submitGesture { submit in
       let location = recognizer.location(in: self)
       submit(.zoomToNextStep(
         anchor: screenPoint(location),

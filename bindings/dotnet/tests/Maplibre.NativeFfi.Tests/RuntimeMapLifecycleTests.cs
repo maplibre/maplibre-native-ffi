@@ -93,10 +93,11 @@ public sealed class RuntimeMapLifecycleTests
         );
 
         var options = DebugOptions.TileBorders | DebugOptions.ParseStatus;
-        var commandId = map.SetDebugOptions(options);
-        var finished = RuntimeEventTestHelpers.WaitForCommand(runtime, commandId);
-        var completion = Assert.IsType<RuntimeEventPayload.CommandFinished>(finished.Payload);
-        Assert.Equal(CommandDisposition.Committed, completion.Disposition);
+        var completion = RuntimeEventTestHelpers.AssertCommandFinishes(
+            runtime,
+            map.SetDebugOptions(options),
+            MaplibreStatus.Ok
+        );
 
         // The published snapshot fence: a snapshot at or past the commit's generation
         // observes the committed value.
@@ -118,10 +119,11 @@ public sealed class RuntimeMapLifecycleTests
         );
 
         Assert.False(map.GetSnapshot().RenderingStatsViewEnabled);
-        var commandId = map.SetRenderingStatsViewEnabled(true);
-        var finished = RuntimeEventTestHelpers.WaitForCommand(runtime, commandId);
-        var completion = Assert.IsType<RuntimeEventPayload.CommandFinished>(finished.Payload);
-        Assert.Equal(CommandDisposition.Committed, completion.Disposition);
+        RuntimeEventTestHelpers.AssertCommandFinishes(
+            runtime,
+            map.SetRenderingStatsViewEnabled(true),
+            MaplibreStatus.Ok
+        );
         Assert.True(map.GetSnapshot().RenderingStatsViewEnabled);
     }
 

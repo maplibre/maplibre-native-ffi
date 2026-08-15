@@ -20,10 +20,8 @@ public struct ProjectedMeters: Equatable, Sendable {
 /// its creation; a live projection still prevents map close.
 public final class MapProjectionHandle: @unchecked Sendable {
   private let handle: NativeHandleBox<NativeMapProjectionHandle>
-  private let map: MapHandle
 
   public init(map: MapHandle) async throws {
-    self.map = map
     let operationRuntime = map.runtimeForOperations
     let operation = try mapNativeFailure {
       try NativeProjection.createStart(map.requireLiveHandle())

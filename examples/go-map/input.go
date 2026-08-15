@@ -71,8 +71,8 @@ func (input *inputController) handleMouseButtonDown(event *sdl.MouseButtonEvent,
 	input.dragMode = mode
 	input.dragButton = event.Button
 	// Cancel first, so the running transition stops before the first delta.
-	cancelQueued := enqueueCameraCommand(commands, cameraCommand{kind: commandCancelTransitions})
-	gestureQueued := enqueueCameraCommand(commands, cameraCommand{kind: commandSetGestureInProgress, inProgress: true})
+	cancelQueued := commands.submit(cameraCommand{kind: commandCancelTransitions})
+	gestureQueued := commands.submit(cameraCommand{kind: commandSetGestureInProgress, inProgress: true})
 	return cancelQueued || gestureQueued
 }
 
@@ -90,7 +90,7 @@ func (input *inputController) handleMouseButtonUp(event *sdl.MouseButtonEvent, c
 	input.dragButton = 0
 	input.lastX = cursor.X
 	input.lastY = cursor.Y
-	return enqueueCameraCommand(commands, cameraCommand{kind: commandSetGestureInProgress, inProgress: false})
+	return commands.submit(cameraCommand{kind: commandSetGestureInProgress, inProgress: false})
 }
 
 func (input *inputController) handleMouseMotion(event *sdl.MouseMotionEvent, commands *cameraController, v viewport) bool {
@@ -108,10 +108,10 @@ func (input *inputController) handleMouseMotion(event *sdl.MouseMotionEvent, com
 
 	switch input.dragMode {
 	case dragPan:
-		return enqueueCameraCommand(commands, cameraCommand{kind: commandMoveBy, deltaX: dx, deltaY: dy})
+		return commands.submit(cameraCommand{kind: commandMoveBy, deltaX: dx, deltaY: dy})
 	case dragRotate:
-		bearingQueued := enqueueCameraCommand(commands, cameraCommand{kind: commandAdjustBearing, deltaX: dx * 0.5})
-		pitchQueued := enqueueCameraCommand(commands, cameraCommand{kind: commandPitchBy, deltaY: dy * 0.5})
+		bearingQueued := commands.submit(cameraCommand{kind: commandAdjustBearing, deltaX: dx * 0.5})
+		pitchQueued := commands.submit(cameraCommand{kind: commandPitchBy, deltaY: dy * 0.5})
 		return bearingQueued || pitchQueued
 	}
 	return false
@@ -122,7 +122,7 @@ func handleMouseWheel(event *sdl.MouseWheelEvent, commands *cameraController, v 
 		return false
 	}
 	anchor := logicalPoint(float64(event.MouseX), float64(event.MouseY), v)
-	return enqueueCameraCommand(commands, cameraCommand{kind: commandScaleBy, scale: math.Pow(2, float64(event.Y)*0.25), anchor: anchor})
+	return commands.submit(cameraCommand{kind: commandScaleBy, scale: math.Pow(2, float64(event.Y)*0.25), anchor: anchor})
 }
 
 func handleKeyDown(event *sdl.KeyboardEvent, commands *cameraController, v viewport) bool {
@@ -164,10 +164,6 @@ func handleKeyDown(event *sdl.KeyboardEvent, commands *cameraController, v viewp
 	default:
 		return false
 	}
-	return enqueueCameraCommand(commands, command)
-}
-
-func enqueueCameraCommand(commands *cameraController, command cameraCommand) bool {
 	return commands.submit(command)
 }
 

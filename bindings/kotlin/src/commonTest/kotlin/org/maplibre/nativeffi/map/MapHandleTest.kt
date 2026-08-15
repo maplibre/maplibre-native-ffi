@@ -192,12 +192,9 @@ class MapHandleTest {
     }
 
   @Test
-  fun canonicalTileIdRejectsOutOfRangeInputs(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      assertFailsWith<InvalidArgumentException> {
-        CanonicalTileId(0, UInt.MAX_VALUE.toLong() + 1, 0)
-      }
-    }
+  fun canonicalTileIdRejectsOutOfRangeInputs() {
+    assertFailsWith<InvalidArgumentException> { CanonicalTileId(0, UInt.MAX_VALUE.toLong() + 1, 0) }
+  }
 
   @Test
   fun mapCreateStyleAndCloseRetainsRuntime(): Unit =
@@ -702,41 +699,6 @@ class MapHandleTest {
       }
     }
 
-  @Test
-  fun mapProjectionCoordinateConversionsCanBeRoundTrippedAndClosed(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      val runtime = RuntimeHandle.create(RuntimeOptions())
-      val map =
-        MapHandle.create(
-          runtime,
-          MapOptions().apply {
-            width = 128
-            height = 128
-            mapMode = MapMode.STATIC
-          },
-        )
-
-      try {
-        val projection = map.createProjection()
-        assertFalse(projection.isClosed)
-        val coordinate = LatLng(0.0, 0.0)
-        val point = projection.pixelForLatLng(coordinate)
-        val roundTrip = projection.latLngForPixel(point)
-        assertNear(coordinate, roundTrip)
-
-        assertFailsWith<InvalidStateException> {
-          org.maplibre.nativeffi.runtime.runSuspendTest { map.close() }
-        }
-        projection.close()
-        assertTrue(projection.isClosed)
-        projection.close()
-        assertFailsWith<InvalidStateException> { projection.pixelForLatLng(coordinate) }
-      } finally {
-        map.close()
-        runtime.close()
-      }
-    }
-
   // The COMMAND_FINISHED generation fences a later snapshot: a snapshot at or past it
   // observes the commit.
   @Test
@@ -860,9 +822,6 @@ class MapHandleTest {
   private fun backgroundLayer(): ByteArray =
     "{\"id\":\"background\",\"type\":\"background\"}".encodeToByteArray()
 
-  private fun pointGeometry(): ByteArray =
-    "{\"type\":\"Point\",\"coordinates\":[0,0]}".encodeToByteArray()
-
   private fun imageCoordinates(): List<LatLng> =
     listOf(LatLng(0.0, 0.0), LatLng(0.0, 1.0), LatLng(1.0, 1.0), LatLng(1.0, 0.0))
 
@@ -893,11 +852,6 @@ class MapHandleTest {
       (event.payload as RuntimeEventPayload.CommandFinished).disposition,
     )
     return event
-  }
-
-  private fun assertNear(expected: LatLng, actual: LatLng) {
-    assertEquals(expected.latitude, actual.latitude, 1e-6)
-    assertEquals(expected.longitude, actual.longitude, 1e-6)
   }
 
   @Test

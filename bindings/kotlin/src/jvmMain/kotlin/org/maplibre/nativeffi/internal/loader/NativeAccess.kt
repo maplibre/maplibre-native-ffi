@@ -3634,17 +3634,7 @@ internal object NativeAccess {
   private fun resourceRequestReleaseFunction(): MethodHandle =
     downcall("mln_resource_request_release")
 
-  private fun mapStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun mapIntStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun mapBooleanStatusFunction(name: String): MethodHandle = downcall(name)
-
   private fun mapAddressStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun mapAddressAddressStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun mapAddressAddressAddressStatusFunction(name: String): MethodHandle = downcall(name)
 
   private fun mapStringViewAddressStatusFunction(name: String): MethodHandle = downcall(name)
 
@@ -3666,53 +3656,15 @@ internal object NativeAccess {
 
   private fun mapStringViewLatLngDoubleStatusFunction(name: String): MethodHandle = downcall(name)
 
-  private fun mapDoubleStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun mapDoubleDoubleStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun mapDoubleAddressStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun mapDoubleDoubleAddressStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun mapDoubleAddressAddressStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun mapTwoAddressStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun mapTwoScreenPointsStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun mapTwoScreenPointsAddressStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun mapLatLngBoundsAddressAddressStatusFunction(name: String): MethodHandle =
-    downcall(name)
-
-  private fun mapAddressLongAddressAddressStatusFunction(name: String): MethodHandle =
-    downcall(name)
-
-  private fun projectionAddressLongEdgeInsetsStatusFunction(name: String): MethodHandle =
-    downcall(name)
-
-  private fun projectionAddressEdgeInsetsStatusFunction(name: String): MethodHandle = downcall(name)
-
   private fun mapLatLngAddressStatusFunction(name: String): MethodHandle = downcall(name)
 
   private fun mapScreenPointAddressStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun mapAddressLongAddressStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun projectionLatLngAddressStatusFunction(name: String): MethodHandle =
-    mapLatLngAddressStatusFunction(name)
-
-  private fun projectionScreenPointAddressStatusFunction(name: String): MethodHandle =
-    mapScreenPointAddressStatusFunction(name)
 
   private fun mapStringViewDoubleStatusFunction(name: String): MethodHandle = downcall(name)
 
   private fun mapStringViewIntStringViewStatusFunction(name: String): MethodHandle = downcall(name)
 
   private fun mapStringViewTwoAddressStatusFunction(name: String): MethodHandle = downcall(name)
-
-  private fun mapStringViewAddressLongTwoAddressStatusFunction(name: String): MethodHandle =
-    downcall(name)
 
   private fun mapStringViewAddressLongStatusFunction(name: String): MethodHandle = downcall(name)
 
@@ -3723,12 +3675,6 @@ internal object NativeAccess {
 
   private fun mapStringViewAddressLongAddressStatusFunction(name: String): MethodHandle =
     downcall(name)
-
-  private fun mapListStyleSourceIdsFunction(): MethodHandle =
-    downcall("mln_map_list_style_source_ids")
-
-  private fun mapListStyleLayerIdsFunction(): MethodHandle =
-    downcall("mln_map_list_style_layer_ids")
 
   private fun styleIdListCountFunction(): MethodHandle = downcall("mln_style_id_list_count")
 
@@ -4343,35 +4289,6 @@ internal object NativeAccess {
     mln_camera_fit_options.fields(segment, fields)
     return segment
   }
-
-  private fun mapCameraAnimationCommand(
-    functionName: String,
-    map: NativeMap,
-    camera: CameraOptions,
-    animation: AnimationOptions?,
-  ) {
-    Arena.ofConfined().use { arena ->
-      Status.check(
-        mapTwoAddressStatusFunction(functionName)
-          .invokeNative(map, cameraOptions(arena, camera), animationOptions(arena, animation))
-          as Int
-      )
-    }
-  }
-
-  private fun mapLatLngBoundsForCamera(
-    functionName: String,
-    map: NativeMap,
-    camera: CameraOptions,
-  ): LatLngBounds =
-    Arena.ofConfined().use { arena ->
-      val outBounds = arena.allocate(latLngBoundsLayout)
-      Status.check(
-        mapTwoAddressStatusFunction(functionName)
-          .invokeNative(map, cameraOptions(arena, camera), outBounds) as Int
-      )
-      latLngBounds(outBounds)
-    }
 
   private fun boundOptionsDefault(arena: Arena): MemorySegment =
     MapLibreNativeC.mln_bound_options_default(arena)
@@ -5691,18 +5608,15 @@ internal object NativeAccess {
   private val SCREEN_LINE_STRING_POINT_COUNT_OFFSET: Long =
     mln_screen_line_string.`point_count$offset`()
 
-  private val UNIT_BEZIER_SIZE: Long = mln_unit_bezier.sizeof()
   private val UNIT_BEZIER_X1_OFFSET: Long = mln_unit_bezier.`x1$offset`()
   private val UNIT_BEZIER_Y1_OFFSET: Long = mln_unit_bezier.`y1$offset`()
   private val UNIT_BEZIER_X2_OFFSET: Long = mln_unit_bezier.`x2$offset`()
   private val UNIT_BEZIER_Y2_OFFSET: Long = mln_unit_bezier.`y2$offset`()
 
-  private val VEC3_SIZE: Long = mln_vec3.sizeof()
   private val VEC3_X_OFFSET: Long = mln_vec3.`x$offset`()
   private val VEC3_Y_OFFSET: Long = mln_vec3.`y$offset`()
   private val VEC3_Z_OFFSET: Long = mln_vec3.`z$offset`()
 
-  private val QUATERNION_SIZE: Long = mln_quaternion.sizeof()
   private val QUATERNION_X_OFFSET: Long = mln_quaternion.`x$offset`()
   private val QUATERNION_Y_OFFSET: Long = mln_quaternion.`y$offset`()
   private val QUATERNION_Z_OFFSET: Long = mln_quaternion.`z$offset`()
@@ -5710,7 +5624,6 @@ internal object NativeAccess {
 
   private val LAT_LNG_BOUNDS_SIZE: Long = mln_lat_lng_bounds.sizeof()
 
-  private val CANONICAL_TILE_ID_SIZE: Long = mln_canonical_tile_id.sizeof()
   private val CANONICAL_TILE_ID_Z_OFFSET: Long = mln_canonical_tile_id.`z$offset`()
   private val CANONICAL_TILE_ID_X_OFFSET: Long = mln_canonical_tile_id.`x$offset`()
   private val CANONICAL_TILE_ID_Y_OFFSET: Long = mln_canonical_tile_id.`y$offset`()
@@ -5764,9 +5677,6 @@ internal object NativeAccess {
     mln_style_source_info.`is_volatile$offset`()
   private val STYLE_SOURCE_INFO_HAS_ATTRIBUTION_OFFSET: Long =
     mln_style_source_info.`has_attribution$offset`()
-  private val STYLE_SOURCE_INFO_ATTRIBUTION_SIZE_OFFSET: Long =
-    mln_style_source_info.`attribution_size$offset`()
-  private val STYLE_SOURCE_INFO_URL_SIZE_OFFSET: Long = mln_style_source_info.`url_size$offset`()
   private val STYLE_SOURCE_INFO_MIN_ZOOM_OFFSET: Long = mln_style_source_info.`min_zoom$offset`()
   private val STYLE_SOURCE_INFO_MAX_ZOOM_OFFSET: Long = mln_style_source_info.`max_zoom$offset`()
   private val STYLE_SOURCE_INFO_SCHEME_OFFSET: Long = mln_style_source_info.`scheme$offset`()
@@ -5789,7 +5699,6 @@ internal object NativeAccess {
 
   private const val IMAGE_SOURCE_COORDINATE_COUNT: Int = 4
 
-  private val EDGE_INSETS_SIZE: Long = mln_edge_insets.sizeof()
   private val EDGE_INSETS_TOP_OFFSET: Long = mln_edge_insets.`top$offset`()
   private val EDGE_INSETS_LEFT_OFFSET: Long = mln_edge_insets.`left$offset`()
   private val EDGE_INSETS_BOTTOM_OFFSET: Long = mln_edge_insets.`bottom$offset`()

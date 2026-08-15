@@ -12,7 +12,6 @@ import org.maplibre.nativeffi.resource.ResourceTransformCallback
 public expect class RuntimeHandle {
   public val isClosed: Boolean
 
-  /** Suspends until every command accepted before this call has reached a terminal disposition. */
   /**
    * Installs the receiver callback for this runtime's notification source. Native threads call the
    * callback only to schedule [drainReady] on the receiver.
@@ -25,6 +24,7 @@ public expect class RuntimeHandle {
   /** Drains one owned copy of the endpoints that are currently ready. */
   public fun drainReady(): List<ReadyEndpoint>
 
+  /** Suspends until every command accepted before this call has reached a terminal disposition. */
   public suspend fun barrier()
 
   public fun startAmbientCacheOperation(operation: AmbientCacheOperation): OperationHandle<Unit>

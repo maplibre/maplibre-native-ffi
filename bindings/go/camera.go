@@ -247,14 +247,6 @@ func cAnimationOptions(options AnimationOptions) C.mln_animation_options {
 	return raw
 }
 
-func cAnimationOptionsPointer(options *AnimationOptions) (C.mln_animation_options, *C.mln_animation_options) {
-	if options == nil {
-		return C.mln_animation_options{}, nil
-	}
-	raw := cAnimationOptions(*options)
-	return raw, &raw
-}
-
 // CameraUpdateMode selects how an atomic camera update reaches its target.
 type CameraUpdateMode uint32
 

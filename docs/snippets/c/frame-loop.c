@@ -30,12 +30,14 @@ mln_status select_frame_events(mln_map map) {
   );
 }
 
+// #region wants
 static bool wants_a_frame(const mln_runtime_event* event, mln_map map) {
   if (event->source != map) return false;
   if (event->type == MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE) return true;
   if (event->type != MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED) return false;
   return event->payload.render_frame.needs_repaint;
 }
+// #endregion wants
 
 static void drain_runtime_events(frame_receiver* receiver, bool* pending) {
   mln_event_batch batch = MLN_HANDLE_NULL;
@@ -56,6 +58,7 @@ static void drain_runtime_events(frame_receiver* receiver, bool* pending) {
 }
 
 static void drain_frame_results(mln_render_session session, bool* pending) {
+  // #region results
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
   if (
     mln_render_session_drain_frame_results(session, 0, &batch) != MLN_STATUS_OK
@@ -67,6 +70,8 @@ static void drain_frame_results(mln_render_session session, bool* pending) {
       mln_render_frame_result result = {
         .size = sizeof(mln_render_frame_result)
       };
+      // A result other than rendered means no frame was presented, so this
+      // loop submits another demand on its next turn.
       if (
         mln_render_frame_batch_get(batch, index, &result) == MLN_STATUS_OK &&
         result.disposition != MLN_RENDER_RESULT_RENDERED
@@ -76,12 +81,12 @@ static void drain_frame_results(mln_render_session session, bool* pending) {
     }
   }
   mln_render_frame_batch_release(batch);
+  // #endregion results
 }
 
 void run_one_frame(
   frame_receiver* receiver, mln_render_session session, bool* pending
 ) {
-  // #region notifications
   if (
     atomic_exchange_explicit(&receiver->scheduled, false, memory_order_acq_rel)
   ) {
@@ -101,7 +106,9 @@ void run_one_frame(
             endpoint->kind == MLN_NOTIFICATION_ENDPOINT_RUNTIME_EVENTS
           ) {
             drain_runtime_events(receiver, pending);
-          } else if (
+          }
+          // #region service
+          if (
             endpoint->id == session &&
             endpoint->kind == MLN_NOTIFICATION_ENDPOINT_DRIVER_WORK
           ) {
@@ -109,7 +116,9 @@ void run_one_frame(
             (void)mln_render_session_service_driver_work(
               session, 64, &serviced
             );
-          } else if (
+          }
+          // #endregion service
+          if (
             endpoint->id == session &&
             endpoint->kind == MLN_NOTIFICATION_ENDPOINT_RENDER_FRAMES
           ) {
@@ -120,7 +129,6 @@ void run_one_frame(
       mln_ready_batch_release(ready);
     }
   }
-  // #endregion notifications
 
   // #region render
   if (!*pending) return;

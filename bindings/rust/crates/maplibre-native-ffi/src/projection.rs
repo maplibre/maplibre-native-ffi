@@ -238,8 +238,7 @@ mod tests {
         assert!((center_point.x - 256.0).abs() < 1e-6);
         assert!((center_point.y - 256.0).abs() < 1e-6);
 
-        let point = projection.pixel_for_lat_lng(center).unwrap();
-        let round_tripped = projection.lat_lng_for_pixel(point).unwrap();
+        let round_tripped = projection.lat_lng_for_pixel(center_point).unwrap();
         assert!((round_tripped.latitude - center.latitude).abs() < 1e-7);
         assert!((round_tripped.longitude - center.longitude).abs() < 1e-7);
         projection.close().unwrap();

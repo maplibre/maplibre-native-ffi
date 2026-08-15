@@ -375,13 +375,3 @@ pub fn styleTransitionOptions(map: *maplibre.MapHandle) !maplibre.StyleTransitio
 fn sleepOneMillisecond() !void {
     try testing.io.sleep(.fromMilliseconds(1), .awake);
 }
-
-pub fn typeNameContains(comptime T: type, comptime needle: []const u8) bool {
-    if (std.mem.indexOf(u8, @typeName(T), needle) != null) return true;
-    const info = @typeInfo(T);
-    if (info != .@"struct") return false;
-    inline for (info.@"struct".fields) |field| {
-        if (std.mem.indexOf(u8, @typeName(field.type), needle) != null) return true;
-    }
-    return false;
-}

@@ -411,10 +411,6 @@ auto map_set_debug_options(mln_map map, uint32_t options) -> mln_status;
 auto map_set_rendering_stats_view_enabled(mln_map map, bool enabled)
   -> mln_status;
 auto map_dump_debug_logs(mln_map map) -> mln_status;
-auto map_get_size(
-  mln_map map, uint32_t* out_width, uint32_t* out_height,
-  double* out_scale_factor
-) -> mln_status;
 auto map_set_viewport_options(
   mln_map map, const mln_map_viewport_options* options
 ) -> mln_status;

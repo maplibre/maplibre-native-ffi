@@ -52,12 +52,11 @@ public sealed class GeoJsonSourceTests
         var options = ClusterOptions();
         options.ClusterProperties = """{"weight_sum":"not-an-expression"}"""u8.ToArray();
 
-        var rejected = map.AddGeoJsonSourceData("clustered-invalid", NearbyPoints, options);
-        var failure = RuntimeEventTestHelpers.WaitForCommand(runtime, rejected);
-        var completion = Assert.IsType<RuntimeEventPayload.CommandFinished>(failure.Payload);
-        Assert.Equal(CommandDisposition.Failed, completion.Disposition);
-        Assert.Equal((int)MaplibreStatus.InvalidArgument, failure.Code);
-        Assert.NotEmpty(failure.Message);
+        RuntimeEventTestHelpers.AssertCommandFinishes(
+            runtime,
+            map.AddGeoJsonSourceData("clustered-invalid", NearbyPoints, options),
+            MaplibreStatus.InvalidArgument
+        );
         Assert.Null(await map.StyleSourceInfoAsync("clustered-invalid"));
     }
 

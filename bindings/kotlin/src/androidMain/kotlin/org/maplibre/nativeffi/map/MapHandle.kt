@@ -11,7 +11,6 @@ import org.maplibre.nativeffi.NativeAccess
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.BoundOptions
 import org.maplibre.nativeffi.camera.BoundsConstraint
-import org.maplibre.nativeffi.camera.CameraFitOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.CameraSnapshot
 import org.maplibre.nativeffi.camera.CameraUpdate
@@ -2286,45 +2285,6 @@ private class LatLngArrayScope : AutoCloseable {
   }
 }
 
-private class ScreenPointArrayScope : AutoCloseable {
-  val points: MaplibreNativeC.mln_screen_point
-  val count: Long
-
-  constructor(values: List<ScreenPoint>) {
-    val pointSnapshot = values.toList()
-    points = MaplibreNativeC.mln_screen_point(pointSnapshot.size.toLong())
-    count = pointSnapshot.size.toLong()
-    pointSnapshot.forEachIndexed { index, point ->
-      points.position(index.toLong()).x(point.x).y(point.y)
-    }
-    points.position(0)
-  }
-
-  constructor(count: Long) {
-    points = MaplibreNativeC.mln_screen_point(count)
-    this.count = count
-  }
-
-  fun toList(count: Int): List<ScreenPoint> =
-    List(count) { index ->
-        val point = points.position(index.toLong())
-        ScreenPoint(point.x(), point.y())
-      }
-      .also { points.position(0) }
-
-  override fun close() {
-    points.close()
-  }
-}
-
-private class ScreenPointScope(value: ScreenPoint?) : AutoCloseable {
-  val point: MaplibreNativeC.mln_screen_point? = value?.let(::screenPoint)
-
-  override fun close() {
-    point?.close()
-  }
-}
-
 private class CameraOptionsScope(value: CameraOptions) : AutoCloseable {
   val options: MaplibreNativeC.mln_camera_options = MaplibreNativeC.mln_camera_options_default()
 
@@ -2401,35 +2361,6 @@ private class AnimationOptionsScope(value: AnimationOptions?) : AutoCloseable {
       value.transitionId?.let {
         fields = fields or MaplibreNativeC.MLN_ANIMATION_OPTION_TRANSITION_ID
         options.transition_id(it)
-      }
-      options.fields(fields)
-    }
-  }
-
-  override fun close() {
-    options?.close()
-  }
-}
-
-private class CameraFitOptionsScope(value: CameraFitOptions?) : AutoCloseable {
-  val options: MaplibreNativeC.mln_camera_fit_options? = value?.let {
-    MaplibreNativeC.mln_camera_fit_options_default()
-  }
-
-  init {
-    if (value != null && options != null) {
-      var fields = 0
-      value.padding?.let {
-        fields = fields or MaplibreNativeC.MLN_CAMERA_FIT_OPTION_PADDING
-        writeEdgeInsets(options.padding(), it)
-      }
-      value.bearing?.let {
-        fields = fields or MaplibreNativeC.MLN_CAMERA_FIT_OPTION_BEARING
-        options.bearing(it)
-      }
-      value.pitch?.let {
-        fields = fields or MaplibreNativeC.MLN_CAMERA_FIT_OPTION_PITCH
-        options.pitch(it)
       }
       options.fields(fields)
     }

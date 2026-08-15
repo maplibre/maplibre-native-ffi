@@ -114,8 +114,4 @@ public actual class MapProjectionHandle internal constructor(handle: NativeMapPr
 
   public actual val isClosed: Boolean
     get() = state.isReleased()
-
-  internal fun nativeHandle(): NativeMapProjection = state.requireLive()
-
-  internal fun nativeHandleId(): Long = state.handleId()
 }

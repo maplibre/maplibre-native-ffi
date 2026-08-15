@@ -99,10 +99,6 @@ mln_status mln_test_map_create_status(
   mln_runtime runtime, const mln_map_options* options, mln_map* out_map
 );
 mln_status mln_test_map_close(mln_map map);
-mln_status mln_test_map_get_size(
-  mln_map map, uint32_t* out_width, uint32_t* out_height,
-  double* out_scale_factor
-);
 mln_status mln_test_map_get_event_mask(mln_map map, uint64_t* out_mask);
 mln_status mln_test_map_get_camera(mln_map map, mln_camera_options* out_camera);
 mln_status mln_test_map_request_repaint(mln_map map);

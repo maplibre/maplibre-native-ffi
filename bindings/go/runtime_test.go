@@ -4,8 +4,6 @@ import (
 	"errors"
 	"testing"
 	"time"
-
-	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/handle"
 )
 
 func TestRuntimeCreateWithOptionsAndClose(t *testing.T) {
@@ -28,28 +26,6 @@ func TestRuntimeOptionsRejectEmbeddedNUL(t *testing.T) {
 	_, err := NewRuntimeWithOptions(NewRuntimeOptions("asset\x00root", ""))
 	if !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("NewRuntimeWithOptions embedded NUL error = %v, want ErrInvalidArgument", err)
-	}
-}
-
-func TestRuntimeCreationRejectsABIMismatchBeforeNativeCreateOrHandleStore(t *testing.T) {
-	createCalled := false
-	storeCalled := false
-	runtime, err := createRuntimeWithStateFactory(
-		ExpectedCABIVersion+1,
-		func(*nativeRuntime) int32 {
-			createCalled = true
-			return 0
-		},
-		func(nativeRuntime) (*handle.State[nativeRuntime], error) {
-			storeCalled = true
-			return nil, nil
-		},
-	)
-	if runtime != nil || !errors.Is(err, ErrABIVersionMismatch) {
-		t.Fatalf("createRuntimeWithStateFactory() = (%v, %v)", runtime, err)
-	}
-	if createCalled || storeCalled {
-		t.Fatal("ABI mismatch invoked a native create or stored a handle")
 	}
 }
 

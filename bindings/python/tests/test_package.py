@@ -835,9 +835,8 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
 
         removed_id = map_handle.remove_style_source("points")
         runtime.barrier()
-        removed = _command_finished_event(runtime, removed_id)
-        assert isinstance(removed.payload, mln.CommandFinishedPayload)
-        assert removed.payload.disposition == mln.CommandDisposition.COMMITTED
+        removed = _command_finished_payload(runtime, removed_id)
+        assert removed.disposition == mln.CommandDisposition.COMMITTED
         assert map_handle.get_style_source_info("points") is None
 
         # Removing the missing source again fails the command with NOT_FOUND.
@@ -1028,9 +1027,8 @@ def test_style_image_metadata_copy_and_removal_public_api() -> None:
 
         removed_id = map_handle.remove_style_image("marker")
         runtime.barrier()
-        removed = _command_finished_event(runtime, removed_id)
-        assert isinstance(removed.payload, mln.CommandFinishedPayload)
-        assert removed.payload.disposition == mln.CommandDisposition.COMMITTED
+        removed = _command_finished_payload(runtime, removed_id)
+        assert removed.disposition == mln.CommandDisposition.COMMITTED
         assert map_handle.get_style_image_info("marker") is None
 
         # Removing the missing image again fails the command with NOT_FOUND.
@@ -1273,9 +1271,8 @@ def test_style_layer_metadata_move_and_removal_public_api() -> None:
 
         removed_id = map_handle.remove_style_layer("background-b")
         runtime.barrier()
-        removed = _command_finished_event(runtime, removed_id)
-        assert isinstance(removed.payload, mln.CommandFinishedPayload)
-        assert removed.payload.disposition == mln.CommandDisposition.COMMITTED
+        removed = _command_finished_payload(runtime, removed_id)
+        assert removed.disposition == mln.CommandDisposition.COMMITTED
         assert map_handle.get_style_layer_info("background-b") is None
         assert "background-b" not in map_handle.list_style_layer_ids()
 

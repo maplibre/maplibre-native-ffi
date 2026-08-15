@@ -880,33 +880,6 @@ func closeNativeRuntime(runtime nativeRuntime) error {
 	return waitNativeOperation(operation)
 }
 
-type runtimeStateFactory func(nativeRuntime) (*handle.State[nativeRuntime], error)
-
-func createRuntime(actualCABI uint32, create func(*nativeRuntime) int32) (*RuntimeHandle, error) {
-	return createRuntimeWithStateFactory(actualCABI, create, newRuntimeState)
-}
-
-func createRuntimeWithStateFactory(actualCABI uint32, create func(*nativeRuntime) int32, newState runtimeStateFactory) (*RuntimeHandle, error) {
-	if err := checkCompatibleCABI(actualCABI); err != nil {
-		return nil, err
-	}
-
-	var runtime nativeRuntime
-	if err := checkNative(func() int32 { return create(&runtime) }); err != nil {
-		return nil, err
-	}
-	state, err := newState(runtime)
-	if err != nil {
-		if destroyRuntimeHandle != nil {
-			_ = destroyRuntimeHandle(runtime)
-		} else {
-			_ = closeNativeRuntime(runtime)
-		}
-		return nil, newBindingError(ErrInvalidArgument, err.Error())
-	}
-	return &RuntimeHandle{state: state}, nil
-}
-
 func newRuntimeState(runtime nativeRuntime) (*handle.State[nativeRuntime], error) {
 	return handle.New(runtime, "RuntimeHandle")
 }

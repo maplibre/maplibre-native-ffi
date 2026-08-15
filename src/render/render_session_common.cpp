@@ -1496,11 +1496,6 @@ auto validate_live_attached_render_session(
   return MLN_STATUS_OK;
 }
 
-auto erase_render_session(mln_render_session session)
-  -> std::shared_ptr<mln_render_session_object> {
-  return handle_table<mln_render_session_object>().remove(session);
-}
-
 auto render_session_resize(
   mln_render_session session, uint32_t width, uint32_t height,
   double scale_factor

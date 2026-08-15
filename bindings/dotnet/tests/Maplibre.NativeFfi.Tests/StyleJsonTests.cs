@@ -120,10 +120,11 @@ public sealed class StyleJsonTests
             Assert.Null(inlineInfo.RawRasterDemEncoding);
 
             Assert.NotEqual(0ul, map.RemoveStyleSource("url-vector"));
-            var removed = map.RemoveStyleSource("inline-vector");
-            var finished = RuntimeEventTestHelpers.WaitForCommand(runtime, removed);
-            var completion = Assert.IsType<RuntimeEventPayload.CommandFinished>(finished.Payload);
-            Assert.Equal(CommandDisposition.Committed, completion.Disposition);
+            RuntimeEventTestHelpers.AssertCommandFinishes(
+                runtime,
+                map.RemoveStyleSource("inline-vector"),
+                MaplibreStatus.Ok
+            );
             Assert.Null(await map.StyleSourceInfoAsync("inline-vector"));
         }
 
@@ -261,8 +262,16 @@ public sealed class StyleJsonTests
         Assert.Equal("background", (await map.StyleLayerInfoAsync("background"))?.Type);
         Assert.Contains("background", await map.StyleLayerIdsAsync());
 
-        AssertCommandFinishes(runtime, map.RemoveStyleLayer("background"), MaplibreStatus.Ok);
-        AssertCommandFinishes(runtime, map.RemoveStyleSource("geo"), MaplibreStatus.Ok);
+        RuntimeEventTestHelpers.AssertCommandFinishes(
+            runtime,
+            map.RemoveStyleLayer("background"),
+            MaplibreStatus.Ok
+        );
+        RuntimeEventTestHelpers.AssertCommandFinishes(
+            runtime,
+            map.RemoveStyleSource("geo"),
+            MaplibreStatus.Ok
+        );
         Assert.Null(await map.StyleLayerInfoAsync("background"));
         Assert.Null(await map.StyleSourceInfoAsync("geo"));
     }
@@ -279,9 +288,21 @@ public sealed class StyleJsonTests
         map.SetStyleJson(EmptyStyle());
 
         // Removing a missing layer, source, or image finishes FAILED with NOT_FOUND.
-        AssertCommandFinishes(runtime, map.RemoveStyleLayer("missing"), MaplibreStatus.NotFound);
-        AssertCommandFinishes(runtime, map.RemoveStyleSource("missing"), MaplibreStatus.NotFound);
-        AssertCommandFinishes(runtime, map.RemoveStyleImage("missing"), MaplibreStatus.NotFound);
+        RuntimeEventTestHelpers.AssertCommandFinishes(
+            runtime,
+            map.RemoveStyleLayer("missing"),
+            MaplibreStatus.NotFound
+        );
+        RuntimeEventTestHelpers.AssertCommandFinishes(
+            runtime,
+            map.RemoveStyleSource("missing"),
+            MaplibreStatus.NotFound
+        );
+        RuntimeEventTestHelpers.AssertCommandFinishes(
+            runtime,
+            map.RemoveStyleImage("missing"),
+            MaplibreStatus.NotFound
+        );
 
         // Removing a source a layer still uses finishes FAILED with INVALID_STATE.
         Assert.NotEqual(0ul, map.AddStyleSourceJson("geo", GeoJsonSource()));
@@ -289,34 +310,25 @@ public sealed class StyleJsonTests
             0ul,
             map.AddStyleLayerJson("""{"id":"fill","type":"fill","source":"geo"}"""u8.ToArray(), "")
         );
-        AssertCommandFinishes(runtime, map.RemoveStyleSource("geo"), MaplibreStatus.InvalidState);
+        RuntimeEventTestHelpers.AssertCommandFinishes(
+            runtime,
+            map.RemoveStyleSource("geo"),
+            MaplibreStatus.InvalidState
+        );
         Assert.NotNull(await map.StyleSourceInfoAsync("geo"));
 
         // After the layer goes away the removal commits and the found flag clears.
-        AssertCommandFinishes(runtime, map.RemoveStyleLayer("fill"), MaplibreStatus.Ok);
-        AssertCommandFinishes(runtime, map.RemoveStyleSource("geo"), MaplibreStatus.Ok);
+        RuntimeEventTestHelpers.AssertCommandFinishes(
+            runtime,
+            map.RemoveStyleLayer("fill"),
+            MaplibreStatus.Ok
+        );
+        RuntimeEventTestHelpers.AssertCommandFinishes(
+            runtime,
+            map.RemoveStyleSource("geo"),
+            MaplibreStatus.Ok
+        );
         Assert.Null(await map.StyleSourceInfoAsync("geo"));
-    }
-
-    private static void AssertCommandFinishes(
-        RuntimeHandle runtime,
-        ulong commandId,
-        MaplibreStatus expectedStatus
-    )
-    {
-        Assert.NotEqual(0ul, commandId);
-        var finished = RuntimeEventTestHelpers.WaitForCommand(runtime, commandId);
-        var completion = Assert.IsType<RuntimeEventPayload.CommandFinished>(finished.Payload);
-        if (expectedStatus == MaplibreStatus.Ok)
-        {
-            Assert.Equal(CommandDisposition.Committed, completion.Disposition);
-            Assert.NotEqual(0ul, completion.Generation);
-        }
-        else
-        {
-            Assert.Equal(CommandDisposition.Failed, completion.Disposition);
-            Assert.Equal((int)expectedStatus, finished.Code);
-        }
     }
 
     private static byte[] EmptyStyle() => """{"version":8,"sources":{},"layers":[]}"""u8.ToArray();
