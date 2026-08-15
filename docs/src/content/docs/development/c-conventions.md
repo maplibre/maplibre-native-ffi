@@ -177,6 +177,24 @@ Operation, Event batch, or Render-driver call. A binding maps that category to
 one target-language shape; it does not add another scheduler or asynchronous
 boundary.
 
+The category follows from the declaration, and
+`scripts/check-execution-conventions.py` enforces the mapping as a test:
+
+| Declaration                                          | Category           |
+| ---------------------------------------------------- | ------------------ |
+| `_start` suffix with `mln_operation* out_operation`  | Operation          |
+| `_take_result`, `_destroy`, or `_release` suffix     | Immediate          |
+| `_drain_` in the name                                | Event batch        |
+| `_service_driver_work` suffix                        | Render-driver call |
+| `snapshot` in the name reading a live map or session | Published snapshot |
+| `uint64_t* out_command_id` parameter                 | Command            |
+| anything else                                        | Immediate          |
+
+Name a new function so that its category derives from this table. The checker's
+exception table exists for forms the conventions cannot express, such as a frame
+demand, whose terminal report drains through frame results rather than a command
+event; growth of that table is a design smell.
+
 Pick the category from what the function reads or writes:
 
 - A read of unkeyed, fixed-size map state that changes only through the caller's

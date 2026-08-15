@@ -71,17 +71,11 @@ endfunction()
 function(mln_ffi_add_c_api_test)
   find_package(Python3 REQUIRED COMPONENTS Interpreter)
   add_test(
-    NAME execution-manifest
+    NAME execution-conventions
     COMMAND
       ${Python3_EXECUTABLE}
-      ${PROJECT_SOURCE_DIR}/scripts/check-execution-manifest.py
-      ${PROJECT_SOURCE_DIR}/api/execution-manifest.json
-      ${PROJECT_SOURCE_DIR}/include/maplibre_native_c/runtime.h
-      ${PROJECT_SOURCE_DIR}/include/maplibre_native_c/map.h
-      ${PROJECT_SOURCE_DIR}/include/maplibre_native_c/camera.h
-      ${PROJECT_SOURCE_DIR}/include/maplibre_native_c/projection.h
-      ${PROJECT_SOURCE_DIR}/include/maplibre_native_c/style.h
-      ${PROJECT_SOURCE_DIR}/include/maplibre_native_c/query.h)
+      ${PROJECT_SOURCE_DIR}/scripts/check-execution-conventions.py
+      ${PROJECT_SOURCE_DIR}/include/maplibre_native_c)
   get_target_property(test_supported mln_ffi_platform_dependencies
                       MLN_FFI_TEST_SUPPORTED)
   if(NOT test_supported)
