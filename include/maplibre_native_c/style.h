@@ -596,21 +596,19 @@ MLN_API mln_status mln_map_add_style_source_json(
 /**
  * Removes one style source by ID.
  *
- * source_id is borrowed for the call. On success, out_removed reports whether a
- * source existed and was removed.
+ * source_id is borrowed for the call. The command commits when a source with
+ * that ID existed and was removed.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, or out_removed is null.
+ *   invalid or empty, or out_command_id is invalid.
+ * - MLN_STATUS_NOT_FOUND when no style source has that ID.
  * - MLN_STATUS_INVALID_STATE when the source exists but a layer still uses it.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_remove_style_source_start(
-  mln_map map, mln_buffer_view source_id, mln_operation* out_operation
-) MLN_NOEXCEPT;
-MLN_API mln_status mln_map_remove_style_source_take_result(
-  mln_operation operation, bool* out_removed
+MLN_API mln_status mln_map_remove_style_source(
+  mln_map map, mln_buffer_view source_id, uint64_t* out_command_id
 ) MLN_NOEXCEPT;
 
 /**
@@ -1045,20 +1043,18 @@ MLN_API mln_status mln_map_set_style_image(
 /**
  * Removes one runtime style image by ID.
  *
- * image_id is borrowed for the call. On success, out_removed reports whether an
- * image existed and was removed.
+ * image_id is borrowed for the call. The command commits when an image with
+ * that ID existed and was removed.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, image_id is
- *   invalid or empty, or out_removed is null.
+ *   invalid or empty, or out_command_id is invalid.
+ * - MLN_STATUS_NOT_FOUND when no runtime style image has that ID.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_remove_style_image_start(
-  mln_map map, mln_buffer_view image_id, mln_operation* out_operation
-) MLN_NOEXCEPT;
-MLN_API mln_status mln_map_remove_style_image_take_result(
-  mln_operation operation, bool* out_removed
+MLN_API mln_status mln_map_remove_style_image(
+  mln_map map, mln_buffer_view image_id, uint64_t* out_command_id
 ) MLN_NOEXCEPT;
 
 /**
@@ -1423,20 +1419,18 @@ MLN_API mln_status mln_map_add_style_layer_json(
 /**
  * Removes one style layer by ID.
  *
- * layer_id is borrowed for the call. On success, out_removed reports whether a
- * layer existed and was removed.
+ * layer_id is borrowed for the call. The command commits when a layer with
+ * that ID existed and was removed.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
- *   invalid or empty, or out_removed is null.
+ *   invalid or empty, or out_command_id is invalid.
+ * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_remove_style_layer_start(
-  mln_map map, mln_buffer_view layer_id, mln_operation* out_operation
-) MLN_NOEXCEPT;
-MLN_API mln_status mln_map_remove_style_layer_take_result(
-  mln_operation operation, bool* out_removed
+MLN_API mln_status mln_map_remove_style_layer(
+  mln_map map, mln_buffer_view layer_id, uint64_t* out_command_id
 ) MLN_NOEXCEPT;
 
 /**

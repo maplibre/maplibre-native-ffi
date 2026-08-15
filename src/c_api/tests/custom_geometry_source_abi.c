@@ -111,19 +111,22 @@ static void an_explicit_removal_releases_once(void) {
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
 
-  mln_operation removal = MLN_HANDLE_NULL;
+  mln_test_drain_all(runtime);
+  uint64_t removal = 0;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_remove_style_source_start(
-                     map, MLN_BUFFER_LITERAL(source_id), &removal
-                   )
+    MLN_STATUS_OK,
+    mln_map_remove_style_source(map, MLN_BUFFER_LITERAL(source_id), &removal)
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
-  bool removed = false;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_remove_style_source_take_result(removal, &removed)
+  mln_runtime_event event = {0};
+  TEST_ASSERT_TRUE(mln_test_drain_find(
+    runtime, MLN_RUNTIME_EVENT_COMMAND_FINISHED, map, &event, NULL, 0
+  ));
+  TEST_ASSERT_EQUAL_UINT64(removal, event.payload.command_finished.command_id);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_COMMAND_DISPOSITION_COMMITTED,
+    event.payload.command_finished.disposition
   );
-  mln_operation_release(removal);
-  TEST_ASSERT_TRUE(removed);
   TEST_ASSERT_EQUAL_size_t(1, probe.release_count);
 
   // A style load after the removal has nothing left to reconcile.

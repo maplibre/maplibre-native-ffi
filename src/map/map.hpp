@@ -43,18 +43,15 @@ auto style_transition_options_default() noexcept
   -> mln_style_transition_options;
 
 enum class StyleOperationKind : uint32_t {
-  RemoveSource = 0x5301,
-  SourceInfo,
+  SourceInfo = 0x5301,
   SourceAttribution,
   SourceUrl,
   SourceTileUrls,
   SourceIds,
-  RemoveImage,
   ImageInfo,
   ImageStretches,
   ImagePixels,
   ImageCoordinates,
-  RemoveLayer,
   LayerType,
   LayerIds,
   LayerJson,
@@ -70,7 +67,6 @@ enum class StyleOperationKind : uint32_t {
 };
 
 struct StyleOperationResult {
-  bool flag = false;
   bool found = false;
   uint32_t value_u32 = 0;
   double value_double = 0;
@@ -196,9 +192,8 @@ auto style_string_list_destroy(mln_style_string_list list) -> void;
 auto map_add_style_source_json(
   mln_map map, mln_buffer_view source_id, mln_buffer_view source_json
 ) -> mln_status;
-auto map_remove_style_source(
-  mln_map map, mln_buffer_view source_id, bool* out_removed
-) -> mln_status;
+auto map_remove_style_source(mln_map map, mln_buffer_view source_id)
+  -> mln_status;
 auto map_get_style_source_info(
   mln_map map, mln_buffer_view source_id, mln_style_source_info* out_info,
   bool* out_found
@@ -274,9 +269,8 @@ auto map_set_style_image(
   const mln_premultiplied_rgba8_image* image,
   const mln_style_image_options* options
 ) -> mln_status;
-auto map_remove_style_image(
-  mln_map map, mln_buffer_view image_id, bool* out_removed
-) -> mln_status;
+auto map_remove_style_image(mln_map map, mln_buffer_view image_id)
+  -> mln_status;
 auto map_get_style_image_info(
   mln_map map, mln_buffer_view image_id, mln_style_image_info* out_info,
   bool* out_found
@@ -341,9 +335,8 @@ auto map_set_location_indicator_image_name(
 auto map_add_style_layer_json(
   mln_map map, mln_buffer_view layer_json, mln_buffer_view before_layer_id
 ) -> mln_status;
-auto map_remove_style_layer(
-  mln_map map, mln_buffer_view layer_id, bool* out_removed
-) -> mln_status;
+auto map_remove_style_layer(mln_map map, mln_buffer_view layer_id)
+  -> mln_status;
 auto map_get_style_layer_type(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view* out_layer_type,
   bool* out_found

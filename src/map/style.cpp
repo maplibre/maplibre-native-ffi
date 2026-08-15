@@ -1793,8 +1793,7 @@ auto style_transition_options_default() noexcept
 StyleOperationResult::StyleOperationResult(
   StyleOperationResult&& other
 ) noexcept
-    : flag(other.flag),
-      found(other.found),
+    : found(other.found),
       value_u32(other.value_u32),
       value_double(other.value_double),
       source_info(other.source_info),
@@ -1817,7 +1816,6 @@ auto StyleOperationResult::operator=(StyleOperationResult&& other) noexcept
   }
   style_id_list_destroy(id_list);
   style_string_list_destroy(string_list);
-  flag = other.flag;
   found = other.found;
   value_u32 = other.value_u32;
   value_double = other.value_double;
@@ -2017,9 +2015,8 @@ auto map_add_style_source_json(
   return MLN_STATUS_OK;
 }
 
-auto map_remove_style_source(
-  mln_map map, mln_buffer_view source_id, bool* out_removed
-) -> mln_status {
+auto map_remove_style_source(mln_map map, mln_buffer_view source_id)
+  -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
   if (status != MLN_STATUS_OK) {
@@ -2032,16 +2029,12 @@ auto map_remove_style_source(
     set_thread_error("source_id must not be empty");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (out_removed == nullptr) {
-    set_thread_error("out_removed must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
 
   auto& style = map_native(live)->getStyle();
   const auto id = string_from_view(source_id);
   if (style.getSource(id) == nullptr) {
-    *out_removed = false;
-    return MLN_STATUS_OK;
+    set_thread_error(("no style source has ID " + id).c_str());
+    return MLN_STATUS_NOT_FOUND;
   }
 
   auto removed = style.removeSource(id);
@@ -2053,7 +2046,6 @@ auto map_remove_style_source(
   // longer holds the callbacks that read the host's state.
   removed.reset();
   release_custom_geometry_source(*live, id);
-  *out_removed = true;
   return MLN_STATUS_OK;
 }
 
@@ -2980,9 +2972,8 @@ auto map_set_style_image(
   return MLN_STATUS_OK;
 }
 
-auto map_remove_style_image(
-  mln_map map, mln_buffer_view image_id, bool* out_removed
-) -> mln_status {
+auto map_remove_style_image(mln_map map, mln_buffer_view image_id)
+  -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
   if (status != MLN_STATUS_OK) {
@@ -2992,17 +2983,14 @@ auto map_remove_style_image(
   if (image_id_status != MLN_STATUS_OK) {
     return image_id_status;
   }
-  if (out_removed == nullptr) {
-    set_thread_error("out_removed must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
 
   auto& style = map_native(live)->getStyle();
   const auto id = string_from_view(image_id);
-  *out_removed = style.getImage(id).has_value();
-  if (*out_removed) {
-    style.removeImage(id);
+  if (!style.getImage(id).has_value()) {
+    set_thread_error(("no style image has ID " + id).c_str());
+    return MLN_STATUS_NOT_FOUND;
   }
+  style.removeImage(id);
   return MLN_STATUS_OK;
 }
 
@@ -3769,9 +3757,8 @@ auto map_add_style_layer_json(
   return MLN_STATUS_OK;
 }
 
-auto map_remove_style_layer(
-  mln_map map, mln_buffer_view layer_id, bool* out_removed
-) -> mln_status {
+auto map_remove_style_layer(mln_map map, mln_buffer_view layer_id)
+  -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
   if (status != MLN_STATUS_OK) {
@@ -3784,14 +3771,13 @@ auto map_remove_style_layer(
     set_thread_error("layer_id must not be empty");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (out_removed == nullptr) {
-    set_thread_error("out_removed must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
 
-  auto removed =
-    map_native(live)->getStyle().removeLayer(string_from_view(layer_id));
-  *out_removed = removed != nullptr;
+  const auto id = string_from_view(layer_id);
+  auto removed = map_native(live)->getStyle().removeLayer(id);
+  if (removed == nullptr) {
+    set_thread_error(("no style layer has ID " + id).c_str());
+    return MLN_STATUS_NOT_FOUND;
+  }
   return MLN_STATUS_OK;
 }
 

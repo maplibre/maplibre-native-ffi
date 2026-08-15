@@ -394,38 +394,20 @@ auto mln_map_add_style_source_json(
   });
 }
 
-auto mln_map_remove_style_source_start(
-  mln_map map, mln_buffer_view source_id, mln_operation* out_operation
+auto mln_map_remove_style_source(
+  mln_map map, mln_buffer_view source_id, uint64_t* out_command_id
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (!valid_view(source_id, "source_id is invalid")) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     auto id = OwnedView{source_id};
-    return operation(
-      map, mln::core::StyleOperationKind::RemoveSource,
-      [map, id = std::move(id)](mln::core::StyleOperationResult& result)
-        -> mln_status {
-        return mln::core::map_remove_style_source(map, id.view(), &result.flag);
+    return command(
+      map,
+      [map, id = std::move(id)]() -> mln_status {
+        return mln::core::map_remove_style_source(map, id.view());
       },
-      out_operation
-    );
-  });
-}
-
-auto mln_map_remove_style_source_take_result(
-  mln_operation operation_id, bool* out_removed
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    if (out_removed == nullptr) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    return take(
-      operation_id, mln::core::StyleOperationKind::RemoveSource,
-      [out_removed](mln::core::StyleOperationResult& result) -> mln_status {
-        *out_removed = result.flag;
-        return MLN_STATUS_OK;
-      }
+      out_command_id
     );
   });
 }
@@ -956,33 +938,20 @@ auto mln_map_set_style_image(
   });
 }
 
-auto mln_map_remove_style_image_start(
-  mln_map map, mln_buffer_view image_id, mln_operation* out_operation
+auto mln_map_remove_style_image(
+  mln_map map, mln_buffer_view image_id, uint64_t* out_command_id
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
+    if (!valid_view(image_id, "image_id is invalid")) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
     auto id = OwnedView{image_id};
-    return operation(
-      map, mln::core::StyleOperationKind::RemoveImage,
-      [map, id = std::move(id)](mln::core::StyleOperationResult& result)
-        -> mln_status {
-        return mln::core::map_remove_style_image(map, id.view(), &result.flag);
+    return command(
+      map,
+      [map, id = std::move(id)]() -> mln_status {
+        return mln::core::map_remove_style_image(map, id.view());
       },
-      out_operation
-    );
-  });
-}
-
-auto mln_map_remove_style_image_take_result(
-  mln_operation operation_id, bool* out_removed
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    if (out_removed == nullptr) return MLN_STATUS_INVALID_ARGUMENT;
-    return take(
-      operation_id, mln::core::StyleOperationKind::RemoveImage,
-      [out_removed](mln::core::StyleOperationResult& result) -> mln_status {
-        *out_removed = result.flag;
-        return MLN_STATUS_OK;
-      }
+      out_command_id
     );
   });
 }
@@ -1493,38 +1462,20 @@ auto mln_map_add_style_layer_json(
   });
 }
 
-auto mln_map_remove_style_layer_start(
-  mln_map map, mln_buffer_view layer_id, mln_operation* out_operation
+auto mln_map_remove_style_layer(
+  mln_map map, mln_buffer_view layer_id, uint64_t* out_command_id
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (!valid_view(layer_id, "layer_id is invalid")) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     auto id = OwnedView{layer_id};
-    return operation(
-      map, mln::core::StyleOperationKind::RemoveLayer,
-      [map, id = std::move(id)](mln::core::StyleOperationResult& result)
-        -> mln_status {
-        return mln::core::map_remove_style_layer(map, id.view(), &result.flag);
+    return command(
+      map,
+      [map, id = std::move(id)]() -> mln_status {
+        return mln::core::map_remove_style_layer(map, id.view());
       },
-      out_operation
-    );
-  });
-}
-
-auto mln_map_remove_style_layer_take_result(
-  mln_operation operation_id, bool* out_removed
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    if (out_removed == nullptr) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    return take(
-      operation_id, mln::core::StyleOperationKind::RemoveLayer,
-      [out_removed](mln::core::StyleOperationResult& result) -> mln_status {
-        *out_removed = result.flag;
-        return MLN_STATUS_OK;
-      }
+      out_command_id
     );
   });
 }

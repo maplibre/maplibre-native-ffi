@@ -23,11 +23,79 @@ static bool source_exists(mln_runtime runtime, mln_map map, const char* id) {
   return found;
 }
 
+static bool image_exists(mln_runtime runtime, mln_map map, const char* id) {
+  mln_operation operation = MLN_HANDLE_NULL;
+  const mln_buffer_view view = {.data = id, .size = strlen(id)};
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_style_image_info_start(map, view, &operation)
+  );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  mln_style_image_info info = {.size = sizeof(mln_style_image_info)};
+  bool found = false;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_get_style_image_info_take_result(operation, &info, &found)
+  );
+  mln_operation_release(operation);
+  return found;
+}
+
 static const mln_runtime_event* event_at(
   const mln_runtime_event_batch_view* view, size_t index
 ) {
   return (const mln_runtime_event*)((const char*)view->events +
                                     (index * view->event_size));
+}
+
+// Drains the queue until it empties and asserts the COMMAND_FINISHED event for
+// command_id carries the expected disposition, code, generation contract, and,
+// when message_fragment is non-NULL, a diagnostic containing it.
+static void expect_command_finished(
+  mln_runtime runtime, uint64_t command_id, uint32_t disposition,
+  mln_status code, const char* message_fragment
+) {
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  bool found = false;
+  for (;;) {
+    mln_test_event_batch batch = mln_test_event_batch_default();
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK, mln_test_drain_events(runtime, 0, &batch)
+    );
+    if (batch.event_count == 0) {
+      break;
+    }
+    for (size_t index = 0; index < batch.event_count; index += 1) {
+      const mln_runtime_event* event =
+        (const mln_runtime_event*)((const char*)batch.events +
+                                   (index * batch.event_size));
+      if (
+        event->type != MLN_RUNTIME_EVENT_COMMAND_FINISHED ||
+        event->payload.command_finished.command_id != command_id
+      ) {
+        continue;
+      }
+      found = true;
+      TEST_ASSERT_EQUAL_UINT32(
+        disposition, event->payload.command_finished.disposition
+      );
+      TEST_ASSERT_EQUAL_INT(code, event->code);
+      if (disposition == MLN_COMMAND_DISPOSITION_COMMITTED) {
+        TEST_ASSERT_NOT_EQUAL(0, event->payload.command_finished.generation);
+      } else {
+        TEST_ASSERT_EQUAL_UINT64(0, event->payload.command_finished.generation);
+      }
+      if (message_fragment != NULL) {
+        char message[256] = {0};
+        size_t copied = event->message_size;
+        if (copied > sizeof(message) - 1) {
+          copied = sizeof(message) - 1;
+        }
+        memcpy(message, batch.messages + event->message_offset, copied);
+        TEST_ASSERT_NOT_NULL(strstr(message, message_fragment));
+      }
+    }
+  }
+  TEST_ASSERT_TRUE(found);
 }
 
 static void style_command_deep_copies_and_ordered_read_observes_it(void) {
@@ -142,10 +210,11 @@ static void wrong_typed_take_does_not_consume_result(void) {
     MLN_STATUS_OK, mln_map_list_style_source_ids_start(map, &operation)
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
-  bool removed = false;
+  mln_style_source_info info = {.size = sizeof(mln_style_source_info)};
+  bool found = false;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_remove_style_source_take_result(operation, &removed)
+    mln_map_get_style_source_info_take_result(operation, &info, &found)
   );
   mln_style_id_list list = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
@@ -298,12 +367,147 @@ static void stretch_size_probe_preserves_typed_result(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+static void remove_commands_commit_and_report_missing_ids(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  const mln_buffer_view json = VIEW(
+    "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\","
+    "\"features\":[]}}"
+  );
+  uint64_t command = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_add_style_source_json(map, VIEW("doomed-source"), json, &command)
+  );
+
+  command = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_remove_style_source(map, VIEW("doomed-source"), &command)
+  );
+  expect_command_finished(
+    runtime, command, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, NULL
+  );
+  TEST_ASSERT_FALSE(source_exists(runtime, map, "doomed-source"));
+
+  command = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_remove_style_source(map, VIEW("doomed-source"), &command)
+  );
+  expect_command_finished(
+    runtime, command, MLN_COMMAND_DISPOSITION_FAILED, MLN_STATUS_NOT_FOUND,
+    "doomed-source"
+  );
+
+  command = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_remove_style_layer(map, VIEW("missing-layer"), &command)
+  );
+  expect_command_finished(
+    runtime, command, MLN_COMMAND_DISPOSITION_FAILED, MLN_STATUS_NOT_FOUND,
+    "missing-layer"
+  );
+
+  const uint8_t pixel[4] = {0, 0, 0, 0};
+  mln_premultiplied_rgba8_image image = mln_premultiplied_rgba8_image_default();
+  image.width = 1;
+  image.height = 1;
+  image.stride = 4;
+  image.pixels = pixel;
+  image.byte_length = sizeof(pixel);
+  mln_style_image_options options = mln_style_image_options_default();
+  command = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_style_image(
+                     map, VIEW("doomed-image"), &image, &options, &command
+                   )
+  );
+
+  command = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_remove_style_image(map, VIEW("doomed-image"), &command)
+  );
+  expect_command_finished(
+    runtime, command, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, NULL
+  );
+  TEST_ASSERT_FALSE(image_exists(runtime, map, "doomed-image"));
+
+  command = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_remove_style_image(map, VIEW("doomed-image"), &command)
+  );
+  expect_command_finished(
+    runtime, command, MLN_COMMAND_DISPOSITION_FAILED, MLN_STATUS_NOT_FOUND,
+    "doomed-image"
+  );
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+static void an_in_use_source_removal_fails_and_leaves_the_source(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  const mln_buffer_view json = VIEW(
+    "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\","
+    "\"features\":[]}}"
+  );
+  uint64_t command = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_add_style_source_json(map, VIEW("in-use"), json, &command)
+  );
+  command = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_add_style_layer_json(
+      map, VIEW("{\"id\":\"user\",\"type\":\"circle\",\"source\":\"in-use\"}"),
+      VIEW(""), &command
+    )
+  );
+
+  command = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_remove_style_source(map, VIEW("in-use"), &command)
+  );
+  expect_command_finished(
+    runtime, command, MLN_COMMAND_DISPOSITION_FAILED, MLN_STATUS_INVALID_STATE,
+    "used by a layer"
+  );
+  TEST_ASSERT_TRUE(source_exists(runtime, map, "in-use"));
+
+  command = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_remove_style_layer(map, VIEW("user"), &command)
+  );
+  expect_command_finished(
+    runtime, command, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, NULL
+  );
+
+  command = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_remove_style_source(map, VIEW("in-use"), &command)
+  );
+  expect_command_finished(
+    runtime, command, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, NULL
+  );
+  TEST_ASSERT_FALSE(source_exists(runtime, map, "in-use"));
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 void run_style_values_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(style_command_deep_copies_and_ordered_read_observes_it);
   RUN_TEST(duplicate_id_is_an_async_failed_terminal_event);
   RUN_TEST(typed_take_transfers_and_discard_retains_no_result);
   RUN_TEST(wrong_typed_take_does_not_consume_result);
+  RUN_TEST(remove_commands_commit_and_report_missing_ids);
+  RUN_TEST(an_in_use_source_removal_fails_and_leaves_the_source);
   RUN_TEST(coordinate_size_probe_preserves_typed_result);
   RUN_TEST(stretch_size_probe_preserves_typed_result);
 }
