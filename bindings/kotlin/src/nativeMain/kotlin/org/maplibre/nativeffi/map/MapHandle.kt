@@ -117,6 +117,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_set_debug_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_event_mask
 import org.maplibre.nativeffi.internal.c.mln_map_set_free_camera_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_geojson_source_data
+import org.maplibre.nativeffi.internal.c.mln_map_set_geojson_source_synchronous_tiling
 import org.maplibre.nativeffi.internal.c.mln_map_set_geojson_source_url
 import org.maplibre.nativeffi.internal.c.mln_map_set_image_source_coordinates
 import org.maplibre.nativeffi.internal.c.mln_map_set_image_source_image
@@ -184,6 +185,7 @@ import org.maplibre.nativeffi.runtime.RuntimeEventMask
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.startOperation
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.GeoJsonSourceDataHandle
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.ImageStretch
 import org.maplibre.nativeffi.style.LayerInfo
@@ -333,23 +335,21 @@ private constructor(
     }
   }
 
-  public actual fun addGeoJsonSourceData(
-    sourceId: String,
-    data: ByteArray,
-    options: GeoJsonSourceOptions?,
-  ): ULong = command { outCommandId ->
-    memScoped {
-      Status.check(
-        mln_map_add_geojson_source_data(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(sourceId, this),
-          ByteStructs.bufferView(data, this),
-          StyleStructs.geoJsonSourceOptions(options, this),
-          outCommandId,
-        )
-      )
+  public actual fun addGeoJsonSourceData(sourceId: String, data: GeoJsonSourceDataHandle): ULong =
+    command { outCommandId ->
+      data.withNativeHandle { nativeData ->
+        memScoped {
+          Status.check(
+            mln_map_add_geojson_source_data(
+              state.requireLive().rawHandleValue,
+              CoreStructs.stringView(sourceId, this),
+              nativeData.rawHandleValue,
+              outCommandId,
+            )
+          )
+        }
+      }
     }
-  }
 
   public actual fun setGeoJsonSourceUrl(sourceId: String, url: String): ULong =
     command { outCommandId ->
@@ -365,14 +365,30 @@ private constructor(
       }
     }
 
-  public actual fun setGeoJsonSourceData(sourceId: String, data: ByteArray): ULong =
+  public actual fun setGeoJsonSourceData(sourceId: String, data: GeoJsonSourceDataHandle): ULong =
+    command { outCommandId ->
+      data.withNativeHandle { nativeData ->
+        memScoped {
+          Status.check(
+            mln_map_set_geojson_source_data(
+              state.requireLive().rawHandleValue,
+              CoreStructs.stringView(sourceId, this),
+              nativeData.rawHandleValue,
+              outCommandId,
+            )
+          )
+        }
+      }
+    }
+
+  public actual fun setGeoJsonSourceSynchronousTiling(sourceId: String, enabled: Boolean): ULong =
     command { outCommandId ->
       memScoped {
         Status.check(
-          mln_map_set_geojson_source_data(
+          mln_map_set_geojson_source_synchronous_tiling(
             state.requireLive().rawHandleValue,
             CoreStructs.stringView(sourceId, this),
-            ByteStructs.bufferView(data, this),
+            enabled,
             outCommandId,
           )
         )

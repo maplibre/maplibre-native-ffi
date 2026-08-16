@@ -136,6 +136,7 @@ func (runtime *RuntimeHandle) DrainReady() ([]NotificationEndpoint, error) {
 
 //export mln_go_notification_callback
 func mln_go_notification_callback(userData unsafe.Pointer) {
+	defer func() { _ = recover() }()
 	handle := cgo.Handle(uintptr(userData))
 	callback, ok := handle.Value().(func())
 	if ok {

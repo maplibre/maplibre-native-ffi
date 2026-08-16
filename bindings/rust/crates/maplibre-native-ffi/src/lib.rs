@@ -10,6 +10,7 @@
 mod camera;
 mod custom_geometry;
 mod events;
+mod geojson;
 mod handle;
 mod logging;
 mod map;
@@ -37,6 +38,7 @@ pub use events::{
     RuntimeEvent, RuntimeEventBatch, RuntimeEventPayload, RuntimeEventRef, RuntimeEventSource,
     TileActionEvent, TileId, UnknownRuntimeEventPayload,
 };
+pub use geojson::GeoJsonSourceDataHandle;
 pub use logging::{LogRecord, clear_log_callback, set_async_log_severity_mask, set_log_callback};
 pub use map::{
     GeoJsonSourceOptions, ImageContent, ImageStretch, LocationIndicatorImageKind, LogicalExtent,

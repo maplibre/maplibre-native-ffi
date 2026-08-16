@@ -79,6 +79,15 @@ typedef struct mln_render_frame_result {
   /** Zero unless disposition is MLN_RENDER_RESULT_RENDERED. */
   uint64_t frame_generation;
   int64_t presentation_time_ns;
+  /**
+   * Whether the map asked for another frame while it rendered this one, as
+   * during an ongoing camera transition. Set only when disposition is
+   * MLN_RENDER_RESULT_RENDERED, and false for every other outcome. This is the
+   * same signal that MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED carries in
+   * its needs_repaint field, delivered with the frame result so a host can
+   * re-arm its frame loop without the runtime event round trip.
+   */
+  bool needs_repaint;
 } mln_render_frame_result;
 
 /** Any-thread render-session snapshot. */
@@ -191,8 +200,11 @@ MLN_API mln_status mln_acquired_frame_get_producer_sync(
  *
  * The call consumes *frame on success and sets it to MLN_HANDLE_NULL. The
  * operation completes only when the ring slot is reusable. CPU-complete
- * synchronization may complete immediately. After abandonment the call closes
- * the handle without graphics work and completes with MLN_STATUS_TARGET_LOST.
+ * synchronization may complete immediately. A synchronization kind the
+ * backend does not support fails with MLN_STATUS_UNSUPPORTED before the
+ * handle is consumed, so the caller keeps frame ownership. After abandonment
+ * the call closes the handle without graphics work and completes with
+ * MLN_STATUS_TARGET_LOST.
  */
 MLN_API mln_status mln_acquired_frame_release_start(
   mln_acquired_frame* frame, const mln_gpu_sync* consumer_completion,

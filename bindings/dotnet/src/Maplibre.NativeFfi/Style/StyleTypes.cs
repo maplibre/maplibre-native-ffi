@@ -173,10 +173,10 @@ public sealed record GeoJsonSourceOptions
     public uint? ClusterMinimumPoints { get; set; }
 
     /// <summary>
-    /// Applies data updates synchronously, so updated data reaches the next rendered frame
+    /// Tiles installed data synchronously, so updated data reaches the next rendered frame
     /// instead of being tiled on a worker and shown in a later one.
     /// </summary>
-    public bool? SynchronousUpdate { get; set; }
+    public bool? SynchronousTiling { get; set; }
 
     private byte[]? clusterProperties;
 
@@ -202,7 +202,7 @@ public sealed record GeoJsonSourceOptions
         && ClusterRadius == other.ClusterRadius
         && ClusterMaximumZoom == other.ClusterMaximumZoom
         && ClusterMinimumPoints == other.ClusterMinimumPoints
-        && SynchronousUpdate == other.SynchronousUpdate
+        && SynchronousTiling == other.SynchronousTiling
         && ValueEquality.SequenceEquals(clusterProperties, other.clusterProperties);
 
     public override int GetHashCode() =>
@@ -218,7 +218,7 @@ public sealed record GeoJsonSourceOptions
                 ClusterRadius,
                 ClusterMaximumZoom,
                 ClusterMinimumPoints,
-                SynchronousUpdate,
+                SynchronousTiling,
                 ValueEquality.SequenceHashCode(clusterProperties)
             )
         );

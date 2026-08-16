@@ -700,13 +700,13 @@ Pointer<raw.mln_geojson_source_options> _nativeGeoJsonSourceOptions(
         .value;
     nativeOptions.ref.cluster = cluster;
   }
-  final synchronousUpdate = options.synchronousUpdate;
-  if (synchronousUpdate != null) {
+  final synchronousTiling = options.synchronousTiling;
+  if (synchronousTiling != null) {
     nativeOptions.ref.fields |= raw
         .mln_geojson_source_option_field
-        .MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE
+        .MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING
         .value;
-    nativeOptions.ref.synchronous_update = synchronousUpdate;
+    nativeOptions.ref.synchronous_tiling = synchronousTiling;
   }
   return nativeOptions;
 }

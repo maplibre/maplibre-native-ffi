@@ -53,9 +53,15 @@ mln_status show_one_point(mln_map map, mln_lat_lng position) {
   }
 
   // A null options pointer selects the defaults. Clustering is off by default.
+  mln_geojson_source_data prepared = MLN_HANDLE_NULL;
+  mln_status status =
+    mln_geojson_source_data_create(view(data), NULL, &prepared);
+  if (status != MLN_STATUS_OK) return status;
+
   uint64_t command_id = 0;
-  return mln_map_add_geojson_source_data(
-    map, view("pins"), view(data), NULL, &command_id
-  );
+  status =
+    mln_map_add_geojson_source_data(map, view("pins"), prepared, &command_id);
+  mln_geojson_source_data_destroy(prepared);
+  return status;
   // #endregion inline-data
 }

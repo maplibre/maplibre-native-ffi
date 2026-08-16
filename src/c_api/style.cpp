@@ -13,6 +13,7 @@
 #include "bytes/buffer.hpp"
 #include "c_api/boundary.hpp"
 #include "diagnostics/diagnostics.hpp"
+#include "geojson/geojson_source_data.hpp"
 #include "map/map.hpp"
 #include "maplibre_native_c.h"
 #include "operation/operation.hpp"
@@ -739,9 +740,49 @@ auto mln_map_list_style_source_ids_take_result(
   }
 
 MLN_GEOJSON_COMMAND(mln_map_add_geojson_source_url, map_add_geojson_source_url)
-MLN_GEOJSON_COMMAND(
-  mln_map_add_geojson_source_data, map_add_geojson_source_data
-)
+
+auto mln_geojson_source_data_create(
+  mln_buffer_view data, const mln_geojson_source_options* options,
+  mln_geojson_source_data* out_data
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::geojson_source_data_create(data, options, out_data);
+  });
+}
+
+auto mln_geojson_source_data_destroy(mln_geojson_source_data data) noexcept
+  -> void {
+  mln::core::geojson_source_data_destroy(data);
+}
+
+auto mln_map_add_geojson_source_data(
+  mln_map map, mln_buffer_view source_id, mln_geojson_source_data data,
+  uint64_t* out_command_id
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    if (!valid_view(source_id, "source_id is invalid")) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    // The lease taken at submit keeps the prepared index alive until the
+    // command runs, so the host may destroy the handle right after this call.
+    auto prepared = mln::core::geojson_source_data_table().lease(data);
+    if (prepared == nullptr) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    auto id = OwnedView{source_id};
+    return command(
+      map,
+      [map, id = std::move(id),
+       prepared =
+         std::shared_ptr<const mln::core::GeoJsonSourceDataObject>{
+           std::move(prepared)
+         }]() -> mln_status {
+        return mln::core::map_add_geojson_source_data(map, id.view(), prepared);
+      },
+      out_command_id
+    );
+  });
+}
 
 auto mln_map_set_geojson_source_url(
   mln_map map, mln_buffer_view source_id, mln_buffer_view url,
@@ -769,23 +810,47 @@ auto mln_map_set_geojson_source_url(
 }
 
 auto mln_map_set_geojson_source_data(
-  mln_map map, mln_buffer_view source_id, mln_buffer_view data,
+  mln_map map, mln_buffer_view source_id, mln_geojson_source_data data,
   uint64_t* out_command_id
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    if (
-      !valid_view(source_id, "source_id is invalid") ||
-      !valid_view(data, "data is invalid")
-    ) {
+    if (!valid_view(source_id, "source_id is invalid")) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    // The lease taken at submit keeps the prepared index alive until the
+    // command runs, so the host may destroy the handle right after this call.
+    auto prepared = mln::core::geojson_source_data_table().lease(data);
+    if (prepared == nullptr) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     auto id = OwnedView{source_id};
-    auto value = OwnedView{data};
     return command(
       map,
-      [map, id = std::move(id), value = std::move(value)]() -> mln_status {
-        return mln::core::map_set_geojson_source_data(
-          map, id.view(), value.view()
+      [map, id = std::move(id),
+       prepared =
+         std::shared_ptr<const mln::core::GeoJsonSourceDataObject>{
+           std::move(prepared)
+         }]() -> mln_status {
+        return mln::core::map_set_geojson_source_data(map, id.view(), prepared);
+      },
+      out_command_id
+    );
+  });
+}
+
+auto mln_map_set_geojson_source_synchronous_tiling(
+  mln_map map, mln_buffer_view source_id, bool enabled, uint64_t* out_command_id
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    if (!valid_view(source_id, "source_id is invalid")) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    auto id = OwnedView{source_id};
+    return command(
+      map,
+      [map, id = std::move(id), enabled]() -> mln_status {
+        return mln::core::map_set_geojson_source_synchronous_tiling(
+          map, id.view(), enabled
         );
       },
       out_command_id

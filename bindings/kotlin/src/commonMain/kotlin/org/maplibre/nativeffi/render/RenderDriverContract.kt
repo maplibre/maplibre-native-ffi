@@ -76,6 +76,12 @@ public data class RenderFrameResult(
   public val extentGeneration: ULong,
   public val frameGeneration: ULong,
   public val presentationTimeNanoseconds: Long,
+  /**
+   * Whether the map asked for another frame while it rendered this one, as during an ongoing camera
+   * transition. Set only when [disposition] is [RenderResult.RENDERED], and false for every other
+   * outcome, so a host can re-arm its frame loop without the runtime event round trip.
+   */
+  public val needsRepaint: Boolean,
 )
 
 public data class RenderSessionSnapshot(

@@ -2461,10 +2461,16 @@ fn owned_texture_session_renders_acquires_resizes_and_reads_back() {
 
     map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
     await_runtime_barrier(&runtime);
-    assert_eq!(
-        render_frame(&session, false).disposition,
-        FrameDisposition::Rendered
-    );
+    let mut rendered = render_frame(&session, false);
+    assert_eq!(rendered.disposition, FrameDisposition::Rendered);
+    // The frame result carries the map's follow-up request; once placement
+    // settles with no transition in flight, the map stops asking to repaint.
+    let repaint_deadline = Instant::now() + Duration::from_secs(5);
+    while rendered.needs_repaint {
+        assert!(Instant::now() < repaint_deadline, "map never settled");
+        rendered = render_frame(&session, false);
+        assert_eq!(rendered.disposition, FrameDisposition::Rendered);
+    }
     assert!(context.try_acquire_frame_extent(&session, &initial_extent));
 
     if capabilities.readback {
@@ -2493,6 +2499,8 @@ fn owned_texture_session_renders_acquires_resizes_and_reads_back() {
             break;
         }
         assert_eq!(result.disposition, FrameDisposition::SizePending);
+        // The repaint flag is meaningful on rendered frames alone.
+        assert!(!result.needs_repaint);
         assert!(
             Instant::now() < deadline,
             "resized frame did not become renderable"
@@ -2841,7 +2849,8 @@ fn cluster_feature_extensions_copy_values_and_feature_collections() {
     options.cluster_max_zoom = Some(17.0);
     options.cluster_properties =
         Some(serde_json::to_vec(&json!({"weight_sum":["+",["get","weight"]]})).unwrap());
-    map.add_geojson_source_data("cluster-source", &data, Some(&options))
+    let data = crate::GeoJsonSourceDataHandle::new(&data, Some(&options)).unwrap();
+    map.add_geojson_source_data("cluster-source", &data)
         .unwrap();
     map.add_style_layer_json(
         br##"{"id":"cluster-circle","type":"circle","source":"cluster-source","filter":["has","point_count"],"paint":{"circle-color":"#2563eb","circle-radius":20}}"##,

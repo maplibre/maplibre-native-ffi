@@ -743,4 +743,5 @@ private fun frameResult(value: mln_render_frame_result) =
     value.extent_generation,
     value.frame_generation,
     value.presentation_time_ns,
+    value.needs_repaint,
   )

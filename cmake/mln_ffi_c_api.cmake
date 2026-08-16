@@ -109,6 +109,7 @@ function(mln_ffi_configure_c_api_implementation target)
       ${PROJECT_SOURCE_DIR}/src/c_api/version.cpp
       ${PROJECT_SOURCE_DIR}/src/diagnostics/diagnostics.cpp
       ${PROJECT_SOURCE_DIR}/src/geojson/geojson.cpp
+      ${PROJECT_SOURCE_DIR}/src/geojson/geojson_source_data.cpp
       ${PROJECT_SOURCE_DIR}/src/handles/handle_table.cpp
       ${PROJECT_SOURCE_DIR}/src/execution/runtime_executor.cpp
       ${PROJECT_SOURCE_DIR}/src/logging/logging.cpp

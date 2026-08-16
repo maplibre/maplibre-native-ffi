@@ -172,7 +172,14 @@ MLN_API mln_status mln_map_camera_for_geometry_take_result(
   mln_operation operation, mln_camera_options* out_camera
 ) MLN_NOEXCEPT;
 
-/** Starts an ordered wrapped-bounds query for a copied camera. */
+/**
+ * Starts an ordered wrapped-bounds query for a copied camera.
+ *
+ * The result is the hull of the top-left and bottom-right screen corners for
+ * that camera in the current viewport. When bearing and pitch are zero, the
+ * box equals the visible area. Those corners are the northwest and southeast
+ * of the viewport. Longitudes stay in -180 to 180.
+ */
 MLN_API mln_status mln_map_lat_lng_bounds_for_camera_start(
   mln_map map, const mln_camera_options* camera, mln_operation* out_operation
 ) MLN_NOEXCEPT;
@@ -182,7 +189,14 @@ MLN_API mln_status mln_map_lat_lng_bounds_for_camera_take_result(
   mln_operation operation, mln_lat_lng_bounds* out_bounds
 ) MLN_NOEXCEPT;
 
-/** Starts an ordered unwrapped-bounds query for a copied camera. */
+/**
+ * Starts an ordered unwrapped-bounds query for a copied camera.
+ *
+ * The result is the axis-aligned hull of all four screen corners and the
+ * center, which encompasses the projected viewport. Longitudes unwrap onto
+ * the shortest path through the center. A viewport that crosses the
+ * antimeridian reports values outside -180 to 180.
+ */
 MLN_API mln_status mln_map_lat_lng_bounds_for_camera_unwrapped_start(
   mln_map map, const mln_camera_options* camera, mln_operation* out_operation
 ) MLN_NOEXCEPT;

@@ -191,9 +191,12 @@ The category follows from the declaration, and
 | anything else                                        | Immediate          |
 
 Name a new function so that its category derives from this table. The checker's
-exception table exists for forms the conventions cannot express, such as a frame
-demand, whose terminal report drains through frame results rather than a command
-event; growth of that table is a design smell.
+A call whose effects surface only through a drained event stream and that hands
+back no completion identity is an immediate: `mln_render_session_request_frame`
+returns its final status synchronously and reports the frame through frame
+results, so it needs no command channel. The checker keeps an exception table
+for forms the conventions cannot express; it is empty today, and growth is a
+design smell.
 
 Pick the category from what the function reads or writes:
 

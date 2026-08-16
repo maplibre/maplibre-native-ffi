@@ -20,6 +20,7 @@
 #include <mbgl/gfx/headless_backend.hpp>
 #include <mbgl/gfx/renderer_backend.hpp>
 #include <mbgl/renderer/renderer.hpp>
+#include <mbgl/renderer/renderer_observer.hpp>
 #include <mbgl/util/size.hpp>
 
 #include "diagnostics/diagnostics.hpp"
@@ -180,6 +181,12 @@ class TextureSessionBackend {
     out_rendered = true;
     return MLN_STATUS_OK;
   }
+  // Rejecting a sync kind here keeps the release synchronous and all-or-
+  // nothing: the caller keeps frame ownership instead of losing the handle to
+  // a release whose wait can never run.
+  virtual auto supports_consumer_sync(mln_gpu_sync_kind kind) -> bool {
+    return kind == MLN_GPU_SYNC_CPU_COMPLETE;
+  }
   virtual auto release_consumer_sync(const mln_gpu_sync& sync) -> mln_status {
     return sync.kind == MLN_GPU_SYNC_CPU_COMPLETE ? MLN_STATUS_OK
                                                   : MLN_STATUS_UNSUPPORTED;
@@ -306,6 +313,147 @@ struct RenderTextureSlot {
   bool rendering = false;
 };
 
+// Records the frame status that mbgl::Renderer reports synchronously out of
+// render(), so render_session_render_update_on_driver() can return its repaint
+// flag with the terminal frame result, and forwards every callback to the
+// map's observer so runtime event delivery is unchanged. Runs entirely on the
+// session's driver thread.
+class SessionFrameObserver final : public mbgl::RendererObserver {
+ public:
+  auto set_delegate(mbgl::RendererObserver* delegate) -> void {
+    delegate_ = delegate;
+  }
+
+  [[nodiscard]] auto needs_repaint() const -> bool { return needs_repaint_; }
+
+  void onInvalidate() override {
+    if (delegate_ != nullptr) {
+      delegate_->onInvalidate();
+    }
+  }
+
+  void onResourceError(std::exception_ptr error) override {
+    if (delegate_ != nullptr) {
+      delegate_->onResourceError(error);
+    }
+  }
+
+  void onWillStartRenderingMap() override {
+    if (delegate_ != nullptr) {
+      delegate_->onWillStartRenderingMap();
+    }
+  }
+
+  void onWillStartRenderingFrame() override {
+    if (delegate_ != nullptr) {
+      delegate_->onWillStartRenderingFrame();
+    }
+  }
+
+  void onDidFinishRenderingFrame(
+    RenderMode mode, bool repaint, bool placement_changed,
+    const mbgl::gfx::RenderingStats& stats
+  ) override {
+    needs_repaint_ = repaint;
+    if (delegate_ != nullptr) {
+      delegate_->onDidFinishRenderingFrame(
+        mode, repaint, placement_changed, stats
+      );
+    }
+  }
+
+  void onDidFinishRenderingMap() override {
+    if (delegate_ != nullptr) {
+      delegate_->onDidFinishRenderingMap();
+    }
+  }
+
+  void onStyleImageMissing(
+    const std::string& id, const StyleImageMissingCallback& done
+  ) override {
+    if (delegate_ != nullptr) {
+      delegate_->onStyleImageMissing(id, done);
+    }
+  }
+
+  void onRemoveUnusedStyleImages(const std::vector<std::string>& ids) override {
+    if (delegate_ != nullptr) {
+      delegate_->onRemoveUnusedStyleImages(ids);
+    }
+  }
+
+  void onPreCompileShader(
+    mbgl::shaders::BuiltIn id, mbgl::gfx::Backend::Type type,
+    const std::string& defines
+  ) override {
+    if (delegate_ != nullptr) {
+      delegate_->onPreCompileShader(id, type, defines);
+    }
+  }
+
+  void onPostCompileShader(
+    mbgl::shaders::BuiltIn id, mbgl::gfx::Backend::Type type,
+    const std::string& defines
+  ) override {
+    if (delegate_ != nullptr) {
+      delegate_->onPostCompileShader(id, type, defines);
+    }
+  }
+
+  void onShaderCompileFailed(
+    mbgl::shaders::BuiltIn id, mbgl::gfx::Backend::Type type,
+    const std::string& defines
+  ) override {
+    if (delegate_ != nullptr) {
+      delegate_->onShaderCompileFailed(id, type, defines);
+    }
+  }
+
+  void onGlyphsLoaded(
+    const mbgl::FontStack& stack, const mbgl::GlyphRange& range
+  ) override {
+    if (delegate_ != nullptr) {
+      delegate_->onGlyphsLoaded(stack, range);
+    }
+  }
+
+  void onGlyphsError(
+    const mbgl::FontStack& stack, const mbgl::GlyphRange& range,
+    std::exception_ptr error
+  ) override {
+    if (delegate_ != nullptr) {
+      delegate_->onGlyphsError(stack, range, error);
+    }
+  }
+
+  void onGlyphsRequested(
+    const mbgl::FontStack& stack, const mbgl::GlyphRange& range
+  ) override {
+    if (delegate_ != nullptr) {
+      delegate_->onGlyphsRequested(stack, range);
+    }
+  }
+
+  void onTileAction(
+    mbgl::TileOperation operation, const mbgl::OverscaledTileID& id,
+    const std::string& source_id
+  ) override {
+    if (delegate_ != nullptr) {
+      delegate_->onTileAction(operation, id, source_id);
+    }
+  }
+
+  void onRenderError(std::exception_ptr error) override {
+    if (delegate_ != nullptr) {
+      delegate_->onRenderError(error);
+    }
+  }
+
+ private:
+  mbgl::RendererObserver* delegate_ = nullptr;
+  bool needs_repaint_ = false;
+};
+
 struct RenderTextureState {
   std::unique_ptr<TextureSessionBackend> backend = nullptr;
   uint64_t next_frame_id = 1;
@@ -384,6 +532,8 @@ struct mln_render_session_object
   // Declared before `renderer` so reverse-order destruction tears the renderer
   // down while the scheduler its mailboxes point at is still alive.
   mln::core::RenderSessionScheduler scheduler;
+  // Declared before `renderer`, which holds a raw pointer to it.
+  mln::core::SessionFrameObserver frame_observer;
   std::unique_ptr<mbgl::Renderer> renderer = nullptr;
   mln::core::RenderSurfaceState surface;
   mln::core::RenderTextureState texture;

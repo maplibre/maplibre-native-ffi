@@ -2,6 +2,23 @@ internal import CMaplibreNativeC
 import Foundation
 
 enum NativeStyle {
+  static func createGeoJSONSourceData(
+    data: mln_buffer_view,
+    options: NativeGeoJSONSourceOptions
+  ) throws -> NativeGeoJSONSourceDataHandle {
+    try options.withNativeOptions { options in
+      try NativeHandleFactory.create(
+        nullDiagnostic: "mln_geojson_source_data_create returned a null handle"
+      ) { outHandle in
+        try checkStatus(mln_geojson_source_data_create(
+          data,
+          options,
+          outHandle
+        ))
+      }
+    }
+  }
+
   static func copyMapData(
     _ map: NativeMapHandle,
     copy: (

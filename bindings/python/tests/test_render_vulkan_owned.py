@@ -163,6 +163,18 @@ def test_core_worker_renders_and_releases_owned_vulkan_frame(
     release_frame(vulkan_owned_session.session, frame)
     assert frame.closed
 
+    # A rendered frame carries the map's repaint request with its result. A
+    # static empty style settles, so the signal clears within a few frames
+    # once nothing asks to draw again.
+    for token in range(2, 32):
+        settled = request_and_finish_frame(vulkan_owned_session.session, token=token)
+        assert settled.disposition == render.RenderResult.RENDERED
+        if settled.needs_repaint is False:
+            break
+        time.sleep(0.01)
+    else:
+        raise AssertionError("needs_repaint never cleared for a static style")
+
 
 def test_core_worker_reads_owned_vulkan_texture(
     vulkan_owned_session: VulkanOwnedSession,

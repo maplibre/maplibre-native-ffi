@@ -1675,32 +1675,101 @@ void main() {
       map.removeStyleSource('dart-geojson-url-source'),
     );
     expect(
-      () => map.addGeoJsonSourceData(
-        'dart-invalid-geojson-options',
+      () => GeoJsonSourceDataHandle.prepare(
         _jsonBytes('{"type":"FeatureCollection","features":[]}'),
         options: GeoJsonSourceOptions(tileSize: 4294967296),
       ),
       throwsA(isA<InvalidArgumentException>()),
     );
-    map.addGeoJsonSourceData(
-      'dart-clustered-geojson-source',
+    // Cluster validation runs at preparation: clustering rejects a bare
+    // geometry because it accepts only point-feature collections.
+    expect(
+      () => GeoJsonSourceDataHandle.prepare(
+        _jsonBytes('{"type":"Point","coordinates":[0,0]}'),
+        options: GeoJsonSourceOptions(cluster: true),
+      ),
+      throwsA(isA<InvalidArgumentException>()),
+    );
+    final clusteredData = GeoJsonSourceDataHandle.prepare(
       _jsonBytes(
         '{"type":"FeatureCollection","features":[{"type":"Feature",'
         '"geometry":{"type":"Point","coordinates":[0,0]},"properties":{}}]}',
       ),
       options: GeoJsonSourceOptions(cluster: true, clusterRadius: 60),
     );
-    final rejectedGeoJsonCommand = map.setGeoJsonSourceData(
-      'dart-clustered-geojson-source',
+    await _expectCommandCommitted(
+      runtime,
+      map.addGeoJsonSourceData('dart-clustered-geojson-source', clusteredData),
+    );
+    // The map thread rejects data whose baked-in options differ from the
+    // source's, reported through the command's terminal event.
+    final plainData = GeoJsonSourceDataHandle.prepare(
       _jsonBytes('{"type":"Point","coordinates":[0,0]}'),
     );
+    final mismatchedInstallCommand = map.setGeoJsonSourceData(
+      'dart-clustered-geojson-source',
+      plainData,
+    );
+    // A prepared handle may close as soon as the install command is submitted.
+    plainData.close();
+    final mismatchedInstallEvent = await _waitForCommandFinishedEvent(
+      runtime,
+      mismatchedInstallCommand,
+    );
     expect(
-      await _waitForCommandDisposition(runtime, rejectedGeoJsonCommand),
+      (mismatchedInstallEvent.payload as RuntimeEventCommandFinished)
+          .disposition,
       CommandDisposition.failed,
+    );
+    expect(
+      MaplibreStatus.fromNativeStatusCode(mismatchedInstallEvent.code),
+      MaplibreStatus.invalidArgument,
+    );
+    await _expectCommandCommitted(
+      runtime,
+      map.setGeoJsonSourceSynchronousTiling(
+        'dart-clustered-geojson-source',
+        true,
+      ),
+    );
+    await _expectCommandCommitted(
+      runtime,
+      map.setGeoJsonSourceSynchronousTiling(
+        'dart-clustered-geojson-source',
+        false,
+      ),
+    );
+    expect(
+      await _waitForCommandDisposition(
+        runtime,
+        map.setGeoJsonSourceSynchronousTiling('missing-source', true),
+      ),
+      CommandDisposition.failed,
+    );
+    // One prepared handle installs on any number of sources.
+    await _expectCommandCommitted(
+      runtime,
+      map.addGeoJsonSourceData('dart-clustered-geojson-copy', clusteredData),
+    );
+    clusteredData.close();
+    // Closing the handle never invalidates a source it was installed on.
+    expect(
+      await map.getStyleSourceInfo('dart-clustered-geojson-source'),
+      isNotNull,
+    );
+    await _expectCommandCommitted(
+      runtime,
+      map.removeStyleSource('dart-clustered-geojson-copy'),
     );
     await _expectCommandCommitted(
       runtime,
       map.removeStyleSource('dart-clustered-geojson-source'),
+    );
+    clusteredData.close();
+    expect(clusteredData.isClosed, isTrue);
+    expect(
+      () => map.addGeoJsonSourceData('dart-closed-data', clusteredData),
+      throwsA(isA<InvalidArgumentException>()),
     );
     map.addVectorSourceUrl(
       'dart-vector-source',
@@ -1933,13 +2002,17 @@ void main() {
       map.removeStyleSource('dart-custom-source'),
     );
 
-    map.addGeoJsonSourceData(
-      'dart-geojson-source',
+    final geoJsonData = GeoJsonSourceDataHandle.prepare(
       _jsonBytes(
         '{"type":"Feature","geometry":{"type":"Point","coordinates":[0,0]},'
         '"properties":{"kind":"dart"}}',
       ),
     );
+    await _expectCommandCommitted(
+      runtime,
+      map.addGeoJsonSourceData('dart-geojson-source', geoJsonData),
+    );
+    geoJsonData.close();
     final info = await map.getStyleSourceInfo('dart-geojson-source');
     expect(info, isNotNull);
     expect(info!.type, SourceType.geoJson);
@@ -1947,10 +2020,11 @@ void main() {
     expect(info.attribution, isNull);
     expect(await map.listStyleSourceIds(), contains('dart-geojson-source'));
 
-    map.setGeoJsonSourceData(
-      'dart-geojson-source',
+    final updatedGeoJsonData = GeoJsonSourceDataHandle.prepare(
       _jsonBytes('{"type":"Point","coordinates":[2,1]}'),
     );
+    map.setGeoJsonSourceData('dart-geojson-source', updatedGeoJsonData);
+    updatedGeoJsonData.close();
     map.addStyleLayerJson(
       _jsonBytes(
         '{"id":"dart-circle-layer","type":"circle","source":"dart-geojson-source"}',

@@ -1164,6 +1164,7 @@ private fun frameResult(value: MaplibreNativeC.mln_render_frame_result): RenderF
     value.extent_generation().toULong(),
     value.frame_generation().toULong(),
     value.presentation_time_ns(),
+    value.needs_repaint(),
   )
 
 /** Direct test seam for the JavaCPP render and query adapter. */

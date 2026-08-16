@@ -17,7 +17,7 @@ so the headers are the single source of truth:
 - Anything else: immediate.
 
 EXCEPTIONS lists the functions whose form is not derivable; each entry says
-why. Growth of that table is a design smell, not a checker gap.
+why. The table is empty today; growth is a design smell, not a checker gap.
 """
 
 from __future__ import annotations
@@ -28,12 +28,7 @@ import re
 import sys
 
 # Irregular forms, with the reason each one cannot follow the conventions.
-EXCEPTIONS = {
-    # A frame demand is a command in the render-session domain, which has no
-    # command channel: its terminal report drains through frame results
-    # instead of COMMAND_FINISHED, so it carries no out_command_id.
-    "mln_render_session_request_frame": "command",
-}
+EXCEPTIONS: dict[str, str] = {}
 
 FUNCTION = re.compile(
     r"MLN_API\s+[^;]*?\b(mln_[A-Za-z0-9_]+)\s*\([^;]*?\)\s*MLN_NOEXCEPT\s*;",

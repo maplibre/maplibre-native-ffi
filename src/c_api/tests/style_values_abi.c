@@ -615,6 +615,351 @@ static void an_in_use_source_removal_fails_and_leaves_the_source(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// Prepared GeoJSON data creation is synchronous and touches no runtime or
+// map, so validation reports through status and the thread diagnostic.
+static void geojson_source_data_create_rejects_unsafe_raw_values(void) {
+  static const char trailing_geojson[] =
+    "{\"type\":\"FeatureCollection\",\"features\":[]}garbage";
+  mln_geojson_source_data trailing_data = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_geojson_source_data_create(
+      MLN_BUFFER_LITERAL(trailing_geojson), NULL, &trailing_data
+    )
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, trailing_data);
+
+  static const char nul_geojson[] =
+    "{\"type\":\"FeatureCollection\",\"features\":[]}\0garbage";
+  mln_geojson_source_data nul_data = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_geojson_source_data_create(
+      (mln_buffer_view){.data = nul_geojson, .size = sizeof(nul_geojson) - 1},
+      NULL, &nul_data
+    )
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, nul_data);
+
+  // A populated output handle is rejected rather than silently overwritten.
+  static const char empty_collection[] =
+    "{\"type\":\"FeatureCollection\",\"features\":[]}";
+  mln_geojson_source_data populated = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_geojson_source_data_create(
+                     MLN_BUFFER_LITERAL(empty_collection), NULL, &populated
+                   )
+  );
+  mln_geojson_source_data reused = populated;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_geojson_source_data_create(
+      MLN_BUFFER_LITERAL(empty_collection), NULL, &reused
+    )
+  );
+  mln_geojson_source_data_destroy(populated);
+
+  // Unsafe raw options reject data preparation up front.
+  mln_geojson_source_options short_size = mln_geojson_source_options_default();
+  short_size.size = sizeof(uint32_t);
+  mln_geojson_source_data short_size_data = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_geojson_source_data_create(
+      MLN_BUFFER_LITERAL(empty_collection), &short_size, &short_size_data
+    )
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, short_size_data);
+}
+
+// Supercluster reads every feature geometry as a point, so data preparation
+// rejects other geometry up front and names the feature and constraint.
+static void clustered_geojson_data_reports_non_point_geometry(void) {
+  static const char data[] =
+    "{\"type\":\"FeatureCollection\",\"features\":["
+    "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\","
+    "\"coordinates\":[-122.5,37.7]},\"properties\":{}},"
+    "{\"type\":\"Feature\",\"geometry\":{\"type\":\"GeometryCollection\","
+    "\"geometries\":[{\"type\":\"Point\",\"coordinates\":[-122.4,37.8]}]},"
+    "\"properties\":{}}]}";
+
+  mln_geojson_source_options clustered = mln_geojson_source_options_default();
+  clustered.fields = MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
+  clustered.cluster = true;
+  mln_geojson_source_data prepared = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_geojson_source_data_create(
+      MLN_BUFFER_LITERAL(data), &clustered, &prepared
+    )
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, prepared);
+
+  const char* message = mln_thread_last_error_message();
+  TEST_ASSERT_NOT_NULL(message);
+  TEST_ASSERT_NOT_NULL(strstr(message, "point geometry on every feature"));
+  TEST_ASSERT_NOT_NULL(strstr(message, "feature 1"));
+  TEST_ASSERT_NOT_NULL(strstr(message, "geometry collection"));
+
+  // The constraint belongs to clustering alone, so the same data tiles fine
+  // without it.
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_geojson_source_data_create(MLN_BUFFER_LITERAL(data), NULL, &prepared)
+  );
+  mln_geojson_source_data_destroy(prepared);
+}
+
+static void clustered_geojson_data_requires_a_feature_collection(void) {
+  static const char bare_geometry[] =
+    "{\"type\":\"Point\",\"coordinates\":[-122.5,37.7]}";
+  static const char single_feature[] =
+    "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\","
+    "\"coordinates\":[-122.5,37.7]},\"properties\":{}}";
+
+  mln_geojson_source_options clustered = mln_geojson_source_options_default();
+  clustered.fields = MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
+  clustered.cluster = true;
+
+  // MapLibre Native clusters feature collections only, so both of these would
+  // tile unclustered rather than honouring the requested cluster option.
+  mln_geojson_source_data prepared = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_geojson_source_data_create(
+      MLN_BUFFER_LITERAL(bare_geometry), &clustered, &prepared
+    )
+  );
+  const char* message = mln_thread_last_error_message();
+  TEST_ASSERT_NOT_NULL(message);
+  TEST_ASSERT_NOT_NULL(strstr(message, "requires a feature collection"));
+  TEST_ASSERT_NOT_NULL(strstr(message, "a bare geometry"));
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_geojson_source_data_create(
+      MLN_BUFFER_LITERAL(single_feature), &clustered, &prepared
+    )
+  );
+  TEST_ASSERT_NOT_NULL(
+    strstr(mln_thread_last_error_message(), "a single feature")
+  );
+
+  // The constraint belongs to clustering alone, so the same data tiles fine
+  // without it.
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_geojson_source_data_create(
+                     MLN_BUFFER_LITERAL(bare_geometry), NULL, &prepared
+                   )
+  );
+  mln_geojson_source_data_destroy(prepared);
+  prepared = MLN_HANDLE_NULL;
+
+  // An empty feature collection carries nothing to cluster, so it stays
+  // accepted and a later update supplies the features to cluster.
+  static const char empty[] =
+    "{\"type\":\"FeatureCollection\",\"features\":[]}";
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_geojson_source_data_create(
+                     MLN_BUFFER_LITERAL(empty), &clustered, &prepared
+                   )
+  );
+  mln_geojson_source_data_destroy(prepared);
+}
+
+// Prepared data installs on any number of sources through commands; an update
+// requires data whose baked-in options match the source's, and released
+// handles reject installs while installed sources keep their own reference.
+static void prepared_geojson_data_installs_and_checks_options(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+
+  static const char points[] =
+    "{\"type\":\"FeatureCollection\",\"features\":["
+    "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\","
+    "\"coordinates\":[-122.5,37.7]},\"properties\":{}}]}";
+
+  mln_geojson_source_options clustered = mln_geojson_source_options_default();
+  clustered.fields = MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
+  clustered.cluster = true;
+
+  mln_geojson_source_data plain_data = MLN_HANDLE_NULL;
+  mln_geojson_source_data clustered_data = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_geojson_source_data_create(
+                     MLN_BUFFER_LITERAL(points), NULL, &plain_data
+                   )
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_geojson_source_data_create(
+                     MLN_BUFFER_LITERAL(points), &clustered, &clustered_data
+                   )
+  );
+
+  uint64_t command = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_add_geojson_source_data(map, VIEW("plain"), plain_data, &command)
+  );
+  expect_command_finished(
+    runtime, command, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, NULL
+  );
+  command = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_add_geojson_source_data(
+                     map, VIEW("clustered"), clustered_data, &command
+                   )
+  );
+  expect_command_finished(
+    runtime, command, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, NULL
+  );
+
+  // Data prepared under different options tiles inconsistently with the
+  // source, so the mismatch fails the command and names the source.
+  command = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_geojson_source_data(
+                     map, VIEW("clustered"), plain_data, &command
+                   )
+  );
+  expect_command_finished(
+    runtime, command, MLN_COMMAND_DISPOSITION_FAILED,
+    MLN_STATUS_INVALID_ARGUMENT, "do not match"
+  );
+
+  // One prepared handle installs on any number of matching sources.
+  command = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_geojson_source_data(
+                     map, VIEW("clustered"), clustered_data, &command
+                   )
+  );
+  expect_command_finished(
+    runtime, command, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, NULL
+  );
+
+  // Cluster aggregations are part of the options match: a different
+  // expression is rejected, while equivalent JSON with different formatting
+  // compares equal by parsed expression.
+  mln_geojson_source_options aggregated = clustered;
+  aggregated.fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
+  aggregated.cluster_properties =
+    MLN_BUFFER_LITERAL("{\"total\":[\"+\",[\"get\",\"rank\"]]}");
+  mln_geojson_source_data aggregated_data = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_geojson_source_data_create(
+                     MLN_BUFFER_LITERAL(points), &aggregated, &aggregated_data
+                   )
+  );
+  command = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_add_geojson_source_data(
+                     map, VIEW("aggregated"), aggregated_data, &command
+                   )
+  );
+  expect_command_finished(
+    runtime, command, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, NULL
+  );
+  mln_geojson_source_options reaggregated = aggregated;
+  reaggregated.cluster_properties =
+    MLN_BUFFER_LITERAL("{\"total\":[\"max\",[\"get\",\"rank\"]]}");
+  mln_geojson_source_data reaggregated_data = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_geojson_source_data_create(
+      MLN_BUFFER_LITERAL(points), &reaggregated, &reaggregated_data
+    )
+  );
+  command = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_geojson_source_data(
+                     map, VIEW("aggregated"), reaggregated_data, &command
+                   )
+  );
+  expect_command_finished(
+    runtime, command, MLN_COMMAND_DISPOSITION_FAILED,
+    MLN_STATUS_INVALID_ARGUMENT, "do not match"
+  );
+  mln_geojson_source_data_destroy(reaggregated_data);
+  mln_geojson_source_options reformatted = aggregated;
+  reformatted.cluster_properties =
+    MLN_BUFFER_LITERAL(" { \"total\" : [\"+\", [\"get\", \"rank\"]] } ");
+  mln_geojson_source_data reformatted_data = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_geojson_source_data_create(
+                     MLN_BUFFER_LITERAL(points), &reformatted, &reformatted_data
+                   )
+  );
+  command = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_geojson_source_data(
+                     map, VIEW("aggregated"), reformatted_data, &command
+                   )
+  );
+  expect_command_finished(
+    runtime, command, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, NULL
+  );
+  mln_geojson_source_data_destroy(reformatted_data);
+  mln_geojson_source_data_destroy(aggregated_data);
+
+  // The submit-time lease keeps the prepared index alive, so the handle may
+  // be destroyed as soon as the install command is submitted.
+  command = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_set_geojson_source_data(map, VIEW("plain"), plain_data, &command)
+  );
+  mln_geojson_source_data_destroy(plain_data);
+  expect_command_finished(
+    runtime, command, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, NULL
+  );
+
+  // The runtime override takes a live GeoJSON source alone.
+  command = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_geojson_source_synchronous_tiling(
+                     map, VIEW("plain"), true, &command
+                   )
+  );
+  expect_command_finished(
+    runtime, command, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, NULL
+  );
+  command = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_geojson_source_synchronous_tiling(
+                     map, VIEW("plain"), false, &command
+                   )
+  );
+  expect_command_finished(
+    runtime, command, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, NULL
+  );
+  command = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_geojson_source_synchronous_tiling(
+                     map, VIEW("missing"), true, &command
+                   )
+  );
+  expect_command_finished(
+    runtime, command, MLN_COMMAND_DISPOSITION_FAILED,
+    MLN_STATUS_INVALID_ARGUMENT, "source does not exist"
+  );
+
+  // A released handle rejects new installs at submit, a second destroy is a
+  // no-op, and installed sources keep their own reference.
+  mln_geojson_source_data_destroy(plain_data);
+  mln_geojson_source_data_destroy(MLN_HANDLE_NULL);
+  command = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_geojson_source_data(map, VIEW("plain"), plain_data, &command)
+  );
+  TEST_ASSERT_TRUE(source_exists(runtime, map, "plain"));
+  mln_geojson_source_data_destroy(clustered_data);
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 void run_style_values_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(style_command_deep_copies_and_ordered_read_observes_it);
@@ -623,6 +968,10 @@ void run_style_values_abi_tests(void) {
   RUN_TEST(wrong_typed_take_does_not_consume_result);
   RUN_TEST(remove_commands_commit_and_report_missing_ids);
   RUN_TEST(an_in_use_source_removal_fails_and_leaves_the_source);
+  RUN_TEST(geojson_source_data_create_rejects_unsafe_raw_values);
+  RUN_TEST(clustered_geojson_data_reports_non_point_geometry);
+  RUN_TEST(clustered_geojson_data_requires_a_feature_collection);
+  RUN_TEST(prepared_geojson_data_installs_and_checks_options);
   RUN_TEST(layer_info_reports_scalars_and_sizes_the_source_id_copy);
   RUN_TEST(coordinate_size_probe_preserves_typed_result);
   RUN_TEST(stretch_size_probe_preserves_typed_result);

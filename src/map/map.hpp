@@ -18,6 +18,7 @@ class UpdateParameters;
 
 namespace mln::core {
 
+struct GeoJsonSourceDataObject;
 struct MapObject;
 
 auto map_options_default() noexcept -> mln_map_options;
@@ -213,14 +214,18 @@ auto map_add_geojson_source_url(
   const mln_geojson_source_options* options
 ) -> mln_status;
 auto map_add_geojson_source_data(
-  mln_map map, mln_buffer_view source_id, mln_buffer_view data,
-  const mln_geojson_source_options* options
+  mln_map map, mln_buffer_view source_id,
+  const std::shared_ptr<const GeoJsonSourceDataObject>& data
 ) -> mln_status;
 auto map_set_geojson_source_url(
   mln_map map, mln_buffer_view source_id, mln_buffer_view url
 ) -> mln_status;
 auto map_set_geojson_source_data(
-  mln_map map, mln_buffer_view source_id, mln_buffer_view data
+  mln_map map, mln_buffer_view source_id,
+  const std::shared_ptr<const GeoJsonSourceDataObject>& data
+) -> mln_status;
+auto map_set_geojson_source_synchronous_tiling(
+  mln_map map, mln_buffer_view source_id, bool enabled
 ) -> mln_status;
 auto map_add_vector_source_url(
   mln_map map, mln_buffer_view source_id, mln_buffer_view url,
@@ -559,6 +564,8 @@ auto map_post_resize(mln_map map, mln_logical_extent extent) -> mln_status;
 auto map_post_trigger_repaint(mln_map map) -> mln_status;
 auto map_latest_update(mln_map map) -> std::shared_ptr<mbgl::UpdateParameters>;
 auto map_latest_update_generation(mln_map map) noexcept -> uint64_t;
+auto map_latest_update_snapshot(mln_map map, uint64_t& out_generation)
+  -> std::shared_ptr<mbgl::UpdateParameters>;
 auto map_set_render_session_publish_callback(
   mln_map map, std::function<void()> callback
 ) -> mln_status;

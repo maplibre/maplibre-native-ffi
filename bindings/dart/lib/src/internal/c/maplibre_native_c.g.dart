@@ -313,6 +313,22 @@ external mln_frame_demand mln_frame_demand_default();
 @ffi.Native<mln_free_camera_options Function()>()
 external mln_free_camera_options mln_free_camera_options_default();
 
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_buffer_view,
+    ffi.Pointer<mln_geojson_source_options>,
+    ffi.Pointer<mln_geojson_source_data>,
+  )
+>()
+external int mln_geojson_source_data_create(
+  mln_buffer_view data,
+  ffi.Pointer<mln_geojson_source_options> options,
+  ffi.Pointer<mln_geojson_source_data> out_data,
+);
+
+@ffi.Native<ffi.Void Function(mln_geojson_source_data)>()
+external void mln_geojson_source_data_destroy(int data);
+
 @ffi.Native<mln_geojson_source_options Function()>()
 external mln_geojson_source_options mln_geojson_source_options_default();
 
@@ -392,16 +408,14 @@ external int mln_map_add_custom_geometry_source(
   ffi.Int32 Function(
     mln_map,
     mln_buffer_view,
-    mln_buffer_view,
-    ffi.Pointer<mln_geojson_source_options>,
+    mln_geojson_source_data,
     ffi.Pointer<ffi.Uint64>,
   )
 >()
 external int mln_map_add_geojson_source_data(
   int map,
   mln_buffer_view source_id,
-  mln_buffer_view data,
-  ffi.Pointer<mln_geojson_source_options> options,
+  int data,
   ffi.Pointer<ffi.Uint64> out_command_id,
 );
 
@@ -1496,14 +1510,29 @@ external int mln_map_set_free_camera_options(
   ffi.Int32 Function(
     mln_map,
     mln_buffer_view,
-    mln_buffer_view,
+    mln_geojson_source_data,
     ffi.Pointer<ffi.Uint64>,
   )
 >()
 external int mln_map_set_geojson_source_data(
   int map,
   mln_buffer_view source_id,
-  mln_buffer_view data,
+  int data,
+  ffi.Pointer<ffi.Uint64> out_command_id,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    ffi.Bool,
+    ffi.Pointer<ffi.Uint64>,
+  )
+>()
+external int mln_map_set_geojson_source_synchronous_tiling(
+  int map,
+  mln_buffer_view source_id,
+  bool enabled,
   ffi.Pointer<ffi.Uint64> out_command_id,
 );
 
@@ -4162,6 +4191,9 @@ final class mln_free_camera_options extends ffi.Struct {
   external mln_quaternion orientation;
 }
 
+typedef mln_geojson_source_data = ffi.Uint64;
+typedef Dartmln_geojson_source_data = int;
+
 enum mln_geojson_source_option_field {
   MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM(1),
   MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM(2),
@@ -4174,7 +4206,7 @@ enum mln_geojson_source_option_field {
   MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS(256),
   MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS(512),
   MLN_GEOJSON_SOURCE_OPTION_CLUSTER(1024),
-  MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE(2048);
+  MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING(2048);
 
   final int value;
   const mln_geojson_source_option_field(this.value);
@@ -4192,7 +4224,7 @@ enum mln_geojson_source_option_field {
         256 => MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS,
         512 => MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS,
         1024 => MLN_GEOJSON_SOURCE_OPTION_CLUSTER,
-        2048 => MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE,
+        2048 => MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING,
         _ => throw ArgumentError(
           'Unknown value for mln_geojson_source_option_field: $value',
         ),
@@ -4239,7 +4271,7 @@ final class mln_geojson_source_options extends ffi.Struct {
   external bool cluster;
 
   @ffi.Bool()
-  external bool synchronous_update;
+  external bool synchronous_tiling;
 }
 
 enum mln_gesture_phase {
@@ -5583,6 +5615,9 @@ final class mln_render_frame_result extends ffi.Struct {
   @ffi.Int64()
   external int presentation_time_ns;
 
+  @ffi.Bool()
+  external bool needs_repaint;
+
   static ffi.Pointer<mln_render_frame_result> $allocate(
     ffi.Allocator $allocator, {
     required int size,
@@ -5592,6 +5627,7 @@ final class mln_render_frame_result extends ffi.Struct {
     required int extent_generation,
     required int frame_generation,
     required int presentation_time_ns,
+    required bool needs_repaint,
   }) => $allocator<mln_render_frame_result>()
     ..ref.size = size
     ..ref.disposition = disposition
@@ -5599,7 +5635,8 @@ final class mln_render_frame_result extends ffi.Struct {
     ..ref.map_update_generation = map_update_generation
     ..ref.extent_generation = extent_generation
     ..ref.frame_generation = frame_generation
-    ..ref.presentation_time_ns = presentation_time_ns;
+    ..ref.presentation_time_ns = presentation_time_ns
+    ..ref.needs_repaint = needs_repaint;
 }
 
 enum mln_render_mode {

@@ -870,7 +870,8 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             value.map_update_generation,
             value.extent_generation,
             value.frame_generation,
-            value.presentation_time_ns
+            value.presentation_time_ns,
+            value.needs_repaint != 0
         );
 }
 
@@ -981,14 +982,7 @@ public sealed unsafe class AcquiredFrameHandle : IDisposable
                 NativeStatus.Check(
                     NativeMethods.mln_acquired_frame_get_result(RequireHandleLocked(), &value)
                 );
-                return new(
-                    (RenderResult)value.disposition,
-                    value.token,
-                    value.map_update_generation,
-                    value.extent_generation,
-                    value.frame_generation,
-                    value.presentation_time_ns
-                );
+                return RenderSessionHandle.FromNative(value);
             }
         }
     }

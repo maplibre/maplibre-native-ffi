@@ -40,7 +40,9 @@ test "style source removal reports state and copies missing results" {
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
-    _ = try map.addGeoJsonSourceData(testing.allocator, "remove-me", "{\"type\":\"FeatureCollection\",\"features\":[]}", null);
+    const empty_data = try maplibre.GeoJsonSourceDataHandle.create(testing.allocator, "{\"type\":\"FeatureCollection\",\"features\":[]}", null);
+    defer empty_data.release();
+    _ = try map.addGeoJsonSourceData(testing.allocator, "remove-me", empty_data);
     try testing.expect(try support.styleSourceExists(&map, "remove-me"));
     try testing.expect(try support.removeStyleSource(&runtime, &map, "remove-me"));
     try testing.expect(!try support.styleSourceExists(&map, "remove-me"));

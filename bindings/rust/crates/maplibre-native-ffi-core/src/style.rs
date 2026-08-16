@@ -114,9 +114,11 @@ pub struct GeoJsonSourceOptions {
     pub cluster_min_points: Option<u32>,
     pub line_metrics: Option<bool>,
     pub cluster: Option<bool>,
-    /// Applies data updates synchronously, so data set through
-    /// `set_geojson_source_data` reaches the next rendered frame.
-    pub synchronous_update: Option<bool>,
+    /// Slices requested tiles out of installed data inline during the update
+    /// pass, so data installed through `set_geojson_source_data` reaches the
+    /// next rendered frame. The map can override this at runtime through
+    /// `set_geojson_source_synchronous_tiling`.
+    pub synchronous_tiling: Option<bool>,
 }
 
 impl GeoJsonSourceOptions {
@@ -179,9 +181,9 @@ impl NativeGeoJsonSourceOptions {
             raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
             raw.cluster = value;
         }
-        if let Some(value) = options.synchronous_update {
-            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE;
-            raw.synchronous_update = value;
+        if let Some(value) = options.synchronous_tiling {
+            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING;
+            raw.synchronous_tiling = value;
         }
         Ok(Self {
             raw,
@@ -853,7 +855,7 @@ mod tests {
             cluster_min_points: Some(3),
             line_metrics: Some(false),
             cluster: Some(true),
-            synchronous_update: Some(true),
+            synchronous_tiling: Some(true),
         };
 
         let native = geojson_source_options_to_native(&options).unwrap();
@@ -872,7 +874,7 @@ mod tests {
                 | sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS
                 | sys::MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS
                 | sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER
-                | sys::MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE
+                | sys::MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING
         );
         // A present zero stays distinguishable from an absent field.
         assert_eq!(raw.min_zoom, 0.0);
@@ -885,7 +887,7 @@ mod tests {
         assert_eq!(raw.cluster_min_points, 3);
         assert!(!raw.line_metrics);
         assert!(raw.cluster);
-        assert!(raw.synchronous_update);
+        assert!(raw.synchronous_tiling);
         // SAFETY: native keeps the cluster-properties buffer alive for this scope.
         let copied = unsafe { crate::string::copy_string_view_bytes(raw.cluster_properties) }
             .expect("cluster properties should copy back");

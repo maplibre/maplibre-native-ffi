@@ -111,7 +111,7 @@ struct NativeGeoJSONSourceOptions: Equatable {
   var clusterMinPoints: UInt32?
   var lineMetrics: Bool?
   var cluster: Bool?
-  var synchronousUpdate: Bool?
+  var synchronousTiling: Bool?
 
   init(
     minZoom: Double? = nil,
@@ -125,7 +125,7 @@ struct NativeGeoJSONSourceOptions: Equatable {
     clusterMinPoints: UInt32? = nil,
     lineMetrics: Bool? = nil,
     cluster: Bool? = nil,
-    synchronousUpdate: Bool? = nil
+    synchronousTiling: Bool? = nil
   ) {
     self.minZoom = minZoom
     self.maxZoom = maxZoom
@@ -138,7 +138,7 @@ struct NativeGeoJSONSourceOptions: Equatable {
     self.clusterMinPoints = clusterMinPoints
     self.lineMetrics = lineMetrics
     self.cluster = cluster
-    self.synchronousUpdate = synchronousUpdate
+    self.synchronousTiling = synchronousTiling
   }
 
   func withNativeOptions<Result>(
@@ -147,7 +147,7 @@ struct NativeGeoJSONSourceOptions: Equatable {
     if minZoom == nil, maxZoom == nil, tolerance == nil, clusterMaxZoom == nil,
        clusterProperties == nil, tileSize == nil, buffer == nil,
        clusterRadius == nil, clusterMinPoints == nil, lineMetrics == nil,
-       cluster == nil, synchronousUpdate == nil
+       cluster == nil, synchronousTiling == nil
     {
       return try body(nil)
     }
@@ -197,9 +197,9 @@ struct NativeGeoJSONSourceOptions: Equatable {
       options.fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER.rawValue
       options.cluster = cluster
     }
-    if let synchronousUpdate {
-      options.fields |= MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE.rawValue
-      options.synchronous_update = synchronousUpdate
+    if let synchronousTiling {
+      options.fields |= MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING.rawValue
+      options.synchronous_tiling = synchronousTiling
     }
     return try withUnsafePointer(to: &options) { options in
       try withExtendedLifetime(arena) { try body(options) }

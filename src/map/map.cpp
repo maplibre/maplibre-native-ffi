@@ -755,6 +755,14 @@ class HeadlessFrontend final : public mbgl::RendererFrontend {
     const std::scoped_lock lock(latest_update_mutex_);
     return latest_update_;
   }
+  // One lock hold keeps the pair coherent: a frame result must report the
+  // generation of the update that was actually rendered.
+  [[nodiscard]] auto latest_update_snapshot(uint64_t& out_generation) const
+    -> std::shared_ptr<mbgl::UpdateParameters> {
+    const std::scoped_lock lock(latest_update_mutex_);
+    out_generation = latest_update_generation_;
+    return latest_update_;
+  }
   auto set_publish_callback(std::function<void()> publish) -> void {
     const std::scoped_lock lock(latest_update_mutex_);
     publish_ = std::move(publish);
@@ -3152,6 +3160,15 @@ auto map_latest_update_generation(mln_map map) noexcept -> uint64_t {
   auto* live = handle_table<MapObject>().try_resolve(map);
   return live == nullptr ? 0 : live->frontend->latest_update_generation();
 }
+auto map_latest_update_snapshot(mln_map map, uint64_t& out_generation)
+  -> std::shared_ptr<mbgl::UpdateParameters> {
+  auto* live = handle_table<MapObject>().try_resolve(map);
+  if (live == nullptr) {
+    out_generation = 0;
+    return nullptr;
+  }
+  return live->frontend->latest_update_snapshot(out_generation);
+}
 
 auto map_set_render_session_publish_callback(
   mln_map map, std::function<void()> callback
@@ -3189,6 +3206,12 @@ auto map_attach_render_target_session(mln_map map, void* session)
   if (session == nullptr) {
     set_thread_error("render session must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  // begin_close() runs under this same lock, so this check makes the claim
+  // atomic with close's empty-session preflight.
+  if (live->control.is_closing()) {
+    set_thread_error("map is closing");
+    return MLN_STATUS_INVALID_STATE;
   }
   if (live->render_target_session != nullptr) {
     set_thread_error("map already has an attached render session");

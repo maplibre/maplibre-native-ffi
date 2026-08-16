@@ -2013,6 +2013,60 @@ final class MapSnapshot {
   final FreeCameraOptions freeCameraOptions;
 }
 
+/// Owned prepared GeoJSON source data.
+///
+/// [prepare] parses one complete UTF-8 GeoJSON document and tiles or clusters
+/// it into an immutable prepared index with its options baked in. Preparation
+/// needs no runtime or map. Its native id is copiable identity only, so a raw
+/// id sent to another isolate cannot become an operable handle there.
+///
+/// Install calls borrow this handle, so one prepared value may be installed on
+/// any number of sources and closed at any time afterward; [close] never
+/// invalidates a source the data was installed on.
+final class GeoJsonSourceDataHandle {
+  GeoJsonSourceDataHandle._(NativeGeoJsonSourceData handle)
+    : _state = NativeHandleState(handle, 'GeoJsonSourceDataHandle');
+
+  /// Parses and tiles one complete UTF-8 GeoJSON document with [options].
+  ///
+  /// Cluster validation happens here: clustering accepts only a feature
+  /// collection whose every feature carries point geometry.
+  factory GeoJsonSourceDataHandle.prepare(
+    Uint8List data, {
+    GeoJsonSourceOptions? options,
+  }) {
+    return withNativeArena((arena) {
+      final nativeData = nativeBufferView(data, arena);
+      final nativeOptions = _nativeGeoJsonSourceOptions(
+        options ?? GeoJsonSourceOptions(),
+        arena,
+      );
+      final outData = arena<Uint64>();
+      outData.value = 0;
+      _check(
+        raw.mln_geojson_source_data_create(nativeData, nativeOptions, outData),
+      );
+      return GeoJsonSourceDataHandle._(NativeGeoJsonSourceData(outData.value));
+    });
+  }
+
+  final NativeHandleState<NativeGeoJsonSourceData> _state;
+
+  /// Whether this prepared data has been closed by the Dart binding.
+  bool get isClosed => _state.isClosed;
+
+  /// Explicitly releases this prepared data.
+  ///
+  /// Sources the data was installed on keep their own reference, so this never
+  /// invalidates a source.
+  void close() {
+    _state.close((handle) {
+      raw.mln_geojson_source_data_destroy(handle.raw);
+      return 0;
+    }, _c.threadLastErrorMessage);
+  }
+}
+
 /// Map handle bound to a retained runtime.
 final class MapHandle {
   MapHandle._(this._runtime, NativeMap handle, this._acceptedEventMask)
@@ -2498,11 +2552,21 @@ final class MapHandle {
     });
   }
 
-  /// Computes wrapped bounds after prior commands.
+  /// Computes geographic bounds for a camera from two viewport corners.
+  ///
+  /// The box is the hull of the top-left and bottom-right screen corners for
+  /// that camera in the current viewport. When bearing and pitch are zero, the
+  /// box equals the visible area. Those corners are the northwest and southeast
+  /// of the viewport. Longitudes stay in -180 to 180.
   Future<LatLngBounds> latLngBoundsForCamera(CameraOptions camera) =>
       _latLngBoundsForCamera(camera, unwrapped: false);
 
-  /// Computes unwrapped bounds after prior commands.
+  /// Computes geographic bounds for a camera from the four viewport corners.
+  ///
+  /// The axis-aligned hull of all four screen corners and the center encompasses
+  /// the projected viewport. Longitudes unwrap onto the shortest path through
+  /// the center. A viewport that crosses the antimeridian reports values outside
+  /// -180 to 180.
   Future<LatLngBounds> latLngBoundsForCameraUnwrapped(CameraOptions camera) =>
       _latLngBoundsForCamera(camera, unwrapped: true);
 
@@ -2991,26 +3055,21 @@ final class MapHandle {
     });
   }
 
-  /// Adds a GeoJSON source with inline data.
-  BigInt addGeoJsonSourceData(
-    String sourceId,
-    Uint8List data, {
-    GeoJsonSourceOptions? options,
-  }) {
+  /// Adds a GeoJSON source with prepared inline [data].
+  ///
+  /// The command borrows [data]'s handle before returning and the source
+  /// retains the prepared index, adopting the options the data was prepared
+  /// with, fixed for the lifetime of the source, so the data may be closed
+  /// as soon as this returns.
+  BigInt addGeoJsonSourceData(String sourceId, GeoJsonSourceDataHandle data) {
     return withNativeArena<BigInt>((arena) {
       final nativeId = nativeStringView(sourceId, arena);
-      final nativeData = nativeBufferView(data, arena);
-      final nativeOptions = _nativeGeoJsonSourceOptions(
-        options ?? GeoJsonSourceOptions(),
-        arena,
-      );
       final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_add_geojson_source_data(
           _handle.raw,
           nativeId.value,
-          nativeData,
-          nativeOptions,
+          data._state.handle.raw,
           outCommandId,
         ),
       );
@@ -3036,17 +3095,43 @@ final class MapHandle {
     });
   }
 
-  /// Updates one GeoJSON source with inline data.
-  BigInt setGeoJsonSourceData(String sourceId, Uint8List data) {
+  /// Updates one GeoJSON source with prepared inline [data].
+  ///
+  /// The command borrows [data]'s handle before returning. Installing is
+  /// cheap: the heavy parse and tiling already ran in
+  /// [GeoJsonSourceDataHandle.prepare]. Data whose baked-in options differ
+  /// from the source's fails the command as an invalid argument, with cluster
+  /// properties excepted from the comparison.
+  BigInt setGeoJsonSourceData(String sourceId, GeoJsonSourceDataHandle data) {
     return withNativeArena<BigInt>((arena) {
       final nativeId = nativeStringView(sourceId, arena);
-      final nativeData = nativeBufferView(data, arena);
       final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_set_geojson_source_data(
           _handle.raw,
           nativeId.value,
-          nativeData,
+          data._state.handle.raw,
+          outCommandId,
+        ),
+      );
+      return uint64FromNative(outCommandId.value);
+    });
+  }
+
+  /// Overrides one GeoJSON source's synchronous-tiling behavior at runtime.
+  ///
+  /// Tiles are sliced inline during the update pass when either the source's
+  /// baked-in [GeoJsonSourceOptions.synchronousTiling] option or this override
+  /// enables it.
+  BigInt setGeoJsonSourceSynchronousTiling(String sourceId, bool enabled) {
+    return withNativeArena<BigInt>((arena) {
+      final nativeId = nativeStringView(sourceId, arena);
+      final outCommandId = arena<Uint64>()..value = 0;
+      _check(
+        raw.mln_map_set_geojson_source_synchronous_tiling(
+          _handle.raw,
+          nativeId.value,
+          enabled,
           outCommandId,
         ),
       );

@@ -9,6 +9,10 @@ import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ObjCObject
 import kotlinx.cinterop.objcPtr
 import kotlinx.cinterop.toLong
+import org.maplibre.nativeffi.camera.AnimationOptions
+import org.maplibre.nativeffi.camera.CameraOptions
+import org.maplibre.nativeffi.camera.CameraUpdate
+import org.maplibre.nativeffi.camera.CameraUpdateMode
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapMode
@@ -90,6 +94,90 @@ class RenderSessionHandleTest {
         runtime.close()
       }
     }
+
+  @Test
+  fun renderedFrameResultsReportNeedsRepaintDuringCameraTransition(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val device = MTLCreateSystemDefaultDevice() ?: return@runSuspendTest
+      val runtime = RuntimeHandle.create(RuntimeOptions())
+      try {
+        val map =
+          MapHandle.create(
+            runtime,
+            MapOptions().apply {
+              width = 32
+              height = 16
+              mapMode = MapMode.CONTINUOUS
+            },
+          )
+        try {
+          map.setStyleJson(EMPTY_STYLE.encodeToByteArray())
+          runtime.barrier()
+          val attachment =
+            map.attachMetalOwnedTexture(
+              MetalOwnedTextureDescriptor(
+                RenderTargetExtent(32, 16, 1.0),
+                MetalContextDescriptor(NativePointer.ofAddress(device.address())),
+              ),
+              RenderSessionAttachOptions(driver = RenderDriver.CALLER_GRAPHICS_THREAD),
+            )
+          val session = attachment.session
+          try {
+            completeOnDriver(session, attachment.operation)
+
+            // Render until the map settles: the last frame asks for no repaint.
+            var settled: RenderFrameResult? = null
+            for (attempt in 0 until 500) {
+              val result = renderOneFrame(session)
+              if (result.disposition == RenderResult.RENDERED && !result.needsRepaint) {
+                settled = result
+                break
+              }
+            }
+            assertEquals(RenderResult.RENDERED, assertNotNull(settled).disposition)
+
+            map.updateCamera(
+              CameraUpdate(
+                mode = CameraUpdateMode.EASE,
+                camera = CameraOptions().apply { zoom = 4.0 },
+                animation = AnimationOptions().apply { durationMs = 60_000.0 },
+              )
+            )
+            runtime.barrier()
+
+            var sawRepaintRequest = false
+            for (attempt in 0 until 500) {
+              val result = renderOneFrame(session)
+              if (result.disposition == RenderResult.RENDERED && result.needsRepaint) {
+                sawRepaintRequest = true
+                break
+              }
+            }
+            assertTrue(sawRepaintRequest)
+
+            completeOnDriver(session, session.startDetach())
+          } finally {
+            if (session.snapshot().state != RenderSessionState.DETACHED) {
+              runCatching { session.abandon() }
+            }
+            session.close()
+          }
+        } finally {
+          map.close()
+        }
+      } finally {
+        runtime.close()
+      }
+    }
+
+  private fun renderOneFrame(session: RenderSessionHandle): RenderFrameResult {
+    session.requestFrame(FrameDemand(ifNeeded = false))
+    while (true) {
+      session.serviceDriverWork()
+      val results = session.drainFrameResults()
+      if (results.isNotEmpty()) return results.last()
+    }
+  }
 
   @Test
   fun abandonReportsQuarantineAndCompletesPendingDriverWorkAsTargetLost(): Unit =

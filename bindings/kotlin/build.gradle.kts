@@ -44,6 +44,8 @@ kotlin {
   androidNativeX64()
   iosArm64()
   iosSimulatorArm64()
+  tvosArm64()
+  tvosSimulatorArm64()
   linuxArm64()
   linuxX64()
   macosArm64()
@@ -139,6 +141,8 @@ canonicalizeKmpRootMetadata(
       "androidNativeX64" to "$mavenArtifact-androidnativex64",
       "iosArm64" to "$mavenArtifact-iosarm64",
       "iosSimulatorArm64" to "$mavenArtifact-iossimulatorarm64",
+      "tvosArm64" to "$mavenArtifact-tvosarm64",
+      "tvosSimulatorArm64" to "$mavenArtifact-tvossimulatorarm64",
       "jvm" to "$mavenArtifact-jvm",
       "linuxArm64" to "$mavenArtifact-linuxarm64",
       "linuxX64" to "$mavenArtifact-linuxx64",

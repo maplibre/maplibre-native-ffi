@@ -202,9 +202,10 @@ func (options cStyleTileSourceOptions) free() {
 	options.attribution.free()
 }
 
-// StyleGeoJSONSourceOptions configures GeoJSON sources. These options are fixed
-// when the source is created, so SetGeoJSONSourceURL and SetGeoJSONSourceData
-// keep the options the source was added with.
+// StyleGeoJSONSourceOptions configures GeoJSON sources. These options are
+// baked into prepared data by NewGeoJSONSourceData and fixed when the source
+// is created, so SetGeoJSONSourceURL keeps the options the source was added
+// with and SetGeoJSONSourceData requires data prepared with matching options.
 type StyleGeoJSONSourceOptions struct {
 	MinZoom        *float64
 	MaxZoom        *float64
@@ -219,10 +220,11 @@ type StyleGeoJSONSourceOptions struct {
 	ClusterMinPoints  *uint32
 	LineMetrics       *bool
 	Cluster           *bool
-	// SynchronousUpdate applies data updates synchronously, so data set through
-	// SetGeoJSONSourceData reaches the next rendered frame rather than a later
-	// one.
-	SynchronousUpdate *bool
+	// SynchronousTiling slices requested tiles inline during the update pass,
+	// so data set through SetGeoJSONSourceData reaches the next rendered frame
+	// rather than a later one. SetGeoJSONSourceSynchronousTiling overrides this
+	// at runtime.
+	SynchronousTiling *bool
 }
 
 // Equal reports whether two descriptors hold the same field values.
@@ -238,7 +240,7 @@ func (options StyleGeoJSONSourceOptions) Equal(other StyleGeoJSONSourceOptions) 
 		equalPointer(options.ClusterMinPoints, other.ClusterMinPoints) &&
 		equalPointer(options.LineMetrics, other.LineMetrics) &&
 		equalPointer(options.Cluster, other.Cluster) &&
-		equalPointer(options.SynchronousUpdate, other.SynchronousUpdate)
+		equalPointer(options.SynchronousTiling, other.SynchronousTiling)
 }
 
 // Clone returns an independent deep copy of this descriptor.
@@ -255,7 +257,7 @@ func (options StyleGeoJSONSourceOptions) Clone() StyleGeoJSONSourceOptions {
 	cloned.ClusterMinPoints = clonePointer(options.ClusterMinPoints)
 	cloned.LineMetrics = clonePointer(options.LineMetrics)
 	cloned.Cluster = clonePointer(options.Cluster)
-	cloned.SynchronousUpdate = clonePointer(options.SynchronousUpdate)
+	cloned.SynchronousTiling = clonePointer(options.SynchronousTiling)
 	return cloned
 }
 
@@ -346,11 +348,12 @@ func (options StyleGeoJSONSourceOptions) WithCluster(cluster bool) StyleGeoJSONS
 	return options
 }
 
-// WithSynchronousUpdate returns a copy that sets whether data updates apply synchronously.
-func (options StyleGeoJSONSourceOptions) WithSynchronousUpdate(synchronousUpdate bool) StyleGeoJSONSourceOptions {
+// WithSynchronousTiling returns a copy that sets whether requested tiles are
+// sliced inline during the update pass.
+func (options StyleGeoJSONSourceOptions) WithSynchronousTiling(synchronousTiling bool) StyleGeoJSONSourceOptions {
 	options = options.Clone()
-	options.SynchronousUpdate = new(bool)
-	*options.SynchronousUpdate = synchronousUpdate
+	options.SynchronousTiling = new(bool)
+	*options.SynchronousTiling = synchronousTiling
 	return options
 }
 
@@ -414,9 +417,9 @@ func newCStyleGeoJSONSourceOptions(options *StyleGeoJSONSourceOptions) (*cStyleG
 		raw.raw.fields |= C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER
 		raw.raw.cluster = C.bool(*options.Cluster)
 	}
-	if options.SynchronousUpdate != nil {
-		raw.raw.fields |= C.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE
-		raw.raw.synchronous_update = C.bool(*options.SynchronousUpdate)
+	if options.SynchronousTiling != nil {
+		raw.raw.fields |= C.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING
+		raw.raw.synchronous_tiling = C.bool(*options.SynchronousTiling)
 	}
 	return raw, nil
 }
@@ -879,8 +882,8 @@ func styleLayerInfoFromC(info C.mln_style_layer_info) StyleLayerInfo {
 }
 
 // AddGeoJSONSourceURL adds a GeoJSON source that loads from a URL. Later
-// SetGeoJSONSourceURL and SetGeoJSONSourceData calls keep the options passed
-// here.
+// SetGeoJSONSourceURL calls keep the options passed here, and later
+// SetGeoJSONSourceData calls require data prepared with matching options.
 func (m *MapHandle) AddGeoJSONSourceURL(sourceID string, url string, options *StyleGeoJSONSourceOptions) (uint64, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
@@ -927,38 +930,67 @@ func (m *MapHandle) SetGeoJSONSourceURL(sourceID string, url string) (uint64, er
 	return uint64(commandID), nil
 }
 
-// AddGeoJSONSourceData adds a GeoJSON source with inline data. Accepted data is
-// copied into MapLibre Native before the call returns, and later
-// SetGeoJSONSourceData and SetGeoJSONSourceURL calls keep the options passed
-// here.
-func (m *MapHandle) AddGeoJSONSourceData(sourceID string, data []byte, options *StyleGeoJSONSourceOptions) (uint64, error) {
+// AddGeoJSONSourceData adds a GeoJSON source with prepared inline data. The
+// call borrows the handle and retains the prepared index, and the source
+// adopts the options the data was prepared with, fixed for the lifetime of the
+// source.
+func (m *MapHandle) AddGeoJSONSourceData(sourceID string, data *GeoJSONSourceDataHandle) (uint64, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
 	defer release()
 	defer m.state.KeepAlive()
+	dataPtr, dataRelease, err := data.ptr()
+	if err != nil {
+		return 0, err
+	}
+	defer dataRelease()
+	defer data.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
-	rawData := newCBufferView(data)
-	defer rawData.free()
-	rawOptions, err := newCStyleGeoJSONSourceOptions(options)
-	if err != nil {
-		return 0, newBindingError(ErrInvalidArgument, err.Error())
-	}
-	defer rawOptions.free()
 	var commandID C.uint64_t
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_add_geojson_source_data(C.mln_map(ptr), sourceView.raw(), rawData.raw(), rawOptions.ptr(), &commandID))
+		return int32(C.mln_map_add_geojson_source_data(C.mln_map(ptr), sourceView.raw(), C.mln_geojson_source_data(dataPtr), &commandID))
 	}); err != nil {
 		return 0, err
 	}
 	return uint64(commandID), nil
 }
 
-// SetGeoJSONSourceData updates a GeoJSON source with inline data. Accepted data
-// is copied into MapLibre Native before the call returns.
-func (m *MapHandle) SetGeoJSONSourceData(sourceID string, data []byte) (uint64, error) {
+// SetGeoJSONSourceData updates a GeoJSON source with prepared inline data. The
+// call borrows the handle and retains the prepared index. The data must have
+// been prepared with options equal to the options the source was added with,
+// ClusterProperties excepted.
+func (m *MapHandle) SetGeoJSONSourceData(sourceID string, data *GeoJSONSourceDataHandle) (uint64, error) {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return 0, err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	dataPtr, dataRelease, err := data.ptr()
+	if err != nil {
+		return 0, err
+	}
+	defer dataRelease()
+	defer data.state.KeepAlive()
+	sourceView := newCStringView(sourceID)
+	defer sourceView.free()
+	var commandID C.uint64_t
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_set_geojson_source_data(C.mln_map(ptr), sourceView.raw(), C.mln_geojson_source_data(dataPtr), &commandID))
+	}); err != nil {
+		return 0, err
+	}
+	return uint64(commandID), nil
+}
+
+// SetGeoJSONSourceSynchronousTiling overrides a GeoJSON source's synchronous
+// tiling at runtime. While enabled is true, the source slices requested tiles
+// inline during the update pass, as if its options had set SynchronousTiling;
+// false restores the option the source was added with.
+func (m *MapHandle) SetGeoJSONSourceSynchronousTiling(sourceID string, enabled bool) (uint64, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
 		return 0, err
@@ -967,11 +999,9 @@ func (m *MapHandle) SetGeoJSONSourceData(sourceID string, data []byte) (uint64, 
 	defer m.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
-	rawData := newCBufferView(data)
-	defer rawData.free()
 	var commandID C.uint64_t
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_set_geojson_source_data(C.mln_map(ptr), sourceView.raw(), rawData.raw(), &commandID))
+		return int32(C.mln_map_set_geojson_source_synchronous_tiling(C.mln_map(ptr), sourceView.raw(), C.bool(enabled), &commandID))
 	}); err != nil {
 		return 0, err
 	}

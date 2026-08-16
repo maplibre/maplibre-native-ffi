@@ -58,7 +58,9 @@ fi
 # failure.
 if [[ ! -x "$adb" ]] ||
   ! "$adb" -s "$serial" shell getprop sys.boot_completed 2>/dev/null |
-  tr -d '\r' | grep -qx 1; then
+  tr -d '\r' | grep -qx 1 ||
+  ! "$adb" -s "$serial" shell getprop ro.product.cpu.abi 2>/dev/null |
+  tr -d '\r' | grep -qx "$abi"; then
   mise run //:android-emulator:boot "$abi"
 fi
 

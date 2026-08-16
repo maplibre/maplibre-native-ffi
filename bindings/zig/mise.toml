@@ -29,7 +29,8 @@ zig build --build-file ../../build.zig \
 [tasks.test]
 extends = "ffi:preset"
 # The preset selects the runner: Android presets use their matching emulator,
-# an iOS simulator preset spawns the suite there, and host presets run in process.
+# an iOS or tvOS simulator preset spawns the suite on a simulator, and host
+# presets run in process.
 run = '''
 case "$usage_preset" in
   android-*)
@@ -41,18 +42,25 @@ case "$usage_preset" in
       --test-timeout 180s --summary all --verbose
     ;;
   ios-simulator-*)
-    native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+    source "$MISE_MONOREPO_ROOT/scripts/zig-cross-env.sh" "$usage_preset"
     mise run //:ios-simulator:boot
     exec zig build test --build-file ../../build.zig \
-      -Dtarget=aarch64-ios-simulator \
-      -Dnative-install-dir="$native_install_dir" \
+      -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
       -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
-      -Dsystem-root="$(xcrun --sdk iphonesimulator --show-sdk-path)" \
-      --libc "$native_install_dir/share/maplibre-native-c/zig-libc" \
+      ${zig_cross_args[@]+"${zig_cross_args[@]}"} \
       --test-timeout 120s --summary all --verbose
     ;;
-  ios-*)
-    echo "The Zig binding tests need a runnable target; test an ios-simulator preset instead of $usage_preset." >&2
+  tvos-simulator-*)
+    source "$MISE_MONOREPO_ROOT/scripts/zig-cross-env.sh" "$usage_preset"
+    mise run //:tvos-simulator:boot
+    exec zig build test --build-file ../../build.zig \
+      -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+      -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
+      ${zig_cross_args[@]+"${zig_cross_args[@]}"} \
+      --test-timeout 120s --summary all --verbose
+    ;;
+  ios-* | tvos-*)
+    echo "The Zig binding tests need a runnable target; test an ios-simulator or tvos-simulator preset instead of $usage_preset." >&2
     exit 2
     ;;
 esac

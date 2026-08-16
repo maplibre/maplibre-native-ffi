@@ -438,6 +438,14 @@ type RenderFrameResult struct {
 	ExtentGeneration    uint64
 	FrameGeneration     uint64
 	PresentationTimeNS  int64
+	// NeedsRepaint reports whether the map asked for another frame while it
+	// rendered this one, as during an ongoing camera transition. It is true
+	// only when Disposition is RenderResultRendered and reads false for every
+	// other outcome. This is the same signal a
+	// RuntimeEventMapRenderFrameFinished event carries in its NeedsRepaint
+	// field, delivered with the frame result so a host can re-arm its frame
+	// loop without the runtime event round trip.
+	NeedsRepaint bool
 }
 
 func (sync GPUSync) toC() C.mln_gpu_sync {
@@ -456,6 +464,7 @@ func frameResultFromC(raw C.mln_render_frame_result) RenderFrameResult {
 		ExtentGeneration:    uint64(raw.extent_generation),
 		FrameGeneration:     uint64(raw.frame_generation),
 		PresentationTimeNS:  int64(raw.presentation_time_ns),
+		NeedsRepaint:        bool(raw.needs_repaint),
 	}
 }
 

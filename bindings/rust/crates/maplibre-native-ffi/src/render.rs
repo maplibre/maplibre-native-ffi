@@ -1117,6 +1117,13 @@ pub struct RenderFrameResult {
     pub extent_generation: u64,
     pub frame_generation: u64,
     pub presentation_time_ns: i64,
+    /// Whether the map asked for another frame while it rendered this one, as
+    /// during an ongoing camera transition. Set only when `disposition` is
+    /// [`FrameDisposition::Rendered`]; false for every other outcome. This is
+    /// the same signal the render-frame-finished event carries, delivered with
+    /// the frame result so a host can re-arm its frame loop without the
+    /// runtime event round trip.
+    pub needs_repaint: bool,
 }
 
 fn frame_result_from_native(raw: sys::mln_render_frame_result) -> RenderFrameResult {
@@ -1127,6 +1134,7 @@ fn frame_result_from_native(raw: sys::mln_render_frame_result) -> RenderFrameRes
         extent_generation: raw.extent_generation,
         frame_generation: raw.frame_generation,
         presentation_time_ns: raw.presentation_time_ns,
+        needs_repaint: raw.needs_repaint,
     }
 }
 

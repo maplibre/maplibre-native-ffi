@@ -140,6 +140,7 @@ pub const OpenGLOwnedTextureFrameInfo = render.OpenGLOwnedTextureFrameInfo;
 pub const WebGPUOwnedTextureFrameInfo = render.WebGPUOwnedTextureFrameInfo;
 pub const RenderSessionHandle = render.RenderSessionHandle;
 
+pub const GeoJsonSourceDataHandle = map.GeoJsonSourceDataHandle;
 pub const MapHandle = map.MapHandle;
 pub const MapOptions = map.MapOptions;
 pub const MapMode = map.MapMode;

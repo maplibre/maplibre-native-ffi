@@ -570,6 +570,168 @@ static void dedicated_egl_surface_renders_and_keeps_its_context_current(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// The repaint flag a rendered frame result carries: a settled static map
+// reports false, and a running camera transition reports true.
+static void frame_results_report_whether_the_map_needs_another_frame(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_map_set_style_json(
+                     map, MLN_BUFFER_LITERAL(dedicated_background_style_json)
+                   )
+  );
+
+  // Render until the map settles: the last frame asks for no repaint.
+  mln_render_frame_result result = {.size = sizeof(mln_render_frame_result)};
+  bool settled = false;
+  for (unsigned int attempt = 0; attempt < 500 && !settled; attempt += 1) {
+    mln_frame_demand demand = mln_frame_demand_default();
+    demand.flags = 0;
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK, mln_render_session_request_frame(fixture.session, &demand)
+    );
+    mln_operation barrier = MLN_HANDLE_NULL;
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK,
+      mln_render_session_barrier_start(fixture.session, 0, &barrier)
+    );
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, barrier)
+    );
+    mln_operation_release(barrier);
+    mln_render_frame_batch batch = MLN_HANDLE_NULL;
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK,
+      mln_render_session_drain_frame_results(fixture.session, SIZE_MAX, &batch)
+    );
+    size_t count = 0;
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK, mln_render_frame_batch_count(batch, &count)
+    );
+    for (size_t index = 0; index < count; index += 1) {
+      TEST_ASSERT_EQUAL_INT(
+        MLN_STATUS_OK, mln_render_frame_batch_get(batch, index, &result)
+      );
+      if (
+        result.disposition == MLN_RENDER_RESULT_RENDERED &&
+        !result.needs_repaint
+      ) {
+        settled = true;
+      }
+    }
+    mln_render_frame_batch_release(batch);
+    if (!settled) {
+      mln_test_sleep_millisecond();
+    }
+  }
+  TEST_ASSERT_TRUE(settled);
+
+  // Once settled, a render-if-needed demand reports no update instead of
+  // rendering the same update again. A rendered result here only means a
+  // fresh update slipped in, so keep demanding until one demand finds none.
+  bool saw_no_update = false;
+  for (unsigned int attempt = 0; attempt < 500 && !saw_no_update;
+       attempt += 1) {
+    mln_frame_demand demand = mln_frame_demand_default();
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK, mln_render_session_request_frame(fixture.session, &demand)
+    );
+    mln_operation barrier = MLN_HANDLE_NULL;
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK,
+      mln_render_session_barrier_start(fixture.session, 0, &barrier)
+    );
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, barrier)
+    );
+    mln_operation_release(barrier);
+    mln_render_frame_batch batch = MLN_HANDLE_NULL;
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK,
+      mln_render_session_drain_frame_results(fixture.session, SIZE_MAX, &batch)
+    );
+    size_t count = 0;
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK, mln_render_frame_batch_count(batch, &count)
+    );
+    for (size_t index = 0; index < count; index += 1) {
+      TEST_ASSERT_EQUAL_INT(
+        MLN_STATUS_OK, mln_render_frame_batch_get(batch, index, &result)
+      );
+      if (result.disposition == MLN_RENDER_RESULT_NO_UPDATE) {
+        saw_no_update = true;
+      }
+    }
+    mln_render_frame_batch_release(batch);
+    if (!saw_no_update) {
+      mln_test_sleep_millisecond();
+    }
+  }
+  TEST_ASSERT_TRUE(saw_no_update);
+
+  // A long camera transition asks for another frame from every rendered one.
+  mln_camera_update update = mln_camera_update_default();
+  update.mode = MLN_CAMERA_UPDATE_MODE_EASE;
+  update.camera.fields = MLN_CAMERA_OPTION_ZOOM;
+  update.camera.zoom = 4.0;
+  update.animation.fields = MLN_ANIMATION_OPTION_DURATION;
+  update.animation.duration_ms = 60000.0;
+  uint64_t command = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_update_camera(map, &update, &command)
+  );
+
+  bool saw_repaint_request = false;
+  for (unsigned int attempt = 0; attempt < 500 && !saw_repaint_request;
+       attempt += 1) {
+    mln_frame_demand demand = mln_frame_demand_default();
+    demand.flags = 0;
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK, mln_render_session_request_frame(fixture.session, &demand)
+    );
+    mln_operation barrier = MLN_HANDLE_NULL;
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK,
+      mln_render_session_barrier_start(fixture.session, 0, &barrier)
+    );
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, barrier)
+    );
+    mln_operation_release(barrier);
+    mln_render_frame_batch batch = MLN_HANDLE_NULL;
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK,
+      mln_render_session_drain_frame_results(fixture.session, SIZE_MAX, &batch)
+    );
+    size_t count = 0;
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK, mln_render_frame_batch_count(batch, &count)
+    );
+    for (size_t index = 0; index < count; index += 1) {
+      TEST_ASSERT_EQUAL_INT(
+        MLN_STATUS_OK, mln_render_frame_batch_get(batch, index, &result)
+      );
+      if (
+        result.disposition == MLN_RENDER_RESULT_RENDERED && result.needs_repaint
+      ) {
+        saw_repaint_request = true;
+      }
+    }
+    mln_render_frame_batch_release(batch);
+    if (!saw_repaint_request) {
+      mln_test_sleep_millisecond();
+    }
+  }
+  TEST_ASSERT_TRUE(saw_repaint_request);
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 static void opengl_borrowed_texture_rejects_unsafe_raw_descriptors(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -749,6 +911,7 @@ void run_render_backend_abi_tests(void) {
   RUN_TEST(opengl_dedicated_context_rejects_shared_session_fields);
   RUN_TEST(opengl_owned_texture_attach_rejects_a_dedicated_context);
   RUN_TEST(dedicated_egl_surface_renders_and_keeps_its_context_current);
+  RUN_TEST(frame_results_report_whether_the_map_needs_another_frame);
   RUN_TEST(opengl_owned_texture_attach_rejects_unsafe_raw_inputs);
   RUN_TEST(opengl_borrowed_texture_rejects_unsafe_raw_descriptors);
   RUN_TEST(vulkan_surface_attach_rejects_unsafe_raw_inputs);

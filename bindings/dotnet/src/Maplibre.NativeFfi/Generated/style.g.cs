@@ -116,7 +116,7 @@ namespace Maplibre.NativeFfi.Internal.C
         MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS = 1U << 8,
         MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS = 1U << 9,
         MLN_GEOJSON_SOURCE_OPTION_CLUSTER = 1U << 10,
-        MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE = 1U << 11,
+        MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING = 1U << 11,
     }
 
     [NativeTypeName("uint32_t")]
@@ -297,7 +297,7 @@ namespace Maplibre.NativeFfi.Internal.C
         public byte cluster;
 
         [NativeTypeName("bool")]
-        public byte synchronous_update;
+        public byte synchronous_tiling;
     }
 
     internal partial struct mln_canonical_tile_id
@@ -548,13 +548,22 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_status mln_map_add_geojson_source_url([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_buffer_view url, [NativeTypeName("const mln_geojson_source_options *")] mln_geojson_source_options* options, [NativeTypeName("uint64_t *")] ulong* out_command_id);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_add_geojson_source_data([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_buffer_view data, [NativeTypeName("const mln_geojson_source_options *")] mln_geojson_source_options* options, [NativeTypeName("uint64_t *")] ulong* out_command_id);
+        public static extern mln_status mln_geojson_source_data_create(mln_buffer_view data, [NativeTypeName("const mln_geojson_source_options *")] mln_geojson_source_options* options, [NativeTypeName("mln_geojson_source_data *")] MlnGeoJsonSourceData* out_data);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern void mln_geojson_source_data_destroy([NativeTypeName("mln_geojson_source_data")] MlnGeoJsonSourceData data);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_add_geojson_source_data([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("mln_geojson_source_data")] MlnGeoJsonSourceData data, [NativeTypeName("uint64_t *")] ulong* out_command_id);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_set_geojson_source_url([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_buffer_view url, [NativeTypeName("uint64_t *")] ulong* out_command_id);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_set_geojson_source_data([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_buffer_view data, [NativeTypeName("uint64_t *")] ulong* out_command_id);
+        public static extern mln_status mln_map_set_geojson_source_data([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("mln_geojson_source_data")] MlnGeoJsonSourceData data, [NativeTypeName("uint64_t *")] ulong* out_command_id);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_set_geojson_source_synchronous_tiling([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("bool")] byte enabled, [NativeTypeName("uint64_t *")] ulong* out_command_id);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_add_vector_source_url([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_buffer_view url, [NativeTypeName("const mln_style_tile_source_options *")] mln_style_tile_source_options* options, [NativeTypeName("uint64_t *")] ulong* out_command_id);

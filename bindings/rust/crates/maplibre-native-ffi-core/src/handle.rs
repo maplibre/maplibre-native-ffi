@@ -45,6 +45,7 @@ native_handle!(
     sys::mln_render_frame_batch,
     sys::mln_acquired_frame,
     sys::mln_resource_request_handle,
+    sys::mln_geojson_source_data,
     sys::mln_offline_region_snapshot,
     sys::mln_offline_region_list,
     sys::mln_style_id_list,

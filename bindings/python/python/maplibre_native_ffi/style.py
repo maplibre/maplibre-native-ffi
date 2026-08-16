@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from . import _native
 from ._enum import NativeIntEnum, UnknownIntEnum
 from ._lifecycle import NativeHandleMixin
 from .errors import InvalidArgumentError
@@ -54,7 +55,9 @@ class GeoJsonSourceOptions:
     """Options for GeoJSON sources.
 
     MapLibre Native fixes these options when the source is created, so updating
-    a GeoJSON source's URL or data keeps the options it was added with.
+    a GeoJSON source's URL keeps the options it was added with, and
+    :meth:`~maplibre_native_ffi.map.MapHandle.set_geojson_source_data` requires
+    data prepared with matching options.
     """
 
     min_zoom: float | None = None
@@ -70,9 +73,11 @@ class GeoJsonSourceOptions:
     cluster_min_points: int | None = None
     line_metrics: bool | None = None
     cluster: bool | None = None
-    synchronous_update: bool | None = None
-    """Applies data updates synchronously, so data set through
-    `set_geojson_source_data` reaches the next rendered frame."""
+    synchronous_tiling: bool | None = None
+    """Slices requested tiles inline during the update pass, so data installed
+    through `set_geojson_source_data` reaches the next rendered frame.
+    `MapHandle.set_geojson_source_synchronous_tiling` overrides this at
+    runtime."""
 
     def __post_init__(self) -> None:
         for name in ("tile_size", "buffer", "cluster_radius", "cluster_min_points"):
@@ -81,6 +86,77 @@ class GeoJsonSourceOptions:
                 raise InvalidArgumentError(
                     None, f"{name} must be within [0, 4294967295]"
                 )
+
+
+def _geojson_source_parts(
+    options: GeoJsonSourceOptions | None,
+) -> tuple[
+    float | None,
+    float | None,
+    float | None,
+    float | None,
+    bytes | None,
+    int | None,
+    int | None,
+    int | None,
+    int | None,
+    bool | None,
+    bool | None,
+    bool | None,
+]:
+    if options is None:
+        return (
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+    return (
+        options.min_zoom,
+        options.max_zoom,
+        options.tolerance,
+        options.cluster_max_zoom,
+        options.cluster_properties,
+        options.tile_size,
+        options.buffer,
+        options.cluster_radius,
+        options.cluster_min_points,
+        options.line_metrics,
+        options.cluster,
+        options.synchronous_tiling,
+    )
+
+
+class GeoJsonSourceDataHandle(NativeHandleMixin):
+    """Owned prepared GeoJSON source data.
+
+    Construction parses one complete UTF-8 GeoJSON document and tiles it into
+    a prepared index with the given options baked in. It needs no runtime or
+    map, runs without the GIL, and is callable from any thread, so worker
+    threads can prepare documents in parallel. The prepared value is immutable
+    and safe to share across threads.
+
+    Install calls borrow the handle, so one prepared value may be installed on
+    any number of sources and closed at any time afterward; closing never
+    invalidates a source the data was installed on.
+    """
+
+    _handle_name = "GeoJsonSourceDataHandle"
+
+    def __init__(
+        self, data: bytes, options: GeoJsonSourceOptions | None = None
+    ) -> None:
+        self._native = _native.create_geojson_source_data(
+            data, *_geojson_source_parts(options)
+        )
 
 
 class StyleSourceType(UnknownIntEnum):
@@ -427,6 +503,7 @@ __all__ = [
     "CustomGeometrySourceEventType",
     "CustomGeometrySourceHandle",
     "CustomGeometrySourceOptions",
+    "GeoJsonSourceDataHandle",
     "GeoJsonSourceOptions",
     "LocationIndicatorImageKind",
     "RasterDemEncoding",

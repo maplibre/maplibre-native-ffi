@@ -118,6 +118,7 @@ import org.maplibre.nativeffi.internal.c.mln_vulkan_owned_texture_descriptor
 import org.maplibre.nativeffi.internal.c.mln_vulkan_owned_texture_frame
 import org.maplibre.nativeffi.internal.c.mln_vulkan_surface_descriptor
 import org.maplibre.nativeffi.internal.c.mln_wgl_context_descriptor
+import org.maplibre.nativeffi.internal.lifecycle.NativeGeoJsonSourceData
 import org.maplibre.nativeffi.internal.lifecycle.NativeHandle
 import org.maplibre.nativeffi.internal.lifecycle.NativeMap
 import org.maplibre.nativeffi.internal.lifecycle.NativeMapProjection
@@ -910,22 +911,36 @@ internal object NativeAccess {
     }
   }
 
+  internal fun createGeoJsonSourceData(
+    data: ByteArray,
+    options: GeoJsonSourceOptions?,
+  ): NativeGeoJsonSourceData =
+    Arena.ofConfined().use { arena ->
+      val outData = arena.allocate(ValueLayout.JAVA_LONG)
+      outData.set(ValueLayout.JAVA_LONG, 0, 0L)
+      Status.check(
+        geoJsonSourceDataCreateFunction()
+          .invokeNative(byteArrayView(arena, data), geoJsonSourceOptions(arena, options), outData)
+          as Int
+      )
+      NativeGeoJsonSourceData(outData.get(ValueLayout.JAVA_LONG, 0)).also { handle ->
+        require(!handle.isNull) { "mln_geojson_source_data_create returned the null handle" }
+      }
+    }
+
+  internal fun destroyGeoJsonSourceData(data: NativeGeoJsonSourceData) {
+    geoJsonSourceDataDestroyFunction().invokeNative(data)
+  }
+
   internal fun addGeoJsonSourceData(
     map: NativeMap,
     sourceId: String,
-    data: ByteArray,
-    options: GeoJsonSourceOptions?,
+    data: NativeGeoJsonSourceData,
   ): Long = command { outCommandId ->
     Arena.ofConfined().use { arena ->
       Status.check(
-        mapStringViewTwoAddressStatusFunction("mln_map_add_geojson_source_data")
-          .invokeNative(
-            map,
-            stringView(arena, sourceId),
-            byteArrayView(arena, data),
-            geoJsonSourceOptions(arena, options),
-            outCommandId,
-          ) as Int
+        mapStringViewHandleStatusFunction("mln_map_add_geojson_source_data")
+          .invokeNative(map, stringView(arena, sourceId), data, outCommandId) as Int
       )
     }
   }
@@ -941,20 +956,31 @@ internal object NativeAccess {
       }
     }
 
-  internal fun setGeoJsonSourceData(map: NativeMap, sourceId: String, data: ByteArray): Long =
-    command { outCommandId ->
-      Arena.ofConfined().use { arena ->
-        Status.check(
-          mapStringViewAddressStatusFunction("mln_map_set_geojson_source_data")
-            .invokeNative(
-              map,
-              stringView(arena, sourceId),
-              byteArrayView(arena, data),
-              outCommandId,
-            ) as Int
-        )
-      }
+  internal fun setGeoJsonSourceData(
+    map: NativeMap,
+    sourceId: String,
+    data: NativeGeoJsonSourceData,
+  ): Long = command { outCommandId ->
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewHandleStatusFunction("mln_map_set_geojson_source_data")
+          .invokeNative(map, stringView(arena, sourceId), data, outCommandId) as Int
+      )
     }
+  }
+
+  internal fun setGeoJsonSourceSynchronousTiling(
+    map: NativeMap,
+    sourceId: String,
+    enabled: Boolean,
+  ): Long = command { outCommandId ->
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewBooleanStatusFunction("mln_map_set_geojson_source_synchronous_tiling")
+          .invokeNative(map, stringView(arena, sourceId), enabled, outCommandId) as Int
+      )
+    }
+  }
 
   internal fun addCustomGeometrySource(
     map: NativeMap,
@@ -3638,6 +3664,16 @@ internal object NativeAccess {
 
   private fun mapStringViewAddressStatusFunction(name: String): MethodHandle = downcall(name)
 
+  private fun mapStringViewHandleStatusFunction(name: String): MethodHandle = downcall(name)
+
+  private fun mapStringViewBooleanStatusFunction(name: String): MethodHandle = downcall(name)
+
+  private fun geoJsonSourceDataCreateFunction(): MethodHandle =
+    downcall("mln_geojson_source_data_create")
+
+  private fun geoJsonSourceDataDestroyFunction(): MethodHandle =
+    downcall("mln_geojson_source_data_destroy")
+
   private fun mapAddressStringViewStatusFunction(name: String): MethodHandle = downcall(name)
 
   private fun mapTwoStringViewsStatusFunction(name: String): MethodHandle = downcall(name)
@@ -3977,9 +4013,9 @@ internal object NativeAccess {
       fields = fields or GEOJSON_SOURCE_OPTION_CLUSTER
       segment.set(ValueLayout.JAVA_BOOLEAN, GEOJSON_SOURCE_OPTIONS_CLUSTER_OFFSET, it)
     }
-    value.synchronousUpdate?.let {
-      fields = fields or GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE
-      segment.set(ValueLayout.JAVA_BOOLEAN, GEOJSON_SOURCE_OPTIONS_SYNCHRONOUS_UPDATE_OFFSET, it)
+    value.synchronousTiling?.let {
+      fields = fields or GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING
+      segment.set(ValueLayout.JAVA_BOOLEAN, GEOJSON_SOURCE_OPTIONS_SYNCHRONOUS_TILING_OFFSET, it)
     }
     segment.set(ValueLayout.JAVA_INT, GEOJSON_SOURCE_OPTIONS_FIELDS_OFFSET, fields)
     return segment
@@ -5490,6 +5526,7 @@ internal object NativeAccess {
       extentGeneration = segment.get(ValueLayout.JAVA_LONG, 24).toULong(),
       frameGeneration = segment.get(ValueLayout.JAVA_LONG, 32).toULong(),
       presentationTimeNanoseconds = segment.get(ValueLayout.JAVA_LONG, 40),
+      needsRepaint = segment.get(ValueLayout.JAVA_BOOLEAN, 48),
     )
 
   private fun gpuSync(arena: Arena, sync: GpuSync): MemorySegment =
@@ -5745,7 +5782,7 @@ internal object NativeAccess {
   private const val GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS: Int = 1 shl 8
   private const val GEOJSON_SOURCE_OPTION_LINE_METRICS: Int = 1 shl 9
   private const val GEOJSON_SOURCE_OPTION_CLUSTER: Int = 1 shl 10
-  private const val GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE: Int = 1 shl 11
+  private const val GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING: Int = 1 shl 11
 
   private val GEOJSON_SOURCE_OPTIONS_SIZE: Long = mln_geojson_source_options.sizeof()
   private val GEOJSON_SOURCE_OPTIONS_SIZE_OFFSET: Long = mln_geojson_source_options.`size$offset`()
@@ -5773,8 +5810,8 @@ internal object NativeAccess {
     mln_geojson_source_options.`line_metrics$offset`()
   private val GEOJSON_SOURCE_OPTIONS_CLUSTER_OFFSET: Long =
     mln_geojson_source_options.`cluster$offset`()
-  private val GEOJSON_SOURCE_OPTIONS_SYNCHRONOUS_UPDATE_OFFSET: Long =
-    mln_geojson_source_options.`synchronous_update$offset`()
+  private val GEOJSON_SOURCE_OPTIONS_SYNCHRONOUS_TILING_OFFSET: Long =
+    mln_geojson_source_options.`synchronous_tiling$offset`()
 
   private const val CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM: Int = 1 shl 0
   private const val CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM: Int = 1 shl 1

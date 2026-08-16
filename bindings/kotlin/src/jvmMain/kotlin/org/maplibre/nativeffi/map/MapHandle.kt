@@ -27,6 +27,7 @@ import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 import org.maplibre.nativeffi.runtime.RuntimeEventMask
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.GeoJsonSourceDataHandle
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.ImageStretch
 import org.maplibre.nativeffi.style.LayerInfo
@@ -122,14 +123,13 @@ private constructor(
     NativeAccess.addGeoJsonSourceUrl(requireLiveHandle(), sourceId, url, options)
   }
 
-  public actual fun addGeoJsonSourceData(
-    sourceId: String,
-    data: ByteArray,
-    options: GeoJsonSourceOptions?,
-  ): ULong = command { outCommandId ->
-    NativeAccess.ensureLoaded()
-    NativeAccess.addGeoJsonSourceData(requireLiveHandle(), sourceId, data, options)
-  }
+  public actual fun addGeoJsonSourceData(sourceId: String, data: GeoJsonSourceDataHandle): ULong =
+    command { outCommandId ->
+      NativeAccess.ensureLoaded()
+      data.withNativeHandle { nativeData ->
+        NativeAccess.addGeoJsonSourceData(requireLiveHandle(), sourceId, nativeData)
+      }
+    }
 
   public actual fun setGeoJsonSourceUrl(sourceId: String, url: String): ULong =
     command { outCommandId ->
@@ -137,10 +137,18 @@ private constructor(
       NativeAccess.setGeoJsonSourceUrl(requireLiveHandle(), sourceId, url)
     }
 
-  public actual fun setGeoJsonSourceData(sourceId: String, data: ByteArray): ULong =
+  public actual fun setGeoJsonSourceData(sourceId: String, data: GeoJsonSourceDataHandle): ULong =
     command { outCommandId ->
       NativeAccess.ensureLoaded()
-      NativeAccess.setGeoJsonSourceData(requireLiveHandle(), sourceId, data)
+      data.withNativeHandle { nativeData ->
+        NativeAccess.setGeoJsonSourceData(requireLiveHandle(), sourceId, nativeData)
+      }
+    }
+
+  public actual fun setGeoJsonSourceSynchronousTiling(sourceId: String, enabled: Boolean): ULong =
+    command { outCommandId ->
+      NativeAccess.ensureLoaded()
+      NativeAccess.setGeoJsonSourceSynchronousTiling(requireLiveHandle(), sourceId, enabled)
     }
 
   public actual fun addCustomGeometrySource(

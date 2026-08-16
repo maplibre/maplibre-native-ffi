@@ -77,13 +77,19 @@ public readonly record struct FrameDemand(
     long DeadlineNanoseconds
 );
 
+/// <summary>
+/// One frame demand's outcome. <see cref="NeedsRepaint"/> is meaningful only when
+/// <see cref="Disposition"/> is <see cref="RenderResult.Rendered"/>; it is true when the map
+/// asked for another frame while it rendered this one, as during an ongoing camera transition.
+/// </summary>
 public readonly record struct RenderFrameResult(
     RenderResult Disposition,
     ulong Token,
     ulong MapUpdateGeneration,
     ulong ExtentGeneration,
     ulong FrameGeneration,
-    long PresentationTimeNanoseconds
+    long PresentationTimeNanoseconds,
+    bool NeedsRepaint
 );
 
 public readonly record struct RenderSessionSnapshot(

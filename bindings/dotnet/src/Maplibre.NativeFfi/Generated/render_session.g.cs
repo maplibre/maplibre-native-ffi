@@ -74,6 +74,9 @@ namespace Maplibre.NativeFfi.Internal.C
 
         [NativeTypeName("int64_t")]
         public long presentation_time_ns;
+
+        [NativeTypeName("bool")]
+        public byte needs_repaint;
     }
 
     internal partial struct mln_render_session_snapshot

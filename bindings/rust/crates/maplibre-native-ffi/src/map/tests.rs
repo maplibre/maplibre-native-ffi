@@ -483,7 +483,7 @@ fn tile_source_helpers_call_real_c_api() {
 
 #[test]
 // Spec coverage: BND-060, BND-061, and BND-105.
-fn geojson_source_helpers_accept_options_and_keep_them_across_updates() {
+fn geojson_source_helpers_accept_prepared_data_and_keep_options_across_updates() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
     map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
@@ -507,7 +507,7 @@ fn geojson_source_helpers_accept_options_and_keep_them_across_updates() {
         Some(SourceType::GeoJson)
     );
 
-    let data = serde_json::to_vec(&json!({
+    let bytes = serde_json::to_vec(&json!({
         "type": "FeatureCollection",
         "features": [{
             "type": "Feature",
@@ -516,17 +516,40 @@ fn geojson_source_helpers_accept_options_and_keep_them_across_updates() {
         }],
     }))
     .unwrap();
-    map.add_geojson_source_data("geojson-data", &data, None)
+    let data = crate::GeoJsonSourceDataHandle::new(&bytes, Some(&options)).unwrap();
+
+    // One prepared value installs on any number of sources.
+    map.add_geojson_source_data("geojson-data", &data).unwrap();
+    map.add_geojson_source_data("geojson-data-2", &data)
         .unwrap();
     assert_eq!(
         source_type_of(&map, "geojson-data"),
         Some(SourceType::GeoJson)
     );
+    assert_eq!(
+        source_type_of(&map, "geojson-data-2"),
+        Some(SourceType::GeoJson)
+    );
 
-    // Updates carry no options; the source keeps what it was added with.
-    map.set_geojson_source_data("geojson-url", &data).unwrap();
-    map.set_geojson_source_url("geojson-data", "https://example.com/points.geojson")
+    // Updates install prepared data; the source keeps the options the data it
+    // was added with carried.
+    let update = map.set_geojson_source_data("geojson-data", &data).unwrap();
+    assert_command_disposition(&runtime, update, CommandDisposition::Committed);
+    let update = map.set_geojson_source_data("geojson-url", &data).unwrap();
+    assert_command_disposition(&runtime, update, CommandDisposition::Committed);
+    map.set_geojson_source_url("geojson-data-2", "https://example.com/points.geojson")
         .unwrap();
+
+    // The submit-time lease keeps the prepared index alive, so the handle may
+    // be released as soon as an install command is submitted, and installed
+    // sources keep their own reference.
+    let final_install = map.set_geojson_source_data("geojson-data", &data).unwrap();
+    data.close();
+    assert_command_disposition(&runtime, final_install, CommandDisposition::Committed);
+    assert_eq!(
+        source_type_of(&map, "geojson-data"),
+        Some(SourceType::GeoJson)
+    );
 
     map.close().unwrap();
     runtime.close().unwrap();
@@ -534,67 +557,160 @@ fn geojson_source_helpers_accept_options_and_keep_them_across_updates() {
 
 #[test]
 // Spec coverage: BND-060 and BND-061.
-fn clustered_geojson_source_requires_a_feature_collection() {
+fn set_geojson_source_data_rejects_mismatched_prepared_options() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
     map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
 
+    let bytes = br#"{"type":"FeatureCollection","features":[]}"#;
+    let mut options = GeoJsonSourceOptions::default();
+    options.cluster = Some(true);
+    options.cluster_radius = Some(40);
+    let added = crate::GeoJsonSourceDataHandle::new(bytes, Some(&options)).unwrap();
+    map.add_geojson_source_data("points", &added).unwrap();
+
+    // Data prepared under different options would tile inconsistently with
+    // the source's fixed options, so the install is rejected.
+    let mut mismatched = options.clone();
+    mismatched.cluster_radius = Some(80);
+    let mismatched = crate::GeoJsonSourceDataHandle::new(bytes, Some(&mismatched)).unwrap();
+    let rejected = map.set_geojson_source_data("points", &mismatched).unwrap();
+    let (_, code, _) = assert_command_disposition(&runtime, rejected, CommandDisposition::Failed);
+    assert_eq!(code, sys::MLN_STATUS_INVALID_ARGUMENT);
+
+    // Cluster aggregations are part of the comparison, so data prepared with
+    // different cluster_properties is rejected too.
+    let mut properties_only = options.clone();
+    properties_only.cluster_properties =
+        Some(serde_json::to_vec(&json!({"weight_sum": ["+", ["get", "weight"]]})).unwrap());
+    let properties_only =
+        crate::GeoJsonSourceDataHandle::new(bytes, Some(&properties_only)).unwrap();
+    let rejected = map
+        .set_geojson_source_data("points", &properties_only)
+        .unwrap();
+    let (_, code, _) = assert_command_disposition(&runtime, rejected, CommandDisposition::Failed);
+    assert_eq!(code, sys::MLN_STATUS_INVALID_ARGUMENT);
+
+    // The rejected install left the source usable with matching data.
+    let matching = crate::GeoJsonSourceDataHandle::new(bytes, Some(&options)).unwrap();
+    let accepted = map.set_geojson_source_data("points", &matching).unwrap();
+    assert_command_disposition(&runtime, accepted, CommandDisposition::Committed);
+
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+// Spec coverage: BND-060 and BND-061.
+fn clustered_geojson_data_requires_a_feature_collection() {
     let mut options = GeoJsonSourceOptions::default();
     options.cluster = Some(true);
 
-    // MapLibre Native clusters feature collections only; anything else tiles
-    // unclustered instead of honouring the requested option.
+    // MapLibre Native clusters feature collections only; anything else would
+    // tile unclustered instead of honouring the requested option, so
+    // preparation rejects it. No runtime or map is required to observe this.
     let bare = br#"{"type":"Point","coordinates":[0.0,0.0]}"#;
-    let bare_id = map
-        .add_geojson_source_data("quakes", bare, Some(&options))
-        .unwrap();
-    assert_ne!(bare_id, 0);
-    await_runtime_barrier(&runtime);
-    assert!(source_type_of(&map, "quakes").is_none());
+    let error = crate::GeoJsonSourceDataHandle::new(bare, Some(&options)).unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+    let message = error.to_string();
+    assert!(
+        message.contains("requires a feature collection"),
+        "{message}"
+    );
+    assert!(message.contains("a bare geometry"), "{message}");
 
     let single = br#"{"type":"Feature","geometry":{"type":"Point","coordinates":[0.0,0.0]},"properties":{}}"#;
-    let single_id = map
-        .add_geojson_source_data("quakes", single, Some(&options))
-        .unwrap();
-    assert_ne!(single_id, 0);
-    await_runtime_barrier(&runtime);
-    assert!(source_type_of(&map, "quakes").is_none());
+    let error = crate::GeoJsonSourceDataHandle::new(single, Some(&options)).unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+    assert!(error.to_string().contains("a single feature"), "{error}");
 
-    // The constraint belongs to clustering alone, and the rejected ID stays free.
-    map.add_geojson_source_data("quakes", bare, None).unwrap();
+    // The constraint belongs to clustering alone.
+    crate::GeoJsonSourceDataHandle::new(bare, None).unwrap();
 
     // An empty feature collection is accepted; a later update supplies the
     // features to cluster.
     let empty = br#"{"type":"FeatureCollection","features":[]}"#;
-    map.add_geojson_source_data("pending", empty, Some(&options))
-        .unwrap();
-
-    map.close().unwrap();
-    runtime.close().unwrap();
+    crate::GeoJsonSourceDataHandle::new(empty, Some(&options)).unwrap();
 }
 
 #[test]
 // Spec coverage: BND-060 and BND-061.
-fn clustered_geojson_source_reports_non_point_geometry() {
-    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
-
+fn clustered_geojson_data_reports_non_point_geometry() {
     let mut options = GeoJsonSourceOptions::default();
     options.cluster = Some(true);
 
     let mixed = br#"{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[0.0,0.0]},"properties":{}},{"type":"Feature","geometry":{"type":"GeometryCollection","geometries":[{"type":"Point","coordinates":[1.0,1.0]}]},"properties":{}}]}"#;
 
     // Supercluster reads every feature geometry as a point.
-    let mixed_id = map
-        .add_geojson_source_data("quakes", mixed, Some(&options))
-        .unwrap();
-    assert_ne!(mixed_id, 0);
-    await_runtime_barrier(&runtime);
-    assert!(source_type_of(&map, "quakes").is_none());
+    let error = crate::GeoJsonSourceDataHandle::new(mixed, Some(&options)).unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+    let message = error.to_string();
+    assert!(
+        message.contains("point geometry on every feature"),
+        "{message}"
+    );
+    assert!(message.contains("geometry collection"), "{message}");
 
-    // The constraint belongs to clustering alone, and the rejected ID stays free.
-    map.add_geojson_source_data("quakes", mixed, None).unwrap();
+    // The constraint belongs to clustering alone.
+    crate::GeoJsonSourceDataHandle::new(mixed, None).unwrap();
+}
+
+#[test]
+// Rust regression: preparation is free of any runtime or map and the prepared
+// value is immutable, so the handle transfers and shares across threads.
+fn geojson_source_data_handle_is_send_and_sync() {
+    static_assertions::assert_impl_all!(crate::GeoJsonSourceDataHandle: Send, Sync);
+}
+
+#[test]
+// Spec coverage: BND-060 and BND-061.
+fn geojson_data_prepared_off_thread_installs_on_the_map_thread() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
+
+    let data = std::thread::spawn(|| {
+        let bytes = br#"{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[0.0,0.0]},"properties":{}}]}"#;
+        crate::GeoJsonSourceDataHandle::new(bytes, None).unwrap()
+    })
+    .join()
+    .unwrap();
+
+    map.add_geojson_source_data("worker-prepared", &data)
+        .unwrap();
+    assert_eq!(
+        source_type_of(&map, "worker-prepared"),
+        Some(SourceType::GeoJson)
+    );
+
+    // The prepared value releases off the map thread as well.
+    std::thread::spawn(move || drop(data)).join().unwrap();
+
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+// Spec coverage: BND-060 and BND-061.
+fn synchronous_tiling_override_targets_live_geojson_sources_only() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    map.set_style_json(STYLE_WITH_IDS_JSON.as_bytes()).unwrap();
+
+    let enabled = map
+        .set_geojson_source_synchronous_tiling("geo", true)
+        .unwrap();
+    assert_command_disposition(&runtime, enabled, CommandDisposition::Committed);
+    let disabled = map
+        .set_geojson_source_synchronous_tiling("geo", false)
+        .unwrap();
+    assert_command_disposition(&runtime, disabled, CommandDisposition::Committed);
+
+    let missing = map
+        .set_geojson_source_synchronous_tiling("missing", true)
+        .unwrap();
+    let (_, code, _) = assert_command_disposition(&runtime, missing, CommandDisposition::Failed);
+    assert_eq!(code, sys::MLN_STATUS_INVALID_ARGUMENT);
 
     map.close().unwrap();
     runtime.close().unwrap();

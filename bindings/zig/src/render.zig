@@ -109,6 +109,10 @@ pub const FrameResult = struct {
     extent_generation: u64,
     frame_generation: u64,
     presentation_time_ns: i64,
+    /// Whether the map asked for another frame while it rendered this one, as
+    /// during an ongoing camera transition. Set only when `disposition` is
+    /// `.rendered`, and false for every other outcome.
+    needs_repaint: bool,
 };
 
 pub const RenderSessionCapabilities = struct {
@@ -1111,7 +1115,7 @@ fn frameDemandToNative(demand: FrameDemand) c.mln_frame_demand {
 }
 
 fn frameResultFromNative(raw: c.mln_render_frame_result) FrameResult {
-    return .{ .disposition = RenderResult.fromRaw(raw.disposition), .token = raw.token, .map_update_generation = raw.map_update_generation, .extent_generation = raw.extent_generation, .frame_generation = raw.frame_generation, .presentation_time_ns = raw.presentation_time_ns };
+    return .{ .disposition = RenderResult.fromRaw(raw.disposition), .token = raw.token, .map_update_generation = raw.map_update_generation, .extent_generation = raw.extent_generation, .frame_generation = raw.frame_generation, .presentation_time_ns = raw.presentation_time_ns, .needs_repaint = raw.needs_repaint };
 }
 
 fn gpuSyncToNative(sync: GpuSync) c.mln_gpu_sync {

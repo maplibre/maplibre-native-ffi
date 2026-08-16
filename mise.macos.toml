@@ -14,14 +14,15 @@ JDK_JAVA_OPTIONS = "-Djava.library.path=/opt/homebrew/opt/vulkan-loader/lib -Dor
 MLN_FFI_VULKAN_LOADER_DIR = "/opt/homebrew/opt/vulkan-loader/lib"
 VK_DRIVER_FILES = "/opt/homebrew/opt/molten-vk/etc/vulkan/icd.d/MoltenVK_icd.json"
 
+[tasks."apple-simulator:boot"]
+description = "Boot an available Apple simulator and wait until it is ready."
+usage = 'arg "<runtime>"'
+run = 'bash "$MISE_MONOREPO_ROOT/scripts/apple-simulator.sh" boot "$usage_runtime"'
+
 [tasks."ios-simulator:boot"]
 description = "Boot an available iPhone simulator and wait until it is ready."
-run = '''
-device=$(xcrun simctl list devices available iOS | awk -F '[()]' '/ iPhone / && /Shutdown|Booted/ { print $2; exit }')
-[[ -n "$device" ]] || { echo "No available iOS simulator device found." >&2; exit 2; }
-state=$(xcrun simctl list devices "$device" | awk -F '[()]' -v id="$device" '$0 ~ id { print $4; exit }')
-if [[ "$state" != "Booted" ]]; then
-  xcrun simctl boot "$device"
-  xcrun simctl bootstatus "$device" -b
-fi
-'''
+run = [{ task = "//:apple-simulator:boot", args = ["iOS"] }]
+
+[tasks."tvos-simulator:boot"]
+description = "Boot an available Apple TV simulator and wait until it is ready."
+run = [{ task = "//:apple-simulator:boot", args = ["tvOS"] }]

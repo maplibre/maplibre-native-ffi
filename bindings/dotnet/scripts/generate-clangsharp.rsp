@@ -19,6 +19,7 @@ mln_buffer=MlnBuffer
 mln_runtime=MlnRuntime
 mln_map=MlnMap
 mln_map_projection=MlnMapProjection
+mln_geojson_source_data=MlnGeoJsonSourceData
 mln_render_session=MlnRenderSession
 mln_render_frame_batch=MlnRenderFrameBatch
 mln_acquired_frame=MlnAcquiredFrame

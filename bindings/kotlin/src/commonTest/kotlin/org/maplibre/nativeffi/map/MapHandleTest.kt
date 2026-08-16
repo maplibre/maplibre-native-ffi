@@ -28,6 +28,7 @@ import org.maplibre.nativeffi.runtime.RuntimeOptions
 import org.maplibre.nativeffi.runtime.use
 import org.maplibre.nativeffi.style.CustomGeometrySourceCallback
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.GeoJsonSourceDataHandle
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.RasterDemEncoding
 import org.maplibre.nativeffi.style.SourceInfo
@@ -384,34 +385,32 @@ class MapHandleTest {
           map.setGeoJsonSourceUrl("remote-places", "https://example.com/updated.geojson"),
         )
 
-        assertCommandCommitted(
-          runtime,
-          map.addGeoJsonSourceData(
-            "inline-places",
-            geoJsonData(),
-            GeoJsonSourceOptions().apply {
-              minZoom = 0.0
-              maxZoom = 14.0
-              tolerance = 0.5
-              tileSize = 256
-              buffer = 64
-              lineMetrics = true
-            },
-          ),
-        )
+        val inlineOptions =
+          GeoJsonSourceOptions().apply {
+            minZoom = 0.0
+            maxZoom = 14.0
+            tolerance = 0.5
+            tileSize = 256
+            buffer = 64
+            lineMetrics = true
+          }
+        GeoJsonSourceDataHandle.create(geoJsonData(), inlineOptions).use { data ->
+          assertCommandCommitted(runtime, map.addGeoJsonSourceData("inline-places", data))
+        }
         assertEquals(SourceType.GEOJSON, map.styleSourceInfo("inline-places")?.type)
-        assertCommandCommitted(
-          runtime,
-          map.setGeoJsonSourceData(
-            "inline-places",
-            "{\"type\":\"LineString\",\"coordinates\":[[0,0],[1,1]]}".encodeToByteArray(),
-          ),
-        )
+        GeoJsonSourceDataHandle.create(
+            ("{\"type\":\"Feature\",\"geometry\":{\"type\":\"LineString\"," +
+                "\"coordinates\":[[0,0],[1,1]]},\"properties\":{}}")
+              .encodeToByteArray(),
+            inlineOptions,
+          )
+          .use { update ->
+            assertCommandCommitted(runtime, map.setGeoJsonSourceData("inline-places", update))
+          }
 
-        assertCommandCommitted(
-          runtime,
-          map.addGeoJsonSourceData("clustered-places", nearbyPoints(), clusterOptions()),
-        )
+        GeoJsonSourceDataHandle.create(nearbyPoints(), clusterOptions()).use { clustered ->
+          assertCommandCommitted(runtime, map.addGeoJsonSourceData("clustered-places", clustered))
+        }
         assertEquals(SourceType.GEOJSON, map.styleSourceInfo("clustered-places")?.type)
 
         assertFailsWith<InvalidArgumentException> {

@@ -10,10 +10,10 @@ import { region } from "../../../snippets";
 
 import liveUpdates from "../../../../snippets/c/geojson-live-updates.c?raw";
 
-A GeoJSON source accepts new inline data or a new URL. Both commands replace the
-whole dataset in runtime submission order. A host that tracks individual
-features keeps its own collection and publishes the collection after each
-change.
+A GeoJSON source accepts prepared inline data or a new URL. Both commands
+replace the whole dataset in runtime submission order. A host that tracks
+individual features keeps its own collection and publishes the collection after
+each change.
 
 Initialize the source with an empty feature collection. Every later update uses
 the same source ID, preserving the layers that draw it.
@@ -26,28 +26,41 @@ caller-provided buffer.
 
 <Code code={region(liveUpdates, "features")} lang="c" title="geojson-live-updates.c" />
 
-One call publishes the complete buffer view to the source. MapLibre parses or
-copies the bytes before returning, so the host can reuse the buffer afterward.
+An update has two steps. Preparation parses the bytes and tiles them into the
+index that the source consumes, which is the expensive part of the update, and
+it runs on any thread with no map in hand. Prepare the data with the same
+options that the source was added with; an install with different options
+reports an invalid-argument status.
+
+<Code code={region(liveUpdates, "prepare")} lang="c" title="geojson-live-updates.c" />
+
+The install is a command that swaps the prepared index into the source, which
+is cheap at any data size. Destroy the prepared handle after the install, or
+keep it to install the same data on other matching sources.
+MapLibre copies what it keeps, so the serialization buffer is free for reuse
+once preparation returns.
 
 <Code code={region(liveUpdates, "publish")} lang="c" title="geojson-live-updates.c" />
 
-Every update re-tiles the whole dataset. When a feed delivers faster than the
-display refreshes, collect the messages that arrive between frames and publish
-once per frame.
+A host with a worker thread prepares there and installs from any thread, so a
+large dataset never blocks the thread that publishes it. When a feed delivers
+faster than the display refreshes, collect the messages that arrive between
+frames and publish once per frame.
 
-## Synchronous updates
+## Synchronous tiling
 
-MapLibre tiles updated data on a worker thread. New features appear in a later
-frame, and the update call does not extend the current frame. Use this default
-for most feeds.
+MapLibre slices the tiles that the viewport requests out of the installed index
+on a worker thread. New features appear in a later frame, and the install call
+does not extend the current frame. Use this default for most feeds.
 
-Set the synchronous-update option when the next frame must include the update.
+Set the synchronous-tiling option when the next frame must include the update.
 Examples include a simulation that advances with rendering and a still image
 captured immediately after an update. Tiling then runs on native worker threads.
 A large dataset can delay the render update that publishes the new tiles.
 
-<Code code={region(liveUpdates, "options")} lang="c" title="geojson-live-updates.c" />
+The option chosen when adding the source is the baseline, and a runtime
+override raises it temporarily. Enable the override around a burst of
+high-frequency small updates, such as a tracked position, and disable it to
+restore the source's own option.
 
-Choose the synchronous-update option when adding the source. Changing it later
-requires removing every layer that draws the source and then replacing the
-source.
+<Code code={region(liveUpdates, "synchronous-tiling")} lang="c" title="geojson-live-updates.c" />

@@ -799,6 +799,13 @@ public struct RenderFrameResult: Sendable, Hashable {
   public let extentGeneration: UInt64
   public let frameGeneration: UInt64
   public let presentationTimeNanoseconds: Int64
+  /// Whether the map asked for another frame while it rendered this one, as
+  /// during an ongoing camera transition. Set only when ``result`` is
+  /// ``RenderResult/rendered``, and false for every other outcome. This is
+  /// the same signal the map render-frame-finished event carries in
+  /// ``RenderFrameEvent/needsRepaint``, delivered with the frame result so a
+  /// host can re-arm its frame loop without the runtime event round trip.
+  public let needsRepaint: Bool
 
   fileprivate init(_ value: mln_render_frame_result) {
     result = .fromNative(value.disposition)
@@ -807,6 +814,7 @@ public struct RenderFrameResult: Sendable, Hashable {
     extentGeneration = value.extent_generation
     frameGeneration = value.frame_generation
     presentationTimeNanoseconds = value.presentation_time_ns
+    needsRepaint = value.needs_repaint
   }
 }
 

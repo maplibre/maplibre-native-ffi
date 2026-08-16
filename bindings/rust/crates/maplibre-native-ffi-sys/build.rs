@@ -105,7 +105,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             "^mln_(buffer|runtime|map|map_projection|render_session",
             "|operation|notification_source|event_batch|ready_batch",
             "|render_frame_batch|acquired_frame",
-            "|resource_request_handle|offline_region_snapshot",
+            "|resource_request_handle|geojson_source_data|offline_region_snapshot",
             "|offline_region_list|style_id_list|style_string_list)$"
         ))
         .layout_tests(true)

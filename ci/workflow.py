@@ -32,6 +32,8 @@ def load_configuration(
 def platform(preset: str) -> str:
     if preset.startswith("ios-simulator-"):
         return "ios-simulator"
+    if preset.startswith("tvos-simulator-"):
+        return "tvos-simulator"
     return preset.split("-", 1)[0]
 
 
@@ -57,7 +59,7 @@ def runner(preset: str) -> str:
         # The zig toolchain sets the glibc floor. These images stay pinned so
         # the graphics loaders and drivers the tests use stay reproducible.
         return "ubuntu-24.04-arm" if target_architecture == "arm64" else "ubuntu-24.04"
-    if target_platform in {"macos", "ios", "ios-simulator"}:
+    if target_platform in {"macos", "ios", "ios-simulator", "tvos", "tvos-simulator"}:
         return "macos-26"
     if target_platform == "windows":
         return "windows-11-arm" if target_architecture == "arm64" else "windows-2022"
@@ -153,6 +155,7 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
             [
                 f"mise run //bindings/kotlin:ios-build {preset}",
                 f"mise run //bindings/swift:build {preset}",
+                f"mise run //bindings/zig:build {preset}",
                 "mise run //examples/swift-map:build:ios",
                 f"mise run //bindings/dart:build:mobile {preset}",
             ]
@@ -165,6 +168,22 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
                 f"mise run //bindings/zig:test {preset}",
                 "mise run //examples/swift-map:build:ios-simulator",
                 f"mise run //bindings/dart:build:mobile {preset}",
+            ]
+        )
+    elif target_platform == "tvos":
+        commands.extend(
+            [
+                f"mise run //bindings/kotlin:ios-build {preset}",
+                f"mise run //bindings/swift:build {preset}",
+                f"mise run //bindings/zig:build {preset}",
+            ]
+        )
+    elif target_platform == "tvos-simulator":
+        commands.extend(
+            [
+                f"mise run //bindings/kotlin:test {preset}",
+                f"mise run //bindings/swift:test {preset}",
+                f"mise run //bindings/zig:test {preset}",
             ]
         )
     elif target_platform in DESKTOP or target_platform == "emscripten":

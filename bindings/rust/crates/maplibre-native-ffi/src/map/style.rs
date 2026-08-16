@@ -681,33 +681,25 @@ impl super::MapHandle {
         Ok(command_id)
     }
 
-    /// Adds a GeoJSON source with inline data.
-    /// `options` are fixed at creation; later data or URL updates keep them.
+    /// Adds a GeoJSON source with prepared inline data.
+    ///
+    /// The call borrows `data`, and the source adopts the options the data
+    /// was prepared with, fixed for the lifetime of the source.
     pub fn add_geojson_source_data(
         &self,
         source_id: &str,
-        data: &[u8],
-        options: Option<&GeoJsonSourceOptions>,
+        data: &crate::GeoJsonSourceDataHandle,
     ) -> Result<u64> {
         let mut command_id = 0;
         let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
-        let data = maplibre_core::string::buffer_view(data);
-        let options = options
-            .map(GeoJsonSourceOptions::try_to_native)
-            .transpose()?;
-        let options_ptr = options
-            .as_ref()
-            .map_or(ptr::null(), NativeGeoJsonSourceOptions::as_ptr);
-        // SAFETY: map is live, source_id and data remain valid for this call,
-        // and options_ptr is null or points to call-scoped native options that
-        // keep the cluster-properties buffer alive.
+        // SAFETY: map is live, source_id is valid for this call, and data is a
+        // live prepared-data handle the call only borrows.
         maplibre_core::check(unsafe {
             sys::mln_map_add_geojson_source_data(
                 map,
                 source_id.raw(),
-                data,
-                options_ptr,
+                data.native(),
                 &mut command_id,
             )
         })?;
@@ -729,17 +721,55 @@ impl super::MapHandle {
         Ok(command_id)
     }
 
-    /// Updates one GeoJSON source with inline data.
+    /// Updates one GeoJSON source with prepared inline data.
     ///
-    /// The source keeps the options it was added with.
-    pub fn set_geojson_source_data(&self, source_id: &str, data: &[u8]) -> Result<u64> {
+    /// The call borrows `data`, and the expensive parse and tiling already
+    /// happened when the data was prepared, so the install is cheap. The data
+    /// must have been prepared with options equal to the options the source
+    /// was added with, `cluster_properties` excepted; a mismatch is rejected.
+    pub fn set_geojson_source_data(
+        &self,
+        source_id: &str,
+        data: &crate::GeoJsonSourceDataHandle,
+    ) -> Result<u64> {
         let mut command_id = 0;
         let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
-        let data = maplibre_core::string::buffer_view(data);
-        // SAFETY: map is live, and source_id and data remain valid for this call.
+        // SAFETY: map is live, source_id is valid for this call, and data is a
+        // live prepared-data handle the call only borrows.
         maplibre_core::check(unsafe {
-            sys::mln_map_set_geojson_source_data(map, source_id.raw(), data, &mut command_id)
+            sys::mln_map_set_geojson_source_data(
+                map,
+                source_id.raw(),
+                data.native(),
+                &mut command_id,
+            )
+        })?;
+        Ok(command_id)
+    }
+
+    /// Overrides one GeoJSON source's synchronous tiling at runtime.
+    ///
+    /// While enabled, the source slices requested tiles inline during the
+    /// update pass, as if its options had set `synchronous_tiling`; disabling
+    /// restores the option the source was added with. The override applies to
+    /// update passes after the command commits.
+    pub fn set_geojson_source_synchronous_tiling(
+        &self,
+        source_id: &str,
+        enabled: bool,
+    ) -> Result<u64> {
+        let mut command_id = 0;
+        let map = self.inner.native()?;
+        let source_id = maplibre_core::string::string_view(source_id);
+        // SAFETY: map is live and source_id is valid for this call.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_geojson_source_synchronous_tiling(
+                map,
+                source_id.raw(),
+                enabled,
+                &mut command_id,
+            )
         })?;
         Ok(command_id)
     }

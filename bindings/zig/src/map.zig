@@ -201,6 +201,53 @@ pub const CustomGeometrySourceOptions = struct {
     wrap: ?bool = null,
 };
 
+/// Prepared GeoJSON source data: one parsed and tiled GeoJSON document with
+/// its source options baked in, ready to install on GeoJSON sources.
+pub const GeoJsonSourceDataHandle = enum(c.mln_geojson_source_data) {
+    _,
+
+    /// Parses one complete UTF-8 GeoJSON document and tiles it into a
+    /// prepared index under `options`; a null takes the C API defaults. When
+    /// the options enable clustering, the data must be a feature collection
+    /// whose every feature carries point geometry.
+    ///
+    /// Callable from any thread and free of any runtime or map, so a host
+    /// prepares data on a worker thread and installs it on the map owner
+    /// thread. The prepared value is immutable, and reads and installs may
+    /// run concurrently from any thread. As with every handle in this
+    /// binding, the host orders `release()` after the installs that use the
+    /// handle; a release that races an install makes the install report an
+    /// invalid-argument status for a stale handle, and never touches freed
+    /// memory, because the C API resolves ids under its own lock and never
+    /// reuses one.
+    pub fn create(
+        allocator: std.mem.Allocator,
+        data: []const u8,
+        options: ?values.StyleGeoJsonSourceOptions,
+    ) status.Error!GeoJsonSourceDataHandle {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        var raw_options = if (options) |value| try styleGeoJsonSourceOptionsToNative(&temp, value) else undefined;
+        var out: c.mln_geojson_source_data = 0;
+        try status.checkStatus(
+            c.mln_geojson_source_data_create(
+                try temp.stringView(data),
+                if (options != null) &raw_options else null,
+                &out,
+            ),
+            null,
+        );
+        return @enumFromInt(out);
+    }
+
+    /// Releases the prepared data from any thread. Releasing again is a no-op,
+    /// and sources the data was installed on keep their own reference, so
+    /// release never invalidates a source.
+    pub fn release(self: GeoJsonSourceDataHandle) void {
+        c.mln_geojson_source_data_destroy(@intFromEnum(self));
+    }
+};
+
 pub const MapHandle = enum(c.mln_map) {
     _,
 
@@ -1174,26 +1221,23 @@ pub const MapHandle = enum(c.mln_map) {
         return command_id;
     }
 
-    /// Adds a GeoJSON source with inline data. The options are fixed at
-    /// creation; later `setGeoJsonSourceData` and `setGeoJsonSourceUrl` calls
-    /// keep them.
+    /// Adds a GeoJSON source with prepared inline data. The call borrows
+    /// `data`, and the source adopts the options the data was prepared with,
+    /// fixed for the lifetime of the source.
     pub fn addGeoJsonSourceData(
         self: *MapHandle,
         allocator: std.mem.Allocator,
         source_id: []const u8,
-        data: []const u8,
-        options: ?values.StyleGeoJsonSourceOptions,
+        data: GeoJsonSourceDataHandle,
     ) status.Error!u64 {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        var raw_options = if (options) |value| try styleGeoJsonSourceOptionsToNative(&temp, value) else undefined;
         var command_id: u64 = 0;
         try status.checkStatus(
             c.mln_map_add_geojson_source_data(
                 try native(self),
                 try temp.stringView(source_id),
-                try temp.stringView(data),
-                if (options != null) &raw_options else null,
+                @intFromEnum(data),
                 &command_id,
             ),
             diagnosticStore(self),
@@ -1201,25 +1245,50 @@ pub const MapHandle = enum(c.mln_map) {
         return command_id;
     }
 
+    /// Updates one GeoJSON source with prepared inline data. The call borrows
+    /// `data`, which must have been prepared with options equal to the options
+    /// the source was added with; a mismatch is rejected. Cluster aggregation
+    /// expressions compare by parsed equality, so equivalent
+    /// `cluster_properties` JSON matches regardless of formatting.
     pub fn setGeoJsonSourceData(
         self: *MapHandle,
         allocator: std.mem.Allocator,
         source_id: []const u8,
-        data: []const u8,
+        data: GeoJsonSourceDataHandle,
     ) status.Error!u64 {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         var command_id: u64 = 0;
         try status.checkStatus(
-            c.mln_map_set_geojson_source_data(try native(self), try temp.stringView(source_id), try temp.stringView(data), &command_id),
+            c.mln_map_set_geojson_source_data(try native(self), try temp.stringView(source_id), @intFromEnum(data), &command_id),
+            diagnosticStore(self),
+        );
+        return command_id;
+    }
+
+    /// Overrides one GeoJSON source's synchronous tiling at runtime. While
+    /// enabled, the source slices requested tiles inline during the update
+    /// pass, as if its options had set `synchronous_tiling`; false restores
+    /// the option the source was added with.
+    pub fn setGeoJsonSourceSynchronousTiling(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        source_id: []const u8,
+        enabled: bool,
+    ) status.Error!u64 {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        var command_id: u64 = 0;
+        try status.checkStatus(
+            c.mln_map_set_geojson_source_synchronous_tiling(try native(self), try temp.stringView(source_id), enabled, &command_id),
             diagnosticStore(self),
         );
         return command_id;
     }
 
     /// Adds a GeoJSON source that loads from a URL. The options are fixed at
-    /// creation; later `setGeoJsonSourceUrl` and `setGeoJsonSourceData` calls
-    /// keep them.
+    /// creation; a later `setGeoJsonSourceUrl` call keeps them, and a later
+    /// `setGeoJsonSourceData` call requires data prepared with equal options.
     pub fn addGeoJsonSourceUrl(
         self: *MapHandle,
         allocator: std.mem.Allocator,
@@ -1582,11 +1651,23 @@ pub const MapHandle = enum(c.mln_map) {
         return values.cameraOptionsFromNative(camera);
     }
 
+    /// Computes geographic bounds for a camera from two viewport corners.
+    ///
+    /// The box is the hull of the top-left and bottom-right screen corners for
+    /// that camera in the current viewport. When bearing and pitch are zero, the
+    /// box equals the visible area. Those corners are the northwest and
+    /// southeast of the viewport. Longitudes stay in -180 to 180.
     pub fn latLngBoundsForCamera(self: *MapHandle, camera: values.CameraOptions) status.Error!values.LatLngBounds {
         var raw_camera = values.cameraOptionsToNative(camera);
         return self.takeBoundsOperation(&raw_camera, c.mln_map_lat_lng_bounds_for_camera_start, c.mln_map_lat_lng_bounds_for_camera_take_result);
     }
 
+    /// Computes geographic bounds for a camera from the four viewport corners.
+    ///
+    /// The axis-aligned hull of all four screen corners and the center
+    /// encompasses the projected viewport. Longitudes unwrap onto the shortest
+    /// path through the center. A viewport that crosses the antimeridian reports
+    /// values outside -180 to 180.
     pub fn latLngBoundsForCameraUnwrapped(self: *MapHandle, camera: values.CameraOptions) status.Error!values.LatLngBounds {
         var raw_camera = values.cameraOptionsToNative(camera);
         return self.takeBoundsOperation(&raw_camera, c.mln_map_lat_lng_bounds_for_camera_unwrapped_start, c.mln_map_lat_lng_bounds_for_camera_unwrapped_take_result);
@@ -1883,9 +1964,9 @@ fn styleGeoJsonSourceOptionsToNative(
         raw.fields |= c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
         raw.cluster = cluster;
     }
-    if (options.synchronous_update) |synchronous_update| {
-        raw.fields |= c.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE;
-        raw.synchronous_update = synchronous_update;
+    if (options.synchronous_tiling) |synchronous_tiling| {
+        raw.fields |= c.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING;
+        raw.synchronous_tiling = synchronous_tiling;
     }
     return raw;
 }

@@ -350,7 +350,7 @@ class OptionsValueSemanticsTest {
             clusterMinPoints = 3
             lineMetrics = true
             cluster = true
-            synchronousUpdate = true
+            synchronousTiling = true
           }
         },
         copyOf = { it.copy() },
@@ -367,7 +367,7 @@ class OptionsValueSemanticsTest {
             { clusterMinPoints = 2 },
             { lineMetrics = false },
             { cluster = false },
-            { synchronousUpdate = false },
+            { synchronousTiling = false },
           ),
       )
     }

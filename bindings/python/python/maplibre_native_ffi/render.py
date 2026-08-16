@@ -271,7 +271,13 @@ class FrameDemand:
 
 @dataclass(frozen=True, slots=True)
 class RenderFrameResult:
-    """Owned terminal result for one accepted frame demand."""
+    """Owned terminal result for one accepted frame demand.
+
+    ``needs_repaint`` reports whether the map asked for another frame while it
+    rendered this one, as during an ongoing camera transition. It is set only
+    when ``disposition`` is ``RENDERED``, and reads false for every other
+    outcome.
+    """
 
     disposition: RenderResult
     token: int
@@ -279,6 +285,7 @@ class RenderFrameResult:
     extent_generation: int
     frame_generation: int
     presentation_time_ns: int
+    needs_repaint: bool
 
     @classmethod
     def _from_native(cls, raw: dict[str, Any]) -> RenderFrameResult:
@@ -289,6 +296,7 @@ class RenderFrameResult:
             extent_generation=raw["extent_generation"],
             frame_generation=raw["frame_generation"],
             presentation_time_ns=raw["presentation_time_ns"],
+            needs_repaint=raw["needs_repaint"],
         )
 
 

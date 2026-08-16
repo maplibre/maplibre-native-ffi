@@ -202,6 +202,7 @@ final class RenderFrameResult {
     required this.extentGeneration,
     required this.frameGeneration,
     required this.presentationTimeNanoseconds,
+    required this.needsRepaint,
   });
 
   factory RenderFrameResult._fromNative(raw.mln_render_frame_result value) =>
@@ -212,6 +213,7 @@ final class RenderFrameResult {
         extentGeneration: value.extent_generation,
         frameGeneration: value.frame_generation,
         presentationTimeNanoseconds: value.presentation_time_ns,
+        needsRepaint: value.needs_repaint,
       );
 
   final RenderResult disposition;
@@ -220,6 +222,13 @@ final class RenderFrameResult {
   final int extentGeneration;
   final int frameGeneration;
   final int presentationTimeNanoseconds;
+
+  /// Whether the map asked for another frame while it rendered this one, as
+  /// during an ongoing camera transition.
+  ///
+  /// Meaningful only when [disposition] is [RenderResult.rendered]; it reads
+  /// false for every other outcome.
+  final bool needsRepaint;
 }
 
 /// Immutable capabilities fixed during attachment.

@@ -1080,6 +1080,8 @@ test "owned texture session renders acquires resizes and reads back" {
         const result = try renderFrame(owned.session, false);
         if (std.meta.activeTag(result.disposition) == .rendered) break;
         try testing.expectEqual(.size_pending, std.meta.activeTag(result.disposition));
+        // The repaint signal is meaningful only on a rendered frame.
+        try testing.expect(!result.needs_repaint);
     } else return error.ResizeDidNotConverge;
     try expectOwnedFrameExtent(owned.session, resized_extent);
     const snapshot = try owned.session.snapshot();
@@ -1400,6 +1402,40 @@ test "sustained frame demands outlast the texture ring depth" {
         try testing.expectEqual(.rendered, std.meta.activeTag((try renderFrame(owned.session, false)).disposition));
     }
     try testing.expect((try owned.session.snapshot()).frame_generation >= 64);
+}
+
+test "a rendered frame during an ease reports needs repaint" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try maplibre.MapHandle.create(&runtime, .{ .width = 32, .height = 16 });
+    defer map.close() catch @panic("map close failed");
+    var owned = try attachTestOwnedTexture(&map, .{ .extent = .{ .width = 32, .height = 16 } });
+    defer owned.close() catch @panic("render session close failed");
+
+    _ = try map.setStyleJson(testing.allocator, support.style_json);
+    try awaitRuntimeBarrier(&runtime);
+    // Settle the style's own frames so the transition drives what follows.
+    try testing.expectEqual(.rendered, std.meta.activeTag((try renderFrame(owned.session, false)).disposition));
+
+    _ = try map.updateCamera(.{
+        .mode = .ease,
+        .camera = .{ .center = .{ .latitude = 37.7749, .longitude = -122.4194 }, .zoom = 4.0 },
+        .animation = .{ .duration_ms = 60_000 },
+    });
+    try awaitRuntimeBarrier(&runtime);
+
+    // Mid-transition the map asks for the next frame with the one it renders,
+    // the same signal a map-render-frame-finished event carries.
+    var observed_repaint = false;
+    for (0..100) |_| {
+        const result = try renderFrame(owned.session, false);
+        if (std.meta.activeTag(result.disposition) == .rendered and result.needs_repaint) {
+            observed_repaint = true;
+            break;
+        }
+    }
+    try testing.expect(observed_repaint);
 }
 
 const SnapshotThread = struct {

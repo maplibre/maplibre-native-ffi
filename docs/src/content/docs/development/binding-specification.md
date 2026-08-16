@@ -99,11 +99,12 @@ Requirements:
   process, runnable Android and OpenHarmony presets cross-compile and push to an
   emulator through the shared runners in `scripts/`
   (`run-android-emulator-test.sh`, `run-ohos-emulator-test.sh`, which boot the
-  emulator on demand), iOS simulator presets build a test bundle and spawn it on
-  a simulator, and Emscripten presets run in headless Chromium.
+  emulator on demand), iOS and tvOS simulator presets build a test bundle and
+  spawn it on a simulator, and Emscripten presets run in headless Chromium.
 - A preset that a binding cannot build or run MUST fail with a message that
   names what the binding supports. A device preset with no runner, such as
-  `ios-arm64-metal`, fails the same way and points at a simulator preset.
+  `ios-arm64-metal` or `tvos-arm64-metal`, fails the same way and points at a
+  simulator preset.
 - Colon-suffixed tasks cover the axes that a preset does not encode: one
   `test:<runtime>` task per runtime when a platform maps to more than one
   (`test:jvm` and `test:native` for Kotlin; a JavaScript binding adds its
@@ -215,6 +216,7 @@ Long-lived C-owned opaque handle concepts include:
 - `RenderSessionHandle`
 - `OperationHandle`
 - `ResourceRequestHandle`
+- `GeoJsonSourceDataHandle`
 
 `Handle` means the public value owns or controls an explicitly releasable native
 resource with identity across operations. The representation can vary by
@@ -454,6 +456,22 @@ The low-level API exposes no parallel string overload. Callers that start with
 text encode it as UTF-8. Callers that start with a file, response, database
 blob, or serializer output can pass its bytes without an intermediate host
 string.
+
+### Prepared GeoJSON source data
+
+Inline GeoJSON source data crosses the boundary in two steps: a preparation call
+parses and tiles one complete GeoJSON document into an owned prepared-data
+handle, and map calls install that handle when adding or updating a GeoJSON
+source. Bindings expose both steps and the handle between them.
+
+Preparation takes the GeoJSON source options, is free of any runtime or map, and
+is callable from any thread; the prepared value is immutable and safe to share
+across threads, subject to the binding's ordinary handle-lifetime rules. A
+binding whose language has a natural worker or async idiom SHOULD make
+off-thread preparation expressible with it, without owning a thread pool inside
+the binding. Install calls borrow the handle, so one prepared value may be
+installed on any number of sources and released at any time afterward; release
+never invalidates a source the data was installed on.
 
 ### Native pointers
 

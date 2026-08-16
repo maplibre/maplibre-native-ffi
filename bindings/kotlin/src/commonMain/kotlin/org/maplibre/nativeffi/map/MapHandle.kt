@@ -23,6 +23,7 @@ import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 import org.maplibre.nativeffi.runtime.RuntimeEventMask
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.GeoJsonSourceDataHandle
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.ImageStretch
 import org.maplibre.nativeffi.style.LayerInfo
@@ -101,15 +102,27 @@ public expect class MapHandle {
     options: GeoJsonSourceOptions?,
   ): ULong
 
-  public fun addGeoJsonSourceData(
-    sourceId: String,
-    data: ByteArray,
-    options: GeoJsonSourceOptions?,
-  ): ULong
+  /**
+   * Adds a GeoJSON source with prepared inline data. The call borrows [data], and the source adopts
+   * the options the data was prepared with, fixed for the lifetime of the source.
+   */
+  public fun addGeoJsonSourceData(sourceId: String, data: GeoJsonSourceDataHandle): ULong
 
   public fun setGeoJsonSourceUrl(sourceId: String, url: String): ULong
 
-  public fun setGeoJsonSourceData(sourceId: String, data: ByteArray): ULong
+  /**
+   * Updates one GeoJSON source with prepared inline data. The call borrows [data]. The data must
+   * have been prepared with options equal to the options the source was added with,
+   * `clusterProperties` excepted; a mismatch is rejected.
+   */
+  public fun setGeoJsonSourceData(sourceId: String, data: GeoJsonSourceDataHandle): ULong
+
+  /**
+   * Overrides one GeoJSON source's synchronous tiling at runtime. While [enabled] is true, the
+   * source slices requested tiles inline during the update pass, as if the source's options had set
+   * [GeoJsonSourceOptions.synchronousTiling]; false restores the option the source was added with.
+   */
+  public fun setGeoJsonSourceSynchronousTiling(sourceId: String, enabled: Boolean): ULong
 
   /**
    * Adds a custom geometry source that calls [options] back for tile data.
