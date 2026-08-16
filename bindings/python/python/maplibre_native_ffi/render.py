@@ -12,6 +12,7 @@ from ._enum import UnknownIntEnum
 from ._lifecycle import NativeHandleMixin
 from .query import (
     FeatureStateSelector,
+    QueriedFeature,
     RenderedFeatureQueryOptions,
     RenderedQueryGeometry,
     SourceFeatureQueryOptions,
@@ -733,27 +734,33 @@ class RenderSessionHandle(NativeHandleMixin):
         self,
         geometry: RenderedQueryGeometry,
         options: RenderedFeatureQueryOptions | None = None,
-    ) -> bytes:
-        """Query rendered features as a UTF-8 JSON array."""
+    ) -> list[QueriedFeature]:
+        """Query rendered features as copied queried-feature values."""
         from .query import _geometry_to_native_wire
 
-        return self._native.query_rendered_features(
-            _geometry_to_native_wire(geometry),
-            options.layer_ids if options is not None else None,
-            options.filter if options is not None else None,
-        )
+        return [
+            QueriedFeature._from_native(raw)
+            for raw in self._native.query_rendered_features(
+                _geometry_to_native_wire(geometry),
+                options.layer_ids if options is not None else None,
+                options.filter if options is not None else None,
+            )
+        ]
 
     def query_source_features(
         self,
         source_id: str,
         options: SourceFeatureQueryOptions | None = None,
-    ) -> bytes:
-        """Query source features as a UTF-8 JSON array."""
-        return self._native.query_source_features(
-            source_id,
-            options.source_layer_ids if options is not None else None,
-            options.filter if options is not None else None,
-        )
+    ) -> list[QueriedFeature]:
+        """Query source features as copied queried-feature values."""
+        return [
+            QueriedFeature._from_native(raw)
+            for raw in self._native.query_source_features(
+                source_id,
+                options.source_layer_ids if options is not None else None,
+                options.filter if options is not None else None,
+            )
+        ]
 
     def query_feature_extensions(
         self,

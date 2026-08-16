@@ -58,6 +58,7 @@ import org.maplibre.nativeffi.internal.lifecycle.HandleState
 import org.maplibre.nativeffi.internal.lifecycle.NativeRenderSession
 import org.maplibre.nativeffi.internal.lifecycle.asHandle
 import org.maplibre.nativeffi.internal.lifecycle.ownedBufferHandle
+import org.maplibre.nativeffi.internal.lifecycle.queriedFeatureListHandle
 import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
 import org.maplibre.nativeffi.internal.lifecycle.renderSessionHandle
 import org.maplibre.nativeffi.internal.status.Status
@@ -67,6 +68,7 @@ import org.maplibre.nativeffi.internal.struct.QueryStructs
 import org.maplibre.nativeffi.internal.struct.RenderStructs
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.query.FeatureStateSelector
+import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
@@ -238,7 +240,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
   public actual fun queryRenderedFeatures(
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions?,
-  ): ByteArray = memScoped {
+  ): List<QueriedFeature> = memScoped {
     activeFrame.ensureInactive("query rendered features")
     val outResult = alloc<ULongVar>()
     outResult.value = 0uL
@@ -250,13 +252,15 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
         outResult.ptr,
       )
     )
-    ByteStructs.ownedBuffer(outResult.value.asHandle("mln_buffer", ::ownedBufferHandle))
+    QueryStructs.queriedFeatureList(
+      outResult.value.asHandle("mln_queried_feature_list", ::queriedFeatureListHandle)
+    )
   }
 
   public actual fun querySourceFeatures(
     sourceId: String,
     options: SourceFeatureQueryOptions?,
-  ): ByteArray = memScoped {
+  ): List<QueriedFeature> = memScoped {
     activeFrame.ensureInactive("query source features")
     val outResult = alloc<ULongVar>()
     outResult.value = 0uL
@@ -268,7 +272,9 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
         outResult.ptr,
       )
     )
-    ByteStructs.ownedBuffer(outResult.value.asHandle("mln_buffer", ::ownedBufferHandle))
+    QueryStructs.queriedFeatureList(
+      outResult.value.asHandle("mln_queried_feature_list", ::queriedFeatureListHandle)
+    )
   }
 
   public actual fun queryFeatureExtension(

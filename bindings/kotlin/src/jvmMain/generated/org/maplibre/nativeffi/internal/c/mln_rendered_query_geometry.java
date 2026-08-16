@@ -151,7 +151,7 @@ public class mln_rendered_query_geometry {
             mln_screen_point.layout().withName("point"),
             mln_screen_box.layout().withName("box"),
             mln_screen_line_string.layout().withName("line_string")
-        ).withName("$anon$49:3");
+        ).withName("$anon$52:3");
 
         /**
          * The layout of this union

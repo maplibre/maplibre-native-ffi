@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from ._enum import NativeIntEnum
 from .camera import ScreenPoint
@@ -90,6 +91,28 @@ class SourceFeatureQueryOptions:
 
 
 @dataclass(frozen=True, slots=True)
+class QueriedFeature:
+    """One copied feature query hit.
+
+    ``feature`` is one GeoJSON Feature. ``state`` is a JSON object when present.
+    """
+
+    feature: bytes
+    source_id: str | None
+    source_layer_id: str | None
+    state: bytes | None
+
+    @classmethod
+    def _from_native(cls, raw: dict[str, Any]) -> QueriedFeature:
+        return cls(
+            feature=raw["feature"],
+            source_id=raw["source_id"],
+            source_layer_id=raw["source_layer_id"],
+            state=raw["state"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class FeatureStateSelector:
     """Source, feature, and state-key selector for render-session feature state."""
 
@@ -132,6 +155,7 @@ def _geometry_to_native_wire(geometry: RenderedQueryGeometry) -> dict[str, objec
 
 __all__ = [
     "FeatureStateSelector",
+    "QueriedFeature",
     "RenderedFeatureQueryOptions",
     "RenderedQueryGeometry",
     "RenderedQueryGeometryType",

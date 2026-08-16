@@ -54,6 +54,8 @@ auto handle_kind_name(std::uint8_t kind) noexcept -> const char* {
       return "mln_resource_request_handle";
     case HandleKind::StyleStringList:
       return "mln_style_string_list";
+    case HandleKind::QueriedFeatureList:
+      return "mln_queried_feature_list";
   }
   return nullptr;
 }

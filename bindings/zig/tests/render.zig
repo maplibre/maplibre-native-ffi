@@ -72,10 +72,10 @@ fn waitForRenderedFeatureQuery(
     session: *maplibre.RenderSessionHandle,
     geometry: maplibre.RenderedQueryGeometry,
     options: maplibre.RenderedFeatureQueryOptions,
-) !maplibre.OwnedString {
+) !maplibre.QueriedFeatureList {
     for (0..1000) |_| {
         var result = try session.queryRenderedFeatures(testing.allocator, geometry, options);
-        if (firstArrayElement(result.value) != null) return result;
+        if (result.items.len != 0) return result;
         result.deinit();
         try runtime.pump(0);
         _ = try session.renderUpdate();
@@ -87,12 +87,12 @@ fn waitForRenderedFeatureQuery(
 fn waitForSourceFeatureQuery(
     runtime: *maplibre.RuntimeHandle,
     session: *maplibre.RenderSessionHandle,
-) !maplibre.OwnedString {
+) !maplibre.QueriedFeatureList {
     for (0..1000) |_| {
         var result = try session.querySourceFeatures(testing.allocator, "point", .{
             .filter = "[\"==\",[\"get\",\"kind\"],\"capital\"]",
         });
-        if (firstArrayElement(result.value) != null) return result;
+        if (result.items.len != 0) return result;
         result.deinit();
         try runtime.pump(0);
         _ = try session.renderUpdate();
@@ -169,13 +169,7 @@ fn firstArrayElement(json: []const u8) ?[]const u8 {
     return json[cursor .. jsonValueEnd(json, cursor) orelse return null];
 }
 
-fn queryFeature(result: []const u8) ?[]const u8 {
-    const queried = firstArrayElement(result) orelse return null;
-    return rawMember(queried, "feature");
-}
-
-fn queryFeatureProperty(result: []const u8, key: []const u8) ?[]const u8 {
-    const feature = queryFeature(result) orelse return null;
+fn queryFeatureProperty(feature: []const u8, key: []const u8) ?[]const u8 {
     const properties = rawMember(feature, "properties") orelse return null;
     return rawMember(properties, key);
 }
@@ -1690,21 +1684,16 @@ test "render session queries rendered and source features" {
         .filter = "[\"==\",[\"get\",\"kind\"],\"capital\"]",
     });
     defer rendered.deinit();
-    const rendered_item = firstArrayElement(rendered.value).?;
-    try testing.expectEqualStrings("\"point\"", rawMember(rendered_item, "sourceId").?);
-    try testing.expectEqualStrings("\"capital\"", queryFeatureProperty(rendered.value, "kind").?);
+    try testing.expectEqualStrings("point", rendered.items[0].source_id.?);
+    try testing.expectEqualStrings("\"capital\"", queryFeatureProperty(rendered.items[0].feature, "kind").?);
 
     var source = try waitForSourceFeatureQuery(&runtime, session);
     defer source.deinit();
-    const source_item = firstArrayElement(source.value).?;
-    try testing.expectEqualStrings("\"point\"", rawMember(source_item, "sourceId").?);
-    try testing.expectEqualStrings("\"capital\"", queryFeatureProperty(source.value, "kind").?);
+    try testing.expectEqualStrings("point", source.items[0].source_id.?);
+    try testing.expectEqualStrings("\"capital\"", queryFeatureProperty(source.items[0].feature, "kind").?);
 
     var failing_allocator = testing.FailingAllocator.init(testing.allocator, .{ .fail_index = 0 });
-    test_hooks.useCountingBufferDestroy();
-    defer test_hooks.restoreBufferDestroy();
     try testing.expectError(error.OutOfMemory, session.querySourceFeatures(failing_allocator.allocator(), "point", null));
-    try testing.expectEqual(@as(usize, 1), test_hooks.bufferDestroyCount());
 
     try testing.expectError(error.InvalidArgument, session.queryRenderedFeatures(testing.allocator, .{ .point = .{ .x = std.math.inf(f64), .y = 0.0 } }, null));
     try testing.expectError(error.InvalidArgument, session.querySourceFeatures(testing.allocator, "", null));
@@ -1734,7 +1723,7 @@ test "render session clips rendered box queries to the viewport" {
         .max = .{ .x = 8192, .y = 8192 },
     } }, options);
     defer oversized.deinit();
-    try testing.expectEqualStrings("\"capital\"", queryFeatureProperty(oversized.value, "kind").?);
+    try testing.expectEqualStrings("\"capital\"", queryFeatureProperty(oversized.items[0].feature, "kind").?);
 
     // Corners in either order describe the same box.
     var inverted = try session.queryRenderedFeatures(testing.allocator, .{ .box = .{
@@ -1742,7 +1731,7 @@ test "render session clips rendered box queries to the viewport" {
         .max = .{ .x = -8192, .y = -8192 },
     } }, options);
     defer inverted.deinit();
-    try testing.expect(firstArrayElement(inverted.value) != null);
+    try testing.expect(inverted.items.len != 0);
 
     // Clipping keeps a fully off-screen box empty rather than collapsing it
     // onto a viewport edge.
@@ -1751,7 +1740,7 @@ test "render session clips rendered box queries to the viewport" {
         .max = .{ .x = 4096, .y = 4096 },
     } }, options);
     defer offscreen.deinit();
-    try testing.expect(firstArrayElement(offscreen.value) == null);
+    try testing.expect(offscreen.items.len == 0);
 }
 
 test "render session queries cluster feature extensions" {
@@ -1780,7 +1769,7 @@ test "render session queries cluster feature extensions" {
     } }, .{ .layer_ids = &.{"cluster-circle"} });
     defer clusters.deinit();
 
-    const feature = queryFeature(clusters.value).?;
+    const feature = clusters.items[0].feature;
     var children = try session.queryFeatureExtension(testing.allocator, "cluster-source", feature, "supercluster", "children", null);
     defer children.deinit();
     try testing.expect(firstArrayElement(rawMember(children.value, "features").?) != null);
@@ -1851,9 +1840,9 @@ test "GeoJSON source options cluster nearby points and aggregate cluster propert
     } }, .{ .layer_ids = &.{"cluster-options-circle"} });
     defer clusters.deinit();
 
-    try testing.expectEqualStrings("true", queryFeatureProperty(clusters.value, "cluster").?);
-    try testing.expectEqualStrings("3", queryFeatureProperty(clusters.value, "point_count").?);
-    try testing.expectEqualStrings("6.0", queryFeatureProperty(clusters.value, "total").?);
+    try testing.expectEqualStrings("true", queryFeatureProperty(clusters.items[0].feature, "cluster").?);
+    try testing.expectEqualStrings("3", queryFeatureProperty(clusters.items[0].feature, "point_count").?);
+    try testing.expectEqualStrings("6.0", queryFeatureProperty(clusters.items[0].feature, "total").?);
 }
 
 test "unsupported backend owned texture attachment reports unsupported" {

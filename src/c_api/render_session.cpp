@@ -142,9 +142,42 @@ auto mln_render_session_remove_feature_state(
   });
 }
 
+auto mln_queried_feature_default() noexcept -> mln_queried_feature {
+  return mln_queried_feature{
+    .size = sizeof(mln_queried_feature),
+    .fields = 0,
+    .feature = {},
+    .source_id = {},
+    .source_layer_id = {},
+    .state = {}
+  };
+}
+
+auto mln_queried_feature_list_count(
+  mln_queried_feature_list list, size_t* out_count
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::queried_feature_list_count(list, out_count);
+  });
+}
+
+auto mln_queried_feature_list_get(
+  mln_queried_feature_list list, size_t index, mln_queried_feature* out_feature
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::queried_feature_list_get(list, index, out_feature);
+  });
+}
+
+auto mln_queried_feature_list_destroy(mln_queried_feature_list list) noexcept
+  -> void {
+  mln::core::queried_feature_list_destroy(list);
+}
+
 auto mln_render_session_query_rendered_features(
   mln_render_session session, const mln_rendered_query_geometry* geometry,
-  const mln_rendered_feature_query_options* options, mln_buffer* out_result
+  const mln_rendered_feature_query_options* options,
+  mln_queried_feature_list* out_result
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::render_session_query_rendered_features(
@@ -155,7 +188,8 @@ auto mln_render_session_query_rendered_features(
 
 auto mln_render_session_query_source_features(
   mln_render_session session, mln_buffer_view source_id,
-  const mln_source_feature_query_options* options, mln_buffer* out_result
+  const mln_source_feature_query_options* options,
+  mln_queried_feature_list* out_result
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::render_session_query_source_features(

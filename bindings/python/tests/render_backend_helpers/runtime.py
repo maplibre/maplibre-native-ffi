@@ -154,7 +154,7 @@ def wait_for_rendered_layer_feature(
     layer_id: str,
     *,
     iterations: int = 5000,
-) -> dict[str, object]:
+) -> query.QueriedFeature:
     """Render until one feature of `layer_id` covers the map center."""
     query_point = map_handle.pixel_for_lat_lng(geo.LatLng(0.0, 0.0))
     geometry = query.RenderedQueryGeometry.box_geometry(
@@ -174,7 +174,7 @@ def wait_for_rendered_layer_feature(
                 except mln.InvalidStateError:
                     pass
         try:
-            features = json.loads(session.query_rendered_features(geometry, options))
+            features = session.query_rendered_features(geometry, options)
         except mln.InvalidStateError:
             features = ()
         if features:
@@ -189,7 +189,7 @@ def wait_for_rendered_cluster(
     session: render.RenderSessionHandle,
     *,
     iterations: int = 5000,
-) -> dict[str, object]:
+) -> query.QueriedFeature:
     """Load the cluster style and return the first rendered cluster feature."""
     map_handle.jump_to(camera.CameraOptions(center=geo.LatLng(0.0, 0.0), zoom=0.0))
     map_handle.set_style_json(CLUSTER_STYLE_JSON.encode())
@@ -208,14 +208,14 @@ def feature_member(feature: dict[str, object], key: str) -> object:
 
 def single_cluster_leaf(
     session: render.RenderSessionHandle,
-    feature: dict[str, object],
+    feature: bytes,
     *,
     offset: int,
 ) -> dict[str, object]:
     """Return the one leaf at `offset` through a bounded supercluster query."""
     leaves = session.query_feature_extensions(
         "cluster-source",
-        json.dumps(feature, separators=(",", ":")).encode(),
+        feature,
         "supercluster",
         "leaves",
         json.dumps({"limit": 1, "offset": offset}, separators=(",", ":")).encode(),
@@ -257,7 +257,7 @@ def assert_geojson_cluster_source(
     # The three source points only collapse into one feature when the options
     # reach MapLibre Native, and weight_sum only appears with cluster
     # properties.
-    feature = queried["feature"]
+    feature = json.loads(queried.feature)
     assert isinstance(feature, dict)
     assert feature_member(feature, "cluster") is True
     assert feature_member(feature, "point_count") == 3
@@ -273,23 +273,22 @@ def assert_cluster_feature_extensions(
     cluster = wait_for_rendered_cluster(runtime, map_handle, session)
     # Native matches cluster_id by exact JSON value type, so the copied feature
     # must keep the unsigned alternative to resolve on the way back in.
-    feature = cluster["feature"]
+    feature = json.loads(cluster.feature)
     assert isinstance(feature, dict)
     assert isinstance(feature_member(feature, "cluster_id"), int)
-    feature_bytes = json.dumps(feature, separators=(",", ":")).encode()
 
     children = session.query_feature_extensions(
-        "cluster-source", feature_bytes, "supercluster", "children", None
+        "cluster-source", cluster.feature, "supercluster", "children", None
     )
     assert json.loads(children)["features"]
 
     expansion_zoom = session.query_feature_extensions(
-        "cluster-source", feature_bytes, "supercluster", "expansion-zoom", None
+        "cluster-source", cluster.feature, "supercluster", "expansion-zoom", None
     )
     assert isinstance(json.loads(expansion_zoom), int)
 
     # Native ignores limit and offset arguments of another type and falls back
     # to ten leaves at offset zero, so both must move the observed result.
-    first = single_cluster_leaf(session, feature, offset=0)
-    second = single_cluster_leaf(session, feature, offset=1)
+    first = single_cluster_leaf(session, cluster.feature, offset=0)
+    second = single_cluster_leaf(session, cluster.feature, offset=1)
     assert feature_member(first, "name") != feature_member(second, "name")

@@ -65,6 +65,7 @@ import org.maplibre.nativeffi.internal.c.mln_premultiplied_rgba8_image
 import org.maplibre.nativeffi.internal.c.mln_projected_meters
 import org.maplibre.nativeffi.internal.c.mln_projection_mode
 import org.maplibre.nativeffi.internal.c.mln_quaternion
+import org.maplibre.nativeffi.internal.c.mln_queried_feature
 import org.maplibre.nativeffi.internal.c.mln_render_target_extent
 import org.maplibre.nativeffi.internal.c.mln_rendered_feature_query_options
 import org.maplibre.nativeffi.internal.c.mln_rendered_query_geometry
@@ -107,6 +108,7 @@ import org.maplibre.nativeffi.internal.lifecycle.NativeMapProjection
 import org.maplibre.nativeffi.internal.lifecycle.NativeOfflineRegionList
 import org.maplibre.nativeffi.internal.lifecycle.NativeOfflineRegionSnapshot
 import org.maplibre.nativeffi.internal.lifecycle.NativeOwnedBuffer
+import org.maplibre.nativeffi.internal.lifecycle.NativeQueriedFeatureList
 import org.maplibre.nativeffi.internal.lifecycle.NativeRenderSession
 import org.maplibre.nativeffi.internal.lifecycle.NativeResourceRequest
 import org.maplibre.nativeffi.internal.lifecycle.NativeRuntime
@@ -131,6 +133,7 @@ import org.maplibre.nativeffi.offline.OfflineRegionDownloadState
 import org.maplibre.nativeffi.offline.OfflineRegionInfo
 import org.maplibre.nativeffi.offline.OfflineRegionStatus
 import org.maplibre.nativeffi.query.FeatureStateSelector
+import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
@@ -2201,7 +2204,7 @@ internal object NativeAccess {
     session: NativeRenderSession,
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions?,
-  ): ByteArray =
+  ): List<QueriedFeature> =
     Arena.ofConfined().use { arena ->
       val outResult = arena.allocate(ValueLayout.JAVA_LONG)
       outResult.set(ValueLayout.JAVA_LONG, 0, 0L)
@@ -2214,14 +2217,14 @@ internal object NativeAccess {
             outResult,
           ) as Int
       )
-      ownedBuffer(NativeOwnedBuffer(outResult.get(ValueLayout.JAVA_LONG, 0)))!!
+      queriedFeatureList(NativeQueriedFeatureList(outResult.get(ValueLayout.JAVA_LONG, 0)))
     }
 
   internal fun querySourceFeatures(
     session: NativeRenderSession,
     sourceId: String,
     options: SourceFeatureQueryOptions?,
-  ): ByteArray =
+  ): List<QueriedFeature> =
     Arena.ofConfined().use { arena ->
       val outResult = arena.allocate(ValueLayout.JAVA_LONG)
       outResult.set(ValueLayout.JAVA_LONG, 0, 0L)
@@ -2234,7 +2237,7 @@ internal object NativeAccess {
             outResult,
           ) as Int
       )
-      ownedBuffer(NativeOwnedBuffer(outResult.get(ValueLayout.JAVA_LONG, 0)))!!
+      queriedFeatureList(NativeQueriedFeatureList(outResult.get(ValueLayout.JAVA_LONG, 0)))
     }
 
   internal fun queryFeatureExtension(
@@ -3387,6 +3390,15 @@ internal object NativeAccess {
   private fun styleIdListGetFunction(): MethodHandle = downcall("mln_style_id_list_get")
 
   private fun styleIdListDestroyFunction(): MethodHandle = downcall("mln_style_id_list_destroy")
+
+  private fun queriedFeatureListCountFunction(): MethodHandle =
+    downcall("mln_queried_feature_list_count")
+
+  private fun queriedFeatureListGetFunction(): MethodHandle =
+    downcall("mln_queried_feature_list_get")
+
+  private fun queriedFeatureListDestroyFunction(): MethodHandle =
+    downcall("mln_queried_feature_list_destroy")
 
   private fun mapGetStyleSourceTileUrlsFunction(): MethodHandle =
     downcall("mln_map_get_style_source_tile_urls")
@@ -4867,6 +4879,44 @@ internal object NativeAccess {
       styleIdListDestroyFunction().invokeNative(list)
     }
 
+  private fun queriedFeatureList(list: NativeQueriedFeatureList): List<QueriedFeature> =
+    try {
+      check(!list.isNull) { "mln_queried_feature_list returned the null handle" }
+      Arena.ofConfined().use { arena ->
+        val outCount = arena.allocate(ValueLayout.JAVA_LONG)
+        Status.check(queriedFeatureListCountFunction().invokeNative(list, outCount) as Int)
+        val count = Math.toIntExact(outCount.get(ValueLayout.JAVA_LONG, 0))
+        List(count) { index ->
+          val outFeature = mln_queried_feature.allocate(arena)
+          mln_queried_feature.size(outFeature, mln_queried_feature.sizeof().toInt())
+          Status.check(
+            queriedFeatureListGetFunction().invokeNative(list, index.toLong(), outFeature) as Int
+          )
+          queriedFeature(outFeature)
+        }
+      }
+    } finally {
+      queriedFeatureListDestroyFunction().invokeNative(list)
+    }
+
+  private fun queriedFeature(segment: MemorySegment): QueriedFeature {
+    val fields = mln_queried_feature.fields(segment)
+    return QueriedFeature(
+      copyBufferView(mln_queried_feature.feature(segment)),
+      if (fields and QUERIED_FEATURE_SOURCE_ID != 0)
+        stringView(mln_queried_feature.source_id(segment))
+      else null,
+      if (fields and QUERIED_FEATURE_SOURCE_LAYER_ID != 0)
+        stringView(mln_queried_feature.source_layer_id(segment))
+      else null,
+      if (fields and QUERIED_FEATURE_STATE != 0) copyBufferView(mln_queried_feature.state(segment))
+      else null,
+    )
+  }
+
+  private fun copyBufferView(view: MemorySegment): ByteArray =
+    copyBytes(mln_buffer_view.data(view), mln_buffer_view.size(view))
+
   private fun styleSourceTileUrls(
     map: NativeMap,
     sourceId: MemorySegment,
@@ -5302,6 +5352,9 @@ internal object NativeAccess {
     mln_rendered_query_geometry.`data$offset`()
 
   private const val RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS: Int = 1 shl 0
+  private const val QUERIED_FEATURE_SOURCE_ID: Int = 1 shl 0
+  private const val QUERIED_FEATURE_SOURCE_LAYER_ID: Int = 1 shl 1
+  private const val QUERIED_FEATURE_STATE: Int = 1 shl 2
 
   private val RENDERED_FEATURE_QUERY_OPTIONS_SIZE: Long =
     mln_rendered_feature_query_options.sizeof()

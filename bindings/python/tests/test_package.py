@@ -339,6 +339,7 @@ def test_public_type_hints_are_resolvable() -> None:
         render.RenderSessionHandle.acquire_opengl_owned_texture_frame,
         render.RenderSessionHandle.query_feature_extensions,
         render.RenderSessionHandle.query_rendered_features,
+        render.RenderSessionHandle.query_source_features,
         render.RenderSessionHandle.set_feature_state,
         mln.RuntimeHandle.create_map,
         mln.RuntimeHandle.create_offline_region,
@@ -401,6 +402,13 @@ def test_public_type_hints_are_resolvable() -> None:
     )
     assert rendered_hints["geometry"] is query.RenderedQueryGeometry
     assert rendered_hints["options"] != typing.Any
+    assert rendered_hints["return"] == list[query.QueriedFeature]
+
+    source_hints = typing.get_type_hints(
+        render.RenderSessionHandle.query_source_features
+    )
+    assert source_hints["source_id"] is str
+    assert source_hints["return"] == list[query.QueriedFeature]
 
     response_error_hints = typing.get_type_hints(offline.OfflineRegionResponseError)
     assert response_error_hints["reason"] is resource.ResourceErrorReason
@@ -2280,7 +2288,7 @@ def test_render_descriptors_are_public_python_values() -> None:
     assert opengl_wgl.target == 0x0DE1
 
 
-def test_render_session_query_public_api_uses_json_buffers() -> None:
+def test_render_session_query_public_api_returns_queried_features() -> None:
     class FakeNativeRenderSession:
         closed = False
         detached = False
@@ -2295,18 +2303,18 @@ def test_render_session_query_public_api_uses_json_buffers() -> None:
             geometry: object,
             layer_ids: tuple[str, ...] | None,
             filter_: object,
-        ) -> bytes:
+        ) -> list[dict[str, object]]:
             self.rendered_call = (geometry, layer_ids, filter_)
-            return queried_features
+            return [queried_feature_wire]
 
         def query_source_features(
             self,
             source_id: str,
             source_layer_ids: tuple[str, ...] | None,
             filter_: object,
-        ) -> bytes:
+        ) -> list[dict[str, object]]:
             self.source_call = (source_id, source_layer_ids, filter_)
-            return queried_features
+            return [queried_feature_wire]
 
         def query_feature_extensions(
             self,
@@ -2333,15 +2341,18 @@ def test_render_session_query_public_api_uses_json_buffers() -> None:
             "id": "feature-1",
         }
     )
-    queried_features = _json_object(
-        [
-            {
-                "feature": json.loads(feature),
-                "source": "points",
-                "sourceLayer": None,
-                "state": {"hover": True},
-            }
-        ]
+    state = _json_object({"hover": True})
+    queried_feature_wire = {
+        "feature": feature,
+        "source_id": "points",
+        "source_layer_id": None,
+        "state": state,
+    }
+    queried = query.QueriedFeature(
+        feature=feature,
+        source_id="points",
+        source_layer_id=None,
+        state=state,
     )
 
     fake_native = FakeNativeRenderSession()
@@ -2376,8 +2387,8 @@ def test_render_session_query_public_api_uses_json_buffers() -> None:
     )
     assert fake_native.source_call[0] == "points"
     assert fake_native.source_call[1] == ("landuse",)
-    assert rendered == queried_features
-    assert source == queried_features
+    assert rendered == [queried]
+    assert source == [queried]
     assert fake_native.extension_call == (
         "points",
         feature,

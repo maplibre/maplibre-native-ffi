@@ -11,6 +11,47 @@ public sealed class FeatureStateSelector
     public string? StateKey { get; set; }
 }
 
+/// <summary>
+/// One copied query hit. <see cref="Feature" /> is a UTF-8 GeoJSON Feature.
+/// <see cref="State" /> is a UTF-8 JSON object when present.
+/// </summary>
+public sealed record QueriedFeature
+{
+    private readonly byte[] feature;
+    private readonly byte[]? state;
+
+    public QueriedFeature(byte[] Feature, string? SourceId, string? SourceLayerId, byte[]? State)
+    {
+        ArgumentNullException.ThrowIfNull(Feature);
+        feature = (byte[])Feature.Clone();
+        this.SourceId = SourceId;
+        this.SourceLayerId = SourceLayerId;
+        state = State?.ToArray();
+    }
+
+    public byte[] Feature => (byte[])feature.Clone();
+    public string? SourceId { get; }
+    public string? SourceLayerId { get; }
+    public byte[]? State => state?.ToArray();
+
+    public bool Equals(QueriedFeature? other) =>
+        other is not null
+        && feature.AsSpan().SequenceEqual(other.feature)
+        && SourceId == other.SourceId
+        && SourceLayerId == other.SourceLayerId
+        && ValueEquality.SequenceEquals(state, other.state);
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        hash.AddBytes(feature);
+        hash.Add(SourceId);
+        hash.Add(SourceLayerId);
+        hash.Add(ValueEquality.SequenceHashCode(state));
+        return hash.ToHashCode();
+    }
+}
+
 public abstract record RenderedQueryGeometry
 {
     private RenderedQueryGeometry() { }

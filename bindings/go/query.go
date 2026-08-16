@@ -75,6 +75,17 @@ func (options SourceFeatureQueryOptions) Equal(other SourceFeatureQueryOptions) 
 		equalOptionalBytes(options.Filter, other.Filter)
 }
 
+// QueriedFeature is one copied feature query hit.
+//
+// Feature is a UTF-8 GeoJSON Feature. SourceID and SourceLayerID are nil when
+// absent. State is nil when absent and otherwise a UTF-8 JSON object.
+type QueriedFeature struct {
+	Feature       []byte
+	SourceID      *string
+	SourceLayerID *string
+	State         []byte
+}
+
 func equalOptionalBytes(left []byte, right []byte) bool {
 	return (left == nil) == (right == nil) && bytes.Equal(left, right)
 }
@@ -320,8 +331,9 @@ func (session *RenderSessionHandle) RemoveFeatureState(selector FeatureStateSele
 	})
 }
 
-// QueryRenderedFeatures queries rendered features from the latest render session state.
-func (session *RenderSessionHandle) QueryRenderedFeatures(geometry RenderedQueryGeometry, options *RenderedFeatureQueryOptions) ([]byte, error) {
+// QueryRenderedFeatures queries rendered features from the latest render session
+// state and returns copied hits.
+func (session *RenderSessionHandle) QueryRenderedFeatures(geometry RenderedQueryGeometry, options *RenderedFeatureQueryOptions) ([]QueriedFeature, error) {
 	ptr, release, err := session.ptr()
 	if err != nil {
 		return nil, err
@@ -335,7 +347,7 @@ func (session *RenderSessionHandle) QueryRenderedFeatures(geometry RenderedQuery
 		return nil, newBindingError(ErrInvalidArgument, err.Error())
 	}
 	defer rawOptions.free()
-	var result C.mln_buffer
+	var result C.mln_queried_feature_list
 	if err := session.withNoAcquiredFrame(func() error {
 		return checkNative(func() int32 {
 			return int32(C.mln_render_session_query_rendered_features(C.mln_render_session(ptr), rawGeometry.ptr(), rawOptions.ptr(), &result))
@@ -343,11 +355,12 @@ func (session *RenderSessionHandle) QueryRenderedFeatures(geometry RenderedQuery
 	}); err != nil {
 		return nil, err
 	}
-	return goOwnedBuffer(result)
+	return queriedFeatureList(result)
 }
 
-// QuerySourceFeatures queries source features from the latest render session state.
-func (session *RenderSessionHandle) QuerySourceFeatures(sourceID string, options *SourceFeatureQueryOptions) ([]byte, error) {
+// QuerySourceFeatures queries source features from the latest render session
+// state and returns copied hits.
+func (session *RenderSessionHandle) QuerySourceFeatures(sourceID string, options *SourceFeatureQueryOptions) ([]QueriedFeature, error) {
 	ptr, release, err := session.ptr()
 	if err != nil {
 		return nil, err
@@ -361,7 +374,7 @@ func (session *RenderSessionHandle) QuerySourceFeatures(sourceID string, options
 		return nil, newBindingError(ErrInvalidArgument, err.Error())
 	}
 	defer rawOptions.free()
-	var result C.mln_buffer
+	var result C.mln_queried_feature_list
 	if err := session.withNoAcquiredFrame(func() error {
 		return checkNative(func() int32 {
 			return int32(C.mln_render_session_query_source_features(C.mln_render_session(ptr), sourceView.raw(), rawOptions.ptr(), &result))
@@ -369,7 +382,46 @@ func (session *RenderSessionHandle) QuerySourceFeatures(sourceID string, options
 	}); err != nil {
 		return nil, err
 	}
-	return goOwnedBuffer(result)
+	return queriedFeatureList(result)
+}
+
+func queriedFeatureList(list C.mln_queried_feature_list) ([]QueriedFeature, error) {
+	defer C.mln_queried_feature_list_destroy(list)
+	var count C.size_t
+	if err := checkNative(func() int32 { return int32(C.mln_queried_feature_list_count(list, &count)) }); err != nil {
+		return nil, err
+	}
+	features := make([]QueriedFeature, int(count))
+	for i := range features {
+		hit := C.mln_queried_feature_default()
+		if err := checkNative(func() int32 {
+			return int32(C.mln_queried_feature_list_get(list, C.size_t(i), &hit))
+		}); err != nil {
+			return nil, err
+		}
+		feature, ok := goByteSlice(hit.feature.data, hit.feature.size)
+		if !ok {
+			return nil, newBindingError(ErrNative, "native queried feature data is invalid")
+		}
+		item := QueriedFeature{Feature: feature}
+		if hit.fields&C.MLN_QUERIED_FEATURE_SOURCE_ID != 0 {
+			sourceID := goStringView(hit.source_id)
+			item.SourceID = &sourceID
+		}
+		if hit.fields&C.MLN_QUERIED_FEATURE_SOURCE_LAYER_ID != 0 {
+			sourceLayerID := goStringView(hit.source_layer_id)
+			item.SourceLayerID = &sourceLayerID
+		}
+		if hit.fields&C.MLN_QUERIED_FEATURE_STATE != 0 {
+			state, ok := goByteSlice(hit.state.data, hit.state.size)
+			if !ok {
+				return nil, newBindingError(ErrNative, "native queried feature state is invalid")
+			}
+			item.State = state
+		}
+		features[i] = item
+	}
+	return features, nil
 }
 
 // QueryFeatureExtensions queries a feature extension from the latest render

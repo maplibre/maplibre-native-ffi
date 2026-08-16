@@ -76,11 +76,30 @@ public struct FeatureStateSelector: Equatable, Sendable {
   }
 }
 
+public struct QueriedFeature: Equatable, Sendable {
+  public var feature: Data
+  public var sourceId: String?
+  public var sourceLayerId: String?
+  public var state: Data?
+
+  public init(
+    feature: Data,
+    sourceId: String? = nil,
+    sourceLayerId: String? = nil,
+    state: Data? = nil
+  ) {
+    self.feature = feature
+    self.sourceId = sourceId
+    self.sourceLayerId = sourceLayerId
+    self.state = state
+  }
+}
+
 public extension RenderSessionHandle {
   func queryRenderedFeatures(
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions = RenderedFeatureQueryOptions()
-  ) throws -> Data {
+  ) throws -> [QueriedFeature] {
     try mapNativeFailure {
       try geometry.nativeGeometry.withNativeGeometry { nativeGeometry in
         try options.nativeOptions.withNativeOptions { nativeOptions in
@@ -97,7 +116,7 @@ public extension RenderSessionHandle {
   func querySourceFeatures(
     sourceId: String,
     options: SourceFeatureQueryOptions = SourceFeatureQueryOptions()
-  ) throws -> Data {
+  ) throws -> [QueriedFeature] {
     try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }

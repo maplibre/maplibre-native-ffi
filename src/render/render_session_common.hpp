@@ -569,13 +569,22 @@ auto render_session_get_feature_state(
 auto render_session_remove_feature_state(
   mln_render_session session, const mln_feature_state_selector* selector
 ) -> mln_status;
+auto queried_feature_list_count(
+  mln_queried_feature_list list, size_t* out_count
+) -> mln_status;
+auto queried_feature_list_get(
+  mln_queried_feature_list list, size_t index, mln_queried_feature* out_feature
+) -> mln_status;
+auto queried_feature_list_destroy(mln_queried_feature_list list) -> void;
 auto render_session_query_rendered_features(
   mln_render_session session, const mln_rendered_query_geometry* geometry,
-  const mln_rendered_feature_query_options* options, mln_buffer* out_result
+  const mln_rendered_feature_query_options* options,
+  mln_queried_feature_list* out_result
 ) -> mln_status;
 auto render_session_query_source_features(
   mln_render_session session, mln_buffer_view source_id,
-  const mln_source_feature_query_options* options, mln_buffer* out_result
+  const mln_source_feature_query_options* options,
+  mln_queried_feature_list* out_result
 ) -> mln_status;
 auto render_session_query_feature_extensions(
   mln_render_session session, mln_buffer_view source_id,

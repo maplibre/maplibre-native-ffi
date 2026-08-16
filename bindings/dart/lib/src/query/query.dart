@@ -1,4 +1,4 @@
-/// Rendered and source feature query descriptors.
+/// Rendered and source feature query descriptors and copied query hits.
 library;
 
 import 'dart:typed_data';
@@ -27,6 +27,46 @@ final class FeatureStateSelector {
 
   /// Optional state key.
   final String? stateKey;
+}
+
+/// One copied feature query hit.
+final class QueriedFeature {
+  /// Creates a copied queried feature.
+  QueriedFeature({
+    required Uint8List feature,
+    this.sourceId,
+    this.sourceLayerId,
+    Uint8List? state,
+  }) : feature = copyBytes(feature),
+       state = copyOptionalBytes(state);
+
+  /// GeoJSON Feature bytes.
+  final Uint8List feature;
+
+  /// Optional source ID.
+  final String? sourceId;
+
+  /// Optional source-layer ID.
+  final String? sourceLayerId;
+
+  /// Optional feature-state JSON object bytes.
+  final Uint8List? state;
+
+  @override
+  bool operator ==(Object other) =>
+      other is QueriedFeature &&
+      optionalBytesEqual(other.feature, feature) &&
+      other.sourceId == sourceId &&
+      other.sourceLayerId == sourceLayerId &&
+      optionalBytesEqual(other.state, state);
+
+  @override
+  int get hashCode => Object.hash(
+    optionalBytesHash(feature),
+    sourceId,
+    sourceLayerId,
+    optionalBytesHash(state),
+  );
 }
 
 /// Rendered feature query geometry.

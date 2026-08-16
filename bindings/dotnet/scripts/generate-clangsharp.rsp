@@ -26,6 +26,7 @@ mln_offline_region_snapshot=MlnOfflineRegionSnapshot
 mln_offline_region_list=MlnOfflineRegionList
 mln_style_id_list=MlnStyleIdList
 mln_style_string_list=MlnStyleStringList
+mln_queried_feature_list=MlnQueriedFeatureList
 --config
 latest-codegen
 --with-access-specifier

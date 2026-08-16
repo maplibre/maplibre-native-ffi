@@ -49,6 +49,10 @@ struct NativeStyleStringListHandle: NativeHandle {
   let raw: UInt64
 }
 
+struct NativeQueriedFeatureListHandle: NativeHandle {
+  let raw: UInt64
+}
+
 struct NativeWakeSourceHandle: NativeHandle {
   let raw: UInt64
 }

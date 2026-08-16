@@ -1183,8 +1183,62 @@ List<String> _copyStyleStringList(NativeStyleStringList list) {
   }
 }
 
+List<QueriedFeature> _copyQueriedFeatureList(NativeQueriedFeatureList list) {
+  try {
+    return withNativeArena((arena) {
+      final outCount = arena<Size>();
+      _check(raw.mln_queried_feature_list_count(list.raw, outCount));
+      final features = <QueriedFeature>[];
+      final outFeature = arena<raw.mln_queried_feature>();
+      for (var index = 0; index < outCount.value; index += 1) {
+        outFeature.ref = raw.mln_queried_feature_default();
+        _check(raw.mln_queried_feature_list_get(list.raw, index, outFeature));
+        final hit = outFeature.ref;
+        final hasSourceId =
+            hit.fields &
+                raw
+                    .mln_queried_feature_field
+                    .MLN_QUERIED_FEATURE_SOURCE_ID
+                    .value !=
+            0;
+        final hasSourceLayerId =
+            hit.fields &
+                raw
+                    .mln_queried_feature_field
+                    .MLN_QUERIED_FEATURE_SOURCE_LAYER_ID
+                    .value !=
+            0;
+        final hasState =
+            hit.fields &
+                raw.mln_queried_feature_field.MLN_QUERIED_FEATURE_STATE.value !=
+            0;
+        features.add(
+          QueriedFeature(
+            feature: _copyBufferViewBytes(hit.feature),
+            sourceId: hasSourceId ? _copyStringView(hit.source_id) : null,
+            sourceLayerId: hasSourceLayerId
+                ? _copyStringView(hit.source_layer_id)
+                : null,
+            state: hasState ? _copyBufferViewBytes(hit.state) : null,
+          ),
+        );
+      }
+      return features;
+    });
+  } finally {
+    raw.mln_queried_feature_list_destroy(list.raw);
+  }
+}
+
 String? _copyStringView(raw.mln_buffer_view view) =>
     _copyNativeString(view.data, view.size);
+
+Uint8List _copyBufferViewBytes(raw.mln_buffer_view view) {
+  if (view.data == nullptr || view.size == 0) {
+    return Uint8List(0);
+  }
+  return Uint8List.fromList(view.data.cast<Uint8>().asTypedList(view.size));
+}
 
 String? _copyNativeString(Pointer<Void> pointer, int byteLength) {
   if (pointer == nullptr || byteLength == 0) {

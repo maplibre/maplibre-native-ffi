@@ -87,3 +87,10 @@ internal readonly struct MlnStyleStringList(ulong value) : IMlnHandle
 
     public bool IsNull => Value == 0;
 }
+
+internal readonly struct MlnQueriedFeatureList(ulong value) : IMlnHandle
+{
+    public ulong Value { get; } = value;
+
+    public bool IsNull => Value == 0;
+}

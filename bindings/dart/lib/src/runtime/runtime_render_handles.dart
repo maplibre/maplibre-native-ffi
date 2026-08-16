@@ -428,7 +428,7 @@ final class RenderSessionHandle {
   }
 
   /// Queries rendered features from the latest render session state.
-  Uint8List queryRenderedFeatures(
+  List<QueriedFeature> queryRenderedFeatures(
     RenderedQueryGeometry geometry, {
     RenderedFeatureQueryOptions? options,
   }) {
@@ -450,12 +450,12 @@ final class RenderSessionHandle {
           outResult,
         ),
       );
-      return copyOwnedBuffer(NativeOwnedBufferHandle(outResult.value));
+      return _copyQueriedFeatureList(NativeQueriedFeatureList(outResult.value));
     });
   }
 
   /// Queries source features from the latest render session state.
-  Uint8List querySourceFeatures(
+  List<QueriedFeature> querySourceFeatures(
     String sourceId, {
     SourceFeatureQueryOptions? options,
   }) {
@@ -476,7 +476,7 @@ final class RenderSessionHandle {
           outResult,
         ),
       );
-      return copyOwnedBuffer(NativeOwnedBufferHandle(outResult.value));
+      return _copyQueriedFeatureList(NativeQueriedFeatureList(outResult.value));
     });
   }
 

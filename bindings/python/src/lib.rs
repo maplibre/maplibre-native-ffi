@@ -4097,7 +4097,7 @@ impl RenderSessionHandle {
         geometry: &Bound<'_, PyAny>,
         layer_ids: Option<Vec<String>>,
         filter: Option<&Bound<'_, PyBytes>>,
-    ) -> PyResult<Py<PyBytes>> {
+    ) -> PyResult<Py<PyList>> {
         let state = self
             .state
             .lock()
@@ -4114,7 +4114,7 @@ impl RenderSessionHandle {
         }
         let options = maplibre_core::query::rendered_feature_query_options_to_native(&options)
             .map_err(map_error)?;
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_queried_feature_list>::new();
         // SAFETY: The C API validates the render-session pointer, query geometry/options, and output pointer.
         maplibre_core::check(unsafe {
             sys::mln_render_session_query_rendered_features(
@@ -4125,7 +4125,13 @@ impl RenderSessionHandle {
             )
         })
         .map_err(map_error)?;
-        owned_buffer_to_py(py, out.get())
+        let native = out
+            .into_live("mln_queried_feature_list")
+            .map_err(map_error)?;
+        // SAFETY: native is an owned queried-feature list returned by native.
+        let features = unsafe { maplibre_core::query::copy_queried_feature_list(native) }
+            .map_err(map_error)?;
+        queried_features_to_py(py, features)
     }
 
     fn query_source_features(
@@ -4134,7 +4140,7 @@ impl RenderSessionHandle {
         source_id: String,
         source_layer_ids: Option<Vec<String>>,
         filter: Option<&Bound<'_, PyBytes>>,
-    ) -> PyResult<Py<PyBytes>> {
+    ) -> PyResult<Py<PyList>> {
         let state = self
             .state
             .lock()
@@ -4150,7 +4156,7 @@ impl RenderSessionHandle {
         }
         let options = maplibre_core::query::source_feature_query_options_to_native(&options)
             .map_err(map_error)?;
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_queried_feature_list>::new();
         // SAFETY: The C API validates the render-session pointer, source ID, query options, and output pointer.
         maplibre_core::check(unsafe {
             sys::mln_render_session_query_source_features(
@@ -4161,7 +4167,13 @@ impl RenderSessionHandle {
             )
         })
         .map_err(map_error)?;
-        owned_buffer_to_py(py, out.get())
+        let native = out
+            .into_live("mln_queried_feature_list")
+            .map_err(map_error)?;
+        // SAFETY: native is an owned queried-feature list returned by native.
+        let features = unsafe { maplibre_core::query::copy_queried_feature_list(native) }
+            .map_err(map_error)?;
+        queried_features_to_py(py, features)
     }
 
     fn query_feature_extensions(
@@ -5989,6 +6001,35 @@ fn lat_lng_bounds_core_to_py(
     dict.set_item("southwest", lat_lng_core_to_py(py, &bounds.southwest)?)?;
     dict.set_item("northeast", lat_lng_core_to_py(py, &bounds.northeast)?)?;
     Ok(dict.into_any().unbind())
+}
+
+fn queried_feature_to_py(
+    py: Python<'_>,
+    feature: maplibre_core::QueriedFeature,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("feature", PyBytes::new(py, &feature.feature))?;
+    dict.set_item("source_id", feature.source_id)?;
+    dict.set_item("source_layer_id", feature.source_layer_id)?;
+    dict.set_item(
+        "state",
+        feature
+            .state
+            .as_deref()
+            .map(|bytes| PyBytes::new(py, bytes)),
+    )?;
+    Ok(dict.into_any().unbind())
+}
+
+fn queried_features_to_py(
+    py: Python<'_>,
+    features: Vec<maplibre_core::QueriedFeature>,
+) -> PyResult<Py<PyList>> {
+    let list = PyList::empty(py);
+    for feature in features {
+        list.append(queried_feature_to_py(py, feature)?)?;
+    }
+    Ok(list.unbind())
 }
 
 fn source_info_to_py(py: Python<'_>, info: maplibre_core::SourceInfo) -> PyResult<Py<PyAny>> {
