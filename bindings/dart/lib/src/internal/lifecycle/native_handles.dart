@@ -45,5 +45,8 @@ extension type const NativeQueriedFeatureList(int raw)
 /// Wake source handle id.
 extension type const NativeWakeSource(int raw) implements NativeHandle {}
 
+/// Prepared GeoJSON source data handle id.
+extension type const NativeGeoJsonSourceData(int raw) implements NativeHandle {}
+
 /// Resource request handle id.
 extension type const NativeResourceRequest(int raw) implements NativeHandle {}

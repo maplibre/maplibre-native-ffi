@@ -111,7 +111,7 @@ internal object VulkanRenderTarget {
       session.resize(viewport.width(), viewport.height(), viewport.scaleFactor())
     }
 
-    override fun renderUpdate(): Boolean = session.renderUpdate() == RenderResult.RENDERED
+    override fun renderUpdate(): Boolean = session.renderUpdate().result == RenderResult.RENDERED
 
     override fun close() {
       session.close()
@@ -128,7 +128,7 @@ internal object VulkanRenderTarget {
     }
 
     override fun renderUpdate(): Boolean {
-      if (session.renderUpdate() != RenderResult.RENDERED) {
+      if (session.renderUpdate().result != RenderResult.RENDERED) {
         return false
       }
       return session.acquireVulkanOwnedTextureFrame().use { frameHandle ->
@@ -177,7 +177,7 @@ internal object VulkanRenderTarget {
     }
 
     override fun renderUpdate(): Boolean {
-      if (session.renderUpdate() != RenderResult.RENDERED) {
+      if (session.renderUpdate().result != RenderResult.RENDERED) {
         return false
       }
       return compositor.drawImageView(image.view())

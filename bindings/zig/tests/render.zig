@@ -77,7 +77,7 @@ fn waitForRenderedFeatureQuery(
         var result = try session.queryRenderedFeatures(testing.allocator, geometry, options);
         if (result.items.len != 0) return result;
         result.deinit();
-        try runtime.pump(0);
+        try runtime.pump(0, null);
         _ = try session.renderUpdate();
         try std.Thread.yield();
     }
@@ -94,7 +94,7 @@ fn waitForSourceFeatureQuery(
         });
         if (result.items.len != 0) return result;
         result.deinit();
-        try runtime.pump(0);
+        try runtime.pump(0, null);
         _ = try session.renderUpdate();
         try std.Thread.yield();
     }
@@ -190,7 +190,7 @@ fn pumpTransitionFrame(
     defer if (build_options.supports_metal) pool.deinit();
 
     try map.requestRepaint();
-    try runtime.pump(0);
+    try runtime.pump(0, null);
 
     var result = TransitionFramePump{};
     var render_update_available = false;
@@ -213,7 +213,7 @@ fn pumpTransitionFrame(
             }
         }
     }
-    if (render_update_available) try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try session.renderUpdate());
+    if (render_update_available) try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
     return result;
 }
 
@@ -970,7 +970,7 @@ fn createMovedMetalSessionWithFrame(device: *anyopaque) !struct {
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try session.renderUpdate());
+    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
 
     const frame = try session.acquireMetalOwnedTextureFrame();
     return .{ .runtime = runtime, .map = map, .session = session, .frame = frame };
@@ -1335,7 +1335,10 @@ test "render update without pending update reports no update and keeps session l
     });
     defer owned.close() catch {};
 
-    try testing.expectEqual(@as(maplibre.RenderResult, .no_update), try owned.session.renderUpdate());
+    const update = try owned.session.renderUpdate();
+    try testing.expectEqual(@as(maplibre.RenderResult, .no_update), update.result);
+    // A non-rendered outcome never asks for another frame.
+    try testing.expect(!update.needs_repaint);
     try owned.session.resize(.{ .width = 32, .height = 16, .scale_factor = 1.0 });
 }
 
@@ -1358,7 +1361,7 @@ test "owned texture render session lifecycle and readback" {
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try session.renderUpdate());
+    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
     try session.reduceMemoryUse();
     try session.dumpDebugLogs();
     try session.clearData();
@@ -1404,14 +1407,14 @@ test "map size follows attach and resize and keeps the creation scale factor" {
     try testing.expectEqual(@as(u32, 64), before_pump.width);
     try testing.expectEqual(@as(u32, 32), before_pump.height);
 
-    try runtime.pump(0);
+    try runtime.pump(0, null);
     const attached = try map.getSize();
     try testing.expectEqual(@as(u32, 32), attached.width);
     try testing.expectEqual(@as(u32, 16), attached.height);
     try testing.expectEqual(@as(f64, 2.0), attached.scale_factor);
 
     try owned.session.resize(.{ .width = 48, .height = 24, .scale_factor = 1.0 });
-    try runtime.pump(0);
+    try runtime.pump(0, null);
     const resized = try map.getSize();
     try testing.expectEqual(@as(u32, 48), resized.width);
     try testing.expectEqual(@as(u32, 24), resized.height);
@@ -1438,7 +1441,7 @@ test "set target reports unsupported for a session-owned texture" {
     // The rejection left the session usable.
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try owned.session.renderUpdate());
+    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try owned.session.renderUpdate()).result);
 }
 
 test "an ease pumped through rendered frames reports its transition finish once" {
@@ -1461,7 +1464,7 @@ test "an ease pumped through rendered frames reports its transition finish once"
     {
         const pool = if (build_options.supports_metal) try metal_support.AutoreleasePool.init() else {};
         defer if (build_options.supports_metal) pool.deinit();
-        try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try owned.session.renderUpdate());
+        try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try owned.session.renderUpdate()).result);
     }
 
     // A camera transition advances when the host requests and renders frames.
@@ -1555,7 +1558,7 @@ test "owned texture frame wrapper allocation failure releases native frame" {
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try session.renderUpdate());
+    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
 
     test_hooks.failNextOwnedTextureFrameWrapperAllocation();
     if (build_options.supports_vulkan) {
@@ -1637,7 +1640,7 @@ test "render session feature state set get and remove" {
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try session.renderUpdate());
+    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
 
     try session.setFeatureState(testing.allocator, selector, feature_state);
     var snapshot = try session.getFeatureState(testing.allocator, selector);
@@ -1647,7 +1650,7 @@ test "render session feature state set get and remove" {
 
     try session.removeFeatureState(testing.allocator, .{ .source_id = "point", .feature_id = "feature-1", .state_key = "hover" });
     try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try session.renderUpdate());
+    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
 
     var after_remove = try session.getFeatureState(testing.allocator, selector);
     defer after_remove.deinit();
@@ -1673,7 +1676,7 @@ test "render session queries rendered and source features" {
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try session.renderUpdate());
+    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
 
     const query_point = try map.pixelForLatLng(.{ .latitude = 37.7749, .longitude = -122.4194 });
     var rendered = try waitForRenderedFeatureQuery(&runtime, session, .{ .box = .{
@@ -1713,7 +1716,7 @@ test "render session clips rendered box queries to the viewport" {
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try session.renderUpdate());
+    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
 
     const options = maplibre.RenderedFeatureQueryOptions{ .layer_ids = &.{"point-circle"} };
 
@@ -1811,9 +1814,8 @@ test "GeoJSON source options cluster nearby points and aggregate cluster propert
     try testing.expect(try support.waitForEvent(&runtime, .map_style_loaded));
 
     const features = "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[0,0]},\"properties\":{\"rank\":1}},{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[0.001,0.001]},\"properties\":{\"rank\":2}},{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[0.002,0.002]},\"properties\":{\"rank\":3}}]}";
-    try map.addGeoJsonSourceData(
+    const cluster_data = try maplibre.GeoJsonSourceDataHandle.create(
         testing.allocator,
-        "cluster-options-source",
         features,
         .{
             .cluster = true,
@@ -1822,6 +1824,12 @@ test "GeoJSON source options cluster nearby points and aggregate cluster propert
             .cluster_max_zoom = 14,
             .cluster_properties = "{\"total\":[\"+\",[\"get\",\"rank\"]]}",
         },
+    );
+    defer cluster_data.release();
+    try map.addGeoJsonSourceData(
+        testing.allocator,
+        "cluster-options-source",
+        cluster_data,
     );
 
     try map.addStyleLayerJson(testing.allocator, "{\"id\":\"cluster-options-circle\",\"type\":\"circle\",\"source\":\"cluster-options-source\",\"filter\":[\"has\",\"point_count\"],\"paint\":{\"circle-radius\":20}}", "");
@@ -1943,7 +1951,7 @@ test "OpenGL owned texture frame scopes public binding access" {
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try session.renderUpdate());
+    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
 
     var image = try readTestImage(&session, testing.allocator, 32 * 32 * 4);
     defer image.deinit();
@@ -2002,7 +2010,7 @@ test "OpenGL borrowed texture renders through public bindings" {
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try session.renderUpdate());
+    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
 
     const pixels = try testing.allocator.alloc(u8, 128 * 128 * 4);
     defer testing.allocator.free(pixels);
@@ -2032,7 +2040,7 @@ test "OpenGL borrowed texture set target renders into a replacement texture" {
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try session.renderUpdate());
+    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
 
     // A caller-owned texture is sized by its owner, so resize is rejected and
     // the host hands over a texture at the new size instead.
@@ -2052,12 +2060,14 @@ test "OpenGL borrowed texture set target renders into a replacement texture" {
 
     // Replacing the target enqueues the new size for the map's owner thread,
     // so the map publishes a matching update only once pumped.
-    try testing.expectEqual(@as(maplibre.RenderResult, .size_pending), try session.renderUpdate());
-    try runtime.pump(0);
+    const size_pending_update = try session.renderUpdate();
+    try testing.expectEqual(@as(maplibre.RenderResult, .size_pending), size_pending_update.result);
+    try testing.expect(!size_pending_update.needs_repaint);
+    try runtime.pump(0, null);
     const resized = try map.getSize();
     try testing.expectEqual(@as(u32, 64), resized.width);
     try testing.expectEqual(@as(u32, 96), resized.height);
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try session.renderUpdate());
+    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
 
     const pixels = try testing.allocator.alloc(u8, 64 * 96 * 4);
     defer testing.allocator.free(pixels);
@@ -2087,7 +2097,7 @@ test "OpenGL surface renders through public bindings" {
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try session.renderUpdate());
+    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
 
     const pixels = try testing.allocator.alloc(u8, 128 * 128 * 4);
     defer testing.allocator.free(pixels);
@@ -2127,8 +2137,8 @@ test "dedicated OpenGL surface renders through a context it owns" {
     // the style and the extent only while this loop pumps the runtime.
     var result: maplibre.RenderResult = .no_update;
     for (0..1000) |_| {
-        try runtime.pump(0);
-        result = try session.renderUpdate();
+        try runtime.pump(0, null);
+        result = (try session.renderUpdate()).result;
         if (result == .rendered) break;
         try std.Thread.yield();
     }
@@ -2160,7 +2170,7 @@ test "Metal owned texture frame handle scopes native pointers" {
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try session.renderUpdate());
+    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
 
     var image = try readTestImage(&session, testing.allocator, 32 * 32 * 4);
     defer image.deinit();
@@ -2191,9 +2201,9 @@ test "Metal owned texture frame handle scopes native pointers" {
     // Resizing enqueues the new logical size for the map's owner thread, so
     // the map publishes a matching update only once pumped.
     try session.resize(.{ .width = 16, .height = 8, .scale_factor = 2.0 });
-    try testing.expectEqual(@as(maplibre.RenderResult, .size_pending), try session.renderUpdate());
-    try runtime.pump(0);
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try session.renderUpdate());
+    try testing.expectEqual(@as(maplibre.RenderResult, .size_pending), (try session.renderUpdate()).result);
+    try runtime.pump(0, null);
+    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
     var resized_frame = try session.acquireMetalOwnedTextureFrame();
     const resized_info = try resized_frame.info();
     try testing.expectEqual(@as(u32, 32), resized_info.width);
@@ -2275,7 +2285,7 @@ test "Metal borrowed texture renders through public bindings" {
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try session.renderUpdate());
+    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
     try expectPixelApprox(try metal_support.readTexturePixelRGBA8(borrowed, 0, 0), .{ 0xd8, 0xf1, 0xff, 0xff }, 8);
 
     try testing.expectError(error.Unsupported, session.acquireMetalOwnedTextureFrame());
@@ -2314,7 +2324,7 @@ test "Metal borrowed texture set target renders into a replacement texture" {
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try session.renderUpdate());
+    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
 
     // A caller-owned texture is sized by its owner, so resize is rejected and
     // the host hands over a texture at the new size instead.
@@ -2336,12 +2346,12 @@ test "Metal borrowed texture set target renders into a replacement texture" {
 
     // Replacing the target enqueues the new size for the map's owner thread,
     // so the map publishes a matching update only once pumped.
-    try testing.expectEqual(@as(maplibre.RenderResult, .size_pending), try session.renderUpdate());
-    try runtime.pump(0);
+    try testing.expectEqual(@as(maplibre.RenderResult, .size_pending), (try session.renderUpdate()).result);
+    try runtime.pump(0, null);
     const resized = try map.getSize();
     try testing.expectEqual(@as(u32, 64), resized.width);
     try testing.expectEqual(@as(u32, 96), resized.height);
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try session.renderUpdate());
+    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
     try expectPixelApprox(try metal_support.readTexturePixelRGBA8(replacement, 0, 0), .{ 0xd8, 0xf1, 0xff, 0xff }, 8);
 }
 
@@ -2365,7 +2375,7 @@ test "Vulkan owned texture frame handle scopes native pointers" {
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try session.renderUpdate());
+    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
 
     var image = try readTestImage(&session, testing.allocator, 32 * 32 * 4);
     defer image.deinit();
@@ -2396,9 +2406,9 @@ test "Vulkan owned texture frame handle scopes native pointers" {
     // Resizing enqueues the new logical size for the map's owner thread, so
     // the map publishes a matching update only once pumped.
     try session.resize(.{ .width = 16, .height = 8, .scale_factor = 2.0 });
-    try testing.expectEqual(@as(maplibre.RenderResult, .size_pending), try session.renderUpdate());
-    try runtime.pump(0);
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try session.renderUpdate());
+    try testing.expectEqual(@as(maplibre.RenderResult, .size_pending), (try session.renderUpdate()).result);
+    try runtime.pump(0, null);
+    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
     var resized_frame = try session.acquireVulkanOwnedTextureFrame();
     const resized_info = try resized_frame.info();
     try testing.expectEqual(@as(u32, 32), resized_info.width);
@@ -2428,7 +2438,7 @@ test "Vulkan borrowed texture renders through public bindings" {
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try session.renderUpdate());
+    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
 
     try testing.expectError(error.Unsupported, session.acquireVulkanOwnedTextureFrame());
     try testing.expectError(error.Unsupported, session.resize(.{ .width = 64, .height = 64, .scale_factor = 1.0 }));
@@ -2453,7 +2463,7 @@ test "Vulkan borrowed texture set target renders into a replacement image" {
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try session.renderUpdate());
+    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
 
     // A caller-owned image is sized by its owner, so resize is rejected and
     // the host hands over an image at the new size instead.
@@ -2473,10 +2483,10 @@ test "Vulkan borrowed texture set target renders into a replacement image" {
 
     // Replacing the target enqueues the new size for the map's owner thread,
     // so the map publishes a matching update only once pumped.
-    try testing.expectEqual(@as(maplibre.RenderResult, .size_pending), try session.renderUpdate());
-    try runtime.pump(0);
+    try testing.expectEqual(@as(maplibre.RenderResult, .size_pending), (try session.renderUpdate()).result);
+    try runtime.pump(0, null);
     const resized = try map.getSize();
     try testing.expectEqual(@as(u32, 64), resized.width);
     try testing.expectEqual(@as(u32, 96), resized.height);
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), try session.renderUpdate());
+    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
 }

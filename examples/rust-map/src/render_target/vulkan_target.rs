@@ -118,7 +118,7 @@ impl RenderTarget {
                 session,
                 compositor,
             } => {
-                if session.render_update()? != RenderResult::Rendered {
+                if session.render_update()?.result != RenderResult::Rendered {
                     return Ok(false);
                 }
                 let frame = session.acquire_vulkan_owned_texture_frame()?;
@@ -140,14 +140,16 @@ impl RenderTarget {
                 compositor,
                 image,
             } => {
-                if session.render_update()? != RenderResult::Rendered {
+                if session.render_update()?.result != RenderResult::Rendered {
                     return Ok(false);
                 }
                 compositor.draw_image_view(image.view()).map_err(|error| {
                     compositor_error(format!("Vulkan texture compositor draw failed: {error:?}"))
                 })
             }
-            Self::Surface { session } => Ok(session.render_update()? == RenderResult::Rendered),
+            Self::Surface { session } => {
+                Ok(session.render_update()?.result == RenderResult::Rendered)
+            }
         }
     }
 

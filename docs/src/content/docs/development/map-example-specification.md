@@ -492,6 +492,9 @@ Requirements:
   other than a rendered frame. Consuming afterwards would discard a request the
   runtime loop published during the render call, and that frame would never be
   drawn.
+- When `render_update` reports a rendered frame, the render loop MAY set the
+  render request again from the call's returned repaint flag instead of waiting
+  for the frame's `map_render_frame_finished` event.
 - `map_render_frame_finished` is delivered by the runtime loop's next `pump`
   after the render loop rendered. An example MUST NOT treat it as a synchronous
   result of the `render_update` it follows, and MUST NOT block a render loop

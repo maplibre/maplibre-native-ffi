@@ -342,7 +342,7 @@ func TestStyleGeoJSONSourceOptionsEqualComparesFieldValues(t *testing.T) {
 				ClusterMinPoints:  optionPtr(uint32(2)),
 				LineMetrics:       optionPtr(true),
 				Cluster:           optionPtr(true),
-				SynchronousUpdate: optionPtr(true),
+				SynchronousTiling: optionPtr(true),
 			}
 		},
 		StyleGeoJSONSourceOptions.Equal,
@@ -360,7 +360,7 @@ func TestStyleGeoJSONSourceOptionsEqualComparesFieldValues(t *testing.T) {
 			func(o *StyleGeoJSONSourceOptions) { o.ClusterMinPoints = optionPtr(uint32(3)) },
 			func(o *StyleGeoJSONSourceOptions) { o.LineMetrics = optionPtr(false) },
 			func(o *StyleGeoJSONSourceOptions) { o.Cluster = optionPtr(false) },
-			func(o *StyleGeoJSONSourceOptions) { o.SynchronousUpdate = optionPtr(false) },
+			func(o *StyleGeoJSONSourceOptions) { o.SynchronousTiling = optionPtr(false) },
 		},
 	)
 }

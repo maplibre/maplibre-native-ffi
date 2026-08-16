@@ -10,6 +10,7 @@
 mod camera;
 mod custom_geometry;
 mod events;
+mod geojson;
 mod handle;
 mod logging;
 mod map;
@@ -36,6 +37,7 @@ pub use events::{
     RuntimeEvent, RuntimeEventBatch, RuntimeEventPayload, RuntimeEventRef, RuntimeEventSource,
     TileActionEvent, TileId, UnknownRuntimeEventPayload,
 };
+pub use geojson::GeoJsonSourceDataHandle;
 pub use logging::{LogRecord, clear_log_callback, set_async_log_severity_mask, set_log_callback};
 pub use map::{
     GeoJsonSourceOptions, ImageContent, ImageStretch, LocationIndicatorImageKind, MapAttachRef,
@@ -62,13 +64,13 @@ pub use render::{
     MetalSurfaceDescriptor, NativePointer, OpenGLBorrowedTextureDescriptor,
     OpenGLContextDescriptor, OpenGLOwnedTextureDescriptor, OpenGLOwnedTextureFrame,
     OpenGLOwnedTextureFrameHandle, OpenGLSurfaceDescriptor, PremultipliedRgba8Image,
-    QueriedFeature, RenderSessionHandle, RenderTargetExtent, RenderedFeatureQueryOptions,
-    RenderedQueryGeometry, SourceFeatureQueryOptions, TextureImageInfo,
-    VulkanBorrowedTextureDescriptor, VulkanContextDescriptor, VulkanOwnedTextureDescriptor,
-    VulkanOwnedTextureFrame, VulkanOwnedTextureFrameHandle, VulkanSurfaceDescriptor,
-    WebGlContextDescriptor, WebGpuBorrowedTextureDescriptor, WebGpuContextDescriptor,
-    WebGpuOwnedTextureDescriptor, WebGpuOwnedTextureFrame, WebGpuOwnedTextureFrameHandle,
-    WebGpuSurfaceDescriptor, WglContextDescriptor,
+    QueriedFeature, RenderSessionHandle, RenderTargetExtent, RenderUpdate,
+    RenderedFeatureQueryOptions, RenderedQueryGeometry, SourceFeatureQueryOptions,
+    TextureImageInfo, VulkanBorrowedTextureDescriptor, VulkanContextDescriptor,
+    VulkanOwnedTextureDescriptor, VulkanOwnedTextureFrame, VulkanOwnedTextureFrameHandle,
+    VulkanSurfaceDescriptor, WebGlContextDescriptor, WebGpuBorrowedTextureDescriptor,
+    WebGpuContextDescriptor, WebGpuOwnedTextureDescriptor, WebGpuOwnedTextureFrame,
+    WebGpuOwnedTextureFrameHandle, WebGpuSurfaceDescriptor, WglContextDescriptor,
 };
 pub use resource::{
     ByteRange, HttpHeader, HttpHeaderTransformRequest, ResourceProviderDecision, ResourceRequest,

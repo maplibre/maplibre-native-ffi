@@ -182,6 +182,22 @@ mln_custom_geometry_source_options_default();
 @ffi.Native<mln_free_camera_options Function()>()
 external mln_free_camera_options mln_free_camera_options_default();
 
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_buffer_view,
+    ffi.Pointer<mln_geojson_source_options>,
+    ffi.Pointer<mln_geojson_source_data>,
+  )
+>()
+external int mln_geojson_source_data_create(
+  mln_buffer_view data,
+  ffi.Pointer<mln_geojson_source_options> options,
+  ffi.Pointer<mln_geojson_source_data> out_data,
+);
+
+@ffi.Native<ffi.Void Function(mln_geojson_source_data)>()
+external void mln_geojson_source_data_destroy(int data);
+
 @ffi.Native<mln_geojson_source_options Function()>()
 external mln_geojson_source_options mln_geojson_source_options_default();
 
@@ -246,18 +262,12 @@ external int mln_map_add_custom_geometry_source(
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    mln_buffer_view,
-    ffi.Pointer<mln_geojson_source_options>,
-  )
+  ffi.Int32 Function(mln_map, mln_buffer_view, mln_geojson_source_data)
 >()
 external int mln_map_add_geojson_source_data(
   int map,
   mln_buffer_view source_id,
-  mln_buffer_view data,
-  ffi.Pointer<mln_geojson_source_options> options,
+  int data,
 );
 
 @ffi.Native<
@@ -1263,11 +1273,20 @@ external int mln_map_set_free_camera_options(
   ffi.Pointer<mln_free_camera_options> options,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, mln_buffer_view)>()
+@ffi.Native<
+  ffi.Int32 Function(mln_map, mln_buffer_view, mln_geojson_source_data)
+>()
 external int mln_map_set_geojson_source_data(
   int map,
   mln_buffer_view source_id,
-  mln_buffer_view data,
+  int data,
+);
+
+@ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Bool)>()
+external int mln_map_set_geojson_source_synchronous_tiling(
+  int map,
+  mln_buffer_view source_id,
+  bool enabled,
 );
 
 @ffi.Native<ffi.Int32 Function(mln_map, mln_buffer_view, mln_buffer_view)>()
@@ -1864,10 +1883,17 @@ external int mln_render_session_remove_feature_state(
   ffi.Pointer<mln_feature_state_selector> selector,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_render_session, ffi.Pointer<ffi.Uint32>)>()
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_render_session,
+    ffi.Pointer<ffi.Uint32>,
+    ffi.Pointer<ffi.Bool>,
+  )
+>()
 external int mln_render_session_render_update(
   int session,
   ffi.Pointer<ffi.Uint32> out_result,
+  ffi.Pointer<ffi.Bool> out_needs_repaint,
 );
 
 @ffi.Native<
@@ -2234,8 +2260,8 @@ external int mln_runtime_offline_regions_merge_database_take_result(
 @ffi.Native<mln_runtime_options Function()>()
 external mln_runtime_options mln_runtime_options_default();
 
-@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Int64)>()
-external int mln_runtime_pump(int runtime, int timeout_ms);
+@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Int64, ffi.Int64)>()
+external int mln_runtime_pump(int runtime, int timeout_ms, int budget_ms);
 
 @ffi.Native<
   ffi.Int32 Function(
@@ -3480,6 +3506,9 @@ final class mln_free_camera_options extends ffi.Struct {
   external mln_quaternion orientation;
 }
 
+typedef mln_geojson_source_data = ffi.Uint64;
+typedef Dartmln_geojson_source_data = int;
+
 enum mln_geojson_source_option_field {
   MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM(1),
   MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM(2),
@@ -3492,7 +3521,7 @@ enum mln_geojson_source_option_field {
   MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS(256),
   MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS(512),
   MLN_GEOJSON_SOURCE_OPTION_CLUSTER(1024),
-  MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE(2048);
+  MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING(2048);
 
   final int value;
   const mln_geojson_source_option_field(this.value);
@@ -3510,7 +3539,7 @@ enum mln_geojson_source_option_field {
         256 => MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS,
         512 => MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS,
         1024 => MLN_GEOJSON_SOURCE_OPTION_CLUSTER,
-        2048 => MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE,
+        2048 => MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING,
         _ => throw ArgumentError(
           'Unknown value for mln_geojson_source_option_field: $value',
         ),
@@ -3557,7 +3586,7 @@ final class mln_geojson_source_options extends ffi.Struct {
   external bool cluster;
 
   @ffi.Bool()
-  external bool synchronous_update;
+  external bool synchronous_tiling;
 }
 
 final class mln_http_header_transform extends ffi.Struct {

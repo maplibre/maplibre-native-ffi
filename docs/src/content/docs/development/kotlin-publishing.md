@@ -74,12 +74,19 @@ link requirements for that target and backend. The final application links the
 archive without acquiring a separate MapLibre Native FFI shared library or
 framework.
 
-The native runtime publications are OpenGL and Vulkan for Linux x64, Linux
-arm64, and macOS arm64, plus Metal for macOS arm64, iOS arm64, and the iOS arm64
-simulator. Each published Kotlin/Native target has a matching runtime variant. A
-Linux x64 host cross-compiles the Linux arm64 publications because Kotlin/Native
-does not run on Linux arm64 hosts. Publication compiles and links the arm64 test
-binary without executing it.
+An Android runtime KLIB cannot place JVM bytecode in its host APK. The
+application packaging module therefore depends directly on the matching runtime
+AAR and excludes that AAR's `libmaplibre-native-c.so`. The AAR contributes the
+Rustls platform verifier classes, consumer keep rule, and licenses. The final
+Kotlin/Native host library already contains the static runtime from the KLIB.
+
+The native runtime publications are OpenGL and Vulkan for Android arm64, Android
+x64, Linux arm64, Linux x64, and macOS arm64, plus Metal for macOS arm64, iOS
+arm64, the iOS arm64 simulator, tvOS arm64, and the tvOS arm64 simulator. Each
+published Kotlin/Native target has a matching runtime variant. A Linux x64 host
+cross-compiles the Linux arm64 publications because Kotlin/Native does not run
+on Linux arm64 hosts. Publication compiles and links the arm64 test binary
+without executing it.
 
 The Kotlin/Native Linux toolchain is the tightest consumer of the Linux archive.
 Its sysroot supplies glibc 2.19 and GCC 8.3, and it statically links its own
@@ -100,6 +107,10 @@ supply ANGLE or MoltenVK.
 Kotlin/Native test binaries in this repository link the C API shared library
 instead of the archive. That library carries the same glibc floor, so the
 Kotlin/Native sysroot resolves its references directly.
+
+The Kotlin/Native Android targets are build-only. CI cross-compiles both
+architectures and publishes their KLIBs. An emulator test harness will add
+execution coverage separately.
 
 Gradle registers this target set consistently on every host. Local and CI
 workflows invoke target-specific KLIB and test tasks, leaving targets
@@ -169,8 +180,8 @@ Explicit native-library path configuration remains available as an override.
 Snapshot versions end in `-SNAPSHOT` and publish from the exact commit that
 passed the main CI workflow. A Linux x64 runner builds the Android and Linux
 publications, cross-compiling and linking the Linux arm64 Kotlin suite. A macOS
-runner builds the JVM, macOS, and iOS publications. Each consumes native build
-artifacts produced by the platform and backend CI matrix.
+runner builds the JVM, macOS, iOS, and tvOS publications. Each consumes native
+build artifacts produced by the platform and backend CI matrix.
 
 A daily schedule drives publication rather than each push to `main`: the Publish
 snapshots workflow picks the latest successful CI run on `main` and publishes
@@ -204,6 +215,13 @@ leaf module before the canonical multiplatform root modules. Serialized
 publishing prevents two commits from interleaving those uploads. Both snapshot
 and tagged release jobs reuse the CI-produced native archives and the same
 staged repository; they do not rebuild MapLibre Native.
+
+The main CI workflow runs the same staging and verification on every pull
+request and on `main`, using the native artifacts from the same run, so a change
+that breaks the publish pipeline fails before merge. Snapshot publication reuses
+the verified repository that the CI run on `main` uploaded, and adds only
+signing and the Central Portal upload. Tagged releases stage again at their
+release version, through the same workflow.
 
 The initial snapshot workflow validates:
 

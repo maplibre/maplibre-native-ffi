@@ -280,9 +280,10 @@ pub const StyleGeoJsonSourceOptions = struct {
     cluster_min_points: ?u32 = null,
     line_metrics: ?bool = null,
     cluster: ?bool = null,
-    /// Applies data updates synchronously, so data set through
-    /// `setGeoJsonSourceData` reaches the next rendered frame.
-    synchronous_update: ?bool = null,
+    /// Slices requested tiles inline during the update pass, so data installed
+    /// through `setGeoJsonSourceData` reaches the next rendered frame.
+    /// `MapHandle.setGeoJsonSourceSynchronousTiling` overrides this at runtime.
+    synchronous_tiling: ?bool = null,
 
     /// Copies this descriptor and owns its cluster-property bytes.
     pub fn copy(self: StyleGeoJsonSourceOptions, allocator: std.mem.Allocator) std.mem.Allocator.Error!OwnedStyleGeoJsonSourceOptions {

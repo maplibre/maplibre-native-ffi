@@ -102,6 +102,7 @@ import org.maplibre.nativeffi.internal.c.mln_vulkan_owned_texture_descriptor
 import org.maplibre.nativeffi.internal.c.mln_vulkan_owned_texture_frame
 import org.maplibre.nativeffi.internal.c.mln_vulkan_surface_descriptor
 import org.maplibre.nativeffi.internal.c.mln_wgl_context_descriptor
+import org.maplibre.nativeffi.internal.lifecycle.NativeGeoJsonSourceData
 import org.maplibre.nativeffi.internal.lifecycle.NativeHandle
 import org.maplibre.nativeffi.internal.lifecycle.NativeMap
 import org.maplibre.nativeffi.internal.lifecycle.NativeMapProjection
@@ -155,6 +156,7 @@ import org.maplibre.nativeffi.render.PremultipliedRgba8Image
 import org.maplibre.nativeffi.render.RenderMode
 import org.maplibre.nativeffi.render.RenderResult
 import org.maplibre.nativeffi.render.RenderTargetExtent
+import org.maplibre.nativeffi.render.RenderUpdate
 import org.maplibre.nativeffi.render.TextureImageInfo
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanContextDescriptor
@@ -346,8 +348,8 @@ internal object NativeAccess {
       }
     }
 
-  internal fun pumpRuntime(runtime: NativeRuntime, timeoutMillis: Long) {
-    Status.check(runtimePumpFunction().invokeNative(runtime, timeoutMillis) as Int)
+  internal fun pumpRuntime(runtime: NativeRuntime, timeoutMillis: Long, budgetMillis: Long) {
+    Status.check(runtimePumpFunction().invokeNative(runtime, timeoutMillis, budgetMillis) as Int)
   }
 
   internal fun acquireWakeSource(runtime: NativeRuntime): NativeWakeSource =
@@ -705,21 +707,36 @@ internal object NativeAccess {
     }
   }
 
+  internal fun createGeoJsonSourceData(
+    data: ByteArray,
+    options: GeoJsonSourceOptions?,
+  ): NativeGeoJsonSourceData =
+    Arena.ofConfined().use { arena ->
+      val outData = arena.allocate(ValueLayout.JAVA_LONG)
+      outData.set(ValueLayout.JAVA_LONG, 0, 0L)
+      Status.check(
+        geoJsonSourceDataCreateFunction()
+          .invokeNative(byteArrayView(arena, data), geoJsonSourceOptions(arena, options), outData)
+          as Int
+      )
+      NativeGeoJsonSourceData(outData.get(ValueLayout.JAVA_LONG, 0)).also { handle ->
+        require(!handle.isNull) { "mln_geojson_source_data_create returned the null handle" }
+      }
+    }
+
+  internal fun destroyGeoJsonSourceData(data: NativeGeoJsonSourceData) {
+    geoJsonSourceDataDestroyFunction().invokeNative(data)
+  }
+
   internal fun addGeoJsonSourceData(
     map: NativeMap,
     sourceId: String,
-    data: ByteArray,
-    options: GeoJsonSourceOptions?,
+    data: NativeGeoJsonSourceData,
   ) {
     Arena.ofConfined().use { arena ->
       Status.check(
-        mapStringViewTwoAddressStatusFunction("mln_map_add_geojson_source_data")
-          .invokeNative(
-            map,
-            stringView(arena, sourceId),
-            byteArrayView(arena, data),
-            geoJsonSourceOptions(arena, options),
-          ) as Int
+        mapStringViewHandleStatusFunction("mln_map_add_geojson_source_data")
+          .invokeNative(map, stringView(arena, sourceId), data) as Int
       )
     }
   }
@@ -733,11 +750,28 @@ internal object NativeAccess {
     }
   }
 
-  internal fun setGeoJsonSourceData(map: NativeMap, sourceId: String, data: ByteArray) {
+  internal fun setGeoJsonSourceData(
+    map: NativeMap,
+    sourceId: String,
+    data: NativeGeoJsonSourceData,
+  ) {
     Arena.ofConfined().use { arena ->
       Status.check(
-        mapStringViewAddressStatusFunction("mln_map_set_geojson_source_data")
-          .invokeNative(map, stringView(arena, sourceId), byteArrayView(arena, data)) as Int
+        mapStringViewHandleStatusFunction("mln_map_set_geojson_source_data")
+          .invokeNative(map, stringView(arena, sourceId), data) as Int
+      )
+    }
+  }
+
+  internal fun setGeoJsonSourceSynchronousTiling(
+    map: NativeMap,
+    sourceId: String,
+    enabled: Boolean,
+  ) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewBooleanStatusFunction("mln_map_set_geojson_source_synchronous_tiling")
+          .invokeNative(map, stringView(arena, sourceId), enabled) as Int
       )
     }
   }
@@ -2131,11 +2165,17 @@ internal object NativeAccess {
     )
   }
 
-  internal fun renderUpdate(session: NativeRenderSession): RenderResult =
+  internal fun renderUpdate(session: NativeRenderSession): RenderUpdate =
     Arena.ofConfined().use { arena ->
       val outResult = arena.allocate(ValueLayout.JAVA_INT)
-      Status.check(renderSessionRenderUpdateFunction().invokeNative(session, outResult) as Int)
-      RenderResult.fromNative(outResult.get(ValueLayout.JAVA_INT, 0))
+      val outNeedsRepaint = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+      Status.check(
+        renderSessionRenderUpdateFunction().invokeNative(session, outResult, outNeedsRepaint) as Int
+      )
+      RenderUpdate(
+        RenderResult.fromNative(outResult.get(ValueLayout.JAVA_INT, 0)),
+        outNeedsRepaint.get(ValueLayout.JAVA_BOOLEAN, 0),
+      )
     }
 
   internal fun detachRenderSession(session: NativeRenderSession) {
@@ -2813,35 +2853,27 @@ internal object NativeAccess {
       FEATURE_STATE_SELECTOR_SIZE_OFFSET,
       FEATURE_STATE_SELECTOR_SIZE.toInt(),
     )
-    segment.set(
-      ValueLayout.ADDRESS,
-      FEATURE_STATE_SELECTOR_SOURCE_ID_OFFSET,
-      stringView(arena, selector.sourceId),
-    )
+    segment
+      .asSlice(FEATURE_STATE_SELECTOR_SOURCE_ID_OFFSET, STRING_VIEW_SIZE)
+      .copyFrom(stringView(arena, selector.sourceId))
     var fields = 0
     selector.sourceLayerId?.let {
       fields = fields or FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID
-      segment.set(
-        ValueLayout.ADDRESS,
-        FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID_OFFSET,
-        stringView(arena, it),
-      )
+      segment
+        .asSlice(FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID_OFFSET, STRING_VIEW_SIZE)
+        .copyFrom(stringView(arena, it))
     }
     selector.featureId?.let {
       fields = fields or FEATURE_STATE_SELECTOR_FEATURE_ID
-      segment.set(
-        ValueLayout.ADDRESS,
-        FEATURE_STATE_SELECTOR_FEATURE_ID_OFFSET,
-        stringView(arena, it),
-      )
+      segment
+        .asSlice(FEATURE_STATE_SELECTOR_FEATURE_ID_OFFSET, STRING_VIEW_SIZE)
+        .copyFrom(stringView(arena, it))
     }
     selector.stateKey?.let {
       fields = fields or FEATURE_STATE_SELECTOR_STATE_KEY
-      segment.set(
-        ValueLayout.ADDRESS,
-        FEATURE_STATE_SELECTOR_STATE_KEY_OFFSET,
-        stringView(arena, it),
-      )
+      segment
+        .asSlice(FEATURE_STATE_SELECTOR_STATE_KEY_OFFSET, STRING_VIEW_SIZE)
+        .copyFrom(stringView(arena, it))
     }
     segment.set(ValueLayout.JAVA_INT, FEATURE_STATE_SELECTOR_FIELDS_OFFSET, fields)
     return segment
@@ -3261,6 +3293,16 @@ internal object NativeAccess {
   private fun mapAddressAddressAddressStatusFunction(name: String): MethodHandle = downcall(name)
 
   private fun mapStringViewAddressStatusFunction(name: String): MethodHandle = downcall(name)
+
+  private fun mapStringViewHandleStatusFunction(name: String): MethodHandle = downcall(name)
+
+  private fun mapStringViewBooleanStatusFunction(name: String): MethodHandle = downcall(name)
+
+  private fun geoJsonSourceDataCreateFunction(): MethodHandle =
+    downcall("mln_geojson_source_data_create")
+
+  private fun geoJsonSourceDataDestroyFunction(): MethodHandle =
+    downcall("mln_geojson_source_data_destroy")
 
   private fun mapAddressStringViewStatusFunction(name: String): MethodHandle = downcall(name)
 
@@ -3694,9 +3736,9 @@ internal object NativeAccess {
       fields = fields or GEOJSON_SOURCE_OPTION_CLUSTER
       segment.set(ValueLayout.JAVA_BOOLEAN, GEOJSON_SOURCE_OPTIONS_CLUSTER_OFFSET, it)
     }
-    value.synchronousUpdate?.let {
-      fields = fields or GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE
-      segment.set(ValueLayout.JAVA_BOOLEAN, GEOJSON_SOURCE_OPTIONS_SYNCHRONOUS_UPDATE_OFFSET, it)
+    value.synchronousTiling?.let {
+      fields = fields or GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING
+      segment.set(ValueLayout.JAVA_BOOLEAN, GEOJSON_SOURCE_OPTIONS_SYNCHRONOUS_TILING_OFFSET, it)
     }
     segment.set(ValueLayout.JAVA_INT, GEOJSON_SOURCE_OPTIONS_FIELDS_OFFSET, fields)
     return segment
@@ -5460,7 +5502,7 @@ internal object NativeAccess {
   private const val GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS: Int = 1 shl 8
   private const val GEOJSON_SOURCE_OPTION_LINE_METRICS: Int = 1 shl 9
   private const val GEOJSON_SOURCE_OPTION_CLUSTER: Int = 1 shl 10
-  private const val GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE: Int = 1 shl 11
+  private const val GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING: Int = 1 shl 11
 
   private val GEOJSON_SOURCE_OPTIONS_SIZE: Long = mln_geojson_source_options.sizeof()
   private val GEOJSON_SOURCE_OPTIONS_SIZE_OFFSET: Long = mln_geojson_source_options.`size$offset`()
@@ -5488,8 +5530,8 @@ internal object NativeAccess {
     mln_geojson_source_options.`line_metrics$offset`()
   private val GEOJSON_SOURCE_OPTIONS_CLUSTER_OFFSET: Long =
     mln_geojson_source_options.`cluster$offset`()
-  private val GEOJSON_SOURCE_OPTIONS_SYNCHRONOUS_UPDATE_OFFSET: Long =
-    mln_geojson_source_options.`synchronous_update$offset`()
+  private val GEOJSON_SOURCE_OPTIONS_SYNCHRONOUS_TILING_OFFSET: Long =
+    mln_geojson_source_options.`synchronous_tiling$offset`()
 
   private const val CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM: Int = 1 shl 0
   private const val CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM: Int = 1 shl 1
@@ -5902,6 +5944,35 @@ internal object NativeAccess {
         val native = renderedQueryGeometry(arena, value)
         native.get(ValueLayout.JAVA_INT, RENDERED_QUERY_GEOMETRY_TYPE_OFFSET)
       }
+
+    fun featureStateSelectorSnapshot(value: FeatureStateSelector): FeatureStateSelectorSnapshot =
+      Arena.ofConfined().use { arena ->
+        val native = featureStateSelector(arena, value)
+        val fields = native.get(ValueLayout.JAVA_INT, FEATURE_STATE_SELECTOR_FIELDS_OFFSET)
+        FeatureStateSelectorSnapshot(
+          fields,
+          stringView(native.asSlice(FEATURE_STATE_SELECTOR_SOURCE_ID_OFFSET, STRING_VIEW_SIZE)),
+          if ((fields and FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID) != 0)
+            stringView(
+              native.asSlice(FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID_OFFSET, STRING_VIEW_SIZE)
+            )
+          else null,
+          if ((fields and FEATURE_STATE_SELECTOR_FEATURE_ID) != 0)
+            stringView(native.asSlice(FEATURE_STATE_SELECTOR_FEATURE_ID_OFFSET, STRING_VIEW_SIZE))
+          else null,
+          if ((fields and FEATURE_STATE_SELECTOR_STATE_KEY) != 0)
+            stringView(native.asSlice(FEATURE_STATE_SELECTOR_STATE_KEY_OFFSET, STRING_VIEW_SIZE))
+          else null,
+        )
+      }
+
+    data class FeatureStateSelectorSnapshot(
+      val fields: Int,
+      val sourceId: String,
+      val sourceLayerId: String?,
+      val featureId: String?,
+      val stateKey: String?,
+    )
 
     fun offlineRegionDefinitionRoundTrip(value: OfflineRegionDefinition): OfflineRegionDefinition =
       Arena.ofConfined().use { arena ->

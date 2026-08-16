@@ -805,6 +805,16 @@ impl RuntimeHandle {
     /// every task queued when it begins plus every task those enqueue, so a
     /// single call can span a full style parse.
     ///
+    /// `budget` bounds the drain. `None` drains without a bound; a `Some`
+    /// value stops the drain at the first task boundary after that long,
+    /// measured from the start of the drain. The first queued task always
+    /// runs, so a bounded pump always makes progress, and tasks left behind
+    /// set the wake flag so the next pump returns without parking and
+    /// continues them. The budget bounds the task queues alone: expired timers
+    /// and ready file descriptors are serviced regardless, and a single task
+    /// runs to completion once started, so one long task can overrun the
+    /// budget.
+    ///
     /// A parking call returns as soon as the runtime's wake flag is set, and
     /// returns without parking while unread runtime events are queued. Timers
     /// and ready file descriptors set the flag only when they queue
@@ -814,13 +824,16 @@ impl RuntimeHandle {
     /// A non-zero timeout blocks the calling thread. Call it outside any lock
     /// that a thread signalling a [`WakeSource`] takes, and outside native
     /// callbacks.
-    pub fn pump(&self, timeout: Option<Duration>) -> Result<()> {
+    pub fn pump(&self, timeout: Option<Duration>, budget: Option<Duration>) -> Result<()> {
         let runtime = self.inner.native()?;
         let timeout_ms = timeout.map_or(-1, |timeout| {
             i64::try_from(timeout.as_millis()).unwrap_or(i64::MAX)
         });
+        let budget_ms = budget.map_or(-1, |budget| {
+            i64::try_from(budget.as_millis()).unwrap_or(i64::MAX)
+        });
         // SAFETY: runtime is a live runtime handle owned by this wrapper.
-        maplibre_core::check(unsafe { sys::mln_runtime_pump(runtime, timeout_ms) })
+        maplibre_core::check(unsafe { sys::mln_runtime_pump(runtime, timeout_ms, budget_ms) })
     }
 
     /// Acquires a [`WakeSource`] that releases this runtime's parked owner
@@ -1162,7 +1175,7 @@ mod tests {
                     ),
                 ));
             }
-            runtime.pump(Some(Duration::ZERO))?;
+            runtime.pump(Some(Duration::ZERO), None)?;
             let mut outcome = None;
             for event in runtime.drain_events(0)?.iter() {
                 let RuntimeEventPayload::OfflineOperationCompleted(completed) = event.payload()
@@ -1533,7 +1546,7 @@ mod tests {
         options.cache_path = Some(String::new());
         let runtime = RuntimeHandle::with_options(&options).unwrap();
 
-        runtime.pump(Some(Duration::ZERO)).unwrap();
+        runtime.pump(Some(Duration::ZERO), None).unwrap();
         runtime.close().unwrap();
     }
 
@@ -1565,7 +1578,7 @@ mod tests {
 
     fn wait_for_runtime_event(runtime: &mut RuntimeHandle, event_type: RuntimeEventType) -> bool {
         for _ in 0..100 {
-            let _ = runtime.pump(Some(Duration::ZERO));
+            let _ = runtime.pump(Some(Duration::ZERO), None);
             if drain_holds_event_type(runtime, event_type) {
                 return true;
             }
@@ -1576,7 +1589,7 @@ mod tests {
 
     fn wait_for_map_loading_failure(runtime: &mut RuntimeHandle) -> RuntimeEvent {
         for _ in 0..100 {
-            runtime.pump(Some(Duration::ZERO)).unwrap();
+            runtime.pump(Some(Duration::ZERO), None).unwrap();
             let mut failure = None;
             for event in runtime.drain_events(0).unwrap().iter() {
                 if event.event_type() == RuntimeEventType::MapLoadingFailed {
@@ -1597,7 +1610,7 @@ mod tests {
     fn runtime_create_run_drain_and_close() {
         let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
 
-        runtime.pump(Some(Duration::ZERO)).unwrap();
+        runtime.pump(Some(Duration::ZERO), None).unwrap();
         // A fresh runtime with no map queues nothing.
         let batch = runtime.drain_events(0).unwrap();
         assert!(batch.is_empty());
@@ -1613,7 +1626,7 @@ mod tests {
     // the signal the test raises.
     fn quiesce(runtime: &mut RuntimeHandle) {
         for _ in 0..100 {
-            runtime.pump(Some(Duration::ZERO)).unwrap();
+            runtime.pump(Some(Duration::ZERO), None).unwrap();
             if runtime.drain_events(0).unwrap().is_empty() {
                 return;
             }
@@ -1626,7 +1639,7 @@ mod tests {
     fn park_for_runtime_event(runtime: &mut RuntimeHandle, event_type: RuntimeEventType) -> bool {
         let started = Instant::now();
         for _ in 0..20 {
-            runtime.pump(Some(Duration::from_secs(10))).unwrap();
+            runtime.pump(Some(Duration::from_secs(10)), None).unwrap();
             assert!(
                 started.elapsed() < Duration::from_secs(5),
                 "parks sat out their timeouts instead of taking wakes"
@@ -1673,7 +1686,7 @@ mod tests {
             source
         });
         let started = Instant::now();
-        runtime.pump(Some(Duration::from_secs(10))).unwrap();
+        runtime.pump(Some(Duration::from_secs(10)), None).unwrap();
         assert!(
             started.elapsed() < Duration::from_secs(5),
             "the parked owner thread timed out instead of taking the signal"
@@ -1696,7 +1709,7 @@ mod tests {
 
         source.signal().unwrap();
         let started = Instant::now();
-        runtime.pump(Some(Duration::from_secs(10))).unwrap();
+        runtime.pump(Some(Duration::from_secs(10)), None).unwrap();
         assert!(
             started.elapsed() < Duration::from_secs(5),
             "a pump waited even though the wake flag was set"
@@ -1704,7 +1717,9 @@ mod tests {
 
         // The pump above cleared the wake flag, so this one waits its full timeout.
         let started = Instant::now();
-        runtime.pump(Some(Duration::from_millis(200))).unwrap();
+        runtime
+            .pump(Some(Duration::from_millis(200)), None)
+            .unwrap();
         assert!(
             started.elapsed() >= Duration::from_millis(100),
             "the first pump left the wake flag set"
@@ -1719,7 +1734,7 @@ mod tests {
         let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
         map.set_style_json(PROVIDER_STYLE_JSON.as_bytes()).unwrap();
-        runtime.pump(Some(Duration::ZERO)).unwrap();
+        runtime.pump(Some(Duration::ZERO), None).unwrap();
 
         let bounded = runtime.drain_events(1).unwrap();
         assert_eq!(bounded.len(), 1);
@@ -1806,7 +1821,8 @@ mod tests {
         let error = std::thread::spawn(move || {
             // SAFETY: This intentionally exercises the C API's owner-thread
             // validation path with a live runtime handle from another thread.
-            maplibre_core::check(unsafe { sys::mln_runtime_pump(runtime_handle, 0) }).unwrap_err()
+            maplibre_core::check(unsafe { sys::mln_runtime_pump(runtime_handle, 0, -1) })
+                .unwrap_err()
         })
         .join()
         .unwrap();
@@ -2537,7 +2553,7 @@ mod tests {
         assert_eq!(error.raw_status(), None);
         let runtime = error.into_handle();
 
-        runtime.pump(Some(Duration::ZERO)).unwrap();
+        runtime.pump(Some(Duration::ZERO), None).unwrap();
         map.close().unwrap();
         runtime.close().unwrap();
     }

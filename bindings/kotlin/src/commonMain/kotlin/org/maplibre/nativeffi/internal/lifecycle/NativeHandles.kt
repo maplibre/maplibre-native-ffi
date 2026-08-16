@@ -37,3 +37,5 @@ internal sealed interface NativeHandle {
 @JvmInline internal value class NativeWakeSource(override val raw: Long) : NativeHandle
 
 @JvmInline internal value class NativeResourceRequest(override val raw: Long) : NativeHandle
+
+@JvmInline internal value class NativeGeoJsonSourceData(override val raw: Long) : NativeHandle

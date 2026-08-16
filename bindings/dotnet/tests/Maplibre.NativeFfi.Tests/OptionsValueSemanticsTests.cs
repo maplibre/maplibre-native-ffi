@@ -292,7 +292,7 @@ public sealed class OptionsValueSemanticsTests
                     ClusterRadius = 60,
                     ClusterMaximumZoom = 15,
                     ClusterMinimumPoints = 3,
-                    SynchronousUpdate = true,
+                    SynchronousTiling = true,
                     ClusterProperties = """{"sum":1}"""u8.ToArray(),
                 },
             options => options.MinimumZoom = 10,
@@ -305,7 +305,7 @@ public sealed class OptionsValueSemanticsTests
             options => options.ClusterRadius = 50,
             options => options.ClusterMaximumZoom = 17,
             options => options.ClusterMinimumPoints = 2,
-            options => options.SynchronousUpdate = false,
+            options => options.SynchronousTiling = false,
             options => options.ClusterProperties = """{"sum":2}"""u8.ToArray()
         );
 

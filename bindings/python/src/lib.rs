@@ -135,6 +135,11 @@ struct MapProjectionHandle {
     state: Mutex<maplibre_core::handle::NativeHandleState<sys::mln_map_projection>>,
 }
 
+#[pyclass(name = "_GeoJsonSourceDataHandle")]
+struct GeoJsonSourceDataHandle {
+    state: Mutex<maplibre_core::handle::NativeHandleState<sys::mln_geojson_source_data>>,
+}
+
 #[derive(Debug, Clone, Copy)]
 struct CustomGeometryEvent {
     kind: u32,
@@ -571,6 +576,35 @@ impl MapProjectionHandle {
     }
 }
 
+impl GeoJsonSourceDataHandle {
+    fn state(
+        &self,
+    ) -> MutexGuard<'_, maplibre_core::handle::NativeHandleState<sys::mln_geojson_source_data>>
+    {
+        self.state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+}
+
+#[pymethods]
+impl GeoJsonSourceDataHandle {
+    fn close(&self) {
+        let state = self.state();
+        // SAFETY: state owns an mln_geojson_source_data handle created by
+        // mln_geojson_source_data_create and pairs it with the matching
+        // destroy function, which accepts calls from any thread. Holding the
+        // state mutex orders this close after any install call that already
+        // borrowed the live handle.
+        unsafe { state.close_infallible(sys::mln_geojson_source_data_destroy) };
+    }
+
+    #[getter]
+    fn closed(&self) -> bool {
+        self.state().is_closed()
+    }
+}
+
 impl PyCustomGeometrySourceShared {
     fn new(max_queued_events: usize) -> Arc<Self> {
         Arc::new(Self {
@@ -829,7 +863,8 @@ impl RuntimeHandle {
         Ok(())
     }
 
-    fn pump(&self, py: Python<'_>, timeout_ms: i64) -> PyResult<()> {
+    #[pyo3(signature = (timeout_ms, budget_ms = -1))]
+    fn pump(&self, py: Python<'_>, timeout_ms: i64, budget_ms: i64) -> PyResult<()> {
         let _operation = self.operation_gate.begin_detached_operation()?;
         let runtime_handle = {
             let state = self.state_for_operation()?;
@@ -842,7 +877,8 @@ impl RuntimeHandle {
         // API validates that it is live and on the owner thread. The call parks,
         // so it runs without the GIL or the state mutex: another Python thread
         // signalling a wake source is what ends the park.
-        let status = py.detach(|| unsafe { sys::mln_runtime_pump(runtime_handle, timeout_ms) });
+        let status =
+            py.detach(|| unsafe { sys::mln_runtime_pump(runtime_handle, timeout_ms, budget_ms) });
         maplibre_core::check(status).map_err(map_error)
     }
 
@@ -2212,7 +2248,7 @@ impl MapHandle {
         cluster_min_points: Option<u32>,
         line_metrics: Option<bool>,
         cluster: Option<bool>,
-        synchronous_update: Option<bool>,
+        synchronous_tiling: Option<bool>,
     ) -> PyResult<()> {
         let state = self.state();
         let source_id = maplibre_core::string::string_view(&source_id);
@@ -2229,7 +2265,7 @@ impl MapHandle {
             cluster_min_points,
             line_metrics,
             cluster,
-            synchronous_update,
+            synchronous_tiling,
         )?;
         let options =
             maplibre_core::style::geojson_source_options_to_native(&options).map_err(map_error)?;
@@ -2245,51 +2281,22 @@ impl MapHandle {
         .map_err(map_error)
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn add_geojson_source_data(
         &self,
         source_id: String,
-        data: &Bound<'_, PyBytes>,
-        min_zoom: Option<f64>,
-        max_zoom: Option<f64>,
-        tolerance: Option<f64>,
-        cluster_max_zoom: Option<f64>,
-        cluster_properties: Option<Bound<'_, PyBytes>>,
-        tile_size: Option<u32>,
-        buffer: Option<u32>,
-        cluster_radius: Option<u32>,
-        cluster_min_points: Option<u32>,
-        line_metrics: Option<bool>,
-        cluster: Option<bool>,
-        synchronous_update: Option<bool>,
+        data: &GeoJsonSourceDataHandle,
     ) -> PyResult<()> {
         let state = self.state();
+        let data_state = data.state();
+        let Some(data_handle) = data_state.live_handle() else {
+            return Err(invalid_state_error("GeoJSON source data handle is closed"));
+        };
         let source_id = maplibre_core::string::string_view(&source_id);
-        let data = maplibre_core::string::buffer_view(data.as_bytes());
-        let options = geojson_source_options_from_parts(
-            min_zoom,
-            max_zoom,
-            tolerance,
-            cluster_max_zoom,
-            cluster_properties,
-            tile_size,
-            buffer,
-            cluster_radius,
-            cluster_min_points,
-            line_metrics,
-            cluster,
-            synchronous_update,
-        )?;
-        let options =
-            maplibre_core::style::geojson_source_options_to_native(&options).map_err(map_error)?;
-        // SAFETY: The C API validates the map pointer, source ID, GeoJSON buffer view, and options.
+        // SAFETY: The C API validates the map pointer, source ID, and data
+        // handle. The call borrows the data handle, which the held state mutex
+        // keeps live for the duration of the call.
         maplibre_core::check(unsafe {
-            sys::mln_map_add_geojson_source_data(
-                state.handle(),
-                source_id.raw(),
-                data,
-                options.as_ptr(),
-            )
+            sys::mln_map_add_geojson_source_data(state.handle(), source_id.raw(), data_handle)
         })
         .map_err(map_error)
     }
@@ -2308,14 +2315,37 @@ impl MapHandle {
     fn set_geojson_source_data(
         &self,
         source_id: String,
-        data: &Bound<'_, PyBytes>,
+        data: &GeoJsonSourceDataHandle,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let data_state = data.state();
+        let Some(data_handle) = data_state.live_handle() else {
+            return Err(invalid_state_error("GeoJSON source data handle is closed"));
+        };
+        let source_id = maplibre_core::string::string_view(&source_id);
+        // SAFETY: The C API validates the map pointer, source ID, and data
+        // handle. The call borrows the data handle, which the held state mutex
+        // keeps live for the duration of the call.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_geojson_source_data(state.handle(), source_id.raw(), data_handle)
+        })
+        .map_err(map_error)
+    }
+
+    fn set_geojson_source_synchronous_tiling(
+        &self,
+        source_id: String,
+        enabled: bool,
     ) -> PyResult<()> {
         let state = self.state();
         let source_id = maplibre_core::string::string_view(&source_id);
-        let data = maplibre_core::string::buffer_view(data.as_bytes());
-        // SAFETY: The C API validates the map pointer, source ID, and GeoJSON buffer view.
+        // SAFETY: The C API validates the map pointer and source ID.
         maplibre_core::check(unsafe {
-            sys::mln_map_set_geojson_source_data(state.handle(), source_id.raw(), data)
+            sys::mln_map_set_geojson_source_synchronous_tiling(
+                state.handle(),
+                source_id.raw(),
+                enabled,
+            )
         })
         .map_err(map_error)
     }
@@ -4026,20 +4056,25 @@ impl RenderSessionHandle {
         })
     }
 
-    fn render_update(&self) -> PyResult<u32> {
+    fn render_update(&self) -> PyResult<(u32, bool)> {
         let state = self
             .state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         state.ensure_no_frame_acquired()?;
         let mut result = sys::MLN_RENDER_RESULT_NO_UPDATE;
+        let mut needs_repaint = false;
         // SAFETY: The C API validates the render-session pointer and state, and
-        // result points to caller-owned output storage.
+        // result and needs_repaint point to caller-owned output storage.
         maplibre_core::check(unsafe {
-            sys::mln_render_session_render_update(state.native(), &raw mut result)
+            sys::mln_render_session_render_update(
+                state.native(),
+                &raw mut result,
+                &raw mut needs_repaint,
+            )
         })
         .map_err(map_error)?;
-        Ok(result)
+        Ok((result, needs_repaint))
     }
 
     fn detach(&self) -> PyResult<DetachedRenderSessionHandle> {
@@ -5390,7 +5425,7 @@ fn geojson_source_options_from_parts(
     cluster_min_points: Option<u32>,
     line_metrics: Option<bool>,
     cluster: Option<bool>,
-    synchronous_update: Option<bool>,
+    synchronous_tiling: Option<bool>,
 ) -> PyResult<maplibre_core::GeoJsonSourceOptions> {
     let mut options = maplibre_core::GeoJsonSourceOptions::default();
     if let Some(min_zoom) = min_zoom {
@@ -5426,10 +5461,72 @@ fn geojson_source_options_from_parts(
     if let Some(cluster) = cluster {
         options.cluster = Some(cluster);
     }
-    if let Some(synchronous_update) = synchronous_update {
-        options.synchronous_update = Some(synchronous_update);
+    if let Some(synchronous_tiling) = synchronous_tiling {
+        options.synchronous_tiling = Some(synchronous_tiling);
     }
     Ok(options)
+}
+
+/// Prepares one GeoJSON document into an owned prepared-data handle.
+///
+/// Parsing and tiling run without the GIL, so worker threads preparing
+/// documents genuinely parallelize.
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn create_geojson_source_data(
+    py: Python<'_>,
+    data: &Bound<'_, PyBytes>,
+    min_zoom: Option<f64>,
+    max_zoom: Option<f64>,
+    tolerance: Option<f64>,
+    cluster_max_zoom: Option<f64>,
+    cluster_properties: Option<Bound<'_, PyBytes>>,
+    tile_size: Option<u32>,
+    buffer: Option<u32>,
+    cluster_radius: Option<u32>,
+    cluster_min_points: Option<u32>,
+    line_metrics: Option<bool>,
+    cluster: Option<bool>,
+    synchronous_tiling: Option<bool>,
+) -> PyResult<GeoJsonSourceDataHandle> {
+    let options = geojson_source_options_from_parts(
+        min_zoom,
+        max_zoom,
+        tolerance,
+        cluster_max_zoom,
+        cluster_properties,
+        tile_size,
+        buffer,
+        cluster_radius,
+        cluster_min_points,
+        line_metrics,
+        cluster,
+        synchronous_tiling,
+    )?;
+    let data = data.as_bytes().to_vec();
+    let native = py
+        .detach(move || -> Result<sys::mln_geojson_source_data, Error> {
+            let options = maplibre_core::style::geojson_source_options_to_native(&options)?;
+            let data = maplibre_core::string::buffer_view(&data);
+            let mut out = maplibre_core::ptr::OutHandle::<sys::mln_geojson_source_data>::new();
+            // SAFETY: data and options are materialized native input owned by
+            // this closure, and out is a null-initialized out-pointer owned by
+            // this call. The C API accepts this call from any thread.
+            maplibre_core::check(unsafe {
+                sys::mln_geojson_source_data_create(data, options.as_ptr(), out.as_mut_ptr())
+            })?;
+            out.into_live("mln_geojson_source_data")
+        })
+        .map_err(map_error)?;
+    // SAFETY: native came from successful mln_geojson_source_data_create and is
+    // paired with the matching destroy function in GeoJsonSourceDataHandle.close.
+    let state = unsafe {
+        maplibre_core::handle::NativeHandleState::from_handle(native, "mln_geojson_source_data")
+    }
+    .map_err(map_error)?;
+    Ok(GeoJsonSourceDataHandle {
+        state: Mutex::new(state),
+    })
 }
 
 fn viewport_options_from_parts(
@@ -7039,7 +7136,7 @@ fn map_size_by_id_for_test(py: Python<'_>, id: u64) -> PyResult<(u32, u32, f64)>
 fn pump_runtime_with_map_id_for_test(py: Python<'_>, id: u64) -> PyResult<()> {
     py.detach(|| {
         // SAFETY: the value is well-formed; the C API rejects it on its kind tag.
-        let status = unsafe { sys::mln_runtime_pump(sys::mln_runtime(id), 0) };
+        let status = unsafe { sys::mln_runtime_pump(sys::mln_runtime(id), 0, -1) };
         if status == sys::MLN_STATUS_OK {
             Ok(())
         } else {
@@ -7920,6 +8017,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<RuntimeHandle>()?;
     module.add_class::<MapHandle>()?;
     module.add_class::<MapProjectionHandle>()?;
+    module.add_class::<GeoJsonSourceDataHandle>()?;
     module.add_class::<ResourceRequestHandle>()?;
     module.add_class::<WakeSource>()?;
     module.add_class::<LogReceiver>()?;
@@ -7941,6 +8039,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
         module
     )?)?;
     module.add_function(wrap_pyfunction!(network_status_raw, module)?)?;
+    module.add_function(wrap_pyfunction!(create_geojson_source_data, module)?)?;
     module.add_function(wrap_pyfunction!(projected_meters_for_lat_lng, module)?)?;
     module.add_function(wrap_pyfunction!(lat_lng_for_projected_meters, module)?)?;
     module.add_function(wrap_pyfunction!(set_network_status_raw, module)?)?;

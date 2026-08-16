@@ -33,7 +33,7 @@ pub const style_json =
 /// batch that carried them.
 pub fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.RuntimeEventType) !bool {
     for (0..1000) |_| {
-        try runtime.pump(0);
+        try runtime.pump(0, null);
         while (true) {
             var batch = try runtime.drainEvents(testing.allocator, 1);
             defer batch.deinit();
@@ -54,7 +54,7 @@ pub fn waitForOwnedEvent(
     event_type: maplibre.RuntimeEventType,
 ) !maplibre.RuntimeEvent {
     for (0..5000) |_| {
-        try runtime.pump(0);
+        try runtime.pump(0, null);
         while (true) {
             var batch = try runtime.drainEvents(testing.allocator, 1);
             defer batch.deinit();

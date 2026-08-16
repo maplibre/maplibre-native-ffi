@@ -996,6 +996,154 @@ def test_geojson_source_options_reject_negative_unsigned_fields(field: str) -> N
     assert field in raised.value.diagnostic
 
 
+def _point_collection(*names: str) -> bytes:
+    return _json_object(
+        {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [float(index), float(index)],
+                    },
+                    "properties": {"name": name},
+                }
+                for index, name in enumerate(names)
+            ],
+        }
+    )
+
+
+def test_geojson_source_data_prepares_off_thread_without_a_runtime() -> None:
+    # Preparation needs no runtime or map and runs on any thread; the handle
+    # then installs onto sources owned by a map created afterwards.
+    results: list[style.GeoJsonSourceDataHandle | BaseException] = []
+
+    def prepare() -> None:
+        try:
+            results.append(style.GeoJsonSourceDataHandle(_point_collection("worker")))
+        except BaseException as error:  # noqa: BLE001 - report into the test
+            results.append(error)
+
+    worker = threading.Thread(target=prepare)
+    worker.start()
+    worker.join()
+    (prepared,) = results
+    assert isinstance(prepared, style.GeoJsonSourceDataHandle)
+    with prepared:
+        assert prepared.closed is False
+        with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+            map_handle.set_style_json(_EMPTY_STYLE_BYTES)
+            map_handle.add_geojson_source_data("worker-points", prepared)
+            assert (
+                map_handle.get_style_source_type("worker-points")
+                == style.StyleSourceType.GEOJSON
+            )
+    assert prepared.closed is True
+
+
+def test_geojson_source_data_installs_on_many_sources_and_outlives_release() -> None:
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        map_handle.set_style_json(_EMPTY_STYLE_BYTES)
+        prepared = style.GeoJsonSourceDataHandle(_point_collection("one", "two"))
+        # Install calls borrow the handle, so one prepared value serves any
+        # number of sources.
+        map_handle.add_geojson_source_data("points-a", prepared)
+        map_handle.add_geojson_source_data("points-b", prepared)
+        map_handle.set_geojson_source_data("points-a", prepared)
+        prepared.close()
+        # Release never invalidates a source the data was installed on.
+        assert (
+            map_handle.get_style_source_type("points-a")
+            == style.StyleSourceType.GEOJSON
+        )
+        assert (
+            map_handle.get_style_source_type("points-b")
+            == style.StyleSourceType.GEOJSON
+        )
+
+
+def test_geojson_source_data_close_is_idempotent_and_blocks_installs() -> None:
+    prepared = style.GeoJsonSourceDataHandle(_point_collection("one"))
+    prepared.close()
+    assert prepared.closed is True
+    prepared.close()
+
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        map_handle.set_style_json(_EMPTY_STYLE_BYTES)
+        with pytest.raises(mln.InvalidStateError, match="closed"):
+            map_handle.add_geojson_source_data("points", prepared)
+        with pytest.raises(mln.InvalidStateError, match="closed"):
+            map_handle.set_geojson_source_data("points", prepared)
+
+
+def test_geojson_source_data_create_validates_cluster_input() -> None:
+    # Clustering applies to feature collections of points only, and that
+    # validation now happens at preparation time with no runtime involved.
+    bare_geometry = _json_object({"type": "Point", "coordinates": [0.0, 0.0]})
+    with pytest.raises(mln.InvalidArgumentError):
+        style.GeoJsonSourceDataHandle(
+            bare_geometry, style.GeoJsonSourceOptions(cluster=True)
+        )
+
+
+def test_set_geojson_source_data_rejects_mismatched_baked_in_options() -> None:
+    document = _point_collection("one", "two")
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        map_handle.set_style_json(_EMPTY_STYLE_BYTES)
+        with style.GeoJsonSourceDataHandle(
+            document,
+            style.GeoJsonSourceOptions(
+                cluster=True,
+                cluster_properties=_json_object({"names": ["+", 1]}),
+            ),
+        ) as clustered:
+            map_handle.add_geojson_source_data("points", clustered)
+
+        with (
+            style.GeoJsonSourceDataHandle(document) as plain,
+            pytest.raises(mln.InvalidArgumentError),
+        ):
+            map_handle.set_geojson_source_data("points", plain)
+
+        # Different cluster aggregations would change cluster feature
+        # properties under the source's layers, so they are rejected too.
+        with (
+            style.GeoJsonSourceDataHandle(
+                document,
+                style.GeoJsonSourceOptions(
+                    cluster=True,
+                    cluster_properties=_json_object({"renamed": ["+", 1]}),
+                ),
+            ) as reclustered,
+            pytest.raises(mln.InvalidArgumentError),
+        ):
+            map_handle.set_geojson_source_data("points", reclustered)
+
+        # Aggregations compare by parsed expression equality, so equivalent
+        # cluster_properties JSON matches regardless of formatting.
+        with style.GeoJsonSourceDataHandle(
+            document,
+            style.GeoJsonSourceOptions(
+                cluster=True,
+                cluster_properties=b' { "names" : ["+", 1] } ',
+            ),
+        ) as matching:
+            map_handle.set_geojson_source_data("points", matching)
+
+
+def test_set_geojson_source_synchronous_tiling_overrides_at_runtime() -> None:
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        map_handle.set_style_json(_EMPTY_STYLE_BYTES)
+        with style.GeoJsonSourceDataHandle(_point_collection("one")) as prepared:
+            map_handle.add_geojson_source_data("points", prepared)
+        map_handle.set_geojson_source_synchronous_tiling("points", True)
+        map_handle.set_geojson_source_synchronous_tiling("points", False)
+        with pytest.raises(mln.InvalidArgumentError):
+            map_handle.set_geojson_source_synchronous_tiling("missing", True)
+
+
 def test_style_source_metadata_enums_preserve_unknown_values() -> None:
     for enum_type in (
         style.TileScheme,
@@ -1068,8 +1216,7 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
                 ],
             }
         )
-        map_handle.add_geojson_source_data(
-            "inline-points",
+        with style.GeoJsonSourceDataHandle(
             inline_points,
             style.GeoJsonSourceOptions(
                 cluster=True,
@@ -1080,12 +1227,13 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
                     {"name_count": ["+", ["case", ["has", "name"], 1, 0]]}
                 ),
             ),
-        )
-        map_handle.set_geojson_source_url(
-            "inline-points",
-            "https://example.test/inline-points.geojson",
-        )
-        map_handle.set_geojson_source_data("inline-points", inline_points)
+        ) as inline_data:
+            map_handle.add_geojson_source_data("inline-points", inline_data)
+            map_handle.set_geojson_source_url(
+                "inline-points",
+                "https://example.test/inline-points.geojson",
+            )
+            map_handle.set_geojson_source_data("inline-points", inline_data)
         map_handle.add_vector_source_url(
             "vector-tiles",
             "https://example.test/vector.json",

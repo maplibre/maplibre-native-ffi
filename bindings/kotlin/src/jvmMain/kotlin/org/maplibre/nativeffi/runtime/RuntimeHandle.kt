@@ -41,10 +41,10 @@ public actual class RuntimeHandle private constructor(private val handle: Native
   public actual val isClosed: Boolean
     get() = core.isReleased()
 
-  public actual fun pump(timeoutMillis: Long) {
+  public actual fun pump(timeoutMillis: Long, budgetMillis: Long) {
     NativeAccess.ensureLoaded()
     core.requireLive()
-    NativeAccess.pumpRuntime(handle, timeoutMillis)
+    NativeAccess.pumpRuntime(handle, timeoutMillis, budgetMillis)
   }
 
   public actual fun acquireWakeSource(): WakeSource {

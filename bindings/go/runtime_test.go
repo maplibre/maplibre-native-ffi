@@ -112,7 +112,7 @@ func TestRuntimeCreatePumpAndClose(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
-	if err := runtime.Pump(0); err != nil {
+	if err := runtime.Pump(0, -1); err != nil {
 		t.Fatalf("Pump(): %v", err)
 	}
 	if batch, err := runtime.DrainEvents(0); err != nil {
@@ -148,7 +148,7 @@ func TestRuntimeCloseWrongThreadLeavesHandleRetryable(t *testing.T) {
 		_ = runtime.Close()
 		t.Fatalf("Close() from another thread error = %v, want ErrWrongThread", err)
 	}
-	if err := runtime.Pump(0); err != nil {
+	if err := runtime.Pump(0, -1); err != nil {
 		_ = runtime.Close()
 		t.Fatalf("Pump() after failed close: %v", err)
 	}
@@ -178,7 +178,7 @@ func TestRuntimePumpWakesForNativeWorkAndForAWakeSource(t *testing.T) {
 	loadingFailed := false
 	loadStarted := time.Now()
 	for i := 0; i < 20; i++ {
-		if err := runtime.Pump(10 * time.Second); err != nil {
+		if err := runtime.Pump(10*time.Second, -1); err != nil {
 			t.Fatalf("Pump(): %v", err)
 		}
 		if time.Since(loadStarted) > 5*time.Second {
@@ -214,7 +214,7 @@ func TestRuntimePumpWakesForNativeWorkAndForAWakeSource(t *testing.T) {
 		signalErr <- source.Signal()
 	}()
 	parkStarted := time.Now()
-	if err := runtime.Pump(10 * time.Second); err != nil {
+	if err := runtime.Pump(10*time.Second, -1); err != nil {
 		t.Fatalf("Pump(): %v", err)
 	}
 	if time.Since(parkStarted) > 5*time.Second {
@@ -263,7 +263,7 @@ func TestRuntimePumpConsumesOneLatchedSignal(t *testing.T) {
 		t.Fatalf("Signal(): %v", err)
 	}
 	signalledStarted := time.Now()
-	if err := runtime.Pump(10 * time.Second); err != nil {
+	if err := runtime.Pump(10*time.Second, -1); err != nil {
 		t.Fatalf("Pump(): %v", err)
 	}
 	if time.Since(signalledStarted) > 5*time.Second {
@@ -272,7 +272,7 @@ func TestRuntimePumpConsumesOneLatchedSignal(t *testing.T) {
 
 	// The pump above cleared the wake flag, so this one waits its full timeout.
 	idleStarted := time.Now()
-	if err := runtime.Pump(200 * time.Millisecond); err != nil {
+	if err := runtime.Pump(200*time.Millisecond, -1); err != nil {
 		t.Fatalf("Pump(): %v", err)
 	}
 	if time.Since(idleStarted) < 100*time.Millisecond {

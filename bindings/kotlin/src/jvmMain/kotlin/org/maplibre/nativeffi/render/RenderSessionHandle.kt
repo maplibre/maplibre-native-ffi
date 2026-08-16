@@ -75,7 +75,7 @@ internal constructor(private val map: MapHandle, private val handle: NativeRende
     NativeAccess.setOpenGLBorrowedTextureTarget(requireLiveHandle(), descriptor)
   }
 
-  public actual fun renderUpdate(): RenderResult {
+  public actual fun renderUpdate(): RenderUpdate {
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("render")
     return NativeAccess.renderUpdate(requireLiveHandle())

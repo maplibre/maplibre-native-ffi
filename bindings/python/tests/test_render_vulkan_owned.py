@@ -196,7 +196,9 @@ def test_detached_session_leaves_the_map_free_to_close(
 def test_render_update_without_pending_update_reports_no_update_and_keeps_session_live(
     vulkan_owned_session: VulkanOwnedSession,
 ) -> None:
-    assert vulkan_owned_session.session.render_update() == render.RenderResult.NO_UPDATE
+    update = vulkan_owned_session.session.render_update()
+    assert update.result == render.RenderResult.NO_UPDATE
+    assert update.needs_repaint is False
 
     assert not vulkan_owned_session.session.closed
     vulkan_owned_session.session.resize(32, 16, 1.0)
@@ -212,7 +214,8 @@ def test_resize_updates_vulkan_owned_texture_frame_extent(
     # renders only on request, so pump the resize through before requesting the
     # still image. A render before that pump reports the pending size.
     assert (
-        vulkan_owned_session.session.render_update() == render.RenderResult.SIZE_PENDING
+        vulkan_owned_session.session.render_update().result
+        == render.RenderResult.SIZE_PENDING
     )
     vulkan_owned_session.runtime.pump()
     frame = wait_for_vulkan_frame(
@@ -276,7 +279,7 @@ def test_a_worker_thread_attaches_its_own_session_and_renders() -> None:
                 # pumps.
                 deadline = time.monotonic() + 5.0
                 while time.monotonic() < deadline:
-                    if session.render_update() == render.RenderResult.RENDERED:
+                    if session.render_update().result == render.RenderResult.RENDERED:
                         rendered.append(True)
                         break
                     time.sleep(0.002)

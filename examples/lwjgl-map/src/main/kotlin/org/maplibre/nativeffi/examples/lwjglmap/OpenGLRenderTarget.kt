@@ -114,7 +114,7 @@ internal object OpenGLRenderTarget {
       session.resize(viewport.width(), viewport.height(), viewport.scaleFactor())
     }
 
-    override fun renderUpdate(): Boolean = session.renderUpdate() == RenderResult.RENDERED
+    override fun renderUpdate(): Boolean = session.renderUpdate().result == RenderResult.RENDERED
 
     override fun close() {
       session.close()
@@ -131,7 +131,7 @@ internal object OpenGLRenderTarget {
     }
 
     override fun renderUpdate(): Boolean {
-      if (session.renderUpdate() != RenderResult.RENDERED) {
+      if (session.renderUpdate().result != RenderResult.RENDERED) {
         return false
       }
       session.acquireOpenGLOwnedTextureFrame().use { frameHandle ->
@@ -181,7 +181,7 @@ internal object OpenGLRenderTarget {
     }
 
     override fun renderUpdate(): Boolean {
-      if (session.renderUpdate() != RenderResult.RENDERED) {
+      if (session.renderUpdate().result != RenderResult.RENDERED) {
         return false
       }
       compositor.drawTexture(texture.texture())

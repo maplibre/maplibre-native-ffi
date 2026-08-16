@@ -972,6 +972,22 @@ impl RenderSessionState {
     }
 }
 
+/// Outcome of a successful [`RenderSessionHandle::render_update`] call.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub struct RenderUpdate {
+    /// Which outcome the call reached; see [`RenderResult`] for the wake each
+    /// variant names.
+    pub result: RenderResult,
+    /// Whether the map asked for another frame while it rendered this one, as
+    /// during an ongoing camera transition. Set only when `result` is
+    /// [`RenderResult::Rendered`]; false for every other outcome. This is the
+    /// same signal the render-frame-finished event carries, delivered here
+    /// without the event round trip, so a host can re-arm its frame loop
+    /// before it drains events.
+    pub needs_repaint: bool,
+}
+
 /// Render session handle bound to the thread that attached it.
 ///
 /// The session holds no Rust-level retention of its map. Native keeps the map
@@ -1758,16 +1774,24 @@ impl RenderSessionHandle {
     /// [`RenderResult::SizePending`] resolve on a render-update-available
     /// event, and [`RenderResult::TargetNotReady`] resolves when the host
     /// changes the render target.
-    pub fn render_update(&self) -> Result<RenderResult> {
+    ///
+    /// The returned [`RenderUpdate::needs_repaint`] reports whether the map
+    /// asked for another frame while rendering this one, so a frame loop can
+    /// re-arm without draining events first.
+    pub fn render_update(&self) -> Result<RenderUpdate> {
         self.inner.ensure_no_frame_acquired()?;
         let session = self.inner.native()?;
         let mut result = sys::MLN_RENDER_RESULT_NO_UPDATE;
+        let mut needs_repaint = false;
         // SAFETY: session is a live render session handle owned by this wrapper,
-        // and result points to caller-owned output storage.
+        // and result and needs_repaint point to caller-owned output storage.
         maplibre_core::check(unsafe {
-            sys::mln_render_session_render_update(session, &raw mut result)
+            sys::mln_render_session_render_update(session, &raw mut result, &raw mut needs_repaint)
         })?;
-        Ok(RenderResult::from_raw(result))
+        Ok(RenderUpdate {
+            result: RenderResult::from_raw(result),
+            needs_repaint,
+        })
     }
 
     /// Detaches backend-bound render resources from the map, consuming this

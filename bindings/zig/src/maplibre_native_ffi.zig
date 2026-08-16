@@ -90,6 +90,7 @@ pub const LogCallback = logging.LogCallback;
 
 pub const NativePointer = render.NativePointer;
 pub const RenderResult = render.RenderResult;
+pub const RenderUpdate = render.RenderUpdate;
 pub const RenderBackendSupport = render.RenderBackendSupport;
 pub const OpenGLContextProviderSupport = render.OpenGLContextProviderSupport;
 pub const RenderTargetExtent = render.RenderTargetExtent;
@@ -125,6 +126,7 @@ pub const MetalOwnedTextureFrameHandle = render.MetalOwnedTextureFrameHandle;
 pub const VulkanOwnedTextureFrameHandle = render.VulkanOwnedTextureFrameHandle;
 pub const OpenGLOwnedTextureFrameHandle = render.OpenGLOwnedTextureFrameHandle;
 
+pub const GeoJsonSourceDataHandle = map.GeoJsonSourceDataHandle;
 pub const MapHandle = map.MapHandle;
 pub const MapOptions = map.MapOptions;
 pub const MapMode = map.MapMode;

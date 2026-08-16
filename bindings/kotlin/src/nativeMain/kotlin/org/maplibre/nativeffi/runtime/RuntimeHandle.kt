@@ -95,8 +95,8 @@ internal constructor(
   private var httpHeaderTransformState: HttpHeaderTransformState? = null
   private var resourceProviderState: ResourceProviderState? = null
 
-  public actual fun pump(timeoutMillis: Long) {
-    Status.check(mln_runtime_pump(state.requireLive().rawHandleValue, timeoutMillis))
+  public actual fun pump(timeoutMillis: Long, budgetMillis: Long) {
+    Status.check(mln_runtime_pump(state.requireLive().rawHandleValue, timeoutMillis, budgetMillis))
   }
 
   public actual fun acquireWakeSource(): WakeSource = memScoped {

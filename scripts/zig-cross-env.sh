@@ -1,10 +1,54 @@
 #!/usr/bin/env bash
 # Sourced by Zig binding tasks with a native preset as $1. Android presets add
-# the NDK sysroot and the installed libc metadata. Host presets need no extra
+# the NDK sysroot and the installed libc metadata. Apple mobile presets add the
+# Xcode SDK root and the installed libc metadata. Host presets need no extra
 # arguments.
 # shellcheck shell=bash
 
 zig_cross_args=()
+
+apple_sdk=
+case "$1" in
+  ios-simulator-*) apple_sdk=iphonesimulator ;;
+  ios-*) apple_sdk=iphoneos ;;
+  tvos-simulator-*) apple_sdk=appletvsimulator ;;
+  tvos-*) apple_sdk=appletvos ;;
+esac
+
+# The SDK root supplies system headers and libc++.tbd. The installed zig-libc
+# file points Zig at that SDK's include layout.
+if [[ -n "$apple_sdk" ]]; then
+  native_install_dir="$MISE_MONOREPO_ROOT/build/$1/install"
+  descriptor="$native_install_dir/share/maplibre-native-c/artifact.json"
+  zig_libc="$native_install_dir/share/maplibre-native-c/zig-libc"
+  if ! command -v xcrun >/dev/null; then
+    echo "Apple mobile Zig builds need xcrun from Xcode." >&2
+    exit 2
+  fi
+  sdk_path=$(xcrun --sdk "$apple_sdk" --show-sdk-path) || exit 2
+  if [[ ! -d "$sdk_path" ]]; then
+    echo "The $apple_sdk SDK does not exist: $sdk_path" >&2
+    exit 2
+  fi
+  if [[ ! -f "$descriptor" ]]; then
+    echo "The Apple native artifact has no descriptor: $descriptor" >&2
+    exit 2
+  fi
+  if [[ ! -f "$zig_libc" ]]; then
+    echo "The Apple native artifact has no Zig libc file: $zig_libc" >&2
+    exit 2
+  fi
+  zig_target=$(sed -n 's/^[[:space:]]*"zigTarget":[[:space:]]*"\([^"]*\)".*/\1/p' "$descriptor")
+  if [[ -z "$zig_target" ]]; then
+    echo "The Apple native artifact has no Zig target: $descriptor" >&2
+    exit 2
+  fi
+  zig_cross_args=(
+    -Dtarget="$zig_target"
+    -Dsystem-root="$sdk_path"
+    --libc "$zig_libc"
+  )
+fi
 
 case "$1" in
   android-*)

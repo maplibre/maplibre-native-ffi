@@ -116,7 +116,7 @@ def render_until_update(
         iterations=iterations,
     )
     assert event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE
-    assert session.render_update() == render.RenderResult.RENDERED
+    assert session.render_update().result == render.RenderResult.RENDERED
 
 
 def render_until(
@@ -233,8 +233,7 @@ def assert_geojson_cluster_source(
     """Cluster nearby points added through the GeoJSON source data API."""
     map_handle.jump_to(camera.CameraOptions(center=geo.LatLng(0.0, 0.0), zoom=0.0))
     map_handle.set_style_json(EMPTY_STYLE_JSON.encode())
-    map_handle.add_geojson_source_data(
-        "typed-cluster-source",
+    with style.GeoJsonSourceDataHandle(
         CLUSTER_POINTS,
         style.GeoJsonSourceOptions(
             cluster=True,
@@ -244,7 +243,8 @@ def assert_geojson_cluster_source(
             # ["+", <map expression>] accumulates the mapped value per cluster.
             cluster_properties=b'{"weight_sum":["+",["get","weight"]]}',
         ),
-    )
+    ) as cluster_data:
+        map_handle.add_geojson_source_data("typed-cluster-source", cluster_data)
     map_handle.add_style_layer_json(
         b'{"id":"typed-cluster-circle","type":"circle",'
         b'"source":"typed-cluster-source","filter":["has","point_count"],'

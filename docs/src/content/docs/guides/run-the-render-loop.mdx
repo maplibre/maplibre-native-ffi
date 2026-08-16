@@ -23,9 +23,10 @@ thread before creating the runtime.
 
 Pump from the display thread when the host already has a frame callback and the
 map is the main work on that thread. The runtime, map, and render session then
-share one thread, and the loop needs no shared state. A pump drains to
-completion, and one call can span an entire style parse. Budget for variable
-work in the frame callback.
+share one thread, and the loop needs no shared state. Pass a drain budget so
+one busy pump spreads its work across frames instead of spanning an entire
+style parse inside one callback. A single task still runs to completion, so
+keep headroom in the frame for the longest one.
 
 Use a dedicated thread when a long pump would stall the display, the map must
 load while the display is idle, or the host draws no frames. That thread parks
@@ -36,8 +37,10 @@ source.
 ## Pump from the frame callback
 
 Pass a timeout of zero. The call drains what is queued and returns, because the
-display already sets the pace. One drain then takes the events that the pump
-produced.
+display already sets the pace. Pass a budget of a few milliseconds so the pump
+leaves the rest of the frame to drawing; work that the budget defers re-arms
+the pump, so the next callback continues it. One drain then takes the events
+that the pump produced.
 
 This loop reads two event types, render-update-available and
 render-frame-finished. It selects them before the map loads a style, as
@@ -54,11 +57,15 @@ A display-paced host stops pumping when it stops requesting frames. Request a
 frame after every map change. This lets an idle loop process the change.
 
 Draw a pending frame after draining events. The render call reports which
-outcome it reached, and only a rendered frame clears the pending flag. A
-no-update result and a pending-size result both mean that the map has not
-published an update for the session's extent, which is expected at startup and
-after an attach or resize. A target-not-ready result means that the render
-target had no frame to draw into, so the next turn tries again.
+outcome it reached. A no-update result and a pending-size result both mean that
+the map has not published an update for the session's extent, which is expected
+at startup and after an attach or resize. A target-not-ready result means that
+the render target had no frame to draw into, so the next turn tries again.
+
+A rendered frame clears the pending flag, unless the map asked for another
+frame while rendering this one, as during a camera transition. The render call
+returns that repaint flag directly, so the loop re-arms in the same turn
+instead of waiting for the frame's events to arrive.
 
 <Code code={region(frameLoop, "render")} lang="c" title="frame-loop.c" />
 

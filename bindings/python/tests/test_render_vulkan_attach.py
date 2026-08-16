@@ -221,7 +221,9 @@ def test_vulkan_borrowed_texture_set_target_hands_over_a_replacement() -> None:
                         lambda: map_handle.get_size() == (48, 24, pytest.approx(1.0)),
                         "the map never took the replacement image extent",
                     )
-                    assert session.render_update() == render.RenderResult.RENDERED
+                    assert (
+                        session.render_update().result == render.RenderResult.RENDERED
+                    )
 
                     # A surface descriptor names a target this session
                     # does not have.

@@ -53,6 +53,20 @@ class RenderResult(UnknownIntEnum):
     TARGET_NOT_READY = 3
 
 
+@dataclass(frozen=True, slots=True)
+class RenderUpdate:
+    """Outcome of one :meth:`RenderSessionHandle.render_update` call.
+
+    ``result`` names the wake to wait for before rendering again.
+    ``needs_repaint`` reports whether the map asked for another frame while it
+    rendered this one, as during an ongoing camera transition. It is set only
+    when ``result`` is ``RENDERED``, and reads false for every other outcome.
+    """
+
+    result: RenderResult
+    needs_repaint: bool
+
+
 class OpenGLContextOwnership(UnknownIntEnum):
     """How a session's OpenGL context relates to the thread that attached it.
 
@@ -655,11 +669,11 @@ class RenderSessionHandle(NativeHandleMixin):
             descriptor.target,
         )
 
-    def render_update(self) -> RenderResult:
+    def render_update(self) -> RenderUpdate:
         """Render the latest map update into this session's render target.
 
-        The returned :class:`RenderResult` names the wake to wait for before
-        calling again:
+        The returned :class:`RenderUpdate` carries a :class:`RenderResult` that
+        names the wake to wait for before calling again:
 
         - ``RENDERED``: the target holds a new frame. The map retains its latest
           update, so redraw on demand after a resize or a surface expose, and
@@ -677,8 +691,16 @@ class RenderSessionHandle(NativeHandleMixin):
           as a Metal surface whose next drawable is nil. No map update resolves
           this, so wait for a host event that changes the target, or back off
           and retry.
+
+        ``needs_repaint`` reports whether the map asked for another frame
+        while it rendered this one, as during an ongoing camera transition.
+        It is set only when ``result`` is ``RENDERED``. This is the same signal
+        the ``RuntimeEventType.MAP_RENDER_FRAME_FINISHED`` event carries in its
+        ``needs_repaint`` field, delivered here without the event round trip,
+        so a host can re-arm its frame loop before it drains events.
         """
-        return RenderResult(self._native.render_update())
+        result, needs_repaint = self._native.render_update()
+        return RenderUpdate(result=RenderResult(result), needs_repaint=needs_repaint)
 
     def detach(self) -> DetachedRenderSessionHandle:
         """Detach backend resources and return a close-only handle.
@@ -980,6 +1002,7 @@ __all__ = [
     "RenderResult",
     "RenderSessionHandle",
     "RenderTargetExtent",
+    "RenderUpdate",
     "TextureImageInfo",
     "VulkanBorrowedTextureDescriptor",
     "VulkanContextDescriptor",

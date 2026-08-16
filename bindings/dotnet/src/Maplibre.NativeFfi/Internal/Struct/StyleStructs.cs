@@ -186,11 +186,11 @@ internal sealed unsafe class NativeGeoJsonSourceOptions : IDisposable
                     mln_geojson_source_option_field.MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
                 native.cluster = cluster ? (byte)1 : (byte)0;
             }
-            if (options.SynchronousUpdate is { } synchronousUpdate)
+            if (options.SynchronousTiling is { } synchronousTiling)
             {
                 native.fields |= (uint)
-                    mln_geojson_source_option_field.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE;
-                native.synchronous_update = synchronousUpdate ? (byte)1 : (byte)0;
+                    mln_geojson_source_option_field.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING;
+                native.synchronous_tiling = synchronousTiling ? (byte)1 : (byte)0;
             }
 
             return new NativeGeoJsonSourceOptions(native, clusterProperties);

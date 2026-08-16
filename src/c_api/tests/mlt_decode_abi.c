@@ -70,10 +70,12 @@ static size_t query_admin_feature_count(
   size_t count = 0;
   for (unsigned int attempt = 0; attempt < 600 && count == 0; attempt += 1) {
     mln_render_result render_result = MLN_RENDER_RESULT_NO_UPDATE;
+    bool needs_repaint = false;
     TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_render_session_render_update(session, &render_result)
+      MLN_STATUS_OK,
+      mln_render_session_render_update(session, &render_result, &needs_repaint)
     );
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0));
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0, -1));
 
     mln_queried_feature_list result = MLN_HANDLE_NULL;
     const mln_status status = mln_render_session_query_source_features(

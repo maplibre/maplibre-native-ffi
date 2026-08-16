@@ -32,6 +32,7 @@ import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
 import org.maplibre.nativeffi.style.CustomGeometrySourceCallback
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.GeoJsonSourceDataHandle
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.RasterDemEncoding
 import org.maplibre.nativeffi.style.SourceInfo
@@ -318,9 +319,7 @@ class MapHandleTest {
       assertEquals(SourceType.GEOJSON, map.styleSourceType("remote-places"))
       map.setGeoJsonSourceUrl("remote-places", "https://example.com/updated.geojson")
 
-      map.addGeoJsonSourceData(
-        "inline-places",
-        geoJsonData(),
+      val options =
         GeoJsonSourceOptions().apply {
           minZoom = 0.0
           maxZoom = 14.0
@@ -328,16 +327,26 @@ class MapHandleTest {
           tileSize = 256
           buffer = 64
           lineMetrics = true
-        },
-      )
+        }
+      GeoJsonSourceDataHandle.create(geoJsonData(), options).use { initialData ->
+        map.addGeoJsonSourceData("inline-places", initialData)
+      }
       assertEquals(SourceType.GEOJSON, map.styleSourceType("inline-places"))
-      map.setGeoJsonSourceData(
-        "inline-places",
-        "{\"type\":\"LineString\",\"coordinates\":[[0,0],[1,1]]}".encodeToByteArray(),
-      )
+      GeoJsonSourceDataHandle.create(
+          "{\"type\":\"LineString\",\"coordinates\":[[0,0],[1,1]]}".encodeToByteArray(),
+          options,
+        )
+        .use { updatedData -> map.setGeoJsonSourceData("inline-places", updatedData) }
+      map.setGeoJsonSourceSynchronousTiling("inline-places", true)
+      map.setGeoJsonSourceSynchronousTiling("inline-places", false)
 
-      map.addGeoJsonSourceData("clustered-places", nearbyPoints(), clusterOptions())
+      GeoJsonSourceDataHandle.create(nearbyPoints(), clusterOptions()).use { clusteredData ->
+        map.addGeoJsonSourceData("clustered-places", clusteredData)
+      }
       assertEquals(SourceType.GEOJSON, map.styleSourceType("clustered-places"))
+      assertFailsWith<InvalidArgumentException> {
+        map.setGeoJsonSourceSynchronousTiling("no-such-source", true)
+      }
 
       // Option values reach native validation rather than being dropped by the binding.
       assertFailsWith<InvalidArgumentException> {

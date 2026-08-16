@@ -86,7 +86,7 @@ fn pumpUntilSessionCloses(
     const shared = args.shared;
     const map_id = try map.id();
     while (shared.failureValue() == null and !shared.sessionClosed()) {
-        runtime.pump(park_timeout_milliseconds) catch |err| {
+        runtime.pump(park_timeout_milliseconds, null) catch |err| {
             logLatestDiagnostic(diagnostic_store);
             return err;
         };
@@ -165,7 +165,7 @@ fn renderOnThisThread(
         // asks: in a still-image map the render attempts themselves advance
         // loading.
         _ = shared.consumeRenderRequest();
-        switch (try session.renderUpdate()) {
+        switch ((try session.renderUpdate()).result) {
             .rendered => rendered_frame = true,
             else => {},
         }

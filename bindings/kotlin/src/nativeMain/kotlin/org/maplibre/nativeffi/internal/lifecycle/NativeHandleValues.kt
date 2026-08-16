@@ -38,6 +38,9 @@ internal fun wakeSourceHandle(value: ULong): NativeWakeSource = NativeWakeSource
 internal fun resourceRequestHandle(value: ULong): NativeResourceRequest =
   NativeResourceRequest(value.toLong())
 
+internal fun geoJsonSourceDataHandle(value: ULong): NativeGeoJsonSourceData =
+  NativeGeoJsonSourceData(value.toLong())
+
 /** Reads a handle the C API wrote to an out-parameter, rejecting the null handle. */
 internal inline fun <T : NativeHandle> ULong.asHandle(name: String, build: (ULong) -> T): T {
   require(this != 0uL) { "$name returned the null handle" }

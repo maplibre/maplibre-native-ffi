@@ -23,6 +23,7 @@ import org.maplibre.nativeffi.map.TileOptions
 import org.maplibre.nativeffi.map.ViewportMode
 import org.maplibre.nativeffi.map.ViewportOptions
 import org.maplibre.nativeffi.offline.OfflineRegionDefinition
+import org.maplibre.nativeffi.query.FeatureStateSelector
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.render.EglContextDescriptor
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
@@ -100,6 +101,30 @@ class JvmStructsTest {
         RenderedQueryGeometry.LineString(listOf(ScreenPoint(1.0, 2.0), ScreenPoint(3.0, 4.0)))
       )
     assertEquals(3, setOf(point, box, line).size)
+  }
+
+  @Test
+  fun featureStateSelectorEmbedsStringViewsByValue() {
+    val minimal = JvmStructs.featureStateSelectorSnapshot(FeatureStateSelector("point"))
+    assertEquals("point", minimal.sourceId)
+    assertEquals(0, minimal.fields)
+    assertEquals(null, minimal.sourceLayerId)
+    assertEquals(null, minimal.featureId)
+    assertEquals(null, minimal.stateKey)
+
+    val full =
+      JvmStructs.featureStateSelectorSnapshot(
+        FeatureStateSelector("point").apply {
+          sourceLayerId = "layer"
+          featureId = "feature-1"
+          stateKey = "hover"
+        }
+      )
+    assertEquals("point", full.sourceId)
+    assertEquals("layer", full.sourceLayerId)
+    assertEquals("feature-1", full.featureId)
+    assertEquals("hover", full.stateKey)
+    assertNotEquals(0, full.fields)
   }
 
   @Test

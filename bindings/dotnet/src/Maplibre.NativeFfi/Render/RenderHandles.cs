@@ -37,7 +37,8 @@ internal unsafe delegate mln_status RenderSessionResize(
 
 internal unsafe delegate mln_status RenderSessionRenderUpdate(
     MlnRenderSession session,
-    mln_render_result* out_result
+    mln_render_result* out_result,
+    bool* out_needs_repaint
 );
 
 internal unsafe delegate mln_status MetalOwnedTextureAcquireFrame(
@@ -74,8 +75,9 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     ) => NativeMethods.mln_render_session_resize(session, width, height, scaleFactor);
     private static readonly RenderSessionRenderUpdate DefaultRenderUpdate = static (
         session,
-        outResult
-    ) => NativeMethods.mln_render_session_render_update(session, outResult);
+        outResult,
+        outNeedsRepaint
+    ) => NativeMethods.mln_render_session_render_update(session, outResult, outNeedsRepaint);
     private static readonly TextureRead DefaultTextureRead = static (session, data, length, info) =>
         NativeMethods.mln_texture_read_premultiplied_rgba8(session, data, length, info);
     private static readonly StatusDestroy<MlnRenderSession> DefaultDestroy = static session =>
@@ -453,14 +455,16 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     /// <see cref="RenderResult.Rendered"/> again. Every other result names the wake to wait for:
     /// <see cref="RenderResult.NoUpdate"/> and <see cref="RenderResult.SizePending"/> resolve on a
     /// render-update-available event, and <see cref="RenderResult.TargetNotReady"/> resolves when
-    /// the host changes the render target.
+    /// the host changes the render target. The returned <see cref="RenderUpdate.NeedsRepaint"/>
+    /// flag tells whether the map asked for another frame while it rendered this one.
     /// </summary>
-    public RenderResult RenderUpdate()
+    public RenderUpdate RenderUpdate()
     {
         ThrowIfTextureFrameActive(nameof(RenderUpdate));
         var result = mln_render_result.MLN_RENDER_RESULT_NO_UPDATE;
-        NativeStatus.Check(RenderUpdateNative(Handle, &result));
-        return (RenderResult)result;
+        var needsRepaint = false;
+        NativeStatus.Check(RenderUpdateNative(Handle, &result, &needsRepaint));
+        return new RenderUpdate((RenderResult)result, needsRepaint);
     }
 
     public void Detach()

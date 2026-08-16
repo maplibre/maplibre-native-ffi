@@ -99,11 +99,12 @@ Requirements:
   process, runnable Android and OpenHarmony presets cross-compile and push to an
   emulator through the shared runners in `scripts/`
   (`run-android-emulator-test.sh`, `run-ohos-emulator-test.sh`, which boot the
-  emulator on demand), iOS simulator presets build a test bundle and spawn it on
-  a simulator, and Emscripten presets run in headless Chromium.
+  emulator on demand), iOS and tvOS simulator presets build a test bundle and
+  spawn it on a simulator, and Emscripten presets run in headless Chromium.
 - A preset that a binding cannot build or run MUST fail with a message that
   names what the binding supports. A device preset with no runner, such as
-  `ios-arm64-metal`, fails the same way and points at a simulator preset.
+  `ios-arm64-metal` or `tvos-arm64-metal`, fails the same way and points at a
+  simulator preset.
 - Colon-suffixed tasks cover the axes that a preset does not encode: one
   `test:<runtime>` task per runtime when a platform maps to more than one
   (`test:jvm` and `test:native` for Kotlin; a JavaScript binding adds its
@@ -215,6 +216,7 @@ Long-lived C-owned opaque handle concepts include:
 - `RenderSessionHandle`
 - `OfflineOperationHandle`
 - `ResourceRequestHandle`
+- `GeoJsonSourceDataHandle`
 
 `Handle` means the public value owns or controls an explicitly releasable native
 resource with identity across operations. The representation can vary by
@@ -435,6 +437,22 @@ The low-level API exposes no parallel string overload. Callers that start with
 text encode it as UTF-8. Callers that start with a file, response, database
 blob, or serializer output can pass its bytes without an intermediate host
 string.
+
+### Prepared GeoJSON source data
+
+Inline GeoJSON source data crosses the boundary in two steps: a preparation call
+parses and tiles one complete GeoJSON document into an owned prepared-data
+handle, and map calls install that handle when adding or updating a GeoJSON
+source. Bindings expose both steps and the handle between them.
+
+Preparation takes the GeoJSON source options, is free of any runtime or map, and
+is callable from any thread; the prepared value is immutable and safe to share
+across threads, subject to the binding's ordinary handle-lifetime rules. A
+binding whose language has a natural worker or async idiom SHOULD make
+off-thread preparation expressible with it, without owning a thread pool inside
+the binding. Install calls borrow the handle, so one prepared value may be
+installed on any number of sources and released at any time afterward; release
+never invalidates a source the data was installed on.
 
 ### Native pointers
 
@@ -701,18 +719,21 @@ submission time.
 
 ### Parking and wake
 
-The pump is one method taking a timeout. Bindings expose it alongside a wake
-source handle.
+The pump is one method taking a timeout and a drain budget. Bindings expose it
+alongside a wake source handle.
 
 The pump wrapper follows this design:
 
 1. It takes the host language's duration or timeout type, maps zero to a
    non-blocking drain, and maps the language's "no timeout" spelling to an
    unbounded park.
-2. It releases the host runtime's blocking-call machinery for the duration of
+2. It takes the budget the same way, maps the language's "no budget" spelling to
+   an unbounded drain, and defaults to unbounded where the language has default
+   arguments.
+3. It releases the host runtime's blocking-call machinery for the duration of
    the call, including any interpreter lock, so other host threads run while the
    owner thread parks.
-3. Its documentation states that a wake signal sets a flag the pump clears, and
+4. Its documentation states that a wake signal sets a flag the pump clears, and
    that callers drain events after every return.
 
 The wake source follows this design:
@@ -864,8 +885,9 @@ The public handle exposes:
 - `resize` for session kinds that support resize;
 - `set_target` for session kinds whose target the host owns, which is surface
   sessions and caller-owned texture sessions;
-- `render_update` for the latest available map render update, reporting the
-  render result as a public enum;
+- `render_update` for the latest available map render update, reporting a public
+  `RenderUpdate` value that pairs the render result enum with the frame's
+  repaint flag;
 - `detach`, which keeps the public handle live after backend resources detach;
 - `close` or `destroy`, using the owned-handle release operation, on the thread
   that attached the session.

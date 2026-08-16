@@ -73,8 +73,8 @@ Take one runtime module:
 - `org.maplibre.nativeffi:maplibre-native-ffi-runtime-metal`
 - `org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan`
 
-On Android, call `MaplibreAndroid.initialize(context)` before you create a
-runtime, as [Android](#android) describes.
+On Android, initialize platform services before you create a runtime, as
+[Android](#android) describes.
 
 For the snapshot channel, add the Maven snapshot repository and take the
 snapshot version of both modules. The runtime modules and Android
@@ -267,18 +267,37 @@ provider.
 Android runs the Vulkan and OpenGL backends, with EGL as the OpenGL context
 provider.
 
-An Android app depends on a Kotlin runtime AAR whichever binding it uses. The
-AAR carries the native library for every ABI and the platform TLS component that
-Android HTTPS requests require.
+An Android app using Kotlin/JVM depends on a Kotlin runtime AAR. The AAR carries
+the native library for every ABI and the platform TLS component that Android
+HTTPS requests require.
 
 ```kotlin title="build.gradle.kts"
 implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan:0.202608.0")
 ```
 
+A Kotlin/Native target gets the native library from its runtime KLIB. Add the
+matching runtime AAR directly to the module that packages the APK or AAB so that
+the app also carries the TLS component. Exclude the AAR's shared library because
+the Kotlin/Native host library already contains the static runtime.
+
+```kotlin title="build.gradle.kts"
+dependencies {
+  implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan-android:0.202608.0")
+}
+
+android {
+  packaging {
+    jniLibs.excludes += "**/libmaplibre-native-c.so"
+  }
+}
+```
+
 Initialize the platform once before you create a runtime, passing an
 `android.content.Context`. Every binding exposes this call under its own name.
 Android HTTPS requests validate against the app's trust policy from that point
-on.
+on. Kotlin/JVM hosts call `MaplibreAndroid.initialize(context)`. Kotlin/Native
+hosts create `AndroidJniEnvironment` and `AndroidContextReference` values from
+host JNI addresses, then pass them to `MaplibreAndroid.initialize`.
 
 ### iOS
 

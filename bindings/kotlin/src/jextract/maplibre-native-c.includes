@@ -544,7 +544,7 @@
 --include-constant MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS
 --include-constant MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM
 --include-constant MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM
---include-constant MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE
+--include-constant MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING
 --include-constant MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE
 --include-constant MLN_GEOJSON_SOURCE_OPTION_TOLERANCE
 --include-constant MLN_LOCATION_INDICATOR_IMAGE_KIND_BEARING
@@ -585,6 +585,8 @@
 --include-constant MLN_STYLE_VECTOR_TILE_ENCODING_MLT
 --include-constant MLN_STYLE_VECTOR_TILE_ENCODING_MVT
 --include-function mln_custom_geometry_source_options_default
+--include-function mln_geojson_source_data_create
+--include-function mln_geojson_source_data_destroy
 --include-function mln_geojson_source_options_default
 --include-function mln_map_add_color_relief_layer
 --include-function mln_map_add_custom_geometry_source
@@ -626,6 +628,7 @@
 --include-function mln_map_remove_style_source
 --include-function mln_map_set_custom_geometry_source_tile_data
 --include-function mln_map_set_geojson_source_data
+--include-function mln_map_set_geojson_source_synchronous_tiling
 --include-function mln_map_set_geojson_source_url
 --include-function mln_map_set_image_source_coordinates
 --include-function mln_map_set_image_source_image

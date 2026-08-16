@@ -114,7 +114,7 @@ pub const NativePointer = enum(usize) {
     }
 };
 
-/// Outcome of a successful `RenderSessionHandle.renderUpdate` call.
+/// Which outcome a successful `RenderSessionHandle.renderUpdate` call reached.
 pub const RenderResult = union(enum) {
     /// The call rendered a frame into the render target.
     rendered,
@@ -135,6 +135,18 @@ pub const RenderResult = union(enum) {
             else => .{ .unknown = raw },
         };
     }
+};
+
+/// Outcome of a successful `RenderSessionHandle.renderUpdate` call.
+pub const RenderUpdate = struct {
+    /// Which outcome the call reached.
+    result: RenderResult,
+    /// Whether the map asked for another frame while it rendered this one, as
+    /// during an ongoing camera transition. True only when `result` is
+    /// `.rendered`; this is the same signal that a map-render-frame-finished
+    /// event carries in its `needs_repaint` field, delivered without the
+    /// event round trip.
+    needs_repaint: bool,
 };
 
 pub const RenderBackendSupport = struct {
@@ -537,16 +549,20 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
     /// again. Every other result names the wake to wait for: `.no_update` and
     /// `.size_pending` resolve on a render-update-available event, and
     /// `.target_not_ready` resolves when the host changes the render target.
-    pub fn renderUpdate(self: *RenderSessionHandle) status.Error!RenderResult {
+    pub fn renderUpdate(self: *RenderSessionHandle) status.Error!RenderUpdate {
         const lease = try renderSessionLease(self.*);
         defer lease.release();
         try ensureNoActiveOwnedFrame(lease);
         var result: c.mln_render_result = c.MLN_RENDER_RESULT_NO_UPDATE;
+        var needs_repaint: bool = false;
         try status.checkStatus(
-            c.mln_render_session_render_update(lease.native, &result),
+            c.mln_render_session_render_update(lease.native, &result, &needs_repaint),
             lease.diagnostic_store,
         );
-        return RenderResult.fromRaw(@intCast(result));
+        return .{
+            .result = RenderResult.fromRaw(@intCast(result)),
+            .needs_repaint = needs_repaint,
+        };
     }
 
     /// Detaches the render target from this session. The session stays live and

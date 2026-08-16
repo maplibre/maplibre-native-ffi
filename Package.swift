@@ -52,18 +52,18 @@ let targets: [Target] = [
     dependencies: ["CMaplibreNativeC"],
     path: "bindings/swift/Sources/MaplibreNativeFFI",
     linkerSettings: [
-      .linkedLibrary("c++", .when(platforms: [.iOS])),
-      .linkedLibrary("objc", .when(platforms: [.iOS])),
-      .linkedLibrary("sqlite3", .when(platforms: [.iOS])),
-      .linkedLibrary("z", .when(platforms: [.iOS])),
-      .linkedFramework("CoreFoundation", .when(platforms: [.iOS])),
-      .linkedFramework("CoreGraphics", .when(platforms: [.iOS])),
-      .linkedFramework("CoreText", .when(platforms: [.iOS])),
-      .linkedFramework("Foundation", .when(platforms: [.iOS])),
-      .linkedFramework("ImageIO", .when(platforms: [.iOS])),
-      .linkedFramework("Metal", .when(platforms: [.iOS])),
-      .linkedFramework("MetalKit", .when(platforms: [.iOS])),
-      .linkedFramework("QuartzCore", .when(platforms: [.iOS])),
+      .linkedLibrary("c++", .when(platforms: [.iOS, .tvOS])),
+      .linkedLibrary("objc", .when(platforms: [.iOS, .tvOS])),
+      .linkedLibrary("sqlite3", .when(platforms: [.iOS, .tvOS])),
+      .linkedLibrary("z", .when(platforms: [.iOS, .tvOS])),
+      .linkedFramework("CoreFoundation", .when(platforms: [.iOS, .tvOS])),
+      .linkedFramework("CoreGraphics", .when(platforms: [.iOS, .tvOS])),
+      .linkedFramework("CoreText", .when(platforms: [.iOS, .tvOS])),
+      .linkedFramework("Foundation", .when(platforms: [.iOS, .tvOS])),
+      .linkedFramework("ImageIO", .when(platforms: [.iOS, .tvOS])),
+      .linkedFramework("Metal", .when(platforms: [.iOS, .tvOS])),
+      .linkedFramework("MetalKit", .when(platforms: [.iOS, .tvOS])),
+      .linkedFramework("QuartzCore", .when(platforms: [.iOS, .tvOS])),
     ]
   ),
   .target(
@@ -90,7 +90,7 @@ let targets: [Target] = [
 
 let package = Package(
   name: "maplibre-native-ffi",
-  platforms: [.macOS("14.3"), .iOS("14.3")],
+  platforms: [.macOS("14.3"), .iOS("14.3"), .tvOS("14.3")],
   products: products,
   dependencies: [
     .package(
