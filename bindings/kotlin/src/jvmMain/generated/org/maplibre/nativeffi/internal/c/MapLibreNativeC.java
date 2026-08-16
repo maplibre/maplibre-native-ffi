@@ -10512,6 +10512,33 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     public static int MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS() {
         return MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
     }
+    private static final int MLN_QUERIED_FEATURE_SOURCE_ID = (int)1L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_queried_feature_field.MLN_QUERIED_FEATURE_SOURCE_ID = 1
+     * }
+     */
+    public static int MLN_QUERIED_FEATURE_SOURCE_ID() {
+        return MLN_QUERIED_FEATURE_SOURCE_ID;
+    }
+    private static final int MLN_QUERIED_FEATURE_SOURCE_LAYER_ID = (int)2L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_queried_feature_field.MLN_QUERIED_FEATURE_SOURCE_LAYER_ID = 2
+     * }
+     */
+    public static int MLN_QUERIED_FEATURE_SOURCE_LAYER_ID() {
+        return MLN_QUERIED_FEATURE_SOURCE_LAYER_ID;
+    }
+    private static final int MLN_QUERIED_FEATURE_STATE = (int)4L;
+    /**
+     * {@snippet lang=c :
+     * enum mln_queried_feature_field.MLN_QUERIED_FEATURE_STATE = 4
+     * }
+     */
+    public static int MLN_QUERIED_FEATURE_STATE() {
+        return MLN_QUERIED_FEATURE_STATE;
+    }
 
     private static class mln_rendered_feature_query_options_default {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
@@ -10810,6 +10837,246 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         }
     }
 
+    private static class mln_queried_feature_default {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            mln_queried_feature.layout()    );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_queried_feature_default");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_queried_feature mln_queried_feature_default()
+     * }
+     */
+    public static FunctionDescriptor mln_queried_feature_default$descriptor() {
+        return mln_queried_feature_default.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_queried_feature mln_queried_feature_default()
+     * }
+     */
+    public static MethodHandle mln_queried_feature_default$handle() {
+        return mln_queried_feature_default.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_queried_feature mln_queried_feature_default()
+     * }
+     */
+    public static MemorySegment mln_queried_feature_default$address() {
+        return mln_queried_feature_default.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_queried_feature mln_queried_feature_default()
+     * }
+     */
+    public static MemorySegment mln_queried_feature_default(SegmentAllocator allocator) {
+        var mh$ = mln_queried_feature_default.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_queried_feature_default", allocator);
+            }
+            return (MemorySegment)mh$.invokeExact(allocator);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_queried_feature_list_count {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_queried_feature_list_count");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_queried_feature_list_count(mln_queried_feature_list list, size_t *out_count)
+     * }
+     */
+    public static FunctionDescriptor mln_queried_feature_list_count$descriptor() {
+        return mln_queried_feature_list_count.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_queried_feature_list_count(mln_queried_feature_list list, size_t *out_count)
+     * }
+     */
+    public static MethodHandle mln_queried_feature_list_count$handle() {
+        return mln_queried_feature_list_count.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_queried_feature_list_count(mln_queried_feature_list list, size_t *out_count)
+     * }
+     */
+    public static MemorySegment mln_queried_feature_list_count$address() {
+        return mln_queried_feature_list_count.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_queried_feature_list_count(mln_queried_feature_list list, size_t *out_count)
+     * }
+     */
+    public static int mln_queried_feature_list_count(long list, MemorySegment out_count) {
+        var mh$ = mln_queried_feature_list_count.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_queried_feature_list_count", list, out_count);
+            }
+            return (int)mh$.invokeExact(list, out_count);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_queried_feature_list_get {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_queried_feature_list_get");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_queried_feature_list_get(mln_queried_feature_list list, size_t index, mln_queried_feature *out_feature)
+     * }
+     */
+    public static FunctionDescriptor mln_queried_feature_list_get$descriptor() {
+        return mln_queried_feature_list_get.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_queried_feature_list_get(mln_queried_feature_list list, size_t index, mln_queried_feature *out_feature)
+     * }
+     */
+    public static MethodHandle mln_queried_feature_list_get$handle() {
+        return mln_queried_feature_list_get.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_queried_feature_list_get(mln_queried_feature_list list, size_t index, mln_queried_feature *out_feature)
+     * }
+     */
+    public static MemorySegment mln_queried_feature_list_get$address() {
+        return mln_queried_feature_list_get.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_queried_feature_list_get(mln_queried_feature_list list, size_t index, mln_queried_feature *out_feature)
+     * }
+     */
+    public static int mln_queried_feature_list_get(long list, long index, MemorySegment out_feature) {
+        var mh$ = mln_queried_feature_list_get.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_queried_feature_list_get", list, index, out_feature);
+            }
+            return (int)mh$.invokeExact(list, index, out_feature);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_queried_feature_list_destroy {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.ofVoid(
+            MapLibreNativeC.C_LONG
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_queried_feature_list_destroy");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * void mln_queried_feature_list_destroy(mln_queried_feature_list list)
+     * }
+     */
+    public static FunctionDescriptor mln_queried_feature_list_destroy$descriptor() {
+        return mln_queried_feature_list_destroy.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * void mln_queried_feature_list_destroy(mln_queried_feature_list list)
+     * }
+     */
+    public static MethodHandle mln_queried_feature_list_destroy$handle() {
+        return mln_queried_feature_list_destroy.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * void mln_queried_feature_list_destroy(mln_queried_feature_list list)
+     * }
+     */
+    public static MemorySegment mln_queried_feature_list_destroy$address() {
+        return mln_queried_feature_list_destroy.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * void mln_queried_feature_list_destroy(mln_queried_feature_list list)
+     * }
+     */
+    public static void mln_queried_feature_list_destroy(long list) {
+        var mh$ = mln_queried_feature_list_destroy.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_queried_feature_list_destroy", list);
+            }
+            mh$.invokeExact(list);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
     private static class mln_render_session_query_rendered_features_start {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
@@ -10995,6 +11262,67 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
                 traceDowncall("mln_render_session_query_feature_extensions_start", session, source_id, feature, extension, extension_field, arguments, out_operation);
             }
             return (int)mh$.invokeExact(session, source_id, feature, extension, extension_field, arguments, out_operation);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_render_query_features_take_result {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_render_query_features_take_result");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_render_query_features_take_result(mln_operation operation, mln_queried_feature_list *out_result)
+     * }
+     */
+    public static FunctionDescriptor mln_render_query_features_take_result$descriptor() {
+        return mln_render_query_features_take_result.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_render_query_features_take_result(mln_operation operation, mln_queried_feature_list *out_result)
+     * }
+     */
+    public static MethodHandle mln_render_query_features_take_result$handle() {
+        return mln_render_query_features_take_result.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_render_query_features_take_result(mln_operation operation, mln_queried_feature_list *out_result)
+     * }
+     */
+    public static MemorySegment mln_render_query_features_take_result$address() {
+        return mln_render_query_features_take_result.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_render_query_features_take_result(mln_operation operation, mln_queried_feature_list *out_result)
+     * }
+     */
+    public static int mln_render_query_features_take_result(long operation, MemorySegment out_result) {
+        var mh$ = mln_render_query_features_take_result.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_render_query_features_take_result", operation, out_result);
+            }
+            return (int)mh$.invokeExact(operation, out_result);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {

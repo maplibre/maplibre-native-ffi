@@ -2238,6 +2238,33 @@ external int mln_projected_meters_for_lat_lng(
 @ffi.Native<mln_projection_mode Function()>()
 external mln_projection_mode mln_projection_mode_default();
 
+@ffi.Native<mln_queried_feature Function()>()
+external mln_queried_feature mln_queried_feature_default();
+
+@ffi.Native<
+  ffi.Int32 Function(mln_queried_feature_list, ffi.Pointer<ffi.Size>)
+>()
+external int mln_queried_feature_list_count(
+  int list,
+  ffi.Pointer<ffi.Size> out_count,
+);
+
+@ffi.Native<ffi.Void Function(mln_queried_feature_list)>()
+external void mln_queried_feature_list_destroy(int list);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_queried_feature_list,
+    ffi.Size,
+    ffi.Pointer<mln_queried_feature>,
+  )
+>()
+external int mln_queried_feature_list_get(
+  int list,
+  int index,
+  ffi.Pointer<mln_queried_feature> out_feature,
+);
+
 @ffi.Native<
   ffi.Int32 Function(mln_ready_batch, ffi.Pointer<mln_ready_batch_view>)
 >()
@@ -2270,6 +2297,14 @@ external int mln_render_frame_batch_get(
 
 @ffi.Native<ffi.Void Function(mln_render_frame_batch)>()
 external void mln_render_frame_batch_release(int batch);
+
+@ffi.Native<
+  ffi.Int32 Function(mln_operation, ffi.Pointer<mln_queried_feature_list>)
+>()
+external int mln_render_query_features_take_result(
+  int operation,
+  ffi.Pointer<mln_queried_feature_list> out_result,
+);
 
 @ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<mln_buffer>)>()
 external int mln_render_query_take_result(
@@ -5463,6 +5498,42 @@ final class mln_quaternion extends ffi.Struct {
     ..ref.w = w;
 }
 
+final class mln_queried_feature extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Uint32()
+  external int fields;
+
+  external mln_buffer_view feature;
+
+  external mln_buffer_view source_id;
+
+  external mln_buffer_view source_layer_id;
+
+  external mln_buffer_view state;
+}
+
+enum mln_queried_feature_field {
+  MLN_QUERIED_FEATURE_SOURCE_ID(1),
+  MLN_QUERIED_FEATURE_SOURCE_LAYER_ID(2),
+  MLN_QUERIED_FEATURE_STATE(4);
+
+  final int value;
+  const mln_queried_feature_field(this.value);
+
+  static mln_queried_feature_field fromValue(int value) => switch (value) {
+    1 => MLN_QUERIED_FEATURE_SOURCE_ID,
+    2 => MLN_QUERIED_FEATURE_SOURCE_LAYER_ID,
+    4 => MLN_QUERIED_FEATURE_STATE,
+    _ => throw ArgumentError(
+      'Unknown value for mln_queried_feature_field: $value',
+    ),
+  };
+}
+
+typedef mln_queried_feature_list = ffi.Uint64;
+typedef Dartmln_queried_feature_list = int;
 typedef mln_ready_batch = ffi.Uint64;
 typedef Dartmln_ready_batch = int;
 

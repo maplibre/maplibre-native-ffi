@@ -75,6 +75,26 @@ func (options SourceFeatureQueryOptions) Equal(other SourceFeatureQueryOptions) 
 		equalOptionalBytes(options.Filter, other.Filter)
 }
 
+// QueriedFeature is one copied feature query hit.
+//
+// Feature is a UTF-8 GeoJSON Feature. SourceID and SourceLayerID are nil when
+// absent. State is nil when absent and otherwise a UTF-8 JSON object.
+type QueriedFeature struct {
+	Feature       []byte
+	SourceID      *string
+	SourceLayerID *string
+	State         []byte
+}
+
+// Equal reports whether two copied hits hold the same field values. Absent
+// optional fields stay distinct from present empty values.
+func (feature QueriedFeature) Equal(other QueriedFeature) bool {
+	return bytes.Equal(feature.Feature, other.Feature) &&
+		equalPointer(feature.SourceID, other.SourceID) &&
+		equalPointer(feature.SourceLayerID, other.SourceLayerID) &&
+		equalOptionalBytes(feature.State, other.State)
+}
+
 func equalOptionalBytes(left []byte, right []byte) bool {
 	return (left == nil) == (right == nil) && bytes.Equal(left, right)
 }
@@ -331,7 +351,8 @@ func (session *RenderSessionHandle) RemoveFeatureStateStart(selector FeatureStat
 }
 
 // QueryRenderedFeaturesStart starts a query against the latest driver state.
-func (session *RenderSessionHandle) QueryRenderedFeaturesStart(geometry RenderedQueryGeometry, options *RenderedFeatureQueryOptions) (*OperationHandle[[]byte], error) {
+// The completed operation yields copied hits.
+func (session *RenderSessionHandle) QueryRenderedFeaturesStart(geometry RenderedQueryGeometry, options *RenderedFeatureQueryOptions) (*OperationHandle[[]QueriedFeature], error) {
 	ptr, release, err := session.ptr()
 	if err != nil {
 		return nil, err
@@ -355,13 +376,12 @@ func (session *RenderSessionHandle) QueryRenderedFeaturesStart(geometry Rendered
 	}); err != nil {
 		return nil, err
 	}
-	return renderJSONOperation(session, operation, func(op C.mln_operation, out *C.mln_buffer) int32 {
-		return int32(C.mln_render_query_take_result(op, out))
-	})
+	return renderFeaturesOperation(session, operation)
 }
 
-// QuerySourceFeaturesStart starts a source query against the latest driver state.
-func (session *RenderSessionHandle) QuerySourceFeaturesStart(sourceID string, options *SourceFeatureQueryOptions) (*OperationHandle[[]byte], error) {
+// QuerySourceFeaturesStart starts a source query against the latest driver
+// state. The completed operation yields copied hits.
+func (session *RenderSessionHandle) QuerySourceFeaturesStart(sourceID string, options *SourceFeatureQueryOptions) (*OperationHandle[[]QueriedFeature], error) {
 	ptr, release, err := session.ptr()
 	if err != nil {
 		return nil, err
@@ -385,9 +405,70 @@ func (session *RenderSessionHandle) QuerySourceFeaturesStart(sourceID string, op
 	}); err != nil {
 		return nil, err
 	}
-	return renderJSONOperation(session, operation, func(op C.mln_operation, out *C.mln_buffer) int32 {
-		return int32(C.mln_render_query_take_result(op, out))
-	})
+	return renderFeaturesOperation(session, operation)
+}
+
+func renderFeaturesOperation(session *RenderSessionHandle, raw C.mln_operation) (*OperationHandle[[]QueriedFeature], error) {
+	if raw == 0 {
+		return nil, newBindingError(ErrInvalidState, "render query did not return an operation")
+	}
+	operation := newOwnedOperationHandle[[]QueriedFeature](
+		session.parent.runtime,
+		session.state.AddChild(),
+		uint64(raw),
+		0,
+		0,
+	)
+	operation.takeResult = func(id uint64) ([]QueriedFeature, bool, error) {
+		var list C.mln_queried_feature_list
+		if err := checkNative(func() int32 {
+			return int32(C.mln_render_query_features_take_result(C.mln_operation(id), &list))
+		}); err != nil {
+			return nil, false, err
+		}
+		result, err := queriedFeatureList(list)
+		return result, true, err
+	}
+	return operation, nil
+}
+
+func queriedFeatureList(list C.mln_queried_feature_list) ([]QueriedFeature, error) {
+	defer C.mln_queried_feature_list_destroy(list)
+	var count C.size_t
+	if err := checkNative(func() int32 { return int32(C.mln_queried_feature_list_count(list, &count)) }); err != nil {
+		return nil, err
+	}
+	features := make([]QueriedFeature, int(count))
+	for i := range features {
+		hit := C.mln_queried_feature_default()
+		if err := checkNative(func() int32 {
+			return int32(C.mln_queried_feature_list_get(list, C.size_t(i), &hit))
+		}); err != nil {
+			return nil, err
+		}
+		feature, ok := goByteSlice(hit.feature.data, hit.feature.size)
+		if !ok {
+			return nil, newBindingError(ErrNative, "native queried feature data is invalid")
+		}
+		item := QueriedFeature{Feature: feature}
+		if hit.fields&C.MLN_QUERIED_FEATURE_SOURCE_ID != 0 {
+			sourceID := goStringView(hit.source_id)
+			item.SourceID = &sourceID
+		}
+		if hit.fields&C.MLN_QUERIED_FEATURE_SOURCE_LAYER_ID != 0 {
+			sourceLayerID := goStringView(hit.source_layer_id)
+			item.SourceLayerID = &sourceLayerID
+		}
+		if hit.fields&C.MLN_QUERIED_FEATURE_STATE != 0 {
+			state, ok := goByteSlice(hit.state.data, hit.state.size)
+			if !ok {
+				return nil, newBindingError(ErrNative, "native queried feature state is invalid")
+			}
+			item.State = state
+		}
+		features[i] = item
+	}
+	return features, nil
 }
 
 // QueryFeatureExtensionsStart starts a feature-extension query.

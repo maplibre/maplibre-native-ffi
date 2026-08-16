@@ -584,6 +584,7 @@ enum : std::uint32_t {
   RENDER_OPERATION_DETACH,
   RENDER_OPERATION_FRAME_RELEASE,
   RENDER_OPERATION_QUERY,
+  RENDER_OPERATION_QUERY_FEATURES,
   RENDER_OPERATION_READBACK,
 };
 
@@ -801,13 +802,22 @@ auto surface_session_set_target(
   const RenderTargetReplacer& replace
 ) -> mln_status;
 auto render_session_destroy(mln_render_session session) -> mln_status;
+auto queried_feature_list_count(
+  mln_queried_feature_list list, size_t* out_count
+) -> mln_status;
+auto queried_feature_list_get(
+  mln_queried_feature_list list, size_t index, mln_queried_feature* out_feature
+) -> mln_status;
+auto queried_feature_list_destroy(mln_queried_feature_list list) -> void;
 auto render_session_query_rendered_features(
   mln_render_session session, const mln_rendered_query_geometry* geometry,
-  const mln_rendered_feature_query_options* options, mln_buffer* out_result
+  const mln_rendered_feature_query_options* options,
+  mln_queried_feature_list* out_result
 ) -> mln_status;
 auto render_session_query_source_features(
   mln_render_session session, mln_buffer_view source_id,
-  const mln_source_feature_query_options* options, mln_buffer* out_result
+  const mln_source_feature_query_options* options,
+  mln_queried_feature_list* out_result
 ) -> mln_status;
 auto render_session_query_feature_extensions(
   mln_render_session session, mln_buffer_view source_id,
@@ -830,6 +840,9 @@ auto render_session_query_feature_extensions_start(
   mln_buffer_view feature, mln_buffer_view extension,
   mln_buffer_view extension_field, const mln_buffer_view* arguments,
   mln_operation* out_operation
+) -> mln_status;
+auto render_query_features_take_result(
+  mln_operation operation, mln_queried_feature_list* out_result
 ) -> mln_status;
 auto render_query_take_result(mln_operation operation, mln_buffer* out_result)
   -> mln_status;

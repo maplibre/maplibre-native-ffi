@@ -6,7 +6,7 @@ use maplibre_native_ffi_sys as sys;
 use crate::Result;
 
 pub use maplibre_core::query::{
-    FeatureStateSelector, RenderedFeatureQueryOptions, RenderedQueryGeometry,
+    FeatureStateSelector, QueriedFeature, RenderedFeatureQueryOptions, RenderedQueryGeometry,
     SourceFeatureQueryOptions,
 };
 pub(crate) use maplibre_core::query::{
@@ -97,11 +97,12 @@ impl super::RenderSessionHandle {
             .operation(operation, crate::runtime::OperationKind::RenderFeatureState)
     }
 
+    /// Starts a rendered-feature query whose result is a typed feature list.
     pub fn query_rendered_features(
         &self,
         geometry: &RenderedQueryGeometry,
         options: Option<&RenderedFeatureQueryOptions>,
-    ) -> Result<crate::runtime::OperationHandle<Vec<u8>>> {
+    ) -> Result<crate::runtime::OperationHandle<Vec<QueriedFeature>>> {
         let geometry = geometry.to_native();
         let options = options
             .map(RenderedFeatureQueryOptions::to_native)
@@ -117,15 +118,18 @@ impl super::RenderSessionHandle {
                 &mut operation,
             )
         })?;
-        self.inner
-            .operation(operation, crate::runtime::OperationKind::RenderQuery)
+        self.inner.operation(
+            operation,
+            crate::runtime::OperationKind::RenderFeaturesQuery,
+        )
     }
 
+    /// Starts a source-feature query whose result is a typed feature list.
     pub fn query_source_features(
         &self,
         source_id: &str,
         options: Option<&SourceFeatureQueryOptions>,
-    ) -> Result<crate::runtime::OperationHandle<Vec<u8>>> {
+    ) -> Result<crate::runtime::OperationHandle<Vec<QueriedFeature>>> {
         let source_id = maplibre_core::string::buffer_view(source_id.as_bytes());
         let options = options
             .map(SourceFeatureQueryOptions::to_native)
@@ -141,10 +145,14 @@ impl super::RenderSessionHandle {
                 &mut operation,
             )
         })?;
-        self.inner
-            .operation(operation, crate::runtime::OperationKind::RenderQuery)
+        self.inner.operation(
+            operation,
+            crate::runtime::OperationKind::RenderFeaturesQuery,
+        )
     }
 
+    /// Starts a feature-extension query whose result is UTF-8 JSON or GeoJSON
+    /// bytes.
     pub fn query_feature_extension(
         &self,
         source_id: &str,
@@ -172,5 +180,25 @@ impl super::RenderSessionHandle {
         })?;
         self.inner
             .operation(operation, crate::runtime::OperationKind::RenderQuery)
+    }
+}
+
+impl crate::runtime::OperationHandle<Vec<QueriedFeature>> {
+    /// Takes the completed typed feature list while retaining the observer.
+    pub fn take(&self) -> Result<Vec<QueriedFeature>> {
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_queried_feature_list>::new();
+        self.with_result_operation(|operation| {
+            let status = match self.operation_kind {
+                crate::runtime::OperationKind::RenderFeaturesQuery => unsafe {
+                    sys::mln_render_query_features_take_result(operation, out.as_mut_ptr())
+                },
+                _ => sys::MLN_STATUS_INVALID_STATE,
+            };
+            maplibre_core::check(status)
+        })?;
+        let list = out.into_live("mln_queried_feature_list")?;
+        // SAFETY: On success, the C API returns an owned queried-feature list
+        // handle; core copies and releases it.
+        unsafe { maplibre_core::query::copy_queried_feature_list(list) }
     }
 }

@@ -76,11 +76,30 @@ public struct FeatureStateSelector: Equatable, Sendable {
   }
 }
 
+public struct QueriedFeature: Equatable, Sendable {
+  public var feature: Data
+  public var sourceId: String?
+  public var sourceLayerId: String?
+  public var state: Data?
+
+  public init(
+    feature: Data,
+    sourceId: String? = nil,
+    sourceLayerId: String? = nil,
+    state: Data? = nil
+  ) {
+    self.feature = feature
+    self.sourceId = sourceId
+    self.sourceLayerId = sourceLayerId
+    self.state = state
+  }
+}
+
 public extension RenderSessionHandle {
   func queryRenderedFeatures(
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions = RenderedFeatureQueryOptions()
-  ) async throws -> Data {
+  ) async throws -> [QueriedFeature] {
     let operation = try mapNativeFailure {
       try geometry.nativeGeometry.withNativeGeometry { geometry in
         try options.nativeOptions.withNativeOptions { options in
@@ -92,13 +111,13 @@ public extension RenderSessionHandle {
         }
       }
     }
-    return try await takeRenderQuery(operation)
+    return try await takeFeatureQuery(operation)
   }
 
   func querySourceFeatures(
     sourceId: String,
     options: SourceFeatureQueryOptions = SourceFeatureQueryOptions()
-  ) async throws -> Data {
+  ) async throws -> [QueriedFeature] {
     let operation = try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
@@ -113,7 +132,7 @@ public extension RenderSessionHandle {
         }
       }
     }
-    return try await takeRenderQuery(operation)
+    return try await takeFeatureQuery(operation)
   }
 
   func queryFeatureExtension(
@@ -227,6 +246,22 @@ public extension RenderSessionHandle {
       var buffer: mln_buffer = 0
       try checkStatus(mln_render_query_take_result(operation.raw, &buffer))
       return try NativeMemory.copyBuffer(NativeBufferHandle(raw: buffer))
+    }
+  }
+
+  private func takeFeatureQuery(
+    _ operation: NativeOperationHandle
+  ) async throws -> [QueriedFeature] {
+    defer { mln_operation_release(operation.raw) }
+    try await waitForOperation(operation)
+    return try mapNativeFailure {
+      var list: mln_queried_feature_list = 0
+      try checkStatus(mln_render_query_features_take_result(
+        operation.raw, &list
+      ))
+      return try NativeQuery.copyQueriedFeatureList(
+        NativeQueriedFeatureListHandle(raw: list)
+      )
     }
   }
 }

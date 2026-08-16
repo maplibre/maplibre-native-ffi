@@ -4,20 +4,31 @@ import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CValue
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.MemScope
+import kotlinx.cinterop.ULongVar
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.allocArray
 import kotlinx.cinterop.cValue
 import kotlinx.cinterop.get
+import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.sizeOf
+import kotlinx.cinterop.value
 import org.maplibre.nativeffi.geo.ScreenBox
 import org.maplibre.nativeffi.internal.c.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID
 import org.maplibre.nativeffi.internal.c.MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID
 import org.maplibre.nativeffi.internal.c.MLN_FEATURE_STATE_SELECTOR_STATE_KEY
+import org.maplibre.nativeffi.internal.c.MLN_QUERIED_FEATURE_SOURCE_ID
+import org.maplibre.nativeffi.internal.c.MLN_QUERIED_FEATURE_SOURCE_LAYER_ID
+import org.maplibre.nativeffi.internal.c.MLN_QUERIED_FEATURE_STATE
 import org.maplibre.nativeffi.internal.c.MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS
 import org.maplibre.nativeffi.internal.c.MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS
 import org.maplibre.nativeffi.internal.c.mln_buffer_view
 import org.maplibre.nativeffi.internal.c.mln_feature_state_selector
+import org.maplibre.nativeffi.internal.c.mln_queried_feature
+import org.maplibre.nativeffi.internal.c.mln_queried_feature_default
+import org.maplibre.nativeffi.internal.c.mln_queried_feature_list_count
+import org.maplibre.nativeffi.internal.c.mln_queried_feature_list_destroy
+import org.maplibre.nativeffi.internal.c.mln_queried_feature_list_get
 import org.maplibre.nativeffi.internal.c.mln_rendered_feature_query_options
 import org.maplibre.nativeffi.internal.c.mln_rendered_feature_query_options_default
 import org.maplibre.nativeffi.internal.c.mln_rendered_query_geometry
@@ -27,7 +38,11 @@ import org.maplibre.nativeffi.internal.c.mln_rendered_query_geometry_point
 import org.maplibre.nativeffi.internal.c.mln_screen_box
 import org.maplibre.nativeffi.internal.c.mln_source_feature_query_options
 import org.maplibre.nativeffi.internal.c.mln_source_feature_query_options_default
+import org.maplibre.nativeffi.internal.lifecycle.NativeQueriedFeatureList
+import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
+import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.query.FeatureStateSelector
+import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
@@ -93,6 +108,35 @@ internal object QueryStructs {
     return native.ptr
   }
 
+  fun queriedFeatureList(list: NativeQueriedFeatureList): List<QueriedFeature> =
+    queriedFeatureList(
+      list.rawHandleValue,
+      counter = ::mln_queried_feature_list_count,
+      getter = ::mln_queried_feature_list_get,
+      destroyer = ::mln_queried_feature_list_destroy,
+    )
+
+  fun queriedFeatureList(
+    list: ULong,
+    counter: (ULong, CPointer<ULongVar>) -> Int,
+    getter: (ULong, ULong, CPointer<mln_queried_feature>) -> Int,
+    destroyer: (ULong) -> Unit,
+  ): List<QueriedFeature> =
+    try {
+      memScoped {
+        val outCount = alloc<ULongVar>()
+        Status.check(counter(list, outCount.ptr))
+        List(checkedInt(outCount.value, "queried feature count")) { index ->
+          val outFeature = alloc<mln_queried_feature>()
+          mln_queried_feature_default().place(outFeature.ptr)
+          Status.check(getter(list, index.toULong(), outFeature.ptr))
+          queriedFeature(outFeature)
+        }
+      }
+    } finally {
+      destroyer(list)
+    }
+
   fun featureStateSelector(
     value: FeatureStateSelector,
     scope: MemScope,
@@ -126,10 +170,29 @@ internal object QueryStructs {
     max.y = value.max.y
   }
 
+  private fun queriedFeature(value: mln_queried_feature): QueriedFeature {
+    val fields = value.fields
+    return QueriedFeature(
+      ByteStructs.copyBufferView(value.feature),
+      if (fields and MLN_QUERIED_FEATURE_SOURCE_ID != 0u) CoreStructs.stringView(value.source_id)
+      else null,
+      if (fields and MLN_QUERIED_FEATURE_SOURCE_LAYER_ID != 0u)
+        CoreStructs.stringView(value.source_layer_id)
+      else null,
+      if (fields and MLN_QUERIED_FEATURE_STATE != 0u) ByteStructs.copyBufferView(value.state)
+      else null,
+    )
+  }
+
   private fun stringViewArray(values: List<String>, scope: MemScope): CPointer<mln_buffer_view>? {
     if (values.isEmpty()) return null
     val array = scope.allocArray<mln_buffer_view>(values.size)
     values.forEachIndexed { index, value -> CoreStructs.setStringView(array[index], value, scope) }
     return array
+  }
+
+  private fun checkedInt(value: ULong, name: String): Int {
+    require(value <= Int.MAX_VALUE.toULong()) { "$name exceeds Int.MAX_VALUE" }
+    return value.toInt()
   }
 }

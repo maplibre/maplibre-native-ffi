@@ -189,7 +189,7 @@ impl fmt::Debug for FrameOpenGLTextureName<'_> {
 
 mod query;
 pub use query::{
-    FeatureStateSelector, RenderedFeatureQueryOptions, RenderedQueryGeometry,
+    FeatureStateSelector, QueriedFeature, RenderedFeatureQueryOptions, RenderedQueryGeometry,
     SourceFeatureQueryOptions,
 };
 #[derive(Debug, Clone, PartialEq)]

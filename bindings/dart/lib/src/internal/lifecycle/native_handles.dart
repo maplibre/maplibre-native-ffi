@@ -38,6 +38,10 @@ extension type const NativeStyleIdList(int raw) implements NativeHandle {}
 /// Style string list handle id.
 extension type const NativeStyleStringList(int raw) implements NativeHandle {}
 
+/// Queried feature list handle id.
+extension type const NativeQueriedFeatureList(int raw)
+    implements NativeHandle {}
+
 /// Prepared GeoJSON source data handle id.
 extension type const NativeGeoJsonSourceData(int raw) implements NativeHandle {}
 

@@ -8,12 +8,14 @@ static mln_buffer_view view(const char* text) {
   return (mln_buffer_view){.data = text, .size = strlen(text)};
 }
 
-static void read_features(mln_buffer result) {
+static void read_features(mln_queried_feature_list result) {
   // #region read
-  mln_buffer_view json = {0};
-  if (mln_buffer_get(result, &json) != MLN_STATUS_OK) return;
-  // Parse json.data[0..json.size] as the query-envelope array. The bytes remain
-  // valid until result is destroyed.
+  size_t count = 0;
+  if (mln_queried_feature_list_count(result, &count) != MLN_STATUS_OK) return;
+  if (count == 0) return;
+  mln_queried_feature hit = mln_queried_feature_default();
+  if (mln_queried_feature_list_get(result, 0, &hit) != MLN_STATUS_OK) return;
+  // Copy hit.feature and any identifier or state view you keep.
   // #endregion read
 }
 
@@ -40,15 +42,15 @@ void list_source_features(mln_render_session session) {
   if (queried == MLN_STATUS_OK && completed) {
     queried = mln_operation_get_status(operation, &terminal);
   }
-  mln_buffer result = MLN_HANDLE_NULL;
+  mln_queried_feature_list result = MLN_HANDLE_NULL;
   if (queried == MLN_STATUS_OK) queried = terminal;
   if (queried == MLN_STATUS_OK) {
-    queried = mln_render_query_take_result(operation, &result);
+    queried = mln_render_query_features_take_result(operation, &result);
   }
   mln_operation_release(operation);
   if (queried != MLN_STATUS_OK) return;
 
   read_features(result);
-  mln_buffer_destroy(result);
+  mln_queried_feature_list_destroy(result);
   // #endregion query
 }

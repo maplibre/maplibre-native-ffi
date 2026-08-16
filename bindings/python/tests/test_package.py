@@ -290,6 +290,7 @@ def test_public_type_hints_are_resolvable() -> None:
         render.RenderSessionHandle.acquire_opengl_owned_texture_frame,
         render.RenderSessionHandle.query_feature_extensions,
         render.RenderSessionHandle.query_rendered_features,
+        render.RenderSessionHandle.query_source_features,
         render.RenderSessionHandle.set_feature_state,
         mln.RuntimeHandle.create_map,
         mln.RuntimeHandle.create_offline_region,
@@ -351,6 +352,15 @@ def test_public_type_hints_are_resolvable() -> None:
     )
     assert rendered_hints["geometry"] is query.RenderedQueryGeometry
     assert rendered_hints["options"] != typing.Any
+    assert typing.get_origin(rendered_hints["return"]) is offline.OperationHandle
+    assert typing.get_args(rendered_hints["return"]) == (list[query.QueriedFeature],)
+
+    source_hints = typing.get_type_hints(
+        render.RenderSessionHandle.query_source_features
+    )
+    assert source_hints["source_id"] is str
+    assert typing.get_origin(source_hints["return"]) is offline.OperationHandle
+    assert typing.get_args(source_hints["return"]) == (list[query.QueriedFeature],)
 
     response_error_hints = typing.get_type_hints(offline.OfflineRegionResponseError)
     assert response_error_hints["reason"] is resource.ResourceErrorReason
@@ -2196,6 +2206,50 @@ def test_render_descriptors_are_public_python_values() -> None:
     assert webgpu.context.device.address == 0x2345
     assert webgpu.texture_view.address == 0x5678
     assert webgpu.format == 44
+
+
+def test_queried_feature_materializes_native_wire_values() -> None:
+    feature = _json_object(
+        {
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": [2.0, 1.0]},
+            "properties": {"name": "one"},
+            "id": "feature-1",
+        }
+    )
+    state = _json_object({"hover": True})
+
+    materialized = render._cast_queried_features(
+        [
+            {
+                "feature": feature,
+                "source_id": "points",
+                "source_layer_id": None,
+                "state": state,
+            },
+            {
+                "feature": feature,
+                "source_id": None,
+                "source_layer_id": "landuse",
+                "state": None,
+            },
+        ]
+    )
+
+    assert materialized == [
+        query.QueriedFeature(
+            feature=feature,
+            source_id="points",
+            source_layer_id=None,
+            state=state,
+        ),
+        query.QueriedFeature(
+            feature=feature,
+            source_id=None,
+            source_layer_id="landuse",
+            state=None,
+        ),
+    ]
 
 
 def test_invalid_render_target_attach_reports_native_status() -> None:

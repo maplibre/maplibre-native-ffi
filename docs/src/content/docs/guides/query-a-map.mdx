@@ -1,6 +1,6 @@
 ---
 title: Query a map
-description: Find features in the last frame and copy borrowed values before destroying the result.
+description: Find features in the last frame and copy the values you keep.
 sidebar:
   order: 12
 ---
@@ -41,13 +41,12 @@ land fills out of the result.
 
 <Code code={region(querySnippet, "layers")} lang="c" title="query-rendered-features.c" />
 
-On success, the query returns an owned buffer containing a JSON array.
-Destroy it after parsing or copying every value that the host keeps.
+On success, the query returns queried features. Copy every value that the host
+keeps.
 
 <Code code={region(querySnippet, "query")} lang="c" title="query-rendered-features.c" />
 
-Each array entry contains a GeoJSON `feature` object and may contain `sourceId`,
-`sourceLayerId`, and `state`. Borrowing the buffer view does not copy it, and the
-span remains valid until the host destroys the result buffer.
+Each hit is a GeoJSON Feature plus optional source ID, source-layer ID, and
+feature state.
 
 <Code code={region(querySnippet, "read")} lang="c" title="query-rendered-features.c" />

@@ -2,6 +2,7 @@ package org.maplibre.nativeffi.render
 
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.query.FeatureStateSelector
+import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
@@ -70,12 +71,16 @@ public expect class RenderSessionHandle : AutoCloseable {
   public fun startQueryRenderedFeatures(
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions?,
-  ): OperationHandle<ByteArray>
+  ): OperationHandle<List<QueriedFeature>>
 
   public fun startQuerySourceFeatures(
     sourceId: String,
     options: SourceFeatureQueryOptions?,
-  ): OperationHandle<ByteArray>
+  ): OperationHandle<List<QueriedFeature>>
+
+  public fun takeQueryFeaturesResult(
+    operation: OperationHandle<List<QueriedFeature>>
+  ): List<QueriedFeature>
 
   public fun startQueryFeatureExtension(
     sourceId: String,

@@ -14,9 +14,15 @@ import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.CameraUpdate
 import org.maplibre.nativeffi.camera.CameraUpdateMode
 import org.maplibre.nativeffi.error.MaplibreStatus
+import org.maplibre.nativeffi.geo.ScreenBox
+import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.map.MapOptions
+import org.maplibre.nativeffi.query.QueriedFeature
+import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
+import org.maplibre.nativeffi.query.RenderedQueryGeometry
+import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
 import org.maplibre.nativeffi.runtime.OperationHandle
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
@@ -243,6 +249,96 @@ class RenderSessionHandleTest {
       }
     }
 
+  @Test
+  fun featureQueriesReturnTypedQueriedFeatureLists(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val device = MTLCreateSystemDefaultDevice() ?: return@runSuspendTest
+      val runtime = RuntimeHandle.create(RuntimeOptions())
+      try {
+        val map =
+          MapHandle.create(
+            runtime,
+            MapOptions().apply {
+              width = 32
+              height = 16
+              mapMode = MapMode.CONTINUOUS
+            },
+          )
+        try {
+          map.setStyleJson(QUERY_STYLE.encodeToByteArray())
+          runtime.barrier()
+          val attachment =
+            map.attachMetalOwnedTexture(
+              MetalOwnedTextureDescriptor(
+                RenderTargetExtent(32, 16, 1.0),
+                MetalContextDescriptor(NativePointer.ofAddress(device.address())),
+              ),
+              RenderSessionAttachOptions(driver = RenderDriver.CALLER_GRAPHICS_THREAD),
+            )
+          val session = attachment.session
+          try {
+            completeOnDriver(session, attachment.operation)
+
+            // An over-covering box queries everything visible in the viewport.
+            val geometry =
+              RenderedQueryGeometry.Box(ScreenBox(ScreenPoint(0.0, 0.0), ScreenPoint(32.0, 16.0)))
+            val options =
+              RenderedFeatureQueryOptions().apply {
+                layerIds = listOf("point-circle")
+                filter = """["==",["get","kind"],"capital"]""".encodeToByteArray()
+              }
+
+            var rendered: QueriedFeature? = null
+            for (attempt in 0 until 500) {
+              renderOneFrame(session)
+              rendered =
+                takeFeaturesOnDriver(session, session.startQueryRenderedFeatures(geometry, options))
+                  .firstOrNull()
+              if (rendered != null) break
+            }
+            val renderedHit = assertNotNull(rendered)
+            assertEquals("point", renderedHit.sourceId)
+            assertTrue(renderedHit.feature.decodeToString().contains("\"kind\":\"capital\""))
+            assertEquals(null, renderedHit.state)
+
+            val source =
+              takeFeaturesOnDriver(
+                  session,
+                  session.startQuerySourceFeatures(
+                    "point",
+                    SourceFeatureQueryOptions().apply {
+                      filter = """["==",["get","kind"],"capital"]""".encodeToByteArray()
+                    },
+                  ),
+                )
+                .single()
+            assertEquals("point", source.sourceId)
+            assertTrue(source.feature.decodeToString().contains("\"kind\":\"capital\""))
+
+            completeOnDriver(session, session.startDetach())
+          } finally {
+            if (session.snapshot().state != RenderSessionState.DETACHED) {
+              runCatching { session.abandon() }
+            }
+            session.close()
+          }
+        } finally {
+          map.close()
+        }
+      } finally {
+        runtime.close()
+      }
+    }
+
+  private fun takeFeaturesOnDriver(
+    session: RenderSessionHandle,
+    operation: OperationHandle<List<QueriedFeature>>,
+  ): List<QueriedFeature> = operation.use {
+    while (!it.poll()) session.serviceDriverWork()
+    assertEquals(MaplibreStatus.OK, it.terminalStatus(), it.diagnostic())
+    session.takeQueryFeaturesResult(it)
+  }
+
   private fun completeOnDriver(session: RenderSessionHandle, operation: OperationHandle<*>) {
     operation.use {
       while (!it.poll()) session.serviceDriverWork()
@@ -255,5 +351,32 @@ class RenderSessionHandleTest {
   private companion object {
     const val EMPTY_STYLE: String =
       """{"version":8,"sources":{},"layers":[{"id":"background","type":"background"}]}"""
+
+    const val QUERY_STYLE: String =
+      """
+      {
+        "version": 8,
+        "sources": {
+          "point": {
+            "type": "geojson",
+            "data": {
+              "type": "FeatureCollection",
+              "features": [
+                {
+                  "type": "Feature",
+                  "id": "feature-1",
+                  "geometry": {"type": "Point", "coordinates": [0.0, 0.0]},
+                  "properties": {"kind": "capital"}
+                }
+              ]
+            }
+          }
+        },
+        "layers": [
+          {"id": "background", "type": "background"},
+          {"id": "point-circle", "type": "circle", "source": "point", "paint": {"circle-radius": 6}}
+        ]
+      }
+      """
   }
 }

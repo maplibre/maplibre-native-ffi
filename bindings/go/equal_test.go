@@ -484,3 +484,61 @@ func TestQueryOptionsEqualSeparatesAbsentFromEmptyLayerIDs(t *testing.T) {
 		t.Error("absent LayerIDs compares equal to an empty LayerIDs list")
 	}
 }
+
+func TestQueriedFeatureEqualComparesFieldValues(t *testing.T) {
+	assertValueSemantics(
+		t,
+		"QueriedFeature",
+		func() QueriedFeature {
+			return QueriedFeature{
+				Feature:       []byte(`{"type":"Feature"}`),
+				SourceID:      optionPtr("points"),
+				SourceLayerID: optionPtr("layer"),
+				State:         []byte(`{"hover":true}`),
+			}
+		},
+		QueriedFeature.Equal,
+		[]func(*QueriedFeature){
+			func(o *QueriedFeature) { o.Feature = []byte(`{"type":"Feature","id":1}`) },
+			func(o *QueriedFeature) { o.SourceID = optionPtr("other") },
+			func(o *QueriedFeature) { o.SourceLayerID = optionPtr("other-layer") },
+			func(o *QueriedFeature) { o.State = []byte(`{}`) },
+		},
+	)
+}
+
+func TestQueriedFeatureEqualComparesCopiedBuffersByContent(t *testing.T) {
+	feature := []byte(`{"type":"Feature"}`)
+	state := []byte(`{"hover":true}`)
+	left := QueriedFeature{
+		Feature:       append([]byte(nil), feature...),
+		SourceID:      optionPtr("points"),
+		SourceLayerID: optionPtr("layer"),
+		State:         append([]byte(nil), state...),
+	}
+	right := QueriedFeature{
+		Feature:       append([]byte(nil), feature...),
+		SourceID:      optionPtr("points"),
+		SourceLayerID: optionPtr("layer"),
+		State:         append([]byte(nil), state...),
+	}
+	if !left.Equal(right) {
+		t.Fatal("queried features with equal copied buffers do not compare equal")
+	}
+
+	absentState := left
+	absentState.State = nil
+	emptyState := left
+	emptyState.State = []byte{}
+	if absentState.Equal(emptyState) {
+		t.Error("absent state compares equal to a present empty state object")
+	}
+
+	absentSource := left
+	absentSource.SourceID = nil
+	emptySource := left
+	emptySource.SourceID = optionPtr("")
+	if absentSource.Equal(emptySource) {
+		t.Error("absent source ID compares equal to a present empty source ID")
+	}
+}

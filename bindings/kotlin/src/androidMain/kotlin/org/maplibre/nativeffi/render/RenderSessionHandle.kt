@@ -5,12 +5,14 @@ import java.util.concurrent.ConcurrentHashMap
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.LongPointer
 import org.bytedeco.javacpp.Pointer
+import org.bytedeco.javacpp.SizeTPointer
 import org.maplibre.nativeffi.NativeAccess
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ScreenBox
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.internal.javacpp.ByteArrayViewScope
+import org.maplibre.nativeffi.internal.javacpp.JavaCppSupport
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 import org.maplibre.nativeffi.internal.javacpp.ownedBuffer
 import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
@@ -18,6 +20,7 @@ import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.query.FeatureStateSelector
+import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
@@ -320,10 +323,10 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
   public actual fun startQueryRenderedFeatures(
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions?,
-  ): OperationHandle<ByteArray> =
+  ): OperationHandle<List<QueriedFeature>> =
     RenderedQueryGeometryScope(geometry).use { nativeGeometry ->
       RenderedFeatureQueryOptionsScope(options).use { nativeOptions ->
-        bufferOperation {
+        queryFeaturesOperation {
           MaplibreNativeC.mln_render_session_query_rendered_features_start(
             requireLiveHandle(),
             nativeGeometry.geometry,
@@ -337,10 +340,10 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
   public actual fun startQuerySourceFeatures(
     sourceId: String,
     options: SourceFeatureQueryOptions?,
-  ): OperationHandle<ByteArray> =
+  ): OperationHandle<List<QueriedFeature>> =
     StringViewScope(sourceId).use { nativeSourceId ->
       SourceFeatureQueryOptionsScope(options).use { nativeOptions ->
-        bufferOperation {
+        queryFeaturesOperation {
           MaplibreNativeC.mln_render_session_query_source_features_start(
             requireLiveHandle(),
             nativeSourceId.view,
@@ -382,6 +385,19 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
 
   public actual fun takeQueryResult(operation: OperationHandle<ByteArray>): ByteArray =
     takeBuffer(operation, OperationKind.RENDER_QUERY, MaplibreNativeC::mln_render_query_take_result)
+
+  public actual fun takeQueryFeaturesResult(
+    operation: OperationHandle<List<QueriedFeature>>
+  ): List<QueriedFeature> =
+    operation.withResultUse(OperationKind.RENDER_QUERY, OperationResultKind.QUERIED_FEATURE_LIST) {
+      operationId ->
+      LongPointer(1).use { outList ->
+        outList.put(0, 0L)
+        Status.check(MaplibreNativeC.mln_render_query_features_take_result(operationId, outList))
+        operation.markResultConsumed()
+        queriedFeatureList(outList.get())
+      }
+    }
 
   public actual fun startReadPremultipliedRgba8(): OperationHandle<TextureReadback> {
     val operation = startOperation {
@@ -455,6 +471,15 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
     kind: OperationKind = OperationKind.RENDER_QUERY,
     start: (LongPointer) -> Int,
   ): OperationHandle<ByteArray> = operation(startOperation(start), kind, OperationResultKind.BUFFER)
+
+  private fun queryFeaturesOperation(
+    start: (LongPointer) -> Int
+  ): OperationHandle<List<QueriedFeature>> =
+    operation(
+      startOperation(start),
+      OperationKind.RENDER_QUERY,
+      OperationResultKind.QUERIED_FEATURE_LIST,
+    )
 
   internal fun <T> operation(
     id: Long,
@@ -994,6 +1019,40 @@ private fun stringView(value: MaplibreNativeC.mln_buffer_view): String {
   val bytes = ByteArray(size)
   BytePointer(value.data()).get(bytes, 0, size)
   return String(bytes, StandardCharsets.UTF_8)
+}
+
+private fun queriedFeatureList(list: Long): List<QueriedFeature> =
+  try {
+    require(list != 0L) { "mln_queried_feature_list returned the null handle" }
+    SizeTPointer(1).use { outCount ->
+      Status.check(MaplibreNativeC.mln_queried_feature_list_count(list, outCount))
+      List(Math.toIntExact(outCount.get())) { index ->
+        MaplibreNativeC.mln_queried_feature().use { outFeature ->
+          outFeature.size(outFeature.sizeof())
+          Status.check(
+            MaplibreNativeC.mln_queried_feature_list_get(list, index.toLong(), outFeature)
+          )
+          queriedFeature(outFeature)
+        }
+      }
+    }
+  } finally {
+    MaplibreNativeC.mln_queried_feature_list_destroy(list)
+  }
+
+private fun queriedFeature(value: MaplibreNativeC.mln_queried_feature): QueriedFeature {
+  val fields = value.fields()
+  return QueriedFeature(
+    JavaCppSupport.byteArray(value.feature().data(), value.feature().size()),
+    if (fields and MaplibreNativeC.MLN_QUERIED_FEATURE_SOURCE_ID != 0) stringView(value.source_id())
+    else null,
+    if (fields and MaplibreNativeC.MLN_QUERIED_FEATURE_SOURCE_LAYER_ID != 0)
+      stringView(value.source_layer_id())
+    else null,
+    if (fields and MaplibreNativeC.MLN_QUERIED_FEATURE_STATE != 0)
+      JavaCppSupport.byteArray(value.state().data(), value.state().size())
+    else null,
+  )
 }
 
 private fun pointerOrNull(pointer: NativePointer): Pointer? =

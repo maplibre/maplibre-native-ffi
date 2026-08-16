@@ -452,6 +452,60 @@ pub const SourceFeatureQueryOptions = struct {
     filter: ?[]const u8 = null,
 };
 
+/// One copied query hit. `feature` is a GeoJSON Feature. `source_id`,
+/// `source_layer_id`, and `state` are present when the native result set those
+/// fields. `state` is a JSON object.
+pub const QueriedFeature = struct {
+    allocator: std.mem.Allocator,
+    feature: []const u8,
+    source_id: ?[]const u8,
+    source_layer_id: ?[]const u8,
+    state: ?[]const u8,
+
+    pub fn deinit(self: *QueriedFeature) void {
+        self.allocator.free(self.feature);
+        if (self.source_id) |value| self.allocator.free(value);
+        if (self.source_layer_id) |value| self.allocator.free(value);
+        if (self.state) |value| self.allocator.free(value);
+        self.feature = "";
+        self.source_id = null;
+        self.source_layer_id = null;
+        self.state = null;
+    }
+
+    pub fn eql(self: QueriedFeature, other: QueriedFeature) bool {
+        return std.mem.eql(u8, self.feature, other.feature) and
+            optionalSliceEql(self.source_id, other.source_id) and
+            optionalSliceEql(self.source_layer_id, other.source_layer_id) and
+            optionalSliceEql(self.state, other.state);
+    }
+};
+
+pub const QueriedFeatureList = struct {
+    allocator: std.mem.Allocator,
+    items: []QueriedFeature,
+
+    pub fn deinit(self: *QueriedFeatureList) void {
+        for (self.items) |*item| item.deinit();
+        self.allocator.free(self.items);
+        self.items = &.{};
+    }
+
+    pub fn eql(self: QueriedFeatureList, other: QueriedFeatureList) bool {
+        if (self.items.len != other.items.len) return false;
+        for (self.items, other.items) |left, right| {
+            if (!left.eql(right)) return false;
+        }
+        return true;
+    }
+};
+
+fn optionalSliceEql(left: ?[]const u8, right: ?[]const u8) bool {
+    const left_value = left orelse return right == null;
+    const right_value = right orelse return false;
+    return std.mem.eql(u8, left_value, right_value);
+}
+
 pub const MetalOwnedTextureFrameInfo = struct {
     generation: u64,
     width: u32,
@@ -747,7 +801,7 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
         defer lease.release();
         var operation: c.mln_operation = 0;
         try status.checkStatus(c.mln_render_session_query_rendered_features_start(lease.native, &raw_geometry, if (options != null) &raw_options else null, &operation), lease.diagnostic_store);
-        return operationHandle(lease, operation, .render_query, .string);
+        return operationHandle(lease, operation, .render_query, .queried_feature_list);
     }
 
     pub fn querySourceFeaturesStart(self: RenderSessionHandle, allocator: std.mem.Allocator, source_id: []const u8, options: ?SourceFeatureQueryOptions) status.Error!runtime_module.OperationHandle {
@@ -758,8 +812,20 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
         defer lease.release();
         var operation: c.mln_operation = 0;
         try status.checkStatus(c.mln_render_session_query_source_features_start(lease.native, try temp.stringView(source_id), if (options != null) &raw_options else null, &operation), lease.diagnostic_store);
-        return operationHandle(lease, operation, .render_query, .string);
+        return operationHandle(lease, operation, .render_query, .queried_feature_list);
     }
+
+    pub fn takeQueryFeaturesResult(self: RenderSessionHandle, allocator: std.mem.Allocator, operation: runtime_module.OperationHandle) status.Error!QueriedFeatureList {
+        const lease = try renderSessionLease(self);
+        defer lease.release();
+        const required = try operation.require(&lease.runtime, .render_query, .queried_feature_list);
+        defer required.lease.release();
+        var result: c.mln_queried_feature_list = 0;
+        try status.checkStatus(c.mln_render_query_features_take_result(required.lease.native, &result), lease.diagnostic_store);
+        defer c.mln_queried_feature_list_destroy(result);
+        return try copyQueriedFeatureList(allocator, result, lease.diagnostic_store);
+    }
+
     pub fn queryFeatureExtensionStart(self: RenderSessionHandle, allocator: std.mem.Allocator, source_id: []const u8, feature: []const u8, extension: []const u8, extension_field: []const u8, arguments: ?[]const u8) status.Error!runtime_module.OperationHandle {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
@@ -1225,6 +1291,64 @@ fn sourceFeatureQueryOptionsToNative(
         raw.filter = view;
     }
     return raw;
+}
+
+fn copyBufferView(allocator: std.mem.Allocator, view: c.mln_buffer_view) status.Error![]const u8 {
+    if (view.size == 0) return allocator.dupe(u8, "");
+    const data: [*]const u8 = @ptrCast(view.data orelse return error.NativeError);
+    return allocator.dupe(u8, data[0..view.size]);
+}
+
+fn copyOptionalBufferView(
+    allocator: std.mem.Allocator,
+    present: bool,
+    view: c.mln_buffer_view,
+) status.Error!?[]const u8 {
+    if (!present) return null;
+    return try copyBufferView(allocator, view);
+}
+
+fn copyQueriedFeature(
+    allocator: std.mem.Allocator,
+    raw: c.mln_queried_feature,
+) status.Error!QueriedFeature {
+    const feature = try copyBufferView(allocator, raw.feature);
+    errdefer allocator.free(feature);
+    const source_id = try copyOptionalBufferView(allocator, (raw.fields & c.MLN_QUERIED_FEATURE_SOURCE_ID) != 0, raw.source_id);
+    errdefer if (source_id) |value| allocator.free(value);
+    const source_layer_id = try copyOptionalBufferView(allocator, (raw.fields & c.MLN_QUERIED_FEATURE_SOURCE_LAYER_ID) != 0, raw.source_layer_id);
+    errdefer if (source_layer_id) |value| allocator.free(value);
+    const state = try copyOptionalBufferView(allocator, (raw.fields & c.MLN_QUERIED_FEATURE_STATE) != 0, raw.state);
+    errdefer if (state) |value| allocator.free(value);
+    return .{
+        .allocator = allocator,
+        .feature = feature,
+        .source_id = source_id,
+        .source_layer_id = source_layer_id,
+        .state = state,
+    };
+}
+
+fn copyQueriedFeatureList(
+    allocator: std.mem.Allocator,
+    list: c.mln_queried_feature_list,
+    diagnostic_store: ?*diagnostics.DiagnosticStore,
+) status.Error!QueriedFeatureList {
+    var count: usize = 0;
+    try status.checkStatus(c.mln_queried_feature_list_count(list, &count), diagnostic_store);
+    const items = try allocator.alloc(QueriedFeature, count);
+    var initialized: usize = 0;
+    errdefer {
+        for (items[0..initialized]) |*item| item.deinit();
+        allocator.free(items);
+    }
+    for (items, 0..) |*item, index| {
+        var raw = c.mln_queried_feature_default();
+        try status.checkStatus(c.mln_queried_feature_list_get(list, index, &raw), diagnostic_store);
+        item.* = try copyQueriedFeature(allocator, raw);
+        initialized += 1;
+    }
+    return .{ .allocator = allocator, .items = items };
 }
 
 fn stringViewArray(temp: *native_temp.TempStorage, values_list: []const []const u8) status.Error![]c.mln_buffer_view {

@@ -511,6 +511,7 @@ pub(crate) enum OperationKind {
     RenderSetTarget,
     RenderFrameRelease,
     RenderQuery,
+    RenderFeaturesQuery,
     RenderFeatureState,
 }
 

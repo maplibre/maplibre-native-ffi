@@ -2418,6 +2418,18 @@ fn take_json(session: &RenderSessionHandle, operation: OperationHandle<Vec<u8>>)
     serde_json::from_slice(&operation.take().unwrap()).unwrap()
 }
 
+fn take_features(
+    session: &RenderSessionHandle,
+    operation: OperationHandle<Vec<QueriedFeature>>,
+) -> Vec<QueriedFeature> {
+    wait_until_completed(session, &operation);
+    operation.take().unwrap()
+}
+
+fn feature_json(feature: &QueriedFeature) -> JsonValue {
+    serde_json::from_slice(&feature.feature).unwrap()
+}
+
 #[test]
 fn native_pointer_round_trips_address() {
     // SAFETY: The test reconstructs but never dereferences this dummy address.
@@ -2746,7 +2758,7 @@ fn feature_state_and_rendered_queries_copy_native_results() {
             )
             .unwrap();
         wait_until_completed(&session, &query);
-        let features: Vec<JsonValue> = serde_json::from_slice(&query.take().unwrap()).unwrap();
+        let features = query.take().unwrap();
         if !features.is_empty() {
             break features;
         }
@@ -2758,21 +2770,22 @@ fn feature_state_and_rendered_queries_copy_native_results() {
         await_runtime_barrier(&runtime);
         let _ = render_frame(&session, false);
     };
-    let feature = features[0].get("feature").unwrap_or(&features[0]);
-    assert_eq!(feature["id"], "feature-1");
+    assert_eq!(features[0].source_id.as_deref(), Some("point"));
+    assert_eq!(features[0].source_layer_id, None);
+    assert_eq!(feature_json(&features[0])["id"], "feature-1");
+    let rendered_state: JsonValue =
+        serde_json::from_slice(features[0].state.as_deref().unwrap()).unwrap();
+    assert_eq!(rendered_state, json!({"hover": true, "count": 3}));
 
-    let source = take_json(
+    let source_features = take_features(
         &session,
         session.query_source_features("point", None).unwrap(),
     );
-    let source_features = source.as_array().unwrap();
     assert_eq!(source_features.len(), 1);
-    let source_feature = source_features[0]
-        .get("feature")
-        .unwrap_or(&source_features[0]);
-    assert_eq!(source_feature["id"], "feature-1");
+    assert_eq!(source_features[0].source_id.as_deref(), Some("point"));
+    assert_eq!(feature_json(&source_features[0])["id"], "feature-1");
 
-    let oversized = take_json(
+    let oversized = take_features(
         &session,
         session
             .query_rendered_features(
@@ -2784,9 +2797,9 @@ fn feature_state_and_rendered_queries_copy_native_results() {
             )
             .unwrap(),
     );
-    assert_eq!(oversized.as_array().unwrap().len(), 1);
+    assert_eq!(oversized.len(), 1);
 
-    let inverted = take_json(
+    let inverted = take_features(
         &session,
         session
             .query_rendered_features(
@@ -2798,9 +2811,9 @@ fn feature_state_and_rendered_queries_copy_native_results() {
             )
             .unwrap(),
     );
-    assert_eq!(inverted.as_array().unwrap().len(), 1);
+    assert_eq!(inverted.len(), 1);
 
-    let offscreen = take_json(
+    let offscreen = take_features(
         &session,
         session
             .query_rendered_features(
@@ -2812,7 +2825,7 @@ fn feature_state_and_rendered_queries_copy_native_results() {
             )
             .unwrap(),
     );
-    assert!(offscreen.as_array().unwrap().is_empty());
+    assert!(offscreen.is_empty());
 
     finish_unit(&session, session.remove_feature_state(&selector).unwrap());
     close_session(session);
@@ -2865,7 +2878,7 @@ fn cluster_feature_extensions_copy_values_and_feature_collections() {
 
     let deadline = Instant::now() + Duration::from_secs(5);
     let cluster = loop {
-        let queried = take_json(
+        let queried = take_features(
             &session,
             session
                 .query_rendered_features(
@@ -2877,8 +2890,8 @@ fn cluster_feature_extensions_copy_values_and_feature_collections() {
                 )
                 .unwrap(),
         );
-        if let Some(cluster) = queried.as_array().unwrap().first() {
-            break cluster.clone();
+        if let Some(cluster) = queried.into_iter().next() {
+            break cluster;
         }
         assert!(
             Instant::now() < deadline,
@@ -2888,10 +2901,13 @@ fn cluster_feature_extensions_copy_values_and_feature_collections() {
         await_runtime_barrier(&runtime);
         let _ = render_frame(&session, false);
     };
-    let feature = cluster.get("feature").unwrap_or(&cluster);
-    assert_eq!(feature["properties"]["point_count"], 3);
-    assert_eq!(feature["properties"]["weight_sum"].as_f64(), Some(6.0));
-    let feature = serde_json::to_vec(feature).unwrap();
+    let feature_value = feature_json(&cluster);
+    assert_eq!(feature_value["properties"]["point_count"], 3);
+    assert_eq!(
+        feature_value["properties"]["weight_sum"].as_f64(),
+        Some(6.0)
+    );
+    let feature = cluster.feature;
 
     let children = take_json(
         &session,

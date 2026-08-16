@@ -158,22 +158,15 @@ static size_t query_admin_feature_count(
       mln_operation_release(query);
     } else {
       TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, query_status);
-      mln_buffer result = MLN_HANDLE_NULL;
+      mln_queried_feature_list result = MLN_HANDLE_NULL;
       TEST_ASSERT_EQUAL_INT(
-        MLN_STATUS_OK, mln_render_query_take_result(query, &result)
+        MLN_STATUS_OK, mln_render_query_features_take_result(query, &result)
       );
       mln_operation_release(query);
-
-      mln_buffer_view json = {0};
-      TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_buffer_get(result, &json));
-      static const char marker[] = "\"feature\":";
-      for (size_t index = 0; index + sizeof(marker) - 1 <= json.size;
-           index += 1) {
-        if (memcmp(json.data + index, marker, sizeof(marker) - 1) == 0) {
-          count += 1;
-        }
-      }
-      mln_buffer_destroy(result);
+      TEST_ASSERT_EQUAL_INT(
+        MLN_STATUS_OK, mln_queried_feature_list_count(result, &count)
+      );
+      mln_queried_feature_list_destroy(result);
     }
     if (count == 0) {
       mln_test_sleep_millisecond();

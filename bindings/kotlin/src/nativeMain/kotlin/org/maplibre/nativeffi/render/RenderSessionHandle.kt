@@ -259,7 +259,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions?,
   ) = memScoped {
-    bufferOperation {
+    queryFeaturesOperation {
       mln_render_session_query_rendered_features_start(
         id(),
         QueryStructs.renderedQueryGeometry(geometry, this),
@@ -273,7 +273,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
     sourceId: String,
     options: SourceFeatureQueryOptions?,
   ) = memScoped {
-    bufferOperation {
+    queryFeaturesOperation {
       mln_render_session_query_source_features_start(
         id(),
         ByteStructs.bufferView(sourceId.encodeToByteArray(), this),
@@ -306,6 +306,22 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
 
   public actual fun takeQueryResult(operation: OperationHandle<ByteArray>): ByteArray =
     takeBuffer(operation, OperationKind.RENDER_QUERY, ::mln_render_query_take_result)
+
+  public actual fun takeQueryFeaturesResult(
+    operation: OperationHandle<List<QueriedFeature>>
+  ): List<QueriedFeature> =
+    operation.withResultUse(OperationKind.RENDER_QUERY, OperationResultKind.QUERIED_FEATURE_LIST) {
+      op ->
+      memScoped {
+        val out = alloc<ULongVar>()
+        out.value = 0u
+        Status.check(mln_render_query_features_take_result(op, out.ptr))
+        operation.markResultConsumed()
+        QueryStructs.queriedFeatureList(
+          out.value.asHandle("mln_queried_feature_list", ::queriedFeatureListHandle)
+        )
+      }
+    }
 
   public actual fun startReadPremultipliedRgba8(): OperationHandle<TextureReadback> {
     val operation = startOperation { mln_texture_read_premultiplied_rgba8_start(id(), it) }
@@ -373,6 +389,15 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
 
   private fun bufferOperation(start: (CPointer<ULongVar>) -> Int): OperationHandle<ByteArray> =
     operation(startOperation(start), OperationKind.RENDER_QUERY, OperationResultKind.BUFFER)
+
+  private fun queryFeaturesOperation(
+    start: (CPointer<ULongVar>) -> Int
+  ): OperationHandle<List<QueriedFeature>> =
+    operation(
+      startOperation(start),
+      OperationKind.RENDER_QUERY,
+      OperationResultKind.QUERIED_FEATURE_LIST,
+    )
 
   internal fun <T> operation(
     id: ULong,

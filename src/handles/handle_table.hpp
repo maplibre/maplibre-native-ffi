@@ -38,6 +38,7 @@ enum class HandleKind : std::uint8_t {
   AcquiredFrame = 20,
   RenderFrameBatch = 21,
   GeoJsonSourceData = 22,
+  QueriedFeatureList = 23,
 };
 
 inline constexpr auto handle_generation_bits = std::uint32_t{36};

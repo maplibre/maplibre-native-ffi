@@ -112,7 +112,12 @@ void main() {
         final query = await session.queryRenderedFeatures(
           const RenderedQueryPoint(ScreenPoint(16, 16)),
         );
-        expect(jsonDecode(utf8.decode(query)), isA<List<Object?>>());
+        for (final hit in query) {
+          expect(
+            jsonDecode(utf8.decode(hit.feature)),
+            isA<Map<Object?, Object?>>(),
+          );
+        }
 
         await session.detach();
         session.close();

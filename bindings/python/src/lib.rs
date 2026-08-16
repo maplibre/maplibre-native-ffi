@@ -4306,6 +4306,29 @@ impl RenderSessionHandle {
         owned_buffer_to_py(py, out.get())
     }
 
+    fn render_query_features_take_result(
+        &self,
+        py: Python<'_>,
+        operation: u64,
+    ) -> PyResult<Py<PyList>> {
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_queried_feature_list>::new();
+        maplibre_core::check(unsafe {
+            sys::mln_render_query_features_take_result(
+                sys::mln_operation(operation),
+                out.as_mut_ptr(),
+            )
+        })
+        .map_err(map_error)
+        .map_err(operation_result_consumed)?;
+        let native = out
+            .into_live("mln_queried_feature_list")
+            .map_err(map_error)?;
+        // SAFETY: native is an owned queried-feature list returned by native.
+        let features = unsafe { maplibre_core::query::copy_queried_feature_list(native) }
+            .map_err(map_error)?;
+        queried_features_to_py(py, features)
+    }
+
     fn set_feature_state_start(
         &self,
         source_id: String,
@@ -6040,6 +6063,35 @@ fn lat_lng_bounds_core_to_py(
     dict.set_item("southwest", lat_lng_core_to_py(py, &bounds.southwest)?)?;
     dict.set_item("northeast", lat_lng_core_to_py(py, &bounds.northeast)?)?;
     Ok(dict.into_any().unbind())
+}
+
+fn queried_feature_to_py(
+    py: Python<'_>,
+    feature: maplibre_core::QueriedFeature,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("feature", PyBytes::new(py, &feature.feature))?;
+    dict.set_item("source_id", feature.source_id)?;
+    dict.set_item("source_layer_id", feature.source_layer_id)?;
+    dict.set_item(
+        "state",
+        feature
+            .state
+            .as_deref()
+            .map(|bytes| PyBytes::new(py, bytes)),
+    )?;
+    Ok(dict.into_any().unbind())
+}
+
+fn queried_features_to_py(
+    py: Python<'_>,
+    features: Vec<maplibre_core::QueriedFeature>,
+) -> PyResult<Py<PyList>> {
+    let list = PyList::empty(py);
+    for feature in features {
+        list.append(queried_feature_to_py(py, feature)?)?;
+    }
+    Ok(list.unbind())
 }
 
 fn source_info_to_py(py: Python<'_>, info: maplibre_core::SourceInfo) -> PyResult<Py<PyAny>> {

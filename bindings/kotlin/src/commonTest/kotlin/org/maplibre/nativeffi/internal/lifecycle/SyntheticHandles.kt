@@ -29,5 +29,8 @@ internal object SyntheticHandles {
   fun resourceRequest(ordinal: Long = 1): NativeResourceRequest =
     NativeResourceRequest(kind(0x0C) or ordinal)
 
+  fun queriedFeatureList(ordinal: Long = 1): NativeQueriedFeatureList =
+    NativeQueriedFeatureList(kind(0x0F) or ordinal)
+
   private fun kind(value: Int): Long = value.toLong() shl 56
 }

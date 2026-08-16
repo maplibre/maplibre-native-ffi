@@ -577,7 +577,7 @@ final class RenderSessionHandle implements Finalizable {
     (out) => raw.mln_render_session_dump_debug_logs_start(_handle.raw, out),
   );
 
-  Future<Uint8List> queryRenderedFeatures(
+  Future<List<QueriedFeature>> queryRenderedFeatures(
     RenderedQueryGeometry geometry, {
     RenderedFeatureQueryOptions? options,
   }) => withNativeArena((arena) {
@@ -596,18 +596,10 @@ final class RenderSessionHandle implements Finalizable {
         operation,
       ),
     );
-    final id = operation.value;
-    return _runtime._takeOperation(
-      id,
-      () => withNativeArena((resultArena) {
-        final result = resultArena<Uint64>()..value = 0;
-        _check(raw.mln_render_query_take_result(id, result));
-        return copyOwnedBuffer(NativeOwnedBufferHandle(result.value));
-      }),
-    );
+    return _takeQueriedFeaturesOperation(operation.value);
   });
 
-  Future<Uint8List> querySourceFeatures(
+  Future<List<QueriedFeature>> querySourceFeatures(
     String sourceId, {
     SourceFeatureQueryOptions? options,
   }) => withNativeArena((arena) {
@@ -624,10 +616,7 @@ final class RenderSessionHandle implements Finalizable {
         operation,
       ),
     );
-    return _takeBufferOperation(
-      operation.value,
-      raw.mln_render_query_take_result,
-    );
+    return _takeQueriedFeaturesOperation(operation.value);
   });
 
   Future<Uint8List> queryFeatureExtensions({
@@ -669,6 +658,17 @@ final class RenderSessionHandle implements Finalizable {
       return copyOwnedBuffer(NativeOwnedBufferHandle(result.value));
     });
   });
+
+  Future<List<QueriedFeature>> _takeQueriedFeaturesOperation(int operation) =>
+      _runtime._takeOperation(operation, () {
+        return withNativeArena((arena) {
+          final result = arena<Uint64>()..value = 0;
+          _check(raw.mln_render_query_features_take_result(operation, result));
+          return _copyQueriedFeatureList(
+            NativeQueriedFeatureList(result.value),
+          );
+        });
+      });
 
   Future<void> setFeatureState(
     FeatureStateSelector selector,

@@ -12,6 +12,7 @@ from ._enum import UnknownIntEnum
 from ._lifecycle import NativeHandleMixin
 from .query import (
     FeatureStateSelector,
+    QueriedFeature,
     RenderedFeatureQueryOptions,
     RenderedQueryGeometry,
     SourceFeatureQueryOptions,
@@ -31,6 +32,12 @@ def _identity(value: object) -> object:
 
 def _cast_bytes(value: object) -> bytes:
     return cast(bytes, value)
+
+
+def _cast_queried_features(value: object) -> list[QueriedFeature]:
+    return [
+        QueriedFeature._from_native(raw) for raw in cast("list[dict[str, Any]]", value)
+    ]
 
 
 class RenderBackend(IntFlag):
@@ -997,14 +1004,14 @@ class RenderSessionHandle(NativeHandleMixin):
         self,
         geometry: RenderedQueryGeometry,
         options: RenderedFeatureQueryOptions | None = None,
-    ) -> OperationHandle[bytes]:
+    ) -> OperationHandle[list[QueriedFeature]]:
         """Start a rendered-feature query."""
         from .query import _geometry_to_native_wire
 
         return self._operation(
             self._native.query_rendered_features_start,
-            self._native.render_query_take_result,
-            _cast_bytes,
+            self._native.render_query_features_take_result,
+            _cast_queried_features,
             _geometry_to_native_wire(geometry),
             options.layer_ids if options is not None else None,
             options.filter if options is not None else None,
@@ -1014,12 +1021,12 @@ class RenderSessionHandle(NativeHandleMixin):
         self,
         source_id: str,
         options: SourceFeatureQueryOptions | None = None,
-    ) -> OperationHandle[bytes]:
+    ) -> OperationHandle[list[QueriedFeature]]:
         """Start a source-feature query."""
         return self._operation(
             self._native.query_source_features_start,
-            self._native.render_query_take_result,
-            _cast_bytes,
+            self._native.render_query_features_take_result,
+            _cast_queried_features,
             source_id,
             options.source_layer_ids if options is not None else None,
             options.filter if options is not None else None,

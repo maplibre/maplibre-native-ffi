@@ -16,6 +16,8 @@
 extern "C" {
 #endif
 
+typedef uint64_t mln_queried_feature_list;
+
 /** Rendered feature query geometry variants. */
 typedef enum mln_rendered_query_geometry_type : uint32_t {
   MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT = 1,
@@ -86,6 +88,29 @@ typedef struct mln_source_feature_query_options {
   const mln_buffer_view* filter;
 } mln_source_feature_query_options;
 
+/** Optional fields for mln_queried_feature. */
+typedef enum mln_queried_feature_field : uint32_t {
+  MLN_QUERIED_FEATURE_SOURCE_ID = 1U << 0U,
+  MLN_QUERIED_FEATURE_SOURCE_LAYER_ID = 1U << 1U,
+  MLN_QUERIED_FEATURE_STATE = 1U << 2U,
+} mln_queried_feature_field;
+
+/**
+ * One query hit borrowed from a queried-feature list.
+ *
+ * Views remain valid until the owner list is destroyed. feature is one UTF-8
+ * GeoJSON Feature. source_id, source_layer_id, and state are present when the
+ * matching field bit is set. state is a UTF-8 JSON object.
+ */
+typedef struct mln_queried_feature {
+  uint32_t size;
+  uint32_t fields;
+  mln_buffer_view feature;
+  mln_buffer_view source_id;
+  mln_buffer_view source_layer_id;
+  mln_buffer_view state;
+} mln_queried_feature;
+
 /** Returns default rendered feature query options. */
 MLN_API mln_rendered_feature_query_options
 mln_rendered_feature_query_options_default(void) MLN_NOEXCEPT;
@@ -107,12 +132,56 @@ MLN_API mln_rendered_query_geometry mln_rendered_query_geometry_line_string(
   const mln_screen_point* points, size_t point_count
 ) MLN_NOEXCEPT;
 
+/** Returns a default queried-feature descriptor. */
+MLN_API mln_queried_feature mln_queried_feature_default(void) MLN_NOEXCEPT;
+
+/**
+ * Gets the number of hits in a queried-feature list handle.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when list is null or not live, or out_count is
+ *   null.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_queried_feature_list_count(
+  mln_queried_feature_list list, size_t* out_count
+) MLN_NOEXCEPT;
+
+/**
+ * Borrows one queried feature from a list handle.
+ *
+ * On success, *out_feature receives views into list-owned storage. The views
+ * remain valid until the list is destroyed. out_feature->size must be at least
+ * sizeof(mln_queried_feature).
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when list is null or not live, index is out of
+ *   range, out_feature is null, or out_feature->size is too small.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_queried_feature_list_get(
+  mln_queried_feature_list list, size_t index, mln_queried_feature* out_feature
+) MLN_NOEXCEPT;
+
+/** Destroys a queried-feature list handle. Null is accepted as a no-op. */
+MLN_API void mln_queried_feature_list_destroy(
+  mln_queried_feature_list list
+) MLN_NOEXCEPT;
+
 /**
  * Starts a rendered-feature query against the session's latest driver state.
  *
  * All inputs are copied before return. Core-worker sessions execute on their
  * worker. Caller-driver sessions publish driver work and complete only after
- * the host services it on the graphics thread.
+ * the host services it on the graphics thread. Take the completed result with
+ * mln_render_query_features_take_result().
+ *
+ * Box geometry is normalized and clipped to the viewport, so a box that
+ * over-covers the viewport queries everything visible. A box that lies entirely
+ * outside the viewport yields an empty result. Point and line-string geometry
+ * are queried as given.
  */
 MLN_API mln_status mln_render_session_query_rendered_features_start(
   mln_render_session session, const mln_rendered_query_geometry* geometry,
@@ -120,13 +189,19 @@ MLN_API mln_status mln_render_session_query_rendered_features_start(
   mln_operation* out_operation
 ) MLN_NOEXCEPT;
 
-/** Starts a source-feature query against the session's latest driver state. */
+/**
+ * Starts a source-feature query against the session's latest driver state.
+ * Take the completed result with mln_render_query_features_take_result().
+ */
 MLN_API mln_status mln_render_session_query_source_features_start(
   mln_render_session session, mln_buffer_view source_id,
   const mln_source_feature_query_options* options, mln_operation* out_operation
 ) MLN_NOEXCEPT;
 
-/** Starts a feature-extension query against the latest driver state. */
+/**
+ * Starts a feature-extension query against the latest driver state. Take the
+ * completed result with mln_render_query_take_result().
+ */
 MLN_API mln_status mln_render_session_query_feature_extensions_start(
   mln_render_session session, mln_buffer_view source_id,
   mln_buffer_view feature, mln_buffer_view extension,
@@ -134,7 +209,19 @@ MLN_API mln_status mln_render_session_query_feature_extensions_start(
   mln_operation* out_operation
 ) MLN_NOEXCEPT;
 
-/** Takes the owned JSON bytes from a completed render query operation. */
+/**
+ * Takes the owned queried-feature list from a completed rendered- or
+ * source-feature query operation. Destroy the list with
+ * mln_queried_feature_list_destroy().
+ */
+MLN_API mln_status mln_render_query_features_take_result(
+  mln_operation operation, mln_queried_feature_list* out_result
+) MLN_NOEXCEPT;
+
+/**
+ * Takes the owned JSON bytes from a completed feature-extension query
+ * operation.
+ */
 MLN_API mln_status mln_render_query_take_result(
   mln_operation operation, mln_buffer* out_result
 ) MLN_NOEXCEPT;

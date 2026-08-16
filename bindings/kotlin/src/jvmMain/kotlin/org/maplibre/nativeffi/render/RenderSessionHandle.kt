@@ -8,6 +8,7 @@ import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.query.FeatureStateSelector
+import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
@@ -163,14 +164,26 @@ internal constructor(private val ownerMap: MapHandle, private val handle: Native
   public actual fun startQueryRenderedFeatures(
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions?,
-  ): OperationHandle<ByteArray> =
-    queryOperation(NativeAccess.startQueryRenderedFeatures(requireLiveHandle(), geometry, options))
+  ): OperationHandle<List<QueriedFeature>> =
+    queryFeaturesOperation(
+      NativeAccess.startQueryRenderedFeatures(requireLiveHandle(), geometry, options)
+    )
 
   public actual fun startQuerySourceFeatures(
     sourceId: String,
     options: SourceFeatureQueryOptions?,
-  ): OperationHandle<ByteArray> =
-    queryOperation(NativeAccess.startQuerySourceFeatures(requireLiveHandle(), sourceId, options))
+  ): OperationHandle<List<QueriedFeature>> =
+    queryFeaturesOperation(
+      NativeAccess.startQuerySourceFeatures(requireLiveHandle(), sourceId, options)
+    )
+
+  public actual fun takeQueryFeaturesResult(
+    operation: OperationHandle<List<QueriedFeature>>
+  ): List<QueriedFeature> =
+    operation.withResultUse(OperationKind.RENDER_QUERY, OperationResultKind.QUERIED_FEATURE_LIST) {
+      id ->
+      NativeAccess.takeQueryFeaturesResult(id).also { operation.markResultConsumed() }
+    }
 
   public actual fun startQueryFeatureExtension(
     sourceId: String,
@@ -247,6 +260,9 @@ internal constructor(private val ownerMap: MapHandle, private val handle: Native
 
   private fun queryOperation(id: Long): OperationHandle<ByteArray> =
     operation(id, OperationKind.RENDER_QUERY, OperationResultKind.BUFFER)
+
+  private fun queryFeaturesOperation(id: Long): OperationHandle<List<QueriedFeature>> =
+    operation(id, OperationKind.RENDER_QUERY, OperationResultKind.QUERIED_FEATURE_LIST)
 
   private fun <T> operation(
     id: Long,

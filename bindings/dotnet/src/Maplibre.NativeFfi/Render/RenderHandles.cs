@@ -530,7 +530,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             cancellationToken
         );
 
-    public Task<byte[]> QueryRenderedFeaturesAsync(
+    public Task<IReadOnlyList<QueriedFeature>> QueryRenderedFeaturesAsync(
         RenderedQueryGeometry geometry,
         RenderedFeatureQueryOptions? options,
         CancellationToken cancellationToken = default
@@ -551,10 +551,10 @@ public sealed unsafe class RenderSessionHandle : IDisposable
                 &operation
             )
         );
-        return AwaitBufferOperationAsync(operation, TakeRenderQueryResult, cancellationToken);
+        return AwaitBufferOperationAsync(operation, TakeQueriedFeaturesResult, cancellationToken);
     }
 
-    public Task<byte[]> QuerySourceFeaturesAsync(
+    public Task<IReadOnlyList<QueriedFeature>> QuerySourceFeaturesAsync(
         string sourceId,
         SourceFeatureQueryOptions? options,
         CancellationToken cancellationToken = default
@@ -574,7 +574,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
                 &operation
             )
         );
-        return AwaitBufferOperationAsync(operation, TakeRenderQueryResult, cancellationToken);
+        return AwaitBufferOperationAsync(operation, TakeQueriedFeaturesResult, cancellationToken);
     }
 
     public Task<byte[]> QueryFeatureExtensionAsync(
@@ -861,6 +861,57 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         MlnBuffer value = default;
         NativeStatus.Check(NativeMethods.mln_render_query_take_result(operation, &value));
         return ValueStructs.ReadBuffer(value);
+    }
+
+    private static IReadOnlyList<QueriedFeature> TakeQueriedFeaturesResult(MlnOperation operation)
+    {
+        MlnQueriedFeatureList list = default;
+        NativeStatus.Check(NativeMethods.mln_render_query_features_take_result(operation, &list));
+        return CopyQueriedFeatureList(list);
+    }
+
+    private static IReadOnlyList<QueriedFeature> CopyQueriedFeatureList(MlnQueriedFeatureList list)
+    {
+        if (list.IsNull)
+        {
+            return [];
+        }
+
+        try
+        {
+            nuint count = 0;
+            NativeStatus.Check(NativeMethods.mln_queried_feature_list_count(list, &count));
+            var features = new QueriedFeature[checked((int)count)];
+            for (var index = 0; index < features.Length; index++)
+            {
+                var native = NativeMethods.mln_queried_feature_default();
+                NativeStatus.Check(
+                    NativeMethods.mln_queried_feature_list_get(list, (nuint)index, &native)
+                );
+                var fields = (mln_queried_feature_field)native.fields;
+                features[index] = new QueriedFeature(
+                    ValueStructs.CopyBufferView(native.feature),
+                    fields.HasFlag(mln_queried_feature_field.MLN_QUERIED_FEATURE_SOURCE_ID)
+                        ? RuntimeStructs.CopyUtf8(native.source_id.data, native.source_id.size)
+                        : null,
+                    fields.HasFlag(mln_queried_feature_field.MLN_QUERIED_FEATURE_SOURCE_LAYER_ID)
+                        ? RuntimeStructs.CopyUtf8(
+                            native.source_layer_id.data,
+                            native.source_layer_id.size
+                        )
+                        : null,
+                    fields.HasFlag(mln_queried_feature_field.MLN_QUERIED_FEATURE_STATE)
+                        ? ValueStructs.CopyBufferView(native.state)
+                        : null
+                );
+            }
+
+            return features;
+        }
+        finally
+        {
+            NativeMethods.mln_queried_feature_list_destroy(list);
+        }
     }
 
     internal static RenderFrameResult FromNative(mln_render_frame_result value) =>

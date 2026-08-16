@@ -13,6 +13,7 @@ internal value class OperationResultKind(internal val nativeValue: Int) {
     internal val REGION_STATUS: OperationResultKind = OperationResultKind(4)
     internal val BUFFER: OperationResultKind = OperationResultKind(5)
     internal val TEXTURE_READBACK: OperationResultKind = OperationResultKind(6)
+    internal val QUERIED_FEATURE_LIST: OperationResultKind = OperationResultKind(7)
 
     internal fun fromNative(nativeValue: UInt): OperationResultKind =
       fromNative(nativeValue.toInt())

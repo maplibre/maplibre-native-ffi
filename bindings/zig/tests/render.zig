@@ -40,6 +40,45 @@ test "supported OpenGL context providers are exposed semantically" {
     }
 }
 
+test "queried features compare copied buffers by content" {
+    const feature = "{\"type\":\"Feature\"}";
+    const state = "{\"hover\":true}";
+    var left = maplibre.QueriedFeature{
+        .allocator = testing.allocator,
+        .feature = try testing.allocator.dupe(u8, feature),
+        .source_id = try testing.allocator.dupe(u8, "points"),
+        .source_layer_id = try testing.allocator.dupe(u8, "layer"),
+        .state = try testing.allocator.dupe(u8, state),
+    };
+    defer left.deinit();
+    var right = maplibre.QueriedFeature{
+        .allocator = testing.allocator,
+        .feature = try testing.allocator.dupe(u8, feature),
+        .source_id = try testing.allocator.dupe(u8, "points"),
+        .source_layer_id = try testing.allocator.dupe(u8, "layer"),
+        .state = try testing.allocator.dupe(u8, state),
+    };
+    defer right.deinit();
+    try testing.expect(left.eql(right));
+
+    var other_feature = right;
+    other_feature.feature = try testing.allocator.dupe(u8, "{\"type\":\"Feature\",\"id\":1}");
+    defer testing.allocator.free(other_feature.feature);
+    try testing.expect(!left.eql(other_feature));
+
+    var absent_state = right;
+    absent_state.state = null;
+    var empty_state = right;
+    empty_state.state = &.{};
+    try testing.expect(!absent_state.eql(empty_state));
+
+    var absent_source = right;
+    absent_source.source_id = null;
+    var empty_source = right;
+    empty_source.source_id = "";
+    try testing.expect(!absent_source.eql(empty_source));
+}
+
 fn hasNonZeroByte(bytes: []const u8) bool {
     for (bytes) |byte| {
         if (byte != 0) return true;
@@ -574,6 +613,12 @@ fn takeQueryResult(session: maplibre.RenderSessionHandle, operation: maplibre.Op
     defer operation.release();
     try waitOperationSuccess(session, operation);
     return session.takeQueryResult(testing.allocator, operation);
+}
+
+fn takeQueryFeaturesResult(session: maplibre.RenderSessionHandle, operation: maplibre.OperationHandle) !maplibre.QueriedFeatureList {
+    defer operation.release();
+    try waitOperationSuccess(session, operation);
+    return session.takeQueryFeaturesResult(testing.allocator, operation);
 }
 
 fn finishAttachment(attachment: maplibre.RenderSessionAttachment) !maplibre.RenderSessionHandle {
@@ -1226,11 +1271,6 @@ fn firstJsonArrayElement(json: []const u8) ?[]const u8 {
     return json[cursor .. jsonValueEnd(json, cursor) orelse return null];
 }
 
-fn queriedFeature(result: []const u8) ?[]const u8 {
-    const queried = firstJsonArrayElement(result) orelse return null;
-    return rawJsonMember(queried, "feature") orelse queried;
-}
-
 fn firstLeafName(collection: []const u8) ?[]const u8 {
     const features = rawJsonMember(collection, "features") orelse return null;
     const feature = firstJsonArrayElement(features) orelse return null;
@@ -1264,23 +1304,35 @@ test "feature state and rendered queries copy operation results" {
     try testing.expect(std.mem.indexOf(u8, state.value, "\"hover\":true") != null);
 
     for (0..1000) |_| {
-        const query_operation = try owned.session.queryRenderedFeaturesStart(
-            testing.allocator,
-            .{ .box = .{
-                .min = .{ .x = 0, .y = 0 },
-                .max = .{ .x = 64, .y = 64 },
-            } },
-            null,
+        var result = try takeQueryFeaturesResult(
+            owned.session,
+            try owned.session.queryRenderedFeaturesStart(
+                testing.allocator,
+                .{ .box = .{
+                    .min = .{ .x = 0, .y = 0 },
+                    .max = .{ .x = 64, .y = 64 },
+                } },
+                null,
+            ),
         );
-        defer query_operation.release();
-        try waitOperationSuccess(owned.session, query_operation);
-        var result = try owned.session.takeQueryResult(testing.allocator, query_operation);
         defer result.deinit();
-        if (!std.mem.eql(u8, std.mem.trim(u8, result.value, " \t\r\n"), "[]")) break;
+        if (result.items.len != 0 and result.items[0].state != null) {
+            try testing.expectEqualStrings("point", result.items[0].source_id.?);
+            try testing.expect(std.mem.indexOf(u8, result.items[0].state.?, "\"hover\":true") != null);
+            break;
+        }
         _ = try map.requestRepaint();
         try awaitRuntimeBarrier(&runtime);
         _ = try renderFrame(owned.session, false);
     } else return error.RenderedFeatureNotQueryable;
+
+    var source = try takeQueryFeaturesResult(
+        owned.session,
+        try owned.session.querySourceFeaturesStart(testing.allocator, "point", null),
+    );
+    defer source.deinit();
+    try testing.expectEqualStrings("point", source.items[0].source_id.?);
+    try testing.expect(std.mem.indexOf(u8, source.items[0].feature, "\"type\":\"Point\"") != null);
 
     try finishOperation(
         owned.session,
@@ -1301,9 +1353,9 @@ test "cluster feature extensions copy values and feature collections" {
     try awaitRuntimeBarrier(&runtime);
     _ = try renderFrame(owned.session, false);
 
-    var cluster_result: ?maplibre.OwnedString = null;
+    var cluster_result: ?maplibre.QueriedFeatureList = null;
     for (0..1000) |_| {
-        var result = try takeQueryResult(
+        var result = try takeQueryFeaturesResult(
             owned.session,
             try owned.session.queryRenderedFeaturesStart(
                 testing.allocator,
@@ -1314,7 +1366,7 @@ test "cluster feature extensions copy values and feature collections" {
                 null,
             ),
         );
-        if (queriedFeature(result.value) != null) {
+        if (result.items.len != 0) {
             cluster_result = result;
             break;
         }
@@ -1325,7 +1377,7 @@ test "cluster feature extensions copy values and feature collections" {
     }
     var clusters = cluster_result orelse return error.ClusterFeatureNotQueryable;
     defer clusters.deinit();
-    const feature = queriedFeature(clusters.value).?;
+    const feature = clusters.items[0].feature;
     const properties = rawJsonMember(feature, "properties").?;
     _ = try std.fmt.parseInt(u64, rawJsonMember(properties, "cluster_id").?, 10);
     try testing.expectEqualStrings("3", rawJsonMember(properties, "point_count").?);

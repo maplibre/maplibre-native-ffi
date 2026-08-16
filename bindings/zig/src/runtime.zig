@@ -229,6 +229,7 @@ pub const OperationResultKind = enum {
     optional_string,
     string,
     string_list,
+    queried_feature_list,
     style_transition_options,
     optional_style_image_info,
     optional_image_stretches,

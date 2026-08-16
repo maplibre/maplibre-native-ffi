@@ -73,6 +73,7 @@ public sealed class PublicApiSurfaceTests
             "Maplibre.NativeFfi.Offline.OfflineRegionInfo",
             "Maplibre.NativeFfi.Offline.OfflineRegionStatus",
             "Maplibre.NativeFfi.Query.FeatureStateSelector",
+            "Maplibre.NativeFfi.Query.QueriedFeature",
             "Maplibre.NativeFfi.Query.RenderedFeatureQueryOptions",
             "Maplibre.NativeFfi.Query.RenderedQueryGeometry",
             "Maplibre.NativeFfi.Query.RenderedQueryGeometry+Box",
