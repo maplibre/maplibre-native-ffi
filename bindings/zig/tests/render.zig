@@ -67,6 +67,45 @@ test "supported OpenGL context providers are exposed semantically" {
     }
 }
 
+test "queried features compare copied buffers by content" {
+    const feature = "{\"type\":\"Feature\"}";
+    const state = "{\"hover\":true}";
+    var left = maplibre.QueriedFeature{
+        .allocator = testing.allocator,
+        .feature = try testing.allocator.dupe(u8, feature),
+        .source_id = try testing.allocator.dupe(u8, "points"),
+        .source_layer_id = try testing.allocator.dupe(u8, "layer"),
+        .state = try testing.allocator.dupe(u8, state),
+    };
+    defer left.deinit();
+    var right = maplibre.QueriedFeature{
+        .allocator = testing.allocator,
+        .feature = try testing.allocator.dupe(u8, feature),
+        .source_id = try testing.allocator.dupe(u8, "points"),
+        .source_layer_id = try testing.allocator.dupe(u8, "layer"),
+        .state = try testing.allocator.dupe(u8, state),
+    };
+    defer right.deinit();
+    try testing.expect(left.eql(right));
+
+    var other_feature = right;
+    other_feature.feature = try testing.allocator.dupe(u8, "{\"type\":\"Feature\",\"id\":1}");
+    defer testing.allocator.free(other_feature.feature);
+    try testing.expect(!left.eql(other_feature));
+
+    var absent_state = right;
+    absent_state.state = null;
+    var empty_state = right;
+    empty_state.state = &.{};
+    try testing.expect(!absent_state.eql(empty_state));
+
+    var absent_source = right;
+    absent_source.source_id = null;
+    var empty_source = right;
+    empty_source.source_id = "";
+    try testing.expect(!absent_source.eql(empty_source));
+}
+
 fn waitForRenderedFeatureQuery(
     runtime: *maplibre.RuntimeHandle,
     session: *maplibre.RenderSessionHandle,

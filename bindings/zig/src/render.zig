@@ -415,6 +415,13 @@ pub const QueriedFeature = struct {
         self.source_layer_id = null;
         self.state = null;
     }
+
+    pub fn eql(self: QueriedFeature, other: QueriedFeature) bool {
+        return std.mem.eql(u8, self.feature, other.feature) and
+            optionalSliceEql(self.source_id, other.source_id) and
+            optionalSliceEql(self.source_layer_id, other.source_layer_id) and
+            optionalSliceEql(self.state, other.state);
+    }
 };
 
 pub const QueriedFeatureList = struct {
@@ -426,7 +433,21 @@ pub const QueriedFeatureList = struct {
         self.allocator.free(self.items);
         self.items = &.{};
     }
+
+    pub fn eql(self: QueriedFeatureList, other: QueriedFeatureList) bool {
+        if (self.items.len != other.items.len) return false;
+        for (self.items, other.items) |left, right| {
+            if (!left.eql(right)) return false;
+        }
+        return true;
+    }
 };
+
+fn optionalSliceEql(left: ?[]const u8, right: ?[]const u8) bool {
+    const left_value = left orelse return right == null;
+    const right_value = right orelse return false;
+    return std.mem.eql(u8, left_value, right_value);
+}
 
 pub const MetalOwnedTextureFrameInfo = struct {
     generation: u64,
