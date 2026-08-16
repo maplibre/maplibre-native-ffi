@@ -34,7 +34,7 @@ namespace Maplibre.NativeFfi.Internal.C
         [NativeTypeName("uint32_t")]
         public uint type;
 
-        [NativeTypeName("__AnonymousRecord_query_L52_C3")]
+        [NativeTypeName("__AnonymousRecord_query_L51_C3")]
         public _data_e__Union data;
 
         [StructLayout(LayoutKind.Explicit)]
