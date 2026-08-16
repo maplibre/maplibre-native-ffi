@@ -56,6 +56,8 @@ auto handle_kind_name(std::uint8_t kind) noexcept -> const char* {
       return "mln_style_string_list";
     case HandleKind::GeoJsonSourceData:
       return "mln_geojson_source_data";
+    case HandleKind::QueriedFeatureList:
+      return "mln_queried_feature_list";
   }
   return nullptr;
 }

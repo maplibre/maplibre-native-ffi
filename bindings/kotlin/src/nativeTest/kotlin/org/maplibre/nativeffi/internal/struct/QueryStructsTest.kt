@@ -1,10 +1,12 @@
 package org.maplibre.nativeffi.internal.struct
 
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.get
@@ -12,15 +14,20 @@ import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.set
 import org.maplibre.nativeffi.error.InvalidArgumentException
+import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.geo.ScreenBox
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.internal.c.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID
 import org.maplibre.nativeffi.internal.c.MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID
 import org.maplibre.nativeffi.internal.c.MLN_FEATURE_STATE_SELECTOR_STATE_KEY
+import org.maplibre.nativeffi.internal.c.MLN_QUERIED_FEATURE_SOURCE_ID
+import org.maplibre.nativeffi.internal.c.MLN_QUERIED_FEATURE_STATE
 import org.maplibre.nativeffi.internal.c.MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS
 import org.maplibre.nativeffi.internal.c.MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX
 import org.maplibre.nativeffi.internal.c.MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING
 import org.maplibre.nativeffi.internal.c.MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS
+import org.maplibre.nativeffi.internal.lifecycle.SyntheticHandles
+import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
 import org.maplibre.nativeffi.query.FeatureStateSelector
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
@@ -102,5 +109,56 @@ class QueryStructsTest : org.maplibre.nativeffi.NativeTestBase() {
     selector.featureId = null
     assertFalse(selector.featureId != null)
     assertFalse(selector.stateKey != null)
+  }
+
+  @Test
+  fun queriedFeatureListCopiesHitsAndDestroysNativeHandle() {
+    var destroys = 0
+    val feature = """{"type":"Feature","id":"feature-1"}""".encodeToByteArray()
+    val state = """{"hover":true}""".encodeToByteArray()
+    val hits = memScoped {
+      QueryStructs.queriedFeatureList(
+        SyntheticHandles.queriedFeatureList().rawHandleValue,
+        counter = { _, outCount ->
+          outCount[0] = 1UL
+          MaplibreStatus.OK.nativeCode
+        },
+        getter = { _, _, outFeature ->
+          val native = outFeature.pointed
+          ByteStructs.setBufferView(native.feature, feature, this)
+          native.fields = MLN_QUERIED_FEATURE_SOURCE_ID or MLN_QUERIED_FEATURE_STATE
+          CoreStructs.setStringView(native.source_id, "point", this)
+          ByteStructs.setBufferView(native.state, state, this)
+          MaplibreStatus.OK.nativeCode
+        },
+        destroyer = { destroys++ },
+      )
+    }
+
+    assertEquals(1, hits.size)
+    assertContentEquals(feature, hits[0].feature)
+    assertEquals("point", hits[0].sourceId)
+    assertNull(hits[0].sourceLayerId)
+    assertContentEquals(state, hits[0].state)
+    assertEquals(1, destroys)
+  }
+
+  @Test
+  fun queriedFeatureListDestroysNativeHandleWhenCopyFails() {
+    memScoped {
+      var destroys = 0
+      assertFailsWith<IllegalArgumentException> {
+        QueryStructs.queriedFeatureList(
+          SyntheticHandles.queriedFeatureList().rawHandleValue,
+          counter = { _, outCount ->
+            outCount[0] = Int.MAX_VALUE.toULong() + 1UL
+            MaplibreStatus.OK.nativeCode
+          },
+          getter = { _, _, _ -> MaplibreStatus.OK.nativeCode },
+          destroyer = { destroys++ },
+        )
+      }
+      assertEquals(1, destroys)
+    }
   }
 }

@@ -13,7 +13,7 @@ static void feature_query_validation_rejects_raw_descriptor_shapes(void) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
 
-  mln_buffer result = MLN_HANDLE_NULL;
+  mln_queried_feature_list result = MLN_HANDLE_NULL;
   mln_rendered_query_geometry geometry = mln_rendered_query_geometry_point(
     (mln_screen_point){.x = 256.0, .y = 256.0}
   );
@@ -23,7 +23,7 @@ static void feature_query_validation_rejects_raw_descriptor_shapes(void) {
                                    fixture.session, &geometry, NULL, &result
                                  )
   );
-  mln_buffer_destroy(result);
+  mln_queried_feature_list_destroy(result);
 
   mln_rendered_feature_query_options options =
     mln_rendered_feature_query_options_default();
@@ -36,21 +36,21 @@ static void feature_query_validation_rejects_raw_descriptor_shapes(void) {
                                    fixture.session, &geometry, &options, &result
                                  )
   );
-  mln_buffer_destroy(result);
+  mln_queried_feature_list_destroy(result);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_render_session_query_source_features(
       fixture.session, (mln_buffer_view){.data = NULL, .size = 1}, NULL, &result
     )
   );
-  mln_buffer_destroy(result);
+  mln_queried_feature_list_destroy(result);
 
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
 
-static void feature_query_bytes_are_owned_by_one_generic_buffer(void) {
+static void feature_query_hits_are_owned_by_one_list_handle(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_INT(
@@ -81,7 +81,7 @@ static void feature_query_bytes_are_owned_by_one_generic_buffer(void) {
 
   const mln_rendered_query_geometry geometry =
     mln_rendered_query_geometry_point((mln_screen_point){0});
-  mln_buffer result = MLN_HANDLE_NULL;
+  mln_queried_feature_list result = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_render_session_query_rendered_features(
                      fixture.session, &geometry, NULL, &result
@@ -89,23 +89,36 @@ static void feature_query_bytes_are_owned_by_one_generic_buffer(void) {
   );
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, result);
 
-  mln_buffer_view bytes = {0};
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_buffer_get(result, &bytes));
-  TEST_ASSERT_EQUAL_size_t(2, bytes.size);
-  TEST_ASSERT_EQUAL_MEMORY("[]", bytes.data, bytes.size);
+  size_t count = 1;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_buffer_get(result, NULL)
+    MLN_STATUS_OK, mln_queried_feature_list_count(result, &count)
+  );
+  TEST_ASSERT_EQUAL_size_t(0, count);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_queried_feature_list_count(result, NULL)
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_buffer_get((mln_buffer)map, &bytes)
+    MLN_STATUS_INVALID_ARGUMENT, mln_queried_feature_list_count(map, &count)
   );
 
-  mln_buffer_destroy(result);
+  mln_queried_feature hit = mln_queried_feature_default();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_buffer_get(result, &bytes)
+    MLN_STATUS_INVALID_ARGUMENT, mln_queried_feature_list_get(result, 0, &hit)
   );
-  mln_buffer_destroy(result);
-  mln_buffer_destroy(MLN_HANDLE_NULL);
+  hit.size = sizeof(mln_queried_feature) - 1;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_queried_feature_list_get(result, 0, &hit)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_queried_feature_list_get(result, 0, NULL)
+  );
+
+  mln_queried_feature_list_destroy(result);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_queried_feature_list_count(result, &count)
+  );
+  mln_queried_feature_list_destroy(result);
+  mln_queried_feature_list_destroy(MLN_HANDLE_NULL);
 
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
@@ -115,5 +128,5 @@ static void feature_query_bytes_are_owned_by_one_generic_buffer(void) {
 void run_query_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(feature_query_validation_rejects_raw_descriptor_shapes);
-  RUN_TEST(feature_query_bytes_are_owned_by_one_generic_buffer);
+  RUN_TEST(feature_query_hits_are_owned_by_one_list_handle);
 }

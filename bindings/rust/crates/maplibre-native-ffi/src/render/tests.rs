@@ -2456,15 +2456,12 @@ fn wait_for_rendered_feature(
     geometry: &RenderedQueryGeometry,
     options: &RenderedFeatureQueryOptions,
     description: &str,
-) -> JsonValue {
+) -> QueriedFeature {
     let deadline = Instant::now() + Duration::from_secs(5);
     while Instant::now() < deadline {
-        let features: Vec<JsonValue> = serde_json::from_slice(
-            &session
-                .query_rendered_features(geometry, Some(options))
-                .unwrap(),
-        )
-        .unwrap();
+        let features = session
+            .query_rendered_features(geometry, Some(options))
+            .unwrap();
         if features.len() == 1 {
             return features.into_iter().next().unwrap();
         }
@@ -2480,15 +2477,12 @@ fn wait_for_source_feature(
     source_id: &str,
     options: &SourceFeatureQueryOptions,
     description: &str,
-) -> JsonValue {
+) -> QueriedFeature {
     let deadline = Instant::now() + Duration::from_secs(5);
     while Instant::now() < deadline {
-        let features: Vec<JsonValue> = serde_json::from_slice(
-            &session
-                .query_source_features(source_id, Some(options))
-                .unwrap(),
-        )
-        .unwrap();
+        let features = session
+            .query_source_features(source_id, Some(options))
+            .unwrap();
         if features.len() == 1 {
             return features.into_iter().next().unwrap();
         }
@@ -2498,17 +2492,12 @@ fn wait_for_source_feature(
     panic!("timed out waiting for {description}");
 }
 
-fn single_cluster_leaf(
-    session: &RenderSessionHandle,
-    feature: &JsonValue,
-    offset: u64,
-) -> JsonValue {
-    let feature = serde_json::to_vec(feature).unwrap();
+fn single_cluster_leaf(session: &RenderSessionHandle, feature: &[u8], offset: u64) -> JsonValue {
     let arguments = serde_json::to_vec(&json!({"limit": 1, "offset": offset})).unwrap();
     let result = session
         .query_feature_extension(
             "cluster-source",
-            &feature,
+            feature,
             "supercluster",
             "leaves",
             Some(&arguments),
@@ -2520,10 +2509,6 @@ fn single_cluster_leaf(
         .expect("expected leaves feature collection");
     assert_eq!(leaves.len(), 1);
     leaves[0].clone()
-}
-
-fn queried_feature(value: &JsonValue) -> &JsonValue {
-    &value["feature"]
 }
 
 fn feature_member<'a>(feature: &'a JsonValue, key: &str) -> Option<&'a JsonValue> {
@@ -3376,18 +3361,21 @@ fn rendered_and_source_queries_copy_results() {
         &rendered_options,
         "rendered point feature",
     );
-    assert_eq!(rendered["sourceId"], json!("point"));
-    assert_eq!(rendered["sourceLayerId"], JsonValue::Null);
-    assert_eq!(queried_feature(&rendered)["id"], json!("feature-1"));
+    let rendered_feature: JsonValue = serde_json::from_slice(&rendered.feature).unwrap();
+    let rendered_state: JsonValue =
+        serde_json::from_slice(rendered.state.as_deref().unwrap()).unwrap();
+    assert_eq!(rendered.source_id.as_deref(), Some("point"));
+    assert_eq!(rendered.source_layer_id, None);
+    assert_eq!(rendered_feature["id"], json!("feature-1"));
     assert_point_geometry_close(
-        &queried_feature(&rendered)["geometry"],
+        &rendered_feature["geometry"],
         LatLng::new(37.7749, -122.4194),
     );
     assert_eq!(
-        feature_member(queried_feature(&rendered), "kind"),
+        feature_member(&rendered_feature, "kind"),
         Some(&json!("capital"))
     );
-    assert_eq!(rendered["state"], json!({"selected": true}));
+    assert_eq!(rendered_state, json!({"selected": true}));
 
     let mut source_options = SourceFeatureQueryOptions::default();
     source_options.filter = Some(filter.to_vec());
@@ -3398,15 +3386,13 @@ fn rendered_and_source_queries_copy_results() {
         &source_options,
         "source point feature",
     );
-    assert_eq!(source["sourceId"], json!("point"));
-    assert_eq!(source["sourceLayerId"], JsonValue::Null);
-    assert_eq!(queried_feature(&source)["id"], json!("feature-1"));
-    assert_point_geometry_close(
-        &queried_feature(&source)["geometry"],
-        LatLng::new(37.7749, -122.4194),
-    );
+    let source_feature: JsonValue = serde_json::from_slice(&source.feature).unwrap();
+    assert_eq!(source.source_id.as_deref(), Some("point"));
+    assert_eq!(source.source_layer_id, None);
+    assert_eq!(source_feature["id"], json!("feature-1"));
+    assert_point_geometry_close(&source_feature["geometry"], LatLng::new(37.7749, -122.4194));
     assert_eq!(
-        feature_member(queried_feature(&source), "kind"),
+        feature_member(&source_feature, "kind"),
         Some(&json!("capital"))
     );
 
@@ -3445,19 +3431,17 @@ fn rendered_box_queries_clip_to_the_viewport() {
         &options,
         "over-covering box query",
     );
-    assert_eq!(queried_feature(&rendered)["id"], json!("feature-1"));
+    let rendered_feature: JsonValue = serde_json::from_slice(&rendered.feature).unwrap();
+    assert_eq!(rendered_feature["id"], json!("feature-1"));
 
     // Corners in either order describe the same box.
     let inverted = RenderedQueryGeometry::box_(ScreenBox::new(
         ScreenPoint::new(4096.0, 4096.0),
         ScreenPoint::new(-4096.0, -4096.0),
     ));
-    let inverted_features: Vec<JsonValue> = serde_json::from_slice(
-        &session
-            .query_rendered_features(&inverted, Some(&options))
-            .unwrap(),
-    )
-    .unwrap();
+    let inverted_features = session
+        .query_rendered_features(&inverted, Some(&options))
+        .unwrap();
     assert_eq!(inverted_features.len(), 1);
 
     // Clipping keeps a fully off-screen box empty instead of collapsing it onto
@@ -3466,12 +3450,9 @@ fn rendered_box_queries_clip_to_the_viewport() {
         ScreenPoint::new(512.0, 512.0),
         ScreenPoint::new(1024.0, 1024.0),
     ));
-    let offscreen_features: Vec<JsonValue> = serde_json::from_slice(
-        &session
-            .query_rendered_features(&offscreen, Some(&options))
-            .unwrap(),
-    )
-    .unwrap();
+    let offscreen_features = session
+        .query_rendered_features(&offscreen, Some(&options))
+        .unwrap();
     assert!(offscreen_features.is_empty());
 
     session.close().unwrap();
@@ -3509,29 +3490,30 @@ fn feature_extension_queries_copy_value_and_feature_collection_results() {
         "rendered cluster",
     );
 
+    let cluster_feature: JsonValue = serde_json::from_slice(&cluster.feature).unwrap();
+
     // Native matches cluster_id by exact JSON value type, so the copied feature
     // keeps the unsigned alternative to resolve on the way back in.
     assert!(matches!(
-        feature_member(queried_feature(&cluster), "cluster_id"),
+        feature_member(&cluster_feature, "cluster_id"),
         Some(JsonValue::Number(_))
     ));
 
     // weight_sum comes from the cluster_properties aggregation lowered through
     // GeoJsonSourceOptions.
     assert_eq!(
-        numeric_member(&queried_feature(&cluster)["properties"], "point_count"),
+        numeric_member(&cluster_feature["properties"], "point_count"),
         Some(3.0)
     );
     assert_eq!(
-        numeric_member(&queried_feature(&cluster)["properties"], "weight_sum"),
+        numeric_member(&cluster_feature["properties"], "weight_sum"),
         Some(6.0)
     );
 
-    let cluster_feature = serde_json::to_vec(queried_feature(&cluster)).unwrap();
     let children = session
         .query_feature_extension(
             "cluster-source",
-            &cluster_feature,
+            &cluster.feature,
             "supercluster",
             "children",
             None,
@@ -3542,8 +3524,8 @@ fn feature_extension_queries_copy_value_and_feature_collection_results() {
 
     // Native ignores arguments of another type and falls back to ten leaves at
     // offset zero, so both unsigned bounds must move the observed result.
-    let first = single_cluster_leaf(&session, queried_feature(&cluster), 0);
-    let second = single_cluster_leaf(&session, queried_feature(&cluster), 1);
+    let first = single_cluster_leaf(&session, &cluster.feature, 0);
+    let second = single_cluster_leaf(&session, &cluster.feature, 1);
     assert_ne!(
         feature_member(&first, "name"),
         feature_member(&second, "name")
@@ -3552,7 +3534,7 @@ fn feature_extension_queries_copy_value_and_feature_collection_results() {
     let expansion_zoom = session
         .query_feature_extension(
             "cluster-source",
-            &cluster_feature,
+            &cluster.feature,
             "supercluster",
             "expansion-zoom",
             None,

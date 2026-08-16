@@ -45,6 +45,7 @@ native_handle!(
     sys::mln_offline_region_list,
     sys::mln_style_id_list,
     sys::mln_style_string_list,
+    sys::mln_queried_feature_list,
 );
 
 /// A native handle a destructor attempted to destroy and could not. The handle
@@ -300,6 +301,13 @@ native_guard!(
     sys::mln_style_string_list_destroy,
     "mln_style_string_list",
     style_string_list
+);
+native_guard!(
+    QueriedFeatureListGuard,
+    sys::mln_queried_feature_list,
+    sys::mln_queried_feature_list_destroy,
+    "mln_queried_feature_list",
+    queried_feature_list
 );
 
 #[cfg(test)]

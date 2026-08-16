@@ -522,13 +522,15 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         );
     }
 
-    public byte[] QueryRenderedFeatures(
+    public QueriedFeature[] QueryRenderedFeatures(
         RenderedQueryGeometry geometry,
         RenderedFeatureQueryOptions? options
     ) => QueryRenderedFeaturesCore(geometry, options);
 
-    public byte[] QuerySourceFeatures(string sourceId, SourceFeatureQueryOptions? options) =>
-        QuerySourceFeaturesCore(sourceId, options);
+    public QueriedFeature[] QuerySourceFeatures(
+        string sourceId,
+        SourceFeatureQueryOptions? options
+    ) => QuerySourceFeaturesCore(sourceId, options);
 
     /// <summary>
     /// Queries a feature extension from the latest render session state.
@@ -886,7 +888,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         }
     }
 
-    private byte[] QueryRenderedFeaturesCore(
+    private QueriedFeature[] QueryRenderedFeaturesCore(
         RenderedQueryGeometry geometry,
         RenderedFeatureQueryOptions? options
     )
@@ -896,7 +898,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             ? null
             : NativeRenderedFeatureQueryOptions.From(options);
         var geometryValue = nativeGeometry.Value;
-        MlnBuffer result = default;
+        MlnQueriedFeatureList result = default;
         if (nativeOptions is null)
         {
             NativeStatus.Check(
@@ -920,16 +922,19 @@ public sealed unsafe class RenderSessionHandle : IDisposable
                 )
             );
         }
-        return ValueStructs.ReadBuffer(result);
+        return CopyQueriedFeatureList(result);
     }
 
-    private byte[] QuerySourceFeaturesCore(string sourceId, SourceFeatureQueryOptions? options)
+    private QueriedFeature[] QuerySourceFeaturesCore(
+        string sourceId,
+        SourceFeatureQueryOptions? options
+    )
     {
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeOptions = options is null
             ? null
             : NativeSourceFeatureQueryOptions.From(options);
-        MlnBuffer result = default;
+        MlnQueriedFeatureList result = default;
         if (nativeOptions is null)
         {
             NativeStatus.Check(
@@ -953,7 +958,51 @@ public sealed unsafe class RenderSessionHandle : IDisposable
                 )
             );
         }
-        return ValueStructs.ReadBuffer(result);
+        return CopyQueriedFeatureList(result);
+    }
+
+    private static QueriedFeature[] CopyQueriedFeatureList(MlnQueriedFeatureList list)
+    {
+        if (list.IsNull)
+        {
+            return [];
+        }
+
+        try
+        {
+            nuint count = 0;
+            NativeStatus.Check(NativeMethods.mln_queried_feature_list_count(list, &count));
+            var features = new QueriedFeature[checked((int)count)];
+            for (var index = 0; index < features.Length; index++)
+            {
+                var native = NativeMethods.mln_queried_feature_default();
+                NativeStatus.Check(
+                    NativeMethods.mln_queried_feature_list_get(list, (nuint)index, &native)
+                );
+                var fields = (mln_queried_feature_field)native.fields;
+                features[index] = new QueriedFeature(
+                    ValueStructs.CopyBufferView(native.feature),
+                    fields.HasFlag(mln_queried_feature_field.MLN_QUERIED_FEATURE_SOURCE_ID)
+                        ? RuntimeStructs.CopyUtf8(native.source_id.data, native.source_id.size)
+                        : null,
+                    fields.HasFlag(mln_queried_feature_field.MLN_QUERIED_FEATURE_SOURCE_LAYER_ID)
+                        ? RuntimeStructs.CopyUtf8(
+                            native.source_layer_id.data,
+                            native.source_layer_id.size
+                        )
+                        : null,
+                    fields.HasFlag(mln_queried_feature_field.MLN_QUERIED_FEATURE_STATE)
+                        ? ValueStructs.CopyBufferView(native.state)
+                        : null
+                );
+            }
+
+            return features;
+        }
+        finally
+        {
+            NativeMethods.mln_queried_feature_list_destroy(list);
+        }
     }
 
     /// <summary>Destroys the render session on the map owner thread.</summary>

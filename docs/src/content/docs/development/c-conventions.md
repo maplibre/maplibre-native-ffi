@@ -71,10 +71,10 @@ constant need no probe.
 
 An `mln_buffer_view` borrows storage only for the call. Parse or copy accepted
 input before returning. An `mln_buffer` owns one contiguous result; its view
-remains valid until the caller destroys the handle. Use a generic buffer instead
-of a domain-specific result handle when an operation serializes JSON or GeoJSON.
-This executes expensive operations once and lets bindings make one bulk copy
-without traversing a native value tree.
+remains valid until the caller destroys the handle. Each JSON or GeoJSON
+document crosses as one generic buffer, so bindings copy bytes instead of
+walking a native value tree. Typed fields that accompany a document stay typed
+fields on the result.
 
 Preserve loaded style documents byte-for-byte when MapLibre retains the source
 bytes. Values reconstructed from native state use compact JSON serialization;

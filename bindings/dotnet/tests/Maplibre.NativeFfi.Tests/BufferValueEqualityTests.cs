@@ -1,5 +1,6 @@
 using Maplibre.NativeFfi.Geo;
 using Maplibre.NativeFfi.Offline;
+using Maplibre.NativeFfi.Query;
 using Maplibre.NativeFfi.Render;
 using Maplibre.NativeFfi.Runtime;
 using Xunit;
@@ -90,6 +91,32 @@ public sealed class BufferValueEqualityTests
         Assert.Equal(left.GetHashCode(), right.GetHashCode());
         Assert.NotEqual(left, new RuntimeEventPayload.Unknown(3, [9, 8, 6]));
         Assert.NotEqual(left, new RuntimeEventPayload.Unknown(4, [9, 8, 7]));
+    }
+
+    [BindingSpecTest("BND-069", "BND-071")]
+    [Fact]
+    public void QueriedFeatureOwnsAndComparesFeatureAndStateContents()
+    {
+        var feature = new byte[] { 1, 2, 3 };
+        var state = new byte[] { 4, 5 };
+        var left = new QueriedFeature(feature, "source", "layer", state);
+        var right = new QueriedFeature([1, 2, 3], "source", "layer", [4, 5]);
+
+        feature[0] = 9;
+        state[0] = 9;
+        var returnedFeature = left.Feature;
+        returnedFeature[1] = 9;
+        var returnedState = left.State!;
+        returnedState[1] = 9;
+
+        Assert.Equal(left, right);
+        Assert.Equal(left.GetHashCode(), right.GetHashCode());
+        Assert.Equal(new byte[] { 1, 2, 3 }, left.Feature);
+        Assert.Equal(new byte[] { 4, 5 }, left.State);
+        Assert.NotEqual(left, new QueriedFeature([1, 2, 4], "source", "layer", [4, 5]));
+        Assert.NotEqual(left, new QueriedFeature([1, 2, 3], "source", "layer", [4, 6]));
+        Assert.NotEqual(left, new QueriedFeature([1, 2, 3], "source", "layer", null));
+        Assert.NotEqual(left, new QueriedFeature([1, 2, 3], null, "layer", [4, 5]));
     }
 
     [BindingSpecTest("BND-070")]

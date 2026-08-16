@@ -229,12 +229,24 @@ void main() {
     expect(renderedOptions.layerIds, ['roads']);
     expect(renderedOptions.filter, '["==","class","primary"]'.codeUnits);
     expect(sourceOptions.sourceLayerIds, ['transportation']);
+
+    final hit = QueriedFeature(
+      feature: Uint8List.fromList('{"type":"Feature"}'.codeUnits),
+      sourceId: 'point',
+      state: Uint8List.fromList('{"selected":true}'.codeUnits),
+    );
+    expect(hit.sourceId, 'point');
+    expect(hit.sourceLayerId, isNull);
+    expect(hit.feature, '{"type":"Feature"}'.codeUnits);
+    expect(hit.state, '{"selected":true}'.codeUnits);
   });
 
   test('byte-backed values own storage and compare by content', () {
     final clusterProperties = Uint8List.fromList([1, 2, 3]);
     final filter = Uint8List.fromList([4, 5, 6]);
     final geometry = Uint8List.fromList([7, 8, 9]);
+    final feature = Uint8List.fromList([10, 11, 12]);
+    final state = Uint8List.fromList([13, 14, 15]);
     final geoJsonOptions = GeoJsonSourceOptions(
       clusterProperties: clusterProperties,
     );
@@ -246,10 +258,17 @@ void main() {
       maxZoom: 10,
       pixelRatio: 1,
     );
+    final queriedFeature = QueriedFeature(
+      feature: feature,
+      sourceId: 'point',
+      state: state,
+    );
 
     clusterProperties[0] = 9;
     filter[0] = 9;
     geometry[0] = 9;
+    feature[0] = 9;
+    state[0] = 9;
 
     expect(
       geoJsonOptions,
@@ -270,11 +289,21 @@ void main() {
       ),
     );
     expect(
+      queriedFeature,
+      QueriedFeature(
+        feature: Uint8List.fromList([10, 11, 12]),
+        sourceId: 'point',
+        state: Uint8List.fromList([13, 14, 15]),
+      ),
+    );
+    expect(
       () => geoJsonOptions.clusterProperties![0] = 9,
       throwsUnsupportedError,
     );
     expect(() => queryOptions.filter![0] = 9, throwsUnsupportedError);
     expect(() => offlineDefinition.geometry[0] = 9, throwsUnsupportedError);
+    expect(() => queriedFeature.feature[0] = 9, throwsUnsupportedError);
+    expect(() => queriedFeature.state![0] = 9, throwsUnsupportedError);
   });
 
   test('public enum-like values preserve native raw values', () {

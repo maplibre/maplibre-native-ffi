@@ -77,22 +77,16 @@ static size_t query_admin_feature_count(
     );
     TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0, -1));
 
-    mln_buffer result = MLN_HANDLE_NULL;
+    mln_queried_feature_list result = MLN_HANDLE_NULL;
     const mln_status status = mln_render_session_query_source_features(
       session, MLN_STRING_LITERAL("mlt-source"), &options, &result
     );
     if (status == MLN_STATUS_OK) {
-      mln_buffer_view json = {0};
-      TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_buffer_get(result, &json));
-      static const char marker[] = "\"feature\":";
-      for (size_t index = 0; index + sizeof(marker) - 1 <= json.size;
-           index += 1) {
-        if (memcmp(json.data + index, marker, sizeof(marker) - 1) == 0) {
-          count += 1;
-        }
-      }
+      TEST_ASSERT_EQUAL_INT(
+        MLN_STATUS_OK, mln_queried_feature_list_count(result, &count)
+      );
     }
-    mln_buffer_destroy(result);
+    mln_queried_feature_list_destroy(result);
     if (count == 0) {
       mln_test_sleep_millisecond();
     }

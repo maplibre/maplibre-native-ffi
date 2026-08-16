@@ -41,6 +41,7 @@ import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.map.MapOptions
 import org.maplibre.nativeffi.query.FeatureStateSelector
+import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
@@ -279,8 +280,8 @@ class RenderSessionHandleTest {
                 },
               )
             }
-          assertEquals("point", stringMember(rendered, "sourceId"))
-          assertEquals("capital", featureStringMember(rendered, "kind"))
+          assertEquals("point", rendered.sourceId)
+          assertEquals("capital", featureStringProperty(rendered.feature, "kind"))
 
           val source =
             waitForQueriedFeature(runtime, map, session) {
@@ -289,8 +290,8 @@ class RenderSessionHandleTest {
                 SourceFeatureQueryOptions().apply { this.filter = filter },
               )
             }
-          assertEquals("point", stringMember(source, "sourceId"))
-          assertEquals("capital", featureStringMember(source, "kind"))
+          assertEquals("point", source.sourceId)
+          assertEquals("capital", featureStringProperty(source.feature, "kind"))
 
           assertFailsWith<InvalidArgumentException> {
             session.setFeatureState(featureStateSelector(), jsonBytes("[]"))
@@ -311,7 +312,7 @@ class RenderSessionHandleTest {
                 },
               )
             }
-          val renderedState = rawMember(renderedWithState, "state") ?: error("missing state")
+          val renderedState = renderedWithState.state ?: error("missing state")
           assertEquals("true", rawMember(renderedState, "hover")?.decodeToString())
           assertEquals(20.0, numberMember(renderedState, "radius"))
 
@@ -365,7 +366,7 @@ class RenderSessionHandleTest {
             assertFailsWith<InvalidStateException> {
               session.queryFeatureExtension(
                 "point",
-                queryFeature(rendered),
+                rendered.feature,
                 "supercluster",
                 "children",
                 null,
@@ -779,19 +780,21 @@ class RenderSessionHandleTest {
                 RenderedFeatureQueryOptions().apply { layerIds = listOf("cluster-circle") },
               )
             }
+          val clusterProperties =
+            rawMember(cluster.feature, "properties") ?: error("feature has no properties")
           // The serialized feature must keep cluster_id as an integral value so
           // MapLibre can resolve it when the bytes are passed back in.
-          assertTrue(numberMember(queryFeatureProperties(cluster), "cluster_id") != null)
+          assertTrue(numberMember(clusterProperties, "cluster_id") != null)
 
           // The rendered cluster exists because GeoJsonSourceOptions enables
           // clustering, and weightSum comes from the byte-encoded aggregation.
-          assertEquals(3.0, numberMember(queryFeatureProperties(cluster), "point_count"))
-          assertEquals(6.0, numberMember(queryFeatureProperties(cluster), "weightSum"))
+          assertEquals(3.0, numberMember(clusterProperties, "point_count"))
+          assertEquals(6.0, numberMember(clusterProperties, "weightSum"))
 
           val children =
             session.queryFeatureExtension(
               "cluster-source",
-              queryFeature(cluster),
+              cluster.feature,
               "supercluster",
               "children",
               null,
@@ -801,7 +804,7 @@ class RenderSessionHandleTest {
           val expansionZoom =
             session.queryFeatureExtension(
               "cluster-source",
-              queryFeature(cluster),
+              cluster.feature,
               "supercluster",
               "expansion-zoom",
               null,
@@ -812,7 +815,7 @@ class RenderSessionHandleTest {
           // selects a later leaf. Native ignores arguments of another type and
           // falls back to ten leaves at offset zero, so both bounds must move
           // the observed result.
-          val feature = queryFeature(cluster)
+          val feature = cluster.feature
           val first = singleClusterLeaf(session, feature, 0)
           val second = singleClusterLeaf(session, feature, 1)
           assertNotEquals(
@@ -931,10 +934,10 @@ class RenderSessionHandleTest {
     runtime: RuntimeHandle,
     map: MapHandle,
     session: RenderSessionHandle,
-    query: () -> ByteArray,
-  ): ByteArray {
+    query: () -> List<QueriedFeature>,
+  ): QueriedFeature {
     repeat(100) {
-      val feature = firstArrayElement(query())
+      val feature = query().firstOrNull()
       if (feature != null) return feature
       renderIfAvailable(runtime, map, session)
       usleep(1_000U)
@@ -1019,15 +1022,6 @@ class RenderSessionHandleTest {
   private fun featureState(): ByteArray = jsonBytes("""{"hover":true,"radius":20}""")
 
   private fun jsonBytes(value: String): ByteArray = value.trimIndent().encodeToByteArray()
-
-  private fun queryFeature(result: ByteArray): ByteArray =
-    rawMember(result, "feature") ?: error("query result has no feature")
-
-  private fun queryFeatureProperties(result: ByteArray): ByteArray =
-    rawMember(queryFeature(result), "properties") ?: error("feature has no properties")
-
-  private fun featureStringMember(result: ByteArray, key: String): String? =
-    stringMember(queryFeatureProperties(result), key)
 
   private fun featureStringProperty(feature: ByteArray, key: String): String? =
     rawMember(feature, "properties")?.let { stringMember(it, key) }

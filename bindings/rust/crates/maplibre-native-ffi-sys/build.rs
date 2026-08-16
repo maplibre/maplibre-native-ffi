@@ -103,7 +103,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .new_type_alias(concat!(
             "^mln_(buffer|runtime|map|map_projection|render_session|wake_source",
             "|resource_request_handle|geojson_source_data|offline_region_snapshot",
-            "|offline_region_list|style_id_list|style_string_list)$"
+            "|offline_region_list|style_id_list|style_string_list|queried_feature_list)$"
         ))
         .prepend_enum_name(false)
         .layout_tests(true)

@@ -4,12 +4,14 @@ import java.nio.charset.StandardCharsets
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.LongPointer
 import org.bytedeco.javacpp.Pointer
+import org.bytedeco.javacpp.SizeTPointer
 import org.maplibre.nativeffi.NativeAccess
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ScreenBox
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.internal.javacpp.ByteArrayViewScope
+import org.maplibre.nativeffi.internal.javacpp.JavaCppSupport
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 import org.maplibre.nativeffi.internal.javacpp.ownedBuffer
 import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
@@ -17,6 +19,7 @@ import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.query.FeatureStateSelector
+import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
@@ -204,7 +207,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
   public actual fun queryRenderedFeatures(
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions?,
-  ): ByteArray {
+  ): List<QueriedFeature> {
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("query rendered features")
     RenderedQueryGeometryScope(geometry).use { nativeGeometry ->
@@ -219,7 +222,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
               outResult,
             )
           )
-          return ownedBuffer(outResult.get())
+          return queriedFeatureList(outResult.get())
         }
       }
     }
@@ -228,7 +231,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
   public actual fun querySourceFeatures(
     sourceId: String,
     options: SourceFeatureQueryOptions?,
-  ): ByteArray {
+  ): List<QueriedFeature> {
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("query source features")
     StringViewScope(sourceId).use { nativeSourceId ->
@@ -243,7 +246,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
               outResult,
             )
           )
-          return ownedBuffer(outResult.get())
+          return queriedFeatureList(outResult.get())
         }
       }
     }
@@ -758,6 +761,40 @@ private fun stringView(value: MaplibreNativeC.mln_buffer_view): String {
   val bytes = ByteArray(size)
   BytePointer(value.data()).get(bytes, 0, size)
   return String(bytes, StandardCharsets.UTF_8)
+}
+
+private fun queriedFeatureList(list: Long): List<QueriedFeature> =
+  try {
+    require(list != 0L) { "mln_queried_feature_list returned the null handle" }
+    SizeTPointer(1).use { outCount ->
+      Status.check(MaplibreNativeC.mln_queried_feature_list_count(list, outCount))
+      List(Math.toIntExact(outCount.get())) { index ->
+        MaplibreNativeC.mln_queried_feature().use { outFeature ->
+          outFeature.size(outFeature.sizeof())
+          Status.check(
+            MaplibreNativeC.mln_queried_feature_list_get(list, index.toLong(), outFeature)
+          )
+          queriedFeature(outFeature)
+        }
+      }
+    }
+  } finally {
+    MaplibreNativeC.mln_queried_feature_list_destroy(list)
+  }
+
+private fun queriedFeature(value: MaplibreNativeC.mln_queried_feature): QueriedFeature {
+  val fields = value.fields()
+  return QueriedFeature(
+    JavaCppSupport.byteArray(value.feature().data(), value.feature().size()),
+    if (fields and MaplibreNativeC.MLN_QUERIED_FEATURE_SOURCE_ID != 0) stringView(value.source_id())
+    else null,
+    if (fields and MaplibreNativeC.MLN_QUERIED_FEATURE_SOURCE_LAYER_ID != 0)
+      stringView(value.source_layer_id())
+    else null,
+    if (fields and MaplibreNativeC.MLN_QUERIED_FEATURE_STATE != 0)
+      JavaCppSupport.byteArray(value.state().data(), value.state().size())
+    else null,
+  )
 }
 
 private fun pointerOrNull(pointer: NativePointer): Pointer? =

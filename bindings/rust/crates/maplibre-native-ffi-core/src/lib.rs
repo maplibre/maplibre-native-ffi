@@ -50,7 +50,7 @@ pub use events::{
 pub use logging::LogRecord;
 pub use options::{MapOptions, MapTileOptions, MapViewportOptions};
 pub use query::{
-    FeatureStateSelector, RenderedFeatureQueryOptions, RenderedQueryGeometry,
+    FeatureStateSelector, QueriedFeature, RenderedFeatureQueryOptions, RenderedQueryGeometry,
     SourceFeatureQueryOptions,
 };
 pub use resource::{

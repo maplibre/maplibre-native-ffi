@@ -285,11 +285,18 @@
 --include-function mln_projected_meters_for_lat_lng
 
 # include/maplibre_native_c/query.h
+--include-constant MLN_QUERIED_FEATURE_SOURCE_ID
+--include-constant MLN_QUERIED_FEATURE_SOURCE_LAYER_ID
+--include-constant MLN_QUERIED_FEATURE_STATE
 --include-constant MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS
 --include-constant MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX
 --include-constant MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING
 --include-constant MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT
 --include-constant MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS
+--include-function mln_queried_feature_default
+--include-function mln_queried_feature_list_count
+--include-function mln_queried_feature_list_destroy
+--include-function mln_queried_feature_list_get
 --include-function mln_render_session_query_feature_extensions
 --include-function mln_render_session_query_rendered_features
 --include-function mln_render_session_query_source_features
@@ -298,6 +305,7 @@
 --include-function mln_rendered_query_geometry_line_string
 --include-function mln_rendered_query_geometry_point
 --include-function mln_source_feature_query_options_default
+--include-struct mln_queried_feature
 --include-struct mln_rendered_feature_query_options
 --include-struct mln_rendered_query_geometry
 --include-struct mln_screen_box

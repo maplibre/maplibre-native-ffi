@@ -8,6 +8,7 @@ import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.query.FeatureStateSelector
+import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
@@ -126,7 +127,7 @@ internal constructor(private val map: MapHandle, private val handle: NativeRende
   public actual fun queryRenderedFeatures(
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions?,
-  ): ByteArray {
+  ): List<QueriedFeature> {
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("query rendered features")
     return NativeAccess.queryRenderedFeatures(requireLiveHandle(), geometry, options)
@@ -135,7 +136,7 @@ internal constructor(private val map: MapHandle, private val handle: NativeRende
   public actual fun querySourceFeatures(
     sourceId: String,
     options: SourceFeatureQueryOptions?,
-  ): ByteArray {
+  ): List<QueriedFeature> {
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("query source features")
     return NativeAccess.querySourceFeatures(requireLiveHandle(), sourceId, options)

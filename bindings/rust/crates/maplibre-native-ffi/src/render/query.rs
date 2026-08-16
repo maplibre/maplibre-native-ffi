@@ -6,7 +6,7 @@ use maplibre_native_ffi_sys as sys;
 use crate::Result;
 
 pub use maplibre_core::query::{
-    FeatureStateSelector, RenderedFeatureQueryOptions, RenderedQueryGeometry,
+    FeatureStateSelector, QueriedFeature, RenderedFeatureQueryOptions, RenderedQueryGeometry,
     SourceFeatureQueryOptions,
 };
 pub(crate) use maplibre_core::query::{
@@ -53,19 +53,19 @@ impl super::RenderSessionHandle {
         })
     }
 
-    /// Queries rendered features as a UTF-8 JSON array.
+    /// Copies rendered features from the latest render session state.
     pub fn query_rendered_features(
         &self,
         geometry: &RenderedQueryGeometry,
         options: Option<&RenderedFeatureQueryOptions>,
-    ) -> Result<Vec<u8>> {
+    ) -> Result<Vec<QueriedFeature>> {
         self.inner.ensure_no_frame_acquired()?;
         let session = self.inner.native()?;
         let geometry = geometry.to_native();
         let options = options
             .map(RenderedFeatureQueryOptions::to_native)
             .transpose()?;
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_queried_feature_list>::new();
         // SAFETY: All descriptors and out storage remain valid for the call.
         maplibre_core::check(unsafe {
             sys::mln_render_session_query_rendered_features(
@@ -77,23 +77,28 @@ impl super::RenderSessionHandle {
                 out.as_mut_ptr(),
             )
         })?;
-        // SAFETY: Success transfers the owned buffer to this call.
-        unsafe { maplibre_core::string::copy_owned_buffer(out.get()) }
+        // SAFETY: On success, the C API returns an owned queried-feature list
+        // handle; core copies and releases it.
+        unsafe {
+            maplibre_core::query::copy_queried_feature_list(
+                out.into_live("mln_queried_feature_list")?,
+            )
+        }
     }
 
-    /// Queries source features as a UTF-8 JSON array.
+    /// Copies source features from the latest render session state.
     pub fn query_source_features(
         &self,
         source_id: &str,
         options: Option<&SourceFeatureQueryOptions>,
-    ) -> Result<Vec<u8>> {
+    ) -> Result<Vec<QueriedFeature>> {
         self.inner.ensure_no_frame_acquired()?;
         let session = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let options = options
             .map(SourceFeatureQueryOptions::to_native)
             .transpose()?;
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_queried_feature_list>::new();
         // SAFETY: All descriptors and out storage remain valid for the call.
         maplibre_core::check(unsafe {
             sys::mln_render_session_query_source_features(
@@ -105,8 +110,13 @@ impl super::RenderSessionHandle {
                 out.as_mut_ptr(),
             )
         })?;
-        // SAFETY: Success transfers the owned buffer to this call.
-        unsafe { maplibre_core::string::copy_owned_buffer(out.get()) }
+        // SAFETY: On success, the C API returns an owned queried-feature list
+        // handle; core copies and releases it.
+        unsafe {
+            maplibre_core::query::copy_queried_feature_list(
+                out.into_live("mln_queried_feature_list")?,
+            )
+        }
     }
 
     /// Queries a feature extension as UTF-8 JSON or GeoJSON bytes.
