@@ -86,6 +86,15 @@ type QueriedFeature struct {
 	State         []byte
 }
 
+// Equal reports whether two copied hits hold the same field values. Absent
+// optional fields stay distinct from present empty values.
+func (feature QueriedFeature) Equal(other QueriedFeature) bool {
+	return bytes.Equal(feature.Feature, other.Feature) &&
+		equalPointer(feature.SourceID, other.SourceID) &&
+		equalPointer(feature.SourceLayerID, other.SourceLayerID) &&
+		equalOptionalBytes(feature.State, other.State)
+}
+
 func equalOptionalBytes(left []byte, right []byte) bool {
 	return (left == nil) == (right == nil) && bytes.Equal(left, right)
 }
