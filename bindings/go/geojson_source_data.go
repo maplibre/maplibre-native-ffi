@@ -23,7 +23,7 @@ type GeoJSONSourceDataHandle struct {
 // data holds one complete UTF-8 GeoJSON document and options may be nil for
 // defaults; both are copied into the prepared data before the call returns.
 // Preparation touches no runtime or map and is callable from any goroutine, so
-// the expensive parse and tiling can run off the map owner thread.
+// the expensive parse and tiling can run concurrently with map work.
 //
 // AddGeoJSONSourceData and SetGeoJSONSourceData borrow the handle, so one
 // prepared value may be installed on any number of sources and closed at any

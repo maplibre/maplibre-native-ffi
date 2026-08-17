@@ -105,7 +105,6 @@ func run(mode renderTargetMode) (result error) {
 	}
 	_ = sdl.GL_SetSwapInterval(1)
 
-	shared := newSharedState()
 	mapState, err := newRuntimeMapState(view)
 	if err != nil {
 		_ = graphics.Close()
@@ -120,7 +119,6 @@ func run(mode renderTargetMode) (result error) {
 	}); err != nil {
 		return errors.Join(err, mapState.Close(), graphics.Close())
 	}
-	commands := &cameraController{state: mapState, shared: shared}
 	state, err := newRenderMapState(graphics, mapState.mapRef, view, mode)
 	if err != nil {
 		return errors.Join(
@@ -135,7 +133,6 @@ func run(mode renderTargetMode) (result error) {
 			state.finishFrame(),
 			state.closeTarget(),
 			mapState.Close(),
-			shared.firstFailure(),
 			graphics.Close(),
 		)
 	}()
@@ -145,6 +142,7 @@ func run(mode renderTargetMode) (result error) {
 	logControls()
 
 	running := true
+	renderRequested := true
 	input := inputController{}
 	handleEvent := func(event *sdl.Event) error {
 		switch event.Type() {
@@ -159,7 +157,7 @@ func run(mode renderTargetMode) (result error) {
 			if err := state.resize(view); err != nil {
 				return err
 			}
-			commandID, err := mapState.mapRef.Resize(maplibre.LogicalExtent{
+			_, err := mapState.mapRef.Resize(maplibre.LogicalExtent{
 				Width:       view.logicalWidth,
 				Height:      view.logicalHeight,
 				ScaleFactor: view.scaleFactor,
@@ -167,22 +165,22 @@ func run(mode renderTargetMode) (result error) {
 			if err != nil {
 				return err
 			}
-			mapState.commandID = commandID
-			shared.requestRender()
+			renderRequested = true
 		default:
 			if view.empty() {
 				return nil
 			}
-			if input.handleEvent(event, commands, view) {
-				shared.requestRender()
+			changed, err := input.handleEvent(event, mapState, view)
+			if err != nil {
+				return err
+			}
+			if changed {
+				renderRequested = true
 			}
 		}
 		return nil
 	}
 	for running {
-		if failure := shared.firstFailure(); failure != nil {
-			return fmt.Errorf("map update failed: %w", failure)
-		}
 		didWork := false
 		var event sdl.Event
 		for sdl.PollEvent(&event) {
@@ -196,18 +194,19 @@ func run(mode renderTargetMode) (result error) {
 			if _, err := mapState.runtime.DrainReady(); err != nil {
 				return err
 			}
-			renderRequested, err := drainEvents(mapState.runtime, mapState.mapID)
+			requested, err := drainEvents(mapState.runtime, mapState.mapID)
 			if err != nil {
 				return err
 			}
-			if renderRequested {
-				shared.requestRender()
+			if requested {
+				renderRequested = true
 				didWork = true
 			}
 		default:
 		}
 
-		if shared.consumeRenderRequest() && !view.empty() && running {
+		if renderRequested && !view.empty() && running {
+			renderRequested = false
 			rendered, err := state.driveFrame()
 			if err != nil {
 				return err
@@ -215,7 +214,7 @@ func run(mode renderTargetMode) (result error) {
 			if rendered {
 				didWork = true
 			} else {
-				shared.requestRender()
+				renderRequested = true
 			}
 		}
 		if err := state.finishFrame(); err != nil {

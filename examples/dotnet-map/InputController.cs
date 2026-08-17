@@ -91,13 +91,18 @@ internal sealed unsafe class InputController : IDisposable
         lastY = y;
         if (rightDown || (leftDown && ctrlDown))
         {
-            Submit(new AdjustBearingCommand(dx * DragRotateFactor, null));
-            Submit(new AdjustPitchCommand(-dy * DragPitchFactor, null));
+            state.AdjustBearing(dx * DragRotateFactor);
+            state.AdjustPitch(-dy * DragPitchFactor);
         }
         else if (leftDown)
         {
-            Submit(new MoveByCommand(dx, dy, null));
+            state.MoveBy(dx, dy);
         }
+        else
+        {
+            return;
+        }
+        renderRequest.Set();
     }
 
     private void OnMouseButton(
@@ -131,14 +136,13 @@ internal sealed unsafe class InputController : IDisposable
             lastX = cursorX;
             lastY = cursorY;
 
-            // Submitted before the drag's own commands, so the transition stops before the first
-            // delta lands.
-            Submit(new CancelTransitionsCommand());
+            // Stop the transition before applying the drag's first delta.
+            state.CancelTransitions();
         }
 
         if (Dragging != wasDragging)
         {
-            Submit(new SetGestureInProgressCommand(Dragging));
+            state.SetGestureInProgress(Dragging);
         }
     }
 
@@ -149,7 +153,8 @@ internal sealed unsafe class InputController : IDisposable
         _ = handle;
         _ = xOffset;
         var scale = Math.Pow(2.0, yOffset * 0.25);
-        Submit(new ScaleByCommand(scale, new ScreenPoint(cursorX, cursorY), null));
+        state.ScaleBy(scale, new ScreenPoint(cursorX, cursorY));
+        renderRequest.Set();
     }
 
     private void OnKey(
@@ -172,50 +177,45 @@ internal sealed unsafe class InputController : IDisposable
         {
             case Keys.Left:
             case Keys.A:
-                Submit(new MoveByCommand(KeyboardPan, 0.0, KeyboardAnimation));
+                state.MoveBy(KeyboardPan, 0.0, KeyboardAnimation);
                 break;
             case Keys.Right:
             case Keys.D:
-                Submit(new MoveByCommand(-KeyboardPan, 0.0, KeyboardAnimation));
+                state.MoveBy(-KeyboardPan, 0.0, KeyboardAnimation);
                 break;
             case Keys.Up:
             case Keys.W:
-                Submit(new MoveByCommand(0.0, KeyboardPan, KeyboardAnimation));
+                state.MoveBy(0.0, KeyboardPan, KeyboardAnimation);
                 break;
             case Keys.Down:
             case Keys.S:
-                Submit(new MoveByCommand(0.0, -KeyboardPan, KeyboardAnimation));
+                state.MoveBy(0.0, -KeyboardPan, KeyboardAnimation);
                 break;
             case Keys.Equal:
             case Keys.KeypadEqual:
-                Submit(new ScaleByCommand(KeyboardZoom, null, KeyboardAnimation));
+                state.ScaleBy(KeyboardZoom, null, KeyboardAnimation);
                 break;
             case Keys.Minus:
-                Submit(new ScaleByCommand(1.0 / KeyboardZoom, null, KeyboardAnimation));
+                state.ScaleBy(1.0 / KeyboardZoom, null, KeyboardAnimation);
                 break;
             case Keys.Q:
-                Submit(new AdjustBearingCommand(-KeyboardBearing, KeyboardAnimation));
+                state.AdjustBearing(-KeyboardBearing, KeyboardAnimation);
                 break;
             case Keys.E:
-                Submit(new AdjustBearingCommand(KeyboardBearing, KeyboardAnimation));
+                state.AdjustBearing(KeyboardBearing, KeyboardAnimation);
                 break;
             case Keys.RightBracket:
-                Submit(new AdjustPitchCommand(KeyboardPitch, KeyboardAnimation));
+                state.AdjustPitch(KeyboardPitch, KeyboardAnimation);
                 break;
             case Keys.LeftBracket:
-                Submit(new AdjustPitchCommand(-KeyboardPitch, KeyboardAnimation));
+                state.AdjustPitch(-KeyboardPitch, KeyboardAnimation);
                 break;
             case Keys.Number0:
-                Submit(new ResetOrientationCommand(ResetAnimation));
+                state.ResetOrientation(ResetAnimation);
                 break;
             default:
                 return;
         }
-    }
-
-    private void Submit(CameraCommand command)
-    {
-        _ = state.Apply(command);
         renderRequest.Set();
     }
 }

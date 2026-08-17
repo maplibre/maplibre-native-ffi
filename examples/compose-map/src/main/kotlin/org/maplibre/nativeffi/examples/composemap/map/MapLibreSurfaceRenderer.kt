@@ -19,7 +19,7 @@ import org.maplibre.nativeffi.runtime.OperationHandle
  * The native-surface render loop.
  *
  * [render] runs on the bridge's producer thread, which owns the graphics context, borrowed texture,
- * and render session. Runtime and map commands are submitted directly to the core-owned worker.
+ * and render session. Runtime and map updates are submitted directly to the core-owned worker.
  */
 internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
   override val backend: ProducerBackend = MapLibreNativeSurfaceAdapter.backend
@@ -116,49 +116,52 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
   }
 
   fun pan(deltaX: Double, deltaY: Double) {
-    enqueue(CameraCommand.MoveBy(deltaX, deltaY))
+    mapState?.moveBy(deltaX, deltaY)
+    requestRender()
   }
 
   fun zoom(scale: Double, anchorX: Double, anchorY: Double) {
-    enqueue(CameraCommand.ScaleBy(scale, ScreenPoint(anchorX, anchorY)))
+    mapState?.scaleBy(scale, ScreenPoint(anchorX, anchorY))
+    requestRender()
   }
 
   fun animatePan(deltaX: Double, deltaY: Double) {
-    enqueue(CameraCommand.MoveByAnimated(deltaX, deltaY))
+    mapState?.moveByAnimated(deltaX, deltaY)
+    requestRender()
   }
 
   fun animateZoom(scale: Double) {
-    enqueue(CameraCommand.ScaleByAnimated(scale, viewportCenter()))
+    mapState?.scaleByAnimated(scale, viewportCenter())
+    requestRender()
   }
 
   fun rotateAndPitch(deltaX: Double, deltaY: Double) {
-    enqueue(
-      CameraCommand.AdjustBearingAndPitch(deltaX * DRAG_ROTATE_FACTOR, -deltaY * DRAG_PITCH_FACTOR)
-    )
+    mapState?.adjustBearingAndPitch(deltaX * DRAG_ROTATE_FACTOR, -deltaY * DRAG_PITCH_FACTOR)
+    requestRender()
   }
 
   fun animateBearing(deltaDegrees: Double) {
-    enqueue(CameraCommand.AdjustBearingAnimated(deltaDegrees))
+    mapState?.adjustBearingAnimated(deltaDegrees)
+    requestRender()
   }
 
   fun animatePitch(deltaDegrees: Double) {
-    enqueue(CameraCommand.AdjustPitchAnimated(deltaDegrees))
+    mapState?.adjustPitchAnimated(deltaDegrees)
+    requestRender()
   }
 
   fun resetOrientation() {
-    enqueue(CameraCommand.ResetOrientation)
+    mapState?.resetOrientation()
+    requestRender()
   }
 
   fun stopCameraAnimation() {
-    enqueue(CameraCommand.CancelTransitions)
+    mapState?.cancelTransitions()
+    requestRender()
   }
 
   fun setGestureActive(inProgress: Boolean) {
-    enqueue(CameraCommand.SetGestureInProgress(inProgress))
-  }
-
-  private fun enqueue(command: CameraCommand) {
-    mapState?.submit(command)
+    mapState?.setGestureInProgress(inProgress)
     requestRender()
   }
 

@@ -102,39 +102,55 @@ internal class MapState(initialViewport: Viewport, private val requestRender: ()
     }
   }
 
-  /** Submits one camera command directly from the UI thread. */
-  fun submit(command: CameraCommand) {
-    when (command) {
-      CameraCommand.CancelTransitions -> map.updateCamera(CameraUpdate())
-      is CameraCommand.SetGestureInProgress -> {
-        if (command.inProgress) gestureId += 1
-        map.updateCamera(
-          CameraUpdate(
-            gesturePhase = if (command.inProgress) GesturePhase.BEGIN else GesturePhase.END,
-            gestureId = gestureId,
-          )
-        )
+  fun cancelTransitions() {
+    map.updateCamera(CameraUpdate())
+    requestRender()
+  }
+
+  fun setGestureInProgress(inProgress: Boolean) {
+    if (inProgress) gestureId += 1
+    map.updateCamera(
+      CameraUpdate(
+        gesturePhase = if (inProgress) GesturePhase.BEGIN else GesturePhase.END,
+        gestureId = gestureId,
+      )
+    )
+    requestRender()
+  }
+
+  fun moveBy(deltaX: Double, deltaY: Double) {
+    moveCameraBy(deltaX, deltaY)
+    requestRender()
+  }
+
+  fun scaleBy(scale: Double, anchor: org.maplibre.nativeffi.geo.ScreenPoint) {
+    scaleCameraBy(scale, anchor, null)
+    requestRender()
+  }
+
+  fun adjustBearing(degrees: Double, anchor: org.maplibre.nativeffi.geo.ScreenPoint) {
+    update(
+      CameraOptions().apply {
+        bearing = (desiredCamera.bearing ?: 0.0) + degrees
+        this.anchor = anchor
       }
-      is CameraCommand.MoveBy -> moveBy(command.deltaX, command.deltaY)
-      is CameraCommand.ScaleBy -> scaleBy(command.scale, command.anchor, null)
-      is CameraCommand.AdjustBearing ->
-        update(
-          CameraOptions().apply {
-            bearing = (desiredCamera.bearing ?: 0.0) + command.degrees
-            anchor = command.anchor
-          }
-        )
-      is CameraCommand.AdjustPitch ->
-        update(
-          CameraOptions().apply {
-            pitch = ((desiredCamera.pitch ?: 0.0) + command.degrees).coerceIn(MIN_PITCH, MAX_PITCH)
-          }
-        )
-      is CameraCommand.ZoomToNextWholeLevel -> {
-        val zoom = desiredCamera.zoom ?: 0.0
-        scaleBy(2.0.pow(round(zoom) + 1.0 - zoom), command.anchor, DOUBLE_TAP_DURATION_MS)
+    )
+    requestRender()
+  }
+
+  fun adjustPitch(degrees: Double) {
+    update(
+      CameraOptions().apply {
+        pitch = ((desiredCamera.pitch ?: 0.0) + degrees).coerceIn(MIN_PITCH, MAX_PITCH)
       }
-    }
+    )
+    requestRender()
+  }
+
+  fun zoomToNextWholeLevel(anchor: org.maplibre.nativeffi.geo.ScreenPoint) {
+    val zoom = desiredCamera.zoom ?: 0.0
+    scaleCameraBy(2.0.pow(round(zoom) + 1.0 - zoom), anchor, DOUBLE_TAP_DURATION_MS)
+    requestRender()
   }
 
   fun resize(viewport: Viewport) {
@@ -145,7 +161,7 @@ internal class MapState(initialViewport: Viewport, private val requestRender: ()
     map.requestRepaint()
   }
 
-  private fun moveBy(dx: Double, dy: Double) {
+  private fun moveCameraBy(dx: Double, dy: Double) {
     val center = desiredCamera.center ?: return
     val zoom = desiredCamera.zoom ?: 0.0
     val bearingRadians = (desiredCamera.bearing ?: 0.0) * PI / 180.0
@@ -169,7 +185,7 @@ internal class MapState(initialViewport: Viewport, private val requestRender: ()
     )
   }
 
-  private fun scaleBy(
+  private fun scaleCameraBy(
     scale: Double,
     anchor: org.maplibre.nativeffi.geo.ScreenPoint,
     durationMs: Double?,
@@ -246,4 +262,15 @@ internal class MapState(initialViewport: Viewport, private val requestRender: ()
     private const val MAX_PITCH = 60.0
     private const val DOUBLE_TAP_DURATION_MS = 160.0
   }
+}
+
+/** One-bit signal that a frame is worth drawing. */
+internal class RenderRequest {
+  private val value = AtomicBoolean(true)
+
+  fun set() {
+    value.set(true)
+  }
+
+  fun consume(): Boolean = value.getAndSet(false)
 }

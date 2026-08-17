@@ -11,11 +11,11 @@ import android.view.SurfaceView
  * The Choreographer-paced render loop.
  *
  * The UI thread owns the surface, touch input, viewport, graphics context, and render session.
- * Runtime and map commands are submitted directly to the core-owned runtime worker.
+ * Runtime and map updates are submitted directly to the core-owned runtime worker.
  */
 internal class AndroidMapView(context: Context) :
   SurfaceView(context), SurfaceHolder.Callback2, Choreographer.FrameCallback, AutoCloseable {
-  private val input = InputController(context, ::submitCameraCommand)
+  private val input = InputController(context) { mapState }
   private var graphics: GraphicsContext? = null
   private var renderTarget: SurfaceRenderTarget? = null
   private var mapState: MapState? = null
@@ -123,11 +123,6 @@ internal class AndroidMapView(context: Context) :
     detachSurface()
     mapState?.close()
     mapState = null
-  }
-
-  private fun submitCameraCommand(command: CameraCommand) {
-    mapState?.submit(command)
-    requestRender()
   }
 
   private fun surfaceAvailable(holder: SurfaceHolder) {

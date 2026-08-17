@@ -31,9 +31,7 @@ class OperationObject final {
   auto operator=(OperationObject&&) -> OperationObject& = delete;
   ~OperationObject() = default;
 
-  auto publish(
-    mln_operation self, std::shared_ptr<NotificationEndpoint> endpoint
-  ) noexcept -> void;
+  auto publish(std::shared_ptr<NotificationEndpoint> endpoint) noexcept -> void;
   auto set_terminal_callback(TerminalCallback callback) noexcept -> void;
   auto complete(
     mln_status status, std::string diagnostic, std::any result
@@ -113,7 +111,6 @@ class OperationObject final {
   std::mutex mutex_;
   std::condition_variable condition_;
   std::uint32_t kind_;
-  mln_operation self_ = MLN_HANDLE_NULL;
   bool cancellable_;
   bool completed_ = false;
   bool observer_attached_ = true;

@@ -23,10 +23,9 @@ OperationObject::OperationObject(
       cancel_callback_(std::move(cancel)) {}
 
 auto OperationObject::publish(
-  mln_operation self, std::shared_ptr<NotificationEndpoint> endpoint
+  std::shared_ptr<NotificationEndpoint> endpoint
 ) noexcept -> void {
   const std::scoped_lock lock(mutex_);
-  self_ = self;
   endpoint_ = std::move(endpoint);
 }
 
@@ -306,7 +305,7 @@ auto register_operation(
       static_cast<void>(handle_table<OperationObject>().remove(handle));
       return MLN_STATUS_INVALID_STATE;
     }
-    state->publish(handle, std::move(endpoint));
+    state->publish(std::move(endpoint));
   } catch (...) {
     static_cast<void>(handle_table<OperationObject>().remove(handle));
     throw;

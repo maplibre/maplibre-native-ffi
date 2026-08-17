@@ -531,7 +531,7 @@ public struct CustomGeometrySourceOptions: Sendable {
 /// GeoJSON source.
 ///
 /// Preparation needs no runtime or map and is callable from any thread, so a
-/// host can prepare data off the map owner thread. Install calls borrow the
+/// host can prepare data concurrently with map work. Install calls borrow the
 /// handle, so one prepared value may be installed on any number of sources and
 /// closed at any time afterward; closing never invalidates a source the data
 /// was installed on.

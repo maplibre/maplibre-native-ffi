@@ -45,7 +45,7 @@ public sealed record ProjectionModeOptions
 
 public readonly record struct LogicalExtent(uint Width, uint Height, double ScaleFactor);
 
-/// <summary>A synchronous copy of the map's committed executor state.</summary>
+/// <summary>A synchronous copy of the map's committed state.</summary>
 /// <remarks>
 /// Every committed map command publishes a new snapshot and reports its generation in the
 /// command's terminal <see cref="Runtime.RuntimeEventPayload.CommandFinished" /> event, so a

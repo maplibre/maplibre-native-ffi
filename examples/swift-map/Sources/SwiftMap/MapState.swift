@@ -26,25 +26,6 @@ struct Viewport: Equatable {
   }
 }
 
-/// A camera change decoded and applied on the main render loop.
-enum CameraCommand {
-  case resize(MapLogicalExtent)
-  case setGestureInProgress(Bool)
-  case moveBy(dx: Double, dy: Double)
-  case moveByAnimated(dx: Double, dy: Double, animation: AnimationOptions)
-  case scaleBy(scale: Double, anchor: ScreenPoint)
-  case scaleByAnimated(
-    scale: Double,
-    anchor: ScreenPoint,
-    animation: AnimationOptions
-  )
-  case adjustBearing(delta: Double)
-  case adjustBearingAnimated(delta: Double, animation: AnimationOptions)
-  case adjustPitch(delta: Double)
-  case adjustPitchAnimated(delta: Double, animation: AnimationOptions)
-  case resetOrientation(animation: AnimationOptions)
-}
-
 /// Runtime and map state owned by the main render loop.
 @MainActor
 final class MapState {
@@ -137,69 +118,80 @@ final class MapState {
     return renderPending
   }
 
-  func apply(_ command: CameraCommand) async throws {
-    switch command {
-    case let .resize(extent):
-      _ = try map.resize(to: extent)
-    case let .setGestureInProgress(inProgress):
-      _ = try map.updateCamera(CameraUpdate(
-        camera: CameraOptions(),
-        gesturePhase: inProgress ? .begin : .end,
-        gestureId: 1
-      ))
-    case let .moveBy(dx, dy):
-      try await moveBy(dx: dx, dy: dy, mode: .jump)
-    case let .moveByAnimated(dx, dy, animation):
-      try await moveBy(dx: dx, dy: dy, mode: .ease, animation: animation)
-    case let .scaleBy(scale, anchor):
-      try await scaleBy(scale, anchor: anchor, mode: .jump)
-    case let .scaleByAnimated(scale, anchor, animation):
-      try await scaleBy(
-        scale,
-        anchor: anchor,
-        mode: .ease,
-        animation: animation
-      )
-    case let .adjustBearing(delta):
-      let current = try await map.queryCamera().camera
-      _ = try map.updateCamera(CameraUpdate(camera: CameraOptions(
-        bearing: (current.bearing ?? 0) + delta
-      )))
-    case let .adjustBearingAnimated(delta, animation):
-      let current = try await map.queryCamera().camera
-      _ = try map.updateCamera(CameraUpdate(
-        mode: .ease,
-        camera: CameraOptions(bearing: (current.bearing ?? 0) + delta),
-        animation: animation
-      ))
-    case let .adjustPitch(delta):
-      let current = try await map.queryCamera().camera
-      _ = try map.updateCamera(CameraUpdate(camera: CameraOptions(
-        pitch: clampedPitch((current.pitch ?? 0) + delta)
-      )))
-    case let .adjustPitchAnimated(delta, animation):
-      let current = try await map.queryCamera().camera
-      _ = try map.updateCamera(CameraUpdate(
-        mode: .ease,
-        camera: CameraOptions(
-          pitch: clampedPitch((current.pitch ?? 0) + delta)
-        ),
-        animation: animation
-      ))
-    case let .resetOrientation(animation):
-      _ = try map.updateCamera(CameraUpdate(
-        mode: .ease,
-        camera: CameraOptions(bearing: 0, pitch: 0),
-        animation: animation
-      ))
-    }
+  func resize(_ extent: MapLogicalExtent) throws {
+    _ = try map.resize(to: extent)
   }
 
-  private func moveBy(
+  func setGestureInProgress(_ inProgress: Bool) throws {
+    _ = try map.updateCamera(CameraUpdate(
+      camera: CameraOptions(),
+      gesturePhase: inProgress ? .begin : .end,
+      gestureId: 1
+    ))
+  }
+
+  func moveBy(
     dx: Double,
     dy: Double,
-    mode: CameraUpdateMode,
-    animation: AnimationOptions = AnimationOptions()
+    animation: AnimationOptions? = nil
+  ) async throws {
+    try await moveCameraBy(dx: dx, dy: dy, animation: animation)
+  }
+
+  func scaleBy(
+    _ scale: Double,
+    anchor: ScreenPoint,
+    animation: AnimationOptions? = nil
+  ) async throws {
+    let current = try await map.queryCamera().camera
+    _ = try map.updateCamera(CameraUpdate(
+      mode: animation == nil ? .jump : .ease,
+      camera: CameraOptions(
+        zoom: (current.zoom ?? 0) + log2(scale),
+        anchor: anchor
+      ),
+      animation: animation ?? AnimationOptions()
+    ))
+  }
+
+  func adjustBearing(
+    delta: Double,
+    animation: AnimationOptions? = nil
+  ) async throws {
+    let current = try await map.queryCamera().camera
+    _ = try map.updateCamera(CameraUpdate(
+      mode: animation == nil ? .jump : .ease,
+      camera: CameraOptions(bearing: (current.bearing ?? 0) + delta),
+      animation: animation ?? AnimationOptions()
+    ))
+  }
+
+  func adjustPitch(
+    delta: Double,
+    animation: AnimationOptions? = nil
+  ) async throws {
+    let current = try await map.queryCamera().camera
+    _ = try map.updateCamera(CameraUpdate(
+      mode: animation == nil ? .jump : .ease,
+      camera: CameraOptions(
+        pitch: clampedPitch((current.pitch ?? 0) + delta)
+      ),
+      animation: animation ?? AnimationOptions()
+    ))
+  }
+
+  func resetOrientation(animation: AnimationOptions) throws {
+    _ = try map.updateCamera(CameraUpdate(
+      mode: .ease,
+      camera: CameraOptions(bearing: 0, pitch: 0),
+      animation: animation
+    ))
+  }
+
+  private func moveCameraBy(
+    dx: Double,
+    dy: Double,
+    animation: AnimationOptions?
   ) async throws {
     let current = try await map.queryCamera().camera
     guard let center = current.center else { return }
@@ -209,26 +201,9 @@ final class MapState {
       y: centerPoint.y - dy
     ))
     _ = try map.updateCamera(CameraUpdate(
-      mode: mode,
+      mode: animation == nil ? .jump : .ease,
       camera: CameraOptions(center: movedCenter),
-      animation: animation
-    ))
-  }
-
-  private func scaleBy(
-    _ scale: Double,
-    anchor: ScreenPoint,
-    mode: CameraUpdateMode,
-    animation: AnimationOptions = AnimationOptions()
-  ) async throws {
-    let current = try await map.queryCamera().camera
-    _ = try map.updateCamera(CameraUpdate(
-      mode: mode,
-      camera: CameraOptions(
-        zoom: (current.zoom ?? 0) + log2(scale),
-        anchor: anchor
-      ),
-      animation: animation
+      animation: animation ?? AnimationOptions()
     ))
   }
 }

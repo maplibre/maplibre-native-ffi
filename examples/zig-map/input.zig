@@ -19,16 +19,7 @@ pub const Result = struct {
     camera_changed: bool = false,
 };
 
-const CommandSink = struct {
-    map: *maplibre.MapHandle,
-    diagnostic_store: *const maplibre.DiagnosticStore,
-
-    fn push(self: CommandSink, command: map_state.CameraCommand) !void {
-        try map_state.applyCameraCommand(self.map, command, self.diagnostic_store);
-    }
-};
-
-/// Decodes host input and submits camera updates directly to the any-thread map.
+/// Decodes host input and updates the any-thread map directly.
 pub const Controller = struct {
     drag_mode: DragMode = .none,
     drag_button: u8 = 0,
@@ -40,17 +31,15 @@ pub const Controller = struct {
     pub fn handleEvent(
         self: *Controller,
         event: *const c.SDL_Event,
-        map: *maplibre.MapHandle,
-        diagnostic_store: *const maplibre.DiagnosticStore,
+        state: *map_state.MapState,
         current_viewport: types.Viewport,
     ) !Result {
-        const commands = CommandSink{ .map = map, .diagnostic_store = diagnostic_store };
         return switch (event.type) {
-            c.SDL_EVENT_MOUSE_BUTTON_DOWN => try self.handleMouseButtonDown(event.button, commands, current_viewport),
-            c.SDL_EVENT_MOUSE_BUTTON_UP => try self.handleMouseButtonUp(event.button, commands),
-            c.SDL_EVENT_MOUSE_MOTION => try self.handleMouseMotion(event.motion, commands, current_viewport),
-            c.SDL_EVENT_MOUSE_WHEEL => try handleMouseWheel(event.wheel, commands, current_viewport),
-            c.SDL_EVENT_KEY_DOWN => try handleKeyDown(event.key, commands, current_viewport),
+            c.SDL_EVENT_MOUSE_BUTTON_DOWN => try self.handleMouseButtonDown(event.button, state, current_viewport),
+            c.SDL_EVENT_MOUSE_BUTTON_UP => try self.handleMouseButtonUp(event.button, state),
+            c.SDL_EVENT_MOUSE_MOTION => try self.handleMouseMotion(event.motion, state, current_viewport),
+            c.SDL_EVENT_MOUSE_WHEEL => try handleMouseWheel(event.wheel, state, current_viewport),
+            c.SDL_EVENT_KEY_DOWN => try handleKeyDown(event.key, state, current_viewport),
             else => .{},
         };
     }
@@ -58,7 +47,7 @@ pub const Controller = struct {
     fn handleMouseButtonDown(
         self: *Controller,
         button: c.SDL_MouseButtonEvent,
-        commands: CommandSink,
+        state: *map_state.MapState,
         current_viewport: types.Viewport,
     ) !Result {
         if (self.drag_mode != .none) return .{ .handled = true };
@@ -70,8 +59,8 @@ pub const Controller = struct {
         self.last_y = cursor.y;
         const gesture_id = self.next_gesture_id;
         self.next_gesture_id +%= 1;
-        try commands.push(.cancel_transitions);
-        try commands.push(.{ .gesture = .{ .phase = .begin, .id = gesture_id } });
+        try state.cancelTransitions();
+        try state.setGesture(.begin, gesture_id);
         self.active_gesture_id = gesture_id;
         self.drag_mode = mode;
         self.drag_button = button.button;
@@ -81,29 +70,29 @@ pub const Controller = struct {
     fn handleMouseButtonUp(
         self: *Controller,
         button: c.SDL_MouseButtonEvent,
-        commands: CommandSink,
+        state: *map_state.MapState,
     ) !Result {
         if (button.button != c.SDL_BUTTON_LEFT and button.button != c.SDL_BUTTON_RIGHT) return .{};
         if (button.button != self.drag_button) return .{ .handled = true };
-        try self.endDrag(commands);
+        try self.endDrag(state);
         self.last_x = button.x;
         self.last_y = button.y;
         return .{ .handled = true };
     }
 
-    fn endDrag(self: *Controller, commands: CommandSink) !void {
+    fn endDrag(self: *Controller, state: *map_state.MapState) !void {
         if (self.drag_mode == .none) return;
         self.drag_mode = .none;
         self.drag_button = 0;
         const gesture_id = self.active_gesture_id;
         self.active_gesture_id = 0;
-        try commands.push(.{ .gesture = .{ .phase = .end, .id = gesture_id } });
+        try state.setGesture(.end, gesture_id);
     }
 
     fn handleMouseMotion(
         self: *Controller,
         motion: c.SDL_MouseMotionEvent,
-        commands: CommandSink,
+        state: *map_state.MapState,
         current_viewport: types.Viewport,
     ) !Result {
         const cursor = logicalPoint(motion.x, motion.y, current_viewport);
@@ -120,14 +109,14 @@ pub const Controller = struct {
                 const dx = x - self.last_x;
                 const dy = y - self.last_y;
                 if (dx == 0 and dy == 0) return .{ .handled = true };
-                try commands.push(.{ .move_by = .{ .dx = dx, .dy = dy } });
+                try state.moveBy(dx, dy);
             },
             .rotate => {
                 const dx = x - self.last_x;
                 const dy = y - self.last_y;
                 if (dx == 0 and dy == 0) return .{ .handled = true };
-                try commands.push(.{ .adjust_bearing = .{ .delta = dx * 0.5 } });
-                try commands.push(.{ .pitch_by = .{ .delta = dy / 2.0 } });
+                try state.adjustBearing(dx * 0.5);
+                try state.pitchBy(dy / 2.0);
             },
         }
         return .{ .handled = true, .camera_changed = true };
@@ -151,7 +140,7 @@ pub fn logControls() void {
 
 fn handleMouseWheel(
     wheel: c.SDL_MouseWheelEvent,
-    commands: CommandSink,
+    state: *map_state.MapState,
     current_viewport: types.Viewport,
 ) !Result {
     const delta: f64 = wheel.y;
@@ -159,13 +148,13 @@ fn handleMouseWheel(
 
     const anchor = logicalPoint(wheel.mouse_x, wheel.mouse_y, current_viewport);
     const scale = std.math.pow(f64, 2.0, delta * 0.25);
-    try commands.push(.{ .scale_by = .{ .scale = scale, .anchor = anchor } });
+    try state.scaleBy(scale, anchor);
     return .{ .handled = true, .camera_changed = true };
 }
 
 fn handleKeyDown(
     key: c.SDL_KeyboardEvent,
-    commands: CommandSink,
+    state: *map_state.MapState,
     current_viewport: types.Viewport,
 ) !Result {
     const pan_step = 120.0;
@@ -178,17 +167,17 @@ fn handleKeyDown(
     );
 
     switch (key.scancode) {
-        scancode(c.SDL_SCANCODE_LEFT), scancode(c.SDL_SCANCODE_A) => try commands.push(.{ .move_by_animated = .{ .dx = pan_step, .dy = 0, .duration_ms = keyboard_animation_ms } }),
-        scancode(c.SDL_SCANCODE_RIGHT), scancode(c.SDL_SCANCODE_D) => try commands.push(.{ .move_by_animated = .{ .dx = -pan_step, .dy = 0, .duration_ms = keyboard_animation_ms } }),
-        scancode(c.SDL_SCANCODE_UP), scancode(c.SDL_SCANCODE_W) => try commands.push(.{ .move_by_animated = .{ .dx = 0, .dy = pan_step, .duration_ms = keyboard_animation_ms } }),
-        scancode(c.SDL_SCANCODE_DOWN), scancode(c.SDL_SCANCODE_S) => try commands.push(.{ .move_by_animated = .{ .dx = 0, .dy = -pan_step, .duration_ms = keyboard_animation_ms } }),
-        scancode(c.SDL_SCANCODE_EQUALS), scancode(c.SDL_SCANCODE_KP_PLUS) => try commands.push(.{ .scale_by_animated = .{ .scale = zoom_step, .anchor = center, .duration_ms = keyboard_animation_ms } }),
-        scancode(c.SDL_SCANCODE_MINUS), scancode(c.SDL_SCANCODE_KP_MINUS) => try commands.push(.{ .scale_by_animated = .{ .scale = 1.0 / zoom_step, .anchor = center, .duration_ms = keyboard_animation_ms } }),
-        scancode(c.SDL_SCANCODE_Q) => try commands.push(.{ .adjust_bearing_animated = .{ .delta = -bearing_step, .duration_ms = keyboard_animation_ms } }),
-        scancode(c.SDL_SCANCODE_E) => try commands.push(.{ .adjust_bearing_animated = .{ .delta = bearing_step, .duration_ms = keyboard_animation_ms } }),
-        scancode(c.SDL_SCANCODE_RIGHTBRACKET) => try commands.push(.{ .adjust_pitch_animated = .{ .delta = pitch_step, .duration_ms = keyboard_animation_ms } }),
-        scancode(c.SDL_SCANCODE_LEFTBRACKET) => try commands.push(.{ .adjust_pitch_animated = .{ .delta = -pitch_step, .duration_ms = keyboard_animation_ms } }),
-        scancode(c.SDL_SCANCODE_0) => try commands.push(.{ .reset_orientation = .{ .duration_ms = reset_animation_ms } }),
+        scancode(c.SDL_SCANCODE_LEFT), scancode(c.SDL_SCANCODE_A) => try state.moveByAnimated(pan_step, 0, keyboard_animation_ms),
+        scancode(c.SDL_SCANCODE_RIGHT), scancode(c.SDL_SCANCODE_D) => try state.moveByAnimated(-pan_step, 0, keyboard_animation_ms),
+        scancode(c.SDL_SCANCODE_UP), scancode(c.SDL_SCANCODE_W) => try state.moveByAnimated(0, pan_step, keyboard_animation_ms),
+        scancode(c.SDL_SCANCODE_DOWN), scancode(c.SDL_SCANCODE_S) => try state.moveByAnimated(0, -pan_step, keyboard_animation_ms),
+        scancode(c.SDL_SCANCODE_EQUALS), scancode(c.SDL_SCANCODE_KP_PLUS) => try state.scaleByAnimated(zoom_step, center, keyboard_animation_ms),
+        scancode(c.SDL_SCANCODE_MINUS), scancode(c.SDL_SCANCODE_KP_MINUS) => try state.scaleByAnimated(1.0 / zoom_step, center, keyboard_animation_ms),
+        scancode(c.SDL_SCANCODE_Q) => try state.adjustBearingAnimated(-bearing_step, keyboard_animation_ms),
+        scancode(c.SDL_SCANCODE_E) => try state.adjustBearingAnimated(bearing_step, keyboard_animation_ms),
+        scancode(c.SDL_SCANCODE_RIGHTBRACKET) => try state.adjustPitchAnimated(pitch_step, keyboard_animation_ms),
+        scancode(c.SDL_SCANCODE_LEFTBRACKET) => try state.adjustPitchAnimated(-pitch_step, keyboard_animation_ms),
+        scancode(c.SDL_SCANCODE_0) => try state.resetOrientation(reset_animation_ms),
         else => return .{},
     }
     return .{ .handled = true, .camera_changed = true };

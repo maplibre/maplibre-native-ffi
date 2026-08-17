@@ -648,7 +648,30 @@ public sealed unsafe class RuntimeHandle : IDisposable
     /// The batch reports the events that this runtime and its maps queued under their masks.
     /// Managed copies preserve queue order after the owned native batch is released.
     /// </remarks>
-    public RuntimeEventBatch DrainEvents() => Drain();
+    public RuntimeEventBatch DrainEvents()
+    {
+        MlnEventBatch batch = default;
+        NativeStatus.Check(NativeMethods.mln_runtime_drain_events(Handle, &batch));
+        try
+        {
+            var view = new mln_runtime_event_batch_view
+            {
+                size = (uint)sizeof(mln_runtime_event_batch_view),
+            };
+            NativeStatus.Check(NativeMethods.mln_event_batch_get(batch, &view));
+            List<RuntimeEvent> events;
+            lock (mapGate)
+            {
+                events = RuntimeStructs.ReadBatch(view, this, MapForLocked);
+            }
+
+            return new RuntimeEventBatch(events);
+        }
+        finally
+        {
+            NativeMethods.mln_event_batch_release(batch);
+        }
+    }
 
     /// <summary>Selects which runtime-originated event types this runtime queues.</summary>
     public void SetEventMask(RuntimeEventMask mask)
@@ -675,31 +698,6 @@ public sealed unsafe class RuntimeHandle : IDisposable
     {
         _ = Handle;
         return notificationReceiver.DrainReadyEndpoints();
-    }
-
-    private RuntimeEventBatch Drain()
-    {
-        MlnEventBatch batch = default;
-        NativeStatus.Check(NativeMethods.mln_runtime_drain_events(Handle, &batch));
-        try
-        {
-            var view = new mln_runtime_event_batch_view
-            {
-                size = (uint)sizeof(mln_runtime_event_batch_view),
-            };
-            NativeStatus.Check(NativeMethods.mln_event_batch_get(batch, &view));
-            List<RuntimeEvent> events;
-            lock (mapGate)
-            {
-                events = RuntimeStructs.ReadBatch(view, this, MapForLocked);
-            }
-
-            return new RuntimeEventBatch(events);
-        }
-        finally
-        {
-            NativeMethods.mln_event_batch_release(batch);
-        }
     }
 
     /// <summary>Waits until all previously accepted runtime work reaches a terminal state.</summary>

@@ -19,49 +19,6 @@ const OPERATION_TIMEOUT: Duration = Duration::from_secs(5);
 const MINIMUM_PITCH: f64 = 0.0;
 const MAXIMUM_PITCH: f64 = 60.0;
 
-#[derive(Clone, Copy, Debug)]
-pub enum CameraCommand {
-    CancelTransitions,
-    SetGestureInProgress {
-        in_progress: bool,
-    },
-    MoveBy {
-        dx: f64,
-        dy: f64,
-    },
-    MoveByAnimated {
-        dx: f64,
-        dy: f64,
-        duration_ms: f64,
-    },
-    ScaleBy {
-        scale: f64,
-        anchor: ScreenPoint,
-    },
-    ScaleByAnimated {
-        scale: f64,
-        anchor: ScreenPoint,
-        duration_ms: f64,
-    },
-    PitchBy {
-        delta: f64,
-    },
-    AdjustBearing {
-        delta: f64,
-    },
-    AdjustBearingAnimated {
-        delta: f64,
-        duration_ms: f64,
-    },
-    AdjustPitchAnimated {
-        delta: f64,
-        duration_ms: f64,
-    },
-    ResetOrientation {
-        duration_ms: f64,
-    },
-}
-
 pub struct MapState {
     projection: Option<MapProjectionHandle>,
     map: MapHandle,
@@ -138,76 +95,87 @@ impl MapState {
         &self.map
     }
 
-    pub fn apply(&mut self, command: CameraCommand) -> Result<(), Box<dyn Error>> {
+    pub fn cancel_transitions(&self) -> Result<(), Box<dyn Error>> {
         let current = self.ordered_camera()?;
         let mut update = CameraUpdate::default();
-        match command {
-            CameraCommand::CancelTransitions => update.camera = current,
-            CameraCommand::SetGestureInProgress { in_progress } => {
-                if in_progress {
-                    self.gesture_id = self.gesture_id.wrapping_add(1).max(1);
-                }
-                update.camera = current;
-                update.gesture_phase = if in_progress {
-                    GesturePhase::Begin
-                } else {
-                    GesturePhase::End
-                };
-                update.gesture_id = self.gesture_id;
-            }
-            CameraCommand::MoveBy { dx, dy } => {
-                update.camera = self.moved_camera(current, dx, dy)?;
-            }
-            CameraCommand::MoveByAnimated {
-                dx,
-                dy,
-                duration_ms,
-            } => {
-                update.mode = CameraUpdateMode::Ease;
-                update.camera = self.moved_camera(current, dx, dy)?;
-                update.animation = animation(duration_ms);
-            }
-            CameraCommand::ScaleBy { scale, anchor } => {
-                update.camera.zoom = Some(current.zoom.unwrap_or(0.0) + scale.log2());
-                update.camera.anchor = Some(anchor);
-            }
-            CameraCommand::ScaleByAnimated {
-                scale,
-                anchor,
-                duration_ms,
-            } => {
-                update.mode = CameraUpdateMode::Ease;
-                update.camera.zoom = Some(current.zoom.unwrap_or(0.0) + scale.log2());
-                update.camera.anchor = Some(anchor);
-                update.animation = animation(duration_ms);
-            }
-            CameraCommand::PitchBy { delta } => {
-                update.camera.pitch = Some(
-                    (current.pitch.unwrap_or(0.0) + delta).clamp(MINIMUM_PITCH, MAXIMUM_PITCH),
-                );
-            }
-            CameraCommand::AdjustBearing { delta } => {
-                update.camera.bearing = Some(current.bearing.unwrap_or(0.0) + delta);
-            }
-            CameraCommand::AdjustBearingAnimated { delta, duration_ms } => {
-                update.mode = CameraUpdateMode::Ease;
-                update.camera.bearing = Some(current.bearing.unwrap_or(0.0) + delta);
-                update.animation = animation(duration_ms);
-            }
-            CameraCommand::AdjustPitchAnimated { delta, duration_ms } => {
-                update.mode = CameraUpdateMode::Ease;
-                update.camera.pitch = Some(
-                    (current.pitch.unwrap_or(0.0) + delta).clamp(MINIMUM_PITCH, MAXIMUM_PITCH),
-                );
-                update.animation = animation(duration_ms);
-            }
-            CameraCommand::ResetOrientation { duration_ms } => {
-                update.mode = CameraUpdateMode::Ease;
-                update.camera.bearing = Some(0.0);
-                update.camera.pitch = Some(0.0);
-                update.animation = animation(duration_ms);
-            }
+        update.camera = current;
+        self.map.update_camera(&update)?;
+        Ok(())
+    }
+
+    pub fn set_gesture_in_progress(&mut self, in_progress: bool) -> Result<(), Box<dyn Error>> {
+        let mut update = CameraUpdate::default();
+        update.camera = self.ordered_camera()?;
+        if in_progress {
+            self.gesture_id = self.gesture_id.wrapping_add(1).max(1);
         }
+        update.gesture_phase = if in_progress {
+            GesturePhase::Begin
+        } else {
+            GesturePhase::End
+        };
+        update.gesture_id = self.gesture_id;
+        self.map.update_camera(&update)?;
+        Ok(())
+    }
+
+    pub fn move_by(
+        &self,
+        dx: f64,
+        dy: f64,
+        duration_ms: Option<f64>,
+    ) -> Result<(), Box<dyn Error>> {
+        let current = self.ordered_camera()?;
+        let mut update = CameraUpdate::default();
+        update.camera = self.moved_camera(current, dx, dy)?;
+        set_animation(&mut update, duration_ms);
+        self.map.update_camera(&update)?;
+        Ok(())
+    }
+
+    pub fn scale_by(
+        &self,
+        scale: f64,
+        anchor: ScreenPoint,
+        duration_ms: Option<f64>,
+    ) -> Result<(), Box<dyn Error>> {
+        let current = self.ordered_camera()?;
+        let mut update = CameraUpdate::default();
+        update.camera.zoom = Some(current.zoom.unwrap_or(0.0) + scale.log2());
+        update.camera.anchor = Some(anchor);
+        set_animation(&mut update, duration_ms);
+        self.map.update_camera(&update)?;
+        Ok(())
+    }
+
+    pub fn adjust_pitch(&self, delta: f64, duration_ms: Option<f64>) -> Result<(), Box<dyn Error>> {
+        let current = self.ordered_camera()?;
+        let mut update = CameraUpdate::default();
+        update.camera.pitch =
+            Some((current.pitch.unwrap_or(0.0) + delta).clamp(MINIMUM_PITCH, MAXIMUM_PITCH));
+        set_animation(&mut update, duration_ms);
+        self.map.update_camera(&update)?;
+        Ok(())
+    }
+
+    pub fn adjust_bearing(
+        &self,
+        delta: f64,
+        duration_ms: Option<f64>,
+    ) -> Result<(), Box<dyn Error>> {
+        let current = self.ordered_camera()?;
+        let mut update = CameraUpdate::default();
+        update.camera.bearing = Some(current.bearing.unwrap_or(0.0) + delta);
+        set_animation(&mut update, duration_ms);
+        self.map.update_camera(&update)?;
+        Ok(())
+    }
+
+    pub fn reset_orientation(&self, duration_ms: f64) -> Result<(), Box<dyn Error>> {
+        let mut update = CameraUpdate::default();
+        update.camera.bearing = Some(0.0);
+        update.camera.pitch = Some(0.0);
+        set_animation(&mut update, Some(duration_ms));
         self.map.update_camera(&update)?;
         Ok(())
     }
@@ -340,6 +308,13 @@ fn animation(duration_ms: f64) -> AnimationOptions {
     let mut animation = AnimationOptions::default();
     animation.duration_ms = Some(duration_ms);
     animation
+}
+
+fn set_animation(update: &mut CameraUpdate, duration_ms: Option<f64>) {
+    if let Some(duration_ms) = duration_ms {
+        update.mode = CameraUpdateMode::Ease;
+        update.animation = animation(duration_ms);
+    }
 }
 
 fn startup_error(

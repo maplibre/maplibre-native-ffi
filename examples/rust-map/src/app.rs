@@ -88,14 +88,14 @@ impl App {
             WindowEvent::RedrawRequested => self.render_or_exit(),
             event => {
                 let (input, map) = (&mut self.input, self.map.as_mut().expect("map is open"));
-                match input.handle(&event, self.viewport, |command| map.apply(command)) {
+                match input.handle(&event, self.viewport, map) {
                     Ok(true) => {
                         self.render_requested = true;
                         self.window.request_redraw();
                     }
                     Ok(false) => {}
                     Err(error) => {
-                        eprintln!("camera command failed: {error}");
+                        eprintln!("camera update failed: {error}");
                         self.abort_process(1);
                     }
                 }

@@ -22,7 +22,7 @@ class NotificationEndpoint final {
  public:
   NotificationEndpoint(
     std::shared_ptr<NotificationSourceObject> source, std::uint64_t id,
-    std::uint32_t kind, bool sticky
+    std::uint32_t kind
   );
   NotificationEndpoint(const NotificationEndpoint&) = delete;
   NotificationEndpoint(NotificationEndpoint&&) = delete;
@@ -82,7 +82,6 @@ class NotificationSourceObject final
 
  private:
   struct EndpointState {
-    std::uint32_t kind = 0;
     bool sticky = false;
     const NotificationEndpoint* owner = nullptr;
     bool ready = false;

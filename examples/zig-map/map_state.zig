@@ -4,20 +4,6 @@ const maplibre = @import("maplibre_native_ffi");
 const diagnostics = @import("diagnostics.zig");
 const types = @import("types.zig");
 
-pub const CameraCommand = union(enum) {
-    cancel_transitions,
-    gesture: struct { phase: maplibre.GesturePhase, id: u64 },
-    move_by: struct { dx: f64, dy: f64 },
-    move_by_animated: struct { dx: f64, dy: f64, duration_ms: f64 },
-    scale_by: struct { scale: f64, anchor: maplibre.ScreenPoint },
-    scale_by_animated: struct { scale: f64, anchor: maplibre.ScreenPoint, duration_ms: f64 },
-    pitch_by: struct { delta: f64 },
-    adjust_bearing: struct { delta: f64 },
-    adjust_bearing_animated: struct { delta: f64, duration_ms: f64 },
-    adjust_pitch_animated: struct { delta: f64, duration_ms: f64 },
-    reset_orientation: struct { duration_ms: f64 },
-};
-
 pub const MapState = struct {
     allocator: std.mem.Allocator,
     diagnostic_store: *maplibre.DiagnosticStore,
@@ -67,100 +53,114 @@ pub const MapState = struct {
         self.diagnostic_store.deinit();
         self.allocator.destroy(self.diagnostic_store);
     }
-};
 
-pub fn applyCameraCommand(
-    map: *maplibre.MapHandle,
-    command: CameraCommand,
-    diagnostic_store: *const maplibre.DiagnosticStore,
-) !void {
-    const update: maplibre.CameraUpdate = switch (command) {
-        .cancel_transitions => .{ .camera = (try orderedCamera(map, diagnostic_store)).camera },
-        .gesture => |gesture| .{
-            .gesture_phase = gesture.phase,
-            .gesture_id = gesture.id,
-        },
-        .move_by => |move| .{ .camera = .{
-            .center = try movedCenter(map, move.dx, move.dy, diagnostic_store),
-        } },
-        .move_by_animated => |move| .{
+    pub fn cancelTransitions(self: *MapState) !void {
+        try self.updateCamera(.{ .camera = (try self.orderedCamera()).camera });
+    }
+
+    pub fn setGesture(self: *MapState, phase: maplibre.GesturePhase, id: u64) !void {
+        try self.updateCamera(.{ .gesture_phase = phase, .gesture_id = id });
+    }
+
+    pub fn moveBy(self: *MapState, dx: f64, dy: f64) !void {
+        try self.updateCamera(.{ .camera = .{ .center = try self.movedCenter(dx, dy) } });
+    }
+
+    pub fn moveByAnimated(self: *MapState, dx: f64, dy: f64, duration_ms: f64) !void {
+        try self.updateCamera(.{
             .mode = .ease,
-            .camera = .{ .center = try movedCenter(map, move.dx, move.dy, diagnostic_store) },
-            .animation = .{ .duration_ms = move.duration_ms },
-        },
-        .scale_by => |zoom| .{ .camera = .{
-            .zoom = ((try orderedCamera(map, diagnostic_store)).camera.zoom orelse 0) + @log2(zoom.scale),
-            .anchor = zoom.anchor,
-        } },
-        .scale_by_animated => |zoom| .{
-            .mode = .ease,
-            .camera = .{
-                .zoom = ((try orderedCamera(map, diagnostic_store)).camera.zoom orelse 0) + @log2(zoom.scale),
-                .anchor = zoom.anchor,
-            },
-            .animation = .{ .duration_ms = zoom.duration_ms },
-        },
-        .pitch_by => |pitch| .{ .camera = .{
-            .pitch = clamp(((try orderedCamera(map, diagnostic_store)).camera.pitch orelse 0) + pitch.delta, 0.0, 60.0),
-        } },
-        .adjust_bearing => |bearing| .{ .camera = .{
-            .bearing = ((try orderedCamera(map, diagnostic_store)).camera.bearing orelse 0) + bearing.delta,
-        } },
-        .adjust_bearing_animated => |bearing| .{
-            .mode = .ease,
-            .camera = .{ .bearing = ((try orderedCamera(map, diagnostic_store)).camera.bearing orelse 0) + bearing.delta },
-            .animation = .{ .duration_ms = bearing.duration_ms },
-        },
-        .adjust_pitch_animated => |pitch| .{
+            .camera = .{ .center = try self.movedCenter(dx, dy) },
+            .animation = .{ .duration_ms = duration_ms },
+        });
+    }
+
+    pub fn scaleBy(self: *MapState, scale: f64, anchor: maplibre.ScreenPoint) !void {
+        try self.updateCamera(.{ .camera = .{
+            .zoom = ((try self.orderedCamera()).camera.zoom orelse 0) + @log2(scale),
+            .anchor = anchor,
+        } });
+    }
+
+    pub fn scaleByAnimated(self: *MapState, scale: f64, anchor: maplibre.ScreenPoint, duration_ms: f64) !void {
+        try self.updateCamera(.{
             .mode = .ease,
             .camera = .{
-                .pitch = clamp(((try orderedCamera(map, diagnostic_store)).camera.pitch orelse 0) + pitch.delta, 0.0, 60.0),
+                .zoom = ((try self.orderedCamera()).camera.zoom orelse 0) + @log2(scale),
+                .anchor = anchor,
             },
-            .animation = .{ .duration_ms = pitch.duration_ms },
-        },
-        .reset_orientation => |reset| .{
+            .animation = .{ .duration_ms = duration_ms },
+        });
+    }
+
+    pub fn pitchBy(self: *MapState, delta: f64) !void {
+        try self.updateCamera(.{ .camera = .{
+            .pitch = clamp(((try self.orderedCamera()).camera.pitch orelse 0) + delta, 0.0, 60.0),
+        } });
+    }
+
+    pub fn adjustBearing(self: *MapState, delta: f64) !void {
+        try self.updateCamera(.{ .camera = .{
+            .bearing = ((try self.orderedCamera()).camera.bearing orelse 0) + delta,
+        } });
+    }
+
+    pub fn adjustBearingAnimated(self: *MapState, delta: f64, duration_ms: f64) !void {
+        try self.updateCamera(.{
+            .mode = .ease,
+            .camera = .{ .bearing = ((try self.orderedCamera()).camera.bearing orelse 0) + delta },
+            .animation = .{ .duration_ms = duration_ms },
+        });
+    }
+
+    pub fn adjustPitchAnimated(self: *MapState, delta: f64, duration_ms: f64) !void {
+        try self.updateCamera(.{
+            .mode = .ease,
+            .camera = .{
+                .pitch = clamp(((try self.orderedCamera()).camera.pitch orelse 0) + delta, 0.0, 60.0),
+            },
+            .animation = .{ .duration_ms = duration_ms },
+        });
+    }
+
+    pub fn resetOrientation(self: *MapState, duration_ms: f64) !void {
+        try self.updateCamera(.{
             .mode = .ease,
             .camera = .{ .bearing = 0, .pitch = 0 },
-            .animation = .{ .duration_ms = reset.duration_ms },
-        },
-    };
-    _ = map.updateCamera(update) catch |err| {
-        diagnostics.logError("camera update failed", err, diagnostic_store);
-        return types.AppError.CameraCommandFailed;
-    };
-}
-
-fn orderedCamera(
-    map: *maplibre.MapHandle,
-    diagnostic_store: *const maplibre.DiagnosticStore,
-) !maplibre.CameraSnapshot {
-    const operation = map.cameraQueryStart() catch |err| {
-        diagnostics.logError("camera query failed", err, diagnostic_store);
-        return types.AppError.CameraCommandFailed;
-    };
-    defer operation.release();
-    if (!(operation.wait(-1) catch false) or (operation.resultStatus() catch -1) != 0) {
-        return types.AppError.CameraCommandFailed;
+            .animation = .{ .duration_ms = duration_ms },
+        });
     }
-    return map.cameraQueryTakeResult(operation) catch |err| {
-        diagnostics.logError("camera query take failed", err, diagnostic_store);
-        return types.AppError.CameraCommandFailed;
-    };
-}
 
-fn movedCenter(
-    map: *maplibre.MapHandle,
-    dx: f64,
-    dy: f64,
-    diagnostic_store: *const maplibre.DiagnosticStore,
-) !maplibre.LatLng {
-    _ = try orderedCamera(map, diagnostic_store);
-    const size = try map.getSize();
-    return map.latLngForPixel(.{
-        .x = @as(f64, @floatFromInt(size.width)) / 2.0 - dx,
-        .y = @as(f64, @floatFromInt(size.height)) / 2.0 - dy,
-    });
-}
+    fn updateCamera(self: *MapState, update: maplibre.CameraUpdate) !void {
+        _ = self.map.updateCamera(update) catch |err| {
+            diagnostics.logError("camera update failed", err, self.diagnostic_store);
+            return types.AppError.CameraUpdateFailed;
+        };
+    }
+
+    fn orderedCamera(self: *MapState) !maplibre.CameraSnapshot {
+        const operation = self.map.cameraQueryStart() catch |err| {
+            diagnostics.logError("camera query failed", err, self.diagnostic_store);
+            return types.AppError.CameraUpdateFailed;
+        };
+        defer operation.release();
+        if (!(operation.wait(-1) catch false) or (operation.resultStatus() catch -1) != 0) {
+            return types.AppError.CameraUpdateFailed;
+        }
+        return self.map.cameraQueryTakeResult(operation) catch |err| {
+            diagnostics.logError("camera query take failed", err, self.diagnostic_store);
+            return types.AppError.CameraUpdateFailed;
+        };
+    }
+
+    fn movedCenter(self: *MapState, dx: f64, dy: f64) !maplibre.LatLng {
+        _ = try self.orderedCamera();
+        const size = try self.map.getSize();
+        return self.map.latLngForPixel(.{
+            .x = @as(f64, @floatFromInt(size.width)) / 2.0 - dx,
+            .y = @as(f64, @floatFromInt(size.height)) / 2.0 - dy,
+        });
+    }
+};
 
 fn waitForBarrier(runtime: *maplibre.RuntimeHandle) !void {
     const operation = try runtime.barrierStart();

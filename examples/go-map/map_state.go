@@ -9,10 +9,9 @@ import (
 )
 
 type runtimeMapState struct {
-	runtime   *maplibre.RuntimeHandle
-	mapRef    *maplibre.MapHandle
-	mapID     maplibre.MapID
-	commandID uint64
+	runtime *maplibre.RuntimeHandle
+	mapRef  *maplibre.MapHandle
+	mapID   maplibre.MapID
 }
 
 func newRuntimeMapState(v viewport) (*runtimeMapState, error) {
@@ -35,23 +34,21 @@ func newRuntimeMapState(v viewport) (*runtimeMapState, error) {
 		_ = state.Close()
 		return nil, fmt.Errorf("map identity read failed: %w", err)
 	}
-	commandID, err := mapHandle.SetStyleURL("https://tiles.openfreemap.org/styles/bright")
+	_, err = mapHandle.SetStyleURL("https://tiles.openfreemap.org/styles/bright")
 	if err != nil {
 		_ = state.Close()
 		return nil, fmt.Errorf("style load failed: %w", err)
 	}
-	state.commandID = commandID
 	initialCamera := maplibre.CameraOptions{}.
 		WithCenter(maplibre.LatLng{Latitude: 37.7749, Longitude: -122.4194}).
 		WithZoom(13).
 		WithBearing(12).
 		WithPitch(30)
-	commandID, err = mapHandle.JumpTo(initialCamera)
+	_, err = mapHandle.JumpTo(initialCamera)
 	if err != nil {
 		_ = state.Close()
 		return nil, fmt.Errorf("camera jump failed: %w", err)
 	}
-	state.commandID = commandID
 	barrier, err := runtimeHandle.Barrier()
 	if err != nil {
 		_ = state.Close()
@@ -68,12 +65,11 @@ func newRuntimeMapState(v viewport) (*runtimeMapState, error) {
 		return nil, fmt.Errorf("initial barrier result failed: %w", err)
 	}
 	barrier.Release()
-	commandID, err = mapHandle.RequestRepaint()
+	_, err = mapHandle.RequestRepaint()
 	if err != nil {
 		_ = state.Close()
 		return nil, fmt.Errorf("initial repaint request failed: %w", err)
 	}
-	state.commandID = commandID
 	return state, nil
 }
 
@@ -90,85 +86,94 @@ func (state *runtimeMapState) Close() error {
 	return result
 }
 
-func (state *runtimeMapState) applyCommand(command cameraCommand) error {
+func (state *runtimeMapState) cancelTransitions() error {
+	return state.updateCamera(maplibre.CameraUpdate{GesturePhase: maplibre.GesturePhaseCancel})
+}
+
+func (state *runtimeMapState) setGestureInProgress(inProgress bool) error {
+	phase := maplibre.GesturePhaseEnd
+	if inProgress {
+		phase = maplibre.GesturePhaseBegin
+	}
+	return state.updateCamera(maplibre.CameraUpdate{GesturePhase: phase})
+}
+
+func (state *runtimeMapState) moveBy(dx, dy float64, durationMS *float64) error {
 	camera, err := state.orderedCamera()
 	if err != nil {
 		return fmt.Errorf("ordered camera read failed: %w", err)
 	}
-	animation := maplibre.AnimationOptions{}.WithDurationMS(command.durationMS)
-	options := maplibre.CameraOptions{}
-	mode := maplibre.CameraUpdateModeJump
-	gesture := maplibre.GesturePhaseNone
-
-	switch command.kind {
-	case commandCancelTransitions:
-		gesture = maplibre.GesturePhaseCancel
-	case commandSetGestureInProgress:
-		if command.inProgress {
-			gesture = maplibre.GesturePhaseBegin
-		} else {
-			gesture = maplibre.GesturePhaseEnd
-		}
-	case commandMoveBy, commandMoveByAnimated:
-		center := maplibre.LatLng{}
-		if camera.Center != nil {
-			center = *camera.Center
-		}
-		zoom := 0.0
-		if camera.Zoom != nil {
-			zoom = *camera.Zoom
-		}
-		degreesPerPixel := 360 / (256 * math.Exp2(zoom))
-		center.Longitude -= command.deltaX * degreesPerPixel
-		center.Latitude += command.deltaY * degreesPerPixel
-		options = options.WithCenter(center)
-		if command.kind == commandMoveByAnimated {
-			mode = maplibre.CameraUpdateModeEase
-		}
-	case commandScaleBy, commandScaleByAnimated:
-		zoom := 0.0
-		if camera.Zoom != nil {
-			zoom = *camera.Zoom
-		}
-		options = options.WithZoom(zoom + math.Log2(command.scale))
-		options.Anchor = &command.anchor
-		if command.kind == commandScaleByAnimated {
-			mode = maplibre.CameraUpdateModeEase
-		}
-	case commandPitchBy, commandAdjustPitchAnimated:
-		pitch := command.deltaY
-		if camera.Pitch != nil {
-			pitch += *camera.Pitch
-		}
-		options = options.WithPitch(clamp(pitch, 0, 60))
-		if command.kind == commandAdjustPitchAnimated {
-			mode = maplibre.CameraUpdateModeEase
-		}
-	case commandAdjustBearing, commandAdjustBearingAnimated:
-		bearing := command.deltaX
-		if camera.Bearing != nil {
-			bearing += *camera.Bearing
-		}
-		options = options.WithBearing(bearing)
-		if command.kind == commandAdjustBearingAnimated {
-			mode = maplibre.CameraUpdateModeEase
-		}
-	case commandResetOrientation:
-		options = options.WithBearing(0).WithPitch(0)
-		mode = maplibre.CameraUpdateModeEase
-	default:
-		return fmt.Errorf("unknown camera command: %d", command.kind)
+	center := maplibre.LatLng{}
+	if camera.Center != nil {
+		center = *camera.Center
 	}
-	update := maplibre.CameraUpdate{Mode: mode, Camera: options, GesturePhase: gesture}
-	if mode != maplibre.CameraUpdateModeJump {
+	zoom := 0.0
+	if camera.Zoom != nil {
+		zoom = *camera.Zoom
+	}
+	degreesPerPixel := 360 / (256 * math.Exp2(zoom))
+	center.Longitude -= dx * degreesPerPixel
+	center.Latitude += dy * degreesPerPixel
+	return state.updateCamera(cameraUpdate(maplibre.CameraOptions{}.WithCenter(center), durationMS))
+}
+
+func (state *runtimeMapState) scaleBy(scale float64, anchor maplibre.ScreenPoint, durationMS *float64) error {
+	camera, err := state.orderedCamera()
+	if err != nil {
+		return fmt.Errorf("ordered camera read failed: %w", err)
+	}
+	zoom := 0.0
+	if camera.Zoom != nil {
+		zoom = *camera.Zoom
+	}
+	options := maplibre.CameraOptions{}.WithZoom(zoom + math.Log2(scale))
+	options.Anchor = &anchor
+	return state.updateCamera(cameraUpdate(options, durationMS))
+}
+
+func (state *runtimeMapState) adjustPitch(delta float64, durationMS *float64) error {
+	camera, err := state.orderedCamera()
+	if err != nil {
+		return fmt.Errorf("ordered camera read failed: %w", err)
+	}
+	pitch := delta
+	if camera.Pitch != nil {
+		pitch += *camera.Pitch
+	}
+	return state.updateCamera(cameraUpdate(maplibre.CameraOptions{}.WithPitch(clamp(pitch, 0, 60)), durationMS))
+}
+
+func (state *runtimeMapState) adjustBearing(delta float64, durationMS *float64) error {
+	camera, err := state.orderedCamera()
+	if err != nil {
+		return fmt.Errorf("ordered camera read failed: %w", err)
+	}
+	bearing := delta
+	if camera.Bearing != nil {
+		bearing += *camera.Bearing
+	}
+	return state.updateCamera(cameraUpdate(maplibre.CameraOptions{}.WithBearing(bearing), durationMS))
+}
+
+func (state *runtimeMapState) resetOrientation(durationMS float64) error {
+	return state.updateCamera(cameraUpdate(maplibre.CameraOptions{}.WithBearing(0).WithPitch(0), &durationMS))
+}
+
+func (state *runtimeMapState) updateCamera(update maplibre.CameraUpdate) error {
+	if _, err := state.mapRef.UpdateCamera(update); err != nil {
+		return fmt.Errorf("camera update failed: %w", err)
+	}
+	return nil
+}
+
+func cameraUpdate(options maplibre.CameraOptions, durationMS *float64) maplibre.CameraUpdate {
+	update := maplibre.CameraUpdate{Camera: options}
+	if durationMS != nil {
+		animation := maplibre.AnimationOptions{}.WithDurationMS(*durationMS)
+		update.Mode = maplibre.CameraUpdateModeEase
 		update.Animation = &animation
 	}
-	commandID, err := state.mapRef.UpdateCamera(update)
-	if err != nil {
-		return fmt.Errorf("camera command failed: %w", err)
-	}
-	state.commandID = commandID
-	return nil
+	return update
 }
 
 func (state *runtimeMapState) orderedCamera() (maplibre.CameraOptions, error) {

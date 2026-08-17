@@ -38,7 +38,7 @@ internal object Shell {
   ) {
     val target = RenderTarget.attach(graphics, state.map, viewport.value, mode)
     try {
-      InputController(graphics.window(), state::submit, renderRequest) { viewport.value }
+      InputController(graphics.window(), state, renderRequest) { viewport.value }
         .use {
           println("render target: ${mode.cliName()}")
           println("render target status: ${mode.status()}")

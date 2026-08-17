@@ -89,55 +89,78 @@ internal class MapState(
     }
   }
 
-  fun submit(command: CameraCommand) {
+  fun cancelTransitions() {
+    synchronized(cameraLock) { map.updateCamera(CameraUpdate()) }
+  }
+
+  fun setGestureInProgress(inProgress: Boolean) {
     synchronized(cameraLock) {
-      when (command) {
-        CameraCommand.CancelTransitions -> map.updateCamera(CameraUpdate())
-        is CameraCommand.SetGestureInProgress -> {
-          if (command.inProgress) gestureId += 1
-          map.updateCamera(
-            CameraUpdate(
-              gesturePhase = if (command.inProgress) GesturePhase.BEGIN else GesturePhase.END,
-              gestureId = gestureId,
-            )
-          )
+      if (inProgress) gestureId += 1
+      map.updateCamera(
+        CameraUpdate(
+          gesturePhase = if (inProgress) GesturePhase.BEGIN else GesturePhase.END,
+          gestureId = gestureId,
+        )
+      )
+    }
+  }
+
+  fun moveBy(deltaX: Double, deltaY: Double) {
+    synchronized(cameraLock) { moveCameraBy(deltaX, deltaY, null) }
+  }
+
+  fun moveByAnimated(deltaX: Double, deltaY: Double) {
+    synchronized(cameraLock) { moveCameraBy(deltaX, deltaY, KEYBOARD_ANIMATION_MS) }
+  }
+
+  fun scaleBy(scale: Double, anchor: org.maplibre.nativeffi.geo.ScreenPoint) {
+    synchronized(cameraLock) { scaleCameraBy(scale, anchor, null) }
+  }
+
+  fun scaleByAnimated(scale: Double, anchor: org.maplibre.nativeffi.geo.ScreenPoint) {
+    synchronized(cameraLock) { scaleCameraBy(scale, anchor, KEYBOARD_ANIMATION_MS) }
+  }
+
+  fun adjustBearingAndPitch(bearingDegrees: Double, pitchDegrees: Double) {
+    synchronized(cameraLock) {
+      update(
+        CameraOptions().apply {
+          bearing = (desiredCamera.bearing ?: 0.0) + bearingDegrees
+          pitch = ((desiredCamera.pitch ?: 0.0) + pitchDegrees).clampPitch()
         }
-        is CameraCommand.MoveBy -> moveBy(command.deltaX, command.deltaY, null)
-        is CameraCommand.MoveByAnimated ->
-          moveBy(command.deltaX, command.deltaY, KEYBOARD_ANIMATION_MS)
-        is CameraCommand.ScaleBy -> scaleBy(command.scale, command.anchor, null)
-        is CameraCommand.ScaleByAnimated ->
-          scaleBy(command.scale, command.anchor, KEYBOARD_ANIMATION_MS)
-        is CameraCommand.AdjustBearingAndPitch ->
-          update(
-            CameraOptions().apply {
-              bearing = (desiredCamera.bearing ?: 0.0) + command.bearingDegrees
-              pitch = ((desiredCamera.pitch ?: 0.0) + command.pitchDegrees).clampPitch()
-            }
-          )
-        is CameraCommand.AdjustBearingAnimated ->
-          update(
-            CameraOptions().apply {
-              bearing = (desiredCamera.bearing ?: 0.0) + command.bearingDegrees
-            },
-            KEYBOARD_ANIMATION_MS,
-          )
-        is CameraCommand.AdjustPitchAnimated ->
-          update(
-            CameraOptions().apply {
-              pitch = ((desiredCamera.pitch ?: 0.0) + command.pitchDegrees).clampPitch()
-            },
-            KEYBOARD_ANIMATION_MS,
-          )
-        CameraCommand.ResetOrientation ->
-          update(
-            CameraOptions().apply {
-              bearing = 0.0
-              pitch = 0.0
-            },
-            RESET_ANIMATION_MS,
-          )
-      }
+      )
+    }
+  }
+
+  fun adjustBearingAnimated(bearingDegrees: Double) {
+    synchronized(cameraLock) {
+      update(
+        CameraOptions().apply { bearing = (desiredCamera.bearing ?: 0.0) + bearingDegrees },
+        KEYBOARD_ANIMATION_MS,
+      )
+    }
+  }
+
+  fun adjustPitchAnimated(pitchDegrees: Double) {
+    synchronized(cameraLock) {
+      update(
+        CameraOptions().apply {
+          pitch = ((desiredCamera.pitch ?: 0.0) + pitchDegrees).clampPitch()
+        },
+        KEYBOARD_ANIMATION_MS,
+      )
+    }
+  }
+
+  fun resetOrientation() {
+    synchronized(cameraLock) {
+      update(
+        CameraOptions().apply {
+          bearing = 0.0
+          pitch = 0.0
+        },
+        RESET_ANIMATION_MS,
+      )
     }
   }
 
@@ -161,7 +184,7 @@ internal class MapState(
     } while (notificationPending.getAndSet(false))
   }
 
-  private fun moveBy(dx: Double, dy: Double, durationMs: Double?) {
+  private fun moveCameraBy(dx: Double, dy: Double, durationMs: Double?) {
     val center = desiredCamera.center ?: return
     val zoom = desiredCamera.zoom ?: 0.0
     val bearingRadians = (desiredCamera.bearing ?: 0.0) * PI / 180.0
@@ -186,7 +209,7 @@ internal class MapState(
     )
   }
 
-  private fun scaleBy(
+  private fun scaleCameraBy(
     scale: Double,
     anchor: org.maplibre.nativeffi.geo.ScreenPoint,
     durationMs: Double?,
@@ -259,6 +282,17 @@ internal class MapState(
     private const val KEYBOARD_ANIMATION_MS = 160.0
     private const val RESET_ANIMATION_MS = 160.0
   }
+}
+
+/** A one-bit frame request shared with notification callbacks. */
+internal class RenderRequest {
+  private val value = AtomicBoolean(true)
+
+  fun set() {
+    value.set(true)
+  }
+
+  fun consume(): Boolean = value.getAndSet(false)
 }
 
 private fun Double.clampPitch(): Double = max(0.0, min(60.0, this))

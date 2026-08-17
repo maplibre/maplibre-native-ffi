@@ -4,6 +4,9 @@ import os
 import QuartzCore
 import UIKit
 
+private typealias CameraUpdateAction = @MainActor (MapState) async throws
+  -> Void
+
 /// The display-paced render loop. This view owns the layer, gesture decoding,
 /// runtime, map, Metal objects, and render session on the main thread.
 @MainActor
@@ -232,11 +235,11 @@ final class MetalMapView: UIView {
           if let latest = self.currentViewport, !latest.isEmpty,
              latest != viewport
           {
-            try await state.apply(.resize(MapLogicalExtent(
+            try state.resize(MapLogicalExtent(
               width: latest.logicalWidth,
               height: latest.logicalHeight,
               scaleFactor: latest.scaleFactor
-            )))
+            ))
           }
           self.mapState = state
           state.scheduleEventDrains(
@@ -276,11 +279,13 @@ final class MetalMapView: UIView {
     currentViewport = viewport
     pendingResize = renderTarget != nil
     if mapState != nil {
-      submit(.resize(MapLogicalExtent(
-        width: viewport.logicalWidth,
-        height: viewport.logicalHeight,
-        scaleFactor: viewport.scaleFactor
-      )))
+      scheduleCameraUpdate { state in
+        try state.resize(MapLogicalExtent(
+          width: viewport.logicalWidth,
+          height: viewport.logicalHeight,
+          scaleFactor: viewport.scaleFactor
+        ))
+      }
     }
     renderRequested = true
     startMapStateIfNeeded(viewport: viewport)
@@ -365,7 +370,7 @@ final class MetalMapView: UIView {
 
   /// Serializes camera queries without moving map ownership off the render
   /// loop. Each task inherits the main actor and waits for its predecessor.
-  private func submit(_ command: CameraCommand) {
+  private func scheduleCameraUpdate(_ update: @escaping CameraUpdateAction) {
     guard !isShutDown else { return }
     renderRequested = true
     nextCameraSequence += 1
@@ -377,7 +382,7 @@ final class MetalMapView: UIView {
             let state = self.mapState else { return }
       var commandError: Error?
       do {
-        try await state.apply(command)
+        try await update(state)
       } catch {
         commandError = error
       }
@@ -391,140 +396,108 @@ final class MetalMapView: UIView {
     }
   }
 
-  /// Decodes a gesture and requests a render when the decoded gesture changed
-  /// the camera.
-  private func submitGesture(_ decode: ((CameraCommand) -> Void) -> Bool) {
-    if decode(submit) {
-      renderRequested = true
-    }
-  }
-
   /// Opens the gesture bracket for the first recognizer to begin.
-  private func beginGesture(
-    _ recognizer: UIGestureRecognizer,
-    _ submit: (CameraCommand) -> Void
-  ) {
+  private func beginGesture(_ recognizer: UIGestureRecognizer) {
     if openGestures.isEmpty {
-      submit(.setGestureInProgress(true))
+      scheduleCameraUpdate { try $0.setGestureInProgress(true) }
     }
     openGestures.insert(ObjectIdentifier(recognizer))
   }
 
   /// Closes the bracket once the last recognizer ends or is cancelled, so each
   /// open is paired with a close.
-  private func endGesture(
-    _ recognizer: UIGestureRecognizer,
-    _ submit: (CameraCommand) -> Void
-  ) {
+  private func endGesture(_ recognizer: UIGestureRecognizer) {
     guard openGestures.remove(ObjectIdentifier(recognizer)) != nil else {
       return
     }
     if openGestures.isEmpty {
-      submit(.setGestureInProgress(false))
+      scheduleCameraUpdate { try $0.setGestureInProgress(false) }
     }
   }
 
   @objc private func handlePan(_ recognizer: UIPanGestureRecognizer) {
-    submitGesture { submit in
-      switch recognizer.state {
-      case .began:
-        self.beginGesture(recognizer, submit)
-        recognizer.setTranslation(.zero, in: self)
-        return false
-      case .changed:
-        let translation = recognizer.translation(in: self)
-        recognizer.setTranslation(.zero, in: self)
-        guard translation != .zero else { return false }
-        submit(.moveBy(
+    switch recognizer.state {
+    case .began:
+      beginGesture(recognizer)
+      recognizer.setTranslation(.zero, in: self)
+    case .changed:
+      let translation = recognizer.translation(in: self)
+      recognizer.setTranslation(.zero, in: self)
+      guard translation != .zero else { return }
+      scheduleCameraUpdate { state in
+        try await state.moveBy(
           dx: Double(translation.x),
           dy: Double(translation.y)
-        ))
-        return true
-      default:
-        self.endGesture(recognizer, submit)
-        return false
+        )
       }
+    default:
+      endGesture(recognizer)
     }
   }
 
   @objc private func handlePinch(_ recognizer: UIPinchGestureRecognizer) {
-    submitGesture { submit in
-      switch recognizer.state {
-      case .began:
-        self.beginGesture(recognizer, submit)
-        recognizer.scale = 1.0
-        return false
-      case .changed:
-        let scale = Double(recognizer.scale)
-        recognizer.scale = 1.0
-        guard scale.isFinite, scale > 0 else { return false }
-        let location = recognizer.location(in: self)
-        submit(.scaleBy(
-          scale: scale,
-          anchor: self.screenPoint(location)
-        ))
-        return true
-      default:
-        self.endGesture(recognizer, submit)
-        return false
-      }
+    switch recognizer.state {
+    case .began:
+      beginGesture(recognizer)
+      recognizer.scale = 1.0
+    case .changed:
+      let scale = Double(recognizer.scale)
+      recognizer.scale = 1.0
+      guard scale.isFinite, scale > 0 else { return }
+      let anchor = screenPoint(recognizer.location(in: self))
+      scheduleCameraUpdate { try await $0.scaleBy(scale, anchor: anchor) }
+    default:
+      endGesture(recognizer)
     }
   }
 
   @objc private func handleRotation(_ recognizer: UIRotationGestureRecognizer) {
-    submitGesture { submit in
-      switch recognizer.state {
-      case .began:
-        self.beginGesture(recognizer, submit)
-        recognizer.rotation = 0
-        return false
-      case .changed:
-        let deltaRadians = recognizer.rotation
-        recognizer.rotation = 0
-        guard deltaRadians != 0 else { return false }
-        let location = recognizer.location(in: self)
-        submit(.adjustBearing(
+    switch recognizer.state {
+    case .began:
+      beginGesture(recognizer)
+      recognizer.rotation = 0
+    case .changed:
+      let deltaRadians = recognizer.rotation
+      recognizer.rotation = 0
+      guard deltaRadians != 0 else { return }
+      let anchor = screenPoint(recognizer.location(in: self))
+      scheduleCameraUpdate {
+        try await $0.adjustBearing(
           delta: -Double(deltaRadians * 180 / .pi),
-          anchor: self.screenPoint(location)
-        ))
-        return true
-      default:
-        self.endGesture(recognizer, submit)
-        return false
+          anchor: anchor
+        )
       }
+    default:
+      endGesture(recognizer)
     }
   }
 
   @objc private func handleShove(_ recognizer: UIPanGestureRecognizer) {
-    submitGesture { submit in
-      switch recognizer.state {
-      case .began:
-        guard recognizer.numberOfTouches == 2 else { return false }
-        self.beginGesture(recognizer, submit)
-        recognizer.setTranslation(.zero, in: self)
-        return false
-      case .changed:
-        guard recognizer.numberOfTouches == 2 else { return false }
-        let translation = recognizer.translation(in: self)
-        recognizer.setTranslation(.zero, in: self)
-        guard translation.y != 0 else { return false }
-        submit(.adjustPitch(delta: -Double(translation.y) * 0.1))
-        return true
-      default:
-        self.endGesture(recognizer, submit)
-        return false
+    switch recognizer.state {
+    case .began:
+      guard recognizer.numberOfTouches == 2 else { return }
+      beginGesture(recognizer)
+      recognizer.setTranslation(.zero, in: self)
+    case .changed:
+      guard recognizer.numberOfTouches == 2 else { return }
+      let translation = recognizer.translation(in: self)
+      recognizer.setTranslation(.zero, in: self)
+      guard translation.y != 0 else { return }
+      scheduleCameraUpdate {
+        try await $0.adjustPitch(delta: -Double(translation.y) * 0.1)
       }
+    default:
+      endGesture(recognizer)
     }
   }
 
   @objc private func handleDoubleTap(_ recognizer: UITapGestureRecognizer) {
-    submitGesture { submit in
-      let location = recognizer.location(in: self)
-      submit(.zoomToNextStep(
-        anchor: screenPoint(location),
+    let anchor = screenPoint(recognizer.location(in: self))
+    scheduleCameraUpdate {
+      try await $0.zoomToNextStep(
+        anchor: anchor,
         animation: MaplibreNativeFFI.AnimationOptions(durationMilliseconds: 160)
-      ))
-      return true
+      )
     }
   }
 

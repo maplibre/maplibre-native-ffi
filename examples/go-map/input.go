@@ -35,67 +35,73 @@ func logControls() {
   0: reset pitch and bearing`)
 }
 
-func (input *inputController) handleEvent(event *sdl.Event, commands *cameraController, v viewport) bool {
+func (input *inputController) handleEvent(event *sdl.Event, state *runtimeMapState, v viewport) (bool, error) {
 	switch event.Type() {
 	case sdl.EventMouseButtonDown:
-		return input.handleMouseButtonDown(event.MouseButton(), commands, v)
+		return input.handleMouseButtonDown(event.MouseButton(), state, v)
 	case sdl.EventMouseButtonUp:
-		return input.handleMouseButtonUp(event.MouseButton(), commands, v)
+		return input.handleMouseButtonUp(event.MouseButton(), state, v)
 	case sdl.EventMouseMotion:
-		return input.handleMouseMotion(event.MouseMotion(), commands, v)
+		return input.handleMouseMotion(event.MouseMotion(), state, v)
 	case sdl.EventMouseWheel:
-		return handleMouseWheel(event.MouseWheel(), commands, v)
+		return handleMouseWheel(event.MouseWheel(), state, v)
 	case sdl.EventKeyDown:
-		return handleKeyDown(event.Keyboard(), commands, v)
+		return handleKeyDown(event.Keyboard(), state, v)
 	default:
-		return false
+		return false, nil
 	}
 }
 
-func (input *inputController) handleMouseButtonDown(event *sdl.MouseButtonEvent, commands *cameraController, v viewport) bool {
+func (input *inputController) handleMouseButtonDown(event *sdl.MouseButtonEvent, state *runtimeMapState, v viewport) (bool, error) {
 	if event == nil {
-		return false
+		return false, nil
 	}
 	// A second button pressed during a live drag joins it, leaving the drag
 	// baseline alone.
 	if input.dragMode != dragNone {
-		return false
+		return false, nil
 	}
 	mode := dragModeForButton(event.Button)
 	if mode == dragNone {
-		return false
+		return false, nil
 	}
 	cursor := logicalPoint(float64(event.X), float64(event.Y), v)
 	input.lastX = cursor.X
 	input.lastY = cursor.Y
 	input.dragMode = mode
 	input.dragButton = event.Button
-	// Cancel first, so the running transition stops before the first delta.
-	cancelQueued := commands.submit(cameraCommand{kind: commandCancelTransitions})
-	gestureQueued := commands.submit(cameraCommand{kind: commandSetGestureInProgress, inProgress: true})
-	return cancelQueued || gestureQueued
+	if err := state.cancelTransitions(); err != nil {
+		return false, err
+	}
+	if err := state.setGestureInProgress(true); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // handleMouseButtonUp ends the drag only for the button that started it, so the
 // gesture bracket stays paired.
-func (input *inputController) handleMouseButtonUp(event *sdl.MouseButtonEvent, commands *cameraController, v viewport) bool {
+func (input *inputController) handleMouseButtonUp(event *sdl.MouseButtonEvent, state *runtimeMapState, v viewport) (bool, error) {
 	if event == nil || (event.Button != sdl.ButtonLeft && event.Button != sdl.ButtonRight) {
-		return false
+		return false, nil
 	}
 	if input.dragMode == dragNone || event.Button != input.dragButton {
-		return false
+		return false, nil
 	}
 	cursor := logicalPoint(float64(event.X), float64(event.Y), v)
 	input.dragMode = dragNone
 	input.dragButton = 0
 	input.lastX = cursor.X
 	input.lastY = cursor.Y
-	return commands.submit(cameraCommand{kind: commandSetGestureInProgress, inProgress: false})
+	if err := state.setGestureInProgress(false); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
-func (input *inputController) handleMouseMotion(event *sdl.MouseMotionEvent, commands *cameraController, v viewport) bool {
+func (input *inputController) handleMouseMotion(event *sdl.MouseMotionEvent, state *runtimeMapState, v viewport) (bool, error) {
 	if event == nil || input.dragMode == dragNone {
-		return false
+		return false, nil
 	}
 	cursor := logicalPoint(float64(event.X), float64(event.Y), v)
 	dx := cursor.X - input.lastX
@@ -103,31 +109,32 @@ func (input *inputController) handleMouseMotion(event *sdl.MouseMotionEvent, com
 	input.lastX = cursor.X
 	input.lastY = cursor.Y
 	if dx == 0 && dy == 0 {
-		return false
+		return false, nil
 	}
 
 	switch input.dragMode {
 	case dragPan:
-		return commands.submit(cameraCommand{kind: commandMoveBy, deltaX: dx, deltaY: dy})
+		return true, state.moveBy(dx, dy, nil)
 	case dragRotate:
-		bearingQueued := commands.submit(cameraCommand{kind: commandAdjustBearing, deltaX: dx * 0.5})
-		pitchQueued := commands.submit(cameraCommand{kind: commandPitchBy, deltaY: dy * 0.5})
-		return bearingQueued || pitchQueued
+		if err := state.adjustBearing(dx*0.5, nil); err != nil {
+			return false, err
+		}
+		return true, state.adjustPitch(dy*0.5, nil)
 	}
-	return false
+	return false, nil
 }
 
-func handleMouseWheel(event *sdl.MouseWheelEvent, commands *cameraController, v viewport) bool {
+func handleMouseWheel(event *sdl.MouseWheelEvent, state *runtimeMapState, v viewport) (bool, error) {
 	if event == nil || event.Y == 0 {
-		return false
+		return false, nil
 	}
 	anchor := logicalPoint(float64(event.MouseX), float64(event.MouseY), v)
-	return commands.submit(cameraCommand{kind: commandScaleBy, scale: math.Pow(2, float64(event.Y)*0.25), anchor: anchor})
+	return true, state.scaleBy(math.Pow(2, float64(event.Y)*0.25), anchor, nil)
 }
 
-func handleKeyDown(event *sdl.KeyboardEvent, commands *cameraController, v viewport) bool {
+func handleKeyDown(event *sdl.KeyboardEvent, state *runtimeMapState, v viewport) (bool, error) {
 	if event == nil {
-		return false
+		return false, nil
 	}
 	const (
 		panStep     = 120.0
@@ -136,35 +143,36 @@ func handleKeyDown(event *sdl.KeyboardEvent, commands *cameraController, v viewp
 		pitchStep   = 5.0
 	)
 	center := maplibre.ScreenPoint{X: float64(v.logicalWidth) / 2, Y: float64(v.logicalHeight) / 2}
-	command := cameraCommand{durationMS: 160}
+	durationMS := 160.0
+	var err error
 
 	switch event.Scancode {
 	case sdl.ScancodeLeft, sdl.ScancodeA:
-		command.kind, command.deltaX = commandMoveByAnimated, panStep
+		err = state.moveBy(panStep, 0, &durationMS)
 	case sdl.ScancodeRight, sdl.ScancodeD:
-		command.kind, command.deltaX = commandMoveByAnimated, -panStep
+		err = state.moveBy(-panStep, 0, &durationMS)
 	case sdl.ScancodeUp, sdl.ScancodeW:
-		command.kind, command.deltaY = commandMoveByAnimated, panStep
+		err = state.moveBy(0, panStep, &durationMS)
 	case sdl.ScancodeDown, sdl.ScancodeS:
-		command.kind, command.deltaY = commandMoveByAnimated, -panStep
+		err = state.moveBy(0, -panStep, &durationMS)
 	case sdl.ScancodeEquals, sdl.ScancodeKPPlus:
-		command.kind, command.scale, command.anchor = commandScaleByAnimated, zoomStep, center
+		err = state.scaleBy(zoomStep, center, &durationMS)
 	case sdl.ScancodeMinus, sdl.ScancodeKPMinus:
-		command.kind, command.scale, command.anchor = commandScaleByAnimated, 1/zoomStep, center
+		err = state.scaleBy(1/zoomStep, center, &durationMS)
 	case sdl.ScancodeQ:
-		command.kind, command.deltaX = commandAdjustBearingAnimated, -bearingStep
+		err = state.adjustBearing(-bearingStep, &durationMS)
 	case sdl.ScancodeE:
-		command.kind, command.deltaX = commandAdjustBearingAnimated, bearingStep
+		err = state.adjustBearing(bearingStep, &durationMS)
 	case sdl.ScancodeRightbracket:
-		command.kind, command.deltaY = commandAdjustPitchAnimated, pitchStep
+		err = state.adjustPitch(pitchStep, &durationMS)
 	case sdl.ScancodeLeftbracket:
-		command.kind, command.deltaY = commandAdjustPitchAnimated, -pitchStep
+		err = state.adjustPitch(-pitchStep, &durationMS)
 	case sdl.Scancode0:
-		command.kind = commandResetOrientation
+		err = state.resetOrientation(220)
 	default:
-		return false
+		return false, nil
 	}
-	return commands.submit(command)
+	return err == nil, err
 }
 
 func dragModeForButton(button byte) dragMode {

@@ -1122,7 +1122,6 @@ auto submit_runtime_command(
           std::invoke(std::move(function), command_id);
         } catch (...) {
           // The command implementation reports its own terminal failure event.
-          static_cast<void>(0);
         }
         mark_runtime_submission_terminal(runtime, sequence);
       }

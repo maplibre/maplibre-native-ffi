@@ -190,13 +190,12 @@ The category follows from the declaration, and
 | `uint64_t* out_command_id` parameter                 | Command            |
 | anything else                                        | Immediate          |
 
-Name a new function so that its category derives from this table. The checker's
-A call whose effects surface only through a drained event stream and that hands
-back no completion identity is an immediate: `mln_render_session_request_frame`
-returns its final status synchronously and reports the frame through frame
-results, so it needs no command channel. The checker keeps an exception table
-for forms the conventions cannot express; it is empty today, and growth is a
-design smell.
+Name a new function so that its category derives from this table. A call whose
+effects surface only through a drained event stream and that hands back no
+completion identity is an immediate: `mln_render_session_request_frame` returns
+its final status synchronously and reports the frame through frame results, so
+it needs no command channel. The checker keeps an exception table for forms the
+conventions cannot express; it is empty today, and growth is a design smell.
 
 Pick the category from what the function reads or writes:
 

@@ -73,44 +73,54 @@ internal sealed class MapState : IDisposable
         }
     }
 
-    /// <summary>Submits a copied any-thread camera command and returns its native command id.</summary>
-    public ulong Apply(CameraCommand command)
+    public void CancelTransitions()
     {
         var current = Map.GetCameraSnapshot().Camera;
-        return command switch
-        {
-            CancelTransitionsCommand => Submit(current, null),
-            SetGestureInProgressCommand gesture => SubmitGesture(current, gesture.InProgress),
-            MoveByCommand move => Submit(MovedCamera(current, move), move.Animation),
-            ScaleByCommand zoom => Submit(
-                new CameraOptions
-                {
-                    Zoom = (current.Zoom ?? 0) + Math.Log2(zoom.Scale),
-                    Anchor = zoom.Anchor,
-                },
-                zoom.Animation
-            ),
-            AdjustBearingCommand bearing => Submit(
-                new CameraOptions { Bearing = (current.Bearing ?? 0) + bearing.Delta },
-                bearing.Animation
-            ),
-            AdjustPitchCommand pitch => Submit(
-                new CameraOptions
-                {
-                    Pitch = Math.Clamp(
-                        (current.Pitch ?? 0) + pitch.Delta,
-                        MinimumPitch,
-                        MaximumPitch
-                    ),
-                },
-                pitch.Animation
-            ),
-            ResetOrientationCommand reset => Submit(
-                new CameraOptions { Bearing = 0, Pitch = 0 },
-                reset.Animation
-            ),
-            _ => throw new ArgumentOutOfRangeException(nameof(command)),
-        };
+        Update(current, null);
+    }
+
+    public void SetGestureInProgress(bool inProgress)
+    {
+        var current = Map.GetCameraSnapshot().Camera;
+        UpdateGesture(current, inProgress);
+    }
+
+    public void MoveBy(double deltaX, double deltaY, AnimationOptions? animation = null)
+    {
+        var current = Map.GetCameraSnapshot().Camera;
+        Update(MovedCamera(current, deltaX, deltaY), animation);
+    }
+
+    public void ScaleBy(double scale, ScreenPoint? anchor, AnimationOptions? animation = null)
+    {
+        var current = Map.GetCameraSnapshot().Camera;
+        Update(
+            new CameraOptions { Zoom = (current.Zoom ?? 0) + Math.Log2(scale), Anchor = anchor },
+            animation
+        );
+    }
+
+    public void AdjustBearing(double delta, AnimationOptions? animation = null)
+    {
+        var current = Map.GetCameraSnapshot().Camera;
+        Update(new CameraOptions { Bearing = (current.Bearing ?? 0) + delta }, animation);
+    }
+
+    public void AdjustPitch(double delta, AnimationOptions? animation = null)
+    {
+        var current = Map.GetCameraSnapshot().Camera;
+        Update(
+            new CameraOptions
+            {
+                Pitch = Math.Clamp((current.Pitch ?? 0) + delta, MinimumPitch, MaximumPitch),
+            },
+            animation
+        );
+    }
+
+    public void ResetOrientation(AnimationOptions animation)
+    {
+        Update(new CameraOptions { Bearing = 0, Pitch = 0 }, animation);
     }
 
     public bool DrainRenderRequests()
@@ -152,9 +162,9 @@ internal sealed class MapState : IDisposable
         }
     }
 
-    private ulong Submit(CameraOptions camera, AnimationOptions? animation)
+    private void Update(CameraOptions camera, AnimationOptions? animation)
     {
-        return Map.UpdateCamera(
+        _ = Map.UpdateCamera(
             new CameraUpdate
             {
                 Mode = animation is null ? CameraUpdateMode.Jump : CameraUpdateMode.Ease,
@@ -164,13 +174,13 @@ internal sealed class MapState : IDisposable
         );
     }
 
-    private ulong SubmitGesture(CameraOptions current, bool begin)
+    private void UpdateGesture(CameraOptions current, bool begin)
     {
         if (begin)
         {
             gestureId++;
         }
-        return Map.UpdateCamera(
+        _ = Map.UpdateCamera(
             new CameraUpdate
             {
                 Mode = CameraUpdateMode.Jump,
@@ -181,7 +191,7 @@ internal sealed class MapState : IDisposable
         );
     }
 
-    private CameraOptions MovedCamera(CameraOptions current, MoveByCommand move)
+    private static CameraOptions MovedCamera(CameraOptions current, double deltaX, double deltaY)
     {
         var center = current.Center ?? new LatLng(0, 0);
         var zoom = current.Zoom ?? 0;
@@ -189,9 +199,27 @@ internal sealed class MapState : IDisposable
         return new CameraOptions
         {
             Center = new LatLng(
-                Math.Clamp(center.Latitude + move.DeltaY * degreesPerPixel, -85, 85),
-                center.Longitude - move.DeltaX * degreesPerPixel
+                Math.Clamp(center.Latitude + deltaY * degreesPerPixel, -85, 85),
+                center.Longitude - deltaX * degreesPerPixel
             ),
         };
+    }
+}
+
+/// <summary>One-bit signal that a frame is worth drawing.</summary>
+internal sealed class RenderRequest
+{
+    private bool requested = true;
+
+    public void Set()
+    {
+        requested = true;
+    }
+
+    public bool Consume()
+    {
+        var current = requested;
+        requested = false;
+        return current;
     }
 }

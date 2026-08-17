@@ -600,8 +600,8 @@ func TestGeoJSONSourceClusterOptions(t *testing.T) {
 	}
 }
 
-// Preparation touches no runtime or map, so a plain goroutine prepares data
-// that installs on the map owner thread, and another goroutine releases it.
+// Preparation touches no runtime or map, so one goroutine prepares data,
+// another installs it on the map, and a third releases it.
 func TestGeoJSONSourceDataPreparesOnAnotherGoroutine(t *testing.T) {
 	runtime, err := NewRuntime()
 	if err != nil {

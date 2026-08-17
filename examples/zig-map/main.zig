@@ -166,8 +166,7 @@ fn renderLoop(
                 else => {
                     const input_result = try input_controller.handleEvent(
                         &event,
-                        &state.map,
-                        state.diagnostic_store,
+                        state,
                         current_viewport.*,
                     );
                     if (input_result.camera_changed) render_requested = true;

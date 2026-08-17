@@ -30,20 +30,6 @@ struct Viewport: Equatable {
   }
 }
 
-/// A camera change decoded and applied on the main render loop.
-enum CameraCommand {
-  case resize(MapLogicalExtent)
-  case setGestureInProgress(Bool)
-  case moveBy(dx: Double, dy: Double)
-  case scaleBy(scale: Double, anchor: ScreenPoint)
-  /// Adds `delta` degrees to the current bearing, pivoting on `anchor`.
-  case adjustBearing(delta: Double, anchor: ScreenPoint)
-  /// Adds `delta` degrees to the current pitch, clamped to `[0, 60]`.
-  case adjustPitch(delta: Double)
-  /// Zooms to `round(zoom) + 1` about `anchor`, the double-tap step.
-  case zoomToNextStep(anchor: ScreenPoint, animation: AnimationOptions)
-}
-
 /// Runtime and map state owned by the main render loop.
 @MainActor
 final class MapState {
@@ -136,52 +122,63 @@ final class MapState {
     return renderPending
   }
 
-  func apply(_ command: CameraCommand) async throws {
-    switch command {
-    case let .resize(extent):
-      _ = try map.resize(to: extent)
-    case let .setGestureInProgress(inProgress):
-      _ = try map.updateCamera(CameraUpdate(
-        camera: CameraOptions(),
-        gesturePhase: inProgress ? .begin : .end,
-        gestureId: 1
-      ))
-    case let .moveBy(dx, dy):
-      let current = try await map.queryCamera().camera
-      guard let center = current.center else { return }
-      let point = try await map.pixel(for: center)
-      let moved = try await map.latLng(for: ScreenPoint(
-        x: point.x - dx,
-        y: point.y - dy
-      ))
-      _ = try map
-        .updateCamera(CameraUpdate(camera: CameraOptions(center: moved)))
-    case let .scaleBy(scale, anchor):
-      let current = try await map.queryCamera().camera
-      _ = try map.updateCamera(CameraUpdate(camera: CameraOptions(
-        zoom: (current.zoom ?? 0) + log2(scale),
-        anchor: anchor
-      )))
-    case let .adjustBearing(delta, anchor):
-      let current = try await map.queryCamera().camera
-      _ = try map.updateCamera(CameraUpdate(camera: CameraOptions(
-        bearing: (current.bearing ?? 0) + delta,
-        anchor: anchor
-      )))
-    case let .adjustPitch(delta):
-      let current = try await map.queryCamera().camera
-      _ = try map.updateCamera(CameraUpdate(camera: CameraOptions(
-        pitch: clampedPitch((current.pitch ?? 0) + delta)
-      )))
-    case let .zoomToNextStep(anchor, animation):
-      let current = try await map.queryCamera().camera
-      let zoom = current.zoom ?? 0
-      _ = try map.updateCamera(CameraUpdate(
-        mode: .ease,
-        camera: CameraOptions(zoom: round(zoom) + 1, anchor: anchor),
-        animation: animation
-      ))
-    }
+  func resize(_ extent: MapLogicalExtent) throws {
+    _ = try map.resize(to: extent)
+  }
+
+  func setGestureInProgress(_ inProgress: Bool) throws {
+    _ = try map.updateCamera(CameraUpdate(
+      camera: CameraOptions(),
+      gesturePhase: inProgress ? .begin : .end,
+      gestureId: 1
+    ))
+  }
+
+  func moveBy(dx: Double, dy: Double) async throws {
+    let current = try await map.queryCamera().camera
+    guard let center = current.center else { return }
+    let point = try await map.pixel(for: center)
+    let moved = try await map.latLng(for: ScreenPoint(
+      x: point.x - dx,
+      y: point.y - dy
+    ))
+    _ = try map.updateCamera(CameraUpdate(camera: CameraOptions(center: moved)))
+  }
+
+  func scaleBy(_ scale: Double, anchor: ScreenPoint) async throws {
+    let current = try await map.queryCamera().camera
+    _ = try map.updateCamera(CameraUpdate(camera: CameraOptions(
+      zoom: (current.zoom ?? 0) + log2(scale),
+      anchor: anchor
+    )))
+  }
+
+  func adjustBearing(delta: Double, anchor: ScreenPoint) async throws {
+    let current = try await map.queryCamera().camera
+    _ = try map.updateCamera(CameraUpdate(camera: CameraOptions(
+      bearing: (current.bearing ?? 0) + delta,
+      anchor: anchor
+    )))
+  }
+
+  func adjustPitch(delta: Double) async throws {
+    let current = try await map.queryCamera().camera
+    _ = try map.updateCamera(CameraUpdate(camera: CameraOptions(
+      pitch: clampedPitch((current.pitch ?? 0) + delta)
+    )))
+  }
+
+  func zoomToNextStep(
+    anchor: ScreenPoint,
+    animation: AnimationOptions
+  ) async throws {
+    let current = try await map.queryCamera().camera
+    let zoom = current.zoom ?? 0
+    _ = try map.updateCamera(CameraUpdate(
+      mode: .ease,
+      camera: CameraOptions(zoom: round(zoom) + 1, anchor: anchor),
+      animation: animation
+    ))
   }
 }
 

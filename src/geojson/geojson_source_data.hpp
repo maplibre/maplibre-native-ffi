@@ -16,7 +16,7 @@ namespace mln::core {
 // Prepared GeoJSON source data: a parsed document tiled or clustered into the
 // index mbgl::style::GeoJSONSource consumes, together with the options the
 // index was built with. Immutable after creation, so any thread may create,
-// read, or destroy one; installing on a map stays an owner-thread call.
+// read, destroy, or install one on a map.
 struct GeoJsonSourceDataObject {
   std::shared_ptr<mbgl::style::GeoJSONData> data;
   mbgl::Immutable<mbgl::style::GeoJSONOptions> options;

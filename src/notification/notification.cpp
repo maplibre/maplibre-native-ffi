@@ -31,7 +31,7 @@ struct HandleTraits<ReadyBatchObject> {
 
 NotificationEndpoint::NotificationEndpoint(
   std::shared_ptr<NotificationSourceObject> source, std::uint64_t id,
-  std::uint32_t kind, bool sticky
+  std::uint32_t kind
 )
     : source_(std::move(source)), kind_(kind), id_(id) {
   if (!valid_endpoint_kind(kind)) {
@@ -40,8 +40,6 @@ NotificationEndpoint::NotificationEndpoint(
   if (id == MLN_HANDLE_NULL) {
     throw std::invalid_argument{"notification endpoint ID is null"};
   }
-  // Association activates the endpoint before publishing this lease.
-  static_cast<void>(sticky);
 }
 
 NotificationEndpoint::~NotificationEndpoint() { detach(); }
@@ -76,9 +74,8 @@ auto NotificationSourceObject::associate(
     set_thread_error("notification endpoint kind or ID is invalid");
     return nullptr;
   }
-  auto endpoint = std::make_shared<NotificationEndpoint>(
-    shared_from_this(), id, kind, sticky
-  );
+  auto endpoint =
+    std::make_shared<NotificationEndpoint>(shared_from_this(), id, kind);
   {
     const std::scoped_lock lock(mutex_);
     if (closing_) {
@@ -92,7 +89,6 @@ auto NotificationSourceObject::associate(
     }
     endpoints_.emplace(
       key, EndpointState{
-             .kind = kind,
              .sticky = sticky,
              .owner = endpoint.get(),
              .ready = false,
@@ -273,9 +269,7 @@ auto NotificationSourceObject::begin_ready_drain(
       if (endpoint.ready) {
         out_endpoints.push_back(
           mln_ready_endpoint{
-            .size = sizeof(mln_ready_endpoint),
-            .kind = endpoint.kind,
-            .id = key.id
+            .size = sizeof(mln_ready_endpoint), .kind = key.kind, .id = key.id
           }
         );
       }
@@ -294,10 +288,7 @@ auto NotificationSourceObject::commit_ready_drain(
   for (const auto& endpoint : endpoints) {
     const auto found =
       endpoints_.find(EndpointKey{.id = endpoint.id, .kind = endpoint.kind});
-    if (
-      found != endpoints_.end() && found->second.kind == endpoint.kind &&
-      !found->second.sticky
-    ) {
+    if (found != endpoints_.end() && !found->second.sticky) {
       found->second.ready = false;
     }
   }

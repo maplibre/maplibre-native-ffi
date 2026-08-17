@@ -234,7 +234,7 @@ void main() {
       expect(retained, 0);
     });
 
-    test('failed cleanup preserves descriptor for owner-thread retry', () {
+    test('failed cleanup preserves descriptor for a later retry', () {
       var released = 0;
       var retained = 0;
 

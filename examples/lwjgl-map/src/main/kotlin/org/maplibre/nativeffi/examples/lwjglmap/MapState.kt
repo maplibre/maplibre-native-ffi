@@ -47,39 +47,48 @@ private constructor(
     }
   }
 
-  /** Submits a camera command directly from the GLFW receiver thread. */
-  fun submit(command: CameraCommand) {
-    when (command) {
-      CameraCommand.CancelTransitions -> submit(CameraUpdate())
-      is CameraCommand.SetGestureInProgress -> {
-        if (command.inProgress) gestureId += 1
-        submit(
-          CameraUpdate(
-            gesturePhase = if (command.inProgress) GesturePhase.BEGIN else GesturePhase.END,
-            gestureId = gestureId,
-          )
-        )
-      }
-      is CameraCommand.MoveBy -> moveBy(command.dx, command.dy, null)
-      is CameraCommand.MoveByAnimated -> moveBy(command.dx, command.dy, command.durationMs)
-      is CameraCommand.ScaleBy -> scaleBy(command.scale, command.anchor, null)
-      is CameraCommand.ScaleByAnimated -> scaleBy(command.scale, command.anchor, command.durationMs)
-      is CameraCommand.PitchBy -> update(CameraOptions().apply { pitch = pitch(command.delta) })
-      is CameraCommand.AdjustBearing ->
-        update(CameraOptions().apply { bearing = bearing(command.delta) })
-      is CameraCommand.AdjustBearingAnimated ->
-        update(CameraOptions().apply { bearing = bearing(command.delta) }, command.durationMs)
-      is CameraCommand.AdjustPitchAnimated ->
-        update(CameraOptions().apply { pitch = pitch(command.delta) }, command.durationMs)
-      is CameraCommand.ResetOrientation ->
-        update(
-          CameraOptions().apply {
-            bearing = 0.0
-            pitch = 0.0
-          },
-          command.durationMs,
-        )
-    }
+  fun cancelTransitions() {
+    updateCamera(CameraUpdate())
+  }
+
+  fun setGestureInProgress(inProgress: Boolean) {
+    if (inProgress) gestureId += 1
+    updateCamera(
+      CameraUpdate(
+        gesturePhase = if (inProgress) GesturePhase.BEGIN else GesturePhase.END,
+        gestureId = gestureId,
+      )
+    )
+  }
+
+  fun moveBy(dx: Double, dy: Double, durationMs: Double? = null) {
+    moveCameraBy(dx, dy, durationMs)
+  }
+
+  fun scaleBy(
+    scale: Double,
+    anchor: org.maplibre.nativeffi.geo.ScreenPoint,
+    durationMs: Double? = null,
+  ) {
+    scaleCameraBy(scale, anchor, durationMs)
+  }
+
+  fun adjustPitch(delta: Double, durationMs: Double? = null) {
+    update(CameraOptions().apply { pitch = pitch(delta) }, durationMs)
+  }
+
+  fun adjustBearing(delta: Double, durationMs: Double? = null) {
+    update(CameraOptions().apply { bearing = bearing(delta) }, durationMs)
+  }
+
+  fun resetOrientation(durationMs: Double) {
+    update(
+      CameraOptions().apply {
+        bearing = 0.0
+        pitch = 0.0
+      },
+      durationMs,
+    )
   }
 
   fun resize(viewport: Viewport) {
@@ -104,7 +113,7 @@ private constructor(
     } while (notificationPending.getAndSet(false))
   }
 
-  private fun moveBy(dx: Double, dy: Double, durationMs: Double?) {
+  private fun moveCameraBy(dx: Double, dy: Double, durationMs: Double?) {
     val current = desiredCamera
     val center = current.center ?: return
     val zoom = current.zoom ?: 0.0
@@ -126,7 +135,7 @@ private constructor(
     update(CameraOptions().apply { this.center = next }, durationMs)
   }
 
-  private fun scaleBy(
+  private fun scaleCameraBy(
     scale: Double,
     anchor: org.maplibre.nativeffi.geo.ScreenPoint,
     durationMs: Double?,
@@ -153,7 +162,7 @@ private constructor(
       camera.bearing?.let { bearing = it }
       camera.pitch?.let { pitch = it }
     }
-    submit(
+    updateCamera(
       CameraUpdate(
         mode = if (durationMs == null) CameraUpdateMode.JUMP else CameraUpdateMode.EASE,
         camera = camera,
@@ -162,7 +171,7 @@ private constructor(
     )
   }
 
-  private fun submit(update: CameraUpdate) {
+  private fun updateCamera(update: CameraUpdate) {
     map.updateCamera(update)
   }
 
@@ -239,7 +248,7 @@ private constructor(
       try {
         val state = MapState(runtime, map, initialCamera, scheduleNotificationDrain)
         map.setStyleUrl(STYLE_URL)
-        state.submit(CameraUpdate(camera = initialCamera))
+        state.updateCamera(CameraUpdate(camera = initialCamera))
         runSuspend { runtime.barrier() }
         state.desiredCamera = map.cameraSnapshot().camera.copy()
         return state
@@ -250,4 +259,15 @@ private constructor(
       }
     }
   }
+}
+
+/** A one-bit frame request shared with notification callbacks. */
+internal class RenderRequest {
+  private val requested = AtomicBoolean(true)
+
+  fun set() {
+    requested.set(true)
+  }
+
+  fun consume(): Boolean = requested.getAndSet(false)
 }
