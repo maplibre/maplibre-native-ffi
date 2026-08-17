@@ -356,9 +356,9 @@ sequenceDiagram
 
 - The render loop MUST submit demand from the host display or invalidation
   source while visible.
-- Each demand MUST carry a unique host token and the display timestamp.
-- A positive deadline MUST use the host's monotonic clock domain. Deadline
-  missed is terminal and does not enter an immediate retry loop.
+- Each demand MUST carry a unique host token.
+- A positive timeout starts when native code accepts the demand. Deadline missed
+  is terminal and does not enter an immediate retry loop.
 - Rendered, no update, size pending, target not ready, superseded, and deadline
   missed MUST remain distinct outcomes.
 - No update and size pending wait for a newer map update. Target not ready waits
@@ -368,7 +368,7 @@ sequenceDiagram
 - The frame result's map-update, extent, and frame generations determine what
   was rendered. Runtime event order MUST NOT be used as a substitute.
 - The example MAY keep presenting the previous completed texture when a newer
-  frame misses its deadline.
+  frame exceeds its timeout.
 - Resize, target replacement, queries, readback, barriers, maintenance, and
   detach progress through the same selected driver.
 

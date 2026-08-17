@@ -14,12 +14,11 @@ class RenderDriverContractTest {
     assertTrue(demand.ifNeeded)
     assertFalse(demand.present)
     assertEquals(0uL, demand.token)
-    assertEquals(0L, demand.deadlineNanoseconds)
-    assertFailsWith<InvalidArgumentException> { FrameDemand(deadlineNanoseconds = -1) }
+    assertEquals(0uL, demand.timeoutNanoseconds)
   }
 
   @Test
-  fun openResultDomainIncludesCoalescingAndDeadlineTerminals() {
+  fun openResultDomainIncludesCoalescingAndTimeoutTerminals() {
     assertEquals(4, RenderResult.SUPERSEDED.nativeValue)
     assertEquals(5, RenderResult.DEADLINE_MISSED.nativeValue)
   }

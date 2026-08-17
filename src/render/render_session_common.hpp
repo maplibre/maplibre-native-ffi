@@ -2,6 +2,7 @@
 
 #include <any>
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <condition_variable>
 #include <cstddef>
@@ -474,6 +475,7 @@ struct RenderDriverWork {
 
 struct PendingFrameDemand {
   mln_frame_demand demand;
+  std::chrono::steady_clock::time_point accepted_at;
   std::uint64_t barrier_epoch;
 };
 }  // namespace mln::core

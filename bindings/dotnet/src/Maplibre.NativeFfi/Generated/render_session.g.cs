@@ -45,8 +45,8 @@ namespace Maplibre.NativeFfi.Internal.C
         [NativeTypeName("uint64_t")]
         public ulong coalescing_boundary;
 
-        [NativeTypeName("int64_t")]
-        public long deadline_ns;
+        [NativeTypeName("uint64_t")]
+        public ulong timeout_ns;
     }
 
     internal partial struct mln_render_frame_result

@@ -92,11 +92,11 @@ thread identity. Later service calls and thread-current backend accessors remain
 affine to that thread. The host services ready work even while presentation
 callbacks are paused.
 
-A frame demand carries a host token, presentation time, optional deadline, and
-coalescing boundary. Every accepted demand produces one terminal result. Result
-records identify the token and the map-update, extent, and frame generations
-that the driver used. A notification source remains ready until the host drains
-all frame results, so coalesced notifications do not lose results.
+A frame demand carries a host token, an optional timeout, and a coalescing
+boundary. Every accepted demand produces one terminal result. Result records
+identify the token and the map-update, extent, and frame generations that the
+driver used. A notification source remains ready until the host drains all frame
+results, so coalesced notifications do not lose results.
 
 Host-acquirable owned texture targets negotiate a ring of one to three slots.
 Acquiring a frame leases one slot and returns producer-completion

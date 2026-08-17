@@ -4186,8 +4186,8 @@ final class mln_frame_demand extends ffi.Struct {
   @ffi.Uint64()
   external int coalescing_boundary;
 
-  @ffi.Int64()
-  external int deadline_ns;
+  @ffi.Uint64()
+  external int timeout_ns;
 
   static ffi.Pointer<mln_frame_demand> $allocate(
     ffi.Allocator $allocator, {
@@ -4195,13 +4195,13 @@ final class mln_frame_demand extends ffi.Struct {
     required int flags,
     required int token,
     required int coalescing_boundary,
-    required int deadline_ns,
+    required int timeout_ns,
   }) => $allocator<mln_frame_demand>()
     ..ref.size = size
     ..ref.flags = flags
     ..ref.token = token
     ..ref.coalescing_boundary = coalescing_boundary
-    ..ref.deadline_ns = deadline_ns;
+    ..ref.timeout_ns = timeout_ns;
 }
 
 enum mln_frame_demand_flag {

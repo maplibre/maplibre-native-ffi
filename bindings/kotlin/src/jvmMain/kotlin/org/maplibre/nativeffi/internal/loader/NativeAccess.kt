@@ -2301,7 +2301,7 @@ internal object NativeAccess {
       nativeDemand.set(ValueLayout.JAVA_INT, 4, flags)
       nativeDemand.set(ValueLayout.JAVA_LONG, 8, demand.token.toLong())
       nativeDemand.set(ValueLayout.JAVA_LONG, 16, demand.coalescingBoundary.toLong())
-      nativeDemand.set(ValueLayout.JAVA_LONG, 24, demand.deadlineNanoseconds)
+      nativeDemand.set(ValueLayout.JAVA_LONG, 24, demand.timeoutNanoseconds.toLong())
       Status.check(
         dynamicStatusDowncall(
             "mln_render_session_request_frame",

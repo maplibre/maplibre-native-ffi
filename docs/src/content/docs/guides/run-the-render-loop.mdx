@@ -18,12 +18,12 @@ caller-driver session.
 
 ## Submit frame demand
 
-Submit a nonblocking frame demand from any thread. It carries a host token,
-presentation time, optional deadline, flags, and a coalescing boundary. Matching
-demands may coalesce before work starts, but every accepted demand produces one
-terminal result record. Presentation time selects render state. A positive
-deadline uses the host's monotonic clock; when it expires before work begins,
-the demand terminates as deadline missed. Neither timestamp supplies cadence.
+Submit a nonblocking frame demand from any thread. It carries a host token, an
+optional timeout, flags, and a coalescing boundary. Matching demands may
+coalesce before work starts, but every accepted demand produces one terminal
+result record. A positive timeout starts when native code accepts the demand;
+when it expires before work begins, the demand terminates as deadline missed.
+The timeout does not supply cadence.
 
 A core-worker session wakes its serial graphics worker. A caller-driver session
 makes its driver-work notification endpoint ready. Map updates use the same
@@ -74,8 +74,8 @@ A rendered result means that a frame was presented or became available for
 acquisition or readback. No update and size pending wait for a newer map update.
 Target not ready waits for host target readiness or paced retry. Superseded
 means that a newer demand replaced this demand within the same coalescing
-boundary. Deadline missed means that work did not begin before the positive
-deadline. These outcomes have different retry conditions, so preserve them in
+boundary. Deadline missed means that work did not begin within the positive
+timeout. These outcomes have different retry conditions, so preserve them in
 host pacing.
 
 <Code code={region(frameLoopSnippet, "results")} lang="c" title="frame-loop.c" />

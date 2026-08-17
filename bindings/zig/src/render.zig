@@ -98,7 +98,7 @@ pub const FrameDemand = struct {
     present: bool = false,
     token: u64 = 0,
     coalescing_boundary: u64 = 0,
-    deadline_ns: i64 = 0,
+    timeout_ns: u64 = 0,
 };
 
 pub const FrameResult = struct {
@@ -1179,7 +1179,7 @@ fn frameDemandToNative(demand: FrameDemand) c.mln_frame_demand {
     var flags: u32 = 0;
     if (demand.if_needed) flags |= c.MLN_FRAME_DEMAND_IF_NEEDED;
     if (demand.present) flags |= c.MLN_FRAME_DEMAND_PRESENT;
-    return .{ .size = @sizeOf(c.mln_frame_demand), .flags = flags, .token = demand.token, .coalescing_boundary = demand.coalescing_boundary, .deadline_ns = demand.deadline_ns };
+    return .{ .size = @sizeOf(c.mln_frame_demand), .flags = flags, .token = demand.token, .coalescing_boundary = demand.coalescing_boundary, .timeout_ns = demand.timeout_ns };
 }
 
 fn frameResultFromNative(raw: c.mln_render_frame_result) FrameResult {

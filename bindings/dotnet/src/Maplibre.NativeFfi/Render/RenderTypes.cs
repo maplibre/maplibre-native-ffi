@@ -31,7 +31,7 @@ public enum RenderResult : uint
     /// <summary>A newer demand replaced this demand in its coalescing boundary.</summary>
     Superseded = 4,
 
-    /// <summary>The positive monotonic deadline elapsed before work began.</summary>
+    /// <summary>The demand's timeout elapsed before work began.</summary>
     DeadlineMissed = 5,
 }
 
@@ -73,7 +73,7 @@ public readonly record struct FrameDemand(
     FrameDemandFlags Flags,
     ulong Token,
     ulong CoalescingBoundary,
-    long DeadlineNanoseconds
+    ulong TimeoutNanoseconds
 );
 
 /// <summary>

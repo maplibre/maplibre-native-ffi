@@ -101,7 +101,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
         .flags(flags)
         .token(demand.token.toLong())
         .coalescing_boundary(demand.coalescingBoundary.toLong())
-        .deadline_ns(demand.deadlineNanoseconds)
+        .timeout_ns(demand.timeoutNanoseconds.toLong())
       Status.check(MaplibreNativeC.mln_render_session_request_frame(requireLiveHandle(), value))
     }
   }

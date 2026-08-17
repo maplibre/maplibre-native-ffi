@@ -1072,7 +1072,7 @@ pub struct FrameDemand {
     pub present: bool,
     pub token: u64,
     pub coalescing_boundary: u64,
-    pub deadline_ns: i64,
+    pub timeout_ns: u64,
 }
 
 impl Default for FrameDemand {
@@ -1082,7 +1082,7 @@ impl Default for FrameDemand {
             present: false,
             token: 0,
             coalescing_boundary: 0,
-            deadline_ns: 0,
+            timeout_ns: 0,
         }
     }
 }
@@ -1101,7 +1101,7 @@ impl FrameDemand {
             flags,
             token: self.token,
             coalescing_boundary: self.coalescing_boundary,
-            deadline_ns: self.deadline_ns,
+            timeout_ns: self.timeout_ns,
         }
     }
 }

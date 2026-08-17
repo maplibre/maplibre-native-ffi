@@ -412,7 +412,7 @@ const (
 type FrameDemand struct {
 	Flags                     FrameDemandFlag
 	Token, CoalescingBoundary uint64
-	DeadlineNS                int64
+	TimeoutNS                 uint64
 }
 
 func NewFrameDemand() FrameDemand {
@@ -424,7 +424,7 @@ func (d FrameDemand) toC() C.mln_frame_demand {
 	raw.flags = C.uint32_t(d.Flags)
 	raw.token = C.uint64_t(d.Token)
 	raw.coalescing_boundary = C.uint64_t(d.CoalescingBoundary)
-	raw.deadline_ns = C.int64_t(d.DeadlineNS)
+	raw.timeout_ns = C.uint64_t(d.TimeoutNS)
 	return raw
 }
 

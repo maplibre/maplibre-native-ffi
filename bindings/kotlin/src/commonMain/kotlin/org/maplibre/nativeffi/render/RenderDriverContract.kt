@@ -59,14 +59,10 @@ public value class RenderSessionState public constructor(public val nativeValue:
 public data class FrameDemand(
   public val token: ULong = 0u,
   public val coalescingBoundary: ULong = 0u,
-  public val deadlineNanoseconds: Long = 0,
+  public val timeoutNanoseconds: ULong = 0u,
   public val ifNeeded: Boolean = true,
   public val present: Boolean = false,
-) {
-  init {
-    Status.requireArgument(deadlineNanoseconds >= 0) { "deadlineNanoseconds must be non-negative" }
-  }
-}
+)
 
 public data class RenderFrameResult(
   public val disposition: RenderResult,

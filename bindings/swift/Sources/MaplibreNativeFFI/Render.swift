@@ -765,18 +765,18 @@ public struct FrameDemand: Sendable, Hashable {
   public var options: Options
   public var token: UInt64
   public var coalescingBoundary: UInt64
-  public var deadlineNanoseconds: Int64
+  public var timeoutNanoseconds: UInt64
 
   public init(
     options: Options = .ifNeeded,
     token: UInt64 = 0,
     coalescingBoundary: UInt64 = 0,
-    deadlineNanoseconds: Int64 = 0
+    timeoutNanoseconds: UInt64 = 0
   ) {
     self.options = options
     self.token = token
     self.coalescingBoundary = coalescingBoundary
-    self.deadlineNanoseconds = deadlineNanoseconds
+    self.timeoutNanoseconds = timeoutNanoseconds
   }
 
   var native: mln_frame_demand {
@@ -784,7 +784,7 @@ public struct FrameDemand: Sendable, Hashable {
     value.flags = options.rawValue
     value.token = token
     value.coalescing_boundary = coalescingBoundary
-    value.deadline_ns = deadlineNanoseconds
+    value.timeout_ns = timeoutNanoseconds
     return value
   }
 }

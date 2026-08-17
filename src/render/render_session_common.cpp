@@ -2413,11 +2413,15 @@ auto run_frame_demand(
     .frame_generation = 0,
     .needs_repaint = false,
   };
-  const auto now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                        std::chrono::steady_clock::now().time_since_epoch()
-  )
-                        .count();
-  if (demand.deadline_ns > 0 && now_ns >= demand.deadline_ns) {
+  const auto elapsed_ns =
+    std::chrono::duration_cast<std::chrono::nanoseconds>(
+      std::chrono::steady_clock::now() - pending.accepted_at
+    )
+      .count();
+  if (
+    demand.timeout_ns > 0 && elapsed_ns >= 0 &&
+    static_cast<std::uint64_t>(elapsed_ns) >= demand.timeout_ns
+  ) {
     result.disposition = MLN_RENDER_RESULT_DEADLINE_MISSED;
     publish_frame_result(session, result);
     return;
@@ -2601,6 +2605,7 @@ auto render_session_request_frame(
     s->demands.push_back(
       PendingFrameDemand{
         .demand = *demand,
+        .accepted_at = std::chrono::steady_clock::now(),
         .barrier_epoch = s->barrier_epoch,
       }
     );

@@ -32,7 +32,7 @@ public value class RenderResult(public val nativeValue: Int) {
     /** A newer demand in the same coalescing boundary replaced this demand. */
     public val SUPERSEDED: RenderResult = RenderResult(4)
 
-    /** The demand's positive monotonic deadline elapsed before rendering began. */
+    /** The demand's timeout elapsed before rendering began. */
     public val DEADLINE_MISSED: RenderResult = RenderResult(5)
 
     internal fun fromNative(nativeValue: UInt): RenderResult = fromNative(nativeValue.toInt())

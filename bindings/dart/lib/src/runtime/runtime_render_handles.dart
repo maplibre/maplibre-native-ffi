@@ -182,14 +182,14 @@ final class FrameDemand {
     this.present = false,
     this.token = 0,
     this.coalescingBoundary = 0,
-    this.deadlineNanoseconds = 0,
+    this.timeoutNanoseconds = 0,
   });
 
   final bool renderIfNeeded;
   final bool present;
   final int token;
   final int coalescingBoundary;
-  final int deadlineNanoseconds;
+  final int timeoutNanoseconds;
 }
 
 /// Immutable terminal result for one accepted frame demand.
@@ -386,7 +386,7 @@ final class RenderSessionHandle implements Finalizable {
           (demand.renderIfNeeded ? 1 : 0) | (demand.present ? 2 : 0);
       native.ref.token = demand.token;
       native.ref.coalescing_boundary = demand.coalescingBoundary;
-      native.ref.deadline_ns = demand.deadlineNanoseconds;
+      native.ref.timeout_ns = demand.timeoutNanoseconds;
       _check(raw.mln_render_session_request_frame(_handle.raw, native));
     });
   }

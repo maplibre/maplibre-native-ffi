@@ -2,18 +2,18 @@ import CMaplibreNativeC
 @testable import MaplibreNativeFFI
 import Testing
 
-@Test func frameDemandPreservesCoalescingAndDeadline() {
+@Test func frameDemandPreservesCoalescingAndTimeout() {
   let demand = FrameDemand(
     options: [.ifNeeded, .present],
     token: 41,
     coalescingBoundary: 7,
-    deadlineNanoseconds: 2000
+    timeoutNanoseconds: 2000
   ).native
 
   #expect(demand.flags == 3)
   #expect(demand.token == 41)
   #expect(demand.coalescing_boundary == 7)
-  #expect(demand.deadline_ns == 2000)
+  #expect(demand.timeout_ns == 2000)
 }
 
 @Test func renderResultsPreserveEveryTerminalDisposition() {

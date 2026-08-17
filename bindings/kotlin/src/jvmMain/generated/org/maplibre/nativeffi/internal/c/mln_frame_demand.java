@@ -19,7 +19,7 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  *     uint32_t flags;
  *     uint64_t token;
  *     uint64_t coalescing_boundary;
- *     int64_t deadline_ns;
+ *     uint64_t timeout_ns;
  * }
  * }
  */
@@ -34,7 +34,7 @@ public class mln_frame_demand {
         MapLibreNativeC.C_INT.withName("flags"),
         MapLibreNativeC.C_LONG.withName("token"),
         MapLibreNativeC.C_LONG.withName("coalescing_boundary"),
-        MapLibreNativeC.C_LONG.withName("deadline_ns")
+        MapLibreNativeC.C_LONG.withName("timeout_ns")
     ).withName("mln_frame_demand");
 
     /**
@@ -220,48 +220,48 @@ public class mln_frame_demand {
         struct.set(coalescing_boundary$LAYOUT, coalescing_boundary$OFFSET, fieldValue);
     }
 
-    private static final OfLong deadline_ns$LAYOUT = (OfLong)$LAYOUT.select(groupElement("deadline_ns"));
+    private static final OfLong timeout_ns$LAYOUT = (OfLong)$LAYOUT.select(groupElement("timeout_ns"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * int64_t deadline_ns
+     * uint64_t timeout_ns
      * }
      */
-    public static final OfLong deadline_ns$layout() {
-        return deadline_ns$LAYOUT;
+    public static final OfLong timeout_ns$layout() {
+        return timeout_ns$LAYOUT;
     }
 
-    private static final long deadline_ns$OFFSET = $LAYOUT.byteOffset(groupElement("deadline_ns"));
+    private static final long timeout_ns$OFFSET = $LAYOUT.byteOffset(groupElement("timeout_ns"));
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * int64_t deadline_ns
+     * uint64_t timeout_ns
      * }
      */
-    public static final long deadline_ns$offset() {
-        return deadline_ns$OFFSET;
+    public static final long timeout_ns$offset() {
+        return timeout_ns$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * int64_t deadline_ns
+     * uint64_t timeout_ns
      * }
      */
-    public static long deadline_ns(MemorySegment struct) {
-        return struct.get(deadline_ns$LAYOUT, deadline_ns$OFFSET);
+    public static long timeout_ns(MemorySegment struct) {
+        return struct.get(timeout_ns$LAYOUT, timeout_ns$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * int64_t deadline_ns
+     * uint64_t timeout_ns
      * }
      */
-    public static void deadline_ns(MemorySegment struct, long fieldValue) {
-        struct.set(deadline_ns$LAYOUT, deadline_ns$OFFSET, fieldValue);
+    public static void timeout_ns(MemorySegment struct, long fieldValue) {
+        struct.set(timeout_ns$LAYOUT, timeout_ns$OFFSET, fieldValue);
     }
 
     /**

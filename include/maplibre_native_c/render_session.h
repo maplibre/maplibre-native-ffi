@@ -30,7 +30,7 @@ typedef enum mln_render_result : uint32_t {
   MLN_RENDER_RESULT_TARGET_NOT_READY = 3,
   /** A newer demand in the same coalescing boundary replaced this demand. */
   MLN_RENDER_RESULT_SUPERSEDED = 4,
-  /** The demand's monotonic deadline elapsed before driver work began. */
+  /** The demand's timeout elapsed before driver work began. */
   MLN_RENDER_RESULT_DEADLINE_MISSED = 5,
 } mln_render_result;
 
@@ -62,9 +62,9 @@ typedef struct mln_frame_demand {
   uint64_t token;
   /** Demands coalesce only when this value and their flags match. */
   uint64_t coalescing_boundary;
-  /** Positive deadline in the host's monotonic clock domain; zero has no limit.
-   */
-  int64_t deadline_ns;
+  /** Positive time allowed before driver work begins, in nanoseconds; zero has
+   * no limit. */
+  uint64_t timeout_ns;
 } mln_frame_demand;
 
 /** Immutable result record copied into an owned frame-result batch. */

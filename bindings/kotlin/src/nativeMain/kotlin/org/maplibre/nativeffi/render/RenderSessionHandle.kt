@@ -74,7 +74,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
         (if (demand.present) MLN_FRAME_DEMAND_PRESENT.toUInt() else 0u)
     value.token = demand.token
     value.coalescing_boundary = demand.coalescingBoundary
-    value.deadline_ns = demand.deadlineNanoseconds
+    value.timeout_ns = demand.timeoutNanoseconds
     Status.check(mln_render_session_request_frame(id(), value.ptr))
   }
 

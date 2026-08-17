@@ -3774,14 +3774,14 @@ impl RenderSessionHandle {
         flags: u32,
         token: u64,
         coalescing_boundary: u64,
-        deadline_ns: i64,
+        timeout_ns: u64,
     ) -> PyResult<()> {
         let demand = sys::mln_frame_demand {
             size: std::mem::size_of::<sys::mln_frame_demand>() as u32,
             flags,
             token,
             coalescing_boundary,
-            deadline_ns,
+            timeout_ns,
         };
         maplibre_core::check(unsafe {
             sys::mln_render_session_request_frame(self.native(), &demand)

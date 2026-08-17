@@ -226,13 +226,12 @@ static void demand_coalescing_preserves_boundaries_and_generations(void) {
   TEST_ASSERT_GREATER_THAN_UINT64(0, rendered.frame_generation);
   mln_render_frame_batch_release(batch);
 
-  mln_frame_demand expired = mln_frame_demand_default();
-  expired.flags = 0;
-  expired.token = 104;
-  expired.deadline_ns =
-    (int64_t)(mln_test_monotonic_milliseconds() * UINT64_C(1000000)) - 1;
+  mln_frame_demand timed_out = mln_frame_demand_default();
+  timed_out.flags = 0;
+  timed_out.token = 104;
+  timed_out.timeout_ns = 1;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_render_session_request_frame(fixture.session, &expired)
+    MLN_STATUS_OK, mln_render_session_request_frame(fixture.session, &timed_out)
   );
   batch = MLN_HANDLE_NULL;
   TEST_ASSERT_TRUE(wait_for_results(&fixture, 1, &batch));

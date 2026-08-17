@@ -262,7 +262,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         native.flags = (uint)demand.Flags;
         native.token = demand.Token;
         native.coalescing_boundary = demand.CoalescingBoundary;
-        native.deadline_ns = demand.DeadlineNanoseconds;
+        native.timeout_ns = demand.TimeoutNanoseconds;
         NativeStatus.Check(NativeMethods.mln_render_session_request_frame(Handle, &native));
     }
 

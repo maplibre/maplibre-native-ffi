@@ -273,7 +273,7 @@ class FrameDemand:
     flags: FrameDemandFlag = FrameDemandFlag.IF_NEEDED
     token: int = 0
     coalescing_boundary: int = 0
-    deadline_ns: int = 0
+    timeout_ns: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -794,7 +794,7 @@ class RenderSessionHandle(NativeHandleMixin):
             int(demand.flags),
             demand.token,
             demand.coalescing_boundary,
-            demand.deadline_ns,
+            demand.timeout_ns,
         )
 
     def drain_frame_results(self) -> list[RenderFrameResult]:

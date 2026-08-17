@@ -928,15 +928,16 @@ ready and target-lost outcomes rather than retrying them in a busy loop.
 ### Frame demand and results
 
 A binding MUST expose frame demand as a nonblocking any-thread call. It carries
-flags, a token, a coalescing boundary, and an optional deadline. Every accepted
+flags, a token, a coalescing boundary, and an optional timeout. Every accepted
 demand produces exactly one terminal result record, including a superseded or
 deadline-missed demand.
 
 Frame results preserve disposition, token, map-update generation, extent
 generation, and frame generation. A binding MUST preserve rendered, no-update,
 size-pending, target-not-ready, superseded, and deadline-missed as distinct
-outcomes. A positive monotonic deadline terminates the demand as deadline missed
-when it expires before work begins. The deadline does not supply cadence.
+outcomes. A positive timeout starts when native code accepts the demand and
+terminates it as deadline missed when it expires before work begins. The timeout
+does not supply cadence.
 
 Frame readiness is level-triggered until drained. Each drain takes every queued
 record into an independently owned batch. A binding MUST preserve the records
@@ -1166,7 +1167,7 @@ When the binding routes provider requests through
 | BND-174 | Render-session control, operation, snapshot, demand, abandon, and destroy calls work from a thread other than the graphics service thread.                                                                                  |
 | BND-175 | A frame-result drain takes every queued record into an independently owned batch, and multiple batches may remain live.                                                                                                     |
 | BND-176 | A barrier waits for preceding render work without requesting a frame.                                                                                                                                                       |
-| BND-177 | A positive expired deadline yields deadline missed before graphics work begins.                                                                                                                                             |
+| BND-177 | An expired positive frame timeout yields deadline missed before graphics work begins.                                                                                                                                       |
 | BND-178 | Normal detach performs graphics destruction through the selected owner and permits any-thread CPU-only destroy afterward.                                                                                                   |
 | BND-179 | Abandon returns busy during a driver call, performs no graphics calls, invalidates accessors, detaches the map, and reports quarantine.                                                                                     |
 | BND-180 | Target loss is preserved in snapshots and does not enter a busy retry loop.                                                                                                                                                 |
