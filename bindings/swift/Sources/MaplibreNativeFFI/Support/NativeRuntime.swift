@@ -38,12 +38,11 @@ enum NativeRuntime {
     return NativeOperationHandle(raw: raw)
   }
 
-  static func drainEvents(
-    _ runtime: NativeRuntimeHandle,
-    maxEvents: Int
-  ) throws -> NativeRuntimeEventBatch {
+  static func drainEvents(_ runtime: NativeRuntimeHandle) throws
+    -> NativeRuntimeEventBatch
+  {
     var batch: mln_event_batch = 0
-    try checkStatus(mln_runtime_drain_events(runtime.raw, maxEvents, &batch))
+    try checkStatus(mln_runtime_drain_events(runtime.raw, &batch))
     defer { mln_event_batch_release(batch) }
     var view = mln_runtime_event_batch_view()
     view.size = UInt32(MemoryLayout<mln_runtime_event_batch_view>.size)

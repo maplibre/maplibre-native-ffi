@@ -618,7 +618,7 @@ static void drain_runtime_events_inline(void* user_data) {
   atomic_fetch_add(&probe->calls, 1);
 
   mln_event_batch events = MLN_HANDLE_NULL;
-  mln_status status = mln_runtime_drain_events(probe->runtime, 0, &events);
+  mln_status status = mln_runtime_drain_events(probe->runtime, &events);
   if (status != MLN_STATUS_OK) {
     record_inline_drain_failure(probe, status);
     return;
@@ -663,7 +663,7 @@ static void a_notification_callback_can_drain_runtime_events_inline(void) {
 
   mln_event_batch queued = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_drain_events(runtime, 0, &queued)
+    MLN_STATUS_OK, mln_runtime_drain_events(runtime, &queued)
   );
   mln_event_batch_release(queued);
   inline_event_drain_probe probe = {.runtime = runtime};
@@ -750,7 +750,7 @@ static void adapter_records_and_runtime_events_share_one_source(void) {
 
   mln_event_batch events = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_drain_events(runtime, 0, &events)
+    MLN_STATUS_OK, mln_runtime_drain_events(runtime, &events)
   );
   mln_event_batch_release(events);
   mln_adapter_queued_resource_request* record = NULL;

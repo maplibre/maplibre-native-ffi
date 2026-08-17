@@ -28,7 +28,7 @@ static mln_status wait_for_resource_command(
 ) {
   for (size_t attempt = 0; attempt < 5000; attempt += 1) {
     mln_test_event_batch batch = mln_test_event_batch_default();
-    if (mln_test_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) {
+    if (mln_test_drain_events(runtime, &batch) != MLN_STATUS_OK) {
       return MLN_STATUS_INVALID_STATE;
     }
     for (size_t index = 0; index < batch.event_count; index += 1) {

@@ -5,7 +5,7 @@ const maplibre = @import("maplibre_native_ffi");
 const support = @import("support.zig");
 
 fn drainRuntimeOnThread(runtime: *maplibre.RuntimeHandle, out_error: *?anyerror) void {
-    var batch = runtime.drainEvents(testing.allocator, 0) catch |err| {
+    var batch = runtime.drainEvents(testing.allocator) catch |err| {
         out_error.* = err;
         return;
     };
@@ -74,7 +74,7 @@ fn expectOnlySelectedTypes(
 
     var saw_style_loaded = false;
     for (0..1000) |_| {
-        var batch = try runtime.drainEvents(testing.allocator, 0);
+        var batch = try runtime.drainEvents(testing.allocator);
         defer batch.deinit();
         for (0..batch.len()) |index| {
             const event = try batch.at(index);
@@ -161,10 +161,8 @@ test "one drain reports the events a style load queued together" {
     var largest_batch: usize = 0;
     var saw_style_loaded = false;
     for (0..1000) |_| {
-        var batch = try runtime.drainEvents(testing.allocator, 0);
+        var batch = try runtime.drainEvents(testing.allocator);
         defer batch.deinit();
-        // An unbounded drain takes the whole queue.
-        try testing.expectEqual(@as(usize, 0), batch.remaining());
         largest_batch = @max(largest_batch, batch.len());
         for (0..batch.len()) |index| {
             const event = try batch.at(index);
@@ -195,7 +193,7 @@ test "notification ready batches are copied before native release" {
         ready.endpoints[0].kind,
     ));
 
-    var events = try runtime.drainEvents(testing.allocator, 0);
+    var events = try runtime.drainEvents(testing.allocator);
     defer events.deinit();
     try testing.expect(events.len() > 0);
 
@@ -205,54 +203,6 @@ test "notification ready batches are copied before native release" {
         maplibre.NotificationEndpointKind.runtime_events,
         ready.endpoints[0].kind,
     ));
-}
-
-test "a bounded drain reports one event at a time in queue order" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
-
-    // A malformed inline style is accepted as a command and later reports a
-    // queued loading-failed event carrying native diagnostics.
-    _ = try map.setStyleJson(testing.allocator, "{");
-    const repaint_command = try map.requestRepaint();
-    try support.waitForBarrier(&runtime);
-
-    var message_length: usize = 0;
-    var count: usize = 0;
-    var saw_remaining = false;
-    var last = maplibre.RuntimeEventType.map_idle;
-    var last_command_id: ?u64 = null;
-    while (true) {
-        var batch = try runtime.drainEvents(testing.allocator, 1);
-        defer batch.deinit();
-        if (batch.len() == 0) {
-            try testing.expectEqual(@as(usize, 0), batch.remaining());
-            break;
-        }
-        try testing.expectEqual(@as(usize, 1), batch.len());
-        // The bound leaves the rest of the queue for the next drain.
-        if (batch.remaining() > 0) saw_remaining = true;
-        const event = try batch.at(0);
-        if (std.meta.eql(event.event_type, maplibre.RuntimeEventType.map_loading_failed)) {
-            message_length = event.message.len;
-        }
-        last = event.event_type;
-        switch (event.payload) {
-            .command_finished => |payload| last_command_id = payload.command_id,
-            else => {},
-        }
-        count += 1;
-    }
-    try testing.expect(count > 1);
-    try testing.expect(saw_remaining);
-    // The loading failure carries native's own text.
-    try testing.expect(message_length > 0);
-    // The repaint's terminal event follows its invalidation.
-    try testing.expect(std.meta.eql(last, maplibre.RuntimeEventType.command_finished));
-    try testing.expectEqual(repaint_command, last_command_id.?);
 }
 
 test "a drained batch outlives its runtime" {
@@ -271,7 +221,7 @@ test "a drained batch outlives its runtime" {
     var kept_index: usize = 0;
     var found = false;
     for (0..1000) |_| {
-        var batch = try runtime.drainEvents(testing.allocator, 0);
+        var batch = try runtime.drainEvents(testing.allocator);
         for (0..batch.len()) |index| {
             const event = try batch.at(index);
             if (!std.meta.eql(event.event_type, maplibre.RuntimeEventType.map_loading_failed)) continue;
@@ -302,7 +252,7 @@ test "a drained batch outlives its runtime" {
     try testing.expect(after_close.message.len > 0);
 }
 
-test "closing a map discards its queued runtime events" {
+test "closing a map leaves its queued runtime events unchanged" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
 
@@ -311,7 +261,15 @@ test "closing a map discards its queued runtime events" {
     try support.waitForBarrier(&runtime);
     try map.close();
 
-    try testing.expectEqual(@as(usize, 0), try support.drainEvents(&runtime));
+    var batch = try runtime.drainEvents(testing.allocator);
+    defer batch.deinit();
+    try testing.expect(batch.len() > 0);
+    var found_source = false;
+    for (0..batch.len()) |index| {
+        const event = try batch.at(index);
+        if (event.source_type == .map and event.source != .none) found_source = true;
+    }
+    try testing.expect(found_source);
 }
 
 test "event masks round-trip through both handles" {

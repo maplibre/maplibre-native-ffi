@@ -42,7 +42,7 @@ fn assert_command_disposition(
     expected: CommandDisposition,
 ) -> (CommandFinishedEvent, i32, Option<String>) {
     await_runtime_barrier(runtime);
-    let batch = runtime.drain_events(0).unwrap();
+    let batch = runtime.drain_events().unwrap();
     let matches = batch
         .iter()
         .filter_map(|event| match event.payload() {
@@ -968,7 +968,7 @@ fn custom_geometry_source_state_releases_after_url_style_replacement() {
     let mut style_loaded_events = 0;
     for _ in 0..1000 {
         std::thread::sleep(std::time::Duration::from_millis(1));
-        for event in runtime.drain_events(0).unwrap().iter() {
+        for event in runtime.drain_events().unwrap().iter() {
             if event.event_type() == RuntimeEventType::MapStyleLoaded {
                 style_loaded_events += 1;
             }
@@ -996,7 +996,7 @@ fn custom_geometry_source_state_releases_after_url_style_replacement() {
 fn drain_runtime_events(runtime: &mut RuntimeHandle) {
     for _ in 0..20 {
         std::thread::sleep(std::time::Duration::from_millis(1));
-        let _ = runtime.drain_events(0).unwrap();
+        let _ = runtime.drain_events().unwrap();
     }
 }
 
@@ -1011,7 +1011,7 @@ fn collect_style_load_event_types(
     map.set_style_json(style_json.as_bytes()).unwrap();
     for _ in 0..20 {
         std::thread::sleep(std::time::Duration::from_millis(1));
-        for event in runtime.drain_events(0).unwrap().iter() {
+        for event in runtime.drain_events().unwrap().iter() {
             if event.source() == RuntimeEventSource::Map(map.id()) {
                 types.push(event.event_type());
             }

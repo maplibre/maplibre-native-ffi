@@ -5,7 +5,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <deque>
 #include <functional>
 #include <map>
 #include <memory>
@@ -151,36 +150,22 @@ struct OfflineRegionEventState {
   bool alive = false;
 };
 
-struct QueuedRuntimeEvent {
-  uint32_t type;
-  uint32_t source_type;
-  // The mln_map for map-originated events, the mln_runtime otherwise, as
-  // selected by source_type.
-  uint64_t source;
-  int32_t code;
-  uint32_t payload_type;
-  mln_runtime_event_payload payload = zeroed_event_payload();
-  std::string message;
-  bool has_offline_region = false;
-  mln_offline_region_id offline_region_id = 0;
+struct RuntimeEventStorage {
+  std::vector<mln_runtime_event> events;
+  std::string messages;
 };
 
 struct RuntimeEventQueueState {
   std::mutex mutex;
-  std::condition_variable drain_condition;
-  bool alive = true;
-  bool drain_active = false;
   std::unordered_map<mln_map, std::shared_ptr<MapEventState>> event_maps;
-  std::deque<mln::core::QueuedRuntimeEvent> events;
+  RuntimeEventStorage pending;
   std::unordered_set<mln_offline_region_id> observed_offline_regions;
   std::shared_ptr<mln::core::NotificationSourceObject> notification_source;
   std::shared_ptr<mln::core::NotificationEndpoint> notification_endpoint;
 };
 
 struct EventBatchObject {
-  std::vector<mln_runtime_event> events;
-  std::string messages;
-  std::size_t remaining_count = 0;
+  RuntimeEventStorage storage;
 };
 
 struct RuntimeObject {
@@ -226,9 +211,8 @@ auto runtime_barrier_start(mln_runtime runtime, mln_operation* out_operation)
   -> mln_status;
 auto close_runtime_start(mln_runtime runtime, mln_operation* out_operation)
   -> mln_status;
-auto drain_runtime_events(
-  mln_runtime runtime, size_t max_events, mln_event_batch* out_batch
-) -> mln_status;
+auto drain_runtime_events(mln_runtime runtime, mln_event_batch* out_batch)
+  -> mln_status;
 auto get_event_batch(
   mln_event_batch batch, mln_runtime_event_batch_view* out_view
 ) -> mln_status;
@@ -412,6 +396,6 @@ auto push_runtime_command_finished(
 auto register_runtime_map_events(
   mln_runtime runtime, mln_map map, std::shared_ptr<MapEventState> event_state
 ) -> void;
-auto discard_runtime_map_events(mln_runtime runtime, mln_map map) -> void;
+auto unregister_runtime_map_events(mln_runtime runtime, mln_map map) -> void;
 
 }  // namespace mln::core

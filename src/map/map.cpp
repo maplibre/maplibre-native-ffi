@@ -1596,8 +1596,8 @@ auto camera_transition_finished_payload(uint64_t transition_id)
 
 // MapLibre Native owns the returned AnimationOptions for the transition
 // lifetime and invokes transitionFinishFn on the runtime worker. Event
-// publication discards events for a closed map. The lambda holds event state by
-// value, so it can still inspect the selected mask after map close.
+// publication stops for a closed map. The lambda holds event state by value, so
+// it can still inspect the selected mask after map close.
 auto to_native_animation(
   mln_runtime runtime, mln_map map,
   const std::shared_ptr<mln::core::MapEventState>& event_state,
@@ -2690,7 +2690,7 @@ auto create_map(
 
   } catch (...) {
     static_cast<void>(handle_table<MapObject>().remove(handle));
-    discard_runtime_map_events(runtime, handle);
+    unregister_runtime_map_events(runtime, handle);
     throw;
   }
   *out_map = handle;
@@ -2920,7 +2920,7 @@ auto map_close_start(mln_map map, mln_operation* out_operation) -> mln_status {
             owned_map->custom_geometry_sources->detach();
             owned_map->frontend->close_renderer_observer();
             owned_map->frontend->shutdown_thread_pool();
-            discard_runtime_map_events(gate->runtime, gate->map);
+            unregister_runtime_map_events(gate->runtime, gate->map);
           } catch (...) {
             cleanup_error = std::current_exception();
           }

@@ -2898,7 +2898,6 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
-            MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER
         );
 
@@ -2910,7 +2909,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_drain_events(mln_runtime runtime, size_t max_events, mln_event_batch *out_batch)
+     * mln_status mln_runtime_drain_events(mln_runtime runtime, mln_event_batch *out_batch)
      * }
      */
     public static FunctionDescriptor mln_runtime_drain_events$descriptor() {
@@ -2920,7 +2919,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_drain_events(mln_runtime runtime, size_t max_events, mln_event_batch *out_batch)
+     * mln_status mln_runtime_drain_events(mln_runtime runtime, mln_event_batch *out_batch)
      * }
      */
     public static MethodHandle mln_runtime_drain_events$handle() {
@@ -2930,7 +2929,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_drain_events(mln_runtime runtime, size_t max_events, mln_event_batch *out_batch)
+     * mln_status mln_runtime_drain_events(mln_runtime runtime, mln_event_batch *out_batch)
      * }
      */
     public static MemorySegment mln_runtime_drain_events$address() {
@@ -2939,16 +2938,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_runtime_drain_events(mln_runtime runtime, size_t max_events, mln_event_batch *out_batch)
+     * mln_status mln_runtime_drain_events(mln_runtime runtime, mln_event_batch *out_batch)
      * }
      */
-    public static int mln_runtime_drain_events(long runtime, long max_events, MemorySegment out_batch) {
+    public static int mln_runtime_drain_events(long runtime, MemorySegment out_batch) {
         var mh$ = mln_runtime_drain_events.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_runtime_drain_events", runtime, max_events, out_batch);
+                traceDowncall("mln_runtime_drain_events", runtime, out_batch);
             }
-            return (int)mh$.invokeExact(runtime, max_events, out_batch);
+            return (int)mh$.invokeExact(runtime, out_batch);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {

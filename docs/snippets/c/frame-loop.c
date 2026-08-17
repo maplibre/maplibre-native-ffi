@@ -41,7 +41,7 @@ static bool wants_a_frame(const mln_runtime_event* event, mln_map map) {
 
 static void drain_runtime_events(frame_receiver* receiver, bool* pending) {
   mln_event_batch batch = MLN_HANDLE_NULL;
-  if (mln_runtime_drain_events(receiver->runtime, 0, &batch) != MLN_STATUS_OK)
+  if (mln_runtime_drain_events(receiver->runtime, &batch) != MLN_STATUS_OK)
     return;
   mln_runtime_event_batch_view view = {
     .size = sizeof(mln_runtime_event_batch_view)

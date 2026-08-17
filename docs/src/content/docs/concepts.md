@@ -137,12 +137,13 @@ queues. Default options select every event type the library reports, and a host
 narrows a subscription by naming the types it reads. An unselected event is
 never built, never queued, and never makes the notification source readable.
 
-One drain creates an owned batch: every queued event in order, plus the message
-text that those events carry. A batch remains readable across later drains and
-runtime close. Copy values that must outlive the batch, then release it.
+One drain transfers the queued event records and their message storage into an
+owned batch. A batch remains readable across later drains and runtime close.
+Copy values that must outlive the batch, then release it.
 
-Queued events belong to their source. Closing a map discards that map's queued
-events. Read any teardown state from an owned batch or published snapshot.
+Closing a map or disabling offline-region observation prevents future events
+from that source and leaves queued events unchanged. Each queued event keeps a
+copied source ID that remains meaningful after the source handle closes.
 
 ## Failures
 

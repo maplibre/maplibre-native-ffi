@@ -1824,14 +1824,6 @@ def test_transition_finished_precedes_camera_did_change_in_one_batch() -> None:
     )
 
 
-@pytest.mark.parametrize("max_events", [-1, 2**64])
-def test_drain_events_out_of_range_bound_raises_binding_error(max_events: int) -> None:
-    # PyO3 extracts this as `usize`, so without a range check the caller would
-    # see a bare OverflowError instead of the binding's error shape.
-    with mln.RuntimeHandle() as runtime, pytest.raises(mln.InvalidArgumentError):
-        runtime.drain_events(max_events)
-
-
 def test_option_default_masks_keep_native_bits_this_build_does_not_name(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1952,25 +1944,6 @@ def test_event_mask_bit_outside_all_is_rejected() -> None:
             map_handle.set_event_mask(outside)
 
 
-def test_bounded_drain_reports_remaining_count_until_the_queue_empties() -> None:
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
-        runtime.drain_events()
-        map_handle.jump_to(camera.CameraOptions(center=geo.LatLng(1.0, 2.0), zoom=3.0))
-        map_handle.jump_to(camera.CameraOptions(center=geo.LatLng(3.0, 4.0), zoom=5.0))
-        runtime.barrier()
-
-        bounded = runtime.drain_events(1)
-        assert len(bounded.events) == 1
-        assert bounded.remaining_count > 0
-
-        # No new command is submitted between drains, so the rest is exactly
-        # bounded drain left behind.
-        rest = runtime.drain_events()
-        assert len(rest.events) == bounded.remaining_count
-        assert rest.remaining_count == 0
-        assert not runtime.drain_events().events
-
-
 def test_notification_callback_reports_ready_runtime_endpoint() -> None:
     wake = threading.Event()
 
@@ -2001,7 +1974,7 @@ def test_drained_events_stay_equal_after_the_next_drain_and_map_close() -> None:
         runtime.barrier()
         assert runtime.drain_events().events
 
-        assert first == mln.RuntimeEventBatch(events=snapshot, remaining_count=0)
+        assert first == mln.RuntimeEventBatch(events=snapshot)
         map_handle.close()
         assert first.events == snapshot
 
@@ -2065,8 +2038,6 @@ def test_synthetic_batch_decodes_every_payload_and_preserves_unknown_domains() -
     render_frame, tile_action, image_missing, region_status, transition, unknown = (
         batch.events
     )
-
-    assert batch.remaining_count == 3
 
     assert isinstance(render_frame.payload, mln.RenderFramePayload)
     assert render_frame.payload.mode == mln.RenderMode.FULL

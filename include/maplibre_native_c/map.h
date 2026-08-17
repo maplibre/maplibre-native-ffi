@@ -527,9 +527,10 @@ MLN_API mln_status mln_runtime_offline_region_get_status_start(
 /**
  * Enables or disables runtime events for an offline region.
  *
- * Observer callbacks are copied into runtime events. Disabling observation also
- * discards queued events for this region. The returned operation uses the
- * runtime's notification source. out_operation must point to the null handle.
+ * Observer callbacks are copied into runtime events. Disabling observation
+ * prevents future events for this region and leaves queued events unchanged.
+ * The returned operation uses the runtime's notification source. out_operation
+ * must point to the null handle.
  */
 MLN_API mln_status mln_runtime_offline_region_set_observed_start(
   mln_runtime runtime, mln_offline_region_id region_id, bool observed,

@@ -225,7 +225,7 @@ import org.maplibre.nativeffi.style.VectorTileEncoding
 
 /** Ensures the native library is loaded before JVM FFM downcalls run. */
 internal object NativeAccess {
-  const val EXPECTED_C_ABI_VERSION: Long = 0L
+  const val EXPECTED_C_ABI_VERSION: Long = 1L
   const val DEFAULT_LOG_SEVERITY_MASK: Int = (1 shl 1) or (1 shl 2)
 
   private val lock = Any()
@@ -3518,19 +3518,13 @@ internal object NativeAccess {
       markTaken,
     )
 
-  /**
-   * Drains at most [maxEvents] events, zero draining every queued event, and copies every field of
-   * every event out of the owned batch before releasing it.
-   */
-  internal fun drainRuntimeEvents(
-    runtime: NativeRuntime,
-    maxEvents: Long,
-  ): NativeRuntimeEventBatch =
+  /** Copies every queued event out of the owned batch before releasing it. */
+  internal fun drainRuntimeEvents(runtime: NativeRuntime): NativeRuntimeEventBatch =
     Arena.ofConfined().use { arena ->
       val batch = arena.allocate(RUNTIME_EVENT_BATCH_SIZE)
       val outBatch = arena.allocate(ValueLayout.JAVA_LONG)
       outBatch.set(ValueLayout.JAVA_LONG, 0, 0L)
-      Status.check(MapLibreNativeC.mln_runtime_drain_events(runtime.raw, maxEvents, outBatch))
+      Status.check(MapLibreNativeC.mln_runtime_drain_events(runtime.raw, outBatch))
       val batchHandle = outBatch.get(ValueLayout.JAVA_LONG, 0)
       require(batchHandle != 0L) { "mln_runtime_drain_events returned the null handle" }
       try {
@@ -3541,9 +3535,8 @@ internal object NativeAccess {
         )
         Status.check(MapLibreNativeC.mln_event_batch_get(batchHandle, batch))
         val eventCount = batch.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_BATCH_EVENT_COUNT_OFFSET)
-        val remainingCount = batch.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_BATCH_REMAINING_OFFSET)
         if (eventCount == 0L) {
-          return@use NativeRuntimeEventBatch(emptyList(), remainingCount)
+          return@use NativeRuntimeEventBatch(emptyList())
         }
         // The stride the batch reports can exceed this binding's compiled event
         // record, so index by it rather than by mln_runtime_event.sizeof().
@@ -3581,16 +3574,13 @@ internal object NativeAccess {
               message =
                 copyMessage(
                   messages,
-                  Integer.toUnsignedLong(
-                    events.get(ValueLayout.JAVA_INT, base + RUNTIME_EVENT_MESSAGE_OFFSET_OFFSET)
-                  ),
+                  events.get(ValueLayout.JAVA_LONG, base + RUNTIME_EVENT_MESSAGE_OFFSET_OFFSET),
                   Integer.toUnsignedLong(
                     events.get(ValueLayout.JAVA_INT, base + RUNTIME_EVENT_MESSAGE_SIZE_OFFSET)
                   ),
                 ),
             )
-          },
-          remainingCount,
+          }
         )
       } finally {
         MapLibreNativeC.mln_event_batch_release(batchHandle)
@@ -6019,8 +6009,6 @@ internal object NativeAccess {
     mln_runtime_event_batch_view.`messages$offset`()
   private val RUNTIME_EVENT_BATCH_MESSAGES_SIZE_OFFSET: Long =
     mln_runtime_event_batch_view.`messages_size$offset`()
-  private val RUNTIME_EVENT_BATCH_REMAINING_OFFSET: Long =
-    mln_runtime_event_batch_view.`remaining_count$offset`()
 
   private val RESOURCE_REQUEST_REQUESTED_URL_OFFSET: Long =
     mln_resource_request.`requested_url$offset`()
@@ -6548,9 +6536,6 @@ internal object NativeAccess {
     val message: String,
   )
 
-  /** Events copied out of one drained batch, plus the count the drain left queued. */
-  internal data class NativeRuntimeEventBatch(
-    val events: List<NativeRuntimeEvent>,
-    val remainingCount: Long,
-  )
+  /** Events copied out of one drained batch. */
+  internal data class NativeRuntimeEventBatch(val events: List<NativeRuntimeEvent>)
 }

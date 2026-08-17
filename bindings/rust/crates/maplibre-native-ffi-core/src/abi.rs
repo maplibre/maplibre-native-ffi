@@ -2,7 +2,7 @@ use maplibre_native_ffi_sys as sys;
 
 use crate::error::{Error, Result};
 
-pub const EXPECTED_C_ABI_VERSION: u32 = 0;
+pub const EXPECTED_C_ABI_VERSION: u32 = 1;
 
 pub fn validate_abi_version() -> Result<()> {
     // SAFETY: mln_c_version takes no arguments and returns the process-global C

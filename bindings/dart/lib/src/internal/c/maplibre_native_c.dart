@@ -6,7 +6,7 @@ import '../../error/maplibre_exception.dart';
 import 'maplibre_native_c.g.dart' as generated;
 
 /// C ABI contract version supported by this generated binding.
-const int expectedCAbiVersion = 0;
+const int expectedCAbiVersion = 1;
 
 /// Callback adapter entry points this binding registers with native code, plus
 /// the ABI check that gates every use of them.

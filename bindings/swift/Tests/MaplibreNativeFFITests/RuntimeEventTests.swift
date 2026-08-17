@@ -40,8 +40,7 @@ private func makeMap(_ runtime: RuntimeHandle) async throws -> MapHandle {
   let batch = try withSynthesizedEventBatch(
     events: events,
     stride: MemoryLayout<mln_runtime_event>.size + 16,
-    messages: arena.bytes,
-    remainingCount: 4
+    messages: arena.bytes
   ) { synthesized in
     try NativeRuntimeEventBatch(copying: synthesized.batch)
   }
@@ -50,7 +49,6 @@ private func makeMap(_ runtime: RuntimeHandle) async throws -> MapHandle {
   #expect(batch.events.map(\.sourceId) == [0x11, 0x22, 0x33])
   #expect(batch.events.map(\.message) == ["first", "second", ""])
   #expect(batch.events.map(\.code) == [0, -3, 0])
-  #expect(batch.remainingCount == 4)
 }
 
 /// BND-083. An event type, source kind, and payload kind this version does not
@@ -228,38 +226,8 @@ private func makeMap(_ runtime: RuntimeHandle) async throws -> MapHandle {
   let batch = try runtime.drainEvents()
 
   #expect(batch.events.count > 1)
-  #expect(batch.remainingCount == 0)
   #expect(batch.events.map(\.type).contains(.mapStyleLoaded))
   #expect(batch.events.allSatisfy { map.isSource(of: $0) })
-}
-
-/// A bounded drain reports what stayed queued, so a host that takes a slice per
-/// iteration learns to come back, and reaches zero when it does.
-@Test func aBoundedDrainReportsTheEventsItLeftQueued() async throws {
-  let runtime = try await makeRuntime()
-  defer { try? runtime.closeBlockingForTests() }
-  let map = try await makeMap(runtime)
-  defer { try? map.closeBlockingForTests() }
-  _ = try runtime.drainEvents()
-
-  try map.setStyleJSON(emptyStyleJSON)
-  try await runtime.barrier()
-  let bounded = try runtime.drainEvents(maxEvents: 1)
-
-  #expect(bounded.events.count == 1)
-  #expect(bounded.remainingCount > 0)
-
-  var drained = bounded.events.count
-  var remaining = bounded.remainingCount
-  while remaining > 0 {
-    let batch = try runtime.drainEvents(maxEvents: 2)
-    #expect(batch.events.count <= 2)
-    #expect(!batch.events.isEmpty)
-    drained += batch.events.count
-    remaining = batch.remainingCount
-  }
-  #expect(drained > 1)
-  #expect(try runtime.drainEvents().events.isEmpty)
 }
 
 /// BND-082, BND-092. An event copied out of a batch keeps its message and

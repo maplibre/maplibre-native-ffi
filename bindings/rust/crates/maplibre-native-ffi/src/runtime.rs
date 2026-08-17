@@ -1323,17 +1323,13 @@ impl RuntimeHandle {
 
     /// Drains an owned batch of queued runtime events.
     ///
-    /// `max_events` bounds the drain. Zero drains every queued event, and a
-    /// positive value drains at most that many and reports the rest through
-    /// [`RuntimeEventBatch::remaining`]. The returned batch remains stable
-    /// across later drains and releases its native storage when dropped.
-    pub fn drain_events(&self, max_events: usize) -> Result<RuntimeEventBatch> {
+    /// The returned batch contains the whole queue, remains stable across later
+    /// drains, and releases its native storage when dropped.
+    pub fn drain_events(&self) -> Result<RuntimeEventBatch> {
         let runtime = self.inner.native()?;
         let mut batch = sys::mln_event_batch(0);
         // SAFETY: runtime is live and batch points to a null writable handle.
-        maplibre_core::check(unsafe {
-            sys::mln_runtime_drain_events(runtime, max_events, &mut batch)
-        })?;
+        maplibre_core::check(unsafe { sys::mln_runtime_drain_events(runtime, &mut batch) })?;
         // SAFETY: A successful drain returns one owned native batch.
         unsafe { RuntimeEventBatch::new(batch) }
     }
@@ -1899,7 +1895,7 @@ mod tests {
 
     fn drain_holds_event_type(runtime: &RuntimeHandle, event_type: RuntimeEventType) -> bool {
         runtime
-            .drain_events(0)
+            .drain_events()
             .unwrap()
             .iter()
             .any(|event| event.event_type() == event_type)
@@ -1920,7 +1916,7 @@ mod tests {
         for _ in 0..100 {
             std::thread::sleep(std::time::Duration::from_millis(1));
             let mut failure = None;
-            for event in runtime.drain_events(0).unwrap().iter() {
+            for event in runtime.drain_events().unwrap().iter() {
                 if event.event_type() == RuntimeEventType::MapLoadingFailed {
                     failure = Some(event.to_owned().unwrap());
                     break;
@@ -1941,13 +1937,12 @@ mod tests {
 
         std::thread::sleep(std::time::Duration::from_millis(1));
         // A fresh runtime with no map queues nothing.
-        let batch = runtime.drain_events(0).unwrap();
+        let batch = runtime.drain_events().unwrap();
         assert!(batch.is_empty());
         assert_eq!(batch.len(), 0);
-        assert_eq!(batch.remaining(), 0);
         assert_eq!(batch.iter().count(), 0);
         // A second drain of an empty queue reports the same empty batch.
-        assert!(runtime.drain_events(0).unwrap().is_empty());
+        assert!(runtime.drain_events().unwrap().is_empty());
         runtime.close().unwrap();
     }
 
@@ -1985,34 +1980,6 @@ mod tests {
                 operation.discard().unwrap();
             }
         });
-        runtime.close().unwrap();
-    }
-
-    #[test]
-    // Spec coverage: BND-090.
-    fn a_bounded_drain_reports_the_events_it_left_queued() {
-        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-        let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
-        map.set_style_json(PROVIDER_STYLE_JSON.as_bytes()).unwrap();
-        std::thread::sleep(std::time::Duration::from_millis(1));
-
-        let bounded = runtime.drain_events(1).unwrap();
-        assert_eq!(bounded.len(), 1);
-        assert!(
-            bounded.remaining() > 0,
-            "a style load should queue more than one event"
-        );
-        let remaining = bounded.remaining();
-        let rest = runtime.drain_events(0).unwrap();
-        assert!(
-            rest.len() >= remaining,
-            "the unbounded drain should include every event previously reported queued"
-        );
-        assert_eq!(rest.remaining(), 0);
-        let first = rest.iter().next().unwrap();
-        assert_eq!(first.source(), RuntimeEventSource::Map(map.id()));
-
-        map.close().unwrap();
         runtime.close().unwrap();
     }
 
@@ -2358,7 +2325,7 @@ mod tests {
         let event = wait_for_map_loading_failure(&mut runtime);
         let copied_message = event.message.clone();
         // The copy stays intact after the drain that ends the batch's window.
-        let _ = runtime.drain_events(0).unwrap();
+        let _ = runtime.drain_events().unwrap();
 
         assert_eq!(event.source, RuntimeEventSource::Map(map_id));
         assert_eq!(event.event_type, RuntimeEventType::MapLoadingFailed);
@@ -2759,7 +2726,7 @@ mod tests {
         barrier.discard().unwrap();
         barrier.release();
 
-        let batch = runtime.drain_events(0).unwrap();
+        let batch = runtime.drain_events().unwrap();
         let types = batch
             .iter()
             .map(|event| event.event_type())
@@ -2794,7 +2761,7 @@ mod tests {
         let owned = loading_failed.to_owned().unwrap();
 
         // A later drain leaves the owned batch readable.
-        assert!(runtime.drain_events(0).unwrap().is_empty());
+        assert!(runtime.drain_events().unwrap().is_empty());
         assert_eq!(loading_failed.source(), RuntimeEventSource::Map(map_id));
         drop(batch);
         assert_eq!(owned.source, RuntimeEventSource::Map(map_id));

@@ -288,13 +288,12 @@ private constructor(
     }
   }
 
-  public actual fun drainEvents(maxEvents: Int): RuntimeEventBatch {
+  public actual fun drainEvents(): RuntimeEventBatch {
     NativeAccess.ensureLoaded()
-    Status.requireArgument(maxEvents >= 0) { "maxEvents must be non-negative" }
-    val batch = NativeAccess.drainRuntimeEvents(requireLiveHandle(), maxEvents.toLong())
+    val batch = NativeAccess.drainRuntimeEvents(requireLiveHandle())
     val events = batch.events.map { it.toRuntimeEvent() }
     events.forEach(::finishCallbackCommand)
-    return RuntimeEventBatch(events, batch.remainingCount)
+    return RuntimeEventBatch(events)
   }
 
   public actual var eventMask: RuntimeEventMask

@@ -188,7 +188,7 @@ func (state *runtimeMapState) orderedCamera() (maplibre.CameraOptions, error) {
 
 func drainEvents(runtimeHandle *maplibre.RuntimeHandle, mapID maplibre.MapID) (bool, error) {
 	renderRequested := false
-	batch, err := runtimeHandle.DrainEvents(0)
+	batch, err := runtimeHandle.DrainEvents()
 	if err != nil {
 		return false, fmt.Errorf("runtime event drain failed: %w", err)
 	}

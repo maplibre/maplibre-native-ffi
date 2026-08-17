@@ -204,31 +204,18 @@ final class RuntimeHandle {
   /// Events arrive in queue order. Every field, message, and payload is copied
   /// before this returns, so a batch stays readable for as long as the host
   /// keeps it.
-  ///
-  /// The default zero [maxEvents] drains every queued event. A positive value
-  /// drains at most that many and reports the rest in
-  /// [RuntimeEventBatch.remainingCount].
-  RuntimeEventBatch drainEvents({int maxEvents = 0}) {
+  RuntimeEventBatch drainEvents() {
     final _ = _handle;
-    if (maxEvents < 0) {
-      throwInvalidArgument('maxEvents must not be negative');
-    }
     _queuedRuntimeEvents.addAll(_drainNativeEvents().events);
-    final count = maxEvents == 0 || maxEvents > _queuedRuntimeEvents.length
-        ? _queuedRuntimeEvents.length
-        : maxEvents;
-    final events = _queuedRuntimeEvents.sublist(0, count);
-    _queuedRuntimeEvents.removeRange(0, count);
-    return RuntimeEventBatch._(
-      events: events,
-      remainingCount: _queuedRuntimeEvents.length,
-    );
+    final events = List<RuntimeEvent>.of(_queuedRuntimeEvents);
+    _queuedRuntimeEvents.clear();
+    return RuntimeEventBatch._(events: events);
   }
 
   RuntimeEventBatch _drainNativeEvents() {
     return withNativeArena((arena) {
       final outBatch = arena<Uint64>()..value = 0;
-      _check(raw.mln_runtime_drain_events(_handle.raw, 0, outBatch));
+      _check(raw.mln_runtime_drain_events(_handle.raw, outBatch));
       final view = arena<raw.mln_runtime_event_batch_view>();
       view.ref.size = sizeOf<raw.mln_runtime_event_batch_view>();
       try {
@@ -980,10 +967,8 @@ Future<void> _waitForStandaloneOperation(int source, int operation) async {
 
 /// One batch of runtime events copied out of the native event arena.
 final class RuntimeEventBatch {
-  RuntimeEventBatch._({
-    required List<RuntimeEvent> events,
-    required this.remainingCount,
-  }) : events = List.unmodifiable(events);
+  RuntimeEventBatch._({required List<RuntimeEvent> events})
+    : events = List.unmodifiable(events);
 
   factory RuntimeEventBatch._fromNative(
     raw.mln_runtime_event_batch_view batch,
@@ -1020,20 +1005,11 @@ final class RuntimeEventBatch {
         }
       }
     }
-    return RuntimeEventBatch._(
-      events: events,
-      remainingCount: batch.remaining_count,
-    );
+    return RuntimeEventBatch._(events: events);
   }
 
   /// Drained events in queue order.
   final List<RuntimeEvent> events;
-
-  /// Events still queued after this batch.
-  ///
-  /// A nonzero count means another drain reports more events, so a host that
-  /// bounds a drain learns to come back.
-  final int remainingCount;
 }
 
 /// Event types a map or a runtime queues, as one bit per [RuntimeEventType].

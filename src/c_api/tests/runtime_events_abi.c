@@ -1,6 +1,6 @@
 // Raw C ABI coverage for the batch event drain and the two subscription masks:
-// batch layout and lifetime, bounded drains, mask validation, and the
-// suppression a cleared mask bit causes at push time.
+// batch layout and lifetime, mask validation, and the suppression a cleared
+// mask bit causes at push time.
 
 #include <assert.h>
 #include <stdatomic.h>
@@ -72,7 +72,7 @@ static_assert(
   "mln_runtime_event_payload is 8-byte aligned"
 );
 static_assert(
-  sizeof(mln_runtime_event) == 104, "mln_runtime_event is 104 bytes wide"
+  sizeof(mln_runtime_event) == 112, "mln_runtime_event is 112 bytes wide"
 );
 static_assert(
   _Alignof(mln_runtime_event) == 8, "mln_runtime_event is 8-byte aligned"
@@ -102,12 +102,12 @@ static_assert(
   "mln_runtime_event.message_offset sits at offset 24"
 );
 static_assert(
-  offsetof(mln_runtime_event, message_size) == 28,
-  "mln_runtime_event.message_size sits at offset 28"
+  offsetof(mln_runtime_event, message_size) == 32,
+  "mln_runtime_event.message_size sits at offset 32"
 );
 static_assert(
-  offsetof(mln_runtime_event, payload) == 32,
-  "mln_runtime_event.payload sits at offset 32"
+  offsetof(mln_runtime_event, payload) == 40,
+  "mln_runtime_event.payload sits at offset 40"
 );
 static_assert(
   sizeof(mln_map_options) == 40, "mln_map_options is 40 bytes wide"
@@ -137,8 +137,8 @@ static_assert(
 // pointer width.
 #if UINTPTR_MAX == UINT64_MAX
 static_assert(
-  sizeof(mln_runtime_event_batch_view) == 48,
-  "mln_runtime_event_batch_view is 48 bytes wide"
+  sizeof(mln_runtime_event_batch_view) == 40,
+  "mln_runtime_event_batch_view is 40 bytes wide"
 );
 static_assert(
   sizeof(mln_runtime_options) == 40, "mln_runtime_options is 40 bytes wide"
@@ -182,17 +182,17 @@ static mln_map_options map_options_with_event_mask(uint64_t mask) {
 static void a_drain_rejects_a_nonnull_output_or_a_stale_runtime(void) {
   mln_runtime runtime = mln_test_create_runtime();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_drain_events(runtime, 0, NULL)
+    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_drain_events(runtime, NULL)
   );
   mln_event_batch batch = UINT64_C(1);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_drain_events(runtime, 0, &batch)
+    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_drain_events(runtime, &batch)
   );
 
   mln_test_destroy_runtime(runtime);
   batch = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_drain_events(runtime, 0, &batch)
+    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_drain_events(runtime, &batch)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
@@ -212,7 +212,7 @@ typedef struct foreign_thread_probe {
 static void call_event_api_from_a_foreign_thread(void* argument) {
   foreign_thread_probe* probe = argument;
   mln_event_batch batch = MLN_HANDLE_NULL;
-  probe->drain_status = mln_runtime_drain_events(probe->runtime, 0, &batch);
+  probe->drain_status = mln_runtime_drain_events(probe->runtime, &batch);
   mln_event_batch_release(batch);
   probe->runtime_mask_status =
     mln_runtime_set_event_mask(probe->runtime, MLN_RUNTIME_EVENT_MASK_ALL);
@@ -380,9 +380,7 @@ static void a_creation_mask_applies_during_construction(void) {
   TEST_ASSERT_EQUAL_UINT64(MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED, map_mask);
 
   mln_test_event_batch batch = mln_test_event_batch_default();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_drain_events(runtime, 0, &batch)
-  );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_drain_events(runtime, &batch));
   TEST_ASSERT_EQUAL_size_t(0, batch.event_count);
 
   load_style_and_wait(runtime, map);
@@ -461,7 +459,7 @@ static void an_owned_batch_remains_stable_across_later_drains(void) {
 
   mln_event_batch first = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_drain_events(runtime, 0, &first)
+    MLN_STATUS_OK, mln_runtime_drain_events(runtime, &first)
   );
   mln_runtime_event_batch_view first_view = {
     .size = sizeof(mln_runtime_event_batch_view)
@@ -474,7 +472,7 @@ static void an_owned_batch_remains_stable_across_later_drains(void) {
 
   mln_event_batch second = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_drain_events(runtime, 0, &second)
+    MLN_STATUS_OK, mln_runtime_drain_events(runtime, &second)
   );
   mln_runtime_event_batch_view second_view = {
     .size = sizeof(mln_runtime_event_batch_view)
@@ -492,38 +490,17 @@ static void an_owned_batch_remains_stable_across_later_drains(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static void a_bounded_drain_reports_what_stayed_queued(void) {
+// Closing a source prevents future publication without rewriting history that
+// is already queued.
+static void queued_events_outlive_the_map_that_produced_them(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   load_style_and_wait(runtime, map);
-
-  mln_test_event_batch batch = mln_test_event_batch_default();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_drain_events(runtime, 1, &batch)
-  );
-  TEST_ASSERT_EQUAL_size_t(1, batch.event_count);
-  TEST_ASSERT_GREATER_THAN_size_t(0, batch.remaining_count);
-
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_drain_events(runtime, 0, &batch)
-  );
-  TEST_ASSERT_GREATER_THAN_size_t(0, batch.event_count);
-  TEST_ASSERT_EQUAL_size_t(0, batch.remaining_count);
-
   mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
-// A batch holds copies on the runtime, so destroying the map whose events it
-// carries leaves it readable.
-static void an_owned_batch_outlives_the_map_that_produced_it(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  load_style_and_wait(runtime, map);
 
   mln_event_batch batch = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_drain_events(runtime, 0, &batch)
+    MLN_STATUS_OK, mln_runtime_drain_events(runtime, &batch)
   );
   mln_runtime_event_batch_view view = {
     .size = sizeof(mln_runtime_event_batch_view)
@@ -531,7 +508,6 @@ static void an_owned_batch_outlives_the_map_that_produced_it(void) {
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_event_batch_get(batch, &view));
   TEST_ASSERT_GREATER_THAN_size_t(0, view.event_count);
 
-  mln_test_destroy_map(map);
   size_t map_sourced = 0;
   for (size_t index = 0; index < view.event_count; index += 1) {
     const mln_runtime_event* event =
@@ -576,9 +552,7 @@ static void one_batch_reports_events_in_queue_order(void) {
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
 
   mln_test_event_batch batch = mln_test_event_batch_default();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_drain_events(runtime, 0, &batch)
-  );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_drain_events(runtime, &batch));
   bool saw_finish = false;
   bool did_change_followed_finish = false;
   for (size_t index = 0; index < batch.event_count; index += 1) {
@@ -620,9 +594,7 @@ static void the_message_arena_carries_one_range_per_event(void) {
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
 
   mln_test_event_batch batch = mln_test_event_batch_default();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_drain_events(runtime, 0, &batch)
-  );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_drain_events(runtime, &batch));
 
   size_t failures = 0;
   uint32_t first_offset = 0;
@@ -739,44 +711,6 @@ static void copied_operation_diagnostics_are_stable_across_threads(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-typedef struct event_drain_lease_probe {
-  mln_runtime runtime;
-  atomic_bool entered;
-  atomic_bool release;
-} event_drain_lease_probe;
-
-static void hold_runtime_event_drain_on_thread(void* argument) {
-  event_drain_lease_probe* probe = argument;
-  mln_test_hold_runtime_event_drain(
-    probe->runtime, &probe->entered, &probe->release
-  );
-}
-
-static void a_second_concurrent_event_drain_is_rejected(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  event_drain_lease_probe probe = {.runtime = runtime};
-  atomic_init(&probe.entered, false);
-  atomic_init(&probe.release, false);
-  mln_test_thread* holder =
-    mln_test_thread_start(hold_runtime_event_drain_on_thread, &probe);
-  while (!atomic_load(&probe.entered)) {
-  }
-
-  mln_event_batch batch = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_STATE, mln_runtime_drain_events(runtime, 0, &batch)
-  );
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, batch);
-  atomic_store(&probe.release, true);
-  mln_test_thread_join(holder);
-
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_drain_events(runtime, 0, &batch)
-  );
-  mln_event_batch_release(batch);
-  mln_test_destroy_runtime(runtime);
-}
-
 void run_runtime_events_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(a_drain_rejects_a_nonnull_output_or_a_stale_runtime);
@@ -789,10 +723,8 @@ void run_runtime_events_abi_tests(void) {
   RUN_TEST(clearing_one_type_leaves_the_others_arriving);
   RUN_TEST(a_suppressed_producer_leaves_the_queue_empty);
   RUN_TEST(an_owned_batch_remains_stable_across_later_drains);
-  RUN_TEST(a_bounded_drain_reports_what_stayed_queued);
-  RUN_TEST(an_owned_batch_outlives_the_map_that_produced_it);
+  RUN_TEST(queued_events_outlive_the_map_that_produced_them);
   RUN_TEST(one_batch_reports_events_in_queue_order);
   RUN_TEST(the_message_arena_carries_one_range_per_event);
   RUN_TEST(copied_operation_diagnostics_are_stable_across_threads);
-  RUN_TEST(a_second_concurrent_event_drain_is_rejected);
 }

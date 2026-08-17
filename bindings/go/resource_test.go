@@ -26,7 +26,7 @@ func loadProbeStyle(t *testing.T, runtime *RuntimeHandle, m *MapHandle, styleURL
 	}
 	for range make([]struct{}, 5000) {
 		time.Sleep(time.Millisecond)
-		batch, err := runtime.DrainEvents(0)
+		batch, err := runtime.DrainEvents()
 		if err != nil {
 			t.Fatalf("DrainEvents(): %v", err)
 		}

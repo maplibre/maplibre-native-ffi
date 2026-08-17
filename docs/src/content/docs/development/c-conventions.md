@@ -317,11 +317,12 @@ points where MapLibre needs a synchronous decision, an asynchronous request
 handle, or process-global integration such as logging.
 
 Event payloads use plain data with documented lifetimes. Each event identifies
-its source kind and source handle. Queued events never outlive the source handle
-they reference: map teardown discards queued events for that map, and runtime
-teardown discards runtime-owned event streams before the runtime handle becomes
-invalid. A drain returns an owned batch of copies. The batch stays readable
-across later drains and runtime close until the caller releases it.
+its source kind and copied source handle value. Closing a map or disabling an
+offline-region observer prevents future publication without changing queued
+history. Runtime teardown discards its undrained event stream before the runtime
+handle becomes invalid. A drain transfers the complete queue into an owned
+batch, which stays readable across later drains and runtime close until the
+caller releases it.
 
 Use the six execution categories defined in Ownership And Execution. An
 Immediate return is final. A Command return reports copied acceptance. Published

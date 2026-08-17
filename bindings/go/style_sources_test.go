@@ -43,7 +43,7 @@ func awaitCommandFinishedForTest(t *testing.T, runtime *RuntimeHandle, commandID
 		t.Fatal("command returned a zero command ID")
 	}
 	for range make([]struct{}, 5000) {
-		batch, drainErr := runtime.DrainEvents(0)
+		batch, drainErr := runtime.DrainEvents()
 		if drainErr != nil {
 			t.Fatalf("DrainEvents(): %v", drainErr)
 		}

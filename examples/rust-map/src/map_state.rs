@@ -244,7 +244,7 @@ impl MapState {
         }
 
         let source = RuntimeEventSource::Map(self.map.id());
-        let batch = self.runtime.drain_events(0)?;
+        let batch = self.runtime.drain_events()?;
         for event in batch.iter().filter(|event| event.source() == source) {
             match event.event_type() {
                 RuntimeEventType::MapRenderUpdateAvailable => render_requested = true,

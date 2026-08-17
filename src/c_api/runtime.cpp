@@ -405,10 +405,10 @@ auto mln_runtime_close_start(
 }
 
 auto mln_runtime_drain_events(
-  mln_runtime runtime, size_t max_events, mln_event_batch* out_batch
+  mln_runtime runtime, mln_event_batch* out_batch
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::drain_runtime_events(runtime, max_events, out_batch);
+    return mln::core::drain_runtime_events(runtime, out_batch);
   });
 }
 

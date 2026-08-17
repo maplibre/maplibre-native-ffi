@@ -239,36 +239,3 @@ extern "C" void mln_test_hold_notification_ready_drain(
   }
   live->abort_ready_drain();
 }
-
-extern "C" void mln_test_hold_runtime_event_drain(
-  mln_runtime runtime, std::atomic_bool* entered,
-  const std::atomic_bool* release
-) {
-  auto queue = std::shared_ptr<mln::core::RuntimeEventQueueState>{};
-  {
-    auto& table = mln::core::handle_table<mln::core::RuntimeObject>();
-    const std::scoped_lock table_lock(table.mutex());
-    const auto* live = table.resolve_locked(runtime);
-    if (live == nullptr) {
-      entered->store(true, std::memory_order_release);
-      return;
-    }
-    queue = live->event_queue;
-    const std::scoped_lock queue_lock(queue->mutex);
-    if (queue->drain_active) {
-      entered->store(true, std::memory_order_release);
-      return;
-    }
-    queue->drain_active = true;
-  }
-
-  entered->store(true, std::memory_order_release);
-  while (!release->load(std::memory_order_acquire)) {
-    std::this_thread::yield();
-  }
-  {
-    const std::scoped_lock queue_lock(queue->mutex);
-    queue->drain_active = false;
-  }
-  queue->drain_condition.notify_all();
-}

@@ -160,16 +160,13 @@ typedef struct mln_test_event_batch {
   size_t event_count;
   const char* messages;
   size_t messages_size;
-  size_t remaining_count;
 } mln_test_event_batch;
 
 mln_test_event_batch mln_test_event_batch_default(void);
 mln_status mln_test_drain_events(
-  mln_runtime runtime, size_t max_events, mln_test_event_batch* out_batch
+  mln_runtime runtime, mln_test_event_batch* out_batch
 );
-// Drains until a batch reports no events, and returns how many it discarded. A
-// bounded batch still empties the queue, because each drain reports what stayed
-// behind.
+// Drains until a batch reports no events, and returns how many it discarded.
 size_t mln_test_drain_all(mln_runtime runtime);
 
 // The same, counting the events whose type matches.
@@ -182,11 +179,6 @@ size_t mln_test_drain_counting(mln_runtime runtime, uint32_t type);
 bool mln_test_drain_find(
   mln_runtime runtime, uint32_t type, mln_map source,
   mln_runtime_event* out_event, char* out_message, size_t message_capacity
-);
-
-// Holds the runtime event queue's real drain lease until `release` is set.
-void mln_test_hold_runtime_event_drain(
-  mln_runtime runtime, atomic_bool* entered, const atomic_bool* release
 );
 
 // Destroys everything this thread still has tracked, render session first, then

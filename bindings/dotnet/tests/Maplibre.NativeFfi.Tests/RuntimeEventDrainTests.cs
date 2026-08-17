@@ -35,28 +35,6 @@ public sealed class RuntimeEventDrainTests
         Assert.All(batch, runtimeEvent => Assert.Same(map, runtimeEvent.MapSource));
     }
 
-    [BindingSpecTest("BND-090")]
-    [Fact]
-    public void ABoundedDrainReportsRemainingEventsAndASecondDrainReachesZero()
-    {
-        using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
-        using var map = TestHandles.CreateMap(
-            runtime,
-            new MapOptions { Width = 512, Height = 512 }
-        );
-        map.SetStyleJson(StyleJson);
-
-        var bounded = DriveUntilABoundedDrainLeavesEvents(runtime);
-        Assert.Single(bounded.Events);
-        Assert.True(bounded.RemainingCount > 0, "a bounded drain took the whole queue");
-
-        // No new work is submitted between the two drains, so the second one takes exactly
-        // what the first one left.
-        var rest = runtime.DrainEvents();
-        Assert.Equal((int)bounded.RemainingCount, rest.Events.Count);
-        Assert.Equal(0ul, rest.RemainingCount);
-    }
-
     [BindingSpecTest("BND-092")]
     [Fact]
     public void ADrainedBatchKeepsItsMessagesAfterTheNextDrainReusesTheArena()
@@ -224,24 +202,6 @@ public sealed class RuntimeEventDrainTests
         IReadOnlyList<RuntimeEvent> Batch,
         IReadOnlyList<RuntimeEvent> Everything
     );
-
-    // Drains until one bounded batch leaves the queue non-empty.
-    private static RuntimeEventBatch DriveUntilABoundedDrainLeavesEvents(RuntimeHandle runtime)
-    {
-        for (var attempt = 0; attempt < 1000; attempt++)
-        {
-            Thread.Sleep(1);
-            var batch = runtime.DrainEvents(1);
-            if (batch.RemainingCount > 0)
-            {
-                return batch;
-            }
-
-            Thread.Sleep(1);
-        }
-
-        throw new TimeoutException("The style load never queued more than one event.");
-    }
 
     // Drains until one batch carries the awaited type.
     private static DrivenEvents DriveUntil(RuntimeHandle runtime, RuntimeEventType eventType)

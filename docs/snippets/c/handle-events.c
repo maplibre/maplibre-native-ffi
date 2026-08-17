@@ -36,7 +36,7 @@ static bool asks_for_a_repaint(const mln_runtime_event* event) {
 void drain_events(mln_runtime runtime, map_observer* observer) {
   // #region drain
   mln_event_batch batch = MLN_HANDLE_NULL;
-  if (mln_runtime_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) return;
+  if (mln_runtime_drain_events(runtime, &batch) != MLN_STATUS_OK) return;
   mln_runtime_event_batch_view view = {
     .size = sizeof(mln_runtime_event_batch_view)
   };

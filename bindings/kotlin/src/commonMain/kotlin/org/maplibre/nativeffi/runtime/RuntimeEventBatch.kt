@@ -8,10 +8,5 @@ package org.maplibre.nativeffi.runtime
  * is closed.
  *
  * @property events the drained events in queue order.
- * @property remainingCount events still queued after this batch, as an unsigned 64-bit count. A
- *   nonzero value means another drain reports more events, and an unbounded drain always reports 0.
  */
-public data class RuntimeEventBatch(
-  public val events: List<RuntimeEvent>,
-  public val remainingCount: Long,
-)
+public data class RuntimeEventBatch(public val events: List<RuntimeEvent>)

@@ -3,7 +3,7 @@ const std = @import("std");
 const c = @import("c.zig").raw;
 const diagnostics = @import("diagnostics.zig");
 
-pub const expected_c_abi_version: u32 = 0;
+pub const expected_c_abi_version: u32 = 1;
 
 pub const NativeStatusError = error{
     InvalidArgument,

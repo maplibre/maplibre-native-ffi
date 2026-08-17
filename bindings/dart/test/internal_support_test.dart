@@ -274,7 +274,6 @@ void main() {
           expect(
             raw.mln_runtime_drain_events(
               runtimeHandleIdForTesting(runtime),
-              0,
               outBatch,
             ),
             nativeStatusOk,
@@ -337,15 +336,12 @@ void main() {
         batch.ref.event_count = 3;
         batch.ref.messages = messages.cast<Char>();
         batch.ref.messages_size = messageBytes.length;
-        batch.ref.remaining_count = 7;
-
         final decoded = decodeRuntimeEventBatchForTesting(batch.ref, runtime);
         // Every field is copied before the drain returns, so overwriting the
         // arena cannot change what the host already holds.
         unknownWindow.fillRange(0, unknownWindow.length, 9);
         messages[0] = 'X'.codeUnitAt(0);
 
-        expect(decoded.remainingCount, 7);
         expect(decoded.events, hasLength(3));
 
         final unknownEvent = decoded.events[0];

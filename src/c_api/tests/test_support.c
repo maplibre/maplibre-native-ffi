@@ -1822,7 +1822,7 @@ mln_test_event_batch mln_test_event_batch_default(void) {
 }
 
 mln_status mln_test_drain_events(
-  mln_runtime runtime, size_t max_events, mln_test_event_batch* out_batch
+  mln_runtime runtime, mln_test_event_batch* out_batch
 ) {
   if (out_batch == NULL || out_batch->size < sizeof(mln_test_event_batch)) {
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -1830,7 +1830,7 @@ mln_status mln_test_drain_events(
   mln_event_batch_release(compatibility_batch_handle);
   compatibility_batch_handle = MLN_HANDLE_NULL;
   mln_event_batch batch = MLN_HANDLE_NULL;
-  mln_status status = mln_runtime_drain_events(runtime, max_events, &batch);
+  mln_status status = mln_runtime_drain_events(runtime, &batch);
   if (status != MLN_STATUS_OK) {
     return status;
   }
@@ -1850,7 +1850,6 @@ mln_status mln_test_drain_events(
     .event_count = view.event_count,
     .messages = view.messages,
     .messages_size = view.messages_size,
-    .remaining_count = view.remaining_count,
   };
   return MLN_STATUS_OK;
 }
@@ -1863,7 +1862,7 @@ size_t mln_test_drain_counting(mln_runtime runtime, uint32_t type) {
   size_t total = 0;
   for (;;) {
     mln_test_event_batch batch = mln_test_event_batch_default();
-    if (mln_test_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) {
+    if (mln_test_drain_events(runtime, &batch) != MLN_STATUS_OK) {
       return total;
     }
     if (batch.event_count == 0) {
@@ -1888,7 +1887,7 @@ bool mln_test_drain_find(
   bool found = false;
   for (;;) {
     mln_test_event_batch batch = mln_test_event_batch_default();
-    if (mln_test_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) {
+    if (mln_test_drain_events(runtime, &batch) != MLN_STATUS_OK) {
       return found;
     }
     if (batch.event_count == 0) {

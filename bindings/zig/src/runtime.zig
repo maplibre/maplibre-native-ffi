@@ -565,24 +565,17 @@ pub const ResourceRequestHandle = enum(c.mln_resource_request_handle) {
 pub const EventBatch = struct {
     allocator: std.mem.Allocator,
     events: []RuntimeEvent,
-    remaining_count: usize,
 
     /// Releases every event and the batch storage.
     pub fn deinit(self: *EventBatch) void {
         for (self.events) |*event| event.deinit();
         self.allocator.free(self.events);
         self.events = &.{};
-        self.remaining_count = 0;
     }
 
     /// Number of events this batch reports.
     pub fn len(self: EventBatch) usize {
         return self.events.len;
-    }
-
-    /// Events still queued for this runtime after this batch.
-    pub fn remaining(self: EventBatch) usize {
-        return self.remaining_count;
     }
 
     /// Reads the event at `index` in queue order.
@@ -1525,20 +1518,16 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
 
     /// Drains this runtime's queued events into one copied batch.
     ///
-    /// `max_events` bounds the drain: zero drains every queued event, and a
-    /// positive value drains at most that many and leaves the rest for the next
-    /// drain, which `EventBatch.remaining` reports.
-    ///
     /// Narrowing a subscription gates later events and keeps queued ones, so a
     /// batch still reports the events a host already caused.
-    pub fn drainEvents(self: *RuntimeHandle, allocator: std.mem.Allocator, max_events: usize) status.Error!EventBatch {
+    pub fn drainEvents(self: *RuntimeHandle, allocator: std.mem.Allocator) status.Error!EventBatch {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
         const runtime_state = runtime_lease.state;
 
         var native_batch: c.mln_event_batch = 0;
         try status.checkStatus(
-            c.mln_runtime_drain_events(runtime_lease.native, max_events, &native_batch),
+            c.mln_runtime_drain_events(runtime_lease.native, &native_batch),
             runtime_lease.diagnostic_store,
         );
         defer c.mln_event_batch_release(native_batch);
@@ -1567,7 +1556,7 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
             event.* = try eventViewAt(runtime_state, events, event_size, messages, index).toOwned(allocator);
             initialized += 1;
         }
-        return .{ .allocator = allocator, .events = copied, .remaining_count = view.remaining_count };
+        return .{ .allocator = allocator, .events = copied };
     }
 
     /// Selects which runtime-originated event types this runtime queues.
@@ -2134,7 +2123,7 @@ fn eventViewAt(
         .source_id = mapIdForNativeSource(runtime_state, native_event.source_type, native_event.source),
         .payload_type = RuntimeEventPayloadType.fromRaw(native_event.payload_type),
         .code = native_event.code,
-        .message = messages[native_event.message_offset..][0..native_event.message_size],
+        .message = messages[@intCast(native_event.message_offset)..][0..native_event.message_size],
         .payload = payloadFromNative(native_event, payloadWindow(events, event_size, offset)),
     };
 }

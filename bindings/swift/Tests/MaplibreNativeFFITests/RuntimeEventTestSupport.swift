@@ -107,7 +107,7 @@ func rawRuntimeEvent(
   source: UInt64 = 1,
   code: Int32 = 0,
   payloadType: UInt32 = MLN_RUNTIME_EVENT_PAYLOAD_NONE.rawValue,
-  messageOffset: UInt32 = 0,
+  messageOffset: UInt64 = 0,
   messageSize: UInt32 = 0
 ) -> mln_runtime_event {
   var event = mln_runtime_event()
@@ -125,11 +125,11 @@ func rawRuntimeEvent(
 /// and reports where each message starts.
 func packMessageArena(
   _ messages: [String]
-) -> (bytes: [UInt8], offsets: [UInt32]) {
+) -> (bytes: [UInt8], offsets: [UInt64]) {
   var bytes: [UInt8] = []
-  var offsets: [UInt32] = []
+  var offsets: [UInt64] = []
   for message in messages {
-    offsets.append(UInt32(bytes.count))
+    offsets.append(UInt64(bytes.count))
     bytes.append(contentsOf: Array(message.utf8))
     bytes.append(0)
   }
@@ -153,7 +153,6 @@ func withSynthesizedEventBatch<Result>(
   events: [mln_runtime_event],
   stride: Int = MemoryLayout<mln_runtime_event>.size,
   messages: [UInt8] = [],
-  remainingCount: Int = 0,
   payloadWindows: [Int: [UInt8]] = [:],
   _ body: (SynthesizedEventBatch) throws -> Result
 ) throws -> Result {
@@ -197,7 +196,6 @@ func withSynthesizedEventBatch<Result>(
         : UnsafeRawPointer(#require(arena.baseAddress))
         .assumingMemoryBound(to: CChar.self)
       batch.messages_size = messages.count
-      batch.remaining_count = remainingCount
       return try body(SynthesizedEventBatch(
         batch: batch,
         records: records,

@@ -71,7 +71,6 @@ void main() {
     // A fresh runtime has nothing queued.
     final empty = runtime.drainEvents();
     expect(empty.events, isEmpty);
-    expect(empty.remainingCount, 0);
 
     final map = await runtime.createMap();
     addTearDown(map.close);
@@ -88,22 +87,10 @@ void main() {
 
     // A style load reports several event types, and one drain takes them all.
     expect(batch.events.length, greaterThan(1));
-    expect(batch.remainingCount, 0);
     expect(
       batch.events.map((event) => event.eventType),
       contains(RuntimeEventType.mapRenderUpdateAvailable),
     );
-
-    // A bounded drain reports what stayed queued, and an unbounded one reaches
-    // the end of the queue.
-    map.setStyleJson(_jsonBytes(_emptyStyleJson));
-    late RuntimeEventBatch bounded;
-    await _waitUntil(() {
-      bounded = runtime.drainEvents(maxEvents: 1);
-      return bounded.remainingCount > 0;
-    });
-    expect(bounded.events, hasLength(1));
-    expect(runtime.drainEvents().remainingCount, 0);
   });
 
   test('both handles report and narrow their event masks', () async {

@@ -515,9 +515,6 @@ type RuntimeEvent struct {
 // the next drain.
 type RuntimeEventBatch struct {
 	Events []RuntimeEvent
-	// RemainingCount is the number of events still queued after this batch. A
-	// nonzero value means another drain reports more.
-	RemainingCount uint64
 }
 
 // CameraChangeMode reports whether a camera change belongs to an animated
@@ -903,17 +900,9 @@ func (runtime *RuntimeHandle) Barrier() (*OperationHandle[struct{}], error) {
 	})
 }
 
-// DrainEvents takes this runtime's queued events as one batch of copied values.
-// Events arrive in queue order, and the batch reports how many events stayed
-// queued.
-//
-// maxEvents bounds the drain: zero takes every queued event, and a positive
-// value takes at most that many and leaves the rest queued. A negative value
-// returns ErrInvalidArgument.
-func (runtime *RuntimeHandle) DrainEvents(maxEvents int) (RuntimeEventBatch, error) {
-	if maxEvents < 0 {
-		return RuntimeEventBatch{}, newBindingError(ErrInvalidArgument, "maxEvents is negative")
-	}
+// DrainEvents takes this runtime's whole event queue as one batch of copied
+// values in queue order.
+func (runtime *RuntimeHandle) DrainEvents() (RuntimeEventBatch, error) {
 	ptr, release, err := runtime.ptr()
 	if err != nil {
 		return RuntimeEventBatch{}, err
@@ -921,7 +910,7 @@ func (runtime *RuntimeHandle) DrainEvents(maxEvents int) (RuntimeEventBatch, err
 	defer release()
 	defer runtime.state.KeepAlive()
 
-	rawBatch, ownedBatch, err := drainRawEvents(ptr, maxEvents)
+	rawBatch, ownedBatch, err := drainRawEvents(ptr)
 	if err != nil {
 		return RuntimeEventBatch{}, err
 	}
@@ -968,10 +957,10 @@ func (runtime *RuntimeHandle) EventMask() (RuntimeEventMask, error) {
 	return RuntimeEventMask(raw), nil
 }
 
-func drainRawEvents(ptr nativeRuntime, maxEvents int) (C.mln_runtime_event_batch_view, C.mln_event_batch, error) {
+func drainRawEvents(ptr nativeRuntime) (C.mln_runtime_event_batch_view, C.mln_event_batch, error) {
 	var batch C.mln_event_batch
 	if err := checkNative(func() int32 {
-		return int32(C.mln_runtime_drain_events(C.mln_runtime(ptr), C.size_t(maxEvents), &batch))
+		return int32(C.mln_runtime_drain_events(C.mln_runtime(ptr), &batch))
 	}); err != nil {
 		return C.mln_runtime_event_batch_view{}, 0, err
 	}
@@ -991,7 +980,7 @@ var runtimeEventPayloadOffset = unsafe.Offsetof(C.mln_runtime_event{}.payload)
 // copyEventBatch copies an owned native batch view into owned Go values. It
 // takes the map registry lock once for the whole batch.
 func (runtime *RuntimeHandle) copyEventBatch(raw C.mln_runtime_event_batch_view) RuntimeEventBatch {
-	batch := RuntimeEventBatch{RemainingCount: uint64(raw.remaining_count)}
+	batch := RuntimeEventBatch{}
 	count := int(raw.event_count)
 	if count <= 0 || raw.events == nil {
 		return batch

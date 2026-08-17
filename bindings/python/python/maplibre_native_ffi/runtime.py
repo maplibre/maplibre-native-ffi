@@ -431,14 +431,6 @@ class RuntimeEventBatch:
     events: list[RuntimeEvent]
     """Drained events in queue order."""
 
-    remaining_count: int
-    """Events still queued after this batch.
-
-    An unbounded drain leaves this at zero. A nonzero value means the
-    ``max_events`` bound ended the batch early, so another drain reports more
-    events.
-    """
-
     @classmethod
     def _from_native(
         cls,
@@ -449,7 +441,6 @@ class RuntimeEventBatch:
             events=[
                 RuntimeEvent._from_native(event, runtime) for event in raw["events"]
             ],
-            remaining_count=raw["remaining_count"],
         )
 
 
@@ -754,27 +745,15 @@ class RuntimeHandle(NativeHandleMixin):
         """
         return self._native.clear_resource_provider()
 
-    def drain_events(self, max_events: int = 0) -> RuntimeEventBatch:
+    def drain_events(self) -> RuntimeEventBatch:
         """Drain and copy this runtime's queued runtime events into one batch.
-
-        ``max_events`` bounds the drain: zero drains every queued event, and a
-        positive value takes at most that many and reports the rest as
-        :attr:`RuntimeEventBatch.remaining_count`.
 
         Draining never waits for worker progress; native execution is autonomous.
 
         `RuntimeEvent.source.map_handle` is None once the caller drops its last
         reference to the source map.
         """
-        if not 0 <= max_events < 2**64:
-            # PyO3 raises a bare OverflowError extracting `usize` before the
-            # binding's error conversion runs.
-            raise InvalidArgumentError(
-                f"max_events must fit in 64 unsigned bits, not {max_events}"
-            )
-        return RuntimeEventBatch._from_native(
-            self._native.drain_events(max_events), runtime=self
-        )
+        return RuntimeEventBatch._from_native(self._native.drain_events(), runtime=self)
 
     def set_event_mask(self, mask: RuntimeEventMask) -> None:
         """Select which runtime-originated event types this runtime queues.

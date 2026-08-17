@@ -28,16 +28,12 @@ pub const style_json =
 /// Waits for an autonomously produced event of `event_type`, reporting whether
 /// it arrived.
 ///
-/// A wait that stops at the event it looks for takes one event per drain, so the
-/// events a later wait needs stay queued rather than being dropped with the
-/// batch that carried them.
 pub fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.RuntimeEventType) !bool {
     for (0..1000) |_| {
-        while (true) {
-            var batch = try runtime.drainEvents(testing.allocator, 1);
-            defer batch.deinit();
-            if (batch.len() == 0) break;
-            const event = try batch.at(0);
+        var batch = try runtime.drainEvents(testing.allocator);
+        defer batch.deinit();
+        for (0..batch.len()) |index| {
+            const event = try batch.at(index);
             if (std.meta.eql(event.event_type, event_type)) return true;
         }
         try sleepOneMillisecond();
@@ -46,18 +42,16 @@ pub fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.Runti
 }
 
 /// Waits for an event of `event_type` and copies it out of its batch. The caller
-/// deinits the returned event. See `waitForEvent` for what a bounded drain keeps
-/// queued.
+/// deinits the returned event.
 pub fn waitForOwnedEvent(
     runtime: *maplibre.RuntimeHandle,
     event_type: maplibre.RuntimeEventType,
 ) !maplibre.RuntimeEvent {
     for (0..5000) |_| {
-        while (true) {
-            var batch = try runtime.drainEvents(testing.allocator, 1);
-            defer batch.deinit();
-            if (batch.len() == 0) break;
-            const event = try batch.at(0);
+        var batch = try runtime.drainEvents(testing.allocator);
+        defer batch.deinit();
+        for (0..batch.len()) |index| {
+            const event = try batch.at(index);
             if (std.meta.eql(event.event_type, event_type)) return try event.clone(testing.allocator);
         }
         try sleepOneMillisecond();
@@ -65,17 +59,16 @@ pub fn waitForOwnedEvent(
     return error.EventNotObserved;
 }
 /// Waits for `command_id`'s terminal event and returns its payload. See
-/// `waitForEvent` for what a bounded drain keeps queued.
+/// `waitForEvent` for its polling behavior.
 pub fn waitForCommandFinished(
     runtime: *maplibre.RuntimeHandle,
     command_id: u64,
 ) !maplibre.CommandFinishedPayload {
     for (0..5000) |_| {
-        while (true) {
-            var batch = try runtime.drainEvents(testing.allocator, 1);
-            defer batch.deinit();
-            if (batch.len() == 0) break;
-            const event = try batch.at(0);
+        var batch = try runtime.drainEvents(testing.allocator);
+        defer batch.deinit();
+        for (0..batch.len()) |index| {
+            const event = try batch.at(index);
             switch (event.payload) {
                 .command_finished => |payload| {
                     if (payload.command_id == command_id) return payload;
@@ -114,7 +107,7 @@ pub fn snapshotAfterCommand(
 
 /// Drains every queued event, reporting how many the batch carried.
 pub fn drainEvents(runtime: *maplibre.RuntimeHandle) !usize {
-    var batch = try runtime.drainEvents(testing.allocator, 0);
+    var batch = try runtime.drainEvents(testing.allocator);
     defer batch.deinit();
     return batch.len();
 }

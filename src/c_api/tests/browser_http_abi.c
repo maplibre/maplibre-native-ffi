@@ -33,7 +33,7 @@ static bool wait_for_style_loaded(
     }
     while (true) {
       mln_test_event_batch batch = mln_test_event_batch_default();
-      if (mln_test_drain_events(runtime, 0, &batch) != MLN_STATUS_OK) {
+      if (mln_test_drain_events(runtime, &batch) != MLN_STATUS_OK) {
         return false;
       }
       if (batch.event_count == 0) {

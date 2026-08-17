@@ -99,7 +99,6 @@ impl RuntimeEventBatch {
             event_count: 0,
             messages: std::ptr::null(),
             messages_size: 0,
-            remaining_count: 0,
         };
         // SAFETY: `handle` is live and `raw` is writable for this ABI version.
         if let Err(error) =
@@ -120,11 +119,6 @@ impl RuntimeEventBatch {
     /// Reports whether this batch has no events.
     pub fn is_empty(&self) -> bool {
         self.len() == 0
-    }
-
-    /// Returns how many events stayed queued after this batch.
-    pub fn remaining(&self) -> usize {
-        self.raw.remaining_count
     }
 
     /// Walks this batch's events in queue order.
@@ -150,7 +144,6 @@ impl fmt::Debug for RuntimeEventBatch {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RuntimeEventBatch")
             .field("len", &self.len())
-            .field("remaining", &self.remaining())
             .finish()
     }
 }
@@ -268,7 +261,7 @@ impl SynthesizedBatch {
     }
 
     pub(crate) fn push(&mut self, mut event: sys::mln_runtime_event, message: &[u8]) {
-        event.message_offset = u32::try_from(self.messages.len()).unwrap();
+        event.message_offset = u64::try_from(self.messages.len()).unwrap();
         event.message_size = u32::try_from(message.len()).unwrap();
         self.messages.extend_from_slice(message);
         self.messages.push(0);
@@ -294,7 +287,6 @@ impl SynthesizedBatch {
             event_count: self.count,
             messages: self.messages.as_ptr().cast(),
             messages_size: self.messages.len(),
-            remaining_count: 0,
         }
     }
 

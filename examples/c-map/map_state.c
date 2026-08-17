@@ -255,7 +255,7 @@ static app_error drain_runtime_events(
   map_state* state, bool* out_render_update
 ) {
   mln_event_batch batch = MLN_HANDLE_NULL;
-  mln_status status = mln_runtime_drain_events(state->runtime, 0, &batch);
+  mln_status status = mln_runtime_drain_events(state->runtime, &batch);
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status("event drain failed", status);
     return APP_ERROR_EVENT_DRAIN_FAILED;

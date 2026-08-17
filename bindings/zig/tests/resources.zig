@@ -1442,7 +1442,7 @@ test "offline region download control emits copied status events" {
 
     var observed = false;
     for (0..5000) |_| {
-        var batch = try runtime.drainEvents(testing.allocator, 0);
+        var batch = try runtime.drainEvents(testing.allocator);
         defer batch.deinit();
         for (0..batch.len()) |index| {
             const event = try batch.at(index);

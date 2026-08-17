@@ -133,7 +133,7 @@ func TestOfflineOperationResultDoesNotUseRuntimeEventQueue(t *testing.T) {
 	if regions == nil {
 		t.Fatal("Take() returned a nil region list")
 	}
-	batch, err := runtime.DrainEvents(0)
+	batch, err := runtime.DrainEvents()
 	if err != nil {
 		t.Fatalf("DrainEvents(): %v", err)
 	}

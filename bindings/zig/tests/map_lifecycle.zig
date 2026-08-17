@@ -97,7 +97,7 @@ test "copied runtime and map handles share closed state" {
 
     try runtime.close();
     try runtime_alias.close();
-    try testing.expectError(error.ClosedHandle, runtime_alias.drainEvents(testing.allocator, 0));
+    try testing.expectError(error.ClosedHandle, runtime_alias.drainEvents(testing.allocator));
 }
 
 test "successful close releases lifecycle handles" {

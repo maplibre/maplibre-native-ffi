@@ -496,27 +496,16 @@ internal constructor(
     }
   }
 
-  public actual fun drainEvents(maxEvents: Int): RuntimeEventBatch = memScoped {
-    Status.requireArgument(maxEvents >= 0) { "maxEvents must be non-negative" }
+  public actual fun drainEvents(): RuntimeEventBatch = memScoped {
     val outBatch = alloc<ULongVar>()
     outBatch.value = 0uL
-    Status.check(
-      mln_runtime_drain_events(
-        state.requireLive().rawHandleValue,
-        maxEvents.toULong(),
-        outBatch.ptr,
-      )
-    )
+    Status.check(mln_runtime_drain_events(state.requireLive().rawHandleValue, outBatch.ptr))
     try {
       val view = alloc<mln_runtime_event_batch_view>()
       view.size = sizeOf<mln_runtime_event_batch_view>().toUInt()
       Status.check(mln_event_batch_get(outBatch.value, view.ptr))
       val eventCount = view.event_count
       require(eventCount <= Int.MAX_VALUE.toULong()) { "event count exceeds Int.MAX_VALUE" }
-      val remainingCount = view.remaining_count
-      require(remainingCount <= Long.MAX_VALUE.toULong()) {
-        "remaining count exceeds Long.MAX_VALUE"
-      }
       val copied =
         if (eventCount == 0uL) {
           emptyList()
@@ -532,7 +521,7 @@ internal constructor(
           }
         }
       copied.forEach(::finishCallbackCommand)
-      RuntimeEventBatch(copied, remainingCount.toLong())
+      RuntimeEventBatch(copied)
     } finally {
       mln_event_batch_release(outBatch.value)
     }

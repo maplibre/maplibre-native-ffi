@@ -428,8 +428,8 @@ namespace Maplibre.NativeFfi.Internal.C
         [NativeTypeName("uint32_t")]
         public uint payload_type;
 
-        [NativeTypeName("uint32_t")]
-        public uint message_offset;
+        [NativeTypeName("uint64_t")]
+        public ulong message_offset;
 
         [NativeTypeName("uint32_t")]
         public uint message_size;
@@ -456,9 +456,6 @@ namespace Maplibre.NativeFfi.Internal.C
 
         [NativeTypeName("size_t")]
         public nuint messages_size;
-
-        [NativeTypeName("size_t")]
-        public nuint remaining_count;
     }
 
     internal unsafe partial struct mln_resource_transform_response
@@ -681,7 +678,7 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_status mln_runtime_close_start([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_drain_events([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("size_t")] nuint max_events, [NativeTypeName("mln_event_batch *")] MlnEventBatch* out_batch);
+        public static extern mln_status mln_runtime_drain_events([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("mln_event_batch *")] MlnEventBatch* out_batch);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_event_batch_get([NativeTypeName("mln_event_batch")] MlnEventBatch batch, mln_runtime_event_batch_view* out_view);

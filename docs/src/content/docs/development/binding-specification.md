@@ -589,8 +589,8 @@ Callback invocation follows this operation:
    callback boundary. If the public callback returns a recoverable host failure,
    convert the failure to the C callback's documented behavior.
 3. Synchronize callback state that native can invoke concurrently.
-4. Return promptly. Callback code schedules any later host work before calling
-   runtime or map APIs.
+4. Return promptly. A callback that may run inline schedules later host work and
+   returns before calling APIs on the object that invoked it.
 
 Callback replacement retains both old and new roots through native acceptance.
 For a command registration, keep the new root through terminal failure or later
@@ -756,11 +756,12 @@ pass that source in the native runtime options. Operations and runtime events
 use the same receiver-scoped source. A binding that drains ready endpoints MUST
 release each owned ready batch after copying its endpoint view.
 
-The native callback schedules a later drain on an existing host execution
-context. A binding MUST NOT create a scheduler, executor, worker, or owner
-thread for notification delivery. A host integration MAY supply the execution
-context. Bindings that leave scheduling to the host expose callback registration
-and ready-endpoint draining together.
+The native callback is a readiness edge that may arrive inline. It schedules a
+later drain on an existing host execution context and returns before calling the
+notification source again. A binding MUST NOT create a scheduler, executor,
+worker, or owner thread for notification delivery. A host integration MAY supply
+the execution context. Bindings that leave scheduling to the host expose
+callback registration and ready-endpoint draining together.
 
 Runtime close MUST complete before the binding closes its notification source.
 Closing the source while an endpoint remains associated leaves the source open,
@@ -775,8 +776,7 @@ ordered sequence that the queue held, empty when it held none.
 The drain follows this operation:
 
 1. Initialize a null native batch handle.
-2. Call the C drain function from any thread, passing the host's maximum event
-   count. The binding's default takes the whole queue.
+2. Call the C drain function from any thread. It transfers the whole queue.
 3. Borrow the batch view from the owned batch handle.
 4. Step through the batch by the event stride that the batch reports, rather
    than by the size of the generated event struct.

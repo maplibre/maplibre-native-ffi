@@ -564,7 +564,7 @@ typedef struct mln_runtime_event {
    * Byte offset of this event's message inside
    * mln_runtime_event_batch_view.messages. Zero when message_size is 0.
    */
-  uint32_t message_offset;
+  uint64_t message_offset;
   /**
    * Number of message bytes, excluding the trailing null terminator that
    * follows them in the arena. Zero when this event carries no message.
@@ -598,8 +598,6 @@ typedef struct mln_runtime_event_batch_view {
   const char* messages;
   /** Number of bytes in messages, including every terminator. */
   size_t messages_size;
-  /** Events still queued after this batch was drained. */
-  size_t remaining_count;
 } mln_runtime_event_batch_view;
 
 typedef struct mln_resource_transform_response {
@@ -1118,17 +1116,13 @@ MLN_API mln_status mln_runtime_close_start(
 /**
  * Drains this runtime's queued events into a new owned batch.
  *
- * Events arrive in queue order. max_events bounds the drain; zero drains every
- * queued event. A positive value drains at most that many events. The batch
- * view reports how many events remained queued.
+ * The drain transfers every event that the queue holds, in queue order. Events
+ * that arrive later enter the next batch. The returned handle owns the event
+ * records and their message arena. Later drains and runtime destruction leave
+ * the batch readable. Release each batch with mln_event_batch_release().
  *
- * The returned handle owns copied event records and their message arena. Later
- * drains and runtime destruction leave the batch readable. Release each batch
- * with mln_event_batch_release().
- *
- * This queue operation may be called from any thread. One drain lease may be
- * active for a runtime event queue. A concurrent second drain returns
- * MLN_STATUS_INVALID_STATE.
+ * This queue operation may be called from any thread. Concurrent drains are
+ * serialized and each event enters exactly one returned batch.
  *
  * The map and runtime subscription masks suppress unselected events before
  * their payloads, messages, queue records, and notification are produced.
@@ -1138,11 +1132,10 @@ MLN_API mln_status mln_runtime_close_start(
  *   batch.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or out_batch
  *   is null or does not point to the null handle.
- * - MLN_STATUS_INVALID_STATE when another drain is active.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_runtime_drain_events(
-  mln_runtime runtime, size_t max_events, mln_event_batch* out_batch
+  mln_runtime runtime, mln_event_batch* out_batch
 ) MLN_NOEXCEPT;
 
 /** Borrows the event and message view stored by an owned event batch. */

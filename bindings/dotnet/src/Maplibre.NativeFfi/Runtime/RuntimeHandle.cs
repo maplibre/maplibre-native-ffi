@@ -648,19 +648,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
     /// The batch reports the events that this runtime and its maps queued under their masks.
     /// Managed copies preserve queue order after the owned native batch is released.
     /// </remarks>
-    public RuntimeEventBatch DrainEvents() => Drain(0);
-
-    /// <summary>Drains at most <paramref name="maxEvents" /> queued runtime events.</summary>
-    /// <remarks>
-    /// Zero drains every queued event. A positive value drains at most that many and reports how
-    /// many stayed queued in <see cref="RuntimeEventBatch.RemainingCount" />, so a host that takes
-    /// a bounded slice per iteration learns to come back.
-    /// </remarks>
-    public RuntimeEventBatch DrainEvents(int maxEvents)
-    {
-        ArgumentOutOfRangeException.ThrowIfNegative(maxEvents);
-        return Drain((nuint)maxEvents);
-    }
+    public RuntimeEventBatch DrainEvents() => Drain();
 
     /// <summary>Selects which runtime-originated event types this runtime queues.</summary>
     public void SetEventMask(RuntimeEventMask mask)
@@ -689,10 +677,10 @@ public sealed unsafe class RuntimeHandle : IDisposable
         return notificationReceiver.DrainReadyEndpoints();
     }
 
-    private RuntimeEventBatch Drain(nuint maxEvents)
+    private RuntimeEventBatch Drain()
     {
         MlnEventBatch batch = default;
-        NativeStatus.Check(NativeMethods.mln_runtime_drain_events(Handle, maxEvents, &batch));
+        NativeStatus.Check(NativeMethods.mln_runtime_drain_events(Handle, &batch));
         try
         {
             var view = new mln_runtime_event_batch_view
@@ -706,7 +694,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
                 events = RuntimeStructs.ReadBatch(view, this, MapForLocked);
             }
 
-            return new RuntimeEventBatch(events, (ulong)view.remaining_count);
+            return new RuntimeEventBatch(events);
         }
         finally
         {

@@ -154,11 +154,7 @@ public enum RuntimeEventMask : ulong
 /// that produced it is closed.
 /// </remarks>
 /// <param name="Events">The copied events in queue order.</param>
-/// <param name="RemainingCount">
-/// Events still queued for the runtime after this batch. A nonzero value means another drain
-/// reports more events.
-/// </param>
-public sealed record RuntimeEventBatch(IReadOnlyList<RuntimeEvent> Events, ulong RemainingCount)
+public sealed record RuntimeEventBatch(IReadOnlyList<RuntimeEvent> Events)
 {
     private readonly IReadOnlyList<RuntimeEvent> events = ValueEquality.Snapshot(Events);
 
@@ -169,12 +165,9 @@ public sealed record RuntimeEventBatch(IReadOnlyList<RuntimeEvent> Events, ulong
     }
 
     public bool Equals(RuntimeEventBatch? other) =>
-        other is not null
-        && ValueEquality.SequenceEquals(events, other.events)
-        && RemainingCount == other.RemainingCount;
+        other is not null && ValueEquality.SequenceEquals(events, other.events);
 
-    public override int GetHashCode() =>
-        HashCode.Combine(ValueEquality.SequenceHashCode(events), RemainingCount);
+    public override int GetHashCode() => ValueEquality.SequenceHashCode(events);
 }
 
 /// <summary>One copied runtime event from <see cref="RuntimeHandle.DrainEvents()" />.</summary>

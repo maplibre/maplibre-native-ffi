@@ -118,8 +118,7 @@ int main(void) {
       )
         continue;
       mln_event_batch batch = MLN_HANDLE_NULL;
-      if (mln_runtime_drain_events(runtime, 0, &batch) != MLN_STATUS_OK)
-        continue;
+      if (mln_runtime_drain_events(runtime, &batch) != MLN_STATUS_OK) continue;
       mln_runtime_event_batch_view view = {
         .size = sizeof(mln_runtime_event_batch_view)
       };

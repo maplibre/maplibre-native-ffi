@@ -175,7 +175,7 @@ pub fn drainNotifications(self: *MapState) !bool {
 
     const map_id = try self.map.id();
     var render_update_available = false;
-    var batch = try self.runtime.drainEvents(self.allocator, 0);
+    var batch = try self.runtime.drainEvents(self.allocator);
     defer batch.deinit();
     for (0..batch.len()) |index| {
         const event = try batch.at(index);

@@ -21,7 +21,6 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  *     size_t event_count;
  *     const char *messages;
  *     size_t messages_size;
- *     size_t remaining_count;
  * }
  * }
  */
@@ -37,8 +36,7 @@ public class mln_runtime_event_batch_view {
         MapLibreNativeC.C_POINTER.withName("events"),
         MapLibreNativeC.C_LONG.withName("event_count"),
         MapLibreNativeC.C_POINTER.withName("messages"),
-        MapLibreNativeC.C_LONG.withName("messages_size"),
-        MapLibreNativeC.C_LONG.withName("remaining_count")
+        MapLibreNativeC.C_LONG.withName("messages_size")
     ).withName("mln_runtime_event_batch_view");
 
     /**
@@ -310,50 +308,6 @@ public class mln_runtime_event_batch_view {
      */
     public static void messages_size(MemorySegment struct, long fieldValue) {
         struct.set(messages_size$LAYOUT, messages_size$OFFSET, fieldValue);
-    }
-
-    private static final OfLong remaining_count$LAYOUT = (OfLong)$LAYOUT.select(groupElement("remaining_count"));
-
-    /**
-     * Layout for field:
-     * {@snippet lang=c :
-     * size_t remaining_count
-     * }
-     */
-    public static final OfLong remaining_count$layout() {
-        return remaining_count$LAYOUT;
-    }
-
-    private static final long remaining_count$OFFSET = $LAYOUT.byteOffset(groupElement("remaining_count"));
-
-    /**
-     * Offset for field:
-     * {@snippet lang=c :
-     * size_t remaining_count
-     * }
-     */
-    public static final long remaining_count$offset() {
-        return remaining_count$OFFSET;
-    }
-
-    /**
-     * Getter for field:
-     * {@snippet lang=c :
-     * size_t remaining_count
-     * }
-     */
-    public static long remaining_count(MemorySegment struct) {
-        return struct.get(remaining_count$LAYOUT, remaining_count$OFFSET);
-    }
-
-    /**
-     * Setter for field:
-     * {@snippet lang=c :
-     * size_t remaining_count
-     * }
-     */
-    public static void remaining_count(MemorySegment struct, long fieldValue) {
-        struct.set(remaining_count$LAYOUT, remaining_count$OFFSET, fieldValue);
     }
 
     /**

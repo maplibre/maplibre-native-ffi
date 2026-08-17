@@ -7,7 +7,7 @@ namespace Maplibre.NativeFfi.Internal.Loader;
 
 internal static class NativeLibraryLoader
 {
-    internal const uint ExpectedAbiVersion = 0;
+    internal const uint ExpectedAbiVersion = 1;
 
     private const string LibraryPathSwitch = "Maplibre.NativeFfi.LibraryPath";
     private const string LibraryDirsSwitch = "Maplibre.NativeFfi.LibraryDirs";

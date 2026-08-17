@@ -415,23 +415,21 @@ private constructor(
     }
   }
 
-  public actual fun drainEvents(maxEvents: Int): RuntimeEventBatch {
+  public actual fun drainEvents(): RuntimeEventBatch {
     NativeAccess.ensureLoaded()
-    Status.requireArgument(maxEvents >= 0) { "maxEvents must be non-negative" }
     val runtime = requireLiveHandle()
     LongPointer(1).use { outBatch ->
       outBatch.put(0, 0L)
-      Status.check(MaplibreNativeC.mln_runtime_drain_events(runtime, maxEvents.toLong(), outBatch))
+      Status.check(MaplibreNativeC.mln_runtime_drain_events(runtime, outBatch))
       val batch = outBatch.get()
       require(batch != 0L) { "mln_runtime_drain_events returned a null event batch" }
       try {
         MaplibreNativeC.mln_runtime_event_batch_view().use { view ->
           view.size(view.sizeof())
           Status.check(MaplibreNativeC.mln_event_batch_get(batch, view))
-          val remainingCount = view.remaining_count()
           val eventCount = Math.toIntExact(view.event_count())
           if (eventCount == 0) {
-            return RuntimeEventBatch(emptyList(), remainingCount)
+            return RuntimeEventBatch(emptyList())
           }
           // The stride the batch reports can exceed the probed record, so index by it.
           val eventSize = view.event_size()
@@ -451,7 +449,7 @@ private constructor(
               copiedEvent(events, index * eventSize, eventSize, messages).toRuntimeEvent()
             }
           copied.forEach(::finishCallbackCommand)
-          return RuntimeEventBatch(copied, remainingCount)
+          return RuntimeEventBatch(copied)
         }
       } finally {
         MaplibreNativeC.mln_event_batch_release(batch)
@@ -624,7 +622,7 @@ private constructor(
       message =
         message(
           messages,
-          events.getInt(base + EventLayout.MESSAGE_OFFSET),
+          events.getLong(base + EventLayout.MESSAGE_OFFSET),
           events.getInt(base + EventLayout.MESSAGE_SIZE),
         ),
     )
@@ -760,12 +758,12 @@ private class CopiedEvent(
 private fun directBuffer(pointer: Pointer, byteCount: Long): ByteBuffer =
   BytePointer(pointer).capacity(byteCount).asByteBuffer().order(ByteOrder.nativeOrder())
 
-private fun message(messages: ByteBuffer?, offset: Int, size: Int): String {
+private fun message(messages: ByteBuffer?, offset: Long, size: Int): String {
   if (messages == null || size == 0) {
     return ""
   }
   val bytes = ByteArray(size)
-  readAt(messages, offset, bytes)
+  readAt(messages, Math.toIntExact(offset), bytes)
   return String(bytes, StandardCharsets.UTF_8)
 }
 
@@ -1030,7 +1028,7 @@ private object EventLayout {
   val SOURCE: Int = probeLong { it.source(LONG_SENTINEL) }
   val CODE: Int = probeInt { it.code(INT_SENTINEL) }
   val PAYLOAD_TYPE: Int = probeInt { it.payload_type(INT_SENTINEL) }
-  val MESSAGE_OFFSET: Int = probeInt { it.message_offset(INT_SENTINEL) }
+  val MESSAGE_OFFSET: Int = probeLong { it.message_offset(LONG_SENTINEL) }
   val MESSAGE_SIZE: Int = probeInt { it.message_size(INT_SENTINEL) }
 
   val RENDER_FRAME_MODE: Int = probeInt { it.payload().render_frame().mode(INT_SENTINEL) }

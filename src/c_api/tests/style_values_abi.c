@@ -60,7 +60,7 @@ static void expect_command_finished(
   for (;;) {
     mln_test_event_batch batch = mln_test_event_batch_default();
     TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_test_drain_events(runtime, 0, &batch)
+      MLN_STATUS_OK, mln_test_drain_events(runtime, &batch)
     );
     if (batch.event_count == 0) {
       break;
@@ -142,7 +142,7 @@ static void duplicate_id_is_an_async_failed_terminal_event(void) {
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
   mln_event_batch batch = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_drain_events(runtime, 0, &batch)
+    MLN_STATUS_OK, mln_runtime_drain_events(runtime, &batch)
   );
   mln_runtime_event_batch_view view = {
     .size = sizeof(mln_runtime_event_batch_view)

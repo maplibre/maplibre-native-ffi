@@ -501,9 +501,6 @@ private struct PendingCallbackReplacement<State> {
 public struct RuntimeEventBatch: Equatable, Sendable {
   /// The drained events, in queue order.
   public let events: [RuntimeEvent]
-  /// Events still queued after this batch. A nonzero value means another drain
-  /// reports more events.
-  public let remainingCount: Int
 }
 
 public final class RuntimeHandle: @unchecked Sendable {
@@ -731,23 +728,12 @@ public final class RuntimeHandle: @unchecked Sendable {
   /// native batch before the call returns.
   ///
   /// Events arrive in queue order, from this runtime and from every map it
-  /// owns. `maxEvents` bounds the drain: zero drains everything, and a positive
-  /// value drains at most that many and reports the rest through
-  /// ``RuntimeEventBatch/remainingCount``.
-  public func drainEvents(maxEvents: Int = 0) throws -> RuntimeEventBatch {
+  /// owns. One drain takes the whole queue.
+  public func drainEvents() throws -> RuntimeEventBatch {
     try mapNativeFailure {
-      guard maxEvents >= 0 else {
-        throw NativeStatusFailure
-
-          .swiftInvalidArgument("maxEvents cannot be negative")
-      }
-      let batch = try NativeRuntime.drainEvents(
-        handle.requireLive(),
-        maxEvents: maxEvents
-      )
+      let batch = try NativeRuntime.drainEvents(handle.requireLive())
       let result = RuntimeEventBatch(
-        events: batch.events.map { RuntimeEvent(native: $0) },
-        remainingCount: batch.remainingCount
+        events: batch.events.map { RuntimeEvent(native: $0) }
       )
       applyCommandFinishedEvents(result.events)
       return result
@@ -757,7 +743,7 @@ public final class RuntimeHandle: @unchecked Sendable {
   /// Schedules the receiver when runtime events become ready to drain.
   ///
   /// The callback may coalesce and carries no event payload. It should schedule
-  /// ``drainEvents(maxEvents:)`` on the host execution context that consumes
+  /// ``drainEvents()`` on the host execution context that consumes
   /// runtime events.
   public func setEventReadyHandler(
     _ handler: (@Sendable () -> Void)?

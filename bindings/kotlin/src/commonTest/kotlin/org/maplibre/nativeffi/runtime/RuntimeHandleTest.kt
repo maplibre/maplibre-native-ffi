@@ -66,7 +66,6 @@ class RuntimeHandleTest {
       RuntimeHandle.create(RuntimeOptions()).use { runtime ->
         val batch = runtime.drainEvents()
         assertEquals(emptyList(), batch.events)
-        assertEquals(0L, batch.remainingCount)
       }
     }
 

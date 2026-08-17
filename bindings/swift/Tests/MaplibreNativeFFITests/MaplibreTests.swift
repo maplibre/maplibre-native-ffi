@@ -2,7 +2,7 @@
 import Testing
 
 @Test func cVersionIsReadable() {
-  #expect(Maplibre.cVersion() == 0)
+  #expect(Maplibre.cVersion() == 1)
 }
 
 @Test func supportedBackendsPreserveMaskBits() {

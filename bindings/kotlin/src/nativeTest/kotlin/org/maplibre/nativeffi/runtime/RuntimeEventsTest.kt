@@ -122,24 +122,6 @@ class RuntimeEventsTest : org.maplibre.nativeffi.NativeTestBase() {
       }
 
   @Test
-  fun boundedDrainReportsWhatStaysQueuedAndTheNextDrainReachesZero(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      withMap { runtime, map ->
-        map.setStyleJson(STYLE_JSON.encodeToByteArray())
-        repeat(20) { runtime.barrier() }
-
-        val bounded = runtime.drainEvents(maxEvents = 1)
-        assertEquals(1, bounded.events.size)
-        assertTrue(bounded.remainingCount > 0, "a bounded drain reported nothing left")
-
-        val rest = runtime.drainEvents()
-        assertEquals(0L, rest.remainingCount)
-        assertEquals(bounded.remainingCount, rest.events.size.toLong())
-        assertFailsWith<InvalidArgumentException> { runtime.drainEvents(maxEvents = -1) }
-      }
-    }
-
-  @Test
   fun styleReplacementReleasesADroppedSourceWithNoStyleLoadedEvent(): Unit =
     org.maplibre.nativeffi.runtime.runSuspendTest {
       RuntimeHandle.create(RuntimeOptions()).use { runtime ->

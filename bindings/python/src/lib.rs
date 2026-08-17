@@ -1483,13 +1483,11 @@ impl RuntimeHandle {
         Ok(command_id)
     }
 
-    fn drain_events(&self, py: Python<'_>, max_events: usize) -> PyResult<Py<PyAny>> {
+    fn drain_events(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let state = self.state_for_operation()?;
         let mut batch = sys::mln_event_batch(0);
-        maplibre_core::check(unsafe {
-            sys::mln_runtime_drain_events(state.handle(), max_events, &mut batch)
-        })
-        .map_err(map_error)?;
+        maplibre_core::check(unsafe { sys::mln_runtime_drain_events(state.handle(), &mut batch) })
+            .map_err(map_error)?;
         let result = (|| {
             let mut view: sys::mln_runtime_event_batch_view = unsafe { std::mem::zeroed() };
             view.size = std::mem::size_of::<sys::mln_runtime_event_batch_view>() as u32;
@@ -1518,7 +1516,7 @@ impl RuntimeHandle {
                 }
                 copied.push(event);
             }
-            event_batch_to_py(py, copied, view.remaining_count)
+            event_batch_to_py(py, copied)
         })();
         unsafe { sys::mln_event_batch_release(batch) };
         result
@@ -4936,7 +4934,6 @@ unsafe extern "C" fn http_header_transform_trampoline(
 fn event_batch_to_py(
     py: Python<'_>,
     events: Vec<maplibre_core::CopiedRuntimeEvent>,
-    remaining_count: usize,
 ) -> PyResult<Py<PyAny>> {
     let list = PyList::empty(py);
     for event in events {
@@ -4944,7 +4941,6 @@ fn event_batch_to_py(
     }
     let dict = PyDict::new(py);
     dict.set_item("events", list)?;
-    dict.set_item("remaining_count", remaining_count)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -7043,7 +7039,7 @@ fn synthetic_event_storage(specs: &[SyntheticEvent]) -> (Vec<sys::mln_runtime_ev
         let (message_offset, message_size) = if spec.message.is_empty() {
             (0, 0)
         } else {
-            let offset = messages.len() as u32;
+            let offset = messages.len() as u64;
             messages.extend_from_slice(spec.message.as_bytes());
             messages.push(0);
             (offset, spec.message.len() as u32)
@@ -7183,7 +7179,6 @@ fn synthetic_runtime_event_batch_for_test(py: Python<'_>) -> PyResult<Py<PyAny>>
         event_count: events.len(),
         messages: messages.as_ptr().cast(),
         messages_size: messages.len(),
-        remaining_count: 3,
     };
 
     // SAFETY: batch names the array and arena built above, which outlive this
@@ -7204,7 +7199,7 @@ fn synthetic_runtime_event_batch_for_test(py: Python<'_>) -> PyResult<Py<PyAny>>
         payload: opaque_event_payload(&[0xFF; 8]),
     });
     messages.fill(b'x');
-    event_batch_to_py(py, copied, batch.remaining_count)
+    event_batch_to_py(py, copied)
 }
 
 /// Reports the event stride a drain of `runtime` names and the stride this
@@ -7214,7 +7209,7 @@ fn synthetic_runtime_event_batch_for_test(py: Python<'_>) -> PyResult<Py<PyAny>>
 fn runtime_event_stride_for_test(runtime: &RuntimeHandle) -> PyResult<(u32, u32)> {
     let state = runtime.state_for_operation()?;
     let mut batch = sys::mln_event_batch(0);
-    maplibre_core::check(unsafe { sys::mln_runtime_drain_events(state.handle(), 0, &mut batch) })
+    maplibre_core::check(unsafe { sys::mln_runtime_drain_events(state.handle(), &mut batch) })
         .map_err(map_error)?;
     let mut view: sys::mln_runtime_event_batch_view = unsafe { std::mem::zeroed() };
     view.size = std::mem::size_of::<sys::mln_runtime_event_batch_view>() as u32;

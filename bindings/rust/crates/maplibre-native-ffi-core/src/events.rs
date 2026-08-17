@@ -522,7 +522,7 @@ mod tests {
         }
 
         fn push(&mut self, mut event: sys::mln_runtime_event, message: &[u8]) {
-            event.message_offset = u32::try_from(self.messages.len()).unwrap();
+            event.message_offset = u64::try_from(self.messages.len()).unwrap();
             event.message_size = u32::try_from(message.len()).unwrap();
             self.messages.extend_from_slice(message);
             self.messages.push(0);
@@ -547,7 +547,6 @@ mod tests {
                 event_count: self.count,
                 messages: self.messages.as_ptr().cast(),
                 messages_size: self.messages.len(),
-                remaining_count: 0,
             }
         }
     }

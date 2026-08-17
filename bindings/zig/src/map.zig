@@ -2365,11 +2365,10 @@ fn createLoadedMapForTesting(runtime: *RuntimeHandle) !MapHandle {
 fn waitForCommandDispositionForTesting(runtime: *RuntimeHandle, command_id: u64) !runtime_module.CommandDisposition {
     var attempts: usize = 0;
     while (attempts < 200) : (attempts += 1) {
-        while (true) {
-            var batch = try runtime.drainEvents(std.testing.allocator, 1);
-            defer batch.deinit();
-            if (batch.len() == 0) break;
-            const event = try batch.at(0);
+        var batch = try runtime.drainEvents(std.testing.allocator);
+        defer batch.deinit();
+        for (0..batch.len()) |index| {
+            const event = try batch.at(index);
             switch (event.payload) {
                 .command_finished => |payload| {
                     if (payload.command_id == command_id) return payload.disposition;
@@ -2385,13 +2384,10 @@ fn waitForCommandDispositionForTesting(runtime: *RuntimeHandle, command_id: u64)
 fn waitForRuntimeEventForTesting(runtime: *RuntimeHandle, event_type: runtime_module.RuntimeEventType) !bool {
     var attempts: usize = 0;
     while (attempts < 200) : (attempts += 1) {
-        // One event per drain, so an event this wait is not looking for stays
-        // queued rather than being dropped with the batch that carried it.
-        while (true) {
-            var batch = try runtime.drainEvents(std.testing.allocator, 1);
-            defer batch.deinit();
-            if (batch.len() == 0) break;
-            const event = try batch.at(0);
+        var batch = try runtime.drainEvents(std.testing.allocator);
+        defer batch.deinit();
+        for (0..batch.len()) |index| {
+            const event = try batch.at(index);
             if (std.meta.eql(event.event_type, event_type)) return true;
         }
         try std.testing.io.sleep(.fromMilliseconds(10), .awake);
@@ -2473,7 +2469,7 @@ test "a style load that drops a source releases the callback state unsubscribed"
     _ = try map.setStyleUrl(std.testing.allocator, "custom://style.json");
     var released = false;
     for (0..200) |_| {
-        var batch = try runtime.drainEvents(std.testing.allocator, 0);
+        var batch = try runtime.drainEvents(std.testing.allocator);
         defer batch.deinit();
         for (0..batch.len()) |index| {
             const event = try batch.at(index);

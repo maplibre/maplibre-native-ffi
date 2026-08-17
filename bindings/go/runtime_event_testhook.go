@@ -145,7 +145,7 @@ type runtimeEventBatchForTest struct {
 // newRuntimeEventBatchForTest lays events out stride bytes apart. A stride wider
 // than this binding's compiled event size is what proves the decoder reads the
 // batch's own stride.
-func newRuntimeEventBatchForTest(stride uintptr, remainingCount uint64, events []runtimeEventForTest) *runtimeEventBatchForTest {
+func newRuntimeEventBatchForTest(stride uintptr, events []runtimeEventForTest) *runtimeEventBatchForTest {
 	if stride < runtimeEventSizeForTest() {
 		stride = runtimeEventSizeForTest()
 	}
@@ -157,7 +157,7 @@ func newRuntimeEventBatchForTest(stride uintptr, remainingCount uint64, events [
 	for index, event := range events {
 		raw := event.raw
 		if len(event.message) > 0 {
-			raw.message_offset = C.uint32_t(len(arena))
+			raw.message_offset = C.uint64_t(len(arena))
 			raw.message_size = C.uint32_t(len(event.message))
 			arena = append(arena, event.message...)
 			arena = append(arena, 0)
@@ -168,13 +168,12 @@ func newRuntimeEventBatchForTest(stride uintptr, remainingCount uint64, events [
 		batch.messages = C.CBytes(arena)
 	}
 	batch.raw = C.mln_runtime_event_batch_view{
-		size:            C.uint32_t(unsafe.Sizeof(C.mln_runtime_event_batch_view{})),
-		event_size:      C.uint32_t(stride),
-		events:          (*C.mln_runtime_event)(batch.events),
-		event_count:     C.size_t(len(events)),
-		messages:        (*C.char)(batch.messages),
-		messages_size:   C.size_t(len(arena)),
-		remaining_count: C.size_t(remainingCount),
+		size:          C.uint32_t(unsafe.Sizeof(C.mln_runtime_event_batch_view{})),
+		event_size:    C.uint32_t(stride),
+		events:        (*C.mln_runtime_event)(batch.events),
+		event_count:   C.size_t(len(events)),
+		messages:      (*C.char)(batch.messages),
+		messages_size: C.size_t(len(arena)),
 	}
 	return batch
 }

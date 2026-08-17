@@ -197,11 +197,9 @@ struct NativeRuntimeEvent: Equatable {
 /// One drained batch of runtime events copied from an owned native batch.
 struct NativeRuntimeEventBatch: Equatable {
   let events: [NativeRuntimeEvent]
-  let remainingCount: Int
 
   init(copying raw: mln_runtime_event_batch_view) throws {
     events = try Self.copyEvents(raw)
-    remainingCount = raw.remaining_count
   }
 
   private static func copyEvents(_ raw: mln_runtime_event_batch_view) throws

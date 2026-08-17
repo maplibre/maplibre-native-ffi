@@ -14,7 +14,7 @@ import "C"
 
 // ExpectedCABIVersion is the C ABI contract version supported by this Go
 // binding.
-const ExpectedCABIVersion uint32 = 0
+const ExpectedCABIVersion uint32 = 1
 
 // CVersion returns the native C ABI contract version.
 func CVersion() uint32 {

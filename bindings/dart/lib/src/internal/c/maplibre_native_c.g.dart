@@ -2673,12 +2673,9 @@ external int mln_runtime_create_take_result(
   ffi.Pointer<mln_runtime> out_runtime,
 );
 
-@ffi.Native<
-  ffi.Int32 Function(mln_runtime, ffi.Size, ffi.Pointer<mln_event_batch>)
->()
+@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_event_batch>)>()
 external int mln_runtime_drain_events(
   int runtime,
-  int max_events,
   ffi.Pointer<mln_event_batch> out_batch,
 );
 
@@ -6461,7 +6458,7 @@ final class mln_runtime_event extends ffi.Struct {
   @ffi.Uint32()
   external int payload_type;
 
-  @ffi.Uint32()
+  @ffi.Uint64()
   external int message_offset;
 
   @ffi.Uint32()
@@ -6487,9 +6484,6 @@ final class mln_runtime_event_batch_view extends ffi.Struct {
   @ffi.Size()
   external int messages_size;
 
-  @ffi.Size()
-  external int remaining_count;
-
   static ffi.Pointer<mln_runtime_event_batch_view> $allocate(
     ffi.Allocator $allocator, {
     required int size,
@@ -6498,15 +6492,13 @@ final class mln_runtime_event_batch_view extends ffi.Struct {
     required int event_count,
     required ffi.Pointer<ffi.Char> messages,
     required int messages_size,
-    required int remaining_count,
   }) => $allocator<mln_runtime_event_batch_view>()
     ..ref.size = size
     ..ref.event_size = event_size
     ..ref.events = events
     ..ref.event_count = event_count
     ..ref.messages = messages
-    ..ref.messages_size = messages_size
-    ..ref.remaining_count = remaining_count;
+    ..ref.messages_size = messages_size;
 }
 
 final class mln_runtime_event_camera_transition_finished extends ffi.Struct {

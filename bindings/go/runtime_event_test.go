@@ -30,7 +30,7 @@ func drainAllRuntimeEvents(t *testing.T, runtime *RuntimeHandle) []RuntimeEvent 
 	var events []RuntimeEvent
 	for range make([]struct{}, 100) {
 		time.Sleep(time.Millisecond)
-		batch, err := runtime.DrainEvents(0)
+		batch, err := runtime.DrainEvents()
 		if err != nil {
 			t.Fatalf("DrainEvents(): %v", err)
 		}
@@ -51,7 +51,7 @@ func collectRuntimeEventsUntil(t *testing.T, runtime *RuntimeHandle, wanted ...R
 	seen := make(map[RuntimeEventType]bool, len(wanted))
 	for range make([]struct{}, 5000) {
 		time.Sleep(time.Millisecond)
-		batch, err := runtime.DrainEvents(0)
+		batch, err := runtime.DrainEvents()
 		if err != nil {
 			t.Fatalf("DrainEvents(): %v", err)
 		}
@@ -136,16 +136,14 @@ func TestRuntimeDrainReportsStyleLoadInQueueOrder(t *testing.T) {
 	// A drain never waits for worker progress, so collect successive owned
 	// batches until the style load finishes and preserve their queue order.
 	var events []RuntimeEvent
-	var loadedBatch RuntimeEventBatch
 	for range make([]struct{}, 5000) {
 		time.Sleep(time.Millisecond)
-		batch, err := runtime.DrainEvents(0)
+		batch, err := runtime.DrainEvents()
 		if err != nil {
 			t.Fatalf("DrainEvents(): %v", err)
 		}
 		events = append(events, batch.Events...)
 		if slices.Contains(eventTypes(batch.Events), RuntimeEventMapStyleLoaded) {
-			loadedBatch = batch
 			break
 		}
 		time.Sleep(time.Millisecond)
@@ -162,38 +160,9 @@ func TestRuntimeDrainReportsStyleLoadInQueueOrder(t *testing.T) {
 			types,
 		)
 	}
-	if loadedBatch.RemainingCount != 0 {
-		t.Fatalf(
-			"unbounded drain remaining = %d, want 0",
-			loadedBatch.RemainingCount,
-		)
-	}
 }
 
-func TestRuntimeBoundedDrainLeavesTheRestQueued(t *testing.T) {
-	runtime, m := newRuntimeAndMap(t, nil)
-	if _, err := m.JumpTo(CameraOptions{}.WithZoom(2)); err != nil {
-		t.Fatalf("JumpTo(): %v", err)
-	}
-
-	bounded, err := runtime.DrainEvents(1)
-	if err != nil {
-		t.Fatalf("DrainEvents(1): %v", err)
-	}
-	if len(bounded.Events) != 1 || bounded.RemainingCount == 0 {
-		t.Fatalf("bounded drain = %d events, %d remaining, want 1 event and a remainder", len(bounded.Events), bounded.RemainingCount)
-	}
-
-	rest, err := runtime.DrainEvents(0)
-	if err != nil {
-		t.Fatalf("DrainEvents(0): %v", err)
-	}
-	if uint64(len(rest.Events)) < bounded.RemainingCount || rest.RemainingCount != 0 {
-		t.Fatalf("unbounded drain = %d events, %d remaining, want at least %d events and none left", len(rest.Events), rest.RemainingCount, bounded.RemainingCount)
-	}
-}
-
-func TestRuntimeDrainRejectsNegativeBoundAndEmptiesFreshRuntime(t *testing.T) {
+func TestRuntimeDrainEmptiesFreshRuntime(t *testing.T) {
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -204,15 +173,12 @@ func TestRuntimeDrainRejectsNegativeBoundAndEmptiesFreshRuntime(t *testing.T) {
 		}
 	}()
 
-	if _, err := runtime.DrainEvents(-1); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("DrainEvents(-1) error = %v, want ErrInvalidArgument", err)
-	}
-	batch, err := runtime.DrainEvents(0)
+	batch, err := runtime.DrainEvents()
 	if err != nil {
 		t.Fatalf("DrainEvents(): %v", err)
 	}
-	if len(batch.Events) != 0 || batch.RemainingCount != 0 {
-		t.Fatalf("fresh runtime batch = %d events, %d remaining", len(batch.Events), batch.RemainingCount)
+	if len(batch.Events) != 0 {
+		t.Fatalf("fresh runtime batch = %d events", len(batch.Events))
 	}
 }
 
@@ -333,7 +299,7 @@ func TestRuntimeDrainAndMaskSettersMigrateAcrossGoroutines(t *testing.T) {
 	runtime, m := newRuntimeAndMap(t, nil)
 	results := make(chan error, 3)
 	go func() {
-		_, err := runtime.DrainEvents(0)
+		_, err := runtime.DrainEvents()
 		results <- err
 		results <- runtime.SetEventMask(RuntimeEventMaskAll)
 		_, err = m.SetEventMask(RuntimeEventMaskAll)
@@ -356,7 +322,7 @@ func TestRuntimeEventCopiesSurviveTheNextDrain(t *testing.T) {
 	var kept RuntimeEventBatch
 	for range make([]struct{}, 5000) {
 		time.Sleep(time.Millisecond)
-		batch, err := runtime.DrainEvents(0)
+		batch, err := runtime.DrainEvents()
 		if err != nil {
 			t.Fatalf("DrainEvents(): %v", err)
 		}
@@ -406,7 +372,7 @@ func TestRuntimeEventDecoderUsesTheBatchStride(t *testing.T) {
 	// A batch whose stride exceeds the compiled event size is what a later C API
 	// version looks like, and every event after the first misdecodes when the
 	// decoder strides by its own struct size.
-	batch := newRuntimeEventBatchForTest(stride+16, 0, []runtimeEventForTest{
+	batch := newRuntimeEventBatchForTest(stride+16, []runtimeEventForTest{
 		newRuntimeEventForTest(RuntimeEventMapRenderFrameFinished, RuntimeEventSourceMap, 0, 0).
 			withRenderFrame(RuntimeEventRenderFramePayload{RawMode: uint32(RenderModeFull), NeedsRepaint: true}),
 		newRuntimeEventForTest(RuntimeEventMapTileAction, RuntimeEventSourceMap, 0, 0).
@@ -457,7 +423,7 @@ func TestRuntimeEventKnownPayloadsDecodeFromTheUnion(t *testing.T) {
 	status := offlineRegionStatusForTest(uint32(OfflineRegionDownloadActive))
 	status.CompletedTileCount = 12
 	status.Complete = true
-	batch := newRuntimeEventBatchForTest(0, 0, []runtimeEventForTest{
+	batch := newRuntimeEventBatchForTest(0, []runtimeEventForTest{
 		newRuntimeEventForTest(RuntimeEventMapRenderMapFinished, RuntimeEventSourceMap, 0, 0).
 			withRenderMap(RuntimeEventRenderMapPayload{RawMode: uint32(RenderModePartial)}),
 		newRuntimeEventForTest(RuntimeEventMapCameraTransitionFinished, RuntimeEventSourceMap, 0, 0).
@@ -537,7 +503,7 @@ func TestRuntimeEventUnknownDomainsPreserveRawValues(t *testing.T) {
 	for index := range window {
 		window[index] = byte(index + 1)
 	}
-	batch := newRuntimeEventBatchForTest(0, 0, []runtimeEventForTest{
+	batch := newRuntimeEventBatchForTest(0, []runtimeEventForTest{
 		newRuntimeEventForTest(RuntimeEventType(0x7fff_0001), RuntimeEventSourceType(0x7fff_0002), 0x7fff_0004, 0).
 			withRawPayload(RuntimeEventPayloadType(0x7fff_0003), window),
 	})
@@ -586,7 +552,7 @@ func TestRuntimeEventMapSourceUsesRuntimeLocalID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ID(): %v", err)
 	}
-	batch := newRuntimeEventBatchForTest(0, 0, []runtimeEventForTest{
+	batch := newRuntimeEventBatchForTest(0, []runtimeEventForTest{
 		newRuntimeEventForTest(RuntimeEventMapIdle, RuntimeEventSourceMap, uint64(mapID), 0),
 		newRuntimeEventForTest(RuntimeEventMapIdle, RuntimeEventSourceMap, uint64(mapID)+1, 0),
 	})

@@ -105,14 +105,10 @@ public expect class RuntimeHandle {
   /**
    * Drains this runtime's queued events into one batch, in queue order.
    *
-   * [maxEvents] bounds the drain. Zero drains every queued event; a positive value drains at most
-   * that many events and reports the rest in [RuntimeEventBatch.remainingCount]. A negative value
-   * throws [org.maplibre.nativeffi.error.InvalidArgumentException].
-   *
    * The two subscription masks decide which events reach the queue. Draining copies events that the
    * runtime worker has already published.
    */
-  public fun drainEvents(maxEvents: Int = 0): RuntimeEventBatch
+  public fun drainEvents(): RuntimeEventBatch
 
   /**
    * Runtime-originated event types that this runtime queues, [RuntimeEventMask.ALL] until a host

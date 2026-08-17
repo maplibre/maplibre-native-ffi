@@ -602,9 +602,8 @@ class MapHandle(NativeHandleMixin):
     def close(self) -> None:
         """Release this map handle exactly once.
 
-        Closing discards this map's queued runtime events and its recorded
-        loading failure. There is no flush and no terminal event, so read any
-        state you mirror from events before closing.
+        Closing prevents future runtime events from this map and leaves queued
+        events unchanged. A queued event keeps the map's copied source ID.
         """
         self._native.close()
         self._runtime._unregister_map(self)

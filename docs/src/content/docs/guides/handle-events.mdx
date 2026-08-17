@@ -47,9 +47,6 @@ batch. A message is the arena bytes at the event's own offset: a failed style
 load carries its failure text there, and a missing-image event carries the image
 ID.
 
-Pass a maximum event count to take a bounded slice instead of the whole queue.
-The batch then reports how many events stayed queued.
-
 ## Match an event to its source
 
 One runtime serves every map created under it, and their events share one queue.
@@ -89,5 +86,6 @@ Immediate calls report validation and inspection failures through the binding's
 error idiom. Commands report acceptance synchronously and application failures
 through terminal events. Operations store their own final status and diagnostic.
 
-Closing a map discards that map's queued events. Read teardown state from an
-owned batch or published snapshot.
+Closing a map prevents future events from that source and leaves queued events
+unchanged. A queued event keeps the copied source ID even when its map is no
+longer live.
