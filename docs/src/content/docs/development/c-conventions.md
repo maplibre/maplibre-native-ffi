@@ -319,8 +319,8 @@ handle, or process-global integration such as logging.
 Event payloads use plain data with documented lifetimes. Each event identifies
 its source kind and copied source handle value. Closing a map or disabling an
 offline-region observer prevents future publication without changing queued
-history. Runtime teardown discards its undrained event stream before the runtime
-handle becomes invalid. A drain transfers the complete queue into an owned
+history. Accepted runtime close consumes the runtime handle and discards its
+undrained event stream. A drain transfers the complete queue into an owned
 batch, which stays readable across later drains and runtime close until the
 caller releases it.
 

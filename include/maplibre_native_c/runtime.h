@@ -1120,10 +1120,10 @@ MLN_API mln_status mln_runtime_barrier_start(
  * Starts committed runtime close.
  *
  * The call synchronously rejects a runtime that has live or pending children
- * and leaves it open. Once accepted, the runtime rejects new work, retires its
- * handle, stops and joins its worker, then completes the operation. Callback
- * registrations remain valid until operation completion. This function may be
- * called from any thread.
+ * and leaves it open. An accepted call consumes the runtime handle before it
+ * returns. Teardown stops and joins the worker before completing the operation.
+ * Callback registrations remain valid until operation completion. This
+ * function may be called from any thread.
  */
 MLN_API mln_status mln_runtime_close_start(
   mln_runtime runtime, mln_operation* out_operation

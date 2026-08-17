@@ -2942,14 +2942,14 @@ auto close_runtime_start(mln_runtime runtime, mln_operation* out_operation)
     state->set_terminal_callback([live, sequence]() noexcept -> void {
       mark_runtime_submission_terminal(live, sequence);
     });
+    static_cast<void>(handle_table<RuntimeObject>().remove(runtime));
   }
 
-  auto close_work = [runtime, live, state, sequence]() -> void {
+  auto close_work = [live, state, sequence]() -> void {
     auto status = MLN_STATUS_OK;
     auto diagnostic = std::string{};
     wait_for_prior_runtime_submissions(live, sequence);
     live->control.wait_for_submissions();
-    static_cast<void>(handle_table<RuntimeObject>().remove(runtime));
     unregister_platform_context(live->platform_context);
     try {
       live->executor.invoke_sync([live]() -> void {
