@@ -14,7 +14,6 @@ const MapRegistration = struct {
 pub const RuntimeRegistry = struct {
     maps: std.ArrayList(MapRegistration),
     next_map_id: u64,
-    live_operations: usize,
 };
 
 const ResourceProviderState = struct {
@@ -1221,8 +1220,6 @@ pub const OperationHandle = enum(u128) {
         result_kind: OperationResultKind,
     ) status.Error!OperationHandle {
         if (operation_id == 0) return error.InvalidArgument;
-        try registerRuntimeOperation(runtime.*);
-        errdefer unregisterRuntimeOperation(runtime.*);
         const operation_state = try std.heap.smp_allocator.create(OperationState);
         operation_state.* = .{
             .handle = undefined,
@@ -1358,7 +1355,6 @@ pub const OperationHandle = enum(u128) {
         }
         finishOperationRelease(self, operation_state);
         c.mln_operation_release(operation_state.operation_id);
-        unregisterRuntimeOperation(operation_state.runtime);
         std.heap.smp_allocator.destroy(operation_state);
     }
 
@@ -2014,7 +2010,7 @@ fn createNative(
     try status.checkStatus(c.mln_runtime_create(native_options, &runtime), diagnostic_store);
 
     const runtime_registry = try std.heap.smp_allocator.create(RuntimeRegistry);
-    runtime_registry.* = .{ .maps = .empty, .next_map_id = 1, .live_operations = 0 };
+    runtime_registry.* = .{ .maps = .empty, .next_map_id = 1 };
     errdefer std.heap.smp_allocator.destroy(runtime_registry);
 
     const runtime_state = try std.heap.smp_allocator.create(RuntimeState);
@@ -2315,10 +2311,6 @@ fn beginRuntimeClose(handle: RuntimeHandle) status.Error!?RuntimeClose {
         try status.setBindingDiagnostic(runtime_state.diagnostic_store, "runtime has live maps");
         return error.InvalidState;
     }
-    if (runtime_registry.live_operations != 0) {
-        try status.setBindingDiagnostic(runtime_state.diagnostic_store, "runtime has live operations");
-        return error.InvalidState;
-    }
     const runtime: c.mln_runtime = @intFromEnum(handle);
     runtime_state.closing = true;
     return .{
@@ -2344,25 +2336,6 @@ fn finishRuntimeClose(handle: RuntimeHandle) ?*RuntimeState {
     const runtime_state = entry.value;
     runtime_state.registry = null;
     return runtime_state;
-}
-
-fn registerRuntimeOperation(handle: RuntimeHandle) status.BindingError!void {
-    lockRuntimeRegistry();
-    defer unlockRuntimeRegistry();
-
-    const runtime_state = runtimeStateLocked(handle) orelse return error.ClosedHandle;
-    if (runtime_state.closing) return error.ActiveBorrow;
-    const runtime_registry = runtime_state.registry orelse return error.ClosedHandle;
-    runtime_registry.live_operations += 1;
-}
-
-fn unregisterRuntimeOperation(handle: RuntimeHandle) void {
-    lockRuntimeRegistry();
-    defer unlockRuntimeRegistry();
-
-    const runtime_state = runtimeStateLocked(handle) orelse return;
-    const runtime_registry = runtime_state.registry orelse return;
-    if (runtime_registry.live_operations > 0) runtime_registry.live_operations -= 1;
 }
 
 fn lockRuntimeRegistry() void {
@@ -2477,7 +2450,6 @@ fn finishOperationRelease(handle: OperationHandle, operation_state: *OperationSt
 
 fn retireConsumedOperation(operation_state: *OperationState) void {
     finishOperationRelease(operation_state.handle, operation_state);
-    unregisterRuntimeOperation(operation_state.runtime);
     std.heap.smp_allocator.destroy(operation_state);
 }
 
@@ -3116,21 +3088,11 @@ test "operation finish failures preserve handle state" {
     operation.release();
 }
 
-test "runtime close rejects live operations" {
-    var diagnostic_store = diagnostics.DiagnosticStore.init(std.testing.allocator);
-    defer diagnostic_store.deinit();
-
-    var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, &diagnostic_store);
-    var runtime_open = true;
-    defer if (runtime_open) runtime.close() catch @panic("runtime close failed");
-
+test "operation remains releasable after runtime close" {
+    var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
     const operation = try runtime.operationHandle(9_999_998, .region_get_status, .region_status);
-    try std.testing.expectError(error.InvalidState, runtime.close());
-    try std.testing.expectEqualStrings("runtime has live operations", diagnostic_store.get().?.message);
-
-    operation.release();
     try runtime.close();
-    runtime_open = false;
+    operation.release();
 }
 
 test "runtime notification callback exposes ready operation endpoint" {

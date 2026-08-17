@@ -156,7 +156,6 @@ import org.maplibre.nativeffi.internal.c.mln_style_layer_info
 import org.maplibre.nativeffi.internal.c.mln_style_source_info
 import org.maplibre.nativeffi.internal.c.mln_style_transition_options_default
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
-import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.lifecycle.NativeMap
 import org.maplibre.nativeffi.internal.lifecycle.asHandle
 import org.maplibre.nativeffi.internal.lifecycle.mapHandle
@@ -209,7 +208,6 @@ private constructor(
   handle: NativeMap,
   cachedEventMask: RuntimeEventMask,
 ) {
-  private val runtimeRetention = runtime.retainChild("MapHandle")
   private val state = HandleState("MapHandle", handle, runtime)
   private var cachedEventMask =
     RuntimeEventMask(cachedEventMask.nativeValue and RuntimeEventMask.ALL_MAP_EVENTS.nativeValue)
@@ -1758,10 +1756,7 @@ private constructor(
       state.abortClose()
       throw error
     }
-    state.completeClose {
-      runtime.unregisterMap(this)
-      runtimeRetention.close()
-    }
+    state.completeClose { runtime.unregisterMap(this) }
   }
 
   public actual val isClosed: Boolean
@@ -1772,9 +1767,6 @@ private constructor(
   internal fun nativeHandle(): NativeMap = state.requireLive()
 
   internal fun nativeHandleId(): Long = state.handleId()
-
-  internal fun retainChild(childTypeName: String): HandleStateCore.ChildRetention =
-    state.retainChild(childTypeName)
 
   private fun checkedInt(value: ULong, name: String): Int {
     require(value <= Int.MAX_VALUE.toULong()) { "$name exceeds Int.MAX_VALUE" }

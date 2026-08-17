@@ -60,7 +60,6 @@ import org.maplibre.nativeffi.internal.callback.HttpHeaderTransformState
 import org.maplibre.nativeffi.internal.callback.ResourceProviderState
 import org.maplibre.nativeffi.internal.callback.ResourceTransformState
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
-import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.lifecycle.NativeRuntime
 import org.maplibre.nativeffi.internal.lifecycle.asHandle
 import org.maplibre.nativeffi.internal.lifecycle.offlineRegionListHandle
@@ -563,9 +562,6 @@ internal constructor(
   internal fun forgetOperation(operation: ULong) {
     notifications.forget(operation)
   }
-
-  internal fun retainChild(childTypeName: String): HandleStateCore.ChildRetention =
-    state.retainChild(childTypeName)
 
   internal fun copyEventForTesting(
     event: mln_runtime_event,

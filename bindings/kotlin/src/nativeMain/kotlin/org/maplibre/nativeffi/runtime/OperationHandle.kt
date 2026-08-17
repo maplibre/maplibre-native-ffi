@@ -22,7 +22,6 @@ import org.maplibre.nativeffi.internal.c.mln_operation_get_status
 import org.maplibre.nativeffi.internal.c.mln_operation_poll
 import org.maplibre.nativeffi.internal.c.mln_operation_release
 import org.maplibre.nativeffi.internal.c.mln_operation_wait
-import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
 
 @OptIn(ExperimentalNativeApi::class, ExperimentalForeignApi::class)
@@ -32,14 +31,8 @@ internal constructor(
   nativeId: ULong,
   kind: OperationKind,
   resultKind: OperationResultKind,
-  ownerRetention: HandleStateCore.ChildRetention? = null,
 ) : AutoCloseable {
-  private val runtimeRetention = runtime.retainChild("OperationHandle")
-  private val core =
-    OperationHandleCore(runtime, nativeId.toLong(), kind, resultKind) {
-      ownerRetention?.close()
-      runtimeRetention.close()
-    }
+  private val core = OperationHandleCore(runtime, nativeId.toLong(), kind, resultKind)
   @Suppress("unused") private val cleaner: Cleaner = createCleaner(core.leakReport) { it.report() }
 
   public actual val isClosed: Boolean

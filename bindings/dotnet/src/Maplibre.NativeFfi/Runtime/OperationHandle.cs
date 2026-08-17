@@ -47,7 +47,6 @@ public sealed unsafe class OperationHandle : IDisposable
 
         this.handle = handle;
         this.resultKind = resultKind;
-        runtime.RegisterOperation(this);
     }
 
     internal ulong NativeId => handle.Value;
@@ -206,7 +205,7 @@ public sealed unsafe class OperationHandle : IDisposable
         }
 
         NativeMethods.mln_operation_release(handle);
-        runtime.UnregisterOperation(this);
+        runtime.ForgetOperation(this);
         lock (gate)
         {
             closed = true;
@@ -256,7 +255,7 @@ public sealed unsafe class OperationHandle : IDisposable
         }
         if (unregister)
         {
-            runtime.UnregisterOperation(this);
+            runtime.ForgetOperation(this);
             lock (gate)
             {
                 closed = true;

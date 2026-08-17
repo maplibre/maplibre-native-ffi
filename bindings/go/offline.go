@@ -489,11 +489,11 @@ func rawOfflineRegionDownloadState(state OfflineRegionDownloadState) (uint32, er
 }
 
 func startOperation[T any](runtime *RuntimeHandle, kind operationKind, resultKind operationResultKind, start func(nativeRuntime, *C.mln_operation) int32) (*OperationHandle[T], error) {
-	ptr, release, err := runtime.ptr()
+	ptr, err := runtime.ptr()
 	if err != nil {
 		return nil, err
 	}
-	defer release()
+
 	defer runtime.state.KeepAlive()
 
 	var id C.mln_operation

@@ -24,7 +24,6 @@ internal sealed class NativeHandleState<T>
     private T handle;
     private bool closed;
     private bool releaseInProgress;
-    private int activeUses;
 
     internal NativeHandleState(T handle, StatusDestroy<T> destroy, string typeName)
     {
@@ -109,37 +108,15 @@ internal sealed class NativeHandleState<T>
     }
 
     /// <summary>
-    /// Runs <paramref name="use" /> with the handle and with release held off until it returns.
+    /// Runs <paramref name="use" /> after checking that this wrapper still owns the handle.
     /// </summary>
     /// <remarks>
-    /// Handles the host may use and release from different threads go through this, so a release
-    /// that begins mid-call waits for the call to finish and a losing race reports this wrapper's
-    /// closed-handle error rather than the C API's rejection of a retired id. Graphics-thread-affine
-    /// handles get that ordering from their thread rule and can read <see cref="Handle" /> directly.
-    /// <paramref name="use" /> runs outside the lock; calling <see cref="Close" /> from inside it on
-    /// the same thread deadlocks.
+    /// The C API leases the native object for each entry point, so concurrent release does not need
+    /// a second binding-side active-use lease.
     /// </remarks>
     internal TResult WithLive<TResult>(Func<T, TResult> use)
     {
-        T live;
-        lock (gate)
-        {
-            live = HandleLocked();
-            activeUses++;
-        }
-
-        try
-        {
-            return use(live);
-        }
-        finally
-        {
-            lock (gate)
-            {
-                activeUses--;
-                Monitor.PulseAll(gate);
-            }
-        }
+        return use(Handle);
     }
 
     internal void WithLive(Action<T> use)
@@ -239,12 +216,6 @@ internal sealed class NativeHandleState<T>
         }
 
         releaseInProgress = true;
-
-        // Uses that already read the handle still hold it; wait for them before destroying it.
-        while (activeUses > 0)
-        {
-            Monitor.Wait(gate);
-        }
 
         return true;
     }

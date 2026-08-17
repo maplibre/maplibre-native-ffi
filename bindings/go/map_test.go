@@ -23,7 +23,8 @@ func TestRuntimeMapLifecycle(t *testing.T) {
 		t.Fatalf("Close() with live map error = %v, want ErrInvalidState", err)
 	} else {
 		var bindingErr *Error
-		if !errors.As(err, &bindingErr) || bindingErr.Diagnostic() != "RuntimeHandle has live child handles" {
+		if !errors.As(err, &bindingErr) ||
+			bindingErr.Diagnostic() != "handle still owns live or pending children" {
 			_ = m.Close()
 			_ = runtime.Close()
 			t.Fatalf("Close() with live map diagnostic = %v", err)

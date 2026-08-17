@@ -20,7 +20,6 @@ import org.maplibre.nativeffi.runtime.OperationResultKind
 public actual class RenderSessionHandle
 internal constructor(private val ownerMap: MapHandle, private val handle: NativeRenderSession) :
   AutoCloseable {
-  private val mapRetention = ownerMap.retainChild("RenderSessionHandle")
   private val core = HandleStateCore("RenderSessionHandle", handle.raw, ownerMap)
   private val runtime = ownerMap.runtime()
   private val acquiredFrameScopes = ConcurrentHashMap.newKeySet<FrameScope>()
@@ -231,17 +230,12 @@ internal constructor(private val ownerMap: MapHandle, private val handle: Native
 
   public actual override fun close() {
     NativeAccess.ensureLoaded()
-    core.closeOnce(
-      destroy = { NativeAccess.destroyRenderSession(handle) },
-      afterSuccess = { mapRetention.close() },
-    )
+    core.closeOnce(destroy = { NativeAccess.destroyRenderSession(handle) })
   }
 
   internal fun frameReleased(scope: FrameScope) {
     acquiredFrameScopes.remove(scope)
   }
-
-  internal fun retainAttachOperation() = core.retainChild("RenderAttachOperation")
 
   private fun requireLiveHandle(): NativeRenderSession {
     core.requireLive()
@@ -261,15 +255,7 @@ internal constructor(private val ownerMap: MapHandle, private val handle: Native
     id: Long,
     kind: OperationKind,
     resultKind: OperationResultKind,
-  ): OperationHandle<T> {
-    val retention = core.retainChild("RenderOperation")
-    return try {
-      OperationHandle(runtime, id, kind, resultKind, retention)
-    } catch (error: Throwable) {
-      retention.close()
-      throw error
-    }
-  }
+  ): OperationHandle<T> = OperationHandle(runtime, id, kind, resultKind)
 
   internal companion object {
     fun attachMetalOwnedTexture(
@@ -356,14 +342,6 @@ internal constructor(private val ownerMap: MapHandle, private val handle: Native
     ): RenderSessionAttachment {
       NativeAccess.ensureLoaded()
       val session = RenderSessionHandle(map, native.first)
-      val retention =
-        try {
-          session.retainAttachOperation()
-        } catch (error: Throwable) {
-          runCatching { session.abandon() }
-          runCatching { session.close() }
-          throw error
-        }
       return try {
         RenderSessionAttachment(
           session,
@@ -372,11 +350,9 @@ internal constructor(private val ownerMap: MapHandle, private val handle: Native
             native.second,
             OperationKind.RENDER_ATTACH,
             OperationResultKind.NONE,
-            retention,
           ),
         )
       } catch (error: Throwable) {
-        retention.close()
         runCatching { session.abandon() }
         runCatching { session.close() }
         throw error

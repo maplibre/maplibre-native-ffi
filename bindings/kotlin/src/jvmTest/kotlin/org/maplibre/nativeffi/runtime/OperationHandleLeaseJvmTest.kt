@@ -16,7 +16,7 @@ class OperationHandleLeaseJvmTest {
       val releaseUse = CountDownLatch(1)
       val closeReturned = CountDownLatch(1)
       val core =
-        OperationHandleCore(runtime, 7L, OperationKind.REGION_CREATE, OperationResultKind.REGION) {}
+        OperationHandleCore(runtime, 7L, OperationKind.REGION_CREATE, OperationResultKind.REGION)
 
       val user = thread {
         core.withUse(runtime) {

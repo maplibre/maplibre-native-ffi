@@ -55,30 +55,19 @@ class OperationHandleCoreTest {
     }
 
   @Test
-  fun closeReleasesRuntimeRetentionOnce(): Unit =
+  fun closeIsIdempotent(): Unit =
     org.maplibre.nativeffi.runtime.runSuspendTest {
-      var retentionReleases = 0
       val runtime = Any()
-      val core = operation(runtime) { retentionReleases += 1 }
+      val core = operation(runtime)
 
       assertTrue(core.beginClose())
       core.finishClose()
       assertFalse(core.beginClose())
 
       assertTrue(core.isClosed)
-      assertEquals(1, retentionReleases)
       assertFailsWith<InvalidStateException> { core.withUse(runtime) {} }
     }
 
-  private fun operation(
-    runtime: Any,
-    releaseRuntimeRetention: () -> Unit = {},
-  ): OperationHandleCore =
-    OperationHandleCore(
-      runtime,
-      7L,
-      OperationKind.REGION_CREATE,
-      OperationResultKind.REGION,
-      releaseRuntimeRetention,
-    )
+  private fun operation(runtime: Any): OperationHandleCore =
+    OperationHandleCore(runtime, 7L, OperationKind.REGION_CREATE, OperationResultKind.REGION)
 }

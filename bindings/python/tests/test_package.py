@@ -2747,19 +2747,16 @@ def test_offline_operation_take_rejects_closed_handles() -> None:
     assert runtime.operations == set()
 
 
-def test_runtime_close_rejects_live_offline_operations(tmp_path: Path) -> None:
+def test_operation_remains_releasable_after_runtime_close(tmp_path: Path) -> None:
     runtime = mln.RuntimeHandle(mln.RuntimeOptions(cache_path=str(tmp_path)))
     operation = runtime.run_ambient_cache_operation(offline.AmbientCacheOperation.CLEAR)
     try:
         assert not operation.closed
-        with pytest.raises(mln.InvalidStateError, match="live operation"):
-            runtime.close()
-
-        assert not runtime.closed
+        runtime.close()
+        assert runtime.closed
         assert not operation.closed
     finally:
         operation.close()
-        runtime.close()
 
 
 def test_ambient_cache_operation_starts_and_finishes_through_public_api(

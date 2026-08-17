@@ -486,10 +486,9 @@ type GPUSync struct {
 // any goroutine; only ServiceDriverWork and OpenGL frame access require the
 // caller graphics thread.
 type RenderSessionHandle struct {
-	closeMu     sync.Mutex
-	state       *handle.State[nativeRenderSession]
-	parent      *MapHandle
-	parentChild *handle.Child
+	closeMu sync.Mutex
+	state   *handle.State[nativeRenderSession]
+	parent  *MapHandle
 }
 
 var destroyRenderSessionHandle = func(native nativeRenderSession) int32 {
@@ -515,7 +514,6 @@ type RenderFrameBatch struct {
 	mu     sync.Mutex
 	handle uint64
 	closed bool
-	child  *handle.Child
 }
 
 // AcquiredFrame leases one owned-texture ring slot. Release consumes the lease.
@@ -523,7 +521,6 @@ type AcquiredFrame struct {
 	mu     sync.Mutex
 	handle uint64
 	closed bool
-	child  *handle.Child
 }
 
 // WebGPUOwnedTextureFrameInfo contains backend-native WebGPU frame metadata.
@@ -770,9 +767,9 @@ func (context OpenGLContextDescriptor) toC() C.mln_opengl_context_descriptor {
 }
 
 func newRenderSessionHandle(parent *MapHandle, session nativeRenderSession) (*RenderSessionHandle, error) {
-	state, err := handle.New(session, "RenderSessionHandle", parent)
+	state, err := handle.New(session, "RenderSessionHandle")
 	if err != nil {
 		return nil, newBindingError(ErrInvalidArgument, err.Error())
 	}
-	return &RenderSessionHandle{state: state, parent: parent, parentChild: parent.state.AddChild()}, nil
+	return &RenderSessionHandle{state: state, parent: parent}, nil
 }

@@ -32,7 +32,6 @@ import org.maplibre.nativeffi.runtime.startOperation
 /** Owned Android JNI render session handle. */
 public actual class RenderSessionHandle
 private constructor(private val map: MapHandle, private val handleId: Long) : AutoCloseable {
-  private val mapRetention = map.retainChild("RenderSessionHandle")
   private val core = HandleStateCore("RenderSessionHandle", handleId, map)
   private val acquiredFrameScopes = ConcurrentHashMap.newKeySet<FrameScope>()
 
@@ -436,13 +435,8 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
 
   public actual override fun close() {
     NativeAccess.ensureLoaded()
-    core.closeOnce(
-      destroy = { MaplibreNativeC.mln_render_session_destroy(handleId) },
-      afterSuccess = { mapRetention.close() },
-    )
+    core.closeOnce(destroy = { MaplibreNativeC.mln_render_session_destroy(handleId) })
   }
-
-  internal fun retainAttachOperation() = core.retainChild("RenderAttachOperation")
 
   internal fun frameReleased(scope: FrameScope) {
     acquiredFrameScopes.remove(scope)
@@ -474,15 +468,7 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
     id: Long,
     kind: OperationKind,
     resultKind: OperationResultKind,
-  ): OperationHandle<T> {
-    val retention = core.retainChild("RenderOperation")
-    return try {
-      OperationHandle(map.runtime(), id, kind, resultKind, retention)
-    } catch (error: Throwable) {
-      retention.close()
-      throw error
-    }
-  }
+  ): OperationHandle<T> = OperationHandle(map.runtime(), id, kind, resultKind)
 
   private fun takeBuffer(
     operation: OperationHandle<ByteArray>,
@@ -537,14 +523,6 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
             val sessionId = outSession.get()
             require(sessionId != 0L) { "render session attach returned a null session" }
             val session = RenderSessionHandle(map, sessionId)
-            val retention =
-              try {
-                session.retainAttachOperation()
-              } catch (error: Throwable) {
-                runCatching { session.abandon() }
-                runCatching { session.close() }
-                throw error
-              }
             return try {
               RenderSessionAttachment(
                 session,
@@ -553,11 +531,9 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
                   outOperation.get(),
                   OperationKind.RENDER_ATTACH,
                   OperationResultKind.NONE,
-                  retention,
                 ),
               )
             } catch (error: Throwable) {
-              retention.close()
               runCatching { session.abandon() }
               runCatching { session.close() }
               throw error

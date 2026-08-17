@@ -69,8 +69,6 @@ const (
 
 // OperationHandle owns a common asynchronous native operation.
 type OperationHandle[T any] struct {
-	child      *handle.Child
-	ownerChild *handle.Child
 	id         uint64
 	kind       operationKind
 	resultKind operationResultKind
@@ -84,24 +82,8 @@ type OperationHandle[T any] struct {
 }
 
 func newOperationHandle[T any](runtime *RuntimeHandle, id uint64, kind operationKind, resultKind operationResultKind) *OperationHandle[T] {
-	var child *handle.Child
-	if runtime != nil && runtime.state != nil {
-		child = runtime.state.AddChild()
-	}
-	operation := &OperationHandle[T]{child: child, id: id, kind: kind, resultKind: resultKind, live: true}
+	operation := &OperationHandle[T]{id: id, kind: kind, resultKind: resultKind, live: true}
 	operation.cond = sync.NewCond(&operation.mu)
-	return operation
-}
-
-func newOwnedOperationHandle[T any](
-	runtime *RuntimeHandle,
-	ownerChild *handle.Child,
-	id uint64,
-	kind operationKind,
-	resultKind operationResultKind,
-) *OperationHandle[T] {
-	operation := newOperationHandle[T](runtime, id, kind, resultKind)
-	operation.ownerChild = ownerChild
 	return operation
 }
 
@@ -143,26 +125,14 @@ func (operation *OperationHandle[T]) beginResultUse() (uint64, operationKind, op
 }
 
 func (operation *OperationHandle[T]) endResultUse(consumed bool) {
-	var child *handle.Child
-	var ownerChild *handle.Child
 	operation.mu.Lock()
 	if consumed {
 		operation.live = false
-		child = operation.child
-		ownerChild = operation.ownerChild
-		operation.child = nil
-		operation.ownerChild = nil
 	}
 	operation.consuming = false
 	operation.activeUses--
 	operation.cond.Broadcast()
 	operation.mu.Unlock()
-	if child != nil {
-		child.Release()
-	}
-	if ownerChild != nil {
-		ownerChild.Release()
-	}
 }
 
 // Poll reports whether this operation reached a terminal disposition.
@@ -302,20 +272,10 @@ func (operation *OperationHandle[T]) Release() {
 		return
 	}
 	id := operation.id
-	child := operation.child
-	ownerChild := operation.ownerChild
-	operation.ownerChild = nil
-	operation.child = nil
 	operation.live = false
 	operation.mu.Unlock()
 
 	C.mln_operation_release(C.mln_operation(id))
-	if child != nil {
-		child.Release()
-	}
-	if ownerChild != nil {
-		ownerChild.Release()
-	}
 
 	operation.mu.Lock()
 	operation.releasing = false
@@ -855,15 +815,15 @@ func newRuntimeState(runtime nativeRuntime) (*handle.State[nativeRuntime], error
 	return handle.New(runtime, "RuntimeHandle")
 }
 
-func (runtime *RuntimeHandle) ptr() (nativeRuntime, func(), error) {
+func (runtime *RuntimeHandle) ptr() (nativeRuntime, error) {
 	if runtime == nil || runtime.state == nil {
-		return 0, nil, newBindingError(ErrInvalidArgument, "RuntimeHandle is nil")
+		return 0, newBindingError(ErrInvalidArgument, "RuntimeHandle is nil")
 	}
-	borrow, live := runtime.state.Borrow()
+	value, live := runtime.state.Handle()
 	if !live {
-		return 0, nil, newBindingError(ErrInvalidArgument, "RuntimeHandle is closed")
+		return 0, newBindingError(ErrInvalidArgument, "RuntimeHandle is closed")
 	}
-	return borrow.Handle(), borrow.Release, nil
+	return value, nil
 }
 
 // Barrier starts an ordered runtime operation that completes after every
@@ -877,11 +837,11 @@ func (runtime *RuntimeHandle) Barrier() (*OperationHandle[struct{}], error) {
 // DrainEvents takes this runtime's whole event queue as one batch of copied
 // values in queue order.
 func (runtime *RuntimeHandle) DrainEvents() (RuntimeEventBatch, error) {
-	ptr, release, err := runtime.ptr()
+	ptr, err := runtime.ptr()
 	if err != nil {
 		return RuntimeEventBatch{}, err
 	}
-	defer release()
+
 	defer runtime.state.KeepAlive()
 
 	rawBatch, ownedBatch, err := drainRawEvents(ptr)
@@ -900,11 +860,11 @@ func (runtime *RuntimeHandle) DrainEvents() (RuntimeEventBatch, error) {
 // Narrowing gates later events and keeps queued ones, so a caller drains what it
 // already caused.
 func (runtime *RuntimeHandle) SetEventMask(mask RuntimeEventMask) error {
-	ptr, release, err := runtime.ptr()
+	ptr, err := runtime.ptr()
 	if err != nil {
 		return err
 	}
-	defer release()
+
 	defer runtime.state.KeepAlive()
 
 	return checkNative(func() int32 {
@@ -915,11 +875,11 @@ func (runtime *RuntimeHandle) SetEventMask(mask RuntimeEventMask) error {
 // EventMask reports which runtime-originated event types this runtime queues. A
 // runtime that has not been narrowed reports RuntimeEventMaskAll.
 func (runtime *RuntimeHandle) EventMask() (RuntimeEventMask, error) {
-	ptr, release, err := runtime.ptr()
+	ptr, err := runtime.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer runtime.state.KeepAlive()
 
 	var raw C.uint64_t
@@ -1133,11 +1093,11 @@ func offlineRegionStatusFromC(status C.mln_offline_region_status) OfflineRegionS
 // StartAmbientCacheOperation starts a native ambient cache maintenance
 // operation.
 func (runtime *RuntimeHandle) StartAmbientCacheOperation(operation AmbientCacheOperation) (*OperationHandle[struct{}], error) {
-	ptr, release, err := runtime.ptr()
+	ptr, err := runtime.ptr()
 	if err != nil {
 		return nil, err
 	}
-	defer release()
+
 	defer runtime.state.KeepAlive()
 
 	var id C.mln_operation
@@ -1156,11 +1116,11 @@ func (runtime *RuntimeHandle) StartAmbientCacheOperation(operation AmbientCacheO
 // ambient cache size. Lowering it evicts ambient resources to fit the new
 // budget; offline regions are unaffected.
 func (runtime *RuntimeHandle) StartSetMaximumAmbientCacheSize(size uint64) (*OperationHandle[struct{}], error) {
-	ptr, release, err := runtime.ptr()
+	ptr, err := runtime.ptr()
 	if err != nil {
 		return nil, err
 	}
-	defer release()
+
 	defer runtime.state.KeepAlive()
 
 	var id C.mln_operation
@@ -1183,11 +1143,11 @@ func (runtime *RuntimeHandle) SetResourceProvider(provider ResourceProviderCallb
 	if provider == nil {
 		return 0, newBindingError(ErrInvalidArgument, "ResourceProviderCallback is nil")
 	}
-	ptr, release, err := runtime.ptr()
+	ptr, err := runtime.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer runtime.state.KeepAlive()
 
 	var commandID uint64
@@ -1225,11 +1185,11 @@ func (runtime *RuntimeHandle) SetResourceProvider(provider ResourceProviderCallb
 // ClearResourceProvider submits removal of the runtime-scoped network resource
 // provider and returns the accepted command ID.
 func (runtime *RuntimeHandle) ClearResourceProvider() (uint64, error) {
-	ptr, release, err := runtime.ptr()
+	ptr, err := runtime.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer runtime.state.KeepAlive()
 
 	var commandID uint64
@@ -1250,11 +1210,11 @@ func (runtime *RuntimeHandle) SetResourceTransform(transform ResourceTransformCa
 	if transform == nil {
 		return 0, newBindingError(ErrInvalidArgument, "ResourceTransformCallback is nil")
 	}
-	ptr, release, err := runtime.ptr()
+	ptr, err := runtime.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer runtime.state.KeepAlive()
 
 	var commandID uint64
@@ -1273,11 +1233,11 @@ func (runtime *RuntimeHandle) SetResourceTransform(transform ResourceTransformCa
 // ClearResourceTransform submits removal of the runtime-scoped network URL
 // transform and returns the accepted command ID.
 func (runtime *RuntimeHandle) ClearResourceTransform() (uint64, error) {
-	ptr, release, err := runtime.ptr()
+	ptr, err := runtime.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer runtime.state.KeepAlive()
 
 	var commandID uint64
@@ -1297,11 +1257,11 @@ func (runtime *RuntimeHandle) SetHttpHeaderTransform(transform HttpHeaderTransfo
 	if transform == nil {
 		return 0, newBindingError(ErrInvalidArgument, "HttpHeaderTransformCallback is nil")
 	}
-	ptr, release, err := runtime.ptr()
+	ptr, err := runtime.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer runtime.state.KeepAlive()
 
 	var commandID uint64
@@ -1325,11 +1285,11 @@ func (runtime *RuntimeHandle) SetHttpHeaderTransform(transform HttpHeaderTransfo
 // ClearHttpHeaderTransform submits removal of the runtime-scoped outgoing HTTP
 // header transform and returns the accepted command ID.
 func (runtime *RuntimeHandle) ClearHttpHeaderTransform() (uint64, error) {
-	ptr, release, err := runtime.ptr()
+	ptr, err := runtime.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer runtime.state.KeepAlive()
 
 	var commandID uint64
@@ -1352,11 +1312,11 @@ func (runtime *RuntimeHandle) NewMap() (*MapHandle, error) {
 // Start from NewMapOptions to keep every map-originated event type selected; a
 // zero-value MapOptions queues no event.
 func (runtime *RuntimeHandle) NewMapWithOptions(options MapOptions) (*MapHandle, error) {
-	ptr, release, err := runtime.ptr()
+	ptr, err := runtime.ptr()
 	if err != nil {
 		return nil, err
 	}
-	defer release()
+
 	defer runtime.state.KeepAlive()
 
 	rawOptions := C.mln_map_options_default()
@@ -1385,16 +1345,15 @@ func (runtime *RuntimeHandle) NewMapWithOptions(options MapOptions) (*MapHandle,
 	}); err != nil {
 		return nil, err
 	}
-	state, err := handle.New(nativeMap(raw), "MapHandle", runtime)
+	state, err := handle.New(nativeMap(raw), "MapHandle")
 	if err != nil {
 		_ = closeNativeMap(nativeMap(raw))
 		return nil, newBindingError(ErrInvalidArgument, err.Error())
 	}
 	m := &MapHandle{
-		state:        state,
-		runtime:      runtime,
-		runtimeChild: runtime.state.AddChild(),
-		id:           MapID(raw),
+		state:   state,
+		runtime: runtime,
+		id:      MapID(raw),
 	}
 	runtime.registerMap(m)
 	return m, nil
@@ -1408,13 +1367,13 @@ func closeNativeMap(m nativeMap) error {
 
 // Close releases this runtime's public native handle. Native teardown continues
 // in submission order after this method returns. A failed close leaves the
-// handle live so callers can retry after closing its children.
+// handle live so callers can correct the native precondition and retry.
 func (runtime *RuntimeHandle) Close() error {
 	if runtime == nil || runtime.state == nil {
 		return newBindingError(ErrInvalidArgument, "RuntimeHandle is nil")
 	}
 	var closeErr error
-	_, err := runtime.state.CloseChecked(func(native nativeRuntime) int32 {
+	_ = runtime.state.Close(func(native nativeRuntime) int32 {
 		if destroyRuntimeHandle != nil {
 			status := destroyRuntimeHandle(native)
 			if status != int32(C.MLN_STATUS_OK) {
@@ -1435,12 +1394,6 @@ func (runtime *RuntimeHandle) Close() error {
 		}
 		return int32(C.MLN_STATUS_OK)
 	})
-	if err != nil {
-		if errors.Is(err, handle.ErrLiveChildren) {
-			return newBindingError(ErrInvalidState, "RuntimeHandle has live child handles")
-		}
-		return newBindingError(ErrInvalidState, err.Error())
-	}
 	if closeErr != nil {
 		return closeErr
 	}

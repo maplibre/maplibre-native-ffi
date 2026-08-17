@@ -48,7 +48,6 @@ private constructor(
   private val handle: NativeMap,
   cachedEventMask: RuntimeEventMask,
 ) {
-  private val runtimeRetention = runtime.retainChild("MapHandle")
   private val core = HandleStateCore("MapHandle", handle.raw)
   private var cachedEventMask =
     RuntimeEventMask(cachedEventMask.nativeValue and RuntimeEventMask.ALL_MAP_EVENTS.nativeValue)
@@ -672,10 +671,7 @@ private constructor(
       core.abortClose()
       throw error
     }
-    core.completeClose {
-      runtime.unregisterMap(this)
-      runtimeRetention.close()
-    }
+    core.completeClose { runtime.unregisterMap(this) }
   }
 
   public actual companion object {
@@ -696,9 +692,6 @@ private constructor(
   internal fun nativeHandleId(): Long = handle.raw
 
   internal fun nativeHandle(): NativeMap = requireLiveHandle()
-
-  internal fun retainChild(childTypeName: String): HandleStateCore.ChildRetention =
-    core.retainChild(childTypeName)
 
   internal fun customGeometrySourceCountForTesting(): Int = customGeometrySources.size
 

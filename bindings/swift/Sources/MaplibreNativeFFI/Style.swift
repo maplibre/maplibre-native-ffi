@@ -572,9 +572,7 @@ public final class GeoJSONSourceDataHandle: @unchecked Sendable {
     }
   }
 
-  /// Borrows the live handle for the duration of `use`, so a concurrent
-  /// `close()` waits for in-flight installs instead of retiring the native
-  /// handle under them.
+  /// Runs `use` after checking that this wrapper still owns the handle.
   func withLiveHandle<T>(
     _ use: (NativeGeoJSONSourceDataHandle) throws -> T
   ) throws -> T {

@@ -12,7 +12,7 @@ use maplibre_native_ffi_sys as sys;
 
 use crate::handle::{ConcurrentNativeHandle, closed_handle_error, out_handle};
 use crate::map::MapHandle;
-use crate::runtime::{OperationHandle, OperationKind, OperationRegistry};
+use crate::runtime::{OperationHandle, OperationKind};
 use crate::{HandleOperationError, Result};
 
 /// Borrowed opaque native address used for backend interop handles. It does not
@@ -1160,13 +1160,12 @@ pub struct RenderAbandonResult {
 #[derive(Debug)]
 struct RenderSessionState {
     handle: ConcurrentNativeHandle<sys::mln_render_session>,
-    operations: Arc<OperationRegistry>,
 }
 
 impl RenderSessionState {
-    fn new(native: sys::mln_render_session, operations: Arc<OperationRegistry>) -> Result<Self> {
+    fn new(native: sys::mln_render_session) -> Result<Self> {
         let handle = unsafe { ConcurrentNativeHandle::from_handle(native, "mln_render_session") }?;
-        Ok(Self { handle, operations })
+        Ok(Self { handle })
     }
 
     fn native(&self) -> Result<sys::mln_render_session> {
@@ -1180,7 +1179,7 @@ impl RenderSessionState {
         operation: sys::mln_operation,
         kind: OperationKind,
     ) -> Result<OperationHandle<T>> {
-        OperationHandle::new(operation, kind, Arc::clone(&self.operations))
+        OperationHandle::new(operation, kind)
     }
 
     fn destroy(&self) -> Result<()> {
@@ -1247,12 +1246,11 @@ impl RenderSessionHandle {
             &mut operation,
         ))?;
         let session = out_handle(session, "mln_render_session")?;
-        let operations = map.operation_registry()?;
         Ok(RenderSessionAttachment {
             session: Self {
-                inner: Arc::new(RenderSessionState::new(session, Arc::clone(&operations))?),
+                inner: Arc::new(RenderSessionState::new(session)?),
             },
-            operation: OperationHandle::new(operation, OperationKind::RenderAttach, operations)?,
+            operation: OperationHandle::new(operation, OperationKind::RenderAttach)?,
         })
     }
 

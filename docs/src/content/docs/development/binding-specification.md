@@ -304,10 +304,10 @@ argument rather than reaching a later native handle.
 
 ### Parent validity
 
-Bindings MUST preserve native parent validity while child wrappers are live.
-Child wrappers retain parent owner state whenever native validity depends on the
-parent. Parent close preflight rejects both live children and pending
-child-creation reservations without consuming or closing the parent.
+The C API owns native parent-child validity and rejects a parent release while a
+dependent child is live or pending. Bindings retain a parent wrapper only when
+the child calls binding-owned behavior through it; they do not duplicate the C
+relationship with child counters or close preflights.
 
 A `MapProjectionHandle` owns a transform snapshot independently of its source
 map and runtime. Every call after creation, including close, is synchronous and
@@ -1197,11 +1197,11 @@ include:
 | BND-046 | Concurrent close or release attempts call the terminal native function at most once, and public calls fail while close or release is in progress.                                                     |
 | BND-190 | Runtime, map, and operation calls from another native thread preserve validity and runtime submission order; projection calls from another thread preserve validity and per-projection serialization. |
 | BND-191 | An operation's copied final diagnostic remains stable after unrelated native calls on another thread.                                                                                                 |
-| BND-197 | A close or release racing a use of the same handle waits for the in-flight use, and a use starting after the transition begins reports the binding's closed error.                                    |
+| BND-197 | A close or release racing a use of the same handle is memory-safe: an entry point that acquired the C handle first completes against its native lease, while a later entry reports a closed handle.   |
 
-A binding that orders the race by holding one lock across the native call
-satisfies BND-197 by construction. A binding that counts in-flight uses and
-drains them exercises the counter directly.
+The C handle table owns the native call lease. Bindings keep close-once state to
+reject calls that begin after their wrapper closes; they do not duplicate the
+native lease with active-use counters.
 
 #### Caller-driver graphics threads
 

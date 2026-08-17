@@ -885,11 +885,11 @@ func styleLayerInfoFromC(info C.mln_style_layer_info) StyleLayerInfo {
 // SetGeoJSONSourceURL calls keep the options passed here, and later
 // SetGeoJSONSourceData calls require data prepared with matching options.
 func (m *MapHandle) AddGeoJSONSourceURL(sourceID string, url string, options *StyleGeoJSONSourceOptions) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
@@ -911,11 +911,11 @@ func (m *MapHandle) AddGeoJSONSourceURL(sourceID string, url string, options *St
 
 // SetGeoJSONSourceURL updates a GeoJSON source to load from a URL.
 func (m *MapHandle) SetGeoJSONSourceURL(sourceID string, url string) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
@@ -935,17 +935,17 @@ func (m *MapHandle) SetGeoJSONSourceURL(sourceID string, url string) (uint64, er
 // adopts the options the data was prepared with, fixed for the lifetime of the
 // source.
 func (m *MapHandle) AddGeoJSONSourceData(sourceID string, data *GeoJSONSourceDataHandle) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
-	dataPtr, dataRelease, err := data.ptr()
+	dataPtr, err := data.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer dataRelease()
+
 	defer data.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
@@ -963,17 +963,17 @@ func (m *MapHandle) AddGeoJSONSourceData(sourceID string, data *GeoJSONSourceDat
 // been prepared with options equal to the options the source was added with,
 // ClusterProperties excepted.
 func (m *MapHandle) SetGeoJSONSourceData(sourceID string, data *GeoJSONSourceDataHandle) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
-	dataPtr, dataRelease, err := data.ptr()
+	dataPtr, err := data.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer dataRelease()
+
 	defer data.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
@@ -991,11 +991,11 @@ func (m *MapHandle) SetGeoJSONSourceData(sourceID string, data *GeoJSONSourceDat
 // inline during the update pass, as if its options had set SynchronousTiling;
 // false restores the option the source was added with.
 func (m *MapHandle) SetGeoJSONSourceSynchronousTiling(sourceID string, enabled bool) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
@@ -1010,11 +1010,11 @@ func (m *MapHandle) SetGeoJSONSourceSynchronousTiling(sourceID string, enabled b
 
 // SetCustomGeometrySourceTileData sets custom geometry data for one tile.
 func (m *MapHandle) SetCustomGeometrySourceTileData(sourceID string, tileID CanonicalTileID, data []byte) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
@@ -1037,11 +1037,11 @@ func (m *MapHandle) SetCustomGeometrySourceTileData(sourceID string, tileID Cano
 
 // InvalidateCustomGeometrySourceTile invalidates custom geometry data for one tile.
 func (m *MapHandle) InvalidateCustomGeometrySourceTile(sourceID string, tileID CanonicalTileID) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
@@ -1056,11 +1056,11 @@ func (m *MapHandle) InvalidateCustomGeometrySourceTile(sourceID string, tileID C
 
 // InvalidateCustomGeometrySourceRegion invalidates custom geometry data inside one geographic region.
 func (m *MapHandle) InvalidateCustomGeometrySourceRegion(sourceID string, bounds LatLngBounds) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
@@ -1075,11 +1075,11 @@ func (m *MapHandle) InvalidateCustomGeometrySourceRegion(sourceID string, bounds
 
 // SetStyleImage sets or replaces one runtime style image.
 func (m *MapHandle) SetStyleImage(imageID string, image PremultipliedRGBA8Image, options StyleImageOptions) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	imageView := newCStringView(imageID)
 	defer imageView.free()
@@ -1101,11 +1101,11 @@ func (m *MapHandle) SetStyleImage(imageID string, image PremultipliedRGBA8Image,
 // with ErrNotFound reported through its terminal event's Err payload field when
 // none does. Check existence with StartStyleImageInfo's found flag.
 func (m *MapHandle) RemoveStyleImage(imageID string) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	imageView := newCStringView(imageID)
 	defer imageView.free()
@@ -1126,11 +1126,11 @@ func (m *MapHandle) RemoveStyleImage(imageID string) (uint64, error) {
 
 // AddImageSourceURL adds an image source that loads its image from a URL.
 func (m *MapHandle) AddImageSourceURL(sourceID string, coordinates []LatLng, url string) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
@@ -1159,11 +1159,11 @@ func (m *MapHandle) AddImageSourceURL(sourceID string, coordinates []LatLng, url
 
 // AddImageSourceImage adds an image source with inline image pixels.
 func (m *MapHandle) AddImageSourceImage(sourceID string, coordinates []LatLng, image PremultipliedRGBA8Image) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
@@ -1192,11 +1192,11 @@ func (m *MapHandle) AddImageSourceImage(sourceID string, coordinates []LatLng, i
 
 // SetImageSourceURL updates an image source to load its image from a URL.
 func (m *MapHandle) SetImageSourceURL(sourceID string, url string) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
@@ -1213,11 +1213,11 @@ func (m *MapHandle) SetImageSourceURL(sourceID string, url string) (uint64, erro
 
 // SetImageSourceImage updates an image source with inline image pixels.
 func (m *MapHandle) SetImageSourceImage(sourceID string, image PremultipliedRGBA8Image) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
@@ -1234,11 +1234,11 @@ func (m *MapHandle) SetImageSourceImage(sourceID string, image PremultipliedRGBA
 
 // SetImageSourceCoordinates updates image source coordinates.
 func (m *MapHandle) SetImageSourceCoordinates(sourceID string, coordinates []LatLng) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
@@ -1266,11 +1266,11 @@ func (m *MapHandle) SetImageSourceCoordinates(sourceID string, coordinates []Lat
 
 // AddVectorSourceURL adds a vector source with a TileJSON URL.
 func (m *MapHandle) AddVectorSourceURL(sourceID string, url string, options *StyleTileSourceOptions) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
@@ -1289,11 +1289,11 @@ func (m *MapHandle) AddVectorSourceURL(sourceID string, url string, options *Sty
 
 // AddVectorSourceTiles adds a vector source with inline tile URLs.
 func (m *MapHandle) AddVectorSourceTiles(sourceID string, tiles []string, options *StyleTileSourceOptions) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
@@ -1312,11 +1312,11 @@ func (m *MapHandle) AddVectorSourceTiles(sourceID string, tiles []string, option
 
 // AddRasterSourceURL adds a raster source with a TileJSON URL.
 func (m *MapHandle) AddRasterSourceURL(sourceID string, url string, options *StyleTileSourceOptions) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
@@ -1335,11 +1335,11 @@ func (m *MapHandle) AddRasterSourceURL(sourceID string, url string, options *Sty
 
 // AddRasterSourceTiles adds a raster source with inline tile URLs.
 func (m *MapHandle) AddRasterSourceTiles(sourceID string, tiles []string, options *StyleTileSourceOptions) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
@@ -1358,11 +1358,11 @@ func (m *MapHandle) AddRasterSourceTiles(sourceID string, tiles []string, option
 
 // AddRasterDEMSourceURL adds a raster DEM source with a TileJSON URL.
 func (m *MapHandle) AddRasterDEMSourceURL(sourceID string, url string, options *StyleTileSourceOptions) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
@@ -1381,11 +1381,11 @@ func (m *MapHandle) AddRasterDEMSourceURL(sourceID string, url string, options *
 
 // AddRasterDEMSourceTiles adds a raster DEM source with inline tile URLs.
 func (m *MapHandle) AddRasterDEMSourceTiles(sourceID string, tiles []string, options *StyleTileSourceOptions) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
@@ -1404,11 +1404,11 @@ func (m *MapHandle) AddRasterDEMSourceTiles(sourceID string, tiles []string, opt
 
 // AddStyleSourceJSON adds one style source from a style-spec source JSON object.
 func (m *MapHandle) AddStyleSourceJSON(sourceID string, sourceJSON []byte) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
@@ -1429,11 +1429,11 @@ func (m *MapHandle) AddStyleSourceJSON(sourceID string, sourceJSON []byte) (uint
 // none does, and with ErrInvalidState when a layer still uses the source. Check
 // existence with StartStyleSourceInfo's found flag.
 func (m *MapHandle) RemoveStyleSource(sourceID string) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
@@ -1492,11 +1492,11 @@ func styleStringListStrings(list C.mln_style_string_list) ([]string, error) {
 // AddHillshadeLayer adds a hillshade layer for a raster DEM source. Passing an
 // empty beforeLayerID appends the layer.
 func (m *MapHandle) AddHillshadeLayer(layerID string, sourceID string, beforeLayerID string) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	layerView := newCStringView(layerID)
 	defer layerView.free()
@@ -1516,11 +1516,11 @@ func (m *MapHandle) AddHillshadeLayer(layerID string, sourceID string, beforeLay
 // AddColorReliefLayer adds a color-relief layer for a raster DEM source.
 // Passing an empty beforeLayerID appends the layer.
 func (m *MapHandle) AddColorReliefLayer(layerID string, sourceID string, beforeLayerID string) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	layerView := newCStringView(layerID)
 	defer layerView.free()
@@ -1540,11 +1540,11 @@ func (m *MapHandle) AddColorReliefLayer(layerID string, sourceID string, beforeL
 // AddLocationIndicatorLayer adds a source-free location indicator layer. Passing
 // an empty beforeLayerID appends the layer.
 func (m *MapHandle) AddLocationIndicatorLayer(layerID string, beforeLayerID string) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	layerView := newCStringView(layerID)
 	defer layerView.free()
@@ -1561,11 +1561,11 @@ func (m *MapHandle) AddLocationIndicatorLayer(layerID string, beforeLayerID stri
 
 // SetLocationIndicatorLocation sets a location indicator layer location.
 func (m *MapHandle) SetLocationIndicatorLocation(layerID string, coordinate LatLng, altitude float64) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	layerView := newCStringView(layerID)
 	defer layerView.free()
@@ -1580,11 +1580,11 @@ func (m *MapHandle) SetLocationIndicatorLocation(layerID string, coordinate LatL
 
 // SetLocationIndicatorBearing sets a location indicator layer bearing in degrees.
 func (m *MapHandle) SetLocationIndicatorBearing(layerID string, bearing float64) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	layerView := newCStringView(layerID)
 	defer layerView.free()
@@ -1599,11 +1599,11 @@ func (m *MapHandle) SetLocationIndicatorBearing(layerID string, bearing float64)
 
 // SetLocationIndicatorAccuracyRadius sets a location indicator layer accuracy radius.
 func (m *MapHandle) SetLocationIndicatorAccuracyRadius(layerID string, radius float64) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	layerView := newCStringView(layerID)
 	defer layerView.free()
@@ -1618,11 +1618,11 @@ func (m *MapHandle) SetLocationIndicatorAccuracyRadius(layerID string, radius fl
 
 // SetLocationIndicatorImageName sets one location indicator image-name property.
 func (m *MapHandle) SetLocationIndicatorImageName(layerID string, imageKind LocationIndicatorImageKind, imageID string) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	layerView := newCStringView(layerID)
 	defer layerView.free()
@@ -1640,11 +1640,11 @@ func (m *MapHandle) SetLocationIndicatorImageName(layerID string, imageKind Loca
 // AddStyleLayerJSON adds one style layer from a style-spec layer JSON object.
 // Passing an empty beforeLayerID appends the layer.
 func (m *MapHandle) AddStyleLayerJSON(layerJSON []byte, beforeLayerID string) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	beforeView := newCStringView(beforeLayerID)
 	defer beforeView.free()
@@ -1664,11 +1664,11 @@ func (m *MapHandle) AddStyleLayerJSON(layerJSON []byte, beforeLayerID string) (u
 // with ErrNotFound reported through its terminal event's Err payload field when
 // none does. Check existence with StartStyleLayerInfo's found flag.
 func (m *MapHandle) RemoveStyleLayer(layerID string) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	layerView := newCStringView(layerID)
 	defer layerView.free()
@@ -1688,11 +1688,11 @@ func (m *MapHandle) RemoveStyleLayer(layerID string) (uint64, error) {
 // MoveStyleLayer moves one style layer before another layer. Passing an empty
 // beforeLayerID moves layerID to the top of the style order.
 func (m *MapHandle) MoveStyleLayer(layerID string, beforeLayerID string) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	layerView := newCStringView(layerID)
 	defer layerView.free()
@@ -1712,11 +1712,11 @@ func (m *MapHandle) MoveStyleLayer(layerID string, beforeLayerID string) (uint64
 
 // SetStyleLightJSON sets the style light from a style-spec light JSON object.
 func (m *MapHandle) SetStyleLightJSON(lightJSON []byte) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	rawJSON := newCBufferView(lightJSON)
 	defer rawJSON.free()
@@ -1731,11 +1731,11 @@ func (m *MapHandle) SetStyleLightJSON(lightJSON []byte) (uint64, error) {
 
 // SetStyleLightProperty sets one style light property.
 func (m *MapHandle) SetStyleLightProperty(propertyName string, value []byte) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	propertyView := newCStringView(propertyName)
 	defer propertyView.free()
@@ -1758,11 +1758,11 @@ func (m *MapHandle) SetStyleLightProperty(propertyName string, value []byte) (ui
 // style-wide override. Loading a style replaces these options with the ones
 // that style declares, so apply an override after the style loads.
 func (m *MapHandle) SetStyleTransitionOptions(options StyleTransitionOptions) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	raw := newCStyleTransitionOptions(options)
 	var commandID C.uint64_t
@@ -1778,11 +1778,11 @@ func (m *MapHandle) SetStyleTransitionOptions(options StyleTransitionOptions) (u
 
 // SetLayerProperty sets one style layer property.
 func (m *MapHandle) SetLayerProperty(layerID string, propertyName string, value []byte) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	layerView := newCStringView(layerID)
 	defer layerView.free()
@@ -1834,11 +1834,11 @@ const (
 // SetLayerVisibility sets whether one layer draws. Read the committed value
 // with StartStyleLayerInfo.
 func (m *MapHandle) SetLayerVisibility(layerID string, visibility StyleLayerVisibility) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	layerView := newCStringView(layerID)
 	defer layerView.free()
@@ -1854,11 +1854,11 @@ func (m *MapHandle) SetLayerVisibility(layerID string, visibility StyleLayerVisi
 // copyMapText probes the required length, then copies. A null buffer with zero
 // capacity is a size probe the C API answers with OK.
 func (m *MapHandle) copyMapText(copy func(C.mln_map, *C.char, C.size_t, *C.size_t) int32) (string, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return "", err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 
 	var required C.size_t
@@ -1882,11 +1882,11 @@ func (m *MapHandle) copyMapText(copy func(C.mln_map, *C.char, C.size_t, *C.size_
 }
 
 func (m *MapHandle) copyMapBytes(copy func(C.mln_map, *C.uint8_t, C.size_t, *C.size_t) int32) ([]byte, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return nil, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 
 	var required C.size_t
@@ -1909,11 +1909,11 @@ func (m *MapHandle) copyMapBytes(copy func(C.mln_map, *C.uint8_t, C.size_t, *C.s
 // SetLayerFilter sets or clears one style layer filter. Passing nil clears the
 // filter.
 func (m *MapHandle) SetLayerFilter(layerID string, filter []byte) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	layerView := newCStringView(layerID)
 	defer layerView.free()
@@ -1948,11 +1948,11 @@ type StyleImageStretchResult struct {
 }
 
 func startMapStyleOperation[T any](m *MapHandle, start func(C.mln_map, *C.mln_operation) int32, take func(C.mln_operation) (T, bool, error)) (*OperationHandle[T], error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return nil, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	var id C.mln_operation
 	if err := checkNative(func() int32 { return start(C.mln_map(ptr), &id) }); err != nil {
@@ -1997,11 +1997,11 @@ func (m *MapHandle) AddCustomGeometrySource(sourceID string, options CustomGeome
 	if options.FetchTile == nil {
 		return 0, newBindingError(ErrInvalidArgument, "CustomGeometrySourceOptions.FetchTile is nil")
 	}
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	var commandID uint64
 	if err := checkNative(func() int32 {
@@ -2288,11 +2288,11 @@ func (m *MapHandle) StartLayerSourceID(layerID string) (*OperationHandle[string]
 }
 
 func submitLayerTextCommand(m *MapHandle, layerID, text string, submit func(C.mln_map, C.mln_buffer_view, C.mln_buffer_view, *C.uint64_t) int32) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	layer := newCStringView(layerID)
 	defer layer.free()
@@ -2318,11 +2318,11 @@ func (m *MapHandle) SetLayerSourceID(layerID, sourceID string) (uint64, error) {
 }
 
 func submitLayerZoomCommand(m *MapHandle, layerID string, zoom float64, submit func(C.mln_map, C.mln_buffer_view, C.double, *C.uint64_t) int32) (uint64, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	layer := newCStringView(layerID)
 	defer layer.free()

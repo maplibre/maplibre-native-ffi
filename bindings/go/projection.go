@@ -21,11 +21,11 @@ type MapProjectionHandle struct {
 // transform state after every earlier map command. Later map changes do not
 // update the helper.
 func (m *MapHandle) NewProjection() (*MapProjectionHandle, error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return nil, err
 	}
-	defer release()
+
 	defer m.state.KeepAlive()
 	operation, err := waitMapOperation(func(out *C.mln_operation) int32 {
 		return int32(C.mln_map_projection_create_start(C.mln_map(ptr), out))
@@ -47,25 +47,24 @@ func (m *MapHandle) NewProjection() (*MapProjectionHandle, error) {
 	return &MapProjectionHandle{state: state}, nil
 }
 
-func (projection *MapProjectionHandle) ptr() (nativeProjection, func(), error) {
+func (projection *MapProjectionHandle) ptr() (nativeProjection, error) {
 	if projection == nil || projection.state == nil {
-		return 0, nil, newBindingError(ErrInvalidArgument, "MapProjectionHandle is nil")
+		return 0, newBindingError(ErrInvalidArgument, "MapProjectionHandle is nil")
 	}
-	borrow, live := projection.state.Borrow()
+	value, live := projection.state.Handle()
 	if !live {
-		return 0, nil, newBindingError(ErrInvalidArgument, "MapProjectionHandle is closed")
+		return 0, newBindingError(ErrInvalidArgument, "MapProjectionHandle is closed")
 	}
-	return borrow.Handle(), borrow.Release, nil
+	return value, nil
 }
 
-// Close destroys this projection helper synchronously after waiting for
-// projection calls already running on other goroutines.
+// Close destroys this projection helper synchronously.
 func (projection *MapProjectionHandle) Close() error {
 	if projection == nil || projection.state == nil {
 		return newBindingError(ErrInvalidArgument, "MapProjectionHandle is nil")
 	}
 	var closeErr error
-	_, err := projection.state.CloseChecked(func(native nativeProjection) int32 {
+	_ = projection.state.Close(func(native nativeProjection) int32 {
 		if err := checkNative(func() int32 {
 			return int32(C.mln_map_projection_close(C.mln_map_projection(native)))
 		}); err != nil {
@@ -74,20 +73,17 @@ func (projection *MapProjectionHandle) Close() error {
 		}
 		return int32(C.MLN_STATUS_OK)
 	})
-	if err != nil {
-		return newBindingError(ErrInvalidState, err.Error())
-	}
 	return closeErr
 }
 
 // Camera returns a copy of the projection camera. The result observes every
 // earlier projection setter.
 func (projection *MapProjectionHandle) Camera() (CameraOptions, error) {
-	ptr, release, err := projection.ptr()
+	ptr, err := projection.ptr()
 	if err != nil {
 		return CameraOptions{}, err
 	}
-	defer release()
+
 	defer projection.state.KeepAlive()
 	camera := C.mln_camera_options_default()
 	if err := checkNative(func() int32 {
@@ -101,11 +97,11 @@ func (projection *MapProjectionHandle) Camera() (CameraOptions, error) {
 // SetCamera applies selected camera fields synchronously, so a later read or
 // conversion observes them. The map's camera is unaffected.
 func (projection *MapProjectionHandle) SetCamera(camera CameraOptions) error {
-	ptr, release, err := projection.ptr()
+	ptr, err := projection.ptr()
 	if err != nil {
 		return err
 	}
-	defer release()
+
 	defer projection.state.KeepAlive()
 	raw := cCameraOptions(camera)
 	return checkNative(func() int32 {
@@ -116,11 +112,11 @@ func (projection *MapProjectionHandle) SetCamera(camera CameraOptions) error {
 // SetVisibleCoordinates applies a camera fitted to geographic coordinates
 // synchronously, so a later read or conversion observes it.
 func (projection *MapProjectionHandle) SetVisibleCoordinates(coordinates []LatLng, padding EdgeInsets) error {
-	ptr, release, err := projection.ptr()
+	ptr, err := projection.ptr()
 	if err != nil {
 		return err
 	}
-	defer release()
+
 	defer projection.state.KeepAlive()
 	raw := cLatLngSlice(coordinates)
 	var data *C.mln_lat_lng
@@ -135,11 +131,11 @@ func (projection *MapProjectionHandle) SetVisibleCoordinates(coordinates []LatLn
 // SetVisibleGeometry applies a camera fitted to GeoJSON Geometry bytes
 // synchronously, so a later read or conversion observes it.
 func (projection *MapProjectionHandle) SetVisibleGeometry(geometry []byte, padding EdgeInsets) error {
-	ptr, release, err := projection.ptr()
+	ptr, err := projection.ptr()
 	if err != nil {
 		return err
 	}
-	defer release()
+
 	defer projection.state.KeepAlive()
 	raw := newCBufferView(geometry)
 	defer raw.free()
@@ -151,11 +147,11 @@ func (projection *MapProjectionHandle) SetVisibleGeometry(geometry []byte, paddi
 // PixelForLatLng converts a geographic coordinate to a logical screen point.
 // The result observes every earlier projection setter.
 func (projection *MapProjectionHandle) PixelForLatLng(coordinate LatLng) (ScreenPoint, error) {
-	ptr, release, err := projection.ptr()
+	ptr, err := projection.ptr()
 	if err != nil {
 		return ScreenPoint{}, err
 	}
-	defer release()
+
 	defer projection.state.KeepAlive()
 	var point C.mln_screen_point
 	if err := checkNative(func() int32 {
@@ -169,11 +165,11 @@ func (projection *MapProjectionHandle) PixelForLatLng(coordinate LatLng) (Screen
 // LatLngForPixel converts a logical screen point to a geographic coordinate.
 // The result observes every earlier projection setter.
 func (projection *MapProjectionHandle) LatLngForPixel(point ScreenPoint) (LatLng, error) {
-	ptr, release, err := projection.ptr()
+	ptr, err := projection.ptr()
 	if err != nil {
 		return LatLng{}, err
 	}
-	defer release()
+
 	defer projection.state.KeepAlive()
 	var coordinate C.mln_lat_lng
 	if err := checkNative(func() int32 {

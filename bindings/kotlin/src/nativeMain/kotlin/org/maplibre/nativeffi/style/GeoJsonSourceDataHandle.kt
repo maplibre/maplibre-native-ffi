@@ -34,7 +34,7 @@ public actual class GeoJsonSourceDataHandle internal constructor(handle: NativeG
     }
   }
 
-  /** Runs [block] with the live native handle and release held off for the borrow window. */
+  /** Runs [block] after checking that this wrapper still owns the native handle. */
   internal fun <R> withNativeHandle(block: (NativeGeoJsonSourceData) -> R): R =
     state.withLive(block)
 

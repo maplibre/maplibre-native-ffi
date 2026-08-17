@@ -26,11 +26,8 @@ class OperationHandleLeaseNativeTest {
     org.maplibre.nativeffi.runtime.runSuspendTest {
       val runtime = Any()
       val phase = AtomicInt(0)
-      val retentionReleases = AtomicInt(0)
       val core =
-        OperationHandleCore(runtime, 7L, OperationKind.REGION_CREATE, OperationResultKind.REGION) {
-          retentionReleases.addAndFetch(1)
-        }
+        OperationHandleCore(runtime, 7L, OperationKind.REGION_CREATE, OperationResultKind.REGION)
 
       memScoped {
         val worker = StableRef.create(OperationUse(core, runtime, phase))
@@ -64,7 +61,6 @@ class OperationHandleLeaseNativeTest {
       }
 
       assertEquals(PHASE_CLOSED, phase.load())
-      assertEquals(1, retentionReleases.load())
       assertTrue(core.isClosed)
     }
 }

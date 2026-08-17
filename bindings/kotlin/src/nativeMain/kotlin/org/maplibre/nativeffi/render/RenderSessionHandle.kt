@@ -17,7 +17,6 @@ import org.maplibre.nativeffi.runtime.*
 @OptIn(ExperimentalAtomicApi::class, ExperimentalForeignApi::class)
 public actual class RenderSessionHandle
 private constructor(private val map: MapHandle, handle: NativeRenderSession) : AutoCloseable {
-  private val mapRetention = map.retainChild("RenderSessionHandle")
   private val state = HandleState("RenderSessionHandle", handle, map)
   private val acquiredFrameScopes = AtomicReference<List<FrameScope>>(emptyList())
 
@@ -359,10 +358,8 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
   }
 
   public actual override fun close() {
-    state.closeOnce({ mln_render_session_destroy(it.rawHandleValue) }) { mapRetention.close() }
+    state.closeOnce(destroy = { mln_render_session_destroy(it.rawHandleValue) })
   }
-
-  internal fun retainAttachOperation() = state.retainChild("RenderAttachOperation")
 
   internal fun frameReleased(scope: FrameScope) {
     while (true) {
@@ -399,15 +396,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
     id: ULong,
     kind: OperationKind,
     resultKind: OperationResultKind,
-  ): OperationHandle<T> {
-    val retention = state.retainChild("RenderOperation")
-    return try {
-      OperationHandle(map.runtime(), id, kind, resultKind, retention)
-    } catch (error: Throwable) {
-      retention.close()
-      throw error
-    }
-  }
+  ): OperationHandle<T> = OperationHandle(map.runtime(), id, kind, resultKind)
 
   private fun takeBuffer(
     operation: OperationHandle<ByteArray>,
@@ -445,14 +434,6 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
           map,
           session.value.asHandle("mln_render_session", ::renderSessionHandle),
         )
-      val retention =
-        try {
-          handle.retainAttachOperation()
-        } catch (error: Throwable) {
-          runCatching { handle.abandon() }
-          runCatching { handle.close() }
-          throw error
-        }
       try {
         RenderSessionAttachment(
           handle,
@@ -461,11 +442,9 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
             operation.value,
             OperationKind.RENDER_ATTACH,
             OperationResultKind.NONE,
-            retention,
           ),
         )
       } catch (error: Throwable) {
-        retention.close()
         runCatching { handle.abandon() }
         runCatching { handle.close() }
         throw error

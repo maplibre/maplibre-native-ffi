@@ -290,9 +290,8 @@ func renderJSONOperation(
 	if raw == 0 {
 		return nil, newBindingError(ErrInvalidState, "render query did not return an operation")
 	}
-	operation := newOwnedOperationHandle[[]byte](
+	operation := newOperationHandle[[]byte](
 		session.parent.runtime,
-		session.state.AddChild(),
 		uint64(raw),
 		0,
 		0,
@@ -323,11 +322,11 @@ func (session *RenderSessionHandle) SetFeatureStateStart(selector FeatureStateSe
 
 // FeatureStateStart starts a renderer-affine feature-state query.
 func (session *RenderSessionHandle) FeatureStateStart(selector FeatureStateSelector) (*OperationHandle[[]byte], error) {
-	ptr, release, err := session.ptr()
+	ptr, err := session.ptr()
 	if err != nil {
 		return nil, err
 	}
-	defer release()
+
 	raw := newCFeatureStateSelector(selector)
 	defer raw.free()
 	var operation C.mln_operation
@@ -353,11 +352,11 @@ func (session *RenderSessionHandle) RemoveFeatureStateStart(selector FeatureStat
 // QueryRenderedFeaturesStart starts a query against the latest driver state.
 // The completed operation yields copied hits.
 func (session *RenderSessionHandle) QueryRenderedFeaturesStart(geometry RenderedQueryGeometry, options *RenderedFeatureQueryOptions) (*OperationHandle[[]QueriedFeature], error) {
-	ptr, release, err := session.ptr()
+	ptr, err := session.ptr()
 	if err != nil {
 		return nil, err
 	}
-	defer release()
+
 	rawGeometry := newCRenderedQueryGeometry(geometry)
 	defer rawGeometry.free()
 	rawOptions, err := newCRenderedFeatureQueryOptions(options)
@@ -382,11 +381,11 @@ func (session *RenderSessionHandle) QueryRenderedFeaturesStart(geometry Rendered
 // QuerySourceFeaturesStart starts a source query against the latest driver
 // state. The completed operation yields copied hits.
 func (session *RenderSessionHandle) QuerySourceFeaturesStart(sourceID string, options *SourceFeatureQueryOptions) (*OperationHandle[[]QueriedFeature], error) {
-	ptr, release, err := session.ptr()
+	ptr, err := session.ptr()
 	if err != nil {
 		return nil, err
 	}
-	defer release()
+
 	source := newCStringView(sourceID)
 	defer source.free()
 	rawOptions, err := newCSourceFeatureQueryOptions(options)
@@ -412,9 +411,8 @@ func renderFeaturesOperation(session *RenderSessionHandle, raw C.mln_operation) 
 	if raw == 0 {
 		return nil, newBindingError(ErrInvalidState, "render query did not return an operation")
 	}
-	operation := newOwnedOperationHandle[[]QueriedFeature](
+	operation := newOperationHandle[[]QueriedFeature](
 		session.parent.runtime,
-		session.state.AddChild(),
 		uint64(raw),
 		0,
 		0,
@@ -473,11 +471,11 @@ func queriedFeatureList(list C.mln_queried_feature_list) ([]QueriedFeature, erro
 
 // QueryFeatureExtensionsStart starts a feature-extension query.
 func (session *RenderSessionHandle) QueryFeatureExtensionsStart(sourceID string, feature []byte, extension, extensionField string, arguments []byte) (*OperationHandle[[]byte], error) {
-	ptr, release, err := session.ptr()
+	ptr, err := session.ptr()
 	if err != nil {
 		return nil, err
 	}
-	defer release()
+
 	source, ext, field := newCStringView(sourceID), newCStringView(extension), newCStringView(extensionField)
 	defer source.free()
 	defer ext.free()

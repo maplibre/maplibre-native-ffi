@@ -1,8 +1,7 @@
 part of 'runtime.dart';
 
 final class OperationHandle implements Finalizable {
-  OperationHandle._(this._runtime, this._id, this._kind, this._resultKind) {
-    _runtime._registerOperation(this);
+  OperationHandle._(this._id, this._kind, this._resultKind) {
     _leakReporter = NativeLeakReporter(
       this,
       'OperationHandle',
@@ -10,7 +9,6 @@ final class OperationHandle implements Finalizable {
     );
   }
 
-  final RuntimeHandle _runtime;
   final _OfflineOperationKind _kind;
   final _OfflineOperationResultKind _resultKind;
 
@@ -226,14 +224,12 @@ final class OperationHandle implements Finalizable {
       return;
     }
     _released = true;
-    _runtime._unregisterOperationId(_id);
     _leakReporter.close();
     raw.mln_operation_release(_id);
   }
 
   void _markResultConsumed() {
     _released = true;
-    _runtime._unregisterOperationId(_id);
     _leakReporter.close();
   }
 

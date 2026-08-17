@@ -130,24 +130,19 @@ import Testing
   #expect(operation.isClosed)
 }
 
-@Test func runtimeCloseRequiresOperationObserverClose() throws {
+@Test func operationObserverRemainsUsableAfterRuntimeClose() throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   let operation = try runtime.setMaximumAmbientCacheSizeStart(8 << 20)
 
-  do {
-    try runtime.close()
-    Issue.record("runtime close should reject a live operation")
-  } catch let error as MaplibreError {
-    #expect(error.kind == .invalidState)
-  }
+  try runtime.close()
+  #expect(runtime.isClosed)
 
   _ = try operation.wait(timeoutMilliseconds: 10000)
   if try operation.poll() {
     try operation.finish()
   }
   try operation.close()
-  try runtime.close()
 }
 
 @Test func typedTakeConsumesOperation() throws {

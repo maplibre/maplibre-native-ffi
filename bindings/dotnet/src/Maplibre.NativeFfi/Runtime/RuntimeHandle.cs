@@ -64,8 +64,6 @@ public sealed unsafe class RuntimeHandle : IDisposable
     private static RuntimeTakeOfflineRegionStatusResult? takeOfflineRegionStatusForTest;
 
     private readonly Lock mapGate = new();
-    private readonly Lock operationGate = new();
-    private readonly HashSet<OperationHandle> liveOperations = [];
     private readonly Dictionary<ulong, WeakReference<Map.MapHandle>> liveMaps = [];
     private readonly NativeHandleState<MlnRuntime> state;
     private readonly NotificationReceiver notificationReceiver;
@@ -496,20 +494,8 @@ public sealed unsafe class RuntimeHandle : IDisposable
         return OfflineStructs.ReadStatus(status);
     }
 
-    internal void RegisterOperation(OperationHandle operation)
+    internal void ForgetOperation(OperationHandle operation)
     {
-        lock (operationGate)
-        {
-            liveOperations.Add(operation);
-        }
-    }
-
-    internal void UnregisterOperation(OperationHandle operation)
-    {
-        lock (operationGate)
-        {
-            liveOperations.Remove(operation);
-        }
         notificationReceiver.ForgetOperation(operation.NativeId);
     }
 
@@ -631,7 +617,6 @@ public sealed unsafe class RuntimeHandle : IDisposable
         {
             return;
         }
-        PreflightNoLiveOperations();
         state.Close();
         notificationReceiver.Dispose();
     }
@@ -668,22 +653,6 @@ public sealed unsafe class RuntimeHandle : IDisposable
                 );
             }
             NativeStatus.Check((int)status, System.Text.Encoding.UTF8.GetString(bytes));
-        }
-    }
-
-    private void PreflightNoLiveOperations()
-    {
-        lock (operationGate)
-        {
-            if (liveOperations.Count != 0)
-            {
-                throw new InvalidStateException(
-                    MaplibreStatus.InvalidState,
-                    null,
-                    "RuntimeHandle cannot close while an OperationHandle is live.",
-                    null
-                );
-            }
         }
     }
 

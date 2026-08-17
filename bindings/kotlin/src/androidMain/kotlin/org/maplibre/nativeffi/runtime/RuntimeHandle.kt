@@ -526,9 +526,6 @@ private constructor(
     return outOperationId[0]
   }
 
-  internal fun retainChild(childTypeName: String): HandleStateCore.ChildRetention =
-    core.retainChild(childTypeName)
-
   internal fun nativeHandleId(): Long = requireLiveHandle()
 
   internal suspend fun awaitOperation(operation: Long) {

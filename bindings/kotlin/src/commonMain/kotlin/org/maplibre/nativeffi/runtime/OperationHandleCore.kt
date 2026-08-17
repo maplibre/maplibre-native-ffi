@@ -13,7 +13,6 @@ internal class OperationHandleCore(
   internal val id: Long,
   internal val kind: OperationKind,
   internal val resultKind: OperationResultKind,
-  private val releaseRuntimeRetention: () -> Unit,
 ) {
   val leakReport = OperationLeakReport()
   private val state = AtomicInt(0)
@@ -79,7 +78,6 @@ internal class OperationHandleCore(
 
   fun finishClose() {
     leakReport.markClosed()
-    releaseRuntimeRetention()
   }
 
   private fun acquireUse(expectedRuntime: Any) {

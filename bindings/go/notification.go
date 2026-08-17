@@ -46,11 +46,11 @@ func (runtime *RuntimeHandle) SetNotificationCallback(callback func()) error {
 	if callback == nil {
 		return runtime.ClearNotificationCallback()
 	}
-	_, release, err := runtime.ptr()
+	_, err := runtime.ptr()
 	if err != nil {
 		return err
 	}
-	defer release()
+
 	handle := cgo.NewHandle(callback)
 	runtime.notificationMu.Lock()
 	defer runtime.notificationMu.Unlock()
@@ -73,11 +73,11 @@ func (runtime *RuntimeHandle) SetNotificationCallback(callback func()) error {
 // ClearNotificationCallback waits for in-flight callback entries and removes
 // the receiver callback. Ready endpoint state remains stored.
 func (runtime *RuntimeHandle) ClearNotificationCallback() error {
-	_, release, err := runtime.ptr()
+	_, err := runtime.ptr()
 	if err != nil {
 		return err
 	}
-	defer release()
+
 	return runtime.clearNotificationCallback()
 }
 
@@ -101,10 +101,8 @@ func (runtime *RuntimeHandle) clearNotificationCallback() error {
 
 // DrainReady returns a copied owned snapshot of ready endpoints.
 func (runtime *RuntimeHandle) DrainReady() ([]NotificationEndpoint, error) {
-	if _, release, err := runtime.ptr(); err != nil {
+	if _, err := runtime.ptr(); err != nil {
 		return nil, err
-	} else {
-		defer release()
 	}
 	var batch C.mln_ready_batch
 	if err := checkNative(func() int32 {

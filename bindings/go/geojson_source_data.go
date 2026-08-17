@@ -55,15 +55,15 @@ func NewGeoJSONSourceData(data []byte, options *StyleGeoJSONSourceOptions) (*Geo
 	return &GeoJSONSourceDataHandle{state: state}, nil
 }
 
-func (data *GeoJSONSourceDataHandle) ptr() (nativeGeoJSONSourceData, func(), error) {
+func (data *GeoJSONSourceDataHandle) ptr() (nativeGeoJSONSourceData, error) {
 	if data == nil || data.state == nil {
-		return 0, nil, newBindingError(ErrInvalidArgument, "GeoJSONSourceDataHandle is nil")
+		return 0, newBindingError(ErrInvalidArgument, "GeoJSONSourceDataHandle is nil")
 	}
-	borrow, live := data.state.Borrow()
+	value, live := data.state.Handle()
 	if !live {
-		return 0, nil, newBindingError(ErrInvalidArgument, "GeoJSONSourceDataHandle is closed")
+		return 0, newBindingError(ErrInvalidArgument, "GeoJSONSourceDataHandle is closed")
 	}
-	return borrow.Handle(), borrow.Release, nil
+	return value, nil
 }
 
 // Close releases this prepared data. Close is callable from any goroutine, and

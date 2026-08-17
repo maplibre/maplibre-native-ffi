@@ -391,7 +391,7 @@ func TestOfflineOperationFinishFailureLeavesHandleRetryable(t *testing.T) {
 	}
 }
 
-func TestOfflineOperationBlocksRuntimeCloseUntilReleased(t *testing.T) {
+func TestOfflineOperationRemainsUsableAfterRuntimeClose(t *testing.T) {
 	runtime := newFakeRuntimeHandle(t)
 	defer closeFakeRuntimeHandle(t, runtime)
 
@@ -405,14 +405,11 @@ func TestOfflineOperationBlocksRuntimeCloseUntilReleased(t *testing.T) {
 	defer restoreRuntimeDestroy()
 
 	operation := newOperationHandle[struct{}](runtime, 1, operationRegionSetObserved, operationResultNone)
-	if err := runtime.Close(); !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("Runtime Close() with live offline operation = %v, want ErrInvalidState", err)
+	if err := runtime.Close(); err != nil {
+		t.Fatalf("Runtime Close() with live offline operation: %v", err)
 	}
 	if err := operation.Finish(); err != nil {
-		t.Fatalf("Finish(): %v", err)
-	}
-	if err := runtime.Close(); err != nil {
-		t.Fatalf("Runtime Close() after Finish(): %v", err)
+		t.Fatalf("Finish() after runtime close: %v", err)
 	}
 }
 

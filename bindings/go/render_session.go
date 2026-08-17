@@ -13,11 +13,10 @@ import (
 func (m *MapHandle) startRenderAttach(
 	start func(C.mln_map, *C.mln_render_session, *C.mln_operation) int32,
 ) (*RenderSessionHandle, *OperationHandle[struct{}], error) {
-	ptr, release, err := m.ptr()
+	ptr, err := m.ptr()
 	if err != nil {
 		return nil, nil, err
 	}
-	defer release()
 
 	var session C.mln_render_session
 	var operation C.mln_operation
@@ -48,9 +47,8 @@ func (m *MapHandle) startRenderAttach(
 		_ = C.mln_render_session_destroy(session)
 		return nil, nil, err
 	}
-	attach := newOwnedOperationHandle[struct{}](
+	attach := newOperationHandle[struct{}](
 		m.runtime,
-		result.state.AddChild(),
 		uint64(operation),
 		0,
 		operationResultNone,
@@ -238,25 +236,24 @@ func (m *MapHandle) AttachWebGPUBorrowedTexture(
 	})
 }
 
-func (s *RenderSessionHandle) ptr() (nativeRenderSession, func(), error) {
+func (s *RenderSessionHandle) ptr() (nativeRenderSession, error) {
 	if s == nil || s.state == nil {
-		return 0, nil, newBindingError(ErrInvalidArgument, "RenderSessionHandle is nil")
+		return 0, newBindingError(ErrInvalidArgument, "RenderSessionHandle is nil")
 	}
-	borrow, live := s.state.Borrow()
+	value, live := s.state.Handle()
 	if !live {
-		return 0, nil, newBindingError(ErrInvalidArgument, "RenderSessionHandle is closed")
+		return 0, newBindingError(ErrInvalidArgument, "RenderSessionHandle is closed")
 	}
-	return borrow.Handle(), borrow.Release, nil
+	return value, nil
 }
 
 func (s *RenderSessionHandle) startOperation(
 	start func(C.mln_render_session, *C.mln_operation) int32,
 ) (*OperationHandle[struct{}], error) {
-	ptr, release, err := s.ptr()
+	ptr, err := s.ptr()
 	if err != nil {
 		return nil, err
 	}
-	defer release()
 
 	var operation C.mln_operation
 	if err := checkNative(func() int32 {
@@ -267,9 +264,8 @@ func (s *RenderSessionHandle) startOperation(
 	if operation == 0 {
 		return nil, newBindingError(ErrInvalidState, "render operation did not return an operation")
 	}
-	return newOwnedOperationHandle[struct{}](
+	return newOperationHandle[struct{}](
 		s.parent.runtime,
-		s.state.AddChild(),
 		uint64(operation),
 		0,
 		operationResultNone,
@@ -277,11 +273,10 @@ func (s *RenderSessionHandle) startOperation(
 }
 
 func (s *RenderSessionHandle) Capabilities() (RenderSessionCapabilities, error) {
-	ptr, release, err := s.ptr()
+	ptr, err := s.ptr()
 	if err != nil {
 		return RenderSessionCapabilities{}, err
 	}
-	defer release()
 
 	var raw C.mln_render_session_capabilities
 	raw.size = C.uint32_t(unsafe.Sizeof(raw))
@@ -298,11 +293,10 @@ func (s *RenderSessionHandle) Capabilities() (RenderSessionCapabilities, error) 
 }
 
 func (s *RenderSessionHandle) Snapshot() (RenderSessionSnapshot, error) {
-	ptr, release, err := s.ptr()
+	ptr, err := s.ptr()
 	if err != nil {
 		return RenderSessionSnapshot{}, err
 	}
-	defer release()
 
 	var raw C.mln_render_session_snapshot
 	raw.size = C.uint32_t(unsafe.Sizeof(raw))
@@ -335,11 +329,11 @@ func (s *RenderSessionHandle) Snapshot() (RenderSessionSnapshot, error) {
 }
 
 func (s *RenderSessionHandle) RequestFrame(demand FrameDemand) error {
-	ptr, release, err := s.ptr()
+	ptr, err := s.ptr()
 	if err != nil {
 		return err
 	}
-	defer release()
+
 	raw := demand.toC()
 	return checkNative(func() int32 {
 		return int32(C.mln_render_session_request_frame(C.mln_render_session(ptr), &raw))
@@ -350,11 +344,10 @@ func (s *RenderSessionHandle) ServiceDriverWork(maxWork int) (int, error) {
 	if maxWork < 0 {
 		return 0, newBindingError(ErrInvalidArgument, "max work is negative")
 	}
-	ptr, release, err := s.ptr()
+	ptr, err := s.ptr()
 	if err != nil {
 		return 0, err
 	}
-	defer release()
 
 	var serviced C.size_t
 	err = checkNative(func() int32 {
@@ -368,11 +361,10 @@ func (s *RenderSessionHandle) ServiceDriverWork(maxWork int) (int, error) {
 }
 
 func (s *RenderSessionHandle) DrainFrameResults() (*RenderFrameBatch, error) {
-	ptr, release, err := s.ptr()
+	ptr, err := s.ptr()
 	if err != nil {
 		return nil, err
 	}
-	defer release()
 
 	var batch C.mln_render_frame_batch
 	if err := checkNative(func() int32 {
@@ -383,10 +375,7 @@ func (s *RenderSessionHandle) DrainFrameResults() (*RenderFrameBatch, error) {
 	}); err != nil {
 		return nil, err
 	}
-	return &RenderFrameBatch{
-		handle: uint64(batch),
-		child:  s.state.AddChild(),
-	}, nil
+	return &RenderFrameBatch{handle: uint64(batch)}, nil
 }
 
 func (b *RenderFrameBatch) Results() ([]RenderFrameResult, error) {
@@ -435,18 +424,13 @@ func (b *RenderFrameBatch) Close() {
 	C.mln_render_frame_batch_release(C.mln_render_frame_batch(b.handle))
 	b.closed = true
 	b.handle = 0
-	if b.child != nil {
-		b.child.Release()
-		b.child = nil
-	}
 }
 
 func (s *RenderSessionHandle) AcquireFrame() (*AcquiredFrame, error) {
-	ptr, release, err := s.ptr()
+	ptr, err := s.ptr()
 	if err != nil {
 		return nil, err
 	}
-	defer release()
 
 	var frame C.mln_acquired_frame
 	if err := checkNative(func() int32 {
@@ -457,10 +441,7 @@ func (s *RenderSessionHandle) AcquireFrame() (*AcquiredFrame, error) {
 	if frame == 0 {
 		return nil, newBindingError(ErrInvalidState, "frame acquisition did not return a frame")
 	}
-	return &AcquiredFrame{
-		handle: uint64(frame),
-		child:  s.state.AddChild(),
-	}, nil
+	return &AcquiredFrame{handle: uint64(frame)}, nil
 }
 
 func (f *AcquiredFrame) use(call func(C.mln_acquired_frame) error) error {
@@ -533,10 +514,6 @@ func (f *AcquiredFrame) Release(sync GPUSync) error {
 	}
 	f.closed = true
 	f.handle = 0
-	if f.child != nil {
-		f.child.Release()
-		f.child = nil
-	}
 	return nil
 }
 
@@ -686,11 +663,10 @@ func (s *RenderSessionHandle) DetachStart() (*OperationHandle[struct{}], error) 
 }
 
 func (s *RenderSessionHandle) ReadPremultipliedRGBA8Start() (*OperationHandle[TextureReadback], error) {
-	ptr, release, err := s.ptr()
+	ptr, err := s.ptr()
 	if err != nil {
 		return nil, err
 	}
-	defer release()
 
 	var rawOperation C.mln_operation
 	if err := checkNative(func() int32 {
@@ -704,9 +680,8 @@ func (s *RenderSessionHandle) ReadPremultipliedRGBA8Start() (*OperationHandle[Te
 	if rawOperation == 0 {
 		return nil, newBindingError(ErrInvalidState, "texture readback did not return an operation")
 	}
-	operation := newOwnedOperationHandle[TextureReadback](
+	operation := newOperationHandle[TextureReadback](
 		s.parent.runtime,
-		s.state.AddChild(),
 		uint64(rawOperation),
 		0,
 		0,
@@ -745,11 +720,10 @@ func (s *RenderSessionHandle) ReadPremultipliedRGBA8Start() (*OperationHandle[Te
 }
 
 func (s *RenderSessionHandle) Abandon() (RenderAbandonResult, error) {
-	ptr, release, err := s.ptr()
+	ptr, err := s.ptr()
 	if err != nil {
 		return RenderAbandonResult{}, err
 	}
-	defer release()
 
 	var raw C.mln_render_abandon_result
 	raw.size = C.uint32_t(unsafe.Sizeof(raw))
@@ -774,10 +748,6 @@ func (s *RenderSessionHandle) Close() error {
 		return s.state.Close(destroyRenderSessionHandle)
 	}); err != nil {
 		return err
-	}
-	if s.parentChild != nil {
-		s.parentChild.Release()
-		s.parentChild = nil
 	}
 	return nil
 }

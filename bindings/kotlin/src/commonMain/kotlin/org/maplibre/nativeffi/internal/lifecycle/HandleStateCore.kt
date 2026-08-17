@@ -1,7 +1,6 @@
 package org.maplibre.nativeffi.internal.lifecycle
 
 import kotlin.concurrent.atomics.AtomicInt
-import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import org.maplibre.nativeffi.internal.status.Status
 
@@ -15,8 +14,6 @@ internal class HandleStateCore(
   @Suppress("unused") private val parents: Array<out Any> = parents
   val leakReport: LeakReport = LeakReport(typeName, handleId)
   private val releaseState = AtomicInt(STATE_LIVE)
-  private val liveChildren = AtomicReference<List<String>>(emptyList())
-  private val activeUses = AtomicInt(0)
 
   fun requireLive() {
     when (releaseState.load()) {
@@ -26,52 +23,16 @@ internal class HandleStateCore(
     }
   }
 
-  /**
-   * Runs [block] with release held off until it returns, for handles the host may use and release
-   * from different threads. Calling [closeOnce] from inside [block] deadlocks.
-   */
+  /** Runs [block] after checking that this wrapper still owns its native handle. */
   fun <T> withLive(block: () -> T): T {
-    addActiveUse(1)
-    try {
-      requireLive()
-      return block()
-    } finally {
-      addActiveUse(-1)
-    }
-  }
-
-  private fun addActiveUse(delta: Int) {
-    while (true) {
-      val current = activeUses.load()
-      if (activeUses.compareAndSet(current, current + delta)) return
-    }
+    requireLive()
+    return block()
   }
 
   fun isReleased(): Boolean = releaseState.load() == STATE_CLOSED
 
   /** The C API handle id this wrapper owns. */
   fun handleId(): Long = handleId
-
-  /**
-   * Retains this handle on behalf of a live child wrapper. [childTypeName] appears in the error a
-   * blocked parent release throws.
-   */
-  fun retainChild(childTypeName: String): ChildRetention {
-    while (true) {
-      requireLive()
-      val children = liveChildren.load()
-      if (!liveChildren.compareAndSet(children, children + childTypeName)) {
-        continue
-      }
-      try {
-        requireLive()
-        return ChildRetention(this, childTypeName)
-      } catch (error: Throwable) {
-        releaseChild(childTypeName)
-        throw error
-      }
-    }
-  }
 
   /**
    * Acquires the exclusive close lease before an asynchronous native close starts.
@@ -86,14 +47,6 @@ internal class HandleStateCore(
         STATE_RELEASING -> throw Status.invalidState("$typeName is currently releasing")
         else -> throw Status.released(typeName)
       }
-    }
-    val children = liveChildren.load()
-    if (children.isNotEmpty()) {
-      releaseState.store(STATE_LIVE)
-      throw Status.liveChildren(typeName, children)
-    }
-    while (activeUses.load() != 0) {
-      yieldWhileClosing()
     }
     return true
   }
@@ -118,34 +71,6 @@ internal class HandleStateCore(
       throw error
     }
     completeClose(afterSuccess)
-  }
-
-  private fun releaseChild(childTypeName: String) {
-    while (true) {
-      val children = liveChildren.load()
-      val index = children.indexOf(childTypeName)
-      if (index < 0) {
-        return
-      }
-      val remaining = children.toMutableList().apply { removeAt(index) }
-      if (liveChildren.compareAndSet(children, remaining)) {
-        return
-      }
-    }
-  }
-
-  /** One child wrapper's retention of its parent handle. Releasing more than once is a no-op. */
-  internal class ChildRetention(
-    private val owner: HandleStateCore,
-    private val childTypeName: String,
-  ) {
-    private val released = AtomicInt(0)
-
-    fun close() {
-      if (released.compareAndSet(0, 1)) {
-        owner.releaseChild(childTypeName)
-      }
-    }
   }
 
   @OptIn(ExperimentalAtomicApi::class)

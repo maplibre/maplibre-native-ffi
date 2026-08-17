@@ -77,7 +77,6 @@ private constructor(
   private val handleId: Long,
   cachedEventMask: RuntimeEventMask,
 ) {
-  private val runtimeRetention = runtime.retainChild("MapHandle")
   private var cachedEventMask =
     RuntimeEventMask(cachedEventMask.nativeValue and RuntimeEventMask.ALL_MAP_EVENTS.nativeValue)
   private val core = HandleStateCore("MapHandle", handleId)
@@ -1697,16 +1696,10 @@ private constructor(
       core.abortClose()
       throw error
     }
-    core.completeClose {
-      runtime.unregisterMap(this)
-      runtimeRetention.close()
-    }
+    core.completeClose { runtime.unregisterMap(this) }
   }
 
   internal fun nativeHandleId(): Long = handleId
-
-  internal fun retainChild(childTypeName: String): HandleStateCore.ChildRetention =
-    core.retainChild(childTypeName)
 
   private fun addTileSourceUrl(
     function:

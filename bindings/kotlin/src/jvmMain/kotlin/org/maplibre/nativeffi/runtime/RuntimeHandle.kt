@@ -337,9 +337,6 @@ private constructor(
     resultKind: OperationResultKind,
   ): OperationHandle<T> = OperationHandle(this, operationId, kind, resultKind)
 
-  internal fun retainChild(childTypeName: String): HandleStateCore.ChildRetention =
-    core.retainChild(childTypeName)
-
   internal fun nativeHandle(): NativeRuntime = requireLiveHandle()
 
   internal suspend fun awaitOperation(operation: Long) {

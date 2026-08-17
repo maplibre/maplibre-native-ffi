@@ -19,11 +19,10 @@ func TestReleasedMapIDReplayedAfterANewMapReportsItStale(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewMap(): %v", err)
 	}
-	released, release, err := first.ptr()
+	released, err := first.ptr()
 	if err != nil {
 		t.Fatalf("ptr(): %v", err)
 	}
-	release()
 	if err := first.Close(); err != nil {
 		t.Fatalf("first.Close(): %v", err)
 	}

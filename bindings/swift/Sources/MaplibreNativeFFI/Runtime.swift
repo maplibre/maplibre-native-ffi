@@ -501,8 +501,6 @@ public struct RuntimeEventBatch: Equatable, Sendable {
 public final class RuntimeHandle: @unchecked Sendable {
   private let handle: NativeHandleBox<NativeRuntimeHandle>
   private let notificationReceiver: NativeNotificationReceiver
-  private let operationLock = NSLock()
-  private var operationCount = 0
 
   public init(options: RuntimeOptions = RuntimeOptions()) throws {
     let receiver = try mapNativeFailure { try NativeNotificationReceiver() }
@@ -531,16 +529,7 @@ public final class RuntimeHandle: @unchecked Sendable {
 
   public func close() throws {
     try mapNativeFailure {
-      try operationLock.withLock {
-        guard operationCount == 0 else {
-          throw NativeStatusFailure(
-            rawStatus: MLN_STATUS_INVALID_STATE.rawValue,
-            diagnostic: "RuntimeHandle has open operations",
-            isNativeStatus: false
-          )
-        }
-        try handle.closeOnce { try NativeRuntime.release($0) }
-      }
+      try handle.closeOnce { try NativeRuntime.release($0) }
     }
     try mapNativeFailure { try notificationReceiver.close() }
   }
@@ -564,9 +553,7 @@ public final class RuntimeHandle: @unchecked Sendable {
   }
 
   func requireLiveHandle() throws -> NativeRuntimeHandle {
-    try operationLock.withLock {
-      try handle.requireLive()
-    }
+    try handle.requireLive()
   }
 
   func forgetOperation(_ operation: NativeOperationHandle) {
@@ -598,23 +585,6 @@ public final class RuntimeHandle: @unchecked Sendable {
     _ handler: (@Sendable () -> Void)?
   ) {
     notificationReceiver.setDriverWorkHandler(for: session, handler)
-  }
-
-  func registerOperation() throws {
-    try operationLock.withLock {
-      guard !handle.isClosed else {
-        throw MaplibreError(
-          kind: .invalidState,
-          rawStatus: nil,
-          diagnostic: "RuntimeHandle is closed"
-        )
-      }
-      operationCount += 1
-    }
-  }
-
-  func unregisterOperation() {
-    operationLock.withLock { operationCount -= 1 }
   }
 
   /// Drains this runtime's queued events, copying every event out of the owned

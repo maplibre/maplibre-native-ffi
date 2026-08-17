@@ -1258,11 +1258,7 @@ void main() {
       AmbientCacheOperation.clear,
     );
     expect(offlineOperation.isReleased, isFalse);
-    await expectLater(runtime.close(), throwsA(isA<InvalidStateException>()));
-    await _waitUntil(() {
-      runtime.drainEvents();
-      return offlineOperation.poll();
-    });
+    await _waitUntil(offlineOperation.poll);
     expect(offlineOperation.terminalStatus, MaplibreStatus.ok);
     expect(offlineOperation.wait(timeout: Duration.zero), isTrue);
     expect(offlineOperation.wait(timeout: const Duration(seconds: 1)), isTrue);
@@ -2059,8 +2055,16 @@ void main() {
 
     await map.close();
     expect(map.isClosed, isTrue);
+    final operationAfterClose = runtime.runAmbientCacheOperation(
+      AmbientCacheOperation.clear,
+    );
     await runtime.close();
     expect(runtime.isClosed, isTrue);
+    expect(
+      operationAfterClose.wait(timeout: const Duration(seconds: 10)),
+      isTrue,
+    );
+    operationAfterClose.finish();
   });
 
   test('native pointer preserves address value semantics', () async {

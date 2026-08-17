@@ -70,20 +70,19 @@ class RuntimeHandleTest {
     }
 
   @Test
-  fun ambientCacheOperationRetainsRuntimeUntilClosed(): Unit =
+  fun ambientCacheOperationRemainsUsableAfterRuntimeClose(): Unit =
     org.maplibre.nativeffi.runtime.runSuspendTest {
       val runtime = RuntimeHandle.create(RuntimeOptions())
       val operation = runtime.startAmbientCacheOperation(AmbientCacheOperation.INVALIDATE)
 
       assertFalse(operation.isClosed)
-      assertFailsWith<InvalidStateException> { runSuspendTest { runtime.close() } }
+      runtime.close()
+      assertTrue(runtime.isClosed)
 
       operation.close()
       operation.close()
 
       assertTrue(operation.isClosed)
-      runtime.close()
-      assertTrue(runtime.isClosed)
     }
 
   @Test
@@ -533,12 +532,7 @@ class RuntimeHandleTest {
           )
         try {
           map.setStyleUrl("custom://close-during-provider.json")
-          assertTrue(
-            waitForCondition {
-              runtime.barrier()
-              closeError.load() != null
-            }
-          )
+          assertTrue(waitForCondition { closeError.load() != null })
           assertFalse(runtime.isClosed)
         } finally {
           map.close()
@@ -571,12 +565,7 @@ class RuntimeHandleTest {
           )
         try {
           map.setStyleUrl("http://example.invalid/close-during-transform.json")
-          assertTrue(
-            waitForCondition {
-              runtime.barrier()
-              closeError.load() != null
-            }
-          )
+          assertTrue(waitForCondition { closeError.load() != null })
           assertFalse(runtime.isClosed)
         } finally {
           map.close()

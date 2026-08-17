@@ -17,7 +17,7 @@ class NativeHandleBox<Handle: NativeHandle>: @unchecked Sendable {
     state.isClosed
   }
 
-  /// Runs `use` with release held off. See `NativeHandleState.withLive`.
+  /// Runs `use` after checking that this wrapper still owns the handle.
   /// Only the box's own liveness failure translates to an invalid-state
   /// error; a native status thrown inside `use` keeps its own status.
   func withLive<T>(_ use: (Handle) throws -> T) throws -> T {

@@ -52,7 +52,7 @@ public sealed unsafe class GeoJsonSourceDataHandle : IDisposable
     /// <summary>Whether this wrapper has successfully closed its native handle.</summary>
     public bool IsClosed => state.IsClosed;
 
-    /// <summary>Runs <paramref name="use" /> with release held off until it returns.</summary>
+    /// <summary>Runs <paramref name="use" /> after checking that this wrapper still owns the handle.</summary>
     internal void WithLive(Action<MlnGeoJsonSourceData> use) => state.WithLive(use);
 
     /// <summary>Destroys the prepared data; sources it was installed on keep their reference.</summary>

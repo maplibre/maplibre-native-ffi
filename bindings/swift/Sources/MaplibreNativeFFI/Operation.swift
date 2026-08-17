@@ -26,7 +26,6 @@ public final class OperationHandle: @unchecked Sendable {
   private let runtime: RuntimeHandle
   private let resultKind: OperationResultKind
   private let lifecycleLock = NSLock()
-  private var registered = false
   private var resultState = OperationResultState.available
 
   init(
@@ -40,13 +39,6 @@ public final class OperationHandle: @unchecked Sendable {
       typeName: "OperationHandle",
       handle: nativeHandle
     )
-    do {
-      try runtime.registerOperation()
-      registered = true
-    } catch {
-      mln_operation_release(nativeHandle.raw)
-      throw error
-    }
   }
 
   deinit {
@@ -168,11 +160,6 @@ public final class OperationHandle: @unchecked Sendable {
       runtime.forgetOperation(operation)
       mln_operation_release(operation.raw)
     }
-    lifecycleLock.withLock {
-      guard registered else { return }
-      registered = false
-      runtime.unregisterOperation()
-    }
   }
 
   func take<Result>(
@@ -251,11 +238,6 @@ public final class OperationHandle: @unchecked Sendable {
   private func retireConsumedHandle() throws {
     try handle.closeOnce { operation in
       runtime.forgetOperation(operation)
-    }
-    lifecycleLock.withLock {
-      guard registered else { return }
-      registered = false
-      runtime.unregisterOperation()
     }
   }
 }

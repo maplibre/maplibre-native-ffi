@@ -82,7 +82,6 @@ class OperationHandle(
         self._closed = False
         self._result_consumed = False
         self._result_in_use = False
-        runtime._register_operation(self)
 
     @staticmethod
     def _from_native[U](
@@ -140,7 +139,6 @@ class OperationHandle(
             self._closed = True
             self._closing = False
             self._idle.notify_all()
-        self._runtime._unregister_operation(self)
         self._retained_owner = None
 
     def __del__(self) -> None:
@@ -248,7 +246,6 @@ class OperationHandle(
             self._closed = True
             self._closing = False
             self._idle.notify_all()
-        self._runtime._unregister_operation(self)
         self._retained_owner = None
 
 

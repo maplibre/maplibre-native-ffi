@@ -140,7 +140,6 @@ final class RuntimeHandle {
   _callbackReleaseListener;
   final _maps = <int, WeakReference<MapHandle>>{};
   final _renderSessions = <int, WeakReference<RenderSessionHandle>>{};
-  final _operations = <int, WeakReference<OperationHandle>>{};
   final _operationWaiters = <int, Completer<void>>{};
   final _queuedRuntimeEvents = <RuntimeEvent>[];
   final _nativeCallbackReleases = <int, void Function()>{};
@@ -443,7 +442,9 @@ final class RuntimeHandle {
               .mln_notification_endpoint_kind
               .MLN_NOTIFICATION_ENDPOINT_RUNTIME_EVENTS
               .value) {
-        _queuedRuntimeEvents.addAll(_drainNativeEvents().events);
+        if (!_state.isClosed) {
+          _queuedRuntimeEvents.addAll(_drainNativeEvents().events);
+        }
       } else if (endpoint.kind ==
           raw
               .mln_notification_endpoint_kind
@@ -506,7 +507,6 @@ final class RuntimeHandle {
         ),
       );
       return OperationHandle._(
-        this,
         outOperationId.value,
         _OfflineOperationKind.ambientCache,
         _OfflineOperationResultKind.none,
@@ -529,7 +529,6 @@ final class RuntimeHandle {
         ),
       );
       return OperationHandle._(
-        this,
         outOperationId.value,
         _OfflineOperationKind.setMaximumAmbientCacheSize,
         _OfflineOperationResultKind.none,
@@ -560,7 +559,6 @@ final class RuntimeHandle {
         ),
       );
       return OperationHandle._(
-        this,
         outOperationId.value,
         _OfflineOperationKind.regionCreate,
         _OfflineOperationResultKind.region,
@@ -607,7 +605,6 @@ final class RuntimeHandle {
         ),
       );
       return OperationHandle._(
-        this,
         outOperationId.value,
         _OfflineOperationKind.regionsMergeDatabase,
         _OfflineOperationResultKind.regionList,
@@ -633,7 +630,6 @@ final class RuntimeHandle {
         ),
       );
       return OperationHandle._(
-        this,
         outOperationId.value,
         _OfflineOperationKind.regionUpdateMetadata,
         _OfflineOperationResultKind.region,
@@ -732,7 +728,7 @@ final class RuntimeHandle {
     return withNativeArena((arena) {
       final outOperationId = arena<Uint64>();
       start(outOperationId);
-      return OperationHandle._(this, outOperationId.value, kind, resultKind);
+      return OperationHandle._(outOperationId.value, kind, resultKind);
     });
   }
 
@@ -748,14 +744,6 @@ final class RuntimeHandle {
     _maps.remove(id);
   }
 
-  void _registerOperation(OperationHandle operation) {
-    _operations[operation._id] = WeakReference(operation);
-  }
-
-  void _unregisterOperationId(int id) {
-    _operations.remove(id);
-  }
-
   /// Completes after every previously accepted runtime command.
   Future<void> barrier() {
     final operation = withNativeArena((arena) {
@@ -768,20 +756,6 @@ final class RuntimeHandle {
 
   /// Releases this runtime's public native handle.
   Future<void> close() async {
-    final collectedOperationIds = _operations.entries
-        .where((entry) => entry.value.target == null)
-        .map((entry) => entry.key)
-        .toList(growable: false);
-    for (final operationId in collectedOperationIds) {
-      raw.mln_operation_release(operationId);
-      _operations.remove(operationId);
-    }
-    if (_operations.isNotEmpty) {
-      throwInvalidState(
-        'RuntimeHandle has ${_operations.length} live operation(s); '
-        'release every operation before closing',
-      );
-    }
     await _state.closeAsync((handle) async {
       _check(raw.mln_runtime_release(handle.raw));
     });

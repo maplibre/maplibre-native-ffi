@@ -39,18 +39,16 @@ public sealed class RuntimeOfflineOperationTests
     }
 
     [Fact]
-    public void RuntimeCloseFailsWhileOperationIsLiveAndCanRetryAfterOperationClose()
+    public void OperationCanBeReleasedAfterRuntimeClose()
     {
         using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
         using var operation = runtime.StartAmbientCacheOperation(AmbientCacheOperation.Invalidate);
 
-        var error = Assert.Throws<InvalidStateException>(() => TestHandles.Close(runtime));
-        Assert.Equal(MaplibreStatus.InvalidState, error.Status);
-        Assert.False(runtime.IsClosed);
-
-        operation.Close();
         TestHandles.Close(runtime);
         Assert.True(runtime.IsClosed);
+
+        operation.Close();
+        Assert.True(operation.IsClosed);
     }
 
     [BindingSpecTest("BND-084")]

@@ -1,6 +1,5 @@
 use std::fmt;
 use std::marker::PhantomData;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
@@ -123,7 +122,6 @@ pub(crate) struct RuntimeState {
     handle: ConcurrentNativeHandle<sys::mln_runtime>,
     notification_source: Mutex<sys::mln_notification_source>,
     notification_callback: Mutex<Option<Box<NotificationCallbackState>>>,
-    pub(crate) operations: Arc<OperationRegistry>,
 }
 impl RuntimeState {
     fn new(
@@ -137,7 +135,6 @@ impl RuntimeState {
             handle,
             notification_source: Mutex::new(notification_source),
             notification_callback: Mutex::new(None),
-            operations: Arc::new(OperationRegistry::default()),
         })
     }
 
@@ -158,13 +155,6 @@ impl RuntimeState {
     }
 
     fn close(&self) -> Result<()> {
-        if self.operations.live.load(Ordering::Acquire) != 0 {
-            return Err(Error::new(
-                ErrorKind::InvalidState,
-                None,
-                "RuntimeHandle cannot close while operation handles are live",
-            ));
-        }
         let runtime = self.native()?;
         // SAFETY: runtime is live and native consumes it only on success.
         maplibre_core::check(unsafe { sys::mln_runtime_release(runtime) })?;
@@ -307,20 +297,6 @@ impl RuntimeState {
 
 impl Drop for RuntimeState {
     fn drop(&mut self) {
-        if self.operations.live.load(Ordering::Acquire) != 0 {
-            self.handle.leak_for_report();
-            let source = *self
-                .notification_source
-                .get_mut()
-                .unwrap_or_else(|poisoned| poisoned.into_inner());
-            if source.0 != 0 {
-                maplibre_core::handle::report_leak(maplibre_core::handle::NativeHandleLeak {
-                    type_name: "mln_notification_source",
-                    id: source.0,
-                });
-            }
-            return;
-        }
         if self.close().is_err() {
             self.handle.leak_for_report();
             let source = *self
@@ -348,11 +324,6 @@ impl fmt::Debug for RuntimeHandle {
             .field("closed", &self.inner.is_closed())
             .finish()
     }
-}
-
-#[derive(Debug, Default)]
-pub(crate) struct OperationRegistry {
-    live: AtomicUsize,
 }
 
 #[derive(Debug, Default)]
@@ -424,7 +395,6 @@ pub(crate) enum OperationKind {
 pub struct OperationHandle<T> {
     operation: sys::mln_operation,
     pub(crate) operation_kind: OperationKind,
-    registry: Arc<OperationRegistry>,
     state: Mutex<OperationState>,
     idle: Condvar,
     _result: PhantomData<fn() -> T>,
@@ -447,16 +417,13 @@ impl<T> OperationHandle<T> {
     pub(crate) fn new(
         operation: sys::mln_operation,
         operation_kind: OperationKind,
-        registry: Arc<OperationRegistry>,
     ) -> Result<Self> {
         if operation.0 == 0 {
             return Err(Error::invalid_argument("operation handle must not be zero"));
         }
-        registry.live.fetch_add(1, Ordering::Release);
         Ok(Self {
             operation,
             operation_kind,
-            registry,
             state: Mutex::new(OperationState {
                 live: true,
                 closing: false,
@@ -523,7 +490,6 @@ impl<T> OperationHandle<T> {
         state.closing = false;
         if result.is_ok() {
             state.live = false;
-            self.registry.live.fetch_sub(1, Ordering::Release);
         }
         self.idle.notify_all();
         result
@@ -548,7 +514,6 @@ impl<T> OperationHandle<T> {
         // SAFETY: This wrapper owns one live public observer and no native call
         // is still using it.
         unsafe { sys::mln_operation_release(self.operation) };
-        self.registry.live.fetch_sub(1, Ordering::Release);
     }
 
     /// Reports whether the operation reached a terminal disposition.
@@ -1002,11 +967,7 @@ impl RuntimeHandle {
         operation: sys::mln_operation,
         operation_kind: OperationKind,
     ) -> Result<OperationHandle<T>> {
-        OperationHandle::new(
-            operation,
-            operation_kind,
-            Arc::clone(&self.inner.operations),
-        )
+        OperationHandle::new(operation, operation_kind)
     }
 
     /// Starts an ambient cache maintenance operation for this runtime.
@@ -1253,16 +1214,6 @@ impl RuntimeHandle {
     pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
         if self.inner.is_closed() {
             return Ok(());
-        }
-        if Arc::strong_count(&self.inner) > 1 {
-            return Err(HandleOperationError::new(
-                Error::new(
-                    ErrorKind::InvalidState,
-                    None,
-                    "RuntimeHandle cannot close while child handles are live",
-                ),
-                self,
-            ));
         }
         self.inner
             .close()
@@ -1539,20 +1490,17 @@ mod tests {
 
     #[test]
     // Spec coverage: BND-084.
-    fn runtime_close_rejects_a_live_operation_before_destroying_native() {
+    fn operation_remains_usable_after_runtime_close() {
         let mut options = RuntimeOptions::default();
         options.cache_path = Some(":memory:".into());
-        let mut runtime = RuntimeHandle::with_options(&options).unwrap();
+        let runtime = RuntimeHandle::with_options(&options).unwrap();
         let operation = runtime
             .start_ambient_cache_operation(AmbientCacheOperation::Clear)
             .unwrap();
 
-        let error = runtime.close().unwrap_err();
-        assert_eq!(error.kind(), ErrorKind::InvalidState);
-        runtime = error.into_handle();
-        wait_for_operation(&mut runtime, &operation).unwrap();
-        operation.finish().unwrap();
         runtime.close().unwrap();
+        assert!(operation.wait(Duration::from_secs(10)).unwrap());
+        operation.finish().unwrap();
     }
 
     #[test]
@@ -2682,7 +2630,7 @@ mod tests {
 
         let error = runtime.close().unwrap_err();
         assert_eq!(error.kind(), ErrorKind::InvalidState);
-        assert_eq!(error.raw_status(), None);
+        assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_INVALID_STATE));
         let runtime = error.into_handle();
 
         std::thread::sleep(std::time::Duration::from_millis(1));

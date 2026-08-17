@@ -49,7 +49,7 @@ pub use style::{
 #[derive(Debug)]
 pub(crate) struct MapState {
     handle: ConcurrentNativeHandle<sys::mln_map>,
-    pub(crate) runtime: Mutex<Option<Arc<RuntimeState>>>,
+    runtime: Mutex<Option<Arc<RuntimeState>>>,
     id: MapId,
 }
 
@@ -100,9 +100,9 @@ impl Drop for MapState {
     }
 }
 
-/// Any-thread map control handle bound to a retained runtime.
+/// Any-thread map control handle.
 pub struct MapHandle {
-    pub(crate) inner: Arc<MapState>,
+    pub(crate) inner: MapState,
 }
 
 /// Logical map extent in UI pixels and device-pixel scale.
@@ -166,7 +166,7 @@ impl MapHandle {
             let native = out_handle(out, "mln_map")?;
             let id = MapId::new(native.0);
             Ok(Self {
-                inner: Arc::new(MapState::new(native, Arc::clone(&runtime.inner), id)?),
+                inner: MapState::new(native, Arc::clone(&runtime.inner), id)?,
             })
         })();
         // SAFETY: this call owns the creation observer.
@@ -174,26 +174,12 @@ impl MapHandle {
         result
     }
 
-    pub(crate) fn operation_registry(&self) -> Result<Arc<crate::runtime::OperationRegistry>> {
-        let runtime = self
-            .inner
-            .runtime
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        Ok(Arc::clone(
-            &runtime
-                .as_ref()
-                .ok_or_else(|| closed_handle_error("MapHandle"))?
-                .operations,
-        ))
-    }
-
     fn start_operation<T>(
         &self,
         operation: sys::mln_operation,
         kind: OperationKind,
     ) -> Result<OperationHandle<T>> {
-        OperationHandle::new(operation, kind, self.operation_registry()?)
+        OperationHandle::new(operation, kind)
     }
 
     /// Returns this map's runtime-local event source identity.
@@ -205,16 +191,6 @@ impl MapHandle {
     pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
         if self.inner.is_closed() {
             return Ok(());
-        }
-        if Arc::strong_count(&self.inner) > 1 {
-            return Err(HandleOperationError::new(
-                Error::new(
-                    ErrorKind::InvalidState,
-                    None,
-                    "MapHandle cannot close while child handles are live",
-                ),
-                self,
-            ));
         }
         self.inner
             .close()
@@ -302,20 +278,7 @@ impl MapHandle {
         maplibre_core::check(unsafe {
             sys::mln_map_request_still_image_start(map, &mut operation)
         })?;
-        let registry = {
-            let runtime = self
-                .inner
-                .runtime
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner());
-            Arc::clone(
-                &runtime
-                    .as_ref()
-                    .ok_or_else(|| closed_handle_error("MapHandle"))?
-                    .operations,
-            )
-        };
-        OperationHandle::new(operation, OperationKind::MapStillImage, registry)
+        OperationHandle::new(operation, OperationKind::MapStillImage)
     }
 
     /// Copies the latest published camera without entering the runtime queue.
@@ -361,20 +324,7 @@ impl MapHandle {
         let mut operation = sys::mln_operation(0);
         // SAFETY: map is live and operation is null writable storage.
         maplibre_core::check(unsafe { sys::mln_map_camera_query_start(map, &mut operation) })?;
-        let registry = {
-            let runtime = self
-                .inner
-                .runtime
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner());
-            Arc::clone(
-                &runtime
-                    .as_ref()
-                    .ok_or_else(|| closed_handle_error("MapHandle"))?
-                    .operations,
-            )
-        };
-        OperationHandle::new(operation, OperationKind::CameraQuery, registry)
+        OperationHandle::new(operation, OperationKind::CameraQuery)
     }
 
     /// Selects which map-originated event types this map queues and returns the

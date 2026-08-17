@@ -473,15 +473,10 @@ class RuntimeHandle(NativeHandleMixin):
             options.cache_path,
             int(options.event_mask),
         )
-        self._operations: weakref.WeakSet[OperationHandle] = weakref.WeakSet()
         self._maps: dict[int, weakref.ReferenceType[MapHandle]] = {}
 
     def close(self) -> None:
         """Release this runtime handle exactly once."""
-        if self._operations:
-            from .errors import InvalidStateError
-
-            raise InvalidStateError(None, "runtime has live operation handles")
         self._native.close()
 
     def barrier(self) -> None:
@@ -506,12 +501,6 @@ class RuntimeHandle(NativeHandleMixin):
             ReadyEndpoint(NotificationEndpointKind(kind), endpoint_id)
             for kind, endpoint_id in self._native.drain_ready()
         )
-
-    def _register_operation(self, operation: OperationHandle) -> None:
-        self._operations.add(operation)
-
-    def _unregister_operation(self, operation: OperationHandle) -> None:
-        self._operations.discard(operation)
 
     def _register_map(self, map_handle: MapHandle) -> None:
         self._maps[map_handle._native_id()] = weakref.ref(map_handle)
