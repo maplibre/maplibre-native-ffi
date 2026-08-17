@@ -18,16 +18,15 @@ the completed texture.
 
 Create the map and target with the required logical extent. Start attachment and
 retain both the returned attaching session and operation. This snippet uses
-OpenGL through EGL, so it services caller-driver work on the graphics thread
-until attachment completes.
+private OpenGL through EGL, so the native core worker creates and owns its
+context. The host keeps the EGL display initialized until detach completes.
 
 <Code code={region(stillImage, "create")} lang="c" title="still-image.c" />
 
 <Code code={region(stillImage, "attach")} lang="c" title="still-image.c" />
 
-Submit one frame demand with a token that identifies the job. Service a caller
-driver whenever its work endpoint is ready. A core-worker target needs no host
-graphics service.
+Submit one frame demand with a token that identifies the job. A core-worker
+target needs no host graphics service.
 
 Drain frame results until the matching token reaches a terminal disposition. A
 rendered disposition supplies the frame generation for readback. Handle target
@@ -38,9 +37,8 @@ wait for a newer map update or matching extent generation.
 
 ## Read the pixels
 
-Start readback after the rendered result. Readback is an operation routed through
-the selected driver, so continue servicing caller-driver work until it
-completes. Taking the result transfers owned premultiplied RGBA8 bytes and their
-width, height, row stride, and byte length.
+Start readback after the rendered result. Readback is an operation routed
+through the selected driver. Taking the result transfers owned premultiplied
+RGBA8 bytes and their width, height, row stride, and byte length.
 
 <Code code={region(stillImage, "read")} lang="c" title="still-image.c" />

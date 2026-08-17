@@ -314,20 +314,43 @@ auto validate_vulkan_borrowed_texture_descriptor(
   return MLN_STATUS_OK;
 }
 
-// A texture session exists to hand its texture to the host, which needs the
-// session context in the host's share group. Dedicated ownership names no share
-// group, so it has no meaning here.
-auto validate_shared_texture_ownership(
+// A shared owned target exposes frames to a host context. A private owned
+// target keeps every GL object on its core worker and exposes CPU readback
+// instead. EGL can create that worker-local context from a display and config;
+// transferred WebGL creates it from the canvas on the worker itself.
+auto validate_owned_texture_ownership(
   const mln_opengl_context_descriptor& context
 ) -> mln_status {
-  if (context.ownership == MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED) {
-    set_thread_error(
-      "an OpenGL texture session shares its context with the host that samples "
-      "the texture"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
+  if (context.ownership == MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED) {
+    return MLN_STATUS_OK;
   }
-  return MLN_STATUS_OK;
+  if (context.platform == MLN_OPENGL_CONTEXT_PLATFORM_EGL) {
+    return MLN_STATUS_OK;
+  }
+  if (
+    context.platform == MLN_OPENGL_CONTEXT_PLATFORM_WEBGL &&
+    context.data.webgl.kind == MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS
+  ) {
+    return MLN_STATUS_OK;
+  }
+  set_thread_error(
+    "dedicated OpenGL owned textures require EGL or a transferred WebGL canvas"
+  );
+  return MLN_STATUS_UNSUPPORTED;
+}
+
+// A borrowed target must share objects with the host context that owns its
+// texture. Dedicated ownership names no share group.
+auto validate_borrowed_texture_ownership(
+  const mln_opengl_context_descriptor& context
+) -> mln_status {
+  if (context.ownership == MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED) {
+    return MLN_STATUS_OK;
+  }
+  set_thread_error(
+    "a borrowed OpenGL texture requires a context shared with its host owner"
+  );
+  return MLN_STATUS_INVALID_ARGUMENT;
 }
 
 auto validate_opengl_owned_texture_descriptor(
@@ -353,7 +376,7 @@ auto validate_opengl_owned_texture_descriptor(
   if (context_status != MLN_STATUS_OK) {
     return context_status;
   }
-  return validate_shared_texture_ownership(descriptor->context);
+  return validate_owned_texture_ownership(descriptor->context);
 }
 
 auto validate_opengl_borrowed_texture_descriptor(
@@ -382,7 +405,7 @@ auto validate_opengl_borrowed_texture_descriptor(
     return context_status;
   }
   const auto ownership_status =
-    validate_shared_texture_ownership(descriptor->context);
+    validate_borrowed_texture_ownership(descriptor->context);
   if (ownership_status != MLN_STATUS_OK) {
     return ownership_status;
   }

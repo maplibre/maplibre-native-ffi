@@ -5,18 +5,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-static mln_status service_until_complete(
-  mln_render_session session, mln_operation operation
-) {
+static mln_status wait_until_complete(mln_operation operation) {
   bool completed = false;
-  while (!completed) {
-    size_t serviced = 0;
-    mln_status status =
-      mln_render_session_service_driver_work(session, SIZE_MAX, &serviced);
-    if (status != MLN_STATUS_OK) return status;
-    status = mln_operation_poll(operation, &completed);
-    if (status != MLN_STATUS_OK) return status;
-  }
+  mln_status status = mln_operation_wait(operation, -1, &completed);
+  if (status != MLN_STATUS_OK) return status;
+  if (!completed) return MLN_STATUS_NOT_READY;
   mln_status terminal = MLN_STATUS_OK;
   return mln_operation_get_status(operation, &terminal) == MLN_STATUS_OK
            ? terminal
@@ -24,7 +17,7 @@ static mln_status service_until_complete(
 }
 
 static mln_render_session attach_owned_texture(
-  mln_map map, const mln_opengl_context_descriptor* context, uint32_t width,
+  mln_map map, void* egl_display, void* egl_config, uint32_t width,
   uint32_t height
 ) {
   // #region attach
@@ -33,10 +26,15 @@ static mln_render_session attach_owned_texture(
   descriptor.extent.width = width;
   descriptor.extent.height = height;
   descriptor.extent.scale_factor = 1.0;
-  descriptor.context = *context;
+  descriptor.context.platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL;
+  descriptor.context.ownership = MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED;
+  descriptor.context.data.egl.display = egl_display;
+  descriptor.context.data.egl.config = egl_config;
+  descriptor.context.data.egl.share_context = NULL;
+  descriptor.context.data.egl.client_api = MLN_OPENGL_CLIENT_API_GLES;
   mln_render_session_attach_options options =
     mln_render_session_attach_options_default();
-  options.driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD;
+  options.driver = MLN_RENDER_DRIVER_CORE_WORKER;
   options.requested_texture_ring_depth = 1;
 
   mln_render_session session = MLN_HANDLE_NULL;
@@ -44,7 +42,7 @@ static mln_render_session attach_owned_texture(
   mln_status status = mln_opengl_owned_texture_attach_start(
     map, &descriptor, &options, &session, &attach
   );
-  if (status == MLN_STATUS_OK) status = service_until_complete(session, attach);
+  if (status == MLN_STATUS_OK) status = wait_until_complete(attach);
   mln_operation_release(attach);
   // #endregion attach
   return status == MLN_STATUS_OK ? session : MLN_HANDLE_NULL;
@@ -61,14 +59,8 @@ static bool await_still_image(
 
   bool still_completed = false;
   bool rendered = false;
+  bool demand_pending = true;
   while (!still_completed || !rendered) {
-    size_t serviced = 0;
-    if (
-      mln_render_session_service_driver_work(session, SIZE_MAX, &serviced) !=
-      MLN_STATUS_OK
-    )
-      return false;
-
     mln_render_frame_batch batch = MLN_HANDLE_NULL;
     if (
       mln_render_session_drain_frame_results(session, &batch) == MLN_STATUS_OK
@@ -77,22 +69,29 @@ static bool await_still_image(
       mln_render_frame_batch_count(batch, &count);
       for (size_t index = 0; index < count; ++index) {
         mln_render_frame_result result = {.size = sizeof(result)};
-        if (mln_render_frame_batch_get(batch, index, &result) == MLN_STATUS_OK)
+        if (
+          mln_render_frame_batch_get(batch, index, &result) == MLN_STATUS_OK &&
+          result.token == demand.token
+        ) {
+          demand_pending = false;
           rendered =
-            rendered || (result.token == demand.token &&
-                         result.disposition == MLN_RENDER_RESULT_RENDERED);
+            rendered || result.disposition == MLN_RENDER_RESULT_RENDERED;
+        }
       }
       mln_render_frame_batch_release(batch);
     }
-    if (mln_operation_poll(still_operation, &still_completed) != MLN_STATUS_OK)
+    if (
+      mln_operation_wait(still_operation, 1, &still_completed) != MLN_STATUS_OK
+    )
       return false;
-    if (serviced == 0) {
+    if (!demand_pending && (!still_completed || !rendered)) {
       if (mln_render_session_request_frame(session, &demand) != MLN_STATUS_OK)
         return false;
+      demand_pending = true;
     }
   }
   // #endregion await
-  return service_until_complete(session, still_operation) == MLN_STATUS_OK;
+  return wait_until_complete(still_operation) == MLN_STATUS_OK;
 }
 
 static uint8_t* read_pixels(
@@ -102,8 +101,7 @@ static uint8_t* read_pixels(
   mln_operation readback = MLN_HANDLE_NULL;
   mln_status status =
     mln_texture_read_premultiplied_rgba8_start(session, &readback);
-  if (status == MLN_STATUS_OK)
-    status = service_until_complete(session, readback);
+  if (status == MLN_STATUS_OK) status = wait_until_complete(readback);
   mln_buffer pixels = MLN_HANDLE_NULL;
   mln_texture_image_info info = mln_texture_image_info_default();
   if (status == MLN_STATUS_OK)
@@ -123,8 +121,8 @@ static uint8_t* read_pixels(
 
 uint8_t* render_still_image(
   mln_notification_source notifications, mln_runtime runtime,
-  const char* style_url, uint32_t width, uint32_t height,
-  const mln_opengl_context_descriptor* context, mln_texture_image_info* out_info
+  const char* style_url, uint32_t width, uint32_t height, void* egl_display,
+  void* egl_config, mln_texture_image_info* out_info
 ) {
   (void)notifications;
   // #region create
@@ -147,7 +145,7 @@ uint8_t* render_still_image(
   uint64_t command_id = 0;
   uint8_t* pixels = NULL;
   mln_render_session session =
-    attach_owned_texture(map, context, width, height);
+    attach_owned_texture(map, egl_display, egl_config, width, height);
   mln_operation still = MLN_HANDLE_NULL;
   if (
     session != MLN_HANDLE_NULL &&
@@ -161,7 +159,7 @@ uint8_t* render_still_image(
   if (session != MLN_HANDLE_NULL) {
     mln_operation detach = MLN_HANDLE_NULL;
     if (mln_render_session_detach_start(session, &detach) == MLN_STATUS_OK)
-      (void)service_until_complete(session, detach);
+      (void)wait_until_complete(detach);
     mln_operation_release(detach);
     (void)mln_render_session_destroy(session);
   }

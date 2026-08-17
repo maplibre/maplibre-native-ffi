@@ -232,7 +232,8 @@ final class OpenGLContextProviderMask {
       'OpenGLContextProviderMask[bits=0x${bits.toRadixString(16)}]';
 }
 
-/// How a session's OpenGL context relates to the thread that attached it.
+/// How a session's OpenGL context relates to its driver thread and host
+/// graphics state.
 ///
 /// Known values use the named constants. Values added by a newer compatible
 /// native library retain their raw integer through [fromRawValue].
@@ -321,8 +322,8 @@ sealed class OpenGLContextDescriptor {
 
   /// Whether the session shares its thread with host graphics work.
   ///
-  /// WGL and EGL surface sessions support both. A texture session hands its
-  /// texture to the host, so it is shared only.
+  /// A private EGL owned texture target uses dedicated ownership and grants
+  /// readback without frame acquisition.
   final OpenGLContextOwnership ownership;
 }
 

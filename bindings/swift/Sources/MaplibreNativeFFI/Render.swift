@@ -91,17 +91,18 @@ public struct VulkanContextDescriptor: Equatable, Sendable {
   }
 }
 
-/// How a session's OpenGL context relates to the thread that attached it.
+/// How a session's OpenGL context relates to its driver and host graphics
+/// state.
 ///
 /// A shared session leaves the thread as it found it: every render makes the
 /// session context current and restores whatever was current before. The
 /// session context joins the host share group named by the descriptor, so a
 /// host may hand the session a texture and sample it from its own context.
 ///
-/// A dedicated session owns the thread. It makes its context current once and
-/// keeps it current between renders, and it joins no share group. Use this when
-/// a thread exists to drive one render session and runs no other graphics work,
-/// such as an Android host that renders into a SurfaceView.
+/// A dedicated session owns its driver thread's context. It keeps the context
+/// current between renders and joins no share group. The driver may be a native
+/// core worker or a dedicated host thread, such as an Android host that renders
+/// into a SurfaceView.
 public enum OpenGLContextOwnership: Sendable, Hashable {
   /// The session shares its thread with host graphics work.
   case shared

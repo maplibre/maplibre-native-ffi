@@ -64,7 +64,10 @@ typedef struct mln_render_session_attach_options {
   uint32_t size;
   /** One mln_render_driver_kind value. */
   uint32_t driver;
-  /** Requested owned-texture slot count. Ignored by other targets. */
+  /**
+   * Requested host-acquirable owned-texture slot count. Private targets grant
+   * one slot regardless of this value. Ignored by other targets.
+   */
   uint32_t requested_texture_ring_depth;
   uint32_t reserved;
   mln_notification_source operation_source;
@@ -174,17 +177,18 @@ typedef enum mln_opengl_context_platform : uint32_t {
 } mln_opengl_context_platform;
 
 /**
- * How a session's OpenGL context relates to the thread that attached it.
+ * How a session's OpenGL context relates to its driver thread and host graphics
+ * state.
  *
  * A shared session leaves the thread as it found it: every render makes the
  * session context current and restores whatever was current before. The session
  * context joins the host share group named by the descriptor, so a host may
  * hand the session a texture and sample it from its own context.
  *
- * A dedicated session owns the thread. It makes its context current once and
- * keeps it current between renders, and it joins no share group. Use this when
- * a thread exists to drive one render session and runs no other graphics work,
- * such as an Android host that renders into a SurfaceView.
+ * A dedicated session owns its driver thread's context. It makes its context
+ * current once, keeps it current between renders, and joins no share group. A
+ * core worker can own transferable private graphics state. A host thread can
+ * own a surface context, such as an Android SurfaceView context.
  */
 typedef enum mln_opengl_context_ownership : uint32_t {
   /** The session shares its thread with host graphics work. */
@@ -221,10 +225,10 @@ typedef struct mln_wgl_context_descriptor {
 /** EGL context fields shared by OpenGL render targets. */
 typedef struct mln_egl_context_descriptor {
   uint32_t size;
-  /** Borrowed EGLDisplay. Required. */
+  /** Borrowed EGLDisplay. Required and kept initialized through teardown. */
   void* display;
   /**
-   * Borrowed EGLConfig used to create a shared session context. Required.
+   * Borrowed EGLConfig used to create the session context. Required.
    * OpenGL texture sessions require EGL_SURFACE_TYPE to include
    * EGL_PBUFFER_BIT.
    */
@@ -278,9 +282,9 @@ typedef struct mln_opengl_context_descriptor {
   /** WGL, EGL, or WebGL context provider. */
   mln_opengl_context_platform platform;
   /**
-   * Whether the session shares its thread with host graphics work. WGL, EGL,
-   * and existing WebGL contexts preserve this policy independently of driver
-   * selection. A transferred WebGL canvas is dedicated to its core worker.
+   * Whether the session shares its driver thread and graphics objects with the
+   * host. A private EGL owned texture and a transferred WebGL canvas are
+   * dedicated to their core worker.
    */
   mln_opengl_context_ownership ownership;
   union {

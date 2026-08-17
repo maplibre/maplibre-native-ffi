@@ -500,8 +500,8 @@ impl WebGlContextDescriptor {
 
 /// OpenGL platform context a render session draws through.
 ///
-/// Each platform descriptor carries its own thread ownership. A browser session
-/// renders through the host's own WebGL context, so it is shared only.
+/// Each platform descriptor carries its own thread ownership. An existing
+/// WebGL context is shared, while a transferred canvas is dedicated.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum OpenGLContextDescriptor {

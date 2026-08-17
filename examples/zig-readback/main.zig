@@ -8,6 +8,7 @@ extern "c" fn MTLCreateSystemDefaultDevice() ?*anyopaque;
 const vk = if (build_options.supports_vulkan) @import("vulkan") else struct {};
 
 const supports_egl = build_options.supports_opengl and (builtin.os.tag == .linux or builtin.os.tag == .macos);
+const uses_caller_driver = build_options.supports_opengl and !supports_egl;
 
 const egl = if (supports_egl) @import("egl") else struct {};
 
@@ -21,9 +22,7 @@ fn waitForOperation(operation: maplibre.OperationHandle) !void {
     if (try operation.resultStatus() != 0) return error.NativeOperationFailed;
 }
 fn waitForSessionOperation(session: *maplibre.RenderSessionHandle, operation: maplibre.OperationHandle) !void {
-    if (!build_options.supports_opengl or build_options.supports_vulkan or build_options.supports_metal) {
-        return waitForOperation(operation);
-    }
+    if (!uses_caller_driver) return waitForOperation(operation);
     while (!try operation.poll()) _ = try session.serviceDriverWork(0);
     if (try operation.resultStatus() != 0) return error.NativeOperationFailed;
 }
@@ -73,8 +72,8 @@ pub fn main(init_args: std.process.Init) !void {
     );
 }
 
-/// Uses the native core worker when the backend can transfer graphics state.
-/// OpenGL explicitly services the caller driver on this graphics thread.
+/// Uses a native core worker except for WGL, whose device context stays on this
+/// graphics thread.
 fn renderWithDriver(
     io: std.Io,
     allocator: std.mem.Allocator,
@@ -114,20 +113,23 @@ fn renderWithDriver(
     try session.requestFrame(.{ .token = 1, .if_needed = false });
     try waitForRenderedFrame(io, &session, still_image, 1);
 
-    var frame = try session.acquireFrame();
-    var frame_owned = true;
-    errdefer if (frame_owned) {
-        var cleanup = frame.releaseStart(.cpu_complete) catch null;
-        if (cleanup) |*operation| {
-            defer operation.release();
-            waitForSessionOperation(&session, operation.*) catch {};
-        }
-    };
-    _ = try frame.producerSync();
-    const release = try frame.releaseStart(.cpu_complete);
-    frame_owned = false;
-    defer release.release();
-    try waitForSessionOperation(&session, release);
+    const capabilities = try session.capabilities();
+    if (capabilities.frame_acquisition) {
+        var frame = try session.acquireFrame();
+        var frame_owned = true;
+        errdefer if (frame_owned) {
+            var cleanup = frame.releaseStart(.cpu_complete) catch null;
+            if (cleanup) |*operation| {
+                defer operation.release();
+                waitForSessionOperation(&session, operation.*) catch {};
+            }
+        };
+        _ = try frame.producerSync();
+        const release = try frame.releaseStart(.cpu_complete);
+        frame_owned = false;
+        defer release.release();
+        try waitForSessionOperation(&session, release);
+    }
 
     const readback = try session.readbackStart();
     defer readback.release();
@@ -148,7 +150,7 @@ fn waitForRenderedFrame(
     var rendered = false;
     var demand_pending = true;
     for (0..10_000) |_| {
-        if (build_options.supports_opengl and !build_options.supports_vulkan and !build_options.supports_metal) {
+        if (uses_caller_driver) {
             _ = try session.serviceDriverWork(0);
         }
         var results = session.drainFrameResults() catch |err| {
@@ -228,8 +230,8 @@ const OwnedTextureContext = if (build_options.supports_vulkan) VulkanAttachConte
     }
 } else if (build_options.supports_opengl) OpenGLAttachContext else struct {};
 
-/// Supplies transferable state to a core worker or a thread-current OpenGL
-/// context to the explicit caller driver.
+/// Supplies transferable state to a core worker or a WGL context to the caller
+/// driver.
 fn attachOwnedTexture(
     context: *OwnedTextureContext,
     map: *maplibre.MapHandle,
@@ -249,7 +251,10 @@ fn attachOwnedTexture(
         try maplibre.attachOpenGLOwnedTexture(map, .{
             .extent = descriptor.extent,
             .context = context.descriptor(),
-        }, .{ .driver = .caller_graphics_thread, .requested_texture_ring_depth = 1 })
+        }, .{
+            .driver = if (supports_egl) .core_worker else .caller_graphics_thread,
+            .requested_texture_ring_depth = 1,
+        })
     else
         return error.RenderBackendUnavailable;
 }
@@ -312,14 +317,10 @@ const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag
 } else if (supports_egl) struct {
     display: egl.EGLDisplay,
     config: egl.EGLConfig,
-    surface: egl.EGLSurface,
-    share_context: egl.EGLContext,
 
     fn init() !@This() {
         const display = try initDisplay();
         errdefer _ = egl.eglTerminate(display);
-
-        if (egl.eglBindAPI(egl.EGL_OPENGL_ES_API) == egl.EGL_FALSE) return error.EglUnavailable;
 
         const config_attributes = [_]egl.EGLint{
             egl.EGL_SURFACE_TYPE,    egl.EGL_PBUFFER_BIT,
@@ -340,36 +341,13 @@ const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag
             return error.EglUnavailable;
         }
 
-        const context_attributes = [_]egl.EGLint{
-            egl.EGL_CONTEXT_CLIENT_VERSION, 3,
-            egl.EGL_NONE,
-        };
-        const share_context = egl.eglCreateContext(display, config, egl.EGL_NO_CONTEXT, &context_attributes);
-        if (share_context == egl.EGL_NO_CONTEXT) return error.EglUnavailable;
-        errdefer _ = egl.eglDestroyContext(display, share_context);
-
-        const surface_attributes = [_]egl.EGLint{
-            egl.EGL_WIDTH,  8,
-            egl.EGL_HEIGHT, 8,
-            egl.EGL_NONE,
-        };
-        const surface = egl.eglCreatePbufferSurface(display, config, &surface_attributes);
-        if (surface == egl.EGL_NO_SURFACE) return error.EglUnavailable;
-        errdefer _ = egl.eglDestroySurface(display, surface);
-
-        if (egl.eglMakeCurrent(display, surface, surface, share_context) == egl.EGL_FALSE) return error.EglUnavailable;
         return .{
             .display = display,
             .config = config,
-            .surface = surface,
-            .share_context = share_context,
         };
     }
 
     fn deinit(self: *@This()) void {
-        _ = egl.eglMakeCurrent(self.display, egl.EGL_NO_SURFACE, egl.EGL_NO_SURFACE, egl.EGL_NO_CONTEXT);
-        _ = egl.eglDestroySurface(self.display, self.surface);
-        _ = egl.eglDestroyContext(self.display, self.share_context);
         _ = egl.eglTerminate(self.display);
     }
 
@@ -398,7 +376,9 @@ const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag
         return .{ .egl = .{
             .display = maplibre.NativePointer.fromPtr(@ptrCast(self.display.?)),
             .config = maplibre.NativePointer.fromPtr(@ptrCast(self.config.?)),
-            .share_context = maplibre.NativePointer.fromPtr(@ptrCast(self.share_context.?)),
+            .share_context = null,
+            .client_api = .gles,
+            .ownership = .dedicated,
             .get_proc_address = null,
         } };
     }

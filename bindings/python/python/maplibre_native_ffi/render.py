@@ -122,16 +122,17 @@ class RenderAbandonDisposition(UnknownIntEnum):
 
 
 class OpenGLContextOwnership(UnknownIntEnum):
-    """How a session's OpenGL context relates to the thread that attached it.
+    """How a session's OpenGL context relates to its driver thread and host
+    graphics state.
 
     A shared session leaves the thread as it found it: every render makes the
     session context current and restores whatever was current before. The
     session context joins the share group named by the descriptor, so a host may
     hand the session a texture and sample it from its own context.
 
-    A dedicated session owns the thread. It makes its context current once and
-    keeps it current between renders, and it joins no share group. Use this when
-    a thread exists to drive one render session and runs no other graphics work.
+    A dedicated session owns its driver thread's context. It keeps the context
+    current between renders and joins no share group. The driver may be a native
+    core worker or a dedicated host thread.
     """
 
     SHARED = 0

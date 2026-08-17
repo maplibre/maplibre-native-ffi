@@ -248,17 +248,17 @@ pub const WebGPUContextDescriptor = struct {
     queue: ?NativePointer = null,
 };
 
-/// How a render session's OpenGL context relates to the thread that attached
-/// it.
+/// How a render session's OpenGL context relates to its driver thread and host
+/// graphics state.
 pub const OpenGLContextOwnership = union(enum) {
     /// The session shares its thread with host graphics work. Every render
     /// makes the session context current and restores whatever was current
     /// before, and the session context joins the share group that the
     /// descriptor names.
     shared,
-    /// The session owns its thread's OpenGL context. It makes its context
-    /// current once, keeps it current between renders, and joins no share
-    /// group. Use this for a thread that exists to drive one render session.
+    /// The session owns its driver thread's OpenGL context. It keeps the
+    /// context current between renders and joins no share group. The driver may
+    /// be a native core worker or a dedicated host thread.
     dedicated,
     unknown: u32,
 

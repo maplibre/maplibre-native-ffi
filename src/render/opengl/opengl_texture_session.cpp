@@ -460,9 +460,7 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
     }
 #elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
     if (!egl_context_) {
-      egl_context_.emplace(
-        context_.data.egl, MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED
-      );
+      egl_context_.emplace(context_.data.egl, context_.ownership);
     }
     egl_context_->activate_pbuffer();
 #elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
@@ -672,6 +670,8 @@ auto opengl_owned_texture_attach_start(
   session->texture.api_kind = TextureSessionApi::OpenGL;
   session->texture.mode = TextureSessionMode::Owned;
   auto copied = *descriptor;
+  const auto private_target =
+    copied.context.ownership == MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED;
 #if defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
   const auto transferred =
     copied.context.platform == MLN_OPENGL_CONTEXT_PLATFORM_WEBGL &&
@@ -688,15 +688,20 @@ auto opengl_owned_texture_attach_start(
 #endif
   if (
     options != nullptr &&
-    options->driver != (transferred ? MLN_RENDER_DRIVER_CORE_WORKER
-                                    : MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD)
+    options->driver != (private_target
+                          ? MLN_RENDER_DRIVER_CORE_WORKER
+                          : MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD)
   ) {
     set_thread_error("OpenGL driver does not match its context placement");
     return MLN_STATUS_UNSUPPORTED;
   }
-  const auto ring_depth = std::clamp(
-    options == nullptr ? 1u : options->requested_texture_ring_depth, 1u, 3u
-  );
+  const auto ring_depth =
+    private_target
+      ? 1u
+      : std::clamp(
+          options == nullptr ? 1u : options->requested_texture_ring_depth, 1u,
+          3u
+        );
   session->initialize_backend =
     [copied, selector = std::move(selector), transferred,
      ring_depth](mln_render_session_object& target) mutable {
@@ -728,9 +733,10 @@ auto opengl_owned_texture_attach_start(
     .size = sizeof(mln_render_session_capabilities),
     .driver = options == nullptr ? 0u : options->driver,
     .texture_ring_depth = ring_depth,
-    .flags = MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION |
-             MLN_RENDER_SESSION_CAPABILITY_READBACK |
-             MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC
+    .flags = MLN_RENDER_SESSION_CAPABILITY_READBACK |
+             (private_target ? 0u
+                             : MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION |
+                                 MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC)
   };
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Texture, options, capabilities,

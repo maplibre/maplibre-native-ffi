@@ -868,9 +868,11 @@ caller-owned backend resources.
 ### Drivers and notification
 
 A binding MUST expose core-worker and caller-graphics-thread placement as the
-common attach option. WGL, EGL, and existing browser WebGL contexts use the
-caller driver. A transferred `OffscreenCanvas` WebGL target may use a core
-worker, which creates and uses its WebGL2 context there. Browser WebGPU uses the
+common attach option. WGL targets, EGL surfaces, shared EGL textures, and
+existing browser WebGL contexts use the caller driver. A private EGL owned
+texture target uses a core worker and grants readback without frame acquisition.
+A transferred `OffscreenCanvas` WebGL target uses the same private-target
+contract and creates its WebGL2 context on the worker. Browser WebGPU uses the
 caller driver. Transferable Metal and Vulkan targets may support the core
 worker.
 
@@ -1145,29 +1147,29 @@ When the binding routes provider requests through
 
 ### Rendering
 
-| ID      | Test                                                                                                                                                                                                    |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-160 | Backend and target capabilities gate driver and target combinations, including caller-driver WGL/EGL/WebGL and browser WebGPU, and core-worker transferable Metal, Vulkan, and `OffscreenCanvas` WebGL. |
-| BND-161 | Render-target descriptors copy extents and `NativePointer` backend handles without taking ownership.                                                                                                    |
-| BND-162 | Every supported target attach returns an attaching session and operation; caller-driver service can complete attachment without a deadlock.                                                             |
-| BND-163 | Attaching a second session to one map reports invalid state and leaves the first session usable.                                                                                                        |
-| BND-164 | Every accepted demand yields one result, preserving all dispositions, tokens, timestamps, and generation fields.                                                                                        |
-| BND-165 | Resize and target replacement complete through the selected driver and update the extent generation.                                                                                                    |
-| BND-166 | Readback transfers owned bytes and copied metadata through an operation.                                                                                                                                |
-| BND-167 | Owned texture capability negotiation grants a one-to-three-slot ring, and acquisition leases a slot with copied metadata and active-checked backend handles.                                            |
-| BND-168 | Frame access after release fails before exposing backend handles.                                                                                                                                       |
-| BND-169 | Frame release consumes the handle and its operation completes only after consumer GPU completion makes the slot reusable.                                                                               |
-| BND-170 | Ring exhaustion reports not ready without blocking or replacing an acquired frame.                                                                                                                      |
-| BND-171 | Borrowed target descriptors do not release or mutate host backend handles during detach.                                                                                                                |
-| BND-172 | A fallible wrapper releases a natively acquired frame when wrapper construction fails.                                                                                                                  |
-| BND-173 | Stale acquired-frame handles cannot expose backend handles after slot reuse.                                                                                                                            |
-| BND-174 | Render-session control, operation, snapshot, demand, abandon, and destroy calls work from a thread other than the graphics service thread.                                                              |
-| BND-175 | A frame-result drain takes every queued record into an independently owned batch, and multiple batches may remain live.                                                                                 |
-| BND-176 | A barrier waits for preceding render work and its minimum map-update generation without requesting a frame.                                                                                             |
-| BND-177 | A positive expired deadline yields deadline missed before graphics work begins.                                                                                                                         |
-| BND-178 | Normal detach performs graphics destruction through the selected owner and permits any-thread CPU-only destroy afterward.                                                                               |
-| BND-179 | Abandon returns busy during a driver call, performs no graphics calls, invalidates accessors, detaches the map, and reports quarantine.                                                                 |
-| BND-180 | Target loss is preserved in snapshots and does not enter a busy retry loop.                                                                                                                             |
+| ID      | Test                                                                                                                                                                                                                        |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-160 | Backend and target capabilities gate driver and target combinations, including caller-driver WGL/shared-EGL/WebGL and browser WebGPU, and core-worker transferable Metal, Vulkan, private EGL, and `OffscreenCanvas` WebGL. |
+| BND-161 | Render-target descriptors copy extents and `NativePointer` backend handles without taking ownership.                                                                                                                        |
+| BND-162 | Every supported target attach returns an attaching session and operation; caller-driver service can complete attachment without a deadlock.                                                                                 |
+| BND-163 | Attaching a second session to one map reports invalid state and leaves the first session usable.                                                                                                                            |
+| BND-164 | Every accepted demand yields one result, preserving all dispositions, tokens, timestamps, and generation fields.                                                                                                            |
+| BND-165 | Resize and target replacement complete through the selected driver and update the extent generation.                                                                                                                        |
+| BND-166 | Readback transfers owned bytes and copied metadata through an operation.                                                                                                                                                    |
+| BND-167 | Host-acquirable owned texture capability negotiation grants a one-to-three-slot ring, and acquisition leases a slot with copied metadata and active-checked backend handles.                                                |
+| BND-168 | Frame access after release fails before exposing backend handles.                                                                                                                                                           |
+| BND-169 | Frame release consumes the handle and its operation completes only after consumer GPU completion makes the slot reusable.                                                                                                   |
+| BND-170 | Ring exhaustion reports not ready without blocking or replacing an acquired frame.                                                                                                                                          |
+| BND-171 | Borrowed target descriptors do not release or mutate host backend handles during detach.                                                                                                                                    |
+| BND-172 | A fallible wrapper releases a natively acquired frame when wrapper construction fails.                                                                                                                                      |
+| BND-173 | Stale acquired-frame handles cannot expose backend handles after slot reuse.                                                                                                                                                |
+| BND-174 | Render-session control, operation, snapshot, demand, abandon, and destroy calls work from a thread other than the graphics service thread.                                                                                  |
+| BND-175 | A frame-result drain takes every queued record into an independently owned batch, and multiple batches may remain live.                                                                                                     |
+| BND-176 | A barrier waits for preceding render work and its minimum map-update generation without requesting a frame.                                                                                                                 |
+| BND-177 | A positive expired deadline yields deadline missed before graphics work begins.                                                                                                                                             |
+| BND-178 | Normal detach performs graphics destruction through the selected owner and permits any-thread CPU-only destroy afterward.                                                                                                   |
+| BND-179 | Abandon returns busy during a driver call, performs no graphics calls, invalidates accessors, detaches the map, and reports quarantine.                                                                                     |
+| BND-180 | Target loss is preserved in snapshots and does not enter a busy retry loop.                                                                                                                                                 |
 
 ### Conditional tests
 

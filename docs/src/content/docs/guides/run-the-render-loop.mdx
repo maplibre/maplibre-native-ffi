@@ -56,9 +56,10 @@ use the mailbox.
 <Code code={region(frameLoopSnippet, "service")} lang="c" title="frame-loop.c" />
 
 A core-worker session rejects the service call because its native worker already
-owns execution. WGL, EGL, existing WebGL contexts, and browser WebGPU use caller
-drivers. Transferable Metal, Vulkan, and `OffscreenCanvas` WebGL targets can use
-core workers.
+owns execution. WGL targets, EGL surfaces, shared EGL textures, existing WebGL
+contexts, and browser WebGPU use caller drivers. Transferable Metal and Vulkan
+targets, private EGL owned texture targets, and `OffscreenCanvas` WebGL targets
+can use core workers.
 
 If the graphics owner cannot run again, abandon the target. Leaving ready work
 unserviced can leave operations pending indefinitely.
@@ -66,15 +67,16 @@ unserviced can leave operations pending indefinitely.
 ## Drain results and present
 
 Frame readiness is level-triggered. Drain an owned frame-result batch from any
-thread when its endpoint is ready. Only one batch may remain live per session;
-release it before another drain. Keep draining until the queue is empty.
+thread when its endpoint is ready. Each batch remains stable until release. Keep
+draining until the queue is empty.
 
 A rendered result means that a frame was presented or became available for
-acquisition. No update and size pending wait for a newer map update. Target not
-ready waits for host target readiness or paced retry. Superseded means that a
-newer demand replaced this demand within the same coalescing boundary. Deadline
-missed means that work did not begin before the positive deadline. These
-outcomes have different retry conditions, so preserve them in host pacing.
+acquisition or readback. No update and size pending wait for a newer map update.
+Target not ready waits for host target readiness or paced retry. Superseded
+means that a newer demand replaced this demand within the same coalescing
+boundary. Deadline missed means that work did not begin before the positive
+deadline. These outcomes have different retry conditions, so preserve them in
+host pacing.
 
 <Code code={region(frameLoopSnippet, "results")} lang="c" title="frame-loop.c" />
 

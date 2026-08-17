@@ -237,9 +237,9 @@ public sealed class VulkanContextDescriptor
 }
 
 /// <summary>
-/// How a render session's OpenGL context relates to the thread that attached it. This is an open
-/// domain: a value may have no named member here, so a switch over it needs a default case.
-/// Unknown values keep their raw value.
+/// How a render session's OpenGL context relates to its driver thread and host graphics state. This
+/// is an open domain: a value may have no named member here, so a switch over it needs a default
+/// case. Unknown values keep their raw value.
 /// </summary>
 public enum OpenGLContextOwnership : uint
 {
@@ -251,8 +251,9 @@ public enum OpenGLContextOwnership : uint
     Shared = 0,
 
     /// <summary>
-    /// The session owns its thread's OpenGL context. It makes its context current once and keeps
-    /// it current between renders, and it joins no share group.
+    /// The session owns its driver thread's OpenGL context. It keeps the context current between
+    /// renders and joins no share group. The driver may be a native core worker or a dedicated host
+    /// thread.
     /// </summary>
     Dedicated = 1,
 }
@@ -279,8 +280,8 @@ public abstract class OpenGLContextDescriptor
     private protected OpenGLContextDescriptor() { }
 
     /// <summary>
-    /// Whether the session shares its thread with host graphics work. WGL and EGL surface targets
-    /// support both. A texture target hands its texture to the host, so it is shared only.
+    /// Whether the session shares its driver thread and graphics objects with the host. A private
+    /// EGL owned texture target uses dedicated ownership and grants readback without acquisition.
     /// </summary>
     public OpenGLContextOwnership Ownership { get; set; } = OpenGLContextOwnership.Shared;
 }

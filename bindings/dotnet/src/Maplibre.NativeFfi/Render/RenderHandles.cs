@@ -127,7 +127,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         return Attach(
             map,
             native,
-            options ?? DefaultOpenGLOptions(descriptor.Context),
+            options ?? DefaultOpenGLHostOptions(descriptor.Context),
             static (m, d, o, s, p) => NativeMethods.mln_opengl_surface_attach_start(m, d, o, s, p)
         );
     }
@@ -207,7 +207,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         return Attach(
             map,
             native,
-            options ?? DefaultOpenGLOptions(descriptor.Context),
+            options ?? DefaultOpenGLOwnedTextureOptions(descriptor.Context),
             static (m, d, o, s, p) =>
                 NativeMethods.mln_opengl_owned_texture_attach_start(m, d, o, s, p)
         );
@@ -224,7 +224,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         return Attach(
             map,
             native,
-            options ?? DefaultOpenGLOptions(descriptor.Context),
+            options ?? DefaultOpenGLHostOptions(descriptor.Context),
             static (m, d, o, s, p) =>
                 NativeMethods.mln_opengl_borrowed_texture_attach_start(m, d, o, s, p)
         );
@@ -743,7 +743,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     private static RenderSessionAttachOptions CallerGraphicsOptions() =>
         new() { Driver = RenderDriverKind.CallerGraphicsThread };
 
-    private static RenderSessionAttachOptions DefaultOpenGLOptions(
+    private static RenderSessionAttachOptions DefaultOpenGLHostOptions(
         OpenGLContextDescriptor? context
     ) =>
         new()
@@ -751,6 +751,21 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             Driver = context is WebGLContextDescriptor { Kind: WebGLContextKind.TransferredCanvas }
                 ? RenderDriverKind.CoreWorker
                 : RenderDriverKind.CallerGraphicsThread,
+        };
+
+    private static RenderSessionAttachOptions DefaultOpenGLOwnedTextureOptions(
+        OpenGLContextDescriptor? context
+    ) =>
+        new()
+        {
+            Driver = context switch
+            {
+                EglContextDescriptor { Ownership: OpenGLContextOwnership.Dedicated } =>
+                    RenderDriverKind.CoreWorker,
+                WebGLContextDescriptor { Kind: WebGLContextKind.TransferredCanvas } =>
+                    RenderDriverKind.CoreWorker,
+                _ => RenderDriverKind.CallerGraphicsThread,
+            },
         };
 
     private static RenderSessionHandle Attach<T>(

@@ -25,8 +25,9 @@ readback.
 Execution placement is a separate choice. A core-worker driver owns a native
 serial graphics worker and requires transferable graphics state. A
 caller-graphics-thread driver stores work until the host services it where the
-graphics context is usable. WGL, EGL, existing WebGL contexts, and browser
-WebGPU require the caller driver. Transferable Metal, Vulkan, and
+graphics context is usable. WGL targets, EGL surfaces, shared EGL textures,
+existing WebGL contexts, and browser WebGPU require the caller driver.
+Transferable Metal and Vulkan targets, private EGL owned texture targets, and
 `OffscreenCanvas` WebGL targets can use a core worker.
 
 The common attach options select the driver and request an owned-texture ring

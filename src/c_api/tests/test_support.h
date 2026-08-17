@@ -149,6 +149,12 @@ mln_test_fixture_result mln_test_dedicated_egl_surface_create(
 );
 void mln_test_dedicated_egl_surface_destroy(mln_test_render_fixture* fixture);
 bool mln_test_egl_context_is_current(void);
+// Attaches a private OpenGL owned texture target whose context and driver both
+// belong to the native core worker.
+mln_test_fixture_result mln_test_dedicated_egl_texture_create(
+  mln_map map, mln_test_render_fixture* fixture
+);
+void mln_test_dedicated_egl_texture_destroy(mln_test_render_fixture* fixture);
 // Waits until `flag` is set while draining runtime events. Returns whether the
 // flag was observed before the bounded deadline.
 bool mln_test_wait_until(mln_runtime runtime, atomic_bool* flag);

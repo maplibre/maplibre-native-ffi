@@ -188,9 +188,9 @@ runtime. The render target chooses one of the driver contracts described in
 - Driver service and thread-current accessors MUST run serially on the host
   graphics thread.
 
-Desktop examples use caller drivers because their host WGL, EGL, Metal, or
-Vulkan presentation context belongs to the render loop. Browser examples use a
-caller driver for existing WebGL and WebGPU objects. A transferred
+Desktop examples use caller drivers because their host WGL, shared EGL, Metal,
+or Vulkan presentation context belongs to the render loop. Browser examples use
+a caller driver for existing WebGL and WebGPU objects. A transferred
 `OffscreenCanvas` WebGL target MAY use a core worker, which creates and uses its
 WebGL2 context on that worker.
 
@@ -224,7 +224,7 @@ operation, frame-result, and driver-work readiness. A separate source MAY be
 used when the host has separate receivers.
 
 For a caller driver, attach descriptors are produced where the graphics context
-is usable. WGL and EGL contexts use the caller driver. A transferred
+is usable. Host-shared WGL and EGL contexts use the caller driver. A transferred
 `OffscreenCanvas` descriptor instead names its canvas selector and creates its
 WebGL2 context on a core worker.
 

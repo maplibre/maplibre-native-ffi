@@ -68,8 +68,8 @@ const (
 	RenderResultDeadlineMissed RenderResult = RenderResult(C.MLN_RENDER_RESULT_DEADLINE_MISSED)
 )
 
-// OpenGLContextOwnership names how a session's OpenGL context relates to the
-// thread that attached it.
+// OpenGLContextOwnership names how a session's OpenGL context relates to its
+// driver thread and host graphics state.
 type OpenGLContextOwnership uint32
 
 const (
@@ -79,10 +79,9 @@ const (
 	// the descriptor, so a host may hand the session a texture and sample it
 	// from its own context.
 	OpenGLContextOwnershipShared OpenGLContextOwnership = OpenGLContextOwnership(C.MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED)
-	// OpenGLContextOwnershipDedicated gives the session its thread. It makes
-	// its context current once and keeps it current between renders, and it
-	// joins no share group. Use this when a thread exists to drive one render
-	// session and runs no other graphics work.
+	// OpenGLContextOwnershipDedicated gives the session its driver thread's
+	// context. It keeps the context current between renders and joins no share
+	// group. The driver may be a native core worker or a dedicated host thread.
 	OpenGLContextOwnershipDedicated OpenGLContextOwnership = OpenGLContextOwnership(C.MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED)
 )
 
@@ -236,8 +235,8 @@ type OpenGLContextDescriptor struct {
 	WGL   *WGLContextDescriptor
 	EGL   *EGLContextDescriptor
 	WebGL *WebGLContextDescriptor
-	// Ownership is independent of caller-driver placement. A transferred canvas
-	// is dedicated to its core worker.
+	// A private EGL owned texture and a transferred canvas are dedicated to
+	// their core worker.
 	Ownership OpenGLContextOwnership
 }
 

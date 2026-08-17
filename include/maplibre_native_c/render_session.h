@@ -19,7 +19,8 @@ extern "C" {
 
 /** Terminal disposition of one accepted frame demand. */
 typedef enum mln_render_result : uint32_t {
-  /** A frame was rendered and is available for acquisition or presentation. */
+  /** A frame was rendered for acquisition, presentation, or ordered readback.
+   */
   MLN_RENDER_RESULT_RENDERED = 0,
   /** No newer map update was available. */
   MLN_RENDER_RESULT_NO_UPDATE = 1,

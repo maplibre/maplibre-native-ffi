@@ -850,12 +850,10 @@ static bool create_backend_state(void** out_state, void* out_context) {
 // EGL_DEFAULT_DISPLAY, so the display is shared with everything else in the
 // process, and terminating it retires EGL objects the C API still holds. A
 // display stays initialized for the process either way, so leaving it is free.
-mln_test_fixture_result mln_test_dedicated_egl_surface_create(
-  mln_map map, mln_test_render_fixture* fixture
-) {
+static egl_state* create_dedicated_egl_state(void) {
   egl_state* state = calloc(1, sizeof(egl_state));
   if (state == NULL) {
-    return MLN_TEST_FIXTURE_UNAVAILABLE;
+    return NULL;
   }
   state->display = get_egl_display();
   if (
@@ -863,7 +861,7 @@ mln_test_fixture_result mln_test_dedicated_egl_surface_create(
     eglInitialize(state->display, NULL, NULL) == EGL_FALSE
   ) {
     free(state);
-    return MLN_TEST_FIXTURE_UNAVAILABLE;
+    return NULL;
   }
   const EGLint config_attributes[] = {
     EGL_SURFACE_TYPE,
@@ -892,6 +890,16 @@ mln_test_fixture_result mln_test_dedicated_egl_surface_create(
     config_count == 0 || state->config == NULL
   ) {
     free(state);
+    return NULL;
+  }
+  return state;
+}
+
+mln_test_fixture_result mln_test_dedicated_egl_surface_create(
+  mln_map map, mln_test_render_fixture* fixture
+) {
+  egl_state* state = create_dedicated_egl_state();
+  if (state == NULL) {
     return MLN_TEST_FIXTURE_UNAVAILABLE;
   }
   const EGLint surface_attributes[] = {EGL_WIDTH, 64, EGL_HEIGHT, 64, EGL_NONE};
@@ -985,6 +993,88 @@ void mln_test_dedicated_egl_surface_destroy(mln_test_render_fixture* fixture) {
 
 bool mln_test_egl_context_is_current(void) {
   return eglGetCurrentContext() != EGL_NO_CONTEXT;
+}
+
+mln_test_fixture_result mln_test_dedicated_egl_texture_create(
+  mln_map map, mln_test_render_fixture* fixture
+) {
+  egl_state* state = create_dedicated_egl_state();
+  if (state == NULL) {
+    return MLN_TEST_FIXTURE_UNAVAILABLE;
+  }
+  mln_opengl_owned_texture_descriptor descriptor =
+    mln_opengl_owned_texture_descriptor_default();
+  descriptor.extent.width = 64;
+  descriptor.extent.height = 64;
+  descriptor.context = (mln_opengl_context_descriptor){
+    .size = sizeof(mln_opengl_context_descriptor),
+    .platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL,
+    .ownership = MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED,
+    .data = {
+      .egl = {
+        .size = sizeof(mln_egl_context_descriptor),
+        .display = state->display,
+        .config = state->config,
+        .share_context = NULL,
+        .client_api = MLN_OPENGL_CLIENT_API_GLES,
+        .get_proc_address = NULL,
+      }
+    },
+  };
+  fixture->driver = MLN_RENDER_DRIVER_CORE_WORKER;
+  fixture->backend_state = state;
+  mln_render_session_attach_options options =
+    mln_render_session_attach_options_default();
+  options.driver = fixture->driver;
+  options.requested_texture_ring_depth = 3;
+  mln_operation attach = MLN_HANDLE_NULL;
+  const mln_status attach_status = mln_opengl_owned_texture_attach_start(
+    map, &descriptor, &options, &fixture->session, &attach
+  );
+  const mln_status finish_status =
+    attach_status == MLN_STATUS_OK
+      ? mln_test_render_fixture_finish_operation(fixture, attach)
+      : attach_status;
+  mln_operation_release(attach);
+  if (finish_status != MLN_STATUS_OK) {
+    if (fixture->session != MLN_HANDLE_NULL) {
+      mln_render_abandon_result abandoned = {
+        .size = sizeof(mln_render_abandon_result)
+      };
+      (void)mln_render_session_abandon(fixture->session, &abandoned);
+      (void)mln_render_session_destroy(fixture->session);
+    }
+    free(state);
+    *fixture = (mln_test_render_fixture){0};
+    return MLN_TEST_FIXTURE_ATTACH_FAILED;
+  }
+  return MLN_TEST_FIXTURE_OK;
+}
+
+void mln_test_dedicated_egl_texture_destroy(mln_test_render_fixture* fixture) {
+  if (fixture == NULL) {
+    return;
+  }
+  if (fixture->session != MLN_HANDLE_NULL) {
+    mln_operation detach = MLN_HANDLE_NULL;
+    mln_status detach_status =
+      mln_render_session_detach_start(fixture->session, &detach);
+    if (detach_status == MLN_STATUS_OK) {
+      detach_status = mln_test_render_fixture_finish_operation(fixture, detach);
+    }
+    if (detach != MLN_HANDLE_NULL) {
+      mln_operation_release(detach);
+    }
+    if (detach_status != MLN_STATUS_OK) {
+      mln_render_abandon_result abandoned = {
+        .size = sizeof(mln_render_abandon_result)
+      };
+      (void)mln_render_session_abandon(fixture->session, &abandoned);
+    }
+    (void)mln_render_session_destroy(fixture->session);
+  }
+  free(fixture->backend_state);
+  *fixture = (mln_test_render_fixture){0};
 }
 
 static void destroy_backend_state(void* opaque_state) {
@@ -1551,6 +1641,18 @@ void mln_test_dedicated_egl_surface_destroy(mln_test_render_fixture* fixture) {
 }
 
 bool mln_test_egl_context_is_current(void) { return false; }
+
+mln_test_fixture_result mln_test_dedicated_egl_texture_create(
+  mln_map map, mln_test_render_fixture* fixture
+) {
+  (void)map;
+  (void)fixture;
+  return MLN_TEST_FIXTURE_UNAVAILABLE;
+}
+
+void mln_test_dedicated_egl_texture_destroy(mln_test_render_fixture* fixture) {
+  (void)fixture;
+}
 #endif
 
 #if defined(MLN_FFI_TEST_BACKEND_WEBGPU)

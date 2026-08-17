@@ -483,21 +483,23 @@ static void opengl_dedicated_context_rejects_shared_session_fields(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A texture session hands its texture to a host that samples it from the host's
-// own context, which is what the share group the descriptor names is for.
-static void opengl_owned_texture_attach_rejects_a_dedicated_context(void) {
+#if defined(MLN_FFI_TEST_OPENGL_WGL)
+// WGL owned texture targets borrow a window device context and cannot transfer
+// their graphics state to a core worker.
+static void opengl_owned_texture_attach_rejects_dedicated_wgl(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_opengl_owned_texture_descriptor descriptor = opengl_owned_descriptor();
   descriptor.context.ownership = MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED;
+  descriptor.context.data.wgl.share_context = NULL;
   mln_render_session session = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
+    MLN_STATUS_UNSUPPORTED,
     mln_opengl_owned_texture_attach_start(
       map, &descriptor,
       &(mln_render_session_attach_options){
         .size = sizeof(mln_render_session_attach_options),
-        .driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
+        .driver = MLN_RENDER_DRIVER_CORE_WORKER
       },
       &session, &(mln_operation){MLN_HANDLE_NULL}
     )
@@ -506,6 +508,7 @@ static void opengl_owned_texture_attach_rejects_a_dedicated_context(void) {
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
+#endif
 
 static const char dedicated_background_style_json[] =
   "{\"version\":8,\"sources\":{},\"layers\":"
@@ -536,6 +539,7 @@ static void dedicated_egl_surface_renders_and_keeps_its_context_current(void) {
                      map, MLN_BUFFER_LITERAL(dedicated_background_style_json)
                    )
   );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
   mln_frame_demand demand = mln_frame_demand_default();
   demand.flags = MLN_FRAME_DEMAND_PRESENT;
   TEST_ASSERT_EQUAL_INT(
@@ -566,6 +570,115 @@ static void dedicated_egl_surface_renders_and_keeps_its_context_current(void) {
   mln_test_dedicated_egl_surface_destroy(&fixture);
   // Destroying the session releases the thread it had taken over.
   TEST_ASSERT_FALSE(mln_test_egl_context_is_current());
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// A private EGL owned texture needs no host graphics thread: its core worker
+// creates the context, renders, reads pixels, and destroys the context.
+static void dedicated_egl_texture_uses_a_readback_only_core_worker(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_fixture fixture = {0};
+  const mln_test_fixture_result fixture_result =
+    mln_test_dedicated_egl_texture_create(map, &fixture);
+  if (fixture_result == MLN_TEST_FIXTURE_UNAVAILABLE) {
+    mln_test_destroy_map(map);
+    mln_test_destroy_runtime(runtime);
+    TEST_IGNORE_MESSAGE("this build has no EGL context provider");
+    return;
+  }
+  TEST_ASSERT_EQUAL_INT(MLN_TEST_FIXTURE_OK, fixture_result);
+
+  mln_render_session_capabilities capabilities = {
+    .size = sizeof(mln_render_session_capabilities)
+  };
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_render_session_get_capabilities(fixture.session, &capabilities)
+  );
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_DRIVER_CORE_WORKER, capabilities.driver);
+  TEST_ASSERT_EQUAL_UINT32(1, capabilities.texture_ring_depth);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_SESSION_CAPABILITY_READBACK, capabilities.flags
+  );
+  size_t serviced = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_STATE,
+    mln_render_session_service_driver_work(fixture.session, 0, &serviced)
+  );
+  mln_acquired_frame frame = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_UNSUPPORTED,
+    mln_render_session_acquire_frame(fixture.session, &frame)
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, frame);
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_map_set_style_json(
+                     map, MLN_BUFFER_LITERAL(dedicated_background_style_json)
+                   )
+  );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  mln_frame_demand demand = mln_frame_demand_default();
+  demand.flags = 0;
+  demand.token = 41;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_render_session_request_frame(fixture.session, &demand)
+  );
+  mln_operation barrier = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_render_session_barrier_start(fixture.session, 0, &barrier)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, barrier)
+  );
+  mln_operation_release(barrier);
+
+  mln_render_frame_batch batch = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_render_session_drain_frame_results(fixture.session, &batch)
+  );
+  mln_render_frame_result result = {.size = sizeof(mln_render_frame_result)};
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_render_frame_batch_get(batch, 0, &result)
+  );
+  TEST_ASSERT_EQUAL_UINT64(demand.token, result.token);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
+  mln_render_frame_batch_release(batch);
+
+  mln_operation readback = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_texture_read_premultiplied_rgba8_start(fixture.session, &readback)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, readback)
+  );
+  mln_buffer pixels = MLN_HANDLE_NULL;
+  mln_texture_image_info info = mln_texture_image_info_default();
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_texture_read_premultiplied_rgba8_take_result(readback, &pixels, &info)
+  );
+  mln_operation_release(readback);
+  TEST_ASSERT_EQUAL_UINT32(64, info.width);
+  TEST_ASSERT_EQUAL_UINT32(64, info.height);
+  TEST_ASSERT_EQUAL_UINT32(64 * 4, info.stride);
+  TEST_ASSERT_EQUAL_size_t(64 * 64 * 4, info.byte_length);
+  mln_buffer_view view = {0};
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_buffer_get(pixels, &view));
+  TEST_ASSERT_EQUAL_size_t(info.byte_length, view.size);
+  const uint8_t* rgba = view.data;
+  TEST_ASSERT_EQUAL_UINT8(255, rgba[0]);
+  TEST_ASSERT_EQUAL_UINT8(0, rgba[1]);
+  TEST_ASSERT_EQUAL_UINT8(0, rgba[2]);
+  TEST_ASSERT_EQUAL_UINT8(255, rgba[3]);
+  mln_buffer_destroy(pixels);
+
+  mln_test_dedicated_egl_texture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -909,8 +1022,11 @@ void run_render_backend_abi_tests(void) {
   RUN_TEST(opengl_surface_attach_rejects_a_webgl_surface_handle);
 #endif
   RUN_TEST(opengl_dedicated_context_rejects_shared_session_fields);
-  RUN_TEST(opengl_owned_texture_attach_rejects_a_dedicated_context);
+#if defined(MLN_FFI_TEST_OPENGL_WGL)
+  RUN_TEST(opengl_owned_texture_attach_rejects_dedicated_wgl);
+#endif
   RUN_TEST(dedicated_egl_surface_renders_and_keeps_its_context_current);
+  RUN_TEST(dedicated_egl_texture_uses_a_readback_only_core_worker);
   RUN_TEST(frame_results_report_whether_the_map_needs_another_frame);
   RUN_TEST(opengl_owned_texture_attach_rejects_unsafe_raw_inputs);
   RUN_TEST(opengl_borrowed_texture_rejects_unsafe_raw_descriptors);

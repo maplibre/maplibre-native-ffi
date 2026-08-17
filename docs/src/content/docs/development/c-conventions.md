@@ -162,8 +162,9 @@ captured, serialized by the projection's internal lock.
 A render session selects one of two execution contracts at attachment. A
 core-worker driver owns a native serial graphics worker. A
 caller-graphics-thread driver stores typed work until the host services it where
-the context is usable. WGL, EGL, existing WebGL, and browser WebGPU use the
-caller driver. Transferable Metal, Vulkan, and `OffscreenCanvas` WebGL targets
+the context is usable. WGL targets, EGL surfaces, shared EGL textures, existing
+WebGL, and browser WebGPU use the caller driver. Transferable Metal and Vulkan
+targets, private EGL owned texture targets, and `OffscreenCanvas` WebGL targets
 may use a core worker.
 
 Keep render-session control separate from graphics execution. Demand, snapshots,
@@ -240,9 +241,9 @@ preceding command.
 
 Graphics contexts that bind to a thread, such as OpenGL, are made current during
 caller-driver service and restored afterward under shared ownership. Dedicated
-ownership keeps a session-created context current between service calls. Context
-ownership and driver placement are independent policies; dedicated OpenGL still
-uses the caller driver.
+ownership keeps a session-created context current between renders. WGL and EGL
+surface targets use a caller driver. Private EGL owned texture targets and
+transferred WebGL targets use a core worker.
 
 On Apple targets each entry point and queued runtime submission drains its own
 Objective-C autorelease pool, so a native worker or host render thread does not
@@ -354,10 +355,11 @@ which context ownership modes the target accepts.
 
 Every accepted frame demand creates one owned terminal result record. Frame
 readiness stays level-triggered until the queue drains. Each drain transfers the
-complete queue into an independently owned result batch. Owned textures
-negotiate a one-to-three-slot ring. An acquired-frame handle leases its slot
-until its release operation observes any consumer GPU-completion
-synchronization.
+complete queue into an independently owned result batch. Host-acquirable owned
+textures negotiate a one-to-three-slot ring. An acquired-frame handle leases its
+slot until its release operation observes any consumer GPU-completion
+synchronization. A private OpenGL owned texture target fixes its depth at one
+and grants readback without acquisition or consumer synchronization.
 
 Normal detach routes graphics destruction through the selected driver before
 CPU-only handle destruction. Abandon closes control and mailboxes without
