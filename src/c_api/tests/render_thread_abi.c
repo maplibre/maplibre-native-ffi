@@ -178,10 +178,8 @@ static void demand_coalescing_preserves_boundaries_and_generations(void) {
   first.flags = 0;
   first.token = 101;
   first.coalescing_boundary = 7;
-  first.presentation_time_ns = 1000;
   mln_frame_demand newest = first;
   newest.token = 102;
-  newest.presentation_time_ns = 2000;
   mln_frame_demand separate = newest;
   separate.token = 103;
   separate.coalescing_boundary = 8;
@@ -220,7 +218,6 @@ static void demand_coalescing_preserves_boundaries_and_generations(void) {
   );
   TEST_ASSERT_EQUAL_UINT64(102, rendered.token);
   TEST_ASSERT_EQUAL_UINT64(103, boundary.token);
-  TEST_ASSERT_EQUAL_INT64(2000, rendered.presentation_time_ns);
   TEST_ASSERT_GREATER_THAN_UINT64(0, rendered.extent_generation);
   TEST_ASSERT_GREATER_THAN_UINT64(0, rendered.map_update_generation);
   TEST_ASSERT_GREATER_OR_EQUAL_UINT64(

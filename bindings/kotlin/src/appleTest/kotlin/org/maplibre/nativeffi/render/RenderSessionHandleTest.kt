@@ -65,9 +65,7 @@ class RenderSessionHandleTest {
             assertEquals(RenderDriver.CALLER_GRAPHICS_THREAD, session.capabilities().driver)
             assertEquals(2, session.capabilities().textureRingDepth)
 
-            session.requestFrame(
-              FrameDemand(ifNeeded = false, token = 7u, presentationTimeNanoseconds = 1)
-            )
+            session.requestFrame(FrameDemand(ifNeeded = false, token = 7u))
             session.serviceDriverWork()
             val result = session.drainFrameResults().single()
             assertEquals(7uL, result.token)

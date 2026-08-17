@@ -59,7 +59,6 @@ public value class RenderSessionState public constructor(public val nativeValue:
 public data class FrameDemand(
   public val token: ULong = 0u,
   public val coalescingBoundary: ULong = 0u,
-  public val presentationTimeNanoseconds: Long = 0,
   public val deadlineNanoseconds: Long = 0,
   public val ifNeeded: Boolean = true,
   public val present: Boolean = false,
@@ -75,7 +74,6 @@ public data class RenderFrameResult(
   public val mapUpdateGeneration: ULong,
   public val extentGeneration: ULong,
   public val frameGeneration: ULong,
-  public val presentationTimeNanoseconds: Long,
   /**
    * Whether the map asked for another frame while it rendered this one, as during an ongoing camera
    * transition. Set only when [disposition] is [RenderResult.RENDERED], and false for every other

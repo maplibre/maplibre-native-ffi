@@ -19,7 +19,6 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  *     uint32_t flags;
  *     uint64_t token;
  *     uint64_t coalescing_boundary;
- *     int64_t presentation_time_ns;
  *     int64_t deadline_ns;
  * }
  * }
@@ -35,7 +34,6 @@ public class mln_frame_demand {
         MapLibreNativeC.C_INT.withName("flags"),
         MapLibreNativeC.C_LONG.withName("token"),
         MapLibreNativeC.C_LONG.withName("coalescing_boundary"),
-        MapLibreNativeC.C_LONG.withName("presentation_time_ns"),
         MapLibreNativeC.C_LONG.withName("deadline_ns")
     ).withName("mln_frame_demand");
 
@@ -220,50 +218,6 @@ public class mln_frame_demand {
      */
     public static void coalescing_boundary(MemorySegment struct, long fieldValue) {
         struct.set(coalescing_boundary$LAYOUT, coalescing_boundary$OFFSET, fieldValue);
-    }
-
-    private static final OfLong presentation_time_ns$LAYOUT = (OfLong)$LAYOUT.select(groupElement("presentation_time_ns"));
-
-    /**
-     * Layout for field:
-     * {@snippet lang=c :
-     * int64_t presentation_time_ns
-     * }
-     */
-    public static final OfLong presentation_time_ns$layout() {
-        return presentation_time_ns$LAYOUT;
-    }
-
-    private static final long presentation_time_ns$OFFSET = $LAYOUT.byteOffset(groupElement("presentation_time_ns"));
-
-    /**
-     * Offset for field:
-     * {@snippet lang=c :
-     * int64_t presentation_time_ns
-     * }
-     */
-    public static final long presentation_time_ns$offset() {
-        return presentation_time_ns$OFFSET;
-    }
-
-    /**
-     * Getter for field:
-     * {@snippet lang=c :
-     * int64_t presentation_time_ns
-     * }
-     */
-    public static long presentation_time_ns(MemorySegment struct) {
-        return struct.get(presentation_time_ns$LAYOUT, presentation_time_ns$OFFSET);
-    }
-
-    /**
-     * Setter for field:
-     * {@snippet lang=c :
-     * int64_t presentation_time_ns
-     * }
-     */
-    public static void presentation_time_ns(MemorySegment struct, long fieldValue) {
-        struct.set(presentation_time_ns$LAYOUT, presentation_time_ns$OFFSET, fieldValue);
     }
 
     private static final OfLong deadline_ns$LAYOUT = (OfLong)$LAYOUT.select(groupElement("deadline_ns"));

@@ -101,7 +101,6 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
         .flags(flags)
         .token(demand.token.toLong())
         .coalescing_boundary(demand.coalescingBoundary.toLong())
-        .presentation_time_ns(demand.presentationTimeNanoseconds)
         .deadline_ns(demand.deadlineNanoseconds)
       Status.check(MaplibreNativeC.mln_render_session_request_frame(requireLiveHandle(), value))
     }
@@ -1217,7 +1216,6 @@ private fun frameResult(value: MaplibreNativeC.mln_render_frame_result): RenderF
     value.map_update_generation().toULong(),
     value.extent_generation().toULong(),
     value.frame_generation().toULong(),
-    value.presentation_time_ns(),
     value.needs_repaint(),
   )
 

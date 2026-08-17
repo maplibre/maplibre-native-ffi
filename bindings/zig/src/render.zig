@@ -98,7 +98,6 @@ pub const FrameDemand = struct {
     present: bool = false,
     token: u64 = 0,
     coalescing_boundary: u64 = 0,
-    presentation_time_ns: i64 = 0,
     deadline_ns: i64 = 0,
 };
 
@@ -108,7 +107,6 @@ pub const FrameResult = struct {
     map_update_generation: u64,
     extent_generation: u64,
     frame_generation: u64,
-    presentation_time_ns: i64,
     /// Whether the map asked for another frame while it rendered this one, as
     /// during an ongoing camera transition. Set only when `disposition` is
     /// `.rendered`, and false for every other outcome.
@@ -1177,11 +1175,11 @@ fn frameDemandToNative(demand: FrameDemand) c.mln_frame_demand {
     var flags: u32 = 0;
     if (demand.if_needed) flags |= c.MLN_FRAME_DEMAND_IF_NEEDED;
     if (demand.present) flags |= c.MLN_FRAME_DEMAND_PRESENT;
-    return .{ .size = @sizeOf(c.mln_frame_demand), .flags = flags, .token = demand.token, .coalescing_boundary = demand.coalescing_boundary, .presentation_time_ns = demand.presentation_time_ns, .deadline_ns = demand.deadline_ns };
+    return .{ .size = @sizeOf(c.mln_frame_demand), .flags = flags, .token = demand.token, .coalescing_boundary = demand.coalescing_boundary, .deadline_ns = demand.deadline_ns };
 }
 
 fn frameResultFromNative(raw: c.mln_render_frame_result) FrameResult {
-    return .{ .disposition = RenderResult.fromRaw(raw.disposition), .token = raw.token, .map_update_generation = raw.map_update_generation, .extent_generation = raw.extent_generation, .frame_generation = raw.frame_generation, .presentation_time_ns = raw.presentation_time_ns, .needs_repaint = raw.needs_repaint };
+    return .{ .disposition = RenderResult.fromRaw(raw.disposition), .token = raw.token, .map_update_generation = raw.map_update_generation, .extent_generation = raw.extent_generation, .frame_generation = raw.frame_generation, .needs_repaint = raw.needs_repaint };
 }
 
 fn gpuSyncToNative(sync: GpuSync) c.mln_gpu_sync {

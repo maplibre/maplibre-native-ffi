@@ -21,7 +21,6 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  *     uint64_t map_update_generation;
  *     uint64_t extent_generation;
  *     uint64_t frame_generation;
- *     int64_t presentation_time_ns;
  *     bool needs_repaint;
  * }
  * }
@@ -39,7 +38,6 @@ public class mln_render_frame_result {
         MapLibreNativeC.C_LONG.withName("map_update_generation"),
         MapLibreNativeC.C_LONG.withName("extent_generation"),
         MapLibreNativeC.C_LONG.withName("frame_generation"),
-        MapLibreNativeC.C_LONG.withName("presentation_time_ns"),
         MapLibreNativeC.C_BOOL.withName("needs_repaint"),
         MemoryLayout.paddingLayout(7)
     ).withName("mln_render_frame_result");
@@ -313,50 +311,6 @@ public class mln_render_frame_result {
      */
     public static void frame_generation(MemorySegment struct, long fieldValue) {
         struct.set(frame_generation$LAYOUT, frame_generation$OFFSET, fieldValue);
-    }
-
-    private static final OfLong presentation_time_ns$LAYOUT = (OfLong)$LAYOUT.select(groupElement("presentation_time_ns"));
-
-    /**
-     * Layout for field:
-     * {@snippet lang=c :
-     * int64_t presentation_time_ns
-     * }
-     */
-    public static final OfLong presentation_time_ns$layout() {
-        return presentation_time_ns$LAYOUT;
-    }
-
-    private static final long presentation_time_ns$OFFSET = $LAYOUT.byteOffset(groupElement("presentation_time_ns"));
-
-    /**
-     * Offset for field:
-     * {@snippet lang=c :
-     * int64_t presentation_time_ns
-     * }
-     */
-    public static final long presentation_time_ns$offset() {
-        return presentation_time_ns$OFFSET;
-    }
-
-    /**
-     * Getter for field:
-     * {@snippet lang=c :
-     * int64_t presentation_time_ns
-     * }
-     */
-    public static long presentation_time_ns(MemorySegment struct) {
-        return struct.get(presentation_time_ns$LAYOUT, presentation_time_ns$OFFSET);
-    }
-
-    /**
-     * Setter for field:
-     * {@snippet lang=c :
-     * int64_t presentation_time_ns
-     * }
-     */
-    public static void presentation_time_ns(MemorySegment struct, long fieldValue) {
-        struct.set(presentation_time_ns$LAYOUT, presentation_time_ns$OFFSET, fieldValue);
     }
 
     private static final OfBoolean needs_repaint$LAYOUT = (OfBoolean)$LAYOUT.select(groupElement("needs_repaint"));

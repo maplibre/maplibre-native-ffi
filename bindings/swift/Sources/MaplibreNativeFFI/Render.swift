@@ -765,20 +765,17 @@ public struct FrameDemand: Sendable, Hashable {
   public var options: Options
   public var token: UInt64
   public var coalescingBoundary: UInt64
-  public var presentationTimeNanoseconds: Int64
   public var deadlineNanoseconds: Int64
 
   public init(
     options: Options = .ifNeeded,
     token: UInt64 = 0,
     coalescingBoundary: UInt64 = 0,
-    presentationTimeNanoseconds: Int64 = 0,
     deadlineNanoseconds: Int64 = 0
   ) {
     self.options = options
     self.token = token
     self.coalescingBoundary = coalescingBoundary
-    self.presentationTimeNanoseconds = presentationTimeNanoseconds
     self.deadlineNanoseconds = deadlineNanoseconds
   }
 
@@ -787,7 +784,6 @@ public struct FrameDemand: Sendable, Hashable {
     value.flags = options.rawValue
     value.token = token
     value.coalescing_boundary = coalescingBoundary
-    value.presentation_time_ns = presentationTimeNanoseconds
     value.deadline_ns = deadlineNanoseconds
     return value
   }
@@ -799,7 +795,6 @@ public struct RenderFrameResult: Sendable, Hashable {
   public let mapUpdateGeneration: UInt64
   public let extentGeneration: UInt64
   public let frameGeneration: UInt64
-  public let presentationTimeNanoseconds: Int64
   /// Whether the map asked for another frame while it rendered this one, as
   /// during an ongoing camera transition. Set only when ``result`` is
   /// ``RenderResult/rendered``, and false for every other outcome. This is
@@ -814,7 +809,6 @@ public struct RenderFrameResult: Sendable, Hashable {
     mapUpdateGeneration = value.map_update_generation
     extentGeneration = value.extent_generation
     frameGeneration = value.frame_generation
-    presentationTimeNanoseconds = value.presentation_time_ns
     needsRepaint = value.needs_repaint
   }
 }

@@ -127,8 +127,8 @@ public sealed unsafe class RenderSessionTests
     [Fact]
     public void PhaseThreeNativeStructsUseExpectedHandleSizedLayouts()
     {
-        Assert.Equal(40, sizeof(mln_frame_demand));
-        Assert.Equal(56, sizeof(mln_render_frame_result));
+        Assert.Equal(32, sizeof(mln_frame_demand));
+        Assert.Equal(48, sizeof(mln_render_frame_result));
         Assert.Equal(24, sizeof(mln_gpu_sync));
         Assert.Equal(8, Marshal.SizeOf<MlnAcquiredFrame>());
         Assert.Equal(8, Marshal.SizeOf<MlnRenderFrameBatch>());

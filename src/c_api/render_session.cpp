@@ -10,7 +10,6 @@ auto mln_frame_demand_default() noexcept -> mln_frame_demand {
     .flags = MLN_FRAME_DEMAND_IF_NEEDED,
     .token = 0,
     .coalescing_boundary = 0,
-    .presentation_time_ns = 0,
     .deadline_ns = 0,
   };
 }

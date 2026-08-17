@@ -2411,7 +2411,6 @@ auto run_frame_demand(
     .map_update_generation = map_latest_update_generation(session->map),
     .extent_generation = session->extent_generation,
     .frame_generation = 0,
-    .presentation_time_ns = demand.presentation_time_ns,
     .needs_repaint = false,
   };
   const auto now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -2596,7 +2595,6 @@ auto render_session_request_frame(
         s->map_update_generation,
         s->extent_generation,
         0,
-        old.presentation_time_ns,
         false
       };
     }
@@ -3177,7 +3175,7 @@ auto render_session_abandon(
       s, mln_render_frame_result{
            sizeof(mln_render_frame_result), MLN_RENDER_RESULT_TARGET_NOT_READY,
            pending.demand.token, s->map_update_generation, s->extent_generation,
-           0, pending.demand.presentation_time_ns, false
+           0, false
          }
     );
   }

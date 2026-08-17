@@ -410,9 +410,9 @@ const (
 
 // FrameDemand is copied by RequestFrame.
 type FrameDemand struct {
-	Flags                          FrameDemandFlag
-	Token, CoalescingBoundary      uint64
-	PresentationTimeNS, DeadlineNS int64
+	Flags                     FrameDemandFlag
+	Token, CoalescingBoundary uint64
+	DeadlineNS                int64
 }
 
 func NewFrameDemand() FrameDemand {
@@ -424,7 +424,6 @@ func (d FrameDemand) toC() C.mln_frame_demand {
 	raw.flags = C.uint32_t(d.Flags)
 	raw.token = C.uint64_t(d.Token)
 	raw.coalescing_boundary = C.uint64_t(d.CoalescingBoundary)
-	raw.presentation_time_ns = C.int64_t(d.PresentationTimeNS)
 	raw.deadline_ns = C.int64_t(d.DeadlineNS)
 	return raw
 }
@@ -436,7 +435,6 @@ type RenderFrameResult struct {
 	MapUpdateGeneration uint64
 	ExtentGeneration    uint64
 	FrameGeneration     uint64
-	PresentationTimeNS  int64
 	// NeedsRepaint reports whether the map asked for another frame while it
 	// rendered this one, as during an ongoing camera transition. It is true
 	// only when Disposition is RenderResultRendered and reads false for every
@@ -462,7 +460,6 @@ func frameResultFromC(raw C.mln_render_frame_result) RenderFrameResult {
 		MapUpdateGeneration: uint64(raw.map_update_generation),
 		ExtentGeneration:    uint64(raw.extent_generation),
 		FrameGeneration:     uint64(raw.frame_generation),
-		PresentationTimeNS:  int64(raw.presentation_time_ns),
 		NeedsRepaint:        bool(raw.needs_repaint),
 	}
 }

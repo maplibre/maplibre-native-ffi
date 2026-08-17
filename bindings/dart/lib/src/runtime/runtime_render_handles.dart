@@ -181,7 +181,6 @@ final class FrameDemand {
     this.present = false,
     this.token = 0,
     this.coalescingBoundary = 0,
-    this.presentationTimeNanoseconds = 0,
     this.deadlineNanoseconds = 0,
   });
 
@@ -189,7 +188,6 @@ final class FrameDemand {
   final bool present;
   final int token;
   final int coalescingBoundary;
-  final int presentationTimeNanoseconds;
   final int deadlineNanoseconds;
 }
 
@@ -201,7 +199,6 @@ final class RenderFrameResult {
     required this.mapUpdateGeneration,
     required this.extentGeneration,
     required this.frameGeneration,
-    required this.presentationTimeNanoseconds,
     required this.needsRepaint,
   });
 
@@ -212,7 +209,6 @@ final class RenderFrameResult {
         mapUpdateGeneration: value.map_update_generation,
         extentGeneration: value.extent_generation,
         frameGeneration: value.frame_generation,
-        presentationTimeNanoseconds: value.presentation_time_ns,
         needsRepaint: value.needs_repaint,
       );
 
@@ -221,7 +217,6 @@ final class RenderFrameResult {
   final int mapUpdateGeneration;
   final int extentGeneration;
   final int frameGeneration;
-  final int presentationTimeNanoseconds;
 
   /// Whether the map asked for another frame while it rendered this one, as
   /// during an ongoing camera transition.
@@ -390,7 +385,6 @@ final class RenderSessionHandle implements Finalizable {
           (demand.renderIfNeeded ? 1 : 0) | (demand.present ? 2 : 0);
       native.ref.token = demand.token;
       native.ref.coalescing_boundary = demand.coalescingBoundary;
-      native.ref.presentation_time_ns = demand.presentationTimeNanoseconds;
       native.ref.deadline_ns = demand.deadlineNanoseconds;
       _check(raw.mln_render_session_request_frame(_handle.raw, native));
     });

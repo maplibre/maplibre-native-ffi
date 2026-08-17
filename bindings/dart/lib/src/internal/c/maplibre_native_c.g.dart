@@ -4202,9 +4202,6 @@ final class mln_frame_demand extends ffi.Struct {
   external int coalescing_boundary;
 
   @ffi.Int64()
-  external int presentation_time_ns;
-
-  @ffi.Int64()
   external int deadline_ns;
 
   static ffi.Pointer<mln_frame_demand> $allocate(
@@ -4213,14 +4210,12 @@ final class mln_frame_demand extends ffi.Struct {
     required int flags,
     required int token,
     required int coalescing_boundary,
-    required int presentation_time_ns,
     required int deadline_ns,
   }) => $allocator<mln_frame_demand>()
     ..ref.size = size
     ..ref.flags = flags
     ..ref.token = token
     ..ref.coalescing_boundary = coalescing_boundary
-    ..ref.presentation_time_ns = presentation_time_ns
     ..ref.deadline_ns = deadline_ns;
 }
 
@@ -5727,9 +5722,6 @@ final class mln_render_frame_result extends ffi.Struct {
   @ffi.Uint64()
   external int frame_generation;
 
-  @ffi.Int64()
-  external int presentation_time_ns;
-
   @ffi.Bool()
   external bool needs_repaint;
 
@@ -5741,7 +5733,6 @@ final class mln_render_frame_result extends ffi.Struct {
     required int map_update_generation,
     required int extent_generation,
     required int frame_generation,
-    required int presentation_time_ns,
     required bool needs_repaint,
   }) => $allocator<mln_render_frame_result>()
     ..ref.size = size
@@ -5750,7 +5741,6 @@ final class mln_render_frame_result extends ffi.Struct {
     ..ref.map_update_generation = map_update_generation
     ..ref.extent_generation = extent_generation
     ..ref.frame_generation = frame_generation
-    ..ref.presentation_time_ns = presentation_time_ns
     ..ref.needs_repaint = needs_repaint;
 }
 

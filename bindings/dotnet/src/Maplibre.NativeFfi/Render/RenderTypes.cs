@@ -73,7 +73,6 @@ public readonly record struct FrameDemand(
     FrameDemandFlags Flags,
     ulong Token,
     ulong CoalescingBoundary,
-    long PresentationTimeNanoseconds,
     long DeadlineNanoseconds
 );
 
@@ -88,7 +87,6 @@ public readonly record struct RenderFrameResult(
     ulong MapUpdateGeneration,
     ulong ExtentGeneration,
     ulong FrameGeneration,
-    long PresentationTimeNanoseconds,
     bool NeedsRepaint
 );
 

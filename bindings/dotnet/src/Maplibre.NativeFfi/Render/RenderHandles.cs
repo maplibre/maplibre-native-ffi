@@ -262,7 +262,6 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         native.flags = (uint)demand.Flags;
         native.token = demand.Token;
         native.coalescing_boundary = demand.CoalescingBoundary;
-        native.presentation_time_ns = demand.PresentationTimeNanoseconds;
         native.deadline_ns = demand.DeadlineNanoseconds;
         NativeStatus.Check(NativeMethods.mln_render_session_request_frame(Handle, &native));
     }
@@ -929,7 +928,6 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             value.map_update_generation,
             value.extent_generation,
             value.frame_generation,
-            value.presentation_time_ns,
             value.needs_repaint != 0
         );
 }

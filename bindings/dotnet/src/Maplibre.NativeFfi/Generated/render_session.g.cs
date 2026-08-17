@@ -46,9 +46,6 @@ namespace Maplibre.NativeFfi.Internal.C
         public ulong coalescing_boundary;
 
         [NativeTypeName("int64_t")]
-        public long presentation_time_ns;
-
-        [NativeTypeName("int64_t")]
         public long deadline_ns;
     }
 
@@ -71,9 +68,6 @@ namespace Maplibre.NativeFfi.Internal.C
 
         [NativeTypeName("uint64_t")]
         public ulong frame_generation;
-
-        [NativeTypeName("int64_t")]
-        public long presentation_time_ns;
 
         [NativeTypeName("bool")]
         public byte needs_repaint;

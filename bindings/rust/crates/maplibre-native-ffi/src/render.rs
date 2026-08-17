@@ -1072,7 +1072,6 @@ pub struct FrameDemand {
     pub present: bool,
     pub token: u64,
     pub coalescing_boundary: u64,
-    pub presentation_time_ns: i64,
     pub deadline_ns: i64,
 }
 
@@ -1083,7 +1082,6 @@ impl Default for FrameDemand {
             present: false,
             token: 0,
             coalescing_boundary: 0,
-            presentation_time_ns: 0,
             deadline_ns: 0,
         }
     }
@@ -1103,7 +1101,6 @@ impl FrameDemand {
             flags,
             token: self.token,
             coalescing_boundary: self.coalescing_boundary,
-            presentation_time_ns: self.presentation_time_ns,
             deadline_ns: self.deadline_ns,
         }
     }
@@ -1116,7 +1113,6 @@ pub struct RenderFrameResult {
     pub map_update_generation: u64,
     pub extent_generation: u64,
     pub frame_generation: u64,
-    pub presentation_time_ns: i64,
     /// Whether the map asked for another frame while it rendered this one, as
     /// during an ongoing camera transition. Set only when `disposition` is
     /// [`FrameDisposition::Rendered`]; false for every other outcome. This is
@@ -1133,7 +1129,6 @@ fn frame_result_from_native(raw: sys::mln_render_frame_result) -> RenderFrameRes
         map_update_generation: raw.map_update_generation,
         extent_generation: raw.extent_generation,
         frame_generation: raw.frame_generation,
-        presentation_time_ns: raw.presentation_time_ns,
         needs_repaint: raw.needs_repaint,
     }
 }

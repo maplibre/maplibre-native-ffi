@@ -3789,13 +3789,11 @@ impl RenderSessionHandle {
         Ok(serviced)
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn request_frame(
         &self,
         flags: u32,
         token: u64,
         coalescing_boundary: u64,
-        presentation_time_ns: i64,
         deadline_ns: i64,
     ) -> PyResult<()> {
         let demand = sys::mln_frame_demand {
@@ -3803,7 +3801,6 @@ impl RenderSessionHandle {
             flags,
             token,
             coalescing_boundary,
-            presentation_time_ns,
             deadline_ns,
         };
         maplibre_core::check(unsafe {
@@ -6646,7 +6643,6 @@ fn render_frame_result_to_py(
     dict.set_item("map_update_generation", value.map_update_generation)?;
     dict.set_item("extent_generation", value.extent_generation)?;
     dict.set_item("frame_generation", value.frame_generation)?;
-    dict.set_item("presentation_time_ns", value.presentation_time_ns)?;
     dict.set_item("needs_repaint", value.needs_repaint)?;
     Ok(dict.into_any().unbind())
 }

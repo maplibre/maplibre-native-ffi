@@ -273,7 +273,6 @@ class FrameDemand:
     flags: FrameDemandFlag = FrameDemandFlag.IF_NEEDED
     token: int = 0
     coalescing_boundary: int = 0
-    presentation_time_ns: int = 0
     deadline_ns: int = 0
 
 
@@ -292,7 +291,6 @@ class RenderFrameResult:
     map_update_generation: int
     extent_generation: int
     frame_generation: int
-    presentation_time_ns: int
     needs_repaint: bool
 
     @classmethod
@@ -303,7 +301,6 @@ class RenderFrameResult:
             map_update_generation=raw["map_update_generation"],
             extent_generation=raw["extent_generation"],
             frame_generation=raw["frame_generation"],
-            presentation_time_ns=raw["presentation_time_ns"],
             needs_repaint=raw["needs_repaint"],
         )
 
@@ -797,7 +794,6 @@ class RenderSessionHandle(NativeHandleMixin):
             int(demand.flags),
             demand.token,
             demand.coalescing_boundary,
-            demand.presentation_time_ns,
             demand.deadline_ns,
         )
 

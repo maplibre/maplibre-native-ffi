@@ -2309,8 +2309,7 @@ internal object NativeAccess {
       nativeDemand.set(ValueLayout.JAVA_INT, 4, flags)
       nativeDemand.set(ValueLayout.JAVA_LONG, 8, demand.token.toLong())
       nativeDemand.set(ValueLayout.JAVA_LONG, 16, demand.coalescingBoundary.toLong())
-      nativeDemand.set(ValueLayout.JAVA_LONG, 24, demand.presentationTimeNanoseconds)
-      nativeDemand.set(ValueLayout.JAVA_LONG, 32, demand.deadlineNanoseconds)
+      nativeDemand.set(ValueLayout.JAVA_LONG, 24, demand.deadlineNanoseconds)
       Status.check(
         dynamicStatusDowncall(
             "mln_render_session_request_frame",
@@ -5589,8 +5588,7 @@ internal object NativeAccess {
       mapUpdateGeneration = segment.get(ValueLayout.JAVA_LONG, 16).toULong(),
       extentGeneration = segment.get(ValueLayout.JAVA_LONG, 24).toULong(),
       frameGeneration = segment.get(ValueLayout.JAVA_LONG, 32).toULong(),
-      presentationTimeNanoseconds = segment.get(ValueLayout.JAVA_LONG, 40),
-      needsRepaint = segment.get(ValueLayout.JAVA_BOOLEAN, 48),
+      needsRepaint = segment.get(ValueLayout.JAVA_BOOLEAN, 40),
     )
 
   private fun gpuSync(arena: Arena, sync: GpuSync): MemorySegment =
@@ -5679,7 +5677,7 @@ internal object NativeAccess {
   private val dynamicDowncallCache = ConcurrentHashMap<String, MethodHandle>()
 
   private const val RENDER_SESSION_CAPABILITIES_SIZE: Long = 16
-  private const val FRAME_DEMAND_SIZE: Long = 40
+  private const val FRAME_DEMAND_SIZE: Long = 32
   private const val RENDER_FRAME_RESULT_SIZE: Long = 48
   private const val RENDER_SESSION_SNAPSHOT_SIZE: Long = 96
   private const val GPU_SYNC_SIZE: Long = 24

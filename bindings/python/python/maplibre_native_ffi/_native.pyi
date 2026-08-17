@@ -499,7 +499,6 @@ class _RenderSessionHandle:
         flags: int,
         token: int,
         coalescing_boundary: int,
-        presentation_time_ns: int,
         deadline_ns: int,
     ) -> None: ...
     def drain_frame_results(self) -> list[_WireDict]: ...

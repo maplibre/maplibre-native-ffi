@@ -62,8 +62,6 @@ typedef struct mln_frame_demand {
   uint64_t token;
   /** Demands coalesce only when this value and their flags match. */
   uint64_t coalescing_boundary;
-  /** Intended presentation time in the host's monotonic clock domain. */
-  int64_t presentation_time_ns;
   /** Positive deadline in the host's monotonic clock domain; zero has no limit.
    */
   int64_t deadline_ns;
@@ -79,7 +77,6 @@ typedef struct mln_render_frame_result {
   uint64_t extent_generation;
   /** Zero unless disposition is MLN_RENDER_RESULT_RENDERED. */
   uint64_t frame_generation;
-  int64_t presentation_time_ns;
   /**
    * Whether the map asked for another frame while it rendered this one, as
    * during an ongoing camera transition. Set only when disposition is

@@ -927,16 +927,15 @@ ready and target-lost outcomes rather than retrying them in a busy loop.
 ### Frame demand and results
 
 A binding MUST expose frame demand as a nonblocking any-thread call. It carries
-flags, token, coalescing boundary, presentation time, and optional deadline.
-Every accepted demand produces exactly one terminal result record, including a
-superseded or deadline-missed demand.
+flags, a token, a coalescing boundary, and an optional deadline. Every accepted
+demand produces exactly one terminal result record, including a superseded or
+deadline-missed demand.
 
-Frame results preserve disposition, token, presentation time, map-update
-generation, extent generation, and frame generation. A binding MUST preserve
-rendered, no-update, size-pending, target-not-ready, superseded, and
-deadline-missed as distinct outcomes. A positive monotonic deadline terminates
-the demand as deadline missed when it expires before work begins. Presentation
-time selects state and neither timestamp supplies cadence.
+Frame results preserve disposition, token, map-update generation, extent
+generation, and frame generation. A binding MUST preserve rendered, no-update,
+size-pending, target-not-ready, superseded, and deadline-missed as distinct
+outcomes. A positive monotonic deadline terminates the demand as deadline missed
+when it expires before work begins. The deadline does not supply cadence.
 
 Frame readiness is level-triggered until drained. Each drain takes every queued
 record into an independently owned batch. A binding MUST preserve the records
