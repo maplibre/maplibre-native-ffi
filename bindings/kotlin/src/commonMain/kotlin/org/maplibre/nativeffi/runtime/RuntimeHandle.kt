@@ -124,7 +124,7 @@ public expect class RuntimeHandle {
    * Suspends until native runtime retirement completes, then releases callbacks and notification
    * resources.
    */
-  public suspend fun close()
+  public fun close()
 
   public companion object {
     /** Creates a runtime without blocking the caller's coroutine. */

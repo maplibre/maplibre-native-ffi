@@ -54,7 +54,7 @@ public sealed unsafe partial class MapHandle : IDisposable
         nativeId = handle.Value;
         state = new NativeHandleState<MlnMap>(
             handle,
-            static _ => mln_status.MLN_STATUS_OK,
+            NativeMethods.mln_map_release,
             nameof(MapHandle)
         );
     }
@@ -2001,27 +2001,15 @@ public sealed unsafe partial class MapHandle : IDisposable
         );
     }
 
-    /// <summary>Closes the map after its previously accepted work completes.</summary>
-    public Task CloseAsync(CancellationToken cancellationToken = default)
+    /// <summary>Releases the map's public native handle.</summary>
+    public void Close()
     {
         if (IsClosed)
         {
-            return Task.CompletedTask;
+            return;
         }
-        cancellationToken.ThrowIfCancellationRequested();
-        var operation = StartMapOperation(outOperation =>
-            NativeMethods.mln_map_close_start(Handle, outOperation)
-        );
-        return OperationAwaiter.WaitThen(
-            runtime.WaitForOperationAsync(operation),
-            () =>
-            {
-                RuntimeHandle.CheckOperationCompletion(operation);
-                state.Close();
-                runtime.UnregisterMap(this);
-            },
-            () => NativeMethods.mln_operation_release(operation)
-        );
+        state.Close();
+        runtime.UnregisterMap(this);
     }
 
     internal static IDisposable UseCustomGeometrySourceInstallForTest(
@@ -2244,7 +2232,7 @@ public sealed unsafe partial class MapHandle : IDisposable
     /// <inheritdoc />
     public void Dispose()
     {
-        CloseAsync().ConfigureAwait(false).GetAwaiter().GetResult();
+        Close();
         GC.KeepAlive(runtime);
     }
 }

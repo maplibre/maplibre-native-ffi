@@ -320,6 +320,7 @@ test "a custom geometry source releases its context once per lifetime end" {
     // releases that context.
     try map.close();
     map_open = false;
+    try support.waitForBarrier(&runtime);
     try testing.expectEqual(@as(usize, 1), removed.release_count);
     try testing.expectEqual(@as(usize, 1), retained.release_count);
 }

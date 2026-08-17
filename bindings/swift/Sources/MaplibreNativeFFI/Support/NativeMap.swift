@@ -21,13 +21,8 @@ enum NativeMap {
     }
   }
 
-  static func closeStart(_ map: NativeMapHandle) throws
-    -> NativeOperationHandle
-  {
-    let raw = try NativeMemory.withTemporary(mln_operation(0)) { operation in
-      try checkStatus(mln_map_close_start(map.raw, operation))
-    }.value
-    return NativeOperationHandle(raw: raw)
+  static func release(_ map: NativeMapHandle) throws {
+    try checkStatus(mln_map_release(map.raw))
   }
 
   static func snapshot(_ map: NativeMapHandle) throws -> mln_map_snapshot {

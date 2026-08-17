@@ -956,8 +956,8 @@ func (m *MapHandle) LatLngsForPixels(points []ScreenPoint) ([]LatLng, error) {
 	return goLatLngSlice(rawCoordinates), nil
 }
 
-// Close waits for this map's native close operation. It discards this map's
-// queued runtime events and releases callback state that the map still holds.
+// Close releases this map's public native handle. Native teardown continues in
+// submission order after this method returns.
 func (m *MapHandle) Close() error {
 	if m == nil || m.state == nil {
 		return newBindingError(ErrInvalidArgument, "MapHandle is nil")
@@ -969,7 +969,6 @@ func (m *MapHandle) Close() error {
 	}()
 	var closeErr error
 	_, err := m.state.CloseChecked(func(native nativeMap) int32 {
-		var operation C.mln_operation
 		if destroyMapHandle != nil {
 			status := destroyMapHandle(native)
 			if status != int32(C.MLN_STATUS_OK) {
@@ -983,13 +982,8 @@ func (m *MapHandle) Close() error {
 			return status
 		}
 		if err := checkNative(func() int32 {
-			return int32(C.mln_map_close_start(C.mln_map(native), &operation))
+			return int32(C.mln_map_release(C.mln_map(native)))
 		}); err != nil {
-			closeErr = err
-			return statusFromError(err)
-		}
-		defer C.mln_operation_release(operation)
-		if err := waitNativeOperation(operation); err != nil {
 			closeErr = err
 			return statusFromError(err)
 		}

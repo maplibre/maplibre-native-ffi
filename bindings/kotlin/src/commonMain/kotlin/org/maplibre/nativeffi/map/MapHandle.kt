@@ -417,7 +417,7 @@ public expect class MapHandle {
   public suspend fun createProjection(): MapProjectionHandle
 
   /** Suspends until native map retirement completes. Queued events keep this map's source ID. */
-  public suspend fun close()
+  public fun close()
 
   public companion object {
     /** Creates a map without blocking the caller's coroutine. */

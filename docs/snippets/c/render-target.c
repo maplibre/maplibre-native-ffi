@@ -177,11 +177,6 @@ void release_map(mln_map map, mln_render_session session) {
   mln_operation_release(operation);
   mln_render_session_destroy(session);
 
-  operation = MLN_HANDLE_NULL;
-  if (mln_map_close_start(map, &operation) == MLN_STATUS_OK) {
-    bool completed = false;
-    (void)mln_operation_wait(operation, -1, &completed);
-  }
-  mln_operation_release(operation);
+  (void)mln_map_release(map);
   // #endregion teardown
 }

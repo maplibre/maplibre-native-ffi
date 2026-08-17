@@ -153,7 +153,7 @@ auto create_map_start(
 ) -> mln_status;
 auto create_map_take_result(mln_operation operation, mln_map* out_map)
   -> mln_status;
-auto map_close_start(mln_map map, mln_operation* out_operation) -> mln_status;
+auto release_map(mln_map map) -> mln_status;
 auto map_snapshot_get(mln_map map, mln_map_snapshot* out_snapshot)
   -> mln_status;
 auto map_resize(

@@ -163,11 +163,6 @@ uint8_t* render_still_image(
     mln_operation_release(detach);
     (void)mln_render_session_destroy(session);
   }
-  mln_operation close = MLN_HANDLE_NULL;
-  if (mln_map_close_start(map, &close) == MLN_STATUS_OK) {
-    completed = false;
-    (void)mln_operation_wait(close, -1, &completed);
-  }
-  mln_operation_release(close);
+  (void)mln_map_release(map);
   return pixels;
 }

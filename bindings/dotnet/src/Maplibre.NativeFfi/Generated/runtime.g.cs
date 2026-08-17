@@ -684,7 +684,7 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_status mln_runtime_barrier_start([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_close_start([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
+        public static extern mln_status mln_runtime_release([NativeTypeName("mln_runtime")] MlnRuntime runtime);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_runtime_drain_events([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("mln_event_batch *")] MlnEventBatch* out_batch);

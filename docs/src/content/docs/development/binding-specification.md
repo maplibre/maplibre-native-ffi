@@ -640,8 +640,8 @@ provider produce no header-transform invocation.
 
 Registration remains replaceable for the lifetime of a runtime, including while
 maps are live. A binding installs a replacement before releasing the previous
-callback state. Replacement, clear, and runtime close release the old state only
-after the native registration call has retired every in-flight callback.
+callback state. Replacement, clear, and runtime teardown release the old state
+only after the native registration has retired every in-flight callback.
 
 Bindings that cannot answer a synchronous callback expose native rule tables. An
 exact rule matches the complete transformed URL, a glob rule matches it against
@@ -691,8 +691,8 @@ Resource provider invocation follows this operation:
 
 Provider registration is replaceable for a runtime's whole life. After command
 acceptance, a binding transfers the new callback state to the C API. The C API
-releases old state after replacement, clear, or runtime close retires its final
-callback.
+releases old state after replacement, clear, or runtime teardown retires its
+final callback.
 
 Handled request completion is terminal. A request can complete once; a
 completion that reaches C consumes the completion path even when native returns
@@ -731,11 +731,11 @@ Bindings preserve the C execution category:
    graphics-thread requirement. A binding MUST NOT apply that requirement to
    render-session control calls.
 
-Lifecycle wrappers start and observe native lifecycle operations. A constructor
-does not publish its runtime or map wrapper until typed result take transfers
-the live handle. Explicit close performs native preflight, retains callbacks and
-dependencies until the close operation completes, and then makes every public
-alias observe closed state. A preflight failure leaves the wrapper open.
+Lifecycle wrappers do not publish a runtime or map until typed creation result
+take transfers the live handle. Explicit close performs native release preflight
+and makes every public alias observe closed state when native consumes the
+handle. Native teardown retains its own callbacks and dependencies. A preflight
+failure leaves the wrapper open.
 
 Operation wrappers retain their native observer until result take, discard, or
 release. They expose permanent terminal status and copied diagnostics. A
@@ -1044,10 +1044,10 @@ that a real native failure would expose.
 | ID      | Test                                                                                                                                                                                                      |
 | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | BND-040 | Runtime creation followed by explicit close retires the native handle exactly once; every public alias observes closed state, and a second binding close no-ops.                                          |
-| BND-041 | A failed native close preflight leaves the handle live; a later accepted close operation retires it.                                                                                                      |
+| BND-041 | A failed native release preflight leaves the handle live; a later accepted release retires it before returning.                                                                                           |
 | BND-042 | A parent close rejects a live or pending child, leaves the parent open, and succeeds after the child closes or creation resolves.                                                                         |
 | BND-043 | A map projection remains usable until explicit close; a live projection prevents map close.                                                                                                               |
-| BND-044 | Releasing an operation observer does not cancel or stall accepted native work, and a pending lifecycle operation preserves every dependency through completion.                                           |
+| BND-044 | Releasing an operation observer does not cancel or stall accepted native work, and native teardown preserves every dependency it still needs.                                                             |
 | BND-045 | A released handle's id, replayed through an internal seam after a new handle of the same kind is created, reports the binding's invalid-argument error naming it stale, and the new handle keeps working. |
 | BND-047 | A handle id of one kind passed to another kind's operation through an internal seam reports the binding's invalid-argument error, and the safe public API has no expression of that call.                 |
 | BND-049 | A runtime, map, projection, or operation handle remains usable when an asynchronous continuation resumes on another native thread.                                                                        |

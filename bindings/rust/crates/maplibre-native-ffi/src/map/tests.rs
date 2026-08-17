@@ -916,6 +916,7 @@ fn custom_geometry_source_state_is_released_on_map_close() {
         .unwrap();
 
     map.close().unwrap();
+    await_runtime_barrier(&runtime);
 
     assert_eq!(releases.load(Ordering::SeqCst), 1);
     runtime.close().unwrap();

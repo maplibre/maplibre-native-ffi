@@ -154,6 +154,7 @@ func TestCustomGeometrySourceReleasedByRemovalAndMapClose(t *testing.T) {
 	if err := m.Close(); err != nil {
 		t.Fatalf("Map Close(): %v", err)
 	}
+	waitForRuntimeBarrier(t, runtime)
 	if live := liveCustomGeometrySources(t, baseline); live != 0 {
 		t.Fatalf("live callback states after the map close = %d, want 0", live)
 	}

@@ -26,13 +26,8 @@ const RuntimeState = struct {
     notification_source: c.mln_notification_source,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
     registry: ?*RuntimeRegistry,
-    resource_roots_lock: std.Io.Mutex,
-    resource_transforms: std.ArrayList(*ResourceTransform),
-    http_header_transforms: std.ArrayList(*HttpHeaderTransform),
-    resource_providers: std.ArrayList(*ResourceProviderState),
     active_leases: std.atomic.Value(usize),
     closing: bool,
-    runtime_destroyed: bool,
 };
 
 pub const RuntimeLease = struct {
@@ -516,6 +511,21 @@ pub const ResourceProvider = struct {
     handler: ResourceProviderHandler,
     context: ?*anyopaque = null,
 };
+
+fn releaseResourceTransform(user_data: ?*anyopaque) callconv(.c) void {
+    const value: *ResourceTransform = @ptrCast(@alignCast(user_data orelse return));
+    std.heap.smp_allocator.destroy(value);
+}
+
+fn releaseHttpHeaderTransform(user_data: ?*anyopaque) callconv(.c) void {
+    const value: *HttpHeaderTransform = @ptrCast(@alignCast(user_data orelse return));
+    std.heap.smp_allocator.destroy(value);
+}
+
+fn releaseResourceProvider(user_data: ?*anyopaque) callconv(.c) void {
+    const value: *ResourceProviderState = @ptrCast(@alignCast(user_data orelse return));
+    std.heap.smp_allocator.destroy(value);
+}
 
 pub const ResourceRequestHandle = enum(c.mln_resource_request_handle) {
     _,
@@ -1853,8 +1863,8 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
     }
 
     /// Registers, replaces, or clears the runtime-scoped URL transform.
-    /// The binding retains accepted callback roots through every terminal
-    /// command disposition and releases them when the runtime closes.
+    /// Native retains each accepted callback root until it is no longer
+    /// reachable from the runtime.
     pub fn setResourceTransform(self: *RuntimeHandle, transform: ?ResourceTransform) status.Error!u64 {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
@@ -1863,14 +1873,11 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
             const replacement = try std.heap.smp_allocator.create(ResourceTransform);
             errdefer std.heap.smp_allocator.destroy(replacement);
             replacement.* = value;
-            std.Io.Threaded.mutexLock(&runtime_lease.state.resource_roots_lock);
-            defer std.Io.Threaded.mutexUnlock(&runtime_lease.state.resource_roots_lock);
-            try runtime_lease.state.resource_transforms.append(std.heap.smp_allocator, replacement);
-            errdefer _ = runtime_lease.state.resource_transforms.pop();
             var native_transform = c.mln_resource_transform{
                 .size = @sizeOf(c.mln_resource_transform),
                 .callback = resourceTransformTrampoline,
                 .user_data = replacement,
+                .release_user_data = releaseResourceTransform,
             };
             try status.checkStatus(c.mln_runtime_set_resource_transform(
                 runtime_lease.native,
@@ -1894,14 +1901,11 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
             const replacement = try std.heap.smp_allocator.create(ResourceProviderState);
             errdefer std.heap.smp_allocator.destroy(replacement);
             replacement.* = .{ .provider = value, .diagnostic_store = runtime_lease.diagnostic_store };
-            std.Io.Threaded.mutexLock(&runtime_lease.state.resource_roots_lock);
-            defer std.Io.Threaded.mutexUnlock(&runtime_lease.state.resource_roots_lock);
-            try runtime_lease.state.resource_providers.append(std.heap.smp_allocator, replacement);
-            errdefer _ = runtime_lease.state.resource_providers.pop();
             var native_provider = c.mln_resource_provider{
                 .size = @sizeOf(c.mln_resource_provider),
                 .callback = resourceProviderTrampoline,
                 .user_data = replacement,
+                .release_user_data = releaseResourceProvider,
             };
             try status.checkStatus(c.mln_runtime_set_resource_provider(
                 runtime_lease.native,
@@ -1925,14 +1929,11 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
             const replacement = try std.heap.smp_allocator.create(HttpHeaderTransform);
             errdefer std.heap.smp_allocator.destroy(replacement);
             replacement.* = value;
-            std.Io.Threaded.mutexLock(&runtime_lease.state.resource_roots_lock);
-            defer std.Io.Threaded.mutexUnlock(&runtime_lease.state.resource_roots_lock);
-            try runtime_lease.state.http_header_transforms.append(std.heap.smp_allocator, replacement);
-            errdefer _ = runtime_lease.state.http_header_transforms.pop();
             var native_transform = c.mln_http_header_transform{
                 .size = @sizeOf(c.mln_http_header_transform),
                 .callback = httpHeaderTransformTrampoline,
                 .user_data = replacement,
+                .release_user_data = releaseHttpHeaderTransform,
             };
             try status.checkStatus(c.mln_runtime_set_http_header_transform(
                 runtime_lease.native,
@@ -1950,30 +1951,14 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
 
     pub fn close(self: *RuntimeHandle) status.Error!void {
         const runtime_close = try beginRuntimeClose(self.*) orelse return;
-        if (!runtime_close.state.runtime_destroyed) {
-            var operation: c.mln_operation = 0;
-            status.checkStatus(
-                c.mln_runtime_close_start(runtime_close.native, &operation),
-                runtime_close.diagnostic_store,
-            ) catch |err| {
-                cancelRuntimeClose(runtime_close.state);
-                return err;
-            };
-            waitNativeOperation(operation, runtime_close.diagnostic_store) catch |err| {
-                c.mln_operation_release(operation);
-                cancelRuntimeClose(runtime_close.state);
-                return err;
-            };
-            c.mln_operation_release(operation);
-            runtime_close.state.runtime_destroyed = true;
-        }
+        status.checkStatus(
+            c.mln_runtime_release(runtime_close.native),
+            runtime_close.diagnostic_store,
+        ) catch |err| {
+            cancelRuntimeClose(runtime_close.state);
+            return err;
+        };
         c.mln_notification_source_release(runtime_close.state.notification_source);
-        for (runtime_close.state.resource_transforms.items) |root| std.heap.smp_allocator.destroy(root);
-        runtime_close.state.resource_transforms.deinit(std.heap.smp_allocator);
-        for (runtime_close.state.http_header_transforms.items) |root| std.heap.smp_allocator.destroy(root);
-        runtime_close.state.http_header_transforms.deinit(std.heap.smp_allocator);
-        for (runtime_close.state.resource_providers.items) |root| std.heap.smp_allocator.destroy(root);
-        runtime_close.state.resource_providers.deinit(std.heap.smp_allocator);
         runtime_close.registry.maps.deinit(std.heap.smp_allocator);
         std.heap.smp_allocator.destroy(runtime_close.registry);
         const runtime_state = finishRuntimeClose(self.*) orelse runtime_close.state;
@@ -2018,13 +2003,8 @@ fn createNative(
         .notification_source = notification_source,
         .diagnostic_store = diagnostic_store,
         .registry = runtime_registry,
-        .resource_roots_lock = std.Io.Mutex.init,
-        .resource_transforms = .empty,
-        .http_header_transforms = .empty,
-        .resource_providers = .empty,
         .active_leases = std.atomic.Value(usize).init(0),
         .closing = false,
-        .runtime_destroyed = false,
     };
     errdefer std.heap.smp_allocator.destroy(runtime_state);
 
@@ -2309,18 +2289,16 @@ fn beginRuntimeClose(handle: RuntimeHandle) status.Error!?RuntimeClose {
     defer unlockRuntimeRegistry();
 
     const runtime_state = runtime_handle_registry.get(@intFromEnum(handle)) orelse return null;
-    if (runtime_state.closing and !runtime_state.runtime_destroyed) return error.ActiveBorrow;
+    if (runtime_state.closing) return error.ActiveBorrow;
     if (runtime_state.active_leases.load(.seq_cst) != 0) return error.ActiveBorrow;
     const runtime_registry = runtime_state.registry orelse return null;
-    if (!runtime_state.runtime_destroyed) {
-        if (runtime_registry.maps.items.len != 0) {
-            try status.setBindingDiagnostic(runtime_state.diagnostic_store, "runtime has live maps");
-            return error.InvalidState;
-        }
-        if (runtime_registry.live_operations != 0) {
-            try status.setBindingDiagnostic(runtime_state.diagnostic_store, "runtime has live operations");
-            return error.InvalidState;
-        }
+    if (runtime_registry.maps.items.len != 0) {
+        try status.setBindingDiagnostic(runtime_state.diagnostic_store, "runtime has live maps");
+        return error.InvalidState;
+    }
+    if (runtime_registry.live_operations != 0) {
+        try status.setBindingDiagnostic(runtime_state.diagnostic_store, "runtime has live operations");
+        return error.InvalidState;
     }
     const runtime: c.mln_runtime = @intFromEnum(handle);
     runtime_state.closing = true;

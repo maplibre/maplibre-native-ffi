@@ -53,7 +53,7 @@ final class MapState {
         )
       )
     } catch {
-      try? await runtime.close()
+      try? runtime.close()
       throw error
     }
 
@@ -90,12 +90,12 @@ final class MapState {
     }
   }
 
-  func close() async throws {
+  func close() throws {
     guard !isClosed else { return }
     isClosed = true
     runtime.setEventReadyHandler(nil)
-    try await map.close()
-    try await runtime.close()
+    try map.close()
+    try runtime.close()
   }
 
   private func drainEvents() throws -> Bool {

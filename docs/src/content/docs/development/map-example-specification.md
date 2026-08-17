@@ -298,11 +298,11 @@ On host termination or fatal error:
    any quarantined resources.
 5. Destroy the detached or abandoned session from any thread.
 6. Release compositor and target resources.
-7. Start and await map close, then runtime close.
+7. Release the map, then the runtime.
 8. Release the notification source and graphics resources.
 
-A map close preflight rejects an attaching or attached session without changing
-map state.
+A map release preflight rejects an attaching or attached session without
+changing map state.
 
 #### Handle ownership
 

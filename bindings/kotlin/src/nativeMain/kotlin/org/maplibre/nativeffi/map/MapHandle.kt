@@ -60,7 +60,6 @@ import org.maplibre.nativeffi.internal.c.mln_map_apply_camera_delta
 import org.maplibre.nativeffi.internal.c.mln_map_camera_query_start
 import org.maplibre.nativeffi.internal.c.mln_map_camera_query_take_result
 import org.maplibre.nativeffi.internal.c.mln_map_camera_snapshot_get
-import org.maplibre.nativeffi.internal.c.mln_map_close_start
 import org.maplibre.nativeffi.internal.c.mln_map_copy_layer_source_id_start
 import org.maplibre.nativeffi.internal.c.mln_map_copy_layer_source_id_take_result
 import org.maplibre.nativeffi.internal.c.mln_map_copy_layer_source_layer_start
@@ -108,6 +107,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_options
 import org.maplibre.nativeffi.internal.c.mln_map_options_default
 import org.maplibre.nativeffi.internal.c.mln_map_projection_create_start
 import org.maplibre.nativeffi.internal.c.mln_map_projection_create_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_release
 import org.maplibre.nativeffi.internal.c.mln_map_remove_style_image
 import org.maplibre.nativeffi.internal.c.mln_map_remove_style_layer
 import org.maplibre.nativeffi.internal.c.mln_map_remove_style_source
@@ -1750,24 +1750,13 @@ private constructor(
     }
   }
 
-  public actual suspend fun close() {
+  public actual fun close() {
     if (!state.beginClose()) return
-    val operation =
-      try {
-        startOperation { outOperation ->
-          mln_map_close_start(state.handleForClose().rawHandleValue, outOperation)
-        }
-      } catch (error: Throwable) {
-        state.abortClose()
-        throw error
-      }
     try {
-      runtime.awaitOperation(operation)
+      Status.check(mln_map_release(state.handleForClose().rawHandleValue))
     } catch (error: Throwable) {
       state.abortClose()
       throw error
-    } finally {
-      mln_operation_release(operation)
     }
     state.completeClose {
       runtime.unregisterMap(this)

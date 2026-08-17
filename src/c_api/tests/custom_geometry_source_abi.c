@@ -181,6 +181,7 @@ static void accepted_adds_release_their_callback_state(void) {
   TEST_ASSERT_EQUAL_size_t(1, probe.release_count);
 
   mln_test_destroy_map(map);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
   TEST_ASSERT_EQUAL_size_t(2, probe.release_count);
   mln_test_destroy_runtime(runtime);
 }

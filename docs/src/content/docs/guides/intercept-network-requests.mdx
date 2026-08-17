@@ -110,6 +110,6 @@ completion or cancellation.
 ## Keep callback state reachable
 
 The runtime owns callback state after accepting a registration. It releases the
-state after replacement, clear, or runtime close retires every in-flight
+state after replacement, clear, or runtime teardown retires every in-flight
 callback. Release any host lock that a callback also acquires before starting
 close; holding that lock can deadlock teardown.

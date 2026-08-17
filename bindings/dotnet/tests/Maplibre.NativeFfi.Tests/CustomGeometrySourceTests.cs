@@ -228,6 +228,7 @@ public sealed class CustomGeometrySourceTests
         map.AddCustomGeometrySource("custom", state);
 
         TestHandles.Close(map);
+        runtime.BarrierAsync(TestContext.Current.CancellationToken).GetAwaiter().GetResult();
 
         Assert.False(state.IsHandleAllocatedForTest);
     }

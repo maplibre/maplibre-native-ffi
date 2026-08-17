@@ -249,8 +249,7 @@ auto create_runtime_take_result(
 ) -> mln_status;
 auto runtime_barrier_start(mln_runtime runtime, mln_operation* out_operation)
   -> mln_status;
-auto close_runtime_start(mln_runtime runtime, mln_operation* out_operation)
-  -> mln_status;
+auto release_runtime(mln_runtime runtime) -> mln_status;
 auto drain_runtime_events(mln_runtime runtime, mln_event_batch* out_batch)
   -> mln_status;
 auto get_event_batch(

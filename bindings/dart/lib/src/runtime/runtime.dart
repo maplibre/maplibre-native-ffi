@@ -199,13 +199,7 @@ final class RuntimeHandle {
         raw.mln_operation_release(operation);
       }
       if (runtimeHandle != 0) {
-        final closeOperation = withNativeArena((arena) {
-          final outOperation = arena<Uint64>()..value = 0;
-          _check(raw.mln_runtime_close_start(runtimeHandle, outOperation));
-          return outOperation.value;
-        });
-        await _waitForStandaloneOperation(source, closeOperation);
-        raw.mln_operation_release(closeOperation);
+        _check(raw.mln_runtime_release(runtimeHandle));
       }
       raw.mln_notification_source_release(source);
       rethrow;
@@ -785,7 +779,7 @@ final class RuntimeHandle {
     return _finishOperation(operation);
   }
 
-  /// Closes this runtime after its native executor has stopped.
+  /// Releases this runtime's public native handle.
   Future<void> close() async {
     final collectedOperationIds = _operations.entries
         .where((entry) => entry.value.target == null)
@@ -802,12 +796,7 @@ final class RuntimeHandle {
       );
     }
     await _state.closeAsync((handle) async {
-      final operation = withNativeArena((arena) {
-        final outOperation = arena<Uint64>()..value = 0;
-        _check(raw.mln_runtime_close_start(handle.raw, outOperation));
-        return outOperation.value;
-      });
-      await _finishOperation(operation);
+      _check(raw.mln_runtime_release(handle.raw));
     });
     if (_notificationSource == 0) {
       return;
@@ -4295,19 +4284,18 @@ final class MapHandle {
     );
   }
 
-  /// Closes this map after its queued work has finished.
+  /// Releases this map's public native handle.
   ///
-  /// Callback roots remain alive until native close completion releases every
+  /// Callback roots remain alive until native teardown releases every
   /// custom-geometry source that the map still owns.
   Future<void> close() async {
     final id = _state.handleId;
     await _state.closeAsync((handle) async {
-      final operation = withNativeArena((arena) {
-        final outOperation = arena<Uint64>()..value = 0;
-        _check(raw.mln_map_close_start(handle.raw, outOperation));
-        return outOperation.value;
-      });
-      await _runtime._finishOperation(operation);
+      _check(raw.mln_map_release(handle.raw));
+      // Dart listener callbacks arrive on this isolate. A barrier submitted
+      // after release keeps the callback roots alive through native teardown
+      // and drains preceding command-finished events.
+      await _runtime.barrier();
       // Native release callbacks are listener callbacks. Yield on this isolate
       // before retiring any root whose release message has not run yet.
       await Future<void>.delayed(Duration.zero);

@@ -166,13 +166,8 @@ impl RuntimeState {
             ));
         }
         let runtime = self.native()?;
-        let mut operation = sys::mln_operation(0);
-        // SAFETY: runtime is live and operation is a null writable handle.
-        maplibre_core::check(unsafe { sys::mln_runtime_close_start(runtime, &mut operation) })?;
-        let result = wait_raw_operation_completed(operation);
-        // SAFETY: the close observer is owned by this call.
-        unsafe { sys::mln_operation_release(operation) };
-        result?;
+        // SAFETY: runtime is live and native consumes it only on success.
+        maplibre_core::check(unsafe { sys::mln_runtime_release(runtime) })?;
         self.handle.mark_closed();
         let mut source = self
             .notification_source
@@ -1271,8 +1266,7 @@ impl RuntimeHandle {
         Ok(RuntimeEventMask::from_bits_retain(raw))
     }
 
-    /// Explicitly closes the runtime and waits for its worker to stop before
-    /// releasing the shared notification source.
+    /// Explicitly releases the runtime's public handle.
     pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
         if self.inner.is_closed() {
             return Ok(());
@@ -1826,6 +1820,14 @@ mod tests {
         false
     }
 
+    fn wait_for_arc_release(value: &Arc<()>) {
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while Arc::strong_count(value) != 1 && std::time::Instant::now() < deadline {
+            std::thread::yield_now();
+        }
+        assert_eq!(Arc::strong_count(value), 1);
+    }
+
     fn wait_for_map_loading_failure(runtime: &mut RuntimeHandle) -> RuntimeEvent {
         for _ in 0..100 {
             std::thread::sleep(std::time::Duration::from_millis(1));
@@ -1999,9 +2001,9 @@ mod tests {
         assert_eq!(Arc::strong_count(&third), 2);
 
         runtime.close().unwrap();
-        assert_eq!(Arc::strong_count(&third), 1);
-        assert_eq!(Arc::strong_count(&first), 1);
-        assert_eq!(Arc::strong_count(&second), 1);
+        wait_for_arc_release(&third);
+        wait_for_arc_release(&first);
+        wait_for_arc_release(&second);
     }
 
     #[test]
@@ -2033,7 +2035,7 @@ mod tests {
         assert_eq!(Arc::strong_count(&second), 1);
 
         runtime.close().unwrap();
-        assert_eq!(Arc::strong_count(&first), 1);
+        wait_for_arc_release(&first);
     }
 
     // Requests a style no file source serves, so the loading-failure event that
@@ -2288,8 +2290,8 @@ mod tests {
         runtime.clear_resource_transform().unwrap();
         assert_eq!(Arc::strong_count(&second), 2);
         runtime.close().unwrap();
-        assert_eq!(Arc::strong_count(&first), 1);
-        assert_eq!(Arc::strong_count(&second), 1);
+        wait_for_arc_release(&first);
+        wait_for_arc_release(&second);
     }
 
     /// The browser has no in-process TCP server, so the runner serves the two
@@ -2566,8 +2568,8 @@ mod tests {
 
         map.close().unwrap();
         runtime.close().unwrap();
-        assert_eq!(Arc::strong_count(&second), 1);
-        assert_eq!(Arc::strong_count(&first), 1);
+        wait_for_arc_release(&second);
+        wait_for_arc_release(&first);
     }
 
     #[test]
@@ -2586,7 +2588,7 @@ mod tests {
 
         runtime.close().unwrap();
 
-        assert_eq!(Arc::strong_count(&token), 1);
+        wait_for_arc_release(&token);
     }
 
     #[test]
@@ -2624,7 +2626,7 @@ mod tests {
         assert_eq!(Arc::strong_count(&token), 2);
 
         runtime.close().unwrap();
-        assert_eq!(Arc::strong_count(&token), 1);
+        wait_for_arc_release(&token);
     }
 
     #[test]

@@ -3864,6 +3864,7 @@ def test_map_close_releases_custom_geometry_handle() -> None:
         runtime.barrier()
 
         map_handle.close()
+        runtime.barrier()
 
         assert source.closed
         source._native.push_fetch_for_test(1, 2, 3)

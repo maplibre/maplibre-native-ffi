@@ -45,23 +45,14 @@ static void runtime_creation_returns_an_operation_result(void) {
   );
   mln_operation_release(creation);
 
-  mln_operation close = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_close_start(runtime, &close)
-  );
-  wait_for_success(close);
-  mln_operation_release(close);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_release(runtime));
   mln_notification_source_release(source);
 }
 
 static void close_preflight_leaves_a_runtime_with_a_live_child_open(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  mln_operation close = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_STATE, mln_runtime_close_start(runtime, &close)
-  );
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, close);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_INVALID_STATE, mln_runtime_release(runtime));
 
   uint64_t mask = 0;
   TEST_ASSERT_EQUAL_INT(
@@ -69,10 +60,7 @@ static void close_preflight_leaves_a_runtime_with_a_live_child_open(void) {
   );
   mln_test_destroy_map(map);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_reserve_child(runtime));
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_STATE, mln_runtime_close_start(runtime, &close)
-  );
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, close);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_INVALID_STATE, mln_runtime_release(runtime));
   mln_test_runtime_abandon_child(runtime);
   mln_test_destroy_runtime(runtime);
 }
@@ -104,7 +92,6 @@ static void a_barrier_waits_for_a_preceding_pending_operation(void) {
 
 typedef struct close_probe {
   mln_runtime runtime;
-  mln_operation operation;
   atomic_int status;
 } close_probe;
 
@@ -131,9 +118,7 @@ static mln_runtime create_untracked_runtime(
 
 static void close_from_foreign_thread(void* argument) {
   close_probe* probe = argument;
-  atomic_store(
-    &probe->status, mln_runtime_close_start(probe->runtime, &probe->operation)
-  );
+  atomic_store(&probe->status, mln_runtime_release(probe->runtime));
 }
 
 static void accepted_close_is_any_thread_and_retires_the_handle(void) {
@@ -141,24 +126,17 @@ static void accepted_close_is_any_thread_and_retires_the_handle(void) {
   mln_runtime runtime = create_untracked_runtime(&source);
   close_probe probe = {
     .runtime = runtime,
-    .operation = MLN_HANDLE_NULL,
   };
   atomic_init(&probe.status, MLN_STATUS_NATIVE_ERROR);
   mln_test_thread* thread =
     mln_test_thread_start(close_from_foreign_thread, &probe);
   mln_test_thread_join(thread);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, atomic_load(&probe.status));
-  TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, probe.operation);
 
   uint64_t mask = 0;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_runtime_get_event_mask(runtime, &mask)
   );
-  wait_for_success(probe.operation);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_get_event_mask(runtime, &mask)
-  );
-  mln_operation_release(probe.operation);
   mln_notification_source_release(source);
 }
 

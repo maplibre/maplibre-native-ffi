@@ -33,18 +33,17 @@ static void runtime_rejects_invalid_arguments(void) {
     MLN_STATUS_INVALID_ARGUMENT, mln_runtime_create_start(&options, &operation)
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_close_start(MLN_HANDLE_NULL, &operation)
+    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_release(MLN_HANDLE_NULL)
   );
 }
 
 static void runtime_rejects_stale_handles(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_test_destroy_runtime(runtime);
-  mln_operation operation = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_close_start(runtime, &operation)
+    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_release(runtime)
   );
+  mln_operation operation = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_runtime_barrier_start(runtime, &operation)
   );

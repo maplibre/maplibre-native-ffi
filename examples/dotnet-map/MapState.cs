@@ -166,11 +166,11 @@ internal sealed class MapState : IDisposable
         closed = true;
         try
         {
-            Map.CloseAsync().GetAwaiter().GetResult();
+            Map.Close();
         }
         finally
         {
-            runtime.CloseAsync().GetAwaiter().GetResult();
+            runtime.Close();
         }
     }
 

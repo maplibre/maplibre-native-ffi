@@ -846,14 +846,9 @@ func NewRuntimeWithOptions(options RuntimeOptions) (*RuntimeHandle, error) {
 }
 
 func closeNativeRuntime(runtime nativeRuntime) error {
-	var operation C.mln_operation
-	if err := checkNative(func() int32 {
-		return int32(C.mln_runtime_close_start(C.mln_runtime(runtime), &operation))
-	}); err != nil {
-		return err
-	}
-	defer C.mln_operation_release(operation)
-	return waitNativeOperation(operation)
+	return checkNative(func() int32 {
+		return int32(C.mln_runtime_release(C.mln_runtime(runtime)))
+	})
 }
 
 func newRuntimeState(runtime nativeRuntime) (*handle.State[nativeRuntime], error) {
@@ -1406,26 +1401,20 @@ func (runtime *RuntimeHandle) NewMapWithOptions(options MapOptions) (*MapHandle,
 }
 
 func closeNativeMap(m nativeMap) error {
-	var operation C.mln_operation
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_close_start(C.mln_map(m), &operation))
-	}); err != nil {
-		return err
-	}
-	defer C.mln_operation_release(operation)
-	return waitNativeOperation(operation)
+	return checkNative(func() int32 {
+		return int32(C.mln_map_release(C.mln_map(m)))
+	})
 }
 
-// Close waits for this runtime's native close operation. A successful close
-// makes later calls no-ops. A failed close leaves the native handle live so
-// callers can retry after closing its children.
+// Close releases this runtime's public native handle. Native teardown continues
+// in submission order after this method returns. A failed close leaves the
+// handle live so callers can retry after closing its children.
 func (runtime *RuntimeHandle) Close() error {
 	if runtime == nil || runtime.state == nil {
 		return newBindingError(ErrInvalidArgument, "RuntimeHandle is nil")
 	}
 	var closeErr error
 	_, err := runtime.state.CloseChecked(func(native nativeRuntime) int32 {
-		var operation C.mln_operation
 		if destroyRuntimeHandle != nil {
 			status := destroyRuntimeHandle(native)
 			if status != int32(C.MLN_STATUS_OK) {
@@ -1439,13 +1428,8 @@ func (runtime *RuntimeHandle) Close() error {
 			return status
 		}
 		if err := checkNative(func() int32 {
-			return int32(C.mln_runtime_close_start(C.mln_runtime(native), &operation))
+			return int32(C.mln_runtime_release(C.mln_runtime(native)))
 		}); err != nil {
-			closeErr = err
-			return statusFromError(err)
-		}
-		defer C.mln_operation_release(operation)
-		if err := waitNativeOperation(operation); err != nil {
 			closeErr = err
 			return statusFromError(err)
 		}

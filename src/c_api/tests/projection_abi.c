@@ -62,11 +62,7 @@ static void creation_has_synchronous_preflight_and_close_retires_the_handle(
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_projection_create_start(map, &operation)
   );
-  mln_operation map_close = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_STATE, mln_map_close_start(map, &map_close)
-  );
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, map_close);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_INVALID_STATE, mln_map_release(map));
   wait_completed(operation);
 
   mln_map_projection projection = UINT64_C(77);

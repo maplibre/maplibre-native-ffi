@@ -295,22 +295,13 @@ private constructor(
       NativeAccess.setRuntimeEventMask(requireLiveHandle(), value.nativeValue)
     }
 
-  public actual suspend fun close() {
+  public actual fun close() {
     if (!core.beginClose()) return
-    val operation =
-      try {
-        NativeAccess.startRuntimeClose(handle)
-      } catch (error: Throwable) {
-        core.abortClose()
-        throw error
-      }
     try {
-      notifications.await(operation)
+      NativeAccess.releaseRuntime(handle)
     } catch (error: Throwable) {
       core.abortClose()
       throw error
-    } finally {
-      NativeAccess.releaseOperation(operation)
     }
     core.completeClose { liveMaps.clear() }
     notifications.close()

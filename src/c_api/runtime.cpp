@@ -396,11 +396,9 @@ auto mln_runtime_barrier_start(
   });
 }
 
-auto mln_runtime_close_start(
-  mln_runtime runtime, mln_operation* out_operation
-) noexcept -> mln_status {
+auto mln_runtime_release(mln_runtime runtime) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::close_runtime_start(runtime, out_operation);
+    return mln::core::release_runtime(runtime);
   });
 }
 

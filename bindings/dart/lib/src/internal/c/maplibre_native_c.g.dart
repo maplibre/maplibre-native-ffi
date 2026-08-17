@@ -758,12 +758,6 @@ external int mln_map_camera_snapshot_get(
   ffi.Pointer<ffi.Uint64> out_generation,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_operation>)>()
-external int mln_map_close_start(
-  int map,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
 @ffi.Native<
   ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_operation>)
 >()
@@ -1416,6 +1410,9 @@ external int mln_map_projection_set_visible_geometry(
   mln_buffer_view geometry,
   mln_edge_insets padding,
 );
+
+@ffi.Native<ffi.Int32 Function(mln_map)>()
+external int mln_map_release(int map);
 
 @ffi.Native<
   ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<ffi.Uint64>)
@@ -2661,12 +2658,6 @@ external int mln_runtime_clear_resource_transform(
   ffi.Pointer<ffi.Uint64> out_command_id,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_operation>)>()
-external int mln_runtime_close_start(
-  int runtime,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
 @ffi.Native<
   ffi.Int32 Function(
     ffi.Pointer<mln_runtime_options>,
@@ -2886,6 +2877,9 @@ external int mln_runtime_offline_regions_merge_database_take_result(
 
 @ffi.Native<mln_runtime_options Function()>()
 external mln_runtime_options mln_runtime_options_default();
+
+@ffi.Native<ffi.Int32 Function(mln_runtime)>()
+external int mln_runtime_release(int runtime);
 
 @ffi.Native<
   ffi.Int32 Function(mln_runtime, ffi.Uint32, ffi.Pointer<mln_operation>)

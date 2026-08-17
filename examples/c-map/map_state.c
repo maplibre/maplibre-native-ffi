@@ -148,29 +148,17 @@ app_error map_state_init(
   return error;
 }
 
-static void close_handle(
-  mln_status (*start)(uint64_t, mln_operation*), uint64_t handle,
-  const char* message
-) {
-  mln_operation operation = MLN_HANDLE_NULL;
-  const mln_status status = start(handle, &operation);
-  if (status != MLN_STATUS_OK) {
-    diagnostics_log_status(message, status);
-    return;
-  }
-  (void)await_operation(operation, APP_ERROR_MAP_CREATE_FAILED, message);
-  mln_operation_release(operation);
-}
-
 void map_state_deinit(map_state* state) {
   if (state->map != MLN_HANDLE_NULL) {
-    close_handle(mln_map_close_start, state->map, "map close failed");
+    const mln_status status = mln_map_release(state->map);
+    if (status != MLN_STATUS_OK)
+      diagnostics_log_status("map release failed", status);
     state->map = MLN_HANDLE_NULL;
   }
   if (state->runtime != MLN_HANDLE_NULL) {
-    close_handle(
-      mln_runtime_close_start, state->runtime, "runtime close failed"
-    );
+    const mln_status status = mln_runtime_release(state->runtime);
+    if (status != MLN_STATUS_OK)
+      diagnostics_log_status("runtime release failed", status);
     state->runtime = MLN_HANDLE_NULL;
   }
   if (state->notification_source != MLN_HANDLE_NULL) {

@@ -799,27 +799,20 @@ impl RuntimeHandle {
         if !self.operation_gate.begin_close()? {
             return Ok(());
         }
-        let operation = {
+        {
             let state = self.state();
             let Some(runtime_handle) = state.live_handle() else {
                 self.operation_gate.finish_successful_close();
                 return Ok(());
             };
-            let mut operation = sys::mln_operation(0);
-            if let Err(error) = maplibre_core::check(unsafe {
-                sys::mln_runtime_close_start(runtime_handle, &mut operation)
+            if let Err(error) = py.detach(|| {
+                maplibre_core::check(unsafe { sys::mln_runtime_release(runtime_handle) })
             }) {
                 self.operation_gate.finish_failed_close();
                 return Err(map_error(error));
             }
             state.mark_closed();
-            OwnedOperation(operation)
-        };
-        if let Err(error) = wait_operation(py, operation.0) {
-            self.operation_gate.finish_successful_close();
-            return Err(error);
         }
-        drop(operation);
 
         let mut callback = self
             .notification_callback
@@ -1453,18 +1446,14 @@ impl RuntimeHandle {
 
 #[pymethods]
 impl MapHandle {
-    fn close(&self, py: Python<'_>) -> PyResult<()> {
+    fn close(&self) -> PyResult<()> {
         let state = self.state();
         let Some(handle) = state.live_handle() else {
             return Ok(());
         };
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe { sys::mln_map_close_start(handle, &mut operation) })
-            .map_err(map_error)?;
+        maplibre_core::check(unsafe { sys::mln_map_release(handle) }).map_err(map_error)?;
         state.mark_closed();
-        drop(state);
-        let operation = OwnedOperation(operation);
-        wait_operation(py, operation.0)
+        Ok(())
     }
 
     /// This map's native handle, which names one map for the life of the

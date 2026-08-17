@@ -14,12 +14,12 @@ Events and bindings connect those objects to host code.
 
 The runtime owns one native scheduler thread and its event storage. Runtime
 creation starts that thread, which keeps MapLibre Native's run loop active until
-runtime close completes.
+native teardown finishes after runtime release.
 
 Any host thread can submit runtime and map work. Submissions wake the native run
 loop, so progress never depends on a display callback or a host pump. One
-runtime may own multiple maps; their commands, operations, barriers, and close
-requests share one ordered submission stream.
+runtime may own multiple maps; their commands, operations, barriers, and release
+work share one ordered submission stream.
 
 Use a runtime barrier when later work must wait for every preceding submission
 to reach a terminal disposition. Use the runtime's receiver-scoped notification

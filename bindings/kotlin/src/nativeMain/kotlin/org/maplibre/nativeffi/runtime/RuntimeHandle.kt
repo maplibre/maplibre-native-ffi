@@ -26,7 +26,6 @@ import org.maplibre.nativeffi.internal.c.mln_runtime_barrier_start
 import org.maplibre.nativeffi.internal.c.mln_runtime_clear_http_header_transform
 import org.maplibre.nativeffi.internal.c.mln_runtime_clear_resource_provider
 import org.maplibre.nativeffi.internal.c.mln_runtime_clear_resource_transform
-import org.maplibre.nativeffi.internal.c.mln_runtime_close_start
 import org.maplibre.nativeffi.internal.c.mln_runtime_create_start
 import org.maplibre.nativeffi.internal.c.mln_runtime_create_take_result
 import org.maplibre.nativeffi.internal.c.mln_runtime_drain_events
@@ -51,6 +50,7 @@ import org.maplibre.nativeffi.internal.c.mln_runtime_offline_regions_merge_datab
 import org.maplibre.nativeffi.internal.c.mln_runtime_offline_regions_merge_database_take_result
 import org.maplibre.nativeffi.internal.c.mln_runtime_options
 import org.maplibre.nativeffi.internal.c.mln_runtime_options_default
+import org.maplibre.nativeffi.internal.c.mln_runtime_release
 import org.maplibre.nativeffi.internal.c.mln_runtime_run_ambient_cache_operation_start
 import org.maplibre.nativeffi.internal.c.mln_runtime_set_event_mask
 import org.maplibre.nativeffi.internal.c.mln_runtime_set_http_header_transform
@@ -534,24 +534,13 @@ internal constructor(
       )
     }
 
-  public actual suspend fun close() {
+  public actual fun close() {
     if (!state.beginClose()) return
-    val operation =
-      try {
-        startOperation { outOperation ->
-          mln_runtime_close_start(state.handleForClose().rawHandleValue, outOperation)
-        }
-      } catch (error: Throwable) {
-        state.abortClose()
-        throw error
-      }
     try {
-      notifications.await(operation)
+      Status.check(mln_runtime_release(state.handleForClose().rawHandleValue))
     } catch (error: Throwable) {
       state.abortClose()
       throw error
-    } finally {
-      mln_operation_release(operation)
     }
     state.completeClose {}
     notifications.close()

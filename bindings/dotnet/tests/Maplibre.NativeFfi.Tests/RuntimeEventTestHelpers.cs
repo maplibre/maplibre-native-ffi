@@ -18,10 +18,9 @@ internal static class TestHandles
     internal static MapHandle CreateMap(RuntimeHandle runtime, MapOptions options) =>
         MapHandle.CreateAsync(runtime, options).GetAwaiter().GetResult();
 
-    internal static void Close(RuntimeHandle runtime) =>
-        runtime.CloseAsync().GetAwaiter().GetResult();
+    internal static void Close(RuntimeHandle runtime) => runtime.Close();
 
-    internal static void Close(MapHandle map) => map.CloseAsync().GetAwaiter().GetResult();
+    internal static void Close(MapHandle map) => map.Close();
 }
 
 internal static unsafe class RuntimeEventTestHelpers

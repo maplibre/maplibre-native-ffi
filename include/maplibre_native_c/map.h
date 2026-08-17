@@ -893,12 +893,20 @@ MLN_API mln_status mln_map_request_still_image_start(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts asynchronous map close after synchronous child and state preflight.
+ * Releases a map after synchronous child and state preflight.
  *
- * The map rejects new submissions as soon as this function succeeds.
+ * A successful call consumes the public handle before returning. Previously
+ * accepted work and native teardown continue in submission order without
+ * requiring a caller-owned close operation.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the handle was consumed.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live.
+ * - MLN_STATUS_INVALID_STATE when the map has a live child or is already
+ *   closing.
+ * - MLN_STATUS_NATIVE_ERROR when teardown could not be scheduled.
  */
-MLN_API mln_status
-mln_map_close_start(mln_map map, mln_operation* out_operation) MLN_NOEXCEPT;
+MLN_API mln_status mln_map_release(mln_map map) MLN_NOEXCEPT;
 
 /**
  * Queues a style URL command.

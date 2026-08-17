@@ -51,9 +51,10 @@ Enable it at creation when your tile sets use that encoding.
 
 ## Close in order
 
-Start and await map close before starting runtime close. Start and await runtime
-close before closing its notification source. A close preflight reports
-invalid state and leaves the handle open while a live child or pending child
-creation prevents close.
+Release the map before releasing the runtime, then release the notification
+source. A release preflight reports invalid state and leaves the handle open
+while a live child or pending child creation prevents release. Successful map
+and runtime release consumes the public handle immediately; native teardown
+continues in submission order.
 
 <Code code={region(createMap, "release")} lang="c" title="create-map.c" />

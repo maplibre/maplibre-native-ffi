@@ -133,8 +133,6 @@ public struct CameraSnapshot: Equatable, Sendable {
 public final class MapHandle: @unchecked Sendable {
   private let handle: NativeHandleBox<NativeMapHandle>
   private let runtime: RuntimeHandle
-  private let lifecycleLock = NSLock()
-  private var isClosing = false
   private let mapId: MapId
 
   public init(runtime: RuntimeHandle, options: MapOptions) async throws {
@@ -170,12 +168,7 @@ public final class MapHandle: @unchecked Sendable {
   }
 
   func requireLiveHandle() throws -> NativeMapHandle {
-    try lifecycleLock.withLock {
-      guard !isClosing else {
-        throw NativeStatusFailure.swiftNativeError("MapHandle is closing")
-      }
-      return try handle.requireLive()
-    }
+    try handle.requireLive()
   }
 
   var runtimeForOperations: RuntimeHandle {
@@ -215,57 +208,15 @@ public final class MapHandle: @unchecked Sendable {
     }
   }
 
-  /// Closes this map after its worker has retired the native handle.
-  public func close() async throws {
-    let operation = try mapNativeFailure {
-      try lifecycleLock.withLock {
-        guard !isClosing else {
-          throw NativeStatusFailure.swiftNativeError("MapHandle is closing")
-        }
-        guard !handle.isClosed else { return NativeOperationHandle(raw: 0) }
-        let operation = try NativeMap.closeStart(handle.requireLive())
-        isClosing = true
-        return operation
-      }
-    }
-    guard !operation.isNull else { return }
-    defer { mln_operation_release(operation.raw) }
-    do {
-      try await mapNativeFailure {
-        try await runtime.waitForOperation(operation)
-      }
-      try handle.closeOnce { _ in }
-      lifecycleLock.withLock { isClosing = false }
-    } catch {
-      lifecycleLock.withLock { isClosing = false }
-      throw error
+  /// Releases this map's public native handle.
+  public func close() throws {
+    try mapNativeFailure {
+      try handle.closeOnce { try NativeMap.release($0) }
     }
   }
 
   func closeBlockingForTests() throws {
-    let operation = try mapNativeFailure {
-      try lifecycleLock.withLock {
-        guard !isClosing else {
-          throw NativeStatusFailure.swiftNativeError("MapHandle is closing")
-        }
-        guard !handle.isClosed else { return NativeOperationHandle(raw: 0) }
-        let operation = try NativeMap.closeStart(handle.requireLive())
-        isClosing = true
-        return operation
-      }
-    }
-    guard !operation.isNull else { return }
-    defer { mln_operation_release(operation.raw) }
-    do {
-      try mapNativeFailure {
-        try NativeOperation.waitForSuccessBlocking(operation)
-      }
-      try handle.closeOnce { _ in }
-      lifecycleLock.withLock { isClosing = false }
-    } catch {
-      lifecycleLock.withLock { isClosing = false }
-      throw error
-    }
+    try close()
   }
 
   /// Loads a style URL.

@@ -139,7 +139,7 @@ import Testing
   let operation = try runtime.setMaximumAmbientCacheSizeStart(8 << 20)
 
   do {
-    try await runtime.close()
+    try runtime.close()
     Issue.record("runtime close should reject a live operation")
   } catch let error as MaplibreError {
     #expect(error.kind == .invalidState)
@@ -150,7 +150,7 @@ import Testing
     try operation.discard()
   }
   try operation.close()
-  try await runtime.close()
+  try runtime.close()
 }
 
 @Test func typedTakeConsumesResultButKeepsObserverOpen() async throws {
@@ -179,7 +179,7 @@ import Testing
 ) async throws {
   let runtime =
     try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
-  try await runtime.close()
+  try runtime.close()
 
   do {
     _ = try runtime.offlineRegionsListStart()

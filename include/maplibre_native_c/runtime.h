@@ -655,8 +655,9 @@ typedef mln_status (*mln_resource_transform_callback)(
  * Releases callback user data after its final possible invocation.
  *
  * For each accepted registration with a non-null release callback, the C API
- * invokes the callback exactly once after replacement, clear, or runtime close
- * has retired the registration and every in-flight callback has returned. It
+ * invokes the callback exactly once after replacement, clear, or runtime
+ * teardown has retired the registration and every in-flight callback has
+ * returned. It
  * may run on a runtime, worker, network, or closing thread. The C API never
  * invokes it for a rejected registration. Another thread may retire an
  * accepted registration before its registration function returns, so the
@@ -871,8 +872,8 @@ MLN_API mln_status mln_runtime_create_take_result(
  * With a non-null release_user_data, MLN_STATUS_OK transfers responsibility for
  * releasing user_data to the C API. With a null release_user_data, the caller
  * keeps user_data valid until a committed replacement or clear command, or
- * until runtime close completes. Requests that the previous provider already
- * handled retain their request handles.
+ * until native runtime teardown finishes. Requests that the previous provider
+ * already handled retain their request handles.
  *
  * Native OnlineFileSource claims every remaining scheme. A URL with an
  * unrecognized scheme, such as jar:file:, reaches this callback and completes
@@ -992,7 +993,7 @@ MLN_API mln_status mln_resource_request_wait_until_retired(
  * With a non-null release_user_data, MLN_STATUS_OK transfers responsibility for
  * releasing user_data to the C API. With a null release_user_data, the caller
  * keeps user_data valid until a committed replacement or clear command, or
- * until runtime close completes.
+ * until native runtime teardown finishes.
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
@@ -1041,7 +1042,7 @@ MLN_API mln_status mln_runtime_clear_resource_transform(
  * With a non-null release_user_data, MLN_STATUS_OK transfers responsibility for
  * releasing user_data to the C API. With a null release_user_data, the caller
  * keeps user_data valid until a committed replacement or clear command, or
- * until runtime close completes.
+ * until native runtime teardown finishes.
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
@@ -1117,17 +1118,22 @@ MLN_API mln_status mln_runtime_barrier_start(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts committed runtime close.
+ * Releases a runtime after synchronous child preflight.
  *
- * The call synchronously rejects a runtime that has live or pending children
- * and leaves it open. An accepted call consumes the runtime handle before it
- * returns. Teardown stops and joins the worker before completing the operation.
- * Callback registrations remain valid until operation completion. This
- * function may be called from any thread.
+ * The call rejects a runtime that has live or pending children and leaves it
+ * open. A successful call consumes the public handle before returning.
+ * Previously accepted work and native teardown continue in submission order;
+ * callback user data remains native-owned until its release callback runs.
+ * This function may be called from any thread.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the handle was consumed.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live.
+ * - MLN_STATUS_INVALID_STATE when the runtime has a live or pending child or is
+ *   already closing.
+ * - MLN_STATUS_NATIVE_ERROR when teardown could not be scheduled.
  */
-MLN_API mln_status mln_runtime_close_start(
-  mln_runtime runtime, mln_operation* out_operation
-) MLN_NOEXCEPT;
+MLN_API mln_status mln_runtime_release(mln_runtime runtime) MLN_NOEXCEPT;
 
 /**
  * Drains this runtime's queued events into a new owned batch.

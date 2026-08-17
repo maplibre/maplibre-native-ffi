@@ -25,16 +25,6 @@ static mln_status wait_ok(mln_operation operation) {
            : MLN_STATUS_NATIVE_ERROR;
 }
 
-static mln_status close_async(
-  mln_status (*start)(uint64_t, mln_operation*), uint64_t handle
-) {
-  mln_operation operation = MLN_HANDLE_NULL;
-  mln_status status = start(handle, &operation);
-  if (status == MLN_STATUS_OK) status = wait_ok(operation);
-  mln_operation_release(operation);
-  return status;
-}
-
 int main(void) {
   receiver receiver_state;
   atomic_init(&receiver_state.scheduled, false);
@@ -71,7 +61,7 @@ int main(void) {
     status = mln_map_create_take_result(operation, &map);
   mln_operation_release(operation);
   if (status != MLN_STATUS_OK) {
-    close_async(mln_runtime_close_start, runtime);
+    (void)mln_runtime_release(runtime);
     return 1;
   }
 
@@ -146,8 +136,8 @@ int main(void) {
     mln_ready_batch_release(ready);
   }
 
-  close_async(mln_map_close_start, map);
-  close_async(mln_runtime_close_start, runtime);
+  (void)mln_map_release(map);
+  (void)mln_runtime_release(runtime);
   mln_notification_source_release(notifications);
   return loaded ? 0 : 1;
 }

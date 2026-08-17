@@ -77,13 +77,8 @@ impl MapState {
 
     fn close(&self) -> Result<()> {
         let map = self.native()?;
-        let mut operation = sys::mln_operation(0);
-        // SAFETY: map is live and operation is null writable storage.
-        maplibre_core::check(unsafe { sys::mln_map_close_start(map, &mut operation) })?;
-        let result = wait_raw_operation_completed(operation);
-        // SAFETY: this call owns the close observer.
-        unsafe { sys::mln_operation_release(operation) };
-        result?;
+        // SAFETY: map is live and native consumes it only on success.
+        maplibre_core::check(unsafe { sys::mln_map_release(map) })?;
         self.handle.mark_closed();
         self.runtime
             .lock()
@@ -206,7 +201,7 @@ impl MapHandle {
         self.inner.id
     }
 
-    /// Explicitly closes the map and waits for worker-side retirement.
+    /// Explicitly releases the map's public handle.
     pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
         if self.inner.is_closed() {
             return Ok(());

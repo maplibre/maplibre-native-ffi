@@ -319,10 +319,10 @@ handle, or process-global integration such as logging.
 Event payloads use plain data with documented lifetimes. Each event identifies
 its source kind and copied source handle value. Closing a map or disabling an
 offline-region observer prevents future publication without changing queued
-history. Accepted runtime close consumes the runtime handle and discards its
-undrained event stream. A drain transfers the complete queue into an owned
-batch, which stays readable across later drains and runtime close until the
-caller releases it.
+history. Accepted runtime release consumes the runtime handle and discards its
+undrained event stream during native teardown. A drain transfers the complete
+queue into an owned batch, which stays readable across later drains and runtime
+release until the caller releases it.
 
 Use the six execution categories defined in Ownership And Execution. An
 Immediate return is final. A Command return reports copied acceptance. Published

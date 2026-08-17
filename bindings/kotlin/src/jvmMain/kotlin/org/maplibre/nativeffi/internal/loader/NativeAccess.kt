@@ -473,8 +473,8 @@ internal object NativeAccess {
     MapLibreNativeC.mln_runtime_barrier_start(runtime.raw, outOperation)
   }
 
-  internal fun startRuntimeClose(runtime: NativeRuntime): Long = startOperation { outOperation ->
-    MapLibreNativeC.mln_runtime_close_start(runtime.raw, outOperation)
+  internal fun releaseRuntime(runtime: NativeRuntime) {
+    Status.check(MapLibreNativeC.mln_runtime_release(runtime.raw))
   }
 
   internal fun checkOperationStatus(operation: Long) {
@@ -747,8 +747,8 @@ internal object NativeAccess {
       }
     }
 
-  internal fun startMapClose(map: NativeMap): Long = startOperation { outOperation ->
-    MapLibreNativeC.mln_map_close_start(map.raw, outOperation)
+  internal fun releaseMap(map: NativeMap) {
+    Status.check(MapLibreNativeC.mln_map_release(map.raw))
   }
 
   internal fun setMapStyleUrl(map: NativeMap, url: String): Long = command { outCommandId ->

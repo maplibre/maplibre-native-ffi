@@ -104,7 +104,6 @@ enum : std::uint32_t {
 
 constexpr auto MLN_RUNTIME_OPERATION_CREATE = UINT32_C(0x10000);
 constexpr auto MLN_RUNTIME_OPERATION_BARRIER = UINT32_C(0x10001);
-constexpr auto MLN_RUNTIME_OPERATION_CLOSE = UINT32_C(0x10002);
 
 enum : std::uint32_t {
   MLN_OFFLINE_OPERATION_RESULT_NONE = 0,
@@ -2910,66 +2909,93 @@ auto runtime_barrier_start(mln_runtime runtime, mln_operation* out_operation)
   return MLN_STATUS_OK;
 }
 
-auto close_runtime_start(mln_runtime runtime, mln_operation* out_operation)
-  -> mln_status {
+auto release_runtime(mln_runtime runtime) -> mln_status {
   auto live = lease_runtime(runtime);
   if (live == nullptr) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto state = std::shared_ptr<OperationObject>{};
-  const auto register_status = register_operation(
-    live->event_queue->notification_source, MLN_RUNTIME_OPERATION_CLOSE, false,
-    {}, out_operation, state
-  );
-  if (register_status != MLN_STATUS_OK) {
-    return register_status;
+  struct ReleaseGate {
+    std::mutex mutex;
+    std::condition_variable condition;
+    bool committed = false;
+    bool aborted = false;
+    uint64_t sequence = 0;
+    std::shared_ptr<RuntimeObject> live;
+  };
+  auto gate = std::shared_ptr<ReleaseGate>{};
+  try {
+    gate = std::make_shared<ReleaseGate>();
+  } catch (...) {
+    set_thread_error("runtime release could not allocate its teardown gate");
+    return MLN_STATUS_NATIVE_ERROR;
+  }
+  gate->live = live;
+  auto waiter = std::thread{};
+  try {
+    // Teardown stops and joins the executor, so it cannot run on that executor
+    // or on the caller that may also service host callbacks.
+    waiter = std::thread([gate]() mutable -> void {
+      {
+        auto lock = std::unique_lock{gate->mutex};
+        gate->condition.wait(lock, [&]() noexcept -> bool {
+          return gate->committed || gate->aborted;
+        });
+        if (gate->aborted) {
+          return;
+        }
+      }
+      auto live = std::move(gate->live);
+      wait_for_prior_runtime_submissions(live, gate->sequence);
+      live->control.wait_for_submissions();
+      unregister_platform_context(live->platform_context);
+      try {
+        live->executor.invoke_sync([live]() -> void {
+          release_runtime_reachable_state(live);
+        });
+      } catch (...) {
+        // The public handle is already retired, so teardown failures are not
+        // actionable by its former owner.
+      }
+      live->executor.stop();
+    });
+  } catch (...) {
+    set_thread_error("runtime release could not start its teardown waiter");
+    return MLN_STATUS_NATIVE_ERROR;
+  }
+  try {
+    waiter.detach();
+  } catch (...) {
+    {
+      const std::scoped_lock lock(gate->mutex);
+      gate->aborted = true;
+    }
+    gate->condition.notify_one();
+    if (waiter.joinable()) {
+      waiter.join();
+    }
+    set_thread_error("runtime release could not detach its teardown waiter");
+    return MLN_STATUS_NATIVE_ERROR;
   }
 
-  auto sequence = uint64_t{0};
   {
     const std::scoped_lock commit_lock(live->submission_mutex);
-    const auto close_status = live->control.begin_close();
-    if (close_status != MLN_STATUS_OK) {
-      abandon_operation(*out_operation);
-      *out_operation = MLN_HANDLE_NULL;
-      return close_status;
+    const auto release_status = live->control.begin_close();
+    if (release_status != MLN_STATUS_OK) {
+      {
+        const std::scoped_lock lock(gate->mutex);
+        gate->aborted = true;
+      }
+      gate->condition.notify_one();
+      return release_status;
     }
-    sequence = live->next_submission_sequence++;
-    {
-      const std::scoped_lock terminal_lock(live->terminal_mutex);
-      live->pending_submissions.insert(sequence);
-    }
-    state->set_terminal_callback([live, sequence]() noexcept -> void {
-      mark_runtime_submission_terminal(live, sequence);
-    });
+    gate->sequence = live->next_submission_sequence++;
     static_cast<void>(handle_table<RuntimeObject>().remove(runtime));
   }
-
-  auto close_work = [live, state, sequence]() -> void {
-    auto status = MLN_STATUS_OK;
-    auto diagnostic = std::string{};
-    wait_for_prior_runtime_submissions(live, sequence);
-    live->control.wait_for_submissions();
-    unregister_platform_context(live->platform_context);
-    try {
-      live->executor.invoke_sync([live]() -> void {
-        release_runtime_reachable_state(live);
-      });
-    } catch (...) {
-      status = MLN_STATUS_NATIVE_ERROR;
-      diagnostic =
-        exception_message(std::current_exception(), "runtime close failed");
-    }
-    live->executor.stop();
-    state->complete(status, std::move(diagnostic), std::any{std::monostate{}});
-  };
-  try {
-    // Closing stops and joins the runtime executor, so it cannot run on that
-    // executor or on the caller that may also service host callbacks.
-    std::thread(close_work).detach();
-  } catch (...) {
-    close_work();
+  {
+    const std::scoped_lock lock(gate->mutex);
+    gate->committed = true;
   }
+  gate->condition.notify_one();
   return MLN_STATUS_OK;
 }
 

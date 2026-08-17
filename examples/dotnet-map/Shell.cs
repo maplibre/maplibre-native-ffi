@@ -80,7 +80,7 @@ internal static class Shell
         }
         finally
         {
-            // The thread-affine session closes before the map/runtime close operations run.
+            // The thread-affine session closes before the map and runtime are released.
             target?.Dispose();
         }
     }

@@ -40,10 +40,9 @@ auto mln_map_create_take_result(
   });
 }
 
-auto mln_map_close_start(mln_map map, mln_operation* out_operation) noexcept
-  -> mln_status {
+auto mln_map_release(mln_map map) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::map_close_start(map, out_operation);
+    return mln::core::release_map(map);
   });
 }
 

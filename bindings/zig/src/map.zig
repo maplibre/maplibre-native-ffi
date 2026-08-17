@@ -1897,13 +1897,7 @@ pub const MapHandle = enum(c.mln_map) {
             }
             return err;
         } orelse return;
-        var operation: c.mln_operation = 0;
-        status.checkStatus(c.mln_map_close_start(map_close.native, &operation), map_close.diagnostic_store) catch |err| {
-            cancelMapClose(map_close.state);
-            return err;
-        };
-        defer c.mln_operation_release(operation);
-        runtime_module.waitNativeOperation(operation, map_close.diagnostic_store) catch |err| {
+        status.checkStatus(c.mln_map_release(map_close.native), map_close.diagnostic_store) catch |err| {
             cancelMapClose(map_close.state);
             return err;
         };
@@ -2492,14 +2486,15 @@ test "a style load that drops a source releases the callback state unsubscribed"
     defer mask_barrier.release();
     try std.testing.expect(try mask_barrier.wait(-1));
 
-    const baseline = liveCustomGeometrySourceCountForTesting();
     var state = TestCustomGeometryCallbackState{};
     _ = try map.addCustomGeometrySource(std.testing.allocator, "custom", .{
         .fetch_tile = testFetchCustomGeometryTile,
         .release_context = testReleaseCustomGeometryContext,
         .context = &state,
     });
-    try std.testing.expectEqual(baseline + 1, liveCustomGeometrySourceCountForTesting());
+    const add_barrier = try runtime.barrierStart();
+    defer add_barrier.release();
+    try std.testing.expect(try add_barrier.wait(-1));
     try std.testing.expectEqual(@as(usize, 0), state.release_count);
     // The mask stays what the host set, because the binding adds nothing to it.
     try std.testing.expectEqual(narrowed, try map.eventMask());
@@ -2516,7 +2511,7 @@ test "a style load that drops a source releases the callback state unsubscribed"
                 runtime_module.RuntimeEventType.map_style_loaded,
             ));
         }
-        if (liveCustomGeometrySourceCountForTesting() == baseline) {
+        if (state.release_count == 1) {
             released = true;
             break;
         }
@@ -2535,17 +2530,19 @@ test "closing a map releases its surviving source callback states" {
     var map_open = true;
     defer if (map_open) map.close() catch @panic("map close failed");
 
-    const baseline = liveCustomGeometrySourceCountForTesting();
     var state = TestCustomGeometryCallbackState{};
     _ = try map.addCustomGeometrySource(std.testing.allocator, "custom", .{
         .fetch_tile = testFetchCustomGeometryTile,
+        .release_context = testReleaseCustomGeometryContext,
         .context = &state,
     });
-    try std.testing.expectEqual(baseline + 1, liveCustomGeometrySourceCountForTesting());
 
     try map.close();
     map_open = false;
-    try std.testing.expectEqual(baseline, liveCustomGeometrySourceCountForTesting());
+    const close_barrier = try runtime.barrierStart();
+    defer close_barrier.release();
+    try std.testing.expect(try close_barrier.wait(-1));
+    try std.testing.expectEqual(@as(usize, 1), state.release_count);
 }
 
 // A rejected add releases nothing, so the state belongs to the failing call.

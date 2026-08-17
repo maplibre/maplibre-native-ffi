@@ -628,11 +628,7 @@ static void map_close_preflight_rejects_live_projection(void) {
   );
   mln_operation_release(create);
 
-  mln_operation close = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_STATE, mln_map_close_start(fixture.map, &close)
-  );
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, close);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_INVALID_STATE, mln_map_release(fixture.map));
 
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_projection_close(projection));
   destroy_map_fixture(fixture);
@@ -651,6 +647,7 @@ static void map_close_cancels_observed_pending_still_image(void) {
   mln_operation pending = start_pending_still_image(fixture);
 
   mln_test_destroy_map(fixture.map);
+  wait_for_operation(pending);
   mln_status result = MLN_STATUS_OK;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_operation_get_status(pending, &result)

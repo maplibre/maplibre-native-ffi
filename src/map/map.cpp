@@ -2184,7 +2184,7 @@ auto validate_map_locked(mln_map map, MapObject*& out_map) -> mln_status {
 }
 
 constexpr uint32_t map_create_operation_kind = UINT32_C(0x4D01);
-constexpr uint32_t map_close_operation_kind = UINT32_C(0x4D02);
+constexpr uint32_t map_release_operation_kind = UINT32_C(0x4D02);
 constexpr uint32_t map_camera_query_operation_kind = UINT32_C(0x4D03);
 constexpr uint32_t map_still_image_operation_kind = UINT32_C(0x4D04);
 constexpr uint32_t map_loaded_style_json_operation_kind = UINT32_C(0x4D05);
@@ -2737,21 +2737,26 @@ auto create_map_start(
   const auto operation = *out_operation;
   const auto submit_status = submit_runtime_operation(
     runtime_state, state, [runtime, effective, state]() mutable -> void {
-      auto pending_reservation = RuntimeMapRetainGuard{runtime};
       auto result = mln_map{MLN_HANDLE_NULL};
+      auto status = MLN_STATUS_NATIVE_ERROR;
+      auto diagnostic = std::string{};
       try {
-        const auto status = create_map(runtime, &effective, &result);
-        if (status == MLN_STATUS_OK) {
-          state->complete(
-            status, {}, std::any{std::make_shared<PendingMapResult>(result)}
-          );
-        } else {
-          state->complete(status, "map creation failed", {});
-        }
+        status = create_map(runtime, &effective, &result);
       } catch (...) {
+        diagnostic = exception_message(std::current_exception());
+      }
+      // Drop the creation reservation before publishing completion. Once the
+      // result is observable, the map itself is the runtime's only child and
+      // callers may release the map and runtime back to back.
+      release_runtime_map(runtime);
+      if (status == MLN_STATUS_OK) {
         state->complete(
-          MLN_STATUS_NATIVE_ERROR, exception_message(std::current_exception()),
-          {}
+          status, {}, std::any{std::make_shared<PendingMapResult>(result)}
+        );
+      } else {
+        state->complete(
+          status,
+          diagnostic.empty() ? "map creation failed" : std::move(diagnostic), {}
         );
       }
     }
@@ -2852,27 +2857,27 @@ auto map_resize(
   return status;
 }
 
-auto map_close_start(mln_map map, mln_operation* out_operation) -> mln_status {
+auto release_map(mln_map map) -> mln_status {
   auto owned_map = handle_table<MapObject>().lease(map);
   if (owned_map == nullptr) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   auto state = std::shared_ptr<OperationObject>{};
-  const auto register_status = register_operation(
-    owned_map->runtime_state->event_queue->notification_source,
-    map_close_operation_kind, false, {}, out_operation, state
-  );
-  if (register_status != MLN_STATUS_OK) {
-    return register_status;
+  try {
+    state = std::make_shared<OperationObject>(
+      map_release_operation_kind, false, OperationObject::CancelCallback{}
+    );
+  } catch (...) {
+    set_thread_error("map release could not allocate its teardown state");
+    return MLN_STATUS_NATIVE_ERROR;
   }
-  const auto operation = *out_operation;
   struct CloseGate {
     std::mutex mutex;
     std::condition_variable condition;
-    bool committed = false;
+    bool ordered = false;
+    bool retired = false;
     bool aborted = false;
     mln_map map = MLN_HANDLE_NULL;
-    mln_runtime runtime = MLN_HANDLE_NULL;
     std::shared_ptr<MapObject> owned_map;
     std::shared_ptr<OperationObject> state;
   };
@@ -2880,13 +2885,10 @@ auto map_close_start(mln_map map, mln_operation* out_operation) -> mln_status {
   try {
     gate = std::make_shared<CloseGate>();
   } catch (...) {
-    abandon_operation(operation);
-    *out_operation = MLN_HANDLE_NULL;
-    set_thread_error("map close could not allocate its teardown gate");
+    set_thread_error("map release could not allocate its teardown gate");
     return MLN_STATUS_NATIVE_ERROR;
   }
   gate->map = map;
-  gate->runtime = owned_map->runtime;
   gate->owned_map = owned_map;
   gate->state = state;
   auto signal_abort = [gate]() noexcept -> void {
@@ -2904,17 +2906,13 @@ auto map_close_start(mln_map map, mln_operation* out_operation) -> mln_status {
       {
         auto lock = std::unique_lock{gate->mutex};
         gate->condition.wait(lock, [&]() noexcept -> bool {
-          return gate->committed || gate->aborted;
+          return (gate->ordered && gate->retired) || gate->aborted;
         });
         if (gate->aborted) {
           return;
         }
       }
       auto owned_map = std::move(gate->owned_map);
-      auto status = MLN_STATUS_OK;
-      auto diagnostic = std::string{};
-      auto retired = false;
-      auto cleanup_error = std::exception_ptr{};
       try {
         owned_map->runtime_state->executor.invoke_sync([&]() -> void {
           if (owned_map->still_image_operation != nullptr) {
@@ -2923,41 +2921,27 @@ auto map_close_start(mln_map map, mln_operation* out_operation) -> mln_status {
         });
         owned_map->control.wait_for_submissions();
         owned_map->runtime_state->executor.invoke_sync([&]() mutable -> void {
-          retired = handle_table<MapObject>().remove(gate->map) != nullptr;
-          if (!retired) {
-            throw std::runtime_error("map close lost its live handle");
-          }
-          try {
-            owned_map->custom_geometry_sources->detach();
-            owned_map->frontend->close_renderer_observer();
-            owned_map->frontend->shutdown_thread_pool();
-            unregister_runtime_map_events(gate->runtime, gate->map);
-          } catch (...) {
-            cleanup_error = std::current_exception();
+          owned_map->custom_geometry_sources->detach();
+          owned_map->frontend->close_renderer_observer();
+          owned_map->frontend->shutdown_thread_pool();
+          {
+            const std::scoped_lock event_lock(
+              owned_map->runtime_state->event_queue->mutex
+            );
+            owned_map->runtime_state->event_queue->event_maps.erase(gate->map);
           }
           owned_map.reset();
         });
-        if (cleanup_error) {
-          std::rethrow_exception(cleanup_error);
-        }
       } catch (...) {
-        status = MLN_STATUS_NATIVE_ERROR;
-        diagnostic = exception_message(std::current_exception());
+        // The public handle is already retired. Teardown failures are not
+        // actionable by its former owner, but the tracked submission must
+        // still become terminal so runtime release can continue.
       }
-      if (retired) {
-        release_runtime_map(gate->runtime);
-      } else {
-        owned_map->control.abort_close();
-      }
-      gate->state->complete(
-        status, std::move(diagnostic), std::any{std::monostate{}}
-      );
+      gate->state->complete(MLN_STATUS_OK, {}, std::any{std::monostate{}});
     });
   } catch (...) {
     signal_abort();
-    abandon_operation(operation);
-    *out_operation = MLN_HANDLE_NULL;
-    set_thread_error("map close could not start its teardown waiter");
+    set_thread_error("map release could not start its teardown waiter");
     return MLN_STATUS_NATIVE_ERROR;
   }
   try {
@@ -2967,9 +2951,7 @@ auto map_close_start(mln_map map, mln_operation* out_operation) -> mln_status {
     if (waiter.joinable()) {
       waiter.join();
     }
-    abandon_operation(operation);
-    *out_operation = MLN_HANDLE_NULL;
-    set_thread_error("map close could not detach its teardown waiter");
+    set_thread_error("map release could not detach its teardown waiter");
     return MLN_STATUS_NATIVE_ERROR;
   }
   {
@@ -2977,22 +2959,16 @@ auto map_close_start(mln_map map, mln_operation* out_operation) -> mln_status {
     auto* live = handle_table<MapObject>().resolve_locked(map);
     if (live == nullptr || live != owned_map.get()) {
       signal_abort();
-      abandon_operation(operation);
-      *out_operation = MLN_HANDLE_NULL;
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     if (live->render_target_session != nullptr) {
       signal_abort();
-      abandon_operation(operation);
-      *out_operation = MLN_HANDLE_NULL;
       set_thread_error("map still has an attached render session");
       return MLN_STATUS_INVALID_STATE;
     }
     const auto close_status = live->control.begin_close();
     if (close_status != MLN_STATUS_OK) {
       signal_abort();
-      abandon_operation(operation);
-      *out_operation = MLN_HANDLE_NULL;
       return close_status;
     }
   }
@@ -3000,7 +2976,7 @@ auto map_close_start(mln_map map, mln_operation* out_operation) -> mln_status {
     owned_map->runtime_state, state, [gate]() mutable -> void {
       {
         const std::scoped_lock lock(gate->mutex);
-        gate->committed = true;
+        gate->ordered = true;
       }
       gate->condition.notify_one();
     }
@@ -3008,20 +2984,26 @@ auto map_close_start(mln_map map, mln_operation* out_operation) -> mln_status {
   if (submit_status != MLN_STATUS_OK) {
     owned_map->control.abort_close();
     signal_abort();
-    abandon_operation(operation);
-    *out_operation = MLN_HANDLE_NULL;
+    return submit_status;
   }
-  return submit_status;
+  {
+    const std::scoped_lock lock(handle_table<MapObject>().mutex());
+    static_cast<void>(handle_table<MapObject>().remove_locked(map));
+  }
+  release_runtime_map(owned_map->runtime);
+  {
+    const std::scoped_lock lock(gate->mutex);
+    gate->retired = true;
+  }
+  gate->condition.notify_one();
+  return MLN_STATUS_OK;
 }
 PendingMapResult::~PendingMapResult() {
   if (value_ == MLN_HANDLE_NULL) {
     return;
   }
   try {
-    auto operation = mln_operation{MLN_HANDLE_NULL};
-    if (map_close_start(value_, &operation) == MLN_STATUS_OK) {
-      release_operation(operation);
-    }
+    static_cast<void>(release_map(value_));
   } catch (...) {
   }
 }

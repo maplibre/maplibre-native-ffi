@@ -205,7 +205,7 @@
 --include-struct mln_screen_point
 --include-struct mln_unit_bezier
 --include-struct mln_vec3
---include-function mln_map_close_start
+--include-function mln_map_release
 --include-function mln_map_create_start
 --include-function mln_map_create_take_result
 --include-function mln_map_loaded_style_json_start
@@ -543,7 +543,7 @@
 --include-function mln_runtime_clear_http_header_transform
 --include-function mln_runtime_clear_resource_provider
 --include-function mln_runtime_clear_resource_transform
---include-function mln_runtime_close_start
+--include-function mln_runtime_release
 --include-function mln_runtime_create_start
 --include-function mln_runtime_create_take_result
 --include-function mln_runtime_drain_events

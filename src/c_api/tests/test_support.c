@@ -204,25 +204,7 @@ mln_status mln_test_runtime_create(
 }
 
 mln_status mln_test_runtime_close(mln_runtime runtime) {
-  mln_operation operation = MLN_HANDLE_NULL;
-  mln_status status = mln_runtime_close_start(runtime, &operation);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  bool completed = false;
-  status = mln_operation_wait(operation, -1, &completed);
-  if (status == MLN_STATUS_OK && !completed) {
-    status = MLN_STATUS_NATIVE_ERROR;
-  }
-  if (status == MLN_STATUS_OK) {
-    mln_status result = MLN_STATUS_NATIVE_ERROR;
-    status = mln_operation_get_status(operation, &result);
-    if (status == MLN_STATUS_OK) {
-      status = result;
-    }
-  }
-  mln_operation_release(operation);
-  return status;
+  return mln_runtime_release(runtime);
 }
 
 mln_runtime mln_test_create_runtime(void) {
@@ -282,27 +264,7 @@ mln_status mln_test_map_create_status(
   return status;
 }
 
-mln_status mln_test_map_close(mln_map map) {
-  mln_operation operation = MLN_HANDLE_NULL;
-  mln_status status = mln_map_close_start(map, &operation);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  bool completed = false;
-  status = mln_operation_wait(operation, -1, &completed);
-  if (status == MLN_STATUS_OK && !completed) {
-    status = MLN_STATUS_NATIVE_ERROR;
-  }
-  if (status == MLN_STATUS_OK) {
-    mln_status result = MLN_STATUS_NATIVE_ERROR;
-    status = mln_operation_get_status(operation, &result);
-    if (status == MLN_STATUS_OK) {
-      status = result;
-    }
-  }
-  mln_operation_release(operation);
-  return status;
-}
+mln_status mln_test_map_close(mln_map map) { return mln_map_release(map); }
 
 mln_status mln_test_map_get_event_mask(mln_map map, uint64_t* out_mask) {
   if (out_mask == NULL) {
@@ -430,25 +392,10 @@ mln_map mln_test_create_map(mln_runtime runtime) {
   return mln_test_create_map_with_options(runtime, &options);
 }
 
-// Untracking happens only after committed close completes.
 void mln_test_destroy_runtime(mln_runtime runtime) {
   mln_event_batch_release(compatibility_batch_handle);
   compatibility_batch_handle = MLN_HANDLE_NULL;
-  mln_operation operation = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_close_start(runtime, &operation)
-  );
-  bool completed = false;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_operation_wait(operation, -1, &completed)
-  );
-  TEST_ASSERT_TRUE(completed);
-  mln_status result_status = MLN_STATUS_NATIVE_ERROR;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_operation_get_status(operation, &result_status)
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, result_status);
-  mln_operation_release(operation);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_release(runtime));
   if (tracked_runtime == runtime) {
     tracked_runtime = MLN_HANDLE_NULL;
   }
@@ -483,19 +430,7 @@ mln_status mln_test_runtime_barrier(mln_runtime runtime) {
 void mln_test_destroy_map(mln_map map) {
   mln_event_batch_release(compatibility_batch_handle);
   compatibility_batch_handle = MLN_HANDLE_NULL;
-  mln_operation operation = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_close_start(map, &operation));
-  bool completed = false;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_operation_wait(operation, -1, &completed)
-  );
-  TEST_ASSERT_TRUE(completed);
-  mln_status result_status = MLN_STATUS_NATIVE_ERROR;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_operation_get_status(operation, &result_status)
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, result_status);
-  mln_operation_release(operation);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_release(map));
   untrack_map(map);
 }
 
@@ -2086,24 +2021,11 @@ bool mln_test_reclaim_thread_resources(void) {
   }
   while (tracked_map_count > 0) {
     tracked_map_count -= 1;
-    mln_operation close = MLN_HANDLE_NULL;
-    if (
-      mln_map_close_start(tracked_maps[tracked_map_count], &close) ==
-      MLN_STATUS_OK
-    ) {
-      bool completed = false;
-      mln_operation_wait(close, -1, &completed);
-      mln_operation_release(close);
-    }
+    (void)mln_map_release(tracked_maps[tracked_map_count]);
     reclaimed = true;
   }
   if (tracked_runtime != MLN_HANDLE_NULL) {
-    mln_operation close = MLN_HANDLE_NULL;
-    if (mln_runtime_close_start(tracked_runtime, &close) == MLN_STATUS_OK) {
-      bool completed = false;
-      (void)mln_operation_wait(close, -1, &completed);
-      mln_operation_release(close);
-    }
+    (void)mln_runtime_release(tracked_runtime);
     tracked_runtime = MLN_HANDLE_NULL;
     reclaimed = true;
   }

@@ -664,22 +664,13 @@ private constructor(
     }
   }
 
-  public actual suspend fun close() {
+  public actual fun close() {
     if (!core.beginClose()) return
-    val operation =
-      try {
-        NativeAccess.startMapClose(handle)
-      } catch (error: Throwable) {
-        core.abortClose()
-        throw error
-      }
     try {
-      runtime.awaitOperation(operation)
+      NativeAccess.releaseMap(handle)
     } catch (error: Throwable) {
       core.abortClose()
       throw error
-    } finally {
-      NativeAccess.releaseOperation(operation)
     }
     core.completeClose {
       runtime.unregisterMap(this)

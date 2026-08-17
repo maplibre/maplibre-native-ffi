@@ -82,7 +82,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
         this.notificationReceiver = notificationReceiver;
         state = new NativeHandleState<MlnRuntime>(
             handle,
-            static _ => mln_status.MLN_STATUS_OK,
+            NativeMethods.mln_runtime_release,
             nameof(RuntimeHandle)
         );
     }
@@ -648,35 +648,20 @@ public sealed unsafe class RuntimeHandle : IDisposable
         );
     }
 
-    /// <summary>Closes the runtime after its autonomous worker stops.</summary>
-    public Task CloseAsync(CancellationToken cancellationToken = default)
+    /// <summary>Releases the runtime's public native handle.</summary>
+    public void Close()
     {
         if (IsClosed)
         {
-            return Task.CompletedTask;
+            return;
         }
-        cancellationToken.ThrowIfCancellationRequested();
         PreflightNoLiveOperations();
-        var operation = StartOperation(outOperation =>
-            NativeMethods.mln_runtime_close_start(Handle, outOperation)
-        );
-        return OperationAwaiter.WaitThen(
-            notificationReceiver.WaitForOperationAsync(operation),
-            () =>
-            {
-                CheckOperationCompletion(operation);
-                state.Close();
-            },
-            () =>
-            {
-                NativeMethods.mln_operation_release(operation);
-                notificationReceiver.Dispose();
-            }
-        );
+        state.Close();
+        notificationReceiver.Dispose();
     }
 
     /// <inheritdoc />
-    public void Dispose() => CloseAsync().ConfigureAwait(false).GetAwaiter().GetResult();
+    public void Dispose() => Close();
 
     internal Task WaitForOperationAsync(
         MlnOperation operation,

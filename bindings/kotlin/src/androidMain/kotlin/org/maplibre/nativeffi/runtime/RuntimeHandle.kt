@@ -460,24 +460,13 @@ private constructor(
       )
     }
 
-  public actual suspend fun close() {
+  public actual fun close() {
     if (!core.beginClose()) return
-    val operation =
-      try {
-        startOperation { outOperation ->
-          MaplibreNativeC.mln_runtime_close_start(handleId, outOperation)
-        }
-      } catch (error: Throwable) {
-        core.abortClose()
-        throw error
-      }
     try {
-      notifications.await(operation)
+      Status.check(MaplibreNativeC.mln_runtime_release(handleId))
     } catch (error: Throwable) {
       core.abortClose()
       throw error
-    } finally {
-      MaplibreNativeC.mln_operation_release(operation)
     }
     core.completeClose { liveMaps.clear() }
     notifications.close()

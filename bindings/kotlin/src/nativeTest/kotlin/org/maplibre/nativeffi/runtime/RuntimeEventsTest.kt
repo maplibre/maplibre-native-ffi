@@ -192,6 +192,7 @@ class RuntimeEventsTest : org.maplibre.nativeffi.NativeTestBase() {
         map.addCustomGeometrySource("surviving", customGeometrySourceOptions())
         runtime.barrier()
         map.close()
+        runtime.barrier()
         assertEquals(0, map.customGeometrySourceCountForTesting())
       }
     }

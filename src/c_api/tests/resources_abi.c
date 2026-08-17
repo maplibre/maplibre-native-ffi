@@ -255,6 +255,10 @@ static void resource_provider_registration_releases_owned_state(void) {
     MLN_STATUS_OK, set_resource_provider_committed(runtime, &provider)
   );
   mln_test_destroy_runtime(runtime);
+  for (size_t attempt = 0; attempt < 10000 && atomic_load(&release_count) < 3;
+       attempt += 1) {
+    mln_test_sleep_millisecond();
+  }
   TEST_ASSERT_EQUAL_INT(3, atomic_load(&release_count));
 }
 
@@ -587,11 +591,17 @@ static void http_header_transform_rejects_raw_invalid_inputs(void) {
 typedef struct teardown_probe {
   atomic_bool transform_entered;
   atomic_bool teardown_started;
+  atomic_bool transform_released;
   atomic_bool other_runtime_ready;
   atomic_bool other_runtime_call_done;
   atomic_bool other_runtime_call_observed;
   atomic_int other_runtime_status;
 } teardown_probe;
+
+static void mark_transform_released(void* user_data) {
+  teardown_probe* probe = user_data;
+  atomic_store(&probe->transform_released, true);
+}
 
 // Wait budgets are generous on purpose: a slow machine delays the passing run
 // instead of turning it red.
@@ -765,6 +775,7 @@ static void runtime_teardown_leaves_other_runtimes_responsive(void) {
     .size = sizeof(mln_resource_transform),
     .callback = blocking_resource_transform,
     .user_data = &probe,
+    .release_user_data = mark_transform_released,
   };
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, set_resource_transform_committed(runtime, &transform)
@@ -775,6 +786,7 @@ static void runtime_teardown_leaves_other_runtimes_responsive(void) {
   // Teardown blocks here until the transform callback returns.
   mln_test_destroy_runtime(runtime);
   mln_test_thread_join(other_thread);
+  TEST_ASSERT_TRUE(wait_for_flag(&probe.transform_released));
 
   TEST_ASSERT_TRUE_MESSAGE(
     atomic_load(&probe.other_runtime_call_observed),
@@ -1241,7 +1253,13 @@ typedef struct provider_teardown_probe {
   atomic_bool entered;
   atomic_bool teardown_started;
   atomic_bool callback_returned;
+  atomic_bool released;
 } provider_teardown_probe;
+
+static void mark_provider_released(void* user_data) {
+  provider_teardown_probe* probe = user_data;
+  atomic_store(&probe->released, true);
+}
 
 enum {
   provider_teardown_wait_attempts = 10000,
@@ -1334,8 +1352,8 @@ static bool wait_for_provider_callback(
   return false;
 }
 
-// The provider callback and borrowed user_data remain valid until runtime
-// destruction returns, including callbacks already running on worker threads.
+// Native retains provider user_data until every in-flight callback returns,
+// even though public runtime release itself does not wait for teardown.
 static void runtime_teardown_waits_for_in_flight_provider_callback(void) {
   provider_teardown_probe probe = {0};
   mln_runtime runtime = mln_test_create_runtime();
@@ -1343,6 +1361,7 @@ static void runtime_teardown_waits_for_in_flight_provider_callback(void) {
     .size = sizeof(mln_resource_provider),
     .callback = blocking_resource_provider,
     .user_data = &probe,
+    .release_user_data = mark_provider_released,
   };
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, set_resource_provider_committed(runtime, &provider)
@@ -1351,6 +1370,7 @@ static void runtime_teardown_waits_for_in_flight_provider_callback(void) {
 
   atomic_store(&probe.teardown_started, true);
   mln_test_destroy_runtime(runtime);
+  TEST_ASSERT_TRUE(wait_for_flag(&probe.released));
   TEST_ASSERT_TRUE_MESSAGE(
     atomic_load(&probe.callback_returned),
     "runtime teardown returned while a provider callback was still running"

@@ -84,16 +84,8 @@ void close_map(
   mln_runtime runtime, mln_map map, mln_notification_source notifications
 ) {
   // #region release
-  mln_operation operation = MLN_HANDLE_NULL;
-  if (mln_map_close_start(map, &operation) == MLN_STATUS_OK) {
-    (void)wait_ok(operation);
-    mln_operation_release(operation);
-  }
-  operation = MLN_HANDLE_NULL;
-  if (mln_runtime_close_start(runtime, &operation) == MLN_STATUS_OK) {
-    (void)wait_ok(operation);
-    mln_operation_release(operation);
-  }
+  (void)mln_map_release(map);
+  (void)mln_runtime_release(runtime);
   mln_notification_source_release(notifications);
   // #endregion release
 }

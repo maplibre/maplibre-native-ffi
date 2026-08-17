@@ -2833,14 +2833,13 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         }
     }
 
-    private static class mln_runtime_close_start {
+    private static class mln_runtime_release {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
-            MapLibreNativeC.C_LONG,
-            MapLibreNativeC.C_POINTER
+            MapLibreNativeC.C_LONG
         );
 
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_runtime_close_start");
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_runtime_release");
 
         public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
     }
@@ -2848,45 +2847,45 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_close_start(mln_runtime runtime, mln_operation *out_operation)
+     * mln_status mln_runtime_release(mln_runtime runtime)
      * }
      */
-    public static FunctionDescriptor mln_runtime_close_start$descriptor() {
-        return mln_runtime_close_start.DESC;
+    public static FunctionDescriptor mln_runtime_release$descriptor() {
+        return mln_runtime_release.DESC;
     }
 
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_close_start(mln_runtime runtime, mln_operation *out_operation)
+     * mln_status mln_runtime_release(mln_runtime runtime)
      * }
      */
-    public static MethodHandle mln_runtime_close_start$handle() {
-        return mln_runtime_close_start.HANDLE;
+    public static MethodHandle mln_runtime_release$handle() {
+        return mln_runtime_release.HANDLE;
     }
 
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_close_start(mln_runtime runtime, mln_operation *out_operation)
+     * mln_status mln_runtime_release(mln_runtime runtime)
      * }
      */
-    public static MemorySegment mln_runtime_close_start$address() {
-        return mln_runtime_close_start.ADDR;
+    public static MemorySegment mln_runtime_release$address() {
+        return mln_runtime_release.ADDR;
     }
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_runtime_close_start(mln_runtime runtime, mln_operation *out_operation)
+     * mln_status mln_runtime_release(mln_runtime runtime)
      * }
      */
-    public static int mln_runtime_close_start(long runtime, MemorySegment out_operation) {
-        var mh$ = mln_runtime_close_start.HANDLE;
+    public static int mln_runtime_release(long runtime) {
+        var mh$ = mln_runtime_release.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_runtime_close_start", runtime, out_operation);
+                traceDowncall("mln_runtime_release", runtime);
             }
-            return (int)mh$.invokeExact(runtime, out_operation);
+            return (int)mh$.invokeExact(runtime);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {
@@ -5556,14 +5555,13 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         }
     }
 
-    private static class mln_map_close_start {
+    private static class mln_map_release {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
-            MapLibreNativeC.C_LONG,
-            MapLibreNativeC.C_POINTER
+            MapLibreNativeC.C_LONG
         );
 
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_close_start");
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_release");
 
         public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
     }
@@ -5571,45 +5569,45 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_close_start(mln_map map, mln_operation *out_operation)
+     * mln_status mln_map_release(mln_map map)
      * }
      */
-    public static FunctionDescriptor mln_map_close_start$descriptor() {
-        return mln_map_close_start.DESC;
+    public static FunctionDescriptor mln_map_release$descriptor() {
+        return mln_map_release.DESC;
     }
 
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_close_start(mln_map map, mln_operation *out_operation)
+     * mln_status mln_map_release(mln_map map)
      * }
      */
-    public static MethodHandle mln_map_close_start$handle() {
-        return mln_map_close_start.HANDLE;
+    public static MethodHandle mln_map_release$handle() {
+        return mln_map_release.HANDLE;
     }
 
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_close_start(mln_map map, mln_operation *out_operation)
+     * mln_status mln_map_release(mln_map map)
      * }
      */
-    public static MemorySegment mln_map_close_start$address() {
-        return mln_map_close_start.ADDR;
+    public static MemorySegment mln_map_release$address() {
+        return mln_map_release.ADDR;
     }
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_close_start(mln_map map, mln_operation *out_operation)
+     * mln_status mln_map_release(mln_map map)
      * }
      */
-    public static int mln_map_close_start(long map, MemorySegment out_operation) {
-        var mh$ = mln_map_close_start.HANDLE;
+    public static int mln_map_release(long map) {
+        var mh$ = mln_map_release.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_close_start", map, out_operation);
+                traceDowncall("mln_map_release", map);
             }
-            return (int)mh$.invokeExact(map, out_operation);
+            return (int)mh$.invokeExact(map);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {

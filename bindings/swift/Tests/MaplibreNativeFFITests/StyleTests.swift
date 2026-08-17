@@ -148,7 +148,7 @@ import Testing
     removeCommand, runtime: runtime
   ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
   #expect(try await map.styleSourceInfo("inline") == nil)
-  try await map.close()
+  try map.close()
 
   // Every nested string and value remains valid after its native source and
   // owning map are gone.
@@ -445,7 +445,7 @@ private func addSourceReportingItsRelease(
     removeCommand, runtime: runtime
   ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
   #expect(counter.value == 1)
-  try await map.close()
+  try map.close()
   #expect(counter.value == 1)
 }
 
@@ -469,7 +469,8 @@ private func addSourceReportingItsRelease(
   }
   #expect(counter.value == 0)
 
-  try await map.close()
+  try map.close()
+  try await runtime.barrier()
 
   #expect(counter.value == 2)
 }
@@ -539,7 +540,7 @@ private func addSourceReportingItsRelease(
   defer { try? runtime.closeBlockingForTests() }
   let map = try await MapHandle(runtime: runtime,
                                 options: MapOptions(width: 1, height: 1))
-  try await map.close()
+  try map.close()
 
   do {
     _ = try await map.styleLayerIds()

@@ -503,7 +503,6 @@ public final class RuntimeHandle: @unchecked Sendable {
   private let notificationReceiver: NativeNotificationReceiver
   private let operationLock = NSLock()
   private var operationCount = 0
-  private var isClosing = false
 
   public init(options: RuntimeOptions = RuntimeOptions()) async throws {
     let receiver = try mapNativeFailure { try NativeNotificationReceiver() }
@@ -549,8 +548,8 @@ public final class RuntimeHandle: @unchecked Sendable {
     handle.isClosed
   }
 
-  public func close() async throws {
-    let operation = try mapNativeFailure {
+  public func close() throws {
+    try mapNativeFailure {
       try operationLock.withLock {
         guard operationCount == 0 else {
           throw NativeStatusFailure(
@@ -559,78 +558,14 @@ public final class RuntimeHandle: @unchecked Sendable {
             isNativeStatus: false
           )
         }
-        guard !isClosing else {
-          throw NativeStatusFailure(
-            rawStatus: MLN_STATUS_INVALID_STATE.rawValue,
-            diagnostic: "RuntimeHandle is closing",
-            isNativeStatus: false
-          )
-        }
-        guard !handle.isClosed else { return NativeOperationHandle(raw: 0) }
-        let operation = try NativeRuntime.closeStart(handle.requireLive())
-        isClosing = true
-        return operation
+        try handle.closeOnce { try NativeRuntime.release($0) }
       }
     }
-    guard !operation.isNull else { return }
-    do {
-      try await mapNativeFailure {
-        try await NativeOperation.waitForSuccess(
-          operation,
-          receiver: notificationReceiver
-        )
-      }
-      try handle.closeOnce { _ in }
-    } catch {
-      mln_operation_release(operation.raw)
-      operationLock.withLock { isClosing = false }
-      throw error
-    }
-
-    // The close operation is itself an endpoint on this source. Release it
-    // before closing the source so no endpoint remains associated.
-    mln_operation_release(operation.raw)
-    operationLock.withLock { isClosing = false }
     try mapNativeFailure { try notificationReceiver.close() }
   }
 
   func closeBlockingForTests() throws {
-    let operation = try mapNativeFailure {
-      try operationLock.withLock {
-        guard operationCount == 0 else {
-          throw NativeStatusFailure(
-            rawStatus: MLN_STATUS_INVALID_STATE.rawValue,
-            diagnostic: "RuntimeHandle has open operations",
-            isNativeStatus: false
-          )
-        }
-        guard !isClosing else {
-          throw NativeStatusFailure(
-            rawStatus: MLN_STATUS_INVALID_STATE.rawValue,
-            diagnostic: "RuntimeHandle is closing",
-            isNativeStatus: false
-          )
-        }
-        guard !handle.isClosed else { return NativeOperationHandle(raw: 0) }
-        let operation = try NativeRuntime.closeStart(handle.requireLive())
-        isClosing = true
-        return operation
-      }
-    }
-    guard !operation.isNull else { return }
-    do {
-      try mapNativeFailure {
-        try NativeOperation.waitForSuccessBlocking(operation)
-      }
-      try handle.closeOnce { _ in }
-    } catch {
-      mln_operation_release(operation.raw)
-      operationLock.withLock { isClosing = false }
-      throw error
-    }
-    mln_operation_release(operation.raw)
-    operationLock.withLock { isClosing = false }
-    try mapNativeFailure { try notificationReceiver.close() }
+    try close()
   }
 
   /// Waits until every command accepted before this call has committed.
@@ -649,10 +584,7 @@ public final class RuntimeHandle: @unchecked Sendable {
 
   func requireLiveHandle() throws -> NativeRuntimeHandle {
     try operationLock.withLock {
-      guard !isClosing else {
-        throw NativeStatusFailure.swiftNativeError("RuntimeHandle is closing")
-      }
-      return try handle.requireLive()
+      try handle.requireLive()
     }
   }
 
