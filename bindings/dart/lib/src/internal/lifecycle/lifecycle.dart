@@ -130,7 +130,7 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
         '$typeName is owned by a native thread its isolate has since left. '
         'The Dart VM moves an isolate between native threads when it resumes '
         'from awaited I/O, so do not await I/O on an isolate that holds a '
-        'runtime, map, projection, or render session. See '
+        'runtime, map, or render session. See '
         'https://github.com/maplibre/maplibre-native-ffi/issues/412',
       );
     }

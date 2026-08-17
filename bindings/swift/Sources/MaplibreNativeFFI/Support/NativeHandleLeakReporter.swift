@@ -28,7 +28,7 @@ enum NativeHandleLeakReporter {
       let subject = leak.handle == 0
         ? leak.detail
         : "native handle 0x\(String(leak.handle, radix: 16))"
-      let message = "Leaked \(leak.typeName) \(subject); close handles explicitly on their owner thread.\n"
+      let message = "Leaked \(leak.typeName) \(subject); close handles explicitly.\n"
       writeStandardError(message)
     }
 

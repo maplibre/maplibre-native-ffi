@@ -282,7 +282,7 @@ mod tests {
 
     assert_not_impl_any!(RuntimeHandle: Send, Sync);
     assert_not_impl_any!(MapHandle: Send, Sync);
-    assert_not_impl_any!(MapProjectionHandle: Send, Sync);
+    assert_impl_all!(MapProjectionHandle: Send, Sync);
     assert_not_impl_any!(NativePointer: Send, Sync);
     assert_not_impl_any!(FrameNativePointer<'static>: Send, Sync);
     assert_not_impl_any!(RenderSessionHandle: Send, Sync);

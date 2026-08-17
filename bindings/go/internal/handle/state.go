@@ -208,7 +208,7 @@ func (state *State[T]) reportLeakIfLive() {
 	typeName := state.typeName
 	state.mu.Unlock()
 	if live {
-		log.Printf("maplibre: leaked %s; call Close on its owner thread", typeName)
+		log.Printf("maplibre: leaked %s; call Close explicitly", typeName)
 	}
 }
 

@@ -1,3 +1,4 @@
+import concurrent.futures
 import contextlib
 import http.server
 import json
@@ -2772,6 +2773,23 @@ def test_map_projection_converts_coordinates_and_closes() -> None:
             assert math.isfinite(projected.longitude)
 
         assert projection.closed
+
+
+def test_map_projection_remains_usable_on_another_thread_after_map_close() -> None:
+    runtime = mln.RuntimeHandle()
+    map_handle = runtime.create_map()
+    projection = map_handle.create_projection()
+    map_handle.close()
+    runtime.close()
+
+    def use_and_close_projection() -> None:
+        assert projection.get_camera() is not None
+        projection.close()
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        executor.submit(use_and_close_projection).result()
+
+    assert projection.closed
 
 
 def test_offline_region_operation_starts_return_public_handles(tmp_path: Path) -> None:

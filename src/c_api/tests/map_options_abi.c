@@ -391,6 +391,30 @@ static void map_projection_mode_rejects_invalid_arguments(void) {
 
 static const mln_lat_lng center = {.latitude = 37.7749, .longitude = -122.4194};
 
+typedef struct projection_thread_probe {
+  mln_map_projection projection;
+  mln_status camera_status;
+  mln_status set_camera_status;
+  mln_status conversion_status;
+  mln_status destroy_status;
+} projection_thread_probe;
+
+static void use_projection_from_another_thread(void* argument) {
+  projection_thread_probe* probe = argument;
+  mln_camera_options camera = mln_camera_options_default();
+  probe->camera_status =
+    mln_map_projection_get_camera(probe->projection, &camera);
+  camera.fields = MLN_CAMERA_OPTION_ZOOM;
+  camera.zoom = 3.0;
+  probe->set_camera_status =
+    mln_map_projection_set_camera(probe->projection, &camera);
+  mln_screen_point point = {0};
+  probe->conversion_status =
+    mln_map_projection_pixel_for_lat_lng(probe->projection, center, &point);
+  probe->destroy_status = mln_map_projection_destroy(probe->projection);
+  mln_test_release_thread_gpu_resources();
+}
+
 static void map_coordinate_conversion_rejects_invalid_arguments(void) {
   map_fixture fixture = create_map_fixture();
   mln_screen_point point = {0};
@@ -464,6 +488,31 @@ static void standalone_projection_rejects_invalid_arguments(void) {
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_projection_destroy(projection));
   destroy_map_fixture(fixture);
+}
+
+static void standalone_projection_is_usable_from_another_thread(void) {
+  map_fixture fixture = create_map_fixture();
+  projection_thread_probe probe = {0};
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_projection_create(fixture.map, &probe.projection)
+  );
+  mln_test_destroy_map(fixture.map);
+  mln_test_destroy_runtime(fixture.runtime);
+
+  mln_test_thread* worker =
+    mln_test_thread_start(use_projection_from_another_thread, &probe);
+  TEST_ASSERT_NOT_NULL(worker);
+  mln_test_thread_join(worker);
+
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.camera_status);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.set_camera_status);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.conversion_status);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.destroy_status);
+  mln_camera_options camera = mln_camera_options_default();
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_projection_get_camera(probe.projection, &camera)
+  );
 }
 
 static void projected_meters_reject_invalid_arguments(void) {
@@ -691,6 +740,7 @@ void run_map_options_abi_tests(void) {
   RUN_TEST(map_projection_mode_rejects_invalid_arguments);
   RUN_TEST(map_coordinate_conversion_rejects_invalid_arguments);
   RUN_TEST(standalone_projection_rejects_invalid_arguments);
+  RUN_TEST(standalone_projection_is_usable_from_another_thread);
   RUN_TEST(projected_meters_reject_invalid_arguments);
   RUN_TEST(map_debug_options_reject_raw_invalid_arguments);
   RUN_TEST(map_options_default_leaves_fast_pfor_decoding_off);

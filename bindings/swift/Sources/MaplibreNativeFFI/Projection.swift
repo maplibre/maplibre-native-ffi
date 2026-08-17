@@ -12,7 +12,8 @@ public struct ProjectedMeters: Equatable, Sendable {
   }
 }
 
-public final class MapProjectionHandle {
+/// An any-thread projection snapshot whose native calls are serialized.
+public final class MapProjectionHandle: @unchecked Sendable {
   private let handle: NativeHandleBox<NativeMapProjectionHandle>
 
   public init(map: MapHandle) throws {
@@ -37,18 +38,22 @@ public final class MapProjectionHandle {
 
   public func camera() throws -> CameraOptions {
     try mapNativeFailure {
-      try CameraOptions(native: NativeCameraOptionsInput(NativeProjection
-          .camera(handle.requireLive())))
+      try handle.withLive { projection in
+        try CameraOptions(native: NativeCameraOptionsInput(NativeProjection
+            .camera(projection)))
+      }
     }
   }
 
   public func setCamera(_ camera: CameraOptions) throws {
     try mapNativeFailure {
       try camera.nativeInput.withNativeOptions { nativeCamera in
-        try checkStatus(mln_map_projection_set_camera(
-          handle.requireLive().raw,
-          nativeCamera
-        ))
+        try handle.withLive { projection in
+          try checkStatus(mln_map_projection_set_camera(
+            projection.raw,
+            nativeCamera
+          ))
+        }
       }
     }
   }
@@ -68,12 +73,14 @@ public final class MapProjectionHandle {
           throw MaplibreError
             .invalidArgument("visible coordinates cannot be empty")
         }
-        try checkStatus(mln_map_projection_set_visible_coordinates(
-          handle.requireLive().raw,
-          baseAddress,
-          buffer.count,
-          padding.nativeInput.native
-        ))
+        try handle.withLive { projection in
+          try checkStatus(mln_map_projection_set_visible_coordinates(
+            projection.raw,
+            baseAddress,
+            buffer.count,
+            padding.nativeInput.native
+          ))
+        }
       }
     }
   }
@@ -85,30 +92,36 @@ public final class MapProjectionHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      try checkStatus(mln_map_projection_set_visible_geometry(
-        handle.requireLive().raw,
-        arena.view(geometry),
-        padding.nativeInput.native
-      ))
+      try handle.withLive { projection in
+        try checkStatus(mln_map_projection_set_visible_geometry(
+          projection.raw,
+          arena.view(geometry),
+          padding.nativeInput.native
+        ))
+      }
     }
   }
 
   public func pixel(for coordinate: LatLng) throws -> ScreenPoint {
     try mapNativeFailure {
-      try ScreenPoint(native: NativeScreenPoint(NativeProjection
-          .pixelForLatLng(
-            handle.requireLive(),
-            coordinate: coordinate.nativeInput.native
-          )))
+      try handle.withLive { projection in
+        try ScreenPoint(native: NativeScreenPoint(NativeProjection
+            .pixelForLatLng(
+              projection,
+              coordinate: coordinate.nativeInput.native
+            )))
+      }
     }
   }
 
   public func latLng(for point: ScreenPoint) throws -> LatLng {
     try mapNativeFailure {
-      try LatLng(native: NativeLatLng(NativeProjection.latLngForPixel(
-        handle.requireLive(),
-        point: point.nativeInput.native
-      )))
+      try handle.withLive { projection in
+        try LatLng(native: NativeLatLng(NativeProjection.latLngForPixel(
+          projection,
+          point: point.nativeInput.native
+        )))
+      }
     }
   }
 }

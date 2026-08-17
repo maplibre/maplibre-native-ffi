@@ -11,7 +11,7 @@ import (
 
 type nativeProjection uint64
 
-// MapProjectionHandle owns a standalone projection snapshot.
+// MapProjectionHandle owns an any-thread standalone projection snapshot.
 type MapProjectionHandle struct {
 	state *handle.State[nativeProjection]
 }
@@ -56,8 +56,7 @@ func (projection *MapProjectionHandle) ptr() (nativeProjection, func(), error) {
 }
 
 // Close destroys this projection helper. A successful close makes later calls
-// no-ops. A failed close leaves the native handle live so callers can retry on
-// the owner thread.
+// no-ops. A failed close leaves the native handle live so callers can retry.
 func (projection *MapProjectionHandle) Close() error {
 	if projection == nil || projection.state == nil {
 		return newBindingError(ErrInvalidArgument, "MapProjectionHandle is nil")

@@ -773,18 +773,19 @@ void main() {
     runtime.close();
   });
 
-  test('projection remains usable after its source map closes', () {
+  test('projection remains usable after its source map closes', () async {
     final runtime = RuntimeHandle.create();
     final map = runtime.createMap();
     final projection = map.createProjection();
 
     map.close();
+    runtime.close();
+    await Future<void>.delayed(Duration.zero);
     expect(projection.pixelForLatLng(const LatLng(0, 0)).x.isFinite, isTrue);
     projection.setCamera(const CameraOptions(center: LatLng(1, 1), zoom: 2));
     expect(projection.camera().zoom, closeTo(2, 0.0001));
 
     projection.close();
-    runtime.close();
   });
 
   test('custom geometry tile callbacks reach their isolate', () async {

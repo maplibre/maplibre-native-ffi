@@ -116,7 +116,7 @@ func TestMapProjectionSnapshotOutlivesMap(t *testing.T) {
 	}
 }
 
-func TestMapProjectionWrongThreadReturnsWrongThread(t *testing.T) {
+func TestMapProjectionCanBeUsedAndClosedFromAnotherThread(t *testing.T) {
 	stdruntime.LockOSThread()
 	defer stdruntime.UnlockOSThread()
 
@@ -139,23 +139,26 @@ func TestMapProjectionWrongThreadReturnsWrongThread(t *testing.T) {
 		if err := projection.Close(); err != nil {
 			t.Errorf("Projection Close(): %v", err)
 		}
-		if err := m.Close(); err != nil {
-			t.Errorf("Map Close(): %v", err)
-		}
-		if err := runtime.Close(); err != nil {
-			t.Errorf("Runtime Close(): %v", err)
-		}
 	}()
+	if err := m.Close(); err != nil {
+		t.Fatalf("Map Close(): %v", err)
+	}
+	if err := runtime.Close(); err != nil {
+		t.Fatalf("Runtime Close(): %v", err)
+	}
 
 	errCh := make(chan error, 1)
 	go func() {
-		_, err := projection.Camera()
-		errCh <- err
+		if _, err := projection.Camera(); err != nil {
+			errCh <- err
+			return
+		}
+		errCh <- projection.Close()
 	}()
-	if err := <-errCh; !errors.Is(err, ErrWrongThread) {
-		t.Fatalf("Projection Camera() from another thread error = %v, want ErrWrongThread", err)
+	if err := <-errCh; err != nil {
+		t.Fatalf("Projection use from another thread: %v", err)
 	}
-	if _, err := projection.Camera(); err != nil {
-		t.Fatalf("Projection Camera() on owner thread after wrong-thread call: %v", err)
+	if _, err := projection.Camera(); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("Projection Camera() after cross-thread close error = %v, want ErrInvalidArgument", err)
 	}
 }

@@ -277,10 +277,10 @@ state, so every handle of that kind gets the same ordering.
 Deterministic cleanup hooks follow the same release operation when they can
 report release failure through the target language's normal error path.
 Non-deterministic cleanup hooks report leaks for thread-affine handles. They
-MUST NOT destroy runtime, map, projection, or render-session handles from
-cleanup hooks. Infallible language destructors that attempt best-effort release
-MUST preserve the explicit release contract and MUST NOT mask native errors from
-the explicit release path.
+MUST NOT destroy runtime, map, or render-session handles from cleanup hooks.
+Infallible language destructors that attempt best-effort release MUST preserve
+the explicit release contract and MUST NOT mask native errors from the explicit
+release path.
 
 ### Stale and mismatched handles
 
@@ -308,8 +308,8 @@ the parent. Releasing a parent while children are live MUST fail without
 consuming or destroying the parent.
 
 `MapProjectionHandle` is the exception: after creation it owns a standalone
-projection snapshot. It MUST remain valid after the source map closes and MUST
-release with `mln_map_projection_destroy()`.
+projection snapshot. It MUST remain valid after the source map closes, MUST be
+usable from any thread, and MUST release with `mln_map_projection_destroy()`.
 
 ### Handle copying
 
@@ -998,15 +998,10 @@ that a real native failure would expose.
 | BND-040 | Runtime creation followed by explicit release destroys the native handle exactly once; every public alias observes release state, and a second release no-ops.                                            |
 | BND-041 | A failed native destroy leaves the handle live; a later successful release destroys the native handle.                                                                                                    |
 | BND-042 | A child handle retains parent owner state, and parent release fails while child handles are live.                                                                                                         |
-| BND-043 | `MapProjectionHandle` remains usable after the source map closes and then releases successfully.                                                                                                          |
+| BND-043 | `MapProjectionHandle` remains usable from another thread after the source map closes and then releases successfully on that thread.                                                                       |
 | BND-045 | A released handle's id, replayed through an internal seam after a new handle of the same kind is created, reports the binding's invalid-argument error naming it stale, and the new handle keeps working. |
 | BND-047 | A handle id of one kind passed to another kind's operation through an internal seam reports the binding's invalid-argument error, and the safe public API has no expression of that call.                 |
-| BND-049 | A handle id moved to a different native thread and called there reports the binding's wrong-thread error rather than a stale-handle or closed-handle error.                                               |
-
-BND-049 applies where the host language can reach a second native thread while
-the handle stays live. Dart is excluded: an isolate may resume on a different
-native thread after an await, so a handle must be closed before the test awaits
-another isolate, which leaves its id stale rather than live.
+| BND-049 | An owner-thread-affine handle id moved to a different native thread and called there reports the binding's wrong-thread error rather than a stale-handle or closed-handle error.                          |
 
 BND-049 applies where the host language can reach a second native thread while
 the handle stays live. Dart is excluded: an isolate may resume on a different

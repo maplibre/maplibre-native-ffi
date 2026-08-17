@@ -21,7 +21,7 @@ class HandleLeakCleanerTest {
 
     assertTrue(awaitReport(reports), "expected the cleaner to report the unreachable handle")
     assertEquals(
-      "Leaked RuntimeHandle native handle 0x1234; close handles explicitly on their owner thread.",
+      "Leaked RuntimeHandle native handle 0x1234; close handles explicitly.",
       reports.single(),
     )
   }

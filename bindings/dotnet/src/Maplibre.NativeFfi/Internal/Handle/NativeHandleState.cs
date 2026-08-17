@@ -55,7 +55,7 @@ internal sealed class NativeHandleState<T>
                     typeName,
                     current,
                     null,
-                    $"Leaked {typeName} native handle 0x{current:x}; call Close() on the owner thread before releasing the wrapper."
+                    $"Leaked {typeName} native handle 0x{current:x}; call Close() before releasing the wrapper."
                 )
             );
         }
@@ -215,7 +215,7 @@ internal sealed class NativeHandleState<T>
                     typeName,
                     current,
                     status,
-                    $"Dispose could not close {typeName} native handle 0x{current:x}; native destroy returned {status}. Call Close() on the owner thread to observe the error and retry."
+                    $"Dispose could not close {typeName} native handle 0x{current:x}; native destroy returned {status}. Call Close() to observe the error and retry."
                 )
             );
             return false;

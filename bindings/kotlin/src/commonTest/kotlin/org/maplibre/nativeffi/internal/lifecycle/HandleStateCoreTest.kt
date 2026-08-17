@@ -157,10 +157,7 @@ class HandleStateCoreTest {
     unreleased.report()
 
     assertEquals(
-      listOf(
-        "Leaked RuntimeHandle native handle 0x1234; " +
-          "close handles explicitly on their owner thread."
-      ),
+      listOf("Leaked RuntimeHandle native handle 0x1234; " + "close handles explicitly."),
       reports,
     )
 

@@ -6,7 +6,7 @@ use maplibre_native_ffi_core::values::{empty_lat_lng, empty_screen_point, lat_ln
 use maplibre_native_ffi_sys as sys;
 
 use crate::camera::CameraOptionsNativeExt;
-use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
+use crate::handle::{ConcurrentNativeHandle, closed_handle_error, out_handle};
 use crate::values::NativeValue;
 use crate::{
     CameraOptions, EdgeInsets, Error, HandleOperationError, LatLng, MapHandle, Result, ScreenPoint,
@@ -14,7 +14,7 @@ use crate::{
 
 #[derive(Debug)]
 pub(crate) struct MapProjectionState {
-    handle: ThreadAffineNativeHandle<sys::mln_map_projection>,
+    handle: ConcurrentNativeHandle<sys::mln_map_projection>,
 }
 
 impl MapProjectionState {
@@ -22,7 +22,7 @@ impl MapProjectionState {
         // SAFETY: native came from successful mln_map_projection_create and is
         // paired with the matching projection destroy function.
         let handle = unsafe {
-            ThreadAffineNativeHandle::from_handle(
+            ConcurrentNativeHandle::from_handle(
                 native,
                 sys::mln_map_projection_destroy,
                 "mln_map_projection",
@@ -49,7 +49,7 @@ impl MapProjectionState {
 /// Standalone projection snapshot created from a map transform.
 ///
 /// The projection does not retain the source map after creation. It remains
-/// thread-affine and must be used and closed on its owner thread.
+/// usable from any thread, and native calls serialize access to its transform.
 pub struct MapProjectionHandle {
     inner: MapProjectionState,
 }
@@ -176,12 +176,12 @@ impl MapProjectionHandle {
 
 #[cfg(test)]
 mod tests {
-    use static_assertions::assert_not_impl_any;
+    use static_assertions::assert_impl_all;
 
     use super::*;
     use crate::{ErrorKind, MapOptions, RuntimeHandle};
 
-    assert_not_impl_any!(MapProjectionHandle: Send, Sync);
+    assert_impl_all!(MapProjectionHandle: Send, Sync);
 
     #[test]
     // Spec coverage: BND-043 and BND-103.
@@ -198,12 +198,15 @@ mod tests {
         map.close().unwrap();
         runtime.close().unwrap();
 
-        let point = projection.pixel_for_lat_lng(center).unwrap();
-        let round_tripped = projection.lat_lng_for_pixel(point).unwrap();
-        assert!((round_tripped.latitude - center.latitude).abs() < 1e-7);
-        assert!((round_tripped.longitude - center.longitude).abs() < 1e-7);
-
-        projection.close().unwrap();
+        std::thread::spawn(move || {
+            let point = projection.pixel_for_lat_lng(center).unwrap();
+            let round_tripped = projection.lat_lng_for_pixel(point).unwrap();
+            assert!((round_tripped.latitude - center.latitude).abs() < 1e-7);
+            assert!((round_tripped.longitude - center.longitude).abs() < 1e-7);
+            projection.close().unwrap();
+        })
+        .join()
+        .unwrap();
     }
 
     #[test]
