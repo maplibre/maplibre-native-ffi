@@ -17,25 +17,36 @@ void begin_gesture(mln_map map) {
 
 void drag_by(mln_map map, mln_screen_point offset) {
   // #region drag
+  mln_camera_delta delta = mln_camera_delta_default();
+  delta.offset = offset;
   uint64_t command_id = 0;
-  mln_map_move_by(map, offset, NULL, &command_id);
+  mln_map_apply_camera_delta(map, &delta, &command_id);
   // #endregion drag
 }
 
 void pinch_by(mln_map map, double scale, mln_screen_point focus) {
   // #region pinch
+  mln_camera_delta delta = mln_camera_delta_default();
+  delta.kind = MLN_CAMERA_DELTA_SCALE;
+  delta.amount = scale;
+  delta.has_anchor = true;
+  delta.anchor = focus;
   uint64_t command_id = 0;
-  mln_map_scale_by(map, scale, &focus, NULL, &command_id);
+  mln_map_apply_camera_delta(map, &delta, &command_id);
   // #endregion pinch
 }
 
 void end_gesture(mln_map map, double residual_scale, mln_screen_point focus) {
   // #region release
-  mln_animation_options animation = mln_animation_options_default();
-  animation.fields = MLN_ANIMATION_OPTION_DURATION;
-  animation.duration_ms = 250.0;
+  mln_camera_delta delta = mln_camera_delta_default();
+  delta.kind = MLN_CAMERA_DELTA_SCALE;
+  delta.amount = residual_scale;
+  delta.has_anchor = true;
+  delta.anchor = focus;
+  delta.animation.fields = MLN_ANIMATION_OPTION_DURATION;
+  delta.animation.duration_ms = 250.0;
   uint64_t command_id = 0;
-  mln_map_scale_by(map, residual_scale, &focus, &animation, &command_id);
+  mln_map_apply_camera_delta(map, &delta, &command_id);
   submit_gesture_phase(map, MLN_GESTURE_PHASE_END);
   // #endregion release
 }

@@ -2,6 +2,8 @@ package org.maplibre.nativeffi.examples.lwjglmap
 
 import java.util.concurrent.atomic.AtomicBoolean
 import org.maplibre.nativeffi.camera.AnimationOptions
+import org.maplibre.nativeffi.camera.CameraDelta
+import org.maplibre.nativeffi.camera.CameraDeltaKind
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.CameraUpdate
 import org.maplibre.nativeffi.camera.CameraUpdateMode
@@ -46,7 +48,12 @@ private constructor(
   }
 
   fun moveBy(dx: Double, dy: Double, durationMs: Double? = null) {
-    map.moveBy(org.maplibre.nativeffi.geo.ScreenPoint(dx, dy), animation(durationMs))
+    map.applyCameraDelta(
+      CameraDelta(
+        offset = org.maplibre.nativeffi.geo.ScreenPoint(dx, dy),
+        animation = animation(durationMs) ?: AnimationOptions(),
+      )
+    )
   }
 
   fun scaleBy(
@@ -54,15 +61,34 @@ private constructor(
     anchor: org.maplibre.nativeffi.geo.ScreenPoint,
     durationMs: Double? = null,
   ) {
-    map.scaleBy(scale, anchor, animation(durationMs))
+    map.applyCameraDelta(
+      CameraDelta(
+        kind = CameraDeltaKind.SCALE,
+        amount = scale,
+        anchor = anchor,
+        animation = animation(durationMs) ?: AnimationOptions(),
+      )
+    )
   }
 
   fun adjustPitch(delta: Double, durationMs: Double? = null) {
-    map.pitchBy(delta, animation(durationMs))
+    map.applyCameraDelta(
+      CameraDelta(
+        kind = CameraDeltaKind.PITCH,
+        amount = delta,
+        animation = animation(durationMs) ?: AnimationOptions(),
+      )
+    )
   }
 
   fun adjustBearing(delta: Double, durationMs: Double? = null) {
-    map.bearingBy(delta, animation = animation(durationMs))
+    map.applyCameraDelta(
+      CameraDelta(
+        kind = CameraDeltaKind.BEARING,
+        amount = delta,
+        animation = animation(durationMs) ?: AnimationOptions(),
+      )
+    )
   }
 
   fun resetOrientation(durationMs: Double) {

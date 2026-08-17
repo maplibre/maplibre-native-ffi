@@ -281,6 +281,32 @@ typedef struct mln_animation_options {
    */
   uint64_t transition_id;
 } mln_animation_options;
+
+/** Relative camera operation carried by mln_camera_delta. */
+typedef enum mln_camera_delta_kind : uint32_t {
+  MLN_CAMERA_DELTA_MOVE = 0,
+  MLN_CAMERA_DELTA_SCALE = 1,
+  MLN_CAMERA_DELTA_BEARING = 2,
+  MLN_CAMERA_DELTA_PITCH = 3,
+} mln_camera_delta_kind;
+
+/**
+ * One relative camera operation.
+ *
+ * MOVE reads offset. SCALE reads amount as a positive factor. BEARING and
+ * PITCH read amount as degrees. SCALE and BEARING apply anchor when has_anchor
+ * is true. Every operation reads animation.
+ */
+typedef struct mln_camera_delta {
+  uint32_t size;
+  uint32_t kind;
+  mln_screen_point offset;
+  double amount;
+  bool has_anchor;
+  mln_screen_point anchor;
+  mln_animation_options animation;
+} mln_camera_delta;
+
 /** Camera transition behavior for mln_camera_update. */
 typedef enum mln_camera_update_mode : uint32_t {
   MLN_CAMERA_UPDATE_MODE_JUMP = 0,

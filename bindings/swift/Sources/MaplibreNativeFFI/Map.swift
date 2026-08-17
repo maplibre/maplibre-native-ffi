@@ -426,95 +426,19 @@ public final class MapHandle: @unchecked Sendable {
     }
   }
 
-  /// Moves the camera by a logical-pixel offset.
+  /// Submits one relative camera operation.
   @discardableResult
-  public func moveBy(
-    _ offset: ScreenPoint,
-    animation: AnimationOptions? = nil
-  ) throws -> UInt64 {
+  public func applyCameraDelta(_ delta: CameraDelta) throws -> UInt64 {
     try mapNativeFailure {
-      try (animation?.nativeInput ?? NativeAnimationOptionsInput())
-        .withOptionalNativeOptions { animation in
-          try submitCommand { map, commandId in
-            try checkStatus(mln_map_move_by(
-              map.raw,
-              offset.nativeInput.native,
-              animation,
-              commandId
-            ))
-          }
+      try delta.withNativeDelta { delta in
+        try submitCommand { map, commandId in
+          try checkStatus(mln_map_apply_camera_delta(
+            map.raw,
+            delta,
+            commandId
+          ))
         }
-    }
-  }
-
-  /// Scales the camera around an optional logical-pixel anchor.
-  @discardableResult
-  public func scaleBy(
-    _ scale: Double,
-    anchor: ScreenPoint? = nil,
-    animation: AnimationOptions? = nil
-  ) throws -> UInt64 {
-    try mapNativeFailure {
-      try (animation?.nativeInput ?? NativeAnimationOptionsInput())
-        .withOptionalNativeOptions { animation in
-          let submit: (UnsafePointer<mln_screen_point>?) throws -> UInt64 = {
-            anchor in
-            try self.submitCommand { map, commandId in
-              try checkStatus(mln_map_scale_by(
-                map.raw, scale, anchor, animation, commandId
-              ))
-            }
-          }
-          guard var nativeAnchor = anchor?.nativeInput.native
-          else { return try submit(nil) }
-          return try withUnsafePointer(to: &nativeAnchor, submit)
-        }
-    }
-  }
-
-  /// Adds degrees to the camera bearing around an optional anchor.
-  @discardableResult
-  public func bearingBy(
-    _ degrees: Double,
-    anchor: ScreenPoint? = nil,
-    animation: AnimationOptions? = nil
-  ) throws -> UInt64 {
-    try mapNativeFailure {
-      try (animation?.nativeInput ?? NativeAnimationOptionsInput())
-        .withOptionalNativeOptions { animation in
-          let submit: (UnsafePointer<mln_screen_point>?) throws -> UInt64 = {
-            anchor in
-            try self.submitCommand { map, commandId in
-              try checkStatus(mln_map_bearing_by(
-                map.raw, degrees, anchor, animation, commandId
-              ))
-            }
-          }
-          guard var nativeAnchor = anchor?.nativeInput.native
-          else { return try submit(nil) }
-          return try withUnsafePointer(to: &nativeAnchor, submit)
-        }
-    }
-  }
-
-  /// Adds degrees to the camera pitch.
-  @discardableResult
-  public func pitchBy(
-    _ degrees: Double,
-    animation: AnimationOptions? = nil
-  ) throws -> UInt64 {
-    try mapNativeFailure {
-      try (animation?.nativeInput ?? NativeAnimationOptionsInput())
-        .withOptionalNativeOptions { animation in
-          try submitCommand { map, commandId in
-            try checkStatus(mln_map_pitch_by(
-              map.raw,
-              degrees,
-              animation,
-              commandId
-            ))
-          }
-        }
+      }
     }
   }
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import IntEnum
 
 from .geo import LatLng, LatLngBounds
 
@@ -104,6 +105,26 @@ class AnimationOptions:
     min_zoom: float | None = None
     easing: UnitBezier | None = None
     transition_id: int | None = None
+
+
+class CameraDeltaKind(IntEnum):
+    """Relative camera operation kind."""
+
+    MOVE = 0
+    SCALE = 1
+    BEARING = 2
+    PITCH = 3
+
+
+@dataclass(frozen=True, slots=True)
+class CameraDelta:
+    """One relative camera operation."""
+
+    kind: CameraDeltaKind = CameraDeltaKind.MOVE
+    offset: ScreenPoint = ScreenPoint(0.0, 0.0)
+    amount: float = 0.0
+    anchor: ScreenPoint | None = None
+    animation: AnimationOptions = AnimationOptions()
 
 
 @dataclass(frozen=True, slots=True)

@@ -17,6 +17,8 @@ public sealed class PublicApiSurfaceTests
             "Maplibre.NativeFfi.Camera.BoundsConstraint+Bounded",
             "Maplibre.NativeFfi.Camera.BoundsConstraint+Unbounded",
             "Maplibre.NativeFfi.Camera.CameraChangeMode",
+            "Maplibre.NativeFfi.Camera.CameraDelta",
+            "Maplibre.NativeFfi.Camera.CameraDeltaKind",
             "Maplibre.NativeFfi.Camera.CameraSnapshot",
             "Maplibre.NativeFfi.Camera.CameraUpdate",
             "Maplibre.NativeFfi.Camera.CameraUpdateMode",

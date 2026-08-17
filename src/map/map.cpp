@@ -2286,6 +2286,19 @@ auto animation_options_default() noexcept -> mln_animation_options {
     .transition_id = 0
   };
 }
+
+auto camera_delta_default() noexcept -> mln_camera_delta {
+  return mln_camera_delta{
+    .size = sizeof(mln_camera_delta),
+    .kind = MLN_CAMERA_DELTA_MOVE,
+    .offset = {},
+    .amount = 0,
+    .has_anchor = false,
+    .anchor = {},
+    .animation = animation_options_default()
+  };
+}
+
 auto camera_update_default() noexcept -> mln_camera_update {
   return mln_camera_update{
     .size = sizeof(mln_camera_update),
@@ -3489,15 +3502,6 @@ auto submit_camera_command(
   );
 }
 
-auto copied_relative_animation(const mln_animation_options* animation)
-  -> std::optional<mln_animation_options> {
-  if (animation == nullptr) return animation_options_default();
-  if (validate_animation_options(animation) != MLN_STATUS_OK) {
-    return std::nullopt;
-  }
-  return *animation;
-}
-
 }  // namespace
 
 auto map_update_camera(
@@ -3569,125 +3573,88 @@ auto map_update_camera(
   );
 }
 
-auto map_move_by(
-  mln_map map, mln_screen_point offset, const mln_animation_options* animation,
-  uint64_t* out_command_id
+auto map_apply_camera_delta(
+  mln_map map, const mln_camera_delta* delta, uint64_t* out_command_id
 ) -> mln_status {
-  if (validate_screen_point(offset) != MLN_STATUS_OK) {
+  if (delta == nullptr || delta->size < sizeof(mln_camera_delta)) {
+    set_thread_error("camera delta must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto copied_animation = copied_relative_animation(animation);
-  if (!copied_animation.has_value()) return MLN_STATUS_INVALID_ARGUMENT;
-  return submit_camera_command(
-    map,
-    [offset, animation =
-               *copied_animation](MapObject& live, mln_map map_handle) -> void {
-      live.map->moveBy(
-        to_native_screen_point(offset),
-        to_native_animation(
-          live.runtime, map_handle, live.event_state, &animation
-        )
-      );
-    },
-    out_command_id
-  );
-}
-
-auto map_scale_by(
-  mln_map map, double scale, const mln_screen_point* anchor,
-  const mln_animation_options* animation, uint64_t* out_command_id
-) -> mln_status {
-  if (!std::isfinite(scale) || scale <= 0) {
+  if (delta->kind > MLN_CAMERA_DELTA_PITCH) {
+    set_thread_error("camera delta kind is invalid");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (
+    delta->kind == MLN_CAMERA_DELTA_MOVE &&
+    validate_screen_point(delta->offset) != MLN_STATUS_OK
+  ) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (
+    delta->kind == MLN_CAMERA_DELTA_SCALE &&
+    (!std::isfinite(delta->amount) || delta->amount <= 0)
+  ) {
     set_thread_error("camera scale must be finite and positive");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (anchor != nullptr && validate_screen_point(*anchor) != MLN_STATUS_OK) {
+  if (
+    (delta->kind == MLN_CAMERA_DELTA_BEARING ||
+     delta->kind == MLN_CAMERA_DELTA_PITCH) &&
+    !std::isfinite(delta->amount)
+  ) {
+    set_thread_error("camera angle delta must be finite");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto copied_animation = copied_relative_animation(animation);
-  if (!copied_animation.has_value()) return MLN_STATUS_INVALID_ARGUMENT;
-  const auto copied_anchor = anchor == nullptr
-                               ? std::optional<mln_screen_point>{}
-                               : std::optional<mln_screen_point>{*anchor};
+  if (
+    delta->has_anchor && delta->kind != MLN_CAMERA_DELTA_SCALE &&
+    delta->kind != MLN_CAMERA_DELTA_BEARING
+  ) {
+    set_thread_error("only scale and bearing camera deltas accept an anchor");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (
+    delta->has_anchor && validate_screen_point(delta->anchor) != MLN_STATUS_OK
+  ) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (validate_animation_options(&delta->animation) != MLN_STATUS_OK) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto copied = *delta;
   return submit_camera_command(
     map,
-    [scale, copied_anchor, animation = *copied_animation](
-      MapObject& live, mln_map map_handle
-    ) -> void {
-      live.map->scaleBy(
-        scale,
-        copied_anchor.has_value()
+    [copied](MapObject& live, mln_map map_handle) -> void {
+      const auto animation = to_native_animation(
+        live.runtime, map_handle, live.event_state, &copied.animation
+      );
+      const auto anchor =
+        copied.has_anchor
           ? std::optional<mbgl::ScreenCoordinate>{to_native_screen_point(
-              *copied_anchor
+              copied.anchor
             )}
-          : std::nullopt,
-        to_native_animation(
-          live.runtime, map_handle, live.event_state, &animation
-        )
-      );
-    },
-    out_command_id
-  );
-}
-
-auto map_bearing_by(
-  mln_map map, double degrees, const mln_screen_point* anchor,
-  const mln_animation_options* animation, uint64_t* out_command_id
-) -> mln_status {
-  if (!std::isfinite(degrees)) {
-    set_thread_error("camera bearing delta must be finite");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (anchor != nullptr && validate_screen_point(*anchor) != MLN_STATUS_OK) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto copied_animation = copied_relative_animation(animation);
-  if (!copied_animation.has_value()) return MLN_STATUS_INVALID_ARGUMENT;
-  const auto copied_anchor = anchor == nullptr
-                               ? std::optional<mln_screen_point>{}
-                               : std::optional<mln_screen_point>{*anchor};
-  return submit_camera_command(
-    map,
-    [degrees, copied_anchor, animation = *copied_animation](
-      MapObject& live, mln_map map_handle
-    ) -> void {
-      const auto current = live.map->getCameraOptions();
-      auto camera = mbgl::CameraOptions{}.withBearing(
-        current.bearing.value_or(0) + degrees
-      );
-      if (copied_anchor.has_value()) {
-        camera.withAnchor(to_native_screen_point(*copied_anchor));
+          : std::nullopt;
+      switch (copied.kind) {
+        case MLN_CAMERA_DELTA_MOVE:
+          live.map->moveBy(to_native_screen_point(copied.offset), animation);
+          break;
+        case MLN_CAMERA_DELTA_SCALE:
+          live.map->scaleBy(copied.amount, anchor, animation);
+          break;
+        case MLN_CAMERA_DELTA_BEARING: {
+          const auto current = live.map->getCameraOptions();
+          auto camera = mbgl::CameraOptions{}.withBearing(
+            current.bearing.value_or(0) + copied.amount
+          );
+          if (anchor.has_value()) camera.withAnchor(*anchor);
+          live.map->easeTo(camera, animation);
+          break;
+        }
+        case MLN_CAMERA_DELTA_PITCH:
+          live.map->pitchBy(-copied.amount, animation);
+          break;
+        default:
+          break;
       }
-      live.map->easeTo(
-        camera, to_native_animation(
-                  live.runtime, map_handle, live.event_state, &animation
-                )
-      );
-    },
-    out_command_id
-  );
-}
-
-auto map_pitch_by(
-  mln_map map, double degrees, const mln_animation_options* animation,
-  uint64_t* out_command_id
-) -> mln_status {
-  if (!std::isfinite(degrees)) {
-    set_thread_error("camera pitch delta must be finite");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto copied_animation = copied_relative_animation(animation);
-  if (!copied_animation.has_value()) return MLN_STATUS_INVALID_ARGUMENT;
-  return submit_camera_command(
-    map,
-    [degrees, animation = *copied_animation](
-      MapObject& live, mln_map map_handle
-    ) -> void {
-      live.map->pitchBy(
-        -degrees, to_native_animation(
-                    live.runtime, map_handle, live.event_state, &animation
-                  )
-      );
     },
     out_command_id
   );

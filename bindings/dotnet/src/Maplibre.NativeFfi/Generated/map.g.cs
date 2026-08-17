@@ -239,6 +239,35 @@ namespace Maplibre.NativeFfi.Internal.C
     }
 
     [NativeTypeName("uint32_t")]
+    internal enum mln_camera_delta_kind : uint
+    {
+        MLN_CAMERA_DELTA_MOVE = 0,
+        MLN_CAMERA_DELTA_SCALE = 1,
+        MLN_CAMERA_DELTA_BEARING = 2,
+        MLN_CAMERA_DELTA_PITCH = 3,
+    }
+
+    internal partial struct mln_camera_delta
+    {
+        [NativeTypeName("uint32_t")]
+        public uint size;
+
+        [NativeTypeName("uint32_t")]
+        public uint kind;
+
+        public mln_screen_point offset;
+
+        public double amount;
+
+        [NativeTypeName("bool")]
+        public byte has_anchor;
+
+        public mln_screen_point anchor;
+
+        public mln_animation_options animation;
+    }
+
+    [NativeTypeName("uint32_t")]
     internal enum mln_camera_update_mode : uint
     {
         MLN_CAMERA_UPDATE_MODE_JUMP = 0,
@@ -429,7 +458,7 @@ namespace Maplibre.NativeFfi.Internal.C
         [NativeTypeName("uint32_t")]
         public uint type;
 
-        [NativeTypeName("__AnonymousRecord_map_L433_C3")]
+        [NativeTypeName("__AnonymousRecord_map_L459_C3")]
         public _data_e__Union data;
 
         [StructLayout(LayoutKind.Explicit)]

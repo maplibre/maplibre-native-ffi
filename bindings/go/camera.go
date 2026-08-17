@@ -286,6 +286,40 @@ func cCameraUpdate(update CameraUpdate) C.mln_camera_update {
 	return raw
 }
 
+// CameraDeltaKind selects one relative camera operation.
+type CameraDeltaKind uint32
+
+const (
+	CameraDeltaKindMove    CameraDeltaKind = CameraDeltaKind(C.MLN_CAMERA_DELTA_MOVE)
+	CameraDeltaKindScale   CameraDeltaKind = CameraDeltaKind(C.MLN_CAMERA_DELTA_SCALE)
+	CameraDeltaKindBearing CameraDeltaKind = CameraDeltaKind(C.MLN_CAMERA_DELTA_BEARING)
+	CameraDeltaKindPitch   CameraDeltaKind = CameraDeltaKind(C.MLN_CAMERA_DELTA_PITCH)
+)
+
+// CameraDelta describes one relative camera operation.
+type CameraDelta struct {
+	Kind      CameraDeltaKind
+	Offset    ScreenPoint
+	Amount    float64
+	Anchor    *ScreenPoint
+	Animation *AnimationOptions
+}
+
+func cCameraDelta(delta CameraDelta) C.mln_camera_delta {
+	raw := C.mln_camera_delta_default()
+	raw.kind = C.uint32_t(delta.Kind)
+	raw.offset = C.mln_screen_point{x: C.double(delta.Offset.X), y: C.double(delta.Offset.Y)}
+	raw.amount = C.double(delta.Amount)
+	if delta.Anchor != nil {
+		raw.has_anchor = true
+		raw.anchor = C.mln_screen_point{x: C.double(delta.Anchor.X), y: C.double(delta.Anchor.Y)}
+	}
+	if delta.Animation != nil {
+		raw.animation = cAnimationOptions(*delta.Animation)
+	}
+	return raw
+}
+
 // CameraFitOptions configures camera fitting queries.
 type CameraFitOptions struct {
 	Padding *EdgeInsets

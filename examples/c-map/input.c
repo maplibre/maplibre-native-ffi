@@ -55,44 +55,52 @@ static app_error camera_status(mln_status status) {
 static app_error pan(
   map_state* state, double dx, double dy, uint32_t mode, double duration_ms
 ) {
-  const mln_animation_options options = animation(duration_ms);
+  mln_camera_delta delta = mln_camera_delta_default();
+  delta.offset = (mln_screen_point){.x = dx, .y = dy};
+  if (mode != MLN_CAMERA_UPDATE_MODE_JUMP)
+    delta.animation = animation(duration_ms);
   uint64_t command_id = 0;
-  return camera_status(mln_map_move_by(
-    state->map, (mln_screen_point){.x = dx, .y = dy},
-    mode == MLN_CAMERA_UPDATE_MODE_JUMP ? NULL : &options, &command_id
-  ));
+  return camera_status(
+    mln_map_apply_camera_delta(state->map, &delta, &command_id)
+  );
 }
 
 static app_error zoom(
   map_state* state, double scale, mln_screen_point anchor, uint32_t mode,
   double duration_ms
 ) {
-  const mln_animation_options options = animation(duration_ms);
+  mln_camera_delta delta = mln_camera_delta_default();
+  delta.kind = MLN_CAMERA_DELTA_SCALE;
+  delta.amount = scale;
+  delta.has_anchor = true;
+  delta.anchor = anchor;
+  if (mode != MLN_CAMERA_UPDATE_MODE_JUMP)
+    delta.animation = animation(duration_ms);
   uint64_t command_id = 0;
-  return camera_status(mln_map_scale_by(
-    state->map, scale, &anchor,
-    mode == MLN_CAMERA_UPDATE_MODE_JUMP ? NULL : &options, &command_id
-  ));
+  return camera_status(
+    mln_map_apply_camera_delta(state->map, &delta, &command_id)
+  );
 }
 
 static app_error adjust_orientation(
   map_state* state, double bearing_delta, double pitch_delta, uint32_t mode,
   double duration_ms
 ) {
-  const mln_animation_options options = animation(duration_ms);
-  const mln_animation_options* animation_options =
-    mode == MLN_CAMERA_UPDATE_MODE_JUMP ? NULL : &options;
+  mln_camera_delta delta = mln_camera_delta_default();
+  if (mode != MLN_CAMERA_UPDATE_MODE_JUMP)
+    delta.animation = animation(duration_ms);
   uint64_t command_id = 0;
   mln_status status = MLN_STATUS_OK;
   if (bearing_delta != 0.0) {
-    status = mln_map_bearing_by(
-      state->map, bearing_delta, NULL, animation_options, &command_id
-    );
+    delta.kind = MLN_CAMERA_DELTA_BEARING;
+    delta.amount = bearing_delta;
+    status = mln_map_apply_camera_delta(state->map, &delta, &command_id);
   }
   if (status == MLN_STATUS_OK && pitch_delta != 0.0) {
+    delta.kind = MLN_CAMERA_DELTA_PITCH;
+    delta.amount = pitch_delta;
     command_id = 0;
-    status =
-      mln_map_pitch_by(state->map, pitch_delta, animation_options, &command_id);
+    status = mln_map_apply_camera_delta(state->map, &delta, &command_id);
   }
   return camera_status(status);
 }

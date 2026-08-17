@@ -532,77 +532,22 @@ func (m *MapHandle) UpdateCamera(update CameraUpdate) (uint64, error) {
 	return uint64(commandID), nil
 }
 
-func (m *MapHandle) submitCameraMutation(
-	submit func(C.mln_map, *C.uint64_t) C.mln_status,
-) (uint64, error) {
+// ApplyCameraDelta submits one relative camera operation and returns its command ID.
+func (m *MapHandle) ApplyCameraDelta(delta CameraDelta) (uint64, error) {
 	ptr, release, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
 	defer release()
 	defer m.state.KeepAlive()
+	raw := cCameraDelta(delta)
 	var commandID C.uint64_t
 	if err := checkNative(func() int32 {
-		return int32(submit(C.mln_map(ptr), &commandID))
+		return int32(C.mln_map_apply_camera_delta(C.mln_map(ptr), &raw, &commandID))
 	}); err != nil {
 		return 0, err
 	}
 	return uint64(commandID), nil
-}
-
-func cOptionalAnimation(options *AnimationOptions) *C.mln_animation_options {
-	if options == nil {
-		return nil
-	}
-	raw := cAnimationOptions(*options)
-	return &raw
-}
-
-// MoveBy moves the camera by a logical-pixel offset.
-func (m *MapHandle) MoveBy(offset ScreenPoint, animation *AnimationOptions) (uint64, error) {
-	rawAnimation := cOptionalAnimation(animation)
-	return m.submitCameraMutation(func(mapHandle C.mln_map, commandID *C.uint64_t) C.mln_status {
-		return C.mln_map_move_by(
-			mapHandle,
-			C.mln_screen_point{x: C.double(offset.X), y: C.double(offset.Y)},
-			rawAnimation,
-			commandID,
-		)
-	})
-}
-
-// ScaleBy scales the camera around an optional logical-pixel anchor.
-func (m *MapHandle) ScaleBy(scale float64, anchor *ScreenPoint, animation *AnimationOptions) (uint64, error) {
-	var rawAnchor *C.mln_screen_point
-	if anchor != nil {
-		value := C.mln_screen_point{x: C.double(anchor.X), y: C.double(anchor.Y)}
-		rawAnchor = &value
-	}
-	rawAnimation := cOptionalAnimation(animation)
-	return m.submitCameraMutation(func(mapHandle C.mln_map, commandID *C.uint64_t) C.mln_status {
-		return C.mln_map_scale_by(mapHandle, C.double(scale), rawAnchor, rawAnimation, commandID)
-	})
-}
-
-// BearingBy adds degrees to the camera bearing around an optional anchor.
-func (m *MapHandle) BearingBy(degrees float64, anchor *ScreenPoint, animation *AnimationOptions) (uint64, error) {
-	var rawAnchor *C.mln_screen_point
-	if anchor != nil {
-		value := C.mln_screen_point{x: C.double(anchor.X), y: C.double(anchor.Y)}
-		rawAnchor = &value
-	}
-	rawAnimation := cOptionalAnimation(animation)
-	return m.submitCameraMutation(func(mapHandle C.mln_map, commandID *C.uint64_t) C.mln_status {
-		return C.mln_map_bearing_by(mapHandle, C.double(degrees), rawAnchor, rawAnimation, commandID)
-	})
-}
-
-// PitchBy adds degrees to the camera pitch.
-func (m *MapHandle) PitchBy(degrees float64, animation *AnimationOptions) (uint64, error) {
-	rawAnimation := cOptionalAnimation(animation)
-	return m.submitCameraMutation(func(mapHandle C.mln_map, commandID *C.uint64_t) C.mln_status {
-		return C.mln_map_pitch_by(mapHandle, C.double(degrees), rawAnimation, commandID)
-	})
 }
 
 // JumpTo submits an atomic camera jump.

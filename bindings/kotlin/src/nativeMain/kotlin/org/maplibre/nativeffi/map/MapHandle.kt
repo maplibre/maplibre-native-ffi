@@ -19,8 +19,8 @@ import kotlinx.cinterop.readValue
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.value
-import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.BoundOptions
+import org.maplibre.nativeffi.camera.CameraDelta
 import org.maplibre.nativeffi.camera.CameraSnapshot
 import org.maplibre.nativeffi.camera.CameraUpdate
 import org.maplibre.nativeffi.camera.FreeCameraOptions
@@ -28,12 +28,12 @@ import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
-import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_LAYER_INFO_SOURCE_ID
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_LAYER_INFO_SOURCE_LAYER
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_SOURCE_INFO_TILEJSON
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_SOURCE_INFO_URL
 import org.maplibre.nativeffi.internal.c.mln_buffer_view
+import org.maplibre.nativeffi.internal.c.mln_camera_delta_default
 import org.maplibre.nativeffi.internal.c.mln_camera_options_default
 import org.maplibre.nativeffi.internal.c.mln_camera_query_result
 import org.maplibre.nativeffi.internal.c.mln_camera_update_default
@@ -56,7 +56,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_add_style_layer_json
 import org.maplibre.nativeffi.internal.c.mln_map_add_style_source_json
 import org.maplibre.nativeffi.internal.c.mln_map_add_vector_source_tiles
 import org.maplibre.nativeffi.internal.c.mln_map_add_vector_source_url
-import org.maplibre.nativeffi.internal.c.mln_map_bearing_by
+import org.maplibre.nativeffi.internal.c.mln_map_apply_camera_delta
 import org.maplibre.nativeffi.internal.c.mln_map_camera_query_start
 import org.maplibre.nativeffi.internal.c.mln_map_camera_query_take_result
 import org.maplibre.nativeffi.internal.c.mln_map_camera_snapshot_get
@@ -103,11 +103,9 @@ import org.maplibre.nativeffi.internal.c.mln_map_list_style_source_ids_start
 import org.maplibre.nativeffi.internal.c.mln_map_list_style_source_ids_take_result
 import org.maplibre.nativeffi.internal.c.mln_map_loaded_style_json_start
 import org.maplibre.nativeffi.internal.c.mln_map_loaded_style_json_take_result
-import org.maplibre.nativeffi.internal.c.mln_map_move_by
 import org.maplibre.nativeffi.internal.c.mln_map_move_style_layer
 import org.maplibre.nativeffi.internal.c.mln_map_options
 import org.maplibre.nativeffi.internal.c.mln_map_options_default
-import org.maplibre.nativeffi.internal.c.mln_map_pitch_by
 import org.maplibre.nativeffi.internal.c.mln_map_projection_create_start
 import org.maplibre.nativeffi.internal.c.mln_map_projection_create_take_result
 import org.maplibre.nativeffi.internal.c.mln_map_remove_style_image
@@ -116,7 +114,6 @@ import org.maplibre.nativeffi.internal.c.mln_map_remove_style_source
 import org.maplibre.nativeffi.internal.c.mln_map_request_repaint
 import org.maplibre.nativeffi.internal.c.mln_map_request_still_image_start
 import org.maplibre.nativeffi.internal.c.mln_map_resize
-import org.maplibre.nativeffi.internal.c.mln_map_scale_by
 import org.maplibre.nativeffi.internal.c.mln_map_set_bounds
 import org.maplibre.nativeffi.internal.c.mln_map_set_custom_geometry_source_tile_data
 import org.maplibre.nativeffi.internal.c.mln_map_set_debug_options
@@ -1634,64 +1631,31 @@ private constructor(
     outCommand.value.toLong()
   }
 
-  public actual fun moveBy(offset: ScreenPoint, animation: AnimationOptions?): Long = memScoped {
+  public actual fun applyCameraDelta(delta: CameraDelta): Long = memScoped {
+    val nativeDelta = mln_camera_delta_default().getPointer(this)
+    nativeDelta.pointed.kind = delta.kind.nativeValue.toUInt()
+    nativeDelta.pointed.offset.x = delta.offset.x
+    nativeDelta.pointed.offset.y = delta.offset.y
+    nativeDelta.pointed.amount = delta.amount
+    nativeDelta.pointed.has_anchor = delta.anchor != null
+    delta.anchor?.let {
+      nativeDelta.pointed.anchor.x = it.x
+      nativeDelta.pointed.anchor.y = it.y
+    }
+    val animation = MapStructs.animationOptions(delta.animation, this).pointed
+    nativeDelta.pointed.animation.size = animation.size
+    nativeDelta.pointed.animation.fields = animation.fields
+    nativeDelta.pointed.animation.duration_ms = animation.duration_ms
+    nativeDelta.pointed.animation.velocity = animation.velocity
+    nativeDelta.pointed.animation.min_zoom = animation.min_zoom
+    nativeDelta.pointed.animation.easing.x1 = animation.easing.x1
+    nativeDelta.pointed.animation.easing.y1 = animation.easing.y1
+    nativeDelta.pointed.animation.easing.x2 = animation.easing.x2
+    nativeDelta.pointed.animation.easing.y2 = animation.easing.y2
+    nativeDelta.pointed.animation.transition_id = animation.transition_id
     val outCommand = alloc<ULongVar>()
     Status.check(
-      mln_map_move_by(
-        state.requireLive().rawHandleValue,
-        CoreStructs.screenPoint(offset),
-        animation?.let { MapStructs.animationOptions(it, this) },
-        outCommand.ptr,
-      )
-    )
-    outCommand.value.toLong()
-  }
-
-  public actual fun scaleBy(
-    scale: Double,
-    anchor: ScreenPoint?,
-    animation: AnimationOptions?,
-  ): Long = memScoped {
-    val outCommand = alloc<ULongVar>()
-    Status.check(
-      mln_map_scale_by(
-        state.requireLive().rawHandleValue,
-        scale,
-        anchor?.let { CoreStructs.screenPoint(it).getPointer(this) },
-        animation?.let { MapStructs.animationOptions(it, this) },
-        outCommand.ptr,
-      )
-    )
-    outCommand.value.toLong()
-  }
-
-  public actual fun bearingBy(
-    degrees: Double,
-    anchor: ScreenPoint?,
-    animation: AnimationOptions?,
-  ): Long = memScoped {
-    val outCommand = alloc<ULongVar>()
-    Status.check(
-      mln_map_bearing_by(
-        state.requireLive().rawHandleValue,
-        degrees,
-        anchor?.let { CoreStructs.screenPoint(it).getPointer(this) },
-        animation?.let { MapStructs.animationOptions(it, this) },
-        outCommand.ptr,
-      )
-    )
-    outCommand.value.toLong()
-  }
-
-  public actual fun pitchBy(degrees: Double, animation: AnimationOptions?): Long = memScoped {
-    val outCommand = alloc<ULongVar>()
-    Status.check(
-      mln_map_pitch_by(
-        state.requireLive().rawHandleValue,
-        degrees,
-        animation?.let { MapStructs.animationOptions(it, this) },
-        outCommand.ptr,
-      )
+      mln_map_apply_camera_delta(state.requireLive().rawHandleValue, nativeDelta, outCommand.ptr)
     )
     outCommand.value.toLong()
   }

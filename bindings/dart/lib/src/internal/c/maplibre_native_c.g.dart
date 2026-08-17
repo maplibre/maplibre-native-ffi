@@ -283,6 +283,9 @@ external int mln_buffer_get(int buffer, ffi.Pointer<mln_buffer_view> out_view);
 @ffi.Native<ffi.Uint32 Function()>()
 external int mln_c_version();
 
+@ffi.Native<mln_camera_delta Function()>()
+external mln_camera_delta mln_camera_delta_default();
+
 @ffi.Native<mln_camera_fit_options Function()>()
 external mln_camera_fit_options mln_camera_fit_options_default();
 
@@ -647,17 +650,13 @@ external int mln_map_add_vector_source_url(
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    ffi.Double,
-    ffi.Pointer<mln_screen_point>,
-    ffi.Pointer<mln_animation_options>,
+    ffi.Pointer<mln_camera_delta>,
     ffi.Pointer<ffi.Uint64>,
   )
 >()
-external int mln_map_bearing_by(
+external int mln_map_apply_camera_delta(
   int map,
-  double degrees,
-  ffi.Pointer<mln_screen_point> anchor,
-  ffi.Pointer<mln_animation_options> animation,
+  ffi.Pointer<mln_camera_delta> delta,
   ffi.Pointer<ffi.Uint64> out_command_id,
 );
 
@@ -1275,21 +1274,6 @@ external int mln_map_loaded_style_json_take_result(
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
-    mln_screen_point,
-    ffi.Pointer<mln_animation_options>,
-    ffi.Pointer<ffi.Uint64>,
-  )
->()
-external int mln_map_move_by(
-  int map,
-  mln_screen_point offset,
-  ffi.Pointer<mln_animation_options> animation,
-  ffi.Pointer<ffi.Uint64> out_command_id,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_map,
     mln_buffer_view,
     mln_buffer_view,
     ffi.Pointer<ffi.Uint64>,
@@ -1304,21 +1288,6 @@ external int mln_map_move_style_layer(
 
 @ffi.Native<mln_map_options Function()>()
 external mln_map_options mln_map_options_default();
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_map,
-    ffi.Double,
-    ffi.Pointer<mln_animation_options>,
-    ffi.Pointer<ffi.Uint64>,
-  )
->()
-external int mln_map_pitch_by(
-  int map,
-  double degrees,
-  ffi.Pointer<mln_animation_options> animation,
-  ffi.Pointer<ffi.Uint64> out_command_id,
-);
 
 @ffi.Native<
   ffi.Int32 Function(mln_map, mln_lat_lng, ffi.Pointer<mln_operation>)
@@ -1493,23 +1462,6 @@ external int mln_map_request_still_image_start(
 external int mln_map_resize(
   int map,
   mln_logical_extent extent,
-  ffi.Pointer<ffi.Uint64> out_command_id,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_map,
-    ffi.Double,
-    ffi.Pointer<mln_screen_point>,
-    ffi.Pointer<mln_animation_options>,
-    ffi.Pointer<ffi.Uint64>,
-  )
->()
-external int mln_map_scale_by(
-  int map,
-  double scale,
-  ffi.Pointer<mln_screen_point> anchor,
-  ffi.Pointer<mln_animation_options> animation,
   ffi.Pointer<ffi.Uint64> out_command_id,
 );
 
@@ -3770,6 +3722,44 @@ enum mln_camera_change_mode {
     _ => throw ArgumentError(
       'Unknown value for mln_camera_change_mode: $value',
     ),
+  };
+}
+
+final class mln_camera_delta extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Uint32()
+  external int kind;
+
+  external mln_screen_point offset;
+
+  @ffi.Double()
+  external double amount;
+
+  @ffi.Bool()
+  external bool has_anchor;
+
+  external mln_screen_point anchor;
+
+  external mln_animation_options animation;
+}
+
+enum mln_camera_delta_kind {
+  MLN_CAMERA_DELTA_MOVE(0),
+  MLN_CAMERA_DELTA_SCALE(1),
+  MLN_CAMERA_DELTA_BEARING(2),
+  MLN_CAMERA_DELTA_PITCH(3);
+
+  final int value;
+  const mln_camera_delta_kind(this.value);
+
+  static mln_camera_delta_kind fromValue(int value) => switch (value) {
+    0 => MLN_CAMERA_DELTA_MOVE,
+    1 => MLN_CAMERA_DELTA_SCALE,
+    2 => MLN_CAMERA_DELTA_BEARING,
+    3 => MLN_CAMERA_DELTA_PITCH,
+    _ => throw ArgumentError('Unknown value for mln_camera_delta_kind: $value'),
   };
 }
 

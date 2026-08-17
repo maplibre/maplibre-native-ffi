@@ -169,3 +169,52 @@ public struct CameraUpdate: Equatable, Sendable {
     }
   }
 }
+
+public enum CameraDeltaKind: UInt32, Sendable, Hashable {
+  case move = 0
+  case scale = 1
+  case bearing = 2
+  case pitch = 3
+}
+
+/// One relative camera operation.
+public struct CameraDelta: Equatable, Sendable {
+  public var kind: CameraDeltaKind
+  public var offset: ScreenPoint
+  public var amount: Double
+  public var anchor: ScreenPoint?
+  public var animation: AnimationOptions
+
+  public init(
+    kind: CameraDeltaKind = .move,
+    offset: ScreenPoint = ScreenPoint(x: 0, y: 0),
+    amount: Double = 0,
+    anchor: ScreenPoint? = nil,
+    animation: AnimationOptions = AnimationOptions()
+  ) {
+    self.kind = kind
+    self.offset = offset
+    self.amount = amount
+    self.anchor = anchor
+    self.animation = animation
+  }
+
+  func withNativeDelta<Result>(
+    _ body: (UnsafePointer<mln_camera_delta>) throws -> Result
+  ) throws -> Result {
+    try animation.nativeInput.withOptionalNativeOptions { animation in
+      var delta = mln_camera_delta_default()
+      delta.kind = kind.rawValue
+      delta.offset = offset.nativeInput.native
+      delta.amount = amount
+      if let anchor {
+        delta.has_anchor = true
+        delta.anchor = anchor.nativeInput.native
+      }
+      if let animation {
+        delta.animation = animation.pointee
+      }
+      return try withUnsafePointer(to: &delta, body)
+    }
+  }
+}

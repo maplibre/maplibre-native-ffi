@@ -11,6 +11,7 @@ import org.maplibre.nativeffi.NativeAccess
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.BoundOptions
 import org.maplibre.nativeffi.camera.BoundsConstraint
+import org.maplibre.nativeffi.camera.CameraDelta
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.CameraSnapshot
 import org.maplibre.nativeffi.camera.CameraUpdate
@@ -1566,85 +1567,33 @@ private constructor(
     }
   }
 
-  public actual fun moveBy(offset: ScreenPoint, animation: AnimationOptions?): Long {
+  public actual fun applyCameraDelta(delta: CameraDelta): Long {
     NativeAccess.ensureLoaded()
-    AnimationOptionsScope(animation).use { nativeAnimation ->
-      screenPoint(offset).use { nativeOffset ->
-        val outCommand = longArrayOf(0L)
-        Status.check(
-          MaplibreNativeC.mln_map_move_by(
-            requireLiveHandle(),
-            nativeOffset,
-            nativeAnimation.options,
-            outCommand,
-          )
-        )
-        return outCommand[0]
-      }
-    }
-  }
-
-  public actual fun scaleBy(
-    scale: Double,
-    anchor: ScreenPoint?,
-    animation: AnimationOptions?,
-  ): Long =
-    relativeCameraCommand(anchor, animation) { nativeAnchor, nativeAnimation, outCommand ->
-      MaplibreNativeC.mln_map_scale_by(
-        requireLiveHandle(),
-        scale,
-        nativeAnchor,
-        nativeAnimation,
-        outCommand,
-      )
-    }
-
-  public actual fun bearingBy(
-    degrees: Double,
-    anchor: ScreenPoint?,
-    animation: AnimationOptions?,
-  ): Long =
-    relativeCameraCommand(anchor, animation) { nativeAnchor, nativeAnimation, outCommand ->
-      MaplibreNativeC.mln_map_bearing_by(
-        requireLiveHandle(),
-        degrees,
-        nativeAnchor,
-        nativeAnimation,
-        outCommand,
-      )
-    }
-
-  public actual fun pitchBy(degrees: Double, animation: AnimationOptions?): Long {
-    NativeAccess.ensureLoaded()
-    AnimationOptionsScope(animation).use { nativeAnimation ->
-      val outCommand = longArrayOf(0L)
-      Status.check(
-        MaplibreNativeC.mln_map_pitch_by(
-          requireLiveHandle(),
-          degrees,
-          nativeAnimation.options,
-          outCommand,
-        )
-      )
-      return outCommand[0]
-    }
-  }
-
-  private inline fun relativeCameraCommand(
-    anchor: ScreenPoint?,
-    animation: AnimationOptions?,
-    call:
-      (MaplibreNativeC.mln_screen_point?, MaplibreNativeC.mln_animation_options?, LongArray) -> Int,
-  ): Long {
-    NativeAccess.ensureLoaded()
-    AnimationOptionsScope(animation).use { nativeAnimation ->
-      val nativeAnchor = anchor?.let(::screenPoint)
-      try {
-        val outCommand = longArrayOf(0L)
-        Status.check(call(nativeAnchor, nativeAnimation.options, outCommand))
-        return outCommand[0]
-      } finally {
-        nativeAnchor?.close()
+    AnimationOptionsScope(delta.animation).use { nativeAnimation ->
+      screenPoint(delta.offset).use { nativeOffset ->
+        val nativeAnchor = delta.anchor?.let(::screenPoint)
+        try {
+          MaplibreNativeC.mln_camera_delta_default().use { nativeDelta ->
+            nativeDelta
+              .kind(delta.kind.nativeValue)
+              .offset(nativeOffset)
+              .amount(delta.amount)
+              .has_anchor(nativeAnchor != null)
+              .animation(nativeAnimation.options)
+            nativeAnchor?.let(nativeDelta::anchor)
+            val outCommand = longArrayOf(0L)
+            Status.check(
+              MaplibreNativeC.mln_map_apply_camera_delta(
+                requireLiveHandle(),
+                nativeDelta,
+                outCommand,
+              )
+            )
+            return outCommand[0]
+          }
+        } finally {
+          nativeAnchor?.close()
+        }
       }
     }
   }

@@ -4,6 +4,8 @@ import android.os.Handler
 import android.os.Looper
 import java.util.concurrent.atomic.AtomicBoolean
 import org.maplibre.nativeffi.camera.AnimationOptions
+import org.maplibre.nativeffi.camera.CameraDelta
+import org.maplibre.nativeffi.camera.CameraDeltaKind
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.CameraUpdate
 import org.maplibre.nativeffi.camera.GesturePhase
@@ -102,27 +104,38 @@ internal class MapState(initialViewport: Viewport, private val requestRender: ()
   }
 
   fun moveBy(deltaX: Double, deltaY: Double) {
-    map.moveBy(org.maplibre.nativeffi.geo.ScreenPoint(deltaX, deltaY))
+    map.applyCameraDelta(
+      CameraDelta(offset = org.maplibre.nativeffi.geo.ScreenPoint(deltaX, deltaY))
+    )
     requestRender()
   }
 
   fun scaleBy(scale: Double, anchor: org.maplibre.nativeffi.geo.ScreenPoint) {
-    map.scaleBy(scale, anchor)
+    map.applyCameraDelta(CameraDelta(kind = CameraDeltaKind.SCALE, amount = scale, anchor = anchor))
     requestRender()
   }
 
   fun adjustBearing(degrees: Double, anchor: org.maplibre.nativeffi.geo.ScreenPoint) {
-    map.bearingBy(degrees, anchor)
+    map.applyCameraDelta(
+      CameraDelta(kind = CameraDeltaKind.BEARING, amount = degrees, anchor = anchor)
+    )
     requestRender()
   }
 
   fun adjustPitch(degrees: Double) {
-    map.pitchBy(degrees)
+    map.applyCameraDelta(CameraDelta(kind = CameraDeltaKind.PITCH, amount = degrees))
     requestRender()
   }
 
   fun zoomToNextWholeLevel(anchor: org.maplibre.nativeffi.geo.ScreenPoint) {
-    map.scaleBy(2.0, anchor, animation(DOUBLE_TAP_DURATION_MS))
+    map.applyCameraDelta(
+      CameraDelta(
+        kind = CameraDeltaKind.SCALE,
+        amount = 2.0,
+        anchor = anchor,
+        animation = animation(DOUBLE_TAP_DURATION_MS),
+      )
+    )
     requestRender()
   }
 

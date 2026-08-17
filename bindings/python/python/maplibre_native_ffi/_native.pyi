@@ -170,14 +170,14 @@ class _MapHandle:
         field_of_view: float | None,
         animation: _Animation | None,
     ) -> int: ...
-    def move_by(self, offset: _Point, animation: _Animation | None) -> int: ...
-    def scale_by(
-        self, scale: float, anchor: _Point | None, animation: _Animation | None
+    def apply_camera_delta(
+        self,
+        kind: int,
+        offset: _Point,
+        amount: float,
+        anchor: _Point | None,
+        animation: _Animation | None,
     ) -> int: ...
-    def bearing_by(
-        self, degrees: float, anchor: _Point | None, animation: _Animation | None
-    ) -> int: ...
-    def pitch_by(self, degrees: float, animation: _Animation | None) -> int: ...
     def camera_for_lat_lng_bounds(
         self,
         southwest: _Point,

@@ -102,6 +102,30 @@ pub const CameraUpdate = struct {
     gesture_phase: GesturePhase = .none,
 };
 
+pub const CameraDeltaKind = enum {
+    move,
+    scale,
+    bearing,
+    pitch,
+
+    fn toRaw(self: CameraDeltaKind) u32 {
+        return switch (self) {
+            .move => c.MLN_CAMERA_DELTA_MOVE,
+            .scale => c.MLN_CAMERA_DELTA_SCALE,
+            .bearing => c.MLN_CAMERA_DELTA_BEARING,
+            .pitch => c.MLN_CAMERA_DELTA_PITCH,
+        };
+    }
+};
+
+pub const CameraDelta = struct {
+    kind: CameraDeltaKind = .move,
+    offset: values.ScreenPoint = .{ .x = 0, .y = 0 },
+    amount: f64 = 0,
+    anchor: ?values.ScreenPoint = null,
+    animation: values.AnimationOptions = .{},
+};
+
 pub const CameraSnapshot = struct {
     generation: u64,
     camera: values.CameraOptions,
@@ -1513,65 +1537,19 @@ pub const MapHandle = enum(c.mln_map) {
         return command_id;
     }
 
-    pub fn moveBy(self: *MapHandle, offset: values.ScreenPoint, animation: ?values.AnimationOptions) status.Error!u64 {
-        var raw_animation = if (animation) |value| values.animationOptionsToNative(value) else c.mln_animation_options_default();
+    pub fn applyCameraDelta(self: *MapHandle, delta: CameraDelta) status.Error!u64 {
+        var raw = c.mln_camera_delta_default();
+        raw.kind = delta.kind.toRaw();
+        raw.offset = .{ .x = delta.offset.x, .y = delta.offset.y };
+        raw.amount = delta.amount;
+        if (delta.anchor) |anchor| {
+            raw.has_anchor = true;
+            raw.anchor = .{ .x = anchor.x, .y = anchor.y };
+        }
+        raw.animation = values.animationOptionsToNative(delta.animation);
         var command_id: u64 = 0;
         try status.checkStatus(
-            c.mln_map_move_by(
-                try native(self),
-                .{ .x = offset.x, .y = offset.y },
-                if (animation == null) null else &raw_animation,
-                &command_id,
-            ),
-            diagnosticStore(self),
-        );
-        return command_id;
-    }
-
-    pub fn scaleBy(self: *MapHandle, scale: f64, anchor: ?values.ScreenPoint, animation: ?values.AnimationOptions) status.Error!u64 {
-        var raw_anchor = if (anchor) |value| c.mln_screen_point{ .x = value.x, .y = value.y } else c.mln_screen_point{ .x = 0, .y = 0 };
-        var raw_animation = if (animation) |value| values.animationOptionsToNative(value) else c.mln_animation_options_default();
-        var command_id: u64 = 0;
-        try status.checkStatus(
-            c.mln_map_scale_by(
-                try native(self),
-                scale,
-                if (anchor == null) null else &raw_anchor,
-                if (animation == null) null else &raw_animation,
-                &command_id,
-            ),
-            diagnosticStore(self),
-        );
-        return command_id;
-    }
-
-    pub fn bearingBy(self: *MapHandle, degrees: f64, anchor: ?values.ScreenPoint, animation: ?values.AnimationOptions) status.Error!u64 {
-        var raw_anchor = if (anchor) |value| c.mln_screen_point{ .x = value.x, .y = value.y } else c.mln_screen_point{ .x = 0, .y = 0 };
-        var raw_animation = if (animation) |value| values.animationOptionsToNative(value) else c.mln_animation_options_default();
-        var command_id: u64 = 0;
-        try status.checkStatus(
-            c.mln_map_bearing_by(
-                try native(self),
-                degrees,
-                if (anchor == null) null else &raw_anchor,
-                if (animation == null) null else &raw_animation,
-                &command_id,
-            ),
-            diagnosticStore(self),
-        );
-        return command_id;
-    }
-
-    pub fn pitchBy(self: *MapHandle, degrees: f64, animation: ?values.AnimationOptions) status.Error!u64 {
-        var raw_animation = if (animation) |value| values.animationOptionsToNative(value) else c.mln_animation_options_default();
-        var command_id: u64 = 0;
-        try status.checkStatus(
-            c.mln_map_pitch_by(
-                try native(self),
-                degrees,
-                if (animation == null) null else &raw_animation,
-                &command_id,
-            ),
+            c.mln_map_apply_camera_delta(try native(self), &raw, &command_id),
             diagnosticStore(self),
         );
         return command_id;

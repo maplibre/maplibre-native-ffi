@@ -17,6 +17,7 @@ import java.util.concurrent.ConcurrentHashMap
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.BoundOptions
 import org.maplibre.nativeffi.camera.BoundsConstraint
+import org.maplibre.nativeffi.camera.CameraDelta
 import org.maplibre.nativeffi.camera.CameraFitOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.CameraSnapshot
@@ -40,6 +41,7 @@ import org.maplibre.nativeffi.internal.c.MapLibreNativeC
 import org.maplibre.nativeffi.internal.c.mln_animation_options
 import org.maplibre.nativeffi.internal.c.mln_bound_options
 import org.maplibre.nativeffi.internal.c.mln_buffer_view
+import org.maplibre.nativeffi.internal.c.mln_camera_delta
 import org.maplibre.nativeffi.internal.c.mln_camera_fit_options
 import org.maplibre.nativeffi.internal.c.mln_camera_options
 import org.maplibre.nativeffi.internal.c.mln_camera_query_result
@@ -2090,69 +2092,17 @@ internal object NativeAccess {
       }
     }
 
-  internal fun moveBy(map: NativeMap, offset: ScreenPoint, animation: AnimationOptions?): Long =
+  internal fun applyCameraDelta(map: NativeMap, delta: CameraDelta): Long =
     Arena.ofConfined().use { arena ->
+      val nativeDelta = MapLibreNativeC.mln_camera_delta_default(arena)
+      mln_camera_delta.kind(nativeDelta, delta.kind.nativeValue)
+      mln_camera_delta.offset(nativeDelta, screenPoint(delta.offset, arena))
+      mln_camera_delta.amount(nativeDelta, delta.amount)
+      mln_camera_delta.has_anchor(nativeDelta, delta.anchor != null)
+      delta.anchor?.let { mln_camera_delta.anchor(nativeDelta, screenPoint(it, arena)) }
+      mln_camera_delta.animation(nativeDelta, animationOptions(arena, delta.animation))
       commandId { outCommand ->
-        MapLibreNativeC.mln_map_move_by(
-          map.raw,
-          screenPoint(offset, arena),
-          animationOptions(arena, animation),
-          outCommand,
-        )
-      }
-    }
-
-  internal fun scaleBy(
-    map: NativeMap,
-    scale: Double,
-    anchor: ScreenPoint?,
-    animation: AnimationOptions?,
-  ): Long =
-    relativeCameraCommand(map, anchor, animation) { anchorSegment, animationSegment, outCommand ->
-      MapLibreNativeC.mln_map_scale_by(map.raw, scale, anchorSegment, animationSegment, outCommand)
-    }
-
-  internal fun bearingBy(
-    map: NativeMap,
-    degrees: Double,
-    anchor: ScreenPoint?,
-    animation: AnimationOptions?,
-  ): Long =
-    relativeCameraCommand(map, anchor, animation) { anchorSegment, animationSegment, outCommand ->
-      MapLibreNativeC.mln_map_bearing_by(
-        map.raw,
-        degrees,
-        anchorSegment,
-        animationSegment,
-        outCommand,
-      )
-    }
-
-  internal fun pitchBy(map: NativeMap, degrees: Double, animation: AnimationOptions?): Long =
-    Arena.ofConfined().use { arena ->
-      commandId { outCommand ->
-        MapLibreNativeC.mln_map_pitch_by(
-          map.raw,
-          degrees,
-          animationOptions(arena, animation),
-          outCommand,
-        )
-      }
-    }
-
-  private inline fun relativeCameraCommand(
-    map: NativeMap,
-    anchor: ScreenPoint?,
-    animation: AnimationOptions?,
-    call: (MemorySegment, MemorySegment, MemorySegment) -> Int,
-  ): Long =
-    Arena.ofConfined().use { arena ->
-      commandId { outCommand ->
-        call(
-          anchor?.let { screenPoint(it, arena) } ?: MemorySegment.NULL,
-          animationOptions(arena, animation),
-          outCommand,
-        )
+        MapLibreNativeC.mln_map_apply_camera_delta(map.raw, nativeDelta, outCommand)
       }
     }
 

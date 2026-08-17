@@ -2,6 +2,8 @@ package org.maplibre.nativeffi.examples.composemap.map
 
 import java.util.concurrent.atomic.AtomicBoolean
 import org.maplibre.nativeffi.camera.AnimationOptions
+import org.maplibre.nativeffi.camera.CameraDelta
+import org.maplibre.nativeffi.camera.CameraDeltaKind
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.CameraUpdate
 import org.maplibre.nativeffi.camera.CameraUpdateMode
@@ -86,35 +88,58 @@ internal class MapState(
   }
 
   fun moveBy(deltaX: Double, deltaY: Double) {
-    map.moveBy(org.maplibre.nativeffi.geo.ScreenPoint(deltaX, deltaY))
+    map.applyCameraDelta(
+      CameraDelta(offset = org.maplibre.nativeffi.geo.ScreenPoint(deltaX, deltaY))
+    )
   }
 
   fun moveByAnimated(deltaX: Double, deltaY: Double) {
-    map.moveBy(
-      org.maplibre.nativeffi.geo.ScreenPoint(deltaX, deltaY),
-      animation(KEYBOARD_ANIMATION_MS),
+    map.applyCameraDelta(
+      CameraDelta(
+        offset = org.maplibre.nativeffi.geo.ScreenPoint(deltaX, deltaY),
+        animation = animation(KEYBOARD_ANIMATION_MS),
+      )
     )
   }
 
   fun scaleBy(scale: Double, anchor: org.maplibre.nativeffi.geo.ScreenPoint) {
-    map.scaleBy(scale, anchor)
+    map.applyCameraDelta(CameraDelta(kind = CameraDeltaKind.SCALE, amount = scale, anchor = anchor))
   }
 
   fun scaleByAnimated(scale: Double, anchor: org.maplibre.nativeffi.geo.ScreenPoint) {
-    map.scaleBy(scale, anchor, animation(KEYBOARD_ANIMATION_MS))
+    map.applyCameraDelta(
+      CameraDelta(
+        kind = CameraDeltaKind.SCALE,
+        amount = scale,
+        anchor = anchor,
+        animation = animation(KEYBOARD_ANIMATION_MS),
+      )
+    )
   }
 
   fun adjustBearingAndPitch(bearingDegrees: Double, pitchDegrees: Double) {
-    map.bearingBy(bearingDegrees)
-    map.pitchBy(pitchDegrees)
+    map.applyCameraDelta(CameraDelta(kind = CameraDeltaKind.BEARING, amount = bearingDegrees))
+    map.applyCameraDelta(CameraDelta(kind = CameraDeltaKind.PITCH, amount = pitchDegrees))
   }
 
   fun adjustBearingAnimated(bearingDegrees: Double) {
-    map.bearingBy(bearingDegrees, animation = animation(KEYBOARD_ANIMATION_MS))
+    map.applyCameraDelta(
+      CameraDelta(
+        kind = CameraDeltaKind.BEARING,
+        amount = bearingDegrees,
+        animation = animation(KEYBOARD_ANIMATION_MS),
+      )
+    )
   }
 
   fun adjustPitchAnimated(pitchDegrees: Double) {
-    map.pitchBy(pitchDegrees, animation(KEYBOARD_ANIMATION_MS))
+    map.applyCameraDelta(
+      CameraDelta(
+        kind = CameraDeltaKind.PITCH,
+        amount = pitchDegrees,
+        animation = animation(KEYBOARD_ANIMATION_MS),
+      )
+    )
   }
 
   fun resetOrientation() {

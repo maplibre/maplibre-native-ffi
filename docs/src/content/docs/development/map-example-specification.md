@@ -670,20 +670,20 @@ Controls:
 
 #### Behavioral constants
 
-| Interaction                   | Behavior                                                                                                                                                                               |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Left drag                     | `move_by` with pointer delta in logical coordinates.                                                                                                                                   |
-| Right drag, or Ctrl+left drag | Adjust bearing by `0.5 × Δx` degrees; adjust pitch by `0.5 × Δy` degrees (same sign convention everywhere).                                                                            |
-| Scroll                        | Zoom about cursor: `scale_by(2^(Δ * 0.25), anchor)`. Δ from the toolkit wheel event; scrolling up zooms in (use OS-adjusted deltas as reported—do not undo platform scroll inversion). |
-| Arrow keys / WASD             | Pan `120` logical units per key press.                                                                                                                                                 |
-| `+` / `-`                     | Zoom `1.25` / `1/1.25` about viewport center.                                                                                                                                          |
-| `Q` / `E`                     | Bearing ±`10`° with keyboard animation.                                                                                                                                                |
-| `]`                           | Pitch +`5`° (clamped to `[0, 60]`) with animation.                                                                                                                                     |
-| `[`                           | Pitch −`5`° (clamped to `[0, 60]`) with animation.                                                                                                                                     |
-| `0`                           | Animate bearing and pitch to `0` with keyboard animation.                                                                                                                              |
+| Interaction                   | Behavior                                                                                                                                                                           |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Left drag                     | Apply a relative move with the pointer delta in logical coordinates.                                                                                                               |
+| Right drag, or Ctrl+left drag | Adjust bearing by `0.5 × Δx` degrees; adjust pitch by `0.5 × Δy` degrees (same sign convention everywhere).                                                                        |
+| Scroll                        | Apply a scale of `2^(Δ * 0.25)` about the cursor. Δ comes from the toolkit wheel event; scrolling up zooms in (use OS-adjusted deltas as reported—do not undo platform inversion). |
+| Arrow keys / WASD             | Pan `120` logical units per key press.                                                                                                                                             |
+| `+` / `-`                     | Zoom `1.25` / `1/1.25` about viewport center.                                                                                                                                      |
+| `Q` / `E`                     | Bearing ±`10`° with keyboard animation.                                                                                                                                            |
+| `]`                           | Pitch +`5`° (clamped to `[0, 60]`) with animation.                                                                                                                                 |
+| `[`                           | Pitch −`5`° (clamped to `[0, 60]`) with animation.                                                                                                                                 |
+| `0`                           | Animate bearing and pitch to `0` with keyboard animation.                                                                                                                          |
 
 Keyboard animated moves SHOULD use ~`160` ms duration. Pointer drags use
-immediate `move_by` / `jump_to` / `pitch_by`.
+immediate relative move, absolute jump, and relative pitch operations.
 
 On pointer down that starts a drag, cancel in-flight camera transitions before
 applying deltas, and set the map's gesture-in-progress state. Clear that state
@@ -767,7 +767,7 @@ Implementations MUST provide the following touch interactions:
 
 | Interaction                      | Behavior                                                                                                                                                               |
 | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| One-finger drag                  | `move_by` with pointer delta in logical coordinates.                                                                                                                   |
+| One-finger drag                  | Apply a relative move with the pointer delta in logical coordinates.                                                                                                   |
 | Pinch                            | Apply incremental scale deltas while preserving the geographic coordinate under the current two-touch centroid, resetting the scale baseline after each applied delta. |
 | Two-finger rotate                | Apply incremental bearing deltas from the change in the two-touch vector angle while preserving the geographic coordinate under the current two-touch centroid.        |
 | Two-finger vertical drag (shove) | `pitch -= 0.1 × Δy` degrees (clamp to `[0, 60]`), where `Δy` is the change in two-touch centroid Y in logical coordinates since the last applied update.               |

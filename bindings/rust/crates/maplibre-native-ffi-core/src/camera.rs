@@ -200,6 +200,60 @@ impl CameraUpdate {
     }
 }
 
+/// Relative camera operation kind.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum CameraDeltaKind {
+    #[default]
+    Move,
+    Scale,
+    Bearing,
+    Pitch,
+}
+
+/// One relative camera operation.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct CameraDelta {
+    pub kind: CameraDeltaKind,
+    pub offset: ScreenPoint,
+    pub amount: f64,
+    pub anchor: Option<ScreenPoint>,
+    pub animation: AnimationOptions,
+}
+
+impl Default for CameraDelta {
+    fn default() -> Self {
+        Self {
+            kind: CameraDeltaKind::Move,
+            offset: ScreenPoint::new(0.0, 0.0),
+            amount: 0.0,
+            anchor: None,
+            animation: AnimationOptions::default(),
+        }
+    }
+}
+
+impl CameraDelta {
+    fn to_native(&self) -> sys::mln_camera_delta {
+        // SAFETY: the default constructor initializes this ABI version's size.
+        let mut raw = unsafe { sys::mln_camera_delta_default() };
+        raw.kind = match self.kind {
+            CameraDeltaKind::Move => sys::MLN_CAMERA_DELTA_MOVE,
+            CameraDeltaKind::Scale => sys::MLN_CAMERA_DELTA_SCALE,
+            CameraDeltaKind::Bearing => sys::MLN_CAMERA_DELTA_BEARING,
+            CameraDeltaKind::Pitch => sys::MLN_CAMERA_DELTA_PITCH,
+        };
+        raw.offset = screen_point_to_native(self.offset);
+        raw.amount = self.amount;
+        if let Some(anchor) = self.anchor {
+            raw.has_anchor = true;
+            raw.anchor = screen_point_to_native(anchor);
+        }
+        raw.animation = self.animation.to_native();
+        raw
+    }
+}
+
 /// Camera and publication generation returned by a snapshot or ordered query.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CameraSnapshot {
@@ -428,6 +482,17 @@ pub fn projection_mode_from_native(raw: sys::mln_projection_mode) -> ProjectionM
 #[doc(hidden)]
 pub trait CameraUpdateNativeExt {
     fn to_native(&self) -> sys::mln_camera_update;
+}
+
+#[doc(hidden)]
+pub trait CameraDeltaNativeExt {
+    fn to_native(&self) -> sys::mln_camera_delta;
+}
+
+impl CameraDeltaNativeExt for CameraDelta {
+    fn to_native(&self) -> sys::mln_camera_delta {
+        CameraDelta::to_native(self)
+    }
 }
 
 impl CameraUpdateNativeExt for CameraUpdate {

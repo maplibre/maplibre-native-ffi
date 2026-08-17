@@ -2290,96 +2290,21 @@ final class MapHandle {
     });
   }
 
-  /// Moves the camera by a logical-pixel offset.
-  BigInt moveBy(ScreenPoint offset, {AnimationOptions? animation}) {
+  /// Submits one relative camera operation.
+  BigInt applyCameraDelta(CameraDelta delta) {
     return withNativeArena((arena) {
+      final native = arena<raw.mln_camera_delta>();
+      native.ref = raw.mln_camera_delta_default();
+      native.ref.kind = delta.kind.rawValue;
+      native.ref.offset = native_struct.screenPointToNative(delta.offset);
+      native.ref.amount = delta.amount;
+      if (delta.anchor case final anchor?) {
+        native.ref.has_anchor = true;
+        native.ref.anchor = native_struct.screenPointToNative(anchor);
+      }
+      native.ref.animation = _nativeAnimation(delta.animation, arena).ref;
       final outCommandId = arena<Uint64>();
-      _check(
-        raw.mln_map_move_by(
-          _handle.raw,
-          native_struct.screenPointToNative(offset),
-          animation == null
-              ? nullptr.cast<raw.mln_animation_options>()
-              : _nativeAnimation(animation, arena),
-          outCommandId,
-        ),
-      );
-      return uint64FromNative(outCommandId.value);
-    });
-  }
-
-  /// Scales the camera around [anchor], or the viewport center when omitted.
-  BigInt scaleBy(
-    double scale, {
-    ScreenPoint? anchor,
-    AnimationOptions? animation,
-  }) => _relativeCameraCommand(
-    anchor,
-    animation,
-    (nativeAnchor, nativeAnimation, outCommandId) => raw.mln_map_scale_by(
-      _handle.raw,
-      scale,
-      nativeAnchor,
-      nativeAnimation,
-      outCommandId,
-    ),
-  );
-
-  /// Rotates the camera by [degrees] around [anchor], or the viewport center when omitted.
-  BigInt bearingBy(
-    double degrees, {
-    ScreenPoint? anchor,
-    AnimationOptions? animation,
-  }) => _relativeCameraCommand(
-    anchor,
-    animation,
-    (nativeAnchor, nativeAnimation, outCommandId) => raw.mln_map_bearing_by(
-      _handle.raw,
-      degrees,
-      nativeAnchor,
-      nativeAnimation,
-      outCommandId,
-    ),
-  );
-
-  /// Changes the camera pitch by [degrees].
-  BigInt pitchBy(double degrees, {AnimationOptions? animation}) {
-    return withNativeArena((arena) {
-      final outCommandId = arena<Uint64>();
-      _check(
-        raw.mln_map_pitch_by(
-          _handle.raw,
-          degrees,
-          animation == null
-              ? nullptr.cast<raw.mln_animation_options>()
-              : _nativeAnimation(animation, arena),
-          outCommandId,
-        ),
-      );
-      return uint64FromNative(outCommandId.value);
-    });
-  }
-
-  BigInt _relativeCameraCommand(
-    ScreenPoint? anchor,
-    AnimationOptions? animation,
-    int Function(
-      Pointer<raw.mln_screen_point>,
-      Pointer<raw.mln_animation_options>,
-      Pointer<Uint64>,
-    )
-    call,
-  ) {
-    return withNativeArena((arena) {
-      final nativeAnchor = anchor == null
-          ? nullptr.cast<raw.mln_screen_point>()
-          : (arena<raw.mln_screen_point>()
-              ..ref = native_struct.screenPointToNative(anchor));
-      final nativeAnimation = animation == null
-          ? nullptr.cast<raw.mln_animation_options>()
-          : _nativeAnimation(animation, arena);
-      final outCommandId = arena<Uint64>();
-      _check(call(nativeAnchor, nativeAnimation, outCommandId));
+      _check(raw.mln_map_apply_camera_delta(_handle.raw, native, outCommandId));
       return uint64FromNative(outCommandId.value);
     });
   }

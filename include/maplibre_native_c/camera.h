@@ -23,6 +23,9 @@ MLN_API mln_camera_options mln_camera_options_default(void) MLN_NOEXCEPT;
 
 /** Returns empty animation options initialized for this C API version. */
 MLN_API mln_animation_options mln_animation_options_default(void) MLN_NOEXCEPT;
+/** Returns an empty relative camera operation initialized for this API version.
+ */
+MLN_API mln_camera_delta mln_camera_delta_default(void) MLN_NOEXCEPT;
 /** Returns an empty atomic camera update initialized for this API version. */
 MLN_API mln_camera_update mln_camera_update_default(void) MLN_NOEXCEPT;
 
@@ -111,28 +114,15 @@ MLN_API mln_status mln_map_update_camera(
   mln_map map, const mln_camera_update* update, uint64_t* out_command_id
 ) MLN_NOEXCEPT;
 
-/** Moves the camera by a logical-pixel offset. */
-MLN_API mln_status mln_map_move_by(
-  mln_map map, mln_screen_point offset, const mln_animation_options* animation,
-  uint64_t* out_command_id
-) MLN_NOEXCEPT;
-
-/** Scales the camera around an optional logical-pixel anchor. */
-MLN_API mln_status mln_map_scale_by(
-  mln_map map, double scale, const mln_screen_point* anchor,
-  const mln_animation_options* animation, uint64_t* out_command_id
-) MLN_NOEXCEPT;
-
-/** Adds degrees to the camera bearing around an optional anchor. */
-MLN_API mln_status mln_map_bearing_by(
-  mln_map map, double degrees, const mln_screen_point* anchor,
-  const mln_animation_options* animation, uint64_t* out_command_id
-) MLN_NOEXCEPT;
-
-/** Adds degrees to the camera pitch. */
-MLN_API mln_status mln_map_pitch_by(
-  mln_map map, double degrees, const mln_animation_options* animation,
-  uint64_t* out_command_id
+/**
+ * Submits one copied relative camera operation.
+ *
+ * out_command_id must point to zero. An accepted command receives a
+ * runtime-wide monotonic ID. Its terminal disposition is reported by
+ * MLN_RUNTIME_EVENT_COMMAND_FINISHED.
+ */
+MLN_API mln_status mln_map_apply_camera_delta(
+  mln_map map, const mln_camera_delta* delta, uint64_t* out_command_id
 ) MLN_NOEXCEPT;
 
 /**

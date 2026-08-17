@@ -5,10 +5,10 @@ use std::error::Error;
 use winit::event_loop::EventLoopProxy;
 
 use maplibre_native_ffi::{
-    AnimationOptions, CameraOptions, CameraUpdate, CameraUpdateMode, GesturePhase, LatLng,
-    LogicalExtent, MapHandle, MapMode, MapOptions, ReadyEndpointKind, RuntimeEventMask,
-    RuntimeEventPayload, RuntimeEventSource, RuntimeEventType, RuntimeHandle, RuntimeOptions,
-    ScreenPoint,
+    AnimationOptions, CameraDelta, CameraDeltaKind, CameraOptions, CameraUpdate, CameraUpdateMode,
+    GesturePhase, LatLng, LogicalExtent, MapHandle, MapMode, MapOptions, ReadyEndpointKind,
+    RuntimeEventMask, RuntimeEventPayload, RuntimeEventSource, RuntimeEventType, RuntimeHandle,
+    RuntimeOptions, ScreenPoint,
 };
 
 use crate::viewport::Viewport;
@@ -89,9 +89,10 @@ impl MapState {
         dy: f64,
         duration_ms: Option<f64>,
     ) -> Result<(), Box<dyn Error>> {
-        let animation = duration_ms.map(animation);
-        self.map
-            .move_by(ScreenPoint::new(dx, dy), animation.as_ref())?;
+        let mut delta = CameraDelta::default();
+        delta.offset = ScreenPoint::new(dx, dy);
+        delta.animation = duration_ms.map(animation).unwrap_or_default();
+        self.map.apply_camera_delta(&delta)?;
         Ok(())
     }
 
@@ -101,14 +102,21 @@ impl MapState {
         anchor: ScreenPoint,
         duration_ms: Option<f64>,
     ) -> Result<(), Box<dyn Error>> {
-        let animation = duration_ms.map(animation);
-        self.map.scale_by(scale, Some(anchor), animation.as_ref())?;
+        let mut delta = CameraDelta::default();
+        delta.kind = CameraDeltaKind::Scale;
+        delta.amount = scale;
+        delta.anchor = Some(anchor);
+        delta.animation = duration_ms.map(animation).unwrap_or_default();
+        self.map.apply_camera_delta(&delta)?;
         Ok(())
     }
 
     pub fn adjust_pitch(&self, delta: f64, duration_ms: Option<f64>) -> Result<(), Box<dyn Error>> {
-        let animation = duration_ms.map(animation);
-        self.map.pitch_by(delta, animation.as_ref())?;
+        let mut camera_delta = CameraDelta::default();
+        camera_delta.kind = CameraDeltaKind::Pitch;
+        camera_delta.amount = delta;
+        camera_delta.animation = duration_ms.map(animation).unwrap_or_default();
+        self.map.apply_camera_delta(&camera_delta)?;
         Ok(())
     }
 
@@ -117,8 +125,11 @@ impl MapState {
         delta: f64,
         duration_ms: Option<f64>,
     ) -> Result<(), Box<dyn Error>> {
-        let animation = duration_ms.map(animation);
-        self.map.bearing_by(delta, None, animation.as_ref())?;
+        let mut camera_delta = CameraDelta::default();
+        camera_delta.kind = CameraDeltaKind::Bearing;
+        camera_delta.amount = delta;
+        camera_delta.animation = duration_ms.map(animation).unwrap_or_default();
+        self.map.apply_camera_delta(&camera_delta)?;
         Ok(())
     }
 

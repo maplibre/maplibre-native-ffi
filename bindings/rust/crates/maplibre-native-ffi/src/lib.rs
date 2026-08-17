@@ -26,9 +26,9 @@ use maplibre_native_ffi_core as maplibre_core;
 use maplibre_native_ffi_sys as sys;
 
 pub use camera::{
-    AnimationOptions, BoundOptions, BoundsConstraint, CameraFitOptions, CameraOptions,
-    CameraSnapshot, CameraUpdate, CameraUpdateMode, FreeCameraOptions, GesturePhase,
-    ProjectionMode,
+    AnimationOptions, BoundOptions, BoundsConstraint, CameraDelta, CameraDeltaKind,
+    CameraFitOptions, CameraOptions, CameraSnapshot, CameraUpdate, CameraUpdateMode,
+    FreeCameraOptions, GesturePhase, ProjectionMode,
 };
 pub use custom_geometry::{CanonicalTileId, CustomGeometrySourceOptions};
 pub use events::{

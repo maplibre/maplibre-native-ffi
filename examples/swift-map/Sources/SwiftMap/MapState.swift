@@ -137,7 +137,10 @@ final class MapState {
     dy: Double,
     animation: AnimationOptions? = nil
   ) throws {
-    _ = try map.moveBy(ScreenPoint(x: dx, y: dy), animation: animation)
+    _ = try map.applyCameraDelta(CameraDelta(
+      offset: ScreenPoint(x: dx, y: dy),
+      animation: animation ?? AnimationOptions()
+    ))
   }
 
   func scaleBy(
@@ -145,21 +148,34 @@ final class MapState {
     anchor: ScreenPoint,
     animation: AnimationOptions? = nil
   ) throws {
-    _ = try map.scaleBy(scale, anchor: anchor, animation: animation)
+    _ = try map.applyCameraDelta(CameraDelta(
+      kind: .scale,
+      amount: scale,
+      anchor: anchor,
+      animation: animation ?? AnimationOptions()
+    ))
   }
 
   func adjustBearing(
     delta: Double,
     animation: AnimationOptions? = nil
   ) throws {
-    _ = try map.bearingBy(delta, animation: animation)
+    _ = try map.applyCameraDelta(CameraDelta(
+      kind: .bearing,
+      amount: delta,
+      animation: animation ?? AnimationOptions()
+    ))
   }
 
   func adjustPitch(
     delta: Double,
     animation: AnimationOptions? = nil
   ) throws {
-    _ = try map.pitchBy(delta, animation: animation)
+    _ = try map.applyCameraDelta(CameraDelta(
+      kind: .pitch,
+      amount: delta,
+      animation: animation ?? AnimationOptions()
+    ))
   }
 
   func resetOrientation(animation: AnimationOptions) throws {

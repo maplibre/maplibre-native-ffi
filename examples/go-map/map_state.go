@@ -78,22 +78,30 @@ func (state *runtimeMapState) setGestureInProgress(inProgress bool) error {
 }
 
 func (state *runtimeMapState) moveBy(dx, dy float64, durationMS *float64) error {
-	_, err := state.mapRef.MoveBy(maplibre.ScreenPoint{X: dx, Y: dy}, animationOptions(durationMS))
+	_, err := state.mapRef.ApplyCameraDelta(maplibre.CameraDelta{
+		Offset: maplibre.ScreenPoint{X: dx, Y: dy}, Animation: animationOptions(durationMS),
+	})
 	return err
 }
 
 func (state *runtimeMapState) scaleBy(scale float64, anchor maplibre.ScreenPoint, durationMS *float64) error {
-	_, err := state.mapRef.ScaleBy(scale, &anchor, animationOptions(durationMS))
+	_, err := state.mapRef.ApplyCameraDelta(maplibre.CameraDelta{
+		Kind: maplibre.CameraDeltaKindScale, Amount: scale, Anchor: &anchor, Animation: animationOptions(durationMS),
+	})
 	return err
 }
 
 func (state *runtimeMapState) adjustPitch(delta float64, durationMS *float64) error {
-	_, err := state.mapRef.PitchBy(delta, animationOptions(durationMS))
+	_, err := state.mapRef.ApplyCameraDelta(maplibre.CameraDelta{
+		Kind: maplibre.CameraDeltaKindPitch, Amount: delta, Animation: animationOptions(durationMS),
+	})
 	return err
 }
 
 func (state *runtimeMapState) adjustBearing(delta float64, durationMS *float64) error {
-	_, err := state.mapRef.BearingBy(delta, nil, animationOptions(durationMS))
+	_, err := state.mapRef.ApplyCameraDelta(maplibre.CameraDelta{
+		Kind: maplibre.CameraDeltaKindBearing, Amount: delta, Animation: animationOptions(durationMS),
+	})
 	return err
 }
 

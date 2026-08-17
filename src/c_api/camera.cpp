@@ -25,6 +25,9 @@ auto mln_camera_options_default(void) noexcept -> mln_camera_options {
 auto mln_animation_options_default(void) noexcept -> mln_animation_options {
   return mln::core::animation_options_default();
 }
+auto mln_camera_delta_default(void) noexcept -> mln_camera_delta {
+  return mln::core::camera_delta_default();
+}
 auto mln_camera_update_default(void) noexcept -> mln_camera_update {
   return mln::core::camera_update_default();
 }
@@ -70,43 +73,11 @@ auto mln_map_update_camera(
   });
 }
 
-auto mln_map_move_by(
-  mln_map map, mln_screen_point offset, const mln_animation_options* animation,
-  uint64_t* out_command_id
+auto mln_map_apply_camera_delta(
+  mln_map map, const mln_camera_delta* delta, uint64_t* out_command_id
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::map_move_by(map, offset, animation, out_command_id);
-  });
-}
-
-auto mln_map_scale_by(
-  mln_map map, double scale, const mln_screen_point* anchor,
-  const mln_animation_options* animation, uint64_t* out_command_id
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::map_scale_by(
-      map, scale, anchor, animation, out_command_id
-    );
-  });
-}
-
-auto mln_map_bearing_by(
-  mln_map map, double degrees, const mln_screen_point* anchor,
-  const mln_animation_options* animation, uint64_t* out_command_id
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::map_bearing_by(
-      map, degrees, anchor, animation, out_command_id
-    );
-  });
-}
-
-auto mln_map_pitch_by(
-  mln_map map, double degrees, const mln_animation_options* animation,
-  uint64_t* out_command_id
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::map_pitch_by(map, degrees, animation, out_command_id);
+    return mln::core::map_apply_camera_delta(map, delta, out_command_id);
   });
 }
 

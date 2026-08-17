@@ -2,17 +2,16 @@ use std::fmt;
 use std::sync::{Arc, Mutex};
 
 use maplibre_native_ffi_core as maplibre_core;
-use maplibre_native_ffi_core::camera::AnimationOptionsNativeExt;
 use maplibre_native_ffi_core::ptr::{const_ptr_or_null, option_ptr};
 use maplibre_native_ffi_core::values::{
-    empty_lat_lng_bounds, lat_lngs_to_native, screen_point_to_native, screen_points_to_native,
+    empty_lat_lng_bounds, lat_lngs_to_native, screen_points_to_native,
 };
 use maplibre_native_ffi_sys as sys;
 
 #[cfg(test)]
 use crate::PremultipliedRgba8Image;
 use crate::camera::{
-    BoundOptionsNativeExt, CameraFitOptionsNativeExt, CameraOptionsNativeExt,
+    BoundOptionsNativeExt, CameraDeltaNativeExt, CameraFitOptionsNativeExt, CameraOptionsNativeExt,
     CameraUpdateNativeExt, FreeCameraOptionsNativeExt, ProjectionModeNativeExt,
 };
 #[cfg(test)]
@@ -32,7 +31,7 @@ use crate::runtime::{
 };
 use crate::values::NativeValue;
 use crate::{
-    AnimationOptions, BoundOptions, CameraFitOptions, CameraOptions, CameraSnapshot, CameraUpdate,
+    BoundOptions, CameraDelta, CameraFitOptions, CameraOptions, CameraSnapshot, CameraUpdate,
     Error, ErrorKind, FreeCameraOptions, HandleOperationError, LatLng, LatLngBounds,
     MapDebugOptions, MapOptions, MapProjectionHandle, MapTileOptions, MapViewportOptions,
     ProjectionMode, Result, RuntimeEventMask, ScreenPoint,
@@ -350,84 +349,13 @@ impl MapHandle {
         Ok(command_id)
     }
 
-    /// Moves the camera by a logical-pixel offset.
-    pub fn move_by(
-        &self,
-        offset: ScreenPoint,
-        animation: Option<&AnimationOptions>,
-    ) -> Result<u64> {
+    /// Submits one relative camera operation and returns its command ID.
+    pub fn apply_camera_delta(&self, delta: &CameraDelta) -> Result<u64> {
         let map = self.inner.native()?;
-        let raw_animation = animation.map(AnimationOptionsNativeExt::to_native);
+        let raw = delta.to_native();
         let mut command_id = 0;
         maplibre_core::check(unsafe {
-            sys::mln_map_move_by(
-                map,
-                screen_point_to_native(offset),
-                option_ptr(raw_animation.as_ref()),
-                &mut command_id,
-            )
-        })?;
-        Ok(command_id)
-    }
-
-    /// Scales the camera around an optional logical-pixel anchor.
-    pub fn scale_by(
-        &self,
-        scale: f64,
-        anchor: Option<ScreenPoint>,
-        animation: Option<&AnimationOptions>,
-    ) -> Result<u64> {
-        let map = self.inner.native()?;
-        let raw_anchor = anchor.map(screen_point_to_native);
-        let raw_animation = animation.map(AnimationOptionsNativeExt::to_native);
-        let mut command_id = 0;
-        maplibre_core::check(unsafe {
-            sys::mln_map_scale_by(
-                map,
-                scale,
-                option_ptr(raw_anchor.as_ref()),
-                option_ptr(raw_animation.as_ref()),
-                &mut command_id,
-            )
-        })?;
-        Ok(command_id)
-    }
-
-    /// Adds degrees to the camera bearing around an optional anchor.
-    pub fn bearing_by(
-        &self,
-        degrees: f64,
-        anchor: Option<ScreenPoint>,
-        animation: Option<&AnimationOptions>,
-    ) -> Result<u64> {
-        let map = self.inner.native()?;
-        let raw_anchor = anchor.map(screen_point_to_native);
-        let raw_animation = animation.map(AnimationOptionsNativeExt::to_native);
-        let mut command_id = 0;
-        maplibre_core::check(unsafe {
-            sys::mln_map_bearing_by(
-                map,
-                degrees,
-                option_ptr(raw_anchor.as_ref()),
-                option_ptr(raw_animation.as_ref()),
-                &mut command_id,
-            )
-        })?;
-        Ok(command_id)
-    }
-
-    /// Adds degrees to the camera pitch.
-    pub fn pitch_by(&self, degrees: f64, animation: Option<&AnimationOptions>) -> Result<u64> {
-        let map = self.inner.native()?;
-        let raw_animation = animation.map(AnimationOptionsNativeExt::to_native);
-        let mut command_id = 0;
-        maplibre_core::check(unsafe {
-            sys::mln_map_pitch_by(
-                map,
-                degrees,
-                option_ptr(raw_animation.as_ref()),
-                &mut command_id,
-            )
+            sys::mln_map_apply_camera_delta(map, &raw, &mut command_id)
         })?;
         Ok(command_id)
     }

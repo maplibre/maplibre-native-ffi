@@ -10,6 +10,8 @@ export '../runtime/runtime.dart'
 export '../camera/camera.dart'
     show
         BoundOptions,
+        CameraDelta,
+        CameraDeltaKind,
         CameraUpdateMode,
         ConstrainMode,
         FreeCameraOptions,

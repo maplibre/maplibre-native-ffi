@@ -232,26 +232,32 @@ static void relative_camera_commands_compose_in_runtime_order(void) {
   );
 
   const mln_screen_point anchor = {.x = 25.0, .y = 30.0};
+  mln_camera_delta delta = mln_camera_delta_default();
+  delta.offset = (mln_screen_point){.x = 5.0, .y = -3.0};
   command_id = 0;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_move_by(
-      fixture.map, (mln_screen_point){.x = 5.0, .y = -3.0}, NULL, &command_id
-    )
+    MLN_STATUS_OK, mln_map_apply_camera_delta(fixture.map, &delta, &command_id)
   );
+  delta.kind = MLN_CAMERA_DELTA_SCALE;
+  delta.amount = 2.0;
+  delta.has_anchor = true;
+  delta.anchor = anchor;
   command_id = 0;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_scale_by(fixture.map, 2.0, &anchor, NULL, &command_id)
+    MLN_STATUS_OK, mln_map_apply_camera_delta(fixture.map, &delta, &command_id)
   );
+  delta.kind = MLN_CAMERA_DELTA_BEARING;
+  delta.amount = 15.0;
   command_id = 0;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_bearing_by(fixture.map, 15.0, &anchor, NULL, &command_id)
+    MLN_STATUS_OK, mln_map_apply_camera_delta(fixture.map, &delta, &command_id)
   );
+  delta.kind = MLN_CAMERA_DELTA_PITCH;
+  delta.amount = 5.0;
+  delta.has_anchor = false;
   command_id = 0;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_pitch_by(fixture.map, 5.0, NULL, &command_id)
+    MLN_STATUS_OK, mln_map_apply_camera_delta(fixture.map, &delta, &command_id)
   );
 
   mln_operation query = MLN_HANDLE_NULL;
@@ -268,10 +274,26 @@ static void relative_camera_commands_compose_in_runtime_order(void) {
   TEST_ASSERT_EQUAL_DOUBLE(27.0, result.camera.bearing);
   TEST_ASSERT_EQUAL_DOUBLE(35.0, result.camera.pitch);
 
+  delta.kind = MLN_CAMERA_DELTA_SCALE;
+  delta.amount = 0.0;
   command_id = 0;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_scale_by(fixture.map, 0.0, NULL, NULL, &command_id)
+    mln_map_apply_camera_delta(fixture.map, &delta, &command_id)
+  );
+
+  delta = mln_camera_delta_default();
+  delta.kind = UINT32_MAX;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_apply_camera_delta(fixture.map, &delta, &command_id)
+  );
+
+  delta = mln_camera_delta_default();
+  delta.has_anchor = true;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_apply_camera_delta(fixture.map, &delta, &command_id)
   );
   destroy_map_fixture(fixture);
 }

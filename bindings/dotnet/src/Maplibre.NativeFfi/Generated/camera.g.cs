@@ -11,6 +11,9 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_animation_options mln_animation_options_default();
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_camera_delta mln_camera_delta_default();
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_camera_update mln_camera_update_default();
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
@@ -53,16 +56,7 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_status mln_map_update_camera([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_camera_update *")] mln_camera_update* update, [NativeTypeName("uint64_t *")] ulong* out_command_id);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_move_by([NativeTypeName("mln_map")] MlnMap map, mln_screen_point offset, [NativeTypeName("const mln_animation_options *")] mln_animation_options* animation, [NativeTypeName("uint64_t *")] ulong* out_command_id);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_scale_by([NativeTypeName("mln_map")] MlnMap map, double scale, [NativeTypeName("const mln_screen_point *")] mln_screen_point* anchor, [NativeTypeName("const mln_animation_options *")] mln_animation_options* animation, [NativeTypeName("uint64_t *")] ulong* out_command_id);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_bearing_by([NativeTypeName("mln_map")] MlnMap map, double degrees, [NativeTypeName("const mln_screen_point *")] mln_screen_point* anchor, [NativeTypeName("const mln_animation_options *")] mln_animation_options* animation, [NativeTypeName("uint64_t *")] ulong* out_command_id);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_pitch_by([NativeTypeName("mln_map")] MlnMap map, double degrees, [NativeTypeName("const mln_animation_options *")] mln_animation_options* animation, [NativeTypeName("uint64_t *")] ulong* out_command_id);
+        public static extern mln_status mln_map_apply_camera_delta([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_camera_delta *")] mln_camera_delta* delta, [NativeTypeName("uint64_t *")] ulong* out_command_id);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_camera_query_start([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);

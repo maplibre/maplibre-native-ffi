@@ -137,25 +137,38 @@ final class MapState {
   }
 
   func moveBy(dx: Double, dy: Double) throws {
-    _ = try map.moveBy(ScreenPoint(x: dx, y: dy))
+    _ = try map.applyCameraDelta(CameraDelta(offset: ScreenPoint(x: dx, y: dy)))
   }
 
   func scaleBy(_ scale: Double, anchor: ScreenPoint) throws {
-    _ = try map.scaleBy(scale, anchor: anchor)
+    _ = try map.applyCameraDelta(CameraDelta(
+      kind: .scale,
+      amount: scale,
+      anchor: anchor
+    ))
   }
 
   func adjustBearing(delta: Double, anchor: ScreenPoint) throws {
-    _ = try map.bearingBy(delta, anchor: anchor)
+    _ = try map.applyCameraDelta(CameraDelta(
+      kind: .bearing,
+      amount: delta,
+      anchor: anchor
+    ))
   }
 
   func adjustPitch(delta: Double) throws {
-    _ = try map.pitchBy(delta)
+    _ = try map.applyCameraDelta(CameraDelta(kind: .pitch, amount: delta))
   }
 
   func zoomToNextStep(
     anchor: ScreenPoint,
     animation: AnimationOptions
   ) throws {
-    _ = try map.scaleBy(2, anchor: anchor, animation: animation)
+    _ = try map.applyCameraDelta(CameraDelta(
+      kind: .scale,
+      amount: 2,
+      anchor: anchor,
+      animation: animation
+    ))
   }
 }

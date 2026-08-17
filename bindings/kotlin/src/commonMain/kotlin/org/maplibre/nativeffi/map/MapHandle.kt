@@ -1,14 +1,13 @@
 package org.maplibre.nativeffi.map
 
-import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.BoundOptions
+import org.maplibre.nativeffi.camera.CameraDelta
 import org.maplibre.nativeffi.camera.CameraSnapshot
 import org.maplibre.nativeffi.camera.CameraUpdate
 import org.maplibre.nativeffi.camera.FreeCameraOptions
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
-import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalSurfaceDescriptor
@@ -356,25 +355,8 @@ public expect class MapHandle {
   /** Submits one atomic camera update and returns its runtime-wide command ID. */
   public fun updateCamera(update: CameraUpdate): Long
 
-  /** Moves the camera by a logical-pixel offset. */
-  public fun moveBy(offset: ScreenPoint, animation: AnimationOptions? = null): Long
-
-  /** Scales the camera around [anchor], or the viewport center when it is null. */
-  public fun scaleBy(
-    scale: Double,
-    anchor: ScreenPoint? = null,
-    animation: AnimationOptions? = null,
-  ): Long
-
-  /** Rotates the camera by [degrees] around [anchor], or the viewport center when it is null. */
-  public fun bearingBy(
-    degrees: Double,
-    anchor: ScreenPoint? = null,
-    animation: AnimationOptions? = null,
-  ): Long
-
-  /** Changes the camera pitch by [degrees]. */
-  public fun pitchBy(degrees: Double, animation: AnimationOptions? = null): Long
+  /** Submits one relative camera operation. */
+  public fun applyCameraDelta(delta: CameraDelta): Long
 
   /** Suspends for an ordered camera observation behind commands accepted before this call. */
   public suspend fun queryCamera(): CameraSnapshot

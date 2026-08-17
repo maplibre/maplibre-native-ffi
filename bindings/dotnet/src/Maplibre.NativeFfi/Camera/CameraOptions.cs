@@ -61,6 +61,24 @@ public sealed record CameraUpdate
     public GesturePhase GesturePhase { get; set; }
 }
 
+public enum CameraDeltaKind : uint
+{
+    Move = 0,
+    Scale = 1,
+    Bearing = 2,
+    Pitch = 3,
+}
+
+/// <summary>One relative camera operation.</summary>
+public sealed record CameraDelta
+{
+    public CameraDeltaKind Kind { get; set; }
+    public ScreenPoint Offset { get; set; }
+    public double Amount { get; set; }
+    public ScreenPoint? Anchor { get; set; }
+    public AnimationOptions Animation { get; set; } = new();
+}
+
 /// <summary>A camera snapshot and its committed generation.</summary>
 public readonly record struct CameraSnapshot(CameraOptions Camera, ulong Generation);
 

@@ -353,10 +353,11 @@ which descriptors are transferable, which graphics calls are thread-affine, and
 which context ownership modes the target accepts.
 
 Every accepted frame demand creates one owned terminal result record. Frame
-readiness stays level-triggered until the queue drains, and only one owned
-result batch may hold the session's drain lease. Owned textures negotiate a
-one-to-three-slot ring. An acquired-frame handle leases its slot until its
-release operation observes any consumer GPU-completion synchronization.
+readiness stays level-triggered until the queue drains. Each drain transfers the
+complete queue into an independently owned result batch. Owned textures
+negotiate a one-to-three-slot ring. An acquired-frame handle leases its slot
+until its release operation observes any consumer GPU-completion
+synchronization.
 
 Normal detach routes graphics destruction through the selected driver before
 CPU-only handle destruction. Abandon closes control and mailboxes without

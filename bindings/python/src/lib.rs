@@ -1848,79 +1848,29 @@ impl MapHandle {
         Ok(command_id)
     }
 
-    fn move_by(&self, offset: (f64, f64), animation: Option<AnimationParts>) -> PyResult<u64> {
-        let state = self.state();
-        let animation = animation.map(animation_options_from_parts);
-        let mut command_id = 0;
-        maplibre_core::check(unsafe {
-            sys::mln_map_move_by(
-                state.handle(),
-                screen_point_from_tuple(offset),
-                animation.as_ref().map_or(ptr::null(), |value| value),
-                &mut command_id,
-            )
-        })
-        .map_err(map_error)?;
-        Ok(command_id)
-    }
-
-    fn scale_by(
+    fn apply_camera_delta(
         &self,
-        scale: f64,
+        kind: u32,
+        offset: (f64, f64),
+        amount: f64,
         anchor: Option<(f64, f64)>,
         animation: Option<AnimationParts>,
     ) -> PyResult<u64> {
         let state = self.state();
-        let anchor = anchor.map(screen_point_from_tuple);
-        let animation = animation.map(animation_options_from_parts);
+        let mut delta = unsafe { sys::mln_camera_delta_default() };
+        delta.kind = kind;
+        delta.offset = screen_point_from_tuple(offset);
+        delta.amount = amount;
+        if let Some(anchor) = anchor {
+            delta.has_anchor = true;
+            delta.anchor = screen_point_from_tuple(anchor);
+        }
+        if let Some(animation) = animation {
+            delta.animation = animation_options_from_parts(animation);
+        }
         let mut command_id = 0;
         maplibre_core::check(unsafe {
-            sys::mln_map_scale_by(
-                state.handle(),
-                scale,
-                anchor.as_ref().map_or(ptr::null(), |value| value),
-                animation.as_ref().map_or(ptr::null(), |value| value),
-                &mut command_id,
-            )
-        })
-        .map_err(map_error)?;
-        Ok(command_id)
-    }
-
-    fn bearing_by(
-        &self,
-        degrees: f64,
-        anchor: Option<(f64, f64)>,
-        animation: Option<AnimationParts>,
-    ) -> PyResult<u64> {
-        let state = self.state();
-        let anchor = anchor.map(screen_point_from_tuple);
-        let animation = animation.map(animation_options_from_parts);
-        let mut command_id = 0;
-        maplibre_core::check(unsafe {
-            sys::mln_map_bearing_by(
-                state.handle(),
-                degrees,
-                anchor.as_ref().map_or(ptr::null(), |value| value),
-                animation.as_ref().map_or(ptr::null(), |value| value),
-                &mut command_id,
-            )
-        })
-        .map_err(map_error)?;
-        Ok(command_id)
-    }
-
-    fn pitch_by(&self, degrees: f64, animation: Option<AnimationParts>) -> PyResult<u64> {
-        let state = self.state();
-        let animation = animation.map(animation_options_from_parts);
-        let mut command_id = 0;
-        maplibre_core::check(unsafe {
-            sys::mln_map_pitch_by(
-                state.handle(),
-                degrees,
-                animation.as_ref().map_or(ptr::null(), |value| value),
-                &mut command_id,
-            )
+            sys::mln_map_apply_camera_delta(state.handle(), &delta, &mut command_id)
         })
         .map_err(map_error)?;
         Ok(command_id)

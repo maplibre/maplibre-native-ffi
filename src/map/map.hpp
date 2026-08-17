@@ -24,6 +24,7 @@ struct MapObject;
 auto map_options_default() noexcept -> mln_map_options;
 auto camera_options_default() noexcept -> mln_camera_options;
 auto animation_options_default() noexcept -> mln_animation_options;
+auto camera_delta_default() noexcept -> mln_camera_delta;
 auto camera_update_default() noexcept -> mln_camera_update;
 auto camera_fit_options_default() noexcept -> mln_camera_fit_options;
 auto bound_options_default() noexcept -> mln_bound_options;
@@ -407,21 +408,8 @@ auto map_camera_snapshot_get(
 auto map_update_camera(
   mln_map map, const mln_camera_update* update, uint64_t* out_command_id
 ) -> mln_status;
-auto map_move_by(
-  mln_map map, mln_screen_point offset, const mln_animation_options* animation,
-  uint64_t* out_command_id
-) -> mln_status;
-auto map_scale_by(
-  mln_map map, double scale, const mln_screen_point* anchor,
-  const mln_animation_options* animation, uint64_t* out_command_id
-) -> mln_status;
-auto map_bearing_by(
-  mln_map map, double degrees, const mln_screen_point* anchor,
-  const mln_animation_options* animation, uint64_t* out_command_id
-) -> mln_status;
-auto map_pitch_by(
-  mln_map map, double degrees, const mln_animation_options* animation,
-  uint64_t* out_command_id
+auto map_apply_camera_delta(
+  mln_map map, const mln_camera_delta* delta, uint64_t* out_command_id
 ) -> mln_status;
 auto map_camera_query_start(mln_map map, mln_operation* out_operation)
   -> mln_status;

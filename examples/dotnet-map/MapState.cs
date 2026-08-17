@@ -84,22 +84,50 @@ internal sealed class MapState : IDisposable
 
     public void MoveBy(double deltaX, double deltaY, AnimationOptions? animation = null)
     {
-        _ = Map.MoveBy(new ScreenPoint(deltaX, deltaY), animation);
+        _ = Map.ApplyCameraDelta(
+            new CameraDelta
+            {
+                Offset = new ScreenPoint(deltaX, deltaY),
+                Animation = animation ?? new AnimationOptions(),
+            }
+        );
     }
 
     public void ScaleBy(double scale, ScreenPoint? anchor, AnimationOptions? animation = null)
     {
-        _ = Map.ScaleBy(scale, anchor, animation);
+        _ = Map.ApplyCameraDelta(
+            new CameraDelta
+            {
+                Kind = CameraDeltaKind.Scale,
+                Amount = scale,
+                Anchor = anchor,
+                Animation = animation ?? new AnimationOptions(),
+            }
+        );
     }
 
     public void AdjustBearing(double delta, AnimationOptions? animation = null)
     {
-        _ = Map.BearingBy(delta, null, animation);
+        _ = Map.ApplyCameraDelta(
+            new CameraDelta
+            {
+                Kind = CameraDeltaKind.Bearing,
+                Amount = delta,
+                Animation = animation ?? new AnimationOptions(),
+            }
+        );
     }
 
     public void AdjustPitch(double delta, AnimationOptions? animation = null)
     {
-        _ = Map.PitchBy(delta, animation);
+        _ = Map.ApplyCameraDelta(
+            new CameraDelta
+            {
+                Kind = CameraDeltaKind.Pitch,
+                Amount = delta,
+                Animation = animation ?? new AnimationOptions(),
+            }
+        );
     }
 
     public void ResetOrientation(AnimationOptions animation)

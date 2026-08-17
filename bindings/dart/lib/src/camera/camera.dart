@@ -165,6 +165,49 @@ final class AnimationOptions {
       Object.hash(durationMs, velocity, minZoom, easing, transitionId);
 }
 
+/// Relative camera operation kind.
+enum CameraDeltaKind {
+  move(0),
+  scale(1),
+  bearing(2),
+  pitch(3);
+
+  const CameraDeltaKind(this.rawValue);
+
+  /// Native camera delta kind value.
+  final int rawValue;
+}
+
+/// One relative camera operation.
+final class CameraDelta {
+  /// Creates a relative camera operation.
+  const CameraDelta({
+    this.kind = CameraDeltaKind.move,
+    this.offset = const ScreenPoint(0, 0),
+    this.amount = 0,
+    this.anchor,
+    this.animation = const AnimationOptions(),
+  });
+
+  final CameraDeltaKind kind;
+  final ScreenPoint offset;
+  final double amount;
+  final ScreenPoint? anchor;
+  final AnimationOptions animation;
+
+  @override
+  bool operator ==(Object other) =>
+      other is CameraDelta &&
+      other.kind == kind &&
+      other.offset == offset &&
+      other.amount == amount &&
+      other.anchor == anchor &&
+      other.animation == animation;
+
+  @override
+  int get hashCode => Object.hash(kind, offset, amount, anchor, animation);
+}
+
 /// Optional fitting controls for camera-for-viewport queries.
 final class CameraFitOptions {
   /// Creates camera fit options.

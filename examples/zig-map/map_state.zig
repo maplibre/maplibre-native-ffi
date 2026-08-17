@@ -57,35 +57,51 @@ pub const MapState = struct {
     }
 
     pub fn moveBy(self: *MapState, dx: f64, dy: f64) !void {
-        try self.cameraMutation(self.map.moveBy(.{ .x = dx, .y = dy }, null));
+        try self.cameraMutation(self.map.applyCameraDelta(.{ .offset = .{ .x = dx, .y = dy } }));
     }
 
     pub fn moveByAnimated(self: *MapState, dx: f64, dy: f64, duration_ms: f64) !void {
-        try self.cameraMutation(self.map.moveBy(.{ .x = dx, .y = dy }, .{ .duration_ms = duration_ms }));
+        try self.cameraMutation(self.map.applyCameraDelta(.{
+            .offset = .{ .x = dx, .y = dy },
+            .animation = .{ .duration_ms = duration_ms },
+        }));
     }
 
     pub fn scaleBy(self: *MapState, scale: f64, anchor: maplibre.ScreenPoint) !void {
-        try self.cameraMutation(self.map.scaleBy(scale, anchor, null));
+        try self.cameraMutation(self.map.applyCameraDelta(.{ .kind = .scale, .amount = scale, .anchor = anchor }));
     }
 
     pub fn scaleByAnimated(self: *MapState, scale: f64, anchor: maplibre.ScreenPoint, duration_ms: f64) !void {
-        try self.cameraMutation(self.map.scaleBy(scale, anchor, .{ .duration_ms = duration_ms }));
+        try self.cameraMutation(self.map.applyCameraDelta(.{
+            .kind = .scale,
+            .amount = scale,
+            .anchor = anchor,
+            .animation = .{ .duration_ms = duration_ms },
+        }));
     }
 
     pub fn pitchBy(self: *MapState, delta: f64) !void {
-        try self.cameraMutation(self.map.pitchBy(delta, null));
+        try self.cameraMutation(self.map.applyCameraDelta(.{ .kind = .pitch, .amount = delta }));
     }
 
     pub fn adjustBearing(self: *MapState, delta: f64) !void {
-        try self.cameraMutation(self.map.bearingBy(delta, null, null));
+        try self.cameraMutation(self.map.applyCameraDelta(.{ .kind = .bearing, .amount = delta }));
     }
 
     pub fn adjustBearingAnimated(self: *MapState, delta: f64, duration_ms: f64) !void {
-        try self.cameraMutation(self.map.bearingBy(delta, null, .{ .duration_ms = duration_ms }));
+        try self.cameraMutation(self.map.applyCameraDelta(.{
+            .kind = .bearing,
+            .amount = delta,
+            .animation = .{ .duration_ms = duration_ms },
+        }));
     }
 
     pub fn adjustPitchAnimated(self: *MapState, delta: f64, duration_ms: f64) !void {
-        try self.cameraMutation(self.map.pitchBy(delta, .{ .duration_ms = duration_ms }));
+        try self.cameraMutation(self.map.applyCameraDelta(.{
+            .kind = .pitch,
+            .amount = delta,
+            .animation = .{ .duration_ms = duration_ms },
+        }));
     }
 
     pub fn resetOrientation(self: *MapState, duration_ms: f64) !void {

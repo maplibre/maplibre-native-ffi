@@ -40,6 +40,7 @@
 --include-function mln_bound_options_default
 --include-function mln_camera_fit_options_default
 --include-function mln_camera_options_default
+--include-function mln_camera_delta_default
 --include-function mln_camera_update_default
 --include-function mln_free_camera_options_default
 --include-function mln_map_camera_for_geometry_start
@@ -51,7 +52,7 @@
 --include-function mln_map_camera_query_start
 --include-function mln_map_camera_query_take_result
 --include-function mln_map_camera_snapshot_get
---include-function mln_map_bearing_by
+--include-function mln_map_apply_camera_delta
 --include-function mln_map_dump_debug_logs
 --include-function mln_map_lat_lng_bounds_for_camera_start
 --include-function mln_map_lat_lng_bounds_for_camera_take_result
@@ -61,10 +62,8 @@
 --include-function mln_map_lat_lng_for_pixel_take_result
 --include-function mln_map_lat_lngs_for_pixels_start
 --include-function mln_map_lat_lngs_for_pixels_take_result
---include-function mln_map_move_by
 --include-function mln_map_pixel_for_lat_lng_start
 --include-function mln_map_pixel_for_lat_lng_take_result
---include-function mln_map_pitch_by
 --include-function mln_map_pixels_for_lat_lngs_start
 --include-function mln_map_pixels_for_lat_lngs_take_result
 --include-function mln_map_set_bounds
@@ -74,7 +73,6 @@
 --include-function mln_map_set_rendering_stats_view_enabled
 --include-function mln_map_set_tile_options
 --include-function mln_map_set_viewport_options
---include-function mln_map_scale_by
 --include-function mln_map_tile_options_default
 --include-function mln_map_update_camera
 --include-function mln_map_viewport_options_default
@@ -183,6 +181,7 @@
 --include-struct mln_animation_options
 --include-struct mln_bound_options
 --include-struct mln_camera_fit_options
+--include-struct mln_camera_delta
 --include-struct mln_camera_options
 --include-struct mln_camera_query_result
 --include-struct mln_camera_update
