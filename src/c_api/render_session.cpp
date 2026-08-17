@@ -111,11 +111,11 @@ auto mln_acquired_frame_get_producer_sync(
   });
 }
 
-auto mln_acquired_frame_release_start(
-  mln_acquired_frame* frame, const mln_gpu_sync* sync, mln_operation* out
+auto mln_acquired_frame_release(
+  mln_acquired_frame* frame, const mln_gpu_sync* sync
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&] {
-    return mln::core::acquired_frame_release_start(frame, sync, out);
+    return mln::core::acquired_frame_release(frame, sync);
   });
 }
 

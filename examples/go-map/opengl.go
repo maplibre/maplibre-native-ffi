@@ -31,7 +31,7 @@ func serviceOperation(session *maplibre.RenderSessionHandle, operation *maplibre
 			return err
 		}
 		if done {
-			return operation.Discard()
+			return operation.Finish()
 		}
 		if _, err := session.ServiceDriverWork(16); err != nil {
 			return err
@@ -429,12 +429,9 @@ func (target *openGLOwnedTextureTarget) DriveFrame() (bool, error) {
 	if accessErr == nil {
 		drawErr = target.compositor.DrawTexture(info.Target, info.Texture)
 	}
-	release, releaseErr := frame.ReleaseStart(maplibre.GPUSync{
+	releaseErr := frame.Release(maplibre.GPUSync{
 		Kind: maplibre.GPUSyncCPUComplete,
 	})
-	if releaseErr == nil {
-		releaseErr = serviceOperation(target.session, release)
-	}
 	return accessErr == nil, errors.Join(accessErr, drawErr, releaseErr)
 }
 

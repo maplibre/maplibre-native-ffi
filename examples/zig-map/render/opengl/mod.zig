@@ -563,20 +563,12 @@ const OpenGLOwnedTextureBackend = struct {
             },
         };
         var frame_owned = true;
-        errdefer if (frame_owned) {
-            var cleanup = frame.releaseStart(.cpu_complete) catch null;
-            if (cleanup) |*operation| {
-                defer operation.release();
-                render_target.serviceUntilComplete(texture, operation.*) catch {};
-            }
-        };
+        errdefer if (frame_owned) frame.release(.cpu_complete) catch {};
         const info = try frame.openGLTexture();
         const drawn = try self.compositor.drawTexture(info.texture);
         try self.compositor.finishFrame();
-        var release = try frame.releaseStart(.cpu_complete);
+        try frame.release(.cpu_complete);
         frame_owned = false;
-        defer release.release();
-        try render_target.serviceUntilComplete(texture, release);
         return drawn;
     }
 };

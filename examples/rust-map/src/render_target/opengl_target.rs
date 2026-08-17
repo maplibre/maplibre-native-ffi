@@ -161,8 +161,7 @@ impl RenderTarget {
                 compositor.draw_frame(graphics.opengl(), &frame)?;
                 frame
                     .release(GpuSync::CPU_COMPLETE)
-                    .map_err(|error| error.into_error())?
-                    .release();
+                    .map_err(|error| error.into_error())?;
                 Ok(true)
             }
             Self::BorrowedTexture {

@@ -6291,7 +6291,7 @@ fn release_acquired_frame(
     kind: u32,
     object: usize,
     value: u64,
-) -> PyResult<u64> {
+) -> PyResult<()> {
     let mut frame = frame
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -6302,19 +6302,12 @@ fn release_acquired_frame(
     sync.kind = kind;
     sync.object = object as *mut c_void;
     sync.value = value;
-    let mut operation = sys::mln_operation(0);
-    maplibre_core::check(unsafe {
-        sys::mln_acquired_frame_release_start(&mut *frame, &sync, &mut operation)
-    })
-    .map_err(map_error)?;
-    Ok(operation.0)
+    maplibre_core::check(unsafe { sys::mln_acquired_frame_release(&mut *frame, &sync) })
+        .map_err(map_error)
 }
 
 fn release_acquired_frame_on_drop(frame: &Mutex<sys::mln_acquired_frame>) {
-    let Ok(operation) = release_acquired_frame(frame, sys::MLN_GPU_SYNC_CPU_COMPLETE, 0, 0) else {
-        return;
-    };
-    unsafe { sys::mln_operation_release(sys::mln_operation(operation)) };
+    let _ = release_acquired_frame(frame, sys::MLN_GPU_SYNC_CPU_COMPLETE, 0, 0);
 }
 
 fn producer_sync_to_py(py: Python<'_>, frame: sys::mln_acquired_frame) -> PyResult<Py<PyAny>> {
@@ -6342,7 +6335,7 @@ fn acquired_frame_result_to_py(
 
 #[pymethods]
 impl MetalOwnedTextureFrameHandle {
-    fn release_start(&self, kind: u32, object_address: usize, value: u64) -> PyResult<u64> {
+    fn release(&self, kind: u32, object_address: usize, value: u64) -> PyResult<()> {
         release_acquired_frame(&self.frame, kind, object_address, value)
     }
 
@@ -6406,7 +6399,7 @@ impl Drop for MetalOwnedTextureFrameHandle {
 
 #[pymethods]
 impl VulkanOwnedTextureFrameHandle {
-    fn release_start(&self, kind: u32, object_address: usize, value: u64) -> PyResult<u64> {
+    fn release(&self, kind: u32, object_address: usize, value: u64) -> PyResult<()> {
         release_acquired_frame(&self.frame, kind, object_address, value)
     }
 
@@ -6488,7 +6481,7 @@ impl Drop for VulkanOwnedTextureFrameHandle {
 
 #[pymethods]
 impl WebGPUOwnedTextureFrameHandle {
-    fn release_start(&self, kind: u32, object_address: usize, value: u64) -> PyResult<u64> {
+    fn release(&self, kind: u32, object_address: usize, value: u64) -> PyResult<()> {
         release_acquired_frame(&self.frame, kind, object_address, value)
     }
 
@@ -6553,7 +6546,7 @@ fn webgpu_owned_texture_frame(
 
 #[pymethods]
 impl OpenGLOwnedTextureFrameHandle {
-    fn release_start(&self, kind: u32, object_address: usize, value: u64) -> PyResult<u64> {
+    fn release(&self, kind: u32, object_address: usize, value: u64) -> PyResult<()> {
         release_acquired_frame(&self.frame, kind, object_address, value)
     }
 

@@ -345,38 +345,27 @@ static void texture_ring_leases_apply_backpressure_until_cpu_release(void) {
   TEST_ASSERT_EQUAL_UINT32(1, snapshot.pending_demand_count);
 
   mln_gpu_sync cpu_complete = mln_gpu_sync_default();
-  mln_operation release = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_acquired_frame_release_start(&first, &cpu_complete, &release)
+    MLN_STATUS_OK, mln_acquired_frame_release(&first, &cpu_complete)
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, first);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, release)
-  );
-  mln_operation_release(release);
+  TEST_ASSERT_TRUE(service_fixture(&fixture));
 
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
   TEST_ASSERT_TRUE(wait_for_results(&fixture, 1, &batch));
   TEST_ASSERT_EQUAL_UINT64(203, batch_result(batch, 0).token);
   mln_render_frame_batch_release(batch);
 
-  release = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_acquired_frame_release_start(&second, &cpu_complete, &release)
+    MLN_STATUS_OK, mln_acquired_frame_release(&second, &cpu_complete)
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, release)
-  );
-  mln_operation_release(release);
 
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
 
-static void acquired_frame_release_after_abandon_is_cpu_only_target_loss(void) {
+static void acquired_frame_release_after_abandon_is_cpu_only(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   prepare_renderable_map(runtime, map);
@@ -399,22 +388,10 @@ static void acquired_frame_release_after_abandon_is_cpu_only_target_loss(void) {
     MLN_STATUS_TARGET_LOST, mln_acquired_frame_get_result(frame, &invalid)
   );
   mln_gpu_sync sync = mln_gpu_sync_default();
-  mln_operation release = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_acquired_frame_release_start(&frame, &sync, &release)
+    MLN_STATUS_OK, mln_acquired_frame_release(&frame, &sync)
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, frame);
-  bool completed = false;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_operation_wait(release, 10000, &completed)
-  );
-  TEST_ASSERT_TRUE(completed);
-  mln_status terminal = MLN_STATUS_OK;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_operation_get_status(release, &terminal)
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_TARGET_LOST, terminal);
-  mln_operation_release(release);
 
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
@@ -459,15 +436,10 @@ static void texture_readback_is_an_ordered_owned_operation_result(void) {
   TEST_ASSERT_EQUAL_UINT8(255, ((const uint8_t*)bytes.data)[3]);
   mln_buffer_destroy(pixels);
 
-  mln_operation release = MLN_HANDLE_NULL;
   mln_gpu_sync sync = mln_gpu_sync_default();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_acquired_frame_release_start(&frame, &sync, &release)
+    MLN_STATUS_OK, mln_acquired_frame_release(&frame, &sync)
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, release)
-  );
-  mln_operation_release(release);
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -786,7 +758,7 @@ void run_render_thread_abi_tests(void) {
   RUN_TEST(texture_readback_is_an_ordered_owned_operation_result);
   RUN_TEST(resize_and_barrier_order_frame_and_extent_generations);
   RUN_TEST(receiver_loss_abandons_pending_work_and_invalidates_accessors);
-  RUN_TEST(acquired_frame_release_after_abandon_is_cpu_only_target_loss);
+  RUN_TEST(acquired_frame_release_after_abandon_is_cpu_only);
 #if defined(MLN_FFI_TEST_BACKEND_OPENGL) && defined(MLN_FFI_TEST_OPENGL_WEBGL)
   RUN_TEST(transferred_offscreen_canvas_runs_on_core_worker);
 #endif

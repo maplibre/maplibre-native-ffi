@@ -702,7 +702,7 @@ internal constructor(
     )
   }
 
-  public actual fun release(consumerCompletion: GpuSync): OperationHandle<Unit> = memScoped {
+  public actual fun release(consumerCompletion: GpuSync): Unit = memScoped {
     check(released.compareAndSet(0, 1)) { "AcquiredFrameHandle is already released" }
     val native = alloc<mln_gpu_sync>()
     mln_gpu_sync_default().place(native.ptr)
@@ -711,14 +711,11 @@ internal constructor(
     native.value = consumerCompletion.value
     val holder = alloc<ULongVar>()
     holder.value = frame
-    val operation = alloc<ULongVar>()
-    operation.value = 0u
     try {
-      Status.check(mln_acquired_frame_release_start(holder.ptr, native.ptr, operation.ptr))
+      Status.check(mln_acquired_frame_release(holder.ptr, native.ptr))
       frame = 0u
       scope.close()
       session.frameReleased(scope)
-      session.operation(operation.value, OperationKind.FRAME_RELEASE, OperationResultKind.NONE)
     } catch (e: Throwable) {
       released.store(0)
       throw e

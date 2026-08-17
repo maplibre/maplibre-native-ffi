@@ -922,12 +922,10 @@ public struct WebGPUOwnedTextureFrame: Sendable, Hashable {
 }
 
 public final class AcquiredFrameHandle: @unchecked Sendable {
-  private let session: RenderSessionHandle
   private let lock = NSLock()
   private var handle: mln_acquired_frame
 
-  fileprivate init(session: RenderSessionHandle, handle: mln_acquired_frame) {
-    self.session = session
+  fileprivate init(handle: mln_acquired_frame) {
     self.handle = handle
   }
 
@@ -937,7 +935,7 @@ public final class AcquiredFrameHandle: @unchecked Sendable {
       NativeHandleLeakReporter.report(NativeHandleLeak(
         typeName: "AcquiredFrameHandle",
         handle: leaked,
-        detail: "release(consumerCompletion:) was not awaited"
+        detail: "release(consumerCompletion:) was not called"
       ))
     }
   }
@@ -1094,21 +1092,14 @@ public final class AcquiredFrameHandle: @unchecked Sendable {
 
   public func release(
     consumerCompletion: GPUSynchronization = .cpuComplete
-  ) async throws {
-    let operation = try mapNativeFailure {
-      try lock.withLock { () throws -> NativeOperationHandle in
-        guard handle != 0 else { return NativeOperationHandle(raw: 0) }
+  ) throws {
+    try mapNativeFailure {
+      try lock.withLock {
+        guard handle != 0 else { return }
         var completion = consumerCompletion.native
-        var operation: mln_operation = 0
-        try checkStatus(mln_acquired_frame_release_start(
-          &handle, &completion, &operation
-        ))
-        return NativeOperationHandle(raw: operation)
+        try checkStatus(mln_acquired_frame_release(&handle, &completion))
       }
     }
-    guard !operation.isNull else { return }
-    defer { mln_operation_release(operation.raw) }
-    try await session.waitForOperation(operation)
   }
 
   private func requireLiveLocked() throws -> mln_acquired_frame {
@@ -1245,7 +1236,7 @@ public final class RenderSessionHandle: @unchecked Sendable {
         let status = mln_render_session_acquire_frame(session.raw, &frame)
         if status == MLN_STATUS_NOT_READY { return nil }
         try checkStatus(status)
-        return AcquiredFrameHandle(session: self, handle: frame)
+        return AcquiredFrameHandle(handle: frame)
       }
     }
   }

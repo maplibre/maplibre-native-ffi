@@ -100,11 +100,11 @@ results, so coalesced notifications do not lose results.
 
 Host-acquirable owned texture targets negotiate a ring of one to three slots.
 Acquiring a frame leases one slot and returns producer-completion
-synchronization. Releasing the frame starts an operation and supplies
-consumer-completion synchronization when the host submitted GPU reads. The
-driver reuses the slot only after the host released the handle and those reads
-completed. A private OpenGL owned texture target fixes its ring depth at one and
-exposes CPU readback instead of frame acquisition.
+synchronization. Releasing the frame supplies consumer-completion
+synchronization when the host submitted GPU reads. The driver reuses the slot
+only after the host released the handle and those reads completed. A private
+OpenGL owned texture target fixes its ring depth at one and exposes CPU readback
+instead of frame acquisition.
 
 ### OpenGL context ownership
 

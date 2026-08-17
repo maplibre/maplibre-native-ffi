@@ -629,13 +629,11 @@ pub const AcquiredFrame = struct {
         return .{ .generation = raw.generation, .width = raw.width, .height = raw.height, .scale_factor = raw.scale_factor, .texture = NativePointer.fromPtr(raw.texture orelse return error.ClosedHandle), .texture_view = NativePointer.fromPtr(raw.texture_view orelse return error.ClosedHandle), .device = NativePointer.fromPtr(raw.device orelse return error.ClosedHandle), .format = raw.format };
     }
 
-    pub fn releaseStart(self: *AcquiredFrame, consumer_completion: GpuSync) status.Error!runtime_module.OperationHandle {
+    pub fn release(self: *AcquiredFrame, consumer_completion: GpuSync) status.Error!void {
         const lease = try renderSessionLease(self.session);
         defer lease.release();
         var sync = gpuSyncToNative(consumer_completion);
-        var operation: c.mln_operation = 0;
-        try status.checkStatus(c.mln_acquired_frame_release_start(&self.native, &sync, &operation), lease.diagnostic_store);
-        return operationHandle(lease, operation, .acquired_frame_release, .none);
+        try status.checkStatus(c.mln_acquired_frame_release(&self.native, &sync), lease.diagnostic_store);
     }
 };
 

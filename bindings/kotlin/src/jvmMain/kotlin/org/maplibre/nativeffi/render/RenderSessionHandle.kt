@@ -243,12 +243,6 @@ internal constructor(private val ownerMap: MapHandle, private val handle: Native
 
   internal fun retainAttachOperation() = core.retainChild("RenderAttachOperation")
 
-  internal fun releaseFrame(frame: Long, sync: GpuSync): Pair<Long, OperationHandle<Unit>> {
-    val (remainingFrame, operationId) = NativeAccess.startReleaseAcquiredFrame(frame, sync)
-    return remainingFrame to
-      operation(operationId, OperationKind.FRAME_RELEASE, OperationResultKind.NONE)
-  }
-
   private fun requireLiveHandle(): NativeRenderSession {
     core.requireLive()
     return handle
@@ -419,14 +413,13 @@ internal constructor(
     NativeAccess.acquiredOpenGLTexture(requireAccessibleFrame(), scope)
 
   @Synchronized
-  public actual fun release(consumerCompletion: GpuSync): OperationHandle<Unit> {
+  public actual fun release(consumerCompletion: GpuSync) {
     val frame = requireFrame()
-    val (remainingFrame, operation) = session.releaseFrame(frame, consumerCompletion)
+    val remainingFrame = NativeAccess.releaseAcquiredFrame(frame, consumerCompletion)
     check(remainingFrame == 0L) { "native frame release did not consume the handle" }
     nativeFrame = 0L
     scope.close()
     session.frameReleased(scope)
-    return operation
   }
 
   private fun requireAccessibleFrame(): Long {

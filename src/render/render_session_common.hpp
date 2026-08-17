@@ -582,7 +582,6 @@ enum : std::uint32_t {
   RENDER_OPERATION_FEATURE_STATE_SET,
   RENDER_OPERATION_FEATURE_STATE_REMOVE,
   RENDER_OPERATION_DETACH,
-  RENDER_OPERATION_FRAME_RELEASE,
   RENDER_OPERATION_QUERY,
   RENDER_OPERATION_QUERY_FEATURES,
   RENDER_OPERATION_READBACK,
@@ -873,9 +872,8 @@ auto acquired_frame_get_result(mln_acquired_frame, mln_render_frame_result*)
   -> mln_status;
 auto acquired_frame_get_producer_sync(mln_acquired_frame, mln_gpu_sync*)
   -> mln_status;
-auto acquired_frame_release_start(
-  mln_acquired_frame*, const mln_gpu_sync*, mln_operation*
-) -> mln_status;
+auto acquired_frame_release(mln_acquired_frame*, const mln_gpu_sync*)
+  -> mln_status;
 auto render_session_resize_start(
   mln_render_session, const mln_render_target_extent*, mln_operation*
 ) -> mln_status;

@@ -518,14 +518,12 @@ type RenderFrameBatch struct {
 	child  *handle.Child
 }
 
-// AcquiredFrame leases one owned-texture ring slot. ReleaseStart consumes the
-// lease and returns the operation that tracks when the slot becomes reusable.
+// AcquiredFrame leases one owned-texture ring slot. Release consumes the lease.
 type AcquiredFrame struct {
-	mu      sync.Mutex
-	handle  uint64
-	closed  bool
-	runtime *RuntimeHandle
-	child   *handle.Child
+	mu     sync.Mutex
+	handle uint64
+	closed bool
+	child  *handle.Child
 }
 
 // WebGPUOwnedTextureFrameInfo contains backend-native WebGPU frame metadata.

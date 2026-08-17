@@ -352,7 +352,7 @@
 --include-function mln_render_session_acquire_frame
 --include-function mln_acquired_frame_get_result
 --include-function mln_acquired_frame_get_producer_sync
---include-function mln_acquired_frame_release_start
+--include-function mln_acquired_frame_release
 --include-function mln_render_session_resize_start
 --include-function mln_render_session_barrier_start
 --include-function mln_render_session_clear_data_start

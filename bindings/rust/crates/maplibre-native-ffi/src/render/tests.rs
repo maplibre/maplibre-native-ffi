@@ -73,12 +73,11 @@ fn finish_unit(session: &RenderSessionHandle, operation: OperationHandle<()>) {
     wait_for_operation(session, &operation);
 }
 
-fn release_frame(session: &RenderSessionHandle, frame: AcquiredFrameHandle) {
-    let operation = match frame.release(GpuSync::CPU_COMPLETE) {
-        Ok(operation) => operation,
+fn release_frame(frame: AcquiredFrameHandle) {
+    match frame.release(GpuSync::CPU_COMPLETE) {
+        Ok(()) => {}
         Err(error) => panic!("failed to release acquired frame: {}", error.error()),
-    };
-    finish_unit(session, operation);
+    }
 }
 
 fn caller_attach_options() -> RenderSessionAttachOptions {
@@ -365,7 +364,7 @@ impl OwnedTextureTestContext {
                 let matches = (metadata.width, metadata.height)
                     == (expected.width, expected.height)
                     && metadata.scale_factor == expected.scale_factor;
-                release_frame(session, frame);
+                release_frame(frame);
                 matches
             }
             #[cfg(mln_webgpu_backend)]
@@ -379,7 +378,7 @@ impl OwnedTextureTestContext {
                 let matches = metadata.width == expected.width
                     && metadata.height == expected.height
                     && metadata.scale_factor == expected.scale_factor;
-                release_frame(session, frame);
+                release_frame(frame);
                 matches
             }
             #[cfg(not(target_os = "emscripten"))]
@@ -393,7 +392,7 @@ impl OwnedTextureTestContext {
                 let matches = (metadata.width, metadata.height)
                     == (expected.width, expected.height)
                     && metadata.scale_factor == expected.scale_factor;
-                release_frame(session, frame);
+                release_frame(frame);
                 matches
             }
             Self::OpenGL(_) => {
@@ -406,7 +405,7 @@ impl OwnedTextureTestContext {
                 let matches = (metadata.width, metadata.height)
                     == (expected.width, expected.height)
                     && metadata.scale_factor == expected.scale_factor;
-                release_frame(session, frame);
+                release_frame(frame);
                 matches
             }
         }
@@ -2566,7 +2565,7 @@ fn opengl_owned_texture_exposes_backend_metadata() {
     assert_eq!(metadata.target, gl_api::TEXTURE_2D);
     assert_eq!(metadata.internal_format, gl_api::RGBA8);
     assert!(!texture.is_zero());
-    release_frame(&session, frame);
+    release_frame(frame);
 
     close_session(session);
     map.close().unwrap();

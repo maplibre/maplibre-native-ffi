@@ -192,19 +192,17 @@ MLN_API mln_status mln_acquired_frame_get_producer_sync(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts release of an acquired frame after optional consumer GPU work.
+ * Releases an acquired frame after optional consumer GPU work.
  *
  * The call consumes *frame on success and sets it to MLN_HANDLE_NULL. The
- * operation completes only when the ring slot is reusable. CPU-complete
- * synchronization may complete immediately. A synchronization kind the
- * backend does not support fails with MLN_STATUS_UNSUPPORTED before the
- * handle is consumed, so the caller keeps frame ownership. After abandonment
- * the call closes the handle without graphics work and completes with
- * MLN_STATUS_TARGET_LOST.
+ * session retires the ring slot through its selected driver before reusing it.
+ * A synchronization kind the backend does not support fails with
+ * MLN_STATUS_UNSUPPORTED before the handle is consumed, so the caller keeps
+ * frame ownership. After abandonment the call closes the handle without
+ * graphics work.
  */
-MLN_API mln_status mln_acquired_frame_release_start(
-  mln_acquired_frame* frame, const mln_gpu_sync* consumer_completion,
-  mln_operation* out_operation
+MLN_API mln_status mln_acquired_frame_release(
+  mln_acquired_frame* frame, const mln_gpu_sync* consumer_completion
 ) MLN_NOEXCEPT;
 
 /**

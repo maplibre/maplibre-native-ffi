@@ -23,10 +23,7 @@ internal sealed class MapState : IDisposable
 
     public static MapState Create(Viewport viewport)
     {
-        var runtime = RuntimeHandle
-            .CreateAsync(new RuntimeOptions { CachePath = ":memory:" })
-            .GetAwaiter()
-            .GetResult();
+        var runtime = RuntimeHandle.Create(new RuntimeOptions { CachePath = ":memory:" });
         MapHandle? map = null;
         try
         {

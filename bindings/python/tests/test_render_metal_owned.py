@@ -94,7 +94,7 @@ class MetalOwnedSession:
         self.map.set_style_json(EMPTY_STYLE_JSON.encode())
         self.runtime.barrier()
         frame = wait_for_metal_frame(self, lambda _: True)
-        release_frame(self.session, frame)
+        release_frame(frame)
 
 
 @pytest.fixture
@@ -142,7 +142,7 @@ def wait_for_metal_frame(
         last_frame = frame.frame
         if predicate(last_frame):
             return frame
-        release_frame(fixture.session, frame)
+        release_frame(frame)
     raise AssertionError(f"matching Metal frame was not observed; last={last_frame!r}")
 
 
@@ -159,7 +159,7 @@ def test_core_worker_renders_and_releases_owned_metal_frame(
     assert (
         frame.device.address == metal_owned_session.context.descriptor().device.address
     )
-    release_frame(metal_owned_session.session, frame)
+    release_frame(frame)
     assert frame.closed
 
 

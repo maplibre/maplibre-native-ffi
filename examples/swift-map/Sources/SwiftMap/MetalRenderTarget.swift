@@ -143,10 +143,10 @@ enum MetalRenderTarget {
       guard let frame = try session.acquireFrame() else { return false }
       do {
         let presented = try compositor.draw(frame: frame)
-        try await frame.release()
+        try frame.release()
         return presented
       } catch {
-        try? await frame.release()
+        try? frame.release()
         throw error
       }
     case let .borrowedTexture(_, compositor, texture):

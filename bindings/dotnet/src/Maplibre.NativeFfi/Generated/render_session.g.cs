@@ -178,7 +178,7 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_status mln_acquired_frame_get_producer_sync([NativeTypeName("mln_acquired_frame")] MlnAcquiredFrame frame, mln_gpu_sync* out_sync);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_acquired_frame_release_start([NativeTypeName("mln_acquired_frame *")] MlnAcquiredFrame* frame, [NativeTypeName("const mln_gpu_sync *")] mln_gpu_sync* consumer_completion, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
+        public static extern mln_status mln_acquired_frame_release([NativeTypeName("mln_acquired_frame *")] MlnAcquiredFrame* frame, [NativeTypeName("const mln_gpu_sync *")] mln_gpu_sync* consumer_completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_render_session_resize_start([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_render_target_extent *")] mln_render_target_extent* extent, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);

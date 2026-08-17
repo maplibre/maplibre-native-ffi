@@ -119,5 +119,5 @@ public expect class AcquiredFrameHandle {
 
   public fun openGLTexture(): OpenGLOwnedTextureFrame
 
-  public fun release(consumerCompletion: GpuSync = GpuSync()): OperationHandle<Unit>
+  public fun release(consumerCompletion: GpuSync = GpuSync())
 }

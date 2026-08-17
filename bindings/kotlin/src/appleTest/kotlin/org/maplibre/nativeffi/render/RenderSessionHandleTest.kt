@@ -78,7 +78,7 @@ class RenderSessionHandleTest {
               val frame = assertNotNull(session.acquireFrame())
               assertEquals(result.frameGeneration, frame.result().frameGeneration)
               assertEquals(GpuSyncKind.CPU_COMPLETE, frame.producerSync().kind)
-              completeOnDriver(session, frame.release(GpuSync()))
+              frame.release(GpuSync())
               assertTrue(frame.isReleased)
             }
 
@@ -227,10 +227,7 @@ class RenderSessionHandleTest {
               assertTrue(it.waitForCompletion(-1))
               assertEquals(MaplibreStatus.TARGET_LOST, it.terminalStatus())
             }
-            frame.release().use {
-              assertTrue(it.waitForCompletion(-1))
-              assertEquals(MaplibreStatus.TARGET_LOST, it.terminalStatus())
-            }
+            frame.release()
             assertTrue(frame.isReleased)
             assertEquals(RenderSessionState.ABANDONED, session.snapshot().state)
           } finally {

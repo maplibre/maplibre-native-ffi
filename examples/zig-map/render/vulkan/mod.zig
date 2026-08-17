@@ -329,20 +329,12 @@ const VulkanOwnedTextureBackend = struct {
             },
         };
         var frame_owned = true;
-        errdefer if (frame_owned) {
-            var cleanup = frame.releaseStart(.cpu_complete) catch null;
-            if (cleanup) |*operation| {
-                defer operation.release();
-                render_target.serviceUntilComplete(texture, operation.*) catch {};
-            }
-        };
+        errdefer if (frame_owned) frame.release(.cpu_complete) catch {};
         const info = try frame.vulkanTexture();
         const image_view: c.VkImageView = @ptrCast(info.image_view.toPtr());
         if (!try self.compositor.presentImageView(image_view)) {
-            var release = try frame.releaseStart(.cpu_complete);
+            try frame.release(.cpu_complete);
             frame_owned = false;
-            defer release.release();
-            try render_target.serviceUntilComplete(texture, release);
             return false;
         }
 
@@ -353,10 +345,7 @@ const VulkanOwnedTextureBackend = struct {
 
     fn releasePendingFrame(self: *VulkanOwnedTextureBackend) void {
         if (self.pending_frame) |*frame| {
-            var operation = frame.releaseStart(.cpu_complete) catch return;
-            defer operation.release();
-            const session = self.session.textureHandle() catch return;
-            render_target.serviceUntilComplete(session, operation) catch |err| diagnostics.logError("Vulkan texture release failed", err, null);
+            frame.release(.cpu_complete) catch |err| diagnostics.logError("Vulkan texture release failed", err, null);
         }
         self.pending_frame = null;
     }

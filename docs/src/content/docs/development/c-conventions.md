@@ -361,9 +361,9 @@ Every accepted frame demand creates one owned terminal result record. Frame
 readiness stays level-triggered until the queue drains. Each drain transfers the
 complete queue into an independently owned result batch. Host-acquirable owned
 textures negotiate a one-to-three-slot ring. An acquired-frame handle leases its
-slot until its release operation observes any consumer GPU-completion
-synchronization. A private OpenGL owned texture target fixes its depth at one
-and grants readback without acquisition or consumer synchronization.
+slot until release transfers any consumer GPU-completion synchronization to the
+session. A private OpenGL owned texture target fixes its depth at one and grants
+readback without acquisition or consumer synchronization.
 
 Normal detach routes graphics destruction through the selected driver before
 CPU-only handle destruction. Abandon closes control and mailboxes without

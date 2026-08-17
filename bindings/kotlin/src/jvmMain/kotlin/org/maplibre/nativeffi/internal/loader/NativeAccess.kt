@@ -2466,21 +2466,19 @@ internal object NativeAccess {
       openglOwnedTextureFrame(out, scope)
     }
 
-  internal fun startReleaseAcquiredFrame(frame: Long, sync: GpuSync): Pair<Long, Long> =
+  internal fun releaseAcquiredFrame(frame: Long, sync: GpuSync): Long =
     Arena.ofConfined().use { arena ->
       val inOutFrame = arena.allocate(ValueLayout.JAVA_LONG)
       inOutFrame.set(ValueLayout.JAVA_LONG, 0, frame)
-      val outOperation = zeroHandle(arena)
       Status.check(
         dynamicStatusDowncall(
-            "mln_acquired_frame_release_start",
-            ValueLayout.ADDRESS,
+            "mln_acquired_frame_release",
             ValueLayout.ADDRESS,
             ValueLayout.ADDRESS,
           )
-          .invokeNative(inOutFrame, gpuSync(arena, sync), outOperation) as Int
+          .invokeNative(inOutFrame, gpuSync(arena, sync)) as Int
       )
-      inOutFrame.get(ValueLayout.JAVA_LONG, 0) to outOperation.get(ValueLayout.JAVA_LONG, 0)
+      inOutFrame.get(ValueLayout.JAVA_LONG, 0)
     }
 
   internal fun startResizeRenderSession(

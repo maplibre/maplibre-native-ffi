@@ -758,7 +758,7 @@ internal constructor(
     }
   }
 
-  public actual fun release(consumerCompletion: GpuSync): OperationHandle<Unit> {
+  public actual fun release(consumerCompletion: GpuSync) {
     check(released.compareAndSet(false, true)) { "AcquiredFrameHandle is already released" }
     MaplibreNativeC.mln_gpu_sync_default().use { nativeSync ->
       nativeSync
@@ -766,25 +766,15 @@ internal constructor(
         .`object`(pointerOrNull(consumerCompletion.objectHandle))
         .value(consumerCompletion.value.toLong())
       LongPointer(1).use { frame ->
-        LongPointer(1).use { outOperation ->
-          frame.put(0, frameId)
-          outOperation.put(0, 0L)
-          try {
-            Status.check(
-              MaplibreNativeC.mln_acquired_frame_release_start(frame, nativeSync, outOperation)
-            )
-            frameId = 0L
-            scope.close()
-            session.frameReleased(scope)
-            return session.operation(
-              outOperation.get(),
-              OperationKind.FRAME_RELEASE,
-              OperationResultKind.NONE,
-            )
-          } catch (error: Throwable) {
-            released.set(false)
-            throw error
-          }
+        frame.put(0, frameId)
+        try {
+          Status.check(MaplibreNativeC.mln_acquired_frame_release(frame, nativeSync))
+          frameId = 0L
+          scope.close()
+          session.frameReleased(scope)
+        } catch (error: Throwable) {
+          released.set(false)
+          throw error
         }
       }
     }

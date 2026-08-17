@@ -408,16 +408,9 @@ static void release_pending_frame(render_target* target) {
     return;
   }
   mln_gpu_sync sync = mln_gpu_sync_default();
-  mln_operation operation = MLN_HANDLE_NULL;
-  const mln_status status = mln_acquired_frame_release_start(
-    &target->as.owned.pending_frame, &sync, &operation
-  );
-  if (status == MLN_STATUS_OK) {
-    (void)render_session_complete_operation(
-      &target->session, operation, APP_ERROR_BACKEND_DRAW_FAILED,
-      "Vulkan texture release failed"
-    );
-  } else {
+  const mln_status status =
+    mln_acquired_frame_release(&target->as.owned.pending_frame, &sync);
+  if (status != MLN_STATUS_OK) {
     diagnostics_log_status("Vulkan texture release failed", status);
   }
   target->as.owned.has_pending_frame = false;
@@ -627,16 +620,7 @@ static app_error render_update_owned(
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status("Vulkan texture access failed", status);
     mln_gpu_sync sync = mln_gpu_sync_default();
-    mln_operation operation = MLN_HANDLE_NULL;
-    if (
-      mln_acquired_frame_release_start(&acquired, &sync, &operation) ==
-      MLN_STATUS_OK
-    ) {
-      (void)render_session_complete_operation(
-        &target->session, operation, APP_ERROR_BACKEND_DRAW_FAILED,
-        "Vulkan texture release failed"
-      );
-    }
+    (void)mln_acquired_frame_release(&acquired, &sync);
     return APP_ERROR_BACKEND_DRAW_FAILED;
   }
   bool presented = false;
@@ -645,14 +629,9 @@ static app_error render_update_owned(
   );
   if (error != APP_OK || !presented) {
     mln_gpu_sync sync = mln_gpu_sync_default();
-    mln_operation operation = MLN_HANDLE_NULL;
-    status = mln_acquired_frame_release_start(&acquired, &sync, &operation);
-    if (status == MLN_STATUS_OK) {
-      (void)render_session_complete_operation(
-        &target->session, operation, APP_ERROR_BACKEND_DRAW_FAILED,
-        "Vulkan texture release failed"
-      );
-    }
+    status = mln_acquired_frame_release(&acquired, &sync);
+    if (status != MLN_STATUS_OK)
+      diagnostics_log_status("Vulkan texture release failed", status);
     return error;
   }
   target->as.owned.pending_frame = acquired;

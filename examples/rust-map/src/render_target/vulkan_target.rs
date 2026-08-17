@@ -150,8 +150,7 @@ impl RenderTarget {
                 })?;
                 frame
                     .release(GpuSync::CPU_COMPLETE)
-                    .map_err(|error| error.into_error())?
-                    .release();
+                    .map_err(|error| error.into_error())?;
                 Ok(presented)
             }
             Self::BorrowedTexture {

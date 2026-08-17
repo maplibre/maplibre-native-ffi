@@ -730,7 +730,7 @@ final class RenderSessionHandle implements Finalizable {
   AcquiredFrame acquireFrame() => withNativeArena((arena) {
     final out = arena<Uint64>()..value = 0;
     _check(raw.mln_render_session_acquire_frame(_handle.raw, out));
-    return AcquiredFrame._(_runtime, out.value);
+    return AcquiredFrame._(out.value);
   });
 
   Future<void> detach() => _voidOperation(
@@ -872,9 +872,8 @@ final class TextureImage {
 
 /// Scoped lease on one rendered texture-ring slot.
 final class AcquiredFrame {
-  AcquiredFrame._(this._runtime, this._handle);
+  AcquiredFrame._(this._handle);
 
-  final RuntimeHandle _runtime;
   int _handle;
 
   void _checkOpen() {
@@ -937,22 +936,19 @@ final class AcquiredFrame {
     return OpenGLOwnedTextureFrame._fromNative(out.ref, this);
   });
 
-  Future<void> release({GpuSync sync = const GpuSync.cpuComplete()}) =>
-      withNativeArena((arena) {
-        _checkOpen();
-        final frame = arena<Uint64>()..value = _handle;
-        final nativeSync = arena<raw.mln_gpu_sync>()
-          ..ref = raw.mln_gpu_sync_default()
-          ..ref.kind = sync.kind
-          ..ref.object = Pointer<Void>.fromAddress(sync.object?.address ?? 0)
-          ..ref.value = sync.value;
-        final operation = arena<Uint64>()..value = 0;
-        _check(
-          raw.mln_acquired_frame_release_start(frame, nativeSync, operation),
-        );
-        _handle = 0;
-        return _runtime._finishOperation(operation.value);
-      });
+  void release({GpuSync sync = const GpuSync.cpuComplete()}) {
+    withNativeArena((arena) {
+      _checkOpen();
+      final frame = arena<Uint64>()..value = _handle;
+      final nativeSync = arena<raw.mln_gpu_sync>()
+        ..ref = raw.mln_gpu_sync_default()
+        ..ref.kind = sync.kind
+        ..ref.object = Pointer<Void>.fromAddress(sync.object?.address ?? 0)
+        ..ref.value = sync.value;
+      _check(raw.mln_acquired_frame_release(frame, nativeSync));
+      _handle = 0;
+    });
+  }
 }
 
 /// Scoped Metal metadata from an [AcquiredFrame].

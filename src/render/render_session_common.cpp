@@ -2799,15 +2799,10 @@ auto acquired_frame_get_producer_sync(
   return MLN_STATUS_OK;
 }
 
-auto acquired_frame_release_start(
-  mln_acquired_frame* handle, const mln_gpu_sync* sync,
-  mln_operation* out_operation
+auto acquired_frame_release(
+  mln_acquired_frame* handle, const mln_gpu_sync* sync
 ) -> mln_status {
-  if (
-    !handle || *handle == MLN_HANDLE_NULL || !out_operation ||
-    *out_operation != MLN_HANDLE_NULL
-  )
-    return MLN_STATUS_INVALID_ARGUMENT;
+  if (!handle || *handle == MLN_HANDLE_NULL) return MLN_STATUS_INVALID_ARGUMENT;
   const auto copied =
     sync ? *sync
          : mln_gpu_sync{
@@ -2830,25 +2825,13 @@ auto acquired_frame_release_start(
   auto claimed = true;
   if (!frame->valid.compare_exchange_strong(claimed, false))
     return MLN_STATUS_INVALID_STATE;
-  auto operation = std::shared_ptr<OperationObject>{};
-  const auto status = register_operation(
-    frame->session->operation_source, RENDER_OPERATION_FRAME_RELEASE, false, {},
-    out_operation, operation
-  );
-  if (status != MLN_STATUS_OK) {
-    frame->valid.store(true);
-    return status;
-  }
   const auto consumed =
     handle_table<mln_acquired_frame_object>().remove(*handle);
   if (!consumed) {
-    operation->complete(
-      MLN_STATUS_INVALID_STATE, "acquired frame was already released", {}
-    );
     return MLN_STATUS_INVALID_STATE;
   }
   *handle = MLN_HANDLE_NULL;
-  const auto release = [consumed, operation, copied]() {
+  const auto release = [consumed, copied]() {
     auto status = MLN_STATUS_OK;
     {
       const auto lock = std::scoped_lock{consumed->session->control_mutex};
@@ -2869,10 +2852,14 @@ auto acquired_frame_release_start(
           consumed->session->texture.slots[consumed->slot].acquired = false;
         resume_demand = !consumed->session->demands.empty();
       }
-      if (consumed->session->acquired_frame_count)
-        --consumed->session->acquired_frame_count;
     }
-    operation->complete(status, {}, {});
+    if (status != MLN_STATUS_OK && status != MLN_STATUS_TARGET_LOST) {
+      mbgl::Log::Error(
+        mbgl::Event::Render,
+        "failed to retire an acquired frame; its texture slot will not be "
+        "reused"
+      );
+    }
     if (resume_demand) {
       enqueue_work(
         consumed->session,
@@ -2882,15 +2869,23 @@ auto acquired_frame_release_start(
       );
     }
   };
-  auto abandoned = false;
+  auto release_immediately = false;
   {
     const auto lock = std::scoped_lock{frame->session->control_mutex};
-    abandoned = frame->session->state == MLN_RENDER_SESSION_STATE_ABANDONED;
+    if (frame->session->acquired_frame_count)
+      --frame->session->acquired_frame_count;
+    release_immediately =
+      frame->session->state == MLN_RENDER_SESSION_STATE_ABANDONED;
+    if (!release_immediately) {
+      auto& queue = frame->session->waiting_update_work.empty()
+                      ? frame->session->driver_work
+                      : frame->session->waiting_update_work;
+      queue.push_back(RenderDriverWork{release, release});
+      if (frame->session->waiting_update_work.empty())
+        publish_driver_work_locked(*frame->session);
+    }
   }
-  if (abandoned)
-    release();
-  else
-    enqueue_work(frame->session, RenderDriverWork{release, release});
+  if (release_immediately) release();
   return MLN_STATUS_OK;
 }
 

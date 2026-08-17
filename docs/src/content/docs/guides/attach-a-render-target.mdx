@@ -86,6 +86,7 @@ the map in CPU state, and performs no graphics calls. It returns busy while a
 driver call is in flight. Resources that require graphics access enter a
 process-lifetime quarantine and the result reports their count. Releasing an
 acquired frame after abandon remains CPU-only, consumes the frame handle, and
-completes with target lost. Destroy the abandoned session afterward.
+does not touch quarantined graphics resources. Destroy the abandoned session
+afterward.
 
 <Code code={region(renderTarget, "teardown")} lang="c" title="render-target.c" />

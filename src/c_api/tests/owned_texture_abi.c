@@ -14,13 +14,10 @@ static void gpu_sync_default_is_cpu_complete(void) {
 
 static void acquired_frame_release_validates_owned_handle_input(void) {
   mln_acquired_frame frame = MLN_HANDLE_NULL;
-  mln_operation operation = MLN_HANDLE_NULL;
   const mln_gpu_sync sync = mln_gpu_sync_default();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_acquired_frame_release_start(&frame, &sync, &operation)
+    MLN_STATUS_INVALID_ARGUMENT, mln_acquired_frame_release(&frame, &sync)
   );
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, operation);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_acquired_frame_get_result(

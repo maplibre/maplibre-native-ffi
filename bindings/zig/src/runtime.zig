@@ -224,7 +224,6 @@ pub const OperationKind = enum {
     render_readback,
     render_set_target,
     render_detach,
-    acquired_frame_release,
 };
 
 pub const OperationResultKind = enum {

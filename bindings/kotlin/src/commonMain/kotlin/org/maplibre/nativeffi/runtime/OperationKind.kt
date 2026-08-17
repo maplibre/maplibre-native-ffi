@@ -22,7 +22,6 @@ internal value class OperationKind(internal val nativeValue: Int) {
     internal val RENDER_CONTROL: OperationKind = OperationKind(21)
     internal val RENDER_QUERY: OperationKind = OperationKind(22)
     internal val RENDER_READBACK: OperationKind = OperationKind(23)
-    internal val FRAME_RELEASE: OperationKind = OperationKind(24)
     internal val RENDER_FEATURE_STATE_GET: OperationKind = OperationKind(25)
 
     internal fun fromNative(nativeValue: UInt): OperationKind = fromNative(nativeValue.toInt())

@@ -102,7 +102,7 @@ void main() {
         expect(frame.result.frameGeneration, results.single.frameGeneration);
         expect(frame.producerSync.kind, 0);
         expect(frame.metalTexture.unsafeTexture.isNull, isFalse);
-        await frame.release();
+        frame.release();
 
         final image = await session.readPremultipliedRgba8();
         expect(image.info.width, 32);
@@ -181,8 +181,8 @@ void main() {
       expect(result.disposition, same(RenderResult.rendered));
 
       final frame = session.acquireFrame();
-      final release = frame.release();
-      await _serviceAndComplete(session, release);
+      frame.release();
+      expect(session.serviceDriverWork(), greaterThan(0));
       expect(() => frame.result, throwsA(isA<MaplibreException>()));
 
       final abandoned = session.abandon();

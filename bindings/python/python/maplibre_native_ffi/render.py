@@ -1097,25 +1097,25 @@ class RenderSessionHandle(NativeHandleMixin):
     def acquire_metal_owned_texture_frame(self) -> MetalOwnedTextureFrameHandle:
         """Acquire a Metal texture-slot lease without waiting."""
         return MetalOwnedTextureFrameHandle._from_native(
-            self._native.acquire_metal_owned_texture_frame(), self._runtime
+            self._native.acquire_metal_owned_texture_frame()
         )
 
     def acquire_vulkan_owned_texture_frame(self) -> VulkanOwnedTextureFrameHandle:
         """Acquire a Vulkan texture-slot lease without waiting."""
         return VulkanOwnedTextureFrameHandle._from_native(
-            self._native.acquire_vulkan_owned_texture_frame(), self._runtime
+            self._native.acquire_vulkan_owned_texture_frame()
         )
 
     def acquire_webgpu_owned_texture_frame(self) -> WebGPUOwnedTextureFrameHandle:
         """Acquire a WebGPU texture-slot lease without waiting."""
         return WebGPUOwnedTextureFrameHandle._from_native(
-            self._native.acquire_webgpu_owned_texture_frame(), self._runtime
+            self._native.acquire_webgpu_owned_texture_frame()
         )
 
     def acquire_opengl_owned_texture_frame(self) -> OpenGLOwnedTextureFrameHandle:
         """Acquire an OpenGL texture-slot lease without waiting."""
         return OpenGLOwnedTextureFrameHandle._from_native(
-            self._native.acquire_opengl_owned_texture_frame(), self._runtime
+            self._native.acquire_opengl_owned_texture_frame()
         )
 
 
@@ -1123,7 +1123,6 @@ class _AcquiredFrameHandle:
     def __init__(
         self,
         native: Any,
-        runtime: Any,
         create_key: object,
         expected_key: object,
     ) -> None:
@@ -1131,7 +1130,6 @@ class _AcquiredFrameHandle:
             msg = "acquired frame handles are created by RenderSessionHandle"
             raise TypeError(msg)
         self._native = native
-        self._runtime = runtime
 
     @property
     def closed(self) -> bool:
@@ -1148,14 +1146,9 @@ class _AcquiredFrameHandle:
         """Return common frame-demand metadata for this lease."""
         return RenderFrameResult._from_native(self._native.result())
 
-    def release(
-        self, consumer_completion: GpuSync = _DEFAULT_GPU_SYNC
-    ) -> OperationHandle[None]:
+    def release(self, consumer_completion: GpuSync = _DEFAULT_GPU_SYNC) -> None:
         """Release this lease after optional consumer GPU work."""
-        return self._runtime._operation(
-            self._native.release_start,
-            None,
-            None,
+        self._native.release(
             consumer_completion.kind.native_code,
             consumer_completion.object.address,
             consumer_completion.value,
@@ -1168,15 +1161,14 @@ class MetalOwnedTextureFrameHandle(_AcquiredFrameHandle):
     def __init__(
         self,
         native: Any,
-        runtime: Any,
         *,
         _create_key: object | None = None,
     ) -> None:
-        super().__init__(native, runtime, _create_key, _METAL_FRAME_HANDLE_CREATE_KEY)
+        super().__init__(native, _create_key, _METAL_FRAME_HANDLE_CREATE_KEY)
 
     @classmethod
-    def _from_native(cls, native: Any, runtime: Any) -> MetalOwnedTextureFrameHandle:
-        return cls(native, runtime, _create_key=_METAL_FRAME_HANDLE_CREATE_KEY)
+    def _from_native(cls, native: Any) -> MetalOwnedTextureFrameHandle:
+        return cls(native, _create_key=_METAL_FRAME_HANDLE_CREATE_KEY)
 
     @property
     def frame(self) -> MetalOwnedTextureFrame:
@@ -1208,15 +1200,14 @@ class VulkanOwnedTextureFrameHandle(_AcquiredFrameHandle):
     def __init__(
         self,
         native: Any,
-        runtime: Any,
         *,
         _create_key: object | None = None,
     ) -> None:
-        super().__init__(native, runtime, _create_key, _VULKAN_FRAME_HANDLE_CREATE_KEY)
+        super().__init__(native, _create_key, _VULKAN_FRAME_HANDLE_CREATE_KEY)
 
     @classmethod
-    def _from_native(cls, native: Any, runtime: Any) -> VulkanOwnedTextureFrameHandle:
-        return cls(native, runtime, _create_key=_VULKAN_FRAME_HANDLE_CREATE_KEY)
+    def _from_native(cls, native: Any) -> VulkanOwnedTextureFrameHandle:
+        return cls(native, _create_key=_VULKAN_FRAME_HANDLE_CREATE_KEY)
 
     @property
     def frame(self) -> VulkanOwnedTextureFrame:
@@ -1257,15 +1248,14 @@ class WebGPUOwnedTextureFrameHandle(_AcquiredFrameHandle):
     def __init__(
         self,
         native: Any,
-        runtime: Any,
         *,
         _create_key: object | None = None,
     ) -> None:
-        super().__init__(native, runtime, _create_key, _WEBGPU_FRAME_HANDLE_CREATE_KEY)
+        super().__init__(native, _create_key, _WEBGPU_FRAME_HANDLE_CREATE_KEY)
 
     @classmethod
-    def _from_native(cls, native: Any, runtime: Any) -> WebGPUOwnedTextureFrameHandle:
-        return cls(native, runtime, _create_key=_WEBGPU_FRAME_HANDLE_CREATE_KEY)
+    def _from_native(cls, native: Any) -> WebGPUOwnedTextureFrameHandle:
+        return cls(native, _create_key=_WEBGPU_FRAME_HANDLE_CREATE_KEY)
 
     @property
     def frame(self) -> WebGPUOwnedTextureFrame:
@@ -1306,15 +1296,14 @@ class OpenGLOwnedTextureFrameHandle(_AcquiredFrameHandle):
     def __init__(
         self,
         native: Any,
-        runtime: Any,
         *,
         _create_key: object | None = None,
     ) -> None:
-        super().__init__(native, runtime, _create_key, _OPENGL_FRAME_HANDLE_CREATE_KEY)
+        super().__init__(native, _create_key, _OPENGL_FRAME_HANDLE_CREATE_KEY)
 
     @classmethod
-    def _from_native(cls, native: Any, runtime: Any) -> OpenGLOwnedTextureFrameHandle:
-        return cls(native, runtime, _create_key=_OPENGL_FRAME_HANDLE_CREATE_KEY)
+    def _from_native(cls, native: Any) -> OpenGLOwnedTextureFrameHandle:
+        return cls(native, _create_key=_OPENGL_FRAME_HANDLE_CREATE_KEY)
 
     @property
     def frame(self) -> OpenGLOwnedTextureFrame:

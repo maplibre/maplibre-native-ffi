@@ -271,20 +271,12 @@ const MetalOwnedTextureBackend = struct {
             },
         };
         var frame_owned = true;
-        errdefer if (frame_owned) {
-            var cleanup = frame.releaseStart(.cpu_complete) catch null;
-            if (cleanup) |*operation| {
-                defer operation.release();
-                render_target.serviceUntilComplete(texture, operation.*) catch {};
-            }
-        };
+        errdefer if (frame_owned) frame.release(.cpu_complete) catch {};
         const producer_sync = try frame.producerSync();
         const info = try frame.metalTexture();
         const drawn = try self.compositor.drawMetalTexture(info.texture.toPtr(), producer_sync);
-        var release = try frame.releaseStart(.cpu_complete);
+        try frame.release(.cpu_complete);
         frame_owned = false;
-        defer release.release();
-        try render_target.serviceUntilComplete(texture, release);
         return drawn;
     }
 };

@@ -102,7 +102,7 @@ class OpenGLOwnedSession:
     def render_once(self) -> None:
         self.map.set_style_json(EMPTY_STYLE_JSON.encode())
         frame = wait_for_opengl_frame(self, lambda _: True)
-        release_frame(self.session, frame)
+        release_frame(frame)
 
 
 @pytest.fixture
@@ -222,7 +222,7 @@ def wait_for_opengl_frame(
         last_frame = frame.frame
         if predicate(last_frame):
             return frame
-        release_frame(fixture.session, frame)
+        release_frame(frame)
     raise AssertionError(f"matching OpenGL frame was not observed; last={last_frame!r}")
 
 
@@ -236,7 +236,7 @@ def test_caller_driver_renders_and_releases_owned_opengl_frame(
     frame = opengl_owned_session.session.acquire_opengl_owned_texture_frame()
     assert frame.result.disposition == result
     assert frame.texture.value != 0
-    release_frame(opengl_owned_session.session, frame)
+    release_frame(frame)
     assert frame.closed
 
 

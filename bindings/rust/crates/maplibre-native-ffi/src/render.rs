@@ -1331,7 +1331,7 @@ impl RenderSessionHandle {
         maplibre_core::check(unsafe {
             sys::mln_render_session_acquire_frame(self.inner.native()?, &mut frame)
         })?;
-        AcquiredFrameHandle::new(frame, Arc::clone(&self.inner.operations))
+        AcquiredFrameHandle::new(frame)
     }
 
     pub fn resize(&self, extent: &RenderTargetExtent) -> Result<OperationHandle<()>> {
@@ -1565,7 +1565,7 @@ pub enum GpuSyncKind {
 /// Consumer completion passed when releasing an acquired frame.
 ///
 /// A non-CPU backend object remains caller-owned and must stay valid until the
-/// returned frame-release operation completes. Constructing its
+/// next render-session barrier or detach completes. Constructing its
 /// [`NativePointer`] is unsafe because Rust cannot verify that lifetime.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct GpuSync {
@@ -1681,11 +1681,10 @@ pub struct OpenGLOwnedTextureFrame {
 pub struct AcquiredFrameHandle {
     raw: Mutex<Option<sys::mln_acquired_frame>>,
     backend_exposed: AtomicBool,
-    operations: Arc<OperationRegistry>,
 }
 
 impl AcquiredFrameHandle {
-    fn new(raw: sys::mln_acquired_frame, operations: Arc<OperationRegistry>) -> Result<Self> {
+    fn new(raw: sys::mln_acquired_frame) -> Result<Self> {
         if raw.0 == 0 {
             return Err(crate::Error::invalid_argument(
                 "acquired frame must not be zero",
@@ -1694,7 +1693,6 @@ impl AcquiredFrameHandle {
         Ok(Self {
             raw: Mutex::new(Some(raw)),
             backend_exposed: AtomicBool::new(false),
-            operations,
         })
     }
 
@@ -1725,7 +1723,7 @@ impl AcquiredFrameHandle {
     pub fn release(
         self,
         consumer_completion: GpuSync,
-    ) -> std::result::Result<OperationHandle<()>, HandleOperationError<Self>> {
+    ) -> std::result::Result<(), HandleOperationError<Self>> {
         let mut guard = self.raw.lock().unwrap_or_else(|p| p.into_inner());
         let Some(mut frame) = *guard else {
             drop(guard);
@@ -1735,23 +1733,15 @@ impl AcquiredFrameHandle {
             ));
         };
         let sync = consumer_completion.to_native();
-        let mut operation = sys::mln_operation(0);
-        if let Err(error) = maplibre_core::check(unsafe {
-            sys::mln_acquired_frame_release_start(&mut frame, &sync, &mut operation)
-        }) {
+        if let Err(error) =
+            maplibre_core::check(unsafe { sys::mln_acquired_frame_release(&mut frame, &sync) })
+        {
             drop(guard);
             return Err(HandleOperationError::new(error, self));
         }
         *guard = None;
         drop(guard);
-        match OperationHandle::new(
-            operation,
-            OperationKind::RenderFrameRelease,
-            Arc::clone(&self.operations),
-        ) {
-            Ok(operation) => Ok(operation),
-            Err(error) => Err(HandleOperationError::new(error, self)),
-        }
+        Ok(())
     }
 }
 
@@ -1773,12 +1763,7 @@ impl Drop for AcquiredFrameHandle {
             return;
         }
         let sync = GpuSync::CPU_COMPLETE.to_native();
-        let mut operation = sys::mln_operation(0);
-        let status =
-            unsafe { sys::mln_acquired_frame_release_start(&mut frame, &sync, &mut operation) };
-        if status == sys::MLN_STATUS_OK && operation.0 != 0 {
-            unsafe { sys::mln_operation_release(operation) };
-        }
+        unsafe { sys::mln_acquired_frame_release(&mut frame, &sync) };
     }
 }
 

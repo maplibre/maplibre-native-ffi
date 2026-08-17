@@ -957,13 +957,14 @@ active-handle accessors.
 The binding MUST expose producer-completion synchronization and accept optional
 consumer-completion synchronization on release. CPU-complete synchronization is
 valid when the relevant GPU producer or consumer completed before publication.
-The release operation consumes the frame handle and completes only when the slot
-is reusable. A binding MUST NOT release a slot merely because the CPU wrapper
-closed while host GPU reads remain pending.
+Release consumes the frame handle synchronously. The session retires the slot
+through its selected driver and does not reuse it until consumer GPU completion.
+A binding MUST NOT release a slot merely because the CPU wrapper closed while
+host GPU reads remain pending. A borrowed non-CPU synchronization object remains
+valid until a later session barrier or detach completes.
 
 After abandonment, releasing an acquired frame still consumes its handle
-CPU-only. Its operation terminates with target lost. The binding MUST surface
-that terminal status and MUST NOT call a backend accessor after abandonment.
+CPU-only. The binding MUST NOT call a backend accessor after abandonment.
 
 Backpressure is the absence of an acquirable or reusable slot. Bindings MUST
 surface not ready without blocking, replacing an acquired frame, or silently
@@ -1159,7 +1160,7 @@ When the binding routes provider requests through
 | BND-166 | Readback transfers owned bytes and copied metadata through an operation.                                                                                                                                                    |
 | BND-167 | Host-acquirable owned texture capability negotiation grants a one-to-three-slot ring, and acquisition leases a slot with copied metadata and active-checked backend handles.                                                |
 | BND-168 | Frame access after release fails before exposing backend handles.                                                                                                                                                           |
-| BND-169 | Frame release consumes the handle and its operation completes only after consumer GPU completion makes the slot reusable.                                                                                                   |
+| BND-169 | Frame release consumes the handle synchronously, and the session reuses the slot only after consumer GPU completion.                                                                                                        |
 | BND-170 | Ring exhaustion reports not ready without blocking or replacing an acquired frame.                                                                                                                                          |
 | BND-171 | Borrowed target descriptors do not release or mutate host backend handles during detach.                                                                                                                                    |
 | BND-172 | A fallible wrapper releases a natively acquired frame when wrapper construction fails.                                                                                                                                      |

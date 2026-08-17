@@ -84,7 +84,8 @@ Owned texture acquisition is nonblocking and leases the oldest completed slot
 that is not already acquired. Wait for or submit work after its producer sync.
 Release the acquired handle with consumer-completion sync when host GPU work
 reads the texture. CPU-complete sync is valid only when that work completed
-before release. The release operation completes when the slot is reusable.
+before release. The session retires the slot through its selected driver before
+reusing it.
 
 Use a session barrier when later work must wait for every preceding render item
 to become terminal. A barrier orders work; it does not request a frame.

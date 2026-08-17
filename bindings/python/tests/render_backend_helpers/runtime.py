@@ -178,12 +178,11 @@ def close_session(session: render.RenderSessionHandle) -> None:
 
 
 def release_frame(
-    session: render.RenderSessionHandle,
     frame: object,
     sync: render.GpuSync = _DEFAULT_GPU_SYNC,
 ) -> None:
-    """Release an acquired texture slot and observe its operation."""
-    finish_render_operation(session, frame.release(sync))
+    """Release an acquired texture slot."""
+    frame.release(sync)
 
 
 def render_until_update(

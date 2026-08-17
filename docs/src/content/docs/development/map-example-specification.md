@@ -292,7 +292,7 @@ Failure cleanup follows the same detach or abandon path as normal shutdown.
 On host termination or fatal error:
 
 1. Stop new frame demand.
-2. Release acquired frames and await their slot-release operations.
+2. Release acquired frames with their consumer-completion synchronization.
 3. Start normal detach. Continue caller-driver service until it completes.
 4. If graphics service is permanently unavailable, abandon instead and report
    any quarantined resources.
@@ -461,7 +461,7 @@ table:
 - After a rendered result, acquire the oldest completed unacquired frame.
 - Wait for producer completion before sampling.
 - Release the handle with consumer-completion synchronization after submitting
-  compositor GPU work. Await or observe the release operation.
+  compositor GPU work.
 - Keep presenting the previous completed frame when acquisition reports not
   ready.
 

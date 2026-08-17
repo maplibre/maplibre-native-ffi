@@ -1118,12 +1118,8 @@ public sealed unsafe class AcquiredFrameHandle : IDisposable
         }
     }
 
-    public Task ReleaseAsync(
-        GpuSync? consumerCompletion,
-        CancellationToken cancellationToken = default
-    )
+    public void Release(GpuSync? consumerCompletion)
     {
-        MlnOperation operation = default;
         lock (gate)
         {
             if (handle.IsNull)
@@ -1136,19 +1132,11 @@ public sealed unsafe class AcquiredFrameHandle : IDisposable
                 sync.value = completion.Value;
             }
             var frame = handle;
-            NativeStatus.Check(
-                NativeMethods.mln_acquired_frame_release_start(&frame, &sync, &operation)
-            );
+            NativeStatus.Check(NativeMethods.mln_acquired_frame_release(&frame, &sync));
             handle = frame;
             scope.Dispose();
         }
         session.FrameReleased(this);
-        var completedOperation = operation;
-        return OperationAwaiter.WaitThen(
-            session.WaitForOperationAsync(completedOperation, cancellationToken),
-            () => RuntimeHandle.CheckOperationCompletion(completedOperation),
-            () => NativeMethods.mln_operation_release(completedOperation)
-        );
     }
 
     internal void InvalidateAccessors()
@@ -1159,21 +1147,17 @@ public sealed unsafe class AcquiredFrameHandle : IDisposable
 
     public void Dispose()
     {
-        MlnOperation operation = default;
         lock (gate)
         {
             if (handle.IsNull)
                 return;
             var sync = NativeMethods.mln_gpu_sync_default();
             var frame = handle;
-            NativeStatus.Check(
-                NativeMethods.mln_acquired_frame_release_start(&frame, &sync, &operation)
-            );
+            NativeStatus.Check(NativeMethods.mln_acquired_frame_release(&frame, &sync));
             handle = frame;
             scope.Dispose();
         }
         session.FrameReleased(this);
-        NativeMethods.mln_operation_release(operation);
     }
 
     private MlnAcquiredFrame RequireHandleLocked()

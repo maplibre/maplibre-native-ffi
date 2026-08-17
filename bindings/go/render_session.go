@@ -458,9 +458,8 @@ func (s *RenderSessionHandle) AcquireFrame() (*AcquiredFrame, error) {
 		return nil, newBindingError(ErrInvalidState, "frame acquisition did not return a frame")
 	}
 	return &AcquiredFrame{
-		handle:  uint64(frame),
-		runtime: s.parent.runtime,
-		child:   s.state.AddChild(),
+		handle: uint64(frame),
+		child:  s.state.AddChild(),
 	}, nil
 }
 
@@ -512,27 +511,25 @@ func (f *AcquiredFrame) ProducerSync() (GPUSync, error) {
 	return sync, err
 }
 
-func (f *AcquiredFrame) ReleaseStart(sync GPUSync) (*OperationHandle[struct{}], error) {
+func (f *AcquiredFrame) Release(sync GPUSync) error {
 	if f == nil {
-		return nil, newBindingError(ErrInvalidArgument, "AcquiredFrame is nil")
+		return newBindingError(ErrInvalidArgument, "AcquiredFrame is nil")
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.closed {
-		return nil, newBindingError(ErrInvalidArgument, "AcquiredFrame is closed")
+		return newBindingError(ErrInvalidArgument, "AcquiredFrame is closed")
 	}
 
 	frame := C.mln_acquired_frame(f.handle)
 	rawSync := sync.toC()
-	var operation C.mln_operation
 	if err := checkNative(func() int32 {
-		return int32(C.mln_acquired_frame_release_start(&frame, &rawSync, &operation))
+		return int32(C.mln_acquired_frame_release(&frame, &rawSync))
 	}); err != nil {
-		return nil, err
+		return err
 	}
 	if frame != 0 {
-		C.mln_operation_release(operation)
-		return nil, newBindingError(ErrInvalidState, "frame release did not consume the frame")
+		return newBindingError(ErrInvalidState, "frame release did not consume the frame")
 	}
 	f.closed = true
 	f.handle = 0
@@ -540,10 +537,7 @@ func (f *AcquiredFrame) ReleaseStart(sync GPUSync) (*OperationHandle[struct{}], 
 		f.child.Release()
 		f.child = nil
 	}
-	if operation == 0 {
-		return nil, newBindingError(ErrInvalidState, "frame release did not return an operation")
-	}
-	return newOperationHandle[struct{}](f.runtime, uint64(operation), 0, operationResultNone), nil
+	return nil
 }
 
 func (f *AcquiredFrame) MetalTexture() (MetalOwnedTextureFrameInfo, error) {

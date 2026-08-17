@@ -1046,9 +1046,8 @@ fn renderFrame(session: maplibre.RenderSessionHandle, if_needed: bool) !maplibre
     return error.FrameTimedOut;
 }
 
-fn releaseFrame(session: maplibre.RenderSessionHandle, frame: *maplibre.AcquiredFrame) !void {
-    const operation = try frame.releaseStart(.cpu_complete);
-    try finishOperation(session, operation);
+fn releaseFrame(frame: *maplibre.AcquiredFrame) !void {
+    try frame.release(.cpu_complete);
 }
 
 fn expectOwnedFrameExtent(
@@ -1077,7 +1076,7 @@ fn expectOwnedFrameExtent(
     } else {
         unreachable;
     }
-    try releaseFrame(session, &frame);
+    try releaseFrame(&frame);
 }
 
 fn closeSession(session: *maplibre.RenderSessionHandle) !void {

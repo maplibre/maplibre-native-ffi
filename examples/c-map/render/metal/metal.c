@@ -613,14 +613,7 @@ static app_error render_update_owned(
         )
       : APP_ERROR_BACKEND_DRAW_FAILED;
   mln_gpu_sync sync = mln_gpu_sync_default();
-  mln_operation release = MLN_HANDLE_NULL;
-  status = mln_acquired_frame_release_start(&acquired, &sync, &release);
-  if (status == MLN_STATUS_OK) {
-    (void)render_session_complete_operation(
-      &target->session, release, APP_ERROR_BACKEND_DRAW_FAILED,
-      "Metal texture release failed"
-    );
-  }
+  status = mln_acquired_frame_release(&acquired, &sync);
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status("Metal texture release failed", status);
   }

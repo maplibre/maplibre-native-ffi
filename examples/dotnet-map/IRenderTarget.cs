@@ -29,7 +29,6 @@ internal static class RenderTargetDriver
                     | (present ? FrameDemandFlags.Present : FrameDemandFlags.None),
                 0,
                 0,
-                0,
                 0
             )
         );
@@ -223,7 +222,7 @@ internal sealed class OwnedTextureRenderTarget : IRenderTarget
             {
                 openGl.FinishGpuWork();
             }
-            RenderTargetDriver.Wait(session, frame.ReleaseAsync(GpuSync.CpuComplete));
+            frame.Release(GpuSync.CpuComplete);
             return presented;
         }
     }

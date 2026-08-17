@@ -77,13 +77,11 @@ external int mln_acquired_frame_get_webgpu_texture(
   ffi.Int32 Function(
     ffi.Pointer<mln_acquired_frame>,
     ffi.Pointer<mln_gpu_sync>,
-    ffi.Pointer<mln_runtime>,
   )
 >()
-external int mln_acquired_frame_release_start(
+external int mln_acquired_frame_release(
   ffi.Pointer<mln_acquired_frame> frame,
   ffi.Pointer<mln_gpu_sync> consumer_completion,
-  ffi.Pointer<mln_operation> out_operation,
 );
 
 @ffi.Native<

@@ -12700,15 +12700,14 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         }
     }
 
-    private static class mln_acquired_frame_release_start {
+    private static class mln_acquired_frame_release {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
-            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_acquired_frame_release_start");
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_acquired_frame_release");
 
         public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
     }
@@ -12716,45 +12715,45 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_release_start(mln_acquired_frame *frame, const mln_gpu_sync *consumer_completion, mln_operation *out_operation)
+     * mln_status mln_acquired_frame_release(mln_acquired_frame *frame, const mln_gpu_sync *consumer_completion)
      * }
      */
-    public static FunctionDescriptor mln_acquired_frame_release_start$descriptor() {
-        return mln_acquired_frame_release_start.DESC;
+    public static FunctionDescriptor mln_acquired_frame_release$descriptor() {
+        return mln_acquired_frame_release.DESC;
     }
 
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_release_start(mln_acquired_frame *frame, const mln_gpu_sync *consumer_completion, mln_operation *out_operation)
+     * mln_status mln_acquired_frame_release(mln_acquired_frame *frame, const mln_gpu_sync *consumer_completion)
      * }
      */
-    public static MethodHandle mln_acquired_frame_release_start$handle() {
-        return mln_acquired_frame_release_start.HANDLE;
+    public static MethodHandle mln_acquired_frame_release$handle() {
+        return mln_acquired_frame_release.HANDLE;
     }
 
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_release_start(mln_acquired_frame *frame, const mln_gpu_sync *consumer_completion, mln_operation *out_operation)
+     * mln_status mln_acquired_frame_release(mln_acquired_frame *frame, const mln_gpu_sync *consumer_completion)
      * }
      */
-    public static MemorySegment mln_acquired_frame_release_start$address() {
-        return mln_acquired_frame_release_start.ADDR;
+    public static MemorySegment mln_acquired_frame_release$address() {
+        return mln_acquired_frame_release.ADDR;
     }
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_acquired_frame_release_start(mln_acquired_frame *frame, const mln_gpu_sync *consumer_completion, mln_operation *out_operation)
+     * mln_status mln_acquired_frame_release(mln_acquired_frame *frame, const mln_gpu_sync *consumer_completion)
      * }
      */
-    public static int mln_acquired_frame_release_start(MemorySegment frame, MemorySegment consumer_completion, MemorySegment out_operation) {
-        var mh$ = mln_acquired_frame_release_start.HANDLE;
+    public static int mln_acquired_frame_release(MemorySegment frame, MemorySegment consumer_completion) {
+        var mh$ = mln_acquired_frame_release.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_acquired_frame_release_start", frame, consumer_completion, out_operation);
+                traceDowncall("mln_acquired_frame_release", frame, consumer_completion);
             }
-            return (int)mh$.invokeExact(frame, consumer_completion, out_operation);
+            return (int)mh$.invokeExact(frame, consumer_completion);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {

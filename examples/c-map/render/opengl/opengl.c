@@ -788,14 +788,8 @@ static app_error render_update_owned(
       : APP_ERROR_BACKEND_DRAW_FAILED;
   target->as.owned.compositor.procs.Finish();
   mln_gpu_sync sync = mln_gpu_sync_default();
-  mln_operation release = MLN_HANDLE_NULL;
-  status = mln_acquired_frame_release_start(&acquired, &sync, &release);
-  if (status == MLN_STATUS_OK) {
-    (void)render_session_complete_operation(
-      &target->session, release, APP_ERROR_BACKEND_DRAW_FAILED,
-      "OpenGL texture release failed"
-    );
-  } else {
+  status = mln_acquired_frame_release(&acquired, &sync);
+  if (status != MLN_STATUS_OK) {
     diagnostics_log_status("OpenGL texture release failed", status);
   }
   MAP_TRY(error);

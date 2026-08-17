@@ -117,18 +117,10 @@ fn renderWithDriver(
     if (capabilities.frame_acquisition) {
         var frame = try session.acquireFrame();
         var frame_owned = true;
-        errdefer if (frame_owned) {
-            var cleanup = frame.releaseStart(.cpu_complete) catch null;
-            if (cleanup) |*operation| {
-                defer operation.release();
-                waitForSessionOperation(&session, operation.*) catch {};
-            }
-        };
+        errdefer if (frame_owned) frame.release(.cpu_complete) catch {};
         _ = try frame.producerSync();
-        const release = try frame.releaseStart(.cpu_complete);
+        try frame.release(.cpu_complete);
         frame_owned = false;
-        defer release.release();
-        try waitForSessionOperation(&session, release);
     }
 
     const readback = try session.readbackStart();

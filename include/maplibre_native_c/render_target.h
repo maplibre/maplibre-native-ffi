@@ -104,7 +104,7 @@ typedef enum mln_gpu_sync_kind : uint32_t {
  * Backend synchronization copied by frame access and release calls.
  *
  * object is retained only for Metal. Vulkan, OpenGL, and WebGPU objects remain
- * borrowed until the release operation completes.
+ * borrowed until a later session barrier or detach completes.
  */
 typedef struct mln_gpu_sync {
   uint32_t size;
