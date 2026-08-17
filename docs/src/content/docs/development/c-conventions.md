@@ -222,6 +222,10 @@ Pick the category from what the function reads or writes:
   touches afterward, is immediate. This choice is per object: reads, setters,
   and close become synchronous together, or their relative order breaks. The map
   projection is the model.
+- Creation of a root executor is immediate when no earlier work exists to order
+  against it. The call returns after the worker is ready. Runtime creation is
+  the model; wrapping startup in an operation only adds an observer and a typed
+  result transfer before the root object exists.
 
 Offer a published snapshot and an ordered operation for the same state only when
 each form does distinct work, as camera does: the snapshot serves

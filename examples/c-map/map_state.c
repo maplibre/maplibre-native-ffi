@@ -41,23 +41,9 @@ static app_error create_runtime(
   mln_runtime_options options = mln_runtime_options_default();
   options.notification_source = state->notification_source;
   options.cache_path = ":memory:";
-  mln_operation operation = MLN_HANDLE_NULL;
-  status = mln_runtime_create_start(&options, &operation);
+  status = mln_runtime_create(&options, &state->runtime);
   if (status != MLN_STATUS_OK) {
-    diagnostics_log_status("runtime create start failed", status);
-    return APP_ERROR_RUNTIME_CREATE_FAILED;
-  }
-  const app_error waited = await_operation(
-    operation, APP_ERROR_RUNTIME_CREATE_FAILED, "runtime create failed"
-  );
-  if (waited == APP_OK) {
-    status = mln_runtime_create_take_result(operation, &state->runtime);
-  }
-  mln_operation_release(operation);
-  if (waited != APP_OK || status != MLN_STATUS_OK) {
-    if (status != MLN_STATUS_OK) {
-      diagnostics_log_status("runtime create result failed", status);
-    }
+    diagnostics_log_status("runtime create failed", status);
     return APP_ERROR_RUNTIME_CREATE_FAILED;
   }
   return APP_OK;

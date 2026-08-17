@@ -161,43 +161,30 @@ final class RuntimeHandle {
     _nativeCallbackReleases.remove(userData.address)?.call();
   }
 
-  /// Creates a runtime without blocking the calling isolate.
-  static Future<RuntimeHandle> create({
+  /// Creates a runtime.
+  static RuntimeHandle create({
     RuntimeOptions options = const RuntimeOptions(),
-  }) async {
+  }) {
     ensureAbiVersion();
     final source = withNativeArena((arena) {
       final outSource = arena<Uint64>()..value = 0;
       _check(raw.mln_notification_source_create(outSource));
       return outSource.value;
     });
-    var operation = 0;
     var runtimeHandle = 0;
     try {
-      operation = withNativeArena((arena) {
+      runtimeHandle = withNativeArena((arena) {
         final nativeOptions = arena<raw.mln_runtime_options>();
         nativeOptions.ref = _runtimeOptionsToNative(options, arena);
         nativeOptions.ref.notification_source = source;
-        final outOperation = arena<Uint64>()..value = 0;
-        _check(raw.mln_runtime_create_start(nativeOptions, outOperation));
-        return outOperation.value;
-      });
-      await _waitForStandaloneOperation(source, operation);
-      _throwIfOperationFailed(operation);
-      runtimeHandle = withNativeArena((arena) {
         final outRuntime = arena<Uint64>()..value = 0;
-        _check(raw.mln_runtime_create_take_result(operation, outRuntime));
+        _check(raw.mln_runtime_create(nativeOptions, outRuntime));
         return outRuntime.value;
       });
-      raw.mln_operation_release(operation);
-      operation = 0;
       final runtime = RuntimeHandle._(NativeRuntime(runtimeHandle), source);
       runtimeHandle = 0;
       return runtime;
     } catch (_) {
-      if (operation != 0) {
-        raw.mln_operation_release(operation);
-      }
       if (runtimeHandle != 0) {
         _check(raw.mln_runtime_release(runtimeHandle));
       }
@@ -877,41 +864,6 @@ void _throwIfOperationFailed(int operation) {
       );
     }
   });
-}
-
-Future<void> _waitForStandaloneOperation(int source, int operation) async {
-  final completer = Completer<void>();
-  late final NativeCallable<raw.mln_notification_callbackFunction> listener;
-  listener = NativeCallable<raw.mln_notification_callbackFunction>.listener((
-    Pointer<Void> _,
-  ) {
-    for (final endpoint in _drainReadyEndpoints(source)) {
-      if (endpoint.kind ==
-              raw
-                  .mln_notification_endpoint_kind
-                  .MLN_NOTIFICATION_ENDPOINT_OPERATION
-                  .value &&
-          endpoint.id == operation &&
-          !completer.isCompleted) {
-        completer.complete();
-      }
-    }
-  });
-  try {
-    _check(
-      raw.mln_notification_source_set_callback(
-        source,
-        listener.nativeFunction,
-        nullptr,
-      ),
-    );
-    if (!_operationCompleted(operation)) {
-      await completer.future;
-    }
-  } finally {
-    _check(raw.mln_notification_source_clear_callback(source));
-    listener.close();
-  }
 }
 
 /// One batch of runtime events copied out of the native event arena.

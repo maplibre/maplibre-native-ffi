@@ -15,22 +15,21 @@
 
 static void runtime_rejects_invalid_arguments(void) {
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_create_start(NULL, NULL)
+    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_create(NULL, NULL)
   );
 
   mln_runtime_options small_options = mln_runtime_options_default();
   small_options.size = sizeof(mln_runtime_options) - 1;
-  mln_operation operation = MLN_HANDLE_NULL;
+  mln_runtime runtime = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_create_start(&small_options, &operation)
+    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_create(&small_options, &runtime)
   );
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, operation);
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, runtime);
 
-  operation = 1;
+  runtime = 1;
   const mln_runtime_options options = mln_runtime_options_default();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_create_start(&options, &operation)
+    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_create(&options, &runtime)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_runtime_release(MLN_HANDLE_NULL)

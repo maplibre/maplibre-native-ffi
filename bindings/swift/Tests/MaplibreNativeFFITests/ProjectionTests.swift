@@ -16,7 +16,7 @@ import Testing
 /// synchronous.
 @Test func mapProjectionIsSynchronousAfterCreation() async throws {
   let runtime =
-    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.closeBlockingForTests() }
   let map = try await MapHandle(runtime: runtime,
                                 options: MapOptions(width: 256, height: 256))
@@ -59,7 +59,7 @@ import Testing
 /// through the same live handle.
 @Test func mapProjectionIsUsableFromASecondThread() async throws {
   let runtime =
-    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.closeBlockingForTests() }
   let map = try await MapHandle(runtime: runtime,
                                 options: MapOptions(width: 256, height: 256))
@@ -78,7 +78,7 @@ import Testing
 @Test func mapProjectionSetVisibleCoordinatesRejectsEmptyInputBeforeCallingC(
 ) async throws {
   let runtime =
-    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.closeBlockingForTests() }
   let map = try await MapHandle(runtime: runtime,
                                 options: MapOptions(width: 256, height: 256))

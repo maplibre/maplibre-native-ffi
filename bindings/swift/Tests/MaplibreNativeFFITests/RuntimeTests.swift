@@ -67,7 +67,7 @@ private final class ResourceHandleStateCapture: @unchecked Sendable {
 
 @Test func runtimeCreateRunDrainAndClose() async throws {
   let runtime =
-    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   try await runtime.barrier()
   _ = try runtime.drainEvents()
   try runtime.close()
@@ -75,9 +75,9 @@ private final class ResourceHandleStateCapture: @unchecked Sendable {
   #expect(runtime.isClosed)
 }
 
-@Test func runtimeResourceTransformCanInstallAndClear() async throws {
+@Test func runtimeResourceTransformCanInstallAndClear() throws {
   let runtime =
-    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.closeBlockingForTests() }
 
   try runtime.setResourceTransform { request in
@@ -115,7 +115,7 @@ private func loadProbeStyle(
 @Test func runtimeResourceProviderIsConsultedUntilReplacedAndCleared(
 ) async throws {
   let runtime =
-    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.closeBlockingForTests() }
   let map = try await MapHandle(runtime: runtime,
                                 options: MapOptions(width: 64, height: 64))
@@ -188,7 +188,7 @@ private final class ResolvedURLCapture: @unchecked Sendable {
 /// have fetched.
 @Test func resourceProviderSeesSchemeAliasAndItsResolvedURL() async throws {
   let runtime =
-    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.closeBlockingForTests() }
 
   let resolved = ResolvedURLCapture()

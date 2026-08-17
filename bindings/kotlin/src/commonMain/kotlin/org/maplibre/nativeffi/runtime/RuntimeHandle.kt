@@ -127,7 +127,7 @@ public expect class RuntimeHandle {
   public fun close()
 
   public companion object {
-    /** Creates a runtime without blocking the caller's coroutine. */
-    public suspend fun create(options: RuntimeOptions): RuntimeHandle
+    /** Creates a runtime. */
+    public fun create(options: RuntimeOptions): RuntimeHandle
   }
 }

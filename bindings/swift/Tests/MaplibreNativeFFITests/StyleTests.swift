@@ -75,7 +75,7 @@ import Testing
 
 @Test func sourceInspectionCopiesReconstructibleMetadata() async throws {
   let runtime =
-    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.closeBlockingForTests() }
   let map = try await MapHandle(runtime: runtime,
                                 options: MapOptions(width: 1, height: 1))
@@ -387,7 +387,7 @@ private func addSourceReportingItsRelease(
 /// that never selected that event type still gets its state freed.
 @Test func aStyleLoadReleasesADroppedCustomGeometrySource() async throws {
   let runtime =
-    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.closeBlockingForTests() }
   try runtime.setResourceProvider { request, handle in
     guard request.requestedUrl == "maplibre://maps/replacement" else {
@@ -430,7 +430,7 @@ private func addSourceReportingItsRelease(
 /// once.
 @Test func removingACustomGeometrySourceReleasesItsCallbacks() async throws {
   let runtime =
-    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.closeBlockingForTests() }
   let map = try await MapHandle(runtime: runtime,
                                 options: MapOptions(width: 64, height: 64))
@@ -452,7 +452,7 @@ private func addSourceReportingItsRelease(
 /// Destroying a map releases the callback state of the sources it still holds.
 @Test func closingAMapReleasesItsCustomGeometrySources() async throws {
   let runtime =
-    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.closeBlockingForTests() }
   let map = try await MapHandle(runtime: runtime,
                                 options: MapOptions(width: 64, height: 64))
@@ -479,7 +479,7 @@ private func addSourceReportingItsRelease(
 /// releases that state before a subsequent runtime barrier completes.
 @Test func aRejectedCustomGeometrySourceAddReleasesItsCallbacks() async throws {
   let runtime =
-    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.closeBlockingForTests() }
   let map = try await MapHandle(runtime: runtime,
                                 options: MapOptions(width: 64, height: 64))
@@ -511,7 +511,7 @@ private func addSourceReportingItsRelease(
 
 @Test func loadedStyleDocumentAndURLReadBackWhatWasLoaded() async throws {
   let runtime =
-    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.closeBlockingForTests() }
   let map = try await MapHandle(runtime: runtime,
                                 options: MapOptions(width: 1, height: 1))
@@ -536,7 +536,7 @@ private func addSourceReportingItsRelease(
 }
 
 @Test func closedMapRejectsStyleCallsThroughSwiftHandleState() async throws {
-  let runtime = try await RuntimeHandle()
+  let runtime = try RuntimeHandle()
   defer { try? runtime.closeBlockingForTests() }
   let map = try await MapHandle(runtime: runtime,
                                 options: MapOptions(width: 1, height: 1))
@@ -555,7 +555,7 @@ private func addSourceReportingItsRelease(
 
 @Test func ninePatchStyleImageRoundTripsStretchContentAndTextFit() async throws {
   let runtime =
-    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.closeBlockingForTests() }
   let map = try await MapHandle(runtime: runtime,
                                 options: MapOptions(width: 1, height: 1))
@@ -608,7 +608,7 @@ private func addSourceReportingItsRelease(
 
 @Test func layerBaseAccessorsRoundTripThroughNativeMap() async throws {
   let runtime =
-    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.closeBlockingForTests() }
   let map = try await MapHandle(runtime: runtime,
                                 options: MapOptions(width: 1, height: 1))
@@ -694,7 +694,7 @@ private func addSourceReportingItsRelease(
 /// flag re-checks existence.
 @Test func styleRemovalsCommitOrFailWithNotFound() async throws {
   let runtime =
-    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.closeBlockingForTests() }
   let map = try await MapHandle(runtime: runtime,
                                 options: MapOptions(width: 1, height: 1))
@@ -848,7 +848,7 @@ private func addSourceReportingItsRelease(
 /// adopts the options the data was prepared with.
 @Test func preparedGeoJSONSourceDataAddsAndUpdatesAcrossSources() async throws {
   let runtime =
-    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.closeBlockingForTests() }
   let map = try await MapHandle(runtime: runtime,
                                 options: MapOptions(width: 512, height: 512))
@@ -932,7 +932,7 @@ private func addSourceReportingItsRelease(
 /// source was added with, because they would tile inconsistently.
 @Test func setGeoJSONSourceDataRejectsMismatchedOptions() async throws {
   let runtime =
-    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.closeBlockingForTests() }
   let map = try await MapHandle(runtime: runtime,
                                 options: MapOptions(width: 512, height: 512))
@@ -972,7 +972,7 @@ private func addSourceReportingItsRelease(
 /// a source, while the closed handle itself stops installing.
 @Test func closedGeoJSONSourceDataStopsInstallingButKeepsSources() async throws {
   let runtime =
-    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.closeBlockingForTests() }
   let map = try await MapHandle(runtime: runtime,
                                 options: MapOptions(width: 512, height: 512))
@@ -1017,7 +1017,7 @@ private func addSourceReportingItsRelease(
 /// source's own option when disabled.
 @Test func synchronousTilingOverrideTogglesPerSource() async throws {
   let runtime =
-    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.closeBlockingForTests() }
   let map = try await MapHandle(runtime: runtime,
                                 options: MapOptions(width: 512, height: 512))
@@ -1074,7 +1074,7 @@ private func addSourceReportingItsRelease(
 
 @Test func styleTransitionOptionsRoundTripThroughTheCAPI() async throws {
   let runtime =
-    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.closeBlockingForTests() }
   let map = try await MapHandle(runtime: runtime,
                                 options: MapOptions(width: 1, height: 1))

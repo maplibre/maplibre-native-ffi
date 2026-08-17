@@ -115,9 +115,9 @@ import Testing
   }
 }
 
-@Test func setMaximumAmbientCacheSizeReportsCompletion() async throws {
+@Test func setMaximumAmbientCacheSizeReportsCompletion() throws {
   let runtime =
-    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.closeBlockingForTests() }
 
   let operation = try runtime.setMaximumAmbientCacheSizeStart(8 << 20)
@@ -130,9 +130,9 @@ import Testing
   #expect(operation.isClosed)
 }
 
-@Test func runtimeCloseRequiresOperationObserverClose() async throws {
+@Test func runtimeCloseRequiresOperationObserverClose() throws {
   let runtime =
-    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   let operation = try runtime.setMaximumAmbientCacheSizeStart(8 << 20)
 
   do {
@@ -150,9 +150,9 @@ import Testing
   try runtime.close()
 }
 
-@Test func typedTakeConsumesOperation() async throws {
+@Test func typedTakeConsumesOperation() throws {
   let runtime =
-    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.closeBlockingForTests() }
   let operation = try runtime.offlineRegionsListStart()
 
@@ -171,9 +171,9 @@ import Testing
 }
 
 @Test func closedRuntimeRejectsOfflineCallsThroughSwiftHandleState(
-) async throws {
+) throws {
   let runtime =
-    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   try runtime.close()
 
   do {

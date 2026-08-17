@@ -41,19 +41,14 @@ int main(void) {
   mln_runtime_options runtime_options = mln_runtime_options_default();
   runtime_options.cache_path = ":memory:";
   runtime_options.notification_source = notifications;
-  mln_operation operation = MLN_HANDLE_NULL;
   mln_runtime runtime = MLN_HANDLE_NULL;
-  mln_status status = mln_runtime_create_start(&runtime_options, &operation);
-  if (status == MLN_STATUS_OK) status = wait_ok(operation);
-  if (status == MLN_STATUS_OK)
-    status = mln_runtime_create_take_result(operation, &runtime);
-  mln_operation_release(operation);
+  mln_status status = mln_runtime_create(&runtime_options, &runtime);
   if (status != MLN_STATUS_OK) return 1;
 
   mln_map_options map_options = mln_map_options_default();
   map_options.initial_extent =
     (mln_logical_extent){.width = 512, .height = 512, .scale_factor = 1.0};
-  operation = MLN_HANDLE_NULL;
+  mln_operation operation = MLN_HANDLE_NULL;
   mln_map map = MLN_HANDLE_NULL;
   status = mln_map_create_start(runtime, &map_options, &operation);
   if (status == MLN_STATUS_OK) status = wait_ok(operation);

@@ -179,28 +179,7 @@ static void untrack_session(mln_render_session session) {
 mln_status mln_test_runtime_create(
   const mln_runtime_options* options, mln_runtime* out_runtime
 ) {
-  mln_operation operation = MLN_HANDLE_NULL;
-  mln_status status = mln_runtime_create_start(options, &operation);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  bool completed = false;
-  status = mln_operation_wait(operation, -1, &completed);
-  if (status == MLN_STATUS_OK && !completed) {
-    status = MLN_STATUS_NATIVE_ERROR;
-  }
-  if (status == MLN_STATUS_OK) {
-    mln_status result = MLN_STATUS_NATIVE_ERROR;
-    status = mln_operation_get_status(operation, &result);
-    if (status == MLN_STATUS_OK) {
-      status = result;
-    }
-  }
-  if (status == MLN_STATUS_OK) {
-    status = mln_runtime_create_take_result(operation, out_runtime);
-  }
-  mln_operation_release(operation);
-  return status;
+  return mln_runtime_create(options, out_runtime);
 }
 
 mln_status mln_test_runtime_close(mln_runtime runtime) {
@@ -213,24 +192,7 @@ mln_runtime mln_test_create_runtime(void) {
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_notification_source_create(&source));
   mln_runtime_options options = mln_runtime_options_default();
   options.notification_source = source;
-  mln_operation operation = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_create_start(&options, &operation)
-  );
-  bool completed = false;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_operation_wait(operation, -1, &completed)
-  );
-  TEST_ASSERT_TRUE(completed);
-  mln_status result_status = MLN_STATUS_NATIVE_ERROR;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_operation_get_status(operation, &result_status)
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, result_status);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_create_take_result(operation, &runtime)
-  );
-  mln_operation_release(operation);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_create(&options, &runtime));
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, runtime);
   tracked_runtime = runtime;
   tracked_notification_source = source;

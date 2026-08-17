@@ -450,22 +450,14 @@ internal object NativeAccess {
     MapLibreNativeC.mln_notification_source_release(source)
   }
 
-  internal fun startCreateRuntime(options: RuntimeOptions, notificationSource: Long): Long =
+  internal fun createRuntime(options: RuntimeOptions, notificationSource: Long): NativeRuntime =
     Arena.ofConfined().use { arena ->
       val nativeOptions = runtimeOptions(options, notificationSource, arena)
-      val outOperation = arena.allocate(ValueLayout.JAVA_LONG)
-      outOperation.set(ValueLayout.JAVA_LONG, 0, 0L)
-      Status.check(MapLibreNativeC.mln_runtime_create_start(nativeOptions, outOperation))
-      outOperation.get(ValueLayout.JAVA_LONG, 0)
-    }
-
-  internal fun takeCreatedRuntime(operation: Long): NativeRuntime =
-    Arena.ofConfined().use { arena ->
       val outRuntime = arena.allocate(ValueLayout.JAVA_LONG)
       outRuntime.set(ValueLayout.JAVA_LONG, 0, 0L)
-      Status.check(MapLibreNativeC.mln_runtime_create_take_result(operation, outRuntime))
+      Status.check(MapLibreNativeC.mln_runtime_create(nativeOptions, outRuntime))
       NativeRuntime(outRuntime.get(ValueLayout.JAVA_LONG, 0)).also { runtime ->
-        require(!runtime.isNull) { "mln_runtime_create_take_result returned the null handle" }
+        require(!runtime.isNull) { "mln_runtime_create returned the null handle" }
       }
     }
 

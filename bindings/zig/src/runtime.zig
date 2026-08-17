@@ -2011,12 +2011,8 @@ fn createNative(
     );
     errdefer c.mln_notification_source_release(notification_source);
     native_options.notification_source = notification_source;
-    var operation: c.mln_operation = 0;
-    try status.checkStatus(c.mln_runtime_create_start(native_options, &operation), diagnostic_store);
-    defer c.mln_operation_release(operation);
-    try waitNativeOperation(operation, diagnostic_store);
     var runtime: c.mln_runtime = 0;
-    try status.checkStatus(c.mln_runtime_create_take_result(operation, &runtime), diagnostic_store);
+    try status.checkStatus(c.mln_runtime_create(native_options, &runtime), diagnostic_store);
 
     const runtime_registry = try std.heap.smp_allocator.create(RuntimeRegistry);
     runtime_registry.* = .{ .maps = .empty, .next_map_id = 1, .live_operations = 0 };

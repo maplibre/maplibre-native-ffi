@@ -148,10 +148,7 @@ public sealed class RuntimeMapLifecycleTests
     [Fact]
     public async Task RuntimeAndMapWorkAcrossManagedThreads()
     {
-        using var runtime = await RuntimeHandle.CreateAsync(
-            new RuntimeOptions(),
-            TestContext.Current.CancellationToken
-        );
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = await MapHandle.CreateAsync(
             runtime,
             new MapOptions { Width = 512, Height = 512 },

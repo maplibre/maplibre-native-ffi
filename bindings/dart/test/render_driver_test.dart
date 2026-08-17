@@ -57,7 +57,7 @@ void main() {
       final context = _MetalTestContext.create();
       if (context == null) return;
 
-      final runtime = await RuntimeHandle.create();
+      final runtime = RuntimeHandle.create();
       final map = await MapHandle.create(
         runtime,
         options: const MapOptions(width: 32, height: 32),
@@ -140,7 +140,7 @@ void main() {
     final context = _MetalTestContext.create();
     if (context == null) return;
 
-    final runtime = await RuntimeHandle.create();
+    final runtime = RuntimeHandle.create();
     final map = await MapHandle.create(
       runtime,
       options: const MapOptions(width: 16, height: 16),

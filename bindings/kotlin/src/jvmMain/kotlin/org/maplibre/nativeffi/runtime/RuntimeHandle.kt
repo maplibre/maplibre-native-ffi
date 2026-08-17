@@ -313,18 +313,12 @@ private constructor(
   }
 
   public actual companion object {
-    public actual suspend fun create(options: RuntimeOptions): RuntimeHandle {
+    public actual fun create(options: RuntimeOptions): RuntimeHandle {
       NativeAccess.ensureLoaded()
       val source = NativeAccess.createNotificationSource()
       val notifications = NotificationDispatcher(source)
       try {
-        val operation = NativeAccess.startCreateRuntime(options, source)
-        try {
-          notifications.await(operation)
-          return RuntimeHandle(NativeAccess.takeCreatedRuntime(operation), source, notifications)
-        } finally {
-          NativeAccess.releaseOperation(operation)
-        }
+        return RuntimeHandle(NativeAccess.createRuntime(options, source), source, notifications)
       } catch (error: Throwable) {
         try {
           notifications.close()

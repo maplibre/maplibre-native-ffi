@@ -1,6 +1,6 @@
 ---
 title: Create a map
-description: Create a runtime and map through lifecycle operations, then close both in order.
+description: Create a runtime and map, then close both in order.
 sidebar:
   order: 1
 ---
@@ -22,10 +22,9 @@ ready drain returns an owned batch; release it after reading its endpoint view.
 
 <Code code={region(createMap, "runtime")} lang="c" title="create-map.c" />
 
-Runtime creation returns an operation, not a runtime handle. Wait for terminal
-success and take the runtime result once; the take consumes the operation. Map
-creation follows the same pattern and reserves its runtime dependency as soon as
-the request is accepted.
+Runtime creation returns its handle after the scheduler thread is ready. Map
+creation is ordered runtime work: wait for its operation, then take the map
+result once. The take consumes the operation.
 
 ## Choose the initial map state
 

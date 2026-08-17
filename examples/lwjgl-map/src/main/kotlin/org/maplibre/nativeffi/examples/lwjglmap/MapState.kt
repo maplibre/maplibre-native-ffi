@@ -166,9 +166,7 @@ private constructor(
     private const val STYLE_URL = "https://tiles.openfreemap.org/styles/bright"
 
     fun create(viewport: Viewport, scheduleNotificationDrain: () -> Unit): MapState {
-      val runtime = runSuspend {
-        RuntimeHandle.create(RuntimeOptions().apply { cachePath = ":memory:" })
-      }
+      val runtime = RuntimeHandle.create(RuntimeOptions().apply { cachePath = ":memory:" })
       val initialCamera =
         CameraOptions().apply {
           center = LatLng(37.7749, -122.4194)

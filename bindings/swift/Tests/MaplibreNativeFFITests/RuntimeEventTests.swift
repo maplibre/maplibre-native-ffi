@@ -4,7 +4,7 @@ import Foundation
 import Testing
 
 private func makeRuntime() async throws -> RuntimeHandle {
-  try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
 }
 
 private func makeMap(_ runtime: RuntimeHandle) async throws -> MapHandle {

@@ -24,7 +24,7 @@ private func mapSize(_ map: NativeMapHandle) throws {
 /// BND-045.
 @Test func releasedMapIdReplayedAfterANewMapIsReportedStale() async throws {
   let runtime =
-    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.closeBlockingForTests() }
 
   let first = try await makeMap(runtime)
@@ -51,7 +51,7 @@ private func mapSize(_ map: NativeMapHandle) throws {
 /// BND-047.
 @Test func mapIdPassedToARuntimeOperationIsRejectedOnItsKind() async throws {
   let runtime =
-    try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.closeBlockingForTests() }
   let map = try await makeMap(runtime)
   defer { try? map.closeBlockingForTests() }

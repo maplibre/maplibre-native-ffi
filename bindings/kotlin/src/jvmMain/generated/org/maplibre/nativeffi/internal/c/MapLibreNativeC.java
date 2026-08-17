@@ -1916,14 +1916,14 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         }
     }
 
-    private static class mln_runtime_create_start {
+    private static class mln_runtime_create {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_runtime_create_start");
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_runtime_create");
 
         public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
     }
@@ -1931,106 +1931,45 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_create_start(const mln_runtime_options *options, mln_operation *out_operation)
+     * mln_status mln_runtime_create(const mln_runtime_options *options, mln_runtime *out_runtime)
      * }
      */
-    public static FunctionDescriptor mln_runtime_create_start$descriptor() {
-        return mln_runtime_create_start.DESC;
+    public static FunctionDescriptor mln_runtime_create$descriptor() {
+        return mln_runtime_create.DESC;
     }
 
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_create_start(const mln_runtime_options *options, mln_operation *out_operation)
+     * mln_status mln_runtime_create(const mln_runtime_options *options, mln_runtime *out_runtime)
      * }
      */
-    public static MethodHandle mln_runtime_create_start$handle() {
-        return mln_runtime_create_start.HANDLE;
+    public static MethodHandle mln_runtime_create$handle() {
+        return mln_runtime_create.HANDLE;
     }
 
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_create_start(const mln_runtime_options *options, mln_operation *out_operation)
+     * mln_status mln_runtime_create(const mln_runtime_options *options, mln_runtime *out_runtime)
      * }
      */
-    public static MemorySegment mln_runtime_create_start$address() {
-        return mln_runtime_create_start.ADDR;
+    public static MemorySegment mln_runtime_create$address() {
+        return mln_runtime_create.ADDR;
     }
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_runtime_create_start(const mln_runtime_options *options, mln_operation *out_operation)
+     * mln_status mln_runtime_create(const mln_runtime_options *options, mln_runtime *out_runtime)
      * }
      */
-    public static int mln_runtime_create_start(MemorySegment options, MemorySegment out_operation) {
-        var mh$ = mln_runtime_create_start.HANDLE;
+    public static int mln_runtime_create(MemorySegment options, MemorySegment out_runtime) {
+        var mh$ = mln_runtime_create.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_runtime_create_start", options, out_operation);
+                traceDowncall("mln_runtime_create", options, out_runtime);
             }
-            return (int)mh$.invokeExact(options, out_operation);
-        } catch (Error | RuntimeException ex) {
-           throw ex;
-        } catch (Throwable ex$) {
-           throw new AssertionError("should not reach here", ex$);
-        }
-    }
-
-    private static class mln_runtime_create_take_result {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            MapLibreNativeC.C_INT,
-            MapLibreNativeC.C_LONG,
-            MapLibreNativeC.C_POINTER
-        );
-
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_runtime_create_take_result");
-
-        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
-    }
-
-    /**
-     * Function descriptor for:
-     * {@snippet lang=c :
-     * mln_status mln_runtime_create_take_result(mln_operation operation, mln_runtime *out_runtime)
-     * }
-     */
-    public static FunctionDescriptor mln_runtime_create_take_result$descriptor() {
-        return mln_runtime_create_take_result.DESC;
-    }
-
-    /**
-     * Downcall method handle for:
-     * {@snippet lang=c :
-     * mln_status mln_runtime_create_take_result(mln_operation operation, mln_runtime *out_runtime)
-     * }
-     */
-    public static MethodHandle mln_runtime_create_take_result$handle() {
-        return mln_runtime_create_take_result.HANDLE;
-    }
-
-    /**
-     * Address for:
-     * {@snippet lang=c :
-     * mln_status mln_runtime_create_take_result(mln_operation operation, mln_runtime *out_runtime)
-     * }
-     */
-    public static MemorySegment mln_runtime_create_take_result$address() {
-        return mln_runtime_create_take_result.ADDR;
-    }
-
-    /**
-     * {@snippet lang=c :
-     * mln_status mln_runtime_create_take_result(mln_operation operation, mln_runtime *out_runtime)
-     * }
-     */
-    public static int mln_runtime_create_take_result(long operation, MemorySegment out_runtime) {
-        var mh$ = mln_runtime_create_take_result.HANDLE;
-        try {
-            if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_runtime_create_take_result", operation, out_runtime);
-            }
-            return (int)mh$.invokeExact(operation, out_runtime);
+            return (int)mh$.invokeExact(options, out_runtime);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {

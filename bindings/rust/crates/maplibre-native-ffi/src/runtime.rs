@@ -798,29 +798,20 @@ impl RuntimeHandle {
             unsafe { *options }
         };
         raw_options.notification_source = source;
-        let mut operation = sys::mln_operation(0);
-        // SAFETY: raw_options remains readable and operation is null writable storage.
-        if let Err(error) = maplibre_core::check(unsafe {
-            sys::mln_runtime_create_start(&raw_options, &mut operation)
-        }) {
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_runtime>::new();
+        // SAFETY: raw_options remains readable and out is null writable storage.
+        if let Err(error) =
+            maplibre_core::check(unsafe { sys::mln_runtime_create(&raw_options, out.as_mut_ptr()) })
+        {
             // SAFETY: failed creation did not retain the source.
             unsafe { sys::mln_notification_source_release(source) };
             return Err(error);
         }
-        let result = (|| {
-            wait_raw_operation_completed(operation)?;
-            let mut out = maplibre_core::ptr::OutHandle::<sys::mln_runtime>::new();
-            // SAFETY: operation completed successfully and out is null writable storage.
-            maplibre_core::check(unsafe {
-                sys::mln_runtime_create_take_result(operation, out.as_mut_ptr())
-            })?;
-            let ptr = out_handle(out, "mln_runtime")?;
+        let result = out_handle(out, "mln_runtime").and_then(|ptr| {
             Ok(Self {
                 inner: Arc::new(RuntimeState::new(ptr, source)?),
             })
-        })();
-        // SAFETY: the creation observer is owned by this call.
-        unsafe { sys::mln_operation_release(operation) };
+        });
         if result.is_err() {
             // SAFETY: no runtime wrapper retained source on failure.
             unsafe { sys::mln_notification_source_release(source) };

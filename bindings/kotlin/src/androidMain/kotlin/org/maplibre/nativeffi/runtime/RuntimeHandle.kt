@@ -478,7 +478,7 @@ private constructor(
   }
 
   public actual companion object {
-    public actual suspend fun create(options: RuntimeOptions): RuntimeHandle {
+    public actual fun create(options: RuntimeOptions): RuntimeHandle {
       NativeAccess.ensureLoaded()
       RuntimeOptionsScope(options).use { nativeOptions ->
         LongPointer(1).use { outSource ->
@@ -491,20 +491,12 @@ private constructor(
           nativeOptions.options.notification_source(source)
           val notifications = NotificationDispatcher(source)
           try {
-            val operation = startOperation { outOperation ->
-              MaplibreNativeC.mln_runtime_create_start(nativeOptions.options, outOperation)
-            }
-            try {
-              notifications.await(operation)
-              LongPointer(1).use { outRuntime ->
-                outRuntime.put(0, 0L)
-                Status.check(MaplibreNativeC.mln_runtime_create_take_result(operation, outRuntime))
-                val runtime = outRuntime.get()
-                require(runtime != 0L) { "mln_runtime_create_take_result returned a null runtime" }
-                return RuntimeHandle(runtime, source, notifications)
-              }
-            } finally {
-              MaplibreNativeC.mln_operation_release(operation)
+            LongPointer(1).use { outRuntime ->
+              outRuntime.put(0, 0L)
+              Status.check(MaplibreNativeC.mln_runtime_create(nativeOptions.options, outRuntime))
+              val runtime = outRuntime.get()
+              require(runtime != 0L) { "mln_runtime_create returned a null runtime" }
+              return RuntimeHandle(runtime, source, notifications)
             }
           } catch (error: Throwable) {
             notifications.close()

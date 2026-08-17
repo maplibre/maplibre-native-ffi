@@ -21,27 +21,17 @@ static void wait_for_success(mln_operation operation) {
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, result);
 }
 
-static void runtime_creation_returns_an_operation_result(void) {
+static void runtime_creation_returns_a_runtime(void) {
   mln_notification_source source = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_notification_source_create(&source));
   mln_runtime_options options = mln_runtime_options_default();
   options.notification_source = source;
 
-  mln_operation creation = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_create_start(&options, &creation)
-  );
-  TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, creation);
-  wait_for_success(creation);
-
   mln_runtime runtime = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_create_take_result(creation, &runtime)
-  );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_create(&options, &runtime));
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, runtime);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_create_take_result(creation, &(mln_runtime){MLN_HANDLE_NULL})
+    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_create(&options, &runtime)
   );
 
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_release(runtime));
@@ -102,16 +92,8 @@ static mln_runtime create_untracked_runtime(
   );
   mln_runtime_options options = mln_runtime_options_default();
   options.notification_source = *out_source;
-  mln_operation creation = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_create_start(&options, &creation)
-  );
-  wait_for_success(creation);
   mln_runtime runtime = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_create_take_result(creation, &runtime)
-  );
-  mln_operation_release(creation);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_create(&options, &runtime));
   return runtime;
 }
 
@@ -141,7 +123,7 @@ static void accepted_close_is_any_thread_and_retires_the_handle(void) {
 
 void run_runtime_lifecycle_abi_tests(void) {
   UnitySetTestFile(__FILE__);
-  RUN_TEST(runtime_creation_returns_an_operation_result);
+  RUN_TEST(runtime_creation_returns_a_runtime);
   RUN_TEST(close_preflight_leaves_a_runtime_with_a_live_child_open);
   RUN_TEST(a_barrier_waits_for_a_preceding_pending_operation);
   RUN_TEST(accepted_close_is_any_thread_and_retires_the_handle);

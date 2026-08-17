@@ -24,13 +24,7 @@ mln_status open_runtime(
   options.cache_path = cache_path;
   options.notification_source = *out_notifications;
 
-  mln_operation operation = MLN_HANDLE_NULL;
-  status = mln_runtime_create_start(&options, &operation);
-  if (status == MLN_STATUS_OK) status = wait_ok(operation);
-  if (status == MLN_STATUS_OK) {
-    status = mln_runtime_create_take_result(operation, out_runtime);
-  }
-  mln_operation_release(operation);
+  status = mln_runtime_create(&options, out_runtime);
   // #endregion runtime
   if (status != MLN_STATUS_OK) {
     mln_notification_source_release(*out_notifications);

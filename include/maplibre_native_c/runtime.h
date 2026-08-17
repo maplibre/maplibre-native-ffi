@@ -837,25 +837,13 @@ typedef struct mln_resource_provider {
 MLN_API mln_runtime_options mln_runtime_options_default(void) MLN_NOEXCEPT;
 
 /**
- * Starts runtime creation on a new core-owned worker.
+ * Creates a runtime with a new core-owned worker.
  *
- * The function copies the options before it returns. The returned operation
- * uses options->notification_source and may be inspected from any thread.
- * Take the runtime handle with mln_runtime_create_take_result() after the
- * operation completes successfully.
+ * The function returns after worker initialization completes. The output must
+ * point to the null handle and receives ownership of the runtime on success.
  */
-MLN_API mln_status mln_runtime_create_start(
-  const mln_runtime_options* options, mln_operation* out_operation
-) MLN_NOEXCEPT;
-
-/**
- * Takes the runtime handle from a completed runtime-creation operation.
- *
- * The output must point to the null handle. A successful take transfers the
- * runtime handle exactly once.
- */
-MLN_API mln_status mln_runtime_create_take_result(
-  mln_operation operation, mln_runtime* out_runtime
+MLN_API mln_status mln_runtime_create(
+  const mln_runtime_options* options, mln_runtime* out_runtime
 ) MLN_NOEXCEPT;
 
 /**

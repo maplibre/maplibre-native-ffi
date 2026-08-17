@@ -26,8 +26,7 @@ import org.maplibre.nativeffi.internal.c.mln_runtime_barrier_start
 import org.maplibre.nativeffi.internal.c.mln_runtime_clear_http_header_transform
 import org.maplibre.nativeffi.internal.c.mln_runtime_clear_resource_provider
 import org.maplibre.nativeffi.internal.c.mln_runtime_clear_resource_transform
-import org.maplibre.nativeffi.internal.c.mln_runtime_create_start
-import org.maplibre.nativeffi.internal.c.mln_runtime_create_take_result
+import org.maplibre.nativeffi.internal.c.mln_runtime_create
 import org.maplibre.nativeffi.internal.c.mln_runtime_drain_events
 import org.maplibre.nativeffi.internal.c.mln_runtime_event
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_batch_view
@@ -609,16 +608,16 @@ internal constructor(
   }
 
   public actual companion object {
-    public actual suspend fun create(options: RuntimeOptions): RuntimeHandle =
-      create(options, Maplibre.cVersion(), ::mln_runtime_create_start)
+    public actual fun create(options: RuntimeOptions): RuntimeHandle =
+      create(options, Maplibre.cVersion(), ::mln_runtime_create)
 
-    internal suspend fun createForTesting(
+    internal fun createForTesting(
       options: RuntimeOptions = RuntimeOptions(),
       actualAbiVersion: Long = Maplibre.EXPECTED_C_ABI_VERSION,
       creator: (CPointer<mln_runtime_options>, CPointer<ULongVar>) -> Int,
     ): RuntimeHandle = create(options, actualAbiVersion, creator)
 
-    private suspend fun create(
+    private fun create(
       options: RuntimeOptions,
       actualAbiVersion: Long,
       creator: (CPointer<mln_runtime_options>, CPointer<ULongVar>) -> Int,
@@ -637,20 +636,14 @@ internal constructor(
 
       val notifications = NotificationDispatcher(source)
       try {
-        val operation = startOperation { outOperation -> creator(nativeOptions.ptr, outOperation) }
-        try {
-          notifications.await(operation)
-          val outRuntime = alloc<ULongVar>()
-          outRuntime.value = 0uL
-          Status.check(mln_runtime_create_take_result(operation, outRuntime.ptr))
-          RuntimeHandle(
-            outRuntime.value.asHandle("mln_runtime_create_take_result", ::runtimeHandle),
-            source,
-            notifications,
-          )
-        } finally {
-          mln_operation_release(operation)
-        }
+        val outRuntime = alloc<ULongVar>()
+        outRuntime.value = 0uL
+        Status.check(creator(nativeOptions.ptr, outRuntime.ptr))
+        RuntimeHandle(
+          outRuntime.value.asHandle("mln_runtime_create", ::runtimeHandle),
+          source,
+          notifications,
+        )
       } catch (error: Throwable) {
         notifications.close()
         mln_notification_source_release(source)

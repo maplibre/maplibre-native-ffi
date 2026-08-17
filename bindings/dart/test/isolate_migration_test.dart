@@ -7,7 +7,7 @@ void main() {
   test(
     'runtime and map remain usable after isolate execution and await',
     () async {
-      final runtime = await RuntimeHandle.create(
+      final runtime = RuntimeHandle.create(
         options: const RuntimeOptions(cachePath: ':memory:'),
       );
       final map = await runtime.createMap(
@@ -32,7 +32,7 @@ void main() {
   test(
     'native execution progresses while the isolate stays responsive',
     () async {
-      final runtime = await RuntimeHandle.create(
+      final runtime = RuntimeHandle.create(
         options: const RuntimeOptions(cachePath: ':memory:'),
       );
       final map = await runtime.createMap();

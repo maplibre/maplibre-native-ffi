@@ -18,7 +18,7 @@ import Testing
 }
 
 @Test func mapLifecycleCommandsSnapshotsAndOrderedCameraQuery() async throws {
-  let runtime = try await RuntimeHandle(
+  let runtime = try RuntimeHandle(
     options: RuntimeOptions(cachePath: ":memory:")
   )
   defer { try? runtime.closeBlockingForTests() }
@@ -68,7 +68,7 @@ import Testing
 
 @Test func cameraSnapshotIsSynchronousAndOrderedQueryObservesCommands(
 ) async throws {
-  let runtime = try await RuntimeHandle(
+  let runtime = try RuntimeHandle(
     options: RuntimeOptions(cachePath: ":memory:")
   )
   defer { try? runtime.closeBlockingForTests() }
@@ -95,7 +95,7 @@ import Testing
 /// A committed mutation's finished event reports the generation its commit
 /// published, and a snapshot at or past that generation observes the value.
 @Test func snapshotObservesACommittedCommandAtItsGeneration() async throws {
-  let runtime = try await RuntimeHandle(
+  let runtime = try RuntimeHandle(
     options: RuntimeOptions(cachePath: ":memory:")
   )
   defer { try? runtime.closeBlockingForTests() }
@@ -121,7 +121,7 @@ import Testing
 /// The snapshot's tile, bound, and free-camera fields observe their set
 /// commands.
 @Test func snapshotFieldsRoundTripThroughTheirSetCommands() async throws {
-  let runtime = try await RuntimeHandle(
+  let runtime = try RuntimeHandle(
     options: RuntimeOptions(cachePath: ":memory:")
   )
   defer { try? runtime.closeBlockingForTests() }
@@ -156,7 +156,7 @@ import Testing
 }
 
 @Test func requestRepaintReturnsACommandId() async throws {
-  let runtime = try await RuntimeHandle(
+  let runtime = try RuntimeHandle(
     options: RuntimeOptions(cachePath: ":memory:")
   )
   defer { try? runtime.closeBlockingForTests() }

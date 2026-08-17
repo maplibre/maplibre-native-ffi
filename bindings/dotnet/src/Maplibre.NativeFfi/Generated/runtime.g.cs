@@ -639,10 +639,7 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_runtime_options mln_runtime_options_default();
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_create_start([NativeTypeName("const mln_runtime_options *")] mln_runtime_options* options, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_create_take_result([NativeTypeName("mln_operation")] MlnOperation operation, [NativeTypeName("mln_runtime *")] MlnRuntime* out_runtime);
+        public static extern mln_status mln_runtime_create([NativeTypeName("const mln_runtime_options *")] mln_runtime_options* options, [NativeTypeName("mln_runtime *")] MlnRuntime* out_runtime);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_runtime_set_resource_provider([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("const mln_resource_provider *")] mln_resource_provider* provider, [NativeTypeName("uint64_t *")] ulong* out_command_id);

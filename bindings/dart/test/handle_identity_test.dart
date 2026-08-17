@@ -45,7 +45,7 @@ void main() {
   test(
     'a released map id replayed after a new map is reported stale',
     () async {
-      final runtime = await RuntimeHandle.create();
+      final runtime = RuntimeHandle.create();
       final first = await runtime.createMap();
       final released = NativeMap(mapHandleIdForTesting(first));
       await first.close();
@@ -77,7 +77,7 @@ void main() {
   test(
     'a map id passed to a runtime operation is rejected on its kind',
     () async {
-      final runtime = await RuntimeHandle.create();
+      final runtime = RuntimeHandle.create();
       final map = await runtime.createMap();
       addTearDown(() async {
         await map.close();

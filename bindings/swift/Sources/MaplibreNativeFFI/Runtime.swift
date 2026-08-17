@@ -504,41 +504,22 @@ public final class RuntimeHandle: @unchecked Sendable {
   private let operationLock = NSLock()
   private var operationCount = 0
 
-  public init(options: RuntimeOptions = RuntimeOptions()) async throws {
+  public init(options: RuntimeOptions = RuntimeOptions()) throws {
     let receiver = try mapNativeFailure { try NativeNotificationReceiver() }
-    let operation: NativeOperationHandle
     do {
-      operation = try mapNativeFailure {
+      let runtime = try mapNativeFailure {
         try options.nativeInput.withNativeOptions(
           notificationSource: receiver.source
         ) { nativeOptions in
-          try NativeRuntime.createStart(nativeOptions)
+          try NativeRuntime.create(nativeOptions)
         }
       }
-    } catch {
-      try? receiver.close()
-      throw error
-    }
-
-    do {
-      try await mapNativeFailure {
-        try await NativeOperation.waitForSuccess(
-          operation,
-          receiver: receiver
-        )
-      }
-      let runtime = try mapNativeFailure {
-        try NativeRuntime.createTakeResult(operation)
-      }
-      let runtimeHandle = try NativeHandleBox(
+      handle = try NativeHandleBox(
         typeName: "RuntimeHandle",
         handle: runtime
       )
-      mln_operation_release(operation.raw)
-      handle = runtimeHandle
       notificationReceiver = receiver
     } catch {
-      mln_operation_release(operation.raw)
       try? receiver.close()
       throw error
     }

@@ -827,19 +827,9 @@ func NewRuntimeWithOptions(options RuntimeOptions) (*RuntimeHandle, error) {
 	rawOptions.event_mask = C.uint64_t(options.EventMask)
 	rawOptions.notification_source = source
 
-	var operation C.mln_operation
-	if err := checkNative(func() int32 {
-		return int32(C.mln_runtime_create_start(&rawOptions, &operation))
-	}); err != nil {
-		return nil, err
-	}
-	defer C.mln_operation_release(operation)
-	if err := waitNativeOperation(operation); err != nil {
-		return nil, err
-	}
 	var raw C.mln_runtime
 	if err := checkNative(func() int32 {
-		return int32(C.mln_runtime_create_take_result(operation, &raw))
+		return int32(C.mln_runtime_create(&rawOptions, &raw))
 	}); err != nil {
 		return nil, err
 	}

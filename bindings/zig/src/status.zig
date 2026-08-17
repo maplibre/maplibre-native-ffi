@@ -131,13 +131,8 @@ test "diagnostic store copies thread-local native message" {
     defer c.mln_notification_source_release(source);
     var options = c.mln_runtime_options_default();
     options.notification_source = source;
-    var create_operation: c.mln_operation = 0;
-    try checkStatus(c.mln_runtime_create_start(&options, &create_operation), null);
-    defer c.mln_operation_release(create_operation);
-    var completed = false;
-    try checkStatus(c.mln_operation_wait(create_operation, -1, &completed), null);
     var runtime: c.mln_runtime = 0;
-    try checkStatus(c.mln_runtime_create_take_result(create_operation, &runtime), null);
+    try checkStatus(c.mln_runtime_create(&options, &runtime), null);
     try checkStatus(c.mln_runtime_release(runtime), null);
 
     try std.testing.expectEqualStrings(copied, store.get().?.message);

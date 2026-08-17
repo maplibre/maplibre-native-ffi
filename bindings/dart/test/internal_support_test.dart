@@ -252,7 +252,7 @@ void main() {
   test(
     'a drained batch is indexed by its stride and copied field by field',
     () async {
-      final runtime = await RuntimeHandle.create();
+      final runtime = RuntimeHandle.create();
       // A stride wider than this binding's own record is what a C API version
       // that added a payload member reports, so the decoder indexes by it.
       final eventSize = sizeOf<raw.mln_runtime_event>() + 8;

@@ -20,19 +20,11 @@ auto mln_runtime_options_default(void) noexcept -> mln_runtime_options {
   };
 }
 
-auto mln_runtime_create_start(
-  const mln_runtime_options* options, mln_operation* out_operation
+auto mln_runtime_create(
+  const mln_runtime_options* options, mln_runtime* out_runtime
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::create_runtime_start(options, out_operation);
-  });
-}
-
-auto mln_runtime_create_take_result(
-  mln_operation operation, mln_runtime* out_runtime
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::create_runtime_take_result(operation, out_runtime);
+    return mln::core::create_runtime(options, out_runtime);
   });
 }
 

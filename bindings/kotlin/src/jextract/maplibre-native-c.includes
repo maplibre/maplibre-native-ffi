@@ -544,8 +544,7 @@
 --include-function mln_runtime_clear_resource_provider
 --include-function mln_runtime_clear_resource_transform
 --include-function mln_runtime_release
---include-function mln_runtime_create_start
---include-function mln_runtime_create_take_result
+--include-function mln_runtime_create
 --include-function mln_runtime_drain_events
 --include-function mln_runtime_get_event_mask
 --include-function mln_runtime_options_default

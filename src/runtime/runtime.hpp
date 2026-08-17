@@ -241,11 +241,8 @@ struct HandleTraits<RuntimeObject> {
   static constexpr auto leasable = true;
 };
 
-auto create_runtime_start(
-  const mln_runtime_options* options, mln_operation* out_operation
-) -> mln_status;
-auto create_runtime_take_result(
-  mln_operation operation, mln_runtime* out_runtime
+auto create_runtime(
+  const mln_runtime_options* options, mln_runtime* out_runtime
 ) -> mln_status;
 auto runtime_barrier_start(mln_runtime runtime, mln_operation* out_operation)
   -> mln_status;

@@ -40,13 +40,6 @@ public sealed unsafe class RuntimeHandle : IDisposable
         return operation;
     }
 
-    private static MlnOperation StartCreate(mln_runtime_options options)
-    {
-        MlnOperation operation = default;
-        NativeStatus.Check(NativeMethods.mln_runtime_create_start(&options, &operation));
-        return operation;
-    }
-
     private static readonly RuntimeSetResourceProvider DefaultSetResourceProvider = static (
         runtime,
         provider,
@@ -87,43 +80,26 @@ public sealed unsafe class RuntimeHandle : IDisposable
         );
     }
 
-    /// <summary>Creates a runtime asynchronously.</summary>
-    public static Task<RuntimeHandle> CreateAsync(
-        RuntimeOptions options,
-        CancellationToken cancellationToken = default
-    )
+    /// <summary>Creates a runtime.</summary>
+    public static RuntimeHandle Create(RuntimeOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
-        cancellationToken.ThrowIfCancellationRequested();
         NativeLibraryLoader.EnsureLoaded();
         using var nativeOptions = options.ToNative();
         var value = nativeOptions.Value;
         var receiver = new NotificationReceiver();
         value.notification_source = receiver.Source;
-        MlnOperation operation = default;
         try
         {
-            operation = StartCreate(value);
+            MlnRuntime runtime = default;
+            NativeStatus.Check(NativeMethods.mln_runtime_create(&value, &runtime));
+            return new RuntimeHandle(runtime, receiver);
         }
         catch
         {
-            NativeMethods.mln_operation_release(operation);
             receiver.Dispose();
             throw;
         }
-        return OperationAwaiter.WaitThen(
-            receiver.WaitForOperationAsync(operation, cancellationToken),
-            () =>
-            {
-                MlnRuntime runtime = default;
-                NativeStatus.Check(
-                    NativeMethods.mln_runtime_create_take_result(operation, &runtime)
-                );
-                return new RuntimeHandle(runtime, receiver);
-            },
-            () => NativeMethods.mln_operation_release(operation),
-            receiver.Dispose
-        );
     }
 
     internal MlnRuntime Handle => state.Handle;

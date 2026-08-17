@@ -275,7 +275,7 @@ Order MUST be:
 3. Create the host presentation surface and graphics resources.
 4. Create the receiver-scoped notification source and install a scheduling
    callback.
-5. Start and await runtime creation.
+5. Create the runtime.
 6. Start and await map creation with the initial extent.
 7. Select the event types that the example reads.
 8. Submit the style and initial camera commands.
@@ -404,7 +404,7 @@ map-specific setup.
 
 #### Creation
 
-- Create and await the runtime operation with a `:memory:` cache.
+- Create the runtime with a `:memory:` cache.
 - Create and await the map operation with the current viewport extent and
   continuous mode.
 - Select every event type the example reads before it loads the style. A map

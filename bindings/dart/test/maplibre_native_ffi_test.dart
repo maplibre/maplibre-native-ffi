@@ -53,7 +53,7 @@ void main() {
     expect(const MapOptions().fastPforEnabled, isFalse);
     expect(const MapOptions(fastPforEnabled: true), isNot(const MapOptions()));
 
-    final runtime = await RuntimeHandle.create();
+    final runtime = RuntimeHandle.create();
     final map = await runtime.createMap(
       options: const MapOptions(width: 64, height: 64, fastPforEnabled: true),
     );
@@ -65,7 +65,7 @@ void main() {
     await runtime.close();
   });
   test('one drain takes every event a style load queued', () async {
-    final runtime = await RuntimeHandle.create();
+    final runtime = RuntimeHandle.create();
     addTearDown(runtime.close);
 
     // A fresh runtime has nothing queued.
@@ -94,7 +94,7 @@ void main() {
   });
 
   test('both handles report and narrow their event masks', () async {
-    final runtime = await RuntimeHandle.create();
+    final runtime = RuntimeHandle.create();
     addTearDown(runtime.close);
     final map = await runtime.createMap();
     addTearDown(map.close);
@@ -134,7 +134,7 @@ void main() {
   test(
     'a narrowed map mask keeps cleared event types out of a batch',
     () async {
-      final runtime = await RuntimeHandle.create();
+      final runtime = RuntimeHandle.create();
       addTearDown(runtime.close);
       final map = await runtime.createMap();
       addTearDown(map.close);
@@ -161,7 +161,7 @@ void main() {
     'a style replacement releases a source with style loads unselected',
     () async {
       const sourceId = 'dart-released-source';
-      final runtime = await RuntimeHandle.create();
+      final runtime = RuntimeHandle.create();
       addTearDown(runtime.close);
       final map = await runtime.createMap(
         options: MapOptions(eventMask: _maskWithoutStyleLoaded),
@@ -310,7 +310,7 @@ void main() {
     'native provider rules complete matching style requests inline',
     () async {
       const styleUrl = 'custom://dart-inline-provider-style.json';
-      final runtime = await RuntimeHandle.create();
+      final runtime = RuntimeHandle.create();
       runtime.setResourceProviderRules([
         ResourceProviderRule(
           kind: ResourceKind.style,
@@ -339,7 +339,7 @@ void main() {
 
   test('unmatched provider routes pass through to native loading', () async {
     const unmatchedUrl = 'custom://dart-provider-pass-through.json';
-    final runtime = await RuntimeHandle.create();
+    final runtime = RuntimeHandle.create();
     var providerCalls = 0;
     runtime.setResourceProvider(
       ResourceProvider(
@@ -371,7 +371,7 @@ void main() {
 
   test('queued resource provider callbacks cross the native C ABI', () async {
     const styleUrl = 'custom://dart-provider-style.json';
-    final runtime = await RuntimeHandle.create();
+    final runtime = RuntimeHandle.create();
     final requests = <ResourceRequest>[];
     late Future<bool> completion;
     late ResourceRequestHandle ownerToken;
@@ -420,7 +420,7 @@ void main() {
   // alongside the URL the built-in network path would have fetched.
   test('queued resource provider sees scheme alias and resolved URL', () async {
     const aliasUrl = 'maplibre://maps/style';
-    final runtime = await RuntimeHandle.create();
+    final runtime = RuntimeHandle.create();
     final requests = <ResourceRequest>[];
 
     runtime.setResourceProvider(
@@ -463,7 +463,7 @@ void main() {
   // when they are requested.
   test('queued resource provider glob routes claim a URL family', () async {
     const origin = 'custom://dart-provider-glob/';
-    final runtime = await RuntimeHandle.create();
+    final runtime = RuntimeHandle.create();
     final claimed = <String>[];
 
     runtime.setResourceProvider(
@@ -515,7 +515,7 @@ void main() {
       const normalizedUrl = 'https://demotiles.maplibre.org/style.json';
 
       Future<ResourceRequest> claimedBy(ResourceProviderRoute route) async {
-        final runtime = await RuntimeHandle.create();
+        final runtime = RuntimeHandle.create();
         final requests = <ResourceRequest>[];
         runtime.setResourceProvider(
           ResourceProvider(
@@ -561,7 +561,7 @@ void main() {
 
   test('cancelled transferred requests complete terminally', () async {
     const styleUrl = 'custom://dart-provider-cancelled.json';
-    final runtime = await RuntimeHandle.create();
+    final runtime = RuntimeHandle.create();
     ResourceRequestHandle? token;
 
     runtime.setResourceProvider(
@@ -598,7 +598,7 @@ void main() {
 
   test('transferred response validation preserves the live token', () async {
     const styleUrl = 'custom://dart-provider-token-validation.json';
-    final runtime = await RuntimeHandle.create();
+    final runtime = RuntimeHandle.create();
     ResourceRequestHandle? token;
 
     runtime.setResourceProvider(
@@ -645,7 +645,7 @@ void main() {
 
   test('transferred token aliases have one terminal winner', () async {
     const styleUrl = 'custom://dart-provider-token-race.json';
-    final runtime = await RuntimeHandle.create();
+    final runtime = RuntimeHandle.create();
     ResourceRequestHandle? token;
 
     runtime.setResourceProvider(
@@ -691,7 +691,7 @@ void main() {
 
   test('queued resource provider callback exceptions are contained', () async {
     const styleUrl = 'custom://dart-provider-throws.json';
-    final runtime = await RuntimeHandle.create();
+    final runtime = RuntimeHandle.create();
     var calls = 0;
 
     runtime.setResourceProvider(
@@ -716,7 +716,7 @@ void main() {
 
   test('closed resource request handles reject further use', () async {
     const styleUrl = 'custom://dart-provider-closed-handle.json';
-    final runtime = await RuntimeHandle.create();
+    final runtime = RuntimeHandle.create();
     var callbackFinished = false;
     var cancelledRejected = false;
     var completionRejected = false;
@@ -762,7 +762,7 @@ void main() {
   test(
     'projection is synchronous and observes only earlier commands',
     () async {
-      final runtime = await RuntimeHandle.create();
+      final runtime = RuntimeHandle.create();
       final map = await runtime.createMap(
         options: const MapOptions(width: 256, height: 256),
       );
@@ -846,7 +846,7 @@ void main() {
   });
 
   test('loaded style document and URL read back what was loaded', () async {
-    final runtime = await RuntimeHandle.create();
+    final runtime = RuntimeHandle.create();
     final map = await runtime.createMap();
     try {
       // Nothing parsed and nothing requested yet.
@@ -872,7 +872,7 @@ void main() {
 
   test('a removal and a map close each release a callback root', () async {
     const sourceId = 'dart-lifecycle-source';
-    final runtime = await RuntimeHandle.create();
+    final runtime = RuntimeHandle.create();
     final map = await runtime.createMap();
     map.setStyleJson(_jsonBytes(_emptyStyleJson));
 
@@ -903,7 +903,7 @@ void main() {
   });
 
   test('nine-patch style images round-trip through the native C ABI', () async {
-    final runtime = await RuntimeHandle.create();
+    final runtime = RuntimeHandle.create();
     final map = await runtime.createMap();
     try {
       map.setStyleJson(_jsonBytes(_emptyStyleJson));
@@ -969,7 +969,7 @@ void main() {
   });
 
   test('layer base accessors round-trip through the native C ABI', () async {
-    final runtime = await RuntimeHandle.create();
+    final runtime = RuntimeHandle.create();
     final map = await runtime.createMap();
     try {
       map.setStyleJson(
@@ -1029,7 +1029,7 @@ void main() {
       const transitionStyleJson =
           '{"version":8,"transition":{"duration":750,"delay":100},'
           '"sources":{},"layers":[]}';
-      final runtime = await RuntimeHandle.create();
+      final runtime = RuntimeHandle.create();
       final map = await runtime.createMap();
       try {
         // A map with no style yet reports no duration or delay. The placement
@@ -1093,7 +1093,7 @@ void main() {
   );
 
   test('runtime and map handles use the native C ABI', () async {
-    final cacheSizeRuntime = await RuntimeHandle.create(
+    final cacheSizeRuntime = RuntimeHandle.create(
       options: const RuntimeOptions(cachePath: ':memory:'),
     );
     // An out-of-domain unsigned value is rejected before crossing into C.
@@ -1122,7 +1122,7 @@ void main() {
     expect(cacheSizeOperation.isReleased, isTrue);
     await cacheSizeRuntime.close();
 
-    final runtime = await RuntimeHandle.create();
+    final runtime = RuntimeHandle.create();
     expect(runtime.isClosed, isFalse);
     expect(
       () => runtime.setResourceUrlRewriteRules([
@@ -2076,7 +2076,7 @@ void main() {
   test(
     'BND-109 source inspection returns independent copied metadata',
     () async {
-      final runtime = await RuntimeHandle.create();
+      final runtime = RuntimeHandle.create();
       final map = await runtime.createMap();
       map.setStyleJson(_jsonBytes(_emptyStyleJson));
 
@@ -2241,7 +2241,7 @@ void main() {
   test(
     'runtime and map survive isolate execution and await resumption',
     () async {
-      final runtime = await RuntimeHandle.create(
+      final runtime = RuntimeHandle.create(
         options: const RuntimeOptions(cachePath: ':memory:'),
       );
       final map = await runtime.createMap(
@@ -2264,7 +2264,7 @@ void main() {
   );
 
   test('native execution progresses without blocking the isolate', () async {
-    final runtime = await RuntimeHandle.create();
+    final runtime = RuntimeHandle.create();
     final map = await runtime.createMap();
     map.setStyleUrl('unsupported://autonomous-progress.json');
 

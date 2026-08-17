@@ -77,7 +77,7 @@ external int mln_acquired_frame_get_webgpu_texture(
   ffi.Int32 Function(
     ffi.Pointer<mln_acquired_frame>,
     ffi.Pointer<mln_gpu_sync>,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_runtime>,
   )
 >()
 external int mln_acquired_frame_release_start(
@@ -2664,14 +2664,8 @@ external int mln_runtime_clear_resource_transform(
     ffi.Pointer<mln_operation>,
   )
 >()
-external int mln_runtime_create_start(
+external int mln_runtime_create(
   ffi.Pointer<mln_runtime_options> options,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<mln_runtime>)>()
-external int mln_runtime_create_take_result(
-  int operation,
   ffi.Pointer<mln_runtime> out_runtime,
 );
 

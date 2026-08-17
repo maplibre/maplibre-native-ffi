@@ -102,7 +102,6 @@ enum : std::uint32_t {
   MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE = 12,
 };
 
-constexpr auto MLN_RUNTIME_OPERATION_CREATE = UINT32_C(0x10000);
 constexpr auto MLN_RUNTIME_OPERATION_BARRIER = UINT32_C(0x10001);
 
 enum : std::uint32_t {
@@ -1184,15 +1183,14 @@ auto submit_runtime_operation(
 
 namespace {
 
-struct RuntimeCreationResult {
-  RuntimeCreationResult() = default;
-  RuntimeCreationResult(const RuntimeCreationResult&) = delete;
-  RuntimeCreationResult(RuntimeCreationResult&&) = delete;
-  auto operator=(const RuntimeCreationResult&)
-    -> RuntimeCreationResult& = delete;
-  auto operator=(RuntimeCreationResult&&) -> RuntimeCreationResult& = delete;
+struct RuntimeCreationGuard {
+  RuntimeCreationGuard() = default;
+  RuntimeCreationGuard(const RuntimeCreationGuard&) = delete;
+  RuntimeCreationGuard(RuntimeCreationGuard&&) = delete;
+  auto operator=(const RuntimeCreationGuard&) -> RuntimeCreationGuard& = delete;
+  auto operator=(RuntimeCreationGuard&&) -> RuntimeCreationGuard& = delete;
 
-  ~RuntimeCreationResult() {
+  ~RuntimeCreationGuard() {
     if (!published && runtime != nullptr) {
       runtime->executor.stop();
       if (runtime->platform_context != nullptr) {
@@ -1208,9 +1206,13 @@ struct RuntimeCreationResult {
 
 }  // namespace
 
-auto create_runtime_start(
-  const mln_runtime_options* options, mln_operation* out_operation
+auto create_runtime(
+  const mln_runtime_options* options, mln_runtime* out_runtime
 ) -> mln_status {
+  if (out_runtime == nullptr || *out_runtime != MLN_HANDLE_NULL) {
+    set_thread_error("out_runtime must point to the null handle");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
   const auto options_status = validate_runtime_options(options);
   if (options_status != MLN_STATUS_OK) {
     return options_status;
@@ -1221,8 +1223,8 @@ auto create_runtime_start(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto result = std::make_shared<RuntimeCreationResult>();
-  result->runtime = std::make_shared<RuntimeObject>();
+  RuntimeCreationGuard result;
+  result.runtime = std::make_shared<RuntimeObject>();
   auto asset_path = options->asset_path == nullptr
                       ? std::string{}
                       : std::string{options->asset_path};
@@ -1231,96 +1233,52 @@ auto create_runtime_start(
                       : std::string{options->cache_path};
   const auto event_mask = options->event_mask;
 
-  auto state = std::shared_ptr<OperationObject>{};
-  const auto register_status = register_operation(
-    notification_source, MLN_RUNTIME_OPERATION_CREATE, false, {}, out_operation,
-    state
-  );
-  if (register_status != MLN_STATUS_OK) {
-    return register_status;
-  }
-
-  auto creation_work =
-    [state, result, notification_source, asset_path = std::move(asset_path),
+  auto runtime = result.runtime;
+  runtime->executor.start(
+    [runtime, notification_source, asset_path = std::move(asset_path),
      cache_path = std::move(cache_path), event_mask]() mutable -> void {
-    try {
-      auto runtime = result->runtime;
-      runtime->executor.start(
-        [runtime, notification_source, asset_path = std::move(asset_path),
-         cache_path = std::move(cache_path), event_mask]() mutable -> void {
-          runtime->event_state = std::make_shared<RuntimeEventState>();
-          runtime->event_state->mask.store(
-            event_mask, std::memory_order_relaxed
-          );
-          runtime->event_queue = std::make_shared<RuntimeEventQueueState>();
-          runtime->event_queue->notification_source = notification_source;
-          runtime->asset_path = std::move(asset_path);
-          runtime->cache_path = std::move(cache_path);
-          runtime->offline_event_state =
-            std::make_shared<OfflineRegionEventState>();
-          runtime->offline_event_state->runtime = runtime.get();
-          runtime->offline_event_state->alive = true;
-          runtime->resource_transform_state =
-            std::make_shared<ResourceTransformState>();
-          runtime->http_header_transform_state =
-            std::make_shared<HttpHeaderTransformState>();
-          runtime->resource_provider_state =
-            std::make_shared<ResourceProviderState>();
-          runtime->platform_context = reserve_platform_context();
-        }
-      );
-      state->complete(MLN_STATUS_OK, {}, std::any{std::move(result)});
-    } catch (...) {
-      state->complete(
-        MLN_STATUS_NATIVE_ERROR,
-        exception_message(std::current_exception(), "runtime creation failed"),
-        std::any{std::monostate{}}
-      );
-    }
-  };
-  try {
-    std::thread(creation_work).detach();
-  } catch (...) {
-    creation_work();
-  }
-  return MLN_STATUS_OK;
-}
-
-auto create_runtime_take_result(
-  mln_operation operation, mln_runtime* out_runtime
-) -> mln_status {
-  if (out_runtime == nullptr || *out_runtime != MLN_HANDLE_NULL) {
-    set_thread_error("out_runtime must point to the null handle");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return take_operation_result<std::shared_ptr<RuntimeCreationResult>>(
-    operation, MLN_RUNTIME_OPERATION_CREATE,
-    [out_runtime](std::shared_ptr<RuntimeCreationResult>& result)
-      -> mln_status {
-      auto runtime = result->runtime;
-      const auto handle = handle_table<RuntimeObject>().insert(runtime);
-      runtime->self = handle;
-      try {
-        runtime->event_queue->notification_endpoint =
-          runtime->event_queue->notification_source->associate(
-            handle, MLN_NOTIFICATION_ENDPOINT_RUNTIME_EVENTS, true
-          );
-        if (runtime->event_queue->notification_endpoint == nullptr) {
-          static_cast<void>(handle_table<RuntimeObject>().remove(handle));
-          runtime->self = MLN_HANDLE_NULL;
-          return MLN_STATUS_INVALID_STATE;
-        }
-      } catch (...) {
-        static_cast<void>(handle_table<RuntimeObject>().remove(handle));
-        runtime->self = MLN_HANDLE_NULL;
-        throw;
-      }
-      bind_platform_context(runtime->platform_context, handle);
-      result->published = true;
-      *out_runtime = handle;
-      return MLN_STATUS_OK;
+      runtime->event_state = std::make_shared<RuntimeEventState>();
+      runtime->event_state->mask.store(event_mask, std::memory_order_relaxed);
+      runtime->event_queue = std::make_shared<RuntimeEventQueueState>();
+      runtime->event_queue->notification_source = notification_source;
+      runtime->asset_path = std::move(asset_path);
+      runtime->cache_path = std::move(cache_path);
+      runtime->offline_event_state =
+        std::make_shared<OfflineRegionEventState>();
+      runtime->offline_event_state->runtime = runtime.get();
+      runtime->offline_event_state->alive = true;
+      runtime->resource_transform_state =
+        std::make_shared<ResourceTransformState>();
+      runtime->http_header_transform_state =
+        std::make_shared<HttpHeaderTransformState>();
+      runtime->resource_provider_state =
+        std::make_shared<ResourceProviderState>();
+      runtime->platform_context = reserve_platform_context();
     }
   );
+  const auto handle = handle_table<RuntimeObject>().insert(runtime);
+  runtime->self = handle;
+  try {
+    runtime->event_queue->notification_endpoint =
+      runtime->event_queue->notification_source->associate(
+        handle, MLN_NOTIFICATION_ENDPOINT_RUNTIME_EVENTS, true
+      );
+    if (runtime->event_queue->notification_endpoint == nullptr) {
+      static_cast<void>(handle_table<RuntimeObject>().remove(handle));
+      runtime->self = MLN_HANDLE_NULL;
+      return MLN_STATUS_INVALID_STATE;
+    }
+    bind_platform_context(runtime->platform_context, handle);
+  } catch (...) {
+    if (runtime->self != MLN_HANDLE_NULL) {
+      static_cast<void>(handle_table<RuntimeObject>().remove(handle));
+      runtime->self = MLN_HANDLE_NULL;
+    }
+    throw;
+  }
+  result.published = true;
+  *out_runtime = handle;
+  return MLN_STATUS_OK;
 }
 
 namespace {

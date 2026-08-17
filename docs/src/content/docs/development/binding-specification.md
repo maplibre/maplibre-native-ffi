@@ -1092,7 +1092,7 @@ that a real native failure would expose.
 
 | ID      | Test                                                                                                                                                                                                    |
 | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-100 | Runtime and map lifecycle operations apply public options, transfer each created handle once, enforce close preflight, and preserve parent relationships.                                               |
+| BND-100 | Synchronous runtime creation and ordered map creation apply public options, transfer each handle once, enforce close preflight, and preserve parent relationships.                                      |
 | BND-101 | Style URL and style JSON commands succeed and return copied style-loaded events through a drain.                                                                                                        |
 | BND-102 | One atomic camera command applies every selected field and correlation value; published snapshots and ordered queries report the expected committed state and generation.                               |
 | BND-103 | Projection helpers round-trip screen, lat/lng, and projected-meter values through copied public values within documented tolerance.                                                                     |

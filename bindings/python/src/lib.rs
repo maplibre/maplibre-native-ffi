@@ -7219,22 +7219,16 @@ fn create_runtime(
         .map_err(map_error)?;
     raw_options.notification_source = source;
 
-    let mut operation = sys::mln_operation(0);
-    if let Err(error) =
-        maplibre_core::check(unsafe { sys::mln_runtime_create_start(&raw_options, &mut operation) })
-    {
-        unsafe { sys::mln_notification_source_release(source) };
-        return Err(map_error(error));
-    }
-    let operation = OwnedOperation(operation);
-    if let Err(error) = wait_operation(py, operation.0) {
-        unsafe { sys::mln_notification_source_release(source) };
-        return Err(error);
-    }
     let mut out = maplibre_core::ptr::OutHandle::<sys::mln_runtime>::new();
-    if let Err(error) = maplibre_core::check(unsafe {
-        sys::mln_runtime_create_take_result(operation.0, out.as_mut_ptr())
-    }) {
+    let options_address = std::ptr::addr_of!(raw_options) as usize;
+    let out_address = out.as_mut_ptr() as usize;
+    let create_status = py.detach(move || unsafe {
+        sys::mln_runtime_create(
+            options_address as *const sys::mln_runtime_options,
+            out_address as *mut sys::mln_runtime,
+        )
+    });
+    if let Err(error) = maplibre_core::check(create_status) {
         unsafe { sys::mln_notification_source_release(source) };
         return Err(map_error(error));
     }

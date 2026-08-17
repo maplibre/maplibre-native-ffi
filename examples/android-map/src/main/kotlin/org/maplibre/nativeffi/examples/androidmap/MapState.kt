@@ -35,9 +35,7 @@ internal class MapState(initialViewport: Viewport, private val requestRender: ()
       pitch = 30.0
     }
 
-  private val runtime = runSuspend {
-    RuntimeHandle.create(RuntimeOptions().apply { cachePath = ":memory:" })
-  }
+  private val runtime = RuntimeHandle.create(RuntimeOptions().apply { cachePath = ":memory:" })
   private lateinit var ownedMap: MapHandle
   val map: MapHandle
     get() = ownedMap

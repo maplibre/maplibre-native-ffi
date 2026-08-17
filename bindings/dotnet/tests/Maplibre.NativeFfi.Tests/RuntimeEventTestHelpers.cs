@@ -13,7 +13,7 @@ namespace Maplibre.NativeFfi.Tests;
 internal static class TestHandles
 {
     internal static RuntimeHandle CreateRuntime(RuntimeOptions options) =>
-        RuntimeHandle.CreateAsync(options).GetAwaiter().GetResult();
+        RuntimeHandle.Create(options);
 
     internal static MapHandle CreateMap(RuntimeHandle runtime, MapOptions options) =>
         MapHandle.CreateAsync(runtime, options).GetAwaiter().GetResult();

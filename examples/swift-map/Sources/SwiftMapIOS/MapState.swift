@@ -42,7 +42,7 @@ final class MapState {
       !viewport.isEmpty,
       "cannot create MapState with an empty viewport"
     )
-    let runtime = try await RuntimeHandle(
+    let runtime = try RuntimeHandle(
       options: RuntimeOptions(cachePath: ":memory:")
     )
     let map: MapHandle

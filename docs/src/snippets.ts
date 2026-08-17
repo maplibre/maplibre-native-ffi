@@ -11,7 +11,7 @@
  *
  * ```c
  * // #region create
- * mln_runtime_create_start(&options, &operation);
+ * mln_runtime_create(&options, &runtime);
  * // #endregion create
  * ```
  *
