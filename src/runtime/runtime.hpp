@@ -151,11 +151,18 @@ struct OfflineRegionEventState {
   bool alive = false;
 };
 
-// Events wait in the public batch layout. Draining a complete buffer therefore
-// transfers its storage instead of repacking every event.
-struct RuntimeEventQueueBuffer {
-  std::vector<mln_runtime_event> events;
-  std::string messages;
+struct QueuedRuntimeEvent {
+  uint32_t type;
+  uint32_t source_type;
+  // The mln_map for map-originated events, the mln_runtime otherwise, as
+  // selected by source_type.
+  uint64_t source;
+  int32_t code;
+  uint32_t payload_type;
+  mln_runtime_event_payload payload = zeroed_event_payload();
+  std::string message;
+  bool has_offline_region = false;
+  mln_offline_region_id offline_region_id = 0;
 };
 
 struct RuntimeEventQueueState {
@@ -164,8 +171,7 @@ struct RuntimeEventQueueState {
   bool alive = true;
   bool drain_active = false;
   std::unordered_map<mln_map, std::shared_ptr<MapEventState>> event_maps;
-  std::deque<RuntimeEventQueueBuffer> buffers;
-  std::size_t event_count = 0;
+  std::deque<mln::core::QueuedRuntimeEvent> events;
   std::unordered_set<mln_offline_region_id> observed_offline_regions;
   std::shared_ptr<mln::core::NotificationSourceObject> notification_source;
   std::shared_ptr<mln::core::NotificationEndpoint> notification_endpoint;
