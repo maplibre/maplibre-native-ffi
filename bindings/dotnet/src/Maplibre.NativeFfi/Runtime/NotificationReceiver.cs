@@ -37,7 +37,7 @@ internal sealed unsafe class NotificationReceiver : IDisposable
         catch
         {
             callbackRoot.Free();
-            _ = NativeMethods.mln_notification_source_close(source);
+            NativeMethods.mln_notification_source_release(source);
             throw;
         }
     }
@@ -214,7 +214,7 @@ internal sealed unsafe class NotificationReceiver : IDisposable
                 }
             }
             NativeStatus.Check(NativeMethods.mln_notification_source_clear_callback(Source));
-            NativeStatus.Check(NativeMethods.mln_notification_source_close(Source));
+            NativeMethods.mln_notification_source_release(Source);
             closed = true;
             callbackRoot.Free();
         }

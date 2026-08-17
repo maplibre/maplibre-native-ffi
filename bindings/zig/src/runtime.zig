@@ -101,9 +101,6 @@ var handle_generation_seed = std.atomic.Value(u64).init(0);
 
 const OfflineRegionSnapshotDestroyFn = *const fn (c.mln_offline_region_snapshot) callconv(.c) void;
 const OfflineRegionListDestroyFn = *const fn (c.mln_offline_region_list) callconv(.c) void;
-const NotificationSourceCloseFn = *const fn (c.mln_notification_source) callconv(.c) c.mln_status;
-
-var notification_source_close_for_testing: NotificationSourceCloseFn = c.mln_notification_source_close;
 
 var offline_region_snapshot_destroy_for_testing: OfflineRegionSnapshotDestroyFn = c.mln_offline_region_snapshot_destroy;
 var offline_region_list_destroy_for_testing: OfflineRegionListDestroyFn = c.mln_offline_region_list_destroy;
@@ -1970,10 +1967,7 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
             c.mln_operation_release(operation);
             runtime_close.state.runtime_destroyed = true;
         }
-        try status.checkStatus(
-            notification_source_close_for_testing(runtime_close.state.notification_source),
-            runtime_close.diagnostic_store,
-        );
+        c.mln_notification_source_release(runtime_close.state.notification_source);
         for (runtime_close.state.resource_transforms.items) |root| std.heap.smp_allocator.destroy(root);
         runtime_close.state.resource_transforms.deinit(std.heap.smp_allocator);
         for (runtime_close.state.http_header_transforms.items) |root| std.heap.smp_allocator.destroy(root);
@@ -2006,7 +2000,7 @@ fn createNative(
         c.mln_notification_source_create(&notification_source),
         diagnostic_store,
     );
-    errdefer _ = notification_source_close_for_testing(notification_source);
+    errdefer c.mln_notification_source_release(notification_source);
     native_options.notification_source = notification_source;
     var operation: c.mln_operation = 0;
     try status.checkStatus(c.mln_runtime_create_start(native_options, &operation), diagnostic_store);
@@ -2848,15 +2842,6 @@ const offline_style_url_for_testing = "http://example.com/offline-style.json";
 
 var snapshot_destroy_count_for_testing: usize = 0;
 var list_destroy_count_for_testing: usize = 0;
-var notification_source_close_attempts_for_testing: usize = 0;
-
-fn failNotificationSourceCloseOnce(source: c.mln_notification_source) callconv(.c) c.mln_status {
-    notification_source_close_attempts_for_testing += 1;
-    if (notification_source_close_attempts_for_testing == 1) {
-        return c.MLN_STATUS_INVALID_STATE;
-    }
-    return c.mln_notification_source_close(source);
-}
 
 fn countingOfflineRegionSnapshotDestroy(snapshot: c.mln_offline_region_snapshot) callconv(.c) void {
     snapshot_destroy_count_for_testing += 1;
@@ -3172,21 +3157,6 @@ test "runtime notification callback exposes ready operation endpoint" {
     }
     try std.testing.expect(found);
     try runtime.clearNotificationCallback();
-}
-
-test "runtime close preserves notification source ownership for retry" {
-    var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
-    var runtime_open = true;
-    defer if (runtime_open) runtime.close() catch @panic("runtime close failed");
-
-    notification_source_close_attempts_for_testing = 0;
-    notification_source_close_for_testing = failNotificationSourceCloseOnce;
-    defer notification_source_close_for_testing = c.mln_notification_source_close;
-
-    try std.testing.expectError(error.InvalidState, runtime.close());
-    try runtime.close();
-    runtime_open = false;
-    try std.testing.expectEqual(@as(usize, 2), notification_source_close_attempts_for_testing);
 }
 
 test "offline region snapshot destroy runs when copied output allocation fails" {

@@ -299,7 +299,7 @@ On host termination or fatal error:
 5. Destroy the detached or abandoned session from any thread.
 6. Release compositor and target resources.
 7. Start and await map close, then runtime close.
-8. Close the notification source and graphics resources.
+8. Release the notification source and graphics resources.
 
 A map close preflight rejects an attaching or attached session without changing
 map state.

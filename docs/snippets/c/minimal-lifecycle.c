@@ -148,6 +148,6 @@ int main(void) {
 
   close_async(mln_map_close_start, map);
   close_async(mln_runtime_close_start, runtime);
-  mln_notification_source_close(notifications);
+  mln_notification_source_release(notifications);
   return loaded ? 0 : 1;
 }

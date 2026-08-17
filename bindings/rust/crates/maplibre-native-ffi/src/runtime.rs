@@ -180,7 +180,7 @@ impl RuntimeState {
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         if source.0 != 0 {
             // SAFETY: Runtime close completed and detached its endpoint.
-            maplibre_core::check(unsafe { sys::mln_notification_source_close(*source) })?;
+            unsafe { sys::mln_notification_source_release(*source) };
             *source = sys::mln_notification_source(0);
         }
         self.notification_callback
@@ -816,7 +816,7 @@ impl RuntimeHandle {
             sys::mln_runtime_create_start(&raw_options, &mut operation)
         }) {
             // SAFETY: failed creation did not retain the source.
-            unsafe { sys::mln_notification_source_close(source) };
+            unsafe { sys::mln_notification_source_release(source) };
             return Err(error);
         }
         let result = (|| {
@@ -835,7 +835,7 @@ impl RuntimeHandle {
         unsafe { sys::mln_operation_release(operation) };
         if result.is_err() {
             // SAFETY: no runtime wrapper retained source on failure.
-            unsafe { sys::mln_notification_source_close(source) };
+            unsafe { sys::mln_notification_source_release(source) };
         }
         result
     }

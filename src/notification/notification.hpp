@@ -71,7 +71,7 @@ class NotificationSourceObject final
   auto set_callback(mln_notification_callback callback, void* user_data)
     -> mln_status;
   auto clear_callback() -> mln_status;
-  auto begin_close() -> mln_status;
+  auto retire_public_handle() noexcept -> void;
 
   auto begin_ready_drain(std::vector<mln_ready_endpoint>& out_endpoints)
     -> mln_status;
@@ -140,6 +140,7 @@ auto drain_notification_ready(
 auto get_ready_batch(mln_ready_batch batch, mln_ready_batch_view* out_view)
   -> mln_status;
 auto release_ready_batch(mln_ready_batch batch) noexcept -> void;
-auto close_notification_source(mln_notification_source source) -> mln_status;
+auto release_notification_source(mln_notification_source source) noexcept
+  -> void;
 
 }  // namespace mln::core

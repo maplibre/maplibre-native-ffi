@@ -229,16 +229,8 @@ auto NotificationSourceObject::clear_callback() -> mln_status {
   return MLN_STATUS_OK;
 }
 
-auto NotificationSourceObject::begin_close() -> mln_status {
+auto NotificationSourceObject::retire_public_handle() noexcept -> void {
   auto lock = std::unique_lock{mutex_};
-  if (closing_) {
-    set_thread_error("notification source is already closing");
-    return MLN_STATUS_INVALID_STATE;
-  }
-  if (!endpoints_.empty()) {
-    set_thread_error("notification source still has associated endpoints");
-    return MLN_STATUS_INVALID_STATE;
-  }
   closing_ = true;
   callback_enabled_ = false;
   callback_condition_.wait(lock, [this]() noexcept -> bool {
@@ -247,7 +239,6 @@ auto NotificationSourceObject::begin_close() -> mln_status {
   callback_ = nullptr;
   callback_user_data_ = nullptr;
   signaled_ = false;
-  return MLN_STATUS_OK;
 }
 
 auto NotificationSourceObject::begin_ready_drain(
@@ -382,17 +373,13 @@ auto release_ready_batch(mln_ready_batch batch) noexcept -> void {
   static_cast<void>(handle_table<ReadyBatchObject>().remove(batch));
 }
 
-auto close_notification_source(mln_notification_source source) -> mln_status {
-  const auto live = notification_source_from_handle(source);
+auto release_notification_source(mln_notification_source source) noexcept
+  -> void {
+  const auto live = handle_table<NotificationSourceObject>().remove(source);
   if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
+    return;
   }
-  const auto status = live->begin_close();
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  static_cast<void>(handle_table<NotificationSourceObject>().remove(source));
-  return MLN_STATUS_OK;
+  live->retire_public_handle();
 }
 
 }  // namespace mln::core

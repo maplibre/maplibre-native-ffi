@@ -698,9 +698,7 @@ static void receiver_loss_abandons_pending_work_and_invalidates_accessors(
       mln_render_session_reduce_memory_use_start(fixture.session, &pending)
     );
   }
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_STATE, mln_notification_source_close(fixture.source)
-  );
+  mln_notification_source_release(fixture.source);
   mln_render_abandon_result abandoned = {
     .size = sizeof(mln_render_abandon_result)
   };

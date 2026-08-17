@@ -117,7 +117,7 @@ static void completion_notifies_before_and_after_callback_registration(void) {
   mln_operation_release(first);
   mln_test_operation_control_destroy(second_control);
   mln_test_operation_control_destroy(first_control);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_notification_source_close(source));
+  mln_notification_source_release(source);
 }
 
 typedef struct operation_race_probe {
@@ -203,7 +203,7 @@ static void polling_waiting_and_cancellation_are_race_safe(void) {
 
   mln_operation_release(operation);
   mln_test_operation_control_destroy(control);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_notification_source_close(source));
+  mln_notification_source_release(source);
 }
 
 typedef struct observer_race_probe {
@@ -257,7 +257,7 @@ static void an_uncancellable_pending_operation_can_lose_its_observer(void) {
   const mln_ready_batch batch = drain_ready(source, &view);
   TEST_ASSERT_EQUAL_size_t(0, view.endpoint_count);
   mln_ready_batch_release(batch);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_notification_source_close(source));
+  mln_notification_source_release(source);
   mln_test_operation_control_destroy(control);
 }
 
@@ -294,7 +294,7 @@ static void observer_release_detaches_an_endpoint_copied_by_cancellation(void) {
   while (!atomic_load(&cancel_entered)) {
   }
   mln_operation_release(operation);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_notification_source_close(source));
+  mln_notification_source_release(source);
   atomic_store(&release_cancel, true);
   mln_test_thread_join(cancel_thread);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.status);
@@ -374,8 +374,11 @@ static void owned_ready_batches_preserve_receiver_boundaries(void) {
     &driver_view, MLN_NOTIFICATION_ENDPOINT_DRIVER_WORK, driver_id
   ));
 
+  mln_notification_source_release(runtime_source);
+  mln_ready_batch stale = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_STATE, mln_notification_source_close(runtime_source)
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_notification_source_drain_ready(runtime_source, &stale)
   );
   mln_test_endpoint_clear_ready(runtime_endpoint);
   mln_test_endpoint_clear_ready(driver_endpoint);
@@ -386,12 +389,8 @@ static void owned_ready_batches_preserve_receiver_boundaries(void) {
   mln_ready_batch_release(driver);
   mln_ready_batch_release(second);
   mln_ready_batch_release(first);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_notification_source_close(runtime_source)
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_notification_source_close(driver_source)
-  );
+  mln_notification_source_release(runtime_source);
+  mln_notification_source_release(driver_source);
 }
 
 static void a_new_ready_endpoint_notifies_while_another_remains_ready(void) {
@@ -441,7 +440,7 @@ static void a_new_ready_endpoint_notifies_while_another_remains_ready(void) {
   mln_test_endpoint_clear_ready(events);
   mln_test_endpoint_control_destroy(operation);
   mln_test_endpoint_control_destroy(events);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_notification_source_close(source));
+  mln_notification_source_release(source);
 }
 
 typedef struct endpoint_thread_probe {
@@ -495,7 +494,7 @@ static void an_empty_drain_cannot_lose_the_next_notification(void) {
   TEST_ASSERT_EQUAL_UINT(2, atomic_load(&probe.calls));
 
   mln_test_endpoint_control_destroy(endpoint);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_notification_source_close(source));
+  mln_notification_source_release(source);
 }
 
 typedef struct callback_update_probe {
@@ -556,7 +555,7 @@ static void callback_replacement_waits_for_an_inflight_entry(void) {
   TEST_ASSERT_TRUE(atomic_load(&update.finished));
   TEST_ASSERT_EQUAL_UINT(1, atomic_load(&replacement.calls));
   mln_test_endpoint_control_destroy(endpoint);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_notification_source_close(source));
+  mln_notification_source_release(source);
 }
 
 typedef struct drain_lease_probe {
@@ -596,7 +595,7 @@ static void a_second_concurrent_ready_drain_is_rejected(void) {
     MLN_STATUS_OK, mln_notification_source_drain_ready(source, &batch)
   );
   mln_ready_batch_release(batch);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_notification_source_close(source));
+  mln_notification_source_release(source);
 }
 
 typedef struct inline_event_drain_probe {
@@ -692,7 +691,7 @@ static void a_notification_callback_can_drain_runtime_events_inline(void) {
 
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_map_close(map));
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_close(runtime));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_notification_source_close(source));
+  mln_notification_source_release(source);
 }
 
 static void adapter_records_and_runtime_events_share_one_source(void) {
@@ -767,7 +766,7 @@ static void adapter_records_and_runtime_events_share_one_source(void) {
   mln_test_destroy_map(map);
   mln_adapter_resource_request_queue_close(queue);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_close(runtime));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_notification_source_close(source));
+  mln_notification_source_release(source);
 }
 
 void run_notification_operation_abi_tests(void) {

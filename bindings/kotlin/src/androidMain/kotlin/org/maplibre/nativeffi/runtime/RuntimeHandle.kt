@@ -483,7 +483,7 @@ private constructor(
     notifications.close()
     val source = notificationSource
     if (source != 0L) {
-      Status.check(MaplibreNativeC.mln_notification_source_close(source))
+      MaplibreNativeC.mln_notification_source_release(source)
       notificationSource = 0L
     }
   }
@@ -519,7 +519,7 @@ private constructor(
             }
           } catch (error: Throwable) {
             notifications.close()
-            MaplibreNativeC.mln_notification_source_close(source)
+            MaplibreNativeC.mln_notification_source_release(source)
             throw error
           }
         }

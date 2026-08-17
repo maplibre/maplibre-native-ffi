@@ -27,7 +27,7 @@ final class _LogCallbackState extends RetainedCallbackState {
         raw.mln_adapter_log_queue_close(queue);
       }
       if (source != 0) {
-        raw.mln_notification_source_close(source);
+        raw.mln_notification_source_release(source);
       }
       rethrow;
     } finally {
@@ -54,7 +54,7 @@ final class _LogCallbackState extends RetainedCallbackState {
       listener.close();
       calloc.free(pointer);
       raw.mln_adapter_log_queue_close(queue);
-      raw.mln_notification_source_close(source);
+      raw.mln_notification_source_release(source);
       rethrow;
     }
   }
@@ -127,7 +127,7 @@ final class _LogCallbackState extends RetainedCallbackState {
   void closeResources() {
     raw.mln_notification_source_clear_callback(source);
     raw.mln_adapter_log_queue_close(queue);
-    raw.mln_notification_source_close(source);
+    raw.mln_notification_source_release(source);
     calloc.free(pointer);
     listener.close();
   }

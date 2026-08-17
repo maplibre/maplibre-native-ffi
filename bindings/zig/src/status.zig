@@ -129,8 +129,7 @@ test "diagnostic store copies thread-local native message" {
 
     var source: c.mln_notification_source = 0;
     try checkStatus(c.mln_notification_source_create(&source), null);
-    defer checkStatus(c.mln_notification_source_close(source), null) catch
-        @panic("notification source close failed");
+    defer c.mln_notification_source_release(source);
     var options = c.mln_runtime_options_default();
     options.notification_source = source;
     var create_operation: c.mln_operation = 0;

@@ -453,9 +453,7 @@ void mln_test_destroy_runtime(mln_runtime runtime) {
     tracked_runtime = MLN_HANDLE_NULL;
   }
   if (tracked_notification_source != MLN_HANDLE_NULL) {
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_notification_source_close(tracked_notification_source)
-    );
+    mln_notification_source_release(tracked_notification_source);
     tracked_notification_source = MLN_HANDLE_NULL;
   }
 }
@@ -1818,7 +1816,7 @@ bool mln_test_render_fixture_create(
       (void)mln_render_session_destroy(fixture->session);
     }
     destroy_backend_state(fixture->backend_state);
-    (void)mln_notification_source_close(fixture->source);
+    mln_notification_source_release(fixture->source);
     *fixture = (mln_test_render_fixture){0};
     return false;
   }
@@ -1906,7 +1904,7 @@ bool mln_test_transferred_webgl_surface_create(
       (void)mln_render_session_destroy(fixture->session);
     }
     destroy_backend_state(fixture->backend_state);
-    (void)mln_notification_source_close(fixture->source);
+    mln_notification_source_release(fixture->source);
     *fixture = (mln_test_render_fixture){0};
     return false;
   }
@@ -2062,7 +2060,7 @@ void mln_test_render_fixture_destroy(mln_test_render_fixture* fixture) {
   }
   untrack_session(fixture->session);
   destroy_backend_state(fixture->backend_state);
-  (void)mln_notification_source_close(fixture->source);
+  mln_notification_source_release(fixture->source);
   *fixture = (mln_test_render_fixture){0};
 }
 
@@ -2083,7 +2081,7 @@ bool mln_test_reclaim_thread_resources(void) {
       (void)mln_render_session_destroy(entry.session);
     }
     destroy_backend_state(entry.backend_state);
-    (void)mln_notification_source_close(entry.source);
+    mln_notification_source_release(entry.source);
     reclaimed = true;
   }
   while (tracked_map_count > 0) {
@@ -2110,7 +2108,7 @@ bool mln_test_reclaim_thread_resources(void) {
     reclaimed = true;
   }
   if (tracked_notification_source != MLN_HANDLE_NULL) {
-    mln_notification_source_close(tracked_notification_source);
+    mln_notification_source_release(tracked_notification_source);
     tracked_notification_source = MLN_HANDLE_NULL;
     reclaimed = true;
   }

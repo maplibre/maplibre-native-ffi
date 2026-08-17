@@ -54,7 +54,7 @@ static void a_handle_of_another_kind_is_rejected_by_kind(void) {
     "A wrong-kind handle should name the kind that was expected."
   );
 
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_notification_source_close(source));
+  mln_notification_source_release(source);
 }
 
 static void a_handle_this_process_never_issued_is_rejected(void) {

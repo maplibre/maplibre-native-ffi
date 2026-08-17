@@ -250,7 +250,7 @@
 --include-struct mln_ready_batch_view
 --include-struct mln_ready_endpoint
 --include-function mln_notification_source_clear_callback
---include-function mln_notification_source_close
+--include-function mln_notification_source_release
 --include-function mln_notification_source_create
 --include-function mln_notification_source_drain_ready
 --include-function mln_notification_source_set_callback

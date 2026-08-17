@@ -52,10 +52,8 @@ extern "C" MLN_API void mln_ready_batch_release(
   mln::core::release_ready_batch(batch);
 }
 
-extern "C" MLN_API auto mln_notification_source_close(
+extern "C" MLN_API void mln_notification_source_release(
   mln_notification_source source
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::close_notification_source(source);
-  });
+) noexcept {
+  mln::core::release_notification_source(source);
 }

@@ -764,9 +764,11 @@ worker, or owner thread for notification delivery. A host integration MAY supply
 the execution context. Bindings that leave scheduling to the host expose
 callback registration and ready-endpoint draining together.
 
-Runtime close MUST complete before the binding closes its notification source.
-Closing the source while an endpoint remains associated leaves the source open,
-so the binding MUST preserve its live state after that failure.
+Releasing a notification source retires its public handle and callback after
+in-flight callback entries return. Associated endpoints retain private source
+state until they detach, but no longer publish receiver readiness. A binding
+therefore releases its source only after it no longer needs notification-driven
+progress from those endpoints.
 
 ### Event draining
 
@@ -1080,7 +1082,7 @@ that a real native failure would expose.
 | BND-086 | A map-originated event with no provable live public map exposes no public map handle.                                                                                    |
 | BND-087 | A binding steps events by the batch's reported event stride.                                                                                                             |
 | BND-088 | An idle receiver resumes when native work makes a runtime event or operation endpoint ready, without polling either domain.                                              |
-| BND-089 | Runtime close completes before its notification source closes, and a failed premature source close preserves the binding's live source state.                            |
+| BND-089 | Notification-source release prevents later callback entries and public drains while associated endpoints remain safe until they detach.                                  |
 | BND-090 | One drain reports more than one event and preserves queue order.                                                                                                         |
 | BND-091 | The default subscription delivers every event type; a narrowed one delivers neither the cleared type nor readiness for it; an unknown bit is rejected.                   |
 | BND-092 | Two owned batches remain readable independently until release, and the values a binding copied out of them remain readable afterward.                                    |

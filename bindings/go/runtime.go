@@ -803,7 +803,7 @@ func NewRuntimeWithOptions(options RuntimeOptions) (*RuntimeHandle, error) {
 	keepSource := false
 	defer func() {
 		if !keepSource {
-			_ = C.mln_notification_source_close(source)
+			C.mln_notification_source_release(source)
 		}
 	}()
 
@@ -1465,11 +1465,7 @@ func (runtime *RuntimeHandle) Close() error {
 	}
 	source := runtime.notificationSource
 	if source != 0 {
-		if err := checkNative(func() int32 {
-			return int32(C.mln_notification_source_close(C.mln_notification_source(source)))
-		}); err != nil {
-			return err
-		}
+		C.mln_notification_source_release(C.mln_notification_source(source))
 		runtime.notificationSource = 0
 	}
 	runtime.mapsMu.Lock()

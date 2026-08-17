@@ -661,7 +661,7 @@ static void other_runtime_entry(void* argument) {
     create_status = mln_test_runtime_create(&options, &runtime);
   }
   if (create_status != MLN_STATUS_OK) {
-    (void)mln_notification_source_close(source);
+    mln_notification_source_release(source);
     atomic_store(&probe->other_runtime_status, create_status);
     atomic_store(&probe->other_runtime_call_done, true);
     return;
@@ -674,7 +674,7 @@ static void other_runtime_entry(void* argument) {
   atomic_store(&probe->other_runtime_status, mln_test_runtime_barrier(runtime));
   atomic_store(&probe->other_runtime_call_done, true);
   (void)mln_test_runtime_close(runtime);
-  mln_notification_source_close(source);
+  mln_notification_source_release(source);
 }
 
 // Creates a region for `style_url` and activates its download, which requests
@@ -874,7 +874,7 @@ static void lookup_other_runtime_entry(void* argument) {
     create_status = mln_test_runtime_create(&options, &runtime);
   }
   if (create_status != MLN_STATUS_OK) {
-    (void)mln_notification_source_close(source);
+    mln_notification_source_release(source);
     atomic_store(&probe->other_runtime_status, create_status);
     atomic_store(&probe->other_runtime_call_done, true);
     return;
@@ -887,7 +887,7 @@ static void lookup_other_runtime_entry(void* argument) {
   atomic_store(&probe->other_runtime_status, mln_test_runtime_barrier(runtime));
   atomic_store(&probe->other_runtime_call_done, true);
   (void)mln_test_runtime_close(runtime);
-  mln_notification_source_close(source);
+  mln_notification_source_release(source);
 }
 
 // A file source resource transform lookup releases the process-global runtime

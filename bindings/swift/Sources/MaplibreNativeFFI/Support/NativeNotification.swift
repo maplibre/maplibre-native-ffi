@@ -43,7 +43,7 @@ final class NativeNotificationReceiver: @unchecked Sendable {
         context
       ))
     } catch {
-      _ = mln_notification_source_close(source)
+      mln_notification_source_release(source)
       throw error
     }
   }
@@ -117,7 +117,7 @@ final class NativeNotificationReceiver: @unchecked Sendable {
       drainScheduled = false
       drainRequested = false
     }
-    try checkStatus(mln_notification_source_close(source))
+    mln_notification_source_release(source)
   }
 
   private func scheduleDrain() {

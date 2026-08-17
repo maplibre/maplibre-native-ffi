@@ -33,7 +33,7 @@ mln_status open_runtime(
   mln_operation_release(operation);
   // #endregion runtime
   if (status != MLN_STATUS_OK) {
-    mln_notification_source_close(*out_notifications);
+    mln_notification_source_release(*out_notifications);
     *out_notifications = MLN_HANDLE_NULL;
   }
   return status;
@@ -94,6 +94,6 @@ void close_map(
     (void)wait_ok(operation);
     mln_operation_release(operation);
   }
-  mln_notification_source_close(notifications);
+  mln_notification_source_release(notifications);
   // #endregion release
 }

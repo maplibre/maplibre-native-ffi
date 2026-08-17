@@ -71,7 +71,7 @@ static uint32_t route_decision(
     mln_adapter_resource_provider_request_destroy(record);
   }
   mln_adapter_resource_request_queue_close(queue);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_notification_source_close(source));
+  mln_notification_source_release(source);
   return decision;
 }
 

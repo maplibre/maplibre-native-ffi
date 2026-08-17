@@ -2037,9 +2037,6 @@ external int mln_network_status_set(int status);
 @ffi.Native<ffi.Int32 Function(mln_notification_source)>()
 external int mln_notification_source_clear_callback(int source);
 
-@ffi.Native<ffi.Int32 Function(mln_notification_source)>()
-external int mln_notification_source_close(int source);
-
 @ffi.Native<ffi.Int32 Function(ffi.Pointer<mln_notification_source>)>()
 external int mln_notification_source_create(
   ffi.Pointer<mln_notification_source> out_source,
@@ -2052,6 +2049,9 @@ external int mln_notification_source_drain_ready(
   int source,
   ffi.Pointer<mln_ready_batch> out_batch,
 );
+
+@ffi.Native<ffi.Void Function(mln_notification_source)>()
+external void mln_notification_source_release(int source);
 
 @ffi.Native<
   ffi.Int32 Function(

@@ -33,7 +33,7 @@ static app_error create_runtime(
   );
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status("notification callback install failed", status);
-    mln_notification_source_close(state->notification_source);
+    mln_notification_source_release(state->notification_source);
     state->notification_source = MLN_HANDLE_NULL;
     return APP_ERROR_RUNTIME_CREATE_FAILED;
   }
@@ -174,12 +174,7 @@ void map_state_deinit(map_state* state) {
     state->runtime = MLN_HANDLE_NULL;
   }
   if (state->notification_source != MLN_HANDLE_NULL) {
-    mln_notification_source_clear_callback(state->notification_source);
-    const mln_status status =
-      mln_notification_source_close(state->notification_source);
-    if (status != MLN_STATUS_OK) {
-      diagnostics_log_status("notification source close failed", status);
-    }
+    mln_notification_source_release(state->notification_source);
     state->notification_source = MLN_HANDLE_NULL;
   }
 }

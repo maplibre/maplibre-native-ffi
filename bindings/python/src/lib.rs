@@ -829,23 +829,16 @@ impl RuntimeHandle {
             .notification_source
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        let close_source_result = if source.0 == 0 {
-            Ok(())
-        } else {
-            let status = py.detach(|| unsafe { sys::mln_notification_source_close(source) });
-            maplibre_core::check(status).map_err(map_error)
-        };
-        if close_source_result.is_ok() {
+        if source.0 != 0 {
+            py.detach(|| unsafe { sys::mln_notification_source_release(source) });
             *self
                 .notification_source
                 .lock()
                 .unwrap_or_else(|poisoned| poisoned.into_inner()) = sys::mln_notification_source(0);
-            callback.take();
-            self.operation_gate.finish_successful_close();
-        } else {
-            self.operation_gate.finish_failed_close();
         }
-        close_source_result
+        callback.take();
+        self.operation_gate.finish_successful_close();
+        Ok(())
     }
 
     fn barrier(&self, py: Python<'_>) -> PyResult<()> {
@@ -7243,19 +7236,19 @@ fn create_runtime(
     if let Err(error) =
         maplibre_core::check(unsafe { sys::mln_runtime_create_start(&raw_options, &mut operation) })
     {
-        let _ = unsafe { sys::mln_notification_source_close(source) };
+        unsafe { sys::mln_notification_source_release(source) };
         return Err(map_error(error));
     }
     let operation = OwnedOperation(operation);
     if let Err(error) = wait_operation(py, operation.0) {
-        let _ = unsafe { sys::mln_notification_source_close(source) };
+        unsafe { sys::mln_notification_source_release(source) };
         return Err(error);
     }
     let mut out = maplibre_core::ptr::OutHandle::<sys::mln_runtime>::new();
     if let Err(error) = maplibre_core::check(unsafe {
         sys::mln_runtime_create_take_result(operation.0, out.as_mut_ptr())
     }) {
-        let _ = unsafe { sys::mln_notification_source_close(source) };
+        unsafe { sys::mln_notification_source_release(source) };
         return Err(map_error(error));
     }
     let native = out.into_live("mln_runtime").map_err(map_error)?;

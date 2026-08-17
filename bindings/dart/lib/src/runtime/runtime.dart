@@ -207,7 +207,7 @@ final class RuntimeHandle {
         await _waitForStandaloneOperation(source, closeOperation);
         raw.mln_operation_release(closeOperation);
       }
-      raw.mln_notification_source_close(source);
+      raw.mln_notification_source_release(source);
       rethrow;
     }
   }
@@ -818,7 +818,7 @@ final class RuntimeHandle {
     }
     final source = _notificationSource;
     if (source != 0) {
-      _check(raw.mln_notification_source_close(source));
+      raw.mln_notification_source_release(source);
       _notificationSource = 0;
       _notificationListener.close();
     }

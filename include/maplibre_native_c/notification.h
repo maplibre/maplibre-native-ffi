@@ -64,9 +64,9 @@ typedef struct mln_ready_batch_view {
  * mln_notification_source_drain_ready(). A host that services inline must
  * serialize drains of the same source.
  *
- * The callback must not replace or clear itself, close its notification source,
- * or call an API that can block. Inline service is suitable only when the
- * callback thread is valid for every endpoint it services.
+ * The callback must not replace or clear itself, release its notification
+ * source, or call an API that can block. Inline service is suitable only when
+ * the callback thread is valid for every endpoint it services.
  */
 typedef void (*mln_notification_callback)(void* user_data);
 
@@ -82,7 +82,7 @@ MLN_API mln_status mln_notification_source_create(
  * in-flight entry to return before it releases the old callback and user_data.
  * If an endpoint is already ready, the new callback is invoked before this call
  * returns. The callback and user_data remain borrowed until replacement,
- * clearing, or successful source close.
+ * clearing, or source release.
  */
 MLN_API mln_status mln_notification_source_set_callback(
   mln_notification_source source, mln_notification_callback callback,
@@ -119,14 +119,16 @@ MLN_API mln_status mln_ready_batch_get(
 MLN_API void mln_ready_batch_release(mln_ready_batch batch) MLN_NOEXCEPT;
 
 /**
- * Closes a notification source.
+ * Releases the public notification source handle.
  *
- * The call returns MLN_STATUS_INVALID_STATE and leaves the source open while an
- * endpoint remains associated. On success it prevents new callback entries,
- * waits for every in-flight entry, and retires the handle.
+ * This prevents new callback entries, waits for every in-flight entry, and
+ * retires the public handle. Associated endpoints retain the source's internal
+ * state until they detach, but no longer produce callbacks or public readiness.
+ * A null or already released handle is a no-op.
  */
-MLN_API mln_status
-mln_notification_source_close(mln_notification_source source) MLN_NOEXCEPT;
+MLN_API void mln_notification_source_release(
+  mln_notification_source source
+) MLN_NOEXCEPT;
 
 // NOLINTEND(modernize-use-using,modernize-use-trailing-return-type)
 

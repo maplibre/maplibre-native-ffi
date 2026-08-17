@@ -18,8 +18,8 @@ import kotlinx.cinterop.value
 import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.internal.c.mln_event_batch_get
 import org.maplibre.nativeffi.internal.c.mln_event_batch_release
-import org.maplibre.nativeffi.internal.c.mln_notification_source_close
 import org.maplibre.nativeffi.internal.c.mln_notification_source_create
+import org.maplibre.nativeffi.internal.c.mln_notification_source_release
 import org.maplibre.nativeffi.internal.c.mln_offline_region_status
 import org.maplibre.nativeffi.internal.c.mln_operation_release
 import org.maplibre.nativeffi.internal.c.mln_runtime_barrier_start
@@ -556,7 +556,7 @@ internal constructor(
     state.completeClose {}
     notifications.close()
     if (notificationSource != 0uL) {
-      Status.check(mln_notification_source_close(notificationSource))
+      mln_notification_source_release(notificationSource)
       notificationSource = 0uL
     }
   }
@@ -664,7 +664,7 @@ internal constructor(
         }
       } catch (error: Throwable) {
         notifications.close()
-        mln_notification_source_close(source)
+        mln_notification_source_release(source)
         throw error
       }
     }

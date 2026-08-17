@@ -447,7 +447,7 @@ internal object NativeAccess {
     }
 
   internal fun closeNotificationSource(source: Long) {
-    Status.check(MapLibreNativeC.mln_notification_source_close(source))
+    MapLibreNativeC.mln_notification_source_release(source)
   }
 
   internal fun startCreateRuntime(options: RuntimeOptions, notificationSource: Long): Long =

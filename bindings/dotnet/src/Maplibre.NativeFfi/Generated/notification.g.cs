@@ -61,6 +61,6 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern void mln_ready_batch_release([NativeTypeName("mln_ready_batch")] MlnReadyBatch batch);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_notification_source_close([NativeTypeName("mln_notification_source")] MlnNotificationSource source);
+        public static extern void mln_notification_source_release([NativeTypeName("mln_notification_source")] MlnNotificationSource source);
     }
 }

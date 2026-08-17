@@ -9426,13 +9426,12 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         }
     }
 
-    private static class mln_notification_source_close {
-        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
-            MapLibreNativeC.C_INT,
+    private static class mln_notification_source_release {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.ofVoid(
             MapLibreNativeC.C_LONG
         );
 
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_notification_source_close");
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_notification_source_release");
 
         public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
     }
@@ -9440,45 +9439,45 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_notification_source_close(mln_notification_source source)
+     * void mln_notification_source_release(mln_notification_source source)
      * }
      */
-    public static FunctionDescriptor mln_notification_source_close$descriptor() {
-        return mln_notification_source_close.DESC;
+    public static FunctionDescriptor mln_notification_source_release$descriptor() {
+        return mln_notification_source_release.DESC;
     }
 
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_notification_source_close(mln_notification_source source)
+     * void mln_notification_source_release(mln_notification_source source)
      * }
      */
-    public static MethodHandle mln_notification_source_close$handle() {
-        return mln_notification_source_close.HANDLE;
+    public static MethodHandle mln_notification_source_release$handle() {
+        return mln_notification_source_release.HANDLE;
     }
 
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_notification_source_close(mln_notification_source source)
+     * void mln_notification_source_release(mln_notification_source source)
      * }
      */
-    public static MemorySegment mln_notification_source_close$address() {
-        return mln_notification_source_close.ADDR;
+    public static MemorySegment mln_notification_source_release$address() {
+        return mln_notification_source_release.ADDR;
     }
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_notification_source_close(mln_notification_source source)
+     * void mln_notification_source_release(mln_notification_source source)
      * }
      */
-    public static int mln_notification_source_close(long source) {
-        var mh$ = mln_notification_source_close.HANDLE;
+    public static void mln_notification_source_release(long source) {
+        var mh$ = mln_notification_source_release.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_notification_source_close", source);
+                traceDowncall("mln_notification_source_release", source);
             }
-            return (int)mh$.invokeExact(source);
+            mh$.invokeExact(source);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {

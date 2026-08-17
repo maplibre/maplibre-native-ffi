@@ -51,7 +51,7 @@ static void runtime_creation_returns_an_operation_result(void) {
   );
   wait_for_success(close);
   mln_operation_release(close);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_notification_source_close(source));
+  mln_notification_source_release(source);
 }
 
 static void close_preflight_leaves_a_runtime_with_a_live_child_open(void) {
@@ -159,7 +159,7 @@ static void accepted_close_is_any_thread_and_retires_the_handle(void) {
     MLN_STATUS_INVALID_ARGUMENT, mln_runtime_get_event_mask(runtime, &mask)
   );
   mln_operation_release(probe.operation);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_notification_source_close(source));
+  mln_notification_source_release(source);
 }
 
 void run_runtime_lifecycle_abi_tests(void) {
