@@ -34,7 +34,7 @@ import org.maplibre.nativeffi.runtime.NetworkStatus
 @OptIn(ExperimentalForeignApi::class)
 public actual object Maplibre {
   /** C ABI contract version expected by this Kotlin/Native binding. */
-  public actual const val EXPECTED_C_ABI_VERSION: Long = 1L
+  public actual const val EXPECTED_C_ABI_VERSION: Long = 0L
 
   /** Native libraries are linked by the host binary for Kotlin/Native. */
   public actual fun loadNativeLibrary() {

@@ -225,7 +225,7 @@ import org.maplibre.nativeffi.style.VectorTileEncoding
 
 /** Ensures the native library is loaded before JVM FFM downcalls run. */
 internal object NativeAccess {
-  const val EXPECTED_C_ABI_VERSION: Long = 1L
+  const val EXPECTED_C_ABI_VERSION: Long = 0L
   const val DEFAULT_LOG_SEVERITY_MASK: Int = (1 shl 1) or (1 shl 2)
 
   private val lock = Any()

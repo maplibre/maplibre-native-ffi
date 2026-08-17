@@ -15,7 +15,7 @@ import org.maplibre.nativeffi.runtime.NetworkStatus
 /** Process-global entry points for the Android JNI bridge. */
 public actual object Maplibre {
   /** C ABI contract version expected by this Android binding. */
-  public actual const val EXPECTED_C_ABI_VERSION: Long = 1L
+  public actual const val EXPECTED_C_ABI_VERSION: Long = 0L
 
   /** Loads the Android JNI bridge library. */
   public actual fun loadNativeLibrary() {
