@@ -599,6 +599,102 @@ static void a_second_concurrent_ready_drain_is_rejected(void) {
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_notification_source_close(source));
 }
 
+typedef struct inline_event_drain_probe {
+  mln_runtime runtime;
+  atomic_uint calls;
+  atomic_uint command_events;
+  atomic_int status;
+} inline_event_drain_probe;
+
+static void record_inline_drain_failure(
+  inline_event_drain_probe* probe, mln_status status
+) {
+  int expected = MLN_STATUS_OK;
+  atomic_compare_exchange_strong(&probe->status, &expected, status);
+}
+
+static void drain_runtime_events_inline(void* user_data) {
+  inline_event_drain_probe* probe = user_data;
+  atomic_fetch_add(&probe->calls, 1);
+
+  mln_event_batch events = MLN_HANDLE_NULL;
+  mln_status status = mln_runtime_drain_events(probe->runtime, 0, &events);
+  if (status != MLN_STATUS_OK) {
+    record_inline_drain_failure(probe, status);
+    return;
+  }
+  mln_runtime_event_batch_view event_view = {
+    .size = sizeof(mln_runtime_event_batch_view)
+  };
+  status = mln_event_batch_get(events, &event_view);
+  if (status == MLN_STATUS_OK) {
+    for (size_t event_index = 0; event_index < event_view.event_count;
+         event_index += 1) {
+      const mln_runtime_event* event =
+        (const mln_runtime_event*)((const char*)event_view.events +
+                                   event_index * event_view.event_size);
+      if (event->type == MLN_RUNTIME_EVENT_COMMAND_FINISHED) {
+        atomic_fetch_add(&probe->command_events, 1);
+      }
+    }
+  } else {
+    record_inline_drain_failure(probe, status);
+  }
+  mln_event_batch_release(events);
+}
+
+static void a_notification_callback_can_drain_runtime_events_inline(void) {
+  mln_notification_source source = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_notification_source_create(&source));
+  mln_runtime_options runtime_options = mln_runtime_options_default();
+  runtime_options.cache_path = ":memory:";
+  runtime_options.event_mask = MLN_RUNTIME_EVENT_MASK_NONE;
+  runtime_options.notification_source = source;
+  mln_runtime runtime = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_runtime_create(&runtime_options, &runtime)
+  );
+  mln_map_options map_options = mln_map_options_default();
+  map_options.event_mask = MLN_RUNTIME_EVENT_MASK_COMMAND_FINISHED;
+  mln_map map = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_map_create_status(runtime, &map_options, &map)
+  );
+
+  mln_event_batch queued = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_drain_events(runtime, 0, &queued)
+  );
+  mln_event_batch_release(queued);
+  inline_event_drain_probe probe = {.runtime = runtime};
+  atomic_init(&probe.calls, 0);
+  atomic_init(&probe.command_events, 0);
+  atomic_init(&probe.status, MLN_STATUS_OK);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_notification_source_set_callback(
+                     source, drain_runtime_events_inline, &probe
+                   )
+  );
+
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_map_request_repaint(map));
+  for (unsigned int elapsed = 0;
+       elapsed < 1000 && atomic_load(&probe.command_events) == 0 &&
+       atomic_load(&probe.status) == MLN_STATUS_OK;
+       elapsed += 1) {
+    mln_test_sleep_millisecond();
+  }
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_notification_source_clear_callback(source)
+  );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, atomic_load(&probe.status));
+  TEST_ASSERT_GREATER_THAN_UINT(0, atomic_load(&probe.calls));
+  TEST_ASSERT_GREATER_THAN_UINT(0, atomic_load(&probe.command_events));
+
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_map_close(map));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_close(runtime));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_notification_source_close(source));
+}
+
 static void adapter_records_and_runtime_events_share_one_source(void) {
   mln_notification_source source = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_notification_source_create(&source));
@@ -685,5 +781,6 @@ void run_notification_operation_abi_tests(void) {
   RUN_TEST(an_empty_drain_cannot_lose_the_next_notification);
   RUN_TEST(callback_replacement_waits_for_an_inflight_entry);
   RUN_TEST(a_second_concurrent_ready_drain_is_rejected);
+  RUN_TEST(a_notification_callback_can_drain_runtime_events_inline);
   RUN_TEST(adapter_records_and_runtime_events_share_one_source);
 }

@@ -261,14 +261,125 @@ auto lease_resource_provider_state(void* platform_context) noexcept
 }
 
 // A batch locates a message by a uint32_t offset and size, so a message is
-// clamped at push rather than at drain time. The arena starts each drain empty,
-// so the first event always fits and a bounded drain always makes progress.
+// clamped before it enters a queue buffer.
 auto truncated_event_message(std::string message) -> std::string {
   constexpr auto max_size = static_cast<size_t>(UINT32_MAX) - 1;
   if (message.size() > max_size) {
     message.resize(max_size);
   }
   return message;
+}
+
+auto append_runtime_event(
+  mln::core::RuntimeEventQueueBuffer& buffer, mln_runtime_event event,
+  const std::string& message
+) -> void {
+  const auto message_storage_size =
+    message.empty() ? size_t{0} : message.size() + 1;
+  const auto event_count = buffer.events.size() + 1;
+  if (event_count > buffer.events.capacity()) {
+    buffer.events.reserve(std::max(event_count, event_count * 2));
+  }
+  const auto messages_size = buffer.messages.size() + message_storage_size;
+  if (messages_size > buffer.messages.capacity()) {
+    buffer.messages.reserve(std::max(messages_size, messages_size * 2));
+  }
+
+  event.message_size = static_cast<uint32_t>(message.size());
+  event.message_offset =
+    message.empty() ? 0 : static_cast<uint32_t>(buffer.messages.size());
+  if (!message.empty()) {
+    buffer.messages.append(message);
+    buffer.messages.push_back('\0');
+  }
+  buffer.events.push_back(event);
+}
+
+// A buffer's message arena is addressable with uint32_t offsets. The queue
+// starts another buffer only at that limit; the common drain transfers the
+// complete front buffer without copying its events or messages.
+auto queue_runtime_event(
+  mln::core::RuntimeEventQueueState& queue, mln_runtime_event event,
+  std::string message
+) -> void {
+  message = truncated_event_message(std::move(message));
+  const auto message_storage_size =
+    message.empty() ? size_t{0} : message.size() + 1;
+  const auto needs_buffer =
+    queue.buffers.empty() ||
+    (!queue.buffers.back().events.empty() &&
+     message_storage_size >
+       static_cast<size_t>(UINT32_MAX) - queue.buffers.back().messages.size());
+  if (needs_buffer) {
+    auto buffer = mln::core::RuntimeEventQueueBuffer{};
+    append_runtime_event(buffer, event, message);
+    queue.buffers.push_back(std::move(buffer));
+  } else {
+    append_runtime_event(queue.buffers.back(), event, message);
+  }
+  queue.event_count += 1;
+}
+
+template <typename Predicate>
+auto erase_runtime_events(
+  mln::core::RuntimeEventQueueState& queue, Predicate&& predicate
+) -> void {
+  auto removed_count = size_t{0};
+  for (auto buffer_it = queue.buffers.begin();
+       buffer_it != queue.buffers.end();) {
+    auto& buffer = *buffer_it;
+    auto kept_count = size_t{0};
+    auto kept_message_size = size_t{0};
+    for (auto index = size_t{0}; index < buffer.events.size(); index += 1) {
+      auto event = buffer.events[index];
+      if (predicate(event)) {
+        removed_count += 1;
+        continue;
+      }
+      if (event.message_size != 0) {
+        const auto storage_size = static_cast<size_t>(event.message_size) + 1;
+        std::memmove(
+          buffer.messages.data() + kept_message_size,
+          buffer.messages.data() + event.message_offset, storage_size
+        );
+        event.message_offset = static_cast<uint32_t>(kept_message_size);
+        kept_message_size += storage_size;
+      }
+      buffer.events[kept_count] = event;
+      kept_count += 1;
+    }
+    buffer.events.resize(kept_count);
+    buffer.messages.resize(kept_message_size);
+    if (buffer.events.empty()) {
+      buffer_it = queue.buffers.erase(buffer_it);
+    } else {
+      ++buffer_it;
+    }
+  }
+  assert(removed_count <= queue.event_count);
+  queue.event_count -= removed_count;
+}
+
+auto offline_region_id(const mln_runtime_event& event)
+  -> std::optional<mln_offline_region_id> {
+  switch (event.payload_type) {
+    case MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS:
+      return event.payload.offline_region_status.region_id;
+    case MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR:
+      return event.payload.offline_region_response_error.region_id;
+    case MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT:
+      return event.payload.offline_region_tile_count_limit.region_id;
+    default:
+      return std::nullopt;
+  }
+}
+
+auto last_runtime_event(const mln::core::RuntimeEventQueueState& queue)
+  -> const mln_runtime_event* {
+  if (queue.buffers.empty() || queue.buffers.back().events.empty()) {
+    return nullptr;
+  }
+  return &queue.buffers.back().events.back();
 }
 
 auto valid_coordinate(const mln_lat_lng& coordinate) -> bool {
@@ -629,16 +740,15 @@ auto push_offline_region_event(
     return;
   }
 
-  auto event = mln::core::QueuedRuntimeEvent{
+  auto event = mln_runtime_event{
     .type = type,
     .source_type = MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
     .source = runtime->self,
     .code = 0,
     .payload_type = payload_type,
-    .payload = payload,
-    .message = truncated_event_message(std::move(message)),
-    .has_offline_region = true,
-    .offline_region_id = region_id
+    .message_offset = 0,
+    .message_size = 0,
+    .payload = payload
   };
 
   {
@@ -646,7 +756,7 @@ auto push_offline_region_event(
     if (!runtime->event_queue->observed_offline_regions.contains(region_id)) {
       return;
     }
-    runtime->event_queue->events.push_back(std::move(event));
+    queue_runtime_event(*runtime->event_queue, event, std::move(message));
   }
   runtime->event_queue->notification_endpoint->mark_ready();
 }
@@ -727,9 +837,9 @@ auto set_offline_region_observed_flag(
     runtime->event_queue->observed_offline_regions.insert(region_id);
   } else {
     runtime->event_queue->observed_offline_regions.erase(region_id);
-    std::erase_if(
-      runtime->event_queue->events, [region_id](const auto& event) -> bool {
-        return event.has_offline_region && event.offline_region_id == region_id;
+    erase_runtime_events(
+      *runtime->event_queue, [region_id](const auto& event) -> bool {
+        return offline_region_id(event) == region_id;
       }
     );
   }
@@ -2783,8 +2893,8 @@ auto release_runtime_reachable_state(
     runtime->offline_event_state->runtime = nullptr;
     const std::scoped_lock event_lock(runtime->event_queue->mutex);
     runtime->event_queue->observed_offline_regions.clear();
-    std::erase_if(runtime->event_queue->events, [](const auto& event) -> bool {
-      return event.has_offline_region;
+    erase_runtime_events(*runtime->event_queue, [](const auto& event) -> bool {
+      return offline_region_id(event).has_value();
     });
   }
 
@@ -2796,7 +2906,8 @@ auto release_runtime_reachable_state(
       [&]() noexcept -> bool { return !runtime->event_queue->drain_active; }
     );
     runtime->event_queue->alive = false;
-    runtime->event_queue->events.clear();
+    runtime->event_queue->buffers.clear();
+    runtime->event_queue->event_count = 0;
     runtime->event_queue->event_maps.clear();
     runtime->event_queue->observed_offline_regions.clear();
     event_endpoint = std::move(runtime->event_queue->notification_endpoint);
@@ -2968,58 +3079,47 @@ auto drain_runtime_events(
   auto owned = std::make_shared<EventBatchObject>();
   const auto batch_handle = handle_table<EventBatchObject>().insert(owned);
   try {
-    auto staging = std::vector<QueuedRuntimeEvent>{};
-    auto arena_size = size_t{0};
-    auto drain_count = size_t{0};
     {
       const std::scoped_lock lock(queue->mutex);
-      for (const auto& queued : queue->events) {
-        if (max_events != 0 && drain_count >= max_events) {
-          break;
-        }
-        const auto next_size =
-          queued.message.empty() ? size_t{0} : queued.message.size() + 1;
-        if (
-          drain_count != 0 &&
-          next_size > static_cast<size_t>(UINT32_MAX) - arena_size
-        ) {
-          break;
-        }
-        arena_size += next_size;
-        drain_count += 1;
-      }
-
-      static_assert(std::is_nothrow_move_constructible_v<QueuedRuntimeEvent>);
-      staging.reserve(drain_count);
-      owned->events.reserve(drain_count);
-      owned->messages.reserve(arena_size);
-      for (auto index = size_t{0}; index < drain_count; index += 1) {
-        staging.push_back(std::move(queue->events.front()));
-        queue->events.pop_front();
-      }
-      owned->remaining_count = queue->events.size();
-      for (const auto& staged : staging) {
-        const auto message_size = static_cast<uint32_t>(staged.message.size());
-        const auto message_offset =
-          static_cast<uint32_t>(owned->messages.size());
-        owned->events.push_back(
-          mln_runtime_event{
-            .type = staged.type,
-            .source_type = staged.source_type,
-            .source = staged.source,
-            .code = staged.code,
-            .payload_type = staged.payload_type,
-            .message_offset = message_size == 0 ? 0 : message_offset,
-            .message_size = message_size,
-            .payload = staged.payload
+      if (queue->event_count != 0) {
+        assert(!queue->buffers.empty());
+        auto& buffer = queue->buffers.front();
+        const auto drain_count = max_events == 0
+                                   ? buffer.events.size()
+                                   : std::min(max_events, buffer.events.size());
+        if (drain_count == buffer.events.size()) {
+          owned->events.swap(buffer.events);
+          owned->messages.swap(buffer.messages);
+          queue->buffers.pop_front();
+        } else {
+          auto message_size = size_t{0};
+          for (auto index = size_t{0}; index < drain_count; index += 1) {
+            const auto& event = buffer.events[index];
+            if (event.message_size != 0) {
+              message_size = static_cast<size_t>(event.message_offset) +
+                             event.message_size + 1;
+            }
           }
-        );
-        if (message_size != 0) {
-          owned->messages.append(staged.message);
-          owned->messages.push_back('\0');
+          owned->events.assign(
+            buffer.events.begin(), buffer.events.begin() + drain_count
+          );
+          if (message_size != 0) {
+            owned->messages.assign(buffer.messages.data(), message_size);
+          }
+          buffer.events.erase(
+            buffer.events.begin(), buffer.events.begin() + drain_count
+          );
+          buffer.messages.erase(0, message_size);
+          for (auto& event : buffer.events) {
+            if (event.message_size != 0) {
+              event.message_offset -= static_cast<uint32_t>(message_size);
+            }
+          }
         }
+        queue->event_count -= drain_count;
       }
-      if (queue->events.empty()) {
+      owned->remaining_count = queue->event_count;
+      if (queue->event_count == 0) {
         queue->notification_endpoint->clear_ready();
       }
     }
@@ -3257,14 +3357,15 @@ auto push_runtime_map_event_payload(
     return;
   }
 
-  auto event = QueuedRuntimeEvent{
+  auto event = mln_runtime_event{
     .type = type,
     .source_type = MLN_RUNTIME_EVENT_SOURCE_MAP,
     .source = map,
     .code = code,
     .payload_type = payload_type,
-    .payload = payload,
-    .message = truncated_event_message(std::move(message))
+    .message_offset = 0,
+    .message_size = 0,
+    .payload = payload
   };
 
   {
@@ -3279,13 +3380,17 @@ auto push_runtime_map_event_payload(
     // alone preserves the order of every other event.
     if (
       type == MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE &&
-      map != MLN_HANDLE_NULL && !live->event_queue->events.empty() &&
-      live->event_queue->events.back().type == type &&
-      live->event_queue->events.back().source == map
+      map != MLN_HANDLE_NULL
     ) {
-      return;
+      const auto* last_event = last_runtime_event(*live->event_queue);
+      if (
+        last_event != nullptr && last_event->type == type &&
+        last_event->source == map
+      ) {
+        return;
+      }
     }
-    live->event_queue->events.push_back(std::move(event));
+    queue_runtime_event(*live->event_queue, event, std::move(message));
   }
   live->event_queue->notification_endpoint->mark_ready();
 }
@@ -3313,16 +3418,15 @@ auto push_runtime_command_finished(
     .reserved = 0,
     .generation = generation,
   };
-  auto event = QueuedRuntimeEvent{
+  auto event = mln_runtime_event{
     .type = MLN_RUNTIME_EVENT_COMMAND_FINISHED,
     .source_type = source_type,
     .source = source,
     .code = static_cast<int32_t>(status),
     .payload_type = MLN_RUNTIME_EVENT_PAYLOAD_COMMAND_FINISHED,
-    .payload = payload,
-    .message = truncated_event_message(
-      message == nullptr ? std::string{} : std::string{message}
-    )
+    .message_offset = 0,
+    .message_size = 0,
+    .payload = payload
   };
   {
     const std::scoped_lock lock(live->event_queue->mutex);
@@ -3335,7 +3439,10 @@ auto push_runtime_command_finished(
         return;
       }
     }
-    live->event_queue->events.push_back(std::move(event));
+    queue_runtime_event(
+      *live->event_queue, event,
+      message == nullptr ? std::string{} : std::string{message}
+    );
   }
   live->event_queue->notification_endpoint->mark_ready();
 }
@@ -3360,7 +3467,7 @@ auto discard_runtime_map_events(mln_runtime runtime, mln_map map) -> void {
 
   const std::scoped_lock lock(live->event_queue->mutex);
   live->event_queue->event_maps.erase(map);
-  std::erase_if(live->event_queue->events, [map](const auto& event) -> bool {
+  erase_runtime_events(*live->event_queue, [map](const auto& event) -> bool {
     return event.source == map;
   });
 }

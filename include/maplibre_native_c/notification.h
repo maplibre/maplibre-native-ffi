@@ -56,11 +56,17 @@ typedef struct mln_ready_batch_view {
 } mln_ready_batch_view;
 
 /**
- * Schedules the receiver that services a notification source.
+ * Notifies the receiver that services a notification source.
  *
- * Native code may invoke this function from any thread. Calls may coalesce. The
- * callback receives no borrowed payload and MUST NOT call the C API. It only
- * schedules a later ready-batch drain on the receiver's execution context.
+ * Native code may invoke this function from any thread. Calls may coalesce or
+ * overlap. The callback receives no borrowed payload. It may schedule receiver
+ * work or use non-blocking C API calls to service endpoints inline, including
+ * mln_notification_source_drain_ready(). A host that services inline must
+ * serialize drains of the same source.
+ *
+ * The callback must not replace or clear itself, close its notification source,
+ * or call an API that can block. Inline service is suitable only when the
+ * callback thread is valid for every endpoint it services.
  */
 typedef void (*mln_notification_callback)(void* user_data);
 

@@ -181,8 +181,10 @@ runtime. The render target chooses one of the driver contracts described in
   services it with the graphics context usable.
 - Runtime, map, render-session control, operation, and notification calls may
   run on any host thread.
-- The notification callback may run on any native thread. It MUST only schedule
-  a later drain and MUST NOT call the C API.
+- The notification callback may run on any native thread. Examples MUST use it
+  to schedule a later drain on the host graphics thread, because a ready batch
+  can contain driver work that requires that thread. The C API also permits a
+  callback to drain and service suitable endpoints inline.
 - Driver service and thread-current accessors MUST run serially on the host
   graphics thread.
 
