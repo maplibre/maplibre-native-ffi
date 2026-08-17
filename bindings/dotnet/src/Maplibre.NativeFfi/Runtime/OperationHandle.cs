@@ -26,7 +26,7 @@ public sealed unsafe class OperationHandle : IDisposable
     private bool resultUseActive;
     private bool closing;
     private bool closed;
-    private bool resultConsumed;
+    private bool nativeConsumed;
 
     internal OperationHandle(
         RuntimeHandle runtime,
@@ -52,7 +52,7 @@ public sealed unsafe class OperationHandle : IDisposable
 
     internal ulong NativeId => handle.Value;
 
-    /// <summary>Whether this binding has released the native handle.</summary>
+    /// <summary>Whether this operation has been consumed or released.</summary>
     public bool IsClosed
     {
         get
@@ -131,11 +131,11 @@ public sealed unsafe class OperationHandle : IDisposable
         );
     }
 
-    /// <summary>Discards the completed operation's untaken result.</summary>
-    public void DiscardResult()
+    /// <summary>Finishes the operation without taking its typed result.</summary>
+    public void Finish()
     {
         using var use = AcquireResultUse(runtime, resultKind);
-        NativeStatus.Check(NativeMethods.mln_operation_discard_result(use.Handle));
+        NativeStatus.Check(NativeMethods.mln_operation_finish(use.Handle));
         MarkResultConsumed(use);
     }
 
@@ -154,10 +154,6 @@ public sealed unsafe class OperationHandle : IDisposable
             if (resultKind != expectedResultKind)
             {
                 throw InvalidState("OperationHandle has a different result type.");
-            }
-            if (resultConsumed)
-            {
-                throw InvalidState("OperationHandle result is already consumed.");
             }
             if (resultUseActive)
             {
@@ -180,7 +176,8 @@ public sealed unsafe class OperationHandle : IDisposable
         }
         lock (gate)
         {
-            resultConsumed = true;
+            nativeConsumed = true;
+            closing = true;
         }
     }
 
@@ -240,6 +237,7 @@ public sealed unsafe class OperationHandle : IDisposable
 
     private void ReleaseUse(bool useResult)
     {
+        var unregister = false;
         lock (gate)
         {
             if (useResult)
@@ -247,8 +245,21 @@ public sealed unsafe class OperationHandle : IDisposable
                 resultUseActive = false;
             }
             activeUses--;
-            if (activeUses == 0)
+            if (activeUses == 0 && nativeConsumed)
             {
+                unregister = true;
+            }
+            else if (activeUses == 0)
+            {
+                Monitor.PulseAll(gate);
+            }
+        }
+        if (unregister)
+        {
+            runtime.UnregisterOperation(this);
+            lock (gate)
+            {
+                closed = true;
                 Monitor.PulseAll(gate);
             }
         }

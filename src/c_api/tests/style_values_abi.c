@@ -170,7 +170,7 @@ static void duplicate_id_is_an_async_failed_terminal_event(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static void typed_take_transfers_and_discard_retains_no_result(void) {
+static void typed_take_and_finish_consume_operations(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_operation operation = MLN_HANDLE_NULL;
@@ -184,21 +184,19 @@ static void typed_take_transfers_and_discard_retains_no_result(void) {
   );
   TEST_ASSERT_NOT_EQUAL(MLN_HANDLE_NULL, list);
   mln_style_id_list_destroy(list);
-  mln_operation_release(operation);
 
   operation = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_list_style_source_ids_start(map, &operation)
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_operation_discard_result(operation));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_operation_finish(operation));
   list = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_STATE,
+    MLN_STATUS_INVALID_ARGUMENT,
     mln_map_list_style_source_ids_take_result(operation, &list)
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, list);
-  mln_operation_release(operation);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -273,11 +271,11 @@ static void coordinate_size_probe_preserves_typed_result(void) {
   );
   TEST_ASSERT_EQUAL_MEMORY(coordinates, copied, sizeof(coordinates));
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_STATE, mln_map_get_image_source_coordinates_take_result(
-                                operation, copied, 4, &count, &found
-                              )
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_get_image_source_coordinates_take_result(
+      operation, copied, 4, &count, &found
+    )
   );
-  mln_operation_release(operation);
 
   operation = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
@@ -358,12 +356,11 @@ static void stretch_size_probe_preserves_typed_result(void) {
   TEST_ASSERT_EQUAL_MEMORY(&stretch_x, &copied_x, sizeof(stretch_x));
   TEST_ASSERT_EQUAL_MEMORY(&stretch_y, &copied_y, sizeof(stretch_y));
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_STATE,
+    MLN_STATUS_INVALID_ARGUMENT,
     mln_map_copy_style_image_stretches_take_result(
       operation, &copied_x, 1, &x_count, &copied_y, 1, &y_count, &found
     )
   );
-  mln_operation_release(operation);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -964,7 +961,7 @@ void run_style_values_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(style_command_deep_copies_and_ordered_read_observes_it);
   RUN_TEST(duplicate_id_is_an_async_failed_terminal_event);
-  RUN_TEST(typed_take_transfers_and_discard_retains_no_result);
+  RUN_TEST(typed_take_and_finish_consume_operations);
   RUN_TEST(wrong_typed_take_does_not_consume_result);
   RUN_TEST(remove_commands_commit_and_report_missing_ids);
   RUN_TEST(an_in_use_source_removal_fails_and_leaves_the_source);

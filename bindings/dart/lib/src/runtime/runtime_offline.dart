@@ -17,14 +17,10 @@ final class OperationHandle implements Finalizable {
   final int _id;
   late final NativeLeakReporter _leakReporter;
 
-  var _resultConsumed = false;
   var _released = false;
 
   /// Whether the operation observer has been released.
   bool get isReleased => _released;
-
-  /// Whether a typed take or discard consumed this operation's result.
-  bool get isResultConsumed => _resultConsumed;
 
   /// Reports whether this operation has reached a terminal disposition.
   bool poll() {
@@ -217,13 +213,10 @@ final class OperationHandle implements Finalizable {
     });
   }
 
-  /// Discards the completed operation's untaken result.
-  void discardResult() {
+  /// Finishes the operation without taking its typed result.
+  void finish() {
     _requireLive();
-    if (_resultConsumed) {
-      throwInvalidState('offline operation result has already been consumed');
-    }
-    _check(raw.mln_operation_discard_result(_id));
+    _check(raw.mln_operation_finish(_id));
     _markResultConsumed();
   }
 
@@ -239,7 +232,9 @@ final class OperationHandle implements Finalizable {
   }
 
   void _markResultConsumed() {
-    _resultConsumed = true;
+    _released = true;
+    _runtime._unregisterOperationId(_id);
+    _leakReporter.close();
   }
 
   void _requireResult(
@@ -248,9 +243,6 @@ final class OperationHandle implements Finalizable {
     String accessorName,
   ) {
     _requireLive();
-    if (_resultConsumed) {
-      throwInvalidState('offline operation result has already been consumed');
-    }
     if (_kind != expectedKind || _resultKind != expected) {
       throwInvalidState(
         '$accessorName cannot take ${_resultKind.name} result from '

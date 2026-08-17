@@ -127,7 +127,7 @@ pub fn waitForBarrier(runtime: *maplibre.RuntimeHandle) !void {
     const operation = try runtime.barrierStart();
     defer operation.release();
     try waitOperation(operation);
-    try operation.discard();
+    try operation.finish();
 }
 
 /// Copies fixed source metadata, reporting null when no source has the ID.

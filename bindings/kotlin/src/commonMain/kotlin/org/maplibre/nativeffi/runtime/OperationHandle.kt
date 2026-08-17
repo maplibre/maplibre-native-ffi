@@ -24,8 +24,8 @@ public expect class OperationHandle<T> : AutoCloseable {
   /** Copies the completed operation's diagnostic text. */
   public fun diagnostic(): String
 
-  /** Discards a completed untaken result while keeping this observer live. */
-  public fun discard()
+  /** Finishes the operation without taking its typed result. */
+  public fun finish()
 
   /** Releases this observer. */
   override fun close()

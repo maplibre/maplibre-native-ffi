@@ -232,8 +232,8 @@ Commands validate and deep-copy every input before returning acceptance. The
 runtime assigns an order and command ID at commit. Each accepted command reaches
 a terminal disposition, and failures after acceptance carry copied diagnostics
 in command events. Operations retain their work independently from their public
-observer and expose a permanent terminal status, copied diagnostic, and typed
-result transfer.
+handle. A completed handle exposes its terminal status and copied diagnostic
+until a typed result take or explicit finish consumes it.
 
 Published snapshots copy immutable committed state without entering mutable
 MapLibre state. Use an ordered operation instead when a query must observe every

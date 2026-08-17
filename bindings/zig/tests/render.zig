@@ -606,7 +606,7 @@ fn waitOperationSuccess(session: maplibre.RenderSessionHandle, operation: maplib
 fn finishOperation(session: maplibre.RenderSessionHandle, operation: maplibre.OperationHandle) !void {
     defer operation.release();
     try waitOperationSuccess(session, operation);
-    try operation.discard();
+    try operation.finish();
 }
 
 fn takeQueryResult(session: maplibre.RenderSessionHandle, operation: maplibre.OperationHandle) !maplibre.OwnedString {
@@ -1014,7 +1014,7 @@ fn awaitRuntimeBarrier(runtime: *maplibre.RuntimeHandle) !void {
     const operation = try runtime.barrierStart();
     defer operation.release();
     try testing.expect(try operation.waitForSuccess(5_000));
-    try operation.discard();
+    try operation.finish();
 }
 
 fn renderFrame(session: maplibre.RenderSessionHandle, if_needed: bool) !maplibre.FrameResult {
@@ -1190,7 +1190,7 @@ test "still-image map modes complete owned texture renders" {
             try std.Thread.yield();
         } else return error.StillImageDidNotComplete;
         try waitOperationSuccess(owned.session, operation);
-        try operation.discard();
+        try operation.finish();
         try expectOwnedFrameExtent(owned.session, .{ .width = 32, .height = 32 });
     }
 }

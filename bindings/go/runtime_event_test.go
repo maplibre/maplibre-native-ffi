@@ -18,8 +18,8 @@ func waitForRuntimeBarrier(t *testing.T, runtime *RuntimeHandle) {
 	if completed, err := operation.Wait(-1); err != nil || !completed {
 		t.Fatalf("Barrier Wait() = %v, %v; want true, nil", completed, err)
 	}
-	if err := operation.Discard(); err != nil {
-		t.Fatalf("Barrier Discard(): %v", err)
+	if err := operation.Finish(); err != nil {
+		t.Fatalf("Barrier Finish(): %v", err)
 	}
 }
 

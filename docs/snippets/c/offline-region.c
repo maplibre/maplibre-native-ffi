@@ -47,13 +47,12 @@ static mln_status await_operation(
   return status;
 }
 
-// An operation with no typed result still requires result disposal and release.
+// Finish consumes an operation whose typed result is not needed.
 static mln_status finish_operation(
   mln_runtime runtime, mln_operation operation
 ) {
   const mln_status status = await_operation(runtime, operation);
-  mln_operation_discard_result(operation);
-  mln_operation_release(operation);
+  mln_operation_finish(operation);
   return status;
 }
 
@@ -103,7 +102,7 @@ mln_offline_region_id download_region(
     mln_runtime_offline_region_create_take_result(create_operation, &region);
   }
   if (region == MLN_HANDLE_NULL) {
-    mln_operation_discard_result(create_operation);
+    mln_operation_finish(create_operation);
     mln_operation_release(create_operation);
     return 0;
   }

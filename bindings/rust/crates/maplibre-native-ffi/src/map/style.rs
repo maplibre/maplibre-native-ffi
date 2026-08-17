@@ -1362,9 +1362,9 @@ impl StyleSourceInfoOperation {
             ));
         }
         let Some(mut info) = self.info.take()? else {
-            self.attribution.discard()?;
-            self.url.discard()?;
-            self.tile_urls.discard()?;
+            self.attribution.finish()?;
+            self.url.finish()?;
+            self.tile_urls.finish()?;
             return Ok(None);
         };
         info.attribution = self.attribution.take()?;
@@ -1436,13 +1436,13 @@ impl StyleLayerInfoOperation {
         let source_id = if raw.fields & sys::MLN_STYLE_LAYER_INFO_SOURCE_ID != 0 {
             Some(self.source_id.take()?)
         } else {
-            self.source_id.discard()?;
+            self.source_id.finish()?;
             None
         };
         let source_layer = if raw.fields & sys::MLN_STYLE_LAYER_INFO_SOURCE_LAYER != 0 {
             Some(self.source_layer.take()?)
         } else {
-            self.source_layer.discard()?;
+            self.source_layer.finish()?;
             None
         };
         // SAFETY: the take filled raw, whose type field views a style-spec
@@ -1486,7 +1486,7 @@ impl StyleImageOperation {
             ));
         }
         let Some(info) = self.info.take()? else {
-            self.pixels.discard()?;
+            self.pixels.finish()?;
             return Ok(None);
         };
         let Some(pixels) = self.pixels.take()? else {

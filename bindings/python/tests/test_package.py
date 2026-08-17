@@ -2455,7 +2455,7 @@ def test_offline_operation_take_results_convert_public_values() -> None:
                 "complete": False,
             }
 
-        def operation_discard(self, operation_id: int) -> None:
+        def operation_finish(self, operation_id: int) -> None:
             self.discarded.append(operation_id)
 
     class FakeRuntime:
@@ -2659,7 +2659,7 @@ def test_offline_operation_take_rejects_closed_handles() -> None:
         def operation_release(self, operation_id: int) -> None:
             self.discarded.append(operation_id)
 
-        def operation_discard(self, operation_id: int) -> None:
+        def operation_finish(self, operation_id: int) -> None:
             self.discarded.append(operation_id)
 
         def offline_region_get_status_take_result(
@@ -2715,10 +2715,10 @@ def test_offline_operation_take_rejects_closed_handles() -> None:
         offline._adapt_status_result,
     )
     assert status_handle.take().complete is True
-    with pytest.raises(mln.InvalidStateError, match="already consumed"):
+    with pytest.raises(mln.InvalidStateError, match="already closed"):
         status_handle.take()
-    assert status_handle.status == mln.MaplibreStatus.OK
-    status_handle.close()
+    with pytest.raises(mln.InvalidStateError, match="already closed"):
+        _ = status_handle.status
     assert runtime._native.status_takes == 1
 
     closed = offline.OperationHandle._from_native(
@@ -2731,7 +2731,7 @@ def test_offline_operation_take_rejects_closed_handles() -> None:
     with pytest.raises(mln.InvalidStateError, match="operation handle"):
         closed.take()
 
-    assert runtime._native.discarded == [10, 20]
+    assert runtime._native.discarded == [20]
     assert runtime.operations == set()
 
 
@@ -2750,7 +2750,7 @@ def test_runtime_close_rejects_live_offline_operations(tmp_path: Path) -> None:
         runtime.close()
 
 
-def test_ambient_cache_operation_starts_and_discards_through_public_api(
+def test_ambient_cache_operation_starts_and_finishes_through_public_api(
     tmp_path: Path,
 ) -> None:
     with mln.RuntimeHandle(mln.RuntimeOptions(cache_path=str(tmp_path))) as runtime:
@@ -2760,12 +2760,13 @@ def test_ambient_cache_operation_starts_and_discards_through_public_api(
 
         assert isinstance(operation, offline.OperationHandle)
         assert not operation.closed
-        operation.close()
+        _wait_for_offline_operation(runtime, operation)
+        _ = operation.status
+        operation.finish()
         assert operation.closed
-        operation.close()
 
 
-def test_set_maximum_ambient_cache_size_starts_and_discards_through_public_api(
+def test_set_maximum_ambient_cache_size_starts_and_finishes_through_public_api(
     tmp_path: Path,
 ) -> None:
     with mln.RuntimeHandle(
@@ -2779,9 +2780,7 @@ def test_set_maximum_ambient_cache_size_starts_and_discards_through_public_api(
         _wait_for_offline_operation(runtime, operation)
         assert operation.status == mln.MaplibreStatus.OK
         assert operation.diagnostic == ""
-        operation.discard()
-        assert not operation.closed
-        operation.close()
+        operation.finish()
         assert operation.closed
 
         # An out-of-range size stays on the binding's documented error family

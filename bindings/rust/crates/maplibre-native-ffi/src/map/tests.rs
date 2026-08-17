@@ -33,7 +33,7 @@ macro_rules! operation_result {
 fn await_runtime_barrier(runtime: &RuntimeHandle) {
     let barrier = runtime.start_barrier().unwrap();
     assert!(barrier.wait(Duration::from_secs(5)).unwrap());
-    barrier.discard().unwrap();
+    barrier.finish().unwrap();
     barrier.release();
 }
 fn assert_command_disposition(

@@ -48,8 +48,8 @@ func TestRuntimeBarrierProgressesAutonomously(t *testing.T) {
 	if !completed {
 		t.Fatal("runtime barrier did not progress autonomously")
 	}
-	if err := operation.Discard(); err != nil {
-		t.Fatalf("Discard(): %v", err)
+	if err := operation.Finish(); err != nil {
+		t.Fatalf("Finish(): %v", err)
 	}
 }
 
@@ -118,7 +118,7 @@ func TestNotificationCallbackOnlySchedulesOwnedReadyDrain(t *testing.T) {
 	if completed, err := operation.Wait(-1); err != nil || !completed {
 		t.Fatalf("Wait() = %v, %v; want true, nil", completed, err)
 	}
-	if err := operation.Discard(); err != nil {
-		t.Fatalf("Discard(): %v", err)
+	if err := operation.Finish(); err != nil {
+		t.Fatalf("Finish(): %v", err)
 	}
 }

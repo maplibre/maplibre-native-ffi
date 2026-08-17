@@ -100,7 +100,7 @@ public sealed class RuntimeOfflineOperationTests
 
         var status = runtime.TakeOfflineRegionStatusResult(operation);
 
-        Assert.False(operation.IsClosed);
+        Assert.True(operation.IsClosed);
         Assert.Equal(2, calls);
         Assert.Equal(OfflineRegionDownloadState.Active, status.DownloadState);
         Assert.Equal(6u, status.RequiredResourceCount);
@@ -134,10 +134,8 @@ public sealed class RuntimeOfflineOperationTests
 
         using var delete = runtime.StartDeleteOfflineRegion(region.Id);
         CompleteOperation(runtime, delete);
-        delete.DiscardResult();
-        Assert.Equal(MaplibreStatus.Ok, delete.GetCompletion().Status);
-        Assert.False(delete.IsClosed);
-        delete.Close();
+        delete.Finish();
+        Assert.True(delete.IsClosed);
 
         using var listAgain = runtime.StartOfflineRegions();
         CompleteOperation(runtime, listAgain);

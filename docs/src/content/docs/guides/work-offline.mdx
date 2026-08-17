@@ -30,12 +30,10 @@ Copy diagnostic bytes that the host keeps.
 
 An operation publishes readiness through the notification source that the
 runtime received at creation. Cancellation is available through the common
-operation API when the underlying work supports it. Take a typed result or
-discard an unneeded result after completion. Either action consumes the result,
-while the operation handle remains live for terminal status and diagnostic
-inspection. Release the operation handle explicitly when inspection is
-complete. Releasing a pending operation requests cancellation when supported
-and detaches its notification endpoint.
+operation API when the underlying work supports it. Inspect terminal status and
+diagnostics before taking a typed result or finishing an operation whose result
+is not needed. A successful take or finish consumes the operation handle.
+Release is for abandoning a pending operation or an untaken completed result.
 
 ## Download a region
 

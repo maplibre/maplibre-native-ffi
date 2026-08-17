@@ -29,13 +29,23 @@ internal constructor(
   public actual val isClosed: Boolean
     get() = core.isClosed
 
-  internal fun <R> withUse(block: (Long) -> R): R = core.withUse(runtime, block)
+  internal fun <R> withUse(block: (Long) -> R): R =
+    try {
+      core.withUse(runtime, block)
+    } finally {
+      retireConsumed()
+    }
 
   internal fun <R> withResultUse(
     expectedKind: OperationKind,
     expectedResultKind: OperationResultKind,
     block: (Long) -> R,
-  ): R = core.withUse(runtime, expectedKind, expectedResultKind, block)
+  ): R =
+    try {
+      core.withUse(runtime, expectedKind, expectedResultKind, block)
+    } finally {
+      retireConsumed()
+    }
 
   internal fun markResultConsumed() {
     core.markResultConsumed()
@@ -57,9 +67,9 @@ internal constructor(
 
   public actual fun diagnostic(): String = withUse(NativeAccess::operationDiagnostic)
 
-  public actual fun discard() {
+  public actual fun finish() {
     withUse {
-      Status.check(NativeAccess.discardOperation(it))
+      Status.check(NativeAccess.finishOperation(it))
       core.markResultConsumed()
     }
   }
@@ -68,6 +78,12 @@ internal constructor(
     if (!core.beginClose()) return
     runtime.forgetOperation(core.id)
     NativeAccess.releaseOperation(core.id)
+    core.finishClose()
+  }
+
+  private fun retireConsumed() {
+    if (!core.hasConsumedResult() || !core.beginClose()) return
+    runtime.forgetOperation(core.id)
     core.finishClose()
   }
 }

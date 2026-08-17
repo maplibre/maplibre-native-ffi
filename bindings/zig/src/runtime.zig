@@ -52,11 +52,13 @@ const ResourceRequestState = struct {
 };
 
 const OperationState = struct {
+    handle: OperationHandle,
     runtime: RuntimeHandle,
     operation_id: c.mln_operation,
     operation_kind: OperationKind,
     active_uses: std.atomic.Value(usize),
     closing: bool,
+    retire_on_idle: std.atomic.Value(bool),
     result_kind: OperationResultKind,
 };
 
@@ -70,7 +72,20 @@ pub const OperationLease = struct {
     native: c.mln_operation,
 
     pub fn release(self: OperationLease) void {
-        _ = self.state.active_uses.fetchSub(1, .seq_cst);
+        if (self.state.active_uses.fetchSub(1, .seq_cst) == 1 and
+            self.state.retire_on_idle.load(.seq_cst))
+        {
+            retireConsumedOperation(self.state);
+        }
+    }
+
+    pub fn consume(self: OperationLease) void {
+        lockOperationRegistry();
+        defer unlockOperationRegistry();
+        if (!self.state.closing) {
+            self.state.closing = true;
+            self.state.retire_on_idle.store(true, .seq_cst);
+        }
     }
 };
 
@@ -1211,15 +1226,19 @@ pub const OperationHandle = enum(u128) {
         errdefer unregisterRuntimeOperation(runtime.*);
         const operation_state = try std.heap.smp_allocator.create(OperationState);
         operation_state.* = .{
+            .handle = undefined,
             .runtime = runtime.*,
             .operation_id = operation_id,
             .operation_kind = operation_kind,
             .active_uses = std.atomic.Value(usize).init(0),
             .closing = false,
+            .retire_on_idle = std.atomic.Value(bool).init(false),
             .result_kind = result_kind,
         };
         errdefer std.heap.smp_allocator.destroy(operation_state);
-        return try registerOperationState(operation_state);
+        const handle = try registerOperationState(operation_state);
+        operation_state.handle = handle;
+        return handle;
     }
 
     /// Returns a stable, non-operable identity for matching ready endpoints.
@@ -1363,13 +1382,14 @@ pub const OperationHandle = enum(u128) {
         return .{ .lease = operation_lease, .operation_kind = operation_lease.state.operation_kind };
     }
 
-    pub fn discard(self: OperationHandle) status.Error!void {
+    pub fn finish(self: OperationHandle) status.Error!void {
         const operation_lease = try operationLease(self);
         defer operation_lease.release();
         try status.checkStatus(
-            c.mln_operation_discard_result(operation_lease.native),
+            c.mln_operation_finish(operation_lease.native),
             null,
         );
+        operation_lease.consume();
     }
 };
 
@@ -1802,6 +1822,7 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
             else => c.MLN_STATUS_INVALID_STATE,
         };
         try status.checkStatus(native_status, runtime_lease.diagnostic_store);
+        required.lease.consume();
         if (snapshot == 0) return error.NativeError;
         const snapshot_handle = snapshot;
         defer destroyOfflineRegionSnapshot(snapshot_handle);
@@ -1821,6 +1842,7 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
         var found = false;
         const native_status = c.mln_runtime_offline_region_get_take_result(required.lease.native, &snapshot, &found);
         try status.checkStatus(native_status, runtime_lease.diagnostic_store);
+        required.lease.consume();
         if (!found) return null;
         if (snapshot == 0) return error.NativeError;
         const snapshot_handle = snapshot;
@@ -1844,6 +1866,7 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
             else => c.MLN_STATUS_INVALID_STATE,
         };
         try status.checkStatus(native_status, runtime_lease.diagnostic_store);
+        required.lease.consume();
         if (list == 0) return error.NativeError;
         const list_handle = list;
         defer destroyOfflineRegionList(list_handle);
@@ -1859,6 +1882,7 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
         native_status_value.size = @sizeOf(c.mln_offline_region_status);
         const native_status = c.mln_runtime_offline_region_get_status_take_result(required.lease.native, &native_status_value);
         try status.checkStatus(native_status, runtime_lease.diagnostic_store);
+        required.lease.consume();
         return offlineStatusFromNative(native_status_value);
     }
 
@@ -2454,6 +2478,12 @@ fn finishOperationRelease(handle: OperationHandle, operation_state: *OperationSt
     slot.state = null;
     slot.generation = nextHandleGeneration();
     operation_free_list.appendAssumeCapacity(slot_index);
+}
+
+fn retireConsumedOperation(operation_state: *OperationState) void {
+    finishOperationRelease(operation_state.handle, operation_state);
+    unregisterRuntimeOperation(operation_state.runtime);
+    std.heap.smp_allocator.destroy(operation_state);
 }
 
 fn lockOperationRegistry() void {
@@ -3080,12 +3110,12 @@ test "operation take-result failures preserve handle state" {
     operation.release();
 }
 
-test "operation discard failures preserve handle state" {
+test "operation finish failures preserve handle state" {
     var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
 
     const operation = try runtime.operationHandle(9_999_997, .region_get_status, .region_status);
-    try std.testing.expectError(error.InvalidArgument, operation.discard());
+    try std.testing.expectError(error.InvalidArgument, operation.finish());
     try std.testing.expectEqual(@as(OperationId, @enumFromInt(9_999_997)), try operation.id());
 
     operation.release();
@@ -3160,7 +3190,7 @@ test "offline region snapshot destroy runs when copied output allocation fails" 
 
     try std.testing.expectError(error.OutOfMemory, runtime.takeOfflineRegion(failing_allocator.allocator(), operation));
     try std.testing.expectEqual(@as(usize, 1), snapshot_destroy_count_for_testing);
-    _ = try operation.id();
+    try std.testing.expectError(error.ClosedHandle, operation.id());
 }
 
 test "offline region list destroy runs when copied output allocation fails" {
@@ -3189,5 +3219,5 @@ test "offline region list destroy runs when copied output allocation fails" {
 
     try std.testing.expectError(error.OutOfMemory, runtime.takeOfflineRegionList(failing_allocator.allocator(), list_operation));
     try std.testing.expectEqual(@as(usize, 1), list_destroy_count_for_testing);
-    _ = try list_operation.id();
+    try std.testing.expectError(error.ClosedHandle, list_operation.id());
 }

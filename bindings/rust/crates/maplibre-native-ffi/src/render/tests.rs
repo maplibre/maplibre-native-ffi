@@ -61,7 +61,7 @@ fn wait_until_completed<T>(session: &RenderSessionHandle, operation: &OperationH
 
 fn wait_for_operation(session: &RenderSessionHandle, operation: &OperationHandle<()>) {
     wait_until_completed(session, operation);
-    operation.discard().unwrap();
+    operation.finish().unwrap();
 }
 
 fn finish_attachment(attachment: RenderSessionAttachment) -> Result<RenderSessionHandle> {
@@ -2368,7 +2368,7 @@ fn await_runtime_barrier(runtime: &RuntimeHandle) {
     let operation = runtime.start_barrier().unwrap();
     assert!(operation.wait(Duration::from_secs(5)).unwrap());
     maplibre_core::check(operation.terminal_status().unwrap()).unwrap();
-    operation.discard().unwrap();
+    operation.finish().unwrap();
 }
 
 fn render_frame(session: &RenderSessionHandle, if_needed: bool) -> RenderFrameResult {

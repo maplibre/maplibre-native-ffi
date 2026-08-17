@@ -19,8 +19,8 @@ private enum OperationResultState {
 
 /// An owned asynchronous operation.
 ///
-/// Close an operation after taking or discarding its result. Deinitialization
-/// also releases an operation that remains open.
+/// Taking a result or finishing the operation consumes it. Deinitialization
+/// releases an operation that remains open.
 public final class OperationHandle: @unchecked Sendable {
   private let handle: NativeHandleBox<NativeOperationHandle>
   private let runtime: RuntimeHandle
@@ -144,17 +144,17 @@ public final class OperationHandle: @unchecked Sendable {
     }
   }
 
-  /// Discards an untaken result. The operation remains open for terminal
-  /// status and diagnostic inspection.
-  public func discard() throws {
+  /// Finishes the operation without taking its typed result.
+  public func finish() throws {
     try beginResultConsumption(expectedResultKind: nil)
     do {
       try mapNativeFailure {
         try handle.withLive { operation in
-          try checkStatus(mln_operation_discard_result(operation.raw))
+          try checkStatus(mln_operation_finish(operation.raw))
         }
       }
       finishResultConsumption(transferred: true)
+      try retireConsumedHandle()
     } catch {
       finishResultConsumption(transferred: false)
       throw error
@@ -207,9 +207,12 @@ public final class OperationHandle: @unchecked Sendable {
           diagnostic: "typed operation result was not transferred"
         )
       }
+      try retireConsumedHandle()
       return result
     } catch {
-      if !transferred {
+      if transferred {
+        try? retireConsumedHandle()
+      } else {
         finishResultConsumption(transferred: false)
       }
       throw error
@@ -242,6 +245,17 @@ public final class OperationHandle: @unchecked Sendable {
     lifecycleLock.withLock {
       guard case .consuming = resultState else { return }
       resultState = transferred ? .consumed : .available
+    }
+  }
+
+  private func retireConsumedHandle() throws {
+    try handle.closeOnce { operation in
+      runtime.forgetOperation(operation)
+    }
+    lifecycleLock.withLock {
+      guard registered else { return }
+      registered = false
+      runtime.unregisterOperation()
     }
   }
 }

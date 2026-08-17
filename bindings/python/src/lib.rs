@@ -1255,11 +1255,9 @@ impl RuntimeHandle {
         offline_region_status_to_py(py, &status).map_err(operation_result_consumed)
     }
 
-    fn operation_discard(&self, operation_id: u64) -> PyResult<()> {
-        maplibre_core::check(unsafe {
-            sys::mln_operation_discard_result(sys::mln_operation(operation_id))
-        })
-        .map_err(map_error)
+    fn operation_finish(&self, operation_id: u64) -> PyResult<()> {
+        maplibre_core::check(unsafe { sys::mln_operation_finish(sys::mln_operation(operation_id)) })
+            .map_err(map_error)
     }
 
     fn set_resource_provider(

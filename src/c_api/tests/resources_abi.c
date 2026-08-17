@@ -447,10 +447,7 @@ static void offline_take_rejects_mismatched_result_kind(void) {
     mln_runtime_offline_regions_list_take_result(operation_id, &wrong_list)
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, wrong_list);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_operation_discard_result(operation_id)
-  );
-  mln_operation_release(operation_id);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_operation_finish(operation_id));
   mln_test_destroy_runtime(runtime);
 }
 
@@ -475,7 +472,7 @@ static void offline_operations_are_uncancellable(void) {
     cancel_status == MLN_STATUS_INVALID_STATE
   );
   TEST_ASSERT_TRUE(wait_for_offline_completion(runtime, operation));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_operation_discard_result(operation));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_operation_finish(operation));
   mln_operation_release(operation);
   mln_test_destroy_runtime(runtime);
 }

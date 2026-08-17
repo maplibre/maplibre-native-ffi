@@ -1116,8 +1116,8 @@ void main() {
     );
     expect(cacheSizeOperation.wait(), isTrue);
     expect(cacheSizeOperation.diagnostic, isEmpty);
-    cacheSizeOperation.discardResult();
-    expect(cacheSizeOperation.isResultConsumed, isTrue);
+    cacheSizeOperation.finish();
+    expect(cacheSizeOperation.isReleased, isTrue);
     cacheSizeOperation.release();
     expect(cacheSizeOperation.isReleased, isTrue);
     await cacheSizeRuntime.close();
@@ -1266,8 +1266,8 @@ void main() {
     expect(offlineOperation.wait(timeout: Duration.zero), isTrue);
     expect(offlineOperation.wait(timeout: const Duration(seconds: 1)), isTrue);
     expect(offlineOperation.diagnostic, isEmpty);
-    offlineOperation.discardResult();
-    expect(offlineOperation.isResultConsumed, isTrue);
+    offlineOperation.finish();
+    expect(offlineOperation.isReleased, isTrue);
     offlineOperation.release();
     expect(offlineOperation.isReleased, isTrue);
     final offlineListOperation = runtime.listOfflineRegions();
@@ -1280,7 +1280,7 @@ void main() {
       return offlineListOperation.poll();
     });
     expect(offlineListOperation.takeRegionList(), isEmpty);
-    expect(offlineListOperation.isResultConsumed, isTrue);
+    expect(offlineListOperation.isReleased, isTrue);
     expect(
       () => offlineListOperation.takeRegionList(),
       throwsA(isA<InvalidStateException>()),

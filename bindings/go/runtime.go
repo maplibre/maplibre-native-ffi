@@ -69,19 +69,18 @@ const (
 
 // OperationHandle owns a common asynchronous native operation.
 type OperationHandle[T any] struct {
-	child          *handle.Child
-	ownerChild     *handle.Child
-	id             uint64
-	kind           operationKind
-	resultKind     operationResultKind
-	takeResult     func(uint64) (T, bool, error)
-	mu             sync.Mutex
-	cond           *sync.Cond
-	activeUses     int
-	live           bool
-	releasing      bool
-	consuming      bool
-	resultConsumed bool
+	child      *handle.Child
+	ownerChild *handle.Child
+	id         uint64
+	kind       operationKind
+	resultKind operationResultKind
+	takeResult func(uint64) (T, bool, error)
+	mu         sync.Mutex
+	cond       *sync.Cond
+	activeUses int
+	live       bool
+	releasing  bool
+	consuming  bool
 }
 
 func newOperationHandle[T any](runtime *RuntimeHandle, id uint64, kind operationKind, resultKind operationResultKind) *OperationHandle[T] {
@@ -113,7 +112,7 @@ func (operation *OperationHandle[T]) beginUse() (uint64, error) {
 	operation.mu.Lock()
 	defer operation.mu.Unlock()
 	if !operation.live || operation.releasing {
-		return 0, newBindingError(ErrInvalidArgument, "OperationHandle is closed")
+		return 0, newBindingError(ErrInvalidState, "OperationHandle is closed")
 	}
 	operation.activeUses++
 	return operation.id, nil
@@ -126,9 +125,9 @@ func (operation *OperationHandle[T]) endUse() {
 	operation.mu.Unlock()
 }
 
-func (operation *OperationHandle[T]) beginResultUse() (uint64, operationKind, operationResultKind, bool, error) {
+func (operation *OperationHandle[T]) beginResultUse() (uint64, operationKind, operationResultKind, error) {
 	if operation == nil {
-		return 0, 0, 0, false, newBindingError(ErrInvalidArgument, "OperationHandle is nil")
+		return 0, 0, 0, newBindingError(ErrInvalidArgument, "OperationHandle is nil")
 	}
 	operation.mu.Lock()
 	defer operation.mu.Unlock()
@@ -136,25 +135,34 @@ func (operation *OperationHandle[T]) beginResultUse() (uint64, operationKind, op
 		operation.cond.Wait()
 	}
 	if !operation.live || operation.releasing {
-		return 0, 0, 0, false, newBindingError(ErrInvalidArgument, "OperationHandle is closed")
-	}
-	if operation.resultConsumed {
-		return operation.id, operation.kind, operation.resultKind, true, nil
+		return 0, 0, 0, newBindingError(ErrInvalidState, "OperationHandle is closed")
 	}
 	operation.consuming = true
 	operation.activeUses++
-	return operation.id, operation.kind, operation.resultKind, false, nil
+	return operation.id, operation.kind, operation.resultKind, nil
 }
 
 func (operation *OperationHandle[T]) endResultUse(consumed bool) {
+	var child *handle.Child
+	var ownerChild *handle.Child
 	operation.mu.Lock()
 	if consumed {
-		operation.resultConsumed = true
+		operation.live = false
+		child = operation.child
+		ownerChild = operation.ownerChild
+		operation.child = nil
+		operation.ownerChild = nil
 	}
 	operation.consuming = false
 	operation.activeUses--
 	operation.cond.Broadcast()
 	operation.mu.Unlock()
+	if child != nil {
+		child.Release()
+	}
+	if ownerChild != nil {
+		ownerChild.Release()
+	}
 }
 
 // Poll reports whether this operation reached a terminal disposition.
@@ -253,19 +261,15 @@ func (operation *OperationHandle[T]) Diagnostic() (string, error) {
 	return string(buffer[:int(size)]), nil
 }
 
-// Discard destroys an untaken result from a completed operation. The operation
-// remains live for status and diagnostic inspection until Release is called.
-func (operation *OperationHandle[T]) Discard() error {
-	id, _, _, consumed, err := operation.beginResultUse()
+// Finish consumes a completed operation without taking its typed result.
+func (operation *OperationHandle[T]) Finish() error {
+	id, _, _, err := operation.beginResultUse()
 	if err != nil {
 		return err
 	}
-	if consumed {
-		return newBindingError(ErrInvalidState, "operation result was already consumed")
-	}
 	success := false
 	defer func() { operation.endResultUse(success) }()
-	if err := checkNative(func() int32 { return operationDiscard(id) }); err != nil {
+	if err := checkNative(func() int32 { return operationFinish(id) }); err != nil {
 		return err
 	}
 	success = true
@@ -290,6 +294,12 @@ func (operation *OperationHandle[T]) Release() {
 	operation.releasing = true
 	for operation.activeUses > 0 {
 		operation.cond.Wait()
+	}
+	if !operation.live {
+		operation.releasing = false
+		operation.cond.Broadcast()
+		operation.mu.Unlock()
+		return
 	}
 	id := operation.id
 	child := operation.child
@@ -669,8 +679,8 @@ type RuntimeHandle struct {
 // Test seam for synthetic handles. Production close uses closeNativeRuntime.
 var destroyRuntimeHandle func(nativeRuntime) int32
 
-var operationDiscard = func(id uint64) int32 {
-	return int32(C.mln_operation_discard_result(C.mln_operation(id)))
+var operationFinish = func(id uint64) int32 {
+	return int32(C.mln_operation_finish(C.mln_operation(id)))
 }
 
 func waitNativeOperation(operation C.mln_operation) error {

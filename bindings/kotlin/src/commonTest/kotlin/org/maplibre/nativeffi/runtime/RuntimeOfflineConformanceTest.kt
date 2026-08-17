@@ -96,7 +96,7 @@ class RuntimeOfflineConformanceTest {
     operation: OperationHandle<Unit>,
   ) {
     waitForOperation(runtime, operation)
-    operation.discard()
+    operation.finish()
     operation.close()
   }
 

@@ -143,10 +143,8 @@ class RuntimeHandleTest {
         assertEquals("", operation.diagnostic())
 
         assertTrue(runtime.takeOfflineRegionsResult(operation).isEmpty())
-        assertFalse(operation.isClosed)
-        assertFailsWith<InvalidStateException> { runtime.takeOfflineRegionsResult(operation) }
-        operation.close()
         assertTrue(operation.isClosed)
+        assertFailsWith<InvalidStateException> { runtime.takeOfflineRegionsResult(operation) }
       }
     }
 

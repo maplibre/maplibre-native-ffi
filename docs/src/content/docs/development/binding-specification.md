@@ -313,22 +313,21 @@ A `MapProjectionHandle` is a child of its source map. Every call after creation,
 including close, is synchronous and usable from any thread, and a live
 projection prevents map close.
 
-An `OperationHandle` retains its own result, diagnostic, notification endpoint,
-and internal work independently of the initiating runtime or map wrapper.
-Releasing the public observer does not cancel accepted work. The notification
-source remains live until every associated operation observer is released.
+An `OperationHandle` retains its result, diagnostic, notification endpoint, and
+internal work independently of the initiating runtime or map wrapper. The
+notification source remains live until every associated operation is consumed or
+released.
 
 ### Operation result lifetime
 
-Typed take functions and result discard consume only the completed operation's
-result. The `OperationHandle` remains live so that public code can inspect its
-terminal status and copied diagnostic afterward. The binding closes the observer
-only through explicit close or release.
+A successful typed take or finish consumes the completed `OperationHandle`.
+Public code inspects terminal status and copied diagnostics before that terminal
+action when it needs them.
 
 A failed typed take before native result ownership transfers MUST leave the
-result available for another take or discard. A successful typed take or discard
-MUST make later result consumption fail while status and diagnostic inspection
-continue to succeed.
+operation available for another take or finish. A successful typed take or
+finish MUST make every later operation call fail through the binding's closed
+handle path.
 
 ### Handle copying
 
@@ -737,15 +736,15 @@ and makes every public alias observe closed state when native consumes the
 handle. Native teardown retains its own callbacks and dependencies. A preflight
 failure leaves the wrapper open.
 
-Operation wrappers retain their native observer until result take, discard, or
-release. They expose permanent terminal status and copied diagnostics. A
-binding's nondeterministic cleanup may detach a pending observer only when every
-callback root and native dependency remains reachable until internal work
-finishes; otherwise it reports a leak.
+Operation wrappers retain their native observer until result take, finish, or
+release. They expose terminal status and copied diagnostics until the operation
+is consumed. A binding's nondeterministic cleanup may detach a pending observer
+only when every callback root and native dependency remains reachable until
+internal work finishes; otherwise it reports a leak.
 
 A binding has one private operation adapter for waiting, cancellation, terminal
-status, copied diagnostics, typed result transfer or discard, and release.
-Domain APIs materialize inputs, start the operation, and convert the transferred
+status, copied diagnostics, typed result transfer or finish, and release. Domain
+APIs materialize inputs, start the operation, and convert the transferred
 result. A blocking resource-release path MAY use the same adapter's explicit
 wait, but a binding MUST NOT add paired blocking and asynchronous workflows for
 ordinary operations.
@@ -1071,23 +1070,23 @@ that a real native failure would expose.
 
 ### Runtime and events
 
-| ID      | Test                                                                                                                                                                     |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| BND-080 | Native runtime work progresses without a host pump, and a runtime barrier completes after every preceding submission reaches a terminal disposition.                     |
-| BND-081 | Map style loading returns the expected copied map event through a drain and identifies the correct public map identity.                                                  |
-| BND-082 | Event message and payload data remain valid after the native batch is released because the binding copied them.                                                          |
-| BND-083 | An unknown event or payload domain preserves its raw value, and an unknown payload keeps the bytes that the batch's event stride reports.                                |
-| BND-084 | Operation result take and discard preserve status and diagnostic inspection until explicit release; a failed take before ownership transfer leaves the result retryable. |
-| BND-085 | Offline region observation returns copied status/error events through the public runtime event model.                                                                    |
-| BND-086 | A map-originated event with no provable live public map exposes no public map handle.                                                                                    |
-| BND-087 | A binding steps events by the batch's reported event stride.                                                                                                             |
-| BND-088 | An idle receiver resumes when native work makes a runtime event or operation endpoint ready, without polling either domain.                                              |
-| BND-089 | Notification-source release prevents later callback entries and public drains while associated endpoints remain safe until they detach.                                  |
-| BND-090 | One drain reports more than one event and preserves queue order.                                                                                                         |
-| BND-091 | The default subscription delivers every event type; a narrowed one delivers neither the cleared type nor readiness for it; an unknown bit is rejected.                   |
-| BND-092 | Two owned batches remain readable independently until release, and the values a binding copied out of them remain readable afterward.                                    |
-| BND-093 | Binding-owned cleanup that a style load drives still runs while the map's subscription leaves out the style-loaded type.                                                 |
-| BND-094 | Accepted commands expose their IDs and one terminal committed, failed, cancelled, or superseded disposition with copied diagnostic data.                                 |
+| ID      | Test                                                                                                                                                   |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| BND-080 | Native runtime work progresses without a host pump, and a runtime barrier completes after every preceding submission reaches a terminal disposition.   |
+| BND-081 | Map style loading returns the expected copied map event through a drain and identifies the correct public map identity.                                |
+| BND-082 | Event message and payload data remain valid after the native batch is released because the binding copied them.                                        |
+| BND-083 | An unknown event or payload domain preserves its raw value, and an unknown payload keeps the bytes that the batch's event stride reports.              |
+| BND-084 | A successful typed result take or finish consumes its operation; a failed take before ownership transfer leaves the operation retryable.               |
+| BND-085 | Offline region observation returns copied status/error events through the public runtime event model.                                                  |
+| BND-086 | A map-originated event with no provable live public map exposes no public map handle.                                                                  |
+| BND-087 | A binding steps events by the batch's reported event stride.                                                                                           |
+| BND-088 | An idle receiver resumes when native work makes a runtime event or operation endpoint ready, without polling either domain.                            |
+| BND-089 | Notification-source release prevents later callback entries and public drains while associated endpoints remain safe until they detach.                |
+| BND-090 | One drain reports more than one event and preserves queue order.                                                                                       |
+| BND-091 | The default subscription delivers every event type; a narrowed one delivers neither the cleared type nor readiness for it; an unknown bit is rejected. |
+| BND-092 | Two owned batches remain readable independently until release, and the values a binding copied out of them remain readable afterward.                  |
+| BND-093 | Binding-owned cleanup that a style load drives still runs while the map's subscription leaves out the style-loaded type.                               |
+| BND-094 | Accepted commands expose their IDs and one terminal committed, failed, cancelled, or superseded disposition with copied diagnostic data.               |
 
 ### Map, camera, projection, style, and query
 

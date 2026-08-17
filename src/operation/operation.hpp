@@ -44,38 +44,38 @@ class OperationObject final {
     char* out_diagnostic, std::size_t diagnostic_capacity,
     std::size_t* out_diagnostic_size
   ) -> mln_status;
-  auto discard_result() -> mln_status;
+  auto finish() -> OperationResultTransfer;
   auto release_observer() noexcept -> void;
 
   template <typename Result, typename Transfer>
   auto take_result(std::uint32_t expected_kind, Transfer&& transfer)
-    -> mln_status {
+    -> OperationResultTransfer {
     const std::scoped_lock lock(mutex_);
     if (kind_ != expected_kind) {
       set_operation_error(
         "operation result type does not match the take function"
       );
-      return MLN_STATUS_INVALID_ARGUMENT;
+      return {MLN_STATUS_INVALID_ARGUMENT, false};
     }
     if (!completed_) {
       set_operation_error("operation is still pending");
-      return MLN_STATUS_INVALID_STATE;
+      return {MLN_STATUS_INVALID_STATE, false};
     }
     if (status_ != MLN_STATUS_OK) {
       set_operation_error(
         diagnostic_.empty() ? "operation did not complete successfully"
                             : diagnostic_.c_str()
       );
-      return MLN_STATUS_INVALID_STATE;
+      return {MLN_STATUS_INVALID_STATE, false};
     }
     if (!result_available_) {
-      set_operation_error("operation result was already taken or discarded");
-      return MLN_STATUS_INVALID_STATE;
+      set_operation_error("operation was already finished");
+      return {MLN_STATUS_INVALID_STATE, false};
     }
     auto* result = std::any_cast<Result>(&result_);
     if (result == nullptr) {
       set_operation_error("operation result storage has the wrong type");
-      return MLN_STATUS_INVALID_STATE;
+      return {MLN_STATUS_INVALID_STATE, false};
     }
     const auto transfer_result = std::forward<Transfer>(transfer)(*result);
     auto transfer_status = MLN_STATUS_OK;
@@ -94,11 +94,11 @@ class OperationObject final {
       transfer_status = transfer_result;
     }
     if (transfer_status != MLN_STATUS_OK || !consume) {
-      return transfer_status;
+      return {transfer_status, false};
     }
     result_.reset();
     result_available_ = false;
-    return MLN_STATUS_OK;
+    return {MLN_STATUS_OK, true};
   }
 
  private:
@@ -144,7 +144,7 @@ auto copy_operation_diagnostic(
   mln_operation operation, char* out_diagnostic,
   std::size_t diagnostic_capacity, std::size_t* out_diagnostic_size
 ) -> mln_status;
-auto discard_operation_result(mln_operation operation) -> mln_status;
+auto finish_operation(mln_operation operation) -> mln_status;
 auto release_operation(mln_operation operation) noexcept -> void;
 
 template <typename Result, typename Transfer>
@@ -155,9 +155,12 @@ auto take_operation_result(
   if (live == nullptr) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  return live->take_result<Result>(
-    expected_kind, std::forward<Transfer>(transfer)
-  );
+  const auto taken =
+    live->take_result<Result>(expected_kind, std::forward<Transfer>(transfer));
+  if (taken.consume) {
+    release_operation(operation);
+  }
+  return taken.status;
 }
 
 }  // namespace mln::core

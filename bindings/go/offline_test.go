@@ -181,11 +181,11 @@ func TestOfflineCreateAndListTakeResultsCopyNativeData(t *testing.T) {
 	if info.ID == 0 {
 		t.Fatal("created offline region ID is zero")
 	}
-	if !errors.Is(create.Discard(), ErrInvalidState) {
-		t.Fatal("Discard() after Take did not report a consumed result")
+	if !errors.Is(create.Finish(), ErrInvalidState) {
+		t.Fatal("Finish() after Take did not report a consumed result")
 	}
-	if status, err := create.Status(); err != nil || status != 0 {
-		t.Fatalf("Status() after Take = (%d, %v), want (0, nil)", status, err)
+	if _, err := create.Status(); !errors.Is(err, ErrInvalidState) {
+		t.Fatalf("Status() after Take = %v, want ErrInvalidState", err)
 	}
 	if got := info.Metadata; len(got) != len(metadata) || got[0] != metadata[0] || got[1] != metadata[1] || got[2] != metadata[2] {
 		t.Fatalf("metadata = %v, want %v", got, metadata)
@@ -240,8 +240,8 @@ func TestOfflineOperationPollAndStatusReportCompletion(t *testing.T) {
 			if err != nil || diagnostic != "" {
 				t.Fatalf("Diagnostic() = (%q, %v), want (empty, nil)", diagnostic, err)
 			}
-			if err := operation.Discard(); err != nil {
-				t.Fatalf("Discard(): %v", err)
+			if err := operation.Finish(); err != nil {
+				t.Fatalf("Finish(): %v", err)
 			}
 			return
 		}
@@ -277,8 +277,8 @@ func TestSetMaximumAmbientCacheSizeReportsCompletion(t *testing.T) {
 			if err != nil || status != 0 {
 				t.Fatalf("Status() = (%d, %v), want (0, nil)", status, err)
 			}
-			if err := operation.Discard(); err != nil {
-				t.Fatalf("Discard(): %v", err)
+			if err := operation.Finish(); err != nil {
+				t.Fatalf("Finish(): %v", err)
 			}
 			return
 		}
@@ -345,12 +345,12 @@ func TestOfflineGeometryDefinitionMaterializesAndCopies(t *testing.T) {
 	}
 }
 
-func TestOfflineOperationSecondDiscardFailsAfterSuccess(t *testing.T) {
+func TestOfflineOperationSecondFinishFailsAfterSuccess(t *testing.T) {
 	runtime := newFakeRuntimeHandle(t)
 	defer closeFakeRuntimeHandle(t, runtime)
 
 	var calls int
-	restore := replaceOperationDiscardForTest(func(id uint64) int32 {
+	restore := replaceOperationFinishForTest(func(id uint64) int32 {
 		calls++
 		return 0
 	})
@@ -358,23 +358,23 @@ func TestOfflineOperationSecondDiscardFailsAfterSuccess(t *testing.T) {
 
 	operation := newOperationHandle[struct{}](runtime, 1, operationRegionSetObserved, operationResultNone)
 	defer operation.Release()
-	if err := operation.Discard(); err != nil {
-		t.Fatalf("Discard(): %v", err)
+	if err := operation.Finish(); err != nil {
+		t.Fatalf("Finish(): %v", err)
 	}
-	if err := operation.Discard(); !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("second Discard() = %v, want ErrInvalidState", err)
+	if err := operation.Finish(); !errors.Is(err, ErrInvalidState) {
+		t.Fatalf("second Finish() = %v, want ErrInvalidState", err)
 	}
 	if calls != 1 {
-		t.Fatalf("discard calls = %d, want 1", calls)
+		t.Fatalf("finish calls = %d, want 1", calls)
 	}
 }
 
-func TestOfflineOperationDiscardFailureLeavesHandleRetryable(t *testing.T) {
+func TestOfflineOperationFinishFailureLeavesHandleRetryable(t *testing.T) {
 	runtime := newFakeRuntimeHandle(t)
 	defer closeFakeRuntimeHandle(t, runtime)
 
 	statuses := []int32{-2, 0, 0}
-	restore := replaceOperationDiscardForTest(func(id uint64) int32 {
+	restore := replaceOperationFinishForTest(func(id uint64) int32 {
 		status := statuses[0]
 		statuses = statuses[1:]
 		return status
@@ -383,11 +383,11 @@ func TestOfflineOperationDiscardFailureLeavesHandleRetryable(t *testing.T) {
 
 	operation := newOperationHandle[struct{}](runtime, 1, operationRegionSetObserved, operationResultNone)
 	defer operation.Release()
-	if err := operation.Discard(); !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("Discard() failure = %v, want ErrInvalidState", err)
+	if err := operation.Finish(); !errors.Is(err, ErrInvalidState) {
+		t.Fatalf("Finish() failure = %v, want ErrInvalidState", err)
 	}
-	if err := operation.Discard(); err != nil {
-		t.Fatalf("Discard() retry: %v", err)
+	if err := operation.Finish(); err != nil {
+		t.Fatalf("Finish() retry: %v", err)
 	}
 }
 
@@ -395,7 +395,7 @@ func TestOfflineOperationBlocksRuntimeCloseUntilReleased(t *testing.T) {
 	runtime := newFakeRuntimeHandle(t)
 	defer closeFakeRuntimeHandle(t, runtime)
 
-	restore := replaceOperationDiscardForTest(func(id uint64) int32 {
+	restore := replaceOperationFinishForTest(func(id uint64) int32 {
 		return 0
 	})
 	defer restore()
@@ -408,26 +408,22 @@ func TestOfflineOperationBlocksRuntimeCloseUntilReleased(t *testing.T) {
 	if err := runtime.Close(); !errors.Is(err, ErrInvalidState) {
 		t.Fatalf("Runtime Close() with live offline operation = %v, want ErrInvalidState", err)
 	}
-	if err := operation.Discard(); err != nil {
-		t.Fatalf("Discard(): %v", err)
+	if err := operation.Finish(); err != nil {
+		t.Fatalf("Finish(): %v", err)
 	}
-	if err := runtime.Close(); !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("Runtime Close() after Discard() = %v, want ErrInvalidState", err)
-	}
-	operation.Release()
 	if err := runtime.Close(); err != nil {
-		t.Fatalf("Runtime Close() after Release(): %v", err)
+		t.Fatalf("Runtime Close() after Finish(): %v", err)
 	}
 }
 
-func TestOfflineOperationDiscardSerializesConcurrentCalls(t *testing.T) {
+func TestOfflineOperationFinishSerializesConcurrentCalls(t *testing.T) {
 	runtime := newFakeRuntimeHandle(t)
 	defer closeFakeRuntimeHandle(t, runtime)
 
 	entered := make(chan struct{})
 	release := make(chan struct{})
 	var calls atomic.Int32
-	restore := replaceOperationDiscardForTest(func(id uint64) int32 {
+	restore := replaceOperationFinishForTest(func(id uint64) int32 {
 		if calls.Add(1) == 1 {
 			close(entered)
 			<-release
@@ -440,29 +436,29 @@ func TestOfflineOperationDiscardSerializesConcurrentCalls(t *testing.T) {
 	defer operation.Release()
 	firstDone := make(chan error, 1)
 	secondDone := make(chan error, 1)
-	go func() { firstDone <- operation.Discard() }()
+	go func() { firstDone <- operation.Finish() }()
 	<-entered
 	secondStarted := make(chan struct{})
 	go func() {
 		close(secondStarted)
-		secondDone <- operation.Discard()
+		secondDone <- operation.Finish()
 	}()
 	<-secondStarted
 	select {
 	case err := <-secondDone:
-		t.Fatalf("second Discard() completed while first discard was in flight: %v", err)
+		t.Fatalf("second Finish() completed while first finish was in flight: %v", err)
 	case <-time.After(25 * time.Millisecond):
 	}
 
 	close(release)
 	if err := <-firstDone; err != nil {
-		t.Fatalf("first Discard(): %v", err)
+		t.Fatalf("first Finish(): %v", err)
 	}
 	if err := <-secondDone; !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("second Discard() = %v, want ErrInvalidState", err)
+		t.Fatalf("second Finish() = %v, want ErrInvalidState", err)
 	}
 	if calls.Load() != 1 {
-		t.Fatalf("native discard calls = %d, want 1", calls.Load())
+		t.Fatalf("native finish calls = %d, want 1", calls.Load())
 	}
 }
 
@@ -501,12 +497,12 @@ func TestOperationReleaseWaitsForActiveUses(t *testing.T) {
 	}
 }
 
-func TestOfflineOperationTakeRejectsNoResultOperationWithoutDiscarding(t *testing.T) {
+func TestOfflineOperationTakeRejectsNoResultOperationWithoutFinishing(t *testing.T) {
 	runtime := newFakeRuntimeHandle(t)
 	defer closeFakeRuntimeHandle(t, runtime)
 
 	var calls int
-	restore := replaceOperationDiscardForTest(func(id uint64) int32 {
+	restore := replaceOperationFinishForTest(func(id uint64) int32 {
 		calls++
 		return 0
 	})
@@ -517,11 +513,11 @@ func TestOfflineOperationTakeRejectsNoResultOperationWithoutDiscarding(t *testin
 	if _, err := operation.Take(); !errors.Is(err, ErrInvalidState) {
 		t.Fatalf("Take() no-result operation = %v, want ErrInvalidState", err)
 	}
-	if err := operation.Discard(); err != nil {
-		t.Fatalf("Discard() after rejected Take: %v", err)
+	if err := operation.Finish(); err != nil {
+		t.Fatalf("Finish() after rejected Take: %v", err)
 	}
 	if calls != 1 {
-		t.Fatalf("discard calls = %d, want 1", calls)
+		t.Fatalf("finish calls = %d, want 1", calls)
 	}
 }
 
@@ -529,7 +525,7 @@ func TestOfflineOperationTakePreConsumeMismatchRemainsRetryable(t *testing.T) {
 	runtime := newFakeRuntimeHandle(t)
 	defer closeFakeRuntimeHandle(t, runtime)
 
-	restore := replaceOperationDiscardForTest(func(id uint64) int32 {
+	restore := replaceOperationFinishForTest(func(id uint64) int32 {
 		return 0
 	})
 	defer restore()
@@ -539,8 +535,8 @@ func TestOfflineOperationTakePreConsumeMismatchRemainsRetryable(t *testing.T) {
 	if _, err := preConsume.Take(); !errors.Is(err, ErrInvalidState) {
 		t.Fatalf("Take() pre-consume mismatch = %v, want ErrInvalidState", err)
 	}
-	if err := preConsume.Discard(); err != nil {
-		t.Fatalf("Discard() after pre-consume mismatch: %v", err)
+	if err := preConsume.Finish(); err != nil {
+		t.Fatalf("Finish() after pre-consume mismatch: %v", err)
 	}
 }
 
@@ -573,11 +569,11 @@ func closeFakeRuntimeHandle(t *testing.T, runtime *RuntimeHandle) {
 	}
 }
 
-func replaceOperationDiscardForTest(discard func(uint64) int32) func() {
-	previous := operationDiscard
-	operationDiscard = discard
+func replaceOperationFinishForTest(finish func(uint64) int32) func() {
+	previous := operationFinish
+	operationFinish = finish
 	return func() {
-		operationDiscard = previous
+		operationFinish = previous
 	}
 }
 

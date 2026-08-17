@@ -47,11 +47,10 @@ extern "C" MLN_API auto mln_operation_copy_diagnostic(
   });
 }
 
-extern "C" MLN_API auto mln_operation_discard_result(
-  mln_operation operation
-) noexcept -> mln_status {
+extern "C" MLN_API auto mln_operation_finish(mln_operation operation) noexcept
+  -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::discard_operation_result(operation);
+    return mln::core::finish_operation(operation);
   });
 }
 

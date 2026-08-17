@@ -496,8 +496,8 @@ internal object NativeAccess {
     MapLibreNativeC.mln_operation_release(operation)
   }
 
-  internal fun discardOperation(operation: Long): Int =
-    MapLibreNativeC.mln_operation_discard_result(operation)
+  internal fun finishOperation(operation: Long): Int =
+    MapLibreNativeC.mln_operation_finish(operation)
 
   internal fun pollOperation(operation: Long): Boolean =
     Arena.ofConfined().use { arena ->

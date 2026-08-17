@@ -40,10 +40,9 @@ static void runtime_creation_returns_an_operation_result(void) {
   );
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, runtime);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_STATE,
+    MLN_STATUS_INVALID_ARGUMENT,
     mln_runtime_create_take_result(creation, &(mln_runtime){MLN_HANDLE_NULL})
   );
-  mln_operation_release(creation);
 
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_release(runtime));
   mln_notification_source_release(source);

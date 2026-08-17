@@ -777,6 +777,7 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
         defer required.lease.release();
         var buffer: c.mln_buffer = 0;
         try status.checkStatus(c.mln_render_session_get_feature_state_take_result(required.lease.native, &buffer), lease.diagnostic_store);
+        required.lease.consume();
         return (try native_temp.copyOwnedBuffer(allocator, buffer, lease.diagnostic_store)) orelse error.NativeError;
     }
 
@@ -820,6 +821,7 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
         defer required.lease.release();
         var result: c.mln_queried_feature_list = 0;
         try status.checkStatus(c.mln_render_query_features_take_result(required.lease.native, &result), lease.diagnostic_store);
+        required.lease.consume();
         defer c.mln_queried_feature_list_destroy(result);
         return try copyQueriedFeatureList(allocator, result, lease.diagnostic_store);
     }
@@ -850,6 +852,7 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
         defer required.lease.release();
         var buffer: c.mln_buffer = 0;
         try status.checkStatus(c.mln_render_query_take_result(required.lease.native, &buffer), lease.diagnostic_store);
+        required.lease.consume();
         return (try native_temp.copyOwnedBuffer(allocator, buffer, lease.diagnostic_store)) orelse error.NativeError;
     }
 
@@ -869,6 +872,7 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
         var buffer: c.mln_buffer = 0;
         var info = c.mln_texture_image_info_default();
         try status.checkStatus(c.mln_texture_read_premultiplied_rgba8_take_result(required.lease.native, &buffer, &info), lease.diagnostic_store);
+        required.lease.consume();
         const data = try copyNativeBuffer(allocator, buffer, lease.diagnostic_store);
         return .{ .allocator = allocator, .data = data, .info = textureImageInfoFromNative(info) };
     }

@@ -126,10 +126,7 @@ import Testing
   #expect(try operation.poll())
   #expect(try operation.status() == MLN_STATUS_OK.rawValue)
   #expect(try operation.diagnostic().isEmpty)
-  try operation.discard()
-  #expect(!operation.isClosed)
-  #expect(try operation.status() == MLN_STATUS_OK.rawValue)
-  try operation.close()
+  try operation.finish()
   #expect(operation.isClosed)
 }
 
@@ -147,13 +144,13 @@ import Testing
 
   _ = try operation.wait(timeoutMilliseconds: 10000)
   if try operation.poll() {
-    try operation.discard()
+    try operation.finish()
   }
   try operation.close()
   try runtime.close()
 }
 
-@Test func typedTakeConsumesResultButKeepsObserverOpen() async throws {
+@Test func typedTakeConsumesOperation() async throws {
   let runtime =
     try await RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.closeBlockingForTests() }
@@ -163,8 +160,7 @@ import Testing
   #expect(try operation.status() == MLN_STATUS_OK.rawValue)
   #expect(try runtime.offlineRegionsListTakeResult(operation: operation)
     .isEmpty)
-  #expect(!operation.isClosed)
-  #expect(try operation.status() == MLN_STATUS_OK.rawValue)
+  #expect(operation.isClosed)
 
   do {
     _ = try runtime.offlineRegionsListTakeResult(operation: operation)
@@ -172,7 +168,6 @@ import Testing
   } catch let error as MaplibreError {
     #expect(error.kind == .invalidState)
   }
-  try operation.close()
 }
 
 @Test func closedRuntimeRejectsOfflineCallsThroughSwiftHandleState(

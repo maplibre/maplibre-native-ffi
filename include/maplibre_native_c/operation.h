@@ -2,6 +2,11 @@
  * @file maplibre_native_c/operation.h
  * Common asynchronous operation API.
  *
+ * Inspect completion, terminal status, and diagnostics before taking a typed
+ * result or calling mln_operation_finish. Either successful action consumes
+ * the operation handle. Call mln_operation_release only to abandon an
+ * operation that has not been consumed.
+ *
  * This header targets C23.
  */
 
@@ -56,7 +61,7 @@ MLN_API mln_status mln_operation_wait(
 MLN_API mln_status mln_operation_cancel(mln_operation operation) MLN_NOEXCEPT;
 
 /**
- * Copies the terminal status of a completed operation.
+ * Copies the terminal status of a completed operation before it is consumed.
  *
  * A pending operation returns MLN_STATUS_INVALID_STATE. The function's own
  * return value reports inspection failure; out_status receives the operation's
@@ -67,7 +72,7 @@ MLN_API mln_status mln_operation_get_status(
 ) MLN_NOEXCEPT;
 
 /**
- * Copies the completed operation's diagnostic bytes.
+ * Copies a completed operation's diagnostic before it is consumed.
  *
  * The bytes are UTF-8 and are not null-terminated. A null out_diagnostic with a
  * zero capacity is a size probe. out_diagnostic_size receives the required
@@ -80,14 +85,14 @@ MLN_API mln_status mln_operation_copy_diagnostic(
 ) MLN_NOEXCEPT;
 
 /**
- * Discards an untaken result from a completed operation.
+ * Finishes a completed operation without taking a typed result.
  *
- * The operation remains live for status and diagnostic inspection. A pending
- * operation or an operation whose result was already taken or discarded
- * returns MLN_STATUS_INVALID_STATE.
+ * A successful call consumes the operation handle and discards any untaken
+ * result. Inspect the terminal status and diagnostic before calling this
+ * function when they are needed. A pending operation returns
+ * MLN_STATUS_INVALID_STATE and remains live.
  */
-MLN_API mln_status
-mln_operation_discard_result(mln_operation operation) MLN_NOEXCEPT;
+MLN_API mln_status mln_operation_finish(mln_operation operation) MLN_NOEXCEPT;
 
 /**
  * Releases the public observer for an operation.
@@ -95,8 +100,8 @@ mln_operation_discard_result(mln_operation operation) MLN_NOEXCEPT;
  * A null or already released handle is a no-op. Releasing a pending operation
  * requests cancellation when cancellation is supported, detaches its
  * notification endpoint, and lets internal work finish without publishing a
- * result. Releasing a completed operation destroys an untaken result. This
- * function may be called from any thread.
+ * result. Releasing a completed operation abandons an untaken typed result.
+ * This function may be called from any thread.
  */
 MLN_API void mln_operation_release(mln_operation operation) MLN_NOEXCEPT;
 

@@ -359,8 +359,6 @@ pub(crate) struct OperationRegistry {
 struct OperationState {
     live: bool,
     closing: bool,
-    result_consumed: bool,
-    result_in_use: bool,
     active_uses: usize,
 }
 
@@ -443,7 +441,6 @@ impl<T> fmt::Debug for OperationHandle<T> {
             .field("operation", &self.operation)
             .field("operation_kind", &self.operation_kind)
             .field("live", &state.live)
-            .field("result_consumed", &state.result_consumed)
             .finish()
     }
 }
@@ -464,9 +461,7 @@ impl<T> OperationHandle<T> {
             state: Mutex::new(OperationState {
                 live: true,
                 closing: false,
-                result_consumed: false,
                 active_uses: 0,
-                result_in_use: false,
             }),
             idle: Condvar::new(),
             _result: PhantomData,
@@ -503,37 +498,35 @@ impl<T> OperationHandle<T> {
         &self,
         call: impl FnOnce(sys::mln_operation) -> Result<R>,
     ) -> Result<R> {
-        {
-            let mut state = self
-                .state
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner());
-            if !state.live || state.closing {
-                return Err(closed_handle_error("OperationHandle"));
-            }
-            if state.result_consumed || state.result_in_use {
-                return Err(Error::new(
-                    ErrorKind::InvalidState,
-                    None,
-                    "operation result was already taken, discarded, or is being consumed",
-                ));
-            }
-            state.result_in_use = true;
-            state.active_uses += 1;
+        let mut state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if !state.live || state.closing {
+            return Err(closed_handle_error("OperationHandle"));
         }
+        state.closing = true;
+        while state.active_uses != 0 {
+            state = self
+                .idle
+                .wait(state)
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+        }
+        state.active_uses = 1;
+        drop(state);
+
         let result = call(self.operation);
         let mut state = self
             .state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        state.result_in_use = false;
-        state.active_uses -= 1;
+        state.active_uses = 0;
+        state.closing = false;
         if result.is_ok() {
-            state.result_consumed = true;
+            state.live = false;
+            self.registry.live.fetch_sub(1, Ordering::Release);
         }
-        if state.active_uses == 0 {
-            self.idle.notify_all();
-        }
+        self.idle.notify_all();
         result
     }
     fn release_native(&self) {
@@ -628,11 +621,11 @@ impl<T> OperationHandle<T> {
         })
     }
 
-    /// Discards an untaken terminal result while retaining the observer.
-    pub fn discard(&self) -> Result<()> {
+    /// Finishes the operation without taking its typed result.
+    pub fn finish(&self) -> Result<()> {
         self.with_result_operation(|operation| {
             // SAFETY: The leased operation is live.
-            maplibre_core::check(unsafe { sys::mln_operation_discard_result(operation) })
+            maplibre_core::check(unsafe { sys::mln_operation_finish(operation) })
         })
     }
 
@@ -649,7 +642,7 @@ impl<T> Drop for OperationHandle<T> {
 }
 
 impl OperationHandle<OfflineRegionInfo> {
-    /// Takes a completed create/update result while retaining the observer.
+    /// Takes a completed create/update result and consumes the operation.
     pub fn take(&self) -> Result<OfflineRegionInfo> {
         let mut out = maplibre_core::ptr::OutHandle::<sys::mln_offline_region_snapshot>::new();
         self.with_result_operation(|operation| {
@@ -675,7 +668,7 @@ impl OperationHandle<OfflineRegionInfo> {
 }
 
 impl OperationHandle<Option<OfflineRegionInfo>> {
-    /// Takes a completed get result while retaining the observer.
+    /// Takes a completed get result and consumes the operation.
     pub fn take(&self) -> Result<Option<OfflineRegionInfo>> {
         let mut out = maplibre_core::ptr::OutHandle::<sys::mln_offline_region_snapshot>::new();
         let mut found = false;
@@ -702,7 +695,7 @@ impl OperationHandle<Option<OfflineRegionInfo>> {
 }
 
 impl OperationHandle<Vec<OfflineRegionInfo>> {
-    /// Takes a completed list/merge result while retaining the observer.
+    /// Takes a completed list/merge result and consumes the operation.
     pub fn take(&self) -> Result<Vec<OfflineRegionInfo>> {
         let mut out = maplibre_core::ptr::OutHandle::<sys::mln_offline_region_list>::new();
         self.with_result_operation(|operation| {
@@ -728,7 +721,7 @@ impl OperationHandle<Vec<OfflineRegionInfo>> {
 }
 
 impl OperationHandle<OfflineRegionStatus> {
-    /// Takes a completed status result while retaining the observer.
+    /// Takes a completed status result and consumes the operation.
     pub fn take(&self) -> Result<OfflineRegionStatus> {
         let mut raw = maplibre_core::events::empty_offline_region_status_native();
         self.with_result_operation(|operation| {
@@ -1526,7 +1519,7 @@ mod tests {
         ] {
             let operation = runtime.start_ambient_cache_operation(operation).unwrap();
             wait_for_operation(&mut runtime, &operation).unwrap();
-            operation.discard().unwrap();
+            operation.finish().unwrap();
             operation.release();
         }
 
@@ -1547,7 +1540,7 @@ mod tests {
         for size in [8 * 1024 * 1024, 0] {
             let operation = runtime.start_set_maximum_ambient_cache_size(size).unwrap();
             wait_for_operation(&mut runtime, &operation).unwrap();
-            operation.discard().unwrap();
+            operation.finish().unwrap();
             operation.release();
         }
 
@@ -1568,9 +1561,7 @@ mod tests {
         assert_eq!(error.kind(), ErrorKind::InvalidState);
         runtime = error.into_handle();
         wait_for_operation(&mut runtime, &operation).unwrap();
-        operation.discard().unwrap();
-        assert_eq!(operation.terminal_status().unwrap(), sys::MLN_STATUS_OK);
-        operation.release();
+        operation.finish().unwrap();
         runtime.close().unwrap();
     }
 
@@ -1645,7 +1636,7 @@ mod tests {
             )
             .unwrap();
         wait_for_operation(&mut runtime, &set_inactive).unwrap();
-        set_inactive.discard().unwrap();
+        set_inactive.finish().unwrap();
         set_inactive.release();
         let error = runtime
             .start_set_offline_region_download_state(
@@ -1659,27 +1650,27 @@ mod tests {
             .start_set_offline_region_observed(created.id, true)
             .unwrap();
         wait_for_operation(&mut runtime, &observe).unwrap();
-        observe.discard().unwrap();
+        observe.finish().unwrap();
         observe.release();
         let unobserve = runtime
             .start_set_offline_region_observed(created.id, false)
             .unwrap();
         wait_for_operation(&mut runtime, &unobserve).unwrap();
-        unobserve.discard().unwrap();
+        unobserve.finish().unwrap();
         unobserve.release();
         let invalidate = runtime.start_invalidate_offline_region(created.id).unwrap();
         wait_for_operation(&mut runtime, &invalidate).unwrap();
-        invalidate.discard().unwrap();
+        invalidate.finish().unwrap();
         invalidate.release();
         let delete = runtime.start_delete_offline_region(created.id).unwrap();
         wait_for_operation(&mut runtime, &delete).unwrap();
-        delete.discard().unwrap();
+        delete.finish().unwrap();
         delete.release();
         let delete_geometry = runtime
             .start_delete_offline_region(geometry_region.id)
             .unwrap();
         wait_for_operation(&mut runtime, &delete_geometry).unwrap();
-        delete_geometry.discard().unwrap();
+        delete_geometry.finish().unwrap();
         delete_geometry.release();
 
         let missing_created = runtime.start_offline_region(created.id).unwrap();
@@ -1893,7 +1884,7 @@ mod tests {
             for operation in [first.join().unwrap(), second.join().unwrap()] {
                 assert!(operation.wait(Duration::from_secs(5)).unwrap());
                 assert_eq!(operation.terminal_status().unwrap(), sys::MLN_STATUS_OK);
-                operation.discard().unwrap();
+                operation.finish().unwrap();
             }
         });
         runtime.close().unwrap();
@@ -2639,7 +2630,7 @@ mod tests {
         let command_id = map.set_style_json(b"{").unwrap();
         let barrier = runtime.start_barrier().unwrap();
         assert!(barrier.wait(Duration::from_secs(5)).unwrap());
-        barrier.discard().unwrap();
+        barrier.finish().unwrap();
         barrier.release();
 
         let batch = runtime.drain_events().unwrap();

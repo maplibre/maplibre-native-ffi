@@ -2211,7 +2211,7 @@ external int mln_operation_copy_diagnostic(
 );
 
 @ffi.Native<ffi.Int32 Function(mln_operation)>()
-external int mln_operation_discard_result(int operation);
+external int mln_operation_finish(int operation);
 
 @ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<ffi.Int32>)>()
 external int mln_operation_get_status(

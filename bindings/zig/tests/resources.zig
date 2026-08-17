@@ -44,20 +44,20 @@ fn runAmbientCacheOperation(runtime: *maplibre.RuntimeHandle, operation: maplibr
     const handle = try runtime.startAmbientCacheOperation(operation);
     defer handle.release();
     _ = waitForOfflineOperation(runtime, handle) catch |err| {
-        handle.discard() catch {};
+        handle.finish() catch {};
         return err;
     };
-    try handle.discard();
+    try handle.finish();
 }
 
 fn setMaximumAmbientCacheSize(runtime: *maplibre.RuntimeHandle, size: u64) !void {
     const handle = try runtime.startSetMaximumAmbientCacheSize(size);
     defer handle.release();
     _ = waitForOfflineOperation(runtime, handle) catch |err| {
-        handle.discard() catch {};
+        handle.finish() catch {};
         return err;
     };
-    try handle.discard();
+    try handle.finish();
 }
 
 fn createOfflineRegion(
@@ -124,10 +124,10 @@ fn setOfflineRegionObserved(runtime: *maplibre.RuntimeHandle, region_id: maplibr
     const handle = try runtime.startSetOfflineRegionObserved(region_id, observed);
     defer handle.release();
     _ = waitForOfflineOperation(runtime, handle) catch |err| {
-        handle.discard() catch {};
+        handle.finish() catch {};
         return err;
     };
-    try handle.discard();
+    try handle.finish();
 }
 
 fn setOfflineRegionDownloadState(
@@ -138,30 +138,30 @@ fn setOfflineRegionDownloadState(
     const handle = try runtime.startSetOfflineRegionDownloadState(region_id, download_state);
     defer handle.release();
     _ = waitForOfflineOperation(runtime, handle) catch |err| {
-        handle.discard() catch {};
+        handle.finish() catch {};
         return err;
     };
-    try handle.discard();
+    try handle.finish();
 }
 
 fn invalidateOfflineRegion(runtime: *maplibre.RuntimeHandle, region_id: maplibre.OfflineRegionId) !void {
     const handle = try runtime.startInvalidateOfflineRegion(region_id);
     defer handle.release();
     _ = waitForOfflineOperation(runtime, handle) catch |err| {
-        handle.discard() catch {};
+        handle.finish() catch {};
         return err;
     };
-    try handle.discard();
+    try handle.finish();
 }
 
 fn deleteOfflineRegion(runtime: *maplibre.RuntimeHandle, region_id: maplibre.OfflineRegionId) !void {
     const handle = try runtime.startDeleteOfflineRegion(region_id);
     defer handle.release();
     _ = waitForOfflineOperation(runtime, handle) catch |err| {
-        handle.discard() catch {};
+        handle.finish() catch {};
         return err;
     };
-    try handle.discard();
+    try handle.finish();
 }
 
 fn waitForStyleLoaded(runtime: *maplibre.RuntimeHandle) !void {

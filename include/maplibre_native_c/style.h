@@ -42,8 +42,8 @@ typedef uint64_t mln_geojson_source_data;
  * descriptions in the paired declaration apply to `_take_result`, not
  * `_start`. A typed take transfers owned list and buffer handles to the caller.
  * A wrong typed take or insufficient output capacity leaves the result
- * available for a later retry. `mln_operation_discard_result` destroys any
- * unclaimed owned result.
+ * available for a later retry. A successful typed take consumes the operation.
+ * `mln_operation_finish` consumes it without transferring the result.
  *
  * All declarations in this header are callable from any thread. Command and
  * operation-start return values describe validation and acceptance failures.

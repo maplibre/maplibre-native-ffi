@@ -218,19 +218,19 @@ auto OperationObject::copy_diagnostic(
   return MLN_STATUS_OK;
 }
 
-auto OperationObject::discard_result() -> mln_status {
+auto OperationObject::finish() -> OperationResultTransfer {
   const std::scoped_lock lock(mutex_);
   if (!completed_) {
     set_thread_error("operation is still pending");
-    return MLN_STATUS_INVALID_STATE;
+    return {MLN_STATUS_INVALID_STATE, false};
   }
   if (!result_available_) {
-    set_thread_error("operation result was already taken or discarded");
-    return MLN_STATUS_INVALID_STATE;
+    set_thread_error("operation was already finished");
+    return {MLN_STATUS_INVALID_STATE, false};
   }
   result_.reset();
   result_available_ = false;
-  return MLN_STATUS_OK;
+  return {MLN_STATUS_OK, true};
 }
 
 auto OperationObject::release_observer() noexcept -> void {
@@ -361,9 +361,16 @@ auto copy_operation_diagnostic(
              );
 }
 
-auto discard_operation_result(mln_operation operation) -> mln_status {
+auto finish_operation(mln_operation operation) -> mln_status {
   const auto live = lease_operation(operation);
-  return live == nullptr ? MLN_STATUS_INVALID_ARGUMENT : live->discard_result();
+  if (live == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto finished = live->finish();
+  if (finished.consume) {
+    release_operation(operation);
+  }
+  return finished.status;
 }
 
 auto release_operation(mln_operation operation) noexcept -> void {

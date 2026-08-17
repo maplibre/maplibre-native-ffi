@@ -27,7 +27,7 @@ static mln_status finish_operation(
   mln_runtime runtime, mln_operation operation
 ) {
   const mln_status status = await_operation(runtime, operation);
-  mln_operation_discard_result(operation);
+  mln_operation_finish(operation);
   mln_operation_release(operation);
   return status;
 }
@@ -53,11 +53,9 @@ size_t delete_other_regions(mln_runtime runtime, const char* keep_metadata) {
     mln_runtime_offline_regions_list_take_result(list_operation, &list);
   }
   if (list == MLN_HANDLE_NULL) {
-    mln_operation_discard_result(list_operation);
-    mln_operation_release(list_operation);
+    mln_operation_finish(list_operation);
     return 0;
   }
-  mln_operation_release(list_operation);
   // #endregion result
 
   size_t deleted = 0;

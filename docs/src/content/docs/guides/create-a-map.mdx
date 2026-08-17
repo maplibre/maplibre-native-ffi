@@ -23,7 +23,7 @@ ready drain returns an owned batch; release it after reading its endpoint view.
 <Code code={region(createMap, "runtime")} lang="c" title="create-map.c" />
 
 Runtime creation returns an operation, not a runtime handle. Wait for terminal
-success, take the runtime result once, and release the operation observer. Map
+success and take the runtime result once; the take consumes the operation. Map
 creation follows the same pattern and reserves its runtime dependency as soon as
 the request is accepted.
 

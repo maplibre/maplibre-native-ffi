@@ -267,17 +267,13 @@ func (runtime *RuntimeHandle) StartDeleteOfflineRegion(id OfflineRegionID) (*Ope
 }
 
 // Take consumes a completed operation result and copies it into Go values. If
-// native reports that the result is not ready, the result remains available
-// for retry. The operation remains live for status and diagnostic inspection
-// until Release is called.
+// native reports that the result is not ready, the operation remains available
+// for retry. A successful take consumes the operation.
 func (operation *OperationHandle[T]) Take() (T, error) {
 	var zero T
-	id, kind, resultKind, consumed, err := operation.beginResultUse()
+	id, kind, resultKind, err := operation.beginResultUse()
 	if err != nil {
 		return zero, err
-	}
-	if consumed {
-		return zero, newBindingError(ErrInvalidState, "operation result was already consumed")
 	}
 	var result T
 	var transferred bool
@@ -297,7 +293,7 @@ func takeOfflineOperationResult[T any](id C.mln_operation, kind operationKind, r
 	var zero T
 	switch resultKind {
 	case operationResultNone:
-		return zero, false, newBindingError(ErrInvalidState, "offline operation does not produce a take result; discard it after completion")
+		return zero, false, newBindingError(ErrInvalidState, "offline operation does not produce a take result; finish it after completion")
 	case operationResultRegion:
 		var snapshot C.mln_offline_region_snapshot
 		var err error

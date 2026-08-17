@@ -61,6 +61,8 @@ internal class OperationHandleCore(
     resultConsumed.store(1)
   }
 
+  fun hasConsumedResult(): Boolean = resultConsumed.load() != 0
+
   /** Prevents new uses and waits until every use that already started has returned. */
   fun beginClose(): Boolean {
     while (true) {

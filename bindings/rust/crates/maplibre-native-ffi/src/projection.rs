@@ -323,7 +323,7 @@ mod tests {
         map.update_camera(&update).unwrap();
         let barrier = runtime.start_barrier().unwrap();
         assert!(barrier.wait(std::time::Duration::from_secs(5)).unwrap());
-        barrier.discard().unwrap();
+        barrier.finish().unwrap();
         barrier.release();
         assert_eq!(projection.camera().unwrap(), creation_camera);
 

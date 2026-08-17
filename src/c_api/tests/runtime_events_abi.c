@@ -706,8 +706,7 @@ static void copied_operation_diagnostics_are_stable_across_threads(void) {
     mln_runtime_offline_regions_merge_database_take_result(operation, &regions)
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, regions);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_operation_discard_result(operation));
-  mln_operation_release(operation);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_operation_finish(operation));
   mln_test_destroy_runtime(runtime);
 }
 

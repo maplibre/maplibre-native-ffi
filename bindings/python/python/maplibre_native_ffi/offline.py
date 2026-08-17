@@ -185,8 +185,8 @@ class OperationHandle(
         if raw_status != MaplibreStatus.OK.native_code:
             raise _from_native_status(raw_status, diagnostic)
 
-    def discard(self) -> None:
-        """Discard the completed result while keeping the observer live."""
+    def finish(self) -> None:
+        """Finish the operation without taking its typed result."""
         with self._use() as operation:
             with self._state_lock:
                 if self._result_consumed or self._result_in_use:
@@ -197,7 +197,7 @@ class OperationHandle(
                     )
                 self._result_in_use = True
             try:
-                self._runtime._native.operation_discard(operation)
+                self._runtime._native.operation_finish(operation)
             except BaseException:
                 with self._state_lock:
                     self._result_in_use = False
@@ -205,36 +205,51 @@ class OperationHandle(
             with self._state_lock:
                 self._result_in_use = False
                 self._result_consumed = True
+        self._retire_consumed()
 
     def take(self) -> _T:
-        """Take this operation's typed result while keeping the observer live."""
-        with self._use() as operation:
-            with self._state_lock:
-                if self._result_consumed or self._result_in_use:
-                    raise InvalidStateError(
-                        None, "operation result is already consumed"
-                    )
-                take_result = self._take_result
-                adapt_result = self._adapt_result
-                if take_result is None or adapt_result is None:
-                    raise InvalidStateError(None, "operation has no typed result")
-                self._result_in_use = True
-            try:
-                self.raise_for_status()
-                raw = take_result(operation)
-            except _OperationResultConsumedError:
+        """Take this operation's typed result and consume the operation."""
+        consumed = False
+        try:
+            with self._use() as operation:
                 with self._state_lock:
-                    self._result_in_use = False
-                    self._result_consumed = True
-                raise
-            except BaseException:
-                with self._state_lock:
-                    self._result_in_use = False
-                raise
-            with self._state_lock:
-                self._result_in_use = False
-                self._result_consumed = True
+                    if self._result_consumed or self._result_in_use:
+                        raise InvalidStateError(
+                            None, "operation result is already consumed"
+                        )
+                    take_result = self._take_result
+                    adapt_result = self._adapt_result
+                    if take_result is None or adapt_result is None:
+                        raise InvalidStateError(None, "operation has no typed result")
+                    self._result_in_use = True
+                try:
+                    self.raise_for_status()
+                    raw = take_result(operation)
+                    consumed = True
+                except _OperationResultConsumedError:
+                    consumed = True
+                    raise
+                finally:
+                    with self._state_lock:
+                        self._result_in_use = False
+                        self._result_consumed = consumed
             return adapt_result(raw)
+        finally:
+            if consumed:
+                self._retire_consumed()
+
+    def _retire_consumed(self) -> None:
+        with self._state_lock:
+            if self._closed:
+                return
+            self._closing = True
+            while self._active_uses:
+                self._idle.wait()
+            self._closed = True
+            self._closing = False
+            self._idle.notify_all()
+        self._runtime._unregister_operation(self)
+        self._retained_owner = None
 
 
 @dataclass(frozen=True, slots=True)

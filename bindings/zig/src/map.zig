@@ -540,6 +540,7 @@ pub const MapHandle = enum(c.mln_map) {
         raw.size = @sizeOf(c.mln_style_layer_info);
         var found = false;
         try status.checkStatus(c.mln_map_get_style_layer_info_take_result(required.lease.native, &raw, &found), state.diagnostic_store);
+        required.lease.consume();
         if (!found) return null;
         const type_data: [*]const u8 = @ptrCast(raw.type.data orelse return error.NativeError);
         return .{
@@ -566,6 +567,7 @@ pub const MapHandle = enum(c.mln_map) {
         defer required.lease.release();
         var list: c.mln_style_id_list = 0;
         try status.checkStatus(c.mln_map_list_style_source_ids_take_result(required.lease.native, &list), state.diagnostic_store);
+        required.lease.consume();
         defer c.mln_style_id_list_destroy(list);
         return copyStyleIdList(allocator, list, state.diagnostic_store);
     }
@@ -584,6 +586,7 @@ pub const MapHandle = enum(c.mln_map) {
         defer required.lease.release();
         var list: c.mln_style_id_list = 0;
         try status.checkStatus(c.mln_map_list_style_layer_ids_take_result(required.lease.native, &list), state.diagnostic_store);
+        required.lease.consume();
         defer c.mln_style_id_list_destroy(list);
         return copyStyleIdList(allocator, list, state.diagnostic_store);
     }
@@ -629,6 +632,7 @@ pub const MapHandle = enum(c.mln_map) {
         raw.size = @sizeOf(c.mln_style_source_info);
         var found = false;
         try status.checkStatus(c.mln_map_get_style_source_info_take_result(required.lease.native, &raw, &found), state.diagnostic_store);
+        required.lease.consume();
         if (!found) return null;
         return .{
             .source_type = values.styleSourceTypeFromNative(raw.type),
@@ -679,6 +683,7 @@ pub const MapHandle = enum(c.mln_map) {
         var list: c.mln_style_string_list = 0;
         var found = false;
         try status.checkStatus(c.mln_map_get_style_source_tile_urls_take_result(required.lease.native, &list, &found), state.diagnostic_store);
+        required.lease.consume();
         if (!found) return null;
         defer c.mln_style_string_list_destroy(list);
         return try copyStyleStringList(allocator, list, state.diagnostic_store);
@@ -779,6 +784,7 @@ pub const MapHandle = enum(c.mln_map) {
         defer required.lease.release();
         var raw = c.mln_style_transition_options_default();
         try status.checkStatus(c.mln_map_get_style_transition_options_take_result(required.lease.native, &raw), state.diagnostic_store);
+        required.lease.consume();
         return values.styleTransitionOptionsFromNative(raw);
     }
 
@@ -995,6 +1001,7 @@ pub const MapHandle = enum(c.mln_map) {
             &y_count,
             &found,
         ), state.diagnostic_store);
+        required.lease.consume();
         const stretch_x = try allocator.alloc(values.ImageStretch, x_count);
         errdefer allocator.free(stretch_x);
         const stretch_y = try allocator.alloc(values.ImageStretch, y_count);
@@ -1022,6 +1029,7 @@ pub const MapHandle = enum(c.mln_map) {
         var info = c.mln_style_image_info_default();
         var found = false;
         try status.checkStatus(c.mln_map_get_style_image_info_take_result(required.lease.native, &info, &found), state.diagnostic_store);
+        required.lease.consume();
         return if (found) values.styleImageInfoFromNative(info) else null;
     }
 
@@ -1142,6 +1150,7 @@ pub const MapHandle = enum(c.mln_map) {
             &count,
             &found,
         ), state.diagnostic_store);
+        required.lease.consume();
         if (!found) return null;
         if (count != raw_coordinates.len) return error.NativeError;
         var coordinates: [4]values.LatLng = undefined;
@@ -1575,6 +1584,7 @@ pub const MapHandle = enum(c.mln_map) {
         var result = std.mem.zeroes(c.mln_camera_query_result);
         result.size = @sizeOf(c.mln_camera_query_result);
         try status.checkStatus(c.mln_map_camera_query_take_result(required.lease.native, &result), state.diagnostic_store);
+        required.lease.consume();
         return .{ .generation = result.generation, .camera = values.cameraOptionsFromNative(result.camera) };
     }
 
@@ -1808,6 +1818,7 @@ pub const MapHandle = enum(c.mln_map) {
         defer required.lease.release();
         var buffer: c.mln_buffer = 0;
         try status.checkStatus(take(required.lease.native, &buffer), state.diagnostic_store);
+        required.lease.consume();
         return native_temp.copyOwnedBuffer(allocator, buffer, state.diagnostic_store);
     }
     fn takeFoundStyleBuffer(
@@ -1823,6 +1834,7 @@ pub const MapHandle = enum(c.mln_map) {
         var buffer: c.mln_buffer = 0;
         var found = false;
         try status.checkStatus(take(required.lease.native, &buffer, &found), state.diagnostic_store);
+        required.lease.consume();
         if (!found) return null;
         return (try native_temp.copyOwnedBuffer(allocator, buffer, state.diagnostic_store)) orelse error.NativeError;
     }
@@ -1852,6 +1864,7 @@ pub const MapHandle = enum(c.mln_map) {
         defer required.lease.release();
         var buffer: c.mln_buffer = 0;
         try status.checkStatus(take(required.lease.native, &buffer), state.diagnostic_store);
+        required.lease.consume();
         return (try native_temp.copyOwnedBuffer(allocator, buffer, state.diagnostic_store)) orelse error.NativeError;
     }
 

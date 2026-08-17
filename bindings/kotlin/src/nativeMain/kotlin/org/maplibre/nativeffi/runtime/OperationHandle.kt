@@ -17,7 +17,7 @@ import kotlinx.cinterop.value
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.internal.c.mln_operation_cancel
 import org.maplibre.nativeffi.internal.c.mln_operation_copy_diagnostic
-import org.maplibre.nativeffi.internal.c.mln_operation_discard_result
+import org.maplibre.nativeffi.internal.c.mln_operation_finish
 import org.maplibre.nativeffi.internal.c.mln_operation_get_status
 import org.maplibre.nativeffi.internal.c.mln_operation_poll
 import org.maplibre.nativeffi.internal.c.mln_operation_release
@@ -45,13 +45,23 @@ internal constructor(
   public actual val isClosed: Boolean
     get() = core.isClosed
 
-  internal fun <R> withUse(block: (ULong) -> R): R = core.withUse(runtime) { block(it.toULong()) }
+  internal fun <R> withUse(block: (ULong) -> R): R =
+    try {
+      core.withUse(runtime) { block(it.toULong()) }
+    } finally {
+      retireConsumed()
+    }
 
   internal fun <R> withResultUse(
     expectedKind: OperationKind,
     expectedResultKind: OperationResultKind,
     block: (ULong) -> R,
-  ): R = core.withUse(runtime, expectedKind, expectedResultKind) { block(it.toULong()) }
+  ): R =
+    try {
+      core.withUse(runtime, expectedKind, expectedResultKind) { block(it.toULong()) }
+    } finally {
+      retireConsumed()
+    }
 
   internal fun markResultConsumed() {
     core.markResultConsumed()
@@ -99,9 +109,9 @@ internal constructor(
     }
   }
 
-  public actual fun discard() {
+  public actual fun finish() {
     withUse {
-      Status.check(mln_operation_discard_result(it))
+      Status.check(mln_operation_finish(it))
       core.markResultConsumed()
     }
   }
@@ -110,6 +120,12 @@ internal constructor(
     if (!core.beginClose()) return
     runtime.forgetOperation(core.id.toULong())
     mln_operation_release(core.id.toULong())
+    core.finishClose()
+  }
+
+  private fun retireConsumed() {
+    if (!core.hasConsumedResult() || !core.beginClose()) return
+    runtime.forgetOperation(core.id.toULong())
     core.finishClose()
   }
 }

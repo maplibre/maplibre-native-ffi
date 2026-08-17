@@ -9790,13 +9790,13 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         }
     }
 
-    private static class mln_operation_discard_result {
+    private static class mln_operation_finish {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG
         );
 
-        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_operation_discard_result");
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_operation_finish");
 
         public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
     }
@@ -9804,43 +9804,43 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_operation_discard_result(mln_operation operation)
+     * mln_status mln_operation_finish(mln_operation operation)
      * }
      */
-    public static FunctionDescriptor mln_operation_discard_result$descriptor() {
-        return mln_operation_discard_result.DESC;
+    public static FunctionDescriptor mln_operation_finish$descriptor() {
+        return mln_operation_finish.DESC;
     }
 
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_operation_discard_result(mln_operation operation)
+     * mln_status mln_operation_finish(mln_operation operation)
      * }
      */
-    public static MethodHandle mln_operation_discard_result$handle() {
-        return mln_operation_discard_result.HANDLE;
+    public static MethodHandle mln_operation_finish$handle() {
+        return mln_operation_finish.HANDLE;
     }
 
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_operation_discard_result(mln_operation operation)
+     * mln_status mln_operation_finish(mln_operation operation)
      * }
      */
-    public static MemorySegment mln_operation_discard_result$address() {
-        return mln_operation_discard_result.ADDR;
+    public static MemorySegment mln_operation_finish$address() {
+        return mln_operation_finish.ADDR;
     }
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_operation_discard_result(mln_operation operation)
+     * mln_status mln_operation_finish(mln_operation operation)
      * }
      */
-    public static int mln_operation_discard_result(long operation) {
-        var mh$ = mln_operation_discard_result.HANDLE;
+    public static int mln_operation_finish(long operation) {
+        var mh$ = mln_operation_finish.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_operation_discard_result", operation);
+                traceDowncall("mln_operation_finish", operation);
             }
             return (int)mh$.invokeExact(operation);
         } catch (Error | RuntimeException ex) {

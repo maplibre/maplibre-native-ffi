@@ -259,7 +259,7 @@
 --include-typedef mln_notification_callback
 --include-function mln_operation_cancel
 --include-function mln_operation_copy_diagnostic
---include-function mln_operation_discard_result
+--include-function mln_operation_finish
 --include-function mln_operation_get_status
 --include-function mln_operation_poll
 --include-function mln_operation_release
