@@ -87,5 +87,4 @@ reads the texture. CPU-complete sync is valid only when that work completed
 before release. The release operation completes when the slot is reusable.
 
 Use a session barrier when later work must wait for every preceding render item
-to become terminal and for the driver to observe a minimum map-update
-generation. A barrier orders work; it does not request a frame.
+to become terminal. A barrier orders work; it does not request a frame.

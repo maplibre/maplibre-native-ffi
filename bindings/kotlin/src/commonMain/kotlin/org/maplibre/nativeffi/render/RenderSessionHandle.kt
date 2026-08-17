@@ -53,7 +53,7 @@ public expect class RenderSessionHandle : AutoCloseable {
 
   public fun startDumpDebugLogs(): OperationHandle<Unit>
 
-  public fun startBarrier(minimumUpdateGeneration: ULong): OperationHandle<Unit>
+  public fun startBarrier(): OperationHandle<Unit>
 
   public fun startDetach(): OperationHandle<Unit>
 

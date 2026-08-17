@@ -2553,17 +2553,16 @@ internal object NativeAccess {
       openglBorrowedTextureDescriptor(descriptor),
     )
 
-  internal fun startRenderBarrier(session: NativeRenderSession, generation: ULong): Long =
+  internal fun startRenderBarrier(session: NativeRenderSession): Long =
     Arena.ofConfined().use { arena ->
       val outOperation = zeroHandle(arena)
       Status.check(
         dynamicStatusDowncall(
             "mln_render_session_barrier_start",
             ValueLayout.JAVA_LONG,
-            ValueLayout.JAVA_LONG,
             ValueLayout.ADDRESS,
           )
-          .invokeNative(session, generation.toLong(), outOperation) as Int
+          .invokeNative(session, outOperation) as Int
       )
       outOperation.get(ValueLayout.JAVA_LONG, 0)
     }

@@ -942,9 +942,9 @@ Frame readiness is level-triggered until drained. Each drain takes every queued
 record into an independently owned batch. A binding MUST preserve the records
 until it releases the batch.
 
-A session barrier completes after all preceding accepted render work is terminal
-and the driver observed the requested minimum map-update generation. A binding
-MUST NOT represent a barrier as a frame request or a runtime pump.
+A session barrier completes after all preceding accepted render work is
+terminal. A binding MUST NOT represent a barrier as a frame request or a runtime
+pump.
 
 ### Texture frames
 
@@ -1165,7 +1165,7 @@ When the binding routes provider requests through
 | BND-173 | Stale acquired-frame handles cannot expose backend handles after slot reuse.                                                                                                                                                |
 | BND-174 | Render-session control, operation, snapshot, demand, abandon, and destroy calls work from a thread other than the graphics service thread.                                                                                  |
 | BND-175 | A frame-result drain takes every queued record into an independently owned batch, and multiple batches may remain live.                                                                                                     |
-| BND-176 | A barrier waits for preceding render work and its minimum map-update generation without requesting a frame.                                                                                                                 |
+| BND-176 | A barrier waits for preceding render work without requesting a frame.                                                                                                                                                       |
 | BND-177 | A positive expired deadline yields deadline missed before graphics work begins.                                                                                                                                             |
 | BND-178 | Normal detach performs graphics destruction through the selected owner and permits any-thread CPU-only destroy afterward.                                                                                                   |
 | BND-179 | Abandon returns busy during a driver call, performs no graphics calls, invalidates accessors, detaches the map, and reports quarantine.                                                                                     |

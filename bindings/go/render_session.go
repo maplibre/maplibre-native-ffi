@@ -661,13 +661,9 @@ func (s *RenderSessionHandle) ResizeStart(extent RenderTargetExtent) (*Operation
 	})
 }
 
-func (s *RenderSessionHandle) BarrierStart(minUpdateGeneration uint64) (*OperationHandle[struct{}], error) {
+func (s *RenderSessionHandle) BarrierStart() (*OperationHandle[struct{}], error) {
 	return s.startOperation(func(session C.mln_render_session, operation *C.mln_operation) int32 {
-		return int32(C.mln_render_session_barrier_start(
-			session,
-			C.uint64_t(minUpdateGeneration),
-			operation,
-		))
+		return int32(C.mln_render_session_barrier_start(session, operation))
 	})
 }
 

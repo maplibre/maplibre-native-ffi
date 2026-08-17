@@ -1341,9 +1341,9 @@ impl RenderSessionHandle {
         })
     }
 
-    pub fn barrier(&self, min_update_generation: u64) -> Result<OperationHandle<()>> {
+    pub fn barrier(&self) -> Result<OperationHandle<()>> {
         self.start_unit(OperationKind::RenderBarrier, |session, operation| unsafe {
-            sys::mln_render_session_barrier_start(session, min_update_generation, operation)
+            sys::mln_render_session_barrier_start(session, operation)
         })
     }
 

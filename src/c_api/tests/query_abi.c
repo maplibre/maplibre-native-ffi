@@ -70,8 +70,7 @@ static void feature_query_hits_are_owned_by_one_list_handle(void) {
   );
   mln_operation barrier = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_render_session_barrier_start(fixture.session, 0, &barrier)
+    MLN_STATUS_OK, mln_render_session_barrier_start(fixture.session, &barrier)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, barrier)

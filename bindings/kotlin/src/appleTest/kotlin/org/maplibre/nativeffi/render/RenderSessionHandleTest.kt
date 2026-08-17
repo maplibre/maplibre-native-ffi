@@ -82,7 +82,7 @@ class RenderSessionHandleTest {
               assertTrue(frame.isReleased)
             }
 
-            completeOnDriver(session, session.startBarrier(result.mapUpdateGeneration))
+            completeOnDriver(session, session.startBarrier())
             completeOnDriver(session, session.startDetach())
             assertEquals(RenderSessionState.DETACHED, session.snapshot().state)
           } finally {

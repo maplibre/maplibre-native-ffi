@@ -436,17 +436,9 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         return CompleteOperationAsync(operation, cancellationToken);
     }
 
-    public Task BarrierAsync(
-        ulong minUpdateGeneration,
-        CancellationToken cancellationToken = default
-    ) =>
+    public Task BarrierAsync(CancellationToken cancellationToken = default) =>
         StartOperationAsync(
-            operation =>
-                NativeMethods.mln_render_session_barrier_start(
-                    Handle,
-                    minUpdateGeneration,
-                    operation
-                ),
+            operation => NativeMethods.mln_render_session_barrier_start(Handle, operation),
             cancellationToken
         );
 

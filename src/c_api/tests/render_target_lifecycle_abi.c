@@ -29,7 +29,7 @@ static void normal_detach_runs_on_the_driver_and_retires_map_attachment(void) {
   mln_operation rejected = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_STATE,
-    mln_render_session_barrier_start(fixture.session, 0, &rejected)
+    mln_render_session_barrier_start(fixture.session, &rejected)
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, rejected);
 

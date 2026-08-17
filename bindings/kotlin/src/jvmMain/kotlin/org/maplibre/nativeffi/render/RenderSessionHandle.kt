@@ -128,8 +128,8 @@ internal constructor(private val ownerMap: MapHandle, private val handle: Native
       )
     )
 
-  public actual fun startBarrier(minimumUpdateGeneration: ULong): OperationHandle<Unit> =
-    controlOperation(NativeAccess.startRenderBarrier(requireLiveHandle(), minimumUpdateGeneration))
+  public actual fun startBarrier(): OperationHandle<Unit> =
+    controlOperation(NativeAccess.startRenderBarrier(requireLiveHandle()))
 
   public actual fun startDetach(): OperationHandle<Unit> =
     controlOperation(

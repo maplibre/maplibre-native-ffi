@@ -545,12 +545,8 @@ final class RenderSessionHandle implements Finalizable {
     }),
   );
 
-  Future<void> barrier({int minUpdateGeneration = 0}) => _voidOperation(
-    (out) => raw.mln_render_session_barrier_start(
-      _handle.raw,
-      minUpdateGeneration,
-      out,
-    ),
+  Future<void> barrier() => _voidOperation(
+    (out) => raw.mln_render_session_barrier_start(_handle.raw, out),
   );
 
   Future<void> reduceMemoryUse() => _voidOperation(

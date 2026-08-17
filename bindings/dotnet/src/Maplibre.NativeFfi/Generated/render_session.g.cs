@@ -184,7 +184,7 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_status mln_render_session_resize_start([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_render_target_extent *")] mln_render_target_extent* extent, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_barrier_start([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("uint64_t")] ulong min_update_generation, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
+        public static extern mln_status mln_render_session_barrier_start([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_render_session_reduce_memory_use_start([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);

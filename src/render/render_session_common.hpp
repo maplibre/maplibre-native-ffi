@@ -877,7 +877,7 @@ auto acquired_frame_release_start(
 auto render_session_resize_start(
   mln_render_session, const mln_render_target_extent*, mln_operation*
 ) -> mln_status;
-auto render_session_barrier_start(mln_render_session, uint64_t, mln_operation*)
+auto render_session_barrier_start(mln_render_session, mln_operation*)
   -> mln_status;
 auto render_session_maintenance_start(
   mln_render_session, std::uint32_t, mln_operation*

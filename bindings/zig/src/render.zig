@@ -730,11 +730,11 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
         return startArgumentOperation(self, c.mln_render_session_resize_start, .render_resize, &raw);
     }
 
-    pub fn barrierStart(self: RenderSessionHandle, min_update_generation: u64) status.Error!runtime_module.OperationHandle {
+    pub fn barrierStart(self: RenderSessionHandle) status.Error!runtime_module.OperationHandle {
         const lease = try renderSessionLease(self);
         defer lease.release();
         var operation: c.mln_operation = 0;
-        try status.checkStatus(c.mln_render_session_barrier_start(lease.native, min_update_generation, &operation), lease.diagnostic_store);
+        try status.checkStatus(c.mln_render_session_barrier_start(lease.native, &operation), lease.diagnostic_store);
         return operationHandle(lease, operation, .render_barrier, .none);
     }
 

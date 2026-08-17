@@ -217,12 +217,11 @@ MLN_API mln_status mln_render_session_resize_start(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts a barrier that completes after all work accepted before it has a
- * terminal result and the driver has observed at least min_update_generation.
+ * Starts a barrier that completes after all render work accepted before it has
+ * a terminal result. A barrier does not request a frame.
  */
 MLN_API mln_status mln_render_session_barrier_start(
-  mln_render_session session, uint64_t min_update_generation,
-  mln_operation* out_operation
+  mln_render_session session, mln_operation* out_operation
 ) MLN_NOEXCEPT;
 
 /** Starts best-effort release of renderer caches. */

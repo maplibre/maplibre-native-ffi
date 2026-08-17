@@ -2950,28 +2950,10 @@ auto make_ordered_resize_work(
 }
 
 auto make_ordered_barrier_work(
-  const std::shared_ptr<mln_render_session_object>& session, uint64_t minimum,
   const std::shared_ptr<OperationObject>& operation
 ) -> RenderDriverWork {
   return RenderDriverWork{
-    [session, minimum, operation]() {
-      if (map_latest_update_generation(session->map) < minimum) {
-        auto lock = std::unique_lock{session->control_mutex};
-        if (map_latest_update_generation(session->map) < minimum) {
-          session->waiting_update_work.push_back(
-            make_ordered_barrier_work(session, minimum, operation)
-          );
-          while (!session->driver_work.empty()) {
-            session->waiting_update_work.push_back(
-              std::move(session->driver_work.front())
-            );
-            session->driver_work.pop_front();
-          }
-          return;
-        }
-      }
-      operation->complete(MLN_STATUS_OK, {}, {});
-    },
+    [operation]() { operation->complete(MLN_STATUS_OK, {}, {}); },
     [operation]() {
       operation->complete(MLN_STATUS_TARGET_LOST, "target abandoned", {});
     }
@@ -3032,9 +3014,8 @@ auto render_session_resize_start(
   return MLN_STATUS_OK;
 }
 
-auto render_session_barrier_start(
-  mln_render_session handle, uint64_t minimum, mln_operation* out
-) -> mln_status {
+auto render_session_barrier_start(mln_render_session handle, mln_operation* out)
+  -> mln_status {
   if (!out || *out != MLN_HANDLE_NULL) return MLN_STATUS_INVALID_ARGUMENT;
   const auto s = lease_render_session(handle);
   if (!s) return MLN_STATUS_INVALID_ARGUMENT;
@@ -3048,7 +3029,7 @@ auto render_session_barrier_start(
     s->operation_source, RENDER_OPERATION_BARRIER, false, {}, out, operation
   );
   if (status != MLN_STATUS_OK) return status;
-  auto item = make_ordered_barrier_work(s, minimum, operation);
+  auto item = make_ordered_barrier_work(operation);
   {
     const auto lock = std::scoped_lock{s->control_mutex};
     if (s->state != MLN_RENDER_SESSION_STATE_ATTACHED) {

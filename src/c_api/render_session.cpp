@@ -129,10 +129,10 @@ auto mln_render_session_resize_start(
 }
 
 auto mln_render_session_barrier_start(
-  mln_render_session session, uint64_t generation, mln_operation* out
+  mln_render_session session, mln_operation* out
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&] {
-    return mln::core::render_session_barrier_start(session, generation, out);
+    return mln::core::render_session_barrier_start(session, out);
   });
 }
 

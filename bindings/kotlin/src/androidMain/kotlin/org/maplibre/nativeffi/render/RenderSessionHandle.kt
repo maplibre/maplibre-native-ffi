@@ -244,14 +244,9 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
     MaplibreNativeC.mln_render_session_dump_debug_logs_start(requireLiveHandle(), it)
   }
 
-  public actual fun startBarrier(minimumUpdateGeneration: ULong): OperationHandle<Unit> =
-    unitOperation {
-      MaplibreNativeC.mln_render_session_barrier_start(
-        requireLiveHandle(),
-        minimumUpdateGeneration.toLong(),
-        it,
-      )
-    }
+  public actual fun startBarrier(): OperationHandle<Unit> = unitOperation {
+    MaplibreNativeC.mln_render_session_barrier_start(requireLiveHandle(), it)
+  }
 
   public actual fun startDetach(): OperationHandle<Unit> = unitOperation {
     MaplibreNativeC.mln_render_session_detach_start(requireLiveHandle(), it)

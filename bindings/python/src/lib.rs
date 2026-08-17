@@ -3714,9 +3714,9 @@ impl RenderSessionHandle {
         Ok(operation.0)
     }
 
-    fn barrier_start(&self, min_update_generation: u64) -> PyResult<u64> {
+    fn barrier_start(&self) -> PyResult<u64> {
         start_session_operation(self.native(), |session, operation| unsafe {
-            sys::mln_render_session_barrier_start(session, min_update_generation, operation)
+            sys::mln_render_session_barrier_start(session, operation)
         })
     }
 

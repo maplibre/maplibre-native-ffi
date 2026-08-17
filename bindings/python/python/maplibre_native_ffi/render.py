@@ -819,11 +819,9 @@ class RenderSessionHandle(NativeHandleMixin):
             extent.scale_factor,
         )
 
-    def barrier(self, min_update_generation: int = 0) -> OperationHandle[None]:
-        """Start a render barrier for accepted work and a map generation."""
-        return self._operation(
-            self._native.barrier_start, None, None, min_update_generation
-        )
+    def barrier(self) -> OperationHandle[None]:
+        """Start a barrier for previously accepted render work."""
+        return self._operation(self._native.barrier_start)
 
     def reduce_memory_use(self) -> OperationHandle[None]:
         """Start best-effort renderer cache release."""

@@ -489,8 +489,7 @@ static void resize_and_barrier_order_frame_and_extent_generations(void) {
   );
   mln_operation barrier = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_render_session_barrier_start(fixture.session, 0, &barrier)
+    MLN_STATUS_OK, mln_render_session_barrier_start(fixture.session, &barrier)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, barrier)

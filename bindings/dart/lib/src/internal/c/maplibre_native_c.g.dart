@@ -2345,12 +2345,9 @@ external int mln_render_session_acquire_frame(
 external mln_render_session_attach_options
 mln_render_session_attach_options_default();
 
-@ffi.Native<
-  ffi.Int32 Function(mln_render_session, ffi.Uint64, ffi.Pointer<mln_operation>)
->()
+@ffi.Native<ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_operation>)>()
 external int mln_render_session_barrier_start(
   int session,
-  int min_update_generation,
   ffi.Pointer<mln_operation> out_operation,
 );
 

@@ -1347,9 +1347,9 @@ public final class RenderSessionHandle: @unchecked Sendable {
     try await waitForOperation(operation)
   }
 
-  public func barrier(minimumUpdateGeneration: UInt64 = 0) async throws {
+  public func barrier() async throws {
     try await performOperation {
-      mln_render_session_barrier_start($0, minimumUpdateGeneration, $1)
+      mln_render_session_barrier_start($0, $1)
     }
   }
 

@@ -547,8 +547,7 @@ static void dedicated_egl_surface_renders_and_keeps_its_context_current(void) {
   );
   mln_operation barrier = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_render_session_barrier_start(fixture.session, 0, &barrier)
+    MLN_STATUS_OK, mln_render_session_barrier_start(fixture.session, &barrier)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, barrier)
@@ -628,8 +627,7 @@ static void dedicated_egl_texture_uses_a_readback_only_core_worker(void) {
   );
   mln_operation barrier = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_render_session_barrier_start(fixture.session, 0, &barrier)
+    MLN_STATUS_OK, mln_render_session_barrier_start(fixture.session, &barrier)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, barrier)
@@ -708,8 +706,7 @@ static void frame_results_report_whether_the_map_needs_another_frame(void) {
     );
     mln_operation barrier = MLN_HANDLE_NULL;
     TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
-      mln_render_session_barrier_start(fixture.session, 0, &barrier)
+      MLN_STATUS_OK, mln_render_session_barrier_start(fixture.session, &barrier)
     );
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, barrier)
@@ -754,8 +751,7 @@ static void frame_results_report_whether_the_map_needs_another_frame(void) {
     );
     mln_operation barrier = MLN_HANDLE_NULL;
     TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
-      mln_render_session_barrier_start(fixture.session, 0, &barrier)
+      MLN_STATUS_OK, mln_render_session_barrier_start(fixture.session, &barrier)
     );
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, barrier)
@@ -807,8 +803,7 @@ static void frame_results_report_whether_the_map_needs_another_frame(void) {
     );
     mln_operation barrier = MLN_HANDLE_NULL;
     TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
-      mln_render_session_barrier_start(fixture.session, 0, &barrier)
+      MLN_STATUS_OK, mln_render_session_barrier_start(fixture.session, &barrier)
     );
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, barrier)

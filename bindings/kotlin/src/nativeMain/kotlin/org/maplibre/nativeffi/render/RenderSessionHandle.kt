@@ -197,9 +197,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
     mln_render_session_dump_debug_logs_start(id(), it)
   }
 
-  public actual fun startBarrier(minimumUpdateGeneration: ULong) = unitOperation {
-    mln_render_session_barrier_start(id(), minimumUpdateGeneration, it)
-  }
+  public actual fun startBarrier() = unitOperation { mln_render_session_barrier_start(id(), it) }
 
   public actual fun startDetach() = unitOperation { mln_render_session_detach_start(id(), it) }
 
