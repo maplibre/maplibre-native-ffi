@@ -146,7 +146,7 @@ jobs:
       - run: mise run //bindings/python:test linux-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/dart:build linux-x64-egl
+      - run: mise run //bindings/dart:test linux-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
       - name: Save Zig packages
@@ -202,9 +202,6 @@ jobs:
       - run: mise run //bindings/rust:test:download
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/dart:test:download
-        env:
-          MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/zig:test linux-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
@@ -238,7 +235,7 @@ jobs:
       - run: mise run //bindings/python:test linux-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/dart:build linux-x64-vulkan
+      - run: mise run //bindings/dart:test linux-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
       - name: Save Zig packages
@@ -328,7 +325,7 @@ jobs:
       - run: mise run //bindings/python:test linux-arm64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/dart:build linux-arm64-egl
+      - run: mise run //bindings/dart:test linux-arm64-egl
         env:
           MISE_TASK_SKIP: "//:build"
       - name: Save Zig packages
@@ -414,7 +411,7 @@ jobs:
       - run: mise run //bindings/python:test linux-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/dart:build linux-arm64-vulkan
+      - run: mise run //bindings/dart:test linux-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
       - name: Save Zig packages
@@ -575,7 +572,7 @@ jobs:
       - run: mise run //bindings/python:test macos-arm64-metal
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/dart:build macos-arm64-metal
+      - run: mise run //bindings/dart:test macos-arm64-metal
         env:
           MISE_TASK_SKIP: "//:build"
       - name: Save Zig packages
@@ -657,7 +654,7 @@ jobs:
       - run: mise run //bindings/python:test macos-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/dart:build macos-arm64-vulkan
+      - run: mise run //bindings/dart:test macos-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
       - name: Save Zig packages
@@ -736,7 +733,7 @@ jobs:
       - run: mise run //bindings/python:test macos-arm64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/dart:build macos-arm64-egl
+      - run: mise run //bindings/dart:test macos-arm64-egl
         env:
           MISE_TASK_SKIP: "//:build"
       - name: Save Zig packages
@@ -1369,7 +1366,7 @@ jobs:
       - run: mise run //bindings/python:test windows-x64-wgl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/dart:build windows-x64-wgl
+      - run: mise run //bindings/dart:test windows-x64-wgl
         env:
           MISE_TASK_SKIP: "//:build"
       - name: Save Zig packages
@@ -1445,7 +1442,7 @@ jobs:
       - run: mise run //bindings/python:test windows-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/dart:build windows-x64-vulkan
+      - run: mise run //bindings/dart:test windows-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
       - name: Save Zig packages
@@ -1511,7 +1508,7 @@ jobs:
       - run: mise run //bindings/python:test windows-arm64-wgl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/dart:build windows-arm64-wgl
+      - run: mise run //bindings/dart:test windows-arm64-wgl
         env:
           MISE_TASK_SKIP: "//:build"
       - name: Upload native artifact
@@ -1568,7 +1565,7 @@ jobs:
       - run: mise run //bindings/python:test windows-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/dart:build windows-arm64-vulkan
+      - run: mise run //bindings/dart:test windows-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
       - name: Upload native artifact

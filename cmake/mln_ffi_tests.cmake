@@ -92,9 +92,6 @@ function(mln_ffi_add_c_api_test)
     set_target_properties(
       mln_ffi_dart_test_support
       PROPERTIES OUTPUT_NAME maplibre_native_ffi_dart_test_support)
-    install(
-      TARGETS mln_ffi_dart_test_support
-      LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
   endif()
   get_target_property(dependency_runtime_dirs mln_ffi_render_dependencies
                       MLN_FFI_RUNTIME_DIRS)

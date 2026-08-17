@@ -14,7 +14,6 @@ commands = [
 platforms = ["linux"]
 commands = [
   { task = "//bindings/rust:test:download", include = ["linux-x64-vulkan"], preset = false },
-  { task = "//bindings/dart:test:download", include = ["linux-x64-vulkan"], preset = false },
 ]
 
 # Zig is unavailable on Windows ARM64; see the `core:zig` note in bindings/zig/mise.toml.

@@ -130,17 +130,3 @@ run_windows = '''
 export PATH="$(cygpath -u "$MISE_MONOREPO_ROOT/build/$usage_preset/install/bin")${PATH:+:${PATH}}"
 dart test
 '''
-
-[tasks."test:download"]
-description = "Test the build hook against a downloaded native snapshot archive."
-# Run the isolate migration regression against the downloaded artifact. Removing
-# the pointer forces the download; the trap restores a local prefix afterward.
-run = '''
-pointer=.dart_tool/maplibre_native_install_dir
-saved="$(mktemp)"
-trap 'if [[ -s "$saved" ]]; then mv "$saved" "$pointer"; else rm -f "$saved"; fi' EXIT
-if [[ -f "$pointer" ]]; then
-  mv "$pointer" "$saved"
-fi
-dart test test/isolate_migration_test.dart
-'''
