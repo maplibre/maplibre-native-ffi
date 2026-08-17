@@ -177,8 +177,6 @@ internal static class MapStructs
         native.camera = ToNative(update.Camera);
         native.animation = ToNative(update.Animation);
         native.gesture_phase = (uint)update.GesturePhase;
-        native.gesture_id = update.GestureId;
-        native.animation_id = update.AnimationId;
         return native;
     }
 

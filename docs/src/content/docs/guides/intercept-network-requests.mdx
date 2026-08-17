@@ -20,10 +20,11 @@ Register each one with an any-thread runtime command.
 
 MapLibre can invoke any of these callbacks concurrently on network and worker
 threads. Protect every value that a callback reads and return quickly because
-the resource request waits. Keep replacement callback state live until the
-registration command reaches its terminal disposition. A transform callback
-sets a replacement URL. A header transform callback sets header names and
-values. A provider callback operates only on the request handle that it received.
+the resource request waits. Transfer callback state to the runtime only after a
+registration succeeds; the runtime releases it after its final invocation. A
+transform callback sets a replacement URL. A header transform callback sets
+header names and values. A provider callback operates only on the request
+handle that it received.
 
 ## Rewrite a URL with a transform
 
@@ -42,8 +43,8 @@ a non-OK status preserves the original request.
 <Code code={region(transformSnippet, "rewrite")} lang="c" title="resource-transform.c" />
 
 Registering a transform replaces the previous transform in runtime submission
-order. Release the replaced callback state after the command reaches its
-terminal disposition.
+order. The runtime releases the replaced callback state after its final
+invocation.
 
 <Code code={region(transformSnippet, "install")} lang="c" title="resource-transform.c" />
 
@@ -108,8 +109,7 @@ completion or cancellation.
 
 ## Keep callback state reachable
 
-The runtime stores each callback and its user data by reference. Keep callback
-state reachable through the command-finished event that commits its replacement
-or clear. Runtime close also waits for in-flight callbacks. Release any host
-lock that a callback also acquires before starting close; holding that lock can
-deadlock teardown.
+The runtime owns callback state after accepting a registration. It releases the
+state after replacement, clear, or runtime close retires every in-flight
+callback. Release any host lock that a callback also acquires before starting
+close; holding that lock can deadlock teardown.

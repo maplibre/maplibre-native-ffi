@@ -136,7 +136,7 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
   }
 
   fun rotateAndPitch(deltaX: Double, deltaY: Double) {
-    mapState?.adjustBearingAndPitch(deltaX * DRAG_ROTATE_FACTOR, -deltaY * DRAG_PITCH_FACTOR)
+    mapState?.adjustBearingAndPitch(deltaX * DRAG_ROTATE_FACTOR, deltaY * DRAG_PITCH_FACTOR)
     requestRender()
   }
 

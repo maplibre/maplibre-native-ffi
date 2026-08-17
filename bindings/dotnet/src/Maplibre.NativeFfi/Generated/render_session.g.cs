@@ -163,7 +163,7 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_status mln_render_session_request_frame([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_frame_demand *")] mln_frame_demand* demand);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_drain_frame_results([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("size_t")] nuint max_results, [NativeTypeName("mln_render_frame_batch *")] MlnRenderFrameBatch* out_batch);
+        public static extern mln_status mln_render_session_drain_frame_results([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("mln_render_frame_batch *")] MlnRenderFrameBatch* out_batch);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_render_frame_batch_count([NativeTypeName("mln_render_frame_batch")] MlnRenderFrameBatch batch, [NativeTypeName("size_t *")] nuint* out_count);

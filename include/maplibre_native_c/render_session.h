@@ -152,13 +152,11 @@ MLN_API mln_status mln_render_session_request_frame(
 ) MLN_NOEXCEPT;
 
 /**
- * Drains owned terminal frame results. Only one frame-result batch may remain
- * live per session. Zero max_results drains every currently queued result. The
- * records remain stable until the batch is released.
+ * Drains every currently queued terminal frame result into an independently
+ * owned batch. The records remain stable until the batch is released.
  */
 MLN_API mln_status mln_render_session_drain_frame_results(
-  mln_render_session session, size_t max_results,
-  mln_render_frame_batch* out_batch
+  mln_render_session session, mln_render_frame_batch* out_batch
 ) MLN_NOEXCEPT;
 
 /** Returns the number of records in an owned frame-result batch. */
@@ -172,7 +170,7 @@ MLN_API mln_status mln_render_frame_batch_get(
   mln_render_frame_result* out_result
 ) MLN_NOEXCEPT;
 
-/** Releases a frame-result batch and its session drain lease. */
+/** Releases a frame-result batch. */
 MLN_API void mln_render_frame_batch_release(
   mln_render_frame_batch batch
 ) MLN_NOEXCEPT;

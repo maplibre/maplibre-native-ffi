@@ -70,17 +70,12 @@ public sealed unsafe class RuntimeHandle : IDisposable
     [ThreadStatic]
     private static RuntimeTakeOfflineRegionStatusResult? takeOfflineRegionStatusForTest;
 
-    private readonly Lock callbackGate = new();
     private readonly Lock mapGate = new();
     private readonly Lock operationGate = new();
     private readonly HashSet<OperationHandle> liveOperations = [];
     private readonly Dictionary<ulong, WeakReference<Map.MapHandle>> liveMaps = [];
     private readonly NativeHandleState<MlnRuntime> state;
     private readonly NotificationReceiver notificationReceiver;
-    private readonly List<IDisposable> retiredCallbackStates = [];
-    private ResourceProviderState? resourceProviderState;
-    private ResourceTransformState? resourceTransformState;
-    private HttpHeaderTransformState? httpHeaderTransformState;
 
     private RuntimeHandle(MlnRuntime handle, NotificationReceiver notificationReceiver)
     {
@@ -140,25 +135,17 @@ public sealed unsafe class RuntimeHandle : IDisposable
     public ulong SetResourceProvider(ResourceProviderCallback callback)
     {
         var replacement = new ResourceProviderState(callback);
-        lock (callbackGate)
+        try
         {
-            try
-            {
-                var descriptor = replacement.Descriptor;
-                ulong commandId = 0;
-                NativeStatus.Check(SetResourceProviderNative(Handle, &descriptor, &commandId));
-                if (resourceProviderState is { } previous)
-                {
-                    retiredCallbackStates.Add(previous);
-                }
-                resourceProviderState = replacement;
-                return commandId;
-            }
-            catch (Exception error)
-            {
-                DisposeAndSuppress(error, replacement);
-                throw;
-            }
+            var descriptor = replacement.Descriptor;
+            ulong commandId = 0;
+            NativeStatus.Check(SetResourceProviderNative(Handle, &descriptor, &commandId));
+            return commandId;
+        }
+        catch (Exception error)
+        {
+            DisposeAndSuppress(error, replacement);
+            throw;
         }
     }
 
@@ -166,25 +153,17 @@ public sealed unsafe class RuntimeHandle : IDisposable
     public ulong SetResourceTransform(ResourceTransformCallback callback)
     {
         var replacement = new ResourceTransformState(callback);
-        lock (callbackGate)
+        try
         {
-            try
-            {
-                var descriptor = replacement.Descriptor;
-                ulong commandId = 0;
-                NativeStatus.Check(SetResourceTransformNative(Handle, &descriptor, &commandId));
-                if (resourceTransformState is { } previous)
-                {
-                    retiredCallbackStates.Add(previous);
-                }
-                resourceTransformState = replacement;
-                return commandId;
-            }
-            catch (Exception error)
-            {
-                DisposeAndSuppress(error, replacement);
-                throw;
-            }
+            var descriptor = replacement.Descriptor;
+            ulong commandId = 0;
+            NativeStatus.Check(SetResourceTransformNative(Handle, &descriptor, &commandId));
+            return commandId;
+        }
+        catch (Exception error)
+        {
+            DisposeAndSuppress(error, replacement);
+            throw;
         }
     }
 
@@ -192,37 +171,21 @@ public sealed unsafe class RuntimeHandle : IDisposable
     public ulong SetHttpHeaderTransform(HttpHeaderTransformCallback callback)
     {
         var replacement = new HttpHeaderTransformState(callback);
-        lock (callbackGate)
+        try
         {
-            try
-            {
-                var descriptor = replacement.Descriptor;
-                ulong commandId = 0;
-                NativeStatus.Check(
-                    NativeMethods.mln_runtime_set_http_header_transform(
-                        Handle,
-                        &descriptor,
-                        &commandId
-                    )
-                );
-                if (httpHeaderTransformState is { } previous)
-                {
-                    retiredCallbackStates.Add(previous);
-                }
-                httpHeaderTransformState = replacement;
-                return commandId;
-            }
-            catch (Exception error)
-            {
-                DisposeAndSuppress(error, replacement);
-                throw;
-            }
+            var descriptor = replacement.Descriptor;
+            ulong commandId = 0;
+            NativeStatus.Check(
+                NativeMethods.mln_runtime_set_http_header_transform(Handle, &descriptor, &commandId)
+            );
+            return commandId;
+        }
+        catch (Exception error)
+        {
+            DisposeAndSuppress(error, replacement);
+            throw;
         }
     }
-
-    internal ResourceProviderState? ResourceProviderStateForTest => resourceProviderState;
-
-    internal ResourceTransformState? ResourceTransformStateForTest => resourceTransformState;
 
     internal static IDisposable UseResourceCallbackInstallMethodsForTest(
         RuntimeSetResourceProvider setProvider,
@@ -279,55 +242,27 @@ public sealed unsafe class RuntimeHandle : IDisposable
     /// <summary>Clears the runtime-scoped resource provider callback.</summary>
     public ulong ClearResourceProvider()
     {
-        lock (callbackGate)
-        {
-            ulong commandId = 0;
-            NativeStatus.Check(
-                NativeMethods.mln_runtime_clear_resource_provider(Handle, &commandId)
-            );
-            if (resourceProviderState is { } previous)
-            {
-                retiredCallbackStates.Add(previous);
-            }
-            resourceProviderState = null;
-            return commandId;
-        }
+        ulong commandId = 0;
+        NativeStatus.Check(NativeMethods.mln_runtime_clear_resource_provider(Handle, &commandId));
+        return commandId;
     }
 
     /// <summary>Clears the runtime-scoped resource transform callback.</summary>
     public ulong ClearResourceTransform()
     {
-        lock (callbackGate)
-        {
-            ulong commandId = 0;
-            NativeStatus.Check(
-                NativeMethods.mln_runtime_clear_resource_transform(Handle, &commandId)
-            );
-            if (resourceTransformState is { } previous)
-            {
-                retiredCallbackStates.Add(previous);
-            }
-            resourceTransformState = null;
-            return commandId;
-        }
+        ulong commandId = 0;
+        NativeStatus.Check(NativeMethods.mln_runtime_clear_resource_transform(Handle, &commandId));
+        return commandId;
     }
 
     /// <summary>Clears headers added to built-in HTTP requests.</summary>
     public ulong ClearHttpHeaderTransform()
     {
-        lock (callbackGate)
-        {
-            ulong commandId = 0;
-            NativeStatus.Check(
-                NativeMethods.mln_runtime_clear_http_header_transform(Handle, &commandId)
-            );
-            if (httpHeaderTransformState is { } previous)
-            {
-                retiredCallbackStates.Add(previous);
-            }
-            httpHeaderTransformState = null;
-            return commandId;
-        }
+        ulong commandId = 0;
+        NativeStatus.Check(
+            NativeMethods.mln_runtime_clear_http_header_transform(Handle, &commandId)
+        );
+        return commandId;
     }
 
     /// <summary>Starts an ambient cache maintenance operation.</summary>
@@ -731,7 +666,6 @@ public sealed unsafe class RuntimeHandle : IDisposable
             {
                 CheckOperationCompletion(operation);
                 state.Close();
-                DisposeCallbackState();
             },
             () =>
             {
@@ -789,27 +723,6 @@ public sealed unsafe class RuntimeHandle : IDisposable
                     null
                 );
             }
-        }
-    }
-
-    private void DisposeCallbackState()
-    {
-        lock (callbackGate)
-        {
-            var provider = resourceProviderState;
-            var transform = resourceTransformState;
-            var headerTransform = httpHeaderTransformState;
-            resourceProviderState = null;
-            resourceTransformState = null;
-            httpHeaderTransformState = null;
-            provider?.Dispose();
-            transform?.Dispose();
-            headerTransform?.Dispose();
-            foreach (var retired in retiredCallbackStates)
-            {
-                retired.Dispose();
-            }
-            retiredCallbackStates.Clear();
         }
     }
 

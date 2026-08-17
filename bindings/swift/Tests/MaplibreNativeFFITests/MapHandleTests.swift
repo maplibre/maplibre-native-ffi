@@ -82,10 +82,8 @@ import Testing
   _ = try map.updateCamera(CameraUpdate(
     mode: .ease,
     camera: CameraOptions(zoom: 6),
-    animation: AnimationOptions(durationMilliseconds: 0),
-    gesturePhase: .end,
-    gestureId: 9,
-    animationId: 10
+    animation: AnimationOptions(durationMilliseconds: 0, transitionId: 10),
+    gesturePhase: .end
   ))
 
   await Task.yield()

@@ -2085,10 +2085,74 @@ internal object NativeAccess {
       mln_camera_update.camera(nativeUpdate, cameraOptions(arena, update.camera))
       mln_camera_update.animation(nativeUpdate, animationOptions(arena, update.animation))
       mln_camera_update.gesture_phase(nativeUpdate, update.gesturePhase.nativeValue)
-      mln_camera_update.gesture_id(nativeUpdate, update.gestureId)
-      mln_camera_update.animation_id(nativeUpdate, update.animationId)
       commandId { outCommand ->
         MapLibreNativeC.mln_map_update_camera(map.raw, nativeUpdate, outCommand)
+      }
+    }
+
+  internal fun moveBy(map: NativeMap, offset: ScreenPoint, animation: AnimationOptions?): Long =
+    Arena.ofConfined().use { arena ->
+      commandId { outCommand ->
+        MapLibreNativeC.mln_map_move_by(
+          map.raw,
+          screenPoint(offset, arena),
+          animationOptions(arena, animation),
+          outCommand,
+        )
+      }
+    }
+
+  internal fun scaleBy(
+    map: NativeMap,
+    scale: Double,
+    anchor: ScreenPoint?,
+    animation: AnimationOptions?,
+  ): Long =
+    relativeCameraCommand(map, anchor, animation) { anchorSegment, animationSegment, outCommand ->
+      MapLibreNativeC.mln_map_scale_by(map.raw, scale, anchorSegment, animationSegment, outCommand)
+    }
+
+  internal fun bearingBy(
+    map: NativeMap,
+    degrees: Double,
+    anchor: ScreenPoint?,
+    animation: AnimationOptions?,
+  ): Long =
+    relativeCameraCommand(map, anchor, animation) { anchorSegment, animationSegment, outCommand ->
+      MapLibreNativeC.mln_map_bearing_by(
+        map.raw,
+        degrees,
+        anchorSegment,
+        animationSegment,
+        outCommand,
+      )
+    }
+
+  internal fun pitchBy(map: NativeMap, degrees: Double, animation: AnimationOptions?): Long =
+    Arena.ofConfined().use { arena ->
+      commandId { outCommand ->
+        MapLibreNativeC.mln_map_pitch_by(
+          map.raw,
+          degrees,
+          animationOptions(arena, animation),
+          outCommand,
+        )
+      }
+    }
+
+  private inline fun relativeCameraCommand(
+    map: NativeMap,
+    anchor: ScreenPoint?,
+    animation: AnimationOptions?,
+    call: (MemorySegment, MemorySegment, MemorySegment) -> Int,
+  ): Long =
+    Arena.ofConfined().use { arena ->
+      commandId { outCommand ->
+        call(
+          anchor?.let { screenPoint(it, arena) } ?: MemorySegment.NULL,
+          animationOptions(arena, animation),
+          outCommand,
+        )
       }
     }
 
@@ -2308,20 +2372,16 @@ internal object NativeAccess {
     }
   }
 
-  internal fun drainRenderFrameResults(
-    session: NativeRenderSession,
-    maxResults: Int,
-  ): List<RenderFrameResult> =
+  internal fun drainRenderFrameResults(session: NativeRenderSession): List<RenderFrameResult> =
     Arena.ofConfined().use { arena ->
       val outBatch = zeroHandle(arena)
       Status.check(
         dynamicStatusDowncall(
             "mln_render_session_drain_frame_results",
             ValueLayout.JAVA_LONG,
-            ValueLayout.JAVA_LONG,
             ValueLayout.ADDRESS,
           )
-          .invokeNative(session, maxResults.toLong(), outBatch) as Int
+          .invokeNative(session, outBatch) as Int
       )
       val batch = outBatch.get(ValueLayout.JAVA_LONG, 0)
       if (batch == 0L) return@use emptyList()

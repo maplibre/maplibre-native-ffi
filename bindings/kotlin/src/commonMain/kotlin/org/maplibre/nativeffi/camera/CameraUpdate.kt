@@ -22,8 +22,6 @@ public data class CameraUpdate(
   public val camera: CameraOptions = CameraOptions(),
   public val animation: AnimationOptions = AnimationOptions(),
   public val gesturePhase: GesturePhase = GesturePhase.NONE,
-  public val gestureId: Long = 0,
-  public val animationId: Long = 0,
 )
 
 /** Camera state and the map generation that published it. */

@@ -303,7 +303,7 @@ public sealed unsafe class ResourceProviderTests
 
     [BindingSpecTest("BND-122")]
     [Fact]
-    public void ResourceProviderInstallFailurePreservesPreviousCallbackAndReleasesReplacement()
+    public void ResourceProviderInstallFailureReleasesReplacement()
     {
         var failInstall = false;
         ResourceProviderState? failedReplacement = null;
@@ -328,20 +328,17 @@ public sealed unsafe class ResourceProviderTests
         );
         using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
         runtime.SetResourceProvider((_, _) => ResourceProviderDecision.PassThrough);
-        var previous = Assert.IsType<ResourceProviderState>(runtime.ResourceProviderStateForTest);
 
         failInstall = true;
         Assert.Throws<InvalidStateException>(() =>
             runtime.SetResourceProvider((_, _) => ResourceProviderDecision.Handle)
         );
 
-        Assert.Same(previous, runtime.ResourceProviderStateForTest);
-        Assert.True(previous.IsHandleAllocatedForTest);
         Assert.NotNull(failedReplacement);
         Assert.False(failedReplacement.IsHandleAllocatedForTest);
     }
 
-    // Callback roots remain retained until a barrier proves the replacing command committed.
+    // Native callback ownership keeps each registration alive through its final invocation.
     [BindingSpecTest("BND-142")]
     [Fact]
     public void ResourceProviderIsConsultedUntilClearedWhileMapIsLive()
@@ -361,7 +358,6 @@ public sealed unsafe class ResourceProviderTests
                 return ResourceProviderDecision.PassThrough;
             }
         );
-        var first = Assert.IsType<ResourceProviderState>(runtime.ResourceProviderStateForTest);
         LoadProbeStyle(runtime, map, "jar:file:/packaged/first.json");
         Assert.True(Volatile.Read(ref firstCalls) > 0);
 
@@ -372,9 +368,6 @@ public sealed unsafe class ResourceProviderTests
                 return ResourceProviderDecision.PassThrough;
             }
         );
-        var second = Assert.IsType<ResourceProviderState>(runtime.ResourceProviderStateForTest);
-        Assert.NotSame(first, second);
-        Assert.True(first.IsHandleAllocatedForTest);
         var firstCallsAfterReplace = Volatile.Read(ref firstCalls);
         LoadProbeStyle(runtime, map, "jar:file:/packaged/second.json");
         Assert.True(Volatile.Read(ref secondCalls) > 0);
@@ -382,8 +375,6 @@ public sealed unsafe class ResourceProviderTests
 
         runtime.ClearResourceProvider();
 
-        Assert.Null(runtime.ResourceProviderStateForTest);
-        Assert.True(second.IsHandleAllocatedForTest);
         var secondCallsAfterClear = Volatile.Read(ref secondCalls);
         LoadProbeStyle(runtime, map, "jar:file:/packaged/third.json");
         Assert.Equal(firstCallsAfterReplace, Volatile.Read(ref firstCalls));

@@ -4,9 +4,6 @@ import os
 import QuartzCore
 import UIKit
 
-private typealias CameraUpdateAction = @MainActor (MapState) async throws
-  -> Void
-
 /// The display-paced render loop. This view owns the layer, gesture decoding,
 /// runtime, map, Metal objects, and render session on the main thread.
 @MainActor
@@ -21,13 +18,11 @@ final class MetalMapView: UIView {
   private var mapState: MapState?
   private var renderTarget: MetalRenderTarget?
   private var setupTask: Task<Void, Never>?
-  private var cameraTask: Task<Void, Never>?
   private var displayLink: CADisplayLink?
   private var frameTask: Task<Void, Never>?
   private var shutdownTask: Task<Void, Never>?
   private var currentViewport: Viewport?
   private var renderRequested = true
-  private var nextCameraSequence = 0
   private var didLogStartupStatus = false
   private var viewVisible = false
   private var appForeground = true
@@ -117,10 +112,8 @@ final class MetalMapView: UIView {
     let target = renderTarget
     renderTarget = nil
     let setup = setupTask
-    let camera = cameraTask
     shutdownTask = Task { @MainActor in
       await setup?.value
-      await camera?.value
       do {
         try await target?.close()
         try await self.mapState?.close()
@@ -278,14 +271,12 @@ final class MetalMapView: UIView {
     graphics.resize(viewport)
     currentViewport = viewport
     pendingResize = renderTarget != nil
-    if mapState != nil {
-      scheduleCameraUpdate { state in
-        try state.resize(MapLogicalExtent(
-          width: viewport.logicalWidth,
-          height: viewport.logicalHeight,
-          scaleFactor: viewport.scaleFactor
-        ))
-      }
+    updateMap { state in
+      try state.resize(MapLogicalExtent(
+        width: viewport.logicalWidth,
+        height: viewport.logicalHeight,
+        scaleFactor: viewport.scaleFactor
+      ))
     }
     renderRequested = true
     startMapStateIfNeeded(viewport: viewport)
@@ -368,38 +359,27 @@ final class MetalMapView: UIView {
     )
   }
 
-  /// Serializes camera queries without moving map ownership off the render
-  /// loop. Each task inherits the main actor and waits for its predecessor.
-  private func scheduleCameraUpdate(_ update: @escaping CameraUpdateAction) {
-    guard !isShutDown else { return }
+  @discardableResult
+  private func updateMap(_ update: (MapState) throws -> Void) -> Bool {
+    guard !isShutDown, let state = mapState else { return false }
     renderRequested = true
-    nextCameraSequence += 1
-    let sequence = nextCameraSequence
-    let predecessor = cameraTask
-    cameraTask = Task { @MainActor [weak self] in
-      await predecessor?.value
-      guard let self, !self.isShutDown,
-            let state = self.mapState else { return }
-      var commandError: Error?
-      do {
-        try await update(state)
-      } catch {
-        commandError = error
-      }
-      if self.nextCameraSequence == sequence {
-        self.cameraTask = nil
-      }
-      if let commandError {
-        self.showError(commandError)
-        self.beginTeardown()
-      }
+    do {
+      try update(state)
+      return true
+    } catch {
+      showError(error)
+      beginTeardown()
+      return false
     }
   }
 
   /// Opens the gesture bracket for the first recognizer to begin.
   private func beginGesture(_ recognizer: UIGestureRecognizer) {
     if openGestures.isEmpty {
-      scheduleCameraUpdate { try $0.setGestureInProgress(true) }
+      guard updateMap({ state in
+        try state.cancelTransitions()
+        try state.setGestureInProgress(true)
+      }) else { return }
     }
     openGestures.insert(ObjectIdentifier(recognizer))
   }
@@ -411,7 +391,7 @@ final class MetalMapView: UIView {
       return
     }
     if openGestures.isEmpty {
-      scheduleCameraUpdate { try $0.setGestureInProgress(false) }
+      updateMap { try $0.setGestureInProgress(false) }
     }
   }
 
@@ -424,8 +404,8 @@ final class MetalMapView: UIView {
       let translation = recognizer.translation(in: self)
       recognizer.setTranslation(.zero, in: self)
       guard translation != .zero else { return }
-      scheduleCameraUpdate { state in
-        try await state.moveBy(
+      updateMap { state in
+        try state.moveBy(
           dx: Double(translation.x),
           dy: Double(translation.y)
         )
@@ -445,7 +425,7 @@ final class MetalMapView: UIView {
       recognizer.scale = 1.0
       guard scale.isFinite, scale > 0 else { return }
       let anchor = screenPoint(recognizer.location(in: self))
-      scheduleCameraUpdate { try await $0.scaleBy(scale, anchor: anchor) }
+      updateMap { try $0.scaleBy(scale, anchor: anchor) }
     default:
       endGesture(recognizer)
     }
@@ -461,8 +441,8 @@ final class MetalMapView: UIView {
       recognizer.rotation = 0
       guard deltaRadians != 0 else { return }
       let anchor = screenPoint(recognizer.location(in: self))
-      scheduleCameraUpdate {
-        try await $0.adjustBearing(
+      updateMap {
+        try $0.adjustBearing(
           delta: -Double(deltaRadians * 180 / .pi),
           anchor: anchor
         )
@@ -483,8 +463,8 @@ final class MetalMapView: UIView {
       let translation = recognizer.translation(in: self)
       recognizer.setTranslation(.zero, in: self)
       guard translation.y != 0 else { return }
-      scheduleCameraUpdate {
-        try await $0.adjustPitch(delta: -Double(translation.y) * 0.1)
+      updateMap {
+        try $0.adjustPitch(delta: -Double(translation.y) * 0.1)
       }
     default:
       endGesture(recognizer)
@@ -493,8 +473,8 @@ final class MetalMapView: UIView {
 
   @objc private func handleDoubleTap(_ recognizer: UITapGestureRecognizer) {
     let anchor = screenPoint(recognizer.location(in: self))
-    scheduleCameraUpdate {
-      try await $0.zoomToNextStep(
+    updateMap {
+      try $0.zoomToNextStep(
         anchor: anchor,
         animation: MaplibreNativeFFI.AnimationOptions(durationMilliseconds: 160)
       )

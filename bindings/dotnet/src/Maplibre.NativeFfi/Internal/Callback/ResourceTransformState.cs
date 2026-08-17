@@ -23,6 +23,7 @@ internal sealed unsafe class ResourceTransformState : IDisposable
             size = (uint)sizeof(mln_resource_transform),
             callback = &OnTransform,
             user_data = (void*)handle,
+            release_user_data = &Release,
         };
 
     internal bool IsHandleAllocatedForTest => handle != 0;
@@ -56,6 +57,16 @@ internal sealed unsafe class ResourceTransformState : IDisposable
         {
             return mln_status.MLN_STATUS_NATIVE_ERROR;
         }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    private static void Release(void* userData)
+    {
+        try
+        {
+            ((ResourceTransformState?)GCHandle.FromIntPtr((nint)userData).Target)?.Dispose();
+        }
+        catch { }
     }
 
     private static mln_status Invoke(

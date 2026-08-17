@@ -51,8 +51,7 @@ test "camera commands accept valid public descriptors" {
     const ease_id = try map.updateCamera(.{
         .mode = .ease,
         .camera = .{ .center = center, .zoom = 12.0 },
-        .animation = .{ .duration_ms = 0, .easing = .{ .x1 = 0.0, .y1 = 0.0, .x2 = 0.25, .y2 = 1.0 } },
-        .animation_id = 7,
+        .animation = .{ .duration_ms = 0, .easing = .{ .x1 = 0.0, .y1 = 0.0, .x2 = 0.25, .y2 = 1.0 }, .transition_id = 7 },
     });
     const fly_id = try map.updateCamera(.{
         .mode = .fly,

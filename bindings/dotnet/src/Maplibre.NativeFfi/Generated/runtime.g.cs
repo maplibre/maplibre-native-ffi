@@ -478,6 +478,9 @@ namespace Maplibre.NativeFfi.Internal.C
         public delegate* unmanaged[Cdecl]<void*, uint, sbyte*, mln_resource_transform_response*, mln_status> callback;
 
         public void* user_data;
+
+        [NativeTypeName("mln_runtime_callback_release")]
+        public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
     }
 
     internal unsafe partial struct mln_http_header_transform_response
@@ -497,6 +500,9 @@ namespace Maplibre.NativeFfi.Internal.C
         public delegate* unmanaged[Cdecl]<void*, uint, sbyte*, mln_http_header_transform_response*, mln_status> callback;
 
         public void* user_data;
+
+        [NativeTypeName("mln_runtime_callback_release")]
+        public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
     }
 
     internal unsafe partial struct mln_resource_request
@@ -610,6 +616,9 @@ namespace Maplibre.NativeFfi.Internal.C
         public delegate* unmanaged[Cdecl]<void*, mln_resource_request*, MlnResourceRequest, uint> callback;
 
         public void* user_data;
+
+        [NativeTypeName("mln_runtime_callback_release")]
+        public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
     }
 
     internal static unsafe partial class NativeMethods

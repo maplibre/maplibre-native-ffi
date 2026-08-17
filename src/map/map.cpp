@@ -2293,9 +2293,7 @@ auto camera_update_default() noexcept -> mln_camera_update {
     .camera = camera_options_default(),
     .animation = animation_options_default(),
     .gesture_phase = MLN_GESTURE_PHASE_NONE,
-    .reserved = 0,
-    .gesture_id = 0,
-    .animation_id = 0
+    .reserved = 0
   };
 }
 
@@ -3453,14 +3451,60 @@ auto map_camera_snapshot_get(
   return MLN_STATUS_OK;
 }
 
+namespace {
+
+template <typename Mutation>
+auto submit_camera_command(
+  mln_map map, Mutation mutation, uint64_t* out_command_id
+) -> mln_status {
+  if (out_command_id == nullptr || *out_command_id != 0) {
+    set_thread_error("out_command_id must point to zero");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto live = handle_table<MapObject>().lease(map);
+  if (live == nullptr) return MLN_STATUS_INVALID_ARGUMENT;
+  if (!live->control.acquire()) return MLN_STATUS_INVALID_STATE;
+  auto submission = std::make_shared<ControlLease>(&live->control);
+  return submit_runtime_command(
+    live->runtime_state,
+    [map, live, mutation = std::move(mutation),
+     submission = std::move(submission)](uint64_t command_id) mutable -> void {
+      try {
+        mutation(*live, map);
+        const auto generation = publish_map_snapshot(*live);
+        push_runtime_command_finished(
+          live->runtime, MLN_RUNTIME_EVENT_SOURCE_MAP, map, command_id,
+          MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, generation
+        );
+      } catch (...) {
+        const auto diagnostic = exception_message(std::current_exception());
+        push_runtime_command_finished(
+          live->runtime, MLN_RUNTIME_EVENT_SOURCE_MAP, map, command_id,
+          MLN_COMMAND_DISPOSITION_FAILED, MLN_STATUS_NATIVE_ERROR, 0,
+          diagnostic.c_str()
+        );
+      }
+    },
+    out_command_id
+  );
+}
+
+auto copied_relative_animation(const mln_animation_options* animation)
+  -> std::optional<mln_animation_options> {
+  if (animation == nullptr) return animation_options_default();
+  if (validate_animation_options(animation) != MLN_STATUS_OK) {
+    return std::nullopt;
+  }
+  return *animation;
+}
+
+}  // namespace
+
 auto map_update_camera(
   mln_map map, const mln_camera_update* update, uint64_t* out_command_id
 ) -> mln_status {
-  if (
-    update == nullptr || update->size < sizeof(mln_camera_update) ||
-    out_command_id == nullptr || *out_command_id != 0
-  ) {
-    set_thread_error("camera update and out_command_id must be valid");
+  if (update == nullptr || update->size < sizeof(mln_camera_update)) {
+    set_thread_error("camera update must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (
@@ -3478,75 +3522,172 @@ auto map_update_camera(
   if (animation_status != MLN_STATUS_OK) {
     return animation_status;
   }
-  auto copied = *update;
-  if (copied.animation_id != 0) {
-    copied.animation.fields |= MLN_ANIMATION_OPTION_TRANSITION_ID;
-    copied.animation.transition_id = copied.animation_id;
-  }
-  auto live = handle_table<MapObject>().lease(map);
-  if (live == nullptr) {
+  const auto copied = *update;
+  return submit_camera_command(
+    map,
+    [copied](MapObject& live, mln_map map_handle) -> void {
+      if (
+        copied.gesture_phase == MLN_GESTURE_PHASE_BEGIN ||
+        copied.gesture_phase == MLN_GESTURE_PHASE_UPDATE
+      ) {
+        live.map->setGestureInProgress(true);
+      }
+      switch (copied.mode) {
+        case MLN_CAMERA_UPDATE_MODE_JUMP:
+          live.map->jumpTo(to_native_camera(copied.camera));
+          break;
+        case MLN_CAMERA_UPDATE_MODE_EASE:
+          live.map->easeTo(
+            to_native_camera(copied.camera),
+            to_native_animation(
+              live.runtime, map_handle, live.event_state, &copied.animation
+            )
+          );
+          break;
+        case MLN_CAMERA_UPDATE_MODE_FLY:
+          live.map->flyTo(
+            to_native_camera(copied.camera),
+            to_native_animation(
+              live.runtime, map_handle, live.event_state, &copied.animation
+            )
+          );
+          break;
+        default:
+          break;
+      }
+      if (copied.gesture_phase == MLN_GESTURE_PHASE_CANCEL) {
+        live.map->cancelTransitions();
+      }
+      if (
+        copied.gesture_phase == MLN_GESTURE_PHASE_END ||
+        copied.gesture_phase == MLN_GESTURE_PHASE_CANCEL
+      ) {
+        live.map->setGestureInProgress(false);
+      }
+    },
+    out_command_id
+  );
+}
+
+auto map_move_by(
+  mln_map map, mln_screen_point offset, const mln_animation_options* animation,
+  uint64_t* out_command_id
+) -> mln_status {
+  if (validate_screen_point(offset) != MLN_STATUS_OK) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (!live->control.acquire()) {
-    return MLN_STATUS_INVALID_STATE;
+  const auto copied_animation = copied_relative_animation(animation);
+  if (!copied_animation.has_value()) return MLN_STATUS_INVALID_ARGUMENT;
+  return submit_camera_command(
+    map,
+    [offset, animation =
+               *copied_animation](MapObject& live, mln_map map_handle) -> void {
+      live.map->moveBy(
+        to_native_screen_point(offset),
+        to_native_animation(
+          live.runtime, map_handle, live.event_state, &animation
+        )
+      );
+    },
+    out_command_id
+  );
+}
+
+auto map_scale_by(
+  mln_map map, double scale, const mln_screen_point* anchor,
+  const mln_animation_options* animation, uint64_t* out_command_id
+) -> mln_status {
+  if (!std::isfinite(scale) || scale <= 0) {
+    set_thread_error("camera scale must be finite and positive");
+    return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto submission = std::make_shared<ControlLease>(&live->control);
-  return submit_runtime_command(
-    live->runtime_state,
-    [map, live, copied,
-     submission = std::move(submission)](uint64_t command_id) mutable -> void {
-      try {
-        if (
-          copied.gesture_phase == MLN_GESTURE_PHASE_BEGIN ||
-          copied.gesture_phase == MLN_GESTURE_PHASE_UPDATE
-        ) {
-          live->map->setGestureInProgress(true);
-        }
-        switch (copied.mode) {
-          case MLN_CAMERA_UPDATE_MODE_JUMP:
-            live->map->jumpTo(to_native_camera(copied.camera));
-            break;
-          case MLN_CAMERA_UPDATE_MODE_EASE:
-            live->map->easeTo(
-              to_native_camera(copied.camera),
-              to_native_animation(
-                live->runtime, map, live->event_state, &copied.animation
-              )
-            );
-            break;
-          case MLN_CAMERA_UPDATE_MODE_FLY:
-            live->map->flyTo(
-              to_native_camera(copied.camera),
-              to_native_animation(
-                live->runtime, map, live->event_state, &copied.animation
-              )
-            );
-            break;
-          default:
-            break;
-        }
-        if (copied.gesture_phase == MLN_GESTURE_PHASE_CANCEL) {
-          live->map->cancelTransitions();
-        }
-        if (
-          copied.gesture_phase == MLN_GESTURE_PHASE_END ||
-          copied.gesture_phase == MLN_GESTURE_PHASE_CANCEL
-        ) {
-          live->map->setGestureInProgress(false);
-        }
-        const auto generation = publish_map_snapshot(*live);
-        push_runtime_command_finished(
-          live->runtime, MLN_RUNTIME_EVENT_SOURCE_MAP, map, command_id,
-          MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, generation
-        );
-      } catch (...) {
-        const auto diagnostic = exception_message(std::current_exception());
-        push_runtime_command_finished(
-          live->runtime, MLN_RUNTIME_EVENT_SOURCE_MAP, map, command_id,
-          MLN_COMMAND_DISPOSITION_FAILED, MLN_STATUS_NATIVE_ERROR, 0,
-          diagnostic.c_str()
-        );
+  if (anchor != nullptr && validate_screen_point(*anchor) != MLN_STATUS_OK) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto copied_animation = copied_relative_animation(animation);
+  if (!copied_animation.has_value()) return MLN_STATUS_INVALID_ARGUMENT;
+  const auto copied_anchor = anchor == nullptr
+                               ? std::optional<mln_screen_point>{}
+                               : std::optional<mln_screen_point>{*anchor};
+  return submit_camera_command(
+    map,
+    [scale, copied_anchor, animation = *copied_animation](
+      MapObject& live, mln_map map_handle
+    ) -> void {
+      live.map->scaleBy(
+        scale,
+        copied_anchor.has_value()
+          ? std::optional<mbgl::ScreenCoordinate>{to_native_screen_point(
+              *copied_anchor
+            )}
+          : std::nullopt,
+        to_native_animation(
+          live.runtime, map_handle, live.event_state, &animation
+        )
+      );
+    },
+    out_command_id
+  );
+}
+
+auto map_bearing_by(
+  mln_map map, double degrees, const mln_screen_point* anchor,
+  const mln_animation_options* animation, uint64_t* out_command_id
+) -> mln_status {
+  if (!std::isfinite(degrees)) {
+    set_thread_error("camera bearing delta must be finite");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (anchor != nullptr && validate_screen_point(*anchor) != MLN_STATUS_OK) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto copied_animation = copied_relative_animation(animation);
+  if (!copied_animation.has_value()) return MLN_STATUS_INVALID_ARGUMENT;
+  const auto copied_anchor = anchor == nullptr
+                               ? std::optional<mln_screen_point>{}
+                               : std::optional<mln_screen_point>{*anchor};
+  return submit_camera_command(
+    map,
+    [degrees, copied_anchor, animation = *copied_animation](
+      MapObject& live, mln_map map_handle
+    ) -> void {
+      const auto current = live.map->getCameraOptions();
+      auto camera = mbgl::CameraOptions{}.withBearing(
+        current.bearing.value_or(0) + degrees
+      );
+      if (copied_anchor.has_value()) {
+        camera.withAnchor(to_native_screen_point(*copied_anchor));
       }
+      live.map->easeTo(
+        camera, to_native_animation(
+                  live.runtime, map_handle, live.event_state, &animation
+                )
+      );
+    },
+    out_command_id
+  );
+}
+
+auto map_pitch_by(
+  mln_map map, double degrees, const mln_animation_options* animation,
+  uint64_t* out_command_id
+) -> mln_status {
+  if (!std::isfinite(degrees)) {
+    set_thread_error("camera pitch delta must be finite");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto copied_animation = copied_relative_animation(animation);
+  if (!copied_animation.has_value()) return MLN_STATUS_INVALID_ARGUMENT;
+  return submit_camera_command(
+    map,
+    [degrees, animation = *copied_animation](
+      MapObject& live, mln_map map_handle
+    ) -> void {
+      live.map->pitchBy(
+        -degrees, to_native_animation(
+                    live.runtime, map_handle, live.event_state, &animation
+                  )
+      );
     },
     out_command_id
   );

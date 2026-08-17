@@ -2386,7 +2386,7 @@ fn render_frame(session: &RenderSessionHandle, if_needed: bool) -> RenderFrameRe
     let deadline = Instant::now() + Duration::from_secs(5);
     loop {
         let _ = session.service_driver_work(64);
-        let batch = match session.drain_frame_results(0) {
+        let batch = match session.drain_frame_results() {
             Ok(batch) => batch,
             Err(error) if error.kind() == ErrorKind::NotReady => {
                 assert!(Instant::now() < deadline, "frame demand timed out");

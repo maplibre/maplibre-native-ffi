@@ -49,10 +49,9 @@ internal constructor(private val ownerMap: MapHandle, private val handle: Native
     NativeAccess.requestRenderFrame(requireLiveHandle(), demand)
   }
 
-  public actual fun drainFrameResults(maxResults: Int): List<RenderFrameResult> {
+  public actual fun drainFrameResults(): List<RenderFrameResult> {
     NativeAccess.ensureLoaded()
-    Status.requireArgument(maxResults >= 0) { "maxResults must be non-negative" }
-    return NativeAccess.drainRenderFrameResults(requireLiveHandle(), maxResults)
+    return NativeAccess.drainRenderFrameResults(requireLiveHandle())
   }
 
   public actual fun serviceDriverWork(maxWork: Int): Int {

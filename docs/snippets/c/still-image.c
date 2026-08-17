@@ -71,8 +71,7 @@ static bool await_still_image(
 
     mln_render_frame_batch batch = MLN_HANDLE_NULL;
     if (
-      mln_render_session_drain_frame_results(session, 0, &batch) ==
-      MLN_STATUS_OK
+      mln_render_session_drain_frame_results(session, &batch) == MLN_STATUS_OK
     ) {
       size_t count = 0;
       mln_render_frame_batch_count(batch, &count);

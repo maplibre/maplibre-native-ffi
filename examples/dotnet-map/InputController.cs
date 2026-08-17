@@ -92,7 +92,7 @@ internal sealed unsafe class InputController : IDisposable
         if (rightDown || (leftDown && ctrlDown))
         {
             state.AdjustBearing(dx * DragRotateFactor);
-            state.AdjustPitch(-dy * DragPitchFactor);
+            state.AdjustPitch(dy * DragPitchFactor);
         }
         else if (leftDown)
         {

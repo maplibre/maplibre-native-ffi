@@ -3,9 +3,10 @@
 
 #include "input.h"
 
+#include "diagnostics.h"
+
 static constexpr double keyboard_animation_ms = 160.0;
 static constexpr double reset_animation_ms = 220.0;
-static constexpr double pi = 3.14159265358979323846;
 
 static double logical_coordinate(
   double value, uint32_t window_size, uint32_t logical_size
@@ -36,73 +37,64 @@ static input_result submitted(app_error error) {
 
 static app_error submit_camera(
   map_state* state, const mln_camera_options* camera, uint32_t mode,
-  double duration_ms, uint32_t gesture_phase, uint64_t gesture_id
+  double duration_ms, uint32_t gesture_phase
 ) {
   mln_animation_options options = animation(duration_ms);
   return map_state_update_camera(
     state, camera, mode, mode == MLN_CAMERA_UPDATE_MODE_JUMP ? NULL : &options,
-    gesture_phase, gesture_id
+    gesture_phase
   );
 }
 
+static app_error camera_status(mln_status status) {
+  if (status == MLN_STATUS_OK) return APP_OK;
+  diagnostics_log_status("camera command failed", status);
+  return APP_ERROR_CAMERA_COMMAND_FAILED;
+}
+
 static app_error pan(
-  map_state* state, double dx, double dy, uint32_t mode, double duration_ms,
-  uint64_t gesture_id
+  map_state* state, double dx, double dy, uint32_t mode, double duration_ms
 ) {
-  mln_camera_options current;
-  app_error error = map_state_camera_query(state, &current);
-  if (error != APP_OK) return error;
-
-  const double latitude =
-    fmax(-85.05112878, fmin(85.05112878, current.latitude));
-  const double latitude_radians = latitude * pi / 180.0;
-  double x = (current.longitude + 180.0) / 360.0;
-  double y =
-    (1.0 - log(tan(latitude_radians) + 1.0 / cos(latitude_radians)) / pi) / 2.0;
-  const double world_size = 512.0 * exp2(current.zoom);
-  const double bearing = current.bearing * pi / 180.0;
-  x += (-dx * cos(bearing) - dy * sin(bearing)) / world_size;
-  y += (dx * sin(bearing) - dy * cos(bearing)) / world_size;
-
-  mln_camera_options target = mln_camera_options_default();
-  target.fields = MLN_CAMERA_OPTION_CENTER;
-  target.longitude = x * 360.0 - 180.0;
-  target.latitude = 180.0 / pi * atan(sinh(pi * (1.0 - 2.0 * y)));
-  return submit_camera(
-    state, &target, mode, duration_ms, MLN_GESTURE_PHASE_UPDATE, gesture_id
-  );
+  const mln_animation_options options = animation(duration_ms);
+  uint64_t command_id = 0;
+  return camera_status(mln_map_move_by(
+    state->map, (mln_screen_point){.x = dx, .y = dy},
+    mode == MLN_CAMERA_UPDATE_MODE_JUMP ? NULL : &options, &command_id
+  ));
 }
 
 static app_error zoom(
   map_state* state, double scale, mln_screen_point anchor, uint32_t mode,
-  double duration_ms, uint64_t gesture_id
+  double duration_ms
 ) {
-  mln_camera_options current;
-  app_error error = map_state_camera_query(state, &current);
-  if (error != APP_OK) return error;
-  mln_camera_options target = mln_camera_options_default();
-  target.fields = MLN_CAMERA_OPTION_ZOOM | MLN_CAMERA_OPTION_ANCHOR;
-  target.zoom = current.zoom + log2(scale);
-  target.anchor = anchor;
-  return submit_camera(
-    state, &target, mode, duration_ms, MLN_GESTURE_PHASE_UPDATE, gesture_id
-  );
+  const mln_animation_options options = animation(duration_ms);
+  uint64_t command_id = 0;
+  return camera_status(mln_map_scale_by(
+    state->map, scale, &anchor,
+    mode == MLN_CAMERA_UPDATE_MODE_JUMP ? NULL : &options, &command_id
+  ));
 }
 
 static app_error adjust_orientation(
   map_state* state, double bearing_delta, double pitch_delta, uint32_t mode,
-  double duration_ms, uint64_t gesture_id
+  double duration_ms
 ) {
-  mln_camera_options current;
-  app_error error = map_state_camera_query(state, &current);
-  if (error != APP_OK) return error;
-  mln_camera_options target = mln_camera_options_default();
-  target.fields = MLN_CAMERA_OPTION_BEARING | MLN_CAMERA_OPTION_PITCH;
-  target.bearing = current.bearing + bearing_delta;
-  target.pitch = fmax(0.0, fmin(60.0, current.pitch + pitch_delta));
-  return submit_camera(
-    state, &target, mode, duration_ms, MLN_GESTURE_PHASE_UPDATE, gesture_id
-  );
+  const mln_animation_options options = animation(duration_ms);
+  const mln_animation_options* animation_options =
+    mode == MLN_CAMERA_UPDATE_MODE_JUMP ? NULL : &options;
+  uint64_t command_id = 0;
+  mln_status status = MLN_STATUS_OK;
+  if (bearing_delta != 0.0) {
+    status = mln_map_bearing_by(
+      state->map, bearing_delta, NULL, animation_options, &command_id
+    );
+  }
+  if (status == MLN_STATUS_OK && pitch_delta != 0.0) {
+    command_id = 0;
+    status =
+      mln_map_pitch_by(state->map, pitch_delta, animation_options, &command_id);
+  }
+  return camera_status(status);
 }
 
 static drag_mode drag_mode_for_button(uint8_t button) {
@@ -125,11 +117,9 @@ static input_result handle_mouse_button_down(
   controller->last_y = cursor.y;
   controller->drag_mode = mode;
   controller->drag_button = button->button;
-  controller->gesture_id = ++controller->next_gesture_id;
   mln_camera_options camera = mln_camera_options_default();
   const app_error error = map_state_update_camera(
-    state, &camera, MLN_CAMERA_UPDATE_MODE_JUMP, NULL, MLN_GESTURE_PHASE_BEGIN,
-    controller->gesture_id
+    state, &camera, MLN_CAMERA_UPDATE_MODE_JUMP, NULL, MLN_GESTURE_PHASE_BEGIN
   );
   return submitted(error);
 }
@@ -146,10 +136,8 @@ static input_result handle_mouse_button_up(
   controller->drag_button = 0;
   mln_camera_options camera = mln_camera_options_default();
   const app_error error = map_state_update_camera(
-    state, &camera, MLN_CAMERA_UPDATE_MODE_JUMP, NULL, MLN_GESTURE_PHASE_END,
-    controller->gesture_id
+    state, &camera, MLN_CAMERA_UPDATE_MODE_JUMP, NULL, MLN_GESTURE_PHASE_END
   );
-  controller->gesture_id = 0;
   return (input_result){.handled = true, .error = error};
 }
 
@@ -166,13 +154,9 @@ static input_result handle_mouse_motion(
   if (dx == 0.0 && dy == 0.0) return (input_result){.handled = true};
   return submitted(
     controller->drag_mode == DRAG_MODE_PAN
-      ? pan(
-          state, dx, dy, MLN_CAMERA_UPDATE_MODE_JUMP, 0.0,
-          controller->gesture_id
-        )
+      ? pan(state, dx, dy, MLN_CAMERA_UPDATE_MODE_JUMP, 0.0)
       : adjust_orientation(
-          state, dx * 0.5, dy / 2.0, MLN_CAMERA_UPDATE_MODE_JUMP, 0.0,
-          controller->gesture_id
+          state, dx * 0.5, dy / 2.0, MLN_CAMERA_UPDATE_MODE_JUMP, 0.0
         )
   );
 }
@@ -184,7 +168,7 @@ static input_result handle_mouse_wheel(
   return submitted(zoom(
     state, pow(2.0, wheel->y * 0.25),
     logical_point(wheel->mouse_x, wheel->mouse_y, value),
-    MLN_CAMERA_UPDATE_MODE_JUMP, 0.0, 0
+    MLN_CAMERA_UPDATE_MODE_JUMP, 0.0
   ));
 }
 
@@ -204,67 +188,65 @@ static input_result handle_key_down(
     case SDL_SCANCODE_LEFT:
     case SDL_SCANCODE_A:
       error = pan(
-        state, pan_step, 0.0, MLN_CAMERA_UPDATE_MODE_EASE,
-        keyboard_animation_ms, 0
+        state, pan_step, 0.0, MLN_CAMERA_UPDATE_MODE_EASE, keyboard_animation_ms
       );
       break;
     case SDL_SCANCODE_RIGHT:
     case SDL_SCANCODE_D:
       error = pan(
         state, -pan_step, 0.0, MLN_CAMERA_UPDATE_MODE_EASE,
-        keyboard_animation_ms, 0
+        keyboard_animation_ms
       );
       break;
     case SDL_SCANCODE_UP:
     case SDL_SCANCODE_W:
       error = pan(
-        state, 0.0, pan_step, MLN_CAMERA_UPDATE_MODE_EASE,
-        keyboard_animation_ms, 0
+        state, 0.0, pan_step, MLN_CAMERA_UPDATE_MODE_EASE, keyboard_animation_ms
       );
       break;
     case SDL_SCANCODE_DOWN:
     case SDL_SCANCODE_S:
       error = pan(
         state, 0.0, -pan_step, MLN_CAMERA_UPDATE_MODE_EASE,
-        keyboard_animation_ms, 0
+        keyboard_animation_ms
       );
       break;
     case SDL_SCANCODE_EQUALS:
     case SDL_SCANCODE_KP_PLUS:
       error = zoom(
         state, zoom_step, center, MLN_CAMERA_UPDATE_MODE_EASE,
-        keyboard_animation_ms, 0
+        keyboard_animation_ms
       );
       break;
     case SDL_SCANCODE_MINUS:
     case SDL_SCANCODE_KP_MINUS:
       error = zoom(
         state, 1.0 / zoom_step, center, MLN_CAMERA_UPDATE_MODE_EASE,
-        keyboard_animation_ms, 0
+        keyboard_animation_ms
       );
       break;
     case SDL_SCANCODE_Q:
       error = adjust_orientation(
         state, -bearing_step, 0.0, MLN_CAMERA_UPDATE_MODE_EASE,
-        keyboard_animation_ms, 0
+        keyboard_animation_ms
       );
       break;
     case SDL_SCANCODE_E:
       error = adjust_orientation(
         state, bearing_step, 0.0, MLN_CAMERA_UPDATE_MODE_EASE,
-        keyboard_animation_ms, 0
+        keyboard_animation_ms
       );
       break;
     case SDL_SCANCODE_RIGHTBRACKET:
       error = adjust_orientation(
         state, 0.0, pitch_step, MLN_CAMERA_UPDATE_MODE_EASE,
-        keyboard_animation_ms, 0
+        keyboard_animation_ms
       );
       break;
     case SDL_SCANCODE_LEFTBRACKET:
       error = adjust_orientation(
         state, 0.0, -pitch_step, MLN_CAMERA_UPDATE_MODE_EASE,
-        keyboard_animation_ms, 0
+        keyboard_animation_ms
       );
       break;
     case SDL_SCANCODE_0: {
@@ -274,7 +256,7 @@ static input_result handle_key_down(
       target.pitch = 0.0;
       error = submit_camera(
         state, &target, MLN_CAMERA_UPDATE_MODE_EASE, reset_animation_ms,
-        MLN_GESTURE_PHASE_NONE, 0
+        MLN_GESTURE_PHASE_NONE
       );
       break;
     }

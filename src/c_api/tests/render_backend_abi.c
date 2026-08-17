@@ -553,7 +553,7 @@ static void dedicated_egl_surface_renders_and_keeps_its_context_current(void) {
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_render_session_drain_frame_results(fixture.session, SIZE_MAX, &batch)
+    mln_render_session_drain_frame_results(fixture.session, &batch)
   );
   mln_render_frame_result result = {.size = sizeof(mln_render_frame_result)};
   TEST_ASSERT_EQUAL_INT(
@@ -605,7 +605,7 @@ static void frame_results_report_whether_the_map_needs_another_frame(void) {
     mln_render_frame_batch batch = MLN_HANDLE_NULL;
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK,
-      mln_render_session_drain_frame_results(fixture.session, SIZE_MAX, &batch)
+      mln_render_session_drain_frame_results(fixture.session, &batch)
     );
     size_t count = 0;
     TEST_ASSERT_EQUAL_INT(
@@ -651,7 +651,7 @@ static void frame_results_report_whether_the_map_needs_another_frame(void) {
     mln_render_frame_batch batch = MLN_HANDLE_NULL;
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK,
-      mln_render_session_drain_frame_results(fixture.session, SIZE_MAX, &batch)
+      mln_render_session_drain_frame_results(fixture.session, &batch)
     );
     size_t count = 0;
     TEST_ASSERT_EQUAL_INT(
@@ -704,7 +704,7 @@ static void frame_results_report_whether_the_map_needs_another_frame(void) {
     mln_render_frame_batch batch = MLN_HANDLE_NULL;
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK,
-      mln_render_session_drain_frame_results(fixture.session, SIZE_MAX, &batch)
+      mln_render_session_drain_frame_results(fixture.session, &batch)
     );
     size_t count = 0;
     TEST_ASSERT_EQUAL_INT(

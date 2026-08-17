@@ -23,8 +23,6 @@ pub const Result = struct {
 pub const Controller = struct {
     drag_mode: DragMode = .none,
     drag_button: u8 = 0,
-    next_gesture_id: u64 = 1,
-    active_gesture_id: u64 = 0,
     last_x: f64 = 0,
     last_y: f64 = 0,
 
@@ -57,11 +55,7 @@ pub const Controller = struct {
         const cursor = logicalPoint(button.x, button.y, current_viewport);
         self.last_x = cursor.x;
         self.last_y = cursor.y;
-        const gesture_id = self.next_gesture_id;
-        self.next_gesture_id +%= 1;
-        try state.cancelTransitions();
-        try state.setGesture(.begin, gesture_id);
-        self.active_gesture_id = gesture_id;
+        try state.setGesture(.begin);
         self.drag_mode = mode;
         self.drag_button = button.button;
         return .{ .handled = true };
@@ -84,9 +78,7 @@ pub const Controller = struct {
         if (self.drag_mode == .none) return;
         self.drag_mode = .none;
         self.drag_button = 0;
-        const gesture_id = self.active_gesture_id;
-        self.active_gesture_id = 0;
-        try state.setGesture(.end, gesture_id);
+        try state.setGesture(.end);
     }
 
     fn handleMouseMotion(

@@ -59,8 +59,6 @@ public sealed record CameraUpdate
     public CameraOptions Camera { get; set; } = new();
     public AnimationOptions Animation { get; set; } = new();
     public GesturePhase GesturePhase { get; set; }
-    public ulong GestureId { get; set; }
-    public ulong AnimationId { get; set; }
 }
 
 /// <summary>A camera snapshot and its committed generation.</summary>

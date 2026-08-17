@@ -100,8 +100,6 @@ pub const CameraUpdate = struct {
     camera: values.CameraOptions = .{},
     animation: values.AnimationOptions = .{},
     gesture_phase: GesturePhase = .none,
-    gesture_id: u64 = 0,
-    animation_id: u64 = 0,
 };
 
 pub const CameraSnapshot = struct {
@@ -1510,10 +1508,72 @@ pub const MapHandle = enum(c.mln_map) {
         raw.camera = values.cameraOptionsToNative(update.camera);
         raw.animation = values.animationOptionsToNative(update.animation);
         raw.gesture_phase = update.gesture_phase.toRaw();
-        raw.gesture_id = update.gesture_id;
-        raw.animation_id = update.animation_id;
         var command_id: u64 = 0;
         try status.checkStatus(c.mln_map_update_camera(try native(self), &raw, &command_id), diagnosticStore(self));
+        return command_id;
+    }
+
+    pub fn moveBy(self: *MapHandle, offset: values.ScreenPoint, animation: ?values.AnimationOptions) status.Error!u64 {
+        var raw_animation = if (animation) |value| values.animationOptionsToNative(value) else c.mln_animation_options_default();
+        var command_id: u64 = 0;
+        try status.checkStatus(
+            c.mln_map_move_by(
+                try native(self),
+                .{ .x = offset.x, .y = offset.y },
+                if (animation == null) null else &raw_animation,
+                &command_id,
+            ),
+            diagnosticStore(self),
+        );
+        return command_id;
+    }
+
+    pub fn scaleBy(self: *MapHandle, scale: f64, anchor: ?values.ScreenPoint, animation: ?values.AnimationOptions) status.Error!u64 {
+        var raw_anchor = if (anchor) |value| c.mln_screen_point{ .x = value.x, .y = value.y } else c.mln_screen_point{ .x = 0, .y = 0 };
+        var raw_animation = if (animation) |value| values.animationOptionsToNative(value) else c.mln_animation_options_default();
+        var command_id: u64 = 0;
+        try status.checkStatus(
+            c.mln_map_scale_by(
+                try native(self),
+                scale,
+                if (anchor == null) null else &raw_anchor,
+                if (animation == null) null else &raw_animation,
+                &command_id,
+            ),
+            diagnosticStore(self),
+        );
+        return command_id;
+    }
+
+    pub fn bearingBy(self: *MapHandle, degrees: f64, anchor: ?values.ScreenPoint, animation: ?values.AnimationOptions) status.Error!u64 {
+        var raw_anchor = if (anchor) |value| c.mln_screen_point{ .x = value.x, .y = value.y } else c.mln_screen_point{ .x = 0, .y = 0 };
+        var raw_animation = if (animation) |value| values.animationOptionsToNative(value) else c.mln_animation_options_default();
+        var command_id: u64 = 0;
+        try status.checkStatus(
+            c.mln_map_bearing_by(
+                try native(self),
+                degrees,
+                if (anchor == null) null else &raw_anchor,
+                if (animation == null) null else &raw_animation,
+                &command_id,
+            ),
+            diagnosticStore(self),
+        );
+        return command_id;
+    }
+
+    pub fn pitchBy(self: *MapHandle, degrees: f64, animation: ?values.AnimationOptions) status.Error!u64 {
+        var raw_animation = if (animation) |value| values.animationOptionsToNative(value) else c.mln_animation_options_default();
+        var command_id: u64 = 0;
+        try status.checkStatus(
+            c.mln_map_pitch_by(
+                try native(self),
+                degrees,
+                if (animation == null) null else &raw_animation,
+                &command_id,
+            ),
+            diagnosticStore(self),
+        );
         return command_id;
     }
 

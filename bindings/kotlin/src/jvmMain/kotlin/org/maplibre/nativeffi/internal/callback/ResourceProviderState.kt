@@ -7,6 +7,8 @@ import java.lang.invoke.MethodHandles
 import java.lang.invoke.MethodType
 import org.maplibre.nativeffi.internal.c.mln_resource_provider
 import org.maplibre.nativeffi.internal.c.mln_resource_provider_callback
+import org.maplibre.nativeffi.internal.c.mln_runtime_callback_release
+import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.NativeResourceRequest
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.resource.ResourceProviderCallback
@@ -15,8 +17,8 @@ import org.maplibre.nativeffi.resource.ResourceRequestHandle
 /** Owns runtime-scoped JVM FFM resource provider callback state. */
 internal class ResourceProviderState(private val callback: ResourceProviderCallback) :
   AutoCloseable {
-  private val arena = Arena.ofShared()
-  private val gate = CallbackGate("resource provider callbacks") { arena.close() }
+  private val arena = Arena.ofAuto()
+  private val gate = CallbackGate("resource provider callbacks") {}
   private val stub: MemorySegment
   private val descriptor: MemorySegment
 
@@ -39,6 +41,19 @@ internal class ResourceProviderState(private val callback: ResourceProviderCallb
     mln_resource_provider.size(descriptor, mln_resource_provider.sizeof().toInt())
     mln_resource_provider.callback(descriptor, stub)
     mln_resource_provider.user_data(descriptor, MemorySegment.NULL)
+    val releaseMethod =
+      MethodHandles.lookup()
+        .findVirtual(
+          ResourceProviderState::class.java,
+          "release",
+          MethodType.methodType(Void.TYPE, MemorySegment::class.java),
+        )
+        .bindTo(this)
+    mln_resource_provider.release_user_data(
+      descriptor,
+      Linker.nativeLinker()
+        .upcallStub(releaseMethod, mln_runtime_callback_release.descriptor(), arena),
+    )
   }
 
   fun descriptor(): MemorySegment = descriptor
@@ -65,6 +80,12 @@ internal class ResourceProviderState(private val callback: ResourceProviderCallb
   fun isClosedForTesting(): Boolean = gate.isClosedForTesting()
 
   override fun close() = gate.close()
+
+  @Suppress("UNUSED_PARAMETER")
+  fun release(userData: MemorySegment) {
+    HandleLeakCleaner.releaseNativeCallbackRoot(this)
+    close()
+  }
 
   private companion object {
     private const val UNKNOWN_DECISION: Int = -1

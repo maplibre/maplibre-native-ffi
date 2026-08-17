@@ -114,6 +114,10 @@ final class RuntimeHandle {
         ) {
           scheduleMicrotask(_drainNotificationSource);
         });
+    _callbackReleaseListener =
+        NativeCallable<raw.mln_runtime_callback_releaseFunction>.listener(
+          _releaseNativeCallback,
+        );
     try {
       _check(
         raw.mln_notification_source_set_callback(
@@ -124,6 +128,7 @@ final class RuntimeHandle {
       );
     } catch (_) {
       _notificationListener.close();
+      _callbackReleaseListener.close();
       rethrow;
     }
   }
@@ -131,17 +136,30 @@ final class RuntimeHandle {
   int _notificationSource;
   late final NativeCallable<raw.mln_notification_callbackFunction>
   _notificationListener;
+  late final NativeCallable<raw.mln_runtime_callback_releaseFunction>
+  _callbackReleaseListener;
   final _maps = <int, WeakReference<MapHandle>>{};
   final _renderSessions = <int, WeakReference<RenderSessionHandle>>{};
   final _operations = <int, WeakReference<OperationHandle>>{};
   final _operationWaiters = <int, Completer<void>>{};
   final _queuedRuntimeEvents = <RuntimeEvent>[];
-  _ResourceTransformState? _resourceTransformState;
-  _HttpHeaderTransformState? _httpHeaderTransformState;
-  _ResourceProviderRulesState? _resourceProviderRulesState;
-  _ResourceProviderCallbackState? _resourceProviderCallbackState;
-  final _pendingResourceCommands = <int, void Function(bool committed)>{};
+  final _nativeCallbackReleases = <int, void Function()>{};
   final _resourceProviderQueues = <int, _ResourceProviderCallbackState>{};
+
+  void _releaseNativeCallback(Pointer<Void> userData) {
+    _nativeCallbackReleases.remove(userData.address)?.call();
+  }
+
+  void _registerNativeCallback(
+    Pointer<Void> userData,
+    void Function() release,
+  ) {
+    _nativeCallbackReleases[userData.address] = release;
+  }
+
+  void _cancelNativeCallback(Pointer<Void> userData) {
+    _nativeCallbackReleases.remove(userData.address)?.call();
+  }
 
   /// Creates a runtime without blocking the calling isolate.
   static Future<RuntimeHandle> create({
@@ -253,12 +271,16 @@ final class RuntimeHandle {
   /// Returns the accepted runtime-wide command ID.
   BigInt setResourceUrlRewriteRules(List<ResourceUrlRewriteRule> rules) {
     final state = _ResourceTransformState(rules);
+    final userData = state.pointer.cast<Void>();
+    _registerNativeCallback(userData, state.close);
     try {
       final commandId = withNativeArena((arena) {
         final transform = arena<raw.mln_resource_transform>();
         transform.ref.size = sizeOf<raw.mln_resource_transform>();
         transform.ref.callback = _c.adapterResourceTransformRewriteCallback();
-        transform.ref.user_data = state.pointer.cast<Void>();
+        transform.ref.user_data = userData;
+        transform.ref.release_user_data =
+            _callbackReleaseListener.nativeFunction;
         final outCommandId = arena<Uint64>()..value = 0;
         _check(
           raw.mln_runtime_set_resource_transform(
@@ -269,17 +291,9 @@ final class RuntimeHandle {
         );
         return outCommandId.value;
       });
-      _recordResourceCommand(commandId, (committed) {
-        if (committed) {
-          _resourceTransformState?.close();
-          _resourceTransformState = state;
-        } else {
-          state.close();
-        }
-      });
       return uint64FromNative(commandId);
     } catch (_) {
-      state.close();
+      _cancelNativeCallback(userData);
       rethrow;
     }
   }
@@ -295,12 +309,6 @@ final class RuntimeHandle {
       );
       return outCommandId.value;
     });
-    _recordResourceCommand(commandId, (committed) {
-      if (committed) {
-        _resourceTransformState?.close();
-        _resourceTransformState = null;
-      }
-    });
     return uint64FromNative(commandId);
   }
 
@@ -309,12 +317,16 @@ final class RuntimeHandle {
   /// Returns the accepted runtime-wide command ID.
   BigInt setHttpHeaderTransformRules(List<HttpHeaderTransformRule> rules) {
     final state = _HttpHeaderTransformState(rules);
+    final userData = state.pointer.cast<Void>();
+    _registerNativeCallback(userData, state.close);
     try {
       final commandId = withNativeArena((arena) {
         final transform = arena<raw.mln_http_header_transform>();
         transform.ref.size = sizeOf<raw.mln_http_header_transform>();
         transform.ref.callback = _c.adapterHttpHeaderTransformCallback();
-        transform.ref.user_data = state.pointer.cast<Void>();
+        transform.ref.user_data = userData;
+        transform.ref.release_user_data =
+            _callbackReleaseListener.nativeFunction;
         final outCommandId = arena<Uint64>()..value = 0;
         _check(
           raw.mln_runtime_set_http_header_transform(
@@ -325,17 +337,9 @@ final class RuntimeHandle {
         );
         return outCommandId.value;
       });
-      _recordResourceCommand(commandId, (committed) {
-        if (committed) {
-          _httpHeaderTransformState?.close();
-          _httpHeaderTransformState = state;
-        } else {
-          state.close();
-        }
-      });
       return uint64FromNative(commandId);
     } catch (_) {
-      state.close();
+      _cancelNativeCallback(userData);
       rethrow;
     }
   }
@@ -351,12 +355,6 @@ final class RuntimeHandle {
       );
       return outCommandId.value;
     });
-    _recordResourceCommand(commandId, (committed) {
-      if (committed) {
-        _httpHeaderTransformState?.close();
-        _httpHeaderTransformState = null;
-      }
-    });
     return uint64FromNative(commandId);
   }
 
@@ -365,12 +363,16 @@ final class RuntimeHandle {
   /// Returns the accepted runtime-wide command ID.
   BigInt setResourceProviderRules(List<ResourceProviderRule> rules) {
     final state = _ResourceProviderRulesState(rules);
+    final userData = state.pointer.cast<Void>();
+    _registerNativeCallback(userData, state.close);
     try {
       final commandId = withNativeArena((arena) {
         final provider = arena<raw.mln_resource_provider>();
         provider.ref.size = sizeOf<raw.mln_resource_provider>();
         provider.ref.callback = _c.adapterResourceProviderRulesCallback();
-        provider.ref.user_data = state.pointer.cast<Void>();
+        provider.ref.user_data = userData;
+        provider.ref.release_user_data =
+            _callbackReleaseListener.nativeFunction;
         final outCommandId = arena<Uint64>()..value = 0;
         _check(
           raw.mln_runtime_set_resource_provider(
@@ -381,17 +383,9 @@ final class RuntimeHandle {
         );
         return outCommandId.value;
       });
-      _recordResourceCommand(commandId, (committed) {
-        if (committed) {
-          _closeActiveResourceProvider();
-          _resourceProviderRulesState = state;
-        } else {
-          state.close();
-        }
-      });
       return uint64FromNative(commandId);
     } catch (_) {
-      state.close();
+      _cancelNativeCallback(userData);
       rethrow;
     }
   }
@@ -402,13 +396,20 @@ final class RuntimeHandle {
   BigInt setResourceProvider(ResourceProvider provider) {
     final state = _ResourceProviderCallbackState(provider, _notificationSource);
     _resourceProviderQueues[state.queue] = state;
+    final userData = state.pointer.cast<Void>();
+    _registerNativeCallback(
+      userData,
+      () => _closeResourceProviderCallback(state),
+    );
     try {
       final commandId = withNativeArena((arena) {
         final nativeProvider = arena<raw.mln_resource_provider>();
         nativeProvider.ref.size = sizeOf<raw.mln_resource_provider>();
         nativeProvider.ref.callback = _c
             .adapterQueuedResourceProviderCallback();
-        nativeProvider.ref.user_data = state.pointer.cast<Void>();
+        nativeProvider.ref.user_data = userData;
+        nativeProvider.ref.release_user_data =
+            _callbackReleaseListener.nativeFunction;
         final outCommandId = arena<Uint64>()..value = 0;
         _check(
           raw.mln_runtime_set_resource_provider(
@@ -419,17 +420,9 @@ final class RuntimeHandle {
         );
         return outCommandId.value;
       });
-      _recordResourceCommand(commandId, (committed) {
-        if (committed) {
-          _closeActiveResourceProvider();
-          _resourceProviderCallbackState = state;
-        } else {
-          _closeResourceProviderCallback(state);
-        }
-      });
       return uint64FromNative(commandId);
     } catch (_) {
-      _closeResourceProviderCallback(state);
+      _cancelNativeCallback(userData);
       rethrow;
     }
   }
@@ -445,40 +438,12 @@ final class RuntimeHandle {
       );
       return outCommandId.value;
     });
-    _recordResourceCommand(commandId, (committed) {
-      if (committed) {
-        _closeActiveResourceProvider();
-      }
-    });
     return uint64FromNative(commandId);
-  }
-
-  void _recordResourceCommand(
-    int commandId,
-    void Function(bool committed) finish,
-  ) {
-    _pendingResourceCommands[commandId] = finish;
-  }
-
-  void _finishResourceCommand(int commandId, CommandDisposition disposition) {
-    _pendingResourceCommands
-        .remove(commandId)
-        ?.call(disposition == CommandDisposition.committed);
   }
 
   void _closeResourceProviderCallback(_ResourceProviderCallbackState state) {
     _resourceProviderQueues.remove(state.queue);
     state.retire();
-  }
-
-  void _closeActiveResourceProvider() {
-    _resourceProviderRulesState?.close();
-    _resourceProviderRulesState = null;
-    final callbackState = _resourceProviderCallbackState;
-    if (callbackState != null) {
-      _closeResourceProviderCallback(callbackState);
-      _resourceProviderCallbackState = null;
-    }
   }
 
   void _drainNotificationSource() {
@@ -848,21 +813,16 @@ final class RuntimeHandle {
       return;
     }
     _check(raw.mln_notification_source_clear_callback(_notificationSource));
-    for (final finish in _pendingResourceCommands.values.toList()) {
-      finish(false);
+    while (_nativeCallbackReleases.isNotEmpty) {
+      await Future<void>.delayed(Duration.zero);
     }
-    _pendingResourceCommands.clear();
-    _closeActiveResourceProvider();
     final source = _notificationSource;
     if (source != 0) {
       _check(raw.mln_notification_source_close(source));
       _notificationSource = 0;
       _notificationListener.close();
     }
-    _resourceTransformState?.close();
-    _resourceTransformState = null;
-    _httpHeaderTransformState?.close();
-    _httpHeaderTransformState = null;
+    _callbackReleaseListener.close();
   }
 }
 
@@ -992,10 +952,6 @@ final class RuntimeEventBatch {
       events.add(event);
       final payload = event.payload;
       if (payload is RuntimeEventCommandFinished) {
-        runtime._finishResourceCommand(
-          payload.commandIdNative,
-          payload.disposition,
-        );
         final source = event.source;
         if (source is MapRuntimeEventSource) {
           source.map?._finishStyleCommand(
@@ -2318,8 +2274,6 @@ final class MapHandle {
     CameraUpdateMode mode = CameraUpdateMode.jump,
     AnimationOptions? animation,
     int gesturePhase = 0,
-    BigInt? gestureId,
-    BigInt? animationId,
   }) {
     return withNativeArena((arena) {
       final update = arena<raw.mln_camera_update>();
@@ -2330,16 +2284,102 @@ final class MapHandle {
         update.ref.animation = _nativeAnimation(animation, arena).ref;
       }
       update.ref.gesture_phase = gesturePhase;
-      update.ref.gesture_id = uint64ToNative(
-        gestureId ?? BigInt.zero,
-        'gestureId',
-      );
-      update.ref.animation_id = uint64ToNative(
-        animationId ?? BigInt.zero,
-        'animationId',
-      );
       final outCommandId = arena<Uint64>();
       _check(raw.mln_map_update_camera(_handle.raw, update, outCommandId));
+      return uint64FromNative(outCommandId.value);
+    });
+  }
+
+  /// Moves the camera by a logical-pixel offset.
+  BigInt moveBy(ScreenPoint offset, {AnimationOptions? animation}) {
+    return withNativeArena((arena) {
+      final outCommandId = arena<Uint64>();
+      _check(
+        raw.mln_map_move_by(
+          _handle.raw,
+          native_struct.screenPointToNative(offset),
+          animation == null
+              ? nullptr.cast<raw.mln_animation_options>()
+              : _nativeAnimation(animation, arena),
+          outCommandId,
+        ),
+      );
+      return uint64FromNative(outCommandId.value);
+    });
+  }
+
+  /// Scales the camera around [anchor], or the viewport center when omitted.
+  BigInt scaleBy(
+    double scale, {
+    ScreenPoint? anchor,
+    AnimationOptions? animation,
+  }) => _relativeCameraCommand(
+    anchor,
+    animation,
+    (nativeAnchor, nativeAnimation, outCommandId) => raw.mln_map_scale_by(
+      _handle.raw,
+      scale,
+      nativeAnchor,
+      nativeAnimation,
+      outCommandId,
+    ),
+  );
+
+  /// Rotates the camera by [degrees] around [anchor], or the viewport center when omitted.
+  BigInt bearingBy(
+    double degrees, {
+    ScreenPoint? anchor,
+    AnimationOptions? animation,
+  }) => _relativeCameraCommand(
+    anchor,
+    animation,
+    (nativeAnchor, nativeAnimation, outCommandId) => raw.mln_map_bearing_by(
+      _handle.raw,
+      degrees,
+      nativeAnchor,
+      nativeAnimation,
+      outCommandId,
+    ),
+  );
+
+  /// Changes the camera pitch by [degrees].
+  BigInt pitchBy(double degrees, {AnimationOptions? animation}) {
+    return withNativeArena((arena) {
+      final outCommandId = arena<Uint64>();
+      _check(
+        raw.mln_map_pitch_by(
+          _handle.raw,
+          degrees,
+          animation == null
+              ? nullptr.cast<raw.mln_animation_options>()
+              : _nativeAnimation(animation, arena),
+          outCommandId,
+        ),
+      );
+      return uint64FromNative(outCommandId.value);
+    });
+  }
+
+  BigInt _relativeCameraCommand(
+    ScreenPoint? anchor,
+    AnimationOptions? animation,
+    int Function(
+      Pointer<raw.mln_screen_point>,
+      Pointer<raw.mln_animation_options>,
+      Pointer<Uint64>,
+    )
+    call,
+  ) {
+    return withNativeArena((arena) {
+      final nativeAnchor = anchor == null
+          ? nullptr.cast<raw.mln_screen_point>()
+          : (arena<raw.mln_screen_point>()
+              ..ref = native_struct.screenPointToNative(anchor));
+      final nativeAnimation = animation == null
+          ? nullptr.cast<raw.mln_animation_options>()
+          : _nativeAnimation(animation, arena);
+      final outCommandId = arena<Uint64>();
+      _check(call(nativeAnchor, nativeAnimation, outCommandId));
       return uint64FromNative(outCommandId.value);
     });
   }

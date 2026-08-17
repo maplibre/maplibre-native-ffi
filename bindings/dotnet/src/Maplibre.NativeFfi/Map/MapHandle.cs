@@ -240,6 +240,93 @@ public sealed unsafe partial class MapHandle : IDisposable
         return commandId;
     }
 
+    /// <summary>Moves the camera by a logical-pixel offset.</summary>
+    public ulong MoveBy(ScreenPoint offset) => MoveBy(offset, null);
+
+    /// <summary>Moves the camera by a logical-pixel offset.</summary>
+    public ulong MoveBy(ScreenPoint offset, AnimationOptions? animation)
+    {
+        var nativeOffset = MapStructs.ToNative(offset);
+        var nativeAnimation = animation is null ? default : MapStructs.ToNative(animation);
+        ulong commandId = 0;
+        NativeStatus.Check(
+            NativeMethods.mln_map_move_by(
+                Handle,
+                nativeOffset,
+                animation is null ? null : &nativeAnimation,
+                &commandId
+            )
+        );
+        return commandId;
+    }
+
+    /// <summary>Scales the camera around an optional logical-pixel anchor.</summary>
+    public ulong ScaleBy(double scale) => ScaleBy(scale, null, null);
+
+    /// <summary>Scales the camera around an optional logical-pixel anchor.</summary>
+    public ulong ScaleBy(double scale, ScreenPoint? anchor) => ScaleBy(scale, anchor, null);
+
+    /// <summary>Scales the camera around an optional logical-pixel anchor.</summary>
+    public ulong ScaleBy(double scale, ScreenPoint? anchor, AnimationOptions? animation)
+    {
+        var nativeAnchor = anchor is null ? default : MapStructs.ToNative(anchor.Value);
+        var nativeAnimation = animation is null ? default : MapStructs.ToNative(animation);
+        ulong commandId = 0;
+        NativeStatus.Check(
+            NativeMethods.mln_map_scale_by(
+                Handle,
+                scale,
+                anchor is null ? null : &nativeAnchor,
+                animation is null ? null : &nativeAnimation,
+                &commandId
+            )
+        );
+        return commandId;
+    }
+
+    /// <summary>Adds degrees to the camera bearing around an optional anchor.</summary>
+    public ulong BearingBy(double degrees) => BearingBy(degrees, null, null);
+
+    /// <summary>Adds degrees to the camera bearing around an optional anchor.</summary>
+    public ulong BearingBy(double degrees, ScreenPoint? anchor) => BearingBy(degrees, anchor, null);
+
+    /// <summary>Adds degrees to the camera bearing around an optional anchor.</summary>
+    public ulong BearingBy(double degrees, ScreenPoint? anchor, AnimationOptions? animation)
+    {
+        var nativeAnchor = anchor is null ? default : MapStructs.ToNative(anchor.Value);
+        var nativeAnimation = animation is null ? default : MapStructs.ToNative(animation);
+        ulong commandId = 0;
+        NativeStatus.Check(
+            NativeMethods.mln_map_bearing_by(
+                Handle,
+                degrees,
+                anchor is null ? null : &nativeAnchor,
+                animation is null ? null : &nativeAnimation,
+                &commandId
+            )
+        );
+        return commandId;
+    }
+
+    /// <summary>Adds degrees to the camera pitch.</summary>
+    public ulong PitchBy(double degrees) => PitchBy(degrees, null);
+
+    /// <summary>Adds degrees to the camera pitch.</summary>
+    public ulong PitchBy(double degrees, AnimationOptions? animation)
+    {
+        var nativeAnimation = animation is null ? default : MapStructs.ToNative(animation);
+        ulong commandId = 0;
+        NativeStatus.Check(
+            NativeMethods.mln_map_pitch_by(
+                Handle,
+                degrees,
+                animation is null ? null : &nativeAnimation,
+                &commandId
+            )
+        );
+        return commandId;
+    }
+
     /// <summary>Reads the camera in runtime order.</summary>
     public Task<CameraSnapshot> QueryCameraAsync(CancellationToken cancellationToken = default)
     {

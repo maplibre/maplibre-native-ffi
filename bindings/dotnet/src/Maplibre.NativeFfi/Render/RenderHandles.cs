@@ -267,17 +267,10 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         NativeStatus.Check(NativeMethods.mln_render_session_request_frame(Handle, &native));
     }
 
-    public RenderFrameBatch DrainFrameResults(int maxResults)
+    public RenderFrameBatch DrainFrameResults()
     {
-        ArgumentOutOfRangeException.ThrowIfNegative(maxResults);
         MlnRenderFrameBatch batch = default;
-        NativeStatus.Check(
-            NativeMethods.mln_render_session_drain_frame_results(
-                Handle,
-                checked((nuint)maxResults),
-                &batch
-            )
-        );
+        NativeStatus.Check(NativeMethods.mln_render_session_drain_frame_results(Handle, &batch));
         try
         {
             return new RenderFrameBatch(batch);

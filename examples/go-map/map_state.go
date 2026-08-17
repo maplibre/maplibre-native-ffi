@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"math"
 
 	maplibre "github.com/maplibre/maplibre-native-ffi/bindings/go"
 )
@@ -49,22 +48,6 @@ func newRuntimeMapState(v viewport) (*runtimeMapState, error) {
 		_ = state.Close()
 		return nil, fmt.Errorf("camera jump failed: %w", err)
 	}
-	barrier, err := runtimeHandle.Barrier()
-	if err != nil {
-		_ = state.Close()
-		return nil, fmt.Errorf("initial barrier failed: %w", err)
-	}
-	if completed, err := barrier.Wait(-1); err != nil || !completed {
-		barrier.Release()
-		_ = state.Close()
-		return nil, fmt.Errorf("initial barrier wait failed: completed=%v: %w", completed, err)
-	}
-	if err := barrier.Discard(); err != nil {
-		barrier.Release()
-		_ = state.Close()
-		return nil, fmt.Errorf("initial barrier result failed: %w", err)
-	}
-	barrier.Release()
 	_, err = mapHandle.RequestRepaint()
 	if err != nil {
 		_ = state.Close()
@@ -86,10 +69,6 @@ func (state *runtimeMapState) Close() error {
 	return result
 }
 
-func (state *runtimeMapState) cancelTransitions() error {
-	return state.updateCamera(maplibre.CameraUpdate{GesturePhase: maplibre.GesturePhaseCancel})
-}
-
 func (state *runtimeMapState) setGestureInProgress(inProgress bool) error {
 	phase := maplibre.GesturePhaseEnd
 	if inProgress {
@@ -99,60 +78,23 @@ func (state *runtimeMapState) setGestureInProgress(inProgress bool) error {
 }
 
 func (state *runtimeMapState) moveBy(dx, dy float64, durationMS *float64) error {
-	camera, err := state.orderedCamera()
-	if err != nil {
-		return fmt.Errorf("ordered camera read failed: %w", err)
-	}
-	center := maplibre.LatLng{}
-	if camera.Center != nil {
-		center = *camera.Center
-	}
-	zoom := 0.0
-	if camera.Zoom != nil {
-		zoom = *camera.Zoom
-	}
-	degreesPerPixel := 360 / (256 * math.Exp2(zoom))
-	center.Longitude -= dx * degreesPerPixel
-	center.Latitude += dy * degreesPerPixel
-	return state.updateCamera(cameraUpdate(maplibre.CameraOptions{}.WithCenter(center), durationMS))
+	_, err := state.mapRef.MoveBy(maplibre.ScreenPoint{X: dx, Y: dy}, animationOptions(durationMS))
+	return err
 }
 
 func (state *runtimeMapState) scaleBy(scale float64, anchor maplibre.ScreenPoint, durationMS *float64) error {
-	camera, err := state.orderedCamera()
-	if err != nil {
-		return fmt.Errorf("ordered camera read failed: %w", err)
-	}
-	zoom := 0.0
-	if camera.Zoom != nil {
-		zoom = *camera.Zoom
-	}
-	options := maplibre.CameraOptions{}.WithZoom(zoom + math.Log2(scale))
-	options.Anchor = &anchor
-	return state.updateCamera(cameraUpdate(options, durationMS))
+	_, err := state.mapRef.ScaleBy(scale, &anchor, animationOptions(durationMS))
+	return err
 }
 
 func (state *runtimeMapState) adjustPitch(delta float64, durationMS *float64) error {
-	camera, err := state.orderedCamera()
-	if err != nil {
-		return fmt.Errorf("ordered camera read failed: %w", err)
-	}
-	pitch := delta
-	if camera.Pitch != nil {
-		pitch += *camera.Pitch
-	}
-	return state.updateCamera(cameraUpdate(maplibre.CameraOptions{}.WithPitch(clamp(pitch, 0, 60)), durationMS))
+	_, err := state.mapRef.PitchBy(delta, animationOptions(durationMS))
+	return err
 }
 
 func (state *runtimeMapState) adjustBearing(delta float64, durationMS *float64) error {
-	camera, err := state.orderedCamera()
-	if err != nil {
-		return fmt.Errorf("ordered camera read failed: %w", err)
-	}
-	bearing := delta
-	if camera.Bearing != nil {
-		bearing += *camera.Bearing
-	}
-	return state.updateCamera(cameraUpdate(maplibre.CameraOptions{}.WithBearing(bearing), durationMS))
+	_, err := state.mapRef.BearingBy(delta, nil, animationOptions(durationMS))
+	return err
 }
 
 func (state *runtimeMapState) resetOrientation(durationMS float64) error {
@@ -176,19 +118,12 @@ func cameraUpdate(options maplibre.CameraOptions, durationMS *float64) maplibre.
 	return update
 }
 
-func (state *runtimeMapState) orderedCamera() (maplibre.CameraOptions, error) {
-	operation, err := state.mapRef.QueryCamera()
-	if err != nil {
-		return maplibre.CameraOptions{}, err
+func animationOptions(durationMS *float64) *maplibre.AnimationOptions {
+	if durationMS == nil {
+		return nil
 	}
-	defer operation.Release()
-	if completed, err := operation.Wait(-1); err != nil {
-		return maplibre.CameraOptions{}, err
-	} else if !completed {
-		return maplibre.CameraOptions{}, errors.New("camera query returned before completion")
-	}
-	result, err := operation.Take()
-	return result.Camera, err
+	animation := maplibre.AnimationOptions{}.WithDurationMS(*durationMS)
+	return &animation
 }
 
 func drainEvents(runtimeHandle *maplibre.RuntimeHandle, mapID maplibre.MapID) (bool, error) {

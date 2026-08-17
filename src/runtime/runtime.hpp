@@ -87,9 +87,50 @@ static_assert(
   return payload;
 }
 
+class RuntimeCallbackContext {
+ public:
+  RuntimeCallbackContext(
+    void* user_data, mln_runtime_callback_release release
+  ) noexcept
+      : user_data_(user_data), release_(release) {}
+
+  RuntimeCallbackContext(const RuntimeCallbackContext&) = delete;
+  auto operator=(const RuntimeCallbackContext&)
+    -> RuntimeCallbackContext& = delete;
+
+  ~RuntimeCallbackContext() noexcept {
+    if (!owned_.load(std::memory_order_acquire) || release_ == nullptr) return;
+    try {
+      release_(user_data_);
+    } catch (...) {
+    }
+  }
+
+  void transfer_to_runtime() noexcept {
+    owned_.store(true, std::memory_order_release);
+  }
+
+  [[nodiscard]] auto user_data() const noexcept -> void* { return user_data_; }
+
+ private:
+  void* user_data_ = nullptr;
+  mln_runtime_callback_release release_ = nullptr;
+  std::atomic_bool owned_{false};
+};
+
 struct ResourceProvider {
   mln_resource_provider_callback callback = nullptr;
-  void* user_data = nullptr;
+  std::shared_ptr<RuntimeCallbackContext> context;
+};
+
+struct ResourceTransformRegistration {
+  mln_resource_transform_callback callback = nullptr;
+  std::shared_ptr<RuntimeCallbackContext> context;
+};
+
+struct HttpHeaderTransformRegistration {
+  mln_http_header_transform_callback callback = nullptr;
+  std::shared_ptr<RuntimeCallbackContext> context;
 };
 
 // Holds the resource transform registration in a reference-counted object that
@@ -100,14 +141,12 @@ struct ResourceProvider {
 // Runtime teardown clears the registration under the exclusive lock.
 struct ResourceTransformState {
   std::shared_mutex mutex;
-  mln_resource_transform_callback callback = nullptr;
-  void* user_data = nullptr;
+  std::shared_ptr<ResourceTransformRegistration> registration;
 };
 
 struct HttpHeaderTransformState {
   std::shared_mutex mutex;
-  mln_http_header_transform_callback callback = nullptr;
-  void* user_data = nullptr;
+  std::shared_ptr<HttpHeaderTransformRegistration> registration;
 };
 
 using HttpHeader = std::pair<std::string, std::string>;
@@ -117,7 +156,6 @@ using HttpHeaders = std::vector<HttpHeader>;
 // `ResourceTransformState`.
 struct ResourceProviderState {
   std::shared_mutex mutex;
-  bool registered = false;
   ResourceProvider provider;
 };
 
@@ -136,7 +174,9 @@ class ResourceProviderLease {
   [[nodiscard]] auto callback() const -> mln_resource_provider_callback {
     return provider_.callback;
   }
-  [[nodiscard]] auto user_data() const -> void* { return provider_.user_data; }
+  [[nodiscard]] auto user_data() const -> void* {
+    return provider_.context->user_data();
+  }
 
  private:
   std::shared_ptr<ResourceProviderState> state_;

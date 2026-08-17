@@ -34,7 +34,7 @@ internal static class RenderTargetDriver
             )
         );
         Service(session);
-        using var batch = session.DrainFrameResults(0);
+        using var batch = session.DrainFrameResults();
         return batch.Any(result => result.Disposition == RenderResult.Rendered);
     }
 

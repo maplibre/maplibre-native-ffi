@@ -48,12 +48,6 @@ struct RuntimeHandle {
     notification_source: Mutex<sys::mln_notification_source>,
     operation_gate: RuntimeOperationGate,
     notification_callback: Mutex<Option<Box<PyNotificationCallbackState>>>,
-    resource_provider: Mutex<Option<Box<PyResourceProviderState>>>,
-    retired_resource_providers: Mutex<Vec<(u64, Box<PyResourceProviderState>)>>,
-    resource_transform: Mutex<Option<Box<PyResourceTransformState>>>,
-    retired_resource_transforms: Mutex<Vec<(u64, Box<PyResourceTransformState>)>>,
-    http_header_transform: Mutex<Option<Box<PyHttpHeaderTransformState>>>,
-    retired_http_header_transforms: Mutex<Vec<(u64, Box<PyHttpHeaderTransformState>)>>,
 }
 
 #[derive(Debug)]
@@ -406,9 +400,6 @@ impl Drop for RuntimeHandle {
             .map(|state| !state.is_closed())
             .unwrap_or(true);
         if native_live {
-            leak_optional_box(&self.resource_provider);
-            leak_optional_box(&self.resource_transform);
-            leak_optional_box(&self.http_header_transform);
             leak_optional_box(&self.notification_callback);
         }
     }
@@ -830,18 +821,6 @@ impl RuntimeHandle {
         }
         drop(operation);
 
-        self.resource_provider
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .take();
-        self.resource_transform
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .take();
-        self.http_header_transform
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .take();
         let mut callback = self
             .notification_callback
             .lock()
@@ -1317,20 +1296,15 @@ impl RuntimeHandle {
             .live_handle()
             .ok_or_else(|| invalid_state_error("runtime handle is closed"))?;
         let mut command_id = 0;
-        maplibre_core::check(unsafe {
+        let replacement = Box::into_raw(replacement);
+        let result = maplibre_core::check(unsafe {
             sys::mln_runtime_set_resource_provider(runtime, &descriptor, &mut command_id)
         })
-        .map_err(map_error)?;
-        if let Some(previous) = self
-            .resource_provider
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .replace(replacement)
-        {
-            self.retired_resource_providers
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner())
-                .push((command_id, previous));
+        .map_err(map_error);
+        if let Err(error) = result {
+            // SAFETY: native never invokes release_user_data for a rejected registration.
+            drop(unsafe { Box::from_raw(replacement) });
+            return Err(error);
         }
         Ok(command_id)
     }
@@ -1345,17 +1319,6 @@ impl RuntimeHandle {
             sys::mln_runtime_clear_resource_provider(runtime, &mut command_id)
         })
         .map_err(map_error)?;
-        if let Some(previous) = self
-            .resource_provider
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .take()
-        {
-            self.retired_resource_providers
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner())
-                .push((command_id, previous));
-        }
         Ok(command_id)
     }
 
@@ -1379,20 +1342,15 @@ impl RuntimeHandle {
             .live_handle()
             .ok_or_else(|| invalid_state_error("runtime handle is closed"))?;
         let mut command_id = 0;
-        maplibre_core::check(unsafe {
+        let replacement = Box::into_raw(replacement);
+        let result = maplibre_core::check(unsafe {
             sys::mln_runtime_set_resource_transform(runtime, &descriptor, &mut command_id)
         })
-        .map_err(map_error)?;
-        if let Some(previous) = self
-            .resource_transform
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .replace(replacement)
-        {
-            self.retired_resource_transforms
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner())
-                .push((command_id, previous));
+        .map_err(map_error);
+        if let Err(error) = result {
+            // SAFETY: native never invokes release_user_data for a rejected registration.
+            drop(unsafe { Box::from_raw(replacement) });
+            return Err(error);
         }
         Ok(command_id)
     }
@@ -1407,17 +1365,6 @@ impl RuntimeHandle {
             sys::mln_runtime_clear_resource_transform(runtime, &mut command_id)
         })
         .map_err(map_error)?;
-        if let Some(previous) = self
-            .resource_transform
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .take()
-        {
-            self.retired_resource_transforms
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner())
-                .push((command_id, previous));
-        }
         Ok(command_id)
     }
 
@@ -1441,20 +1388,15 @@ impl RuntimeHandle {
             .live_handle()
             .ok_or_else(|| invalid_state_error("runtime handle is closed"))?;
         let mut command_id = 0;
-        maplibre_core::check(unsafe {
+        let replacement = Box::into_raw(replacement);
+        let result = maplibre_core::check(unsafe {
             sys::mln_runtime_set_http_header_transform(runtime, &descriptor, &mut command_id)
         })
-        .map_err(map_error)?;
-        if let Some(previous) = self
-            .http_header_transform
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .replace(replacement)
-        {
-            self.retired_http_header_transforms
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner())
-                .push((command_id, previous));
+        .map_err(map_error);
+        if let Err(error) = result {
+            // SAFETY: native never invokes release_user_data for a rejected registration.
+            drop(unsafe { Box::from_raw(replacement) });
+            return Err(error);
         }
         Ok(command_id)
     }
@@ -1469,17 +1411,6 @@ impl RuntimeHandle {
             sys::mln_runtime_clear_http_header_transform(runtime, &mut command_id)
         })
         .map_err(map_error)?;
-        if let Some(previous) = self
-            .http_header_transform
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .take()
-        {
-            self.retired_http_header_transforms
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner())
-                .push((command_id, previous));
-        }
         Ok(command_id)
     }
 
@@ -1496,24 +1427,6 @@ impl RuntimeHandle {
             let mut copied = Vec::with_capacity(view.event_count);
             for event in unsafe { maplibre_core::events::drain_batch(&view) } {
                 let event = event.map_err(map_error)?;
-                if let maplibre_core::events::RuntimeEventPayload::CommandFinished(command) =
-                    &event.payload
-                {
-                    if command.disposition == maplibre_core::events::CommandDisposition::Committed {
-                        self.retired_resource_providers
-                            .lock()
-                            .unwrap_or_else(|poisoned| poisoned.into_inner())
-                            .retain(|(command_id, _)| *command_id != command.command_id);
-                        self.retired_resource_transforms
-                            .lock()
-                            .unwrap_or_else(|poisoned| poisoned.into_inner())
-                            .retain(|(command_id, _)| *command_id != command.command_id);
-                        self.retired_http_header_transforms
-                            .lock()
-                            .unwrap_or_else(|poisoned| poisoned.into_inner())
-                            .retain(|(command_id, _)| *command_id != command.command_id);
-                    }
-                }
                 copied.push(event);
             }
             event_batch_to_py(py, copied)
@@ -1930,6 +1843,84 @@ impl MapHandle {
         let mut command_id = 0;
         maplibre_core::check(unsafe {
             sys::mln_map_update_camera(state.handle(), &update, &mut command_id)
+        })
+        .map_err(map_error)?;
+        Ok(command_id)
+    }
+
+    fn move_by(&self, offset: (f64, f64), animation: Option<AnimationParts>) -> PyResult<u64> {
+        let state = self.state();
+        let animation = animation.map(animation_options_from_parts);
+        let mut command_id = 0;
+        maplibre_core::check(unsafe {
+            sys::mln_map_move_by(
+                state.handle(),
+                screen_point_from_tuple(offset),
+                animation.as_ref().map_or(ptr::null(), |value| value),
+                &mut command_id,
+            )
+        })
+        .map_err(map_error)?;
+        Ok(command_id)
+    }
+
+    fn scale_by(
+        &self,
+        scale: f64,
+        anchor: Option<(f64, f64)>,
+        animation: Option<AnimationParts>,
+    ) -> PyResult<u64> {
+        let state = self.state();
+        let anchor = anchor.map(screen_point_from_tuple);
+        let animation = animation.map(animation_options_from_parts);
+        let mut command_id = 0;
+        maplibre_core::check(unsafe {
+            sys::mln_map_scale_by(
+                state.handle(),
+                scale,
+                anchor.as_ref().map_or(ptr::null(), |value| value),
+                animation.as_ref().map_or(ptr::null(), |value| value),
+                &mut command_id,
+            )
+        })
+        .map_err(map_error)?;
+        Ok(command_id)
+    }
+
+    fn bearing_by(
+        &self,
+        degrees: f64,
+        anchor: Option<(f64, f64)>,
+        animation: Option<AnimationParts>,
+    ) -> PyResult<u64> {
+        let state = self.state();
+        let anchor = anchor.map(screen_point_from_tuple);
+        let animation = animation.map(animation_options_from_parts);
+        let mut command_id = 0;
+        maplibre_core::check(unsafe {
+            sys::mln_map_bearing_by(
+                state.handle(),
+                degrees,
+                anchor.as_ref().map_or(ptr::null(), |value| value),
+                animation.as_ref().map_or(ptr::null(), |value| value),
+                &mut command_id,
+            )
+        })
+        .map_err(map_error)?;
+        Ok(command_id)
+    }
+
+    fn pitch_by(&self, degrees: f64, animation: Option<AnimationParts>) -> PyResult<u64> {
+        let state = self.state();
+        let animation = animation.map(animation_options_from_parts);
+        let mut command_id = 0;
+        maplibre_core::check(unsafe {
+            sys::mln_map_pitch_by(
+                state.handle(),
+                degrees,
+                animation.as_ref().map_or(ptr::null(), |value| value),
+                &mut command_id,
+            )
         })
         .map_err(map_error)?;
         Ok(command_id)
@@ -3895,10 +3886,10 @@ impl RenderSessionHandle {
         render_session_snapshot_to_py(py, &value)
     }
 
-    fn drain_frame_results(&self, py: Python<'_>, max_results: usize) -> PyResult<Py<PyList>> {
+    fn drain_frame_results(&self, py: Python<'_>) -> PyResult<Py<PyList>> {
         let mut batch = sys::mln_render_frame_batch(0);
         maplibre_core::check(unsafe {
-            sys::mln_render_session_drain_frame_results(self.native(), max_results, &mut batch)
+            sys::mln_render_session_drain_frame_results(self.native(), &mut batch)
         })
         .map_err(map_error)?;
         let batch = OwnedRenderFrameBatch(batch);
@@ -4670,10 +4661,12 @@ impl PyResourceProviderState {
     }
 
     fn descriptor(&self) -> sys::mln_resource_provider {
-        maplibre_core::resource::resource_provider_descriptor(
+        let mut descriptor = maplibre_core::resource::resource_provider_descriptor(
             Some(resource_provider_trampoline),
             ptr::from_ref(self).cast_mut().cast::<c_void>(),
-        )
+        );
+        descriptor.release_user_data = Some(release_py_resource_provider_state);
+        descriptor
     }
 
     fn invoke(
@@ -4731,6 +4724,13 @@ impl PyResourceProviderState {
     }
 }
 
+unsafe extern "C" fn release_py_resource_provider_state(user_data: *mut c_void) {
+    if !user_data.is_null() {
+        // SAFETY: successful registration transfers this Box to native exactly once.
+        drop(unsafe { Box::from_raw(user_data.cast::<PyResourceProviderState>()) });
+    }
+}
+
 unsafe extern "C" fn resource_provider_trampoline(
     user_data: *mut c_void,
     request: *const sys::mln_resource_request,
@@ -4757,10 +4757,12 @@ impl PyResourceTransformState {
     }
 
     fn descriptor(&self) -> sys::mln_resource_transform {
-        maplibre_core::resource::resource_transform_descriptor(
+        let mut descriptor = maplibre_core::resource::resource_transform_descriptor(
             Some(resource_transform_trampoline),
             ptr::from_ref(self).cast_mut().cast::<c_void>(),
-        )
+        );
+        descriptor.release_user_data = Some(release_py_resource_transform_state);
+        descriptor
     }
 
     fn invoke(
@@ -4814,6 +4816,13 @@ impl PyResourceTransformState {
     }
 }
 
+unsafe extern "C" fn release_py_resource_transform_state(user_data: *mut c_void) {
+    if !user_data.is_null() {
+        // SAFETY: successful registration transfers this Box to native exactly once.
+        drop(unsafe { Box::from_raw(user_data.cast::<PyResourceTransformState>()) });
+    }
+}
+
 unsafe extern "C" fn resource_transform_trampoline(
     user_data: *mut c_void,
     kind: u32,
@@ -4841,10 +4850,12 @@ impl PyHttpHeaderTransformState {
     }
 
     fn descriptor(&self) -> sys::mln_http_header_transform {
-        maplibre_core::resource::http_header_transform_descriptor(
+        let mut descriptor = maplibre_core::resource::http_header_transform_descriptor(
             Some(http_header_transform_trampoline),
             ptr::from_ref(self).cast_mut().cast::<c_void>(),
-        )
+        );
+        descriptor.release_user_data = Some(release_py_http_header_transform_state);
+        descriptor
     }
 
     fn invoke(
@@ -4912,6 +4923,13 @@ impl PyHttpHeaderTransformState {
             }
         }
         sys::MLN_STATUS_OK
+    }
+}
+
+unsafe extern "C" fn release_py_http_header_transform_state(user_data: *mut c_void) {
+    if !user_data.is_null() {
+        // SAFETY: successful registration transfers this Box to native exactly once.
+        drop(unsafe { Box::from_raw(user_data.cast::<PyHttpHeaderTransformState>()) });
     }
 }
 
@@ -7302,12 +7320,6 @@ fn create_runtime(
         state: Mutex::new(state),
         notification_source: Mutex::new(source),
         operation_gate: RuntimeOperationGate::new(),
-        resource_provider: Mutex::new(None),
-        retired_resource_providers: Mutex::new(Vec::new()),
-        resource_transform: Mutex::new(None),
-        retired_resource_transforms: Mutex::new(Vec::new()),
-        http_header_transform: Mutex::new(None),
-        retired_http_header_transforms: Mutex::new(Vec::new()),
         notification_callback: Mutex::new(None),
     })
 }

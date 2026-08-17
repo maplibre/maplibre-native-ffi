@@ -82,7 +82,7 @@ public sealed class ResourceTransformTests
 
     [BindingSpecTest("BND-122")]
     [Fact]
-    public unsafe void ResourceTransformInstallFailurePreservesPreviousCallbackAndReleasesReplacement()
+    public unsafe void ResourceTransformInstallFailureReleasesReplacement()
     {
         var failInstall = false;
         ResourceTransformState? failedReplacement = null;
@@ -107,15 +107,12 @@ public sealed class ResourceTransformTests
         );
         using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
         runtime.SetResourceTransform(request => request.Url + "?first");
-        var previous = Assert.IsType<ResourceTransformState>(runtime.ResourceTransformStateForTest);
 
         failInstall = true;
         Assert.Throws<InvalidStateException>(() =>
             runtime.SetResourceTransform(request => request.Url + "?second")
         );
 
-        Assert.Same(previous, runtime.ResourceTransformStateForTest);
-        Assert.True(previous.IsHandleAllocatedForTest);
         Assert.NotNull(failedReplacement);
         Assert.False(failedReplacement.IsHandleAllocatedForTest);
     }

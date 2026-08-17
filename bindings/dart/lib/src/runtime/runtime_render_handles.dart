@@ -396,19 +396,10 @@ final class RenderSessionHandle implements Finalizable {
     });
   }
 
-  List<RenderFrameResult> drainFrameResults({int maxResults = 0}) {
-    if (maxResults < 0) {
-      throwInvalidArgument('maxResults must not be negative');
-    }
+  List<RenderFrameResult> drainFrameResults() {
     return withNativeArena((arena) {
       final outBatch = arena<Uint64>()..value = 0;
-      _check(
-        raw.mln_render_session_drain_frame_results(
-          _handle.raw,
-          maxResults,
-          outBatch,
-        ),
-      );
+      _check(raw.mln_render_session_drain_frame_results(_handle.raw, outBatch));
       final batch = outBatch.value;
       if (batch == 0) return const <RenderFrameResult>[];
       try {

@@ -647,6 +647,23 @@ external int mln_map_add_vector_source_url(
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
+    ffi.Double,
+    ffi.Pointer<mln_screen_point>,
+    ffi.Pointer<mln_animation_options>,
+    ffi.Pointer<ffi.Uint64>,
+  )
+>()
+external int mln_map_bearing_by(
+  int map,
+  double degrees,
+  ffi.Pointer<mln_screen_point> anchor,
+  ffi.Pointer<mln_animation_options> animation,
+  ffi.Pointer<ffi.Uint64> out_command_id,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
     mln_buffer_view,
     ffi.Pointer<mln_camera_fit_options>,
     ffi.Pointer<mln_operation>,
@@ -1258,6 +1275,21 @@ external int mln_map_loaded_style_json_take_result(
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
+    mln_screen_point,
+    ffi.Pointer<mln_animation_options>,
+    ffi.Pointer<ffi.Uint64>,
+  )
+>()
+external int mln_map_move_by(
+  int map,
+  mln_screen_point offset,
+  ffi.Pointer<mln_animation_options> animation,
+  ffi.Pointer<ffi.Uint64> out_command_id,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
     mln_buffer_view,
     mln_buffer_view,
     ffi.Pointer<ffi.Uint64>,
@@ -1272,6 +1304,21 @@ external int mln_map_move_style_layer(
 
 @ffi.Native<mln_map_options Function()>()
 external mln_map_options mln_map_options_default();
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Double,
+    ffi.Pointer<mln_animation_options>,
+    ffi.Pointer<ffi.Uint64>,
+  )
+>()
+external int mln_map_pitch_by(
+  int map,
+  double degrees,
+  ffi.Pointer<mln_animation_options> animation,
+  ffi.Pointer<ffi.Uint64> out_command_id,
+);
 
 @ffi.Native<
   ffi.Int32 Function(mln_map, mln_lat_lng, ffi.Pointer<mln_operation>)
@@ -1446,6 +1493,23 @@ external int mln_map_request_still_image_start(
 external int mln_map_resize(
   int map,
   mln_logical_extent extent,
+  ffi.Pointer<ffi.Uint64> out_command_id,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Double,
+    ffi.Pointer<mln_screen_point>,
+    ffi.Pointer<mln_animation_options>,
+    ffi.Pointer<ffi.Uint64>,
+  )
+>()
+external int mln_map_scale_by(
+  int map,
+  double scale,
+  ffi.Pointer<mln_screen_point> anchor,
+  ffi.Pointer<mln_animation_options> animation,
   ffi.Pointer<ffi.Uint64> out_command_id,
 );
 
@@ -2361,15 +2425,10 @@ external int mln_render_session_detach_start(
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_render_session,
-    ffi.Size,
-    ffi.Pointer<mln_render_frame_batch>,
-  )
+  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_render_frame_batch>)
 >()
 external int mln_render_session_drain_frame_results(
   int session,
-  int max_results,
   ffi.Pointer<mln_render_frame_batch> out_batch,
 );
 
@@ -3843,12 +3902,6 @@ final class mln_camera_update extends ffi.Struct {
 
   @ffi.Uint32()
   external int reserved;
-
-  @ffi.Uint64()
-  external int gesture_id;
-
-  @ffi.Uint64()
-  external int animation_id;
 }
 
 enum mln_camera_update_mode {
@@ -4379,15 +4432,19 @@ final class mln_http_header_transform extends ffi.Struct {
 
   external ffi.Pointer<ffi.Void> user_data;
 
+  external mln_runtime_callback_release release_user_data;
+
   static ffi.Pointer<mln_http_header_transform> $allocate(
     ffi.Allocator $allocator, {
     required int size,
     required mln_http_header_transform_callback callback,
     required ffi.Pointer<ffi.Void> user_data,
+    required mln_runtime_callback_release release_user_data,
   }) => $allocator<mln_http_header_transform>()
     ..ref.size = size
     ..ref.callback = callback
-    ..ref.user_data = user_data;
+    ..ref.user_data = user_data
+    ..ref.release_user_data = release_user_data;
 }
 
 typedef mln_http_header_transform_callback =
@@ -6124,15 +6181,19 @@ final class mln_resource_provider extends ffi.Struct {
 
   external ffi.Pointer<ffi.Void> user_data;
 
+  external mln_runtime_callback_release release_user_data;
+
   static ffi.Pointer<mln_resource_provider> $allocate(
     ffi.Allocator $allocator, {
     required int size,
     required mln_resource_provider_callback callback,
     required ffi.Pointer<ffi.Void> user_data,
+    required mln_runtime_callback_release release_user_data,
   }) => $allocator<mln_resource_provider>()
     ..ref.size = size
     ..ref.callback = callback
-    ..ref.user_data = user_data;
+    ..ref.user_data = user_data
+    ..ref.release_user_data = release_user_data;
 }
 
 typedef mln_resource_provider_callback =
@@ -6378,15 +6439,19 @@ final class mln_resource_transform extends ffi.Struct {
 
   external ffi.Pointer<ffi.Void> user_data;
 
+  external mln_runtime_callback_release release_user_data;
+
   static ffi.Pointer<mln_resource_transform> $allocate(
     ffi.Allocator $allocator, {
     required int size,
     required mln_resource_transform_callback callback,
     required ffi.Pointer<ffi.Void> user_data,
+    required mln_runtime_callback_release release_user_data,
   }) => $allocator<mln_resource_transform>()
     ..ref.size = size
     ..ref.callback = callback
-    ..ref.user_data = user_data;
+    ..ref.user_data = user_data
+    ..ref.release_user_data = release_user_data;
 }
 
 typedef mln_resource_transform_callback =
@@ -6441,6 +6506,12 @@ enum mln_resource_usage {
 
 typedef mln_runtime = ffi.Uint64;
 typedef Dartmln_runtime = int;
+typedef mln_runtime_callback_release =
+    ffi.Pointer<ffi.NativeFunction<mln_runtime_callback_releaseFunction>>;
+typedef mln_runtime_callback_releaseFunction =
+    ffi.Void Function(ffi.Pointer<ffi.Void> user_data);
+typedef Dartmln_runtime_callback_releaseFunction =
+    void Function(ffi.Pointer<ffi.Void> user_data);
 
 final class mln_runtime_event extends ffi.Struct {
   @ffi.Uint32()

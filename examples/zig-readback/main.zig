@@ -151,7 +151,7 @@ fn waitForRenderedFrame(
         if (build_options.supports_opengl and !build_options.supports_vulkan and !build_options.supports_metal) {
             _ = try session.serviceDriverWork(0);
         }
-        var results = session.drainFrameResults(0) catch |err| {
+        var results = session.drainFrameResults() catch |err| {
             if (err != error.NotReady) return err;
             try io.sleep(.fromMilliseconds(1), .awake);
             continue;

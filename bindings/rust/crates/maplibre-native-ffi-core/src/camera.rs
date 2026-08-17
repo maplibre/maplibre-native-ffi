@@ -186,8 +186,6 @@ pub struct CameraUpdate {
     pub camera: CameraOptions,
     pub animation: AnimationOptions,
     pub gesture_phase: GesturePhase,
-    pub gesture_id: u64,
-    pub animation_id: u64,
 }
 
 impl CameraUpdate {
@@ -198,8 +196,6 @@ impl CameraUpdate {
         raw.camera = self.camera.to_native();
         raw.animation = self.animation.to_native();
         raw.gesture_phase = self.gesture_phase.to_native();
-        raw.gesture_id = self.gesture_id;
-        raw.animation_id = self.animation_id;
         raw
     }
 }

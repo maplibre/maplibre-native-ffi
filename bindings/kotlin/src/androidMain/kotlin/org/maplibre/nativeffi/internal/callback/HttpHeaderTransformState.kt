@@ -6,6 +6,7 @@ import org.bytedeco.javacpp.Pointer
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.internal.javacpp.JavaCppSupport
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
+import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.resource.HttpHeaderTransformCallback
 import org.maplibre.nativeffi.resource.HttpHeaderTransformRequest
 import org.maplibre.nativeffi.resource.ResourceKind
@@ -23,11 +24,19 @@ internal class HttpHeaderTransformState(private val callback: HttpHeaderTransfor
       ): Int = invoke(kind, url, response)
     }
   private val transform = MaplibreNativeC.mln_http_header_transform()
+  private val nativeRelease =
+    object : MaplibreNativeC.mln_runtime_callback_release() {
+      override fun call(userData: Pointer?) {
+        HandleLeakCleaner.releaseNativeCallbackRoot(this@HttpHeaderTransformState)
+        close()
+      }
+    }
 
   init {
     transform.size(transform.sizeof())
     transform.callback(nativeCallback)
     transform.user_data(null)
+    transform.release_user_data(nativeRelease)
   }
 
   fun descriptor(): MaplibreNativeC.mln_http_header_transform = transform

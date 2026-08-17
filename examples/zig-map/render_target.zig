@@ -59,7 +59,7 @@ pub const Session = union(enum) {
             diagnostics.logError("render driver service failed", err, diagnostic_store);
             return types.AppError.TextureRenderFailed;
         };
-        var batch = try target.session.drainFrameResults(0);
+        var batch = try target.session.drainFrameResults();
         defer batch.release();
         for (0..try batch.count()) |index| switch ((try batch.get(index)).disposition) {
             .rendered => return true,

@@ -20,7 +20,7 @@ public expect class RenderSessionHandle : AutoCloseable {
 
   public fun requestFrame(demand: FrameDemand = FrameDemand())
 
-  public fun drainFrameResults(maxResults: Int = 0): List<RenderFrameResult>
+  public fun drainFrameResults(): List<RenderFrameResult>
 
   /** Services typed native work for a caller-graphics-thread driver. */
   public fun serviceDriverWork(maxWork: Int = 0): Int

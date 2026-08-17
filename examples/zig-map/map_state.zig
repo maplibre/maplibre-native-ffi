@@ -37,8 +37,6 @@ pub const MapState = struct {
         };
         try loadStyle(allocator, &map, diagnostic_store);
         try setCamera(&map, diagnostic_store);
-        try waitForBarrier(&runtime);
-
         return .{
             .allocator = allocator,
             .diagnostic_store = diagnostic_store,
@@ -54,72 +52,40 @@ pub const MapState = struct {
         self.allocator.destroy(self.diagnostic_store);
     }
 
-    pub fn cancelTransitions(self: *MapState) !void {
-        try self.updateCamera(.{ .camera = (try self.orderedCamera()).camera });
-    }
-
-    pub fn setGesture(self: *MapState, phase: maplibre.GesturePhase, id: u64) !void {
-        try self.updateCamera(.{ .gesture_phase = phase, .gesture_id = id });
+    pub fn setGesture(self: *MapState, phase: maplibre.GesturePhase) !void {
+        try self.updateCamera(.{ .gesture_phase = phase });
     }
 
     pub fn moveBy(self: *MapState, dx: f64, dy: f64) !void {
-        try self.updateCamera(.{ .camera = .{ .center = try self.movedCenter(dx, dy) } });
+        try self.cameraMutation(self.map.moveBy(.{ .x = dx, .y = dy }, null));
     }
 
     pub fn moveByAnimated(self: *MapState, dx: f64, dy: f64, duration_ms: f64) !void {
-        try self.updateCamera(.{
-            .mode = .ease,
-            .camera = .{ .center = try self.movedCenter(dx, dy) },
-            .animation = .{ .duration_ms = duration_ms },
-        });
+        try self.cameraMutation(self.map.moveBy(.{ .x = dx, .y = dy }, .{ .duration_ms = duration_ms }));
     }
 
     pub fn scaleBy(self: *MapState, scale: f64, anchor: maplibre.ScreenPoint) !void {
-        try self.updateCamera(.{ .camera = .{
-            .zoom = ((try self.orderedCamera()).camera.zoom orelse 0) + @log2(scale),
-            .anchor = anchor,
-        } });
+        try self.cameraMutation(self.map.scaleBy(scale, anchor, null));
     }
 
     pub fn scaleByAnimated(self: *MapState, scale: f64, anchor: maplibre.ScreenPoint, duration_ms: f64) !void {
-        try self.updateCamera(.{
-            .mode = .ease,
-            .camera = .{
-                .zoom = ((try self.orderedCamera()).camera.zoom orelse 0) + @log2(scale),
-                .anchor = anchor,
-            },
-            .animation = .{ .duration_ms = duration_ms },
-        });
+        try self.cameraMutation(self.map.scaleBy(scale, anchor, .{ .duration_ms = duration_ms }));
     }
 
     pub fn pitchBy(self: *MapState, delta: f64) !void {
-        try self.updateCamera(.{ .camera = .{
-            .pitch = clamp(((try self.orderedCamera()).camera.pitch orelse 0) + delta, 0.0, 60.0),
-        } });
+        try self.cameraMutation(self.map.pitchBy(delta, null));
     }
 
     pub fn adjustBearing(self: *MapState, delta: f64) !void {
-        try self.updateCamera(.{ .camera = .{
-            .bearing = ((try self.orderedCamera()).camera.bearing orelse 0) + delta,
-        } });
+        try self.cameraMutation(self.map.bearingBy(delta, null, null));
     }
 
     pub fn adjustBearingAnimated(self: *MapState, delta: f64, duration_ms: f64) !void {
-        try self.updateCamera(.{
-            .mode = .ease,
-            .camera = .{ .bearing = ((try self.orderedCamera()).camera.bearing orelse 0) + delta },
-            .animation = .{ .duration_ms = duration_ms },
-        });
+        try self.cameraMutation(self.map.bearingBy(delta, null, .{ .duration_ms = duration_ms }));
     }
 
     pub fn adjustPitchAnimated(self: *MapState, delta: f64, duration_ms: f64) !void {
-        try self.updateCamera(.{
-            .mode = .ease,
-            .camera = .{
-                .pitch = clamp(((try self.orderedCamera()).camera.pitch orelse 0) + delta, 0.0, 60.0),
-            },
-            .animation = .{ .duration_ms = duration_ms },
-        });
+        try self.cameraMutation(self.map.pitchBy(delta, .{ .duration_ms = duration_ms }));
     }
 
     pub fn resetOrientation(self: *MapState, duration_ms: f64) !void {
@@ -137,36 +103,13 @@ pub const MapState = struct {
         };
     }
 
-    fn orderedCamera(self: *MapState) !maplibre.CameraSnapshot {
-        const operation = self.map.cameraQueryStart() catch |err| {
-            diagnostics.logError("camera query failed", err, self.diagnostic_store);
+    fn cameraMutation(self: *MapState, result: anyerror!u64) !void {
+        _ = result catch |err| {
+            diagnostics.logError("camera update failed", err, self.diagnostic_store);
             return types.AppError.CameraUpdateFailed;
         };
-        defer operation.release();
-        if (!(operation.wait(-1) catch false) or (operation.resultStatus() catch -1) != 0) {
-            return types.AppError.CameraUpdateFailed;
-        }
-        return self.map.cameraQueryTakeResult(operation) catch |err| {
-            diagnostics.logError("camera query take failed", err, self.diagnostic_store);
-            return types.AppError.CameraUpdateFailed;
-        };
-    }
-
-    fn movedCenter(self: *MapState, dx: f64, dy: f64) !maplibre.LatLng {
-        _ = try self.orderedCamera();
-        const size = try self.map.getSize();
-        return self.map.latLngForPixel(.{
-            .x = @as(f64, @floatFromInt(size.width)) / 2.0 - dx,
-            .y = @as(f64, @floatFromInt(size.height)) / 2.0 - dy,
-        });
     }
 };
-
-fn waitForBarrier(runtime: *maplibre.RuntimeHandle) !void {
-    const operation = try runtime.barrierStart();
-    defer operation.release();
-    if (!try operation.wait(-1) or try operation.resultStatus() != 0) return error.RuntimeBarrierFailed;
-}
 /// Drains receiver readiness and runtime events, reporting whether the map
 /// requested another frame.
 pub fn drainNotifications(self: *MapState) !bool {
@@ -191,12 +134,6 @@ pub fn drainNotifications(self: *MapState) !bool {
         }
     }
     return render_update_available;
-}
-
-fn clamp(value: f64, min: f64, max: f64) f64 {
-    if (value < min) return min;
-    if (value > max) return max;
-    return value;
 }
 
 /// Selects the two event types that the host drains. This runs before the style

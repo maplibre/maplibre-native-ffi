@@ -267,15 +267,12 @@ const (
 	GesturePhaseCancel GesturePhase = GesturePhase(C.MLN_GESTURE_PHASE_CANCEL)
 )
 
-// CameraUpdate is one atomic camera command. GestureID and AnimationID are
-// caller-defined correlation values.
+// CameraUpdate is one atomic absolute camera update.
 type CameraUpdate struct {
 	Mode         CameraUpdateMode
 	Camera       CameraOptions
 	Animation    *AnimationOptions
 	GesturePhase GesturePhase
-	GestureID    uint64
-	AnimationID  uint64
 }
 
 func cCameraUpdate(update CameraUpdate) C.mln_camera_update {
@@ -286,8 +283,6 @@ func cCameraUpdate(update CameraUpdate) C.mln_camera_update {
 		raw.animation = cAnimationOptions(*update.Animation)
 	}
 	raw.gesture_phase = C.uint32_t(update.GesturePhase)
-	raw.gesture_id = C.uint64_t(update.GestureID)
-	raw.animation_id = C.uint64_t(update.AnimationID)
 	return raw
 }
 

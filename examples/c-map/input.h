@@ -23,8 +23,6 @@ typedef struct input_result {
 typedef struct input_controller {
   drag_mode drag_mode;
   uint8_t drag_button;
-  uint64_t next_gesture_id;
-  uint64_t gesture_id;
   double last_x;
   double last_y;
 } input_controller;

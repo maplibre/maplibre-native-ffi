@@ -114,10 +114,12 @@ impl ResourceProviderState {
     }
 
     pub(crate) fn descriptor(&self) -> sys::mln_resource_provider {
-        maplibre_core::resource::resource_provider_descriptor(
+        let mut descriptor = maplibre_core::resource::resource_provider_descriptor(
             Some(resource_provider_trampoline),
             ptr::from_ref(self).cast_mut().cast::<c_void>(),
-        )
+        );
+        descriptor.release_user_data = Some(release_resource_provider_state);
+        descriptor
     }
 
     fn invoke(
@@ -145,6 +147,13 @@ impl ResourceProviderState {
             Ok(decision) => state.finish_provider_decision(decision),
             Err(_) => state.finish_provider_exception(),
         }
+    }
+}
+
+unsafe extern "C" fn release_resource_provider_state(user_data: *mut c_void) {
+    if !user_data.is_null() {
+        // SAFETY: successful registration transfers this Box to native exactly once.
+        drop(unsafe { Box::from_raw(user_data.cast::<ResourceProviderState>()) });
     }
 }
 
@@ -187,10 +196,12 @@ impl ResourceTransformState {
     }
 
     pub(crate) fn descriptor(&self) -> sys::mln_resource_transform {
-        maplibre_core::resource::resource_transform_descriptor(
+        let mut descriptor = maplibre_core::resource::resource_transform_descriptor(
             Some(resource_transform_trampoline),
             ptr::from_ref(self).cast_mut().cast::<c_void>(),
-        )
+        );
+        descriptor.release_user_data = Some(release_resource_transform_state);
+        descriptor
     }
 
     fn invoke(
@@ -240,6 +251,13 @@ impl ResourceTransformState {
     }
 }
 
+unsafe extern "C" fn release_resource_transform_state(user_data: *mut c_void) {
+    if !user_data.is_null() {
+        // SAFETY: successful registration transfers this Box to native exactly once.
+        drop(unsafe { Box::from_raw(user_data.cast::<ResourceTransformState>()) });
+    }
+}
+
 unsafe extern "C" fn resource_transform_trampoline(
     user_data: *mut c_void,
     kind: u32,
@@ -280,10 +298,12 @@ impl HttpHeaderTransformState {
     }
 
     pub(crate) fn descriptor(&self) -> sys::mln_http_header_transform {
-        maplibre_core::resource::http_header_transform_descriptor(
+        let mut descriptor = maplibre_core::resource::http_header_transform_descriptor(
             Some(http_header_transform_trampoline),
             ptr::from_ref(self).cast_mut().cast::<c_void>(),
-        )
+        );
+        descriptor.release_user_data = Some(release_http_header_transform_state);
+        descriptor
     }
 
     fn invoke(
@@ -335,6 +355,13 @@ impl HttpHeaderTransformState {
             }
         }
         sys::MLN_STATUS_OK
+    }
+}
+
+unsafe extern "C" fn release_http_header_transform_state(user_data: *mut c_void) {
+    if !user_data.is_null() {
+        // SAFETY: successful registration transfers this Box to native exactly once.
+        drop(unsafe { Box::from_raw(user_data.cast::<HttpHeaderTransformState>()) });
     }
 }
 

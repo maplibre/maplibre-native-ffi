@@ -800,11 +800,11 @@ class RenderSessionHandle(NativeHandleMixin):
             demand.deadline_ns,
         )
 
-    def drain_frame_results(self, max_results: int = 64) -> list[RenderFrameResult]:
+    def drain_frame_results(self) -> list[RenderFrameResult]:
         """Drain an owned batch of terminal frame-demand results."""
         return [
             RenderFrameResult._from_native(raw)
-            for raw in self._native.drain_frame_results(max_results)
+            for raw in self._native.drain_frame_results()
         ]
 
     def service_driver_work(self, max_work: int = 64) -> int:

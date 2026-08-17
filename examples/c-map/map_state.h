@@ -19,13 +19,9 @@ typedef struct map_state {
 );
 void map_state_deinit(map_state* state);
 
-[[nodiscard]] app_error map_state_camera_query(
-  map_state* state, mln_camera_options* out_camera
-);
 [[nodiscard]] app_error map_state_update_camera(
   map_state* state, const mln_camera_options* camera, uint32_t mode,
-  const mln_animation_options* animation, uint32_t gesture_phase,
-  uint64_t gesture_id
+  const mln_animation_options* animation, uint32_t gesture_phase
 );
 [[nodiscard]] app_error map_state_resize(map_state* state, viewport value);
 

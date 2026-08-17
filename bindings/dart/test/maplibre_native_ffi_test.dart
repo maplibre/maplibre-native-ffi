@@ -1409,7 +1409,6 @@ void main() {
       const CameraOptions(zoom: 2),
       mode: CameraUpdateMode.ease,
       animation: AnimationOptions(durationMs: 0, transitionId: transitionId),
-      animationId: transitionId,
     );
     await runtime.barrier();
     final cameraEvents = runtime.drainEvents().events;

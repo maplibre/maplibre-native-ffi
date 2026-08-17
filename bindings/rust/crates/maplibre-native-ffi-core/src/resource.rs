@@ -253,6 +253,7 @@ pub fn resource_provider_descriptor(
         size: std::mem::size_of::<sys::mln_resource_provider>() as u32,
         callback,
         user_data,
+        release_user_data: None,
     }
 }
 
@@ -271,6 +272,7 @@ pub fn resource_transform_descriptor(
         size: std::mem::size_of::<sys::mln_resource_transform>() as u32,
         callback,
         user_data,
+        release_user_data: None,
     }
 }
 
@@ -289,6 +291,7 @@ pub fn http_header_transform_descriptor(
         size: std::mem::size_of::<sys::mln_http_header_transform>() as u32,
         callback,
         user_data,
+        release_user_data: None,
     }
 }
 

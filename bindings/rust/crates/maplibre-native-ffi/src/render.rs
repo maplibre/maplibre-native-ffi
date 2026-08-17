@@ -1323,14 +1323,10 @@ impl RenderSessionHandle {
         })
     }
 
-    pub fn drain_frame_results(&self, max_results: usize) -> Result<RenderFrameBatch> {
+    pub fn drain_frame_results(&self) -> Result<RenderFrameBatch> {
         let mut batch = sys::mln_render_frame_batch(0);
         maplibre_core::check(unsafe {
-            sys::mln_render_session_drain_frame_results(
-                self.inner.native()?,
-                max_results,
-                &mut batch,
-            )
+            sys::mln_render_session_drain_frame_results(self.inner.native()?, &mut batch)
         })?;
         RenderFrameBatch::new(batch)
     }

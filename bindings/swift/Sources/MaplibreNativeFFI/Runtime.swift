@@ -489,11 +489,6 @@ public struct RuntimeEvent: Equatable, Sendable {
   }
 }
 
-private struct PendingCallbackReplacement<State> {
-  let replacement: State?
-  let previous: State?
-}
-
 /// One drained batch of runtime events.
 ///
 /// This is a copy of an owned C event batch, so a host keeps events, their
@@ -509,15 +504,6 @@ public final class RuntimeHandle: @unchecked Sendable {
   private let operationLock = NSLock()
   private var operationCount = 0
   private var isClosing = false
-  private var resourceTransform: NativeResourceTransformState?
-  private var pendingResourceTransforms:
-    [UInt64: PendingCallbackReplacement<NativeResourceTransformState>] = [:]
-  private var pendingHttpHeaderTransforms:
-    [UInt64: PendingCallbackReplacement<NativeHttpHeaderTransformState>] = [:]
-  private var pendingResourceProviders:
-    [UInt64: PendingCallbackReplacement<NativeResourceProviderState>] = [:]
-  private var httpHeaderTransform: NativeHttpHeaderTransformState?
-  private var resourceProvider: NativeResourceProviderState?
 
   public init(options: RuntimeOptions = RuntimeOptions()) async throws {
     let receiver = try mapNativeFailure { try NativeNotificationReceiver() }
@@ -606,9 +592,6 @@ public final class RuntimeHandle: @unchecked Sendable {
     mln_operation_release(operation.raw)
     operationLock.withLock { isClosing = false }
     try mapNativeFailure { try notificationReceiver.close() }
-    resourceTransform = nil
-    httpHeaderTransform = nil
-    resourceProvider = nil
   }
 
   func closeBlockingForTests() throws {
@@ -648,9 +631,6 @@ public final class RuntimeHandle: @unchecked Sendable {
     mln_operation_release(operation.raw)
     operationLock.withLock { isClosing = false }
     try mapNativeFailure { try notificationReceiver.close() }
-    resourceTransform = nil
-    httpHeaderTransform = nil
-    resourceProvider = nil
   }
 
   /// Waits until every command accepted before this call has committed.
@@ -732,11 +712,9 @@ public final class RuntimeHandle: @unchecked Sendable {
   public func drainEvents() throws -> RuntimeEventBatch {
     try mapNativeFailure {
       let batch = try NativeRuntime.drainEvents(handle.requireLive())
-      let result = RuntimeEventBatch(
+      return RuntimeEventBatch(
         events: batch.events.map { RuntimeEvent(native: $0) }
       )
-      applyCommandFinishedEvents(result.events)
-      return result
     }
   }
 
@@ -753,9 +731,6 @@ public final class RuntimeHandle: @unchecked Sendable {
 
   /// Selects which runtime-originated event types this runtime queues.
   ///
-  /// Keep ``RuntimeEventMask/commandFinished`` selected while a resource
-  /// transform, HTTP header transform, or resource provider is installed.
-  /// Those events retire callback state replaced by later commands.
   public func setEventMask(_ mask: RuntimeEventMask) throws {
     try mapNativeFailure { try NativeRuntime.setEventMask(
       handle.requireLive(),
@@ -781,26 +756,15 @@ public final class RuntimeHandle: @unchecked Sendable {
     let replacement = NativeResourceTransformState {
       callback(ResourceTransformRequest(native: $0))
     }
-    let commandId = try replacement.withDescriptor { try submitCallbackSet(
+    return try replacement.withDescriptor { try submitCallbackSet(
       $0,
       mln_runtime_set_resource_transform
     ) }
-    operationLock.withLock { pendingResourceTransforms[commandId] = .init(
-      replacement: replacement,
-      previous: resourceTransform
-    ) }
-    return commandId
   }
 
   @discardableResult
   public func clearResourceTransform() throws -> UInt64 {
-    let commandId =
-      try submitCallbackClear(mln_runtime_clear_resource_transform)
-    operationLock.withLock { pendingResourceTransforms[commandId] = .init(
-      replacement: nil,
-      previous: resourceTransform
-    ) }
-    return commandId
+    try submitCallbackClear(mln_runtime_clear_resource_transform)
   }
 
   @discardableResult
@@ -810,26 +774,15 @@ public final class RuntimeHandle: @unchecked Sendable {
     -> [HttpHeader]) throws -> UInt64
   {
     let replacement = NativeHttpHeaderTransformState(callback)
-    let commandId = try replacement.withDescriptor { try submitCallbackSet(
+    return try replacement.withDescriptor { try submitCallbackSet(
       $0,
       mln_runtime_set_http_header_transform
     ) }
-    operationLock.withLock { pendingHttpHeaderTransforms[commandId] = .init(
-      replacement: replacement,
-      previous: httpHeaderTransform
-    ) }
-    return commandId
   }
 
   @discardableResult
   public func clearHttpHeaderTransform() throws -> UInt64 {
-    let commandId =
-      try submitCallbackClear(mln_runtime_clear_http_header_transform)
-    operationLock.withLock { pendingHttpHeaderTransforms[commandId] = .init(
-      replacement: nil,
-      previous: httpHeaderTransform
-    ) }
-    return commandId
+    try submitCallbackClear(mln_runtime_clear_http_header_transform)
   }
 
   @discardableResult
@@ -846,25 +799,15 @@ public final class RuntimeHandle: @unchecked Sendable {
       case .handle: return 1
       }
     }
-    let commandId = try replacement.withDescriptor { try submitCallbackSet(
+    return try replacement.withDescriptor { try submitCallbackSet(
       $0,
       mln_runtime_set_resource_provider
     ) }
-    operationLock.withLock { pendingResourceProviders[commandId] = .init(
-      replacement: replacement,
-      previous: resourceProvider
-    ) }
-    return commandId
   }
 
   @discardableResult
   public func clearResourceProvider() throws -> UInt64 {
-    let commandId = try submitCallbackClear(mln_runtime_clear_resource_provider)
-    operationLock.withLock { pendingResourceProviders[commandId] = .init(
-      replacement: nil,
-      previous: resourceProvider
-    ) }
-    return commandId
+    try submitCallbackClear(mln_runtime_clear_resource_provider)
   }
 
   private func submitCallbackSet<Descriptor>(
@@ -893,26 +836,6 @@ public final class RuntimeHandle: @unchecked Sendable {
         handle.requireLive().raw,
         $0
       )) }.value
-    }
-  }
-
-  private func applyCommandFinishedEvents(_ events: [RuntimeEvent]) {
-    operationLock.withLock {
-      for event in events {
-        guard case let .commandFinished(finished) = event.payload
-        else { continue }
-        let committed = finished
-          .disposition == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue
-        if let pending = pendingResourceTransforms
-          .removeValue(forKey: finished.commandId),
-          committed { resourceTransform = pending.replacement }
-        if let pending = pendingHttpHeaderTransforms
-          .removeValue(forKey: finished.commandId),
-          committed { httpHeaderTransform = pending.replacement }
-        if let pending = pendingResourceProviders
-          .removeValue(forKey: finished.commandId),
-          committed { resourceProvider = pending.replacement }
-      }
     }
   }
 }

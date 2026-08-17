@@ -133,7 +133,7 @@ app_error render_session_render_update(
     );
   }
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
-  status = mln_render_session_drain_frame_results(session->handle, 0, &batch);
+  status = mln_render_session_drain_frame_results(session->handle, &batch);
   if (status == MLN_STATUS_NOT_READY) {
     return APP_OK;
   }

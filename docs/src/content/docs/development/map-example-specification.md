@@ -310,7 +310,7 @@ map state.
 - One runtime per process, with one native scheduler thread.
 - One map per runtime for the demo.
 - One attaching or attached session per map.
-- At most one live frame-result batch per session.
+- Frame-result batches own their records independently of the session.
 - Every acquired-frame handle leases one texture-ring slot until its release
   operation completes.
 - Graphics handles stay valid through normal detach. Abandon quarantines

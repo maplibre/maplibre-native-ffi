@@ -70,9 +70,8 @@ static bool wait_for_frame_result(
         return false;
       }
     }
-    const mln_status status = mln_render_session_drain_frame_results(
-      fixture->session, SIZE_MAX, out_batch
-    );
+    const mln_status status =
+      mln_render_session_drain_frame_results(fixture->session, out_batch);
     if (status == MLN_STATUS_OK) {
       return true;
     }

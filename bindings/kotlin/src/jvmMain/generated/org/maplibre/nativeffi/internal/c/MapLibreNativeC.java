@@ -7002,6 +7002,260 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         }
     }
 
+    private static class mln_map_move_by {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            mln_screen_point.layout(),
+            MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_move_by");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_map_move_by(mln_map map, mln_screen_point offset, const mln_animation_options *animation, uint64_t *out_command_id)
+     * }
+     */
+    public static FunctionDescriptor mln_map_move_by$descriptor() {
+        return mln_map_move_by.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_map_move_by(mln_map map, mln_screen_point offset, const mln_animation_options *animation, uint64_t *out_command_id)
+     * }
+     */
+    public static MethodHandle mln_map_move_by$handle() {
+        return mln_map_move_by.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_map_move_by(mln_map map, mln_screen_point offset, const mln_animation_options *animation, uint64_t *out_command_id)
+     * }
+     */
+    public static MemorySegment mln_map_move_by$address() {
+        return mln_map_move_by.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_map_move_by(mln_map map, mln_screen_point offset, const mln_animation_options *animation, uint64_t *out_command_id)
+     * }
+     */
+    public static int mln_map_move_by(long map, MemorySegment offset, MemorySegment animation, MemorySegment out_command_id) {
+        var mh$ = mln_map_move_by.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_map_move_by", map, offset, animation, out_command_id);
+            }
+            return (int)mh$.invokeExact(map, offset, animation, out_command_id);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_map_scale_by {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_DOUBLE,
+            MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_scale_by");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_map_scale_by(mln_map map, double scale, const mln_screen_point *anchor, const mln_animation_options *animation, uint64_t *out_command_id)
+     * }
+     */
+    public static FunctionDescriptor mln_map_scale_by$descriptor() {
+        return mln_map_scale_by.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_map_scale_by(mln_map map, double scale, const mln_screen_point *anchor, const mln_animation_options *animation, uint64_t *out_command_id)
+     * }
+     */
+    public static MethodHandle mln_map_scale_by$handle() {
+        return mln_map_scale_by.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_map_scale_by(mln_map map, double scale, const mln_screen_point *anchor, const mln_animation_options *animation, uint64_t *out_command_id)
+     * }
+     */
+    public static MemorySegment mln_map_scale_by$address() {
+        return mln_map_scale_by.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_map_scale_by(mln_map map, double scale, const mln_screen_point *anchor, const mln_animation_options *animation, uint64_t *out_command_id)
+     * }
+     */
+    public static int mln_map_scale_by(long map, double scale, MemorySegment anchor, MemorySegment animation, MemorySegment out_command_id) {
+        var mh$ = mln_map_scale_by.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_map_scale_by", map, scale, anchor, animation, out_command_id);
+            }
+            return (int)mh$.invokeExact(map, scale, anchor, animation, out_command_id);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_map_bearing_by {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_DOUBLE,
+            MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_bearing_by");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_map_bearing_by(mln_map map, double degrees, const mln_screen_point *anchor, const mln_animation_options *animation, uint64_t *out_command_id)
+     * }
+     */
+    public static FunctionDescriptor mln_map_bearing_by$descriptor() {
+        return mln_map_bearing_by.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_map_bearing_by(mln_map map, double degrees, const mln_screen_point *anchor, const mln_animation_options *animation, uint64_t *out_command_id)
+     * }
+     */
+    public static MethodHandle mln_map_bearing_by$handle() {
+        return mln_map_bearing_by.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_map_bearing_by(mln_map map, double degrees, const mln_screen_point *anchor, const mln_animation_options *animation, uint64_t *out_command_id)
+     * }
+     */
+    public static MemorySegment mln_map_bearing_by$address() {
+        return mln_map_bearing_by.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_map_bearing_by(mln_map map, double degrees, const mln_screen_point *anchor, const mln_animation_options *animation, uint64_t *out_command_id)
+     * }
+     */
+    public static int mln_map_bearing_by(long map, double degrees, MemorySegment anchor, MemorySegment animation, MemorySegment out_command_id) {
+        var mh$ = mln_map_bearing_by.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_map_bearing_by", map, degrees, anchor, animation, out_command_id);
+            }
+            return (int)mh$.invokeExact(map, degrees, anchor, animation, out_command_id);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
+    private static class mln_map_pitch_by {
+        public static final FunctionDescriptor DESC = FunctionDescriptor.of(
+            MapLibreNativeC.C_INT,
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_DOUBLE,
+            MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER
+        );
+
+        public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_pitch_by");
+
+        public static final MethodHandle HANDLE = Linker.nativeLinker().downcallHandle(ADDR, DESC);
+    }
+
+    /**
+     * Function descriptor for:
+     * {@snippet lang=c :
+     * mln_status mln_map_pitch_by(mln_map map, double degrees, const mln_animation_options *animation, uint64_t *out_command_id)
+     * }
+     */
+    public static FunctionDescriptor mln_map_pitch_by$descriptor() {
+        return mln_map_pitch_by.DESC;
+    }
+
+    /**
+     * Downcall method handle for:
+     * {@snippet lang=c :
+     * mln_status mln_map_pitch_by(mln_map map, double degrees, const mln_animation_options *animation, uint64_t *out_command_id)
+     * }
+     */
+    public static MethodHandle mln_map_pitch_by$handle() {
+        return mln_map_pitch_by.HANDLE;
+    }
+
+    /**
+     * Address for:
+     * {@snippet lang=c :
+     * mln_status mln_map_pitch_by(mln_map map, double degrees, const mln_animation_options *animation, uint64_t *out_command_id)
+     * }
+     */
+    public static MemorySegment mln_map_pitch_by$address() {
+        return mln_map_pitch_by.ADDR;
+    }
+
+    /**
+     * {@snippet lang=c :
+     * mln_status mln_map_pitch_by(mln_map map, double degrees, const mln_animation_options *animation, uint64_t *out_command_id)
+     * }
+     */
+    public static int mln_map_pitch_by(long map, double degrees, MemorySegment animation, MemorySegment out_command_id) {
+        var mh$ = mln_map_pitch_by.HANDLE;
+        try {
+            if (TRACE_DOWNCALLS) {
+                traceDowncall("mln_map_pitch_by", map, degrees, animation, out_command_id);
+            }
+            return (int)mh$.invokeExact(map, degrees, animation, out_command_id);
+        } catch (Error | RuntimeException ex) {
+           throw ex;
+        } catch (Throwable ex$) {
+           throw new AssertionError("should not reach here", ex$);
+        }
+    }
+
     private static class mln_map_camera_query_start {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
@@ -12222,7 +12476,6 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_LONG,
-            MapLibreNativeC.C_LONG,
             MapLibreNativeC.C_POINTER
         );
 
@@ -12234,7 +12487,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_drain_frame_results(mln_render_session session, size_t max_results, mln_render_frame_batch *out_batch)
+     * mln_status mln_render_session_drain_frame_results(mln_render_session session, mln_render_frame_batch *out_batch)
      * }
      */
     public static FunctionDescriptor mln_render_session_drain_frame_results$descriptor() {
@@ -12244,7 +12497,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_drain_frame_results(mln_render_session session, size_t max_results, mln_render_frame_batch *out_batch)
+     * mln_status mln_render_session_drain_frame_results(mln_render_session session, mln_render_frame_batch *out_batch)
      * }
      */
     public static MethodHandle mln_render_session_drain_frame_results$handle() {
@@ -12254,7 +12507,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_render_session_drain_frame_results(mln_render_session session, size_t max_results, mln_render_frame_batch *out_batch)
+     * mln_status mln_render_session_drain_frame_results(mln_render_session session, mln_render_frame_batch *out_batch)
      * }
      */
     public static MemorySegment mln_render_session_drain_frame_results$address() {
@@ -12263,16 +12516,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_render_session_drain_frame_results(mln_render_session session, size_t max_results, mln_render_frame_batch *out_batch)
+     * mln_status mln_render_session_drain_frame_results(mln_render_session session, mln_render_frame_batch *out_batch)
      * }
      */
-    public static int mln_render_session_drain_frame_results(long session, long max_results, MemorySegment out_batch) {
+    public static int mln_render_session_drain_frame_results(long session, MemorySegment out_batch) {
         var mh$ = mln_render_session_drain_frame_results.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_render_session_drain_frame_results", session, max_results, out_batch);
+                traceDowncall("mln_render_session_drain_frame_results", session, out_batch);
             }
-            return (int)mh$.invokeExact(session, max_results, out_batch);
+            return (int)mh$.invokeExact(session, out_batch);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {

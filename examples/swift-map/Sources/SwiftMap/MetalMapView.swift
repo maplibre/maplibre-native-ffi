@@ -8,22 +8,18 @@ import QuartzCore
 @MainActor
 final class MetalMapView: NSView {
   private let metalLayer = CAMetalLayer()
-  private lazy var input = InputController { [weak self] update in
-    self?.scheduleCameraUpdate(update)
-  }
+  private let input = InputController()
 
   private let mode: RenderTargetMode
   private var graphics: MetalGraphicsContext?
   private var mapState: MapState?
   private var renderTarget: MetalRenderTarget?
   private var setupTask: Task<Void, Never>?
-  private var cameraTask: Task<Void, Never>?
   private var timer: Timer?
   private var frameTask: Task<Void, Never>?
   private var shutdownTask: Task<Void, Never>?
   private var currentViewport: Viewport?
   private var renderRequested = true
-  private var nextCameraSequence = 0
   private var consecutiveRenderFailures = 0
   private var didLogStartupStatus = false
   private var isShutDown = false
@@ -98,10 +94,8 @@ final class MetalMapView: NSView {
     let target = renderTarget
     renderTarget = nil
     let setup = setupTask
-    let camera = cameraTask
     shutdownTask = Task { @MainActor in
       await setup?.value
-      await camera?.value
       do {
         try await target?.close()
         try await self.mapState?.close()
@@ -127,74 +121,46 @@ final class MetalMapView: NSView {
   }
 
   override func mouseDown(with event: NSEvent) {
-    requestRenderIfCameraChanged(input.mouseDown(event))
+    updateMap { try input.mouseDown(event, mapState: $0) }
   }
 
   override func rightMouseDown(with event: NSEvent) {
-    requestRenderIfCameraChanged(
-      input.rightMouseDown(event)
-    )
+    updateMap { try input.rightMouseDown(event, mapState: $0) }
   }
 
   override func mouseUp(with event: NSEvent) {
-    requestRenderIfCameraChanged(input.mouseUp(event))
+    updateMap { try input.mouseUp(event, mapState: $0) }
   }
 
   override func rightMouseUp(with event: NSEvent) {
-    requestRenderIfCameraChanged(input.rightMouseUp(event))
+    updateMap { try input.rightMouseUp(event, mapState: $0) }
   }
 
   override func mouseDragged(with event: NSEvent) {
-    requestRenderIfCameraChanged(input.mouseDragged(event))
+    updateMap { try input.mouseDragged(event, mapState: $0) }
   }
 
   override func rightMouseDragged(with event: NSEvent) {
-    requestRenderIfCameraChanged(input.mouseDragged(event))
+    updateMap { try input.mouseDragged(event, mapState: $0) }
   }
 
   override func scrollWheel(with event: NSEvent) {
-    requestRenderIfCameraChanged(
-      input.scrollWheel(event, in: self)
-    )
+    updateMap { try input.scrollWheel(event, in: self, mapState: $0) }
   }
 
   override func keyDown(with event: NSEvent) {
     guard let viewport = currentViewport else { return }
-    requestRenderIfCameraChanged(
-      input.keyDown(event, viewport: viewport)
-    )
+    updateMap { try input.keyDown(event, viewport: viewport, mapState: $0) }
   }
 
-  private func requestRenderIfCameraChanged(_ cameraChanged: Bool) {
-    if cameraChanged {
-      renderRequested = true
-    }
-  }
-
-  /// Serializes camera queries without moving map ownership off the render
-  /// loop. Each task inherits the main actor and waits for its predecessor.
-  private func scheduleCameraUpdate(_ update: @escaping CameraUpdateAction) {
-    guard !isShutDown else { return }
-    renderRequested = true
-    nextCameraSequence += 1
-    let sequence = nextCameraSequence
-    let predecessor = cameraTask
-    cameraTask = Task { @MainActor [weak self] in
-      await predecessor?.value
-      guard let self, !self.isShutDown,
-            let state = self.mapState else { return }
-      var commandError: Error?
-      do {
-        try await update(state)
-      } catch {
-        commandError = error
+  private func updateMap(_ update: (MapState) throws -> Bool) {
+    guard !isShutDown, let state = mapState else { return }
+    do {
+      if try update(state) {
+        renderRequested = true
       }
-      if self.nextCameraSequence == sequence {
-        self.cameraTask = nil
-      }
-      if let commandError {
-        self.fail(String(describing: commandError))
-      }
+    } catch {
+      fail(String(describing: error))
     }
   }
 
@@ -266,16 +232,14 @@ final class MetalMapView: NSView {
 
     graphics.resize(viewport)
     currentViewport = viewport
-    if mapState != nil {
-      scheduleCameraUpdate { state in
-        try state.resize(MapLogicalExtent(
-          width: viewport.logicalWidth,
-          height: viewport.logicalHeight,
-          scaleFactor: viewport.scaleFactor
-        ))
-      }
+    updateMap { state in
+      try state.resize(MapLogicalExtent(
+        width: viewport.logicalWidth,
+        height: viewport.logicalHeight,
+        scaleFactor: viewport.scaleFactor
+      ))
+      return true
     }
-    renderRequested = true
     startMapStateIfNeeded(viewport: viewport)
   }
 

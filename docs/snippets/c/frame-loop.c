@@ -60,9 +60,7 @@ static void drain_runtime_events(frame_receiver* receiver, bool* pending) {
 static void drain_frame_results(mln_render_session session, bool* pending) {
   // #region results
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
-  if (
-    mln_render_session_drain_frame_results(session, 0, &batch) != MLN_STATUS_OK
-  )
+  if (mln_render_session_drain_frame_results(session, &batch) != MLN_STATUS_OK)
     return;
   size_t count = 0;
   if (mln_render_frame_batch_count(batch, &count) == MLN_STATUS_OK) {

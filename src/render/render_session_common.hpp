@@ -503,7 +503,6 @@ struct mln_render_session_object
   mln_render_result latest_result = MLN_RENDER_RESULT_NO_UPDATE;
   bool target_ready = true;
   bool pending_changes = true;
-  bool frame_batch_live = false;
   std::optional<mln_render_target_extent> pending_extent;
   std::optional<std::thread::id> graphics_thread;
   uint32_t acquired_frame_count = 0;
@@ -540,8 +539,7 @@ struct mln_render_session_object
 };
 
 struct mln_render_frame_batch_object {
-  std::shared_ptr<mln_render_session_object> session;
-  std::vector<mln_render_frame_result> results;
+  std::deque<mln_render_frame_result> results;
 };
 
 struct mln_acquired_frame_object {
@@ -859,7 +857,7 @@ auto render_session_service_driver_work(
   mln_render_session, std::size_t, std::size_t*
 ) -> mln_status;
 auto render_session_drain_frame_results(
-  mln_render_session, std::size_t, mln_render_frame_batch*
+  mln_render_session, mln_render_frame_batch*
 ) -> mln_status;
 auto render_frame_batch_count(mln_render_frame_batch, std::size_t*)
   -> mln_status;

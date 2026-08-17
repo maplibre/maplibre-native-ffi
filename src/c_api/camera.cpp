@@ -70,6 +70,46 @@ auto mln_map_update_camera(
   });
 }
 
+auto mln_map_move_by(
+  mln_map map, mln_screen_point offset, const mln_animation_options* animation,
+  uint64_t* out_command_id
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_move_by(map, offset, animation, out_command_id);
+  });
+}
+
+auto mln_map_scale_by(
+  mln_map map, double scale, const mln_screen_point* anchor,
+  const mln_animation_options* animation, uint64_t* out_command_id
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_scale_by(
+      map, scale, anchor, animation, out_command_id
+    );
+  });
+}
+
+auto mln_map_bearing_by(
+  mln_map map, double degrees, const mln_screen_point* anchor,
+  const mln_animation_options* animation, uint64_t* out_command_id
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_bearing_by(
+      map, degrees, anchor, animation, out_command_id
+    );
+  });
+}
+
+auto mln_map_pitch_by(
+  mln_map map, double degrees, const mln_animation_options* animation,
+  uint64_t* out_command_id
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_pitch_by(map, degrees, animation, out_command_id);
+  });
+}
+
 auto mln_map_camera_query_start(
   mln_map map, mln_operation* out_operation
 ) noexcept -> mln_status {

@@ -1319,6 +1319,42 @@ class MapHandle(NativeHandleMixin):
         """Submit a camera fly transition and return its command ID."""
         return self._native.fly_to(*_camera_parts(camera), _animation_parts(animation))
 
+    def move_by(
+        self,
+        offset: ScreenPoint,
+        animation: AnimationOptions | None = None,
+    ) -> int:
+        """Move the camera by a logical-pixel offset."""
+        return self._native.move_by((offset.x, offset.y), _animation_parts(animation))
+
+    def scale_by(
+        self,
+        scale: float,
+        anchor: ScreenPoint | None = None,
+        animation: AnimationOptions | None = None,
+    ) -> int:
+        """Scale the camera around an anchor or the viewport center."""
+        raw_anchor = None if anchor is None else (anchor.x, anchor.y)
+        return self._native.scale_by(scale, raw_anchor, _animation_parts(animation))
+
+    def bearing_by(
+        self,
+        degrees: float,
+        anchor: ScreenPoint | None = None,
+        animation: AnimationOptions | None = None,
+    ) -> int:
+        """Rotate the camera around an anchor or the viewport center."""
+        raw_anchor = None if anchor is None else (anchor.x, anchor.y)
+        return self._native.bearing_by(degrees, raw_anchor, _animation_parts(animation))
+
+    def pitch_by(
+        self,
+        degrees: float,
+        animation: AnimationOptions | None = None,
+    ) -> int:
+        """Change the camera pitch by a relative amount."""
+        return self._native.pitch_by(degrees, _animation_parts(animation))
+
     def camera_for_lat_lng_bounds(
         self,
         bounds: LatLngBounds,

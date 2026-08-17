@@ -367,10 +367,7 @@ func (s *RenderSessionHandle) ServiceDriverWork(maxWork int) (int, error) {
 	return int(serviced), err
 }
 
-func (s *RenderSessionHandle) DrainFrameResults(maxResults int) (*RenderFrameBatch, error) {
-	if maxResults < 0 {
-		return nil, newBindingError(ErrInvalidArgument, "max results is negative")
-	}
+func (s *RenderSessionHandle) DrainFrameResults() (*RenderFrameBatch, error) {
 	ptr, release, err := s.ptr()
 	if err != nil {
 		return nil, err
@@ -381,7 +378,6 @@ func (s *RenderSessionHandle) DrainFrameResults(maxResults int) (*RenderFrameBat
 	if err := checkNative(func() int32 {
 		return int32(C.mln_render_session_drain_frame_results(
 			C.mln_render_session(ptr),
-			C.size_t(maxResults),
 			&batch,
 		))
 	}); err != nil {

@@ -1387,21 +1387,33 @@ auto set_resource_transform(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  const auto copied = *transform;
+  const auto context = std::make_shared<RuntimeCallbackContext>(
+    transform->user_data, transform->release_user_data
+  );
+  const auto registration = std::make_shared<ResourceTransformRegistration>(
+    ResourceTransformRegistration{
+      .callback = transform->callback,
+      .context = context,
+    }
+  );
   const auto state = live->resource_transform_state;
-  return submit_runtime_command(
+  const auto status = submit_runtime_command(
     live,
-    [live, state, copied](std::uint64_t command_id) -> void {
+    [live, state, registration](std::uint64_t command_id) -> void {
       execute_resource_configuration_command(
-        live, command_id, [state, copied]() -> void {
-          const std::unique_lock lock(state->mutex);
-          state->callback = copied.callback;
-          state->user_data = copied.user_data;
+        live, command_id, [state, registration]() -> void {
+          auto previous = std::shared_ptr<ResourceTransformRegistration>{};
+          {
+            const std::unique_lock lock(state->mutex);
+            previous = std::exchange(state->registration, registration);
+          }
         }
       );
     },
     out_command_id
   );
+  if (status == MLN_STATUS_OK) context->transfer_to_runtime();
+  return status;
 }
 
 auto resource_transform_response_set_url(
@@ -1459,9 +1471,11 @@ auto clear_resource_transform(
     [live, state](std::uint64_t command_id) -> void {
       execute_resource_configuration_command(
         live, command_id, [state]() -> void {
-          const std::unique_lock lock(state->mutex);
-          state->callback = nullptr;
-          state->user_data = nullptr;
+          auto previous = std::shared_ptr<ResourceTransformRegistration>{};
+          {
+            const std::unique_lock lock(state->mutex);
+            previous = std::exchange(state->registration, nullptr);
+          }
         }
       );
     },
@@ -1509,21 +1523,33 @@ auto set_http_header_transform(
   return MLN_STATUS_UNSUPPORTED;
 #endif
 
-  const auto copied = *transform;
+  const auto context = std::make_shared<RuntimeCallbackContext>(
+    transform->user_data, transform->release_user_data
+  );
+  const auto registration = std::make_shared<HttpHeaderTransformRegistration>(
+    HttpHeaderTransformRegistration{
+      .callback = transform->callback,
+      .context = context,
+    }
+  );
   const auto state = live->http_header_transform_state;
-  return submit_runtime_command(
+  const auto status = submit_runtime_command(
     live,
-    [live, state, copied](std::uint64_t command_id) -> void {
+    [live, state, registration](std::uint64_t command_id) -> void {
       execute_resource_configuration_command(
-        live, command_id, [state, copied]() -> void {
-          const std::unique_lock lock(state->mutex);
-          state->callback = copied.callback;
-          state->user_data = copied.user_data;
+        live, command_id, [state, registration]() -> void {
+          auto previous = std::shared_ptr<HttpHeaderTransformRegistration>{};
+          {
+            const std::unique_lock lock(state->mutex);
+            previous = std::exchange(state->registration, registration);
+          }
         }
       );
     },
     out_command_id
   );
+  if (status == MLN_STATUS_OK) context->transfer_to_runtime();
+  return status;
 }
 
 namespace {
@@ -1750,9 +1776,11 @@ auto clear_http_header_transform(
     [live, state](std::uint64_t command_id) -> void {
       execute_resource_configuration_command(
         live, command_id, [state]() -> void {
-          const std::unique_lock lock(state->mutex);
-          state->callback = nullptr;
-          state->user_data = nullptr;
+          auto previous = std::shared_ptr<HttpHeaderTransformRegistration>{};
+          {
+            const std::unique_lock lock(state->mutex);
+            previous = std::exchange(state->registration, nullptr);
+          }
         }
       );
     },
@@ -2708,24 +2736,31 @@ auto set_resource_provider(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
+  const auto context = std::make_shared<RuntimeCallbackContext>(
+    provider->user_data, provider->release_user_data
+  );
   const auto copied = ResourceProvider{
     .callback = provider->callback,
-    .user_data = provider->user_data,
+    .context = context,
   };
   const auto state = live->resource_provider_state;
-  return submit_runtime_command(
+  const auto status = submit_runtime_command(
     live,
     [live, state, copied](std::uint64_t command_id) -> void {
       execute_resource_configuration_command(
         live, command_id, [state, copied]() -> void {
-          const std::unique_lock lock(state->mutex);
-          state->registered = true;
-          state->provider = copied;
+          auto previous = ResourceProvider{};
+          {
+            const std::unique_lock lock(state->mutex);
+            previous = std::exchange(state->provider, copied);
+          }
         }
       );
     },
     out_command_id
   );
+  if (status == MLN_STATUS_OK) context->transfer_to_runtime();
+  return status;
 }
 
 auto clear_resource_provider(mln_runtime runtime, std::uint64_t* out_command_id)
@@ -2744,9 +2779,11 @@ auto clear_resource_provider(mln_runtime runtime, std::uint64_t* out_command_id)
     [live, state](std::uint64_t command_id) -> void {
       execute_resource_configuration_command(
         live, command_id, [state]() -> void {
-          const std::unique_lock lock(state->mutex);
-          state->registered = false;
-          state->provider = ResourceProvider{};
+          auto previous = ResourceProvider{};
+          {
+            const std::unique_lock lock(state->mutex);
+            previous = std::exchange(state->provider, ResourceProvider{});
+          }
         }
       );
     },
@@ -2777,21 +2814,27 @@ auto release_runtime_reachable_state(
 ) -> void {
   {
     auto& transform_state = *runtime->resource_transform_state;
-    const std::unique_lock transform_lock(transform_state.mutex);
-    transform_state.callback = nullptr;
-    transform_state.user_data = nullptr;
+    auto previous = std::shared_ptr<ResourceTransformRegistration>{};
+    {
+      const std::unique_lock transform_lock(transform_state.mutex);
+      previous = std::exchange(transform_state.registration, nullptr);
+    }
   }
   {
     auto& transform_state = *runtime->http_header_transform_state;
-    const std::unique_lock transform_lock(transform_state.mutex);
-    transform_state.callback = nullptr;
-    transform_state.user_data = nullptr;
+    auto previous = std::shared_ptr<HttpHeaderTransformRegistration>{};
+    {
+      const std::unique_lock transform_lock(transform_state.mutex);
+      previous = std::exchange(transform_state.registration, nullptr);
+    }
   }
   {
     auto& provider_state = *runtime->resource_provider_state;
-    const std::unique_lock provider_lock(provider_state.mutex);
-    provider_state.registered = false;
-    provider_state.provider = ResourceProvider{};
+    auto previous = ResourceProvider{};
+    {
+      const std::unique_lock provider_lock(provider_state.mutex);
+      previous = std::exchange(provider_state.provider, ResourceProvider{});
+    }
   }
   {
     const std::scoped_lock state_lock(runtime->offline_event_state->mutex);
@@ -3078,7 +3121,7 @@ auto acquire_resource_provider_for_platform_context(
   // committed close clears the registration holds teardown until it returns;
   // one that arrives later finds an empty registration.
   std::shared_lock provider_lock(state->mutex);
-  if (!state->registered) {
+  if (state->provider.callback == nullptr) {
     return std::nullopt;
   }
   return ResourceProviderLease{
@@ -3095,7 +3138,7 @@ auto has_resource_transform_for_platform_context(
   }
 
   const std::shared_lock transform_lock(state->mutex);
-  return state->callback != nullptr;
+  return state->registration != nullptr;
 }
 
 auto invoke_resource_transform(
@@ -3109,8 +3152,8 @@ auto invoke_resource_transform(
 
   // Same locking rule as `acquire_resource_provider_for_platform_context()`.
   const std::shared_lock transform_lock(state->mutex);
-  const auto callback = state->callback;
-  if (callback == nullptr) {
+  const auto registration = state->registration;
+  if (registration == nullptr) {
     return MLN_STATUS_OK;
   }
 
@@ -3120,7 +3163,9 @@ auto invoke_resource_transform(
     .context = &out_replacement_url,
   };
   try {
-    const auto status = callback(state->user_data, kind, url, &response);
+    const auto status = registration->callback(
+      registration->context->user_data(), kind, url, &response
+    );
     if (
       status == MLN_STATUS_OK && response.url != nullptr &&
       *response.url != '\0'
@@ -3142,8 +3187,8 @@ auto invoke_http_header_transform(
   }
 
   const std::shared_lock transform_lock(state->mutex);
-  const auto callback = state->callback;
-  if (callback == nullptr) {
+  const auto registration = state->registration;
+  if (registration == nullptr) {
     return {};
   }
 
@@ -3153,7 +3198,11 @@ auto invoke_http_header_transform(
     .context = &headers,
   };
   try {
-    if (callback(state->user_data, kind, url, &response) != MLN_STATUS_OK) {
+    if (
+      registration->callback(
+        registration->context->user_data(), kind, url, &response
+      ) != MLN_STATUS_OK
+    ) {
       return {};
     }
     return headers;

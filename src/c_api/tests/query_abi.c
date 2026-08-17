@@ -79,9 +79,8 @@ static void feature_query_hits_are_owned_by_one_list_handle(void) {
   mln_operation_release(barrier);
   mln_render_frame_batch frame_batch = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_render_session_drain_frame_results(
-                     fixture.session, SIZE_MAX, &frame_batch
-                   )
+    MLN_STATUS_OK,
+    mln_render_session_drain_frame_results(fixture.session, &frame_batch)
   );
   mln_render_frame_batch_release(frame_batch);
 

@@ -215,6 +215,49 @@ static uint32_t resource_provider_stub(
   return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
 }
 
+static void count_runtime_callback_release(void* user_data) {
+  atomic_fetch_add((atomic_int*)user_data, 1);
+}
+
+static void resource_provider_registration_releases_owned_state(void) {
+  atomic_int release_count;
+  atomic_init(&release_count, 0);
+  const mln_resource_provider provider = {
+    .size = sizeof(mln_resource_provider),
+    .callback = resource_provider_stub,
+    .user_data = &release_count,
+    .release_user_data = count_runtime_callback_release,
+  };
+
+  uint64_t rejected_command_id = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_runtime_set_resource_provider(
+      MLN_HANDLE_NULL, &provider, &rejected_command_id
+    )
+  );
+  TEST_ASSERT_EQUAL_INT(0, atomic_load(&release_count));
+
+  mln_runtime runtime = mln_test_create_runtime();
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, set_resource_provider_committed(runtime, &provider)
+  );
+  TEST_ASSERT_EQUAL_INT(0, atomic_load(&release_count));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, set_resource_provider_committed(runtime, &provider)
+  );
+  TEST_ASSERT_EQUAL_INT(1, atomic_load(&release_count));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, clear_resource_provider_committed(runtime)
+  );
+  TEST_ASSERT_EQUAL_INT(2, atomic_load(&release_count));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, set_resource_provider_committed(runtime, &provider)
+  );
+  mln_test_destroy_runtime(runtime);
+  TEST_ASSERT_EQUAL_INT(3, atomic_load(&release_count));
+}
+
 typedef struct inline_release_provider_state {
   atomic_bool callback_finished;
   atomic_int completion_status;
@@ -1330,6 +1373,7 @@ void run_resources_abi_tests(void) {
   RUN_TEST(runtime_teardown_leaves_other_runtimes_responsive);
   RUN_TEST(resource_transform_lookup_leaves_other_runtimes_responsive);
   RUN_TEST(resource_provider_rejects_raw_invalid_descriptors);
+  RUN_TEST(resource_provider_registration_releases_owned_state);
   RUN_TEST(resource_provider_command_copies_cross_thread_descriptor);
   RUN_TEST(clearing_resource_provider_waits_for_in_flight_callback);
   RUN_TEST(unsupported_style_url_scheme_names_scheme_and_url);

@@ -1222,19 +1222,12 @@ public final class RenderSessionHandle: @unchecked Sendable {
     }
   }
 
-  public func drainFrameResults(maxResults: Int = 64) throws
-    -> [RenderFrameResult]
-  {
-    guard maxResults >= 0 else {
-      throw NativeStatusFailure.swiftInvalidArgument(
-        "maxResults cannot be negative"
-      )
-    }
+  public func drainFrameResults() throws -> [RenderFrameResult] {
     return try mapNativeFailure {
       try handle.withLive { session in
         var batch: mln_render_frame_batch = 0
         try checkStatus(mln_render_session_drain_frame_results(
-          session.raw, maxResults, &batch
+          session.raw, &batch
         ))
         guard batch != 0 else { return [] }
         defer { mln_render_frame_batch_release(batch) }

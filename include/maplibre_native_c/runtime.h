@@ -644,19 +644,33 @@ MLN_API mln_status mln_resource_transform_response_set_url(
  *   API-managed storage for the current transform invocation.
  * - A non-OK return status is treated as no rewrite and does not fail the
  *   resource request.
- * - The callback and user_data stay valid through the command-finished event
- *   for the command that replaces or clears them. A committed event guarantees
- *   that every invocation using the previous registration has returned.
+ * - The C API invokes release_user_data after the final callback returns.
  */
 typedef mln_status (*mln_resource_transform_callback)(
   void* user_data, uint32_t kind, const char* url,
   mln_resource_transform_response* out_response
 );
 
+/**
+ * Releases callback user data after its final possible invocation.
+ *
+ * For each accepted registration with a non-null release callback, the C API
+ * invokes the callback exactly once after replacement, clear, or runtime close
+ * has retired the registration and every in-flight callback has returned. It
+ * may run on a runtime, worker, network, or closing thread. The C API never
+ * invokes it for a rejected registration. Another thread may retire an
+ * accepted registration before its registration function returns, so the
+ * caller transfers user_data ownership before entering that function and
+ * reclaims it only when registration is rejected.
+ */
+typedef void (*mln_runtime_callback_release)(void* user_data);
+
 typedef struct mln_resource_transform {
   uint32_t size;
   mln_resource_transform_callback callback;
   void* user_data;
+  /** Optional. Invoked exactly once for each accepted registration. */
+  mln_runtime_callback_release release_user_data;
 } mln_resource_transform;
 
 typedef struct mln_http_header_transform_response {
@@ -695,11 +709,9 @@ MLN_API mln_status mln_http_header_transform_response_set(
  * transport starts the attempt. kind is one mln_resource_kind value and url is
  * the transformed URL that the transport will request.
  *
- * The callback and user_data must be thread-safe. They stay valid through the
- * command-finished event for the command that replaces or clears them. A
- * committed event guarantees that every invocation using the previous
- * registration has returned. url and out_response are borrowed for the
- * callback duration. Callback implementations call only
+ * The callback and user_data must be thread-safe. The C API invokes
+ * release_user_data after the final callback returns. url and out_response are
+ * borrowed for the callback duration. Callback implementations call only
  * mln_http_header_transform_response_set() and return promptly. A non-OK result
  * discards every header collected during the invocation and lets the request
  * proceed unchanged.
@@ -713,6 +725,8 @@ typedef struct mln_http_header_transform {
   uint32_t size;
   mln_http_header_transform_callback callback;
   void* user_data;
+  /** Optional. Invoked exactly once for each accepted registration. */
+  mln_runtime_callback_release release_user_data;
 } mln_http_header_transform;
 
 typedef struct mln_resource_request {
@@ -801,9 +815,7 @@ typedef struct mln_resource_response {
  *   runtime C API functions.
  * - The callback may call resource request handle functions for the provided
  *   handle.
- * - The callback and user_data stay valid through the command-finished event
- *   for the command that replaces or clears them. A committed event guarantees
- *   that every invocation using the previous registration has returned.
+ * - The C API invokes release_user_data after the final callback returns.
  */
 typedef uint32_t (*mln_resource_provider_callback)(
   void* user_data, const mln_resource_request* request,
@@ -814,6 +826,8 @@ typedef struct mln_resource_provider {
   uint32_t size;
   mln_resource_provider_callback callback;
   void* user_data;
+  /** Optional. Invoked exactly once for each accepted registration. */
+  mln_runtime_callback_release release_user_data;
 } mln_resource_provider;
 
 /**
@@ -854,10 +868,11 @@ MLN_API mln_status mln_runtime_create_take_result(
  * thread. Execution is ordered with every other command for this runtime.
  * out_command_id must point to zero and receives the accepted command's ID.
  *
- * The callback and user_data remain borrowed. They must stay valid until the
- * command-finished event for this command. A committed event means that no
- * in-flight request can invoke the previous provider. Requests that the
- * previous provider already handled retain their request handles.
+ * With a non-null release_user_data, MLN_STATUS_OK transfers responsibility for
+ * releasing user_data to the C API. With a null release_user_data, the caller
+ * keeps user_data valid until a committed replacement or clear command, or
+ * until runtime close completes. Requests that the previous provider already
+ * handled retain their request handles.
  *
  * Native OnlineFileSource claims every remaining scheme. A URL with an
  * unrecognized scheme, such as jar:file:, reaches this callback and completes
@@ -880,11 +895,11 @@ MLN_API mln_status mln_runtime_set_resource_provider(
  * Clears the runtime-scoped network resource provider.
  *
  * The function accepts the change from any thread and orders it with every
- * other command for this runtime. out_command_id must point to zero. The
- * callback and user_data remain valid until this command's command-finished
- * event. A committed event means that no in-flight request can invoke the
- * previous provider and later requests use MapLibre's online file source.
- * Requests that the previous provider already handled retain their handles.
+ * other command for this runtime. out_command_id must point to zero. The C API
+ * invokes the previous provider's release_user_data after every
+ * in-flight callback returns. Later requests use MapLibre's online file
+ * source. Requests that the previous provider already handled retain their
+ * handles.
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
@@ -974,9 +989,10 @@ MLN_API mln_status mln_resource_request_wait_until_retired(
  * The function copies the transform shape and accepts the change from any
  * thread. Execution is ordered with every other command for this runtime.
  * out_command_id must point to zero and receives the accepted command's ID.
- * The callback and user_data remain borrowed until this command's
- * command-finished event. A committed event means that no in-flight request can
- * invoke the previous transform.
+ * With a non-null release_user_data, MLN_STATUS_OK transfers responsibility for
+ * releasing user_data to the C API. With a null release_user_data, the caller
+ * keeps user_data valid until a committed replacement or clear command, or
+ * until runtime close completes.
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
@@ -995,10 +1011,10 @@ MLN_API mln_status mln_runtime_set_resource_transform(
  * Clears the runtime-scoped URL transform for network resources.
  *
  * The function accepts the change from any thread and orders it with every
- * other command for this runtime. out_command_id must point to zero. The
- * callback and user_data remain valid until this command's command-finished
- * event. A committed event means that network resource URLs pass through
- * unchanged and no in-flight request can invoke the previous transform.
+ * other command for this runtime. out_command_id must point to zero. The C API
+ * invokes the previous transform's release_user_data after every
+ * in-flight callback returns. Network resource URLs then pass through
+ * unchanged.
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
@@ -1022,9 +1038,10 @@ MLN_API mln_status mln_runtime_clear_resource_transform(
  * The function copies the transform shape and accepts the change from any
  * thread. Execution is ordered with every other command for this runtime.
  * out_command_id must point to zero and receives the accepted command's ID.
- * The callback and user_data remain borrowed until this command's
- * command-finished event. A committed event means that no in-flight request can
- * invoke the previous transform.
+ * With a non-null release_user_data, MLN_STATUS_OK transfers responsibility for
+ * releasing user_data to the C API. With a null release_user_data, the caller
+ * keeps user_data valid until a committed replacement or clear command, or
+ * until runtime close completes.
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
@@ -1046,10 +1063,9 @@ MLN_API mln_status mln_runtime_set_http_header_transform(
  * Clears the runtime-scoped outgoing HTTP header transform.
  *
  * The function accepts the change from any thread and orders it with every
- * other command for this runtime. out_command_id must point to zero. The
- * callback and user_data remain valid until this command's command-finished
- * event. A committed event means that no in-flight request can invoke the
- * previous transform.
+ * other command for this runtime. out_command_id must point to zero. The C API
+ * invokes the previous transform's release_user_data after every
+ * in-flight callback returns.
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.

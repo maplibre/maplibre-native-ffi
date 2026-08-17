@@ -9,12 +9,9 @@ namespace Maplibre.NativeFfi.Examples.DotnetMap;
 internal sealed class MapState : IDisposable
 {
     private const string StyleUrl = "https://tiles.openfreemap.org/styles/bright";
-    private const double MinimumPitch = 0.0;
-    private const double MaximumPitch = 60.0;
 
     private readonly RuntimeHandle runtime;
     private bool closed;
-    private ulong gestureId;
 
     private MapState(RuntimeHandle runtime, MapHandle map)
     {
@@ -75,47 +72,34 @@ internal sealed class MapState : IDisposable
 
     public void CancelTransitions()
     {
-        var current = Map.GetCameraSnapshot().Camera;
-        Update(current, null);
+        _ = Map.UpdateCamera(new CameraUpdate());
     }
 
     public void SetGestureInProgress(bool inProgress)
     {
-        var current = Map.GetCameraSnapshot().Camera;
-        UpdateGesture(current, inProgress);
+        _ = Map.UpdateCamera(
+            new CameraUpdate { GesturePhase = inProgress ? GesturePhase.Begin : GesturePhase.End }
+        );
     }
 
     public void MoveBy(double deltaX, double deltaY, AnimationOptions? animation = null)
     {
-        var current = Map.GetCameraSnapshot().Camera;
-        Update(MovedCamera(current, deltaX, deltaY), animation);
+        _ = Map.MoveBy(new ScreenPoint(deltaX, deltaY), animation);
     }
 
     public void ScaleBy(double scale, ScreenPoint? anchor, AnimationOptions? animation = null)
     {
-        var current = Map.GetCameraSnapshot().Camera;
-        Update(
-            new CameraOptions { Zoom = (current.Zoom ?? 0) + Math.Log2(scale), Anchor = anchor },
-            animation
-        );
+        _ = Map.ScaleBy(scale, anchor, animation);
     }
 
     public void AdjustBearing(double delta, AnimationOptions? animation = null)
     {
-        var current = Map.GetCameraSnapshot().Camera;
-        Update(new CameraOptions { Bearing = (current.Bearing ?? 0) + delta }, animation);
+        _ = Map.BearingBy(delta, null, animation);
     }
 
     public void AdjustPitch(double delta, AnimationOptions? animation = null)
     {
-        var current = Map.GetCameraSnapshot().Camera;
-        Update(
-            new CameraOptions
-            {
-                Pitch = Math.Clamp((current.Pitch ?? 0) + delta, MinimumPitch, MaximumPitch),
-            },
-            animation
-        );
+        _ = Map.PitchBy(delta, animation);
     }
 
     public void ResetOrientation(AnimationOptions animation)
@@ -172,37 +156,6 @@ internal sealed class MapState : IDisposable
                 Animation = animation ?? new AnimationOptions(),
             }
         );
-    }
-
-    private void UpdateGesture(CameraOptions current, bool begin)
-    {
-        if (begin)
-        {
-            gestureId++;
-        }
-        _ = Map.UpdateCamera(
-            new CameraUpdate
-            {
-                Mode = CameraUpdateMode.Jump,
-                Camera = current,
-                GesturePhase = begin ? GesturePhase.Begin : GesturePhase.End,
-                GestureId = gestureId,
-            }
-        );
-    }
-
-    private static CameraOptions MovedCamera(CameraOptions current, double deltaX, double deltaY)
-    {
-        var center = current.Center ?? new LatLng(0, 0);
-        var zoom = current.Zoom ?? 0;
-        var degreesPerPixel = 360.0 / (512.0 * Math.Pow(2, zoom));
-        return new CameraOptions
-        {
-            Center = new LatLng(
-                Math.Clamp(center.Latitude + deltaY * degreesPerPixel, -85, 85),
-                center.Longitude - deltaX * degreesPerPixel
-            ),
-        };
     }
 }
 

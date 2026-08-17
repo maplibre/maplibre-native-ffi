@@ -1556,14 +1556,95 @@ private constructor(
             .camera(nativeCamera.options)
             .animation(nativeAnimation.options)
             .gesture_phase(update.gesturePhase.nativeValue)
-            .gesture_id(update.gestureId)
-            .animation_id(update.animationId)
           val outCommand = longArrayOf(0L)
           Status.check(
             MaplibreNativeC.mln_map_update_camera(requireLiveHandle(), nativeUpdate, outCommand)
           )
           return outCommand[0]
         }
+      }
+    }
+  }
+
+  public actual fun moveBy(offset: ScreenPoint, animation: AnimationOptions?): Long {
+    NativeAccess.ensureLoaded()
+    AnimationOptionsScope(animation).use { nativeAnimation ->
+      screenPoint(offset).use { nativeOffset ->
+        val outCommand = longArrayOf(0L)
+        Status.check(
+          MaplibreNativeC.mln_map_move_by(
+            requireLiveHandle(),
+            nativeOffset,
+            nativeAnimation.options,
+            outCommand,
+          )
+        )
+        return outCommand[0]
+      }
+    }
+  }
+
+  public actual fun scaleBy(
+    scale: Double,
+    anchor: ScreenPoint?,
+    animation: AnimationOptions?,
+  ): Long =
+    relativeCameraCommand(anchor, animation) { nativeAnchor, nativeAnimation, outCommand ->
+      MaplibreNativeC.mln_map_scale_by(
+        requireLiveHandle(),
+        scale,
+        nativeAnchor,
+        nativeAnimation,
+        outCommand,
+      )
+    }
+
+  public actual fun bearingBy(
+    degrees: Double,
+    anchor: ScreenPoint?,
+    animation: AnimationOptions?,
+  ): Long =
+    relativeCameraCommand(anchor, animation) { nativeAnchor, nativeAnimation, outCommand ->
+      MaplibreNativeC.mln_map_bearing_by(
+        requireLiveHandle(),
+        degrees,
+        nativeAnchor,
+        nativeAnimation,
+        outCommand,
+      )
+    }
+
+  public actual fun pitchBy(degrees: Double, animation: AnimationOptions?): Long {
+    NativeAccess.ensureLoaded()
+    AnimationOptionsScope(animation).use { nativeAnimation ->
+      val outCommand = longArrayOf(0L)
+      Status.check(
+        MaplibreNativeC.mln_map_pitch_by(
+          requireLiveHandle(),
+          degrees,
+          nativeAnimation.options,
+          outCommand,
+        )
+      )
+      return outCommand[0]
+    }
+  }
+
+  private inline fun relativeCameraCommand(
+    anchor: ScreenPoint?,
+    animation: AnimationOptions?,
+    call:
+      (MaplibreNativeC.mln_screen_point?, MaplibreNativeC.mln_animation_options?, LongArray) -> Int,
+  ): Long {
+    NativeAccess.ensureLoaded()
+    AnimationOptionsScope(animation).use { nativeAnimation ->
+      val nativeAnchor = anchor?.let(::screenPoint)
+      try {
+        val outCommand = longArrayOf(0L)
+        Status.check(call(nativeAnchor, nativeAnimation.options, outCommand))
+        return outCommand[0]
+      } finally {
+        nativeAnchor?.close()
       }
     }
   }

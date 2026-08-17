@@ -1029,7 +1029,7 @@ fn renderFrame(session: maplibre.RenderSessionHandle, if_needed: bool) !maplibre
 
     for (0..100_000) |_| {
         _ = session.serviceDriverWork(64) catch 0;
-        var batch = session.drainFrameResults(0) catch |err| switch (err) {
+        var batch = session.drainFrameResults() catch |err| switch (err) {
             error.NotReady => {
                 try std.Thread.yield();
                 continue;

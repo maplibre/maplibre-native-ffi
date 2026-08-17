@@ -103,9 +103,6 @@ impl Controller {
             MouseButton::Right => self.right_down = state == ElementState::Pressed,
             _ => return Ok(false),
         }
-        if state == ElementState::Pressed {
-            map.cancel_transitions()?;
-        }
         if self.dragging() != was_dragging {
             map.set_gesture_in_progress(self.dragging())?;
         }

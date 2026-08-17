@@ -298,10 +298,9 @@ typedef enum mln_gesture_phase : uint32_t {
 } mln_gesture_phase;
 
 /**
- * One atomic camera command.
+ * One atomic absolute camera update.
  *
- * The command copies this struct before returning. gesture_id and animation_id
- * are caller-defined correlation values.
+ * The command copies this struct before returning.
  */
 typedef struct mln_camera_update {
   uint32_t size;
@@ -310,8 +309,6 @@ typedef struct mln_camera_update {
   mln_animation_options animation;
   uint32_t gesture_phase;
   uint32_t reserved;
-  uint64_t gesture_id;
-  uint64_t animation_id;
 } mln_camera_update;
 
 /** Optional fitting controls for camera-for-viewport queries. */

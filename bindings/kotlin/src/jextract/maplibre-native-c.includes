@@ -51,6 +51,7 @@
 --include-function mln_map_camera_query_start
 --include-function mln_map_camera_query_take_result
 --include-function mln_map_camera_snapshot_get
+--include-function mln_map_bearing_by
 --include-function mln_map_dump_debug_logs
 --include-function mln_map_lat_lng_bounds_for_camera_start
 --include-function mln_map_lat_lng_bounds_for_camera_take_result
@@ -60,8 +61,10 @@
 --include-function mln_map_lat_lng_for_pixel_take_result
 --include-function mln_map_lat_lngs_for_pixels_start
 --include-function mln_map_lat_lngs_for_pixels_take_result
+--include-function mln_map_move_by
 --include-function mln_map_pixel_for_lat_lng_start
 --include-function mln_map_pixel_for_lat_lng_take_result
+--include-function mln_map_pitch_by
 --include-function mln_map_pixels_for_lat_lngs_start
 --include-function mln_map_pixels_for_lat_lngs_take_result
 --include-function mln_map_set_bounds
@@ -71,6 +74,7 @@
 --include-function mln_map_set_rendering_stats_view_enabled
 --include-function mln_map_set_tile_options
 --include-function mln_map_set_viewport_options
+--include-function mln_map_scale_by
 --include-function mln_map_tile_options_default
 --include-function mln_map_update_camera
 --include-function mln_map_viewport_options_default
@@ -556,6 +560,7 @@
 --include-typedef mln_offline_region_id
 --include-typedef mln_resource_provider_callback
 --include-typedef mln_resource_transform_callback
+--include-typedef mln_runtime_callback_release
 --include-constant MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER
 --include-constant MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP
 --include-constant MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM

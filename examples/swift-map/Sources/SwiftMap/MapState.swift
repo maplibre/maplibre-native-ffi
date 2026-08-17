@@ -68,7 +68,6 @@ final class MapState {
       pitch: 30.0
     )))
     _ = try map.requestRepaint()
-    try await runtime.barrier()
   }
 
   var mapHandle: MapHandle {
@@ -125,59 +124,42 @@ final class MapState {
   func setGestureInProgress(_ inProgress: Bool) throws {
     _ = try map.updateCamera(CameraUpdate(
       camera: CameraOptions(),
-      gesturePhase: inProgress ? .begin : .end,
-      gestureId: 1
+      gesturePhase: inProgress ? .begin : .end
     ))
+  }
+
+  func cancelTransitions() throws {
+    _ = try map.updateCamera(CameraUpdate(camera: CameraOptions()))
   }
 
   func moveBy(
     dx: Double,
     dy: Double,
     animation: AnimationOptions? = nil
-  ) async throws {
-    try await moveCameraBy(dx: dx, dy: dy, animation: animation)
+  ) throws {
+    _ = try map.moveBy(ScreenPoint(x: dx, y: dy), animation: animation)
   }
 
   func scaleBy(
     _ scale: Double,
     anchor: ScreenPoint,
     animation: AnimationOptions? = nil
-  ) async throws {
-    let current = try await map.queryCamera().camera
-    _ = try map.updateCamera(CameraUpdate(
-      mode: animation == nil ? .jump : .ease,
-      camera: CameraOptions(
-        zoom: (current.zoom ?? 0) + log2(scale),
-        anchor: anchor
-      ),
-      animation: animation ?? AnimationOptions()
-    ))
+  ) throws {
+    _ = try map.scaleBy(scale, anchor: anchor, animation: animation)
   }
 
   func adjustBearing(
     delta: Double,
     animation: AnimationOptions? = nil
-  ) async throws {
-    let current = try await map.queryCamera().camera
-    _ = try map.updateCamera(CameraUpdate(
-      mode: animation == nil ? .jump : .ease,
-      camera: CameraOptions(bearing: (current.bearing ?? 0) + delta),
-      animation: animation ?? AnimationOptions()
-    ))
+  ) throws {
+    _ = try map.bearingBy(delta, animation: animation)
   }
 
   func adjustPitch(
     delta: Double,
     animation: AnimationOptions? = nil
-  ) async throws {
-    let current = try await map.queryCamera().camera
-    _ = try map.updateCamera(CameraUpdate(
-      mode: animation == nil ? .jump : .ease,
-      camera: CameraOptions(
-        pitch: clampedPitch((current.pitch ?? 0) + delta)
-      ),
-      animation: animation ?? AnimationOptions()
-    ))
+  ) throws {
+    _ = try map.pitchBy(delta, animation: animation)
   }
 
   func resetOrientation(animation: AnimationOptions) throws {
@@ -187,27 +169,4 @@ final class MapState {
       animation: animation
     ))
   }
-
-  private func moveCameraBy(
-    dx: Double,
-    dy: Double,
-    animation: AnimationOptions?
-  ) async throws {
-    let current = try await map.queryCamera().camera
-    guard let center = current.center else { return }
-    let centerPoint = try await map.pixel(for: center)
-    let movedCenter = try await map.latLng(for: ScreenPoint(
-      x: centerPoint.x - dx,
-      y: centerPoint.y - dy
-    ))
-    _ = try map.updateCamera(CameraUpdate(
-      mode: animation == nil ? .jump : .ease,
-      camera: CameraOptions(center: movedCenter),
-      animation: animation ?? AnimationOptions()
-    ))
-  }
-}
-
-private func clampedPitch(_ pitch: Double) -> Double {
-  min(max(pitch, 0.0), 60.0)
 }

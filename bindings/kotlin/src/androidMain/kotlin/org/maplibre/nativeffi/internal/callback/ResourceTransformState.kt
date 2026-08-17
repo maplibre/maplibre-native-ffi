@@ -6,6 +6,7 @@ import org.bytedeco.javacpp.Pointer
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.internal.javacpp.JavaCppSupport
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
+import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.resource.ResourceKind
 import org.maplibre.nativeffi.resource.ResourceTransformCallback
 import org.maplibre.nativeffi.resource.ResourceTransformRequest
@@ -24,11 +25,19 @@ internal class ResourceTransformState(private val callback: ResourceTransformCal
       ): Int = invoke(kind, url, response)
     }
   private val transform = MaplibreNativeC.mln_resource_transform()
+  private val nativeRelease =
+    object : MaplibreNativeC.mln_runtime_callback_release() {
+      override fun call(userData: Pointer?) {
+        HandleLeakCleaner.releaseNativeCallbackRoot(this@ResourceTransformState)
+        close()
+      }
+    }
 
   init {
     transform.size(transform.sizeof())
     transform.callback(nativeCallback)
     transform.user_data(null)
+    transform.release_user_data(nativeRelease)
   }
 
   fun descriptor(): MaplibreNativeC.mln_resource_transform = transform

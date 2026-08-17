@@ -1,5 +1,6 @@
 package org.maplibre.nativeffi.map
 
+import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.BoundOptions
 import org.maplibre.nativeffi.camera.CameraSnapshot
 import org.maplibre.nativeffi.camera.CameraUpdate
@@ -7,6 +8,7 @@ import org.maplibre.nativeffi.camera.FreeCameraOptions
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
+import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.lifecycle.NativeMap
@@ -586,6 +588,24 @@ private constructor(
     NativeAccess.ensureLoaded()
     return NativeAccess.updateCamera(requireLiveHandle(), update)
   }
+
+  public actual fun moveBy(offset: ScreenPoint, animation: AnimationOptions?): Long =
+    NativeAccess.moveBy(requireLiveHandle(), offset, animation)
+
+  public actual fun scaleBy(
+    scale: Double,
+    anchor: ScreenPoint?,
+    animation: AnimationOptions?,
+  ): Long = NativeAccess.scaleBy(requireLiveHandle(), scale, anchor, animation)
+
+  public actual fun bearingBy(
+    degrees: Double,
+    anchor: ScreenPoint?,
+    animation: AnimationOptions?,
+  ): Long = NativeAccess.bearingBy(requireLiveHandle(), degrees, anchor, animation)
+
+  public actual fun pitchBy(degrees: Double, animation: AnimationOptions?): Long =
+    NativeAccess.pitchBy(requireLiveHandle(), degrees, animation)
 
   public actual suspend fun queryCamera(): CameraSnapshot {
     NativeAccess.ensureLoaded()

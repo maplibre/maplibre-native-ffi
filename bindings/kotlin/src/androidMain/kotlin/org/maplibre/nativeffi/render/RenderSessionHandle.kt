@@ -107,17 +107,12 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
     }
   }
 
-  public actual fun drainFrameResults(maxResults: Int): List<RenderFrameResult> {
+  public actual fun drainFrameResults(): List<RenderFrameResult> {
     NativeAccess.ensureLoaded()
-    Status.requireArgument(maxResults >= 0) { "maxResults must be non-negative" }
     LongPointer(1).use { outBatch ->
       outBatch.put(0, 0L)
       Status.check(
-        MaplibreNativeC.mln_render_session_drain_frame_results(
-          requireLiveHandle(),
-          maxResults.toLong(),
-          outBatch,
-        )
+        MaplibreNativeC.mln_render_session_drain_frame_results(requireLiveHandle(), outBatch)
       )
       val batch = outBatch.get()
       try {

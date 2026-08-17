@@ -654,18 +654,6 @@ type RuntimeEventUnknownPayload struct {
 	Bytes []byte
 }
 
-type pendingResourceTransform struct {
-	replacement *callback.ResourceTransformState
-}
-
-type pendingHttpHeaderTransform struct {
-	replacement *callback.HttpHeaderTransformState
-}
-
-type pendingResourceProvider struct {
-	replacement *callback.ResourceProviderState
-}
-
 // RuntimeHandle owns autonomous scheduler state and event storage.
 type RuntimeHandle struct {
 	state                *handle.State[nativeRuntime]
@@ -673,16 +661,7 @@ type RuntimeHandle struct {
 	notificationMu       sync.Mutex
 	notificationCallback uintptr
 
-	resourceTransformMu        sync.Mutex
-	resourceTransform          *callback.ResourceTransformState
-	pendingResourceTransform   map[uint64]pendingResourceTransform
-	httpHeaderTransformMu      sync.Mutex
-	httpHeaderTransform        *callback.HttpHeaderTransformState
-	pendingHttpHeaderTransform map[uint64]pendingHttpHeaderTransform
-	resourceProviderMu         sync.Mutex
-	resourceProvider           *callback.ResourceProviderState
-	pendingResourceProvider    map[uint64]pendingResourceProvider
-	mapsMu                     sync.Mutex
+	mapsMu sync.Mutex
 	// Resolves an event's source id to the public wrapper.
 	maps map[MapID]*MapHandle
 }
@@ -1019,9 +998,6 @@ func (runtime *RuntimeHandle) copyEventBatch(raw C.mln_runtime_event_batch_view)
 			Payload:     payload,
 		}
 		events = append(events, event)
-		if finished, ok := payload.(RuntimeEventCommandFinishedPayload); ok {
-			runtime.finishResourceCallbackCommand(finished.CommandID, finished.Disposition)
-		}
 	}
 	runtime.mapsMu.Unlock()
 
@@ -1056,56 +1032,6 @@ func (runtime *RuntimeHandle) unregisterMap(m *MapHandle) {
 	runtime.mapsMu.Lock()
 	delete(runtime.maps, m.id)
 	runtime.mapsMu.Unlock()
-}
-
-func (runtime *RuntimeHandle) finishResourceCallbackCommand(commandID uint64, disposition CommandDisposition) {
-	runtime.resourceTransformMu.Lock()
-	if transition, ok := runtime.pendingResourceTransform[commandID]; ok {
-		delete(runtime.pendingResourceTransform, commandID)
-		if disposition == CommandDispositionCommitted {
-			previous := runtime.resourceTransform
-			runtime.resourceTransform = transition.replacement
-			runtime.resourceTransformMu.Unlock()
-			previous.Release()
-		} else {
-			runtime.resourceTransformMu.Unlock()
-			transition.replacement.Release()
-		}
-	} else {
-		runtime.resourceTransformMu.Unlock()
-	}
-
-	runtime.httpHeaderTransformMu.Lock()
-	if transition, ok := runtime.pendingHttpHeaderTransform[commandID]; ok {
-		delete(runtime.pendingHttpHeaderTransform, commandID)
-		if disposition == CommandDispositionCommitted {
-			previous := runtime.httpHeaderTransform
-			runtime.httpHeaderTransform = transition.replacement
-			runtime.httpHeaderTransformMu.Unlock()
-			previous.Release()
-		} else {
-			runtime.httpHeaderTransformMu.Unlock()
-			transition.replacement.Release()
-		}
-	} else {
-		runtime.httpHeaderTransformMu.Unlock()
-	}
-
-	runtime.resourceProviderMu.Lock()
-	if transition, ok := runtime.pendingResourceProvider[commandID]; ok {
-		delete(runtime.pendingResourceProvider, commandID)
-		if disposition == CommandDispositionCommitted {
-			previous := runtime.resourceProvider
-			runtime.resourceProvider = transition.replacement
-			runtime.resourceProviderMu.Unlock()
-			previous.Release()
-		} else {
-			runtime.resourceProviderMu.Unlock()
-			transition.replacement.Release()
-		}
-	} else {
-		runtime.resourceProviderMu.Unlock()
-	}
 }
 
 // runtimeEventPayloadFromC copies the payload member payload_type names. The
@@ -1269,12 +1195,9 @@ func (runtime *RuntimeHandle) SetResourceProvider(provider ResourceProviderCallb
 	defer release()
 	defer runtime.state.KeepAlive()
 
-	runtime.resourceProviderMu.Lock()
-	defer runtime.resourceProviderMu.Unlock()
-	var replacement *callback.ResourceProviderState
 	var commandID uint64
 	if err := checkNative(func() int32 {
-		state, id, status := callback.SetResourceProvider(uint64(ptr), func(request callback.ResourceRequest, handle *callback.ResourceRequestHandle) uint32 {
+		id, status := callback.SetResourceProvider(uint64(ptr), func(request callback.ResourceRequest, handle *callback.ResourceRequestHandle) uint32 {
 			decision := provider(ResourceRequest{
 				RequestedURL:        request.RequestedURL,
 				ResolvedURL:         request.ResolvedURL,
@@ -1296,16 +1219,11 @@ func (runtime *RuntimeHandle) SetResourceProvider(provider ResourceProviderCallb
 			}, newResourceRequestHandle(handle))
 			return rawResourceProviderDecision(decision)
 		})
-		replacement = state
 		commandID = id
 		return status
 	}); err != nil {
 		return 0, err
 	}
-	if runtime.pendingResourceProvider == nil {
-		runtime.pendingResourceProvider = make(map[uint64]pendingResourceProvider)
-	}
-	runtime.pendingResourceProvider[commandID] = pendingResourceProvider{replacement: replacement}
 	return commandID, nil
 }
 
@@ -1319,8 +1237,6 @@ func (runtime *RuntimeHandle) ClearResourceProvider() (uint64, error) {
 	defer release()
 	defer runtime.state.KeepAlive()
 
-	runtime.resourceProviderMu.Lock()
-	defer runtime.resourceProviderMu.Unlock()
 	var commandID uint64
 	if err := checkNative(func() int32 {
 		id, status := callback.ClearResourceProvider(uint64(ptr))
@@ -1329,24 +1245,7 @@ func (runtime *RuntimeHandle) ClearResourceProvider() (uint64, error) {
 	}); err != nil {
 		return 0, err
 	}
-	if runtime.pendingResourceProvider == nil {
-		runtime.pendingResourceProvider = make(map[uint64]pendingResourceProvider)
-	}
-	runtime.pendingResourceProvider[commandID] = pendingResourceProvider{}
 	return commandID, nil
-}
-
-func (runtime *RuntimeHandle) releaseResourceProvider() {
-	runtime.resourceProviderMu.Lock()
-	current := runtime.resourceProvider
-	runtime.resourceProvider = nil
-	pending := runtime.pendingResourceProvider
-	runtime.pendingResourceProvider = nil
-	runtime.resourceProviderMu.Unlock()
-	current.Release()
-	for _, transition := range pending {
-		transition.replacement.Release()
-	}
 }
 
 // SetResourceTransform submits a runtime-scoped network URL transform. Native
@@ -1363,24 +1262,16 @@ func (runtime *RuntimeHandle) SetResourceTransform(transform ResourceTransformCa
 	defer release()
 	defer runtime.state.KeepAlive()
 
-	runtime.resourceTransformMu.Lock()
-	defer runtime.resourceTransformMu.Unlock()
-	var replacement *callback.ResourceTransformState
 	var commandID uint64
 	if err := checkNative(func() int32 {
-		state, id, status := callback.SetResourceTransform(uint64(ptr), func(kind uint32, url string) (string, bool) {
+		id, status := callback.SetResourceTransform(uint64(ptr), func(kind uint32, url string) (string, bool) {
 			return transform(ResourceTransformRequest{Kind: ResourceKind(kind), RawKind: kind, URL: url})
 		})
-		replacement = state
 		commandID = id
 		return status
 	}); err != nil {
 		return 0, err
 	}
-	if runtime.pendingResourceTransform == nil {
-		runtime.pendingResourceTransform = make(map[uint64]pendingResourceTransform)
-	}
-	runtime.pendingResourceTransform[commandID] = pendingResourceTransform{replacement: replacement}
 	return commandID, nil
 }
 
@@ -1394,8 +1285,6 @@ func (runtime *RuntimeHandle) ClearResourceTransform() (uint64, error) {
 	defer release()
 	defer runtime.state.KeepAlive()
 
-	runtime.resourceTransformMu.Lock()
-	defer runtime.resourceTransformMu.Unlock()
 	var commandID uint64
 	if err := checkNative(func() int32 {
 		id, status := callback.ClearResourceTransform(uint64(ptr))
@@ -1404,24 +1293,7 @@ func (runtime *RuntimeHandle) ClearResourceTransform() (uint64, error) {
 	}); err != nil {
 		return 0, err
 	}
-	if runtime.pendingResourceTransform == nil {
-		runtime.pendingResourceTransform = make(map[uint64]pendingResourceTransform)
-	}
-	runtime.pendingResourceTransform[commandID] = pendingResourceTransform{}
 	return commandID, nil
-}
-
-func (runtime *RuntimeHandle) releaseResourceTransform() {
-	runtime.resourceTransformMu.Lock()
-	current := runtime.resourceTransform
-	runtime.resourceTransform = nil
-	pending := runtime.pendingResourceTransform
-	runtime.pendingResourceTransform = nil
-	runtime.resourceTransformMu.Unlock()
-	current.Release()
-	for _, transition := range pending {
-		transition.replacement.Release()
-	}
 }
 
 // SetHttpHeaderTransform submits a runtime-scoped outgoing HTTP header
@@ -1437,12 +1309,9 @@ func (runtime *RuntimeHandle) SetHttpHeaderTransform(transform HttpHeaderTransfo
 	defer release()
 	defer runtime.state.KeepAlive()
 
-	runtime.httpHeaderTransformMu.Lock()
-	defer runtime.httpHeaderTransformMu.Unlock()
-	var replacement *callback.HttpHeaderTransformState
 	var commandID uint64
 	if err := checkNative(func() int32 {
-		state, id, status := callback.SetHttpHeaderTransform(uint64(ptr), func(kind uint32, url string) []callback.HttpHeader {
+		id, status := callback.SetHttpHeaderTransform(uint64(ptr), func(kind uint32, url string) []callback.HttpHeader {
 			provided := transform(HttpHeaderTransformRequest{Kind: ResourceKind(kind), RawKind: kind, URL: url})
 			headers := make([]callback.HttpHeader, len(provided))
 			for index, header := range provided {
@@ -1450,16 +1319,11 @@ func (runtime *RuntimeHandle) SetHttpHeaderTransform(transform HttpHeaderTransfo
 			}
 			return headers
 		})
-		replacement = state
 		commandID = id
 		return status
 	}); err != nil {
 		return 0, err
 	}
-	if runtime.pendingHttpHeaderTransform == nil {
-		runtime.pendingHttpHeaderTransform = make(map[uint64]pendingHttpHeaderTransform)
-	}
-	runtime.pendingHttpHeaderTransform[commandID] = pendingHttpHeaderTransform{replacement: replacement}
 	return commandID, nil
 }
 
@@ -1473,8 +1337,6 @@ func (runtime *RuntimeHandle) ClearHttpHeaderTransform() (uint64, error) {
 	defer release()
 	defer runtime.state.KeepAlive()
 
-	runtime.httpHeaderTransformMu.Lock()
-	defer runtime.httpHeaderTransformMu.Unlock()
 	var commandID uint64
 	if err := checkNative(func() int32 {
 		id, status := callback.ClearHttpHeaderTransform(uint64(ptr))
@@ -1483,24 +1345,7 @@ func (runtime *RuntimeHandle) ClearHttpHeaderTransform() (uint64, error) {
 	}); err != nil {
 		return 0, err
 	}
-	if runtime.pendingHttpHeaderTransform == nil {
-		runtime.pendingHttpHeaderTransform = make(map[uint64]pendingHttpHeaderTransform)
-	}
-	runtime.pendingHttpHeaderTransform[commandID] = pendingHttpHeaderTransform{}
 	return commandID, nil
-}
-
-func (runtime *RuntimeHandle) releaseHttpHeaderTransform() {
-	runtime.httpHeaderTransformMu.Lock()
-	current := runtime.httpHeaderTransform
-	runtime.httpHeaderTransform = nil
-	pending := runtime.pendingHttpHeaderTransform
-	runtime.pendingHttpHeaderTransform = nil
-	runtime.httpHeaderTransformMu.Unlock()
-	current.Release()
-	for _, transition := range pending {
-		transition.replacement.Release()
-	}
 }
 
 // NewMap creates a 512 by 512 logical map with native default options.
@@ -1615,9 +1460,6 @@ func (runtime *RuntimeHandle) Close() error {
 	if closeErr != nil {
 		return closeErr
 	}
-	runtime.releaseResourceTransform()
-	runtime.releaseHttpHeaderTransform()
-	runtime.releaseResourceProvider()
 	if err := runtime.clearNotificationCallback(); err != nil {
 		return err
 	}

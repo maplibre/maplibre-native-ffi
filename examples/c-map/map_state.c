@@ -125,7 +125,7 @@ static app_error configure_map(map_state* state) {
   camera.bearing = 12.0;
   camera.pitch = 30.0;
   return map_state_update_camera(
-    state, &camera, MLN_CAMERA_UPDATE_MODE_JUMP, NULL, MLN_GESTURE_PHASE_NONE, 0
+    state, &camera, MLN_CAMERA_UPDATE_MODE_JUMP, NULL, MLN_GESTURE_PHASE_NONE
   );
 }
 
@@ -184,39 +184,9 @@ void map_state_deinit(map_state* state) {
   }
 }
 
-app_error map_state_camera_query(
-  map_state* state, mln_camera_options* out_camera
-) {
-  mln_operation operation = MLN_HANDLE_NULL;
-  mln_status status = mln_map_camera_query_start(state->map, &operation);
-  if (status != MLN_STATUS_OK) {
-    diagnostics_log_status("camera query start failed", status);
-    return APP_ERROR_CAMERA_COMMAND_FAILED;
-  }
-  const app_error waited = await_operation(
-    operation, APP_ERROR_CAMERA_COMMAND_FAILED, "camera query failed"
-  );
-  mln_camera_query_result result = {
-    .size = sizeof(mln_camera_query_result),
-  };
-  if (waited == APP_OK) {
-    status = mln_map_camera_query_take_result(operation, &result);
-    *out_camera = result.camera;
-  }
-  mln_operation_release(operation);
-  if (waited != APP_OK || status != MLN_STATUS_OK) {
-    if (status != MLN_STATUS_OK) {
-      diagnostics_log_status("camera query result failed", status);
-    }
-    return APP_ERROR_CAMERA_COMMAND_FAILED;
-  }
-  return APP_OK;
-}
-
 app_error map_state_update_camera(
   map_state* state, const mln_camera_options* camera, uint32_t mode,
-  const mln_animation_options* animation, uint32_t gesture_phase,
-  uint64_t gesture_id
+  const mln_animation_options* animation, uint32_t gesture_phase
 ) {
   mln_camera_update update = mln_camera_update_default();
   update.mode = mode;
@@ -225,7 +195,6 @@ app_error map_state_update_camera(
     update.animation = *animation;
   }
   update.gesture_phase = gesture_phase;
-  update.gesture_id = gesture_id;
   uint64_t command_id = 0;
   const mln_status status =
     mln_map_update_camera(state->map, &update, &command_id);

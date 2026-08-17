@@ -273,12 +273,6 @@ namespace Maplibre.NativeFfi.Internal.C
 
         [NativeTypeName("uint32_t")]
         public uint reserved;
-
-        [NativeTypeName("uint64_t")]
-        public ulong gesture_id;
-
-        [NativeTypeName("uint64_t")]
-        public ulong animation_id;
     }
 
     internal partial struct mln_camera_fit_options
@@ -435,7 +429,7 @@ namespace Maplibre.NativeFfi.Internal.C
         [NativeTypeName("uint32_t")]
         public uint type;
 
-        [NativeTypeName("__AnonymousRecord_map_L436_C3")]
+        [NativeTypeName("__AnonymousRecord_map_L433_C3")]
         public _data_e__Union data;
 
         [StructLayout(LayoutKind.Explicit)]

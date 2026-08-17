@@ -76,7 +76,7 @@ fn request_render_frame(
         session.service_driver_work(usize::MAX)?;
     }
     Ok(session
-        .drain_frame_results(0)?
+        .drain_frame_results()?
         .copy_results()?
         .into_iter()
         .any(|result| result.disposition == FrameDisposition::Rendered))

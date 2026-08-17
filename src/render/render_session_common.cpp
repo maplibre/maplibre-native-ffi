@@ -2657,37 +2657,26 @@ auto render_session_service_driver_work(
 }
 
 auto render_session_drain_frame_results(
-  mln_render_session handle, std::size_t maximum, mln_render_frame_batch* out
+  mln_render_session handle, mln_render_frame_batch* out
 ) -> mln_status {
   if (!out || *out != MLN_HANDLE_NULL) return MLN_STATUS_INVALID_ARGUMENT;
   const auto s = lease_render_session(handle);
   if (!s) return MLN_STATUS_INVALID_ARGUMENT;
   auto batch = std::make_shared<mln_render_frame_batch_object>();
-  batch->session = s;
+  const auto batch_handle =
+    handle_table<mln_render_frame_batch_object>().insert(batch);
   {
     const auto lock = std::scoped_lock{s->control_mutex};
-    if (s->frame_batch_live) return MLN_STATUS_BUSY;
-    if (s->frame_results.empty()) return MLN_STATUS_NOT_READY;
-    s->frame_batch_live = true;
-    while ((maximum == 0 || batch->results.size() < maximum) &&
-           !s->frame_results.empty()) {
-      batch->results.push_back(s->frame_results.front());
-      s->frame_results.pop_front();
-    }
-    if (s->frame_results.empty() && s->frame_endpoint)
-      s->frame_endpoint->clear_ready();
+    batch->results.swap(s->frame_results);
+    if (s->frame_endpoint) s->frame_endpoint->clear_ready();
   }
-  try {
-    *out = handle_table<mln_render_frame_batch_object>().insert(batch);
-  } catch (...) {
-    const auto lock = std::scoped_lock{s->control_mutex};
-    for (auto item = batch->results.rbegin(); item != batch->results.rend();
-         ++item)
-      s->frame_results.push_front(*item);
-    s->frame_batch_live = false;
-    if (s->frame_endpoint) s->frame_endpoint->mark_ready();
-    throw;
+  if (batch->results.empty()) {
+    static_cast<void>(
+      handle_table<mln_render_frame_batch_object>().remove(batch_handle)
+    );
+    return MLN_STATUS_NOT_READY;
   }
+  *out = batch_handle;
   return MLN_STATUS_OK;
 }
 
@@ -2715,13 +2704,9 @@ auto render_frame_batch_get(
 
 auto render_frame_batch_release(mln_render_frame_batch handle) noexcept
   -> void {
-  const auto batch =
-    handle_table<mln_render_frame_batch_object>().remove(handle);
-  if (!batch || !batch->session) return;
-  const auto lock = std::scoped_lock{batch->session->control_mutex};
-  batch->session->frame_batch_live = false;
-  if (!batch->session->frame_results.empty() && batch->session->frame_endpoint)
-    batch->session->frame_endpoint->mark_ready();
+  static_cast<void>(
+    handle_table<mln_render_frame_batch_object>().remove(handle)
+  );
 }
 
 auto render_session_acquire_frame(

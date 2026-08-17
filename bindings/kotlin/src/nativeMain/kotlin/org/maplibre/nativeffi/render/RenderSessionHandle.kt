@@ -79,11 +79,10 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
     Status.check(mln_render_session_request_frame(id(), value.ptr))
   }
 
-  public actual fun drainFrameResults(maxResults: Int): List<RenderFrameResult> = memScoped {
-    Status.requireArgument(maxResults >= 0) { "maxResults must be non-negative" }
+  public actual fun drainFrameResults(): List<RenderFrameResult> = memScoped {
     val outBatch = alloc<ULongVar>()
     outBatch.value = 0u
-    Status.check(mln_render_session_drain_frame_results(id(), maxResults.toULong(), outBatch.ptr))
+    Status.check(mln_render_session_drain_frame_results(id(), outBatch.ptr))
     val batch = outBatch.value
     try {
       val outCount = alloc<ULongVar>()

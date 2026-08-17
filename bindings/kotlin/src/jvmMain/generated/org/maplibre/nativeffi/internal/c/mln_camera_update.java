@@ -21,8 +21,6 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  *     mln_animation_options animation;
  *     uint32_t gesture_phase;
  *     uint32_t reserved;
- *     uint64_t gesture_id;
- *     uint64_t animation_id;
  * }
  * }
  */
@@ -38,9 +36,7 @@ public class mln_camera_update {
         mln_camera_options.layout().withName("camera"),
         mln_animation_options.layout().withName("animation"),
         MapLibreNativeC.C_INT.withName("gesture_phase"),
-        MapLibreNativeC.C_INT.withName("reserved"),
-        MapLibreNativeC.C_LONG.withName("gesture_id"),
-        MapLibreNativeC.C_LONG.withName("animation_id")
+        MapLibreNativeC.C_INT.withName("reserved")
     ).withName("mln_camera_update");
 
     /**
@@ -312,94 +308,6 @@ public class mln_camera_update {
      */
     public static void reserved(MemorySegment struct, int fieldValue) {
         struct.set(reserved$LAYOUT, reserved$OFFSET, fieldValue);
-    }
-
-    private static final OfLong gesture_id$LAYOUT = (OfLong)$LAYOUT.select(groupElement("gesture_id"));
-
-    /**
-     * Layout for field:
-     * {@snippet lang=c :
-     * uint64_t gesture_id
-     * }
-     */
-    public static final OfLong gesture_id$layout() {
-        return gesture_id$LAYOUT;
-    }
-
-    private static final long gesture_id$OFFSET = $LAYOUT.byteOffset(groupElement("gesture_id"));
-
-    /**
-     * Offset for field:
-     * {@snippet lang=c :
-     * uint64_t gesture_id
-     * }
-     */
-    public static final long gesture_id$offset() {
-        return gesture_id$OFFSET;
-    }
-
-    /**
-     * Getter for field:
-     * {@snippet lang=c :
-     * uint64_t gesture_id
-     * }
-     */
-    public static long gesture_id(MemorySegment struct) {
-        return struct.get(gesture_id$LAYOUT, gesture_id$OFFSET);
-    }
-
-    /**
-     * Setter for field:
-     * {@snippet lang=c :
-     * uint64_t gesture_id
-     * }
-     */
-    public static void gesture_id(MemorySegment struct, long fieldValue) {
-        struct.set(gesture_id$LAYOUT, gesture_id$OFFSET, fieldValue);
-    }
-
-    private static final OfLong animation_id$LAYOUT = (OfLong)$LAYOUT.select(groupElement("animation_id"));
-
-    /**
-     * Layout for field:
-     * {@snippet lang=c :
-     * uint64_t animation_id
-     * }
-     */
-    public static final OfLong animation_id$layout() {
-        return animation_id$LAYOUT;
-    }
-
-    private static final long animation_id$OFFSET = $LAYOUT.byteOffset(groupElement("animation_id"));
-
-    /**
-     * Offset for field:
-     * {@snippet lang=c :
-     * uint64_t animation_id
-     * }
-     */
-    public static final long animation_id$offset() {
-        return animation_id$OFFSET;
-    }
-
-    /**
-     * Getter for field:
-     * {@snippet lang=c :
-     * uint64_t animation_id
-     * }
-     */
-    public static long animation_id(MemorySegment struct) {
-        return struct.get(animation_id$LAYOUT, animation_id$OFFSET);
-    }
-
-    /**
-     * Setter for field:
-     * {@snippet lang=c :
-     * uint64_t animation_id
-     * }
-     */
-    public static void animation_id(MemorySegment struct, long fieldValue) {
-        struct.set(animation_id$LAYOUT, animation_id$OFFSET, fieldValue);
     }
 
     /**

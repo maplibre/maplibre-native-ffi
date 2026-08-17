@@ -70,9 +70,6 @@ func (input *inputController) handleMouseButtonDown(event *sdl.MouseButtonEvent,
 	input.lastY = cursor.Y
 	input.dragMode = mode
 	input.dragButton = event.Button
-	if err := state.cancelTransitions(); err != nil {
-		return false, err
-	}
 	if err := state.setGestureInProgress(true); err != nil {
 		return false, err
 	}

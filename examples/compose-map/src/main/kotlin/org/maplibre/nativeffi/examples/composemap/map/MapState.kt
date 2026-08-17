@@ -1,15 +1,6 @@
 package org.maplibre.nativeffi.examples.composemap.map
 
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.math.PI
-import kotlin.math.atan
-import kotlin.math.cos
-import kotlin.math.ln
-import kotlin.math.max
-import kotlin.math.min
-import kotlin.math.pow
-import kotlin.math.sin
-import kotlin.math.sinh
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.CameraUpdate
@@ -21,7 +12,6 @@ import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.map.MapOptions
 import org.maplibre.nativeffi.map.MapSize
-import org.maplibre.nativeffi.runtime.CommandDisposition
 import org.maplibre.nativeffi.runtime.ReadyEndpoint
 import org.maplibre.nativeffi.runtime.RuntimeEventMask
 import org.maplibre.nativeffi.runtime.RuntimeEventPayload
@@ -36,12 +26,10 @@ internal class MapState(
   private val requestRender: () -> Unit,
 ) : AutoCloseable {
   private val notificationPending = AtomicBoolean(false)
-  private val cameraLock = Any()
   private var closed = false
-  private var gestureId = 0L
   private var currentSize =
     MapSize(initialExtent.width, initialExtent.height, initialExtent.scaleFactor)
-  private var desiredCamera =
+  private val initialCamera =
     CameraOptions().apply {
       center = LatLng(37.7749, -122.4194)
       zoom = 13.0
@@ -78,9 +66,7 @@ internal class MapState(
         )
       }
       map.setStyleUrl(STYLE_URL)
-      map.updateCamera(CameraUpdate(camera = desiredCamera.copy()))
-      runSuspend { runtime.barrier() }
-      desiredCamera = map.cameraSnapshot().camera.copy()
+      map.updateCamera(CameraUpdate(camera = initialCamera))
     } catch (error: Throwable) {
       runtime.clearNotificationCallback()
       if (::ownedMap.isInitialized) runSuspend { ownedMap.close() }
@@ -90,78 +76,55 @@ internal class MapState(
   }
 
   fun cancelTransitions() {
-    synchronized(cameraLock) { map.updateCamera(CameraUpdate()) }
+    map.updateCamera(CameraUpdate())
   }
 
   fun setGestureInProgress(inProgress: Boolean) {
-    synchronized(cameraLock) {
-      if (inProgress) gestureId += 1
-      map.updateCamera(
-        CameraUpdate(
-          gesturePhase = if (inProgress) GesturePhase.BEGIN else GesturePhase.END,
-          gestureId = gestureId,
-        )
-      )
-    }
+    map.updateCamera(
+      CameraUpdate(gesturePhase = if (inProgress) GesturePhase.BEGIN else GesturePhase.END)
+    )
   }
 
   fun moveBy(deltaX: Double, deltaY: Double) {
-    synchronized(cameraLock) { moveCameraBy(deltaX, deltaY, null) }
+    map.moveBy(org.maplibre.nativeffi.geo.ScreenPoint(deltaX, deltaY))
   }
 
   fun moveByAnimated(deltaX: Double, deltaY: Double) {
-    synchronized(cameraLock) { moveCameraBy(deltaX, deltaY, KEYBOARD_ANIMATION_MS) }
+    map.moveBy(
+      org.maplibre.nativeffi.geo.ScreenPoint(deltaX, deltaY),
+      animation(KEYBOARD_ANIMATION_MS),
+    )
   }
 
   fun scaleBy(scale: Double, anchor: org.maplibre.nativeffi.geo.ScreenPoint) {
-    synchronized(cameraLock) { scaleCameraBy(scale, anchor, null) }
+    map.scaleBy(scale, anchor)
   }
 
   fun scaleByAnimated(scale: Double, anchor: org.maplibre.nativeffi.geo.ScreenPoint) {
-    synchronized(cameraLock) { scaleCameraBy(scale, anchor, KEYBOARD_ANIMATION_MS) }
+    map.scaleBy(scale, anchor, animation(KEYBOARD_ANIMATION_MS))
   }
 
   fun adjustBearingAndPitch(bearingDegrees: Double, pitchDegrees: Double) {
-    synchronized(cameraLock) {
-      update(
-        CameraOptions().apply {
-          bearing = (desiredCamera.bearing ?: 0.0) + bearingDegrees
-          pitch = ((desiredCamera.pitch ?: 0.0) + pitchDegrees).clampPitch()
-        }
-      )
-    }
+    map.bearingBy(bearingDegrees)
+    map.pitchBy(pitchDegrees)
   }
 
   fun adjustBearingAnimated(bearingDegrees: Double) {
-    synchronized(cameraLock) {
-      update(
-        CameraOptions().apply { bearing = (desiredCamera.bearing ?: 0.0) + bearingDegrees },
-        KEYBOARD_ANIMATION_MS,
-      )
-    }
+    map.bearingBy(bearingDegrees, animation = animation(KEYBOARD_ANIMATION_MS))
   }
 
   fun adjustPitchAnimated(pitchDegrees: Double) {
-    synchronized(cameraLock) {
-      update(
-        CameraOptions().apply {
-          pitch = ((desiredCamera.pitch ?: 0.0) + pitchDegrees).clampPitch()
-        },
-        KEYBOARD_ANIMATION_MS,
-      )
-    }
+    map.pitchBy(pitchDegrees, animation(KEYBOARD_ANIMATION_MS))
   }
 
   fun resetOrientation() {
-    synchronized(cameraLock) {
-      update(
-        CameraOptions().apply {
-          bearing = 0.0
-          pitch = 0.0
-        },
-        RESET_ANIMATION_MS,
-      )
-    }
+    update(
+      CameraOptions().apply {
+        bearing = 0.0
+        pitch = 0.0
+      },
+      RESET_ANIMATION_MS,
+    )
   }
 
   fun resize(extent: SurfaceExtent) {
@@ -184,52 +147,7 @@ internal class MapState(
     } while (notificationPending.getAndSet(false))
   }
 
-  private fun moveCameraBy(dx: Double, dy: Double, durationMs: Double?) {
-    val center = desiredCamera.center ?: return
-    val zoom = desiredCamera.zoom ?: 0.0
-    val bearingRadians = (desiredCamera.bearing ?: 0.0) * PI / 180.0
-    val worldDx = -(dx * cos(bearingRadians) - dy * sin(bearingRadians))
-    val worldDy = -(dx * sin(bearingRadians) + dy * cos(bearingRadians))
-    val worldSize = TILE_SIZE * 2.0.pow(zoom)
-    val x = (center.longitude + 180.0) / 360.0 * worldSize + worldDx
-    val latitudeRadians =
-      center.latitude.coerceIn(-MAX_MERCATOR_LATITUDE, MAX_MERCATOR_LATITUDE) * PI / 180.0
-    val y =
-      (0.5 - ln(kotlin.math.tan(PI / 4.0 + latitudeRadians / 2.0)) / (2.0 * PI)) * worldSize +
-        worldDy
-    update(
-      CameraOptions().apply {
-        this.center =
-          LatLng(
-            atan(sinh(PI * (1.0 - 2.0 * y / worldSize))) * 180.0 / PI,
-            x / worldSize * 360.0 - 180.0,
-          )
-      },
-      durationMs,
-    )
-  }
-
-  private fun scaleCameraBy(
-    scale: Double,
-    anchor: org.maplibre.nativeffi.geo.ScreenPoint,
-    durationMs: Double?,
-  ) {
-    update(
-      CameraOptions().apply {
-        zoom = (desiredCamera.zoom ?: 0.0) + ln(scale) / ln(2.0)
-        this.anchor = anchor
-      },
-      durationMs,
-    )
-  }
-
   private fun update(camera: CameraOptions, durationMs: Double? = null) {
-    desiredCamera = desiredCamera.copy {
-      camera.center?.let { center = it }
-      camera.zoom?.let { zoom = it }
-      camera.bearing?.let { bearing = it }
-      camera.pitch?.let { pitch = it }
-    }
     map.updateCamera(
       CameraUpdate(
         mode = if (durationMs == null) CameraUpdateMode.JUMP else CameraUpdateMode.EASE,
@@ -239,19 +157,13 @@ internal class MapState(
     )
   }
 
+  private fun animation(durationMs: Double) =
+    AnimationOptions().apply { this.durationMs = durationMs }
+
   private fun drainEvents(): Boolean {
     var renderUpdateAvailable = false
     for (event in runtime.drainEvents().events) {
       if (event.mapSource != map) continue
-      if (event.type == RuntimeEventType.COMMAND_FINISHED) {
-        val terminal = event.payload as? RuntimeEventPayload.CommandFinished
-        if (terminal?.disposition == CommandDisposition.FAILED) {
-          System.err.println(
-            "command ${terminal.commandId} failed with status ${event.code}: ${event.message}"
-          )
-        }
-        continue
-      }
       if (event.type == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE) {
         renderUpdateAvailable = true
       } else if (
@@ -277,8 +189,6 @@ internal class MapState(
 
   private companion object {
     private const val STYLE_URL = "https://tiles.openfreemap.org/styles/bright"
-    private const val TILE_SIZE = 512.0
-    private const val MAX_MERCATOR_LATITUDE = 85.0511287798066
     private const val KEYBOARD_ANIMATION_MS = 160.0
     private const val RESET_ANIMATION_MS = 160.0
   }
@@ -294,5 +204,3 @@ internal class RenderRequest {
 
   fun consume(): Boolean = value.getAndSet(false)
 }
-
-private fun Double.clampPitch(): Double = max(0.0, min(60.0, this))

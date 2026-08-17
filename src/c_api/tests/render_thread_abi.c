@@ -52,9 +52,8 @@ static bool wait_for_results(
       continue;
     }
     mln_render_frame_batch batch = MLN_HANDLE_NULL;
-    const mln_status status = mln_render_session_drain_frame_results(
-      fixture->session, SIZE_MAX, &batch
-    );
+    const mln_status status =
+      mln_render_session_drain_frame_results(fixture->session, &batch);
     if (status == MLN_STATUS_OK) {
       size_t count = 0;
       if (
@@ -203,12 +202,15 @@ static void demand_coalescing_preserves_boundaries_and_generations(void) {
 
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
   TEST_ASSERT_TRUE(wait_for_results(&fixture, 3, &batch));
-  mln_render_frame_batch second_batch = MLN_HANDLE_NULL;
+  mln_frame_demand later = separate;
+  later.token = 104;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_BUSY, mln_render_session_drain_frame_results(
-                       fixture.session, SIZE_MAX, &second_batch
-                     )
+    MLN_STATUS_OK, mln_render_session_request_frame(fixture.session, &later)
   );
+  mln_render_frame_batch second_batch = MLN_HANDLE_NULL;
+  TEST_ASSERT_TRUE(wait_for_results(&fixture, 1, &second_batch));
+  TEST_ASSERT_EQUAL_UINT64(104, batch_result(second_batch, 0).token);
+  mln_render_frame_batch_release(second_batch);
   const mln_render_frame_result superseded = batch_result(batch, 0);
   const mln_render_frame_result rendered = batch_result(batch, 1);
   const mln_render_frame_result boundary = batch_result(batch, 2);
@@ -298,7 +300,7 @@ static void frame_readiness_is_level_triggered_until_results_are_drained(void) {
   mln_render_frame_batch results = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_render_session_drain_frame_results(fixture.session, SIZE_MAX, &results)
+    mln_render_session_drain_frame_results(fixture.session, &results)
   );
   mln_render_frame_batch_release(results);
   TEST_ASSERT_FALSE(

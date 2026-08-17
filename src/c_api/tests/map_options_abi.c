@@ -167,8 +167,8 @@ static void camera_snapshot_command_copy_and_disposition_are_ordered(void) {
   mln_camera_update update = mln_camera_update_default();
   update.camera = test_camera();
   update.gesture_phase = MLN_GESTURE_PHASE_BEGIN;
-  update.gesture_id = UINT64_C(41);
-  update.animation_id = UINT64_C(77);
+  update.animation.fields |= MLN_ANIMATION_OPTION_TRANSITION_ID;
+  update.animation.transition_id = UINT64_C(77);
   uint64_t command_id = 0;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_update_camera(fixture.map, &update, &command_id)
@@ -219,6 +219,60 @@ static void camera_snapshot_command_copy_and_disposition_are_ordered(void) {
   );
   TEST_ASSERT_GREATER_THAN_UINT64(before.generation, after.generation);
   TEST_ASSERT_EQUAL_DOUBLE(-122.4194, after.camera.longitude);
+  destroy_map_fixture(fixture);
+}
+
+static void relative_camera_commands_compose_in_runtime_order(void) {
+  map_fixture fixture = create_map_fixture();
+  mln_camera_update update = mln_camera_update_default();
+  update.camera = test_camera();
+  uint64_t command_id = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_update_camera(fixture.map, &update, &command_id)
+  );
+
+  const mln_screen_point anchor = {.x = 25.0, .y = 30.0};
+  command_id = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_move_by(
+      fixture.map, (mln_screen_point){.x = 5.0, .y = -3.0}, NULL, &command_id
+    )
+  );
+  command_id = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_scale_by(fixture.map, 2.0, &anchor, NULL, &command_id)
+  );
+  command_id = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_bearing_by(fixture.map, 15.0, &anchor, NULL, &command_id)
+  );
+  command_id = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_pitch_by(fixture.map, 5.0, NULL, &command_id)
+  );
+
+  mln_operation query = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_camera_query_start(fixture.map, &query)
+  );
+  wait_for_operation(query);
+  mln_camera_query_result result = {.size = sizeof(mln_camera_query_result)};
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_camera_query_take_result(query, &result)
+  );
+  mln_operation_release(query);
+  TEST_ASSERT_EQUAL_DOUBLE(12.0, result.camera.zoom);
+  TEST_ASSERT_EQUAL_DOUBLE(27.0, result.camera.bearing);
+  TEST_ASSERT_EQUAL_DOUBLE(35.0, result.camera.pitch);
+
+  command_id = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_scale_by(fixture.map, 0.0, NULL, NULL, &command_id)
+  );
   destroy_map_fixture(fixture);
 }
 
@@ -727,6 +781,7 @@ void run_map_options_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(camera_rejects_invalid_arguments);
   RUN_TEST(camera_snapshot_command_copy_and_disposition_are_ordered);
+  RUN_TEST(relative_camera_commands_compose_in_runtime_order);
   RUN_TEST(camera_fitting_rejects_invalid_arguments);
   RUN_TEST(camera_bounds_constraints_reject_invalid_arguments);
   RUN_TEST(camera_bounds_distinguish_unbounded_from_world);

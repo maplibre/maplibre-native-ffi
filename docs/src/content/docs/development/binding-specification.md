@@ -593,11 +593,12 @@ Callback invocation follows this operation:
    returns before calling APIs on the object that invoked it.
 
 Callback replacement retains both old and new roots through native acceptance.
-For a command registration, keep the new root through terminal failure or later
-replacement, and keep the old root through the terminal committed replacement or
-clear event. For an Immediate registration, release the old root only after the
-call returns successfully. Native quiescence prevents new entries and waits for
-in-flight upcalls before the old root becomes unreachable.
+When a descriptor provides a native release callback, make the new root
+independently reachable before registration. Reclaim the root when registration
+is rejected. After acceptance, replacement, clearing, or owner release retires
+the registration. The native release callback then retires the root after every
+in-flight upcall returns. For an immediate registration without a release
+callback, release the old root only after the call returns successfully.
 
 If a leaked native owner can still reach callback user data, non-deterministic
 cleanup reports the leak and keeps callback memory reachable from native alive.
@@ -688,10 +689,10 @@ Resource provider invocation follows this operation:
 6. Allow deferred or cross-thread completion when the C API allows it, without
    changing one-shot or release behavior.
 
-Provider registration is replaceable for a runtime's whole life. A binding keeps
-the new callback state reachable after command acceptance and keeps the old
-state reachable until the replacement or clear command reaches a terminal
-disposition.
+Provider registration is replaceable for a runtime's whole life. After command
+acceptance, a binding transfers the new callback state to the C API. The C API
+releases old state after replacement, clear, or runtime close retires its final
+callback.
 
 Handled request completion is terminal. A request can complete once; a
 completion that reaches C consumes the completion path even when native returns
@@ -822,10 +823,9 @@ The subscription follows this design:
    type the host left out to drive its own bookkeeping, and it MUST NOT hide a
    queued event from a host.
 5. Where a binding needs a native signal for its own state, it MUST use the
-   dedicated C mechanism, as
-   `mln_custom_geometry_source_options.release_user_data` provides for source
-   callback state. Binding-owned state that such a mechanism maintains keeps
-   working for every subscription.
+   dedicated C mechanism, as `release_user_data` provides for callback state.
+   Binding-owned state that such a mechanism maintains keeps working for every
+   subscription.
 6. Documentation for a subscription setter names the event types that carry
    state a host reaches no other way.
 
@@ -936,10 +936,9 @@ deadline-missed as distinct outcomes. A positive monotonic deadline terminates
 the demand as deadline missed when it expires before work begins. Presentation
 time selects state and neither timestamp supplies cadence.
 
-Frame readiness is level-triggered until drained. A binding MUST hold at most
-one live native frame-result batch per session, copy records before release
-unless its type system bounds the borrow, and drain until empty after
-notification.
+Frame readiness is level-triggered until drained. Each drain takes every queued
+record into an independently owned batch. A binding MUST preserve the records
+until it releases the batch.
 
 A session barrier completes after all preceding accepted render work is terminal
 and the driver observed the requested minimum map-update generation. A binding
@@ -1163,7 +1162,7 @@ When the binding routes provider requests through
 | BND-172 | A fallible wrapper releases a natively acquired frame when wrapper construction fails.                                                                                                                  |
 | BND-173 | Stale acquired-frame handles cannot expose backend handles after slot reuse.                                                                                                                            |
 | BND-174 | Render-session control, operation, snapshot, demand, abandon, and destroy calls work from a thread other than the graphics service thread.                                                              |
-| BND-175 | Frame-result readiness stays level-triggered until every record drains, and a second live batch is rejected.                                                                                            |
+| BND-175 | A frame-result drain takes every queued record into an independently owned batch, and multiple batches may remain live.                                                                                 |
 | BND-176 | A barrier waits for preceding render work and its minimum map-update generation without requesting a frame.                                                                                             |
 | BND-177 | A positive expired deadline yields deadline missed before graphics work begins.                                                                                                                         |
 | BND-178 | Normal detach performs graphics destruction through the selected owner and permits any-thread CPU-only destroy afterward.                                                                               |

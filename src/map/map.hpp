@@ -407,6 +407,22 @@ auto map_camera_snapshot_get(
 auto map_update_camera(
   mln_map map, const mln_camera_update* update, uint64_t* out_command_id
 ) -> mln_status;
+auto map_move_by(
+  mln_map map, mln_screen_point offset, const mln_animation_options* animation,
+  uint64_t* out_command_id
+) -> mln_status;
+auto map_scale_by(
+  mln_map map, double scale, const mln_screen_point* anchor,
+  const mln_animation_options* animation, uint64_t* out_command_id
+) -> mln_status;
+auto map_bearing_by(
+  mln_map map, double degrees, const mln_screen_point* anchor,
+  const mln_animation_options* animation, uint64_t* out_command_id
+) -> mln_status;
+auto map_pitch_by(
+  mln_map map, double degrees, const mln_animation_options* animation,
+  uint64_t* out_command_id
+) -> mln_status;
 auto map_camera_query_start(mln_map map, mln_operation* out_operation)
   -> mln_status;
 auto map_camera_query_take_result(

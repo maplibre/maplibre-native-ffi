@@ -118,20 +118,10 @@ fn ready_endpoint_kind(raw: u32) -> ReadyEndpointKind {
     }
 }
 
-#[expect(
-    clippy::vec_box,
-    reason = "retired callback boxes must keep stable addresses until native releases them"
-)]
 #[derive(Debug)]
 pub(crate) struct RuntimeState {
     handle: ConcurrentNativeHandle<sys::mln_runtime>,
     notification_source: Mutex<sys::mln_notification_source>,
-    resource_transform: Mutex<Option<Box<ResourceTransformState>>>,
-    retired_resource_transforms: Mutex<Vec<Box<ResourceTransformState>>>,
-    http_header_transform: Mutex<Option<Box<HttpHeaderTransformState>>>,
-    retired_http_header_transforms: Mutex<Vec<Box<HttpHeaderTransformState>>>,
-    resource_provider: Mutex<Option<Box<ResourceProviderState>>>,
-    retired_resource_providers: Mutex<Vec<Box<ResourceProviderState>>>,
     notification_callback: Mutex<Option<Box<NotificationCallbackState>>>,
     pub(crate) operations: Arc<OperationRegistry>,
 }
@@ -146,12 +136,6 @@ impl RuntimeState {
         Ok(Self {
             handle,
             notification_source: Mutex::new(notification_source),
-            resource_transform: Mutex::new(None),
-            retired_resource_transforms: Mutex::new(Vec::new()),
-            http_header_transform: Mutex::new(None),
-            retired_http_header_transforms: Mutex::new(Vec::new()),
-            resource_provider: Mutex::new(None),
-            retired_resource_providers: Mutex::new(Vec::new()),
             notification_callback: Mutex::new(None),
             operations: Arc::new(OperationRegistry::default()),
         })
@@ -190,30 +174,6 @@ impl RuntimeState {
         unsafe { sys::mln_operation_release(operation) };
         result?;
         self.handle.mark_closed();
-        self.resource_transform
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .take();
-        self.http_header_transform
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .take();
-        self.resource_provider
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .take();
-        self.retired_resource_transforms
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .clear();
-        self.retired_http_header_transforms
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .clear();
-        self.retired_resource_providers
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .clear();
         let mut source = self
             .notification_source
             .lock()
@@ -268,20 +228,16 @@ impl RuntimeState {
     ) -> Result<u64> {
         let runtime = self.native()?;
         let mut command_id = 0;
-        // SAFETY: descriptor points to replacement, retained after acceptance.
-        maplibre_core::check(unsafe {
+        let replacement = Box::into_raw(replacement);
+        // SAFETY: descriptor points to replacement, transferred before native can accept and
+        // release it. A rejected registration leaves ownership with this binding.
+        let result = maplibre_core::check(unsafe {
             sys::mln_runtime_set_resource_provider(runtime, &descriptor, &mut command_id)
-        })?;
-        if let Some(previous) = self
-            .resource_provider
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .replace(replacement)
-        {
-            self.retired_resource_providers
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner())
-                .push(previous);
+        });
+        if let Err(error) = result {
+            // SAFETY: native never invokes release_user_data for a rejected registration.
+            drop(unsafe { Box::from_raw(replacement) });
+            return Err(error);
         }
         Ok(command_id)
     }
@@ -292,17 +248,6 @@ impl RuntimeState {
         maplibre_core::check(unsafe {
             sys::mln_runtime_clear_resource_provider(runtime, &mut command_id)
         })?;
-        if let Some(previous) = self
-            .resource_provider
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .take()
-        {
-            self.retired_resource_providers
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner())
-                .push(previous);
-        }
         Ok(command_id)
     }
 
@@ -314,19 +259,14 @@ impl RuntimeState {
         let replacement = ResourceTransformState::new(callback);
         let descriptor = replacement.descriptor();
         let mut command_id = 0;
-        maplibre_core::check(unsafe {
+        let replacement = Box::into_raw(replacement);
+        let result = maplibre_core::check(unsafe {
             sys::mln_runtime_set_resource_transform(runtime, &descriptor, &mut command_id)
-        })?;
-        if let Some(previous) = self
-            .resource_transform
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .replace(replacement)
-        {
-            self.retired_resource_transforms
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner())
-                .push(previous);
+        });
+        if let Err(error) = result {
+            // SAFETY: native never invokes release_user_data for a rejected registration.
+            drop(unsafe { Box::from_raw(replacement) });
+            return Err(error);
         }
         Ok(command_id)
     }
@@ -337,17 +277,6 @@ impl RuntimeState {
         maplibre_core::check(unsafe {
             sys::mln_runtime_clear_resource_transform(runtime, &mut command_id)
         })?;
-        if let Some(previous) = self
-            .resource_transform
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .take()
-        {
-            self.retired_resource_transforms
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner())
-                .push(previous);
-        }
         Ok(command_id)
     }
 
@@ -359,19 +288,14 @@ impl RuntimeState {
         let replacement = HttpHeaderTransformState::new(callback);
         let descriptor = replacement.descriptor();
         let mut command_id = 0;
-        maplibre_core::check(unsafe {
+        let replacement = Box::into_raw(replacement);
+        let result = maplibre_core::check(unsafe {
             sys::mln_runtime_set_http_header_transform(runtime, &descriptor, &mut command_id)
-        })?;
-        if let Some(previous) = self
-            .http_header_transform
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .replace(replacement)
-        {
-            self.retired_http_header_transforms
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner())
-                .push(previous);
+        });
+        if let Err(error) = result {
+            // SAFETY: native never invokes release_user_data for a rejected registration.
+            drop(unsafe { Box::from_raw(replacement) });
+            return Err(error);
         }
         Ok(command_id)
     }
@@ -382,17 +306,6 @@ impl RuntimeState {
         maplibre_core::check(unsafe {
             sys::mln_runtime_clear_http_header_transform(runtime, &mut command_id)
         })?;
-        if let Some(previous) = self
-            .http_header_transform
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .take()
-        {
-            self.retired_http_header_transforms
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner())
-                .push(previous);
-        }
         Ok(command_id)
     }
 }
@@ -934,9 +847,10 @@ impl RuntimeHandle {
     /// let native networking handle the request, or `Handle` to complete or
     /// release the provided `ResourceRequestHandle` inline or later.
     ///
-    /// A successful replacement retires the previous provider before returning
-    /// and then releases its Rust state. Handles the previous provider already
-    /// took stay valid; complete and release each one as usual.
+    /// A committed replacement retires the previous provider after its
+    /// in-flight callbacks return and then releases its Rust state. Handles the
+    /// previous provider already took stay valid; complete and release each one
+    /// as usual.
     pub fn set_resource_provider<F>(&self, callback: F) -> Result<u64>
     where
         F: Fn(crate::ResourceRequest, crate::ResourceRequestHandle) -> ResourceProviderDecision
@@ -948,9 +862,9 @@ impl RuntimeHandle {
     }
 
     /// Clears the runtime-scoped network resource provider, sending later
-    /// requests to MapLibre's online file source. The clear waits for in-flight
-    /// provider callbacks before returning and then releases the Rust callback
-    /// state. Handles the provider already took stay valid.
+    /// requests to MapLibre's online file source. The command commits after
+    /// in-flight provider callbacks return and releases the Rust callback state.
+    /// Handles the provider already took stay valid.
     pub fn clear_resource_provider(&self) -> Result<u64> {
         self.inner.clear_resource_provider()
     }
@@ -967,9 +881,9 @@ impl RuntimeHandle {
         self.inner.set_resource_transform(callback)
     }
 
-    /// Clears the runtime-scoped network URL transform. The clear waits for
-    /// in-flight transform callbacks before returning and then releases the
-    /// Rust callback state.
+    /// Clears the runtime-scoped network URL transform. The command commits
+    /// after in-flight transform callbacks return and releases the Rust callback
+    /// state.
     pub fn clear_resource_transform(&self) -> Result<u64> {
         self.inner.clear_resource_transform()
     }

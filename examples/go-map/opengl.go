@@ -64,7 +64,7 @@ func renderCallerFrame(session *maplibre.RenderSessionHandle) (maplibre.RenderRe
 	if _, err := session.ServiceDriverWork(16); err != nil {
 		return 0, err
 	}
-	batch, err := session.DrainFrameResults(1)
+	batch, err := session.DrainFrameResults()
 	if err != nil {
 		return 0, err
 	}
@@ -73,7 +73,13 @@ func renderCallerFrame(session *maplibre.RenderSessionHandle) (maplibre.RenderRe
 	if err != nil || len(results) == 0 {
 		return 0, err
 	}
-	return results[0].Disposition, nil
+	result := results[len(results)-1].Disposition
+	for _, frame := range results {
+		if frame.Disposition == maplibre.RenderResultRendered {
+			return frame.Disposition, nil
+		}
+	}
+	return result, nil
 }
 
 type openGLContext struct {

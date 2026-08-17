@@ -139,23 +139,17 @@ public struct CameraUpdate: Equatable, Sendable {
   public var camera: CameraOptions
   public var animation: AnimationOptions
   public var gesturePhase: GesturePhase
-  public var gestureId: UInt64
-  public var animationId: UInt64
 
   public init(
     mode: CameraUpdateMode = .jump,
     camera: CameraOptions,
     animation: AnimationOptions = AnimationOptions(),
-    gesturePhase: GesturePhase = .none,
-    gestureId: UInt64 = 0,
-    animationId: UInt64 = 0
+    gesturePhase: GesturePhase = .none
   ) {
     self.mode = mode
     self.camera = camera
     self.animation = animation
     self.gesturePhase = gesturePhase
-    self.gestureId = gestureId
-    self.animationId = animationId
   }
 
   func withNativeUpdate<Result>(
@@ -170,8 +164,6 @@ public struct CameraUpdate: Equatable, Sendable {
           update.animation = animation.pointee
         }
         update.gesture_phase = gesturePhase.rawValue
-        update.gesture_id = gestureId
-        update.animation_id = animationId
         return try withUnsafePointer(to: &update, body)
       }
     }

@@ -111,6 +111,30 @@ MLN_API mln_status mln_map_update_camera(
   mln_map map, const mln_camera_update* update, uint64_t* out_command_id
 ) MLN_NOEXCEPT;
 
+/** Moves the camera by a logical-pixel offset. */
+MLN_API mln_status mln_map_move_by(
+  mln_map map, mln_screen_point offset, const mln_animation_options* animation,
+  uint64_t* out_command_id
+) MLN_NOEXCEPT;
+
+/** Scales the camera around an optional logical-pixel anchor. */
+MLN_API mln_status mln_map_scale_by(
+  mln_map map, double scale, const mln_screen_point* anchor,
+  const mln_animation_options* animation, uint64_t* out_command_id
+) MLN_NOEXCEPT;
+
+/** Adds degrees to the camera bearing around an optional anchor. */
+MLN_API mln_status mln_map_bearing_by(
+  mln_map map, double degrees, const mln_screen_point* anchor,
+  const mln_animation_options* animation, uint64_t* out_command_id
+) MLN_NOEXCEPT;
+
+/** Adds degrees to the camera pitch. */
+MLN_API mln_status mln_map_pitch_by(
+  mln_map map, double degrees, const mln_animation_options* animation,
+  uint64_t* out_command_id
+) MLN_NOEXCEPT;
+
 /**
  * Starts an ordered camera read.
  *

@@ -61,10 +61,10 @@ auto mln_render_session_request_frame(
 }
 
 auto mln_render_session_drain_frame_results(
-  mln_render_session session, size_t maximum, mln_render_frame_batch* out
+  mln_render_session session, mln_render_frame_batch* out
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&] {
-    return mln::core::render_session_drain_frame_results(session, maximum, out);
+    return mln::core::render_session_drain_frame_results(session, out);
   });
 }
 

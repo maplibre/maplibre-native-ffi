@@ -23,6 +23,7 @@ internal sealed unsafe class HttpHeaderTransformState : IDisposable
             size = (uint)sizeof(mln_http_header_transform),
             callback = &OnTransform,
             user_data = (void*)handle,
+            release_user_data = &Release,
         };
 
     [UnmanagedCallersOnly(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
@@ -86,6 +87,16 @@ internal sealed unsafe class HttpHeaderTransformState : IDisposable
         {
             return mln_status.MLN_STATUS_NATIVE_ERROR;
         }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    private static void Release(void* userData)
+    {
+        try
+        {
+            ((HttpHeaderTransformState?)GCHandle.FromIntPtr((nint)userData).Target)?.Dispose();
+        }
+        catch { }
     }
 
     public void Dispose()

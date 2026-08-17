@@ -702,11 +702,11 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
         try status.checkStatus(c.mln_render_session_request_frame(lease.native, &raw), lease.diagnostic_store);
     }
 
-    pub fn drainFrameResults(self: RenderSessionHandle, max_results: usize) status.Error!RenderFrameBatch {
+    pub fn drainFrameResults(self: RenderSessionHandle) status.Error!RenderFrameBatch {
         const lease = try renderSessionLease(self);
         defer lease.release();
         var batch: c.mln_render_frame_batch = 0;
-        try status.checkStatus(c.mln_render_session_drain_frame_results(lease.native, max_results, &batch), lease.diagnostic_store);
+        try status.checkStatus(c.mln_render_session_drain_frame_results(lease.native, &batch), lease.diagnostic_store);
         return .{ .native = batch, .diagnostic_store = lease.diagnostic_store };
     }
 

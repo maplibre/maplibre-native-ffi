@@ -14,7 +14,6 @@ import org.maplibre.nativeffi.NativeAccess
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.TileId
-import org.maplibre.nativeffi.internal.callback.CallbackCommandRegistry
 import org.maplibre.nativeffi.internal.callback.HttpHeaderTransformState
 import org.maplibre.nativeffi.internal.callback.ResourceProviderState
 import org.maplibre.nativeffi.internal.callback.ResourceTransformState
@@ -50,21 +49,6 @@ private constructor(
     HandleLeakCleaner.register(this, core.leakReport)
   }
 
-  private val resourceProviderCommands =
-    CallbackCommandRegistry<ResourceProviderState>(
-      HandleLeakCleaner::retainNativeCallbackRoot,
-      ::releaseCallbackRoot,
-    )
-  private val resourceTransformCommands =
-    CallbackCommandRegistry<ResourceTransformState>(
-      HandleLeakCleaner::retainNativeCallbackRoot,
-      ::releaseCallbackRoot,
-    )
-  private val httpHeaderTransformCommands =
-    CallbackCommandRegistry<HttpHeaderTransformState>(
-      HandleLeakCleaner::retainNativeCallbackRoot,
-      ::releaseCallbackRoot,
-    )
   private val liveMaps = mutableMapOf<Long, WeakReference<MapHandle>>()
 
   public actual val isClosed: Boolean
@@ -360,7 +344,8 @@ private constructor(
 
   public actual fun setResourceProvider(callback: ResourceProviderCallback): ULong {
     val replacement = ResourceProviderState(callback)
-    return resourceProviderCommands.set(replacement) {
+    HandleLeakCleaner.retainNativeCallbackRoot(replacement)
+    return try {
       command { outCommandId ->
         MaplibreNativeC.mln_runtime_set_resource_provider(
           requireLiveHandle(),
@@ -368,18 +353,20 @@ private constructor(
           outCommandId,
         )
       }
+    } catch (error: Throwable) {
+      releaseCallbackRoot(replacement)
+      throw error
     }
   }
 
-  public actual fun clearResourceProvider(): ULong = resourceProviderCommands.clear {
-    command { outCommandId ->
-      MaplibreNativeC.mln_runtime_clear_resource_provider(requireLiveHandle(), outCommandId)
-    }
+  public actual fun clearResourceProvider(): ULong = command { outCommandId ->
+    MaplibreNativeC.mln_runtime_clear_resource_provider(requireLiveHandle(), outCommandId)
   }
 
   public actual fun setResourceTransform(callback: ResourceTransformCallback): ULong {
     val replacement = ResourceTransformState(callback)
-    return resourceTransformCommands.set(replacement) {
+    HandleLeakCleaner.retainNativeCallbackRoot(replacement)
+    return try {
       command { outCommandId ->
         MaplibreNativeC.mln_runtime_set_resource_transform(
           requireLiveHandle(),
@@ -387,18 +374,20 @@ private constructor(
           outCommandId,
         )
       }
+    } catch (error: Throwable) {
+      releaseCallbackRoot(replacement)
+      throw error
     }
   }
 
-  public actual fun clearResourceTransform(): ULong = resourceTransformCommands.clear {
-    command { outCommandId ->
-      MaplibreNativeC.mln_runtime_clear_resource_transform(requireLiveHandle(), outCommandId)
-    }
+  public actual fun clearResourceTransform(): ULong = command { outCommandId ->
+    MaplibreNativeC.mln_runtime_clear_resource_transform(requireLiveHandle(), outCommandId)
   }
 
   public actual fun setHttpHeaderTransform(callback: HttpHeaderTransformCallback): ULong {
     val replacement = HttpHeaderTransformState(callback)
-    return httpHeaderTransformCommands.set(replacement) {
+    HandleLeakCleaner.retainNativeCallbackRoot(replacement)
+    return try {
       command { outCommandId ->
         MaplibreNativeC.mln_runtime_set_http_header_transform(
           requireLiveHandle(),
@@ -406,13 +395,14 @@ private constructor(
           outCommandId,
         )
       }
+    } catch (error: Throwable) {
+      releaseCallbackRoot(replacement)
+      throw error
     }
   }
 
-  public actual fun clearHttpHeaderTransform(): ULong = httpHeaderTransformCommands.clear {
-    command { outCommandId ->
-      MaplibreNativeC.mln_runtime_clear_http_header_transform(requireLiveHandle(), outCommandId)
-    }
+  public actual fun clearHttpHeaderTransform(): ULong = command { outCommandId ->
+    MaplibreNativeC.mln_runtime_clear_http_header_transform(requireLiveHandle(), outCommandId)
   }
 
   public actual fun drainEvents(): RuntimeEventBatch {
@@ -448,7 +438,6 @@ private constructor(
             List(eventCount) { index ->
               copiedEvent(events, index * eventSize, eventSize, messages).toRuntimeEvent()
             }
-          copied.forEach(::finishCallbackCommand)
           return RuntimeEventBatch(copied)
         }
       } finally {
@@ -490,25 +479,13 @@ private constructor(
     } finally {
       MaplibreNativeC.mln_operation_release(operation)
     }
-    core.completeClose {
-      resourceProviderCommands.close()
-      resourceTransformCommands.close()
-      httpHeaderTransformCommands.close()
-      liveMaps.clear()
-    }
+    core.completeClose { liveMaps.clear() }
     notifications.close()
     val source = notificationSource
     if (source != 0L) {
       Status.check(MaplibreNativeC.mln_notification_source_close(source))
       notificationSource = 0L
     }
-  }
-
-  private fun finishCallbackCommand(event: RuntimeEvent) {
-    val payload = event.payload as? RuntimeEventPayload.CommandFinished ?: return
-    resourceProviderCommands.finish(payload.commandId, payload.disposition)
-    resourceTransformCommands.finish(payload.commandId, payload.disposition)
-    httpHeaderTransformCommands.finish(payload.commandId, payload.disposition)
   }
 
   public actual companion object {

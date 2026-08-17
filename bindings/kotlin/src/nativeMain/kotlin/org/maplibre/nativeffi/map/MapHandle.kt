@@ -19,6 +19,7 @@ import kotlinx.cinterop.readValue
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.value
+import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.BoundOptions
 import org.maplibre.nativeffi.camera.CameraSnapshot
 import org.maplibre.nativeffi.camera.CameraUpdate
@@ -27,6 +28,7 @@ import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
+import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_LAYER_INFO_SOURCE_ID
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_LAYER_INFO_SOURCE_LAYER
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_SOURCE_INFO_TILEJSON
@@ -54,6 +56,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_add_style_layer_json
 import org.maplibre.nativeffi.internal.c.mln_map_add_style_source_json
 import org.maplibre.nativeffi.internal.c.mln_map_add_vector_source_tiles
 import org.maplibre.nativeffi.internal.c.mln_map_add_vector_source_url
+import org.maplibre.nativeffi.internal.c.mln_map_bearing_by
 import org.maplibre.nativeffi.internal.c.mln_map_camera_query_start
 import org.maplibre.nativeffi.internal.c.mln_map_camera_query_take_result
 import org.maplibre.nativeffi.internal.c.mln_map_camera_snapshot_get
@@ -100,9 +103,11 @@ import org.maplibre.nativeffi.internal.c.mln_map_list_style_source_ids_start
 import org.maplibre.nativeffi.internal.c.mln_map_list_style_source_ids_take_result
 import org.maplibre.nativeffi.internal.c.mln_map_loaded_style_json_start
 import org.maplibre.nativeffi.internal.c.mln_map_loaded_style_json_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_move_by
 import org.maplibre.nativeffi.internal.c.mln_map_move_style_layer
 import org.maplibre.nativeffi.internal.c.mln_map_options
 import org.maplibre.nativeffi.internal.c.mln_map_options_default
+import org.maplibre.nativeffi.internal.c.mln_map_pitch_by
 import org.maplibre.nativeffi.internal.c.mln_map_projection_create_start
 import org.maplibre.nativeffi.internal.c.mln_map_projection_create_take_result
 import org.maplibre.nativeffi.internal.c.mln_map_remove_style_image
@@ -111,6 +116,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_remove_style_source
 import org.maplibre.nativeffi.internal.c.mln_map_request_repaint
 import org.maplibre.nativeffi.internal.c.mln_map_request_still_image_start
 import org.maplibre.nativeffi.internal.c.mln_map_resize
+import org.maplibre.nativeffi.internal.c.mln_map_scale_by
 import org.maplibre.nativeffi.internal.c.mln_map_set_bounds
 import org.maplibre.nativeffi.internal.c.mln_map_set_custom_geometry_source_tile_data
 import org.maplibre.nativeffi.internal.c.mln_map_set_debug_options
@@ -1621,11 +1627,71 @@ private constructor(
     nativeUpdate.pointed.animation.easing.y2 = animation.easing.y2
     nativeUpdate.pointed.animation.transition_id = animation.transition_id
     nativeUpdate.pointed.gesture_phase = update.gesturePhase.nativeValue.toUInt()
-    nativeUpdate.pointed.gesture_id = update.gestureId.toULong()
-    nativeUpdate.pointed.animation_id = update.animationId.toULong()
     val outCommand = alloc<ULongVar>()
     Status.check(
       mln_map_update_camera(state.requireLive().rawHandleValue, nativeUpdate, outCommand.ptr)
+    )
+    outCommand.value.toLong()
+  }
+
+  public actual fun moveBy(offset: ScreenPoint, animation: AnimationOptions?): Long = memScoped {
+    val outCommand = alloc<ULongVar>()
+    Status.check(
+      mln_map_move_by(
+        state.requireLive().rawHandleValue,
+        CoreStructs.screenPoint(offset),
+        animation?.let { MapStructs.animationOptions(it, this) },
+        outCommand.ptr,
+      )
+    )
+    outCommand.value.toLong()
+  }
+
+  public actual fun scaleBy(
+    scale: Double,
+    anchor: ScreenPoint?,
+    animation: AnimationOptions?,
+  ): Long = memScoped {
+    val outCommand = alloc<ULongVar>()
+    Status.check(
+      mln_map_scale_by(
+        state.requireLive().rawHandleValue,
+        scale,
+        anchor?.let { CoreStructs.screenPoint(it).getPointer(this) },
+        animation?.let { MapStructs.animationOptions(it, this) },
+        outCommand.ptr,
+      )
+    )
+    outCommand.value.toLong()
+  }
+
+  public actual fun bearingBy(
+    degrees: Double,
+    anchor: ScreenPoint?,
+    animation: AnimationOptions?,
+  ): Long = memScoped {
+    val outCommand = alloc<ULongVar>()
+    Status.check(
+      mln_map_bearing_by(
+        state.requireLive().rawHandleValue,
+        degrees,
+        anchor?.let { CoreStructs.screenPoint(it).getPointer(this) },
+        animation?.let { MapStructs.animationOptions(it, this) },
+        outCommand.ptr,
+      )
+    )
+    outCommand.value.toLong()
+  }
+
+  public actual fun pitchBy(degrees: Double, animation: AnimationOptions?): Long = memScoped {
+    val outCommand = alloc<ULongVar>()
+    Status.check(
+      mln_map_pitch_by(
+        state.requireLive().rawHandleValue,
+        degrees,
+        animation?.let { MapStructs.animationOptions(it, this) },
+        outCommand.ptr,
+      )
     )
     outCommand.value.toLong()
   }

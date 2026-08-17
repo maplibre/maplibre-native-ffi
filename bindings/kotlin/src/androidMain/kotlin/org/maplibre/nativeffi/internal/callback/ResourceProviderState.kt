@@ -4,6 +4,7 @@ import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.Pointer
 import org.maplibre.nativeffi.internal.javacpp.JavaCppSupport
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
+import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.resource.ResourceKind
 import org.maplibre.nativeffi.resource.ResourceLoadingMethod
 import org.maplibre.nativeffi.resource.ResourcePriority
@@ -26,11 +27,19 @@ internal class ResourceProviderState(private val callback: ResourceProviderCallb
       ): Int = invoke(request, handle)
     }
   private val provider = MaplibreNativeC.mln_resource_provider()
+  private val nativeRelease =
+    object : MaplibreNativeC.mln_runtime_callback_release() {
+      override fun call(userData: Pointer?) {
+        HandleLeakCleaner.releaseNativeCallbackRoot(this@ResourceProviderState)
+        close()
+      }
+    }
 
   init {
     provider.size(provider.sizeof())
     provider.callback(nativeCallback)
     provider.user_data(null)
+    provider.release_user_data(nativeRelease)
   }
 
   fun descriptor(): MaplibreNativeC.mln_resource_provider = provider
