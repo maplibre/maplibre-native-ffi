@@ -66,12 +66,20 @@ typedef uint32_t (*mln_log_callback)(
   const char* message
 );
 
+/** Releases user_data from a log callback registration. */
+typedef void (*mln_log_callback_release)(void* user_data);
+
 /**
  * Installs a process-global MapLibre Native log callback.
  *
- * Passing null clears the current callback. The callback and user_data are
- * stored by reference and must remain valid until the callback is replaced or
- * cleared.
+ * Passing a null callback clears the current callback. callback and user_data
+ * are stored by reference.
+ *
+ * With a non-null release_user_data, MLN_STATUS_OK transfers responsibility for
+ * releasing user_data to the C API. The C API invokes release_user_data after
+ * the final callback returns, when the registration is replaced or cleared.
+ * With a null release_user_data, the caller keeps that responsibility and must
+ * keep user_data valid until the registration is replaced or cleared.
  *
  * The callback is a low-level native callback:
  *
@@ -80,13 +88,17 @@ typedef uint32_t (*mln_log_callback)(
  * - MapLibre may invoke it while holding internal logging locks.
  * - The callback must be thread-safe, return quickly, and must not call this C
  *   API or MapLibre Native APIs.
+ * - release_user_data may run on the caller that replaces or clears the
+ *   registration. It must not call this C API or MapLibre Native APIs.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status
-mln_log_set_callback(mln_log_callback callback, void* user_data) MLN_NOEXCEPT;
+MLN_API mln_status mln_log_set_callback(
+  mln_log_callback callback, void* user_data,
+  mln_log_callback_release release_user_data
+) MLN_NOEXCEPT;
 
 /**
  * Clears the process-global log callback.

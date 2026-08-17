@@ -101,28 +101,16 @@ const LogCallbackState = struct {
     context: ?*anyopaque,
 };
 
-var log_callback_state: std.atomic.Value(usize) = std.atomic.Value(usize).init(0);
-
 pub fn setLogCallback(callback: LogCallback, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!void {
     const replacement = try std.heap.smp_allocator.create(LogCallbackState);
     replacement.* = .{ .handler = callback.handler, .context = callback.context };
     errdefer std.heap.smp_allocator.destroy(replacement);
 
-    try status.checkStatus(c.mln_log_set_callback(logTrampoline, replacement), diagnostic_store);
-    const previous = log_callback_state.swap(@intFromPtr(replacement), .seq_cst);
-    if (previous != 0) {
-        const previous_state: *LogCallbackState = @ptrFromInt(previous);
-        std.heap.smp_allocator.destroy(previous_state);
-    }
+    try status.checkStatus(c.mln_log_set_callback(logTrampoline, replacement, releaseLogCallback), diagnostic_store);
 }
 
 pub fn clearLogCallback(diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!void {
     try status.checkStatus(c.mln_log_clear_callback(), diagnostic_store);
-    const previous = log_callback_state.swap(0, .seq_cst);
-    if (previous != 0) {
-        const previous_state: *LogCallbackState = @ptrFromInt(previous);
-        std.heap.smp_allocator.destroy(previous_state);
-    }
 }
 
 pub fn setAsyncLogSeverityMask(mask: LogSeverityMask, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!void {
@@ -140,6 +128,11 @@ fn logTrampoline(user_data: ?*anyopaque, severity: u32, event: u32, code: i64, m
         .code = code,
         .message = copied_message,
     })) 1 else 0;
+}
+
+fn releaseLogCallback(user_data: ?*anyopaque) callconv(.c) void {
+    const callback_state: *LogCallbackState = @ptrCast(@alignCast(user_data orelse return));
+    std.heap.smp_allocator.destroy(callback_state);
 }
 
 test "log raw domains preserve unknown values" {

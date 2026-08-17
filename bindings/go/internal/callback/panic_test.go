@@ -1,9 +1,7 @@
 package callback
 
 import (
-	"sync/atomic"
 	"testing"
-	"time"
 )
 
 const (
@@ -38,54 +36,6 @@ func TestLogCallbackTrampolineReturnsConsumed(t *testing.T) {
 		return true
 	}); consumed != 1 {
 		t.Fatalf("consumed = %d, want 1", consumed)
-	}
-}
-
-func TestLogCallbackSetSerializesNativeAndGoState(t *testing.T) {
-	oldSet := setNativeLogCallback
-	oldClear := clearNativeLogCallback
-	t.Cleanup(func() {
-		_ = ClearLogCallback()
-		setNativeLogCallback = oldSet
-		clearNativeLogCallback = oldClear
-	})
-
-	entered := make(chan struct{})
-	release := make(chan struct{})
-	var calls atomic.Int32
-	setNativeLogCallback = func() int32 {
-		if calls.Add(1) == 1 {
-			close(entered)
-			<-release
-		}
-		return 0
-	}
-	clearNativeLogCallback = func() int32 { return 0 }
-
-	firstDone := make(chan int32, 1)
-	secondDone := make(chan int32, 1)
-	go func() {
-		firstDone <- SetLogCallback(func(uint32, uint32, int64, string) bool { return false })
-	}()
-	<-entered
-	go func() {
-		secondDone <- SetLogCallback(func(uint32, uint32, int64, string) bool { return true })
-	}()
-	select {
-	case status := <-secondDone:
-		close(release)
-		t.Fatalf("second SetLogCallback completed while first native install was in flight: %d", status)
-	case <-time.After(25 * time.Millisecond):
-	}
-	close(release)
-	if status := <-firstDone; status != 0 {
-		t.Fatalf("first SetLogCallback status = %d, want 0", status)
-	}
-	if status := <-secondDone; status != 0 {
-		t.Fatalf("second SetLogCallback status = %d, want 0", status)
-	}
-	if calls.Load() != 2 {
-		t.Fatalf("native set calls = %d, want 2", calls.Load())
 	}
 }
 

@@ -1110,7 +1110,7 @@ that a real native failure would expose.
 | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | BND-120 | Log callback install invokes the registered callback, clear prevents later invocation, and replacement invokes only the replacement callback.               |
 | BND-121 | Host-language failures do not unwind or escape across the C callback boundary, and recoverable callback failures are converted to documented C behavior.    |
-| BND-122 | Each exposed callback family preserves the previous callback and releases replacement state when replacement fails.                                         |
+| BND-122 | Each exposed callback family transfers its state through the C release callback after a successful install; a failed replacement stays binding-owned.       |
 | BND-123 | Callback state remains synchronized for callback families whose C contract allows concurrent invocation.                                                    |
 | BND-124 | Custom geometry or style-scoped callback teardown handles style reload, source removal, source ID reuse, map close, and in-flight upcalls without late use. |
 

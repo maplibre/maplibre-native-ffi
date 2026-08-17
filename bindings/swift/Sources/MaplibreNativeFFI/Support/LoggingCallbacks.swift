@@ -38,43 +38,46 @@ private func logCallbackTrampoline(
   return box.invoke(record) ? 1 : 0
 }
 
-enum LoggingCallbackState {
-  private static let lock = NSLock()
-  private nonisolated(unsafe) static var retainedBox: Unmanaged<LogCallbackBox>?
+private func releaseLogCallback(_ userData: UnsafeMutableRawPointer?) {
+  guard let userData else { return }
+  Unmanaged<LogCallbackBox>.fromOpaque(userData).release()
+}
 
+enum LoggingCallbackState {
   static func set(_ callback: @escaping @Sendable (NativeLogRecord)
     -> Bool) throws
   {
     let replacement = Unmanaged.passRetained(LogCallbackBox(callback))
-    var old: Unmanaged<LogCallbackBox>?
     do {
-      try lock.withLock {
-        try checkStatus(mln_log_set_callback(
-          logCallbackTrampoline,
-          replacement.toOpaque()
-        ))
-        old = retainedBox
-        retainedBox = replacement
-      }
+      try checkStatus(mln_log_set_callback(
+        logCallbackTrampoline,
+        replacement.toOpaque(),
+        releaseLogCallback
+      ))
     } catch {
       replacement.release()
       throw error
     }
-    old?.release()
   }
 
   static func clear() throws {
-    var old: Unmanaged<LogCallbackBox>?
-    try lock.withLock {
-      try checkStatus(mln_log_clear_callback())
-      old = retainedBox
-      retainedBox = nil
-    }
-    old?.release()
+    try checkStatus(mln_log_clear_callback())
   }
 
-  static func invokeForTesting(_ record: NativeLogRecord) -> Bool? {
-    let box = lock.withLock { retainedBox?.takeUnretainedValue() }
-    return box?.invoke(record)
+  static func invokeForTesting(
+    _ callback: @escaping @Sendable (NativeLogRecord) -> Bool,
+    record: NativeLogRecord
+  ) -> Bool {
+    let box = Unmanaged.passRetained(LogCallbackBox(callback))
+    defer { box.release() }
+    return record.message.withCString { message in
+      logCallbackTrampoline(
+        userData: box.toOpaque(),
+        severity: record.severity,
+        event: record.event,
+        code: record.code,
+        message: message
+      ) != 0
+    }
   }
 }

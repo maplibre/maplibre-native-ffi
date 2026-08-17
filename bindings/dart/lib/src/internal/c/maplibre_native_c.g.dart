@@ -74,10 +74,7 @@ external int mln_acquired_frame_get_webgpu_texture(
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    ffi.Pointer<mln_acquired_frame>,
-    ffi.Pointer<mln_gpu_sync>,
-  )
+  ffi.Int32 Function(ffi.Pointer<mln_acquired_frame>, ffi.Pointer<mln_gpu_sync>)
 >()
 external int mln_acquired_frame_release(
   ffi.Pointer<mln_acquired_frame> frame,
@@ -367,10 +364,17 @@ external int mln_log_clear_callback();
 @ffi.Native<ffi.Int32 Function(ffi.Uint32)>()
 external int mln_log_set_async_severity_mask(int mask);
 
-@ffi.Native<ffi.Int32 Function(mln_log_callback, ffi.Pointer<ffi.Void>)>()
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_log_callback,
+    ffi.Pointer<ffi.Void>,
+    mln_log_callback_release,
+  )
+>()
 external int mln_log_set_callback(
   mln_log_callback callback,
   ffi.Pointer<ffi.Void> user_data,
+  mln_log_callback_release release_user_data,
 );
 
 @ffi.Native<
@@ -2343,7 +2347,9 @@ external int mln_render_session_acquire_frame(
 external mln_render_session_attach_options
 mln_render_session_attach_options_default();
 
-@ffi.Native<ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_operation>)>()
+@ffi.Native<
+  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_operation>)
+>()
 external int mln_render_session_barrier_start(
   int session,
   ffi.Pointer<mln_operation> out_operation,
@@ -2654,10 +2660,7 @@ external int mln_runtime_clear_resource_transform(
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    ffi.Pointer<mln_runtime_options>,
-    ffi.Pointer<mln_operation>,
-  )
+  ffi.Int32 Function(ffi.Pointer<mln_runtime_options>, ffi.Pointer<mln_runtime>)
 >()
 external int mln_runtime_create(
   ffi.Pointer<mln_runtime_options> options,
@@ -3283,13 +3286,21 @@ final class mln_adapter_log_callback_state extends ffi.Struct {
   @ffi.Uint32()
   external int consume;
 
+  external mln_log_callback_release release_user_data;
+
+  external ffi.Pointer<ffi.Void> release_context;
+
   static ffi.Pointer<mln_adapter_log_callback_state> $allocate(
     ffi.Allocator $allocator, {
     required int queue,
     required int consume,
+    required mln_log_callback_release release_user_data,
+    required ffi.Pointer<ffi.Void> release_context,
   }) => $allocator<mln_adapter_log_callback_state>()
     ..ref.queue = queue
-    ..ref.consume = consume;
+    ..ref.consume = consume
+    ..ref.release_user_data = release_user_data
+    ..ref.release_context = release_context;
 }
 
 typedef mln_adapter_log_queue = ffi.Uint64;
@@ -4548,6 +4559,12 @@ typedef Dartmln_log_callbackFunction =
       int code,
       ffi.Pointer<ffi.Char> message,
     );
+typedef mln_log_callback_release =
+    ffi.Pointer<ffi.NativeFunction<mln_log_callback_releaseFunction>>;
+typedef mln_log_callback_releaseFunction =
+    ffi.Void Function(ffi.Pointer<ffi.Void> user_data);
+typedef Dartmln_log_callback_releaseFunction =
+    void Function(ffi.Pointer<ffi.Void> user_data);
 
 enum mln_log_event {
   MLN_LOG_EVENT_GENERAL(0),

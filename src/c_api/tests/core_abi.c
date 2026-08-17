@@ -217,6 +217,46 @@ static void diagnostics_are_thread_local(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+static uint32_t ignore_log_record(
+  void* user_data, uint32_t severity, uint32_t event, int64_t code,
+  const char* message
+) {
+  (void)user_data;
+  (void)severity;
+  (void)event;
+  (void)code;
+  (void)message;
+  return 0;
+}
+
+static void count_log_callback_release(void* user_data) { ++*(int*)user_data; }
+
+static void log_callback_releases_owned_user_data(void) {
+  int first_releases = 0;
+  int second_releases = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_log_set_callback(
+      ignore_log_record, &first_releases, count_log_callback_release
+    )
+  );
+  TEST_ASSERT_EQUAL_INT(0, first_releases);
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_log_set_callback(
+      ignore_log_record, &second_releases, count_log_callback_release
+    )
+  );
+  TEST_ASSERT_EQUAL_INT(1, first_releases);
+  TEST_ASSERT_EQUAL_INT(0, second_releases);
+
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_log_clear_callback());
+  TEST_ASSERT_EQUAL_INT(1, second_releases);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_log_clear_callback());
+  TEST_ASSERT_EQUAL_INT(1, second_releases);
+}
+
 void run_core_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(runtime_rejects_invalid_arguments);
@@ -227,4 +267,5 @@ void run_core_abi_tests(void) {
   RUN_TEST(style_functions_reject_null_inputs);
   RUN_TEST(failing_status_sets_and_successful_status_clears_diagnostics);
   RUN_TEST(diagnostics_are_thread_local);
+  RUN_TEST(log_callback_releases_owned_user_data);
 }

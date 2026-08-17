@@ -29,6 +29,7 @@
 #include <stdint.h>
 
 #include "maplibre_native_c/base.h"     // IWYU pragma: export
+#include "maplibre_native_c/logging.h"  // IWYU pragma: export
 #include "maplibre_native_c/runtime.h"  // IWYU pragma: export
 #include "maplibre_native_c/style.h"    // IWYU pragma: export
 
@@ -264,12 +265,16 @@ typedef struct mln_adapter_log_record {
  * Registration state for an adapted log callback.
  *
  * The callback copies records into queue and reports consume to MapLibre. The
- * address of this struct identifies the registration and remains borrowed until
- * the callback is replaced or cleared.
+ * address of this struct identifies the registration. When release_user_data is
+ * non-null, a successful install transfers responsibility for release_context
+ * to the adapter, which releases it after the registration is replaced or
+ * cleared. The struct must remain valid until that release callback runs.
  */
 typedef struct mln_adapter_log_callback_state {
   mln_adapter_log_queue queue;
   uint32_t consume;
+  mln_log_callback_release release_user_data;
+  void* release_context;
 } mln_adapter_log_callback_state;
 
 /**

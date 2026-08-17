@@ -671,6 +671,19 @@ extern "C" MLN_API auto mln_adapter_log_callback(
   return state.consume;
 }
 
+namespace {
+
+auto release_adapter_log_callback_state(void* user_data) noexcept -> void {
+  auto* state = static_cast<mln_adapter_log_callback_state*>(user_data);
+  if (state != nullptr && state->release_user_data != nullptr) {
+    const auto release = state->release_user_data;
+    const auto context = state->release_context;
+    release(context);
+  }
+}
+
+}  // namespace
+
 extern "C" MLN_API auto mln_adapter_log_set_callback(
   mln_adapter_log_callback_state* state
 ) noexcept -> mln_status {
@@ -678,9 +691,13 @@ extern "C" MLN_API auto mln_adapter_log_set_callback(
   if (state != nullptr && lease_log_queue(state->queue) == nullptr) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  return state == nullptr
-           ? mln_log_clear_callback()
-           : mln_log_set_callback(mln_adapter_log_callback, state);
+  return state == nullptr ? mln_log_clear_callback()
+                          : mln_log_set_callback(
+                              mln_adapter_log_callback, state,
+                              state->release_user_data == nullptr
+                                ? nullptr
+                                : release_adapter_log_callback_state
+                            );
 }
 
 extern "C" MLN_API void mln_adapter_log_record_destroy(void* record) noexcept {

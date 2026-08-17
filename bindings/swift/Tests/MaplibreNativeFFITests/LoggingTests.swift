@@ -30,7 +30,11 @@ private final class LogRecords: @unchecked Sendable {
   }
   #expect(
     LoggingCallbackState.invokeForTesting(
-      NativeLogRecord(severity: 1, event: 0, code: 7, message: "first")
+      { record in
+        first.append(LogRecord(native: record))
+        return true
+      },
+      record: NativeLogRecord(severity: 1, event: 0, code: 7, message: "first")
     ) == true
   )
 
@@ -40,18 +44,17 @@ private final class LogRecords: @unchecked Sendable {
   }
   #expect(
     LoggingCallbackState.invokeForTesting(
-      NativeLogRecord(severity: 2, event: 3, code: 8, message: "second")
+      { record in
+        second.append(LogRecord(native: record))
+        return false
+      },
+      record: NativeLogRecord(severity: 2, event: 3, code: 8, message: "second")
     ) == false
   )
 
   try Maplibre.clearLogCallback()
-  #expect(
-    LoggingCallbackState.invokeForTesting(
-      NativeLogRecord(severity: 3, event: 4, code: 9, message: "cleared")
-    ) == nil
-  )
 
-  let syntheticMessages = Set(["first", "second", "cleared"])
+  let syntheticMessages = Set(["first", "second"])
   #expect(first.snapshot()
     .filter { syntheticMessages.contains($0.message) } == [LogRecord(
       severity: .info,

@@ -91,17 +91,6 @@ struct PyLogCallbackState {
     consume: bool,
 }
 
-#[derive(Debug)]
-struct GlobalPyLogCallbackState {
-    current: Option<Arc<PyLogCallbackState>>,
-    retired: Vec<Arc<PyLogCallbackState>>,
-}
-
-static LOG_CALLBACK_STATE: Mutex<GlobalPyLogCallbackState> = Mutex::new(GlobalPyLogCallbackState {
-    current: None,
-    retired: Vec::new(),
-});
-
 #[pyclass(name = "_LogReceiver")]
 struct LogReceiver {
     state: Arc<PyLogCallbackState>,
@@ -6649,20 +6638,24 @@ fn set_log_callback(max_queued_records: usize, consume: bool) -> PyResult<LogRec
         ));
     }
     let replacement = PyLogCallbackState::new(max_queued_records, consume);
-    let user_data = Arc::as_ptr(&replacement).cast_mut().cast::<c_void>();
-    // SAFETY: log_callback_trampoline has the C callback ABI. user_data points
-    // to replacement, which is retained by LOG_CALLBACK_STATE after success.
-    maplibre_core::check(unsafe {
-        sys::mln_log_set_callback(Some(log_callback_trampoline), user_data)
+    let user_data = Arc::into_raw(Arc::clone(&replacement))
+        .cast_mut()
+        .cast::<c_void>();
+    // SAFETY: native owns one Arc strong reference after success and releases
+    // it after the final callback returns.
+    let result = maplibre_core::check(unsafe {
+        sys::mln_log_set_callback(
+            Some(log_callback_trampoline),
+            user_data,
+            Some(release_log_callback_state),
+        )
     })
-    .map_err(map_error)?;
-    let mut state = LOG_CALLBACK_STATE
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    if let Some(previous) = state.current.take() {
-        state.retired.push(previous);
+    .map_err(map_error);
+    if let Err(error) = result {
+        // SAFETY: a failed registration does not take ownership.
+        drop(unsafe { Arc::from_raw(user_data.cast::<PyLogCallbackState>()) });
+        return Err(error);
     }
-    state.current = Some(Arc::clone(&replacement));
     Ok(LogReceiver { state: replacement })
 }
 
@@ -6670,14 +6663,7 @@ fn set_log_callback(max_queued_records: usize, consume: bool) -> PyResult<LogRec
 fn clear_log_callback() -> PyResult<()> {
     // SAFETY: mln_log_clear_callback takes no arguments and clears native's
     // process-global callback slot.
-    maplibre_core::check(unsafe { sys::mln_log_clear_callback() }).map_err(map_error)?;
-    let mut state = LOG_CALLBACK_STATE
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    if let Some(previous) = state.current.take() {
-        state.retired.push(previous);
-    }
-    Ok(())
+    maplibre_core::check(unsafe { sys::mln_log_clear_callback() }).map_err(map_error)
 }
 
 #[pyfunction]
@@ -6714,6 +6700,15 @@ unsafe extern "C" fn log_callback_trampoline(
         })
     }))
     .unwrap_or(0)
+}
+
+unsafe extern "C" fn release_log_callback_state(user_data: *mut c_void) {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        if let Some(state) = ptr::NonNull::new(user_data.cast::<PyLogCallbackState>()) {
+            // SAFETY: native calls this once for the Arc transferred on install.
+            drop(unsafe { Arc::from_raw(state.as_ptr()) });
+        }
+    }));
 }
 
 #[pyfunction]

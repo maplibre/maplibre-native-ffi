@@ -17,7 +17,7 @@ open class NativeTestBase {
   fun installNativeTestLogCallback() {
     // Native logs share the process output stream with Kotlin/Native test events, so
     // consume MapLibre records to keep them out of Gradle's test report.
-    Status.check(mln_log_set_callback(staticCFunction(::consumeNativeTestLog), null))
+    Status.check(mln_log_set_callback(staticCFunction(::consumeNativeTestLog), null, null))
   }
 
   @AfterTest

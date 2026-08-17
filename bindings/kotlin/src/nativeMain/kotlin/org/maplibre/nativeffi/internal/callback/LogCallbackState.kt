@@ -4,10 +4,13 @@ import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.StableRef
+import kotlinx.cinterop.asStableRef
 import kotlinx.cinterop.staticCFunction
 import org.maplibre.nativeffi.internal.c.mln_log_clear_callback
 import org.maplibre.nativeffi.internal.c.mln_log_set_callback
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
+import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.log.LogCallback
 import org.maplibre.nativeffi.log.LogEvent
 import org.maplibre.nativeffi.log.LogRecord
@@ -15,9 +18,9 @@ import org.maplibre.nativeffi.log.LogSeverity
 
 /** Owns process-global logging callback state. */
 @OptIn(ExperimentalForeignApi::class)
-internal class LogCallbackState private constructor(private val callback: LogCallback) :
-  AutoCloseable {
-  private val gate = CallbackGate("log callbacks")
+internal class LogCallbackState(private val callback: LogCallback) : AutoCloseable {
+  private val selfRef = StableRef.create(this)
+  private val gate = CallbackGate("log callbacks") { selfRef.dispose() }
 
   fun invoke(severity: UInt, event: UInt, code: Long, message: CPointer<ByteVar>?): UInt {
     val lease = gate.enter() ?: return 0U
@@ -39,44 +42,33 @@ internal class LogCallbackState private constructor(private val callback: LogCal
 
   override fun close() = gate.close()
 
-  internal fun checkCanClose() = gate.checkCanClose()
-
   internal fun isClosedForTesting(): Boolean = gate.isClosedForTesting()
 
-  internal fun isClosingForTesting(): Boolean = gate.isClosingForTesting()
-
   internal companion object {
-    private val registry = LogCallbackRegistry<LogCallbackState>()
-
     fun set(callback: LogCallback) {
-      registry.current()?.checkCanClose()
-      registry.set(LogCallbackState(callback)) {
-        mln_log_set_callback(staticCFunction(::logCallback), null)
+      val replacement = LogCallbackState(callback)
+      try {
+        Status.check(
+          mln_log_set_callback(
+            staticCFunction(::logCallback),
+            replacement.selfRef.asCPointer(),
+            staticCFunction(::releaseLogCallback),
+          )
+        )
+      } catch (error: Throwable) {
+        replacement.close()
+        throw error
       }
     }
 
-    fun setForTesting(
-      callback: LogCallback,
-      install: () -> Int,
-      captureReplacement: (LogCallbackState) -> Unit,
-    ) {
-      registry.current()?.checkCanClose()
-      registry.set(LogCallbackState(callback).also(captureReplacement), install)
-    }
-
     fun clear() {
-      registry.current()?.checkCanClose()
-      registry.clear(::mln_log_clear_callback)
+      Status.check(mln_log_clear_callback())
     }
 
-    fun currentForTesting(): LogCallbackState? = registry.current()
-
-    fun invokeCurrent(severity: UInt, event: UInt, code: Long, message: CPointer<ByteVar>?): UInt =
-      registry.current()?.invoke(severity, event, code, message) ?: 0U
+    fun createForTesting(callback: LogCallback): LogCallbackState = LogCallbackState(callback)
   }
 }
 
-@Suppress("UNUSED_PARAMETER")
 @OptIn(ExperimentalForeignApi::class)
 private fun logCallback(
   userData: COpaquePointer?,
@@ -84,4 +76,10 @@ private fun logCallback(
   event: UInt,
   code: Long,
   message: CPointer<ByteVar>?,
-): UInt = LogCallbackState.invokeCurrent(severity, event, code, message)
+): UInt =
+  userData?.asStableRef<LogCallbackState>()?.get()?.invoke(severity, event, code, message) ?: 0U
+
+@OptIn(ExperimentalForeignApi::class)
+private fun releaseLogCallback(userData: COpaquePointer?) {
+  userData?.asStableRef<LogCallbackState>()?.get()?.close()
+}

@@ -37,6 +37,14 @@ final class _LogCallbackState extends RetainedCallbackState {
     pointer = calloc<raw.mln_adapter_log_callback_state>();
     pointer.ref.queue = queue;
     pointer.ref.consume = consume ? 1 : 0;
+    releaseListener =
+        NativeCallable<raw.mln_log_callback_releaseFunction>.listener((
+          Pointer<Void> context,
+        ) {
+          Maplibre._releaseLogCallbackState(context);
+        });
+    pointer.ref.release_user_data = releaseListener.nativeFunction;
+    pointer.ref.release_context = pointer.cast<Void>();
     listener = NativeCallable<raw.mln_notification_callbackFunction>.listener((
       Pointer<Void> _,
     ) {
@@ -62,6 +70,8 @@ final class _LogCallbackState extends RetainedCallbackState {
   final LogCallback _callback;
   late final Pointer<raw.mln_adapter_log_callback_state> pointer;
   late final NativeCallable<raw.mln_notification_callbackFunction> listener;
+  late final NativeCallable<raw.mln_log_callback_releaseFunction>
+  releaseListener;
   var source = 0;
   var queue = 0;
 
@@ -130,6 +140,7 @@ final class _LogCallbackState extends RetainedCallbackState {
     raw.mln_notification_source_release(source);
     calloc.free(pointer);
     listener.close();
+    releaseListener.close();
   }
 }
 
@@ -155,8 +166,19 @@ final class Maplibre {
   Maplibre._();
 
   static final MaplibreNativeCApi _c = MaplibreNativeCApi.open();
-  // Retains the Dart listener while native code owns its callback pointer.
+  static final _logCallbackRoots = <int, _LogCallbackState>{};
   static _LogCallbackState? _logCallbackState;
+
+  static void _releaseLogCallbackState(Pointer<Void> context) {
+    final state = _logCallbackRoots.remove(context.address);
+    if (state == null) {
+      return;
+    }
+    if (identical(_logCallbackState, state)) {
+      _logCallbackState = null;
+    }
+    state.close();
+  }
 
   /// Returns the native C ABI contract version.
   ///
@@ -199,13 +221,13 @@ final class Maplibre {
     // Before the registration: the failure path frees state that an installed
     // native callback would still point at.
     ensureAbiVersion();
-    final previous = _logCallbackState;
     final state = _LogCallbackState(callback, consume: consume);
+    _logCallbackRoots[state.pointer.address] = state;
     try {
       _checkStatus(raw.mln_adapter_log_set_callback(state.pointer));
       _logCallbackState = state;
-      previous?.close();
     } catch (_) {
+      _logCallbackRoots.remove(state.pointer.address);
       state.close();
       rethrow;
     }
@@ -215,9 +237,7 @@ final class Maplibre {
   static void clearLogCallback() {
     ensureAbiVersion();
     _checkStatus(raw.mln_adapter_log_set_callback(nullptr));
-    final previous = _logCallbackState;
     _logCallbackState = null;
-    previous?.close();
   }
 
   /// Sets which log severities MapLibre Native may dispatch asynchronously.

@@ -8771,6 +8771,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
             MapLibreNativeC.C_POINTER,
+            MapLibreNativeC.C_POINTER,
             MapLibreNativeC.C_POINTER
         );
 
@@ -8782,7 +8783,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_log_set_callback(mln_log_callback callback, void *user_data)
+     * mln_status mln_log_set_callback(mln_log_callback callback, void *user_data, mln_log_callback_release release_user_data)
      * }
      */
     public static FunctionDescriptor mln_log_set_callback$descriptor() {
@@ -8792,7 +8793,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_log_set_callback(mln_log_callback callback, void *user_data)
+     * mln_status mln_log_set_callback(mln_log_callback callback, void *user_data, mln_log_callback_release release_user_data)
      * }
      */
     public static MethodHandle mln_log_set_callback$handle() {
@@ -8802,7 +8803,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_log_set_callback(mln_log_callback callback, void *user_data)
+     * mln_status mln_log_set_callback(mln_log_callback callback, void *user_data, mln_log_callback_release release_user_data)
      * }
      */
     public static MemorySegment mln_log_set_callback$address() {
@@ -8811,16 +8812,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_log_set_callback(mln_log_callback callback, void *user_data)
+     * mln_status mln_log_set_callback(mln_log_callback callback, void *user_data, mln_log_callback_release release_user_data)
      * }
      */
-    public static int mln_log_set_callback(MemorySegment callback, MemorySegment user_data) {
+    public static int mln_log_set_callback(MemorySegment callback, MemorySegment user_data, MemorySegment release_user_data) {
         var mh$ = mln_log_set_callback.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_log_set_callback", callback, user_data);
+                traceDowncall("mln_log_set_callback", callback, user_data, release_user_data);
             }
-            return (int)mh$.invokeExact(callback, user_data);
+            return (int)mh$.invokeExact(callback, user_data, release_user_data);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {

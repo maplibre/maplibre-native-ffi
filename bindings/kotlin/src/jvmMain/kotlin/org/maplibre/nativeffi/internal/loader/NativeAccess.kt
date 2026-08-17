@@ -329,8 +329,8 @@ internal object NativeAccess {
     Status.check(statusInFunction("mln_log_set_async_severity_mask").invokeNative(mask) as Int)
   }
 
-  internal fun setLogCallback(callback: MemorySegment): Int =
-    logSetCallbackFunction().invokeNative(callback, MemorySegment.NULL) as Int
+  internal fun setLogCallback(callback: MemorySegment, release: MemorySegment): Int =
+    logSetCallbackFunction().invokeNative(callback, MemorySegment.NULL, release) as Int
 
   internal fun clearLogCallback(): Int = intFunction("mln_log_clear_callback").invokeNative() as Int
 

@@ -14,8 +14,19 @@ namespace {
 
 class CallbackLogObserver final : public mbgl::Log::Observer {
  public:
-  CallbackLogObserver(mln_log_callback callback, void* user_data)
-      : callback_(callback), user_data_(user_data) {}
+  CallbackLogObserver(
+    mln_log_callback callback, void* user_data,
+    mln_log_callback_release release_user_data
+  )
+      : callback_(callback),
+        user_data_(user_data),
+        release_user_data_(release_user_data) {}
+
+  ~CallbackLogObserver() override {
+    if (release_user_data_ != nullptr) {
+      release_user_data_(user_data_);
+    }
+  }
 
   auto onRecord(
     mbgl::EventSeverity severity, mbgl::Event event, std::int64_t code,
@@ -34,6 +45,7 @@ class CallbackLogObserver final : public mbgl::Log::Observer {
  private:
   mln_log_callback callback_ = nullptr;
   void* user_data_ = nullptr;
+  mln_log_callback_release release_user_data_ = nullptr;
 };
 
 auto set_severity_async(
@@ -46,15 +58,22 @@ auto set_severity_async(
 
 namespace mln::core {
 
-auto set_log_callback(mln_log_callback callback, void* user_data)
-  -> mln_status {
+auto set_log_callback(
+  mln_log_callback callback, void* user_data,
+  mln_log_callback_release release_user_data
+) -> mln_status {
   if (callback == nullptr) {
     mbgl::Log::removeObserver();
+    if (release_user_data != nullptr) {
+      release_user_data(user_data);
+    }
     return MLN_STATUS_OK;
   }
 
   mbgl::Log::setObserver(
-    std::make_unique<CallbackLogObserver>(callback, user_data)
+    std::make_unique<CallbackLogObserver>(
+      callback, user_data, release_user_data
+    )
   );
   return MLN_STATUS_OK;
 }

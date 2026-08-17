@@ -107,6 +107,7 @@
 --include-function mln_log_set_async_severity_mask
 --include-function mln_log_set_callback
 --include-typedef mln_log_callback
+--include-typedef mln_log_callback_release
 --include-constant MLN_ANIMATION_OPTION_DURATION
 --include-constant MLN_ANIMATION_OPTION_EASING
 --include-constant MLN_ANIMATION_OPTION_MIN_ZOOM
