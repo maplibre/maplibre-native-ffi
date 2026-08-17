@@ -58,9 +58,8 @@ func (projection *MapProjectionHandle) ptr() (nativeProjection, func(), error) {
 	return borrow.Handle(), borrow.Release, nil
 }
 
-// Close destroys this projection helper synchronously. It waits for projection
-// calls already running on other goroutines, then releases the projection's
-// map child reservation before it returns.
+// Close destroys this projection helper synchronously after waiting for
+// projection calls already running on other goroutines.
 func (projection *MapProjectionHandle) Close() error {
 	if projection == nil || projection.state == nil {
 		return newBindingError(ErrInvalidArgument, "MapProjectionHandle is nil")

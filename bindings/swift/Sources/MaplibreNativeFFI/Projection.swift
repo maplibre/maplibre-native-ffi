@@ -17,7 +17,7 @@ public struct ProjectedMeters: Equatable, Sendable {
 /// Every call after creation, including close, is synchronous, runs on the
 /// calling thread, and is serialized by a native lock, so a projection is
 /// usable from any thread. A projection never observes map changes made after
-/// its creation; a live projection still prevents map close.
+/// its creation and remains usable after its source map and runtime close.
 public final class MapProjectionHandle: @unchecked Sendable {
   private let handle: NativeHandleBox<NativeMapProjectionHandle>
 
@@ -43,9 +43,8 @@ public final class MapProjectionHandle: @unchecked Sendable {
     handle.isClosed
   }
 
-  /// Closes this projection and releases its map reservation. The native call
-  /// waits for calls already running on other threads before it retires the
-  /// handle.
+  /// Closes this projection. The native call waits for calls already running
+  /// on other threads before it retires the handle.
   public func close() throws {
     try mapNativeFailure {
       try handle.closeOnce { projection in

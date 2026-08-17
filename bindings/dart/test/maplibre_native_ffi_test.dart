@@ -806,9 +806,10 @@ void main() {
         projection.setVisibleGeometry(
           _jsonBytes('{"type":"Point","coordinates":[0,0]}'),
         );
+        await map.close();
+        await runtime.close();
         expect(projection.camera().center, isNotNull);
       } finally {
-        // Close is synchronous and runs before the source map closes.
         projection.close();
         expect(projection.isClosed, isTrue);
         await map.close();

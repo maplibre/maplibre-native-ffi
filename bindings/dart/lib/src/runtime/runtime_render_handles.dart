@@ -5,7 +5,8 @@ part of 'runtime.dart';
 /// Every method is synchronous, runs on the calling isolate's thread, is
 /// internally serialized, and may be called from any isolate. A projection
 /// copies the map's transform state at creation and never observes map
-/// changes made after that; a live projection prevents its map from closing.
+/// changes made after that and remains usable after its source map and runtime
+/// close.
 final class MapProjectionHandle {
   MapProjectionHandle._(NativeMapProjection handle)
     : _state = NativeHandleState(handle, 'MapProjectionHandle');
@@ -112,8 +113,8 @@ final class MapProjectionHandle {
     });
   }
 
-  /// Closes the projection, waiting for projection calls already running on
-  /// other threads, and releases its map reservation before returning.
+  /// Closes the projection after waiting for projection calls already running
+  /// on other threads.
   void close() {
     _state.close(
       (handle) => raw.mln_map_projection_close(handle.raw),

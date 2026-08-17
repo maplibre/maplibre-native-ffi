@@ -20,10 +20,10 @@ extern "C" {
  * Starts creation of a standalone projection from the map's ordered transform
  * state.
  *
- * The returned operation uses the map runtime's notification source. Creation
- * reserves a child before this function returns, so an accepted operation
- * prevents the map from closing. The operation result is a projection handle
- * that copies the map's transform state after every earlier map command. This
+ * The returned operation uses the map runtime's notification source. The
+ * operation result is an independent projection handle that copies the map's
+ * transform state after every earlier map command. Once creation completes,
+ * the projection remains usable after its source map and runtime close. This
  * function may be called from any thread.
  *
  * Every later projection call is synchronous, runs on the calling thread, and
@@ -49,10 +49,9 @@ MLN_API mln_status mln_map_projection_create_take_result(
  * Closes a standalone projection.
  *
  * The close retires the handle, waits for projection calls already running on
- * other threads, destroys the projection, and releases the projection's map
- * child reservation before it returns. A later call with the retired handle
- * returns MLN_STATUS_INVALID_ARGUMENT. This function may be called from any
- * thread.
+ * other threads, and destroys the projection before it returns. A later call
+ * with the retired handle returns MLN_STATUS_INVALID_ARGUMENT. This function
+ * may be called from any thread.
  */
 MLN_API mln_status
 mln_map_projection_close(mln_map_projection projection) MLN_NOEXCEPT;

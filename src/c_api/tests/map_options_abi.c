@@ -615,25 +615,6 @@ static void map_extent_snapshot_tracks_resize_and_scale_factor(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static void map_close_preflight_rejects_live_projection(void) {
-  map_fixture fixture = create_map_fixture();
-  mln_operation create = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_projection_create_start(fixture.map, &create)
-  );
-  wait_for_operation(create);
-  mln_map_projection projection = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_projection_create_take_result(create, &projection)
-  );
-  mln_operation_release(create);
-
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_INVALID_STATE, mln_map_release(fixture.map));
-
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_projection_close(projection));
-  destroy_map_fixture(fixture);
-}
-
 static void released_pending_still_image_does_not_block_map_close(void) {
   map_fixture fixture = create_static_map_fixture();
   mln_operation pending = start_pending_still_image(fixture);
@@ -811,7 +792,6 @@ void run_map_options_abi_tests(void) {
   RUN_TEST(map_debug_options_reject_raw_invalid_arguments);
   RUN_TEST(map_options_default_leaves_fast_pfor_decoding_off);
   RUN_TEST(map_extent_snapshot_tracks_resize_and_scale_factor);
-  RUN_TEST(map_close_preflight_rejects_live_projection);
   RUN_TEST(released_pending_still_image_does_not_block_map_close);
   RUN_TEST(map_close_cancels_observed_pending_still_image);
   RUN_TEST(map_viewport_options_reject_invalid_arguments);

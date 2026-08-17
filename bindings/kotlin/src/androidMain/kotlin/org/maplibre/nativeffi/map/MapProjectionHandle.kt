@@ -16,7 +16,7 @@ import org.maplibre.nativeffi.internal.status.Status
  *
  * Every call is synchronous, runs on the calling thread, is internally serialized, and may be made
  * from any thread. A projection copies the map's transform state at creation and never observes map
- * changes made after that; a live projection prevents its map from closing.
+ * changes made after that and remains usable after its source map and runtime close.
  */
 public actual class MapProjectionHandle internal constructor(private val handleId: Long) {
   private val core = HandleStateCore("MapProjectionHandle", handleId)

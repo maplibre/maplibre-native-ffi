@@ -108,12 +108,13 @@ test "successful close releases lifecycle handles" {
     var map = try maplibre.MapHandle.create(&runtime, .{});
     var projection = try maplibre.MapProjectionHandle.create(&map);
 
-    try projection.close();
-    try projection.close();
     try map.close();
     try map.close();
     try runtime.close();
     try runtime.close();
+    _ = try projection.getCamera();
+    try projection.close();
+    try projection.close();
 }
 
 test "failed close remains retryable" {

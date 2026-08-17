@@ -12,8 +12,8 @@ namespace Maplibre.NativeFfi.Map;
 /// <summary>Any-thread standalone projection handle.</summary>
 /// <remarks>
 /// Every call after creation is synchronous, runs on the calling thread, is internally serialized,
-/// and is thread-safe. A projection copies the map's transform state at creation and never
-/// observes map changes made after that; a live projection prevents its map from closing.
+/// and is thread-safe. A projection copies the map's transform state at creation, never
+/// observes later map changes, and remains usable after its source map and runtime close.
 /// </remarks>
 public sealed unsafe class MapProjectionHandle : IDisposable
 {
@@ -158,8 +158,7 @@ public sealed unsafe class MapProjectionHandle : IDisposable
     }
 
     /// <summary>
-    /// Closes the projection, waiting for projection calls already running on other threads, and
-    /// releases its map reservation before returning.
+    /// Closes the projection after waiting for projection calls already running on other threads.
     /// </summary>
     public void Close() => state.Close();
 

@@ -309,9 +309,9 @@ Child wrappers retain parent owner state whenever native validity depends on the
 parent. Parent close preflight rejects both live children and pending
 child-creation reservations without consuming or closing the parent.
 
-A `MapProjectionHandle` is a child of its source map. Every call after creation,
-including close, is synchronous and usable from any thread, and a live
-projection prevents map close.
+A `MapProjectionHandle` owns a transform snapshot independently of its source
+map and runtime. Every call after creation, including close, is synchronous and
+usable from any thread.
 
 An `OperationHandle` retains its result, diagnostic, notification endpoint, and
 internal work independently of the initiating runtime or map wrapper. The
@@ -1045,7 +1045,7 @@ that a real native failure would expose.
 | BND-040 | Runtime creation followed by explicit close retires the native handle exactly once; every public alias observes closed state, and a second binding close no-ops.                                          |
 | BND-041 | A failed native release preflight leaves the handle live; a later accepted release retires it before returning.                                                                                           |
 | BND-042 | A parent close rejects a live or pending child, leaves the parent open, and succeeds after the child closes or creation resolves.                                                                         |
-| BND-043 | A map projection remains usable until explicit close; a live projection prevents map close.                                                                                                               |
+| BND-043 | A map projection remains usable until explicit close, including after its source map and runtime close.                                                                                                   |
 | BND-044 | Releasing an operation observer does not cancel or stall accepted native work, and native teardown preserves every dependency it still needs.                                                             |
 | BND-045 | A released handle's id, replayed through an internal seam after a new handle of the same kind is created, reports the binding's invalid-argument error naming it stale, and the new handle keeps working. |
 | BND-047 | A handle id of one kind passed to another kind's operation through an internal seam reports the binding's invalid-argument error, and the safe public API has no expression of that call.                 |

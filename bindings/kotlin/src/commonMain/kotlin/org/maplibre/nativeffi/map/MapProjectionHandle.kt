@@ -10,7 +10,7 @@ import org.maplibre.nativeffi.geo.ScreenPoint
  *
  * Every call is synchronous, runs on the calling thread, is internally serialized, and may be made
  * from any thread. A projection copies the map's transform state at creation and never observes map
- * changes made after that; a live projection prevents its map from closing.
+ * changes made after that and remains usable after its source map and runtime close.
  */
 public expect class MapProjectionHandle {
   /** Copies the projection camera, observing every earlier projection setter. */
@@ -33,9 +33,6 @@ public expect class MapProjectionHandle {
 
   public val isClosed: Boolean
 
-  /**
-   * Closes the projection, waiting for projection calls already running on other threads, and
-   * releases its map reservation before returning.
-   */
+  /** Closes the projection after waiting for projection calls already running on other threads. */
   public fun close()
 }

@@ -2036,74 +2036,6 @@ class PendingMapResult final {
   mln_map value_ = MLN_HANDLE_NULL;
 };
 
-class PendingProjectionResult final {
- public:
-  explicit PendingProjectionResult(std::shared_ptr<MapProjectionObject> value)
-      : value_(new std::shared_ptr<MapProjectionObject>{std::move(value)}) {}
-
-  PendingProjectionResult(const PendingProjectionResult&) = delete;
-  PendingProjectionResult(PendingProjectionResult&&) = delete;
-  auto operator=(const PendingProjectionResult&)
-    -> PendingProjectionResult& = delete;
-  auto operator=(PendingProjectionResult&&)
-    -> PendingProjectionResult& = delete;
-
-  ~PendingProjectionResult() {
-    if (value_ == nullptr) {
-      return;
-    }
-    auto runtime = (*value_)->runtime_state;
-    auto* value = std::exchange(value_, nullptr);
-    auto cleanup = [value]() mutable -> void {
-      (*value)->projection.reset();
-      (*value)->parent->control.release_child();
-      (*value)->parent.reset();
-      delete value;
-    };
-    if (runtime->executor.is_worker_thread()) {
-      cleanup();
-      return;
-    }
-    try {
-      runtime->executor.invoke(std::move(cleanup));
-    } catch (...) {
-      // A stopped runtime cannot safely destroy MapLibre state. Process
-      // teardown reclaims this unreachable allocation.
-    }
-  }
-
-  [[nodiscard]] auto value() const
-    -> const std::shared_ptr<MapProjectionObject>& {
-    return *value_;
-  }
-
-  auto transfer() noexcept -> void { delete std::exchange(value_, nullptr); }
-
- private:
-  std::shared_ptr<MapProjectionObject>* value_;
-};
-
-class ChildReservationGuard final {
- public:
-  explicit ChildReservationGuard(ControlState& state) noexcept
-      : state_(&state) {}
-  ChildReservationGuard(const ChildReservationGuard&) = delete;
-  ChildReservationGuard(ChildReservationGuard&&) = delete;
-  auto operator=(const ChildReservationGuard&)
-    -> ChildReservationGuard& = delete;
-  auto operator=(ChildReservationGuard&&) -> ChildReservationGuard& = delete;
-  ~ChildReservationGuard() {
-    if (state_ != nullptr) {
-      state_->abandon_child_reservation();
-    }
-  }
-
-  auto dismiss() noexcept -> void { state_ = nullptr; }
-
- private:
-  ControlState* state_;
-};
-
 }  // namespace mln::core
 
 namespace mln::core {
@@ -4108,10 +4040,6 @@ auto map_projection_create_start(mln_map map, mln_operation* out_operation)
   if (parent == nullptr) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (!parent->control.reserve_child()) {
-    return MLN_STATUS_INVALID_STATE;
-  }
-  auto reservation = ChildReservationGuard{parent->control};
   auto runtime = lease_runtime(parent->runtime);
   if (runtime == nullptr) {
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -4125,36 +4053,23 @@ auto map_projection_create_start(mln_map map, mln_operation* out_operation)
     return register_status;
   }
   const auto operation = *out_operation;
-  const auto submit_status = submit_runtime_operation(
-    runtime, state, [parent, runtime, state]() mutable -> void {
+  const auto submit_status =
+    submit_runtime_operation(runtime, state, [parent, state]() mutable -> void {
       try {
         auto projection = std::make_shared<MapProjectionObject>();
-        projection->parent = parent;
-        projection->runtime_state = runtime;
         projection->projection =
           std::make_unique<mbgl::MapProjection>(*parent->map);
-        parent->control.commit_child();
-        state->complete(
-          MLN_STATUS_OK, {},
-          std::any{
-            std::make_shared<PendingProjectionResult>(std::move(projection))
-          }
-        );
+        state->complete(MLN_STATUS_OK, {}, std::any{std::move(projection)});
       } catch (...) {
-        parent->control.abandon_child_reservation();
         state->complete(
           MLN_STATUS_NATIVE_ERROR, exception_message(std::current_exception()),
           {}
         );
       }
-    }
-  );
+    });
   if (submit_status != MLN_STATUS_OK) {
     abandon_operation(operation);
     *out_operation = MLN_HANDLE_NULL;
-  }
-  if (submit_status == MLN_STATUS_OK) {
-    reservation.dismiss();
   }
   return submit_status;
 }
@@ -4162,9 +4077,9 @@ auto map_projection_create_start(mln_map map, mln_operation* out_operation)
 auto map_projection_create_take_result(
   mln_operation operation, mln_map_projection* out_projection
 ) -> mln_status {
-  return take_operation_result<std::shared_ptr<PendingProjectionResult>>(
+  return take_operation_result<std::shared_ptr<MapProjectionObject>>(
     operation, projection_operation_create,
-    [out_projection](std::shared_ptr<PendingProjectionResult>& result)
+    [out_projection](std::shared_ptr<MapProjectionObject>& result)
       -> mln_status {
       if (out_projection == nullptr) {
         set_thread_error("out_projection must not be null");
@@ -4174,9 +4089,7 @@ auto map_projection_create_take_result(
         set_thread_error("out_projection must point to the null handle");
         return MLN_STATUS_INVALID_ARGUMENT;
       }
-      *out_projection =
-        handle_table<MapProjectionObject>().insert(result->value());
-      result->transfer();
+      *out_projection = handle_table<MapProjectionObject>().insert(result);
       return MLN_STATUS_OK;
     }
   );
@@ -4200,13 +4113,6 @@ auto map_projection_close(mln_map_projection projection) -> mln_status {
     const std::scoped_lock call_lock(owned->call_mutex);
     owned->projection.reset();
   }
-  // Drops this close's parent reference before releasing the child slot, so a
-  // concurrent map close never leaves this thread holding the last MapObject
-  // reference. The map cannot begin closing while the child slot is held, so
-  // the control state stays valid in between.
-  auto& parent_control = owned->parent->control;
-  owned->parent.reset();
-  parent_control.release_child();
   return MLN_STATUS_OK;
 }
 

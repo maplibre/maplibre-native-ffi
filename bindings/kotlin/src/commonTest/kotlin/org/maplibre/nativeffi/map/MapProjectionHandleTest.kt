@@ -12,7 +12,6 @@ import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.CameraUpdate
 import org.maplibre.nativeffi.camera.EdgeInsets
-import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.runtime.RuntimeHandle
@@ -75,18 +74,15 @@ class MapProjectionHandleTest {
       assertEquals(0.0, offThreadRoundTrip.latitude, 0.000001)
       assertEquals(0.0, offThreadRoundTrip.longitude, 0.000001)
 
-      // A live projection prevents map close.
-      assertFailsWith<InvalidStateException> {
-        org.maplibre.nativeffi.runtime.runSuspendTest { map.close() }
-      }
-      assertNotNull(projection.camera().zoom)
-      projection.close()
       map.close()
       runtime.close()
+      // The projection owns its snapshot independently of both source handles.
+      assertNotNull(projection.camera().zoom)
+      projection.close()
 
       assertTrue(projection.isClosed)
       projection.close()
-      assertFailsWith<InvalidStateException> { projection.camera() }
+      assertFailsWith<org.maplibre.nativeffi.error.InvalidStateException> { projection.camera() }
     }
 
   @Test

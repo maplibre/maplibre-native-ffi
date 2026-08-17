@@ -2360,6 +2360,18 @@ def test_map_projection_converts_coordinates_and_closes() -> None:
             projection.get_camera()
 
 
+def test_map_projection_outlives_its_source_handles() -> None:
+    runtime = mln.RuntimeHandle()
+    map_handle = runtime.create_map()
+    projection = map_handle.create_projection()
+
+    map_handle.close()
+    runtime.close()
+
+    assert isinstance(projection.get_camera(), camera.CameraOptions)
+    projection.close()
+
+
 def test_offline_region_operation_starts_return_public_handles(tmp_path: Path) -> None:
     definition = offline.OfflineTilePyramidRegionDefinition(
         style_url="https://example.test/style.json",

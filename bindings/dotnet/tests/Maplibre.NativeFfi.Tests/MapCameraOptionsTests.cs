@@ -240,7 +240,7 @@ public sealed class MapCameraOptionsTests
         Assert.NotEmpty(error.Diagnostic);
     }
 
-    [BindingSpecTest("BND-103")]
+    [BindingSpecTest("BND-043", "BND-103")]
     [Fact]
     public async Task CoordinateProjectionRoundTripsThroughNativeMap()
     {
@@ -310,6 +310,10 @@ public sealed class MapCameraOptionsTests
             TestContext.Current.CancellationToken
         );
         AssertClose(coordinate, threadRoundTrip);
+
+        map.Close();
+        runtime.Close();
+        AssertClose(coordinate, projection.LatLngForPixel(projection.PixelForLatLng(coordinate)));
 
         // Close is synchronous and idempotent through Dispose.
         projection.Close();

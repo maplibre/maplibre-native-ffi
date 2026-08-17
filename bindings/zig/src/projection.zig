@@ -33,7 +33,7 @@ var projection_registry: std.AutoHashMapUnmanaged(c.mln_map_projection, *Project
 /// Creation is an operation ordered after every earlier map command; every
 /// later call is synchronous, callable from any thread, and internally
 /// serialized. A projection never observes map changes made after its
-/// creation, and a live projection prevents its map from closing.
+/// creation and remains usable after its source map and runtime close.
 pub const MapProjectionHandle = enum(c.mln_map_projection) {
     _,
 
@@ -134,8 +134,8 @@ pub const MapProjectionHandle = enum(c.mln_map_projection) {
         return values.latLngFromNative(coordinate);
     }
 
-    /// Closes the projection before returning and releases the projection's
-    /// map child reservation. Synchronous, callable from any thread.
+    /// Closes the projection before returning. Synchronous, callable from any
+    /// thread.
     pub fn close(self: *MapProjectionHandle) status.Error!void {
         const projection_close = try beginProjectionClose(self.*) orelse return;
         status.checkStatus(c.mln_map_projection_close(projection_close.native), projection_close.diagnostic_store) catch |err| {

@@ -43,9 +43,7 @@ static mln_camera_options read_camera(mln_map_projection projection) {
   return camera;
 }
 
-static void creation_has_synchronous_preflight_and_close_retires_the_handle(
-  void
-) {
+static void projection_outlives_its_source_map_and_runtime(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
 
@@ -62,7 +60,7 @@ static void creation_has_synchronous_preflight_and_close_retires_the_handle(
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_projection_create_start(map, &operation)
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_INVALID_STATE, mln_map_release(map));
+  mln_test_destroy_map(map);
   wait_completed(operation);
 
   mln_map_projection projection = UINT64_C(77);
@@ -75,6 +73,10 @@ static void creation_has_synchronous_preflight_and_close_retires_the_handle(
     MLN_STATUS_OK, mln_map_projection_create_take_result(operation, &projection)
   );
   mln_operation_release(operation);
+
+  mln_test_destroy_runtime(runtime);
+  const mln_camera_options source_camera = read_camera(projection);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-7, 0.0, source_camera.latitude);
 
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_projection_close(projection));
 
@@ -100,9 +102,6 @@ static void creation_has_synchronous_preflight_and_close_retires_the_handle(
       projection, (mln_lat_lng){.latitude = 0.0, .longitude = 0.0}, &point
     )
   );
-
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
 }
 
 static void creation_observes_earlier_map_camera_commands(void) {
@@ -282,7 +281,7 @@ static void projection_handles_are_callable_from_foreign_threads(void) {
 
 void run_projection_abi_tests(void) {
   UnitySetTestFile(__FILE__);
-  RUN_TEST(creation_has_synchronous_preflight_and_close_retires_the_handle);
+  RUN_TEST(projection_outlives_its_source_map_and_runtime);
   RUN_TEST(creation_observes_earlier_map_camera_commands);
   RUN_TEST(setters_apply_before_return_and_conversions_round_trip);
   RUN_TEST(projection_handles_are_callable_from_foreign_threads);

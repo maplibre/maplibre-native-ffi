@@ -116,7 +116,7 @@ func TestMapProjectionObservesEarlierMapCommands(t *testing.T) {
 	}
 }
 
-func TestMapProjectionClosesBeforeMap(t *testing.T) {
+func TestMapProjectionOutlivesMapAndRuntime(t *testing.T) {
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -133,6 +133,12 @@ func TestMapProjectionClosesBeforeMap(t *testing.T) {
 		t.Fatalf("NewProjection(): %v", err)
 	}
 	coordinate := LatLng{Latitude: 0, Longitude: 0}
+	if err := m.Close(); err != nil {
+		t.Fatalf("Map Close(): %v", err)
+	}
+	if err := runtime.Close(); err != nil {
+		t.Fatalf("Runtime Close(): %v", err)
+	}
 	point, err := projection.PixelForLatLng(coordinate)
 	if err != nil {
 		t.Fatalf("PixelForLatLng(): %v", err)
@@ -147,16 +153,9 @@ func TestMapProjectionClosesBeforeMap(t *testing.T) {
 	if diff := roundTripped.Longitude - coordinate.Longitude; diff < -1e-7 || diff > 1e-7 {
 		t.Fatalf("longitude round trip = %f, want %f", roundTripped.Longitude, coordinate.Longitude)
 	}
-	// Close is synchronous: when it returns, the handle is retired and the map
-	// can close.
+	// Close is synchronous: when it returns, the independent handle is retired.
 	if err := projection.Close(); err != nil {
 		t.Fatalf("Projection Close(): %v", err)
-	}
-	if err := m.Close(); err != nil {
-		t.Fatalf("Map Close(): %v", err)
-	}
-	if err := runtime.Close(); err != nil {
-		t.Fatalf("Runtime Close(): %v", err)
 	}
 	if _, err := projection.PixelForLatLng(coordinate); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("PixelForLatLng() after close error = %v, want ErrInvalidArgument", err)

@@ -32,7 +32,7 @@ import org.maplibre.nativeffi.internal.struct.MapStructs
  *
  * Every call is synchronous, runs on the calling thread, is internally serialized, and may be made
  * from any thread. A projection copies the map's transform state at creation and never observes map
- * changes made after that; a live projection prevents its map from closing.
+ * changes made after that and remains usable after its source map and runtime close.
  */
 @OptIn(ExperimentalForeignApi::class)
 public actual class MapProjectionHandle internal constructor(handle: NativeMapProjection) {

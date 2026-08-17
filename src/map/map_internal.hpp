@@ -68,8 +68,6 @@ struct MapProjectionObject {
   // Serializes every synchronous projection call, including close, so callers
   // may use one handle from any thread.
   std::mutex call_mutex;
-  std::shared_ptr<MapObject> parent;
-  std::shared_ptr<RuntimeObject> runtime_state;
   // Null once close has destroyed the projection; guarded by call_mutex.
   std::unique_ptr<mbgl::MapProjection> projection;
 

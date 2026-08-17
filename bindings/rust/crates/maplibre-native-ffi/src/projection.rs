@@ -1,5 +1,5 @@
 use std::fmt;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use maplibre_native_ffi_core as maplibre_core;
 use maplibre_native_ffi_core::ptr::const_ptr_or_null;
@@ -8,7 +8,7 @@ use maplibre_native_ffi_sys as sys;
 
 use crate::camera::CameraOptionsNativeExt;
 use crate::handle::{ConcurrentNativeHandle, closed_handle_error, out_handle};
-use crate::runtime::{RuntimeState, wait_raw_operation_completed};
+use crate::runtime::wait_raw_operation_completed;
 use crate::values::NativeValue;
 use crate::{
     CameraOptions, EdgeInsets, Error, HandleOperationError, LatLng, MapHandle, Result, ScreenPoint,
@@ -17,18 +17,14 @@ use crate::{
 #[derive(Debug)]
 pub(crate) struct MapProjectionState {
     handle: ConcurrentNativeHandle<sys::mln_map_projection>,
-    runtime: Mutex<Option<Arc<RuntimeState>>>,
 }
 
 impl MapProjectionState {
-    fn new(native: sys::mln_map_projection, runtime: Arc<RuntimeState>) -> Result<Self> {
+    fn new(native: sys::mln_map_projection) -> Result<Self> {
         // SAFETY: native came from the typed creation take and projection
         // control state supports calls from any thread.
         let handle = unsafe { ConcurrentNativeHandle::from_handle(native, "mln_map_projection") }?;
-        Ok(Self {
-            handle,
-            runtime: Mutex::new(Some(runtime)),
-        })
+        Ok(Self { handle })
     }
 
     fn native(&self) -> Result<sys::mln_map_projection> {
@@ -47,10 +43,6 @@ impl MapProjectionState {
         // already running on other threads before it retires the handle.
         maplibre_core::check(unsafe { sys::mln_map_projection_close(projection) })?;
         self.handle.mark_closed();
-        self.runtime
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .take();
         Ok(())
     }
 }
@@ -68,7 +60,8 @@ impl Drop for MapProjectionState {
 /// Every call after creation is synchronous, runs on the calling thread, and
 /// is internally serialized, so a projection is usable from any thread. A
 /// projection copies the map transform once at creation and never observes
-/// map changes made after it; a live projection still prevents map close.
+/// map changes made after it and remains usable after that map and its runtime
+/// close.
 pub struct MapProjectionHandle {
     inner: Arc<MapProjectionState>,
 }
@@ -84,14 +77,6 @@ impl fmt::Debug for MapProjectionHandle {
 impl MapProjectionHandle {
     pub(crate) fn new(map: &MapHandle) -> Result<Self> {
         let map_ptr = map.inner.native()?;
-        let runtime = map
-            .inner
-            .runtime
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .as_ref()
-            .cloned()
-            .ok_or_else(|| closed_handle_error("MapHandle"))?;
         let mut operation = sys::mln_operation(0);
         maplibre_core::check(unsafe {
             sys::mln_map_projection_create_start(map_ptr, &mut operation)
@@ -103,10 +88,10 @@ impl MapProjectionHandle {
                 sys::mln_map_projection_create_take_result(operation, out.as_mut_ptr())
             })?;
             Ok(Self {
-                inner: Arc::new(MapProjectionState::new(
-                    out_handle(out, "mln_map_projection")?,
-                    runtime,
-                )?),
+                inner: Arc::new(MapProjectionState::new(out_handle(
+                    out,
+                    "mln_map_projection",
+                )?)?),
             })
         })();
         // SAFETY: this call owns the operation observer.
@@ -114,7 +99,7 @@ impl MapProjectionHandle {
         result
     }
 
-    /// Closes the projection synchronously and releases its map reservation.
+    /// Closes the projection synchronously.
     pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
         self.inner
             .close()
@@ -238,12 +223,12 @@ mod tests {
         assert!((center_point.x - 256.0).abs() < 1e-6);
         assert!((center_point.y - 256.0).abs() < 1e-6);
 
+        map.close().unwrap();
+        runtime.close().unwrap();
         let round_tripped = projection.lat_lng_for_pixel(center_point).unwrap();
         assert!((round_tripped.latitude - center.latitude).abs() < 1e-7);
         assert!((round_tripped.longitude - center.longitude).abs() < 1e-7);
         projection.close().unwrap();
-        map.close().unwrap();
-        runtime.close().unwrap();
     }
 
     #[test]

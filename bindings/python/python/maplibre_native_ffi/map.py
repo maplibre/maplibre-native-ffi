@@ -483,8 +483,8 @@ class MapProjectionHandle(NativeHandleMixin):
     Every method is synchronous, thread-safe, and internally serialized. A
     projection copies the map transform once at creation and never observes
     map changes made after that, while its own setters apply before they
-    return, so a later read or conversion observes them. A live projection
-    prevents its map from closing.
+    return, so a later read or conversion observes them. The projection remains
+    usable after its source map and runtime close.
     """
 
     _handle_name = "MapProjectionHandle"
@@ -529,9 +529,8 @@ class MapProjectionHandle(NativeHandleMixin):
     def close(self) -> None:
         """Release this projection handle exactly once.
 
-        The close is synchronous: it waits for projection calls already
-        running on other threads and releases the projection's map child
-        reservation before it returns.
+        The close is synchronous and waits for projection calls already running
+        on other threads before it returns.
         """
         self._native.close()
 

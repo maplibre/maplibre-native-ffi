@@ -77,8 +77,8 @@ until their frame or owner is closed.
 
 Projection handles are created asynchronously and are synchronous after that:
 every projection call, `close()` included, runs on the calling isolate's thread,
-may be made from any isolate, and never observes map changes made after
-creation. A live projection prevents its map from closing.
+may be made from any isolate, and never observes map changes made after creation
+and remains usable after its source map and runtime close.
 
 Create runtimes and maps with `await`. Runtime and map commands copy their input
 and return a command ID immediately. Snapshot methods synchronously copy
