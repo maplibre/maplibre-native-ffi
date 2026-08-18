@@ -18,17 +18,7 @@ import org.maplibre.nativeffi.log.LogSeverity
 @OptIn(ExperimentalAtomicApi::class)
 internal class LogCallbackState private constructor(private val callback: LogCallback) :
   AutoCloseable {
-  private val gate = CallbackGate("log callbacks") { nativeCallback.close() }
-  private val nativeCallback =
-    object : MaplibreNativeC.mln_log_callback() {
-      override fun call(
-        userData: Pointer?,
-        severity: Int,
-        event: Int,
-        code: Long,
-        message: BytePointer?,
-      ): Int = invoke(severity, event, code, message)
-    }
+  private val gate = CallbackGate("log callbacks")
 
   fun invoke(rawSeverity: Int, rawEvent: Int, code: Long, message: BytePointer?): Int {
     val lease = gate.enter() ?: return 0
@@ -60,8 +50,8 @@ internal class LogCallbackState private constructor(private val callback: LogCal
 
     fun set(callback: LogCallback) {
       NativeAccess.ensureLoaded()
-      replace(callback) { replacement ->
-        Status.check(MaplibreNativeC.mln_log_set_callback(replacement.nativeCallback, null))
+      replace(callback) {
+        Status.check(MaplibreNativeC.mln_log_set_callback(NATIVE_CALLBACK, null))
       }
     }
 
@@ -75,8 +65,16 @@ internal class LogCallbackState private constructor(private val callback: LogCal
       try {
         withUpdateLock {
           current.load()?.checkCanClose()
-          register(replacement)
+          // Publish before native install. The shared thunk dispatches through `current`, so
+          // installing first would deliver logs to the previous callback until exchange.
           previous = current.exchange(replacement)
+          try {
+            register(replacement)
+          } catch (error: Throwable) {
+            current.store(previous)
+            previous = null
+            throw error
+          }
         }
       } catch (error: Throwable) {
         closeAndSuppress(error, replacement)
@@ -115,6 +113,21 @@ internal class LogCallbackState private constructor(private val callback: LogCal
         error.addSuppressed(cleanup)
       }
     }
+
+    /**
+     * One process-wide thunk. JavaCPP's FunctionPointer pool is ten slots per generated class, so
+     * per-registration thunks would fail once eleven log callbacks were live at once.
+     */
+    private val NATIVE_CALLBACK =
+      object : MaplibreNativeC.mln_log_callback() {
+        override fun call(
+          userData: Pointer?,
+          severity: Int,
+          event: Int,
+          code: Long,
+          message: BytePointer?,
+        ): Int = current.load()?.invoke(severity, event, code, message) ?: 0
+      }
 
     private inline fun <R> withUpdateLock(block: () -> R): R {
       while (!updateLock.compareAndSet(0, 1)) {
