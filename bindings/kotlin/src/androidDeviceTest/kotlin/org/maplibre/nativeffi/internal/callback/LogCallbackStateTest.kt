@@ -79,6 +79,19 @@ class LogCallbackStateTest {
     }
   }
 
+  @Test
+  fun elevenReplacementsKeepTheSharedThunkCallable() {
+    try {
+      repeat(11) { index ->
+        LogCallbackState.setForTesting(LogCallback { it.code == index.toLong() })
+        val state = assertNotNull(LogCallbackState.currentForTesting())
+        assertEquals(1, state.invoke(0, 0, index.toLong(), null))
+      }
+    } finally {
+      LogCallbackState.clearForTesting()
+    }
+  }
+
   private fun install(callback: LogCallback): LogCallbackState {
     LogCallbackState.setForTesting(callback)
     return assertNotNull(LogCallbackState.currentForTesting())

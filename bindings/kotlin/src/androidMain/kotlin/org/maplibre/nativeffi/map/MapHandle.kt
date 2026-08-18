@@ -2562,26 +2562,12 @@ internal class CustomGeometrySourceState(
 ) : AutoCloseable {
   private val token = TOKENS.getAndIncrement()
   private val gate = CallbackGate("custom geometry callbacks", ::closeNative)
-  // JavaCPP passes null for a null void* and drops the upcall if the Kotlin
-  // override rejects it, so every parameter stays nullable.
-  private val fetchTile =
-    object : MaplibreNativeC.mln_custom_geometry_source_tile_callback() {
-      override fun call(userData: Pointer?, tileId: MaplibreNativeC.mln_canonical_tile_id?) {
-        fetchTile(tileId)
-      }
-    }
-  private val cancelTile =
-    object : MaplibreNativeC.mln_custom_geometry_source_tile_callback() {
-      override fun call(userData: Pointer?, tileId: MaplibreNativeC.mln_canonical_tile_id?) {
-        cancelTile(tileId)
-      }
-    }
   val descriptor: MaplibreNativeC.mln_custom_geometry_source_options =
     MaplibreNativeC.mln_custom_geometry_source_options_default()
 
   init {
-    descriptor.fetch_tile(fetchTile)
-    descriptor.cancel_tile(cancelTile)
+    descriptor.fetch_tile(FETCH_TILE)
+    descriptor.cancel_tile(CANCEL_TILE)
     descriptor.release_user_data(RELEASE_CALLBACK)
     descriptor.user_data(AddressPointer(token))
     STATES[token] = this
@@ -2654,8 +2640,6 @@ internal class CustomGeometrySourceState(
   private fun closeNative() {
     STATES.remove(token)
     descriptor.close()
-    fetchTile.close()
-    cancelTile.close()
   }
 
   private fun canonicalTileId(tileId: MaplibreNativeC.mln_canonical_tile_id): CanonicalTileId =
@@ -2672,9 +2656,27 @@ internal class CustomGeometrySourceState(
     private val STATES = ConcurrentHashMap<Long, CustomGeometrySourceState>()
 
     /**
-     * One process-wide release callback, so releasing a state can close that state's own callbacks.
-     * A per-state callback would be one of the callbacks it has to close.
+     * One process-wide thunk per callback type. JavaCPP's FunctionPointer pool is ten slots per
+     * generated class, and fetch_tile and cancel_tile share a class, so per-source thunks ran out
+     * at six live sources.
+     *
+     * JavaCPP passes null for a null void* and drops the upcall if the Kotlin override rejects it,
+     * so every parameter stays nullable.
      */
+    private val FETCH_TILE =
+      object : MaplibreNativeC.mln_custom_geometry_source_tile_callback() {
+        override fun call(userData: Pointer?, tileId: MaplibreNativeC.mln_canonical_tile_id?) {
+          STATES[userData?.address() ?: 0L]?.fetchTile(tileId)
+        }
+      }
+
+    private val CANCEL_TILE =
+      object : MaplibreNativeC.mln_custom_geometry_source_tile_callback() {
+        override fun call(userData: Pointer?, tileId: MaplibreNativeC.mln_canonical_tile_id?) {
+          STATES[userData?.address() ?: 0L]?.cancelTile(tileId)
+        }
+      }
+
     private val RELEASE_CALLBACK =
       object : MaplibreNativeC.mln_custom_geometry_source_release_callback() {
         override fun call(userData: Pointer?) {
@@ -2700,26 +2702,12 @@ internal class CustomMvtVectorSourceState(
 ) : AutoCloseable {
   private val token = TOKENS.getAndIncrement()
   private val gate = CallbackGate("custom MVT vector callbacks", ::closeNative)
-  // JavaCPP passes null for a null void* and drops the upcall if the Kotlin
-  // override rejects it, so every parameter stays nullable.
-  private val fetchTile =
-    object : MaplibreNativeC.mln_custom_mvt_vector_source_tile_callback() {
-      override fun call(userData: Pointer?, tileId: MaplibreNativeC.mln_canonical_tile_id?) {
-        fetchTile(tileId)
-      }
-    }
-  private val cancelTile =
-    object : MaplibreNativeC.mln_custom_mvt_vector_source_tile_callback() {
-      override fun call(userData: Pointer?, tileId: MaplibreNativeC.mln_canonical_tile_id?) {
-        cancelTile(tileId)
-      }
-    }
   val descriptor: MaplibreNativeC.mln_custom_mvt_vector_source_options =
     MaplibreNativeC.mln_custom_mvt_vector_source_options_default()
 
   init {
-    descriptor.fetch_tile(fetchTile)
-    descriptor.cancel_tile(cancelTile)
+    descriptor.fetch_tile(FETCH_TILE)
+    descriptor.cancel_tile(CANCEL_TILE)
     descriptor.release_user_data(RELEASE_CALLBACK)
     descriptor.user_data(AddressPointer(token))
     STATES[token] = this
@@ -2772,8 +2760,6 @@ internal class CustomMvtVectorSourceState(
   private fun closeNative() {
     STATES.remove(token)
     descriptor.close()
-    fetchTile.close()
-    cancelTile.close()
   }
 
   private fun canonicalTileId(tileId: MaplibreNativeC.mln_canonical_tile_id): CanonicalTileId =
@@ -2790,9 +2776,27 @@ internal class CustomMvtVectorSourceState(
     private val STATES = ConcurrentHashMap<Long, CustomMvtVectorSourceState>()
 
     /**
-     * One process-wide release callback, so releasing a state can close that state's own callbacks.
-     * A per-state callback would be one of the callbacks it has to close.
+     * One process-wide thunk per callback type. JavaCPP's FunctionPointer pool is ten slots per
+     * generated class, and fetch_tile and cancel_tile share a class, so per-source thunks ran out
+     * at six live sources.
+     *
+     * JavaCPP passes null for a null void* and drops the upcall if the Kotlin override rejects it,
+     * so every parameter stays nullable.
      */
+    private val FETCH_TILE =
+      object : MaplibreNativeC.mln_custom_mvt_vector_source_tile_callback() {
+        override fun call(userData: Pointer?, tileId: MaplibreNativeC.mln_canonical_tile_id?) {
+          STATES[userData?.address() ?: 0L]?.fetchTile(tileId)
+        }
+      }
+
+    private val CANCEL_TILE =
+      object : MaplibreNativeC.mln_custom_mvt_vector_source_tile_callback() {
+        override fun call(userData: Pointer?, tileId: MaplibreNativeC.mln_canonical_tile_id?) {
+          STATES[userData?.address() ?: 0L]?.cancelTile(tileId)
+        }
+      }
+
     private val RELEASE_CALLBACK =
       object : MaplibreNativeC.mln_custom_mvt_vector_source_release_callback() {
         override fun call(userData: Pointer?) {

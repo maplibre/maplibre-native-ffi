@@ -1,6 +1,8 @@
 package org.maplibre.nativeffi.internal.callback
 
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.Pointer
 import org.maplibre.nativeffi.error.MaplibreStatus
@@ -12,22 +14,15 @@ import org.maplibre.nativeffi.resource.ResourceKind
 
 internal class HttpHeaderTransformState(private val callback: HttpHeaderTransformCallback) :
   AutoCloseable {
+  private val token = TOKENS.getAndIncrement()
   private val gate = CallbackGate("HTTP header transform callbacks") { closeNative() }
-  private val nativeCallback =
-    object : MaplibreNativeC.mln_http_header_transform_callback() {
-      override fun call(
-        userData: Pointer?,
-        kind: Int,
-        url: BytePointer?,
-        response: MaplibreNativeC.mln_http_header_transform_response?,
-      ): Int = invoke(kind, url, response)
-    }
   private val transform = MaplibreNativeC.mln_http_header_transform()
 
   init {
     transform.size(transform.sizeof())
-    transform.callback(nativeCallback)
-    transform.user_data(null)
+    transform.callback(NATIVE_CALLBACK)
+    transform.user_data(JavaCppSupport.addressPointer(token))
+    STATES[token] = this
   }
 
   fun descriptor(): MaplibreNativeC.mln_http_header_transform = transform
@@ -70,8 +65,8 @@ internal class HttpHeaderTransformState(private val callback: HttpHeaderTransfor
   override fun close() = gate.close()
 
   private fun closeNative() {
+    STATES.remove(token)
     transform.close()
-    nativeCallback.close()
   }
 
   private fun setResponseHeader(
@@ -94,5 +89,26 @@ internal class HttpHeaderTransformState(private val callback: HttpHeaderTransfor
         )
       }
     }
+  }
+
+  private companion object {
+    private val TOKENS = AtomicLong(1)
+    private val STATES = ConcurrentHashMap<Long, HttpHeaderTransformState>()
+
+    /**
+     * One process-wide thunk. JavaCPP's FunctionPointer pool is ten slots per generated class, so
+     * per-runtime thunks ran out at eleven live runtimes.
+     */
+    private val NATIVE_CALLBACK =
+      object : MaplibreNativeC.mln_http_header_transform_callback() {
+        override fun call(
+          userData: Pointer?,
+          kind: Int,
+          url: BytePointer?,
+          response: MaplibreNativeC.mln_http_header_transform_response?,
+        ): Int =
+          STATES[userData?.address() ?: 0L]?.invoke(kind, url, response)
+            ?: MaplibreStatus.INVALID_ARGUMENT.nativeCode
+      }
   }
 }
