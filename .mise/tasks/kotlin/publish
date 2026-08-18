@@ -191,10 +191,15 @@ publish_linux_leaves() {
     -Pkotlin.native.enableKlibsCrossCompilation=true \
     "${vulkan[@]}"
 
-  ./gradlew \
-    -Pkotlin.native.enableKlibsCrossCompilation=true \
-    -PmaplibreNativeCInstallDir="$install_root/linux-arm64-egl" \
-    :bindings:kotlin:linkDebugTestLinuxArm64
+  # linuxTest links libEGL from the host. The x64 Maven staging job
+  # cross-compiles linuxArm64 KLIBs above; ARM CI links and runs the tests
+  # natively on ubuntu-24.04-arm.
+  if [[ "$(uname -s)" == Linux && "$(uname -m)" == aarch64 ]]; then
+    ./gradlew \
+      -Pkotlin.native.enableKlibsCrossCompilation=true \
+      -PmaplibreNativeCInstallDir="$install_root/linux-arm64-egl" \
+      :bindings:kotlin:linkDebugTestLinuxArm64
+  fi
 }
 
 publish_apple_leaves() {
