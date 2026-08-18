@@ -115,6 +115,15 @@ kotlin {
     }
 
     commonTest.dependencies { implementation(kotlin("test")) }
+
+    jvmTest.dependencies {
+      val lwjglNative = hostPlatform.lwjglNativeClassifier
+      implementation(platform(libs.lwjgl.bom))
+      implementation(libs.lwjgl)
+      implementation(libs.lwjgl.egl)
+      runtimeOnly(variantOf(libs.lwjgl) { classifier(lwjglNative) })
+      runtimeOnly(variantOf(libs.lwjgl.egl) { classifier(lwjglNative) })
+    }
   }
 }
 
