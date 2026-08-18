@@ -7,19 +7,54 @@ import org.maplibre.nativeffi.map.MapHandle
 
 private const val EGL_OPENGL_ES3_BIT = 0x00000040
 
-internal actual object OwnedTextureQuerySupport {
-  actual fun attach(map: MapHandle, width: Int, height: Int): OwnedTextureQuerySession? {
+internal actual object OwnedTextureTestSupport {
+  actual fun attach(map: MapHandle, width: Int, height: Int): OwnedTextureTestSession? {
     if (RenderBackend.OPENGL !in Maplibre.supportedRenderBackends()) return null
     return createEglSession(map, width, height)
   }
 }
 
-private class AndroidEglQuerySession(
+private class AndroidEglOwnedTextureSession(
   private val display: android.opengl.EGLDisplay,
+  private val config: EGLConfig,
   private val surface: android.opengl.EGLSurface,
   private val context: android.opengl.EGLContext,
   override val session: RenderSessionHandle,
-) : OwnedTextureQuerySession {
+) : OwnedTextureTestSession {
+  override fun attachAnotherOwnedTexture(width: Int, height: Int): RenderSessionHandle {
+    val descriptor =
+      EglContextDescriptor(
+        NativePointer.ofAddress(display.nativeHandle),
+        NativePointer.ofAddress(config.nativeHandle),
+        NativePointer.ofAddress(context.nativeHandle),
+        NativePointer.NULL,
+      )
+    return session
+      .map()
+      .attachOpenGLOwnedTexture(
+        OpenGLOwnedTextureDescriptor(RenderTargetExtent(width, height, 1.0), descriptor)
+      )
+  }
+
+  override fun acquireFrame(): OwnedTextureTestFrame {
+    val handle = session.acquireOpenGLOwnedTextureFrame()
+    val frame = handle.frame()
+    return object : OwnedTextureTestFrame {
+      override val width: Int
+        get() = frame.width()
+
+      override val height: Int
+        get() = frame.height()
+
+      override val isClosed: Boolean
+        get() = handle.isClosed
+
+      override fun close() {
+        handle.close()
+      }
+    }
+  }
+
   override fun close() {
     try {
       session.close()
@@ -29,7 +64,7 @@ private class AndroidEglQuerySession(
   }
 }
 
-private fun createEglSession(map: MapHandle, width: Int, height: Int): OwnedTextureQuerySession {
+private fun createEglSession(map: MapHandle, width: Int, height: Int): OwnedTextureTestSession {
   val display = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
   check(display != EGL14.EGL_NO_DISPLAY) { "EGL display is unavailable" }
   val version = IntArray(2)
@@ -61,7 +96,7 @@ private fun createEglSession(map: MapHandle, width: Int, height: Int): OwnedText
       map.attachOpenGLOwnedTexture(
         OpenGLOwnedTextureDescriptor(RenderTargetExtent(width, height, 1.0), descriptor)
       )
-    return AndroidEglQuerySession(display, surface, context, session)
+    return AndroidEglOwnedTextureSession(display, config, surface, context, session)
   } catch (error: Throwable) {
     releaseEgl(display, surface, context)
     throw error

@@ -38,7 +38,7 @@ class RenderQueryTest {
             },
           )
         try {
-          val owned = OwnedTextureQuerySupport.attach(map, 32, 16) ?: return
+          val owned = OwnedTextureTestSupport.attach(map, 32, 16) ?: return
           owned.use {
             val session = owned.session
             val featureCoordinate = LatLng(37.7749, -122.4194)

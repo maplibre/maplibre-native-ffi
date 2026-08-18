@@ -10,8 +10,8 @@ import org.maplibre.nativeffi.map.MapHandle
 
 private const val EGL_PLATFORM_SURFACELESS_MESA = 0x31DD
 
-internal actual object OwnedTextureQuerySupport {
-  actual fun attach(map: MapHandle, width: Int, height: Int): OwnedTextureQuerySession? {
+internal actual object OwnedTextureTestSupport {
+  actual fun attach(map: MapHandle, width: Int, height: Int): OwnedTextureTestSession? {
     if (RenderBackend.OPENGL !in Maplibre.supportedRenderBackends()) return null
     if (OpenGLContextProvider.EGL !in Maplibre.supportedOpenGLContextProviders()) return null
     ensureEglFunctionProvider()
@@ -19,12 +19,47 @@ internal actual object OwnedTextureQuerySupport {
   }
 }
 
-private class JvmEglQuerySession(
+private class JvmEglOwnedTextureSession(
   private val display: Long,
+  private val config: Long,
   private val surface: Long,
   private val context: Long,
   override val session: RenderSessionHandle,
-) : OwnedTextureQuerySession {
+) : OwnedTextureTestSession {
+  override fun attachAnotherOwnedTexture(width: Int, height: Int): RenderSessionHandle {
+    val descriptor =
+      EglContextDescriptor(
+        NativePointer.ofAddress(display),
+        NativePointer.ofAddress(config),
+        NativePointer.ofAddress(context),
+        NativePointer.NULL,
+      )
+    return session
+      .map()
+      .attachOpenGLOwnedTexture(
+        OpenGLOwnedTextureDescriptor(RenderTargetExtent(width, height, 1.0), descriptor)
+      )
+  }
+
+  override fun acquireFrame(): OwnedTextureTestFrame {
+    val handle = session.acquireOpenGLOwnedTextureFrame()
+    val frame = handle.frame()
+    return object : OwnedTextureTestFrame {
+      override val width: Int
+        get() = frame.width()
+
+      override val height: Int
+        get() = frame.height()
+
+      override val isClosed: Boolean
+        get() = handle.isClosed
+
+      override fun close() {
+        handle.close()
+      }
+    }
+  }
+
   override fun close() {
     try {
       session.close()
@@ -39,7 +74,7 @@ private fun createEglSession(
   width: Int,
   height: Int,
   stack: MemoryStack,
-): OwnedTextureQuerySession? {
+): OwnedTextureTestSession? {
   val display = initializedDisplay(stack)
   if (display == null) {
     check(!isLinuxHost()) { "EGL pbuffer fixture failed on Linux" }
@@ -101,7 +136,7 @@ private fun createEglSession(
       map.attachOpenGLOwnedTexture(
         OpenGLOwnedTextureDescriptor(RenderTargetExtent(width, height, 1.0), descriptor)
       )
-    return JvmEglQuerySession(display, surface, context, session)
+    return JvmEglOwnedTextureSession(display, config, surface, context, session)
   } catch (error: Throwable) {
     releaseEgl(display, surface, context)
     throw error
