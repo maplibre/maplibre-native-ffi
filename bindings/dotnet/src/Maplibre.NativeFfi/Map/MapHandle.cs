@@ -18,6 +18,12 @@ internal unsafe delegate mln_status MapAddCustomGeometrySource(
     mln_custom_geometry_source_options* options
 );
 
+internal unsafe delegate mln_status MapAddCustomMvtVectorSource(
+    MlnMap map,
+    mln_buffer_view sourceId,
+    mln_custom_mvt_vector_source_options* options
+);
+
 /// <summary>Owner-thread map handle bound to a runtime.</summary>
 public sealed unsafe class MapHandle : IDisposable
 {
@@ -27,8 +33,17 @@ public sealed unsafe class MapHandle : IDisposable
         options
     ) => NativeMethods.mln_map_add_custom_geometry_source(map, sourceId, options);
 
+    private static readonly MapAddCustomMvtVectorSource DefaultAddCustomMvtVectorSource = static (
+        map,
+        sourceId,
+        options
+    ) => NativeMethods.mln_map_add_custom_mvt_vector_source(map, sourceId, options);
+
     [ThreadStatic]
     private static MapAddCustomGeometrySource? addCustomGeometrySourceForTest;
+
+    [ThreadStatic]
+    private static MapAddCustomMvtVectorSource? addCustomMvtVectorSourceForTest;
 
     private readonly RuntimeHandle runtime;
     private readonly ulong nativeId;
@@ -1068,6 +1083,90 @@ public sealed unsafe class MapHandle : IDisposable
         );
     }
 
+    /// <summary>Adds a custom MVT vector source with tile callbacks.</summary>
+    /// <remarks>
+    /// The upcall stubs this installs live until MapLibre stops referencing them: until the source
+    /// is removed, until a style load leaves a style without it, or until this map closes. The
+    /// binding releases them from the callback the C API invokes then, so nothing here depends on
+    /// the events <see cref="SetEventMask" /> selects.
+    /// </remarks>
+    public void AddCustomMvtVectorSource(string sourceId, CustomMvtVectorSourceOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        AddCustomMvtVectorSource(sourceId, new CustomMvtVectorSourceState(options));
+    }
+
+    internal void AddCustomMvtVectorSource(string sourceId, CustomMvtVectorSourceState sourceState)
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        try
+        {
+            var descriptor = sourceState.Descriptor;
+            NativeStatus.Check(
+                AddCustomMvtVectorSourceNative(Handle, nativeSourceId.Value, &descriptor)
+            );
+        }
+        catch
+        {
+            // A rejected add never referenced the state, so no release callback is owed for it.
+            sourceState.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>Sets custom MVT vector source tile data.</summary>
+    public void SetCustomMvtVectorSourceTileData(
+        string sourceId,
+        CanonicalTileId tileId,
+        byte[] data
+    )
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        using var nativeData = NativeStringView.From(data, nameof(data));
+        var nativeTileId = StyleStructs.ToNative(tileId);
+        NativeStatus.Check(
+            NativeMethods.mln_map_set_custom_mvt_vector_source_tile_data(
+                Handle,
+                nativeSourceId.Value,
+                nativeTileId,
+                nativeData.Value
+            )
+        );
+    }
+
+    /// <summary>Reports a custom MVT vector source error for one tile.</summary>
+    public void SetCustomMvtVectorSourceTileError(
+        string sourceId,
+        CanonicalTileId tileId,
+        string message
+    )
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        using var nativeMessage = NativeStringView.From(message, nameof(message));
+        var nativeTileId = StyleStructs.ToNative(tileId);
+        NativeStatus.Check(
+            NativeMethods.mln_map_set_custom_mvt_vector_source_tile_error(
+                Handle,
+                nativeSourceId.Value,
+                nativeTileId,
+                nativeMessage.Value
+            )
+        );
+    }
+
+    /// <summary>Invalidates one custom MVT vector source tile.</summary>
+    public void InvalidateCustomMvtVectorSourceTile(string sourceId, CanonicalTileId tileId)
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        NativeStatus.Check(
+            NativeMethods.mln_map_invalidate_custom_mvt_vector_source_tile(
+                Handle,
+                nativeSourceId.Value,
+                StyleStructs.ToNative(tileId)
+            )
+        );
+    }
+
     /// <summary>Adds a vector source that loads TileJSON from a URL.</summary>
     public void AddVectorSourceUrl(string sourceId, string url, TileSourceOptions? options)
     {
@@ -2023,12 +2122,33 @@ public sealed unsafe class MapHandle : IDisposable
     private static MapAddCustomGeometrySource AddCustomGeometrySourceNative =>
         addCustomGeometrySourceForTest ?? DefaultAddCustomGeometrySource;
 
+    internal static IDisposable UseCustomMvtVectorSourceInstallForTest(
+        MapAddCustomMvtVectorSource addCustomMvtVectorSource
+    )
+    {
+        var previous = addCustomMvtVectorSourceForTest;
+        addCustomMvtVectorSourceForTest = addCustomMvtVectorSource;
+        return new RestoreCustomMvtVectorSourceInstall(previous);
+    }
+
+    private static MapAddCustomMvtVectorSource AddCustomMvtVectorSourceNative =>
+        addCustomMvtVectorSourceForTest ?? DefaultAddCustomMvtVectorSource;
+
     private sealed class RestoreCustomGeometrySourceInstall(MapAddCustomGeometrySource? previous)
         : IDisposable
     {
         public void Dispose()
         {
             addCustomGeometrySourceForTest = previous;
+        }
+    }
+
+    private sealed class RestoreCustomMvtVectorSourceInstall(MapAddCustomMvtVectorSource? previous)
+        : IDisposable
+    {
+        public void Dispose()
+        {
+            addCustomMvtVectorSourceForTest = previous;
         }
     }
 

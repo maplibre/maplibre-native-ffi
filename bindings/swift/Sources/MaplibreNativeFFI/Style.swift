@@ -511,6 +511,37 @@ public struct CustomGeometrySourceOptions: Sendable {
   }
 }
 
+public struct CustomMvtVectorSourceOptions: Sendable {
+  public typealias TileCallback = @Sendable (CanonicalTileID) -> Void
+
+  public var fetchTile: TileCallback
+  public var cancelTile: TileCallback?
+  public var minZoom: Double?
+  public var maxZoom: Double?
+
+  public init(
+    fetchTile: @escaping TileCallback,
+    cancelTile: TileCallback? = nil,
+    minZoom: Double? = nil,
+    maxZoom: Double? = nil
+  ) {
+    self.fetchTile = fetchTile
+    self.cancelTile = cancelTile
+    self.minZoom = minZoom
+    self.maxZoom = maxZoom
+  }
+
+  func nativeOptions(callbacks: NativeCustomMvtVectorSourceCallbacks)
+    -> NativeCustomMvtVectorSourceOptions
+  {
+    NativeCustomMvtVectorSourceOptions(
+      callbacks: callbacks,
+      minZoom: minZoom,
+      maxZoom: maxZoom
+    )
+  }
+}
+
 /// Prepared GeoJSON source data: one UTF-8 GeoJSON document parsed and tiled
 /// into an immutable index that map calls install when adding or updating a
 /// GeoJSON source.
@@ -958,6 +989,101 @@ public extension MapHandle {
         requireLiveHandle().raw,
         arena.view(sourceId),
         bounds.nativeInput.native
+      ))
+    }
+  }
+
+  /// Adds a custom MVT vector source, whose tile callbacks run on native worker
+  /// threads.
+  ///
+  /// The source's callbacks stay alive until the C API stops referencing them,
+  /// which is when the source is removed, when a style load drops it, or when
+  /// the map is destroyed. The C API then releases them, waiting for any tile
+  /// callback still running, so a closure is never entered afterwards.
+  func addCustomMvtVectorSource(
+    sourceId: String,
+    options: CustomMvtVectorSourceOptions
+  ) throws {
+    let fetchTile: NativeCustomMvtVectorSourceCallbacks
+      .TileCallback = { tileId in
+        options.fetchTile(CanonicalTileID(native: tileId))
+      }
+    let cancelTile: NativeCustomMvtVectorSourceCallbacks.TileCallback?
+    if let callback = options.cancelTile {
+      cancelTile = { tileId in callback(CanonicalTileID(native: tileId)) }
+    } else {
+      cancelTile = nil
+    }
+    let callbacks = NativeCustomMvtVectorSourceCallbacks(
+      fetchTile: fetchTile,
+      cancelTile: cancelTile
+    )
+    do {
+      try mapNativeFailure {
+        let arena = NativeInputArena()
+        defer { withExtendedLifetime(arena) {} }
+        try options.nativeOptions(callbacks: callbacks)
+          .withNativeOptions { nativeOptions in
+            try checkStatus(mln_map_add_custom_mvt_vector_source(
+              requireLiveHandle().raw,
+              arena.view(sourceId),
+              nativeOptions
+            ))
+          }
+      }
+    } catch {
+      // A rejected add is the one case the C API never releases, because it
+      // never took the callbacks on.
+      callbacks.release()
+      throw error
+    }
+  }
+
+  func setCustomMvtVectorSourceTileData(
+    sourceId: String,
+    tileId: CanonicalTileID,
+    data: Data
+  ) throws {
+    try mapNativeFailure {
+      let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
+      try checkStatus(mln_map_set_custom_mvt_vector_source_tile_data(
+        requireLiveHandle().raw,
+        arena.view(sourceId),
+        tileId.nativeTileID.native,
+        arena.view(data)
+      ))
+    }
+  }
+
+  func setCustomMvtVectorSourceTileError(
+    sourceId: String,
+    tileId: CanonicalTileID,
+    message: String
+  ) throws {
+    try mapNativeFailure {
+      let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
+      try checkStatus(mln_map_set_custom_mvt_vector_source_tile_error(
+        requireLiveHandle().raw,
+        arena.view(sourceId),
+        tileId.nativeTileID.native,
+        arena.view(message)
+      ))
+    }
+  }
+
+  func invalidateCustomMvtVectorSourceTile(
+    sourceId: String,
+    tileId: CanonicalTileID
+  ) throws {
+    try mapNativeFailure {
+      let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
+      try checkStatus(mln_map_invalidate_custom_mvt_vector_source_tile(
+        requireLiveHandle().raw,
+        arena.view(sourceId),
+        tileId.nativeTileID.native
       ))
     }
   }

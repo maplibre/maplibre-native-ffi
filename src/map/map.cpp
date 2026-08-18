@@ -15,6 +15,7 @@
 #include <optional>
 #include <ratio>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -53,6 +54,7 @@
 #include <mbgl/style/rapidjson_conversion.hpp>
 #include <mbgl/style/source.hpp>
 #include <mbgl/style/sources/custom_geometry_source.hpp>
+#include <mbgl/style/sources/custom_vector_source.hpp>
 #include <mbgl/style/sources/geojson_source.hpp>
 #include <mbgl/style/sources/image_source.hpp>
 #include <mbgl/style/sources/raster_dem_source.hpp>
@@ -760,7 +762,7 @@ auto to_c_canonical_tile_id(const mbgl::CanonicalTileID& tile_id)
 }
 
 auto to_native_tile_function(
-  mln_custom_geometry_source_tile_callback callback, void* user_data
+  void (*callback)(void*, mln_canonical_tile_id), void* user_data
 ) -> mbgl::style::TileFunction {
   if (callback == nullptr) {
     return nullptr;
@@ -771,7 +773,7 @@ auto to_native_tile_function(
     } catch (const std::exception& exception) {
       mln::core::set_thread_error(exception);
     } catch (...) {
-      mln::core::set_thread_error("custom geometry source callback threw");
+      mln::core::set_thread_error("custom source callback threw");
     }
   };
 }
@@ -798,30 +800,157 @@ auto to_native_custom_geometry_source_options(
   return result;
 }
 
-// Holds the release callback owed for each tracked custom geometry source. A
-// host cannot see when a style load drops a source, so this layer tracks it.
+auto has_custom_mvt_vector_source_option(
+  const mln_custom_mvt_vector_source_options& options, uint32_t field
+) -> bool {
+  return (options.fields & field) != 0U;
+}
+
+auto effective_custom_mvt_vector_source_options(
+  const mln_custom_mvt_vector_source_options& options
+) -> mln_custom_mvt_vector_source_options;
+
+auto validate_custom_mvt_vector_source_options(
+  const mln_custom_mvt_vector_source_options* options
+) -> mln_status {
+  if (options == nullptr) {
+    mln::core::set_thread_error("options must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (options->size < sizeof(mln_custom_mvt_vector_source_options)) {
+    mln::core::set_thread_error(
+      "mln_custom_mvt_vector_source_options.size is too small"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  constexpr auto known_fields =
+    static_cast<uint32_t>(MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM) |
+    MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM;
+  if ((options->fields & ~known_fields) != 0U) {
+    mln::core::set_thread_error(
+      "mln_custom_mvt_vector_source_options.fields contains unknown bits"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (options->fetch_tile == nullptr) {
+    mln::core::set_thread_error("fetch_tile must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (
+    has_custom_mvt_vector_source_option(
+      *options, MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM
+    )
+  ) {
+    const auto status =
+      validate_custom_geometry_zoom(options->min_zoom, "min_zoom");
+    if (status != MLN_STATUS_OK) {
+      return status;
+    }
+  }
+  if (
+    has_custom_mvt_vector_source_option(
+      *options, MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM
+    )
+  ) {
+    const auto status =
+      validate_custom_geometry_zoom(options->max_zoom, "max_zoom");
+    if (status != MLN_STATUS_OK) {
+      return status;
+    }
+  }
+  const auto effective = effective_custom_mvt_vector_source_options(*options);
+  if (effective.min_zoom > effective.max_zoom) {
+    mln::core::set_thread_error(
+      "min_zoom must be less than or equal to max_zoom"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
+auto effective_custom_mvt_vector_source_options(
+  const mln_custom_mvt_vector_source_options& options
+) -> mln_custom_mvt_vector_source_options {
+  auto result = mln::core::custom_mvt_vector_source_options_default();
+  result.fields = options.fields;
+  result.fetch_tile = options.fetch_tile;
+  result.cancel_tile = options.cancel_tile;
+  result.user_data = options.user_data;
+  result.release_user_data = options.release_user_data;
+  if (
+    has_custom_mvt_vector_source_option(
+      options, MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM
+    )
+  ) {
+    result.min_zoom = options.min_zoom;
+  }
+  if (
+    has_custom_mvt_vector_source_option(
+      options, MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM
+    )
+  ) {
+    result.max_zoom = options.max_zoom;
+  }
+  return result;
+}
+
+auto to_native_custom_mvt_vector_source_options(
+  const mln_custom_mvt_vector_source_options& options
+) -> mbgl::style::CustomVectorSource::Options {
+  auto result = mbgl::style::CustomVectorSource::Options{};
+  result.fetchTileFunction =
+    to_native_tile_function(options.fetch_tile, options.user_data);
+  result.cancelTileFunction =
+    to_native_tile_function(options.cancel_tile, options.user_data);
+  result.zoomRange = mbgl::Range<uint8_t>{
+    static_cast<uint8_t>(options.min_zoom),
+    static_cast<uint8_t>(options.max_zoom)
+  };
+  return result;
+}
+
+enum class CallbackSourceKind : uint8_t { CustomGeometry, CustomMvtVector };
+
+using CallbackSourceRelease = void (*)(void*);
+
+auto source_matches_kind(
+  const mbgl::style::Source* source, CallbackSourceKind kind
+) -> bool {
+  if (source == nullptr) {
+    return false;
+  }
+  switch (kind) {
+    case CallbackSourceKind::CustomGeometry:
+      return source->as<mbgl::style::CustomGeometrySource>() != nullptr;
+    case CallbackSourceKind::CustomMvtVector:
+      return source->as<mbgl::style::CustomVectorSource>() != nullptr;
+  }
+  return false;
+}
+
+// Holds the release callback owed for each tracked callback source. A host
+// cannot see when a style load drops a source, so this layer tracks it.
 //
 // Every mutation runs on the map owner thread, which is the only thread that
 // adds or removes sources and the only thread mbgl reports style loads on.
-class CustomGeometrySourceRegistry final {
+class CallbackSourceRegistry final {
  public:
-  CustomGeometrySourceRegistry() = default;
+  CallbackSourceRegistry() = default;
 
   // Runs when the owning map is destroyed, after the mbgl::Map that could still
   // call into the source is gone.
-  ~CustomGeometrySourceRegistry() { release_all(); }
+  ~CallbackSourceRegistry() { release_all(); }
 
-  CustomGeometrySourceRegistry(const CustomGeometrySourceRegistry&) = delete;
-  CustomGeometrySourceRegistry(CustomGeometrySourceRegistry&&) = delete;
-  auto operator=(const CustomGeometrySourceRegistry&)
-    -> CustomGeometrySourceRegistry& = delete;
-  auto operator=(CustomGeometrySourceRegistry&&)
-    -> CustomGeometrySourceRegistry& = delete;
+  CallbackSourceRegistry(const CallbackSourceRegistry&) = delete;
+  CallbackSourceRegistry(CallbackSourceRegistry&&) = delete;
+  auto operator=(const CallbackSourceRegistry&)
+    -> CallbackSourceRegistry& = delete;
+  auto operator=(CallbackSourceRegistry&&) -> CallbackSourceRegistry& = delete;
 
   // A source with no release callback is not tracked.
   auto add(
-    const std::string& source_id,
-    mln_custom_geometry_source_release_callback release, void* user_data
+    const std::string& source_id, CallbackSourceKind kind,
+    CallbackSourceRelease release, void* user_data
   ) -> void {
     // An entry already under this ID belongs to a source that the style dropped
     // before reconciliation ran, so it still owes its release. Invoke it here
@@ -838,7 +967,7 @@ class CustomGeometrySourceRegistry final {
     // The caller tracks before the style takes the source, so a throw here
     // leaves nothing committed and the caller still owns user_data. A failed
     // add owes no release.
-    entries_.insert_or_assign(source_id, Entry{release, user_data});
+    entries_.insert_or_assign(source_id, Entry{kind, release, user_data});
   }
 
   // Drops an entry without releasing it, for a source the style then rejected.
@@ -865,8 +994,8 @@ class CustomGeometrySourceRegistry final {
   }
 
   // Releases every tracked source the current style no longer holds. A style
-  // document cannot declare a custom geometry source, so a source of another
-  // type under a tracked ID means the tracked source is gone.
+  // document cannot declare a callback source, so a source of another type
+  // under a tracked ID means the tracked source is gone.
   auto reconcile() -> void {
     if (map_ == nullptr || entries_.empty()) {
       return;
@@ -875,10 +1004,7 @@ class CustomGeometrySourceRegistry final {
     auto owed = std::vector<Entry>{};
     for (auto entry = entries_.begin(); entry != entries_.end();) {
       auto* source = style.getSource(entry->first);
-      if (
-        source != nullptr &&
-        source->as<mbgl::style::CustomGeometrySource>() != nullptr
-      ) {
+      if (source_matches_kind(source, entry->second.kind)) {
         ++entry;
         continue;
       }
@@ -900,7 +1026,8 @@ class CustomGeometrySourceRegistry final {
 
  private:
   struct Entry {
-    mln_custom_geometry_source_release_callback release = nullptr;
+    CallbackSourceKind kind = CallbackSourceKind::CustomGeometry;
+    CallbackSourceRelease release = nullptr;
     void* user_data = nullptr;
   };
 
@@ -910,7 +1037,7 @@ class CustomGeometrySourceRegistry final {
     } catch (const std::exception& exception) {
       mln::core::set_thread_error(exception);
     } catch (...) {
-      mln::core::set_thread_error("custom geometry source release threw");
+      mln::core::set_thread_error("callback source release threw");
     }
   }
 
@@ -1465,12 +1592,12 @@ class HeadlessObserver final : public mbgl::MapObserver {
   HeadlessObserver(
     mln_runtime runtime, mln_map map,
     std::shared_ptr<mln::core::MapEventState> event_state,
-    std::shared_ptr<CustomGeometrySourceRegistry> custom_geometry_sources
+    std::shared_ptr<CallbackSourceRegistry> callback_sources
   )
       : runtime_(runtime),
         map_(map),
         event_state_(std::move(event_state)),
-        custom_geometry_sources_(std::move(custom_geometry_sources)) {}
+        callback_sources_(std::move(callback_sources)) {}
 
   void onCameraWillChange(CameraChangeMode mode) override {
     if (!selected(MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE)) {
@@ -1527,8 +1654,8 @@ class HeadlessObserver final : public mbgl::MapObserver {
     );
   }
 
-  // A style load can drop custom geometry sources that the previous style held.
-  // The release callbacks that owes are map state rather than an event, so the
+  // A style load can drop callback sources that the previous style held.
+  // The release callbacks it owes are map state rather than an event, so the
   // reconciliation runs whatever the mask selects.
   void onDidFinishLoadingStyle() override {
     // The event is queued before the reconciliation, and the registry is held
@@ -1538,7 +1665,7 @@ class HeadlessObserver final : public mbgl::MapObserver {
     if (selected(MLN_RUNTIME_EVENT_MAP_STYLE_LOADED)) {
       push(MLN_RUNTIME_EVENT_MAP_STYLE_LOADED);
     }
-    const auto sources = custom_geometry_sources_;
+    const auto sources = callback_sources_;
     sources->reconcile();
   }
 
@@ -1647,7 +1774,7 @@ class HeadlessObserver final : public mbgl::MapObserver {
   mln_runtime runtime_;
   mln_map map_;
   std::shared_ptr<mln::core::MapEventState> event_state_;
-  std::shared_ptr<CustomGeometrySourceRegistry> custom_geometry_sources_;
+  std::shared_ptr<CallbackSourceRegistry> callback_sources_;
 };
 
 // Delivers mbgl::RendererObserver callbacks on the map's run loop instead of on
@@ -3123,7 +3250,7 @@ struct MapObject {
   bool still_image_request_pending = false;
   // Declared first so reverse-order destruction runs the release callbacks it
   // still owes after the mbgl::Map that could still reach a source is gone.
-  std::shared_ptr<CustomGeometrySourceRegistry> custom_geometry_sources;
+  std::shared_ptr<CallbackSourceRegistry> callback_sources;
   // Declared before `observer` so reverse-order destruction retires the
   // observer, which holds its own reference, before this member is destroyed.
   std::shared_ptr<MapEventState> event_state;
@@ -3440,6 +3567,20 @@ auto custom_geometry_source_options_default() noexcept
   };
 }
 
+auto custom_mvt_vector_source_options_default() noexcept
+  -> mln_custom_mvt_vector_source_options {
+  return mln_custom_mvt_vector_source_options{
+    .size = sizeof(mln_custom_mvt_vector_source_options),
+    .fields = 0,
+    .fetch_tile = nullptr,
+    .cancel_tile = nullptr,
+    .user_data = nullptr,
+    .min_zoom = 0,
+    .max_zoom = 18,
+    .release_user_data = nullptr
+  };
+}
+
 auto premultiplied_rgba8_image_default() noexcept
   -> mln_premultiplied_rgba8_image {
   return mln_premultiplied_rgba8_image{
@@ -3561,7 +3702,7 @@ auto create_map(
   // so a throw here cannot leave a registered map the caller has no handle to
   // destroy.
   auto event_state = std::make_shared<MapEventState>();
-  auto source_registry = std::make_shared<CustomGeometrySourceRegistry>();
+  auto source_registry = std::make_shared<CallbackSourceRegistry>();
   // Publish the handle first, so the observer and frontend capture an id that
   // already resolves.
   const auto handle = handle_table<MapObject>().insert(owned_map);
@@ -3570,7 +3711,7 @@ auto create_map(
   owned_map->map_mode = effective.map_mode;
   owned_map->scale_factor = effective.scale_factor;
   owned_map->event_state = std::move(event_state);
-  owned_map->custom_geometry_sources = std::move(source_registry);
+  owned_map->callback_sources = std::move(source_registry);
   owned_map->event_state->mask.store(
     effective.event_mask, std::memory_order_relaxed
   );
@@ -3580,8 +3721,7 @@ auto create_map(
     // observer and frontend below are the first producers that need it.
     register_runtime_map_events(runtime, handle);
     owned_map->observer = std::make_unique<HeadlessObserver>(
-      runtime, handle, owned_map->event_state,
-      owned_map->custom_geometry_sources
+      runtime, handle, owned_map->event_state, owned_map->callback_sources
     );
     owned_map->frontend = std::make_unique<HeadlessFrontend>(
       runtime, handle, runtime_run_loop(live_runtime), owned_map->event_state
@@ -3596,7 +3736,7 @@ auto create_map(
       *owned_map->frontend, *owned_map->observer, map_options,
       resource_options_for_runtime(runtime)
     );
-    owned_map->custom_geometry_sources->attach(*owned_map->map);
+    owned_map->callback_sources->attach(*owned_map->map);
 
     owned_map->commands = std::make_unique<MapCommands>(*owned_map->map);
     owned_map->command_mailbox =
@@ -3640,7 +3780,7 @@ auto destroy_map(mln_map map) -> mln_status {
   // clears its map at the same point, so nothing reconciles against a map
   // that is being destroyed; the releases it still owes run from its own
   // destructor once the map is gone.
-  owned_map->custom_geometry_sources->detach();
+  owned_map->callback_sources->detach();
   owned_map->frontend->close_renderer_observer();
   owned_map->command_mailbox->close();
   // Runs outside the registry lock: it can block on in-flight background work.
@@ -4080,7 +4220,7 @@ auto map_remove_style_source(
   // The detached source is dropped before the release runs, so the style no
   // longer holds the callbacks that read the host's state.
   removed.reset();
-  live->custom_geometry_sources->release(id);
+  live->callback_sources->release(id);
   *out_removed = true;
   return MLN_STATUS_OK;
 }
@@ -4899,8 +5039,9 @@ auto map_add_custom_geometry_source(
   // rejects the source untracks it again; either way the add failed and the
   // caller still owns user_data. Tracking afterwards would leave a live source
   // whose release never runs.
-  live->custom_geometry_sources->add(
-    id, effective.release_user_data, effective.user_data
+  live->callback_sources->add(
+    id, CallbackSourceKind::CustomGeometry, effective.release_user_data,
+    effective.user_data
   );
   try {
     style.addSource(
@@ -4913,7 +5054,7 @@ auto map_add_custom_geometry_source(
     // never tracked, so there is nothing to untrack and no entry of another
     // source's to erase.
     if (effective.release_user_data != nullptr) {
-      live->custom_geometry_sources->untrack(id);
+      live->callback_sources->untrack(id);
     }
     throw;
   }
@@ -5015,6 +5156,172 @@ auto map_invalidate_custom_geometry_source_region(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   custom_source->invalidateRegion(to_native_lat_lng_bounds(bounds));
+  return MLN_STATUS_OK;
+}
+
+auto lookup_custom_mvt_vector_source(
+  MapObject* live, mln_buffer_view source_id,
+  mbgl::style::CustomVectorSource*& out_source
+) -> mln_status {
+  auto* source = live->map->getStyle().getSource(string_from_view(source_id));
+  if (source == nullptr) {
+    set_thread_error("source does not exist");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  out_source = source->as<mbgl::style::CustomVectorSource>();
+  if (out_source == nullptr) {
+    set_thread_error("source is not a custom MVT vector source");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
+auto map_add_custom_mvt_vector_source(
+  mln_map map, mln_buffer_view source_id,
+  const mln_custom_mvt_vector_source_options* options
+) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  const auto source_id_status = validate_source_id(source_id);
+  if (source_id_status != MLN_STATUS_OK) {
+    return source_id_status;
+  }
+  const auto options_status =
+    validate_custom_mvt_vector_source_options(options);
+  if (options_status != MLN_STATUS_OK) {
+    return options_status;
+  }
+
+  auto& style = live->map->getStyle();
+  const auto id = string_from_view(source_id);
+  const auto add_status = validate_source_can_be_added(style, id);
+  if (add_status != MLN_STATUS_OK) {
+    return add_status;
+  }
+
+  const auto effective = effective_custom_mvt_vector_source_options(*options);
+  live->callback_sources->add(
+    id, CallbackSourceKind::CustomMvtVector, effective.release_user_data,
+    effective.user_data
+  );
+  try {
+    style.addSource(
+      std::make_unique<mbgl::style::CustomVectorSource>(
+        id, to_native_custom_mvt_vector_source_options(effective)
+      )
+    );
+  } catch (...) {
+    if (effective.release_user_data != nullptr) {
+      live->callback_sources->untrack(id);
+    }
+    throw;
+  }
+  return MLN_STATUS_OK;
+}
+
+auto map_set_custom_mvt_vector_source_tile_data(
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
+  mln_buffer_view data
+) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  const auto source_id_status = validate_source_id(source_id);
+  if (source_id_status != MLN_STATUS_OK) {
+    return source_id_status;
+  }
+  const auto tile_status = validate_canonical_tile_id(tile_id);
+  if (tile_status != MLN_STATUS_OK) {
+    return tile_status;
+  }
+  if (!validate_string_view(data, "data")) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  mbgl::style::CustomVectorSource* custom_source = nullptr;
+  const auto source_status =
+    lookup_custom_mvt_vector_source(live, source_id, custom_source);
+  if (source_status != MLN_STATUS_OK) {
+    return source_status;
+  }
+
+  auto native_data = std::shared_ptr<const std::string>{};
+  if (data.size != 0) {
+    native_data = std::make_shared<const std::string>(
+      static_cast<const char*>(data.data), data.size
+    );
+  }
+  custom_source->setTileData(
+    to_native_canonical_tile_id(tile_id), native_data,
+    mbgl::style::TileDataFormat::MVT
+  );
+  return MLN_STATUS_OK;
+}
+
+auto map_set_custom_mvt_vector_source_tile_error(
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
+  mln_buffer_view message
+) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  const auto source_id_status = validate_source_id(source_id);
+  if (source_id_status != MLN_STATUS_OK) {
+    return source_id_status;
+  }
+  const auto tile_status = validate_canonical_tile_id(tile_id);
+  if (tile_status != MLN_STATUS_OK) {
+    return tile_status;
+  }
+  if (!validate_string_view(message, "message")) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  mbgl::style::CustomVectorSource* custom_source = nullptr;
+  const auto source_status =
+    lookup_custom_mvt_vector_source(live, source_id, custom_source);
+  if (source_status != MLN_STATUS_OK) {
+    return source_status;
+  }
+
+  custom_source->setTileError(
+    to_native_canonical_tile_id(tile_id),
+    std::make_exception_ptr(std::runtime_error(string_from_view(message)))
+  );
+  return MLN_STATUS_OK;
+}
+
+auto map_invalidate_custom_mvt_vector_source_tile(
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id
+) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  const auto source_id_status = validate_source_id(source_id);
+  if (source_id_status != MLN_STATUS_OK) {
+    return source_id_status;
+  }
+  const auto tile_status = validate_canonical_tile_id(tile_id);
+  if (tile_status != MLN_STATUS_OK) {
+    return tile_status;
+  }
+
+  mbgl::style::CustomVectorSource* custom_source = nullptr;
+  const auto source_status =
+    lookup_custom_mvt_vector_source(live, source_id, custom_source);
+  if (source_status != MLN_STATUS_OK) {
+    return source_status;
+  }
+  custom_source->invalidateTile(to_native_canonical_tile_id(tile_id));
   return MLN_STATUS_OK;
 }
 

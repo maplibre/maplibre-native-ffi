@@ -483,6 +483,117 @@ private func addSourceReportingItsRelease(
   #expect(accepted.value == 0)
 }
 
+private func addMvtSourceReportingItsRelease(
+  to map: MapHandle,
+  sourceId: String = "custom-mvt",
+  counter: ReleaseCounter
+) throws {
+  let sentinel = ReleaseSentinel(counter)
+  try map.addCustomMvtVectorSource(
+    sourceId: sourceId,
+    options: CustomMvtVectorSourceOptions(fetchTile: { _ in
+      withExtendedLifetime(sentinel) {}
+    })
+  )
+}
+
+@Test func customMvtVectorOptionsRetainAndInvokeTileCallbacks() throws {
+  final class TileBox: @unchecked Sendable {
+    var fetched: [NativeCanonicalTileID] = []
+    var cancelled: [NativeCanonicalTileID] = []
+  }
+
+  let box = TileBox()
+  let callbacks = NativeCustomMvtVectorSourceCallbacks(
+    fetchTile: { box.fetched.append($0) },
+    cancelTile: { box.cancelled.append($0) }
+  )
+  defer { callbacks.release() }
+  let options = NativeCustomMvtVectorSourceOptions(
+    callbacks: callbacks,
+    minZoom: 1,
+    maxZoom: 10
+  )
+
+  try options.withNativeOptions { native in
+    #expect((native.pointee
+        .fields & MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM
+        .rawValue) != 0)
+    #expect(native.pointee.min_zoom == 1)
+    #expect(native.pointee.max_zoom == 10)
+    native.pointee.fetch_tile!(
+      native.pointee.user_data,
+      mln_canonical_tile_id(z: 1, x: 2, y: 3)
+    )
+    native.pointee.cancel_tile!(
+      native.pointee.user_data,
+      mln_canonical_tile_id(z: 4, x: 5, y: 6)
+    )
+  }
+
+  #expect(box.fetched == [NativeCanonicalTileID(z: 1, x: 2, y: 3)])
+  #expect(box.cancelled == [NativeCanonicalTileID(z: 4, x: 5, y: 6)])
+}
+
+@Test func customMvtVectorSourcesCanBeAddedInspectedAndReleased() throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  let map = try MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 64, height: 64)
+  )
+  defer { try? map.close() }
+
+  try map.setStyleJSON(emptyStyleJSON)
+  let counter = ReleaseCounter()
+  try addMvtSourceReportingItsRelease(to: map, counter: counter)
+  #expect(try map.styleSourceExists("custom-mvt"))
+  #expect(try map.styleSourceType("custom-mvt") == .customMVTVector)
+
+  let tileId = CanonicalTileID(z: 0, x: 0, y: 0)
+  try map.setCustomMvtVectorSourceTileData(
+    sourceId: "custom-mvt",
+    tileId: tileId,
+    data: Data()
+  )
+  try map.setCustomMvtVectorSourceTileError(
+    sourceId: "custom-mvt",
+    tileId: tileId,
+    message: "tile missing"
+  )
+  try map.invalidateCustomMvtVectorSourceTile(
+    sourceId: "custom-mvt",
+    tileId: tileId
+  )
+
+  #expect(try map.removeStyleSource("custom-mvt"))
+  #expect(counter.value == 1)
+}
+
+@Test func aRejectedCustomMvtVectorSourceAddReleasesItsCallbacks() throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  let map = try MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 64, height: 64)
+  )
+  defer { try? map.close() }
+
+  try map.setStyleJSON(emptyStyleJSON)
+  let accepted = ReleaseCounter()
+  try addMvtSourceReportingItsRelease(to: map, counter: accepted)
+
+  let rejected = ReleaseCounter()
+  #expect(throws: MaplibreError.self) {
+    try addMvtSourceReportingItsRelease(to: map, counter: rejected)
+  }
+
+  #expect(rejected.value == 1)
+  #expect(accepted.value == 0)
+}
+
 @Test func loadedStyleDocumentAndURLReadBackWhatWasLoaded() throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))

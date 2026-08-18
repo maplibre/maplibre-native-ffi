@@ -30,6 +30,17 @@ func TestCustomGeometryTrampolineRecoversPanic(t *testing.T) {
 	})
 }
 
+func TestCustomMVTVectorTrampolineRecoversPanic(t *testing.T) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			t.Fatalf("custom MVT vector trampoline propagated panic: %v", recovered)
+		}
+	}()
+	invokeCustomMVTVectorFetchForTest(func(CanonicalTileID) {
+		panic("boom")
+	})
+}
+
 func TestLogCallbackTrampolineReturnsConsumed(t *testing.T) {
 	if consumed := invokeLogCallbackForTest(func(severity uint32, event uint32, code int64, message string) bool {
 		if severity != testLogSeverityInfo || event != testLogEventGeneral || code != 0 || message != "test message" {
@@ -100,6 +111,35 @@ func TestCustomGeometryReleaseWaitsForActiveCallback(t *testing.T) {
 	})
 
 	go invokeCustomGeometryFetchStateForTest(state)
+	<-entered
+
+	go func() {
+		state.release()
+		close(released)
+	}()
+
+	select {
+	case <-released:
+		t.Fatal("Release returned while callback was active")
+	default:
+	}
+
+	close(unblock)
+	<-released
+	state.release()
+}
+
+func TestCustomMVTVectorReleaseWaitsForActiveCallback(t *testing.T) {
+	entered := make(chan struct{})
+	unblock := make(chan struct{})
+	released := make(chan struct{})
+
+	state := newCustomMVTVectorSourceStateForTest(func(CanonicalTileID) {
+		close(entered)
+		<-unblock
+	})
+
+	go invokeCustomMVTVectorFetchStateForTest(state)
 	<-entered
 
 	go func() {

@@ -28,6 +28,19 @@ external void mln_adapter_custom_geometry_callbacks_retire(
   ffi.Pointer<ffi.Void> user_data,
 );
 
+@ffi.Native<
+  ffi.Void Function(
+    mln_custom_mvt_vector_source_tile_callback,
+    mln_custom_mvt_vector_source_tile_callback,
+    ffi.Pointer<ffi.Void>,
+  )
+>()
+external void mln_adapter_custom_mvt_vector_callbacks_retire(
+  mln_custom_mvt_vector_source_tile_callback fetch_tile,
+  mln_custom_mvt_vector_source_tile_callback cancel_tile,
+  ffi.Pointer<ffi.Void> user_data,
+);
+
 @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.Void>)>()
 external void mln_adapter_handle_leak_report(ffi.Pointer<ffi.Void> token);
 
@@ -179,6 +192,10 @@ external mln_camera_options mln_camera_options_default();
 external mln_custom_geometry_source_options
 mln_custom_geometry_source_options_default();
 
+@ffi.Native<mln_custom_mvt_vector_source_options Function()>()
+external mln_custom_mvt_vector_source_options
+mln_custom_mvt_vector_source_options_default();
+
 @ffi.Native<mln_free_camera_options Function()>()
 external mln_free_camera_options mln_free_camera_options_default();
 
@@ -259,6 +276,19 @@ external int mln_map_add_custom_geometry_source(
   int map,
   mln_buffer_view source_id,
   ffi.Pointer<mln_custom_geometry_source_options> options,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    ffi.Pointer<mln_custom_mvt_vector_source_options>,
+  )
+>()
+external int mln_map_add_custom_mvt_vector_source(
+  int map,
+  mln_buffer_view source_id,
+  ffi.Pointer<mln_custom_mvt_vector_source_options> options,
 );
 
 @ffi.Native<
@@ -948,6 +978,15 @@ external int mln_map_invalidate_custom_geometry_source_tile(
   mln_canonical_tile_id tile_id,
 );
 
+@ffi.Native<
+  ffi.Int32 Function(mln_map, mln_buffer_view, mln_canonical_tile_id)
+>()
+external int mln_map_invalidate_custom_mvt_vector_source_tile(
+  int map,
+  mln_buffer_view source_id,
+  mln_canonical_tile_id tile_id,
+);
+
 @ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<ffi.Bool>)>()
 external int mln_map_is_fully_loaded(int map, ffi.Pointer<ffi.Bool> out_loaded);
 
@@ -1259,6 +1298,36 @@ external int mln_map_set_custom_geometry_source_tile_data(
   mln_buffer_view source_id,
   mln_canonical_tile_id tile_id,
   mln_buffer_view data,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    mln_canonical_tile_id,
+    mln_buffer_view,
+  )
+>()
+external int mln_map_set_custom_mvt_vector_source_tile_data(
+  int map,
+  mln_buffer_view source_id,
+  mln_canonical_tile_id tile_id,
+  mln_buffer_view data,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    mln_canonical_tile_id,
+    mln_buffer_view,
+  )
+>()
+external int mln_map_set_custom_mvt_vector_source_tile_error(
+  int map,
+  mln_buffer_view source_id,
+  mln_canonical_tile_id tile_id,
+  mln_buffer_view message,
 );
 
 @ffi.Native<ffi.Int32 Function(mln_map, ffi.Uint32)>()
@@ -3376,6 +3445,88 @@ typedef mln_custom_geometry_source_tile_callbackFunction =
       mln_canonical_tile_id tile_id,
     );
 typedef Dartmln_custom_geometry_source_tile_callbackFunction =
+    void Function(
+      ffi.Pointer<ffi.Void> user_data,
+      mln_canonical_tile_id tile_id,
+    );
+
+enum mln_custom_mvt_vector_source_option_field {
+  MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM(1),
+  MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM(2);
+
+  final int value;
+  const mln_custom_mvt_vector_source_option_field(this.value);
+
+  static mln_custom_mvt_vector_source_option_field fromValue(int value) =>
+      switch (value) {
+        1 => MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM,
+        2 => MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM,
+        _ => throw ArgumentError(
+          'Unknown value for mln_custom_mvt_vector_source_option_field: $value',
+        ),
+      };
+}
+
+final class mln_custom_mvt_vector_source_options extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Uint32()
+  external int fields;
+
+  external mln_custom_mvt_vector_source_tile_callback fetch_tile;
+
+  external mln_custom_mvt_vector_source_tile_callback cancel_tile;
+
+  external ffi.Pointer<ffi.Void> user_data;
+
+  @ffi.Double()
+  external double min_zoom;
+
+  @ffi.Double()
+  external double max_zoom;
+
+  external mln_custom_mvt_vector_source_release_callback release_user_data;
+
+  static ffi.Pointer<mln_custom_mvt_vector_source_options> $allocate(
+    ffi.Allocator $allocator, {
+    required int size,
+    required int fields,
+    required mln_custom_mvt_vector_source_tile_callback fetch_tile,
+    required mln_custom_mvt_vector_source_tile_callback cancel_tile,
+    required ffi.Pointer<ffi.Void> user_data,
+    required double min_zoom,
+    required double max_zoom,
+    required mln_custom_mvt_vector_source_release_callback release_user_data,
+  }) => $allocator<mln_custom_mvt_vector_source_options>()
+    ..ref.size = size
+    ..ref.fields = fields
+    ..ref.fetch_tile = fetch_tile
+    ..ref.cancel_tile = cancel_tile
+    ..ref.user_data = user_data
+    ..ref.min_zoom = min_zoom
+    ..ref.max_zoom = max_zoom
+    ..ref.release_user_data = release_user_data;
+}
+
+typedef mln_custom_mvt_vector_source_release_callback =
+    ffi.Pointer<
+      ffi.NativeFunction<mln_custom_mvt_vector_source_release_callbackFunction>
+    >;
+typedef mln_custom_mvt_vector_source_release_callbackFunction =
+    ffi.Void Function(ffi.Pointer<ffi.Void> user_data);
+typedef Dartmln_custom_mvt_vector_source_release_callbackFunction =
+    void Function(ffi.Pointer<ffi.Void> user_data);
+typedef mln_custom_mvt_vector_source_tile_callback =
+    ffi.Pointer<
+      ffi.NativeFunction<mln_custom_mvt_vector_source_tile_callbackFunction>
+    >;
+typedef mln_custom_mvt_vector_source_tile_callbackFunction =
+    ffi.Void Function(
+      ffi.Pointer<ffi.Void> user_data,
+      mln_canonical_tile_id tile_id,
+    );
+typedef Dartmln_custom_mvt_vector_source_tile_callbackFunction =
     void Function(
       ffi.Pointer<ffi.Void> user_data,
       mln_canonical_tile_id tile_id,

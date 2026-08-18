@@ -61,6 +61,11 @@ auto mln_custom_geometry_source_options_default(void) noexcept
   return mln::core::custom_geometry_source_options_default();
 }
 
+auto mln_custom_mvt_vector_source_options_default(void) noexcept
+  -> mln_custom_mvt_vector_source_options {
+  return mln::core::custom_mvt_vector_source_options_default();
+}
+
 auto mln_premultiplied_rgba8_image_default(void) noexcept
   -> mln_premultiplied_rgba8_image {
   return mln::core::premultiplied_rgba8_image_default();
@@ -434,6 +439,47 @@ auto mln_map_invalidate_custom_geometry_source_region(
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_invalidate_custom_geometry_source_region(
       map, source_id, bounds
+    );
+  });
+}
+
+auto mln_map_add_custom_mvt_vector_source(
+  mln_map map, mln_buffer_view source_id,
+  const mln_custom_mvt_vector_source_options* options
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_add_custom_mvt_vector_source(map, source_id, options);
+  });
+}
+
+auto mln_map_set_custom_mvt_vector_source_tile_data(
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
+  mln_buffer_view data
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_set_custom_mvt_vector_source_tile_data(
+      map, source_id, tile_id, data
+    );
+  });
+}
+
+auto mln_map_set_custom_mvt_vector_source_tile_error(
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
+  mln_buffer_view message
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_set_custom_mvt_vector_source_tile_error(
+      map, source_id, tile_id, message
+    );
+  });
+}
+
+auto mln_map_invalidate_custom_mvt_vector_source_tile(
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_invalidate_custom_mvt_vector_source_tile(
+      map, source_id, tile_id
     );
   });
 }

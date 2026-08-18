@@ -294,6 +294,47 @@ test "custom geometry source helpers add sources and accept tile updates" {
     try testing.expectError(error.InvalidArgument, map.invalidateCustomGeometrySourceTile(testing.allocator, "point", tile_id));
 }
 
+test "custom MVT vector source helpers add sources and accept tile updates" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try support.createLoadedMap(&runtime);
+    defer map.close() catch @panic("map close failed");
+
+    var state = CustomGeometryState{};
+    try map.addCustomMvtVectorSource(testing.allocator, "custom-mvt", .{
+        .fetch_tile = fetchCustomGeometryTile,
+        .cancel_tile = cancelCustomGeometryTile,
+        .context = &state,
+        .min_zoom = 0.0,
+        .max_zoom = 14.0,
+    });
+
+    try testing.expect(try map.styleSourceExists(testing.allocator, "custom-mvt"));
+    try testing.expectEqual(maplibre.StyleSourceType.custom_mvt_vector, (try map.getStyleSourceType(testing.allocator, "custom-mvt")).?);
+
+    const tile_id = maplibre.CanonicalTileId{ .z = 0, .x = 0, .y = 0 };
+    try map.setCustomMvtVectorSourceTileData(testing.allocator, "custom-mvt", tile_id, "");
+    try map.setCustomMvtVectorSourceTileError(testing.allocator, "custom-mvt", tile_id, "missing");
+    try map.invalidateCustomMvtVectorSourceTile(testing.allocator, "custom-mvt", tile_id);
+
+    try testing.expectError(error.InvalidArgument, map.addCustomMvtVectorSource(testing.allocator, "custom-mvt", .{
+        .fetch_tile = fetchCustomGeometryTile,
+        .context = &state,
+    }));
+    try testing.expectError(error.InvalidArgument, map.addCustomMvtVectorSource(testing.allocator, "bad-zoom", .{
+        .fetch_tile = fetchCustomGeometryTile,
+        .context = &state,
+        .max_zoom = 33.0,
+    }));
+    try testing.expectError(error.InvalidArgument, map.setCustomMvtVectorSourceTileData(
+        testing.allocator,
+        "custom",
+        tile_id,
+        "",
+    ));
+    try testing.expectError(error.InvalidArgument, map.invalidateCustomMvtVectorSourceTile(testing.allocator, "point", tile_id));
+}
+
 // A host owns the context its callbacks read, and the release callback is the
 // only report that the map stopped referencing it.
 test "a custom geometry source releases its context once per lifetime end" {

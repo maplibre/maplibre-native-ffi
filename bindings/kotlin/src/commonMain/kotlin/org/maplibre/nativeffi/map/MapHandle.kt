@@ -23,6 +23,7 @@ import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 import org.maplibre.nativeffi.runtime.RuntimeEventMask
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.CustomMvtVectorSourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceDataHandle
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.ImageStretch
@@ -138,6 +139,31 @@ public expect class MapHandle : AutoCloseable {
   public fun invalidateCustomGeometrySourceTile(sourceId: String, tileId: CanonicalTileId)
 
   public fun invalidateCustomGeometrySourceRegion(sourceId: String, bounds: LatLngBounds)
+
+  /**
+   * Adds a custom MVT vector source that calls [options] back for encoded tile bytes.
+   *
+   * The source belongs to this map's current style. Its callback state lives until the source
+   * leaves the style, which happens when [removeStyleSource] removes it, when a style load replaces
+   * the style that held it, or when this map closes. Native reports that moment on the map owner
+   * thread, and the binding closes the source's callbacks there, waiting for any in-flight tile
+   * callback to return.
+   */
+  public fun addCustomMvtVectorSource(sourceId: String, options: CustomMvtVectorSourceOptions)
+
+  public fun setCustomMvtVectorSourceTileData(
+    sourceId: String,
+    tileId: CanonicalTileId,
+    data: ByteArray,
+  )
+
+  public fun setCustomMvtVectorSourceTileError(
+    sourceId: String,
+    tileId: CanonicalTileId,
+    message: String,
+  )
+
+  public fun invalidateCustomMvtVectorSourceTile(sourceId: String, tileId: CanonicalTileId)
 
   public fun addVectorSourceUrl(sourceId: String, url: String, options: TileSourceOptions?)
 

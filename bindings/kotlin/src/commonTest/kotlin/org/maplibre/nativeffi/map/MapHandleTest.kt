@@ -32,6 +32,8 @@ import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
 import org.maplibre.nativeffi.style.CustomGeometrySourceCallback
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.CustomMvtVectorSourceCallback
+import org.maplibre.nativeffi.style.CustomMvtVectorSourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceDataHandle
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.RasterDemEncoding
@@ -428,6 +430,61 @@ class MapHandleTest {
   }
 
   @Test
+  fun customMvtVectorSourcesCanBeManaged() {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 64
+          height = 64
+          mapMode = MapMode.STATIC
+        },
+      )
+
+    try {
+      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
+      map.addCustomMvtVectorSource(
+        "custom-mvt",
+        CustomMvtVectorSourceOptions(
+            object : CustomMvtVectorSourceCallback {
+              override fun fetchTile(tileId: CanonicalTileId) {}
+            }
+          )
+          .apply {
+            minZoom = 0.0
+            maxZoom = 14.0
+          },
+      )
+
+      assertTrue(map.styleSourceExists("custom-mvt"))
+      assertEquals(SourceType.CUSTOM_MVT_VECTOR, map.styleSourceType("custom-mvt"))
+
+      val tileId = CanonicalTileId(0, 0, 0)
+      map.setCustomMvtVectorSourceTileData("custom-mvt", tileId, ByteArray(0))
+      map.setCustomMvtVectorSourceTileError("custom-mvt", tileId, "tile missing")
+      map.invalidateCustomMvtVectorSourceTile("custom-mvt", tileId)
+
+      assertFailsWith<InvalidArgumentException> {
+        map.addCustomMvtVectorSource(
+          "custom-mvt",
+          CustomMvtVectorSourceOptions(
+            object : CustomMvtVectorSourceCallback {
+              override fun fetchTile(tileId: CanonicalTileId) {}
+            }
+          ),
+        )
+      }
+
+      assertTrue(map.removeStyleSource("custom-mvt"))
+      assertFalse(map.styleSourceExists("custom-mvt"))
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
+  @Test
   fun sixLiveCustomGeometrySourcesStayRegistered() {
     RuntimeHandle.create(RuntimeOptions()).use { runtime ->
       MapHandle.create(
@@ -454,6 +511,37 @@ class MapHandleTest {
           map.addCustomGeometrySource("custom-7", options)
           assertTrue(map.styleSourceExists("custom-7"))
           assertFalse(map.styleSourceExists("custom-1"))
+        }
+    }
+  }
+
+  @Test
+  fun sixLiveCustomMvtVectorSourcesStayRegistered() {
+    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+      MapHandle.create(
+          runtime,
+          MapOptions().apply {
+            width = 64
+            height = 64
+            mapMode = MapMode.STATIC
+          },
+        )
+        .use { map ->
+          map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
+          val options =
+            CustomMvtVectorSourceOptions(
+              object : CustomMvtVectorSourceCallback {
+                override fun fetchTile(tileId: CanonicalTileId) {}
+              }
+            )
+          val ids = (1..6).map { "custom-mvt-$it" }
+          ids.forEach { map.addCustomMvtVectorSource(it, options) }
+          ids.forEach { id -> assertTrue(map.styleSourceExists(id), id) }
+
+          assertTrue(map.removeStyleSource("custom-mvt-1"))
+          map.addCustomMvtVectorSource("custom-mvt-7", options)
+          assertTrue(map.styleSourceExists("custom-mvt-7"))
+          assertFalse(map.styleSourceExists("custom-mvt-1"))
         }
     }
   }

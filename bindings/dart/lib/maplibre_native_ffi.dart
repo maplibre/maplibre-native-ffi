@@ -16,6 +16,8 @@ export 'src/runtime/runtime.dart'
     hide
         CustomGeometryCallbackLifecycleProbe,
         customGeometryCallbackProbeForTesting,
+        CustomMvtVectorCallbackLifecycleProbe,
+        customMvtVectorCallbackProbeForTesting,
         decodeRuntimeEventBatchForTesting,
         mapAttachRefIdForTesting,
         runtimeHandleIdForTesting;

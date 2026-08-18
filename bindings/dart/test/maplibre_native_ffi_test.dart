@@ -12,7 +12,9 @@ import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
 import 'package:maplibre_native_ffi/src/maplibre.dart'
     show logCallbackStateForTesting;
 import 'package:maplibre_native_ffi/src/runtime/runtime.dart'
-    show customGeometryCallbackProbeForTesting;
+    show
+        customGeometryCallbackProbeForTesting,
+        customMvtVectorCallbackProbeForTesting;
 import 'package:test/test.dart';
 
 const _emptyStyleJson = '{"version":8,"sources":{},"layers":[]}';
@@ -205,6 +207,41 @@ void main() {
       });
       expect(types, isNot(contains(RuntimeEventType.mapStyleLoaded)));
       expect(customGeometryCallbackProbeForTesting(map, sourceId), isNull);
+      await _waitUntil(() => probe.closed);
+    },
+  );
+
+  test(
+    'a style replacement releases a custom MVT vector source with style loads unselected',
+    () async {
+      const sourceId = 'dart-released-mvt-source';
+      final runtime = RuntimeHandle.create();
+      addTearDown(runtime.close);
+      final map = runtime.createMap(
+        options: MapOptions(eventMask: _maskWithoutStyleLoaded),
+      );
+      addTearDown(map.close);
+      map.setStyleJson(_jsonBytes(_emptyStyleJson));
+      _quiesce(runtime);
+      map.addCustomMvtVectorSource(
+        sourceId,
+        CustomMvtVectorSourceOptions(fetchTile: (_) {}),
+      );
+      final probe = customMvtVectorCallbackProbeForTesting(map, sourceId)!;
+
+      expect(map.eventMask, _maskWithoutStyleLoaded);
+
+      map.setStyleJson(_jsonBytes(_emptyStyleJson));
+      final types = <RuntimeEventType>{};
+      await _waitUntil(() {
+        runtime.pump();
+        types.addAll(
+          runtime.drainEvents().events.map((event) => event.eventType),
+        );
+        return probe.retirementQueued;
+      });
+      expect(types, isNot(contains(RuntimeEventType.mapStyleLoaded)));
+      expect(customMvtVectorCallbackProbeForTesting(map, sourceId), isNull);
       await _waitUntil(() => probe.closed);
     },
   );
@@ -865,6 +902,38 @@ void main() {
     expect(closeProbe.retirementQueued, isTrue);
     await _waitUntil(() => removedProbe.closed && closeProbe.closed);
   });
+
+  test(
+    'a custom MVT vector source removal and map close each release a callback root',
+    () async {
+      const sourceId = 'dart-mvt-lifecycle-source';
+      final runtime = RuntimeHandle.create();
+      final map = runtime.createMap();
+      map.setStyleJson(_jsonBytes(_emptyStyleJson));
+
+      map.addCustomMvtVectorSource(
+        sourceId,
+        CustomMvtVectorSourceOptions(fetchTile: (_) {}),
+      );
+      final removedProbe = customMvtVectorCallbackProbeForTesting(
+        map,
+        sourceId,
+      )!;
+      expect(map.removeStyleSource(sourceId), isTrue);
+      expect(removedProbe.retirementQueued, isTrue);
+      expect(customMvtVectorCallbackProbeForTesting(map, sourceId), isNull);
+
+      map.addCustomMvtVectorSource(
+        sourceId,
+        CustomMvtVectorSourceOptions(fetchTile: (_) {}),
+      );
+      final closeProbe = customMvtVectorCallbackProbeForTesting(map, sourceId)!;
+      map.close();
+      runtime.close();
+      expect(closeProbe.retirementQueued, isTrue);
+      await _waitUntil(() => removedProbe.closed && closeProbe.closed);
+    },
+  );
 
   test('nine-patch style images round-trip through the native C ABI', () {
     final runtime = RuntimeHandle.create();
@@ -1756,6 +1825,29 @@ void main() {
       CustomGeometrySourceOptions(fetchTile: fetchedTiles.add),
     );
     expect(map.removeStyleSource('dart-custom-source'), isTrue);
+    map.addCustomMvtVectorSource(
+      'dart-custom-mvt-source',
+      CustomMvtVectorSourceOptions(fetchTile: fetchedTiles.add),
+    );
+    expect(
+      map.getStyleSourceInfo('dart-custom-mvt-source')!.type,
+      SourceType.customMvtVector,
+    );
+    map.setCustomMvtVectorSourceTileData(
+      'dart-custom-mvt-source',
+      const CanonicalTileId(z: 0, x: 0, y: 0),
+      Uint8List(0),
+    );
+    map.setCustomMvtVectorSourceTileError(
+      'dart-custom-mvt-source',
+      const CanonicalTileId(z: 0, x: 0, y: 0),
+      'tile missing',
+    );
+    map.invalidateCustomMvtVectorSourceTile(
+      'dart-custom-mvt-source',
+      const CanonicalTileId(z: 0, x: 0, y: 0),
+    );
+    expect(map.removeStyleSource('dart-custom-mvt-source'), isTrue);
 
     final geoJsonData = GeoJsonSourceDataHandle.prepare(
       _jsonBytes(

@@ -9,6 +9,7 @@
 
 mod camera;
 mod custom_geometry;
+mod custom_mvt_vector;
 mod events;
 mod geojson;
 mod handle;
@@ -30,6 +31,7 @@ pub use camera::{
     FreeCameraOptions, ProjectionMode,
 };
 pub use custom_geometry::{CanonicalTileId, CustomGeometrySourceOptions};
+pub use custom_mvt_vector::CustomMvtVectorSourceOptions;
 pub use events::{
     CameraTransitionFinishedEvent, MapId, OfflineOperationCompletedEvent,
     OfflineRegionResponseErrorEvent, OfflineRegionStatus, OfflineRegionStatusEvent,

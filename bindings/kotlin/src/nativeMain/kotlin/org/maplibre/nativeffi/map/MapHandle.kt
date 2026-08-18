@@ -40,6 +40,7 @@ import org.maplibre.nativeffi.internal.c.mln_lat_lng
 import org.maplibre.nativeffi.internal.c.mln_lat_lng_bounds
 import org.maplibre.nativeffi.internal.c.mln_map_add_color_relief_layer
 import org.maplibre.nativeffi.internal.c.mln_map_add_custom_geometry_source
+import org.maplibre.nativeffi.internal.c.mln_map_add_custom_mvt_vector_source
 import org.maplibre.nativeffi.internal.c.mln_map_add_geojson_source_data
 import org.maplibre.nativeffi.internal.c.mln_map_add_geojson_source_url
 import org.maplibre.nativeffi.internal.c.mln_map_add_hillshade_layer
@@ -97,6 +98,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_get_tile_options
 import org.maplibre.nativeffi.internal.c.mln_map_get_viewport_options
 import org.maplibre.nativeffi.internal.c.mln_map_invalidate_custom_geometry_source_region
 import org.maplibre.nativeffi.internal.c.mln_map_invalidate_custom_geometry_source_tile
+import org.maplibre.nativeffi.internal.c.mln_map_invalidate_custom_mvt_vector_source_tile
 import org.maplibre.nativeffi.internal.c.mln_map_is_fully_loaded
 import org.maplibre.nativeffi.internal.c.mln_map_is_gesture_in_progress
 import org.maplibre.nativeffi.internal.c.mln_map_jump_to
@@ -127,6 +129,8 @@ import org.maplibre.nativeffi.internal.c.mln_map_scale_by
 import org.maplibre.nativeffi.internal.c.mln_map_scale_by_animated
 import org.maplibre.nativeffi.internal.c.mln_map_set_bounds
 import org.maplibre.nativeffi.internal.c.mln_map_set_custom_geometry_source_tile_data
+import org.maplibre.nativeffi.internal.c.mln_map_set_custom_mvt_vector_source_tile_data
+import org.maplibre.nativeffi.internal.c.mln_map_set_custom_mvt_vector_source_tile_error
 import org.maplibre.nativeffi.internal.c.mln_map_set_debug_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_event_mask
 import org.maplibre.nativeffi.internal.c.mln_map_set_free_camera_options
@@ -198,6 +202,7 @@ import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 import org.maplibre.nativeffi.runtime.RuntimeEventMask
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.CustomMvtVectorSourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceDataHandle
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.ImageStretch
@@ -219,6 +224,8 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
   private val state = HandleState("MapHandle", handle, runtime)
   private val customGeometrySources =
     CustomGeometrySourceRegistry<CustomGeometrySourceState> { it.close() }
+  private val customMvtVectorSources =
+    CustomGeometrySourceRegistry<CustomMvtVectorSourceState> { it.close() }
 
   public actual var eventMask: RuntimeEventMask
     get() = memScoped {
@@ -458,6 +465,71 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           CoreStructs.latLngBounds(bounds),
+        )
+      )
+    }
+  }
+
+  public actual fun addCustomMvtVectorSource(
+    sourceId: String,
+    options: CustomMvtVectorSourceOptions,
+  ) {
+    val registry = customMvtVectorSources
+    val sourceState = CustomMvtVectorSourceState(options) { registry.remove(sourceId) }
+    registry.install(sourceId, sourceState) {
+      memScoped {
+        Status.check(
+          mln_map_add_custom_mvt_vector_source(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(sourceId, this),
+            sourceState.descriptor(),
+          )
+        )
+      }
+    }
+  }
+
+  public actual fun setCustomMvtVectorSourceTileData(
+    sourceId: String,
+    tileId: CanonicalTileId,
+    data: ByteArray,
+  ) {
+    memScoped {
+      Status.check(
+        mln_map_set_custom_mvt_vector_source_tile_data(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(sourceId, this),
+          StyleStructs.canonicalTileId(tileId),
+          ByteStructs.bufferView(data, this),
+        )
+      )
+    }
+  }
+
+  public actual fun setCustomMvtVectorSourceTileError(
+    sourceId: String,
+    tileId: CanonicalTileId,
+    message: String,
+  ) {
+    memScoped {
+      Status.check(
+        mln_map_set_custom_mvt_vector_source_tile_error(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(sourceId, this),
+          StyleStructs.canonicalTileId(tileId),
+          CoreStructs.stringView(message, this),
+        )
+      )
+    }
+  }
+
+  public actual fun invalidateCustomMvtVectorSourceTile(sourceId: String, tileId: CanonicalTileId) {
+    memScoped {
+      Status.check(
+        mln_map_invalidate_custom_mvt_vector_source_tile(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(sourceId, this),
+          StyleStructs.canonicalTileId(tileId),
         )
       )
     }

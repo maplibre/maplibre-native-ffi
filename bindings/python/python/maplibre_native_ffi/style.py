@@ -13,6 +13,7 @@ from .geo import LatLng, LatLngBounds
 from .render import PremultipliedRgba8Image, TextureImageInfo
 
 _CUSTOM_GEOMETRY_SOURCE_HANDLE_CREATE_KEY = object()
+_CUSTOM_MVT_VECTOR_SOURCE_HANDLE_CREATE_KEY = object()
 
 
 class TileScheme(UnknownIntEnum):
@@ -434,6 +435,38 @@ class CustomGeometrySourceOptions:
     max_queued_events: int = 1024
 
 
+class CustomMvtVectorSourceEventType(NativeIntEnum):
+    """Custom MVT vector source callback event kind."""
+
+    FETCH_TILE = 0
+    CANCEL_TILE = 1
+
+
+@dataclass(frozen=True, slots=True)
+class CustomMvtVectorSourceEvent:
+    """Queued custom MVT vector source callback event."""
+
+    event_type: CustomMvtVectorSourceEventType
+    tile_id: CanonicalTileId
+
+    @classmethod
+    def _from_native(cls, raw: dict[str, Any]) -> CustomMvtVectorSourceEvent:
+        return cls(
+            event_type=CustomMvtVectorSourceEventType(raw["kind"]),
+            tile_id=CanonicalTileId(z=raw["z"], x=raw["x"], y=raw["y"]),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class CustomMvtVectorSourceOptions:
+    """Options used when adding a custom MVT vector source."""
+
+    min_zoom: float | None = None
+    max_zoom: float | None = None
+    has_cancel_tile: bool = False
+    max_queued_events: int = 1024
+
+
 class CustomGeometrySourceHandle(NativeHandleMixin):
     """Owner-thread handle for queued custom geometry source callback events."""
 
@@ -467,12 +500,49 @@ class CustomGeometrySourceHandle(NativeHandleMixin):
         return CustomGeometrySourceEvent._from_native(event)
 
 
+class CustomMvtVectorSourceHandle(NativeHandleMixin):
+    """Owner-thread handle for queued custom MVT vector source callback events."""
+
+    _handle_name = "CustomMvtVectorSourceHandle"
+
+    def __init__(self, native: Any, *, _create_key: object | None = None) -> None:
+        if _create_key is not _CUSTOM_MVT_VECTOR_SOURCE_HANDLE_CREATE_KEY:
+            msg = "CustomMvtVectorSourceHandle instances are created by MapHandle"
+            raise TypeError(msg)
+        self._native = native
+
+    @classmethod
+    def _from_native(cls, native: Any) -> CustomMvtVectorSourceHandle:
+        return cls(native, _create_key=_CUSTOM_MVT_VECTOR_SOURCE_HANDLE_CREATE_KEY)
+
+    @property
+    def dropped_event_count(self) -> int:
+        """Return how many callback events were dropped because the queue was full."""
+        return self._native.dropped_event_count
+
+    def poll_event(self) -> CustomMvtVectorSourceEvent | None:
+        """Return one queued fetch/cancel event copied into Python values.
+
+        This queue belongs to the binding and reports one event per call.
+        :meth:`RuntimeHandle.drain_events` takes a whole C batch instead,
+        because the C API owns that queue.
+        """
+        event = self._native.poll_event()
+        if event is None:
+            return None
+        return CustomMvtVectorSourceEvent._from_native(event)
+
+
 __all__ = [
     "CanonicalTileId",
     "CustomGeometrySourceEvent",
     "CustomGeometrySourceEventType",
     "CustomGeometrySourceHandle",
     "CustomGeometrySourceOptions",
+    "CustomMvtVectorSourceEvent",
+    "CustomMvtVectorSourceEventType",
+    "CustomMvtVectorSourceHandle",
+    "CustomMvtVectorSourceOptions",
     "GeoJsonSourceDataHandle",
     "GeoJsonSourceOptions",
     "LocationIndicatorImageKind",

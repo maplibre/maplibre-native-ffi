@@ -798,10 +798,9 @@ The subscription follows this design:
    type the host left out to drive its own bookkeeping, and it MUST NOT hide a
    queued event from a host.
 5. Where a binding needs a native signal for its own state, it MUST use the
-   dedicated C mechanism, as
-   `mln_custom_geometry_source_options.release_user_data` provides for source
-   callback state. Binding-owned state that such a mechanism maintains keeps
-   working for every subscription.
+   dedicated C mechanism that style-scoped source callback state uses, as
+   `release_user_data` provides. Binding-owned state that such a mechanism
+   maintains keeps working for every subscription.
 6. Documentation for a subscription setter names the event types that carry
    state a host reaches no other way.
 

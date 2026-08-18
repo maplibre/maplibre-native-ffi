@@ -34,6 +34,7 @@ import org.maplibre.nativeffi.internal.c.mln_camera_fit_options
 import org.maplibre.nativeffi.internal.c.mln_camera_options
 import org.maplibre.nativeffi.internal.c.mln_canonical_tile_id
 import org.maplibre.nativeffi.internal.c.mln_custom_geometry_source_options
+import org.maplibre.nativeffi.internal.c.mln_custom_mvt_vector_source_options
 import org.maplibre.nativeffi.internal.c.mln_edge_insets
 import org.maplibre.nativeffi.internal.c.mln_egl_context_descriptor
 import org.maplibre.nativeffi.internal.c.mln_feature_state_selector
@@ -177,6 +178,7 @@ import org.maplibre.nativeffi.runtime.OfflineOperationResultKind
 import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 import org.maplibre.nativeffi.runtime.RuntimeOptions
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.CustomMvtVectorSourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.ImageContent
 import org.maplibre.nativeffi.style.ImageStretch
@@ -814,6 +816,72 @@ internal object NativeAccess {
     Arena.ofConfined().use { arena ->
       Status.check(
         mapStringViewCanonicalTileIdStatusFunction("mln_map_invalidate_custom_geometry_source_tile")
+          .invokeNative(map, stringView(arena, sourceId), canonicalTileId(arena, tileId)) as Int
+      )
+    }
+  }
+
+  internal fun addCustomMvtVectorSource(map: NativeMap, sourceId: String, options: MemorySegment) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewAddressStatusFunction("mln_map_add_custom_mvt_vector_source")
+          .invokeNative(map, stringView(arena, sourceId), options) as Int
+      )
+    }
+  }
+
+  internal fun setCustomMvtVectorSourceTileData(
+    map: NativeMap,
+    sourceId: String,
+    tileId: CanonicalTileId,
+    data: ByteArray,
+  ) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewCanonicalTileIdAddressStatusFunction(
+            "mln_map_set_custom_mvt_vector_source_tile_data"
+          )
+          .invokeNative(
+            map,
+            stringView(arena, sourceId),
+            canonicalTileId(arena, tileId),
+            byteArrayView(arena, data),
+          ) as Int
+      )
+    }
+  }
+
+  internal fun setCustomMvtVectorSourceTileError(
+    map: NativeMap,
+    sourceId: String,
+    tileId: CanonicalTileId,
+    message: String,
+  ) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewCanonicalTileIdAddressStatusFunction(
+            "mln_map_set_custom_mvt_vector_source_tile_error"
+          )
+          .invokeNative(
+            map,
+            stringView(arena, sourceId),
+            canonicalTileId(arena, tileId),
+            stringView(arena, message),
+          ) as Int
+      )
+    }
+  }
+
+  internal fun invalidateCustomMvtVectorSourceTile(
+    map: NativeMap,
+    sourceId: String,
+    tileId: CanonicalTileId,
+  ) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewCanonicalTileIdStatusFunction(
+            "mln_map_invalidate_custom_mvt_vector_source_tile"
+          )
           .invokeNative(map, stringView(arena, sourceId), canonicalTileId(arena, tileId)) as Int
       )
     }
@@ -2616,6 +2684,45 @@ internal object NativeAccess {
       segment.set(ValueLayout.JAVA_BOOLEAN, CUSTOM_GEOMETRY_SOURCE_OPTIONS_WRAP_OFFSET, it)
     }
     segment.set(ValueLayout.JAVA_INT, CUSTOM_GEOMETRY_SOURCE_OPTIONS_FIELDS_OFFSET, fields)
+    return segment
+  }
+
+  internal fun customMvtVectorSourceOptions(
+    arena: Arena,
+    value: CustomMvtVectorSourceOptions,
+    fetchTile: MemorySegment,
+    cancelTile: MemorySegment,
+    releaseUserData: MemorySegment,
+    userData: MemorySegment,
+  ): MemorySegment {
+    val segment = arena.allocate(CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_SIZE)
+    segment.set(
+      ValueLayout.JAVA_INT,
+      CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_SIZE_OFFSET,
+      CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_SIZE.toInt(),
+    )
+    segment.set(ValueLayout.ADDRESS, CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_FETCH_TILE_OFFSET, fetchTile)
+    segment.set(
+      ValueLayout.ADDRESS,
+      CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_CANCEL_TILE_OFFSET,
+      cancelTile,
+    )
+    segment.set(ValueLayout.ADDRESS, CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_USER_DATA_OFFSET, userData)
+    segment.set(
+      ValueLayout.ADDRESS,
+      CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_RELEASE_USER_DATA_OFFSET,
+      releaseUserData,
+    )
+    var fields = 0
+    value.minZoom?.let {
+      fields = fields or CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM
+      segment.set(ValueLayout.JAVA_DOUBLE, CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_MIN_ZOOM_OFFSET, it)
+    }
+    value.maxZoom?.let {
+      fields = fields or CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM
+      segment.set(ValueLayout.JAVA_DOUBLE, CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_MAX_ZOOM_OFFSET, it)
+    }
+    segment.set(ValueLayout.JAVA_INT, CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_FIELDS_OFFSET, fields)
     return segment
   }
 
@@ -5569,6 +5676,28 @@ internal object NativeAccess {
     mln_custom_geometry_source_options.`wrap$offset`()
   private val CUSTOM_GEOMETRY_SOURCE_OPTIONS_RELEASE_USER_DATA_OFFSET: Long =
     mln_custom_geometry_source_options.`release_user_data$offset`()
+
+  private const val CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM: Int = 1 shl 0
+  private const val CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM: Int = 1 shl 1
+
+  private val CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_SIZE: Long =
+    mln_custom_mvt_vector_source_options.sizeof()
+  private val CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_SIZE_OFFSET: Long =
+    mln_custom_mvt_vector_source_options.`size$offset`()
+  private val CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_FIELDS_OFFSET: Long =
+    mln_custom_mvt_vector_source_options.`fields$offset`()
+  private val CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_FETCH_TILE_OFFSET: Long =
+    mln_custom_mvt_vector_source_options.`fetch_tile$offset`()
+  private val CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_CANCEL_TILE_OFFSET: Long =
+    mln_custom_mvt_vector_source_options.`cancel_tile$offset`()
+  private val CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_USER_DATA_OFFSET: Long =
+    mln_custom_mvt_vector_source_options.`user_data$offset`()
+  private val CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_MIN_ZOOM_OFFSET: Long =
+    mln_custom_mvt_vector_source_options.`min_zoom$offset`()
+  private val CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_MAX_ZOOM_OFFSET: Long =
+    mln_custom_mvt_vector_source_options.`max_zoom$offset`()
+  private val CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_RELEASE_USER_DATA_OFFSET: Long =
+    mln_custom_mvt_vector_source_options.`release_user_data$offset`()
 
   private const val FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID: Int = 1 shl 0
   private const val FEATURE_STATE_SELECTOR_FEATURE_ID: Int = 1 shl 1

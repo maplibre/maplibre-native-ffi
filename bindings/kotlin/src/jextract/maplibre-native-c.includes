@@ -535,6 +535,8 @@
 --include-constant MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE
 --include-constant MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE
 --include-constant MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP
+--include-constant MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM
+--include-constant MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM
 --include-constant MLN_GEOJSON_SOURCE_OPTION_BUFFER
 --include-constant MLN_GEOJSON_SOURCE_OPTION_CLUSTER
 --include-constant MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM
@@ -585,11 +587,13 @@
 --include-constant MLN_STYLE_VECTOR_TILE_ENCODING_MLT
 --include-constant MLN_STYLE_VECTOR_TILE_ENCODING_MVT
 --include-function mln_custom_geometry_source_options_default
+--include-function mln_custom_mvt_vector_source_options_default
 --include-function mln_geojson_source_data_create
 --include-function mln_geojson_source_data_destroy
 --include-function mln_geojson_source_options_default
 --include-function mln_map_add_color_relief_layer
 --include-function mln_map_add_custom_geometry_source
+--include-function mln_map_add_custom_mvt_vector_source
 --include-function mln_map_add_geojson_source_data
 --include-function mln_map_add_geojson_source_url
 --include-function mln_map_add_hillshade_layer
@@ -620,6 +624,7 @@
 --include-function mln_map_get_style_transition_options
 --include-function mln_map_invalidate_custom_geometry_source_region
 --include-function mln_map_invalidate_custom_geometry_source_tile
+--include-function mln_map_invalidate_custom_mvt_vector_source_tile
 --include-function mln_map_list_style_layer_ids
 --include-function mln_map_list_style_source_ids
 --include-function mln_map_move_style_layer
@@ -627,6 +632,8 @@
 --include-function mln_map_remove_style_layer
 --include-function mln_map_remove_style_source
 --include-function mln_map_set_custom_geometry_source_tile_data
+--include-function mln_map_set_custom_mvt_vector_source_tile_data
+--include-function mln_map_set_custom_mvt_vector_source_tile_error
 --include-function mln_map_set_geojson_source_data
 --include-function mln_map_set_geojson_source_synchronous_tiling
 --include-function mln_map_set_geojson_source_url
@@ -659,6 +666,7 @@
 --include-function mln_style_transition_options_default
 --include-struct mln_canonical_tile_id
 --include-struct mln_custom_geometry_source_options
+--include-struct mln_custom_mvt_vector_source_options
 --include-struct mln_geojson_source_options
 --include-struct mln_premultiplied_rgba8_image
 --include-struct mln_style_image_info
@@ -668,6 +676,8 @@
 --include-struct mln_style_transition_options
 --include-typedef mln_custom_geometry_source_release_callback
 --include-typedef mln_custom_geometry_source_tile_callback
+--include-typedef mln_custom_mvt_vector_source_release_callback
+--include-typedef mln_custom_mvt_vector_source_tile_callback
 
 # include/maplibre_native_c/surface.h
 --include-function mln_metal_surface_attach

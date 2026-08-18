@@ -42,6 +42,8 @@ from .style import (
     CanonicalTileId,
     CustomGeometrySourceHandle,
     CustomGeometrySourceOptions,
+    CustomMvtVectorSourceHandle,
+    CustomMvtVectorSourceOptions,
     GeoJsonSourceDataHandle,
     GeoJsonSourceOptions,
     ImageStretch,
@@ -1516,6 +1518,71 @@ class MapHandle(NativeHandleMixin):
             source_id,
             (bounds.southwest.latitude, bounds.southwest.longitude),
             (bounds.northeast.latitude, bounds.northeast.longitude),
+        )
+
+    def add_custom_mvt_vector_source(
+        self,
+        source_id: str,
+        options: CustomMvtVectorSourceOptions | None = None,
+    ) -> CustomMvtVectorSourceHandle:
+        """Add a custom MVT vector source and return its queued-event handle.
+
+        The handle closes when the source goes away: an explicit removal, a
+        style load that leaves a style without the source, or closing this map.
+        """
+        from .style import CustomMvtVectorSourceHandle, CustomMvtVectorSourceOptions
+
+        options = options or CustomMvtVectorSourceOptions()
+        native = self._native.add_custom_mvt_vector_source(
+            source_id,
+            options.max_queued_events,
+            options.min_zoom,
+            options.max_zoom,
+            options.has_cancel_tile,
+        )
+        return CustomMvtVectorSourceHandle._from_native(native)
+
+    def set_custom_mvt_vector_source_tile_data(
+        self,
+        source_id: str,
+        tile_id: CanonicalTileId,
+        data: bytes,
+    ) -> None:
+        """Set custom MVT vector source data for one canonical tile."""
+        self._native.set_custom_mvt_vector_source_tile_data(
+            source_id,
+            tile_id.z,
+            tile_id.x,
+            tile_id.y,
+            data,
+        )
+
+    def set_custom_mvt_vector_source_tile_error(
+        self,
+        source_id: str,
+        tile_id: CanonicalTileId,
+        message: str,
+    ) -> None:
+        """Report a custom MVT vector source error for one canonical tile."""
+        self._native.set_custom_mvt_vector_source_tile_error(
+            source_id,
+            tile_id.z,
+            tile_id.x,
+            tile_id.y,
+            message,
+        )
+
+    def invalidate_custom_mvt_vector_source_tile(
+        self,
+        source_id: str,
+        tile_id: CanonicalTileId,
+    ) -> None:
+        """Invalidate custom MVT vector source data for one canonical tile."""
+        self._native.invalidate_custom_mvt_vector_source_tile(
+            source_id,
+            tile_id.z,
+            tile_id.x,
+            tile_id.y,
         )
 
     def _attach_render_session(

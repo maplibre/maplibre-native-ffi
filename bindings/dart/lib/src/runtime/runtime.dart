@@ -51,6 +51,25 @@ CustomGeometryCallbackLifecycleProbe? customGeometryCallbackProbeForTesting(
   return state == null ? null : CustomGeometryCallbackLifecycleProbe._(state);
 }
 
+/// Read-only view of one custom-MVT-vector callback root for lifecycle tests.
+final class CustomMvtVectorCallbackLifecycleProbe {
+  CustomMvtVectorCallbackLifecycleProbe._(this._state);
+
+  final _CustomMvtVectorCallbackState _state;
+
+  bool get retirementQueued => _state.retirementQueuedForTesting;
+  bool get closed => _state.closedForTesting;
+}
+
+/// Returns the callback root currently owned by [map] for lifecycle tests.
+CustomMvtVectorCallbackLifecycleProbe? customMvtVectorCallbackProbeForTesting(
+  MapHandle map,
+  String sourceId,
+) {
+  final state = map._customMvtVectorCallbacks[sourceId];
+  return state == null ? null : CustomMvtVectorCallbackLifecycleProbe._(state);
+}
+
 /// Dart resource provider callback run on the owner isolate.
 typedef ResourceProviderCallback =
     void Function(ResourceRequest request, ResourceRequestHandle handle);
@@ -1801,6 +1820,7 @@ final class MapHandle {
   /// Callback roots of the custom-geometry sources this map still holds, each
   /// released by the C API's own release callback.
   final _customGeometryCallbacks = <String, _CustomGeometryCallbackState>{};
+  final _customMvtVectorCallbacks = <String, _CustomMvtVectorCallbackState>{};
 
   /// Whether this map has been closed by the Dart binding.
   bool get isClosed => _state.isClosed;
@@ -2998,6 +3018,99 @@ final class MapHandle {
     });
   }
 
+  /// Adds a custom MVT vector source with queued fetch/cancel notifications.
+  ///
+  /// The C API releases the source's callback root when the source is removed,
+  /// when a style load drops it, or when this map is destroyed, so a host that
+  /// adds a source subscribes to nothing to keep it alive.
+  void addCustomMvtVectorSource(
+    String sourceId,
+    CustomMvtVectorSourceOptions options,
+  ) {
+    final callbackState = _CustomMvtVectorCallbackState(
+      options,
+      () => _releaseCustomMvtVectorCallbacks(sourceId),
+    );
+    try {
+      withNativeArena((arena) {
+        final nativeId = nativeStringView(sourceId, arena);
+        final nativeOptions = arena<raw.mln_custom_mvt_vector_source_options>();
+        nativeOptions.ref = _customMvtVectorSourceOptionsToNative(
+          options,
+          callbackState,
+        );
+        _check(
+          raw.mln_map_add_custom_mvt_vector_source(
+            _handle.raw,
+            nativeId.value,
+            nativeOptions,
+          ),
+        );
+      });
+      _customMvtVectorCallbacks[sourceId] = callbackState;
+    } catch (_) {
+      callbackState.close();
+      rethrow;
+    }
+  }
+
+  /// Sets custom MVT vector source data for one canonical tile.
+  void setCustomMvtVectorSourceTileData(
+    String sourceId,
+    CanonicalTileId tileId,
+    Uint8List data,
+  ) {
+    withNativeArena((arena) {
+      final nativeId = nativeStringView(sourceId, arena);
+      final nativeData = nativeBufferView(data, arena);
+      _check(
+        raw.mln_map_set_custom_mvt_vector_source_tile_data(
+          _handle.raw,
+          nativeId.value,
+          _canonicalTileIdToNative(tileId),
+          nativeData,
+        ),
+      );
+    });
+  }
+
+  /// Reports a custom MVT vector source error for one canonical tile.
+  void setCustomMvtVectorSourceTileError(
+    String sourceId,
+    CanonicalTileId tileId,
+    String message,
+  ) {
+    withNativeArena((arena) {
+      final nativeId = nativeStringView(sourceId, arena);
+      final nativeMessage = nativeStringView(message, arena);
+      _check(
+        raw.mln_map_set_custom_mvt_vector_source_tile_error(
+          _handle.raw,
+          nativeId.value,
+          _canonicalTileIdToNative(tileId),
+          nativeMessage.value,
+        ),
+      );
+    });
+  }
+
+  /// Invalidates custom MVT vector source data for one canonical tile.
+  void invalidateCustomMvtVectorSourceTile(
+    String sourceId,
+    CanonicalTileId tileId,
+  ) {
+    withNativeArena((arena) {
+      final nativeId = nativeStringView(sourceId, arena);
+      _check(
+        raw.mln_map_invalidate_custom_mvt_vector_source_tile(
+          _handle.raw,
+          nativeId.value,
+          _canonicalTileIdToNative(tileId),
+        ),
+      );
+    });
+  }
+
   /// Reports whether a style source ID exists.
   bool styleSourceExists(String sourceId) {
     return withNativeArena((arena) {
@@ -3687,5 +3800,10 @@ final class MapHandle {
   /// Drops [sourceId]'s callback root once the C API has released it.
   void _releaseCustomGeometryCallbacks(String sourceId) {
     _customGeometryCallbacks.remove(sourceId);
+  }
+
+  /// Drops [sourceId]'s callback root once the C API has released it.
+  void _releaseCustomMvtVectorCallbacks(String sourceId) {
+    _customMvtVectorCallbacks.remove(sourceId);
   }
 }
