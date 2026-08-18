@@ -32,6 +32,7 @@
 #include "maplibre_native_c/logging.h"  // IWYU pragma: export
 #include "maplibre_native_c/runtime.h"  // IWYU pragma: export
 #include "maplibre_native_c/style.h"    // IWYU pragma: export
+#include "maplibre_native_c/wake.h"     // IWYU pragma: export
 
 #ifdef __cplusplus
 extern "C" {
@@ -41,6 +42,65 @@ extern "C" {
 
 /** Rule kind that matches every resource kind. */
 #define MLN_ADAPTER_RESOURCE_KIND_ANY UINT32_MAX
+
+/** How a completion adapter copies the function-specific result value. */
+typedef enum mln_adapter_completion_copy_kind : uint32_t {
+  /** Copy value_count elements of the element size supplied at creation. */
+  MLN_ADAPTER_COMPLETION_COPY_FLAT = 0,
+  /** Copy one or more mln_buffer_view values and their bytes. */
+  MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEWS = 1,
+  /** Copy one or more mln_offline_region_info values and nested storage. */
+  MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGIONS = 2,
+  /** Copy one mln_style_source_result and its nested storage. */
+  MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE = 3,
+  /** Copy one mln_style_layer_result and its nested storage. */
+  MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER = 4,
+  /** Copy one mln_style_image_result and its nested storage. */
+  MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE = 5,
+  /** Copy one mln_style_image_stretches_result and its arrays. */
+  MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_STRETCHES = 6,
+  /** Copy one or more mln_queried_feature values and nested storage. */
+  MLN_ADAPTER_COMPLETION_COPY_QUERIED_FEATURES = 7,
+  /** Copy one mln_texture_readback_result and its pixel bytes. */
+  MLN_ADAPTER_COMPLETION_COPY_TEXTURE_READBACK = 8,
+} mln_adapter_completion_copy_kind;
+
+/** Native-owned completion copy delivered to an asynchronous host listener. */
+typedef struct mln_adapter_completion_record {
+  void* owner;
+  mln_completion_result result;
+} mln_adapter_completion_record;
+
+/** Receives one native-owned completion record on the host listener context. */
+typedef void (*mln_adapter_completion_listener)(
+  void* user_data, mln_adapter_completion_record* record
+);
+
+/**
+ * Creates a completion descriptor that copies its borrowed result before
+ * notifying an asynchronous host listener.
+ *
+ * out_completion must point to a zeroed descriptor. element_size is used only
+ * with MLN_ADAPTER_COMPLETION_COPY_FLAT and may be zero for resultless calls.
+ * The caller passes the descriptor to exactly one asynchronous C API call. If
+ * that call rejects the submission, the caller must pass the descriptor to
+ * mln_adapter_completion_reject().
+ */
+MLN_API mln_status mln_adapter_completion_create(
+  uint32_t copy_kind, size_t element_size,
+  mln_adapter_completion_listener listener, void* user_data,
+  mln_completion* out_completion
+) MLN_NOEXCEPT;
+
+/** Releases adapter state after the submitting C API rejected a completion. */
+MLN_API void mln_adapter_completion_reject(
+  mln_completion* completion
+) MLN_NOEXCEPT;
+
+/** Releases a completion record after the host copied its result. */
+MLN_API void mln_adapter_completion_record_destroy(
+  mln_adapter_completion_record* record
+) MLN_NOEXCEPT;
 
 // This block uses line comments because its examples contain URL patterns that
 // a block comment cannot carry.
@@ -297,13 +357,13 @@ MLN_API void mln_adapter_handle_leak_token_destroy(void* token) MLN_NOEXCEPT;
 MLN_API void mln_adapter_handle_leak_report(void* token) MLN_NOEXCEPT;
 
 /**
- * Creates a resource-request queue associated with one notification source.
+ * Creates a resource-request queue with a wake for its receiver.
  *
  * out_queue must point to the null handle. The association remains immutable
  * until the queue is closed.
  */
 MLN_API mln_status mln_adapter_resource_request_queue_create(
-  mln_notification_source source, mln_adapter_resource_request_queue* out_queue
+  const mln_wake* wake, mln_adapter_resource_request_queue* out_queue
 ) MLN_NOEXCEPT;
 
 /**
@@ -321,22 +381,22 @@ MLN_API mln_status mln_adapter_resource_request_queue_acquire(
 /**
  * Closes a resource-request queue.
  *
- * Pending records and their request handles are released, and the notification
- * endpoint is detached before this function returns. A null or already
- * released queue is a no-op.
+ * Pending records and their request handles are released, and the wake is
+ * detached before this function returns. A null or already released queue is
+ * a no-op.
  */
 MLN_API void mln_adapter_resource_request_queue_close(
   mln_adapter_resource_request_queue queue
 ) MLN_NOEXCEPT;
 
 /**
- * Creates a log-record queue associated with one notification source.
+ * Creates a log-record queue with a wake for its receiver.
  *
  * out_queue must point to the null handle. The association remains immutable
  * until the queue is closed.
  */
 MLN_API mln_status mln_adapter_log_queue_create(
-  mln_notification_source source, mln_adapter_log_queue* out_queue
+  const mln_wake* wake, mln_adapter_log_queue* out_queue
 ) MLN_NOEXCEPT;
 
 /**
@@ -352,8 +412,8 @@ MLN_API mln_status mln_adapter_log_queue_acquire(
 /**
  * Closes a log queue.
  *
- * Pending records are released, and the notification endpoint is detached
- * before this function returns. A null or already released queue is a no-op.
+ * Pending records are released, and the wake is detached before this function
+ * returns. A null or already released queue is a no-op.
  */
 MLN_API void mln_adapter_log_queue_close(
   mln_adapter_log_queue queue

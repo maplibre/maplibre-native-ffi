@@ -18,8 +18,6 @@ static const char background_style_json[] =
   "\"background\",\"paint\":{\"background-color\":\"#102030\"}}]}";
 static const uint64_t unknown_mask_bit = UINT64_C(1) << 63U;
 static const size_t style_barrier_attempts = 200;
-static const char missing_database_path[] = "does-not-exist.db";
-static const size_t take_result_attempts = 5000;
 
 // The record layout every binding probes. A host reads a batch as two byte
 // ranges at these offsets, so a change here is an ABI break.
@@ -42,10 +40,6 @@ static_assert(
 static_assert(
   sizeof(mln_runtime_event_camera_transition_finished) == 8,
   "mln_runtime_event_camera_transition_finished is 8 bytes wide"
-);
-static_assert(
-  sizeof(mln_runtime_event_command_finished) == 24,
-  "mln_runtime_event_command_finished is 24 bytes wide"
 );
 static_assert(
   sizeof(mln_offline_region_status) == 64,
@@ -121,16 +115,16 @@ static_assert(
   "mln_runtime_options.flags sits at offset 4"
 );
 static_assert(
-  MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS == UINT64_C(0x187FFFE),
-  "MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS is 0x187FFFE"
+  MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS == UINT64_C(0x47FFFE),
+  "MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS is 0x47FFFE"
 );
 static_assert(
-  MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS == UINT64_C(0x1380000),
-  "MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS is 0x1380000"
+  MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS == UINT64_C(0x380000),
+  "MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS is 0x380000"
 );
 static_assert(
-  MLN_RUNTIME_EVENT_MASK_ALL == UINT64_C(0x1BFFFFE),
-  "MLN_RUNTIME_EVENT_MASK_ALL is 0x1BFFFFE"
+  MLN_RUNTIME_EVENT_MASK_ALL == UINT64_C(0x7FFFFE),
+  "MLN_RUNTIME_EVENT_MASK_ALL is 0x7FFFFE"
 );
 
 // These structs carry pointers or size_t, so their extents follow the target's
@@ -141,15 +135,15 @@ static_assert(
   "mln_runtime_event_batch_view is 40 bytes wide"
 );
 static_assert(
-  sizeof(mln_runtime_options) == 40, "mln_runtime_options is 40 bytes wide"
+  sizeof(mln_runtime_options) == 64, "mln_runtime_options is 64 bytes wide"
 );
 static_assert(
   offsetof(mln_runtime_options, event_mask) == 24,
   "mln_runtime_options.event_mask sits at offset 24"
 );
 static_assert(
-  offsetof(mln_runtime_options, notification_source) == 32,
-  "mln_runtime_options.notification_source sits at offset 32"
+  offsetof(mln_runtime_options, event_wake) == 32,
+  "mln_runtime_options.event_wake sits at offset 32"
 );
 #endif
 
@@ -545,11 +539,12 @@ static void one_batch_reports_events_in_queue_order(void) {
   update.mode = MLN_CAMERA_UPDATE_MODE_EASE;
   update.camera = camera;
   update.animation = animation;
-  uint64_t command_id = 0;
+  mln_test_completion completion = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_update_camera(map, &update, &command_id)
+    MLN_STATUS_OK, mln_map_update_camera(map, &update, &completion.descriptor)
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
+  mln_test_completion_destroy(&completion);
 
   mln_test_event_batch batch = mln_test_event_batch_default();
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_drain_events(runtime, &batch));
@@ -631,85 +626,6 @@ static void the_message_arena_carries_one_range_per_event(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-typedef struct operation_diagnostic_probe {
-  mln_operation operation;
-  mln_status size_status;
-  mln_status copy_status;
-  size_t size;
-  char bytes[512];
-} operation_diagnostic_probe;
-
-static void copy_operation_diagnostic_on_foreign_thread(void* argument) {
-  operation_diagnostic_probe* probe = argument;
-  probe->size_status =
-    mln_operation_copy_diagnostic(probe->operation, NULL, 0, &probe->size);
-  if (probe->size > sizeof(probe->bytes)) {
-    probe->copy_status = MLN_STATUS_INVALID_STATE;
-    return;
-  }
-  probe->copy_status = mln_operation_copy_diagnostic(
-    probe->operation, probe->bytes, sizeof(probe->bytes), &probe->size
-  );
-}
-
-static void copied_operation_diagnostics_are_stable_across_threads(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_operation operation = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_offline_regions_merge_database_start(
-                     runtime, missing_database_path, &operation
-                   )
-  );
-
-  bool completed = false;
-  for (size_t attempt = 0; attempt < take_result_attempts && !completed;
-       attempt += 1) {
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_operation_poll(operation, &completed)
-    );
-  }
-  TEST_ASSERT_TRUE_MESSAGE(
-    completed, "Merging a missing database should complete."
-  );
-
-  mln_status terminal_status = MLN_STATUS_OK;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_operation_get_status(operation, &terminal_status)
-  );
-  TEST_ASSERT_NOT_EQUAL_INT(MLN_STATUS_OK, terminal_status);
-
-  operation_diagnostic_probe probe = {.operation = operation};
-  mln_test_thread* thread =
-    mln_test_thread_start(copy_operation_diagnostic_on_foreign_thread, &probe);
-  mln_test_thread_join(thread);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.size_status);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.copy_status);
-  TEST_ASSERT_GREATER_THAN_size_t(0, probe.size);
-
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_test_map_request_repaint(MLN_HANDLE_NULL)
-  );
-  char owner_copy[512] = {0};
-  size_t owner_size = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_operation_copy_diagnostic(
-                     operation, owner_copy, sizeof(owner_copy), &owner_size
-                   )
-  );
-  TEST_ASSERT_EQUAL_size_t(probe.size, owner_size);
-  TEST_ASSERT_EQUAL_MEMORY(probe.bytes, owner_copy, owner_size);
-
-  mln_offline_region_list regions = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_STATE,
-    mln_runtime_offline_regions_merge_database_take_result(operation, &regions)
-  );
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, regions);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_operation_finish(operation));
-  mln_test_destroy_runtime(runtime);
-}
-
 void run_runtime_events_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(a_drain_rejects_a_nonnull_output_or_a_stale_runtime);
@@ -725,5 +641,4 @@ void run_runtime_events_abi_tests(void) {
   RUN_TEST(queued_events_outlive_the_map_that_produced_them);
   RUN_TEST(one_batch_reports_events_in_queue_order);
   RUN_TEST(the_message_arena_carries_one_range_per_event);
-  RUN_TEST(copied_operation_diagnostics_are_stable_across_threads);
 }

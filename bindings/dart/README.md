@@ -2,8 +2,8 @@
 
 `maplibre_native_ffi` is the low-level Dart binding for the public MapLibre
 Native C API. The package exposes explicit native handle lifetimes, copied value
-types, owned runtime event batches, common operation handles, resource
-callbacks, and the render backend descriptors used by host integrations.
+types, owned runtime event batches, ordinary futures, resource callbacks, and
+the render backend descriptors used by host integrations.
 
 ## Build and test
 
@@ -81,10 +81,9 @@ may be made from any isolate, and never observes map changes made after creation
 and remains usable after its source map and runtime close.
 
 Create runtimes and maps with `await`. Runtime and map commands copy their input
-and return a command ID immediately. Snapshot methods synchronously copy
-immutable state. Ordered queries and lifecycle operations return `Future`
-values. A runtime's notification source completes those futures and reports
-event readiness, so native execution progresses without blocking the UI isolate.
+and return `Future` values. Snapshot methods synchronously copy immutable state.
+Ordered queries and lifecycle operations also return `Future` values. Direct
+wake callbacks report queued events without participating in future completion.
 Read queued events with `RuntimeHandle.drainEvents()`. Narrow what a map or a
 runtime queues with `setEventMask`.
 

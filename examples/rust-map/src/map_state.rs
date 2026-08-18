@@ -1,14 +1,13 @@
 //! Autonomous runtime and any-thread map state.
 
 use std::error::Error;
-
-use winit::event_loop::EventLoopProxy;
+use std::time::Duration;
 
 use maplibre_native_ffi::{
     AnimationOptions, CameraDelta, CameraDeltaKind, CameraOptions, CameraUpdate, CameraUpdateMode,
-    GesturePhase, LatLng, LogicalExtent, MapHandle, MapMode, MapOptions, ReadyEndpointKind,
-    RuntimeEventMask, RuntimeEventPayload, RuntimeEventSource, RuntimeEventType, RuntimeHandle,
-    RuntimeOptions, ScreenPoint,
+    GesturePhase, LatLng, LogicalExtent, MapHandle, MapMode, MapOptions, RuntimeEventMask,
+    RuntimeEventPayload, RuntimeEventSource, RuntimeEventType, RuntimeHandle, RuntimeOptions,
+    ScreenPoint,
 };
 
 use crate::viewport::Viewport;
@@ -21,22 +20,11 @@ pub struct MapState {
 }
 
 impl MapState {
-    pub fn new(
-        viewport: Viewport,
-        event_loop_proxy: EventLoopProxy<()>,
-    ) -> Result<Self, Box<dyn Error>> {
+    pub fn new(viewport: Viewport) -> Result<Self, Box<dyn Error>> {
         let mut runtime_options = RuntimeOptions::default();
         runtime_options.cache_path = Some(":memory:".into());
         let runtime = RuntimeHandle::with_options(&runtime_options)
             .map_err(|error| format!("runtime creation failed: {error}"))?;
-
-        if let Err(error) = runtime.set_notification_callback(move || {
-            let _ = event_loop_proxy.send_event(());
-        }) {
-            let mut message = format!("notification callback installation failed: {error}");
-            append_cleanup_result(&mut message, "runtime", runtime.close());
-            return Err(message.into());
-        }
 
         let mut map_options = MapOptions::new(
             viewport.logical_width,
@@ -44,15 +32,19 @@ impl MapState {
             viewport.scale_factor,
         );
         map_options.mode = MapMode::Continuous;
-        let map = match MapHandle::with_options(&runtime, &map_options) {
+        let map = match MapHandle::with_options(&runtime, &map_options).and_then(|future| {
+            if !future.wait(Duration::from_secs(30))? {
+                return Err(maplibre_native_ffi::Error::new(
+                    maplibre_native_ffi::ErrorKind::NotReady,
+                    None,
+                    "map creation timed out",
+                ));
+            }
+            future.take()
+        }) {
             Ok(map) => map,
             Err(error) => {
                 let mut message = format!("map creation failed: {error}");
-                append_cleanup_result(
-                    &mut message,
-                    "notification callback",
-                    runtime.clear_notification_callback(),
-                );
                 append_cleanup_result(&mut message, "runtime", runtime.close());
                 return Err(message.into());
             }
@@ -152,21 +144,8 @@ impl MapState {
         Ok(())
     }
 
-    pub fn drain_notifications(&self) -> maplibre_native_ffi::Result<bool> {
-        let ready = self.runtime.drain_ready()?;
-        let mut render_requested = ready.iter().any(|endpoint| {
-            matches!(
-                endpoint.kind,
-                ReadyEndpointKind::RenderFrames | ReadyEndpointKind::DriverWork
-            )
-        });
-        if !ready
-            .iter()
-            .any(|endpoint| endpoint.kind == ReadyEndpointKind::RuntimeEvents)
-        {
-            return Ok(render_requested);
-        }
-
+    pub fn drain_events(&self) -> maplibre_native_ffi::Result<bool> {
+        let mut render_requested = false;
         let source = RuntimeEventSource::Map(self.map.id());
         let batch = self.runtime.drain_events()?;
         for event in batch.iter().filter(|event| event.source() == source) {
@@ -188,12 +167,6 @@ impl MapState {
         let mut first_error = None;
         if let Err(error) = map.close() {
             append_optional_error(&mut first_error, format!("map close failed: {error}"));
-        }
-        if let Err(error) = runtime.clear_notification_callback() {
-            append_optional_error(
-                &mut first_error,
-                format!("notification callback clear failed: {error}"),
-            );
         }
         if let Err(error) = runtime.close() {
             append_optional_error(&mut first_error, format!("runtime close failed: {error}"));

@@ -1,7 +1,6 @@
 package org.maplibre.nativeffi.examples.lwjglmap
 
 import org.lwjgl.glfw.GLFW.glfwPollEvents
-import org.lwjgl.glfw.GLFW.glfwPostEmptyEvent
 import org.lwjgl.glfw.GLFW.glfwSetFramebufferSizeCallback
 import org.lwjgl.glfw.GLFW.glfwSetWindowContentScaleCallback
 import org.lwjgl.glfw.GLFW.glfwSetWindowSizeCallback
@@ -23,7 +22,7 @@ internal object Shell {
       initialViewport.log("initial viewport")
       val renderRequest = RenderRequest()
 
-      MapState.create(initialViewport, ::glfwPostEmptyEvent).use { state ->
+      MapState.create(initialViewport).use { state ->
         renderLoop(graphics, mode, viewport, state, renderRequest)
       }
     }
@@ -46,7 +45,7 @@ internal object Shell {
           installResizeCallbacks(graphics.window(), viewport)
           while (!glfwWindowShouldClose(graphics.window())) {
             glfwPollEvents()
-            state.drainNotifications(renderRequest)
+            state.pollEvents(renderRequest)
             if (viewport.consumeChanged()) {
               viewport.value.log("resized viewport")
               if (!viewport.value.empty()) {

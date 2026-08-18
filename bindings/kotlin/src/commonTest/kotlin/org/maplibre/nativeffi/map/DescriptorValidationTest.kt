@@ -56,11 +56,11 @@ class DescriptorValidationTest {
   fun mapAndProjectionInputsPropagateNativeCoordinateValidation(): Unit =
     org.maplibre.nativeffi.runtime.runSuspendTest {
       val runtime = RuntimeHandle.create(RuntimeOptions())
-      val map = MapHandle.create(runtime, mapOptions())
+      val map = MapHandle.create(runtime, mapOptions()).await()
       var projection: MapProjectionHandle? = null
       try {
         val invalidCoordinate = LatLng(Double.NaN, 0.0)
-        val createdProjection = map.createProjection()
+        val createdProjection = map.createProjection().await()
         projection = createdProjection
         assertInvalidCoordinateDiagnostic { createdProjection.pixelForLatLng(invalidCoordinate) }
         assertInvalidCoordinateDiagnostic { Maplibre.projectedMetersForLatLng(invalidCoordinate) }
@@ -77,7 +77,7 @@ class DescriptorValidationTest {
       val supported = Maplibre.supportedRenderBackends()
       assertTrue(supported.isNotEmpty())
       val runtime = RuntimeHandle.create(RuntimeOptions())
-      val map = MapHandle.create(runtime, mapOptions())
+      val map = MapHandle.create(runtime, mapOptions()).await()
       try {
         val pointer = NativePointer.ofAddress(0x10L)
         val extent = RenderTargetExtent(256, 256, 1.0)

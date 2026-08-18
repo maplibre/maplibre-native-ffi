@@ -119,11 +119,8 @@ public sealed class CustomGeometrySourceTests
     {
         var failInstall = false;
         using var install = MapHandle.UseCustomGeometrySourceInstallForTest(
-            (_, _, _, commandId) =>
-            {
-                *commandId = 1;
-                return failInstall ? mln_status.MLN_STATUS_INVALID_STATE : mln_status.MLN_STATUS_OK;
-            }
+            (_, _, _, _) =>
+                failInstall ? mln_status.MLN_STATUS_INVALID_STATE : mln_status.MLN_STATUS_OK
         );
         using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
         using var map = TestHandles.CreateMap(
@@ -133,13 +130,15 @@ public sealed class CustomGeometrySourceTests
         var installed = new CustomGeometrySourceState(
             new CustomGeometrySourceOptions { FetchTile = _ => { } }
         );
-        map.AddCustomGeometrySource("custom", installed);
+        map.AddCustomGeometrySourceAsync("custom", installed);
 
         failInstall = true;
         var rejected = new CustomGeometrySourceState(
             new CustomGeometrySourceOptions { FetchTile = _ => { } }
         );
-        Assert.Throws<InvalidStateException>(() => map.AddCustomGeometrySource("custom", rejected));
+        Assert.Throws<InvalidStateException>(() =>
+            map.AddCustomGeometrySourceAsync("custom", rejected).GetAwaiter().GetResult()
+        );
 
         // A rejected add owes no release callback, so the binding frees that state itself and
         // leaves the state the accepted add handed over untouched.
@@ -159,10 +158,10 @@ public sealed class CustomGeometrySourceTests
             runtime,
             new MapOptions { Width = 512, Height = 512 }
         );
-        map.SetStyleJson(EmptyStyleJson);
+        map.SetStyleJsonAsync(EmptyStyleJson);
         var tile = new CanonicalTileId(0, 0, 0);
 
-        map.AddCustomGeometrySource(
+        map.AddCustomGeometrySourceAsync(
             "custom",
             new CustomGeometrySourceOptions
             {
@@ -177,19 +176,19 @@ public sealed class CustomGeometrySourceTests
                 Wrap = false,
             }
         );
-        map.SetCustomGeometrySourceTileData(
+        map.SetCustomGeometrySourceTileDataAsync(
             "custom",
             tile,
             """{"type":"FeatureCollection","features":[]}"""u8.ToArray()
         );
-        map.InvalidateCustomGeometrySourceTile("custom", tile);
-        map.InvalidateCustomGeometrySourceRegion(
+        map.InvalidateCustomGeometrySourceTileAsync("custom", tile);
+        map.InvalidateCustomGeometrySourceRegionAsync(
             "custom",
             new LatLngBounds(new LatLng(-1, -1), new LatLng(1, 1))
         );
 
         Assert.Equal(SourceType.CustomVector, (await map.StyleSourceInfoAsync("custom"))?.Type);
-        RuntimeEventTestHelpers.WaitForCommand(runtime, map.RemoveStyleSource("custom"));
+        RuntimeEventTestHelpers.WaitForCommand(runtime, map.RemoveStyleSourceAsync("custom"));
         Assert.Null(await map.StyleSourceInfoAsync("custom"));
     }
 
@@ -202,14 +201,14 @@ public sealed class CustomGeometrySourceTests
             runtime,
             new MapOptions { Width = 512, Height = 512 }
         );
-        map.SetStyleJson(EmptyStyleJson);
+        map.SetStyleJsonAsync(EmptyStyleJson);
         var state = new CustomGeometrySourceState(
             new CustomGeometrySourceOptions { FetchTile = _ => { } }
         );
-        map.AddCustomGeometrySource("custom", state);
+        map.AddCustomGeometrySourceAsync("custom", state);
         Assert.True(state.IsHandleAllocatedForTest);
 
-        RuntimeEventTestHelpers.WaitForCommand(runtime, map.RemoveStyleSource("custom"));
+        RuntimeEventTestHelpers.WaitForCommand(runtime, map.RemoveStyleSourceAsync("custom"));
         Assert.Null(await map.StyleSourceInfoAsync("custom"));
 
         Assert.False(state.IsHandleAllocatedForTest);
@@ -221,14 +220,14 @@ public sealed class CustomGeometrySourceTests
     {
         using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
         var map = TestHandles.CreateMap(runtime, new MapOptions { Width = 512, Height = 512 });
-        map.SetStyleJson(EmptyStyleJson);
+        map.SetStyleJsonAsync(EmptyStyleJson);
         var state = new CustomGeometrySourceState(
             new CustomGeometrySourceOptions { FetchTile = _ => { } }
         );
-        map.AddCustomGeometrySource("custom", state);
+        map.AddCustomGeometrySourceAsync("custom", state);
 
         TestHandles.Close(map);
-        runtime.BarrierAsync(TestContext.Current.CancellationToken).GetAwaiter().GetResult();
+        runtime.BarrierAsync().GetAwaiter().GetResult();
 
         Assert.False(state.IsHandleAllocatedForTest);
     }
@@ -247,15 +246,15 @@ public sealed class CustomGeometrySourceTests
                 EventMask = RuntimeEventMask.All & ~RuntimeEventMask.MapStyleLoaded,
             }
         );
-        map.SetStyleJson(EmptyStyleJson);
+        map.SetStyleJsonAsync(EmptyStyleJson);
         var state = new CustomGeometrySourceState(
             new CustomGeometrySourceOptions { FetchTile = _ => { } }
         );
-        map.AddCustomGeometrySource("custom", state);
+        map.AddCustomGeometrySourceAsync("custom", state);
 
         // The replacement style drops the source, and the C API reports that through the release
         // callback rather than through an event, so the host's cleared mask stays cleared.
-        map.SetStyleJson(EmptyStyleJson);
+        map.SetStyleJsonAsync(EmptyStyleJson);
         var drained = new List<RuntimeEventType>();
         for (var attempt = 0; attempt < 1000 && state.IsHandleAllocatedForTest; attempt++)
         {

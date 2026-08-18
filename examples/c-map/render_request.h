@@ -1,4 +1,4 @@
-// The one-bit render request shared with notification callbacks.
+// The one-bit render request shared with native wake callbacks.
 
 #ifndef C_MAP_RENDER_REQUEST_H
 #define C_MAP_RENDER_REQUEST_H

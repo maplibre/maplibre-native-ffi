@@ -1,3 +1,4 @@
+using Maplibre.NativeFfi.Camera;
 using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Geo;
 using Maplibre.NativeFfi.Internal;
@@ -16,9 +17,6 @@ public enum AmbientCacheOperation : uint
     Clear = 4,
 }
 
-/// <summary>The terminal state copied from a completed operation.</summary>
-public sealed record OperationCompletion(MaplibreStatus Status, int RawStatus, string Diagnostic);
-
 public enum CommandDisposition : uint
 {
     Committed = 0,
@@ -26,20 +24,6 @@ public enum CommandDisposition : uint
     Failed = 2,
     Cancelled = 3,
 }
-
-public enum NotificationEndpointKind : uint
-{
-    Unknown = 0,
-    RuntimeEvents = 1,
-    Operation = 2,
-    AdapterResourceRequests = 3,
-    AdapterLogRecords = 4,
-    RenderFrames = 5,
-    DriverWork = 6,
-}
-
-/// <summary>One copied endpoint from a notification-source ready batch.</summary>
-public sealed record ReadyEndpoint(NotificationEndpointKind Kind, uint RawKind, ulong Id);
 
 public enum RuntimeEventSourceType : uint
 {
@@ -70,8 +54,7 @@ public enum RuntimeEventType : uint
     OfflineRegionStatusChanged = 19,
     OfflineRegionResponseError = 20,
     OfflineRegionTileCountLimitExceeded = 21,
-    MapCameraTransitionFinished = 23,
-    CommandFinished = 24,
+    MapCameraTransitionFinished = 22,
 }
 
 /// <summary>Event types a map or a runtime queues.</summary>
@@ -79,7 +62,7 @@ public enum RuntimeEventType : uint
 /// Each bit is <c>1</c> shifted left by the <see cref="RuntimeEventType" /> value it selects, so a
 /// mask a host computes from a decoded event type matches these constants.
 /// <para>
-/// <see cref="MapHandle.SetEventMask" /> reads the bits in <see cref="AllMapEvents" /> and
+/// <see cref="MapHandle.SetEventMaskAsync" /> reads the bits in <see cref="AllMapEvents" /> and
 /// <see cref="RuntimeHandle.SetEventMask" /> reads the bits in <see cref="AllRuntimeEvents" />, so
 /// both accept <see cref="All" /> and a host reads a mask, changes one bit, and writes it back.
 /// </para>
@@ -108,7 +91,6 @@ public enum RuntimeEventMask : ulong
     MapStyleImageMissing = 1UL << (int)RuntimeEventType.MapStyleImageMissing,
     MapTileAction = 1UL << (int)RuntimeEventType.MapTileAction,
     MapCameraTransitionFinished = 1UL << (int)RuntimeEventType.MapCameraTransitionFinished,
-    CommandFinished = 1UL << (int)RuntimeEventType.CommandFinished,
     OfflineRegionStatusChanged = 1UL << (int)RuntimeEventType.OfflineRegionStatusChanged,
     OfflineRegionResponseError = 1UL << (int)RuntimeEventType.OfflineRegionResponseError,
     OfflineRegionTileCountLimitExceeded =
@@ -134,15 +116,13 @@ public enum RuntimeEventMask : ulong
         | MapRenderMapFinished
         | MapStyleImageMissing
         | MapTileAction
-        | MapCameraTransitionFinished
-        | CommandFinished,
+        | MapCameraTransitionFinished,
 
     /// <summary>Selects every runtime-originated event type this binding declares.</summary>
     AllRuntimeEvents =
         OfflineRegionStatusChanged
         | OfflineRegionResponseError
-        | OfflineRegionTileCountLimitExceeded
-        | CommandFinished,
+        | OfflineRegionTileCountLimitExceeded,
 
     /// <summary>Selects every event type this binding declares.</summary>
     All = AllMapEvents | AllRuntimeEvents,
@@ -196,7 +176,7 @@ public sealed record RuntimeEventBatch(IReadOnlyList<RuntimeEvent> Events)
 /// <description>
 /// <see cref="RuntimeEventType.MapCameraWillChange" /> and
 /// <see cref="RuntimeEventType.MapCameraDidChange" />: a
-/// <see cref="Maplibre.NativeFfi.Camera.CameraChangeMode" /> value.
+/// <see cref="CameraChangeMode" /> value.
 /// </description>
 /// </item>
 /// <item>
@@ -280,13 +260,6 @@ public abstract record RuntimeEventPayload
     public sealed record CameraTransitionFinished(ulong TransitionId) : RuntimeEventPayload;
 
     /// <summary>Terminal outcome of an accepted ordered command.</summary>
-    public sealed record CommandFinished(
-        ulong CommandId,
-        CommandDisposition Disposition,
-        uint RawDisposition,
-        ulong Generation
-    ) : RuntimeEventPayload;
-
     /// <summary>Payload for a payload kind this binding does not declare.</summary>
     /// <remarks>
     /// <see cref="PayloadBytes" /> holds the event record's fixed payload window, copied unchanged,

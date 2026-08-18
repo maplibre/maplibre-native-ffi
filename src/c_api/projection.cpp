@@ -15,24 +15,13 @@
 #include "diagnostics/diagnostics.hpp"
 #include "map/map.hpp"
 #include "maplibre_native_c.h"
-#include "operation/operation.hpp"
 #include "runtime/runtime.hpp"
 
-auto mln_map_projection_create_start(
-  mln_map map, mln_operation* out_operation
+auto mln_map_projection_create(
+  mln_map map, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::map_projection_create_start(map, out_operation);
-  });
-}
-
-auto mln_map_projection_create_take_result(
-  mln_operation operation, mln_map_projection* out_projection
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::map_projection_create_take_result(
-      operation, out_projection
-    );
+    return mln::core::map_projection_create_start(map, completion);
   });
 }
 

@@ -4,7 +4,6 @@
 use std::error::Error;
 
 use winit::event::WindowEvent;
-use winit::event_loop::EventLoopProxy;
 use winit::window::{Window, WindowId};
 
 use crate::graphics::GraphicsContext;
@@ -31,7 +30,6 @@ impl App {
         window: Window,
         graphics: GraphicsContext,
         mode: Mode,
-        event_loop_proxy: EventLoopProxy<()>,
     ) -> Result<Self, Box<dyn Error>> {
         let viewport = Viewport::from_window(&window);
         if viewport.is_empty() {
@@ -39,7 +37,7 @@ impl App {
         }
         viewport.log("initial viewport");
 
-        let map = MapState::new(viewport, event_loop_proxy)?;
+        let map = MapState::new(viewport)?;
         let target = match RenderTarget::attach(mode, map.map_handle(), &graphics, viewport) {
             Ok(target) => target,
             Err(error) => {
@@ -108,19 +106,14 @@ impl App {
             eprintln!("resize failed: {error}");
             self.abort_process(1);
         }
-        match self
-            .map
-            .as_ref()
-            .expect("map is open")
-            .drain_notifications()
-        {
+        match self.map.as_ref().expect("map is open").drain_events() {
             Ok(true) => {
                 self.render_requested = true;
                 self.window.request_redraw();
             }
             Ok(false) => {}
             Err(error) => {
-                eprintln!("notification drain failed: {error}");
+                eprintln!("event drain failed: {error}");
                 self.abort_process(1);
             }
         }

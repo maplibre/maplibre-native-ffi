@@ -14,6 +14,7 @@
 #include <stdint.h>
 
 #include "base.h"
+#include "completion.h"
 #include "map.h"
 
 #ifdef __cplusplus
@@ -27,33 +28,27 @@ typedef uint64_t mln_geojson_source_data;
 /**
  * @name Style execution contract
  *
- * Every mutation without a `_start` suffix is a command. It validates and
- * copies all input bytes, arrays, option structs, and image pixels before
- * returning. The call reports acceptance only: `out_command_id` must point to
- * zero and receives a monotonic runtime command ID. Application runs later in
- * runtime order. Exactly one `MLN_RUNTIME_EVENT_COMMAND_FINISHED` event reports
- * committed, superseded, failed, or cancelled disposition. Its code and copied
- * message report application failure; committed events carry the map snapshot
- * generation the commit published, so a caller can fence a later
+ * Every mutation is a command. It validates and copies all input bytes, arrays,
+ * option structs, and image pixels before returning. Application runs later in
+ * runtime order. Its completion reports committed, superseded, failed, or
+ * cancelled disposition. Committed completions carry the map snapshot
+ * generation they published, so a caller can fence a later
  * mln_map_snapshot_get() on it.
  *
- * Every `_start` function is an ordered operation. It copies its inputs before
- * returning and observes all commands accepted earlier by the runtime. Output
- * descriptions in the paired declaration apply to `_take_result`, not
- * `_start`. A typed take transfers owned list and buffer handles to the caller.
- * A wrong typed take or insufficient output capacity leaves the result
- * available for a later retry. A successful typed take consumes the operation.
- * `mln_operation_finish` consumes it without transferring the result.
+ * Every query is ordered. It copies its inputs before returning and observes
+ * all commands accepted earlier by the runtime. Its completion borrows the
+ * typed result for the duration of the callback; owned handle values inside a
+ * successful result transfer to the receiver.
  *
- * All declarations in this header are callable from any thread. Command and
- * operation-start return values describe validation and acceptance failures.
+ * All declarations in this header are callable from any thread. Submission
+ * return values describe validation and acceptance failures.
  * State-dependent style errors described in the per-function Returns sections
- * are delivered by command-finished events or operation completion. Command
- * inputs described below as borrowed remain caller-owned; accepted calls have
- * already copied them when they return.
+ * are delivered through the completion. Command inputs described below as
+ * borrowed remain caller-owned; accepted calls have already copied them when
+ * they return.
  */
 
-/** Style source type values returned by the source-type operation take. */
+/** Style source type values returned by source metadata queries. */
 typedef enum mln_style_source_type : uint32_t {
   MLN_STYLE_SOURCE_TYPE_UNKNOWN = 0,
   MLN_STYLE_SOURCE_TYPE_VECTOR = 1,
@@ -69,7 +64,7 @@ typedef enum mln_style_source_type : uint32_t {
 
 /** Fields available in mln_style_source_info. */
 typedef enum mln_style_source_info_field : uint32_t {
-  /** The source retains a URL. Read it with the source-URL operation. */
+  /** The source retains a URL. */
   MLN_STYLE_SOURCE_INFO_URL = 1U << 0U,
   /** The tile source was defined with an inline TileJSON description. */
   MLN_STYLE_SOURCE_INFO_TILEJSON = 1U << 1U,
@@ -85,11 +80,9 @@ typedef enum mln_style_source_info_field : uint32_t {
 
 /** Fields available in mln_style_layer_info. */
 typedef enum mln_style_layer_info_field : uint32_t {
-  /** The layer carries a source ID. Copy it with the layer-source-ID
-     operation. */
+  /** The layer carries a source ID. */
   MLN_STYLE_LAYER_INFO_SOURCE_ID = 1U << 0U,
-  /** The layer carries a source-layer ID. Copy it with the layer-source-layer
-     operation. */
+  /** The layer carries a source-layer ID. */
   MLN_STYLE_LAYER_INFO_SOURCE_LAYER = 1U << 1U,
 } mln_style_layer_info_field;
 
@@ -136,6 +129,16 @@ typedef struct mln_image_stretch {
   float from;
   float to;
 } mln_image_stretch;
+
+/** Borrowed image-stretch arrays available during a completion callback. */
+typedef struct mln_style_image_stretches_result {
+  uint32_t size;
+  uint32_t reserved;
+  const mln_image_stretch* stretch_x;
+  size_t stretch_x_count;
+  const mln_image_stretch* stretch_y;
+  size_t stretch_y_count;
+} mln_style_image_stretches_result;
 
 /**
  * Content-box insets in image pixels, measured from the image's top-left.
@@ -214,7 +217,7 @@ typedef enum mln_location_indicator_image_kind : uint32_t {
   MLN_LOCATION_INDICATOR_IMAGE_KIND_SHADOW = 2,
 } mln_location_indicator_image_kind;
 
-/** Fixed source metadata returned by the source-info operation take. */
+/** Fixed source metadata included in mln_style_source_result. */
 typedef struct mln_style_source_info {
   uint32_t size;
   /** One of mln_style_source_type. */
@@ -247,7 +250,18 @@ typedef struct mln_style_source_info {
   uint32_t raster_encoding;
 } mln_style_source_info;
 
-/** Fixed layer metadata returned by the layer-info operation take. */
+/** Complete source metadata borrowed for a completion callback. */
+typedef struct mln_style_source_result {
+  uint32_t size;
+  uint32_t reserved;
+  mln_style_source_info info;
+  mln_buffer_view attribution;
+  mln_buffer_view url;
+  const mln_buffer_view* tile_urls;
+  size_t tile_url_count;
+} mln_style_source_result;
+
+/** Fixed layer metadata included in mln_style_layer_result. */
 typedef struct mln_style_layer_info {
   uint32_t size;
   /** Bitwise combination of mln_style_layer_info_field values. */
@@ -268,6 +282,15 @@ typedef struct mln_style_layer_info {
      lacks SOURCE_LAYER. */
   size_t source_layer_size;
 } mln_style_layer_info;
+
+/** Complete layer metadata borrowed for a completion callback. */
+typedef struct mln_style_layer_result {
+  uint32_t size;
+  uint32_t reserved;
+  mln_style_layer_info info;
+  mln_buffer_view source_id;
+  mln_buffer_view source_layer;
+} mln_style_layer_result;
 
 /** Options for vector and raster tile sources. */
 typedef struct mln_style_tile_source_options {
@@ -447,8 +470,7 @@ typedef struct mln_style_image_info {
   uint32_t stride;
   size_t byte_length;
   /**
-   * Interval counts for the stretchable axes. Read the intervals with the
-   * style-image-stretches operation.
+   * Interval counts for the stretchable axes.
    */
   size_t stretch_x_count;
   size_t stretch_y_count;
@@ -464,6 +486,18 @@ typedef struct mln_style_image_info {
   bool has_text_fit_width;
   bool has_text_fit_height;
 } mln_style_image_info;
+
+/** Complete style image borrowed for a completion callback. */
+typedef struct mln_style_image_result {
+  uint32_t size;
+  uint32_t reserved;
+  mln_style_image_info info;
+  mln_buffer_view pixels;
+  const mln_image_stretch* stretch_x;
+  size_t stretch_x_count;
+  const mln_image_stretch* stretch_y;
+  size_t stretch_y_count;
+} mln_style_image_result;
 
 /**
  * Global style transition options.
@@ -625,7 +659,7 @@ MLN_API void mln_style_string_list_destroy(
  */
 MLN_API mln_status mln_map_add_style_source_json(
   mln_map map, mln_buffer_view source_id, mln_buffer_view source_json,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -637,134 +671,93 @@ MLN_API mln_status mln_map_add_style_source_json(
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, or out_command_id is invalid.
+ *   invalid or empty, or completion is invalid.
  * - MLN_STATUS_NOT_FOUND when no style source has that ID.
  * - MLN_STATUS_INVALID_STATE when the source exists but a layer still uses it.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_remove_style_source(
-  mln_map map, mln_buffer_view source_id, uint64_t* out_command_id
+  mln_map map, mln_buffer_view source_id, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
- * Copies fixed metadata for one style source.
+ * Copies complete metadata for one style source.
  *
- * The returned struct contains string lengths, the source type, and fixed
- * inline TileJSON fields, not string contents. Use the source-attribution,
- * source-URL, and source-tile-URLs operations to copy their owned results. The
- * source ID is the lookup key and is also available through style source ID
- * lists. out_found reports whether source_id exists.
+ * A found source completes with one borrowed mln_style_source_result. A missing
+ * source completes successfully with no value. The binding must copy strings
+ * and tile URL views before the callback returns.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, out_info is null, out_info->size is too small, or
- *   out_found is null.
+ *   invalid or empty, or completion is invalid.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_get_style_source_info_start(
-  mln_map map, mln_buffer_view source_id, mln_operation* out_operation
-) MLN_NOEXCEPT;
-MLN_API mln_status mln_map_get_style_source_info_take_result(
-  mln_operation operation, mln_style_source_info* out_info, bool* out_found
+MLN_API mln_status mln_map_get_style_source_info(
+  mln_map map, mln_buffer_view source_id, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
- * Copies one style source attribution string into caller-owned memory.
+ * Copies one style source attribution string.
  *
- * source_id is borrowed for the call. On success, out_attribution_size receives
- * the byte length of the attribution, excluding any null terminator. When
- * out_found is false or the source has no attribution, out_attribution_size
- * receives 0.
- *
- * Passing null for out_attribution with a capacity of 0 is a size probe: it
- * reports the required byte length and succeeds, so a caller can size a buffer
- * without treating the result as a failure. With a non-null out_attribution, a
- * capacity smaller than the required length still reports that length and
- * returns MLN_STATUS_INVALID_ARGUMENT.
- *
- * Returns:
- * - MLN_STATUS_OK on success, including a size probe.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, out_attribution is null with non-zero capacity,
- *   attribution_capacity is too small for a non-null buffer,
- *   out_attribution_size is null, or out_found is null.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_map_copy_style_source_attribution_start(
-  mln_map map, mln_buffer_view source_id, mln_operation* out_operation
-) MLN_NOEXCEPT;
-MLN_API mln_status mln_map_copy_style_source_attribution_take_result(
-  mln_operation operation, mln_buffer* out_attribution, bool* out_found
-) MLN_NOEXCEPT;
-
-/**
- * Copies one style source URL into caller-owned memory.
- *
- * source_id is borrowed for the call. On success, out_url_size receives the URL
- * byte length, excluding any null terminator. When out_found is false or the
- * source has no URL, out_url_size receives 0.
- *
- * Passing null for out_url with a capacity of 0 is a size probe. It reports the
- * required byte length and succeeds. With a non-null out_url, a capacity
- * smaller than the required length still reports that length and returns
- * MLN_STATUS_INVALID_ARGUMENT.
- *
- * Returns:
- * - MLN_STATUS_OK on success, including a size probe.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, out_url is null with non-zero capacity, url_capacity is
- *   too small for a non-null buffer, out_url_size is null, or out_found is
- *   null.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_map_copy_style_source_url_start(
-  mln_map map, mln_buffer_view source_id, mln_operation* out_operation
-) MLN_NOEXCEPT;
-MLN_API mln_status mln_map_copy_style_source_url_take_result(
-  mln_operation operation, mln_buffer* out_url, bool* out_found
-) MLN_NOEXCEPT;
-
-/**
- * Copies one style source's inline TileJSON tile URLs into an owned list.
- *
- * On success, out_found reports whether source_id exists. When found,
- * *out_tile_urls receives an owned list. A URL-backed tile source and every
- * source without inline TileJSON return an empty list. Loading a URL-backed
- * source does not change this result. Destroy the list with
- * mln_style_string_list_destroy().
+ * A found attribution completes with one borrowed mln_buffer_view. A missing
+ * source or attribution completes successfully with no value.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, out_tile_urls is null, *out_tile_urls is not null, or
- *   out_found is null.
+ *   invalid or empty, or completion is invalid.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_get_style_source_tile_urls_start(
-  mln_map map, mln_buffer_view source_id, mln_operation* out_operation
+MLN_API mln_status mln_map_copy_style_source_attribution(
+  mln_map map, mln_buffer_view source_id, const mln_completion* completion
 ) MLN_NOEXCEPT;
-MLN_API mln_status mln_map_get_style_source_tile_urls_take_result(
-  mln_operation operation, mln_style_string_list* out_tile_urls, bool* out_found
+
+/**
+ * Copies one style source URL.
+ *
+ * A found URL completes with one borrowed mln_buffer_view. A missing source or
+ * URL completes successfully with no value.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
+ *   invalid or empty, or completion is invalid.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_copy_style_source_url(
+  mln_map map, mln_buffer_view source_id, const mln_completion* completion
+) MLN_NOEXCEPT;
+
+/**
+ * Copies one style source's inline TileJSON tile URLs.
+ *
+ * A found source completes with a borrowed array of mln_buffer_view values. A
+ * URL-backed source or source without inline TileJSON returns an empty array.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
+ *   invalid or empty, or completion is invalid.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_get_style_source_tile_urls(
+  mln_map map, mln_buffer_view source_id, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
  * Copies style source IDs in style order.
  *
- * On success, *out_source_ids receives an owned list handle. Destroy it with
- * mln_style_id_list_destroy().
+ * The completion borrows an array of mln_buffer_view values.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, out_source_ids is
- *   null, or *out_source_ids is not null.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or completion is
+ *   invalid.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_list_style_source_ids_start(
-  mln_map map, mln_operation* out_operation
-) MLN_NOEXCEPT;
-MLN_API mln_status mln_map_list_style_source_ids_take_result(
-  mln_operation operation, mln_style_id_list* out_source_ids
+MLN_API mln_status mln_map_list_style_source_ids(
+  mln_map map, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -782,7 +775,7 @@ MLN_API mln_status mln_map_list_style_source_ids_take_result(
  */
 MLN_API mln_status mln_map_add_geojson_source_url(
   mln_map map, mln_buffer_view source_id, mln_buffer_view url,
-  const mln_geojson_source_options* options, uint64_t* out_command_id
+  const mln_geojson_source_options* options, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -849,7 +842,7 @@ MLN_API void mln_geojson_source_data_destroy(
  */
 MLN_API mln_status mln_map_add_geojson_source_data(
   mln_map map, mln_buffer_view source_id, mln_geojson_source_data data,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -867,7 +860,7 @@ MLN_API mln_status mln_map_add_geojson_source_data(
  */
 MLN_API mln_status mln_map_set_geojson_source_url(
   mln_map map, mln_buffer_view source_id, mln_buffer_view url,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -896,7 +889,7 @@ MLN_API mln_status mln_map_set_geojson_source_url(
  */
 MLN_API mln_status mln_map_set_geojson_source_data(
   mln_map map, mln_buffer_view source_id, mln_geojson_source_data data,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -917,7 +910,8 @@ MLN_API mln_status mln_map_set_geojson_source_data(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_set_geojson_source_synchronous_tiling(
-  mln_map map, mln_buffer_view source_id, bool enabled, uint64_t* out_command_id
+  mln_map map, mln_buffer_view source_id, bool enabled,
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -935,7 +929,7 @@ MLN_API mln_status mln_map_set_geojson_source_synchronous_tiling(
  */
 MLN_API mln_status mln_map_add_vector_source_url(
   mln_map map, mln_buffer_view source_id, mln_buffer_view url,
-  const mln_style_tile_source_options* options, uint64_t* out_command_id
+  const mln_style_tile_source_options* options, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -955,7 +949,7 @@ MLN_API mln_status mln_map_add_vector_source_url(
 MLN_API mln_status mln_map_add_vector_source_tiles(
   mln_map map, mln_buffer_view source_id, const mln_buffer_view* tiles,
   size_t tile_count, const mln_style_tile_source_options* options,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -972,7 +966,7 @@ MLN_API mln_status mln_map_add_vector_source_tiles(
  */
 MLN_API mln_status mln_map_add_raster_source_url(
   mln_map map, mln_buffer_view source_id, mln_buffer_view url,
-  const mln_style_tile_source_options* options, uint64_t* out_command_id
+  const mln_style_tile_source_options* options, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -992,7 +986,7 @@ MLN_API mln_status mln_map_add_raster_source_url(
 MLN_API mln_status mln_map_add_raster_source_tiles(
   mln_map map, mln_buffer_view source_id, const mln_buffer_view* tiles,
   size_t tile_count, const mln_style_tile_source_options* options,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1010,7 +1004,7 @@ MLN_API mln_status mln_map_add_raster_source_tiles(
  */
 MLN_API mln_status mln_map_add_raster_dem_source_url(
   mln_map map, mln_buffer_view source_id, mln_buffer_view url,
-  const mln_style_tile_source_options* options, uint64_t* out_command_id
+  const mln_style_tile_source_options* options, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1030,7 +1024,7 @@ MLN_API mln_status mln_map_add_raster_dem_source_url(
 MLN_API mln_status mln_map_add_raster_dem_source_tiles(
   mln_map map, mln_buffer_view source_id, const mln_buffer_view* tiles,
   size_t tile_count, const mln_style_tile_source_options* options,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1068,7 +1062,8 @@ MLN_API mln_status mln_map_add_raster_dem_source_tiles(
  */
 MLN_API mln_status mln_map_add_custom_geometry_source(
   mln_map map, mln_buffer_view source_id,
-  const mln_custom_geometry_source_options* options, uint64_t* out_command_id
+  const mln_custom_geometry_source_options* options,
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1086,7 +1081,7 @@ MLN_API mln_status mln_map_add_custom_geometry_source(
  */
 MLN_API mln_status mln_map_set_custom_geometry_source_tile_data(
   mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
-  mln_buffer_view data, uint64_t* out_command_id
+  mln_buffer_view data, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1101,7 +1096,7 @@ MLN_API mln_status mln_map_set_custom_geometry_source_tile_data(
  */
 MLN_API mln_status mln_map_invalidate_custom_geometry_source_tile(
   mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1116,7 +1111,7 @@ MLN_API mln_status mln_map_invalidate_custom_geometry_source_tile(
  */
 MLN_API mln_status mln_map_invalidate_custom_geometry_source_region(
   mln_map map, mln_buffer_view source_id, mln_lat_lng_bounds bounds,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1139,7 +1134,7 @@ MLN_API mln_status mln_map_invalidate_custom_geometry_source_region(
 MLN_API mln_status mln_map_set_style_image(
   mln_map map, mln_buffer_view image_id,
   const mln_premultiplied_rgba8_image* image,
-  const mln_style_image_options* options, uint64_t* out_command_id
+  const mln_style_image_options* options, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1151,90 +1146,61 @@ MLN_API mln_status mln_map_set_style_image(
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, image_id is
- *   invalid or empty, or out_command_id is invalid.
+ *   invalid or empty, or completion is invalid.
  * - MLN_STATUS_NOT_FOUND when no runtime style image has that ID.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_remove_style_image(
-  mln_map map, mln_buffer_view image_id, uint64_t* out_command_id
+  mln_map map, mln_buffer_view image_id, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
- * Copies fixed metadata for one runtime style image.
+ * Copies one complete runtime style image.
  *
- * On success, out_found reports whether image_id exists. When not found,
- * out_info receives default image metadata.
+ * A found image completes with one borrowed mln_style_image_result containing
+ * metadata, pixels, and stretch intervals. A missing image completes
+ * successfully with no value.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, image_id is
- *   invalid or empty, out_info is null, out_info->size is too small, or
- *   out_found is null.
+ *   invalid or empty, or completion is invalid.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_get_style_image_info_start(
-  mln_map map, mln_buffer_view image_id, mln_operation* out_operation
-) MLN_NOEXCEPT;
-MLN_API mln_status mln_map_get_style_image_info_take_result(
-  mln_operation operation, mln_style_image_info* out_info, bool* out_found
+MLN_API mln_status mln_map_get_style_image_info(
+  mln_map map, mln_buffer_view image_id, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
  * Copies one runtime style image as tightly packed premultiplied RGBA8 pixels.
  *
- * image_id is borrowed for the call. On success, out_byte_length receives the
- * required byte length. When out_found is false, out_byte_length receives 0.
- *
- * Passing null for out_pixels with a capacity of 0 is a size probe: it reports
- * the required byte length and succeeds, so a caller can size a buffer without
- * treating the result as a failure. With a non-null out_pixels, a capacity
- * smaller than the required length still reports that length and returns
- * MLN_STATUS_INVALID_ARGUMENT.
+ * A found image completes with one borrowed mln_buffer_view. A missing image
+ * completes successfully with no value.
  *
  * Returns:
- * - MLN_STATUS_OK on success, including a size probe.
+ * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, image_id is
- *   invalid or empty, out_pixels is null with non-zero capacity, pixel_capacity
- *   is too small for a non-null buffer, out_byte_length is null, or out_found
- *   is null.
+ *   invalid or empty, or completion is invalid.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_copy_style_image_premultiplied_rgba8_start(
-  mln_map map, mln_buffer_view image_id, mln_operation* out_operation
-) MLN_NOEXCEPT;
-MLN_API mln_status mln_map_copy_style_image_premultiplied_rgba8_take_result(
-  mln_operation operation, mln_buffer* out_pixels, bool* out_found
+MLN_API mln_status mln_map_copy_style_image_premultiplied_rgba8(
+  mln_map map, mln_buffer_view image_id, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
  * Copies one runtime style image's stretchable intervals.
  *
- * image_id is borrowed for the call. Each output array may be null only when
- * its capacity is 0. On success, out_stretch_x_count and out_stretch_y_count
- * receive the interval counts, and both receive 0 when out_found is false.
- *
- * Passing null for both arrays with both capacities 0 is a size probe. It
- * reports the required counts without consuming the operation result, so a
- * later typed take can transfer the intervals. With a non-null array, a
- * capacity smaller than that axis's count still reports the counts and returns
- * MLN_STATUS_INVALID_ARGUMENT without consuming the result.
+ * A found image completes with one borrowed mln_style_image_stretches_result.
+ * A missing image completes successfully with no value.
  *
  * Returns:
- * - MLN_STATUS_OK on success, including a size probe.
+ * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, image_id is
- *   invalid or empty, an output array is null with non-zero capacity, a
- * capacity is too small for a non-null array, or an output count or out_found
- * is null.
+ *   invalid or empty, or completion is invalid.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_copy_style_image_stretches_start(
-  mln_map map, mln_buffer_view image_id, mln_operation* out_operation
-) MLN_NOEXCEPT;
-MLN_API mln_status mln_map_copy_style_image_stretches_take_result(
-  mln_operation operation, mln_image_stretch* out_stretch_x,
-  size_t stretch_x_capacity, size_t* out_stretch_x_count,
-  mln_image_stretch* out_stretch_y, size_t stretch_y_capacity,
-  size_t* out_stretch_y_count, bool* out_found
+MLN_API mln_status mln_map_copy_style_image_stretches(
+  mln_map map, mln_buffer_view image_id, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1258,7 +1224,7 @@ MLN_API mln_status mln_map_copy_style_image_stretches_take_result(
  */
 MLN_API mln_status mln_map_add_image_source_url(
   mln_map map, mln_buffer_view source_id, const mln_lat_lng* coordinates,
-  size_t coordinate_count, mln_buffer_view url, uint64_t* out_command_id
+  size_t coordinate_count, mln_buffer_view url, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1283,7 +1249,7 @@ MLN_API mln_status mln_map_add_image_source_url(
 MLN_API mln_status mln_map_add_image_source_image(
   mln_map map, mln_buffer_view source_id, const mln_lat_lng* coordinates,
   size_t coordinate_count, const mln_premultiplied_rgba8_image* image,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1301,7 +1267,7 @@ MLN_API mln_status mln_map_add_image_source_image(
  */
 MLN_API mln_status mln_map_set_image_source_url(
   mln_map map, mln_buffer_view source_id, mln_buffer_view url,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1320,7 +1286,7 @@ MLN_API mln_status mln_map_set_image_source_url(
  */
 MLN_API mln_status mln_map_set_image_source_image(
   mln_map map, mln_buffer_view source_id,
-  const mln_premultiplied_rgba8_image* image, uint64_t* out_command_id
+  const mln_premultiplied_rgba8_image* image, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1339,32 +1305,24 @@ MLN_API mln_status mln_map_set_image_source_image(
  */
 MLN_API mln_status mln_map_set_image_source_coordinates(
   mln_map map, mln_buffer_view source_id, const mln_lat_lng* coordinates,
-  size_t coordinate_count, uint64_t* out_command_id
+  size_t coordinate_count, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
  * Copies image source coordinates.
  *
- * The typed take sets out_found and, when found, reports 4 through
- * out_coordinate_count. Passing null with zero capacity is a successful size
- * probe that does not consume the operation result. A later typed take can
- * copy the coordinates. Insufficient capacity reports the required count and
- * returns MLN_STATUS_INVALID_ARGUMENT without consuming the result.
+ * A found image source completes with four borrowed mln_lat_lng values. A
+ * missing source completes successfully with no value.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, out_coordinates is null with non-zero capacity,
- *   coordinate_capacity is too small for a found source, out_coordinate_count
- * is null, out_found is null, or the source exists and is not an image source.
+ *   invalid or empty, completion is invalid, or the source exists and is not
+ *   an image source.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_get_image_source_coordinates_start(
-  mln_map map, mln_buffer_view source_id, mln_operation* out_operation
-) MLN_NOEXCEPT;
-MLN_API mln_status mln_map_get_image_source_coordinates_take_result(
-  mln_operation operation, mln_lat_lng* out_coordinates,
-  size_t coordinate_capacity, size_t* out_coordinate_count, bool* out_found
+MLN_API mln_status mln_map_get_image_source_coordinates(
+  mln_map map, mln_buffer_view source_id, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1384,7 +1342,7 @@ MLN_API mln_status mln_map_get_image_source_coordinates_take_result(
  */
 MLN_API mln_status mln_map_add_hillshade_layer(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id,
-  mln_buffer_view before_layer_id, uint64_t* out_command_id
+  mln_buffer_view before_layer_id, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1405,7 +1363,7 @@ MLN_API mln_status mln_map_add_hillshade_layer(
  */
 MLN_API mln_status mln_map_add_color_relief_layer(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id,
-  mln_buffer_view before_layer_id, uint64_t* out_command_id
+  mln_buffer_view before_layer_id, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1424,7 +1382,7 @@ MLN_API mln_status mln_map_add_color_relief_layer(
  */
 MLN_API mln_status mln_map_add_location_indicator_layer(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1443,7 +1401,7 @@ MLN_API mln_status mln_map_add_location_indicator_layer(
  */
 MLN_API mln_status mln_map_set_location_indicator_location(
   mln_map map, mln_buffer_view layer_id, mln_lat_lng coordinate,
-  double altitude, uint64_t* out_command_id
+  double altitude, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1458,7 +1416,7 @@ MLN_API mln_status mln_map_set_location_indicator_location(
  */
 MLN_API mln_status mln_map_set_location_indicator_bearing(
   mln_map map, mln_buffer_view layer_id, double bearing,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1472,7 +1430,8 @@ MLN_API mln_status mln_map_set_location_indicator_bearing(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_set_location_indicator_accuracy_radius(
-  mln_map map, mln_buffer_view layer_id, double radius, uint64_t* out_command_id
+  mln_map map, mln_buffer_view layer_id, double radius,
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1490,7 +1449,7 @@ MLN_API mln_status mln_map_set_location_indicator_accuracy_radius(
  */
 MLN_API mln_status mln_map_set_location_indicator_image_name(
   mln_map map, mln_buffer_view layer_id, uint32_t image_kind,
-  mln_buffer_view image_id, uint64_t* out_command_id
+  mln_buffer_view image_id, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1515,7 +1474,7 @@ MLN_API mln_status mln_map_set_location_indicator_image_name(
  */
 MLN_API mln_status mln_map_add_style_layer_json(
   mln_map map, mln_buffer_view layer_json, mln_buffer_view before_layer_id,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1527,54 +1486,43 @@ MLN_API mln_status mln_map_add_style_layer_json(
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
- *   invalid or empty, or out_command_id is invalid.
+ *   invalid or empty, or completion is invalid.
  * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_remove_style_layer(
-  mln_map map, mln_buffer_view layer_id, uint64_t* out_command_id
+  mln_map map, mln_buffer_view layer_id, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
- * Copies fixed metadata for one style layer.
+ * Copies complete metadata for one style layer.
  *
- * The returned struct contains the layer type, zoom range, visibility, and
- * string lengths for the layer's source ID and source-layer ID, not their
- * contents. Use the layer-source-ID and layer-source-layer operations to copy
- * those strings. The layer ID is the lookup key and is also available through
- * style layer ID lists. out_found reports whether layer_id exists.
+ * A found layer completes with one borrowed mln_style_layer_result. A missing
+ * layer completes successfully with no value.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
- *   invalid or empty, out_info is null, out_info->size is too small, or
- *   out_found is null.
+ *   invalid or empty, or completion is invalid.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_get_style_layer_info_start(
-  mln_map map, mln_buffer_view layer_id, mln_operation* out_operation
-) MLN_NOEXCEPT;
-MLN_API mln_status mln_map_get_style_layer_info_take_result(
-  mln_operation operation, mln_style_layer_info* out_info, bool* out_found
+MLN_API mln_status mln_map_get_style_layer_info(
+  mln_map map, mln_buffer_view layer_id, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
  * Copies style layer IDs in style order.
  *
- * On success, *out_layer_ids receives an owned list handle. Destroy it with
- * mln_style_id_list_destroy().
+ * The completion borrows an array of mln_buffer_view values.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, out_layer_ids is
- *   null, or *out_layer_ids is not null.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or completion is
+ *   invalid.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_list_style_layer_ids_start(
-  mln_map map, mln_operation* out_operation
-) MLN_NOEXCEPT;
-MLN_API mln_status mln_map_list_style_layer_ids_take_result(
-  mln_operation operation, mln_style_id_list* out_layer_ids
+MLN_API mln_status mln_map_list_style_layer_ids(
+  mln_map map, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1592,28 +1540,23 @@ MLN_API mln_status mln_map_list_style_layer_ids_take_result(
  */
 MLN_API mln_status mln_map_move_style_layer(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
  * Serializes one style layer as a full style-spec layer JSON object.
  *
- * On success, out_found reports whether layer_id exists. When found,
- * *out_layer receives an owned UTF-8 JSON buffer. Destroy it with
- * mln_buffer_destroy().
+ * A found layer completes with one borrowed mln_buffer_view. A missing layer
+ * completes successfully with no value.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
- *   invalid or empty, out_layer is null, *out_layer is not null, or out_found
- *   is null.
+ *   invalid or empty, or completion is invalid.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_get_style_layer_json_start(
-  mln_map map, mln_buffer_view layer_id, mln_operation* out_operation
-) MLN_NOEXCEPT;
-MLN_API mln_status mln_map_get_style_layer_json_take_result(
-  mln_operation operation, mln_buffer* out_layer, bool* out_found
+MLN_API mln_status mln_map_get_style_layer_json(
+  mln_map map, mln_buffer_view layer_id, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1629,7 +1572,7 @@ MLN_API mln_status mln_map_get_style_layer_json_take_result(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_set_style_light_json(
-  mln_map map, mln_buffer_view light_json, uint64_t* out_command_id
+  mln_map map, mln_buffer_view light_json, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1648,27 +1591,23 @@ MLN_API mln_status mln_map_set_style_light_json(
  */
 MLN_API mln_status mln_map_set_style_light_property(
   mln_map map, mln_buffer_view property_name, mln_buffer_view value,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
  * Serializes one style light property as a style-spec JSON value.
  *
- * On success, *out_value receives an owned UTF-8 JSON buffer. Destroy it
- * with mln_buffer_destroy(). Undefined native style light properties
- * return null buffers.
+ * A defined property completes with one borrowed mln_buffer_view. An undefined
+ * property completes successfully with no value.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, property_name is
- *   invalid or empty, out_value is null, or *out_value is not null.
+ *   invalid or empty, or completion is invalid.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_get_style_light_property_start(
-  mln_map map, mln_buffer_view property_name, mln_operation* out_operation
-) MLN_NOEXCEPT;
-MLN_API mln_status mln_map_get_style_light_property_take_result(
-  mln_operation operation, mln_buffer* out_value
+MLN_API mln_status mln_map_get_style_light_property(
+  mln_map map, mln_buffer_view property_name, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1692,14 +1631,14 @@ MLN_API mln_status mln_map_get_style_light_property_take_result(
  */
 MLN_API mln_status mln_map_set_style_transition_options(
   mln_map map, const mln_style_transition_options* options,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
  * Reads the style's global transition options.
  *
- * On success, *out_options receives the last-known transition configuration.
- * Duration and delay report through their field-mask bits, because MapLibre
+ * The completion borrows the last-known transition configuration. Duration
+ * and delay report through their field-mask bits, because MapLibre
  * Native leaves either one unset until a style or a host sets it.
  *
  * A map that has loaded no style yet reports duration and delay unset. A style
@@ -1713,15 +1652,12 @@ MLN_API mln_status mln_map_set_style_transition_options(
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or out_options is
- *   null or undersized.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or completion is
+ *   invalid.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_get_style_transition_options_start(
-  mln_map map, mln_operation* out_operation
-) MLN_NOEXCEPT;
-MLN_API mln_status mln_map_get_style_transition_options_take_result(
-  mln_operation operation, mln_style_transition_options* out_options
+MLN_API mln_status mln_map_get_style_transition_options(
+  mln_map map, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1742,29 +1678,25 @@ MLN_API mln_status mln_map_get_style_transition_options_take_result(
  */
 MLN_API mln_status mln_map_set_layer_property(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name,
-  mln_buffer_view value, uint64_t* out_command_id
+  mln_buffer_view value, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
  * Serializes one layer property as a style-spec JSON value.
  *
- * On success, *out_value receives an owned UTF-8 JSON buffer. Destroy it
- * with mln_buffer_destroy(). Undefined native style properties return
- * null buffers.
+ * A defined property completes with one borrowed mln_buffer_view. An undefined
+ * property completes successfully with no value.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id or
- *   property_name is invalid or empty, out_value is null, *out_value is not
- *   null, or the layer does not exist.
+ *   property_name is invalid or empty, completion is invalid, or the layer does
+ *   not exist.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_get_layer_property_start(
+MLN_API mln_status mln_map_get_layer_property(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name,
-  mln_operation* out_operation
-) MLN_NOEXCEPT;
-MLN_API mln_status mln_map_get_layer_property_take_result(
-  mln_operation operation, mln_buffer* out_value
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1784,27 +1716,23 @@ MLN_API mln_status mln_map_get_layer_property_take_result(
  */
 MLN_API mln_status mln_map_set_layer_filter(
   mln_map map, mln_buffer_view layer_id, const mln_buffer_view* filter,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
  * Serializes one layer filter as a style-spec JSON value.
  *
- * On success, *out_filter receives an owned UTF-8 JSON buffer. Destroy it
- * with mln_buffer_destroy(). Missing filters return null buffers.
+ * A present filter completes with one borrowed mln_buffer_view. A missing
+ * filter completes successfully with no value.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
- *   invalid or empty, out_filter is null, *out_filter is not null, or the layer
- *   does not exist.
+ *   invalid or empty, completion is invalid, or the layer does not exist.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_get_layer_filter_start(
-  mln_map map, mln_buffer_view layer_id, mln_operation* out_operation
-) MLN_NOEXCEPT;
-MLN_API mln_status mln_map_get_layer_filter_take_result(
-  mln_operation operation, mln_buffer* out_filter
+MLN_API mln_status mln_map_get_layer_filter(
+  mln_map map, mln_buffer_view layer_id, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1826,35 +1754,23 @@ MLN_API mln_status mln_map_get_layer_filter_take_result(
  */
 MLN_API mln_status mln_map_set_layer_source_layer(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view source_layer,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
- * Copies one layer's source-layer ID into caller-owned memory.
+ * Copies one layer's source-layer ID.
  *
- * layer_id is borrowed for the call. On success, out_source_layer_size receives
- * the byte length excluding any null terminator, and 0 when the layer carries
- * no source-layer.
- *
- * Passing null for out_source_layer with a capacity of 0 is a size probe: it
- * reports the required byte length and succeeds, so a caller can size a buffer
- * without treating the result as a failure. With a non-null out_source_layer, a
- * capacity smaller than the required length still reports that length and
- * returns MLN_STATUS_INVALID_ARGUMENT.
+ * The completion borrows one mln_buffer_view, which is empty when the layer
+ * carries no source-layer ID.
  *
  * Returns:
- * - MLN_STATUS_OK on success, including a size probe.
+ * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
- *   invalid or empty, out_source_layer is null with non-zero capacity,
- *   source_layer_capacity is too small for a non-null buffer,
- *   out_source_layer_size is null, or the layer does not exist.
+ *   invalid or empty, completion is invalid, or the layer does not exist.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_copy_layer_source_layer_start(
-  mln_map map, mln_buffer_view layer_id, mln_operation* out_operation
-) MLN_NOEXCEPT;
-MLN_API mln_status mln_map_copy_layer_source_layer_take_result(
-  mln_operation operation, mln_buffer* out_source_layer
+MLN_API mln_status mln_map_copy_layer_source_layer(
+  mln_map map, mln_buffer_view layer_id, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1876,35 +1792,23 @@ MLN_API mln_status mln_map_copy_layer_source_layer_take_result(
  */
 MLN_API mln_status mln_map_set_layer_source_id(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
- * Copies one layer's source ID into caller-owned memory.
+ * Copies one layer's source ID.
  *
- * layer_id is borrowed for the call. On success, out_source_id_size receives
- * the byte length excluding any null terminator, and 0 when the layer carries
- * no source.
- *
- * Passing null for out_source_id with a capacity of 0 is a size probe: it
- * reports the required byte length and succeeds, so a caller can size a buffer
- * without treating the result as a failure. With a non-null out_source_id, a
- * capacity smaller than the required length still reports that length and
- * returns MLN_STATUS_INVALID_ARGUMENT.
+ * The completion borrows one mln_buffer_view, which is empty when the layer
+ * carries no source ID.
  *
  * Returns:
- * - MLN_STATUS_OK on success, including a size probe.
+ * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
- *   invalid or empty, out_source_id is null with non-zero capacity,
- *   source_id_capacity is too small for a non-null buffer, out_source_id_size
- * is null, or the layer does not exist.
+ *   invalid or empty, completion is invalid, or the layer does not exist.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_copy_layer_source_id_start(
-  mln_map map, mln_buffer_view layer_id, mln_operation* out_operation
-) MLN_NOEXCEPT;
-MLN_API mln_status mln_map_copy_layer_source_id_take_result(
-  mln_operation operation, mln_buffer* out_source_id
+MLN_API mln_status mln_map_copy_layer_source_id(
+  mln_map map, mln_buffer_view layer_id, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1921,7 +1825,7 @@ MLN_API mln_status mln_map_copy_layer_source_id_take_result(
  */
 MLN_API mln_status mln_map_set_layer_min_zoom(
   mln_map map, mln_buffer_view layer_id, double min_zoom,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1938,7 +1842,7 @@ MLN_API mln_status mln_map_set_layer_min_zoom(
  */
 MLN_API mln_status mln_map_set_layer_max_zoom(
   mln_map map, mln_buffer_view layer_id, double max_zoom,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -1955,7 +1859,7 @@ MLN_API mln_status mln_map_set_layer_max_zoom(
  */
 MLN_API mln_status mln_map_set_layer_visibility(
   mln_map map, mln_buffer_view layer_id, uint32_t visibility,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

@@ -120,7 +120,11 @@ test "event mask setters accept calls from another thread" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
+    var map_future = try maplibre.MapHandle.create(&runtime, .{});
+
+    defer map_future.deinit();
+
+    var map = try map_future.wait(null);
     defer map.close() catch @panic("map close failed");
 
     var runtime_mask_error: ?anyerror = null;
@@ -153,7 +157,11 @@ test "one drain reports the events a style load queued together" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
+    var map_future = try maplibre.MapHandle.create(&runtime, .{});
+
+    defer map_future.deinit();
+
+    var map = try map_future.wait(null);
     defer map.close() catch @panic("map close failed");
 
     _ = try map.setStyleJson(testing.allocator, support.style_json);
@@ -176,41 +184,16 @@ test "one drain reports the events a style load queued together" {
     try testing.expect(saw_style_loaded);
     try testing.expect(largest_batch > 1);
 }
-test "notification ready batches are copied before native release" {
-    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
-
-    var map = try maplibre.MapHandle.create(&runtime, .{});
-    defer map.close() catch @panic("map close failed");
-
-    _ = try map.setStyleJson(testing.allocator, support.style_json);
-
-    var ready = try runtime.drainReady(testing.allocator);
-    defer ready.deinit();
-    try testing.expect(ready.endpoints.len > 0);
-    try testing.expect(std.meta.eql(
-        maplibre.NotificationEndpointKind.runtime_events,
-        ready.endpoints[0].kind,
-    ));
-
-    var events = try runtime.drainEvents(testing.allocator);
-    defer events.deinit();
-    try testing.expect(events.len() > 0);
-
-    // The copied ready endpoint remains valid after draining and releasing a
-    // later owned event batch.
-    try testing.expect(std.meta.eql(
-        maplibre.NotificationEndpointKind.runtime_events,
-        ready.endpoints[0].kind,
-    ));
-}
-
 test "a drained batch outlives its runtime" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     var runtime_open = true;
     defer if (runtime_open) runtime.close() catch @panic("runtime close failed");
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
+    var map_future = try maplibre.MapHandle.create(&runtime, .{});
+
+    defer map_future.deinit();
+
+    var map = try map_future.wait(null);
     var map_open = true;
     defer if (map_open) map.close() catch @panic("map close failed");
     const map_id = try map.id();
@@ -256,7 +239,11 @@ test "closing a map leaves its queued runtime events unchanged" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
+    var map_future = try maplibre.MapHandle.create(&runtime, .{});
+
+    defer map_future.deinit();
+
+    var map = try map_future.wait(null);
     _ = try map.setStyleJson(testing.allocator, "{");
     try support.waitForBarrier(&runtime);
     try map.close();
@@ -276,7 +263,11 @@ test "event masks round-trip through both handles" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
+    var map_future = try maplibre.MapHandle.create(&runtime, .{});
+
+    defer map_future.deinit();
+
+    var map = try map_future.wait(null);
     defer map.close() catch @panic("map close failed");
 
     var runtime_mask = try runtime.eventMask();
@@ -307,7 +298,11 @@ test "a narrowed map mask drops the type it clears and keeps the rest" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
+    var map_future = try maplibre.MapHandle.create(&runtime, .{});
+
+    defer map_future.deinit();
+
+    var map = try map_future.wait(null);
     defer map.close() catch @panic("map close failed");
 
     const narrowed = maskWithout("map_render_update_available");
@@ -335,7 +330,9 @@ test "masks passed as create options narrow both handles" {
     try testing.expectEqual(narrowed_runtime_mask, try runtime.eventMask());
 
     const narrowed_map_mask = maskWithout("map_render_update_available");
-    var map = try maplibre.MapHandle.create(&runtime, .{ .event_mask = narrowed_map_mask });
+    var map_future = try maplibre.MapHandle.create(&runtime, .{ .event_mask = narrowed_map_mask });
+    defer map_future.deinit();
+    var map = try map_future.wait(null);
     defer map.close() catch @panic("map close failed");
     try testing.expectEqual(narrowed_map_mask, try map.eventMask());
 

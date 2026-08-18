@@ -1,47 +1,54 @@
+#include <stdatomic.h>
+#include <threads.h>
+
 #include "map_state.h"
 
 #include "diagnostics.h"
 
-static app_error await_operation(
-  mln_operation operation, app_error error, const char* message
+typedef struct map_create_completion {
+  atomic_bool completed;
+  mln_status status;
+  mln_map map;
+} map_create_completion;
+
+static void discard_completion(
+  void* user_data, const mln_completion_result* result
 ) {
-  bool completed = false;
-  mln_status status = mln_operation_wait(operation, -1, &completed);
-  if (status == MLN_STATUS_OK && completed) {
-    status = mln_operation_get_status(operation, &status) == MLN_STATUS_OK
-               ? status
-               : MLN_STATUS_NATIVE_ERROR;
+  (void)user_data;
+  (void)result;
+}
+
+static const mln_completion discarded_completion = {
+  .size = sizeof(mln_completion),
+  .callback = discard_completion,
+};
+
+const mln_completion* map_state_discarded_completion(void) {
+  return &discarded_completion;
+}
+
+static void complete_map_create(
+  void* user_data, const mln_completion_result* result
+) {
+  map_create_completion* state = user_data;
+  state->status = result->status;
+  if (result->status == MLN_STATUS_OK && result->value_count == 1) {
+    state->map = *(const mln_map*)result->value;
   }
-  if (status != MLN_STATUS_OK || !completed) {
-    diagnostics_log_status(message, status);
-    return error;
-  }
-  return APP_OK;
+  atomic_store_explicit(&state->completed, true, memory_order_release);
 }
 
 static app_error create_runtime(
-  map_state* state, mln_notification_callback callback, void* user_data
+  map_state* state, mln_wake_callback callback, void* user_data
 ) {
-  mln_status status =
-    mln_notification_source_create(&state->notification_source);
-  if (status != MLN_STATUS_OK) {
-    diagnostics_log_status("notification source create failed", status);
-    return APP_ERROR_RUNTIME_CREATE_FAILED;
-  }
-  status = mln_notification_source_set_callback(
-    state->notification_source, callback, user_data
-  );
-  if (status != MLN_STATUS_OK) {
-    diagnostics_log_status("notification callback install failed", status);
-    mln_notification_source_release(state->notification_source);
-    state->notification_source = MLN_HANDLE_NULL;
-    return APP_ERROR_RUNTIME_CREATE_FAILED;
-  }
-
   mln_runtime_options options = mln_runtime_options_default();
-  options.notification_source = state->notification_source;
   options.cache_path = ":memory:";
-  status = mln_runtime_create(&options, &state->runtime);
+  options.event_wake = (mln_wake){
+    .size = sizeof(mln_wake),
+    .callback = callback,
+    .user_data = user_data,
+  };
+  const mln_status status = mln_runtime_create(&options, &state->runtime);
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status("runtime create failed", status);
     return APP_ERROR_RUNTIME_CREATE_FAILED;
@@ -58,36 +65,34 @@ static app_error create_map(map_state* state, viewport initial_viewport) {
   };
   options.map_mode = MLN_MAP_MODE_CONTINUOUS;
 
-  mln_operation operation = MLN_HANDLE_NULL;
-  mln_status status =
-    mln_map_create_start(state->runtime, &options, &operation);
+  map_create_completion result = {.completed = false};
+  const mln_completion completion = {
+    .size = sizeof(mln_completion),
+    .callback = complete_map_create,
+    .user_data = &result,
+  };
+  mln_status status = mln_map_create(state->runtime, &options, &completion);
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status("map create start failed", status);
     return APP_ERROR_MAP_CREATE_FAILED;
   }
-  const app_error waited = await_operation(
-    operation, APP_ERROR_MAP_CREATE_FAILED, "map create failed"
-  );
-  if (waited == APP_OK) {
-    status = mln_map_create_take_result(operation, &state->map);
+  while (!atomic_load_explicit(&result.completed, memory_order_acquire)) {
+    thrd_yield();
   }
-  mln_operation_release(operation);
-  if (waited != APP_OK || status != MLN_STATUS_OK) {
-    if (status != MLN_STATUS_OK) {
-      diagnostics_log_status("map create result failed", status);
-    }
+  if (result.status != MLN_STATUS_OK || result.map == MLN_HANDLE_NULL) {
+    diagnostics_log_status("map create failed", result.status);
     return APP_ERROR_MAP_CREATE_FAILED;
   }
+  state->map = result.map;
   return APP_OK;
 }
 
 static app_error configure_map(map_state* state) {
-  uint64_t command_id = 0;
   mln_status status = mln_map_set_event_mask(
     state->map,
     MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE |
       MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED,
-    &command_id
+    &discarded_completion
   );
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status("event mask select failed", status);
@@ -95,7 +100,8 @@ static app_error configure_map(map_state* state) {
   }
 
   status = mln_map_set_style_url(
-    state->map, "https://tiles.openfreemap.org/styles/bright", &command_id
+    state->map, "https://tiles.openfreemap.org/styles/bright",
+    &discarded_completion
   );
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status("style load failed", status);
@@ -116,12 +122,11 @@ static app_error configure_map(map_state* state) {
 }
 
 app_error map_state_init(
-  map_state* out_state, viewport initial_viewport,
-  mln_notification_callback notification_callback, void* notification_user_data
+  map_state* out_state, viewport initial_viewport, mln_wake_callback event_wake,
+  void* event_wake_user_data
 ) {
   *out_state = (map_state){};
-  app_error error =
-    create_runtime(out_state, notification_callback, notification_user_data);
+  app_error error = create_runtime(out_state, event_wake, event_wake_user_data);
   if (error == APP_OK) {
     error = create_map(out_state, initial_viewport);
   }
@@ -147,10 +152,6 @@ void map_state_deinit(map_state* state) {
       diagnostics_log_status("runtime release failed", status);
     state->runtime = MLN_HANDLE_NULL;
   }
-  if (state->notification_source != MLN_HANDLE_NULL) {
-    mln_notification_source_release(state->notification_source);
-    state->notification_source = MLN_HANDLE_NULL;
-  }
 }
 
 app_error map_state_update_camera(
@@ -164,9 +165,8 @@ app_error map_state_update_camera(
     update.animation = *animation;
   }
   update.gesture_phase = gesture_phase;
-  uint64_t command_id = 0;
   const mln_status status =
-    mln_map_update_camera(state->map, &update, &command_id);
+    mln_map_update_camera(state->map, &update, &discarded_completion);
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status("camera command failed", status);
     return APP_ERROR_CAMERA_COMMAND_FAILED;
@@ -180,8 +180,8 @@ app_error map_state_resize(map_state* state, viewport value) {
     .height = value.logical_height,
     .scale_factor = value.scale_factor,
   };
-  uint64_t command_id = 0;
-  const mln_status status = mln_map_resize(state->map, extent, &command_id);
+  const mln_status status =
+    mln_map_resize(state->map, extent, &discarded_completion);
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status("map resize failed", status);
     return APP_ERROR_MAP_RESIZE_FAILED;
@@ -228,39 +228,7 @@ static app_error drain_runtime_events(
   return APP_OK;
 }
 
-app_error map_state_drain_notifications(
-  map_state* state, bool* out_render_update
-) {
+app_error map_state_drain_events(map_state* state, bool* out_render_update) {
   *out_render_update = false;
-  mln_ready_batch batch = MLN_HANDLE_NULL;
-  mln_status status =
-    mln_notification_source_drain_ready(state->notification_source, &batch);
-  if (status != MLN_STATUS_OK) {
-    diagnostics_log_status("notification drain failed", status);
-    return APP_ERROR_EVENT_DRAIN_FAILED;
-  }
-  mln_ready_batch_view view = {.size = sizeof(mln_ready_batch_view)};
-  status = mln_ready_batch_get(batch, &view);
-  if (status != MLN_STATUS_OK) {
-    mln_ready_batch_release(batch);
-    diagnostics_log_status("notification batch read failed", status);
-    return APP_ERROR_EVENT_DRAIN_FAILED;
-  }
-  app_error error = APP_OK;
-  for (size_t index = 0; index < view.endpoint_count; index += 1) {
-    const char* bytes =
-      (const char*)view.endpoints + index * view.endpoint_size;
-    const mln_ready_endpoint* endpoint = (const mln_ready_endpoint*)bytes;
-    if (
-      endpoint->kind == MLN_NOTIFICATION_ENDPOINT_RUNTIME_EVENTS &&
-      endpoint->id == state->runtime
-    ) {
-      error = drain_runtime_events(state, out_render_update);
-      if (error != APP_OK) {
-        break;
-      }
-    }
-  }
-  mln_ready_batch_release(batch);
-  return error;
+  return drain_runtime_events(state, out_render_update);
 }

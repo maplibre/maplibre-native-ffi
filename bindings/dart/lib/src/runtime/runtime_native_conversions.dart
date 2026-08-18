@@ -1031,87 +1031,30 @@ Pointer<raw.mln_animation_options> _nativeAnimation(
   return nativeAnimation;
 }
 
-List<String> _copyStyleIdList(NativeStyleIdList list) {
-  try {
-    return withNativeArena((arena) {
-      final outCount = arena<Size>();
-      _check(raw.mln_style_id_list_count(list.raw, outCount));
-      final ids = <String>[];
-      for (var index = 0; index < outCount.value; index += 1) {
-        final outId = arena<raw.mln_buffer_view>();
-        _check(raw.mln_style_id_list_get(list.raw, index, outId));
-        ids.add(_copyStringView(outId.ref) ?? '');
-      }
-      return ids;
-    });
-  } finally {
-    raw.mln_style_id_list_destroy(list.raw);
-  }
-}
-
-List<String> _copyStyleStringList(NativeStyleStringList list) {
-  try {
-    return withNativeArena((arena) {
-      final outCount = arena<Size>();
-      _check(raw.mln_style_string_list_count(list.raw, outCount));
-      final values = <String>[];
-      for (var index = 0; index < outCount.value; index += 1) {
-        final outValue = arena<raw.mln_buffer_view>();
-        _check(raw.mln_style_string_list_get(list.raw, index, outValue));
-        values.add(_copyStringView(outValue.ref) ?? '');
-      }
-      return values;
-    });
-  } finally {
-    raw.mln_style_string_list_destroy(list.raw);
-  }
-}
-
-List<QueriedFeature> _copyQueriedFeatureList(NativeQueriedFeatureList list) {
-  try {
-    return withNativeArena((arena) {
-      final outCount = arena<Size>();
-      _check(raw.mln_queried_feature_list_count(list.raw, outCount));
-      final features = <QueriedFeature>[];
-      final outFeature = arena<raw.mln_queried_feature>();
-      for (var index = 0; index < outCount.value; index += 1) {
-        outFeature.ref = raw.mln_queried_feature_default();
-        _check(raw.mln_queried_feature_list_get(list.raw, index, outFeature));
-        final hit = outFeature.ref;
-        final hasSourceId =
-            hit.fields &
-                raw
-                    .mln_queried_feature_field
-                    .MLN_QUERIED_FEATURE_SOURCE_ID
-                    .value !=
-            0;
-        final hasSourceLayerId =
-            hit.fields &
-                raw
-                    .mln_queried_feature_field
-                    .MLN_QUERIED_FEATURE_SOURCE_LAYER_ID
-                    .value !=
-            0;
-        final hasState =
-            hit.fields &
-                raw.mln_queried_feature_field.MLN_QUERIED_FEATURE_STATE.value !=
-            0;
-        features.add(
-          QueriedFeature(
-            feature: _copyBufferViewBytes(hit.feature),
-            sourceId: hasSourceId ? _copyStringView(hit.source_id) : null,
-            sourceLayerId: hasSourceLayerId
-                ? _copyStringView(hit.source_layer_id)
-                : null,
-            state: hasState ? _copyBufferViewBytes(hit.state) : null,
-          ),
-        );
-      }
-      return features;
-    });
-  } finally {
-    raw.mln_queried_feature_list_destroy(list.raw);
-  }
+QueriedFeature _queriedFeatureFromNative(raw.mln_queried_feature hit) {
+  final hasSourceId =
+      hit.fields &
+          raw.mln_queried_feature_field.MLN_QUERIED_FEATURE_SOURCE_ID.value !=
+      0;
+  final hasSourceLayerId =
+      hit.fields &
+          raw
+              .mln_queried_feature_field
+              .MLN_QUERIED_FEATURE_SOURCE_LAYER_ID
+              .value !=
+      0;
+  final hasState =
+      hit.fields &
+          raw.mln_queried_feature_field.MLN_QUERIED_FEATURE_STATE.value !=
+      0;
+  return QueriedFeature(
+    feature: _copyBufferViewBytes(hit.feature),
+    sourceId: hasSourceId ? _copyStringView(hit.source_id) : null,
+    sourceLayerId: hasSourceLayerId
+        ? _copyStringView(hit.source_layer_id)
+        : null,
+    state: hasState ? _copyBufferViewBytes(hit.state) : null,
+  );
 }
 
 String? _copyStringView(raw.mln_buffer_view view) =>

@@ -18,16 +18,16 @@ public sealed class StyleLayerTests
             runtime,
             new MapOptions { Width = 512, Height = 512 }
         );
-        map.SetStyleJson("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
-        map.AddRasterDemSourceTiles("dem", ["https://example.test/dem/{z}/{x}/{y}.png"], null);
+        map.SetStyleJsonAsync("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
+        map.AddRasterDemSourceTilesAsync("dem", ["https://example.test/dem/{z}/{x}/{y}.png"], null);
 
-        map.AddHillshadeLayer("hillshade", "dem", "");
-        map.AddColorReliefLayer("relief", "dem", "");
-        map.AddLocationIndicatorLayer("location", "");
-        map.SetLocationIndicatorLocation("location", new LatLng(12.5, 34.25), 100);
-        map.SetLocationIndicatorBearing("location", 45);
-        map.SetLocationIndicatorAccuracyRadius("location", 12);
-        map.SetLocationIndicatorImageName(
+        map.AddHillshadeLayerAsync("hillshade", "dem", "");
+        map.AddColorReliefLayerAsync("relief", "dem", "");
+        map.AddLocationIndicatorLayerAsync("location", "");
+        map.SetLocationIndicatorLocationAsync("location", new LatLng(12.5, 34.25), 100);
+        map.SetLocationIndicatorBearingAsync("location", 45);
+        map.SetLocationIndicatorAccuracyRadiusAsync("location", 12);
+        map.SetLocationIndicatorImageNameAsync(
             "location",
             LocationIndicatorImageKind.Top,
             "missing-image-name"
@@ -44,7 +44,7 @@ public sealed class StyleLayerTests
     {
         using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
         using var map = TestHandles.CreateMap(runtime, new MapOptions { Width = 64, Height = 64 });
-        map.SetStyleJson(
+        map.SetStyleJsonAsync(
             System.Text.Encoding.UTF8.GetBytes(
                 "{\"version\":8,\"sources\":{\"geo\":{\"type\":\"geojson\",\"data\":"
                     + "{\"type\":\"FeatureCollection\",\"features\":[]}}},\"layers\":["
@@ -53,27 +53,32 @@ public sealed class StyleLayerTests
             )
         );
 
-        Assert.Equal(string.Empty, await map.GetLayerSourceLayerAsync("fill"));
-        Assert.NotEqual(0ul, map.SetLayerSourceLayer("fill", "roads"));
-        Assert.Equal("roads", await map.GetLayerSourceLayerAsync("fill"));
-        Assert.Equal("geo", await map.GetLayerSourceIdAsync("fill"));
+        Assert.Null((await map.StyleLayerInfoAsync("fill"))?.SourceLayer);
+        RuntimeEventTestHelpers.AssertCommitted(map.SetLayerSourceLayerAsync("fill", "roads"));
+        Assert.Equal("roads", (await map.StyleLayerInfoAsync("fill"))?.SourceLayer);
+        Assert.Equal("geo", (await map.StyleLayerInfoAsync("fill"))?.SourceId);
 
-        // A layer type that takes no source preserves its empty source ID.
-        Assert.NotEqual(0ul, map.SetLayerSourceLayer("bg", "roads"));
-        Assert.Equal(string.Empty, await map.GetLayerSourceIdAsync("bg"));
+        // A layer type that takes no source rejects a source-layer mutation.
+        RuntimeEventTestHelpers.AssertCommandFinishes(
+            runtime,
+            map.SetLayerSourceLayerAsync("bg", "roads"),
+            MaplibreStatus.InvalidArgument
+        );
+        Assert.Null((await map.StyleLayerInfoAsync("bg"))?.SourceId);
 
         // An unset zoom range crosses the boundary as infinities.
         var unset = Assert.IsType<LayerInfo>(await map.StyleLayerInfoAsync("fill"));
         Assert.Equal(double.NegativeInfinity, unset.MinZoom);
         Assert.Equal(double.PositiveInfinity, unset.MaxZoom);
-        Assert.NotEqual(0ul, map.SetLayerMinZoom("fill", 4));
-        Assert.NotEqual(0ul, map.SetLayerMaxZoom("fill", 12.5));
+        RuntimeEventTestHelpers.AssertCommitted(map.SetLayerMinZoomAsync("fill", 4));
+        RuntimeEventTestHelpers.AssertCommitted(map.SetLayerMaxZoomAsync("fill", 12.5));
 
         Assert.Equal(StyleLayerVisibility.Visible, unset.Visibility);
-        Assert.NotEqual(0ul, map.SetLayerVisibility("fill", StyleLayerVisibility.None));
+        RuntimeEventTestHelpers.AssertCommitted(
+            map.SetLayerVisibilityAsync("fill", StyleLayerVisibility.None)
+        );
 
-        // The layer-info aggregate reports everything at once, and its source ID and
-        // source layer match the dedicated copy operations.
+        // The layer-info aggregate reports everything at once.
         var info = Assert.IsType<LayerInfo>(await map.StyleLayerInfoAsync("fill"));
         Assert.Equal("fill", info.Id);
         Assert.Equal("fill", info.Type);
@@ -83,11 +88,13 @@ public sealed class StyleLayerTests
         Assert.Equal((uint)StyleLayerVisibility.None, info.RawVisibility);
         Assert.Equal("geo", info.SourceId);
         Assert.Equal("roads", info.SourceLayer);
-        Assert.Equal(await map.GetLayerSourceIdAsync("fill"), info.SourceId);
-        Assert.Equal(await map.GetLayerSourceLayerAsync("fill"), info.SourceLayer);
 
-        // An unknown raw visibility is accepted as a command, then leaves the value unchanged.
-        Assert.NotEqual(0ul, map.SetLayerVisibility("fill", (StyleLayerVisibility)900));
+        // An unknown raw visibility is rejected by the completion.
+        RuntimeEventTestHelpers.AssertCommandFinishes(
+            runtime,
+            map.SetLayerVisibilityAsync("fill", (StyleLayerVisibility)900),
+            MaplibreStatus.InvalidArgument
+        );
         Assert.Equal(
             StyleLayerVisibility.None,
             (await map.StyleLayerInfoAsync("fill"))?.Visibility
@@ -116,12 +123,12 @@ public sealed class StyleLayerTests
 
         // The style parser fills in its own 300ms duration for a style that declares no
         // transition.
-        map.SetStyleJson("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
+        map.SetStyleJsonAsync("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
         var parsed = await map.GetStyleTransitionOptionsAsync();
         Assert.Equal(300, parsed.Duration);
         Assert.Null(parsed.Delay);
 
-        map.SetStyleJson(System.Text.Encoding.UTF8.GetBytes(transitionStyleJson));
+        map.SetStyleJsonAsync(System.Text.Encoding.UTF8.GetBytes(transitionStyleJson));
         var declared = await map.GetStyleTransitionOptionsAsync();
         Assert.Equal(750, declared.Duration);
         Assert.Equal(100, declared.Delay);
@@ -134,16 +141,16 @@ public sealed class StyleLayerTests
             Duration = 0,
             EnablePlacementTransitions = false,
         };
-        Assert.NotEqual(0ul, map.SetStyleTransitionOptions(options));
+        RuntimeEventTestHelpers.AssertCommitted(map.SetStyleTransitionOptionsAsync(options));
         Assert.Equal(options, await map.GetStyleTransitionOptionsAsync());
 
         // Loading a style replaces the override with what that style declares.
-        map.SetStyleJson(System.Text.Encoding.UTF8.GetBytes(transitionStyleJson));
+        map.SetStyleJsonAsync(System.Text.Encoding.UTF8.GetBytes(transitionStyleJson));
         Assert.Equal(declared, await map.GetStyleTransitionOptionsAsync());
 
         RuntimeEventTestHelpers.AssertCommandFinishes(
             runtime,
-            map.SetStyleTransitionOptions(new StyleTransitionOptions { Delay = -1 }),
+            map.SetStyleTransitionOptionsAsync(new StyleTransitionOptions { Delay = -1 }),
             MaplibreStatus.InvalidArgument
         );
     }

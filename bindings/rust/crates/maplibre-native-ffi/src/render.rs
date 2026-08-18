@@ -12,8 +12,7 @@ use maplibre_native_ffi_sys as sys;
 
 use crate::handle::{ConcurrentNativeHandle, closed_handle_error, out_handle};
 use crate::map::MapHandle;
-use crate::runtime::{OperationHandle, OperationKind};
-use crate::{HandleOperationError, Result};
+use crate::{HandleOperationError, NativeFuture, Result};
 
 /// Borrowed opaque native address used for backend interop handles. It does not
 /// own, retain, dereference, or validate the pointed-to object, and passing it
@@ -973,8 +972,7 @@ impl RenderDriverKind {
     }
 }
 
-/// Attachment policy. Notification roles inherit the map runtime's native
-/// receiver-scoped source.
+/// Attachment policy for a render session.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RenderSessionAttachOptions {
     pub driver: RenderDriverKind,
@@ -1174,14 +1172,6 @@ impl RenderSessionState {
             .ok_or_else(|| closed_handle_error("RenderSessionHandle"))
     }
 
-    fn operation<T>(
-        &self,
-        operation: sys::mln_operation,
-        kind: OperationKind,
-    ) -> Result<OperationHandle<T>> {
-        OperationHandle::new(operation, kind)
-    }
-
     fn destroy(&self) -> Result<()> {
         let Some(session) = self.handle.live_handle() else {
             return Ok(());
@@ -1214,11 +1204,11 @@ impl fmt::Debug for RenderSessionHandle {
     }
 }
 
-/// Attaching session and the operation that reports attachment completion.
+/// A session returned at submission and its asynchronous attachment completion.
 #[derive(Debug)]
 pub struct RenderSessionAttachment {
     pub session: RenderSessionHandle,
-    pub operation: OperationHandle<()>,
+    pub completion: NativeFuture<()>,
 }
 
 impl RenderSessionHandle {
@@ -1232,36 +1222,34 @@ impl RenderSessionHandle {
             sys::mln_map,
             *const sys::mln_render_session_attach_options,
             *mut sys::mln_render_session,
-            *mut sys::mln_operation,
+            *const sys::mln_completion,
         ) -> sys::mln_status,
     {
         let map_native = map.inner.native()?;
         let raw_options = options.to_native();
         let mut session = maplibre_core::ptr::OutHandle::<sys::mln_render_session>::new();
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(attach(
-            map_native,
-            &raw_options,
-            session.as_mut_ptr(),
-            &mut operation,
-        ))?;
+        let completion = crate::completion::submit(
+            |completion| attach(map_native, &raw_options, session.as_mut_ptr(), completion),
+            crate::completion::unit,
+        )?;
         let session = out_handle(session, "mln_render_session")?;
+        let inner = Arc::new(RenderSessionState::new(session)?);
+        completion.retain(Arc::clone(&inner));
         Ok(RenderSessionAttachment {
-            session: Self {
-                inner: Arc::new(RenderSessionState::new(session)?),
-            },
-            operation: OperationHandle::new(operation, OperationKind::RenderAttach)?,
+            session: Self { inner },
+            completion,
         })
     }
 
     fn start_unit(
         &self,
-        kind: OperationKind,
-        start: impl FnOnce(sys::mln_render_session, *mut sys::mln_operation) -> sys::mln_status,
-    ) -> Result<OperationHandle<()>> {
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(start(self.inner.native()?, &mut operation))?;
-        self.inner.operation(operation, kind)
+        start: impl FnOnce(sys::mln_render_session, *const sys::mln_completion) -> sys::mln_status,
+    ) -> Result<NativeFuture<()>> {
+        let session = self.inner.native()?;
+        crate::completion::submit(
+            |completion| start(session, completion),
+            crate::completion::unit,
+        )
     }
 
     pub fn capabilities(&self) -> Result<RenderSessionCapabilities> {
@@ -1332,53 +1320,50 @@ impl RenderSessionHandle {
         AcquiredFrameHandle::new(frame)
     }
 
-    pub fn resize(&self, extent: &RenderTargetExtent) -> Result<OperationHandle<()>> {
+    pub fn resize(&self, extent: &RenderTargetExtent) -> Result<NativeFuture<()>> {
         let raw = maplibre_core::render::render_target_extent_to_native(extent.to_core());
-        self.start_unit(OperationKind::RenderResize, |session, operation| unsafe {
-            sys::mln_render_session_resize_start(session, &raw, operation)
+        self.start_unit(|session, completion| unsafe {
+            sys::mln_render_session_resize(session, &raw, completion)
         })
     }
 
-    pub fn barrier(&self) -> Result<OperationHandle<()>> {
-        self.start_unit(OperationKind::RenderBarrier, |session, operation| unsafe {
-            sys::mln_render_session_barrier_start(session, operation)
+    pub fn barrier(&self) -> Result<NativeFuture<()>> {
+        self.start_unit(|session, completion| unsafe {
+            sys::mln_render_session_barrier(session, completion)
         })
     }
 
-    pub fn reduce_memory_use(&self) -> Result<OperationHandle<()>> {
-        self.start_unit(
-            OperationKind::RenderMaintenance,
-            |session, operation| unsafe {
-                sys::mln_render_session_reduce_memory_use_start(session, operation)
-            },
-        )
+    pub fn reduce_memory_use(&self) -> Result<NativeFuture<()>> {
+        self.start_unit(|session, completion| unsafe {
+            sys::mln_render_session_reduce_memory_use(session, completion)
+        })
     }
 
-    pub fn clear_data(&self) -> Result<OperationHandle<()>> {
-        self.start_unit(
-            OperationKind::RenderMaintenance,
-            |session, operation| unsafe {
-                sys::mln_render_session_clear_data_start(session, operation)
-            },
-        )
+    pub fn clear_data(&self) -> Result<NativeFuture<()>> {
+        self.start_unit(|session, completion| unsafe {
+            sys::mln_render_session_clear_data(session, completion)
+        })
     }
 
-    pub fn dump_debug_logs(&self) -> Result<OperationHandle<()>> {
-        self.start_unit(
-            OperationKind::RenderMaintenance,
-            |session, operation| unsafe {
-                sys::mln_render_session_dump_debug_logs_start(session, operation)
-            },
-        )
+    pub fn dump_debug_logs(&self) -> Result<NativeFuture<()>> {
+        self.start_unit(|session, completion| unsafe {
+            sys::mln_render_session_dump_debug_logs(session, completion)
+        })
     }
 
-    pub fn read_premultiplied_rgba8(&self) -> Result<OperationHandle<PremultipliedRgba8Image>> {
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_texture_read_premultiplied_rgba8_start(self.inner.native()?, &mut operation)
-        })?;
-        self.inner
-            .operation(operation, OperationKind::RenderReadback)
+    pub fn read_premultiplied_rgba8(&self) -> Result<NativeFuture<PremultipliedRgba8Image>> {
+        let session = self.inner.native()?;
+        crate::completion::submit(
+            |completion| unsafe { sys::mln_texture_read_premultiplied_rgba8(session, completion) },
+            |result| {
+                let raw =
+                    crate::completion::copy_value::<sys::mln_texture_readback_result>(result)?;
+                Ok(PremultipliedRgba8Image::new(
+                    maplibre_core::values::texture_image_info_from_native(&raw.info),
+                    unsafe { maplibre_core::string::copy_string_view_bytes(raw.data) }?,
+                ))
+            },
+        )
     }
 
     /// Services typed native work on the caller driver's graphics thread.
@@ -1397,9 +1382,9 @@ impl RenderSessionHandle {
         Ok(serviced)
     }
 
-    pub fn detach(&self) -> Result<OperationHandle<()>> {
-        self.start_unit(OperationKind::RenderDetach, |session, operation| unsafe {
-            sys::mln_render_session_detach_start(session, operation)
+    pub fn detach(&self) -> Result<NativeFuture<()>> {
+        self.start_unit(|session, completion| unsafe {
+            sys::mln_render_session_detach(session, completion)
         })
     }
 
@@ -1428,80 +1413,77 @@ impl RenderSessionHandle {
         start: unsafe extern "C" fn(
             sys::mln_render_session,
             *const D,
-            *mut sys::mln_operation,
+            *const sys::mln_completion,
         ) -> sys::mln_status,
-    ) -> Result<OperationHandle<()>> {
-        self.start_unit(
-            OperationKind::RenderSetTarget,
-            |session, operation| unsafe { start(session, raw, operation) },
-        )
+    ) -> Result<NativeFuture<()>> {
+        self.start_unit(|session, completion| unsafe { start(session, raw, completion) })
     }
 
     pub fn set_metal_surface_target(
         &self,
         value: &MetalSurfaceDescriptor,
-    ) -> Result<OperationHandle<()>> {
-        self.set_target(&value.to_native(), sys::mln_metal_surface_set_target_start)
+    ) -> Result<NativeFuture<()>> {
+        self.set_target(&value.to_native(), sys::mln_metal_surface_set_target)
     }
 
     pub fn set_vulkan_surface_target(
         &self,
         value: &VulkanSurfaceDescriptor,
-    ) -> Result<OperationHandle<()>> {
-        self.set_target(&value.to_native(), sys::mln_vulkan_surface_set_target_start)
+    ) -> Result<NativeFuture<()>> {
+        self.set_target(&value.to_native(), sys::mln_vulkan_surface_set_target)
     }
 
     pub fn set_webgpu_surface_target(
         &self,
         value: &WebGpuSurfaceDescriptor,
-    ) -> Result<OperationHandle<()>> {
-        self.set_target(&value.to_native(), sys::mln_webgpu_surface_set_target_start)
+    ) -> Result<NativeFuture<()>> {
+        self.set_target(&value.to_native(), sys::mln_webgpu_surface_set_target)
     }
 
     pub fn set_opengl_surface_target(
         &self,
         value: &OpenGLSurfaceDescriptor,
-    ) -> Result<OperationHandle<()>> {
-        self.set_target(&value.to_native(), sys::mln_opengl_surface_set_target_start)
+    ) -> Result<NativeFuture<()>> {
+        self.set_target(&value.to_native(), sys::mln_opengl_surface_set_target)
     }
 
     pub fn set_metal_borrowed_texture_target(
         &self,
         value: &MetalBorrowedTextureDescriptor,
-    ) -> Result<OperationHandle<()>> {
+    ) -> Result<NativeFuture<()>> {
         self.set_target(
             &value.to_native(),
-            sys::mln_metal_borrowed_texture_set_target_start,
+            sys::mln_metal_borrowed_texture_set_target,
         )
     }
 
     pub fn set_vulkan_borrowed_texture_target(
         &self,
         value: &VulkanBorrowedTextureDescriptor,
-    ) -> Result<OperationHandle<()>> {
+    ) -> Result<NativeFuture<()>> {
         self.set_target(
             &value.to_native(),
-            sys::mln_vulkan_borrowed_texture_set_target_start,
+            sys::mln_vulkan_borrowed_texture_set_target,
         )
     }
 
     pub fn set_webgpu_borrowed_texture_target(
         &self,
         value: &WebGpuBorrowedTextureDescriptor,
-    ) -> Result<OperationHandle<()>> {
+    ) -> Result<NativeFuture<()>> {
         self.set_target(
             &value.to_native(),
-            sys::mln_webgpu_borrowed_texture_set_target_start,
+            sys::mln_webgpu_borrowed_texture_set_target,
         )
     }
 
     pub fn set_opengl_borrowed_texture_target(
         &self,
         value: &OpenGLBorrowedTextureDescriptor,
-    ) -> Result<OperationHandle<()>> {
+    ) -> Result<NativeFuture<()>> {
         self.set_target(
             &value.to_native(),
-            sys::mln_opengl_borrowed_texture_set_target_start,
+            sys::mln_opengl_borrowed_texture_set_target,
         )
     }
 }
@@ -1873,24 +1855,6 @@ impl AcquiredFrameHandle {
                 type_: raw.type_,
             },
             FrameOpenGLTextureName::new(raw.texture),
-        ))
-    }
-}
-
-impl OperationHandle<PremultipliedRgba8Image> {
-    pub fn take(&self) -> Result<PremultipliedRgba8Image> {
-        let mut data = sys::mln_buffer(0);
-        let mut info = unsafe { sys::mln_texture_image_info_default() };
-        self.with_result_operation(|operation| {
-            maplibre_core::check(unsafe {
-                sys::mln_texture_read_premultiplied_rgba8_take_result(
-                    operation, &mut data, &mut info,
-                )
-            })
-        })?;
-        Ok(PremultipliedRgba8Image::new(
-            maplibre_core::values::texture_image_info_from_native(&info),
-            unsafe { maplibre_core::string::copy_owned_buffer(data) }?,
         ))
     }
 }

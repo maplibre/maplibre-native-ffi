@@ -17,8 +17,8 @@ public sealed class RuntimeExecutorTests
             TestContext.Current.CancellationToken
         );
 
-        map.SetStyleUrl("unsupported://style.json");
-        await runtime.BarrierAsync(TestContext.Current.CancellationToken);
+        map.SetStyleUrlAsync("unsupported://style.json");
+        await runtime.BarrierAsync();
 
         RuntimeEventTestHelpers.WaitForMapEvent(runtime, map, RuntimeEventType.MapLoadingFailed);
     }
@@ -34,25 +34,20 @@ public sealed class RuntimeExecutorTests
             TestContext.Current.CancellationToken
         );
 
-        var commandId = await Task.Run(map.RequestRepaint);
-        await runtime.BarrierAsync(TestContext.Current.CancellationToken);
+        var completion = await Task.Run(map.RequestRepaintAsync);
+        await runtime.BarrierAsync();
 
-        Assert.NotEqual(0ul, commandId);
+        Assert.Equal(CommandDisposition.Committed, completion.Disposition);
     }
 
     [Fact]
-    public async Task TaskOnlyOperationWaitsDoNotAccumulateReadyEndpoints()
+    public async Task RepeatedCompletionWaitsNeedNoEventDrain()
     {
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
 
         for (var index = 0; index < 256; index++)
         {
-            await runtime.BarrierAsync(TestContext.Current.CancellationToken);
+            await runtime.BarrierAsync();
         }
-
-        Assert.DoesNotContain(
-            runtime.DrainReadyEndpoints(),
-            endpoint => endpoint.Kind == NotificationEndpointKind.Operation
-        );
     }
 }

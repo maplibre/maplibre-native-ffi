@@ -5,13 +5,10 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use crate::custom_geometry::CustomGeometrySourceOptions;
-use crate::events::{
-    CommandDisposition, CommandFinishedEvent, RuntimeEventPayload, RuntimeEventSource,
-    RuntimeEventType,
-};
+use crate::events::{CommandDisposition, RuntimeEventSource, RuntimeEventType};
 use crate::{
-    ErrorKind, RasterDemEncoding, ResourceKind, ResourceProviderDecision, ResourceResponse,
-    RuntimeEventMask, TextureImageInfo,
+    CommandCompletion, ErrorKind, NativeFuture, RasterDemEncoding, ResourceKind,
+    ResourceProviderDecision, ResourceResponse, RuntimeEventMask, TextureImageInfo,
 };
 
 const VALID_STYLE_JSON: &str = r#"{"version":8,"sources":{},"layers":[]}"#;
@@ -31,45 +28,30 @@ macro_rules! operation_result {
     }};
 }
 fn await_runtime_barrier(runtime: &RuntimeHandle) {
-    let barrier = runtime.start_barrier().unwrap();
+    let barrier = runtime.barrier().unwrap();
     assert!(barrier.wait(Duration::from_secs(5)).unwrap());
     barrier.finish().unwrap();
     barrier.release();
 }
 fn assert_command_disposition(
-    runtime: &RuntimeHandle,
-    command_id: u64,
+    _runtime: &RuntimeHandle,
+    completion: NativeFuture<CommandCompletion>,
     expected: CommandDisposition,
-) -> (CommandFinishedEvent, i32, Option<String>) {
-    await_runtime_barrier(runtime);
-    let batch = runtime.drain_events().unwrap();
-    let matches = batch
-        .iter()
-        .filter_map(|event| match event.payload() {
-            RuntimeEventPayload::CommandFinished(finished) if finished.command_id == command_id => {
-                Some((
-                    finished,
-                    event.code(),
-                    event.message().unwrap().map(str::to_owned),
-                ))
-            }
-            _ => None,
-        })
-        .collect::<Vec<_>>();
-    assert_eq!(
-        matches.len(),
-        1,
-        "terminal outcome count for command {command_id}"
-    );
-    assert_eq!(matches[0].0.disposition, expected);
-    matches.into_iter().next().unwrap()
+) -> (Option<CommandCompletion>, i32, Option<String>) {
+    assert!(completion.wait(Duration::from_secs(5)).unwrap());
+    let completion = completion.take().unwrap();
+    assert_eq!(completion.disposition, expected);
+    let status = completion.raw_status;
+    let diagnostic = (!completion.diagnostic.is_empty()).then(|| completion.diagnostic.clone());
+    (Some(completion), status, diagnostic)
 }
 
 #[test]
 // Spec coverage: BND-105.
 fn nine_patch_style_image_round_trips_stretch_content_and_text_fit() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
     map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
 
     let image =
@@ -90,13 +72,13 @@ fn nine_patch_style_image_round_trips_stretch_content_and_text_fit() {
     map.set_style_image("patch", &image, Some(&options))
         .unwrap();
 
-    let info = operation_result!(map.style_image_info("patch"))
+    let saved = operation_result!(map.style_image("patch"))
         .unwrap()
         .unwrap();
-    assert_eq!(info.stretch_x_count, 1);
-    assert_eq!(info.stretch_y_count, 2);
+    assert_eq!(saved.stretch_x, vec![ImageStretch::new(0.0, 1.0)]);
+    assert_eq!(saved.stretch_y.len(), 2);
     assert_eq!(
-        info.content,
+        saved.content,
         Some(ImageContent {
             left: 0.5,
             top: 0.5,
@@ -105,19 +87,10 @@ fn nine_patch_style_image_round_trips_stretch_content_and_text_fit() {
         })
     );
     // An absent text fit stays distinguishable from a present default.
-    assert_eq!(info.text_fit_width, None);
-    assert_eq!(info.text_fit_height, Some(StyleImageTextFit::Proportional));
-
-    let (stretch_x, stretch_y) = operation_result!(map.style_image_stretches("patch"))
-        .unwrap()
-        .unwrap();
-    assert_eq!(stretch_x, vec![ImageStretch::new(0.0, 1.0)]);
-    assert_eq!(
-        stretch_y,
-        vec![ImageStretch::new(0.0, 1.0), ImageStretch::new(1.0, 2.0)]
-    );
+    assert_eq!(saved.text_fit_width, None);
+    assert_eq!(saved.text_fit_height, Some(StyleImageTextFit::Proportional));
     assert!(
-        operation_result!(map.style_image_stretches("missing"))
+        operation_result!(map.style_image("missing"))
             .unwrap()
             .is_none()
     );
@@ -135,7 +108,8 @@ fn nine_patch_style_image_round_trips_stretch_content_and_text_fit() {
 // Spec coverage: BND-105.
 fn layer_base_accessors_round_trip_through_real_c_abi() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
     map.set_style_json(STYLE_WITH_IDS_JSON.as_bytes()).unwrap();
 
     assert_eq!(
@@ -153,7 +127,7 @@ fn layer_base_accessors_round_trip_through_real_c_abi() {
     );
 
     let rejected_command = map.set_layer_source_layer("background", "roads").unwrap();
-    assert_ne!(rejected_command, 0);
+    assert_command_disposition(&runtime, rejected_command, CommandDisposition::Failed);
     assert_eq!(
         operation_result!(map.layer_source_id("background")).unwrap(),
         ""
@@ -214,7 +188,8 @@ fn object_member<'a>(value: &'a JsonValue, key: &str) -> Option<&'a JsonValue> {
 // Spec coverage: BND-040 and BND-100.
 fn map_close_consumes_handle_and_drop_stays_idempotent() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
 
     map.close().unwrap();
     runtime.close().unwrap();
@@ -224,7 +199,8 @@ fn map_close_consumes_handle_and_drop_stays_idempotent() {
 // Spec coverage: BND-042.
 fn map_retains_runtime_after_runtime_handle_is_dropped() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
 
     drop(runtime);
 
@@ -235,7 +211,8 @@ fn map_retains_runtime_after_runtime_handle_is_dropped() {
 // Spec coverage: BND-024, BND-101, and BND-105.
 fn style_setters_accept_valid_input_and_reject_embedded_nul() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
 
     map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
     let _ = operation_result!(map.style_source_ids()).unwrap();
@@ -258,8 +235,7 @@ fn style_setters_accept_valid_input_and_reject_embedded_nul() {
     assert!(error.diagnostic().contains("embedded NUL"));
 
     let malformed_id = map.set_style_json(b"{").unwrap();
-    assert_ne!(malformed_id, 0);
-    await_runtime_barrier(&runtime);
+    assert_command_disposition(&runtime, malformed_id, CommandDisposition::Failed);
 
     map.close().unwrap();
     runtime.close().unwrap();
@@ -269,7 +245,8 @@ fn style_setters_accept_valid_input_and_reject_embedded_nul() {
 // Spec coverage: BND-101.
 fn loaded_style_document_and_url_read_back_what_was_loaded() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
 
     assert!(
         operation_result!(map.loaded_style_json())
@@ -307,7 +284,8 @@ fn loaded_style_document_and_url_read_back_what_was_loaded() {
 // Spec coverage: BND-105.
 fn style_removals_commit_or_fail_with_not_found() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
     map.set_style_json(STYLE_WITH_IDS_JSON.as_bytes()).unwrap();
 
     let source = serde_json::to_vec(&json!({
@@ -321,7 +299,7 @@ fn style_removals_commit_or_fail_with_not_found() {
     let (finished, code, _) =
         assert_command_disposition(&runtime, missing, CommandDisposition::Failed);
     assert_eq!(code, sys::MLN_STATUS_NOT_FOUND);
-    assert_eq!(finished.generation, 0);
+    assert!(finished.is_some());
 
     // Removing an existing source commits, and the info getter's found flag
     // re-checks existence on both sides of the removal.
@@ -334,7 +312,7 @@ fn style_removals_commit_or_fail_with_not_found() {
     let removed = map.remove_style_source("owned-source").unwrap();
     let (finished, _, _) =
         assert_command_disposition(&runtime, removed, CommandDisposition::Committed);
-    assert_ne!(finished.generation, 0);
+    assert_ne!(finished.unwrap().generation, 0);
     assert!(
         operation_result!(map.style_source_info("owned-source"))
             .unwrap()
@@ -378,7 +356,8 @@ fn test_style_image(data: Vec<u8>) -> PremultipliedRgba8Image {
 // Spec coverage: BND-069 and BND-105.
 fn style_image_copy_uses_rust_owned_buffer() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
     map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
 
     let original_pixels = vec![
@@ -388,12 +367,7 @@ fn style_image_copy_uses_rust_owned_buffer() {
 
     map.set_style_image("plain", &image, None).unwrap();
     image.data.fill(0);
-    let info = operation_result!(map.style_image_info("plain"))
-        .unwrap()
-        .expect("added image should have copied metadata");
-    assert_eq!(info.width, image.info.width);
-    assert_eq!(info.height, image.info.height);
-    let mut copied = operation_result!(map.copy_style_image_premultiplied_rgba8("plain"))
+    let mut copied = operation_result!(map.style_image("plain"))
         .unwrap()
         .expect("added Rust image should copy back through C");
 
@@ -402,7 +376,7 @@ fn style_image_copy_uses_rust_owned_buffer() {
     assert_eq!(copied.image.data, original_pixels);
     copied.image.data.fill(1);
     assert_eq!(
-        operation_result!(map.copy_style_image_premultiplied_rgba8("plain"))
+        operation_result!(map.style_image("plain"))
             .unwrap()
             .expect("style image copy should not expose native storage")
             .image
@@ -414,7 +388,7 @@ fn style_image_copy_uses_rust_owned_buffer() {
     let removed = map.remove_style_image("plain").unwrap();
     assert_command_disposition(&runtime, removed, CommandDisposition::Committed);
     assert!(
-        operation_result!(map.style_image_info("plain"))
+        operation_result!(map.style_image("plain"))
             .unwrap()
             .is_none()
     );
@@ -436,7 +410,8 @@ fn image_source_coordinates() -> [LatLng; 4] {
 // Spec coverage: BND-105.
 fn image_source_helpers_accept_url_and_inline_images() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
     map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
 
     let coordinates = image_source_coordinates();
@@ -460,7 +435,8 @@ fn image_source_helpers_accept_url_and_inline_images() {
 // Spec coverage: BND-105.
 fn tile_source_helpers_call_real_c_api() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
     map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
 
     map.add_vector_source_url("vector-url", "https://example.com/vector.json", None)
@@ -485,7 +461,8 @@ fn tile_source_helpers_call_real_c_api() {
 // Spec coverage: BND-060, BND-061, and BND-105.
 fn geojson_source_helpers_accept_prepared_data_and_keep_options_across_updates() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
     map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
 
     let mut options = GeoJsonSourceOptions::default();
@@ -559,7 +536,8 @@ fn geojson_source_helpers_accept_prepared_data_and_keep_options_across_updates()
 // Spec coverage: BND-060 and BND-061.
 fn set_geojson_source_data_rejects_mismatched_prepared_options() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
     map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
 
     let bytes = br#"{"type":"FeatureCollection","features":[]}"#;
@@ -666,7 +644,8 @@ fn geojson_source_data_handle_is_send_and_sync() {
 // Spec coverage: BND-060 and BND-061.
 fn geojson_data_prepared_off_thread_installs_on_the_map_thread() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
     map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
 
     let data = std::thread::spawn(|| {
@@ -694,7 +673,8 @@ fn geojson_data_prepared_off_thread_installs_on_the_map_thread() {
 // Spec coverage: BND-060 and BND-061.
 fn synchronous_tiling_override_targets_live_geojson_sources_only() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
     map.set_style_json(STYLE_WITH_IDS_JSON.as_bytes()).unwrap();
 
     let enabled = map
@@ -720,7 +700,8 @@ fn synchronous_tiling_override_targets_live_geojson_sources_only() {
 // Spec coverage: BND-105.
 fn style_source_info_reports_type_and_found_flag() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
     map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
 
     let geojson_source = serde_json::to_vec(&json!({
@@ -766,7 +747,8 @@ fn style_source_info_reports_type_and_found_flag() {
 // Spec coverage: BND-066, BND-109.
 fn style_source_info_copies_reconstructible_source_state() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
     map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
 
     map.add_vector_source_url("remote", "https://example.com/source.json", None)
@@ -852,7 +834,8 @@ fn options_counting_releases(releases: &Arc<AtomicUsize>) -> CustomGeometrySourc
 // Spec coverage: BND-124.
 fn custom_geometry_source_apis_call_real_c_api_and_style_replacement_releases_state() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
     map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
     let releases = Arc::new(AtomicUsize::new(0));
 
@@ -893,8 +876,8 @@ fn custom_geometry_source_apis_call_real_c_api_and_style_replacement_releases_st
     let duplicate_add = map
         .add_custom_geometry_source("custom", options_counting_releases(&releases))
         .unwrap();
-    assert_ne!(first_add, duplicate_add);
-    await_runtime_barrier(&runtime);
+    assert_command_disposition(&runtime, first_add, CommandDisposition::Committed);
+    assert_command_disposition(&runtime, duplicate_add, CommandDisposition::Failed);
     assert_eq!(releases.load(Ordering::SeqCst), 2);
 
     map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
@@ -909,7 +892,8 @@ fn custom_geometry_source_apis_call_real_c_api_and_style_replacement_releases_st
 // Spec coverage: BND-124.
 fn custom_geometry_source_state_is_released_on_map_close() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
     map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
     let releases = Arc::new(AtomicUsize::new(0));
     map.add_custom_geometry_source("custom", options_counting_releases(&releases))
@@ -926,7 +910,8 @@ fn custom_geometry_source_state_is_released_on_map_close() {
 // Spec coverage: BND-124.
 fn custom_geometry_source_adds_to_current_style_after_url_style_request() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
     map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
     map.set_style_url("unsupported://style.json").unwrap();
     let releases = Arc::new(AtomicUsize::new(0));
@@ -955,7 +940,8 @@ fn custom_geometry_source_state_releases_after_url_style_replacement() {
             ResourceProviderDecision::PassThrough
         })
         .unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
     // The host wants no style-loaded events, and the release runs anyway.
     map.set_event_mask(RuntimeEventMask::ALL - RuntimeEventMask::MAP_STYLE_LOADED)
         .unwrap();
@@ -1025,7 +1011,8 @@ fn collect_style_load_event_types(
 // Spec coverage: BND-091.
 fn a_narrowed_map_mask_delivers_the_kept_type_alone() {
     let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
 
     map.set_event_mask(RuntimeEventMask::ALL - RuntimeEventMask::MAP_LOADING_STARTED)
         .unwrap();
@@ -1056,7 +1043,7 @@ fn a_creation_mask_narrows_a_map_from_its_first_style_load() {
     let mut runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let mut options = MapOptions::default();
     options.event_mask = RuntimeEventMask::ALL - RuntimeEventMask::MAP_LOADING_STARTED;
-    let map = MapHandle::with_options(&runtime, &options).unwrap();
+    let map = crate::completion::blocking(MapHandle::with_options(&runtime, &options));
 
     let types = collect_style_load_event_types(&mut runtime, &map, VALID_STYLE_JSON);
 
@@ -1075,15 +1062,17 @@ fn a_creation_mask_narrows_a_map_from_its_first_style_load() {
 
 #[test]
 // Spec coverage: BND-091.
-fn map_mask_commands_return_ids_and_reject_undefined_bits() {
+fn map_mask_commands_complete_and_reject_undefined_bits() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
 
-    let first_id = map.set_event_mask(RuntimeEventMask::ALL).unwrap();
-    let second_id = map
+    let first = map.set_event_mask(RuntimeEventMask::ALL).unwrap();
+    let second = map
         .set_event_mask(RuntimeEventMask::ALL - RuntimeEventMask::MAP_TILE_ACTION)
         .unwrap();
-    assert!(second_id > first_id);
+    assert_command_disposition(&runtime, first, CommandDisposition::Committed);
+    assert_command_disposition(&runtime, second, CommandDisposition::Committed);
 
     let error = map
         .set_event_mask(RuntimeEventMask::from_bits_retain(1 << 63))
@@ -1099,7 +1088,8 @@ fn map_mask_commands_return_ids_and_reject_undefined_bits() {
 // Spec coverage: BND-060, BND-061, BND-070, and BND-105.
 fn style_transition_options_round_trip_through_the_real_c_api() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
 
     // MapLibre Native always holds a placement flag, so it reports even before
     // a style is loaded.
@@ -1177,7 +1167,8 @@ fn style_transition_options_round_trip_through_the_real_c_api() {
 // Spec coverage: BND-063, BND-064, and BND-105.
 fn style_json_buffers_copy_owned_rust_values() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
     map.set_style_json(STYLE_WITH_IDS_JSON.as_bytes()).unwrap();
 
     let layer = serde_json::to_vec(&json!({
@@ -1224,7 +1215,7 @@ fn style_json_buffers_copy_owned_rust_values() {
     let rejected_command = map
         .set_layer_filter("owned-background", Some(b"NaN"))
         .unwrap();
-    assert_ne!(rejected_command, 0);
+    assert_command_disposition(&runtime, rejected_command, CommandDisposition::Failed);
     assert_eq!(
         operation_result!(map.layer_filter("owned-background")).unwrap(),
         None
@@ -1235,21 +1226,22 @@ fn style_json_buffers_copy_owned_rust_values() {
 }
 
 #[test]
-fn camera_commands_return_ids_and_ordered_queries_take_typed_results() {
+fn camera_commands_and_ordered_queries_return_typed_completions() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
     let center = LatLng::new(45.0, -122.0);
     let mut update = CameraUpdate::default();
     update.camera.center = Some(center);
     update.camera.zoom = Some(4.0);
 
-    let command_id = map.update_camera(&update).unwrap();
-    assert_ne!(command_id, 0);
+    let command = map.update_camera(&update).unwrap();
 
-    let query = map.start_camera_query().unwrap();
+    let query = map.camera_query().unwrap();
     assert!(query.wait(Duration::from_secs(5)).unwrap());
     let queried = query.take().unwrap();
     query.release();
+    assert_command_disposition(&runtime, command, CommandDisposition::Committed);
     assert_eq!(queried.camera.center, Some(center));
     assert_eq!(queried.camera.zoom, Some(4.0));
 
@@ -1263,17 +1255,16 @@ fn camera_commands_return_ids_and_ordered_queries_take_typed_results() {
 // Spec coverage: BND-045.
 fn map_accepts_concurrent_commands_and_cross_thread_snapshots() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
 
     std::thread::scope(|scope| {
         let first = scope.spawn(|| map.request_repaint().unwrap());
         let second = scope.spawn(|| map.request_repaint().unwrap());
-        let first_id = first.join().unwrap();
-        let second_id = second.join().unwrap();
-        assert_ne!(first_id, 0);
-        assert_ne!(second_id, 0);
-        await_runtime_barrier(&runtime);
-        assert_ne!(second_id, first_id);
+        let first = first.join().unwrap();
+        let second = second.join().unwrap();
+        assert_command_disposition(&runtime, first, CommandDisposition::Committed);
+        assert_command_disposition(&runtime, second, CommandDisposition::Committed);
 
         let snapshot = scope.spawn(|| map.snapshot().unwrap()).join().unwrap();
         assert_eq!(snapshot.logical_extent.width, MapOptions::default().width);
@@ -1286,17 +1277,19 @@ fn map_accepts_concurrent_commands_and_cross_thread_snapshots() {
 // Spec coverage: BND-102.
 fn a_snapshot_at_the_committed_generation_observes_the_commit() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
     assert_eq!(
         map.snapshot().unwrap().debug_options,
         MapDebugOptions::empty()
     );
 
-    let command_id = map
+    let completion = map
         .set_debug_options(MapDebugOptions::TILE_BORDERS)
         .unwrap();
     let (finished, _, _) =
-        assert_command_disposition(&runtime, command_id, CommandDisposition::Committed);
+        assert_command_disposition(&runtime, completion, CommandDisposition::Committed);
+    let finished = finished.unwrap();
     assert_ne!(finished.generation, 0);
 
     // The commit fence: a snapshot at or past the reported generation shows
@@ -1313,7 +1306,8 @@ fn a_snapshot_at_the_committed_generation_observes_the_commit() {
 // Spec coverage: BND-102.
 fn snapshot_fields_round_trip_through_their_set_commands() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
 
     let mut tile = crate::MapTileOptions::default();
     tile.prefetch_zoom_delta = Some(3);
@@ -1338,7 +1332,7 @@ fn snapshot_fields_round_trip_through_their_set_commands() {
         assert_command_disposition(&runtime, stats_command, CommandDisposition::Committed);
 
     let snapshot = map.snapshot().unwrap();
-    assert!(snapshot.generation >= finished.generation);
+    assert!(snapshot.generation >= finished.unwrap().generation);
     assert_eq!(snapshot.tile.prefetch_zoom_delta, Some(3));
     assert_eq!(snapshot.tile.lod_scale, Some(1.5));
     assert_eq!(snapshot.bounds.min_zoom, Some(2.0));

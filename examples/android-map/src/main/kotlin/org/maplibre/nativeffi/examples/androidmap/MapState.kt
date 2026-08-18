@@ -1,7 +1,5 @@
 package org.maplibre.nativeffi.examples.androidmap
 
-import android.os.Handler
-import android.os.Looper
 import java.util.concurrent.atomic.AtomicBoolean
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.CameraDelta
@@ -14,7 +12,6 @@ import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.map.MapOptions
 import org.maplibre.nativeffi.map.MapSize
-import org.maplibre.nativeffi.runtime.ReadyEndpoint
 import org.maplibre.nativeffi.runtime.RuntimeEventMask
 import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 import org.maplibre.nativeffi.runtime.RuntimeEventType
@@ -24,8 +21,6 @@ import org.maplibre.nativeffi.runtime.RuntimeOptions
 /** Runtime and map state driven by the core-owned runtime worker. */
 internal class MapState(initialViewport: Viewport, private val requestRender: () -> Unit) :
   AutoCloseable {
-  private val receiver = Handler(Looper.getMainLooper())
-  private val notificationPending = AtomicBoolean(false)
   private var closed = false
   private val initialCamera =
     CameraOptions().apply {
@@ -42,49 +37,28 @@ internal class MapState(initialViewport: Viewport, private val requestRender: ()
 
   val renderRequest = RenderRequest()
 
-  private val drainNotifications = Runnable {
-    if (!closed && notificationPending.getAndSet(false)) {
-      do {
-        val ready = runtime.drainReady()
-        if (ready.any { it.kind == ReadyEndpoint.Kind.DRIVER_WORK }) {
-          renderRequest.set()
-          requestRender()
-        }
-        if (ready.any { it.kind == ReadyEndpoint.Kind.RUNTIME_EVENTS } && drainEvents()) {
-          renderRequest.set()
-          requestRender()
-        }
-      } while (notificationPending.getAndSet(false))
-    }
-  }
-
   init {
-    runtime.setNotificationCallback {
-      if (notificationPending.compareAndSet(false, true)) {
-        receiver.post(drainNotifications)
-      }
-    }
     try {
       ownedMap = runSuspend {
         MapHandle.create(
-          runtime,
-          MapOptions().apply {
-            width = initialViewport.logicalWidth
-            height = initialViewport.logicalHeight
-            scaleFactor = initialViewport.scaleFactor
-            mapMode = MapMode.CONTINUOUS
-            eventMask =
-              RuntimeEventMask.MAP_RENDER_UPDATE_AVAILABLE +
-                RuntimeEventMask.MAP_RENDER_FRAME_FINISHED
-          },
-        )
+            runtime,
+            MapOptions().apply {
+              width = initialViewport.logicalWidth
+              height = initialViewport.logicalHeight
+              scaleFactor = initialViewport.scaleFactor
+              mapMode = MapMode.CONTINUOUS
+              eventMask =
+                RuntimeEventMask.MAP_RENDER_UPDATE_AVAILABLE +
+                  RuntimeEventMask.MAP_RENDER_FRAME_FINISHED
+            },
+          )
+          .await()
       }
       map.setStyleUrl(STYLE_URL)
       map.updateCamera(CameraUpdate(camera = initialCamera))
     } catch (error: Throwable) {
-      runtime.clearNotificationCallback()
-      if (::ownedMap.isInitialized) runSuspend { ownedMap.close() }
-      runSuspend { runtime.close() }
+      if (::ownedMap.isInitialized) ownedMap.close()
+      runtime.close()
       throw error
     }
   }
@@ -145,6 +119,10 @@ internal class MapState(initialViewport: Viewport, private val requestRender: ()
     map.requestRepaint()
   }
 
+  fun pollEvents() {
+    if (drainEvents()) renderRequest.set()
+  }
+
   private fun animation(durationMs: Double) =
     AnimationOptions().apply { this.durationMs = durationMs }
 
@@ -167,12 +145,10 @@ internal class MapState(initialViewport: Viewport, private val requestRender: ()
   override fun close() {
     if (closed) return
     closed = true
-    receiver.removeCallbacks(drainNotifications)
-    runtime.clearNotificationCallback()
     try {
-      runSuspend { map.close() }
+      map.close()
     } finally {
-      runSuspend { runtime.close() }
+      runtime.close()
     }
   }
 

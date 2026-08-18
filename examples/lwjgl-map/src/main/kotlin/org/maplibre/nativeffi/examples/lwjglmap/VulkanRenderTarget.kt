@@ -121,10 +121,7 @@ internal object VulkanRenderTarget {
 
   private class Surface(private val session: RenderSessionHandle) : RenderTarget {
     override fun resize(viewport: Viewport) {
-      RenderTarget.completeDriverOperation(
-        session,
-        session.startResize(RenderTarget.extent(viewport)),
-      )
+      RenderTarget.completeDriverOperation(session, session.resize(RenderTarget.extent(viewport)))
     }
 
     override fun renderUpdate(): Boolean =
@@ -141,10 +138,7 @@ internal object VulkanRenderTarget {
   ) : RenderTarget {
     override fun resize(viewport: Viewport) {
       compositor.resize(viewport)
-      RenderTarget.completeDriverOperation(
-        session,
-        session.startResize(RenderTarget.extent(viewport)),
-      )
+      RenderTarget.completeDriverOperation(session, session.resize(RenderTarget.extent(viewport)))
     }
 
     override fun renderUpdate(): Boolean {
@@ -161,7 +155,7 @@ internal object VulkanRenderTarget {
         }
         compositor.drawImageView(frame.imageView().address)
       } finally {
-        RenderTarget.completeDriverOperation(session, frameHandle.release())
+        frameHandle.release()
       }
     }
 
@@ -187,9 +181,7 @@ internal object VulkanRenderTarget {
       try {
         RenderTarget.completeDriverOperation(
           session,
-          session.startSetVulkanBorrowedTextureTarget(
-            borrowedDescriptor(context, viewport, replacement)
-          ),
+          session.setVulkanBorrowedTextureTarget(borrowedDescriptor(context, viewport, replacement)),
         )
       } catch (error: RuntimeException) {
         // A failed handover leaves it unknown which image the session holds, so detach before

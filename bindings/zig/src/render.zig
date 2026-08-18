@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const c = @import("c.zig").raw;
+const completion = @import("completion.zig");
 const diagnostics = @import("diagnostics.zig");
 const map_module = @import("map.zig");
 const native_temp = @import("native_temp.zig");
@@ -169,7 +170,7 @@ pub const AbandonResult = struct {
 
 pub const RenderSessionAttachment = struct {
     session: RenderSessionHandle,
-    operation: runtime_module.OperationHandle,
+    completion: completion.Future(void),
 };
 
 pub const RenderBackendSupport = struct {
@@ -723,199 +724,118 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
         return serviced;
     }
 
-    pub fn resizeStart(self: RenderSessionHandle, extent: RenderTargetExtent) status.Error!runtime_module.OperationHandle {
+    pub fn resize(self: RenderSessionHandle, extent: RenderTargetExtent) status.Error!completion.Future(void) {
         var raw = renderTargetExtentToNative(extent);
-        return startArgumentOperation(self, c.mln_render_session_resize_start, .render_resize, &raw);
+        return submitRender(void, self, completion.unit, c.mln_render_session_resize, .{&raw});
     }
 
-    pub fn barrierStart(self: RenderSessionHandle) status.Error!runtime_module.OperationHandle {
-        const lease = try renderSessionLease(self);
-        defer lease.release();
-        var operation: c.mln_operation = 0;
-        try status.checkStatus(c.mln_render_session_barrier_start(lease.native, &operation), lease.diagnostic_store);
-        return operationHandle(lease, operation, .render_barrier, .none);
+    pub fn barrier(self: RenderSessionHandle) status.Error!completion.Future(void) {
+        return submitRender(void, self, completion.unit, c.mln_render_session_barrier, .{});
     }
 
-    pub fn reduceMemoryUseStart(self: RenderSessionHandle) status.Error!runtime_module.OperationHandle {
-        return startSimpleOperation(self, c.mln_render_session_reduce_memory_use_start, .render_reduce_memory_use);
+    pub fn reduceMemoryUse(self: RenderSessionHandle) status.Error!completion.Future(void) {
+        return submitRender(void, self, completion.unit, c.mln_render_session_reduce_memory_use, .{});
     }
 
-    pub fn clearDataStart(self: RenderSessionHandle) status.Error!runtime_module.OperationHandle {
-        return startSimpleOperation(self, c.mln_render_session_clear_data_start, .render_clear_data);
+    pub fn clearData(self: RenderSessionHandle) status.Error!completion.Future(void) {
+        return submitRender(void, self, completion.unit, c.mln_render_session_clear_data, .{});
     }
 
-    pub fn dumpDebugLogsStart(self: RenderSessionHandle) status.Error!runtime_module.OperationHandle {
-        return startSimpleOperation(self, c.mln_render_session_dump_debug_logs_start, .render_dump_debug_logs);
+    pub fn dumpDebugLogs(self: RenderSessionHandle) status.Error!completion.Future(void) {
+        return submitRender(void, self, completion.unit, c.mln_render_session_dump_debug_logs, .{});
     }
 
-    pub fn setFeatureStateStart(self: RenderSessionHandle, allocator: std.mem.Allocator, selector: FeatureStateSelector, state_json: []const u8) status.Error!runtime_module.OperationHandle {
+    pub fn setFeatureState(self: RenderSessionHandle, allocator: std.mem.Allocator, selector: FeatureStateSelector, state_json: []const u8) status.Error!completion.Future(void) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        const lease = try renderSessionLease(self);
-        defer lease.release();
-        var operation: c.mln_operation = 0;
-        try status.checkStatus(c.mln_render_session_set_feature_state_start(lease.native, try temp.stringView(selector.source_id), try optionalStringView(&temp, selector.source_layer_id), try optionalStringView(&temp, selector.feature_id), try temp.stringView(state_json), &operation), lease.diagnostic_store);
-        return operationHandle(lease, operation, .render_set_feature_state, .none);
+        return submitRender(void, self, completion.unit, c.mln_render_session_set_feature_state, .{ try temp.stringView(selector.source_id), try optionalStringView(&temp, selector.source_layer_id), try optionalStringView(&temp, selector.feature_id), try temp.stringView(state_json) });
     }
 
-    pub fn getFeatureStateStart(self: RenderSessionHandle, allocator: std.mem.Allocator, selector: FeatureStateSelector) status.Error!runtime_module.OperationHandle {
+    pub fn getFeatureState(self: RenderSessionHandle, allocator: std.mem.Allocator, selector: FeatureStateSelector) status.Error!completion.Future(values.OwnedString) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        const lease = try renderSessionLease(self);
-        defer lease.release();
-        var operation: c.mln_operation = 0;
-        try status.checkStatus(c.mln_render_session_get_feature_state_start(lease.native, try temp.stringView(selector.source_id), try optionalStringView(&temp, selector.source_layer_id), try optionalStringView(&temp, selector.feature_id), &operation), lease.diagnostic_store);
-        return operationHandle(lease, operation, .render_get_feature_state, .string);
+        return submitAllocatedRender(values.OwnedString, self, allocator, copyOwnedBufferViewCompletion, c.mln_render_session_get_feature_state, .{ try temp.stringView(selector.source_id), try optionalStringView(&temp, selector.source_layer_id), try optionalStringView(&temp, selector.feature_id) });
     }
 
-    pub fn takeFeatureState(self: RenderSessionHandle, allocator: std.mem.Allocator, operation: runtime_module.OperationHandle) status.Error!values.OwnedString {
-        const lease = try renderSessionLease(self);
-        defer lease.release();
-        const required = try operation.require(&lease.runtime, .render_get_feature_state, .string);
-        defer required.lease.release();
-        var buffer: c.mln_buffer = 0;
-        try status.checkStatus(c.mln_render_session_get_feature_state_take_result(required.lease.native, &buffer), lease.diagnostic_store);
-        required.lease.consume();
-        return (try native_temp.copyOwnedBuffer(allocator, buffer, lease.diagnostic_store)) orelse error.NativeError;
-    }
-
-    pub fn removeFeatureStateStart(self: RenderSessionHandle, allocator: std.mem.Allocator, selector: FeatureStateSelector) status.Error!runtime_module.OperationHandle {
+    pub fn removeFeatureState(self: RenderSessionHandle, allocator: std.mem.Allocator, selector: FeatureStateSelector) status.Error!completion.Future(void) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        const lease = try renderSessionLease(self);
-        defer lease.release();
-        var operation: c.mln_operation = 0;
-        try status.checkStatus(c.mln_render_session_remove_feature_state_start(lease.native, try temp.stringView(selector.source_id), try optionalStringView(&temp, selector.source_layer_id), try optionalStringView(&temp, selector.feature_id), try optionalStringView(&temp, selector.state_key), &operation), lease.diagnostic_store);
-        return operationHandle(lease, operation, .render_remove_feature_state, .none);
+        return submitRender(void, self, completion.unit, c.mln_render_session_remove_feature_state, .{ try temp.stringView(selector.source_id), try optionalStringView(&temp, selector.source_layer_id), try optionalStringView(&temp, selector.feature_id), try optionalStringView(&temp, selector.state_key) });
     }
 
-    pub fn queryRenderedFeaturesStart(self: RenderSessionHandle, allocator: std.mem.Allocator, geometry: RenderedQueryGeometry, options: ?RenderedFeatureQueryOptions) status.Error!runtime_module.OperationHandle {
+    pub fn queryRenderedFeatures(self: RenderSessionHandle, allocator: std.mem.Allocator, geometry: RenderedQueryGeometry, options: ?RenderedFeatureQueryOptions) status.Error!completion.Future(QueriedFeatureList) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         var raw_geometry = try renderedQueryGeometryToNative(&temp, geometry);
         var raw_options = if (options) |value| try renderedFeatureQueryOptionsToNative(&temp, value) else undefined;
-        const lease = try renderSessionLease(self);
-        defer lease.release();
-        var operation: c.mln_operation = 0;
-        try status.checkStatus(c.mln_render_session_query_rendered_features_start(lease.native, &raw_geometry, if (options != null) &raw_options else null, &operation), lease.diagnostic_store);
-        return operationHandle(lease, operation, .render_query, .queried_feature_list);
+        return submitAllocatedRender(QueriedFeatureList, self, allocator, copyQueriedFeaturesCompletion, c.mln_render_session_query_rendered_features, .{ &raw_geometry, if (options != null) &raw_options else null });
     }
 
-    pub fn querySourceFeaturesStart(self: RenderSessionHandle, allocator: std.mem.Allocator, source_id: []const u8, options: ?SourceFeatureQueryOptions) status.Error!runtime_module.OperationHandle {
+    pub fn querySourceFeatures(self: RenderSessionHandle, allocator: std.mem.Allocator, source_id: []const u8, options: ?SourceFeatureQueryOptions) status.Error!completion.Future(QueriedFeatureList) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         var raw_options = if (options) |value| try sourceFeatureQueryOptionsToNative(&temp, value) else undefined;
-        const lease = try renderSessionLease(self);
-        defer lease.release();
-        var operation: c.mln_operation = 0;
-        try status.checkStatus(c.mln_render_session_query_source_features_start(lease.native, try temp.stringView(source_id), if (options != null) &raw_options else null, &operation), lease.diagnostic_store);
-        return operationHandle(lease, operation, .render_query, .queried_feature_list);
+        return submitAllocatedRender(QueriedFeatureList, self, allocator, copyQueriedFeaturesCompletion, c.mln_render_session_query_source_features, .{ try temp.stringView(source_id), if (options != null) &raw_options else null });
     }
 
-    pub fn takeQueryFeaturesResult(self: RenderSessionHandle, allocator: std.mem.Allocator, operation: runtime_module.OperationHandle) status.Error!QueriedFeatureList {
-        const lease = try renderSessionLease(self);
-        defer lease.release();
-        const required = try operation.require(&lease.runtime, .render_query, .queried_feature_list);
-        defer required.lease.release();
-        var result: c.mln_queried_feature_list = 0;
-        try status.checkStatus(c.mln_render_query_features_take_result(required.lease.native, &result), lease.diagnostic_store);
-        required.lease.consume();
-        defer c.mln_queried_feature_list_destroy(result);
-        return try copyQueriedFeatureList(allocator, result, lease.diagnostic_store);
-    }
-
-    pub fn queryFeatureExtensionStart(self: RenderSessionHandle, allocator: std.mem.Allocator, source_id: []const u8, feature: []const u8, extension: []const u8, extension_field: []const u8, arguments: ?[]const u8) status.Error!runtime_module.OperationHandle {
+    pub fn queryFeatureExtension(self: RenderSessionHandle, allocator: std.mem.Allocator, source_id: []const u8, feature: []const u8, extension: []const u8, extension_field: []const u8, arguments: ?[]const u8) status.Error!completion.Future(values.OwnedString) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         var raw_arguments = if (arguments) |value| try temp.stringView(value) else undefined;
-        const lease = try renderSessionLease(self);
-        defer lease.release();
-        var operation: c.mln_operation = 0;
-        try status.checkStatus(c.mln_render_session_query_feature_extensions_start(
-            lease.native,
+        return submitAllocatedRender(values.OwnedString, self, allocator, copyOwnedBufferViewCompletion, c.mln_render_session_query_feature_extensions, .{
             try temp.stringView(source_id),
             try temp.stringView(feature),
             try temp.stringView(extension),
             try temp.stringView(extension_field),
             if (arguments != null) &raw_arguments else null,
-            &operation,
-        ), lease.diagnostic_store);
-        return operationHandle(lease, operation, .render_query, .string);
+        });
     }
 
-    pub fn takeQueryResult(self: RenderSessionHandle, allocator: std.mem.Allocator, operation: runtime_module.OperationHandle) status.Error!values.OwnedString {
-        const lease = try renderSessionLease(self);
-        defer lease.release();
-        const required = try operation.require(&lease.runtime, .render_query, .string);
-        defer required.lease.release();
-        var buffer: c.mln_buffer = 0;
-        try status.checkStatus(c.mln_render_query_take_result(required.lease.native, &buffer), lease.diagnostic_store);
-        required.lease.consume();
-        return (try native_temp.copyOwnedBuffer(allocator, buffer, lease.diagnostic_store)) orelse error.NativeError;
+    pub fn readback(self: RenderSessionHandle, allocator: std.mem.Allocator) status.Error!completion.Future(OwnedReadback) {
+        return submitAllocatedRender(OwnedReadback, self, allocator, copyReadbackCompletion, c.mln_texture_read_premultiplied_rgba8, .{});
     }
 
-    pub fn readbackStart(self: RenderSessionHandle) status.Error!runtime_module.OperationHandle {
-        const lease = try renderSessionLease(self);
-        defer lease.release();
-        var operation: c.mln_operation = 0;
-        try status.checkStatus(c.mln_texture_read_premultiplied_rgba8_start(lease.native, &operation), lease.diagnostic_store);
-        return operationHandle(lease, operation, .render_readback, .render_readback);
-    }
-
-    pub fn takeReadback(self: RenderSessionHandle, allocator: std.mem.Allocator, operation: runtime_module.OperationHandle) status.Error!OwnedReadback {
-        const lease = try renderSessionLease(self);
-        defer lease.release();
-        const required = try operation.require(&lease.runtime, .render_readback, .render_readback);
-        defer required.lease.release();
-        var buffer: c.mln_buffer = 0;
-        var info = c.mln_texture_image_info_default();
-        try status.checkStatus(c.mln_texture_read_premultiplied_rgba8_take_result(required.lease.native, &buffer, &info), lease.diagnostic_store);
-        required.lease.consume();
-        const data = try copyNativeBuffer(allocator, buffer, lease.diagnostic_store);
-        return .{ .allocator = allocator, .data = data, .info = textureImageInfoFromNative(info) };
-    }
-
-    pub fn setMetalSurfaceTargetStart(self: RenderSessionHandle, descriptor: MetalSurfaceDescriptor) status.Error!runtime_module.OperationHandle {
+    pub fn setMetalSurfaceTarget(self: RenderSessionHandle, descriptor: MetalSurfaceDescriptor) status.Error!completion.Future(void) {
         var raw = metalSurfaceDescriptorToNative(descriptor);
-        return startArgumentOperation(self, c.mln_metal_surface_set_target_start, .render_set_target, &raw);
+        return submitRender(void, self, completion.unit, c.mln_metal_surface_set_target, .{&raw});
     }
 
-    pub fn setVulkanSurfaceTargetStart(self: RenderSessionHandle, descriptor: VulkanSurfaceDescriptor) status.Error!runtime_module.OperationHandle {
+    pub fn setVulkanSurfaceTarget(self: RenderSessionHandle, descriptor: VulkanSurfaceDescriptor) status.Error!completion.Future(void) {
         var raw = vulkanSurfaceDescriptorToNative(descriptor);
-        return startArgumentOperation(self, c.mln_vulkan_surface_set_target_start, .render_set_target, &raw);
+        return submitRender(void, self, completion.unit, c.mln_vulkan_surface_set_target, .{&raw});
     }
 
-    pub fn setOpenGLSurfaceTargetStart(self: RenderSessionHandle, descriptor: OpenGLSurfaceDescriptor) status.Error!runtime_module.OperationHandle {
+    pub fn setOpenGLSurfaceTarget(self: RenderSessionHandle, descriptor: OpenGLSurfaceDescriptor) status.Error!completion.Future(void) {
         var raw = openglSurfaceDescriptorToNative(descriptor);
-        return startArgumentOperation(self, c.mln_opengl_surface_set_target_start, .render_set_target, &raw);
+        return submitRender(void, self, completion.unit, c.mln_opengl_surface_set_target, .{&raw});
     }
 
-    pub fn setMetalBorrowedTextureTargetStart(self: RenderSessionHandle, descriptor: MetalBorrowedTextureDescriptor) status.Error!runtime_module.OperationHandle {
+    pub fn setMetalBorrowedTextureTarget(self: RenderSessionHandle, descriptor: MetalBorrowedTextureDescriptor) status.Error!completion.Future(void) {
         var raw = metalBorrowedTextureDescriptorToNative(descriptor);
-        return startArgumentOperation(self, c.mln_metal_borrowed_texture_set_target_start, .render_set_target, &raw);
+        return submitRender(void, self, completion.unit, c.mln_metal_borrowed_texture_set_target, .{&raw});
     }
 
-    pub fn setVulkanBorrowedTextureTargetStart(self: RenderSessionHandle, descriptor: VulkanBorrowedTextureDescriptor) status.Error!runtime_module.OperationHandle {
+    pub fn setVulkanBorrowedTextureTarget(self: RenderSessionHandle, descriptor: VulkanBorrowedTextureDescriptor) status.Error!completion.Future(void) {
         var raw = vulkanBorrowedTextureDescriptorToNative(descriptor);
-        return startArgumentOperation(self, c.mln_vulkan_borrowed_texture_set_target_start, .render_set_target, &raw);
+        return submitRender(void, self, completion.unit, c.mln_vulkan_borrowed_texture_set_target, .{&raw});
     }
 
-    pub fn setOpenGLBorrowedTextureTargetStart(self: RenderSessionHandle, descriptor: OpenGLBorrowedTextureDescriptor) status.Error!runtime_module.OperationHandle {
+    pub fn setOpenGLBorrowedTextureTarget(self: RenderSessionHandle, descriptor: OpenGLBorrowedTextureDescriptor) status.Error!completion.Future(void) {
         var raw = openglBorrowedTextureDescriptorToNative(descriptor);
-        return startArgumentOperation(self, c.mln_opengl_borrowed_texture_set_target_start, .render_set_target, &raw);
+        return submitRender(void, self, completion.unit, c.mln_opengl_borrowed_texture_set_target, .{&raw});
     }
-    pub fn setWebGPUBorrowedTextureTargetStart(self: RenderSessionHandle, descriptor: WebGPUBorrowedTextureDescriptor) status.Error!runtime_module.OperationHandle {
+    pub fn setWebGPUBorrowedTextureTarget(self: RenderSessionHandle, descriptor: WebGPUBorrowedTextureDescriptor) status.Error!completion.Future(void) {
         var raw = webgpuBorrowedTextureDescriptorToNative(descriptor);
-        return startArgumentOperation(self, c.mln_webgpu_borrowed_texture_set_target_start, .render_set_target, &raw);
+        return submitRender(void, self, completion.unit, c.mln_webgpu_borrowed_texture_set_target, .{&raw});
     }
 
-    pub fn setWebGPUSurfaceTargetStart(self: RenderSessionHandle, descriptor: WebGPUSurfaceDescriptor) status.Error!runtime_module.OperationHandle {
+    pub fn setWebGPUSurfaceTarget(self: RenderSessionHandle, descriptor: WebGPUSurfaceDescriptor) status.Error!completion.Future(void) {
         var raw = webgpuSurfaceDescriptorToNative(descriptor);
-        return startArgumentOperation(self, c.mln_webgpu_surface_set_target_start, .render_set_target, &raw);
+        return submitRender(void, self, completion.unit, c.mln_webgpu_surface_set_target, .{&raw});
     }
 
-    pub fn detachStart(self: RenderSessionHandle) status.Error!runtime_module.OperationHandle {
-        return startSimpleOperation(self, c.mln_render_session_detach_start, .render_detach);
+    pub fn detach(self: RenderSessionHandle) status.Error!completion.Future(void) {
+        return submitRender(void, self, completion.unit, c.mln_render_session_detach, .{});
     }
 
     pub fn abandon(self: RenderSessionHandle) status.Error!AbandonResult {
@@ -949,79 +869,91 @@ pub fn attachMetalOwnedTexture(map: *map_module.MapHandle, descriptor: MetalOwne
     var raw = c.mln_metal_owned_texture_descriptor_default();
     raw.extent = renderTargetExtentToNative(descriptor.extent);
     raw.context = metalContextToNative(descriptor.context);
-    return attach(map, c.mln_metal_owned_texture_attach_start, &raw, options);
+    return attach(map, c.mln_metal_owned_texture_attach, &raw, options);
 }
 
 pub fn attachMetalBorrowedTexture(map: *map_module.MapHandle, descriptor: MetalBorrowedTextureDescriptor, options: RenderSessionAttachOptions) status.Error!RenderSessionAttachment {
     var raw = metalBorrowedTextureDescriptorToNative(descriptor);
-    return attach(map, c.mln_metal_borrowed_texture_attach_start, &raw, options);
+    return attach(map, c.mln_metal_borrowed_texture_attach, &raw, options);
 }
 
 pub fn attachVulkanOwnedTexture(map: *map_module.MapHandle, descriptor: VulkanOwnedTextureDescriptor, options: RenderSessionAttachOptions) status.Error!RenderSessionAttachment {
     var raw = c.mln_vulkan_owned_texture_descriptor_default();
     raw.extent = renderTargetExtentToNative(descriptor.extent);
     raw.context = vulkanContextToNative(descriptor.context);
-    return attach(map, c.mln_vulkan_owned_texture_attach_start, &raw, options);
+    return attach(map, c.mln_vulkan_owned_texture_attach, &raw, options);
 }
 
 pub fn attachVulkanBorrowedTexture(map: *map_module.MapHandle, descriptor: VulkanBorrowedTextureDescriptor, options: RenderSessionAttachOptions) status.Error!RenderSessionAttachment {
     var raw = vulkanBorrowedTextureDescriptorToNative(descriptor);
-    return attach(map, c.mln_vulkan_borrowed_texture_attach_start, &raw, options);
+    return attach(map, c.mln_vulkan_borrowed_texture_attach, &raw, options);
 }
 
 pub fn attachOpenGLOwnedTexture(map: *map_module.MapHandle, descriptor: OpenGLOwnedTextureDescriptor, options: RenderSessionAttachOptions) status.Error!RenderSessionAttachment {
     var raw = c.mln_opengl_owned_texture_descriptor_default();
     raw.extent = renderTargetExtentToNative(descriptor.extent);
     raw.context = openglContextToNative(descriptor.context);
-    return attach(map, c.mln_opengl_owned_texture_attach_start, &raw, options);
+    return attach(map, c.mln_opengl_owned_texture_attach, &raw, options);
 }
 
 pub fn attachOpenGLBorrowedTexture(map: *map_module.MapHandle, descriptor: OpenGLBorrowedTextureDescriptor, options: RenderSessionAttachOptions) status.Error!RenderSessionAttachment {
     var raw = openglBorrowedTextureDescriptorToNative(descriptor);
-    return attach(map, c.mln_opengl_borrowed_texture_attach_start, &raw, options);
+    return attach(map, c.mln_opengl_borrowed_texture_attach, &raw, options);
 }
 pub fn attachWebGPUOwnedTexture(map: *map_module.MapHandle, descriptor: WebGPUOwnedTextureDescriptor, options: RenderSessionAttachOptions) status.Error!RenderSessionAttachment {
     var raw = c.mln_webgpu_owned_texture_descriptor_default();
     raw.extent = renderTargetExtentToNative(descriptor.extent);
     raw.context = webgpuContextToNative(descriptor.context);
-    return attach(map, c.mln_webgpu_owned_texture_attach_start, &raw, options);
+    return attach(map, c.mln_webgpu_owned_texture_attach, &raw, options);
 }
 
 pub fn attachWebGPUBorrowedTexture(map: *map_module.MapHandle, descriptor: WebGPUBorrowedTextureDescriptor, options: RenderSessionAttachOptions) status.Error!RenderSessionAttachment {
     var raw = webgpuBorrowedTextureDescriptorToNative(descriptor);
-    return attach(map, c.mln_webgpu_borrowed_texture_attach_start, &raw, options);
+    return attach(map, c.mln_webgpu_borrowed_texture_attach, &raw, options);
 }
 
 pub fn attachMetalSurface(map: *map_module.MapHandle, descriptor: MetalSurfaceDescriptor, options: RenderSessionAttachOptions) status.Error!RenderSessionAttachment {
     var raw = metalSurfaceDescriptorToNative(descriptor);
-    return attach(map, c.mln_metal_surface_attach_start, &raw, options);
+    return attach(map, c.mln_metal_surface_attach, &raw, options);
 }
 
 pub fn attachVulkanSurface(map: *map_module.MapHandle, descriptor: VulkanSurfaceDescriptor, options: RenderSessionAttachOptions) status.Error!RenderSessionAttachment {
     var raw = vulkanSurfaceDescriptorToNative(descriptor);
-    return attach(map, c.mln_vulkan_surface_attach_start, &raw, options);
+    return attach(map, c.mln_vulkan_surface_attach, &raw, options);
 }
 
 pub fn attachOpenGLSurface(map: *map_module.MapHandle, descriptor: OpenGLSurfaceDescriptor, options: RenderSessionAttachOptions) status.Error!RenderSessionAttachment {
     var raw = openglSurfaceDescriptorToNative(descriptor);
-    return attach(map, c.mln_opengl_surface_attach_start, &raw, options);
+    return attach(map, c.mln_opengl_surface_attach, &raw, options);
 }
 pub fn attachWebGPUSurface(map: *map_module.MapHandle, descriptor: WebGPUSurfaceDescriptor, options: RenderSessionAttachOptions) status.Error!RenderSessionAttachment {
     var raw = webgpuSurfaceDescriptorToNative(descriptor);
-    return attach(map, c.mln_webgpu_surface_attach_start, &raw, options);
+    return attach(map, c.mln_webgpu_surface_attach, &raw, options);
 }
 
 fn attach(map: *map_module.MapHandle, comptime attachFn: anytype, descriptor: anytype, options: RenderSessionAttachOptions) status.Error!RenderSessionAttachment {
     const registration = try map_module.registerRenderSession(map);
     var raw_options = attachOptionsToNative(options);
-    var session: c.mln_render_session = 0;
-    var operation: c.mln_operation = 0;
-    status.checkStatus(attachFn(registration.native, descriptor, &raw_options, &session, &operation), registration.diagnostic_store) catch |err| {
+    const Context = struct {
+        map: c.mln_map,
+        descriptor: @TypeOf(descriptor),
+        options: *const c.mln_render_session_attach_options,
+    };
+    var submission = completion.submitWithOutput(void, c.mln_render_session, registration.diagnostic_store, completion.unit, 0, Context{
+        .map = registration.native,
+        .descriptor = descriptor,
+        .options = &raw_options,
+    }, struct {
+        fn start(context: Context, out_session: *c.mln_render_session, completion_descriptor: *const c.mln_completion) c.mln_status {
+            return attachFn(context.map, context.descriptor, context.options, out_session, completion_descriptor);
+        }
+    }.start) catch |err| {
         map_module.unregisterRenderSession(map.*);
         return err;
     };
+    const session = submission.output;
     const handle = newRenderSession(session, map.*, registration.runtime, registration.diagnostic_store) catch |err| {
-        c.mln_operation_release(operation);
+        submission.future.deinit();
         var abandoned: c.mln_render_abandon_result = undefined;
         abandoned.size = @sizeOf(c.mln_render_abandon_result);
         _ = c.mln_render_session_abandon(session, &abandoned);
@@ -1029,37 +961,44 @@ fn attach(map: *map_module.MapHandle, comptime attachFn: anytype, descriptor: an
         map_module.unregisterRenderSession(map.*);
         return err;
     };
-    const operation_handle = runtime_module.OperationHandle.init(&registration.runtime, operation, .render_attach, .none) catch |err| {
-        c.mln_operation_release(operation);
-        var mutable = handle;
-        _ = mutable.abandon() catch {};
-        mutable.destroy() catch {};
-        return err;
-    };
-    return .{ .session = handle, .operation = operation_handle };
+    return .{ .session = handle, .completion = submission.future };
 }
 
-fn startSimpleOperation(handle: RenderSessionHandle, comptime startFn: anytype, kind: runtime_module.OperationKind) status.Error!runtime_module.OperationHandle {
+fn submitRender(
+    comptime T: type,
+    handle: RenderSessionHandle,
+    comptime copy: *const fn (*const c.mln_completion_result) status.Error!T,
+    comptime startFn: anytype,
+    arguments: anytype,
+) status.Error!completion.Future(T) {
     const lease = try renderSessionLease(handle);
     defer lease.release();
-    var operation: c.mln_operation = 0;
-    try status.checkStatus(startFn(lease.native, &operation), lease.diagnostic_store);
-    return operationHandle(lease, operation, kind, .none);
+    const Arguments = @TypeOf(arguments);
+    const Context = struct { native: c.mln_render_session, arguments: Arguments };
+    return completion.submit(T, lease.diagnostic_store, copy, Context{ .native = lease.native, .arguments = arguments }, struct {
+        fn start(context: Context, descriptor: *const c.mln_completion) c.mln_status {
+            return @call(.auto, startFn, .{context.native} ++ context.arguments ++ .{descriptor});
+        }
+    }.start);
 }
 
-fn startArgumentOperation(handle: RenderSessionHandle, comptime startFn: anytype, kind: runtime_module.OperationKind, argument: anytype) status.Error!runtime_module.OperationHandle {
+fn submitAllocatedRender(
+    comptime T: type,
+    handle: RenderSessionHandle,
+    allocator: std.mem.Allocator,
+    comptime copy: *const fn (*const c.mln_completion_result, *std.mem.Allocator) status.Error!T,
+    comptime startFn: anytype,
+    arguments: anytype,
+) status.Error!completion.Future(T) {
     const lease = try renderSessionLease(handle);
     defer lease.release();
-    var operation: c.mln_operation = 0;
-    try status.checkStatus(startFn(lease.native, argument, &operation), lease.diagnostic_store);
-    return operationHandle(lease, operation, kind, .none);
-}
-
-fn operationHandle(lease: RenderSessionLease, operation: c.mln_operation, kind: runtime_module.OperationKind, result_kind: runtime_module.OperationResultKind) status.Error!runtime_module.OperationHandle {
-    return runtime_module.OperationHandle.init(&lease.runtime, operation, kind, result_kind) catch |err| {
-        c.mln_operation_release(operation);
-        return err;
-    };
+    const Arguments = @TypeOf(arguments);
+    const Context = struct { native: c.mln_render_session, arguments: Arguments };
+    return completion.submitWithCopyContext(T, std.mem.Allocator, lease.diagnostic_store, copy, allocator, Context{ .native = lease.native, .arguments = arguments }, struct {
+        fn start(context: Context, descriptor: *const c.mln_completion) c.mln_status {
+            return @call(.auto, startFn, .{context.native} ++ context.arguments ++ .{descriptor});
+        }
+    }.start);
 }
 
 fn newRenderSession(session: c.mln_render_session, map_handle: map_module.MapHandle, runtime: runtime_module.RuntimeHandle, diagnostic_store: ?*diagnostics.DiagnosticStore) std.mem.Allocator.Error!RenderSessionHandle {
@@ -1229,6 +1168,41 @@ fn optionalStringView(temp: *native_temp.TempStorage, value: ?[]const u8) status
 fn copyNativeBuffer(allocator: std.mem.Allocator, buffer: c.mln_buffer, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error![]u8 {
     const owned = (try native_temp.copyOwnedBuffer(allocator, buffer, diagnostic_store)) orelse return error.NativeError;
     return @constCast(owned.value);
+}
+
+fn copyOwnedBufferViewCompletion(result: *const c.mln_completion_result, allocator: *std.mem.Allocator) status.Error!values.OwnedString {
+    const view = try completion.value(c.mln_buffer_view)(result);
+    return .{ .allocator = allocator.*, .value = try copyBufferView(allocator.*, view) };
+}
+
+fn copyQueriedFeaturesCompletion(result: *const c.mln_completion_result, allocator: *std.mem.Allocator) status.Error!QueriedFeatureList {
+    if (result.value_count != 0 and result.value == null) return error.NativeError;
+    const raw = if (result.value_count == 0)
+        &.{}
+    else
+        @as([*]align(1) const c.mln_queried_feature, @ptrCast(result.value.?))[0..result.value_count];
+    const items = try allocator.alloc(QueriedFeature, raw.len);
+    var initialized: usize = 0;
+    errdefer {
+        for (items[0..initialized]) |*item| item.deinit();
+        allocator.free(items);
+    }
+    for (raw, items) |feature, *item| {
+        item.* = try copyQueriedFeature(allocator.*, feature);
+        initialized += 1;
+    }
+    return .{ .allocator = allocator.*, .items = items };
+}
+
+fn copyReadbackCompletion(result: *const c.mln_completion_result, allocator: *std.mem.Allocator) status.Error!OwnedReadback {
+    const raw = try completion.value(c.mln_texture_readback_result)(result);
+    const data = if (raw.data.size == 0)
+        try allocator.dupe(u8, "")
+    else blk: {
+        const pointer = raw.data.data orelse return error.NativeError;
+        break :blk try allocator.dupe(u8, @as([*]const u8, @ptrCast(pointer))[0..raw.data.size]);
+    };
+    return .{ .allocator = allocator.*, .data = data, .info = textureImageInfoFromNative(raw.info) };
 }
 
 fn textureImageInfoFromNative(info: c.mln_texture_image_info) TextureImageInfo {

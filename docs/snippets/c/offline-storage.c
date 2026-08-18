@@ -2,95 +2,68 @@
 // ones that the host no longer needs.
 
 #include <maplibre_native_c.h>
-#include <stdbool.h>
 #include <string.h>
 
-// Waits for the operation, then returns its terminal status.
-static mln_status await_operation(
-  mln_runtime runtime, mln_operation operation
-) {
-  (void)runtime;
-  bool completed = false;
-  if (
-    mln_operation_wait(operation, -1, &completed) != MLN_STATUS_OK || !completed
-  ) {
-    return MLN_STATUS_NATIVE_ERROR;
-  }
+typedef struct offline_cleanup {
+  mln_runtime runtime;
+  const char* keep_metadata;
+  size_t deleted;
+} offline_cleanup;
 
-  mln_status status = MLN_STATUS_NATIVE_ERROR;
-  return mln_operation_get_status(operation, &status) == MLN_STATUS_OK
-           ? status
-           : MLN_STATUS_NATIVE_ERROR;
+static void region_deleted(
+  void* user_data, const mln_completion_result* result
+) {
+  offline_cleanup* cleanup = user_data;
+  if (result->status == MLN_STATUS_OK) cleanup->deleted++;
 }
 
-static mln_status finish_operation(
-  mln_runtime runtime, mln_operation operation
+static void regions_listed(
+  void* user_data, const mln_completion_result* result
 ) {
-  const mln_status status = await_operation(runtime, operation);
-  mln_operation_finish(operation);
-  mln_operation_release(operation);
-  return status;
-}
-
-// Deletes every stored region whose metadata differs from keep_metadata, and
-// returns how many it deleted.
-size_t delete_other_regions(mln_runtime runtime, const char* keep_metadata) {
-  // Operation readiness comes from the runtime's notification source.
-
-  // #region list
-  mln_operation list_operation = MLN_HANDLE_NULL;
-  if (
-    mln_runtime_offline_regions_list_start(runtime, &list_operation) !=
-    MLN_STATUS_OK
-  ) {
-    return 0;
-  }
-  // #endregion list
-
+  offline_cleanup* cleanup = user_data;
   // #region result
-  mln_offline_region_list list = MLN_HANDLE_NULL;
-  if (await_operation(runtime, list_operation) == MLN_STATUS_OK) {
-    mln_runtime_offline_regions_list_take_result(list_operation, &list);
-  }
-  if (list == MLN_HANDLE_NULL) {
-    mln_operation_finish(list_operation);
-    return 0;
-  }
+  if (result->status != MLN_STATUS_OK) return;
+  const mln_offline_region_info* regions = result->value;
   // #endregion result
 
-  size_t deleted = 0;
-
   // #region entries
-  size_t count = 0;
-  mln_offline_region_list_count(list, &count);
-
-  for (size_t index = 0; index < count; index++) {
-    // Copy the definition and metadata before destroying the list.
-    mln_offline_region_info info = {.size = sizeof(info)};
-    if (mln_offline_region_list_get(list, index, &info) != MLN_STATUS_OK) {
-      continue;
-    }
+  for (size_t index = 0; index < result->value_count; index++) {
+    const mln_offline_region_info* info = &regions[index];
+    // Copy the definition and metadata here if the host keeps them.
     // #endregion entries
     if (
-      info.metadata_size == strlen(keep_metadata) &&
-      memcmp(info.metadata, keep_metadata, info.metadata_size) == 0
+      info->metadata_size == strlen(cleanup->keep_metadata) &&
+      memcmp(info->metadata, cleanup->keep_metadata, info->metadata_size) == 0
     ) {
       continue;
     }
 
     // #region delete
-    mln_operation delete_operation = MLN_HANDLE_NULL;
-    if (
-      mln_runtime_offline_region_delete_start(
-        runtime, info.id, &delete_operation
-      ) == MLN_STATUS_OK &&
-      finish_operation(runtime, delete_operation) == MLN_STATUS_OK
-    ) {
-      deleted++;
-    }
+    const mln_completion completion = {
+      .size = sizeof(mln_completion),
+      .callback = region_deleted,
+      .user_data = cleanup,
+    };
+    (void)mln_runtime_offline_region_delete(
+      cleanup->runtime, info->id, &completion
+    );
     // #endregion delete
   }
+}
 
-  mln_offline_region_list_destroy(list);
-  return deleted;
+mln_status delete_other_regions(
+  mln_runtime runtime, const char* keep_metadata, offline_cleanup* cleanup
+) {
+  cleanup->runtime = runtime;
+  cleanup->keep_metadata = keep_metadata;
+  cleanup->deleted = 0;
+  const mln_completion completion = {
+    .size = sizeof(mln_completion),
+    .callback = regions_listed,
+    .user_data = cleanup,
+  };
+
+  // #region list
+  return mln_runtime_offline_regions_list(runtime, &completion);
+  // #endregion list
 }

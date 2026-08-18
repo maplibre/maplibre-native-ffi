@@ -18,16 +18,17 @@ static mln_camera_options downtown(void) {
 }
 
 // #region jump
-mln_status jump_downtown(mln_map map) {
+mln_status jump_downtown(mln_map map, const mln_completion* completion) {
   mln_camera_update update = mln_camera_update_default();
   update.mode = MLN_CAMERA_UPDATE_MODE_JUMP;
   update.camera = downtown();
-  uint64_t command_id = 0;
-  return mln_map_update_camera(map, &update, &command_id);
+  return mln_map_update_camera(map, &update, completion);
 }
 // #endregion jump
 
-mln_status ease_downtown(mln_map map, uint64_t transition_id) {
+mln_status ease_downtown(
+  mln_map map, uint64_t transition_id, const mln_completion* completion
+) {
   // #region ease
   mln_camera_update update = mln_camera_update_default();
   update.mode = MLN_CAMERA_UPDATE_MODE_EASE;
@@ -39,15 +40,13 @@ mln_status ease_downtown(mln_map map, uint64_t transition_id) {
   update.animation.easing =
     (mln_unit_bezier){.x1 = 0.25, .y1 = 0.1, .x2 = 0.25, .y2 = 1.0};
   update.animation.transition_id = transition_id;
-  uint64_t command_id = 0;
-  return mln_map_update_camera(map, &update, &command_id);
+  return mln_map_update_camera(map, &update, completion);
   // #endregion ease
 }
 
-mln_status select_camera_events(mln_map map) {
-  uint64_t command_id = 0;
+mln_status select_camera_events(mln_map map, const mln_completion* completion) {
   return mln_map_set_event_mask(
-    map, MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED, &command_id
+    map, MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED, completion
   );
 }
 

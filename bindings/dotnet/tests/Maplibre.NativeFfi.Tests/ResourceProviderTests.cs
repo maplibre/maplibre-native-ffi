@@ -308,9 +308,8 @@ public sealed unsafe class ResourceProviderTests
         var failInstall = false;
         ResourceProviderState? failedReplacement = null;
         using var install = RuntimeHandle.UseResourceCallbackInstallMethodsForTest(
-            (_, provider, commandId) =>
+            (_, provider, _) =>
             {
-                *commandId = 1;
                 if (!failInstall)
                 {
                     return mln_status.MLN_STATUS_OK;
@@ -320,18 +319,17 @@ public sealed unsafe class ResourceProviderTests
                     GCHandle.FromIntPtr((nint)provider->user_data).Target;
                 return mln_status.MLN_STATUS_INVALID_STATE;
             },
-            (_, _, commandId) =>
-            {
-                *commandId = 1;
-                return mln_status.MLN_STATUS_OK;
-            }
+            (_, _, _) => mln_status.MLN_STATUS_OK
         );
         using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
-        runtime.SetResourceProvider((_, _) => ResourceProviderDecision.PassThrough);
+        runtime.SetResourceProviderAsync((_, _) => ResourceProviderDecision.PassThrough);
 
         failInstall = true;
         Assert.Throws<InvalidStateException>(() =>
-            runtime.SetResourceProvider((_, _) => ResourceProviderDecision.Handle)
+            runtime
+                .SetResourceProviderAsync((_, _) => ResourceProviderDecision.Handle)
+                .GetAwaiter()
+                .GetResult()
         );
 
         Assert.NotNull(failedReplacement);
@@ -351,7 +349,7 @@ public sealed unsafe class ResourceProviderTests
             new MapOptions { Width = 512, Height = 512 }
         );
 
-        runtime.SetResourceProvider(
+        runtime.SetResourceProviderAsync(
             (_, _) =>
             {
                 Interlocked.Increment(ref firstCalls);
@@ -361,7 +359,7 @@ public sealed unsafe class ResourceProviderTests
         LoadProbeStyle(runtime, map, "jar:file:/packaged/first.json");
         Assert.True(Volatile.Read(ref firstCalls) > 0);
 
-        runtime.SetResourceProvider(
+        runtime.SetResourceProviderAsync(
             (_, _) =>
             {
                 Interlocked.Increment(ref secondCalls);
@@ -373,7 +371,7 @@ public sealed unsafe class ResourceProviderTests
         Assert.True(Volatile.Read(ref secondCalls) > 0);
         Assert.Equal(firstCallsAfterReplace, Volatile.Read(ref firstCalls));
 
-        runtime.ClearResourceProvider();
+        runtime.ClearResourceProviderAsync();
 
         var secondCallsAfterClear = Volatile.Read(ref secondCalls);
         LoadProbeStyle(runtime, map, "jar:file:/packaged/third.json");
@@ -388,7 +386,7 @@ public sealed unsafe class ResourceProviderTests
         const string AliasUrl = "maplibre://maps/style";
         string? resolvedUrl = null;
         using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
-        runtime.SetResourceProvider(
+        runtime.SetResourceProviderAsync(
             (request, handle) =>
             {
                 if (request.RequestedUrl != AliasUrl)
@@ -406,7 +404,7 @@ public sealed unsafe class ResourceProviderTests
             new MapOptions { Width = 512, Height = 512 }
         );
 
-        map.SetStyleUrl(AliasUrl);
+        map.SetStyleUrlAsync(AliasUrl);
         RuntimeEventTestHelpers.WaitForMapEvent(runtime, map, RuntimeEventType.MapStyleLoaded);
 
         Assert.Equal("https://demotiles.maplibre.org/style.json", resolvedUrl);
@@ -418,7 +416,7 @@ public sealed unsafe class ResourceProviderTests
     {
         ResourceRequestHandle? handled = null;
         using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
-        runtime.SetResourceProvider(
+        runtime.SetResourceProviderAsync(
             (request, handle) =>
             {
                 Assert.Equal(StyleUrl, request.RequestedUrl);
@@ -432,7 +430,7 @@ public sealed unsafe class ResourceProviderTests
             new MapOptions { Width = 512, Height = 512 }
         );
 
-        map.SetStyleUrl(StyleUrl);
+        map.SetStyleUrlAsync(StyleUrl);
         var runtimeEvent = RuntimeEventTestHelpers.WaitForMapEvent(
             runtime,
             map,
@@ -451,7 +449,7 @@ public sealed unsafe class ResourceProviderTests
         using var providerCalled = new ManualResetEventSlim(false);
         ResourceRequestHandle? handled = null;
         using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
-        runtime.SetResourceProvider(
+        runtime.SetResourceProviderAsync(
             (request, handle) =>
             {
                 Assert.Equal(StyleUrl, request.RequestedUrl);
@@ -465,7 +463,7 @@ public sealed unsafe class ResourceProviderTests
             new MapOptions { Width = 512, Height = 512 }
         );
 
-        map.SetStyleUrl(StyleUrl);
+        map.SetStyleUrlAsync(StyleUrl);
         DriveRuntimeUntil(runtime, providerCalled);
         Assert.NotNull(handled);
         handled.Complete(StyleResponse());
@@ -487,7 +485,7 @@ public sealed unsafe class ResourceProviderTests
         using var providerCalled = new ManualResetEventSlim(false);
         ResourceRequestHandle? handled = null;
         using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
-        runtime.SetResourceProvider(
+        runtime.SetResourceProviderAsync(
             (_, handle) =>
             {
                 handled = handle;
@@ -500,11 +498,11 @@ public sealed unsafe class ResourceProviderTests
             new MapOptions { Width = 512, Height = 512 }
         );
 
-        map.SetStyleUrl(StyleUrl);
+        map.SetStyleUrlAsync(StyleUrl);
         DriveRuntimeUntil(runtime, providerCalled);
         Assert.NotNull(handled);
 
-        map.SetStyleJson(System.Text.Encoding.UTF8.GetBytes(StyleJson));
+        map.SetStyleJsonAsync(System.Text.Encoding.UTF8.GetBytes(StyleJson));
         DriveRuntimeUntilCancelled(runtime, handled);
 
         var error = Assert.Throws<InvalidStateException>(() => handled.Complete(StyleResponse()));
@@ -519,7 +517,7 @@ public sealed unsafe class ResourceProviderTests
     public void ResourceProviderErrorResponseProducesCopiedLoadingFailureEvent()
     {
         using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
-        runtime.SetResourceProvider(
+        runtime.SetResourceProviderAsync(
             (_, handle) =>
             {
                 handle.Complete(
@@ -537,7 +535,7 @@ public sealed unsafe class ResourceProviderTests
             new MapOptions { Width = 512, Height = 512 }
         );
 
-        map.SetStyleUrl(StyleUrl);
+        map.SetStyleUrlAsync(StyleUrl);
         var runtimeEvent = RuntimeEventTestHelpers.WaitForMapEvent(
             runtime,
             map,
@@ -555,7 +553,7 @@ public sealed unsafe class ResourceProviderTests
         // Drain earlier events so this probe observes its own failure.
         RuntimeEventTestHelpers.DrainUntilIdle(runtime);
 
-        map.SetStyleUrl(styleUrl);
+        map.SetStyleUrlAsync(styleUrl);
         var runtimeEvent = RuntimeEventTestHelpers.WaitForMapEvent(
             runtime,
             map,

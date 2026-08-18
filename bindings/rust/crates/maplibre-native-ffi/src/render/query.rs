@@ -3,7 +3,7 @@ use std::ptr;
 use maplibre_native_ffi_core as maplibre_core;
 use maplibre_native_ffi_sys as sys;
 
-use crate::Result;
+use crate::{NativeFuture, Result};
 
 pub use maplibre_core::query::{
     FeatureStateSelector, QueriedFeature, RenderedFeatureQueryOptions, RenderedQueryGeometry,
@@ -40,61 +40,50 @@ impl super::RenderSessionHandle {
         &self,
         selector: &FeatureStateSelector,
         state: &[u8],
-    ) -> Result<crate::runtime::OperationHandle<()>> {
+    ) -> Result<NativeFuture<()>> {
         let (source, layer, feature, _) = Self::selector_views(selector);
         let state = maplibre_core::string::buffer_view(state);
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_render_session_set_feature_state_start(
-                self.inner.native()?,
-                source,
-                layer,
-                feature,
-                state,
-                &mut operation,
-            )
-        })?;
-        self.inner
-            .operation(operation, crate::runtime::OperationKind::RenderFeatureState)
+        let session = self.inner.native()?;
+        crate::completion::submit(
+            |completion| unsafe {
+                sys::mln_render_session_set_feature_state(
+                    session, source, layer, feature, state, completion,
+                )
+            },
+            crate::completion::unit,
+        )
     }
 
     pub fn get_feature_state(
         &self,
         selector: &FeatureStateSelector,
-    ) -> Result<crate::runtime::OperationHandle<Vec<u8>>> {
+    ) -> Result<NativeFuture<Vec<u8>>> {
         let (source, layer, feature, _) = Self::selector_views(selector);
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_render_session_get_feature_state_start(
-                self.inner.native()?,
-                source,
-                layer,
-                feature,
-                &mut operation,
-            )
-        })?;
-        self.inner
-            .operation(operation, crate::runtime::OperationKind::RenderFeatureState)
+        let session = self.inner.native()?;
+        crate::completion::submit(
+            |completion| unsafe {
+                sys::mln_render_session_get_feature_state(
+                    session, source, layer, feature, completion,
+                )
+            },
+            crate::completion::buffer,
+        )
     }
 
     pub fn remove_feature_state(
         &self,
         selector: &FeatureStateSelector,
-    ) -> Result<crate::runtime::OperationHandle<()>> {
+    ) -> Result<NativeFuture<()>> {
         let (source, layer, feature, key) = Self::selector_views(selector);
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_render_session_remove_feature_state_start(
-                self.inner.native()?,
-                source,
-                layer,
-                feature,
-                key,
-                &mut operation,
-            )
-        })?;
-        self.inner
-            .operation(operation, crate::runtime::OperationKind::RenderFeatureState)
+        let session = self.inner.native()?;
+        crate::completion::submit(
+            |completion| unsafe {
+                sys::mln_render_session_remove_feature_state(
+                    session, source, layer, feature, key, completion,
+                )
+            },
+            crate::completion::unit,
+        )
     }
 
     /// Starts a rendered-feature query whose result is a typed feature list.
@@ -102,25 +91,24 @@ impl super::RenderSessionHandle {
         &self,
         geometry: &RenderedQueryGeometry,
         options: Option<&RenderedFeatureQueryOptions>,
-    ) -> Result<crate::runtime::OperationHandle<Vec<QueriedFeature>>> {
+    ) -> Result<NativeFuture<Vec<QueriedFeature>>> {
         let geometry = geometry.to_native();
         let options = options
             .map(RenderedFeatureQueryOptions::to_native)
             .transpose()?;
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_render_session_query_rendered_features_start(
-                self.inner.native()?,
-                geometry.as_ptr(),
-                options
-                    .as_ref()
-                    .map_or(ptr::null(), NativeRenderedFeatureQueryOptions::as_ptr),
-                &mut operation,
-            )
-        })?;
-        self.inner.operation(
-            operation,
-            crate::runtime::OperationKind::RenderFeaturesQuery,
+        let session = self.inner.native()?;
+        crate::completion::submit(
+            |completion| unsafe {
+                sys::mln_render_session_query_rendered_features(
+                    session,
+                    geometry.as_ptr(),
+                    options
+                        .as_ref()
+                        .map_or(ptr::null(), NativeRenderedFeatureQueryOptions::as_ptr),
+                    completion,
+                )
+            },
+            copy_queried_features,
         )
     }
 
@@ -129,25 +117,24 @@ impl super::RenderSessionHandle {
         &self,
         source_id: &str,
         options: Option<&SourceFeatureQueryOptions>,
-    ) -> Result<crate::runtime::OperationHandle<Vec<QueriedFeature>>> {
+    ) -> Result<NativeFuture<Vec<QueriedFeature>>> {
         let source_id = maplibre_core::string::buffer_view(source_id.as_bytes());
         let options = options
             .map(SourceFeatureQueryOptions::to_native)
             .transpose()?;
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_render_session_query_source_features_start(
-                self.inner.native()?,
-                source_id,
-                options
-                    .as_ref()
-                    .map_or(ptr::null(), NativeSourceFeatureQueryOptions::as_ptr),
-                &mut operation,
-            )
-        })?;
-        self.inner.operation(
-            operation,
-            crate::runtime::OperationKind::RenderFeaturesQuery,
+        let session = self.inner.native()?;
+        crate::completion::submit(
+            |completion| unsafe {
+                sys::mln_render_session_query_source_features(
+                    session,
+                    source_id,
+                    options
+                        .as_ref()
+                        .map_or(ptr::null(), NativeSourceFeatureQueryOptions::as_ptr),
+                    completion,
+                )
+            },
+            copy_queried_features,
         )
     }
 
@@ -160,45 +147,32 @@ impl super::RenderSessionHandle {
         extension: &str,
         extension_field: &str,
         arguments: Option<&[u8]>,
-    ) -> Result<crate::runtime::OperationHandle<Vec<u8>>> {
+    ) -> Result<NativeFuture<Vec<u8>>> {
         let source_id = maplibre_core::string::buffer_view(source_id.as_bytes());
         let feature = maplibre_core::string::buffer_view(feature);
         let extension = maplibre_core::string::buffer_view(extension.as_bytes());
         let extension_field = maplibre_core::string::buffer_view(extension_field.as_bytes());
         let arguments = arguments.map(maplibre_core::string::buffer_view);
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_render_session_query_feature_extensions_start(
-                self.inner.native()?,
-                source_id,
-                feature,
-                extension,
-                extension_field,
-                arguments.as_ref().map_or(ptr::null(), ptr::from_ref),
-                &mut operation,
-            )
-        })?;
-        self.inner
-            .operation(operation, crate::runtime::OperationKind::RenderQuery)
+        let session = self.inner.native()?;
+        crate::completion::submit(
+            |completion| unsafe {
+                sys::mln_render_session_query_feature_extensions(
+                    session,
+                    source_id,
+                    feature,
+                    extension,
+                    extension_field,
+                    arguments.as_ref().map_or(ptr::null(), ptr::from_ref),
+                    completion,
+                )
+            },
+            crate::completion::buffer,
+        )
     }
 }
 
-impl crate::runtime::OperationHandle<Vec<QueriedFeature>> {
-    /// Takes the completed typed feature list while retaining the observer.
-    pub fn take(&self) -> Result<Vec<QueriedFeature>> {
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_queried_feature_list>::new();
-        self.with_result_operation(|operation| {
-            let status = match self.operation_kind {
-                crate::runtime::OperationKind::RenderFeaturesQuery => unsafe {
-                    sys::mln_render_query_features_take_result(operation, out.as_mut_ptr())
-                },
-                _ => sys::MLN_STATUS_INVALID_STATE,
-            };
-            maplibre_core::check(status)
-        })?;
-        let list = out.into_live("mln_queried_feature_list")?;
-        // SAFETY: On success, the C API returns an owned queried-feature list
-        // handle; core copies and releases it.
-        unsafe { maplibre_core::query::copy_queried_feature_list(list) }
-    }
+fn copy_queried_features(result: &sys::mln_completion_result) -> Result<Vec<QueriedFeature>> {
+    let hits = crate::completion::copy_slice::<sys::mln_queried_feature>(result)?;
+    // SAFETY: completion keeps every nested feature view alive for this callback.
+    unsafe { maplibre_core::query::copy_queried_features(&hits) }
 }

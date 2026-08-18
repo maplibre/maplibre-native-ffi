@@ -9,6 +9,8 @@ import '../camera/camera.dart';
 import '../error/maplibre_exception.dart';
 import '../geo/geo.dart';
 import '../internal/callback/callback_state.dart';
+import '../internal/callback/completion.dart';
+import '../internal/callback/wake.dart';
 import '../internal/c/maplibre_native_c.dart';
 import '../internal/c/maplibre_native_c.g.dart' as raw;
 import '../internal/lifecycle/lifecycle.dart';
@@ -48,12 +50,7 @@ CustomGeometryCallbackLifecycleProbe? customGeometryCallbackProbeForTesting(
   MapHandle map,
   String sourceId,
 ) {
-  final state =
-      map._customGeometryCallbacks[sourceId] ??
-      map._pendingStyleCallbacks.values
-          .where((pending) => pending.sourceId == sourceId)
-          .firstOrNull
-          ?.state;
+  final state = map._customGeometryCallbacks[sourceId];
   return state == null ? null : CustomGeometryCallbackLifecycleProbe._(state);
 }
 
@@ -106,41 +103,18 @@ final class RuntimeOptions {
 
 /// Runtime handle with autonomous native execution.
 final class RuntimeHandle {
-  RuntimeHandle._(NativeRuntime handle, this._notificationSource)
+  RuntimeHandle._(NativeRuntime handle, this._eventWake)
     : _state = NativeHandleState(handle, 'RuntimeHandle') {
-    _notificationListener =
-        NativeCallable<raw.mln_notification_callbackFunction>.listener((
-          Pointer<Void> _,
-        ) {
-          scheduleMicrotask(_drainNotificationSource);
-        });
     _callbackReleaseListener =
         NativeCallable<raw.mln_runtime_callback_releaseFunction>.listener(
           _releaseNativeCallback,
         );
-    try {
-      _check(
-        raw.mln_notification_source_set_callback(
-          _notificationSource,
-          _notificationListener.nativeFunction,
-          nullptr,
-        ),
-      );
-    } catch (_) {
-      _notificationListener.close();
-      _callbackReleaseListener.close();
-      rethrow;
-    }
   }
   final NativeHandleState<NativeRuntime> _state;
-  int _notificationSource;
-  late final NativeCallable<raw.mln_notification_callbackFunction>
-  _notificationListener;
+  final NativeWakeState _eventWake;
   late final NativeCallable<raw.mln_runtime_callback_releaseFunction>
   _callbackReleaseListener;
   final _maps = <int, WeakReference<MapHandle>>{};
-  final _renderSessions = <int, WeakReference<RenderSessionHandle>>{};
-  final _operationWaiters = <int, Completer<void>>{};
   final _queuedRuntimeEvents = <RuntimeEvent>[];
   final _nativeCallbackReleases = <int, void Function()>{};
   final _resourceProviderQueues = <int, _ResourceProviderCallbackState>{};
@@ -160,34 +134,73 @@ final class RuntimeHandle {
     _nativeCallbackReleases.remove(userData.address)?.call();
   }
 
+  Future<CommandCompletion> _startCommand(
+    NativeCompletionStart start, {
+    void Function()? onRejected,
+  }) => startNativeCompletion(
+    copyKind:
+        raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
+    elementSize: 0,
+    start: start,
+    onRejected: onRejected,
+    acceptErrorStatus: true,
+    decode: (result) => CommandCompletion(
+      disposition: CommandDisposition.fromRawValue(result.disposition),
+      generation: uint64FromNative(result.generation),
+      status: MaplibreStatus.fromNativeStatusCode(result.status),
+      diagnostic: copyCompletionDiagnostic(result.diagnostic),
+    ),
+  );
+
+  Future<T> _startValue<T>({
+    required raw.mln_adapter_completion_copy_kind copyKind,
+    required int elementSize,
+    required NativeCompletionStart start,
+    required NativeCompletionDecoder<T> decode,
+    void Function()? onRejected,
+  }) => startNativeCompletion(
+    copyKind: copyKind,
+    elementSize: elementSize,
+    start: start,
+    decode: decode,
+    onRejected: onRejected,
+  );
+
   /// Creates a runtime.
   static RuntimeHandle create({
     RuntimeOptions options = const RuntimeOptions(),
   }) {
     ensureAbiVersion();
-    final source = withNativeArena((arena) {
-      final outSource = arena<Uint64>()..value = 0;
-      _check(raw.mln_notification_source_create(outSource));
-      return outSource.value;
+    RuntimeHandle? runtime;
+    final eventWake = NativeWakeState(() {
+      scheduleMicrotask(() {
+        final target = runtime;
+        if (target != null && !target.isClosed) {
+          target._queuedRuntimeEvents.addAll(
+            target._drainNativeEvents().events,
+          );
+        }
+      });
     });
     var runtimeHandle = 0;
     try {
       runtimeHandle = withNativeArena((arena) {
         final nativeOptions = arena<raw.mln_runtime_options>();
         nativeOptions.ref = _runtimeOptionsToNative(options, arena);
-        nativeOptions.ref.notification_source = source;
+        eventWake.writeTo(nativeOptions.ref.event_wake);
         final outRuntime = arena<Uint64>()..value = 0;
         _check(raw.mln_runtime_create(nativeOptions, outRuntime));
         return outRuntime.value;
       });
-      final runtime = RuntimeHandle._(NativeRuntime(runtimeHandle), source);
+      final created = RuntimeHandle._(NativeRuntime(runtimeHandle), eventWake);
+      runtime = created;
       runtimeHandle = 0;
-      return runtime;
+      return created;
     } catch (_) {
       if (runtimeHandle != 0) {
         _check(raw.mln_runtime_release(runtimeHandle));
       }
-      raw.mln_notification_source_release(source);
+      eventWake.reject();
       rethrow;
     }
   }
@@ -248,141 +261,108 @@ final class RuntimeHandle {
 
   /// Registers exact native-owned URL rewrite rules for network resources.
   ///
-  /// Returns the accepted runtime-wide command ID.
-  BigInt setResourceUrlRewriteRules(List<ResourceUrlRewriteRule> rules) {
+  Future<CommandCompletion> setResourceUrlRewriteRules(
+    List<ResourceUrlRewriteRule> rules,
+  ) {
     final state = _ResourceTransformState(rules);
     final userData = state.pointer.cast<Void>();
     _registerNativeCallback(userData, state.close);
-    try {
-      final commandId = withNativeArena((arena) {
+    return _startCommand(
+      (completion) => withNativeArena((arena) {
         final transform = arena<raw.mln_resource_transform>();
         transform.ref.size = sizeOf<raw.mln_resource_transform>();
         transform.ref.callback = _c.adapterResourceTransformRewriteCallback();
         transform.ref.user_data = userData;
         transform.ref.release_user_data =
             _callbackReleaseListener.nativeFunction;
-        final outCommandId = arena<Uint64>()..value = 0;
-        _check(
-          raw.mln_runtime_set_resource_transform(
-            _handle.raw,
-            transform,
-            outCommandId,
-          ),
+        return raw.mln_runtime_set_resource_transform(
+          _handle.raw,
+          transform,
+          completion,
         );
-        return outCommandId.value;
-      });
-      return uint64FromNative(commandId);
-    } catch (_) {
-      _cancelNativeCallback(userData);
-      rethrow;
-    }
+      }),
+      onRejected: () => _cancelNativeCallback(userData),
+    );
   }
 
   /// Clears runtime-scoped URL rewrite rules.
   ///
-  /// Returns the accepted runtime-wide command ID.
-  BigInt clearResourceTransform() {
-    final commandId = withNativeArena((arena) {
-      final outCommandId = arena<Uint64>()..value = 0;
-      _check(
-        raw.mln_runtime_clear_resource_transform(_handle.raw, outCommandId),
-      );
-      return outCommandId.value;
-    });
-    return uint64FromNative(commandId);
-  }
+  Future<CommandCompletion> clearResourceTransform() => _startCommand(
+    (completion) =>
+        raw.mln_runtime_clear_resource_transform(_handle.raw, completion),
+  );
 
   /// Registers native-owned HTTP header routes evaluated on network threads.
   ///
-  /// Returns the accepted runtime-wide command ID.
-  BigInt setHttpHeaderTransformRules(List<HttpHeaderTransformRule> rules) {
+  Future<CommandCompletion> setHttpHeaderTransformRules(
+    List<HttpHeaderTransformRule> rules,
+  ) {
     final state = _HttpHeaderTransformState(rules);
     final userData = state.pointer.cast<Void>();
     _registerNativeCallback(userData, state.close);
-    try {
-      final commandId = withNativeArena((arena) {
+    return _startCommand(
+      (completion) => withNativeArena((arena) {
         final transform = arena<raw.mln_http_header_transform>();
         transform.ref.size = sizeOf<raw.mln_http_header_transform>();
         transform.ref.callback = _c.adapterHttpHeaderTransformCallback();
         transform.ref.user_data = userData;
         transform.ref.release_user_data =
             _callbackReleaseListener.nativeFunction;
-        final outCommandId = arena<Uint64>()..value = 0;
-        _check(
-          raw.mln_runtime_set_http_header_transform(
-            _handle.raw,
-            transform,
-            outCommandId,
-          ),
+        return raw.mln_runtime_set_http_header_transform(
+          _handle.raw,
+          transform,
+          completion,
         );
-        return outCommandId.value;
-      });
-      return uint64FromNative(commandId);
-    } catch (_) {
-      _cancelNativeCallback(userData);
-      rethrow;
-    }
+      }),
+      onRejected: () => _cancelNativeCallback(userData),
+    );
   }
 
   /// Clears native-owned HTTP header transform routes.
   ///
-  /// Returns the accepted runtime-wide command ID.
-  BigInt clearHttpHeaderTransform() {
-    final commandId = withNativeArena((arena) {
-      final outCommandId = arena<Uint64>()..value = 0;
-      _check(
-        raw.mln_runtime_clear_http_header_transform(_handle.raw, outCommandId),
-      );
-      return outCommandId.value;
-    });
-    return uint64FromNative(commandId);
-  }
+  Future<CommandCompletion> clearHttpHeaderTransform() => _startCommand(
+    (completion) =>
+        raw.mln_runtime_clear_http_header_transform(_handle.raw, completion),
+  );
 
   /// Registers or replaces exact native-owned response rules.
   ///
-  /// Returns the accepted runtime-wide command ID.
-  BigInt setResourceProviderRules(List<ResourceProviderRule> rules) {
+  Future<CommandCompletion> setResourceProviderRules(
+    List<ResourceProviderRule> rules,
+  ) {
     final state = _ResourceProviderRulesState(rules);
     final userData = state.pointer.cast<Void>();
     _registerNativeCallback(userData, state.close);
-    try {
-      final commandId = withNativeArena((arena) {
+    return _startCommand(
+      (completion) => withNativeArena((arena) {
         final provider = arena<raw.mln_resource_provider>();
         provider.ref.size = sizeOf<raw.mln_resource_provider>();
         provider.ref.callback = _c.adapterResourceProviderRulesCallback();
         provider.ref.user_data = userData;
         provider.ref.release_user_data =
             _callbackReleaseListener.nativeFunction;
-        final outCommandId = arena<Uint64>()..value = 0;
-        _check(
-          raw.mln_runtime_set_resource_provider(
-            _handle.raw,
-            provider,
-            outCommandId,
-          ),
+        return raw.mln_runtime_set_resource_provider(
+          _handle.raw,
+          provider,
+          completion,
         );
-        return outCommandId.value;
-      });
-      return uint64FromNative(commandId);
-    } catch (_) {
-      _cancelNativeCallback(userData);
-      rethrow;
-    }
+      }),
+      onRejected: () => _cancelNativeCallback(userData),
+    );
   }
 
   /// Registers or replaces a queued Dart resource provider callback.
   ///
-  /// Returns the accepted runtime-wide command ID.
-  BigInt setResourceProvider(ResourceProvider provider) {
-    final state = _ResourceProviderCallbackState(provider, _notificationSource);
+  Future<CommandCompletion> setResourceProvider(ResourceProvider provider) {
+    final state = _ResourceProviderCallbackState(provider);
     _resourceProviderQueues[state.queue] = state;
     final userData = state.pointer.cast<Void>();
     _registerNativeCallback(
       userData,
       () => _closeResourceProviderCallback(state),
     );
-    try {
-      final commandId = withNativeArena((arena) {
+    return _startCommand(
+      (completion) => withNativeArena((arena) {
         final nativeProvider = arena<raw.mln_resource_provider>();
         nativeProvider.ref.size = sizeOf<raw.mln_resource_provider>();
         nativeProvider.ref.callback = _c
@@ -390,347 +370,240 @@ final class RuntimeHandle {
         nativeProvider.ref.user_data = userData;
         nativeProvider.ref.release_user_data =
             _callbackReleaseListener.nativeFunction;
-        final outCommandId = arena<Uint64>()..value = 0;
-        _check(
-          raw.mln_runtime_set_resource_provider(
-            _handle.raw,
-            nativeProvider,
-            outCommandId,
-          ),
+        return raw.mln_runtime_set_resource_provider(
+          _handle.raw,
+          nativeProvider,
+          completion,
         );
-        return outCommandId.value;
-      });
-      return uint64FromNative(commandId);
-    } catch (_) {
-      _cancelNativeCallback(userData);
-      rethrow;
-    }
+      }),
+      onRejected: () => _cancelNativeCallback(userData),
+    );
   }
 
   /// Clears the runtime-scoped network resource provider.
   ///
-  /// Returns the accepted runtime-wide command ID.
-  BigInt clearResourceProvider() {
-    final commandId = withNativeArena((arena) {
-      final outCommandId = arena<Uint64>()..value = 0;
-      _check(
-        raw.mln_runtime_clear_resource_provider(_handle.raw, outCommandId),
-      );
-      return outCommandId.value;
-    });
-    return uint64FromNative(commandId);
-  }
+  Future<CommandCompletion> clearResourceProvider() => _startCommand(
+    (completion) =>
+        raw.mln_runtime_clear_resource_provider(_handle.raw, completion),
+  );
 
   void _closeResourceProviderCallback(_ResourceProviderCallbackState state) {
     _resourceProviderQueues.remove(state.queue);
     state.retire();
   }
 
-  void _drainNotificationSource() {
-    if (_notificationSource == 0) {
-      return;
-    }
-    for (final endpoint in _drainReadyEndpoints(_notificationSource)) {
-      if (endpoint.kind ==
-          raw
-              .mln_notification_endpoint_kind
-              .MLN_NOTIFICATION_ENDPOINT_OPERATION
-              .value) {
-        _operationWaiters.remove(endpoint.id)?.complete();
-      } else if (endpoint.kind ==
-          raw
-              .mln_notification_endpoint_kind
-              .MLN_NOTIFICATION_ENDPOINT_RUNTIME_EVENTS
-              .value) {
-        if (!_state.isClosed) {
-          _queuedRuntimeEvents.addAll(_drainNativeEvents().events);
-        }
-      } else if (endpoint.kind ==
-          raw
-              .mln_notification_endpoint_kind
-              .MLN_NOTIFICATION_ENDPOINT_ADAPTER_RESOURCE_REQUESTS
-              .value) {
-        _resourceProviderQueues[endpoint.id]?.drain();
-      } else if (endpoint.kind ==
-          raw
-              .mln_notification_endpoint_kind
-              .MLN_NOTIFICATION_ENDPOINT_RENDER_FRAMES
-              .value) {
-        _renderSessions[endpoint.id]?.target?._notifyFramesReady();
-      } else if (endpoint.kind ==
-          raw
-              .mln_notification_endpoint_kind
-              .MLN_NOTIFICATION_ENDPOINT_DRIVER_WORK
-              .value) {
-        _renderSessions[endpoint.id]?.target?._notifyDriverWorkReady();
-      }
-    }
-  }
-
-  Future<void> _waitForOperation(int operation) async {
-    await Future<void>.delayed(Duration.zero);
-    if (_operationCompleted(operation)) {
-      return;
-    }
-    final completer = Completer<void>();
-    _operationWaiters[operation] = completer;
-    if (_operationCompleted(operation)) {
-      _operationWaiters.remove(operation);
-      return;
-    }
-    await completer.future;
-  }
-
-  Future<T> _takeOperation<T>(int operation, T Function() takeResult) async {
-    try {
-      await _waitForOperation(operation);
-      _throwIfOperationFailed(operation);
-      return takeResult();
-    } finally {
-      _operationWaiters.remove(operation);
-      raw.mln_operation_release(operation);
-    }
-  }
-
-  Future<void> _finishOperation(int operation) =>
-      _takeOperation<void>(operation, () {});
-
   /// Starts an ambient cache maintenance operation.
-  OperationHandle runAmbientCacheOperation(AmbientCacheOperation operation) {
-    return withNativeArena((arena) {
-      final outOperationId = arena<Uint64>();
-      _check(
-        raw.mln_runtime_run_ambient_cache_operation_start(
+  Future<void> runAmbientCacheOperation(AmbientCacheOperation operation) =>
+      _startUnit(
+        (completion) => raw.mln_runtime_run_ambient_cache_operation(
           _handle.raw,
           operation.rawValue,
-          outOperationId,
+          completion,
         ),
       );
-      return OperationHandle._(
-        outOperationId.value,
-        _OfflineOperationKind.ambientCache,
-        _OfflineOperationResultKind.none,
-      );
-    });
-  }
 
   /// Starts a change to this runtime's maximum ambient cache size.
   ///
   /// MapLibre evicts ambient resources to fit the new budget, so lowering it
   /// discards cached resources. Offline regions are unaffected.
-  OperationHandle setMaximumAmbientCacheSize(BigInt size) {
-    return withNativeArena((arena) {
-      final outOperationId = arena<Uint64>();
-      _check(
-        raw.mln_runtime_set_maximum_ambient_cache_size_start(
-          _handle.raw,
-          uint64ToNative(size, 'maximum ambient cache size'),
-          outOperationId,
-        ),
-      );
-      return OperationHandle._(
-        outOperationId.value,
-        _OfflineOperationKind.setMaximumAmbientCacheSize,
-        _OfflineOperationResultKind.none,
-      );
-    });
-  }
+  Future<void> setMaximumAmbientCacheSize(BigInt size) => _startUnit(
+    (completion) => raw.mln_runtime_set_maximum_ambient_cache_size(
+      _handle.raw,
+      uint64ToNative(size, 'maximum ambient cache size'),
+      completion,
+    ),
+  );
 
   /// Starts creating an offline region.
-  OperationHandle createOfflineRegion(
+  Future<OfflineRegionInfo> createOfflineRegion(
     OfflineRegionDefinition definition, {
     Uint8List? metadata,
   }) {
-    return withNativeArena((arena) {
-      final nativeDefinition = arena<raw.mln_offline_region_definition>();
-      nativeDefinition.ref = _offlineRegionDefinitionToNative(
-        definition,
-        arena,
-      );
-      final nativeMetadata = _nativeBytes(metadata, arena);
-      final outOperationId = arena<Uint64>();
-      _check(
-        raw.mln_runtime_offline_region_create_start(
+    return _startOfflineValue(
+      copyKind: raw
+          .mln_adapter_completion_copy_kind
+          .MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGIONS,
+      elementSize: sizeOf<raw.mln_offline_region_info>(),
+      start: (completion) => withNativeArena((arena) {
+        final nativeDefinition = arena<raw.mln_offline_region_definition>();
+        nativeDefinition.ref = _offlineRegionDefinitionToNative(
+          definition,
+          arena,
+        );
+        final nativeMetadata = _nativeBytes(metadata, arena);
+        return raw.mln_runtime_offline_region_create(
           _handle.raw,
           nativeDefinition,
           nativeMetadata,
           metadata?.length ?? 0,
-          outOperationId,
-        ),
-      );
-      return OperationHandle._(
-        outOperationId.value,
-        _OfflineOperationKind.regionCreate,
-        _OfflineOperationResultKind.region,
-      );
-    });
+          completion,
+        );
+      }),
+      decode: (result) => _offlineRegionInfoFromNative(
+        result.value.cast<raw.mln_offline_region_info>().ref,
+      ),
+    );
   }
 
   /// Starts getting an offline region snapshot by ID.
-  OperationHandle getOfflineRegion(int regionId) => _startOfflineOperation(
-    _OfflineOperationKind.regionGet,
-    _OfflineOperationResultKind.optionalRegion,
-    (outOperationId) {
-      _check(
-        raw.mln_runtime_offline_region_get_start(
+  Future<OfflineRegionInfo?> getOfflineRegion(int regionId) =>
+      _startOfflineValue(
+        copyKind: raw
+            .mln_adapter_completion_copy_kind
+            .MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGIONS,
+        elementSize: sizeOf<raw.mln_offline_region_info>(),
+        start: (completion) => raw.mln_runtime_offline_region_get(
           _handle.raw,
           regionId,
-          outOperationId,
+          completion,
         ),
+        decode: (result) => result.value_count == 0
+            ? null
+            : _offlineRegionInfoFromNative(
+                result.value.cast<raw.mln_offline_region_info>().ref,
+              ),
       );
-    },
-  );
 
   /// Starts listing offline region snapshots.
-  OperationHandle listOfflineRegions() => _startOfflineOperation(
-    _OfflineOperationKind.regionsList,
-    _OfflineOperationResultKind.regionList,
-    (outOperationId) {
-      _check(
-        raw.mln_runtime_offline_regions_list_start(_handle.raw, outOperationId),
-      );
-    },
+  Future<List<OfflineRegionInfo>> listOfflineRegions() => _startOfflineRegions(
+    (completion) =>
+        raw.mln_runtime_offline_regions_list(_handle.raw, completion),
   );
 
   /// Starts merging offline regions from another database path.
-  OperationHandle mergeOfflineRegionDatabase(String sideDatabasePath) {
-    return withNativeArena((arena) {
+  Future<List<OfflineRegionInfo>> mergeOfflineRegionDatabase(
+    String sideDatabasePath,
+  ) => _startOfflineRegions(
+    (completion) => withNativeArena((arena) {
       final nativePath = nativeUtf8CString(sideDatabasePath, arena);
-      final outOperationId = arena<Uint64>();
-      _check(
-        raw.mln_runtime_offline_regions_merge_database_start(
-          _handle.raw,
-          nativePath.pointer.cast<Char>(),
-          outOperationId,
-        ),
+      return raw.mln_runtime_offline_regions_merge_database(
+        _handle.raw,
+        nativePath.pointer.cast<Char>(),
+        completion,
       );
-      return OperationHandle._(
-        outOperationId.value,
-        _OfflineOperationKind.regionsMergeDatabase,
-        _OfflineOperationResultKind.regionList,
-      );
-    });
-  }
+    }),
+  );
 
   /// Starts updating opaque offline region metadata.
-  OperationHandle updateOfflineRegionMetadata(
+  Future<OfflineRegionInfo> updateOfflineRegionMetadata(
     int regionId,
     Uint8List metadata,
   ) {
-    return withNativeArena((arena) {
-      final nativeMetadata = _nativeBytes(metadata, arena);
-      final outOperationId = arena<Uint64>();
-      _check(
-        raw.mln_runtime_offline_region_update_metadata_start(
+    return _startOfflineValue(
+      copyKind: raw
+          .mln_adapter_completion_copy_kind
+          .MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGIONS,
+      elementSize: sizeOf<raw.mln_offline_region_info>(),
+      start: (completion) => withNativeArena((arena) {
+        final nativeMetadata = _nativeBytes(metadata, arena);
+        return raw.mln_runtime_offline_region_update_metadata(
           _handle.raw,
           regionId,
           nativeMetadata,
           metadata.length,
-          outOperationId,
-        ),
-      );
-      return OperationHandle._(
-        outOperationId.value,
-        _OfflineOperationKind.regionUpdateMetadata,
-        _OfflineOperationResultKind.region,
-      );
-    });
+          completion,
+        );
+      }),
+      decode: (result) => _offlineRegionInfoFromNative(
+        result.value.cast<raw.mln_offline_region_info>().ref,
+      ),
+    );
   }
 
   /// Starts getting the current offline region status.
-  OperationHandle getOfflineRegionStatus(int regionId) =>
-      _startOfflineOperation(
-        _OfflineOperationKind.regionGetStatus,
-        _OfflineOperationResultKind.regionStatus,
-        (outOperationId) {
-          _check(
-            raw.mln_runtime_offline_region_get_status_start(
-              _handle.raw,
-              regionId,
-              outOperationId,
-            ),
-          );
-        },
+  Future<OfflineRegionStatus> getOfflineRegionStatus(int regionId) =>
+      _startOfflineValue(
+        copyKind: raw
+            .mln_adapter_completion_copy_kind
+            .MLN_ADAPTER_COMPLETION_COPY_FLAT,
+        elementSize: sizeOf<raw.mln_offline_region_status>(),
+        start: (completion) => raw.mln_runtime_offline_region_get_status(
+          _handle.raw,
+          regionId,
+          completion,
+        ),
+        decode: (result) => _offlineRegionStatusFromNative(
+          result.value.cast<raw.mln_offline_region_status>().ref,
+        ),
       );
 
   /// Starts enabling or disabling offline region observation.
-  OperationHandle setOfflineRegionObserved(int regionId, bool observed) =>
-      _startOfflineOperation(
-        _OfflineOperationKind.regionSetObserved,
-        _OfflineOperationResultKind.none,
-        (outOperationId) {
-          _check(
-            raw.mln_runtime_offline_region_set_observed_start(
-              _handle.raw,
-              regionId,
-              observed,
-              outOperationId,
-            ),
-          );
-        },
+  Future<void> setOfflineRegionObserved(int regionId, bool observed) =>
+      _startUnit(
+        (completion) => raw.mln_runtime_offline_region_set_observed(
+          _handle.raw,
+          regionId,
+          observed,
+          completion,
+        ),
       );
 
   /// Starts changing an offline region's download state.
-  OperationHandle setOfflineRegionDownloadState(
+  Future<void> setOfflineRegionDownloadState(
     int regionId,
     OfflineRegionDownloadState state,
-  ) => _startOfflineOperation(
-    _OfflineOperationKind.regionSetDownloadState,
-    _OfflineOperationResultKind.none,
-    (outOperationId) {
-      _check(
-        raw.mln_runtime_offline_region_set_download_state_start(
-          _handle.raw,
-          regionId,
-          state.rawValue,
-          outOperationId,
-        ),
-      );
-    },
+  ) => _startUnit(
+    (completion) => raw.mln_runtime_offline_region_set_download_state(
+      _handle.raw,
+      regionId,
+      state.rawValue,
+      completion,
+    ),
   );
 
   /// Starts invalidating cached resources for an offline region.
-  OperationHandle invalidateOfflineRegion(int regionId) =>
-      _startOfflineOperation(
-        _OfflineOperationKind.regionInvalidate,
-        _OfflineOperationResultKind.none,
-        (outOperationId) {
-          _check(
-            raw.mln_runtime_offline_region_invalidate_start(
-              _handle.raw,
-              regionId,
-              outOperationId,
-            ),
-          );
-        },
-      );
-
-  /// Starts deleting an offline region.
-  OperationHandle deleteOfflineRegion(int regionId) => _startOfflineOperation(
-    _OfflineOperationKind.regionDelete,
-    _OfflineOperationResultKind.none,
-    (outOperationId) {
-      _check(
-        raw.mln_runtime_offline_region_delete_start(
-          _handle.raw,
-          regionId,
-          outOperationId,
-        ),
-      );
-    },
+  Future<void> invalidateOfflineRegion(int regionId) => _startUnit(
+    (completion) => raw.mln_runtime_offline_region_invalidate(
+      _handle.raw,
+      regionId,
+      completion,
+    ),
   );
 
-  OperationHandle _startOfflineOperation(
-    _OfflineOperationKind kind,
-    _OfflineOperationResultKind resultKind,
-    void Function(Pointer<Uint64> outOperationId) start,
-  ) {
-    return withNativeArena((arena) {
-      final outOperationId = arena<Uint64>();
-      start(outOperationId);
-      return OperationHandle._(outOperationId.value, kind, resultKind);
-    });
-  }
+  /// Starts deleting an offline region.
+  Future<void> deleteOfflineRegion(int regionId) => _startUnit(
+    (completion) => raw.mln_runtime_offline_region_delete(
+      _handle.raw,
+      regionId,
+      completion,
+    ),
+  );
+
+  Future<void> _startUnit(NativeCompletionStart start) => _startValue(
+    copyKind:
+        raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
+    elementSize: 0,
+    start: start,
+    decode: (_) {},
+  );
+
+  Future<T> _startOfflineValue<T>({
+    required raw.mln_adapter_completion_copy_kind copyKind,
+    required int elementSize,
+    required NativeCompletionStart start,
+    required NativeCompletionDecoder<T> decode,
+  }) => _startValue(
+    copyKind: copyKind,
+    elementSize: elementSize,
+    start: start,
+    decode: decode,
+  );
+
+  Future<List<OfflineRegionInfo>> _startOfflineRegions(
+    NativeCompletionStart start,
+  ) => _startOfflineValue(
+    copyKind: raw
+        .mln_adapter_completion_copy_kind
+        .MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGIONS,
+    elementSize: sizeOf<raw.mln_offline_region_info>(),
+    start: start,
+    decode: (result) => [
+      for (var index = 0; index < result.value_count; index += 1)
+        _offlineRegionInfoFromNative(
+          result.value.cast<raw.mln_offline_region_info>()[index],
+        ),
+    ],
+  );
 
   /// Creates a map without blocking the calling isolate.
   Future<MapHandle> createMap({MapOptions options = const MapOptions()}) =>
@@ -745,99 +618,21 @@ final class RuntimeHandle {
   }
 
   /// Completes after every previously accepted runtime command.
-  Future<void> barrier() {
-    final operation = withNativeArena((arena) {
-      final outOperation = arena<Uint64>()..value = 0;
-      _check(raw.mln_runtime_barrier_start(_handle.raw, outOperation));
-      return outOperation.value;
-    });
-    return _finishOperation(operation);
-  }
+  Future<void> barrier() => _startUnit(
+    (completion) => raw.mln_runtime_barrier(_handle.raw, completion),
+  );
 
   /// Releases this runtime's public native handle.
   Future<void> close() async {
     await _state.closeAsync((handle) async {
       _check(raw.mln_runtime_release(handle.raw));
     });
-    if (_notificationSource == 0) {
-      return;
-    }
-    _check(raw.mln_notification_source_clear_callback(_notificationSource));
     while (_nativeCallbackReleases.isNotEmpty) {
       await Future<void>.delayed(Duration.zero);
     }
-    final source = _notificationSource;
-    if (source != 0) {
-      raw.mln_notification_source_release(source);
-      _notificationSource = 0;
-      _notificationListener.close();
-    }
+    await _eventWake.released;
     _callbackReleaseListener.close();
   }
-}
-
-List<({int kind, int id})> _drainReadyEndpoints(int source) {
-  return withNativeArena((arena) {
-    final outBatch = arena<Uint64>()..value = 0;
-    _check(raw.mln_notification_source_drain_ready(source, outBatch));
-    final view = arena<raw.mln_ready_batch_view>();
-    view.ref.size = sizeOf<raw.mln_ready_batch_view>();
-    try {
-      _check(raw.mln_ready_batch_get(outBatch.value, view));
-      final endpoints = <({int kind, int id})>[];
-      final first = view.ref.endpoints.cast<Uint8>();
-      for (var index = 0; index < view.ref.endpoint_count; index += 1) {
-        final endpoint = (first + index * view.ref.endpoint_size)
-            .cast<raw.mln_ready_endpoint>()
-            .ref;
-        endpoints.add((kind: endpoint.kind, id: endpoint.id));
-      }
-      return endpoints;
-    } finally {
-      raw.mln_ready_batch_release(outBatch.value);
-    }
-  });
-}
-
-bool _operationCompleted(int operation) {
-  return withNativeArena((arena) {
-    final completed = arena<Bool>();
-    _check(raw.mln_operation_poll(operation, completed));
-    return completed.value;
-  });
-}
-
-String _operationDiagnostic(int operation) {
-  return withNativeArena((arena) {
-    final outSize = arena<Size>();
-    _check(raw.mln_operation_copy_diagnostic(operation, nullptr, 0, outSize));
-    if (outSize.value == 0) {
-      return '';
-    }
-    final bytes = arena<Uint8>(outSize.value);
-    _check(
-      raw.mln_operation_copy_diagnostic(
-        operation,
-        bytes.cast<Char>(),
-        outSize.value,
-        outSize,
-      ),
-    );
-    return utf8.decode(bytes.asTypedList(outSize.value));
-  });
-}
-
-void _throwIfOperationFailed(int operation) {
-  withNativeArena((arena) {
-    final outStatus = arena<Int32>();
-    _check(raw.mln_operation_get_status(operation, outStatus));
-    if (outStatus.value != raw.mln_status.MLN_STATUS_OK) {
-      throw MaplibreException.forNativeStatusCode(
-        outStatus.value,
-        _operationDiagnostic(operation),
-      );
-    }
-  });
 }
 
 /// One batch of runtime events copied out of the native event arena.
@@ -865,16 +660,6 @@ final class RuntimeEventBatch {
         runtime,
       );
       events.add(event);
-      final payload = event.payload;
-      if (payload is RuntimeEventCommandFinished) {
-        final source = event.source;
-        if (source is MapRuntimeEventSource) {
-          source.map?._finishStyleCommand(
-            payload.commandIdNative,
-            payload.disposition,
-          );
-        }
-      }
     }
     return RuntimeEventBatch._(events: events);
   }
@@ -916,8 +701,7 @@ final class RuntimeEventMask {
   static const offlineRegionResponseError = RuntimeEventMask(1 << 20);
   static const offlineRegionTileCountLimitExceeded = RuntimeEventMask(1 << 21);
 
-  static const mapCameraTransitionFinished = RuntimeEventMask(1 << 23);
-  static const commandFinished = RuntimeEventMask(1 << 24);
+  static const mapCameraTransitionFinished = RuntimeEventMask(1 << 22);
 
   static const _mapEventBits =
       (1 << 1) |
@@ -938,9 +722,8 @@ final class RuntimeEventMask {
       (1 << 16) |
       (1 << 17) |
       (1 << 18) |
-      (1 << 23);
-  static const _runtimeEventBits =
-      (1 << 19) | (1 << 20) | (1 << 21) | (1 << 24);
+      (1 << 22);
+  static const _runtimeEventBits = (1 << 19) | (1 << 20) | (1 << 21);
 
   /// Selects every map-originated event type this binding names.
   static const allMapEvents = RuntimeEventMask(_mapEventBits);
@@ -1106,10 +889,9 @@ final class RuntimeEventType {
   );
 
   static const mapCameraTransitionFinished = RuntimeEventType._(
-    23,
+    22,
     'mapCameraTransitionFinished',
   );
-  static const commandFinished = RuntimeEventType._(24, 'commandFinished');
 
   factory RuntimeEventType.fromRawValue(int rawValue) => switch (rawValue) {
     1 => mapCameraWillChange,
@@ -1134,8 +916,7 @@ final class RuntimeEventType {
     20 => offlineRegionResponseError,
     21 => offlineRegionTileCountLimitExceeded,
 
-    23 => mapCameraTransitionFinished,
-    24 => commandFinished,
+    22 => mapCameraTransitionFinished,
     _ => RuntimeEventType._(rawValue, 'unknown($rawValue)'),
   };
 
@@ -1369,6 +1150,21 @@ final class CommandDisposition {
   int get hashCode => rawValue.hashCode;
 }
 
+/// Terminal outcome of an ordered native command.
+final class CommandCompletion {
+  const CommandCompletion({
+    required this.disposition,
+    required this.generation,
+    required this.status,
+    required this.diagnostic,
+  });
+
+  final CommandDisposition disposition;
+  final BigInt generation;
+  final MaplibreStatus status;
+  final String diagnostic;
+}
+
 /// Typed runtime event payload copied into Dart-owned values.
 sealed class RuntimeEventPayload {
   const RuntimeEventPayload(this.rawPayloadType);
@@ -1391,10 +1187,7 @@ sealed class RuntimeEventPayload {
       7 => _offlineRegionTileCountLimitPayload(
         payload.offline_region_tile_count_limit,
       ),
-      // Offline operation completion is observed through the operation handle,
-      // not through the runtime event queue.
-      9 => _cameraTransitionFinishedPayload(payload.camera_transition_finished),
-      10 => _commandFinishedPayload(payload.command_finished),
+      8 => _cameraTransitionFinishedPayload(payload.camera_transition_finished),
       _ => RuntimeEventPayloadUnknown(
         rawPayloadType,
         _copyRuntimePayloadWindow(event, eventSize),
@@ -1496,35 +1289,6 @@ final class RuntimeEventCameraTransitionFinished extends RuntimeEventPayload {
   final BigInt transitionId;
 }
 
-/// Terminal event for one accepted runtime command.
-final class RuntimeEventCommandFinished extends RuntimeEventPayload {
-  const RuntimeEventCommandFinished({
-    required this.commandId,
-    required this.disposition,
-    required this.rawDisposition,
-    required this.generation,
-    required this.commandIdNative,
-  }) : super(10);
-
-  /// Runtime-wide command identity across the full `uint64_t` domain.
-  final BigInt commandId;
-
-  /// Typed terminal disposition.
-  final CommandDisposition disposition;
-
-  /// Raw terminal disposition.
-  final int rawDisposition;
-
-  /// The map snapshot generation the commit published, or zero when the
-  /// command committed no generation.
-  ///
-  /// A later [MapHandle.snapshot] whose generation is at or past this value
-  /// observes the commit.
-  final BigInt generation;
-
-  final int commandIdNative;
-}
-
 /// Payload of a type this binding does not name, copied as raw bytes.
 final class RuntimeEventPayloadUnknown extends RuntimeEventPayload {
   RuntimeEventPayloadUnknown(super.rawPayloadType, Uint8List bytes)
@@ -1542,16 +1306,6 @@ RuntimeEventPayload _renderFramePayload(
   needsRepaint: value.needs_repaint,
   placementChanged: value.placement_changed,
   stats: RenderingStats._fromNative(value.stats),
-);
-
-RuntimeEventPayload _commandFinishedPayload(
-  raw.mln_runtime_event_command_finished value,
-) => RuntimeEventCommandFinished(
-  commandId: uint64FromNative(value.command_id),
-  disposition: CommandDisposition.fromRawValue(value.disposition),
-  rawDisposition: value.disposition,
-  generation: uint64FromNative(value.generation),
-  commandIdNative: value.command_id,
 );
 
 RuntimeEventPayload _renderMapPayload(raw.mln_runtime_event_render_map value) =>
@@ -1794,9 +1548,8 @@ final class CameraSnapshot {
 
 /// Immutable map state copied from the latest published generation.
 ///
-/// Every committed map command publishes a new map snapshot and reports the
-/// published generation in its terminal [RuntimeEventCommandFinished] event,
-/// so a snapshot whose [generation] is at or past a commit's observes that
+/// Every committed map command publishes a new map snapshot. A snapshot whose
+/// [generation] is at or past a command completion's generation observes that
 /// commit.
 final class MapSnapshot {
   /// Creates a copied map snapshot.
@@ -1924,38 +1677,37 @@ final class MapHandle {
     RuntimeHandle runtime, {
     MapOptions options = const MapOptions(),
   }) async {
-    final operation = withNativeArena((arena) {
-      final nativeOptions = arena<raw.mln_map_options>();
-      nativeOptions.ref = raw.mln_map_options_default();
-      nativeOptions.ref.initial_extent.width = _positiveUint32(
-        options.width,
-        'map width',
-      );
-      nativeOptions.ref.initial_extent.height = _positiveUint32(
-        options.height,
-        'map height',
-      );
-      nativeOptions.ref.initial_extent.scale_factor = options.scaleFactor;
-      nativeOptions.ref.map_mode = options.mapMode.rawValue;
-      nativeOptions.ref.fast_pfor_enabled = options.fastPforEnabled;
-      nativeOptions.ref.event_mask = options.eventMask.value;
-      final outOperation = arena<Uint64>()..value = 0;
-      _check(
-        raw.mln_map_create_start(
+    final map = await runtime._startValue(
+      copyKind:
+          raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
+      elementSize: sizeOf<Uint64>(),
+      start: (completion) => withNativeArena((arena) {
+        final nativeOptions = arena<raw.mln_map_options>();
+        nativeOptions.ref = raw.mln_map_options_default();
+        nativeOptions.ref.initial_extent.width = _positiveUint32(
+          options.width,
+          'map width',
+        );
+        nativeOptions.ref.initial_extent.height = _positiveUint32(
+          options.height,
+          'map height',
+        );
+        nativeOptions.ref.initial_extent.scale_factor = options.scaleFactor;
+        nativeOptions.ref.map_mode = options.mapMode.rawValue;
+        nativeOptions.ref.fast_pfor_enabled = options.fastPforEnabled;
+        nativeOptions.ref.event_mask = options.eventMask.value;
+        return raw.mln_map_create(
           runtime._handle.raw,
           nativeOptions,
-          outOperation,
-        ),
-      );
-      return outOperation.value;
-    });
-    final map = await runtime._takeOperation(operation, () {
-      return withNativeArena((arena) {
-        final outMap = arena<Uint64>()..value = 0;
-        _check(raw.mln_map_create_take_result(operation, outMap));
-        return MapHandle._(runtime, NativeMap(outMap.value), options.eventMask);
-      });
-    });
+          completion,
+        );
+      }),
+      decode: (result) => MapHandle._(
+        runtime,
+        NativeMap(result.value.cast<Uint64>().value),
+        options.eventMask,
+      ),
+    );
     runtime._registerMap(map);
     return map;
   }
@@ -1967,8 +1719,6 @@ final class MapHandle {
   /// Callback roots of the custom-geometry sources this map still holds, each
   /// released by the C API's own release callback.
   final _customGeometryCallbacks = <String, _CustomGeometryCallbackState>{};
-  final _pendingStyleCallbacks =
-      <int, ({String sourceId, _CustomGeometryCallbackState state})>{};
 
   /// Whether this map has been closed by the Dart binding.
   bool get isClosed => _state.isClosed;
@@ -1978,31 +1728,49 @@ final class MapHandle {
     return _state.handle;
   }
 
-  /// Loads a style URL and returns the accepted command ID.
-  BigInt setStyleUrl(String url) {
-    return withNativeArena<BigInt>((arena) {
-      final nativeUrl = nativeUtf8CString(url, arena);
-      final outCommandId = arena<Uint64>();
-      _check(
-        raw.mln_map_set_style_url(
-          _handle.raw,
-          nativeUrl.pointer.cast<Char>(),
-          outCommandId,
-        ),
-      );
-      return uint64FromNative(outCommandId.value);
-    });
-  }
+  Future<CommandCompletion> _startCommand(NativeCompletionStart start) =>
+      _runtime._startCommand(start);
 
-  /// Loads inline style JSON and returns the accepted command ID.
-  BigInt setStyleJson(Uint8List json) {
-    return withNativeArena<BigInt>((arena) {
+  Future<CommandCompletion> _startCommandInArena(
+    void Function(Arena, Pointer<raw.mln_completion>) start,
+  ) => _startCommand(
+    (completion) => withNativeArena((arena) {
+      start(arena, completion);
+      return nativeStatusOk;
+    }),
+  );
+
+  Future<T> _startMapValue<T>({
+    required raw.mln_adapter_completion_copy_kind copyKind,
+    required int elementSize,
+    required NativeCompletionStart start,
+    required NativeCompletionDecoder<T> decode,
+  }) => _runtime._startValue(
+    copyKind: copyKind,
+    elementSize: elementSize,
+    start: start,
+    decode: decode,
+  );
+
+  /// Loads a style URL.
+  Future<CommandCompletion> setStyleUrl(String url) => _startCommand(
+    (completion) => withNativeArena((arena) {
+      final nativeUrl = nativeUtf8CString(url, arena);
+      return raw.mln_map_set_style_url(
+        _handle.raw,
+        nativeUrl.pointer.cast<Char>(),
+        completion,
+      );
+    }),
+  );
+
+  /// Loads inline style JSON.
+  Future<CommandCompletion> setStyleJson(Uint8List json) => _startCommand(
+    (completion) => withNativeArena((arena) {
       final nativeJson = nativeBufferView(json, arena);
-      final outCommandId = arena<Uint64>();
-      _check(raw.mln_map_set_style_json(_handle.raw, nativeJson, outCommandId));
-      return uint64FromNative(outCommandId.value);
-    });
-  }
+      return raw.mln_map_set_style_json(_handle.raw, nativeJson, completion);
+    }),
+  );
 
   /// Returns the style document this map's style was last parsed from.
   ///
@@ -2011,15 +1779,15 @@ final class MapHandle {
   /// previously parsed document in place. The result is empty when no document
   /// has been parsed.
   Future<Uint8List> getLoadedStyleJson() {
-    return _styleOperation(
-      (arena, outOperation) {
-        _check(raw.mln_map_loaded_style_json_start(_handle.raw, outOperation));
-      },
-      (operation, arena) {
-        final outJson = arena<Uint64>()..value = 0;
-        _check(raw.mln_map_loaded_style_json_take_result(operation, outJson));
-        return copyOwnedBuffer(NativeOwnedBufferHandle(outJson.value));
-      },
+    return _startMapValue(
+      copyKind: raw
+          .mln_adapter_completion_copy_kind
+          .MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEWS,
+      elementSize: sizeOf<raw.mln_buffer_view>(),
+      start: (completion) =>
+          raw.mln_map_loaded_style_json(_handle.raw, completion),
+      decode: (result) =>
+          _copyBufferView(result.value.cast<raw.mln_buffer_view>().ref),
     );
   }
 
@@ -2030,28 +1798,26 @@ final class MapHandle {
   /// [getLoadedStyleJson] while a load is in flight or after one fails. The
   /// result is empty when no URL bytes are available.
   Future<String> getStyleUrl() async {
-    final bytes = await _styleOperation(
-      (arena, outOperation) {
-        _check(raw.mln_map_style_url_start(_handle.raw, outOperation));
-      },
-      (operation, arena) {
-        final outUrl = arena<Uint64>()..value = 0;
-        _check(raw.mln_map_style_url_take_result(operation, outUrl));
-        return copyOwnedBuffer(NativeOwnedBufferHandle(outUrl.value));
-      },
+    final bytes = await _startMapValue(
+      copyKind: raw
+          .mln_adapter_completion_copy_kind
+          .MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEWS,
+      elementSize: sizeOf<raw.mln_buffer_view>(),
+      start: (completion) => raw.mln_map_style_url(_handle.raw, completion),
+      decode: (result) =>
+          _copyBufferView(result.value.cast<raw.mln_buffer_view>().ref),
     );
     return utf8.decode(bytes);
   }
 
-  /// Selects map-originated events and returns the accepted command ID.
-  BigInt setEventMask(RuntimeEventMask mask) {
-    final commandId = withNativeArena<BigInt>((arena) {
-      final outCommandId = arena<Uint64>();
-      _check(raw.mln_map_set_event_mask(_handle.raw, mask.value, outCommandId));
-      return uint64FromNative(outCommandId.value);
-    });
+  /// Selects map-originated events.
+  Future<CommandCompletion> setEventMask(RuntimeEventMask mask) {
+    final completion = _startCommand(
+      (completion) =>
+          raw.mln_map_set_event_mask(_handle.raw, mask.value, completion),
+    );
     _acceptedEventMask = mask;
-    return commandId;
+    return completion;
   }
 
   /// Reports the most recently accepted map event mask.
@@ -2095,57 +1861,41 @@ final class MapHandle {
     });
   }
 
-  /// Resizes the map and returns the accepted command ID.
-  BigInt resize(MapSize size) {
-    return withNativeArena<BigInt>((arena) {
+  /// Resizes the map.
+  Future<CommandCompletion> resize(MapSize size) => _startCommand(
+    (completion) => withNativeArena((arena) {
       final extent = arena<raw.mln_logical_extent>();
       extent.ref.width = _positiveUint32(size.width, 'map width');
       extent.ref.height = _positiveUint32(size.height, 'map height');
       extent.ref.scale_factor = size.scaleFactor;
-      final outCommandId = arena<Uint64>();
-      _check(raw.mln_map_resize(_handle.raw, extent.ref, outCommandId));
-      return uint64FromNative(outCommandId.value);
-    });
-  }
+      return raw.mln_map_resize(_handle.raw, extent.ref, completion);
+    }),
+  );
 
-  /// Requests a repaint and returns its runtime-wide command ID.
-  BigInt requestRepaint() {
-    return withNativeArena<BigInt>((arena) {
-      final outCommandId = arena<Uint64>();
-      _check(raw.mln_map_request_repaint(_handle.raw, outCommandId));
-      return uint64FromNative(outCommandId.value);
-    });
-  }
+  /// Requests a repaint.
+  Future<CommandCompletion> requestRepaint() => _startCommand(
+    (completion) => raw.mln_map_request_repaint(_handle.raw, completion),
+  );
 
   /// Requests one still image without blocking the calling isolate.
-  Future<void> requestStillImage() {
-    final operation = withNativeArena((arena) {
-      final outOperation = arena<Uint64>()..value = 0;
-      _check(raw.mln_map_request_still_image_start(_handle.raw, outOperation));
-      return outOperation.value;
-    });
-    return _runtime._finishOperation(operation);
-  }
+  Future<void> requestStillImage() => _runtime._startUnit(
+    (completion) => raw.mln_map_request_still_image(_handle.raw, completion),
+  );
 
   /// Applies MapLibre debug overlay options.
-  BigInt setDebugOptions(MapDebugOptions options) {
-    return withNativeArena<BigInt>((arena) {
-      final outCommandId = arena<Uint64>();
-      _check(
-        raw.mln_map_set_debug_options(_handle.raw, options.bits, outCommandId),
+  Future<CommandCompletion> setDebugOptions(MapDebugOptions options) =>
+      _startCommand(
+        (completion) => raw.mln_map_set_debug_options(
+          _handle.raw,
+          options.bits,
+          completion,
+        ),
       );
-      return uint64FromNative(outCommandId.value);
-    });
-  }
 
   /// Dumps map debug logs through MapLibre Native logging.
-  BigInt dumpDebugLogs() {
-    return withNativeArena<BigInt>((arena) {
-      final outCommandId = arena<Uint64>();
-      _check(raw.mln_map_dump_debug_logs(_handle.raw, outCommandId));
-      return uint64FromNative(outCommandId.value);
-    });
-  }
+  Future<CommandCompletion> dumpDebugLogs() => _startCommand(
+    (completion) => raw.mln_map_dump_debug_logs(_handle.raw, completion),
+  );
 
   /// Copies the latest camera snapshot.
   CameraSnapshot cameraSnapshot() {
@@ -2164,249 +1914,220 @@ final class MapHandle {
   }
 
   /// Reads the camera after every previously accepted command.
-  Future<CameraSnapshot> queryCamera() {
-    final operation = withNativeArena((arena) {
-      final outOperation = arena<Uint64>()..value = 0;
-      _check(raw.mln_map_camera_query_start(_handle.raw, outOperation));
-      return outOperation.value;
-    });
-    return _runtime._takeOperation(operation, () {
-      return withNativeArena((arena) {
-        final outResult = arena<raw.mln_camera_query_result>();
-        outResult.ref.size = sizeOf<raw.mln_camera_query_result>();
-        _check(raw.mln_map_camera_query_take_result(operation, outResult));
-        return CameraSnapshot(
-          camera: native_struct.cameraOptionsFromNative(outResult.ref.camera),
-          generation: uint64FromNative(outResult.ref.generation),
-        );
-      });
-    });
-  }
+  Future<CameraSnapshot> queryCamera() => _startMapValue(
+    copyKind:
+        raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
+    elementSize: sizeOf<raw.mln_camera_query_result>(),
+    start: (completion) => raw.mln_map_camera_query(_handle.raw, completion),
+    decode: (result) {
+      final value = result.value.cast<raw.mln_camera_query_result>().ref;
+      return CameraSnapshot(
+        camera: native_struct.cameraOptionsFromNative(value.camera),
+        generation: uint64FromNative(value.generation),
+      );
+    },
+  );
 
-  /// Submits an atomic camera update and returns its command ID.
-  BigInt updateCamera(
+  /// Submits an atomic camera update.
+  Future<CommandCompletion> updateCamera(
     CameraOptions camera, {
     CameraUpdateMode mode = CameraUpdateMode.jump,
     AnimationOptions? animation,
     int gesturePhase = 0,
   }) {
-    return withNativeArena((arena) {
-      final update = arena<raw.mln_camera_update>();
-      update.ref = raw.mln_camera_update_default();
-      update.ref.mode = mode.rawValue;
-      update.ref.camera = _nativeCamera(camera, arena).ref;
-      if (animation != null) {
-        update.ref.animation = _nativeAnimation(animation, arena).ref;
-      }
-      update.ref.gesture_phase = gesturePhase;
-      final outCommandId = arena<Uint64>();
-      _check(raw.mln_map_update_camera(_handle.raw, update, outCommandId));
-      return uint64FromNative(outCommandId.value);
-    });
+    return _startCommand(
+      (completion) => withNativeArena((arena) {
+        final update = arena<raw.mln_camera_update>();
+        update.ref = raw.mln_camera_update_default();
+        update.ref.mode = mode.rawValue;
+        update.ref.camera = _nativeCamera(camera, arena).ref;
+        if (animation != null) {
+          update.ref.animation = _nativeAnimation(animation, arena).ref;
+        }
+        update.ref.gesture_phase = gesturePhase;
+        return raw.mln_map_update_camera(_handle.raw, update, completion);
+      }),
+    );
   }
 
   /// Submits one relative camera operation.
-  BigInt applyCameraDelta(CameraDelta delta) {
-    return withNativeArena((arena) {
-      final native = arena<raw.mln_camera_delta>();
-      native.ref = raw.mln_camera_delta_default();
-      native.ref.kind = delta.kind.rawValue;
-      native.ref.offset = native_struct.screenPointToNative(delta.offset);
-      native.ref.amount = delta.amount;
-      if (delta.anchor case final anchor?) {
-        native.ref.has_anchor = true;
-        native.ref.anchor = native_struct.screenPointToNative(anchor);
-      }
-      native.ref.animation = _nativeAnimation(delta.animation, arena).ref;
-      final outCommandId = arena<Uint64>();
-      _check(raw.mln_map_apply_camera_delta(_handle.raw, native, outCommandId));
-      return uint64FromNative(outCommandId.value);
-    });
+  Future<CommandCompletion> applyCameraDelta(CameraDelta delta) {
+    return _startCommand(
+      (completion) => withNativeArena((arena) {
+        final native = arena<raw.mln_camera_delta>();
+        native.ref = raw.mln_camera_delta_default();
+        native.ref.kind = delta.kind.rawValue;
+        native.ref.offset = native_struct.screenPointToNative(delta.offset);
+        native.ref.amount = delta.amount;
+        if (delta.anchor case final anchor?) {
+          native.ref.has_anchor = true;
+          native.ref.anchor = native_struct.screenPointToNative(anchor);
+        }
+        native.ref.animation = _nativeAnimation(delta.animation, arena).ref;
+        return raw.mln_map_apply_camera_delta(_handle.raw, native, completion);
+      }),
+    );
   }
 
   /// Enables or disables the rendering stats overlay.
-  BigInt setRenderingStatsViewEnabled(bool enabled) {
-    return withNativeArena<BigInt>((arena) {
-      final outCommandId = arena<Uint64>();
-      _check(
-        raw.mln_map_set_rendering_stats_view_enabled(
+  Future<CommandCompletion> setRenderingStatsViewEnabled(bool enabled) =>
+      _startCommand(
+        (completion) => raw.mln_map_set_rendering_stats_view_enabled(
           _handle.raw,
           enabled,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
-    });
-  }
 
   /// Applies selected live map viewport and render-transform controls.
-  BigInt setViewportOptions(MapViewportOptions options) {
-    return withNativeArena<BigInt>((arena) {
-      final nativeOptions = arena<raw.mln_map_viewport_options>();
-      nativeOptions.ref = native_struct.mapViewportOptionsToNative(
-        options,
-        raw.mln_map_viewport_options_default(),
+  Future<CommandCompletion> setViewportOptions(MapViewportOptions options) =>
+      _startCommand(
+        (completion) => withNativeArena((arena) {
+          final nativeOptions = arena<raw.mln_map_viewport_options>();
+          nativeOptions.ref = native_struct.mapViewportOptionsToNative(
+            options,
+            raw.mln_map_viewport_options_default(),
+          );
+          return raw.mln_map_set_viewport_options(
+            _handle.raw,
+            nativeOptions,
+            completion,
+          );
+        }),
       );
-      final outCommandId = arena<Uint64>();
-      _check(
-        raw.mln_map_set_viewport_options(
-          _handle.raw,
-          nativeOptions,
-          outCommandId,
-        ),
-      );
-      return uint64FromNative(outCommandId.value);
-    });
-  }
 
   /// Applies selected tile prefetch and LOD tuning controls.
-  BigInt setTileOptions(MapTileOptions options) {
-    return withNativeArena<BigInt>((arena) {
-      final nativeOptions = arena<raw.mln_map_tile_options>();
-      nativeOptions.ref = native_struct.mapTileOptionsToNative(
-        options,
-        raw.mln_map_tile_options_default(),
+  Future<CommandCompletion> setTileOptions(MapTileOptions options) =>
+      _startCommand(
+        (completion) => withNativeArena((arena) {
+          final nativeOptions = arena<raw.mln_map_tile_options>();
+          nativeOptions.ref = native_struct.mapTileOptionsToNative(
+            options,
+            raw.mln_map_tile_options_default(),
+          );
+          return raw.mln_map_set_tile_options(
+            _handle.raw,
+            nativeOptions,
+            completion,
+          );
+        }),
       );
-      final outCommandId = arena<Uint64>();
-      _check(
-        raw.mln_map_set_tile_options(_handle.raw, nativeOptions, outCommandId),
-      );
-      return uint64FromNative(outCommandId.value);
-    });
-  }
 
   /// Applies selected map camera constraint options.
-  BigInt setBounds(BoundOptions options) {
-    return withNativeArena<BigInt>((arena) {
+  Future<CommandCompletion> setBounds(BoundOptions options) => _startCommand(
+    (completion) => withNativeArena((arena) {
       final nativeOptions = arena<raw.mln_bound_options>();
       nativeOptions.ref = native_struct.boundOptionsToNative(
         options,
         raw.mln_bound_options_default(),
       );
-      final outCommandId = arena<Uint64>();
-      _check(raw.mln_map_set_bounds(_handle.raw, nativeOptions, outCommandId));
-      return uint64FromNative(outCommandId.value);
-    });
-  }
+      return raw.mln_map_set_bounds(_handle.raw, nativeOptions, completion);
+    }),
+  );
 
   /// Applies selected free camera position and orientation fields.
-  BigInt setFreeCameraOptions(FreeCameraOptions options) {
-    return withNativeArena<BigInt>((arena) {
-      final nativeOptions = arena<raw.mln_free_camera_options>();
-      nativeOptions.ref = native_struct.freeCameraOptionsToNative(
-        options,
-        raw.mln_free_camera_options_default(),
+  Future<CommandCompletion> setFreeCameraOptions(FreeCameraOptions options) =>
+      _startCommand(
+        (completion) => withNativeArena((arena) {
+          final nativeOptions = arena<raw.mln_free_camera_options>();
+          nativeOptions.ref = native_struct.freeCameraOptionsToNative(
+            options,
+            raw.mln_free_camera_options_default(),
+          );
+          return raw.mln_map_set_free_camera_options(
+            _handle.raw,
+            nativeOptions,
+            completion,
+          );
+        }),
       );
-      final outCommandId = arena<Uint64>();
-      _check(
-        raw.mln_map_set_free_camera_options(
-          _handle.raw,
-          nativeOptions,
-          outCommandId,
-        ),
-      );
-      return uint64FromNative(outCommandId.value);
-    });
-  }
 
   /// Copies axonometric rendering options from the latest map snapshot.
   ProjectionModeOptions projectionMode() => snapshot().projectionMode;
 
   /// Applies selected axonometric rendering option fields.
-  BigInt setProjectionMode(ProjectionModeOptions mode) {
-    return withNativeArena<BigInt>((arena) {
-      final nativeMode = arena<raw.mln_projection_mode>();
-      nativeMode.ref = native_struct.projectionModeOptionsToNative(
-        mode,
-        raw.mln_projection_mode_default(),
+  Future<CommandCompletion> setProjectionMode(ProjectionModeOptions mode) =>
+      _startCommand(
+        (completion) => withNativeArena((arena) {
+          final nativeMode = arena<raw.mln_projection_mode>();
+          nativeMode.ref = native_struct.projectionModeOptionsToNative(
+            mode,
+            raw.mln_projection_mode_default(),
+          );
+          return raw.mln_map_set_projection_mode(
+            _handle.raw,
+            nativeMode,
+            completion,
+          );
+        }),
       );
-      final outCommandId = arena<Uint64>();
-      _check(
-        raw.mln_map_set_projection_mode(_handle.raw, nativeMode, outCommandId),
-      );
-      return uint64FromNative(outCommandId.value);
-    });
-  }
 
   /// Computes a camera that fits geographic bounds after prior commands.
   Future<CameraOptions> cameraForLatLngBounds(
     LatLngBounds bounds, {
     CameraFitOptions fitOptions = const CameraFitOptions(),
-  }) => _cameraFitQuery((arena, outOperation) {
+  }) => _cameraFitQuery((arena, completion) {
     final nativeFitOptions = arena<raw.mln_camera_fit_options>();
     nativeFitOptions.ref = native_struct.cameraFitOptionsToNative(
       fitOptions,
       raw.mln_camera_fit_options_default(),
     );
-    _check(
-      raw.mln_map_camera_for_lat_lng_bounds_start(
-        _handle.raw,
-        native_struct.latLngBoundsToNative(bounds),
-        nativeFitOptions,
-        outOperation,
-      ),
+    return raw.mln_map_camera_for_lat_lng_bounds(
+      _handle.raw,
+      native_struct.latLngBoundsToNative(bounds),
+      nativeFitOptions,
+      completion,
     );
-  }, raw.mln_map_camera_for_lat_lng_bounds_take_result);
+  });
 
   /// Computes a camera that fits geographic coordinates after prior commands.
   Future<CameraOptions> cameraForLatLngs(
     List<LatLng> coordinates, {
     CameraFitOptions fitOptions = const CameraFitOptions(),
-  }) => _cameraFitQuery((arena, outOperation) {
+  }) => _cameraFitQuery((arena, completion) {
     final nativeFitOptions = arena<raw.mln_camera_fit_options>();
     nativeFitOptions.ref = native_struct.cameraFitOptionsToNative(
       fitOptions,
       raw.mln_camera_fit_options_default(),
     );
-    _check(
-      raw.mln_map_camera_for_lat_lngs_start(
-        _handle.raw,
-        _latLngArray(coordinates, arena),
-        coordinates.length,
-        nativeFitOptions,
-        outOperation,
-      ),
+    return raw.mln_map_camera_for_lat_lngs(
+      _handle.raw,
+      _latLngArray(coordinates, arena),
+      coordinates.length,
+      nativeFitOptions,
+      completion,
     );
-  }, raw.mln_map_camera_for_lat_lngs_take_result);
+  });
 
   /// Computes a camera that fits geometry after prior commands.
   Future<CameraOptions> cameraForGeometry(
     Uint8List geometry, {
     CameraFitOptions fitOptions = const CameraFitOptions(),
-  }) => _cameraFitQuery((arena, outOperation) {
+  }) => _cameraFitQuery((arena, completion) {
     final nativeFitOptions = arena<raw.mln_camera_fit_options>();
     nativeFitOptions.ref = native_struct.cameraFitOptionsToNative(
       fitOptions,
       raw.mln_camera_fit_options_default(),
     );
-    _check(
-      raw.mln_map_camera_for_geometry_start(
-        _handle.raw,
-        nativeBufferView(geometry, arena),
-        nativeFitOptions,
-        outOperation,
-      ),
+    return raw.mln_map_camera_for_geometry(
+      _handle.raw,
+      nativeBufferView(geometry, arena),
+      nativeFitOptions,
+      completion,
     );
-  }, raw.mln_map_camera_for_geometry_take_result);
+  });
 
   Future<CameraOptions> _cameraFitQuery(
-    void Function(Arena, Pointer<Uint64>) start,
-    int Function(int, Pointer<raw.mln_camera_options>) take,
-  ) {
-    final operation = withNativeArena((arena) {
-      final outOperation = arena<Uint64>()..value = 0;
-      start(arena, outOperation);
-      return outOperation.value;
-    });
-    return _runtime._takeOperation(operation, () {
-      return withNativeArena((arena) {
-        final outCamera = arena<raw.mln_camera_options>();
-        outCamera.ref.size = sizeOf<raw.mln_camera_options>();
-        _check(take(operation, outCamera));
-        return native_struct.cameraOptionsFromNative(outCamera.ref);
-      });
-    });
-  }
+    int Function(Arena, Pointer<raw.mln_completion>) start,
+  ) => _startMapValue(
+    copyKind:
+        raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
+    elementSize: sizeOf<raw.mln_camera_options>(),
+    start: (completion) => withNativeArena((arena) => start(arena, completion)),
+    decode: (result) => native_struct.cameraOptionsFromNative(
+      result.value.cast<raw.mln_camera_options>().ref,
+    ),
+  );
 
   /// Computes geographic bounds for a camera from two viewport corners.
   ///
@@ -2429,226 +2150,151 @@ final class MapHandle {
   Future<LatLngBounds> _latLngBoundsForCamera(
     CameraOptions camera, {
     required bool unwrapped,
-  }) {
-    final operation = withNativeArena((arena) {
-      final outOperation = arena<Uint64>()..value = 0;
+  }) => _startMapValue(
+    copyKind:
+        raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
+    elementSize: sizeOf<raw.mln_lat_lng_bounds>(),
+    start: (completion) => withNativeArena((arena) {
       final nativeCamera = _nativeCamera(camera, arena);
-      _check(
-        unwrapped
-            ? raw.mln_map_lat_lng_bounds_for_camera_unwrapped_start(
-                _handle.raw,
-                nativeCamera,
-                outOperation,
-              )
-            : raw.mln_map_lat_lng_bounds_for_camera_start(
-                _handle.raw,
-                nativeCamera,
-                outOperation,
-              ),
-      );
-      return outOperation.value;
-    });
-    return _runtime._takeOperation(operation, () {
-      return withNativeArena((arena) {
-        final outBounds = arena<raw.mln_lat_lng_bounds>();
-        _check(
-          unwrapped
-              ? raw.mln_map_lat_lng_bounds_for_camera_unwrapped_take_result(
-                  operation,
-                  outBounds,
-                )
-              : raw.mln_map_lat_lng_bounds_for_camera_take_result(
-                  operation,
-                  outBounds,
-                ),
-        );
-        return native_struct.latLngBoundsFromNative(outBounds.ref);
-      });
-    });
-  }
+      return unwrapped
+          ? raw.mln_map_lat_lng_bounds_for_camera_unwrapped(
+              _handle.raw,
+              nativeCamera,
+              completion,
+            )
+          : raw.mln_map_lat_lng_bounds_for_camera(
+              _handle.raw,
+              nativeCamera,
+              completion,
+            );
+    }),
+    decode: (result) => native_struct.latLngBoundsFromNative(
+      result.value.cast<raw.mln_lat_lng_bounds>().ref,
+    ),
+  );
 
   /// Converts a geographic coordinate after prior commands.
-  Future<ScreenPoint> pixelForLatLng(LatLng coordinate) {
-    final operation = withNativeArena((arena) {
-      final outOperation = arena<Uint64>()..value = 0;
-      _check(
-        raw.mln_map_pixel_for_lat_lng_start(
-          _handle.raw,
-          native_struct.latLngToNative(coordinate),
-          outOperation,
-        ),
-      );
-      return outOperation.value;
-    });
-    return _runtime._takeOperation(operation, () {
-      return withNativeArena((arena) {
-        final outPoint = arena<raw.mln_screen_point>();
-        _check(raw.mln_map_pixel_for_lat_lng_take_result(operation, outPoint));
-        return native_struct.screenPointFromNative(outPoint.ref);
-      });
-    });
-  }
+  Future<ScreenPoint> pixelForLatLng(LatLng coordinate) => _startMapValue(
+    copyKind:
+        raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
+    elementSize: sizeOf<raw.mln_screen_point>(),
+    start: (completion) => raw.mln_map_pixel_for_lat_lng(
+      _handle.raw,
+      native_struct.latLngToNative(coordinate),
+      completion,
+    ),
+    decode: (result) => native_struct.screenPointFromNative(
+      result.value.cast<raw.mln_screen_point>().ref,
+    ),
+  );
 
   /// Converts a screen point after prior commands.
-  Future<LatLng> latLngForPixel(ScreenPoint point) {
-    final operation = withNativeArena((arena) {
-      final outOperation = arena<Uint64>()..value = 0;
-      _check(
-        raw.mln_map_lat_lng_for_pixel_start(
-          _handle.raw,
-          native_struct.screenPointToNative(point),
-          outOperation,
-        ),
-      );
-      return outOperation.value;
-    });
-    return _runtime._takeOperation(operation, () {
-      return withNativeArena((arena) {
-        final outCoordinate = arena<raw.mln_lat_lng>();
-        _check(
-          raw.mln_map_lat_lng_for_pixel_take_result(operation, outCoordinate),
-        );
-        return native_struct.latLngFromNative(outCoordinate.ref);
-      });
-    });
-  }
+  Future<LatLng> latLngForPixel(ScreenPoint point) => _startMapValue(
+    copyKind:
+        raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
+    elementSize: sizeOf<raw.mln_lat_lng>(),
+    start: (completion) => raw.mln_map_lat_lng_for_pixel(
+      _handle.raw,
+      native_struct.screenPointToNative(point),
+      completion,
+    ),
+    decode: (result) => native_struct.latLngFromNative(
+      result.value.cast<raw.mln_lat_lng>().ref,
+    ),
+  );
 
   /// Converts geographic coordinates after prior commands.
   Future<List<ScreenPoint>> pixelsForLatLngs(List<LatLng> coordinates) =>
       _coordinateListQuery<ScreenPoint>(
-        coordinates.length,
-        (arena, outOperation) => _check(
-          raw.mln_map_pixels_for_lat_lngs_start(
-            _handle.raw,
-            _latLngArray(coordinates, arena),
-            coordinates.length,
-            outOperation,
-          ),
+        sizeOf<raw.mln_screen_point>(),
+        (arena, completion) => raw.mln_map_pixels_for_lat_lngs(
+          _handle.raw,
+          _latLngArray(coordinates, arena),
+          coordinates.length,
+          completion,
         ),
-        (operation, arena, count) {
-          final values = count == 0
-              ? nullptr.cast<raw.mln_screen_point>()
-              : arena<raw.mln_screen_point>(count);
-          final outCount = arena<Size>();
-          _check(
-            raw.mln_map_pixels_for_lat_lngs_take_result(
-              operation,
-              values,
-              count,
-              outCount,
-            ),
-          );
-          return [
-            for (var index = 0; index < outCount.value; index += 1)
-              native_struct.screenPointFromNative(values[index]),
-          ];
-        },
+        (values, index) => native_struct.screenPointFromNative(
+          values.cast<raw.mln_screen_point>()[index],
+        ),
       );
 
   /// Converts screen points after prior commands.
-  Future<List<LatLng>> latLngsForPixels(List<ScreenPoint> points) =>
-      _coordinateListQuery<LatLng>(
+  Future<List<LatLng>> latLngsForPixels(
+    List<ScreenPoint> points,
+  ) => _coordinateListQuery<LatLng>(
+    sizeOf<raw.mln_lat_lng>(),
+    (arena, completion) {
+      // Keep argument storage alive until native copies it below.
+      final nativePoints = points.isEmpty
+          ? nullptr.cast<raw.mln_screen_point>()
+          : arena<raw.mln_screen_point>(points.length);
+      for (var index = 0; index < points.length; index += 1) {
+        nativePoints[index] = native_struct.screenPointToNative(points[index]);
+      }
+      return raw.mln_map_lat_lngs_for_pixels(
+        _handle.raw,
+        nativePoints,
         points.length,
-        (arena, outOperation) {
-          final nativePoints = points.isEmpty
-              ? nullptr.cast<raw.mln_screen_point>()
-              : arena<raw.mln_screen_point>(points.length);
-          for (var index = 0; index < points.length; index += 1) {
-            nativePoints[index] = native_struct.screenPointToNative(
-              points[index],
-            );
-          }
-          _check(
-            raw.mln_map_lat_lngs_for_pixels_start(
-              _handle.raw,
-              nativePoints,
-              points.length,
-              outOperation,
-            ),
-          );
-        },
-        (operation, arena, count) {
-          final values = count == 0
-              ? nullptr.cast<raw.mln_lat_lng>()
-              : arena<raw.mln_lat_lng>(count);
-          final outCount = arena<Size>();
-          _check(
-            raw.mln_map_lat_lngs_for_pixels_take_result(
-              operation,
-              values,
-              count,
-              outCount,
-            ),
-          );
-          return [
-            for (var index = 0; index < outCount.value; index += 1)
-              native_struct.latLngFromNative(values[index]),
-          ];
-        },
+        completion,
       );
+    },
+    (values, index) =>
+        native_struct.latLngFromNative(values.cast<raw.mln_lat_lng>()[index]),
+  );
 
   Future<List<T>> _coordinateListQuery<T>(
-    int count,
-    void Function(Arena, Pointer<Uint64>) start,
-    List<T> Function(int, Arena, int) take,
-  ) {
-    final operation = withNativeArena((arena) {
-      final outOperation = arena<Uint64>()..value = 0;
-      start(arena, outOperation);
-      return outOperation.value;
-    });
-    return _runtime._takeOperation(
-      operation,
-      () => withNativeArena((arena) => take(operation, arena, count)),
-    );
-  }
+    int elementSize,
+    int Function(Arena, Pointer<raw.mln_completion>) start,
+    T Function(Pointer<Void>, int) convert,
+  ) => _startMapValue(
+    copyKind:
+        raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
+    elementSize: elementSize,
+    start: (completion) => withNativeArena((arena) => start(arena, completion)),
+    decode: (result) => [
+      for (var index = 0; index < result.value_count; index += 1)
+        convert(result.value, index),
+    ],
+  );
 
   /// Creates a projection helper without blocking the calling isolate.
   ///
   /// The projection copies this map's transform state after every earlier map
   /// command and never observes map changes made after its creation. Every
   /// later projection call is synchronous.
-  Future<MapProjectionHandle> createProjection() {
-    final operation = withNativeArena((arena) {
-      final outOperation = arena<Uint64>()..value = 0;
-      _check(raw.mln_map_projection_create_start(_handle.raw, outOperation));
-      return outOperation.value;
-    });
-    return _runtime._takeOperation(operation, () {
-      return withNativeArena((arena) {
-        final outProjection = arena<Uint64>()..value = 0;
-        _check(
-          raw.mln_map_projection_create_take_result(operation, outProjection),
-        );
-        return MapProjectionHandle._(NativeMapProjection(outProjection.value));
-      });
-    });
-  }
+  Future<MapProjectionHandle> createProjection() => _startMapValue(
+    copyKind:
+        raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
+    elementSize: sizeOf<Uint64>(),
+    start: (completion) =>
+        raw.mln_map_projection_create(_handle.raw, completion),
+    decode: (result) => MapProjectionHandle._(
+      NativeMapProjection(result.value.cast<Uint64>().value),
+    ),
+  );
 
   /// Sets or replaces one runtime style image.
-  BigInt setStyleImage(
+  Future<CommandCompletion> setStyleImage(
     String imageId,
     PremultipliedRgba8Image image, {
     StyleImageOptions? options,
   }) {
     final resolvedOptions = options ?? StyleImageOptions();
-    return withNativeArena((arena) {
+    return _startCommandInArena((arena, completion) {
       final nativeId = nativeStringView(imageId, arena);
       final nativeImage = arena<raw.mln_premultiplied_rgba8_image>();
       nativeImage.ref = _premultipliedRgba8ImageToNative(image, arena);
       final nativeOptions = arena<raw.mln_style_image_options>();
       nativeOptions.ref = _styleImageOptionsToNative(resolvedOptions, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_set_style_image(
           _handle.raw,
           nativeId.value,
           nativeImage,
           nativeOptions,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
@@ -2656,57 +2302,24 @@ final class MapHandle {
   /// image carries [imageId]. The record holds horizontal intervals first.
   Future<({List<ImageStretch> stretchX, List<ImageStretch> stretchY})?>
   getStyleImageStretches(String imageId) {
-    return _styleOperation(
-      (arena, outOperation) {
+    return _startMapValue(
+      copyKind: raw
+          .mln_adapter_completion_copy_kind
+          .MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_STRETCHES,
+      elementSize: sizeOf<raw.mln_style_image_stretches_result>(),
+      start: (completion) => withNativeArena((arena) {
         final nativeId = nativeStringView(imageId, arena);
-        _check(
-          raw.mln_map_copy_style_image_stretches_start(
-            _handle.raw,
-            nativeId.value,
-            outOperation,
-          ),
+        return raw.mln_map_copy_style_image_stretches(
+          _handle.raw,
+          nativeId.value,
+          completion,
         );
-      },
-      (operation, arena) {
-        final outXCount = arena<Size>();
-        final outYCount = arena<Size>();
-        final outFound = arena<Bool>();
-        _check(
-          raw.mln_map_copy_style_image_stretches_take_result(
-            operation,
-            nullptr,
-            0,
-            outXCount,
-            nullptr,
-            0,
-            outYCount,
-            outFound,
-          ),
-        );
-        if (!outFound.value) {
-          return null;
-        }
-
-        final xCount = outXCount.value;
-        final yCount = outYCount.value;
-        final rawX = xCount == 0
-            ? nullptr.cast<raw.mln_image_stretch>()
-            : arena<raw.mln_image_stretch>(xCount);
-        final rawY = yCount == 0
-            ? nullptr.cast<raw.mln_image_stretch>()
-            : arena<raw.mln_image_stretch>(yCount);
-        _check(
-          raw.mln_map_copy_style_image_stretches_take_result(
-            operation,
-            rawX,
-            xCount,
-            outXCount,
-            rawY,
-            yCount,
-            outYCount,
-            outFound,
-          ),
-        );
+      }),
+      decode: (result) {
+        if (result.value_count == 0) return null;
+        final value = result.value
+            .cast<raw.mln_style_image_stretches_result>()
+            .ref;
         List<ImageStretch> read(
           Pointer<raw.mln_image_stretch> array,
           int count,
@@ -2715,199 +2328,118 @@ final class MapHandle {
           (index) => ImageStretch(array[index].from, array[index].to),
         );
         return (
-          stretchX: read(rawX, outXCount.value),
-          stretchY: read(rawY, outYCount.value),
+          stretchX: read(value.stretch_x, value.stretch_x_count),
+          stretchY: read(value.stretch_y, value.stretch_y_count),
         );
       },
     );
   }
 
-  /// Removes one runtime style image and returns the accepted command ID.
+  /// Removes one runtime style image.
   ///
   /// The command fails with [MaplibreStatus.notFound] when no runtime style
   /// image has [imageId].
-  BigInt removeStyleImage(String imageId) {
-    return withNativeArena<BigInt>((arena) {
+  Future<CommandCompletion> removeStyleImage(String imageId) {
+    return _startCommandInArena((arena, completion) {
       final nativeId = nativeStringView(imageId, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
-        raw.mln_map_remove_style_image(
-          _handle.raw,
-          nativeId.value,
-          outCommandId,
-        ),
+        raw.mln_map_remove_style_image(_handle.raw, nativeId.value, completion),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Copies fixed metadata for one runtime style image.
   Future<StyleImageInfo?> getStyleImageInfo(String imageId) {
-    return _styleOperation(
-      (arena, outOperation) {
-        final nativeId = nativeStringView(imageId, arena);
-        _check(
-          raw.mln_map_get_style_image_info_start(
-            _handle.raw,
-            nativeId.value,
-            outOperation,
-          ),
-        );
-      },
-      (operation, arena) {
-        final outInfo = arena<raw.mln_style_image_info>();
-        outInfo.ref = raw.mln_style_image_info_default();
-        final outFound = arena<Bool>();
-        _check(
-          raw.mln_map_get_style_image_info_take_result(
-            operation,
-            outInfo,
-            outFound,
-          ),
-        );
-        return outFound.value ? _styleImageInfoFromNative(outInfo.ref) : null;
-      },
-    );
+    return _startStyleImage(imageId).then((image) => image?.info);
   }
+
+  Future<StyleImage?> _startStyleImage(String imageId) => _startMapValue(
+    copyKind: raw
+        .mln_adapter_completion_copy_kind
+        .MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE,
+    elementSize: sizeOf<raw.mln_style_image_result>(),
+    start: (completion) => withNativeArena((arena) {
+      final nativeId = nativeStringView(imageId, arena);
+      return raw.mln_map_get_style_image_info(
+        _handle.raw,
+        nativeId.value,
+        completion,
+      );
+    }),
+    decode: (result) {
+      if (result.value_count == 0) return null;
+      final value = result.value.cast<raw.mln_style_image_result>().ref;
+      return StyleImage(
+        info: _styleImageInfoFromNative(value.info),
+        bytes: _copyBufferView(value.pixels),
+      );
+    },
+  );
 
   /// Copies one runtime style image as premultiplied RGBA8 pixels.
-  Future<StyleImage?> copyStyleImagePremultipliedRgba8(String imageId) async {
-    final info = await getStyleImageInfo(imageId);
-    if (info == null) {
-      return null;
-    }
-    final bytes = await _styleOperation<Uint8List?>(
-      (arena, outOperation) {
-        final nativeId = nativeStringView(imageId, arena);
-        _check(
-          raw.mln_map_copy_style_image_premultiplied_rgba8_start(
-            _handle.raw,
-            nativeId.value,
-            outOperation,
-          ),
-        );
-      },
-      (operation, arena) {
-        final outPixels = arena<Uint64>()..value = 0;
-        final outFound = arena<Bool>();
-        _check(
-          raw.mln_map_copy_style_image_premultiplied_rgba8_take_result(
-            operation,
-            outPixels,
-            outFound,
-          ),
-        );
-        return outFound.value
-            ? copyOwnedBuffer(NativeOwnedBufferHandle(outPixels.value))
-            : null;
-      },
-    );
-    return bytes == null ? null : StyleImage(info: info, bytes: bytes);
-  }
-
-  Future<T> _styleOperation<T>(
-    void Function(Arena arena, Pointer<Uint64> outOperation) start,
-    T Function(int operation, Arena arena) take,
-  ) {
-    final operation = withNativeArena((arena) {
-      final outOperation = arena<Uint64>()..value = 0;
-      start(arena, outOperation);
-      return outOperation.value;
-    });
-    return _runtime._takeOperation(
-      operation,
-      () => withNativeArena((arena) => take(operation, arena)),
-    );
-  }
-
-  Future<String?> _copyStyleSourceText(
-    String sourceId,
-    int Function(int, raw.mln_buffer_view, Pointer<Uint64>) start,
-    int Function(int, Pointer<Uint64>, Pointer<Bool>) take,
-  ) {
-    return _styleOperation(
-      (arena, outOperation) {
-        final nativeId = nativeStringView(sourceId, arena);
-        _check(start(_handle.raw, nativeId.value, outOperation));
-      },
-      (operation, arena) {
-        final outBuffer = arena<Uint64>()..value = 0;
-        final outFound = arena<Bool>();
-        _check(take(operation, outBuffer, outFound));
-        if (!outFound.value) {
-          return null;
-        }
-        return utf8.decode(
-          copyOwnedBuffer(NativeOwnedBufferHandle(outBuffer.value)),
-        );
-      },
-    );
-  }
+  Future<StyleImage?> copyStyleImagePremultipliedRgba8(String imageId) =>
+      _startStyleImage(imageId);
 
   Future<String> _copyLayerText(
     String layerId,
-    int Function(int, raw.mln_buffer_view, Pointer<Uint64>) start,
-    int Function(int, Pointer<Uint64>) take,
-  ) {
-    return _styleOperation(
-      (arena, outOperation) {
-        final nativeId = nativeStringView(layerId, arena);
-        _check(start(_handle.raw, nativeId.value, outOperation));
-      },
-      (operation, arena) {
-        final outBuffer = arena<Uint64>()..value = 0;
-        _check(take(operation, outBuffer));
-        return utf8.decode(
-          copyOwnedBuffer(NativeOwnedBufferHandle(outBuffer.value)),
-        );
-      },
-    );
-  }
+    int Function(int, raw.mln_buffer_view, Pointer<raw.mln_completion>) start,
+  ) => _startMapValue(
+    copyKind: raw
+        .mln_adapter_completion_copy_kind
+        .MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEWS,
+    elementSize: sizeOf<raw.mln_buffer_view>(),
+    start: (completion) => withNativeArena((arena) {
+      final nativeId = nativeStringView(layerId, arena);
+      return start(_handle.raw, nativeId.value, completion);
+    }),
+    decode: (result) => utf8.decode(
+      _copyBufferView(result.value.cast<raw.mln_buffer_view>().ref),
+    ),
+  );
 
   /// Adds one style source from a style-spec source JSON object.
   ///
-  /// Returns the accepted runtime-wide command ID.
-  BigInt addStyleSourceJson(String sourceId, Uint8List sourceJson) {
-    return withNativeArena<BigInt>((arena) {
+  /// Resolves with the command's terminal disposition and snapshot generation.
+  Future<CommandCompletion> addStyleSourceJson(
+    String sourceId,
+    Uint8List sourceJson,
+  ) {
+    return _startCommandInArena((arena, completion) {
       final nativeId = nativeStringView(sourceId, arena);
       final nativeSourceJson = nativeBufferView(sourceJson, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_add_style_source_json(
           _handle.raw,
           nativeId.value,
           nativeSourceJson,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Adds a GeoJSON source that loads from [url].
-  BigInt addGeoJsonSourceUrl(
+  Future<CommandCompletion> addGeoJsonSourceUrl(
     String sourceId,
     String url, {
     GeoJsonSourceOptions? options,
   }) {
-    return withNativeArena<BigInt>((arena) {
+    return _startCommandInArena((arena, completion) {
       final nativeId = nativeStringView(sourceId, arena);
       final nativeUrl = nativeStringView(url, arena);
       final nativeOptions = _nativeGeoJsonSourceOptions(
         options ?? GeoJsonSourceOptions(),
         arena,
       );
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_add_geojson_source_url(
           _handle.raw,
           nativeId.value,
           nativeUrl.value,
           nativeOptions,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
@@ -2917,37 +2449,36 @@ final class MapHandle {
   /// retains the prepared index, adopting the options the data was prepared
   /// with, fixed for the lifetime of the source, so the data may be closed
   /// as soon as this returns.
-  BigInt addGeoJsonSourceData(String sourceId, GeoJsonSourceDataHandle data) {
-    return withNativeArena<BigInt>((arena) {
+  Future<CommandCompletion> addGeoJsonSourceData(
+    String sourceId,
+    GeoJsonSourceDataHandle data,
+  ) {
+    return _startCommandInArena((arena, completion) {
       final nativeId = nativeStringView(sourceId, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_add_geojson_source_data(
           _handle.raw,
           nativeId.value,
           data._state.handle.raw,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Updates one GeoJSON source to load from [url].
-  BigInt setGeoJsonSourceUrl(String sourceId, String url) {
-    return withNativeArena<BigInt>((arena) {
+  Future<CommandCompletion> setGeoJsonSourceUrl(String sourceId, String url) {
+    return _startCommandInArena((arena, completion) {
       final nativeId = nativeStringView(sourceId, arena);
       final nativeUrl = nativeStringView(url, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_set_geojson_source_url(
           _handle.raw,
           nativeId.value,
           nativeUrl.value,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
@@ -2958,19 +2489,20 @@ final class MapHandle {
   /// [GeoJsonSourceDataHandle.prepare]. Data whose baked-in options differ
   /// from the source's fails the command as an invalid argument, with cluster
   /// properties excepted from the comparison.
-  BigInt setGeoJsonSourceData(String sourceId, GeoJsonSourceDataHandle data) {
-    return withNativeArena<BigInt>((arena) {
+  Future<CommandCompletion> setGeoJsonSourceData(
+    String sourceId,
+    GeoJsonSourceDataHandle data,
+  ) {
+    return _startCommandInArena((arena, completion) {
       final nativeId = nativeStringView(sourceId, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_set_geojson_source_data(
           _handle.raw,
           nativeId.value,
           data._state.handle.raw,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
@@ -2979,54 +2511,52 @@ final class MapHandle {
   /// Tiles are sliced inline during the update pass when either the source's
   /// baked-in [GeoJsonSourceOptions.synchronousTiling] option or this override
   /// enables it.
-  BigInt setGeoJsonSourceSynchronousTiling(String sourceId, bool enabled) {
-    return withNativeArena<BigInt>((arena) {
+  Future<CommandCompletion> setGeoJsonSourceSynchronousTiling(
+    String sourceId,
+    bool enabled,
+  ) {
+    return _startCommandInArena((arena, completion) {
       final nativeId = nativeStringView(sourceId, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_set_geojson_source_synchronous_tiling(
           _handle.raw,
           nativeId.value,
           enabled,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Adds a vector source with a TileJSON URL.
-  BigInt addVectorSourceUrl(
+  Future<CommandCompletion> addVectorSourceUrl(
     String sourceId,
     String url, {
     TileSourceOptions options = const TileSourceOptions(),
   }) {
-    return withNativeArena<BigInt>((arena) {
+    return _startCommandInArena((arena, completion) {
       final nativeId = nativeStringView(sourceId, arena);
       final nativeUrl = nativeStringView(url, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_add_vector_source_url(
           _handle.raw,
           nativeId.value,
           nativeUrl.value,
           _nativeTileSourceOptions(options, arena),
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Adds a vector source with inline tile URL templates.
-  BigInt addVectorSourceTiles(
+  Future<CommandCompletion> addVectorSourceTiles(
     String sourceId,
     List<String> tiles, {
     TileSourceOptions options = const TileSourceOptions(),
   }) {
-    return withNativeArena<BigInt>((arena) {
+    return _startCommandInArena((arena, completion) {
       final nativeId = nativeStringView(sourceId, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_add_vector_source_tiles(
           _handle.raw,
@@ -3034,45 +2564,41 @@ final class MapHandle {
           _stringViewArray(tiles, arena),
           tiles.length,
           _nativeTileSourceOptions(options, arena),
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Adds a raster source with a TileJSON URL.
-  BigInt addRasterSourceUrl(
+  Future<CommandCompletion> addRasterSourceUrl(
     String sourceId,
     String url, {
     TileSourceOptions options = const TileSourceOptions(),
   }) {
-    return withNativeArena<BigInt>((arena) {
+    return _startCommandInArena((arena, completion) {
       final nativeId = nativeStringView(sourceId, arena);
       final nativeUrl = nativeStringView(url, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_add_raster_source_url(
           _handle.raw,
           nativeId.value,
           nativeUrl.value,
           _nativeTileSourceOptions(options, arena),
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Adds a raster source with inline tile URL templates.
-  BigInt addRasterSourceTiles(
+  Future<CommandCompletion> addRasterSourceTiles(
     String sourceId,
     List<String> tiles, {
     TileSourceOptions options = const TileSourceOptions(),
   }) {
-    return withNativeArena<BigInt>((arena) {
+    return _startCommandInArena((arena, completion) {
       final nativeId = nativeStringView(sourceId, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_add_raster_source_tiles(
           _handle.raw,
@@ -3080,45 +2606,41 @@ final class MapHandle {
           _stringViewArray(tiles, arena),
           tiles.length,
           _nativeTileSourceOptions(options, arena),
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Adds a raster DEM source with a TileJSON URL.
-  BigInt addRasterDemSourceUrl(
+  Future<CommandCompletion> addRasterDemSourceUrl(
     String sourceId,
     String url, {
     TileSourceOptions options = const TileSourceOptions(),
   }) {
-    return withNativeArena<BigInt>((arena) {
+    return _startCommandInArena((arena, completion) {
       final nativeId = nativeStringView(sourceId, arena);
       final nativeUrl = nativeStringView(url, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_add_raster_dem_source_url(
           _handle.raw,
           nativeId.value,
           nativeUrl.value,
           _nativeTileSourceOptions(options, arena),
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Adds a raster DEM source with inline tile URL templates.
-  BigInt addRasterDemSourceTiles(
+  Future<CommandCompletion> addRasterDemSourceTiles(
     String sourceId,
     List<String> tiles, {
     TileSourceOptions options = const TileSourceOptions(),
   }) {
-    return withNativeArena<BigInt>((arena) {
+    return _startCommandInArena((arena, completion) {
       final nativeId = nativeStringView(sourceId, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_add_raster_dem_source_tiles(
           _handle.raw,
@@ -3126,23 +2648,21 @@ final class MapHandle {
           _stringViewArray(tiles, arena),
           tiles.length,
           _nativeTileSourceOptions(options, arena),
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Adds an image source that loads its image from [url].
-  BigInt addImageSourceUrl(
+  Future<CommandCompletion> addImageSourceUrl(
     String sourceId,
     List<LatLng> coordinates,
     String url,
   ) {
-    return withNativeArena<BigInt>((arena) {
+    return _startCommandInArena((arena, completion) {
       final nativeId = nativeStringView(sourceId, arena);
       final nativeUrl = nativeStringView(url, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_add_image_source_url(
           _handle.raw,
@@ -3150,24 +2670,22 @@ final class MapHandle {
           _latLngArray(coordinates, arena),
           coordinates.length,
           nativeUrl.value,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Adds an image source with inline image pixels.
-  BigInt addImageSourceImage(
+  Future<CommandCompletion> addImageSourceImage(
     String sourceId,
     List<LatLng> coordinates,
     PremultipliedRgba8Image image,
   ) {
-    return withNativeArena<BigInt>((arena) {
+    return _startCommandInArena((arena, completion) {
       final nativeId = nativeStringView(sourceId, arena);
       final nativeImage = arena<raw.mln_premultiplied_rgba8_image>();
       nativeImage.ref = _premultipliedRgba8ImageToNative(image, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_add_image_source_image(
           _handle.raw,
@@ -3175,101 +2693,89 @@ final class MapHandle {
           _latLngArray(coordinates, arena),
           coordinates.length,
           nativeImage,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Updates an image source to load from [url].
-  BigInt setImageSourceUrl(String sourceId, String url) {
-    return withNativeArena<BigInt>((arena) {
+  Future<CommandCompletion> setImageSourceUrl(String sourceId, String url) {
+    return _startCommandInArena((arena, completion) {
       final nativeId = nativeStringView(sourceId, arena);
       final nativeUrl = nativeStringView(url, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_set_image_source_url(
           _handle.raw,
           nativeId.value,
           nativeUrl.value,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Updates an image source with inline image pixels.
-  BigInt setImageSourceImage(String sourceId, PremultipliedRgba8Image image) {
-    return withNativeArena<BigInt>((arena) {
+  Future<CommandCompletion> setImageSourceImage(
+    String sourceId,
+    PremultipliedRgba8Image image,
+  ) {
+    return _startCommandInArena((arena, completion) {
       final nativeId = nativeStringView(sourceId, arena);
       final nativeImage = arena<raw.mln_premultiplied_rgba8_image>();
       nativeImage.ref = _premultipliedRgba8ImageToNative(image, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_set_image_source_image(
           _handle.raw,
           nativeId.value,
           nativeImage,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Updates image source coordinates.
-  BigInt setImageSourceCoordinates(String sourceId, List<LatLng> coordinates) {
-    return withNativeArena<BigInt>((arena) {
+  Future<CommandCompletion> setImageSourceCoordinates(
+    String sourceId,
+    List<LatLng> coordinates,
+  ) {
+    return _startCommandInArena((arena, completion) {
       final nativeId = nativeStringView(sourceId, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_set_image_source_coordinates(
           _handle.raw,
           nativeId.value,
           _latLngArray(coordinates, arena),
           coordinates.length,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Copies image source coordinates, or null when the source is missing.
   Future<List<LatLng>?> getImageSourceCoordinates(String sourceId) {
-    return _styleOperation(
-      (arena, outOperation) {
+    return _startMapValue(
+      copyKind:
+          raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
+      elementSize: sizeOf<raw.mln_lat_lng>(),
+      start: (completion) => withNativeArena((arena) {
         final nativeId = nativeStringView(sourceId, arena);
-        _check(
-          raw.mln_map_get_image_source_coordinates_start(
-            _handle.raw,
-            nativeId.value,
-            outOperation,
-          ),
+        return raw.mln_map_get_image_source_coordinates(
+          _handle.raw,
+          nativeId.value,
+          completion,
         );
-      },
-      (operation, arena) {
-        final outCoordinates = arena<raw.mln_lat_lng>(4);
-        final outCount = arena<Size>();
-        final outFound = arena<Bool>();
-        _check(
-          raw.mln_map_get_image_source_coordinates_take_result(
-            operation,
-            outCoordinates,
-            4,
-            outCount,
-            outFound,
-          ),
-        );
-        return outFound.value
-            ? [
-                for (var index = 0; index < outCount.value; index += 1)
-                  native_struct.latLngFromNative(outCoordinates[index]),
-              ]
-            : null;
-      },
+      }),
+      decode: (result) => result.value_count == 0
+          ? null
+          : [
+              for (var index = 0; index < result.value_count; index += 1)
+                native_struct.latLngFromNative(
+                  result.value.cast<raw.mln_lat_lng>()[index],
+                ),
+            ],
     );
   }
 
@@ -3278,7 +2784,7 @@ final class MapHandle {
   /// The C API releases the source's callback root when the source is removed,
   /// when a style load drops it, or when this map is destroyed, so a host that
   /// adds a source subscribes to nothing to keep it alive.
-  BigInt addCustomGeometrySource(
+  Future<CommandCompletion> addCustomGeometrySource(
     String sourceId,
     CustomGeometrySourceOptions options,
   ) {
@@ -3286,547 +2792,447 @@ final class MapHandle {
       options,
       () => _releaseCustomGeometryCallbacks(sourceId),
     );
-    try {
-      final commandId = withNativeArena((arena) {
+    final future = _runtime._startCommand(
+      (completion) => withNativeArena((arena) {
         final nativeId = nativeStringView(sourceId, arena);
         final nativeOptions = arena<raw.mln_custom_geometry_source_options>();
         nativeOptions.ref = _customGeometrySourceOptionsToNative(
           options,
           callbackState,
         );
-        final outCommandId = arena<Uint64>()..value = 0;
-        _check(
-          raw.mln_map_add_custom_geometry_source(
-            _handle.raw,
-            nativeId.value,
-            nativeOptions,
-            outCommandId,
-          ),
+        return raw.mln_map_add_custom_geometry_source(
+          _handle.raw,
+          nativeId.value,
+          nativeOptions,
+          completion,
         );
-        return outCommandId.value;
-      });
-      _pendingStyleCallbacks[commandId] = (
-        sourceId: sourceId,
-        state: callbackState,
-      );
-      return uint64FromNative(commandId);
-    } catch (_) {
-      callbackState.close();
-      rethrow;
-    }
+      }),
+      onRejected: callbackState.close,
+    );
+    future.then((completion) {
+      if (completion.disposition == CommandDisposition.committed) {
+        _customGeometryCallbacks[sourceId] = callbackState;
+      } else {
+        callbackState.close();
+      }
+    }, onError: (_, _) => callbackState.close());
+    return future;
   }
 
   /// Sets custom geometry source data for one canonical tile.
-  BigInt setCustomGeometrySourceTileData(
+  Future<CommandCompletion> setCustomGeometrySourceTileData(
     String sourceId,
     CanonicalTileId tileId,
     Uint8List data,
   ) {
-    return withNativeArena((arena) {
+    return _startCommandInArena((arena, completion) {
       final nativeId = nativeStringView(sourceId, arena);
       final nativeData = nativeBufferView(data, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_set_custom_geometry_source_tile_data(
           _handle.raw,
           nativeId.value,
           _canonicalTileIdToNative(tileId),
           nativeData,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Invalidates custom geometry source data for one canonical tile.
-  BigInt invalidateCustomGeometrySourceTile(
+  Future<CommandCompletion> invalidateCustomGeometrySourceTile(
     String sourceId,
     CanonicalTileId tileId,
   ) {
-    return withNativeArena((arena) {
+    return _startCommandInArena((arena, completion) {
       final nativeId = nativeStringView(sourceId, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_invalidate_custom_geometry_source_tile(
           _handle.raw,
           nativeId.value,
           _canonicalTileIdToNative(tileId),
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Invalidates custom geometry source data inside one geographic region.
-  BigInt invalidateCustomGeometrySourceRegion(
+  Future<CommandCompletion> invalidateCustomGeometrySourceRegion(
     String sourceId,
     LatLngBounds bounds,
   ) {
-    return withNativeArena((arena) {
+    return _startCommandInArena((arena, completion) {
       final nativeId = nativeStringView(sourceId, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_invalidate_custom_geometry_source_region(
           _handle.raw,
           nativeId.value,
           native_struct.latLngBoundsToNative(bounds),
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
-  /// Removes one style source by ID and returns the accepted command ID.
+  /// Removes one style source by ID.
   ///
   /// The command fails with [MaplibreStatus.notFound] when no style source
   /// has [sourceId], and with [MaplibreStatus.invalidState] when a layer
   /// still uses the source.
-  BigInt removeStyleSource(String sourceId) {
-    return withNativeArena<BigInt>((arena) {
+  Future<CommandCompletion> removeStyleSource(String sourceId) {
+    return _startCommandInArena((arena, completion) {
       final nativeId = nativeStringView(sourceId, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_remove_style_source(
           _handle.raw,
           nativeId.value,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Copies fixed style source metadata after prior commands.
-  Future<SourceInfo?> getStyleSourceInfo(String sourceId) async {
-    late int fields;
-    late int type;
-    late bool isVolatile;
-    late bool hasAttribution;
-    late double minZoom;
-    late double maxZoom;
-    late int scheme;
-    late LatLngBounds bounds;
-    late int tileSize;
-    late int vectorEncoding;
-    late int rasterEncoding;
-    final found = await _styleOperation(
-      (arena, outOperation) {
-        final nativeId = nativeStringView(sourceId, arena);
-        _check(
-          raw.mln_map_get_style_source_info_start(
-            _handle.raw,
-            nativeId.value,
-            outOperation,
-          ),
-        );
-      },
-      (operation, arena) {
-        final outInfo = arena<raw.mln_style_source_info>();
-        outInfo.ref.size = sizeOf<raw.mln_style_source_info>();
-        final outFound = arena<Bool>();
-        _check(
-          raw.mln_map_get_style_source_info_take_result(
-            operation,
-            outInfo,
-            outFound,
-          ),
-        );
-        if (!outFound.value) {
-          return false;
-        }
-        final info = outInfo.ref;
-        fields = info.fields;
-        type = info.type;
-        isVolatile = info.is_volatile;
-        hasAttribution = info.has_attribution;
-        minZoom = info.min_zoom;
-        maxZoom = info.max_zoom;
-        scheme = info.scheme;
-        bounds = native_struct.latLngBoundsFromNative(info.bounds);
-        tileSize = info.tile_size;
-        vectorEncoding = info.vector_encoding;
-        rasterEncoding = info.raster_encoding;
-        return true;
-      },
-    );
-    if (!found) {
-      return null;
-    }
-    final hasUrl =
-        fields &
-            raw.mln_style_source_info_field.MLN_STYLE_SOURCE_INFO_URL.value !=
-        0;
-    final hasTileJson =
-        fields &
-            raw
-                .mln_style_source_info_field
-                .MLN_STYLE_SOURCE_INFO_TILEJSON
-                .value !=
-        0;
-    final hasBounds =
-        fields &
-            raw
-                .mln_style_source_info_field
-                .MLN_STYLE_SOURCE_INFO_BOUNDS
-                .value !=
-        0;
-    final hasTileSize =
-        fields &
-            raw
-                .mln_style_source_info_field
-                .MLN_STYLE_SOURCE_INFO_TILE_SIZE
-                .value !=
-        0;
-    final hasVectorEncoding =
-        fields &
-            raw
-                .mln_style_source_info_field
-                .MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING
-                .value !=
-        0;
-    final hasRasterEncoding =
-        fields &
-            raw
-                .mln_style_source_info_field
-                .MLN_STYLE_SOURCE_INFO_RASTER_ENCODING
-                .value !=
-        0;
-    final attribution = hasAttribution
-        ? await _copyStyleSourceText(
-            sourceId,
-            raw.mln_map_copy_style_source_attribution_start,
-            raw.mln_map_copy_style_source_attribution_take_result,
-          )
-        : null;
-    final url = hasUrl
-        ? await _copyStyleSourceText(
-            sourceId,
-            raw.mln_map_copy_style_source_url_start,
-            raw.mln_map_copy_style_source_url_take_result,
-          )
-        : null;
-    final tileUrls = hasTileJson
-        ? await _styleOperation<List<String>?>(
-            (arena, outOperation) {
-              final nativeId = nativeStringView(sourceId, arena);
-              _check(
-                raw.mln_map_get_style_source_tile_urls_start(
-                  _handle.raw,
-                  nativeId.value,
-                  outOperation,
-                ),
-              );
-            },
-            (operation, arena) {
-              final outList = arena<Uint64>()..value = 0;
-              final outFound = arena<Bool>();
-              _check(
-                raw.mln_map_get_style_source_tile_urls_take_result(
-                  operation,
-                  outList,
-                  outFound,
-                ),
-              );
-              return outFound.value
-                  ? _copyStyleStringList(NativeStyleStringList(outList.value))
-                  : null;
-            },
-          )
-        : null;
-    return SourceInfo(
-      type: SourceType.fromRaw(type),
-      id: sourceId,
-      isVolatile: isVolatile,
-      attribution: attribution,
-      url: url,
-      tileJson: hasTileJson
-          ? ParsedTileJson(
-              tileUrls: tileUrls ?? const [],
-              minZoom: minZoom,
-              maxZoom: maxZoom,
-              scheme: TileScheme.fromRaw(scheme),
-              bounds: hasBounds ? bounds : null,
-            )
-          : null,
-      tileSize: hasTileSize ? tileSize : null,
-      vectorEncoding: hasVectorEncoding
-          ? VectorTileEncoding.fromRaw(vectorEncoding)
-          : null,
-      rasterDemEncoding: hasRasterEncoding
-          ? RasterDemEncoding.fromRaw(rasterEncoding)
-          : null,
-    );
-  }
+  Future<SourceInfo?> getStyleSourceInfo(String sourceId) => _startMapValue(
+    copyKind: raw
+        .mln_adapter_completion_copy_kind
+        .MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE,
+    elementSize: sizeOf<raw.mln_style_source_result>(),
+    start: (completion) => withNativeArena((arena) {
+      final nativeId = nativeStringView(sourceId, arena);
+      return raw.mln_map_get_style_source_info(
+        _handle.raw,
+        nativeId.value,
+        completion,
+      );
+    }),
+    decode: (result) {
+      if (result.value_count == 0) return null;
+      final value = result.value.cast<raw.mln_style_source_result>().ref;
+      final info = value.info;
+      final hasUrl =
+          info.fields &
+              raw.mln_style_source_info_field.MLN_STYLE_SOURCE_INFO_URL.value !=
+          0;
+      final hasTileJson =
+          info.fields &
+              raw
+                  .mln_style_source_info_field
+                  .MLN_STYLE_SOURCE_INFO_TILEJSON
+                  .value !=
+          0;
+      final hasBounds =
+          info.fields &
+              raw
+                  .mln_style_source_info_field
+                  .MLN_STYLE_SOURCE_INFO_BOUNDS
+                  .value !=
+          0;
+      final hasTileSize =
+          info.fields &
+              raw
+                  .mln_style_source_info_field
+                  .MLN_STYLE_SOURCE_INFO_TILE_SIZE
+                  .value !=
+          0;
+      final hasVectorEncoding =
+          info.fields &
+              raw
+                  .mln_style_source_info_field
+                  .MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING
+                  .value !=
+          0;
+      final hasRasterEncoding =
+          info.fields &
+              raw
+                  .mln_style_source_info_field
+                  .MLN_STYLE_SOURCE_INFO_RASTER_ENCODING
+                  .value !=
+          0;
+      return SourceInfo(
+        type: SourceType.fromRaw(info.type),
+        id: sourceId,
+        isVolatile: info.is_volatile,
+        attribution: info.has_attribution
+            ? utf8.decode(_copyBufferView(value.attribution))
+            : null,
+        url: hasUrl ? utf8.decode(_copyBufferView(value.url)) : null,
+        tileJson: hasTileJson
+            ? ParsedTileJson(
+                tileUrls: [
+                  for (var index = 0; index < value.tile_url_count; index += 1)
+                    utf8.decode(_copyBufferView(value.tile_urls[index])),
+                ],
+                minZoom: info.min_zoom,
+                maxZoom: info.max_zoom,
+                scheme: TileScheme.fromRaw(info.scheme),
+                bounds: hasBounds
+                    ? native_struct.latLngBoundsFromNative(info.bounds)
+                    : null,
+              )
+            : null,
+        tileSize: hasTileSize ? info.tile_size : null,
+        vectorEncoding: hasVectorEncoding
+            ? VectorTileEncoding.fromRaw(info.vector_encoding)
+            : null,
+        rasterDemEncoding: hasRasterEncoding
+            ? RasterDemEncoding.fromRaw(info.raster_encoding)
+            : null,
+      );
+    },
+  );
 
   /// Copies style source IDs in style order after prior commands.
-  Future<List<String>> listStyleSourceIds() {
-    return _styleOperation(
-      (arena, outOperation) {
-        _check(
-          raw.mln_map_list_style_source_ids_start(_handle.raw, outOperation),
-        );
-      },
-      (operation, arena) {
-        final outList = arena<Uint64>()..value = 0;
-        _check(
-          raw.mln_map_list_style_source_ids_take_result(operation, outList),
-        );
-        return _copyStyleIdList(NativeStyleIdList(outList.value));
-      },
-    );
-  }
+  Future<List<String>> listStyleSourceIds() => _startStringList(
+    (completion) => raw.mln_map_list_style_source_ids(_handle.raw, completion),
+  );
+
+  Future<List<String>> _startStringList(NativeCompletionStart start) =>
+      _startMapValue(
+        copyKind: raw
+            .mln_adapter_completion_copy_kind
+            .MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEWS,
+        elementSize: sizeOf<raw.mln_buffer_view>(),
+        start: start,
+        decode: (result) => [
+          for (var index = 0; index < result.value_count; index += 1)
+            utf8.decode(
+              _copyBufferView(result.value.cast<raw.mln_buffer_view>()[index]),
+            ),
+        ],
+      );
+
+  Future<Uint8List?> _startOptionalBuffer(NativeCompletionStart start) =>
+      _startMapValue(
+        copyKind: raw
+            .mln_adapter_completion_copy_kind
+            .MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEWS,
+        elementSize: sizeOf<raw.mln_buffer_view>(),
+        start: start,
+        decode: (result) => result.value_count == 0
+            ? null
+            : _copyBufferView(result.value.cast<raw.mln_buffer_view>().ref),
+      );
 
   /// Adds a hillshade layer for a raster DEM source.
-  BigInt addHillshadeLayer(
+  Future<CommandCompletion> addHillshadeLayer(
     String layerId,
     String sourceId, {
     String? beforeLayerId,
   }) {
-    return withNativeArena((arena) {
+    return _startCommandInArena((arena, completion) {
       final nativeLayerId = nativeStringView(layerId, arena);
       final nativeSourceId = nativeStringView(sourceId, arena);
       final nativeBeforeLayerId = nativeStringView(beforeLayerId ?? '', arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_add_hillshade_layer(
           _handle.raw,
           nativeLayerId.value,
           nativeSourceId.value,
           nativeBeforeLayerId.value,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Adds a color-relief layer for a raster DEM source.
-  BigInt addColorReliefLayer(
+  Future<CommandCompletion> addColorReliefLayer(
     String layerId,
     String sourceId, {
     String? beforeLayerId,
   }) {
-    return withNativeArena((arena) {
+    return _startCommandInArena((arena, completion) {
       final nativeLayerId = nativeStringView(layerId, arena);
       final nativeSourceId = nativeStringView(sourceId, arena);
       final nativeBeforeLayerId = nativeStringView(beforeLayerId ?? '', arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_add_color_relief_layer(
           _handle.raw,
           nativeLayerId.value,
           nativeSourceId.value,
           nativeBeforeLayerId.value,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Adds a source-free location indicator layer.
-  BigInt addLocationIndicatorLayer(String layerId, {String? beforeLayerId}) {
-    return withNativeArena<BigInt>((arena) {
+  Future<CommandCompletion> addLocationIndicatorLayer(
+    String layerId, {
+    String? beforeLayerId,
+  }) {
+    return _startCommandInArena((arena, completion) {
       final nativeLayerId = nativeStringView(layerId, arena);
       final nativeBeforeLayerId = nativeStringView(beforeLayerId ?? '', arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_add_location_indicator_layer(
           _handle.raw,
           nativeLayerId.value,
           nativeBeforeLayerId.value,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Sets a location indicator layer location.
-  BigInt setLocationIndicatorLocation(
+  Future<CommandCompletion> setLocationIndicatorLocation(
     String layerId,
     LatLng coordinate, {
     double altitude = 0,
   }) {
-    return withNativeArena<BigInt>((arena) {
+    return _startCommandInArena((arena, completion) {
       final nativeLayerId = nativeStringView(layerId, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_set_location_indicator_location(
           _handle.raw,
           nativeLayerId.value,
           native_struct.latLngToNative(coordinate),
           altitude,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Sets a location indicator layer bearing in degrees.
-  BigInt setLocationIndicatorBearing(String layerId, double bearing) {
-    return withNativeArena<BigInt>((arena) {
+  Future<CommandCompletion> setLocationIndicatorBearing(
+    String layerId,
+    double bearing,
+  ) {
+    return _startCommandInArena((arena, completion) {
       final nativeLayerId = nativeStringView(layerId, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_set_location_indicator_bearing(
           _handle.raw,
           nativeLayerId.value,
           bearing,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Sets a location indicator layer accuracy radius in logical pixels.
-  BigInt setLocationIndicatorAccuracyRadius(String layerId, double radius) {
-    return withNativeArena<BigInt>((arena) {
+  Future<CommandCompletion> setLocationIndicatorAccuracyRadius(
+    String layerId,
+    double radius,
+  ) {
+    return _startCommandInArena((arena, completion) {
       final nativeLayerId = nativeStringView(layerId, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_set_location_indicator_accuracy_radius(
           _handle.raw,
           nativeLayerId.value,
           radius,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Sets one location indicator image-name property.
-  BigInt setLocationIndicatorImageName(
+  Future<CommandCompletion> setLocationIndicatorImageName(
     String layerId,
     LocationIndicatorImageKind imageKind,
     String imageId,
   ) {
-    return withNativeArena<BigInt>((arena) {
+    return _startCommandInArena((arena, completion) {
       final nativeLayerId = nativeStringView(layerId, arena);
       final nativeImageId = nativeStringView(imageId, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_set_location_indicator_image_name(
           _handle.raw,
           nativeLayerId.value,
           imageKind.rawValue,
           nativeImageId.value,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Adds one style layer from a full style-spec layer JSON object.
-  BigInt addStyleLayerJson(Uint8List layerJson, {String? beforeLayerId}) {
-    return withNativeArena<BigInt>((arena) {
+  Future<CommandCompletion> addStyleLayerJson(
+    Uint8List layerJson, {
+    String? beforeLayerId,
+  }) {
+    return _startCommandInArena((arena, completion) {
       final nativeLayerJson = nativeBufferView(layerJson, arena);
       final nativeBeforeLayerId = nativeStringView(beforeLayerId ?? '', arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_add_style_layer_json(
           _handle.raw,
           nativeLayerJson,
           nativeBeforeLayerId.value,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Copies one style layer as a full style-spec layer JSON snapshot.
   Future<Uint8List?> getStyleLayerJson(String layerId) {
-    return _styleOperation(
-      (arena, outOperation) {
+    return _startOptionalBuffer(
+      (completion) => withNativeArena((arena) {
         final nativeId = nativeStringView(layerId, arena);
-        _check(
-          raw.mln_map_get_style_layer_json_start(
-            _handle.raw,
-            nativeId.value,
-            outOperation,
-          ),
+        return raw.mln_map_get_style_layer_json(
+          _handle.raw,
+          nativeId.value,
+          completion,
         );
-      },
-      (operation, arena) {
-        final outLayer = arena<Uint64>()..value = 0;
-        final outFound = arena<Bool>();
-        _check(
-          raw.mln_map_get_style_layer_json_take_result(
-            operation,
-            outLayer,
-            outFound,
-          ),
-        );
-        return outFound.value
-            ? copyOwnedBuffer(NativeOwnedBufferHandle(outLayer.value))
-            : null;
-      },
+      }),
     );
   }
 
   /// Sets the style light from a style-spec light JSON object.
-  BigInt setStyleLightJson(Uint8List lightJson) {
-    return withNativeArena<BigInt>((arena) {
+  Future<CommandCompletion> setStyleLightJson(Uint8List lightJson) {
+    return _startCommandInArena((arena, completion) {
       final nativeLightJson = nativeBufferView(lightJson, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_set_style_light_json(
           _handle.raw,
           nativeLightJson,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Sets one style light property by style-spec property name.
-  BigInt setStyleLightProperty(String propertyName, Uint8List value) {
-    return withNativeArena<BigInt>((arena) {
+  Future<CommandCompletion> setStyleLightProperty(
+    String propertyName,
+    Uint8List value,
+  ) {
+    return _startCommandInArena((arena, completion) {
       final nativePropertyName = nativeStringView(propertyName, arena);
       final nativeValue = nativeBufferView(value, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_set_style_light_property(
           _handle.raw,
           nativePropertyName.value,
           nativeValue,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Copies one style light property, or null when the property is undefined.
   Future<Uint8List?> getStyleLightProperty(String propertyName) {
-    return _styleOperation(
-      (arena, outOperation) {
+    return _startOptionalBuffer(
+      (completion) => withNativeArena((arena) {
         final nativePropertyName = nativeStringView(propertyName, arena);
-        _check(
-          raw.mln_map_get_style_light_property_start(
-            _handle.raw,
-            nativePropertyName.value,
-            outOperation,
-          ),
+        return raw.mln_map_get_style_light_property(
+          _handle.raw,
+          nativePropertyName.value,
+          completion,
         );
-      },
-      (operation, arena) {
-        final outValue = arena<Uint64>()..value = 0;
-        _check(
-          raw.mln_map_get_style_light_property_take_result(operation, outValue),
-        );
-        final buffer = NativeOwnedBufferHandle(outValue.value);
-        return buffer.isNull ? null : copyOwnedBuffer(buffer);
-      },
+      }),
     );
   }
 
@@ -3835,378 +3241,292 @@ final class MapHandle {
   /// This replaces the whole transition configuration rather than merging into
   /// it, and loading a style replaces it again with the style's own options, so
   /// apply an override after the style loads.
-  BigInt setStyleTransitionOptions(StyleTransitionOptions options) {
-    return withNativeArena<BigInt>((arena) {
+  Future<CommandCompletion> setStyleTransitionOptions(
+    StyleTransitionOptions options,
+  ) {
+    return _startCommandInArena((arena, completion) {
       final nativeOptions = arena<raw.mln_style_transition_options>();
       nativeOptions.ref = _styleTransitionOptionsToNative(options);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_set_style_transition_options(
           _handle.raw,
           nativeOptions,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Copies the style's global transition options.
   Future<StyleTransitionOptions> getStyleTransitionOptions() {
-    return _styleOperation(
-      (arena, outOperation) {
-        _check(
-          raw.mln_map_get_style_transition_options_start(
-            _handle.raw,
-            outOperation,
-          ),
-        );
-      },
-      (operation, arena) {
-        final outOptions = arena<raw.mln_style_transition_options>();
-        outOptions.ref = raw.mln_style_transition_options_default();
-        _check(
-          raw.mln_map_get_style_transition_options_take_result(
-            operation,
-            outOptions,
-          ),
-        );
-        return _styleTransitionOptionsFromNative(outOptions.ref);
-      },
+    return _startMapValue(
+      copyKind:
+          raw.mln_adapter_completion_copy_kind.MLN_ADAPTER_COMPLETION_COPY_FLAT,
+      elementSize: sizeOf<raw.mln_style_transition_options>(),
+      start: (completion) =>
+          raw.mln_map_get_style_transition_options(_handle.raw, completion),
+      decode: (result) => _styleTransitionOptionsFromNative(
+        result.value.cast<raw.mln_style_transition_options>().ref,
+      ),
     );
   }
 
   /// Sets one layer property by style-spec property name.
-  BigInt setLayerProperty(
+  Future<CommandCompletion> setLayerProperty(
     String layerId,
     String propertyName,
     Uint8List value,
   ) {
-    return withNativeArena<BigInt>((arena) {
+    return _startCommandInArena((arena, completion) {
       final nativeLayerId = nativeStringView(layerId, arena);
       final nativePropertyName = nativeStringView(propertyName, arena);
       final nativeValue = nativeBufferView(value, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_set_layer_property(
           _handle.raw,
           nativeLayerId.value,
           nativePropertyName.value,
           nativeValue,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Copies one layer property, or null when the property is undefined.
   Future<Uint8List?> getLayerProperty(String layerId, String propertyName) {
-    return _styleOperation(
-      (arena, outOperation) {
+    return _startOptionalBuffer(
+      (completion) => withNativeArena((arena) {
         final nativeLayerId = nativeStringView(layerId, arena);
         final nativePropertyName = nativeStringView(propertyName, arena);
-        _check(
-          raw.mln_map_get_layer_property_start(
-            _handle.raw,
-            nativeLayerId.value,
-            nativePropertyName.value,
-            outOperation,
-          ),
+        return raw.mln_map_get_layer_property(
+          _handle.raw,
+          nativeLayerId.value,
+          nativePropertyName.value,
+          completion,
         );
-      },
-      (operation, arena) {
-        final outValue = arena<Uint64>()..value = 0;
-        _check(raw.mln_map_get_layer_property_take_result(operation, outValue));
-        final buffer = NativeOwnedBufferHandle(outValue.value);
-        return buffer.isNull ? null : copyOwnedBuffer(buffer);
-      },
+      }),
     );
   }
 
   /// Sets or clears one layer filter.
-  BigInt setLayerFilter(String layerId, Uint8List? filter) {
-    return withNativeArena<BigInt>((arena) {
+  Future<CommandCompletion> setLayerFilter(String layerId, Uint8List? filter) {
+    return _startCommandInArena((arena, completion) {
       final nativeLayerId = nativeStringView(layerId, arena);
       final nativeFilter = filter == null
           ? nullptr.cast<raw.mln_buffer_view>()
           : (arena<raw.mln_buffer_view>()
               ..ref = nativeBufferView(filter, arena));
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_set_layer_filter(
           _handle.raw,
           nativeLayerId.value,
           nativeFilter,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Copies one layer filter, or null when the layer has no filter.
   Future<Uint8List?> getLayerFilter(String layerId) {
-    return _styleOperation(
-      (arena, outOperation) {
+    return _startOptionalBuffer(
+      (completion) => withNativeArena((arena) {
         final nativeLayerId = nativeStringView(layerId, arena);
-        _check(
-          raw.mln_map_get_layer_filter_start(
-            _handle.raw,
-            nativeLayerId.value,
-            outOperation,
-          ),
+        return raw.mln_map_get_layer_filter(
+          _handle.raw,
+          nativeLayerId.value,
+          completion,
         );
-      },
-      (operation, arena) {
-        final outFilter = arena<Uint64>()..value = 0;
-        _check(raw.mln_map_get_layer_filter_take_result(operation, outFilter));
-        final buffer = NativeOwnedBufferHandle(outFilter.value);
-        return buffer.isNull ? null : copyOwnedBuffer(buffer);
-      },
+      }),
     );
   }
 
   /// Sets one layer's source-layer ID.
   ///
   /// Layer types that take no source, such as background, are rejected.
-  BigInt setLayerSourceLayer(String layerId, String sourceLayer) {
-    return withNativeArena<BigInt>((arena) {
+  Future<CommandCompletion> setLayerSourceLayer(
+    String layerId,
+    String sourceLayer,
+  ) {
+    return _startCommandInArena((arena, completion) {
       final nativeLayerId = nativeStringView(layerId, arena);
       final nativeSourceLayer = nativeStringView(sourceLayer, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_set_layer_source_layer(
           _handle.raw,
           nativeLayerId.value,
           nativeSourceLayer.value,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Copies one layer's source-layer ID, empty when the layer carries none.
   Future<String> getLayerSourceLayer(String layerId) {
-    return _copyLayerText(
-      layerId,
-      raw.mln_map_copy_layer_source_layer_start,
-      raw.mln_map_copy_layer_source_layer_take_result,
-    );
+    return _copyLayerText(layerId, raw.mln_map_copy_layer_source_layer);
   }
 
   /// Sets one layer's source ID.
   ///
   /// Layer types that take no source, such as background, are rejected. The
   /// named source need not exist yet.
-  BigInt setLayerSourceId(String layerId, String sourceId) {
-    return withNativeArena<BigInt>((arena) {
+  Future<CommandCompletion> setLayerSourceId(String layerId, String sourceId) {
+    return _startCommandInArena((arena, completion) {
       final nativeLayerId = nativeStringView(layerId, arena);
       final nativeSourceId = nativeStringView(sourceId, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_set_layer_source_id(
           _handle.raw,
           nativeLayerId.value,
           nativeSourceId.value,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Copies one layer's source ID, empty when the layer carries none.
   Future<String> getLayerSourceId(String layerId) {
-    return _copyLayerText(
-      layerId,
-      raw.mln_map_copy_layer_source_id_start,
-      raw.mln_map_copy_layer_source_id_take_result,
-    );
+    return _copyLayerText(layerId, raw.mln_map_copy_layer_source_id);
   }
 
   /// Sets the lowest zoom at which one layer draws.
   ///
   /// Pass `double.negativeInfinity` for no lower bound.
-  BigInt setLayerMinZoom(String layerId, double minZoom) {
-    return withNativeArena<BigInt>((arena) {
+  Future<CommandCompletion> setLayerMinZoom(String layerId, double minZoom) {
+    return _startCommandInArena((arena, completion) {
       final nativeLayerId = nativeStringView(layerId, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_set_layer_min_zoom(
           _handle.raw,
           nativeLayerId.value,
           minZoom,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Sets the highest zoom at which one layer draws.
   ///
   /// Pass `double.infinity` for no upper bound.
-  BigInt setLayerMaxZoom(String layerId, double maxZoom) {
-    return withNativeArena<BigInt>((arena) {
+  Future<CommandCompletion> setLayerMaxZoom(String layerId, double maxZoom) {
+    return _startCommandInArena((arena, completion) {
       final nativeLayerId = nativeStringView(layerId, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_set_layer_max_zoom(
           _handle.raw,
           nativeLayerId.value,
           maxZoom,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Sets whether one layer draws.
-  BigInt setLayerVisibility(String layerId, StyleLayerVisibility visibility) {
-    return withNativeArena<BigInt>((arena) {
+  Future<CommandCompletion> setLayerVisibility(
+    String layerId,
+    StyleLayerVisibility visibility,
+  ) {
+    return _startCommandInArena((arena, completion) {
       final nativeLayerId = nativeStringView(layerId, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_set_layer_visibility(
           _handle.raw,
           nativeLayerId.value,
           visibility.rawValue,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Copies fixed style layer metadata, or null when no layer has [layerId].
-  Future<LayerInfo?> getStyleLayerInfo(String layerId) async {
-    late String type;
-    late double minZoom;
-    late double maxZoom;
-    late StyleLayerVisibility visibility;
-    late bool hasSourceId;
-    late bool hasSourceLayer;
-    final found = await _styleOperation(
-      (arena, outOperation) {
-        final nativeId = nativeStringView(layerId, arena);
-        _check(
-          raw.mln_map_get_style_layer_info_start(
-            _handle.raw,
-            nativeId.value,
-            outOperation,
-          ),
-        );
-      },
-      (operation, arena) {
-        final outInfo = arena<raw.mln_style_layer_info>();
-        outInfo.ref.size = sizeOf<raw.mln_style_layer_info>();
-        final outFound = arena<Bool>();
-        _check(
-          raw.mln_map_get_style_layer_info_take_result(
-            operation,
-            outInfo,
-            outFound,
-          ),
-        );
-        if (!outFound.value) {
-          return false;
-        }
-        final info = outInfo.ref;
-        // The type view names a static style-spec string that stays valid for
-        // the life of the process.
-        type = _copyStringView(info.type) ?? '';
-        minZoom = info.min_zoom;
-        maxZoom = info.max_zoom;
-        visibility = StyleLayerVisibility.fromRawValue(info.visibility);
-        hasSourceId =
-            info.fields &
-                raw
-                    .mln_style_layer_info_field
-                    .MLN_STYLE_LAYER_INFO_SOURCE_ID
-                    .value !=
-            0;
-        hasSourceLayer =
-            info.fields &
-                raw
-                    .mln_style_layer_info_field
-                    .MLN_STYLE_LAYER_INFO_SOURCE_LAYER
-                    .value !=
-            0;
-        return true;
-      },
-    );
-    if (!found) {
-      return null;
-    }
-    final sourceId = hasSourceId ? await getLayerSourceId(layerId) : null;
-    final sourceLayer = hasSourceLayer
-        ? await getLayerSourceLayer(layerId)
-        : null;
-    return LayerInfo(
-      type: type,
-      minZoom: minZoom,
-      maxZoom: maxZoom,
-      visibility: visibility,
-      sourceId: sourceId,
-      sourceLayer: sourceLayer,
-    );
-  }
+  Future<LayerInfo?> getStyleLayerInfo(String layerId) => _startMapValue(
+    copyKind: raw
+        .mln_adapter_completion_copy_kind
+        .MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER,
+    elementSize: sizeOf<raw.mln_style_layer_result>(),
+    start: (completion) => withNativeArena((arena) {
+      final nativeId = nativeStringView(layerId, arena);
+      return raw.mln_map_get_style_layer_info(
+        _handle.raw,
+        nativeId.value,
+        completion,
+      );
+    }),
+    decode: (result) {
+      if (result.value_count == 0) return null;
+      final value = result.value.cast<raw.mln_style_layer_result>().ref;
+      final info = value.info;
+      final hasSourceId =
+          info.fields &
+              raw
+                  .mln_style_layer_info_field
+                  .MLN_STYLE_LAYER_INFO_SOURCE_ID
+                  .value !=
+          0;
+      final hasSourceLayer =
+          info.fields &
+              raw
+                  .mln_style_layer_info_field
+                  .MLN_STYLE_LAYER_INFO_SOURCE_LAYER
+                  .value !=
+          0;
+      return LayerInfo(
+        type: _copyStringView(info.type) ?? '',
+        minZoom: info.min_zoom,
+        maxZoom: info.max_zoom,
+        visibility: StyleLayerVisibility.fromRawValue(info.visibility),
+        sourceId: hasSourceId
+            ? utf8.decode(_copyBufferView(value.source_id))
+            : null,
+        sourceLayer: hasSourceLayer
+            ? utf8.decode(_copyBufferView(value.source_layer))
+            : null,
+      );
+    },
+  );
 
   /// Moves one style layer before another layer or to the top.
-  BigInt moveStyleLayer(String layerId, {String? beforeLayerId}) {
-    return withNativeArena<BigInt>((arena) {
+  Future<CommandCompletion> moveStyleLayer(
+    String layerId, {
+    String? beforeLayerId,
+  }) {
+    return _startCommandInArena((arena, completion) {
       final nativeLayerId = nativeStringView(layerId, arena);
       final nativeBeforeLayerId = nativeStringView(beforeLayerId ?? '', arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
         raw.mln_map_move_style_layer(
           _handle.raw,
           nativeLayerId.value,
           nativeBeforeLayerId.value,
-          outCommandId,
+          completion,
         ),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
-  /// Removes one style layer by ID and returns the accepted command ID.
+  /// Removes one style layer by ID.
   ///
   /// The command fails with [MaplibreStatus.notFound] when no style layer has
   /// [layerId].
-  BigInt removeStyleLayer(String layerId) {
-    return withNativeArena<BigInt>((arena) {
+  Future<CommandCompletion> removeStyleLayer(String layerId) {
+    return _startCommandInArena((arena, completion) {
       final nativeId = nativeStringView(layerId, arena);
-      final outCommandId = arena<Uint64>()..value = 0;
       _check(
-        raw.mln_map_remove_style_layer(
-          _handle.raw,
-          nativeId.value,
-          outCommandId,
-        ),
+        raw.mln_map_remove_style_layer(_handle.raw, nativeId.value, completion),
       );
-      return uint64FromNative(outCommandId.value);
     });
   }
 
   /// Copies style layer IDs in style order.
   Future<List<String>> listStyleLayerIds() {
-    return _styleOperation(
-      (arena, outOperation) {
-        _check(
-          raw.mln_map_list_style_layer_ids_start(_handle.raw, outOperation),
-        );
-      },
-      (operation, arena) {
-        final outList = arena<Uint64>()..value = 0;
-        _check(
-          raw.mln_map_list_style_layer_ids_take_result(operation, outList),
-        );
-        return _copyStyleIdList(NativeStyleIdList(outList.value));
-      },
+    return _startStringList(
+      (completion) => raw.mln_map_list_style_layer_ids(_handle.raw, completion),
     );
   }
 
@@ -4219,8 +3539,7 @@ final class MapHandle {
     await _state.closeAsync((handle) async {
       _check(raw.mln_map_release(handle.raw));
       // Dart listener callbacks arrive on this isolate. A barrier submitted
-      // after release keeps the callback roots alive through native teardown
-      // and drains preceding command-finished events.
+      // after release keeps the callback roots alive through native teardown.
       await _runtime.barrier();
       // Native release callbacks are listener callbacks. Yield on this isolate
       // before retiring any root whose release message has not run yet.
@@ -4228,25 +3547,9 @@ final class MapHandle {
       for (final state in _customGeometryCallbacks.values.toList()) {
         state._retire();
       }
-      for (final pending in _pendingStyleCallbacks.values.toList()) {
-        pending.state._retire();
-      }
       await Future<void>.delayed(Duration.zero);
     });
     _runtime._unregisterMapId(id);
-  }
-
-  /// Drops [sourceId]'s callback root once the C API has released it.
-  void _finishStyleCommand(int commandId, CommandDisposition disposition) {
-    final pending = _pendingStyleCallbacks.remove(commandId);
-    if (pending == null) {
-      return;
-    }
-    if (disposition == CommandDisposition.committed) {
-      _customGeometryCallbacks[pending.sourceId] = pending.state;
-    } else {
-      pending.state.close();
-    }
   }
 
   void _releaseCustomGeometryCallbacks(String sourceId) {

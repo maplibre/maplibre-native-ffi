@@ -11,81 +11,66 @@ import (
 )
 
 func (m *MapHandle) startRenderAttach(
-	start func(C.mln_map, *C.mln_render_session, *C.mln_operation) int32,
-) (*RenderSessionHandle, *OperationHandle[struct{}], error) {
+	start func(C.mln_map, *C.mln_render_session, *C.mln_completion) int32,
+) (*RenderSessionHandle, *Future[struct{}], error) {
 	ptr, err := m.ptr()
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var session C.mln_render_session
-	var operation C.mln_operation
-	if err := checkNative(func() int32 {
-		return start(C.mln_map(ptr), &session, &operation)
-	}); err != nil {
+	attach, err := startCompletion(func(completion *C.mln_completion) int32 {
+		return start(C.mln_map(ptr), &session, completion)
+	}, completionUnit)
+	if err != nil {
 		return nil, nil, err
 	}
-	if session == 0 || operation == 0 {
-		if operation != 0 {
-			C.mln_operation_release(operation)
-		}
-		if session != 0 {
-			var abandoned C.mln_render_abandon_result
-			abandoned.size = C.uint32_t(unsafe.Sizeof(abandoned))
-			_ = C.mln_render_session_abandon(session, &abandoned)
-			_ = C.mln_render_session_destroy(session)
-		}
-		return nil, nil, newBindingError(ErrInvalidState, "render attach did not return a session and operation")
+	if session == 0 {
+		return nil, nil, newBindingError(ErrInvalidState, "render attach did not return a session")
 	}
 
 	result, err := newRenderSessionHandle(m, nativeRenderSession(session))
 	if err != nil {
-		C.mln_operation_release(operation)
 		var abandoned C.mln_render_abandon_result
 		abandoned.size = C.uint32_t(unsafe.Sizeof(abandoned))
 		_ = C.mln_render_session_abandon(session, &abandoned)
 		_ = C.mln_render_session_destroy(session)
 		return nil, nil, err
 	}
-	attach := newOperationHandle[struct{}](
-		m.runtime,
-		uint64(operation),
-		0,
-		operationResultNone,
-	)
+	attach.retain(result)
 	return result, attach, nil
 }
 
 func (m *MapHandle) AttachMetalSurface(
 	descriptor MetalSurfaceDescriptor,
 	options RenderSessionAttachOptions,
-) (*RenderSessionHandle, *OperationHandle[struct{}], error) {
+) (*RenderSessionHandle, *Future[struct{}], error) {
 	if err := descriptor.Extent.validate(); err != nil {
 		return nil, nil, err
 	}
 	rawDescriptor, rawOptions := descriptor.toC(), options.toC()
-	return m.startRenderAttach(func(m C.mln_map, session *C.mln_render_session, operation *C.mln_operation) int32 {
-		return int32(C.mln_metal_surface_attach_start(m, &rawDescriptor, &rawOptions, session, operation))
+	return m.startRenderAttach(func(m C.mln_map, session *C.mln_render_session, operation *C.mln_completion) int32 {
+		return int32(C.mln_metal_surface_attach(m, &rawDescriptor, &rawOptions, session, operation))
 	})
 }
 
 func (m *MapHandle) AttachVulkanSurface(
 	descriptor VulkanSurfaceDescriptor,
 	options RenderSessionAttachOptions,
-) (*RenderSessionHandle, *OperationHandle[struct{}], error) {
+) (*RenderSessionHandle, *Future[struct{}], error) {
 	if err := descriptor.Extent.validate(); err != nil {
 		return nil, nil, err
 	}
 	rawDescriptor, rawOptions := descriptor.toC(), options.toC()
-	return m.startRenderAttach(func(m C.mln_map, session *C.mln_render_session, operation *C.mln_operation) int32 {
-		return int32(C.mln_vulkan_surface_attach_start(m, &rawDescriptor, &rawOptions, session, operation))
+	return m.startRenderAttach(func(m C.mln_map, session *C.mln_render_session, operation *C.mln_completion) int32 {
+		return int32(C.mln_vulkan_surface_attach(m, &rawDescriptor, &rawOptions, session, operation))
 	})
 }
 
 func (m *MapHandle) AttachOpenGLSurface(
 	descriptor OpenGLSurfaceDescriptor,
 	options RenderSessionAttachOptions,
-) (*RenderSessionHandle, *OperationHandle[struct{}], error) {
+) (*RenderSessionHandle, *Future[struct{}], error) {
 	if err := descriptor.Extent.validate(); err != nil {
 		return nil, nil, err
 	}
@@ -94,67 +79,67 @@ func (m *MapHandle) AttachOpenGLSurface(
 	}
 	rawDescriptor, rawOptions := descriptor.toC(), options.toC()
 	defer runtime.KeepAlive(descriptor)
-	return m.startRenderAttach(func(m C.mln_map, session *C.mln_render_session, operation *C.mln_operation) int32 {
-		return int32(C.mln_opengl_surface_attach_start(m, &rawDescriptor, &rawOptions, session, operation))
+	return m.startRenderAttach(func(m C.mln_map, session *C.mln_render_session, operation *C.mln_completion) int32 {
+		return int32(C.mln_opengl_surface_attach(m, &rawDescriptor, &rawOptions, session, operation))
 	})
 }
 
 func (m *MapHandle) AttachMetalOwnedTexture(
 	descriptor MetalOwnedTextureDescriptor,
 	options RenderSessionAttachOptions,
-) (*RenderSessionHandle, *OperationHandle[struct{}], error) {
+) (*RenderSessionHandle, *Future[struct{}], error) {
 	if err := descriptor.Extent.validate(); err != nil {
 		return nil, nil, err
 	}
 	rawDescriptor, rawOptions := descriptor.toC(), options.toC()
-	return m.startRenderAttach(func(m C.mln_map, session *C.mln_render_session, operation *C.mln_operation) int32 {
-		return int32(C.mln_metal_owned_texture_attach_start(m, &rawDescriptor, &rawOptions, session, operation))
+	return m.startRenderAttach(func(m C.mln_map, session *C.mln_render_session, operation *C.mln_completion) int32 {
+		return int32(C.mln_metal_owned_texture_attach(m, &rawDescriptor, &rawOptions, session, operation))
 	})
 }
 
 func (m *MapHandle) AttachMetalBorrowedTexture(
 	descriptor MetalBorrowedTextureDescriptor,
 	options RenderSessionAttachOptions,
-) (*RenderSessionHandle, *OperationHandle[struct{}], error) {
+) (*RenderSessionHandle, *Future[struct{}], error) {
 	if err := descriptor.Extent.validate(); err != nil {
 		return nil, nil, err
 	}
 	rawDescriptor, rawOptions := descriptor.toC(), options.toC()
-	return m.startRenderAttach(func(m C.mln_map, session *C.mln_render_session, operation *C.mln_operation) int32 {
-		return int32(C.mln_metal_borrowed_texture_attach_start(m, &rawDescriptor, &rawOptions, session, operation))
+	return m.startRenderAttach(func(m C.mln_map, session *C.mln_render_session, operation *C.mln_completion) int32 {
+		return int32(C.mln_metal_borrowed_texture_attach(m, &rawDescriptor, &rawOptions, session, operation))
 	})
 }
 
 func (m *MapHandle) AttachVulkanOwnedTexture(
 	descriptor VulkanOwnedTextureDescriptor,
 	options RenderSessionAttachOptions,
-) (*RenderSessionHandle, *OperationHandle[struct{}], error) {
+) (*RenderSessionHandle, *Future[struct{}], error) {
 	if err := descriptor.Extent.validate(); err != nil {
 		return nil, nil, err
 	}
 	rawDescriptor, rawOptions := descriptor.toC(), options.toC()
-	return m.startRenderAttach(func(m C.mln_map, session *C.mln_render_session, operation *C.mln_operation) int32 {
-		return int32(C.mln_vulkan_owned_texture_attach_start(m, &rawDescriptor, &rawOptions, session, operation))
+	return m.startRenderAttach(func(m C.mln_map, session *C.mln_render_session, operation *C.mln_completion) int32 {
+		return int32(C.mln_vulkan_owned_texture_attach(m, &rawDescriptor, &rawOptions, session, operation))
 	})
 }
 
 func (m *MapHandle) AttachVulkanBorrowedTexture(
 	descriptor VulkanBorrowedTextureDescriptor,
 	options RenderSessionAttachOptions,
-) (*RenderSessionHandle, *OperationHandle[struct{}], error) {
+) (*RenderSessionHandle, *Future[struct{}], error) {
 	if err := descriptor.Extent.validate(); err != nil {
 		return nil, nil, err
 	}
 	rawDescriptor, rawOptions := descriptor.toC(), options.toC()
-	return m.startRenderAttach(func(m C.mln_map, session *C.mln_render_session, operation *C.mln_operation) int32 {
-		return int32(C.mln_vulkan_borrowed_texture_attach_start(m, &rawDescriptor, &rawOptions, session, operation))
+	return m.startRenderAttach(func(m C.mln_map, session *C.mln_render_session, operation *C.mln_completion) int32 {
+		return int32(C.mln_vulkan_borrowed_texture_attach(m, &rawDescriptor, &rawOptions, session, operation))
 	})
 }
 
 func (m *MapHandle) AttachOpenGLOwnedTexture(
 	descriptor OpenGLOwnedTextureDescriptor,
 	options RenderSessionAttachOptions,
-) (*RenderSessionHandle, *OperationHandle[struct{}], error) {
+) (*RenderSessionHandle, *Future[struct{}], error) {
 	if err := descriptor.Extent.validate(); err != nil {
 		return nil, nil, err
 	}
@@ -163,15 +148,15 @@ func (m *MapHandle) AttachOpenGLOwnedTexture(
 	}
 	rawDescriptor, rawOptions := descriptor.toC(), options.toC()
 	defer runtime.KeepAlive(descriptor)
-	return m.startRenderAttach(func(m C.mln_map, session *C.mln_render_session, operation *C.mln_operation) int32 {
-		return int32(C.mln_opengl_owned_texture_attach_start(m, &rawDescriptor, &rawOptions, session, operation))
+	return m.startRenderAttach(func(m C.mln_map, session *C.mln_render_session, operation *C.mln_completion) int32 {
+		return int32(C.mln_opengl_owned_texture_attach(m, &rawDescriptor, &rawOptions, session, operation))
 	})
 }
 
 func (m *MapHandle) AttachOpenGLBorrowedTexture(
 	descriptor OpenGLBorrowedTextureDescriptor,
 	options RenderSessionAttachOptions,
-) (*RenderSessionHandle, *OperationHandle[struct{}], error) {
+) (*RenderSessionHandle, *Future[struct{}], error) {
 	if err := descriptor.Extent.validate(); err != nil {
 		return nil, nil, err
 	}
@@ -180,15 +165,15 @@ func (m *MapHandle) AttachOpenGLBorrowedTexture(
 	}
 	rawDescriptor, rawOptions := descriptor.toC(), options.toC()
 	defer runtime.KeepAlive(descriptor)
-	return m.startRenderAttach(func(m C.mln_map, session *C.mln_render_session, operation *C.mln_operation) int32 {
-		return int32(C.mln_opengl_borrowed_texture_attach_start(m, &rawDescriptor, &rawOptions, session, operation))
+	return m.startRenderAttach(func(m C.mln_map, session *C.mln_render_session, operation *C.mln_completion) int32 {
+		return int32(C.mln_opengl_borrowed_texture_attach(m, &rawDescriptor, &rawOptions, session, operation))
 	})
 }
 
 func (m *MapHandle) AttachWebGPUSurface(
 	descriptor WebGPUSurfaceDescriptor,
 	options RenderSessionAttachOptions,
-) (*RenderSessionHandle, *OperationHandle[struct{}], error) {
+) (*RenderSessionHandle, *Future[struct{}], error) {
 	if err := descriptor.Extent.validate(); err != nil {
 		return nil, nil, err
 	}
@@ -196,16 +181,16 @@ func (m *MapHandle) AttachWebGPUSurface(
 	return m.startRenderAttach(func(
 		m C.mln_map,
 		session *C.mln_render_session,
-		operation *C.mln_operation,
+		operation *C.mln_completion,
 	) int32 {
-		return int32(C.mln_webgpu_surface_attach_start(m, &rawDescriptor, &rawOptions, session, operation))
+		return int32(C.mln_webgpu_surface_attach(m, &rawDescriptor, &rawOptions, session, operation))
 	})
 }
 
 func (m *MapHandle) AttachWebGPUOwnedTexture(
 	descriptor WebGPUOwnedTextureDescriptor,
 	options RenderSessionAttachOptions,
-) (*RenderSessionHandle, *OperationHandle[struct{}], error) {
+) (*RenderSessionHandle, *Future[struct{}], error) {
 	if err := descriptor.Extent.validate(); err != nil {
 		return nil, nil, err
 	}
@@ -213,16 +198,16 @@ func (m *MapHandle) AttachWebGPUOwnedTexture(
 	return m.startRenderAttach(func(
 		m C.mln_map,
 		session *C.mln_render_session,
-		operation *C.mln_operation,
+		operation *C.mln_completion,
 	) int32 {
-		return int32(C.mln_webgpu_owned_texture_attach_start(m, &rawDescriptor, &rawOptions, session, operation))
+		return int32(C.mln_webgpu_owned_texture_attach(m, &rawDescriptor, &rawOptions, session, operation))
 	})
 }
 
 func (m *MapHandle) AttachWebGPUBorrowedTexture(
 	descriptor WebGPUBorrowedTextureDescriptor,
 	options RenderSessionAttachOptions,
-) (*RenderSessionHandle, *OperationHandle[struct{}], error) {
+) (*RenderSessionHandle, *Future[struct{}], error) {
 	if err := descriptor.Extent.validate(); err != nil {
 		return nil, nil, err
 	}
@@ -230,9 +215,9 @@ func (m *MapHandle) AttachWebGPUBorrowedTexture(
 	return m.startRenderAttach(func(
 		m C.mln_map,
 		session *C.mln_render_session,
-		operation *C.mln_operation,
+		operation *C.mln_completion,
 	) int32 {
-		return int32(C.mln_webgpu_borrowed_texture_attach_start(m, &rawDescriptor, &rawOptions, session, operation))
+		return int32(C.mln_webgpu_borrowed_texture_attach(m, &rawDescriptor, &rawOptions, session, operation))
 	})
 }
 
@@ -248,28 +233,9 @@ func (s *RenderSessionHandle) ptr() (nativeRenderSession, error) {
 }
 
 func (s *RenderSessionHandle) startOperation(
-	start func(C.mln_render_session, *C.mln_operation) int32,
-) (*OperationHandle[struct{}], error) {
-	ptr, err := s.ptr()
-	if err != nil {
-		return nil, err
-	}
-
-	var operation C.mln_operation
-	if err := checkNative(func() int32 {
-		return start(C.mln_render_session(ptr), &operation)
-	}); err != nil {
-		return nil, err
-	}
-	if operation == 0 {
-		return nil, newBindingError(ErrInvalidState, "render operation did not return an operation")
-	}
-	return newOperationHandle[struct{}](
-		s.parent.runtime,
-		uint64(operation),
-		0,
-		operationResultNone,
-	), nil
+	start func(C.mln_render_session, *C.mln_completion) int32,
+) (*Future[struct{}], error) {
+	return startRenderCompletion(s, start, completionUnit)
 }
 
 func (s *RenderSessionHandle) Capabilities() (RenderSessionCapabilities, error) {
@@ -622,101 +588,60 @@ func (f *AcquiredFrame) WebGPUTexture() (WebGPUOwnedTextureFrameInfo, error) {
 	return info, err
 }
 
-func (s *RenderSessionHandle) ResizeStart(extent RenderTargetExtent) (*OperationHandle[struct{}], error) {
+func (s *RenderSessionHandle) Resize(extent RenderTargetExtent) (*Future[struct{}], error) {
 	if err := extent.validate(); err != nil {
 		return nil, err
 	}
 	raw := extent.toC()
-	return s.startOperation(func(session C.mln_render_session, operation *C.mln_operation) int32 {
-		return int32(C.mln_render_session_resize_start(session, &raw, operation))
+	return s.startOperation(func(session C.mln_render_session, operation *C.mln_completion) int32 {
+		return int32(C.mln_render_session_resize(session, &raw, operation))
 	})
 }
 
-func (s *RenderSessionHandle) BarrierStart() (*OperationHandle[struct{}], error) {
-	return s.startOperation(func(session C.mln_render_session, operation *C.mln_operation) int32 {
-		return int32(C.mln_render_session_barrier_start(session, operation))
+func (s *RenderSessionHandle) Barrier() (*Future[struct{}], error) {
+	return s.startOperation(func(session C.mln_render_session, operation *C.mln_completion) int32 {
+		return int32(C.mln_render_session_barrier(session, operation))
 	})
 }
 
-func (s *RenderSessionHandle) ReduceMemoryUseStart() (*OperationHandle[struct{}], error) {
-	return s.startOperation(func(session C.mln_render_session, operation *C.mln_operation) int32 {
-		return int32(C.mln_render_session_reduce_memory_use_start(session, operation))
+func (s *RenderSessionHandle) ReduceMemoryUse() (*Future[struct{}], error) {
+	return s.startOperation(func(session C.mln_render_session, operation *C.mln_completion) int32 {
+		return int32(C.mln_render_session_reduce_memory_use(session, operation))
 	})
 }
 
-func (s *RenderSessionHandle) ClearDataStart() (*OperationHandle[struct{}], error) {
-	return s.startOperation(func(session C.mln_render_session, operation *C.mln_operation) int32 {
-		return int32(C.mln_render_session_clear_data_start(session, operation))
+func (s *RenderSessionHandle) ClearData() (*Future[struct{}], error) {
+	return s.startOperation(func(session C.mln_render_session, operation *C.mln_completion) int32 {
+		return int32(C.mln_render_session_clear_data(session, operation))
 	})
 }
 
-func (s *RenderSessionHandle) DumpDebugLogsStart() (*OperationHandle[struct{}], error) {
-	return s.startOperation(func(session C.mln_render_session, operation *C.mln_operation) int32 {
-		return int32(C.mln_render_session_dump_debug_logs_start(session, operation))
+func (s *RenderSessionHandle) DumpDebugLogs() (*Future[struct{}], error) {
+	return s.startOperation(func(session C.mln_render_session, operation *C.mln_completion) int32 {
+		return int32(C.mln_render_session_dump_debug_logs(session, operation))
 	})
 }
 
-func (s *RenderSessionHandle) DetachStart() (*OperationHandle[struct{}], error) {
-	return s.startOperation(func(session C.mln_render_session, operation *C.mln_operation) int32 {
-		return int32(C.mln_render_session_detach_start(session, operation))
+func (s *RenderSessionHandle) Detach() (*Future[struct{}], error) {
+	return s.startOperation(func(session C.mln_render_session, operation *C.mln_completion) int32 {
+		return int32(C.mln_render_session_detach(session, operation))
 	})
 }
 
-func (s *RenderSessionHandle) ReadPremultipliedRGBA8Start() (*OperationHandle[TextureReadback], error) {
-	ptr, err := s.ptr()
-	if err != nil {
-		return nil, err
-	}
-
-	var rawOperation C.mln_operation
-	if err := checkNative(func() int32 {
-		return int32(C.mln_texture_read_premultiplied_rgba8_start(
-			C.mln_render_session(ptr),
-			&rawOperation,
-		))
-	}); err != nil {
-		return nil, err
-	}
-	if rawOperation == 0 {
-		return nil, newBindingError(ErrInvalidState, "texture readback did not return an operation")
-	}
-	operation := newOperationHandle[TextureReadback](
-		s.parent.runtime,
-		uint64(rawOperation),
-		0,
-		0,
-	)
-	operation.takeResult = func(id uint64) (TextureReadback, bool, error) {
-		var buffer C.mln_buffer
-		var info C.mln_texture_image_info
-		info.size = C.uint32_t(unsafe.Sizeof(info))
-		if err := checkNative(func() int32 {
-			return int32(C.mln_texture_read_premultiplied_rgba8_take_result(
-				C.mln_operation(id),
-				&buffer,
-				&info,
-			))
-		}); err != nil {
-			return TextureReadback{}, false, err
+func (s *RenderSessionHandle) ReadPremultipliedRGBA8() (*Future[TextureReadback], error) {
+	return startRenderCompletion(s, func(session C.mln_render_session, completion *C.mln_completion) int32 {
+		return int32(C.mln_texture_read_premultiplied_rgba8(session, completion))
+	}, func(result *C.mln_completion_result) (TextureReadback, error) {
+		raw, err := completionValue[C.mln_texture_readback_result](result)
+		if err != nil {
+			return TextureReadback{}, err
 		}
-		if buffer == 0 {
-			return TextureReadback{Info: textureImageInfoFromC(info)}, true, nil
+		data, ok := goByteSlice(raw.data.data, raw.data.size)
+		if !ok {
+			return TextureReadback{}, newBindingError(ErrNative, "native texture readback is invalid")
 		}
-		defer C.mln_buffer_destroy(buffer)
-
-		var view C.mln_buffer_view
-		if err := checkNative(func() int32 {
-			return int32(C.mln_buffer_get(buffer, &view))
-		}); err != nil {
-			return TextureReadback{}, true, err
-		}
-		data := append([]byte(nil), unsafe.Slice((*byte)(view.data), int(view.size))...)
-		return TextureReadback{
-			Data: data,
-			Info: textureImageInfoFromC(info),
-		}, true, nil
-	}
-	return operation, nil
+		return TextureReadback{Data: data, Info: textureImageInfoFromC(raw.info)}, nil
+	})
 }
 
 func (s *RenderSessionHandle) Abandon() (RenderAbandonResult, error) {
@@ -752,9 +677,9 @@ func (s *RenderSessionHandle) Close() error {
 	return nil
 }
 
-func (s *RenderSessionHandle) SetOpenGLBorrowedTextureTargetStart(
+func (s *RenderSessionHandle) SetOpenGLBorrowedTextureTarget(
 	descriptor OpenGLBorrowedTextureDescriptor,
-) (*OperationHandle[struct{}], error) {
+) (*Future[struct{}], error) {
 	if err := descriptor.Extent.validate(); err != nil {
 		return nil, err
 	}
@@ -763,14 +688,14 @@ func (s *RenderSessionHandle) SetOpenGLBorrowedTextureTargetStart(
 	}
 	raw := descriptor.toC()
 	defer runtime.KeepAlive(descriptor)
-	return s.startOperation(func(session C.mln_render_session, operation *C.mln_operation) int32 {
-		return int32(C.mln_opengl_borrowed_texture_set_target_start(session, &raw, operation))
+	return s.startOperation(func(session C.mln_render_session, operation *C.mln_completion) int32 {
+		return int32(C.mln_opengl_borrowed_texture_set_target(session, &raw, operation))
 	})
 }
 
-func (s *RenderSessionHandle) SetOpenGLSurfaceTargetStart(
+func (s *RenderSessionHandle) SetOpenGLSurfaceTarget(
 	descriptor OpenGLSurfaceDescriptor,
-) (*OperationHandle[struct{}], error) {
+) (*Future[struct{}], error) {
 	if err := descriptor.Extent.validate(); err != nil {
 		return nil, err
 	}
@@ -779,79 +704,79 @@ func (s *RenderSessionHandle) SetOpenGLSurfaceTargetStart(
 	}
 	raw := descriptor.toC()
 	defer runtime.KeepAlive(descriptor)
-	return s.startOperation(func(session C.mln_render_session, operation *C.mln_operation) int32 {
-		return int32(C.mln_opengl_surface_set_target_start(session, &raw, operation))
+	return s.startOperation(func(session C.mln_render_session, operation *C.mln_completion) int32 {
+		return int32(C.mln_opengl_surface_set_target(session, &raw, operation))
 	})
 }
 
-func (s *RenderSessionHandle) SetMetalSurfaceTargetStart(
+func (s *RenderSessionHandle) SetMetalSurfaceTarget(
 	descriptor MetalSurfaceDescriptor,
-) (*OperationHandle[struct{}], error) {
+) (*Future[struct{}], error) {
 	if err := descriptor.Extent.validate(); err != nil {
 		return nil, err
 	}
 	raw := descriptor.toC()
-	return s.startOperation(func(session C.mln_render_session, operation *C.mln_operation) int32 {
-		return int32(C.mln_metal_surface_set_target_start(session, &raw, operation))
+	return s.startOperation(func(session C.mln_render_session, operation *C.mln_completion) int32 {
+		return int32(C.mln_metal_surface_set_target(session, &raw, operation))
 	})
 }
 
-func (s *RenderSessionHandle) SetVulkanSurfaceTargetStart(
+func (s *RenderSessionHandle) SetVulkanSurfaceTarget(
 	descriptor VulkanSurfaceDescriptor,
-) (*OperationHandle[struct{}], error) {
+) (*Future[struct{}], error) {
 	if err := descriptor.Extent.validate(); err != nil {
 		return nil, err
 	}
 	raw := descriptor.toC()
-	return s.startOperation(func(session C.mln_render_session, operation *C.mln_operation) int32 {
-		return int32(C.mln_vulkan_surface_set_target_start(session, &raw, operation))
+	return s.startOperation(func(session C.mln_render_session, operation *C.mln_completion) int32 {
+		return int32(C.mln_vulkan_surface_set_target(session, &raw, operation))
 	})
 }
 
-func (s *RenderSessionHandle) SetMetalBorrowedTextureTargetStart(
+func (s *RenderSessionHandle) SetMetalBorrowedTextureTarget(
 	descriptor MetalBorrowedTextureDescriptor,
-) (*OperationHandle[struct{}], error) {
+) (*Future[struct{}], error) {
 	if err := descriptor.Extent.validate(); err != nil {
 		return nil, err
 	}
 	raw := descriptor.toC()
-	return s.startOperation(func(session C.mln_render_session, operation *C.mln_operation) int32 {
-		return int32(C.mln_metal_borrowed_texture_set_target_start(session, &raw, operation))
+	return s.startOperation(func(session C.mln_render_session, operation *C.mln_completion) int32 {
+		return int32(C.mln_metal_borrowed_texture_set_target(session, &raw, operation))
 	})
 }
 
-func (s *RenderSessionHandle) SetVulkanBorrowedTextureTargetStart(
+func (s *RenderSessionHandle) SetVulkanBorrowedTextureTarget(
 	descriptor VulkanBorrowedTextureDescriptor,
-) (*OperationHandle[struct{}], error) {
+) (*Future[struct{}], error) {
 	if err := descriptor.Extent.validate(); err != nil {
 		return nil, err
 	}
 	raw := descriptor.toC()
-	return s.startOperation(func(session C.mln_render_session, operation *C.mln_operation) int32 {
-		return int32(C.mln_vulkan_borrowed_texture_set_target_start(session, &raw, operation))
+	return s.startOperation(func(session C.mln_render_session, operation *C.mln_completion) int32 {
+		return int32(C.mln_vulkan_borrowed_texture_set_target(session, &raw, operation))
 	})
 }
 
-func (s *RenderSessionHandle) SetWebGPUSurfaceTargetStart(
+func (s *RenderSessionHandle) SetWebGPUSurfaceTarget(
 	descriptor WebGPUSurfaceDescriptor,
-) (*OperationHandle[struct{}], error) {
+) (*Future[struct{}], error) {
 	if err := descriptor.Extent.validate(); err != nil {
 		return nil, err
 	}
 	raw := descriptor.toC()
-	return s.startOperation(func(session C.mln_render_session, operation *C.mln_operation) int32 {
-		return int32(C.mln_webgpu_surface_set_target_start(session, &raw, operation))
+	return s.startOperation(func(session C.mln_render_session, operation *C.mln_completion) int32 {
+		return int32(C.mln_webgpu_surface_set_target(session, &raw, operation))
 	})
 }
 
-func (s *RenderSessionHandle) SetWebGPUBorrowedTextureTargetStart(
+func (s *RenderSessionHandle) SetWebGPUBorrowedTextureTarget(
 	descriptor WebGPUBorrowedTextureDescriptor,
-) (*OperationHandle[struct{}], error) {
+) (*Future[struct{}], error) {
 	if err := descriptor.Extent.validate(); err != nil {
 		return nil, err
 	}
 	raw := descriptor.toC()
-	return s.startOperation(func(session C.mln_render_session, operation *C.mln_operation) int32 {
-		return int32(C.mln_webgpu_borrowed_texture_set_target_start(session, &raw, operation))
+	return s.startOperation(func(session C.mln_render_session, operation *C.mln_completion) int32 {
+		return int32(C.mln_webgpu_borrowed_texture_set_target(session, &raw, operation))
 	})
 }

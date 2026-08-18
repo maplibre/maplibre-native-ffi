@@ -48,10 +48,7 @@ test "style source removal reports state and copies missing results" {
     try testing.expect(!try support.styleSourceExists(&map, "remove-me"));
 
     // A removal of a missing ID is accepted, then fails with NOT_FOUND.
-    const missing_id = try map.removeStyleSource(testing.allocator, "remove-me");
-    const missing = try support.waitForCommandFinished(&runtime, missing_id);
-    try testing.expect(std.meta.eql(missing.disposition, maplibre.CommandDisposition.failed));
-    try testing.expectError(error.NotFound, missing.status);
+    try support.expectCommandError(&runtime, try map.removeStyleSource(testing.allocator, "remove-me"), error.NotFound);
 
     try testing.expect((try support.styleSourceInfo(&map, "remove-me")) == null);
     try testing.expect((try support.styleSourceAttribution(&map, "remove-me")) == null);
@@ -137,8 +134,8 @@ test "tile source helpers expose copied reconstructible source information" {
     try testing.expectEqualStrings("color-relief", (try support.styleLayerType(&map, "dem-relief")).?);
 
     _ = try map.setLayerProperty(testing.allocator, "dem-relief", "color-relief-color", "[\"interpolate\",[\"linear\"],[\"elevation\"],0,\"black\",1000,\"white\"]");
-    try testing.expect((try map.setLayerProperty(testing.allocator, "dem-relief", "color-relief-color", "[\"interpolate\",[\"linear\"],[\"zoom\"],0,\"black\",1,\"white\"]")) != 0);
-    try testing.expect((try map.addHillshadeLayer(testing.allocator, "bad-hillshade", "point", "")) != 0);
+    try support.expectCommandError(&runtime, try map.setLayerProperty(testing.allocator, "dem-relief", "color-relief-color", "[\"interpolate\",[\"linear\"],[\"zoom\"],0,\"black\",1,\"white\"]"), error.InvalidArgument);
+    try support.expectCommandError(&runtime, try map.addHillshadeLayer(testing.allocator, "bad-hillshade", "point", ""), error.InvalidArgument);
     try testing.expectError(error.InvalidArgument, map.addRasterSourceTiles(testing.allocator, "bad-raster", raster_tiles[0..], .{ .raster_encoding = .mapbox }));
 
     try testing.expect(try support.removeStyleSource(&runtime, &map, "vector-helper"));
@@ -195,8 +192,8 @@ test "image source helpers add update and copy coordinates" {
     try testing.expectApproxEqAbs(updated_coordinates[0].longitude, updated[0].longitude, 0.000001);
 
     try testing.expect((try support.imageSourceCoordinates(&map, "missing-image-source")) == null);
-    try testing.expect((try map.addImageSourceUrl(testing.allocator, "image-url-source", coordinates, "https://example.com/duplicate.png")) != 0);
-    try testing.expect((try map.setImageSourceUrl(testing.allocator, "point", "https://example.com/not-image.png")) != 0);
+    try support.expectCommandError(&runtime, try map.addImageSourceUrl(testing.allocator, "image-url-source", coordinates, "https://example.com/duplicate.png"), error.InvalidArgument);
+    try support.expectCommandError(&runtime, try map.setImageSourceUrl(testing.allocator, "point", "https://example.com/not-image.png"), error.InvalidArgument);
 }
 
 test "style source JSON buffers reject invalid source data and pass explicit-length IDs" {
@@ -205,7 +202,7 @@ test "style source JSON buffers reject invalid source data and pass explicit-len
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
-    try testing.expect((try map.addStyleSourceJson(testing.allocator, "invalid-json-source", "{\"type\":\"definitely-not-a-source-type\"}")) != 0);
+    try support.expectCommandError(&runtime, try map.addStyleSourceJson(testing.allocator, "invalid-json-source", "{\"type\":\"definitely-not-a-source-type\"}"), error.InvalidArgument);
     _ = try map.addStyleSourceJson(testing.allocator, "nul\x00source", "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\",\"features\":[]}}");
     try testing.expect(try support.styleSourceExists(&map, "nul\x00source"));
     var info = (try support.styleSourceInfo(&map, "nul\x00source")).?;
@@ -272,22 +269,19 @@ test "custom geometry source helpers add sources and accept tile updates" {
         .fetch_tile = fetchCustomGeometryTile,
         .context = &state,
     });
-    try testing.expect(std.meta.eql(
-        try support.waitForCommandDisposition(&runtime, duplicate_custom),
-        maplibre.CommandDisposition.failed,
-    ));
+    try support.expectCommandError(&runtime, duplicate_custom, error.InvalidArgument);
     try testing.expectError(error.InvalidArgument, map.addCustomGeometrySource(testing.allocator, "bad-zoom", .{
         .fetch_tile = fetchCustomGeometryTile,
         .context = &state,
         .max_zoom = 33.0,
     }));
-    try testing.expect((try map.setCustomGeometrySourceTileData(
+    try support.expectCommandError(&runtime, try map.setCustomGeometrySourceTileData(
         testing.allocator,
         "custom",
         .{ .z = 1, .x = 2, .y = 0 },
         "{\"type\":\"FeatureCollection\",\"features\":[]}",
-    )) != 0);
-    try testing.expect((try map.invalidateCustomGeometrySourceTile(testing.allocator, "point", tile_id)) != 0);
+    ), error.InvalidArgument);
+    try support.expectCommandError(&runtime, try map.invalidateCustomGeometrySourceTile(testing.allocator, "point", tile_id), error.InvalidArgument);
 }
 
 // A host owns the context its callbacks read, and the release callback is the

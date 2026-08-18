@@ -1,9 +1,9 @@
 use std::error::Error as StdError;
 
 use maplibre_native_ffi::{
-    Error, GpuSync, MapHandle, OpenGLBorrowedTextureDescriptor, OpenGLOwnedTextureDescriptor,
-    OpenGLSurfaceDescriptor, OperationHandle, RenderSessionAttachOptions, RenderSessionAttachment,
-    RenderSessionHandle,
+    Error, GpuSync, MapHandle, NativeFuture, OpenGLBorrowedTextureDescriptor,
+    OpenGLOwnedTextureDescriptor, OpenGLSurfaceDescriptor, RenderSessionAttachOptions,
+    RenderSessionAttachment, RenderSessionHandle,
 };
 
 use crate::graphics::GraphicsContext;
@@ -101,7 +101,7 @@ impl RenderTarget {
                 compositor,
             } => {
                 compositor.resize(viewport);
-                session.resize(&extent(viewport))?.release();
+                drop(session.resize(&extent(viewport))?);
                 Ok(())
             }
             Self::BorrowedTexture {
@@ -124,14 +124,13 @@ impl RenderTarget {
                 );
                 let operation = session.set_opengl_borrowed_texture_target(&descriptor)?;
                 drive(session, &operation)?;
-                operation.release();
                 compositor.resize(viewport);
                 let outgoing = std::mem::replace(&mut **texture, replacement);
                 outgoing.close(Some(gl));
                 Ok(())
             }
             Self::Surface { session } => {
-                session.resize(&extent(viewport))?.release();
+                drop(session.resize(&extent(viewport))?);
                 Ok(())
             }
         }
@@ -207,31 +206,26 @@ impl RenderTarget {
 fn finish_attach(
     attachment: RenderSessionAttachment,
 ) -> maplibre_native_ffi::Result<RenderSessionHandle> {
-    drive(&attachment.session, &attachment.operation)?;
+    drive(&attachment.session, &attachment.completion)?;
     let session = attachment.session;
-    attachment.operation.release();
     Ok(session)
 }
 
 fn drive(
     session: &RenderSessionHandle,
-    operation: &OperationHandle<()>,
+    operation: &NativeFuture<()>,
 ) -> maplibre_native_ffi::Result<()> {
-    while !operation.is_completed()? {
+    while !operation.is_ready() {
         if session.service_driver_work(usize::MAX)? == 0 {
             std::thread::yield_now();
         }
     }
-    if operation.terminal_status()? != 0 {
-        return Err(compositor_error(operation.diagnostic()?));
-    }
-    Ok(())
+    operation.take()
 }
 
 fn detach(session: &RenderSessionHandle) -> Result<(), Box<dyn StdError>> {
     let operation = session.detach()?;
     drive(session, &operation)?;
-    operation.release();
     Ok(())
 }
 

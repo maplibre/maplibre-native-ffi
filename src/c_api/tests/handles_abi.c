@@ -39,22 +39,20 @@ static void a_released_map_handle_never_names_a_later_map(void) {
 }
 
 static void a_handle_of_another_kind_is_rejected_by_kind(void) {
-  mln_notification_source source = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_notification_source_create(&source));
+  mln_runtime runtime = mln_test_create_runtime();
 
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_test_map_request_repaint(source)
+    MLN_STATUS_INVALID_ARGUMENT, mln_test_map_request_repaint(runtime)
   );
   TEST_ASSERT_TRUE_MESSAGE(
-    last_error_mentions("mln_notification_source"),
+    last_error_mentions("mln_runtime"),
     "A wrong-kind handle should name the kind it actually is."
   );
   TEST_ASSERT_TRUE_MESSAGE(
     last_error_mentions("mln_map"),
     "A wrong-kind handle should name the kind that was expected."
   );
-
-  mln_notification_source_release(source);
+  mln_test_destroy_runtime(runtime);
 }
 
 static void a_handle_this_process_never_issued_is_rejected(void) {
@@ -78,61 +76,9 @@ static void a_handle_this_process_never_issued_is_rejected(void) {
   );
 }
 
-static void releasing_a_scoped_handle_twice_is_a_no_op(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-
-  mln_operation operation = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_list_style_layer_ids_start(map, &operation)
-  );
-  bool completed = false;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_operation_wait(operation, -1, &completed)
-  );
-  TEST_ASSERT_TRUE(completed);
-  mln_style_id_list layers = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_list_style_layer_ids_take_result(operation, &layers)
-  );
-  mln_operation_release(operation);
-  TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, layers);
-
-  mln_style_id_list_destroy(layers);
-  mln_style_id_list_destroy(layers);
-  mln_style_id_list_destroy(MLN_HANDLE_NULL);
-
-  size_t count = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_style_id_list_count(layers, &count)
-  );
-
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
-static void an_operation_handle_names_its_kind(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_operation operation = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_offline_regions_list_start(runtime, &operation)
-  );
-
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_test_map_request_repaint(operation)
-  );
-  TEST_ASSERT_TRUE(last_error_mentions("mln_operation"));
-  TEST_ASSERT_TRUE(last_error_mentions("mln_map"));
-
-  mln_operation_release(operation);
-  mln_test_destroy_runtime(runtime);
-}
-
 void run_handles_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(a_released_map_handle_never_names_a_later_map);
   RUN_TEST(a_handle_of_another_kind_is_rejected_by_kind);
   RUN_TEST(a_handle_this_process_never_issued_is_rejected);
-  RUN_TEST(releasing_a_scoped_handle_twice_is_a_no_op);
-  RUN_TEST(an_operation_handle_names_its_kind);
 }

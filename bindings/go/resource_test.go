@@ -45,7 +45,7 @@ func TestRuntimeResourceProviderInstallsReplacesAndClears(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
-	m, err := runtime.NewMap()
+	m, err := awaitForTest(runtime.NewMap())
 	if err != nil {
 		_ = runtime.Close()
 		t.Fatalf("NewMap(): %v", err)
@@ -121,7 +121,7 @@ func TestResourceProviderSeesSchemeAliasAndItsResolvedURL(t *testing.T) {
 		_ = runtime.Close()
 		t.Fatalf("SetResourceProvider(): %v", err)
 	}
-	m, err := runtime.NewMap()
+	m, err := awaitForTest(runtime.NewMap())
 	if err != nil {
 		_ = runtime.Close()
 		t.Fatalf("NewMap(): %v", err)

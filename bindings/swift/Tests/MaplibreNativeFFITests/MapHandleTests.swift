@@ -36,19 +36,19 @@ import Testing
 
   // Cross an actor/task suspension before using the any-thread map handle.
   await Task.yield()
-  let cameraCommand = try map.updateCamera(CameraUpdate(
+  let cameraCommand = try await map.updateCamera(CameraUpdate(
     camera: CameraOptions(
       center: LatLng(latitude: 37.7749, longitude: -122.4194),
       zoom: 12
     )
   ))
-  let resizeCommand = try map.resize(to: MapLogicalExtent(
+  let resizeCommand = try await map.resize(to: MapLogicalExtent(
     width: 512,
     height: 256,
     scaleFactor: 2
   ))
-  #expect(cameraCommand > 0)
-  #expect(resizeCommand > cameraCommand)
+  #expect(cameraCommand.disposition == .committed)
+  #expect(resizeCommand.generation >= cameraCommand.generation)
 
   let ordered = try await map.queryCamera()
   #expect(abs((ordered.camera.center?.latitude ?? 0) - 37.7749) < 0.000001)
@@ -79,7 +79,7 @@ import Testing
   defer { try? map.closeBlockingForTests() }
 
   let before = try map.cameraSnapshot()
-  _ = try map.updateCamera(CameraUpdate(
+  _ = try await map.updateCamera(CameraUpdate(
     mode: .ease,
     camera: CameraOptions(zoom: 6),
     animation: AnimationOptions(durationMilliseconds: 0, transitionId: 10),
@@ -105,16 +105,14 @@ import Testing
   )
   defer { try? map.closeBlockingForTests() }
 
-  let command = try map.setDebugOptions([.tileBorders])
-  let result = try #require(try await commandFinished(
-    command, runtime: runtime
-  ))
-  #expect(result.finished
-    .disposition == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
-  #expect(result.finished.generation > 0)
+  let command = try await map.setDebugOptions([.tileBorders])
+  let result = command
+  #expect(rawCommandDisposition(result) == MLN_COMMAND_DISPOSITION_COMMITTED
+    .rawValue)
+  #expect(result.generation > 0)
 
   let snapshot = try map.snapshot()
-  #expect(snapshot.generation >= result.finished.generation)
+  #expect(snapshot.generation >= result.generation)
   #expect(snapshot.debugOptions == [.tileBorders])
 }
 
@@ -131,13 +129,20 @@ import Testing
   )
   defer { try? map.closeBlockingForTests() }
 
-  _ = try map.setTileOptions(MapTileOptions(prefetchZoomDelta: 5, lodScale: 2))
-  _ = try map.setBounds(BoundOptions(minZoom: 2, maxZoom: 15, maxPitch: 45))
+  _ = try await map.setTileOptions(MapTileOptions(
+    prefetchZoomDelta: 5,
+    lodScale: 2
+  ))
+  _ = try await map.setBounds(BoundOptions(
+    minZoom: 2,
+    maxZoom: 15,
+    maxPitch: 45
+  ))
   // The altitude sits inside the bound zoom range, so it is not clamped.
-  _ = try map.setFreeCameraOptions(FreeCameraOptions(
+  _ = try await map.setFreeCameraOptions(FreeCameraOptions(
     position: Vec3(x: 0.25, y: 0.5, z: 0.01)
   ))
-  let statsCommand = try map.setRenderingStatsViewEnabled(true)
+  let statsCommand = try await map.setRenderingStatsViewEnabled(true)
   #expect(try await commandDisposition(
     statsCommand, runtime: runtime
   ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
@@ -155,7 +160,7 @@ import Testing
   #expect(snapshot.renderingStatsViewEnabled)
 }
 
-@Test func requestRepaintReturnsACommandId() async throws {
+@Test func requestRepaintReturnsACommittedCompletion() async throws {
   let runtime = try RuntimeHandle(
     options: RuntimeOptions(cachePath: ":memory:")
   )
@@ -166,7 +171,6 @@ import Testing
   )
   defer { try? map.closeBlockingForTests() }
 
-  let command = try map.requestRepaint()
-  #expect(command > 0)
-  try await runtime.barrier()
+  let command = try await map.requestRepaint()
+  #expect(command.disposition == .committed)
 }

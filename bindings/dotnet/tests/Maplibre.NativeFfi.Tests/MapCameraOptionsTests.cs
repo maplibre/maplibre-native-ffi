@@ -27,7 +27,7 @@ public sealed class MapCameraOptionsTests
             new MapOptions { Width = 512, Height = 512 }
         );
 
-        map.SetViewportOptions(
+        map.SetViewportOptionsAsync(
             new ViewportOptions
             {
                 NorthOrientation = NorthOrientation.Right,
@@ -36,7 +36,7 @@ public sealed class MapCameraOptionsTests
                 FrustumOffset = new EdgeInsets(1, 2, 3, 4),
             }
         );
-        var commandId = map.SetTileOptions(
+        var completion = map.SetTileOptionsAsync(
             new TileOptions
             {
                 PrefetchZoomDelta = 3,
@@ -47,7 +47,7 @@ public sealed class MapCameraOptionsTests
                 LodMode = TileLodMode.Distance,
             }
         );
-        RuntimeEventTestHelpers.WaitForCommand(runtime, commandId);
+        RuntimeEventTestHelpers.WaitForCommand(runtime, completion);
 
         var snapshot = map.GetSnapshot();
         var viewport = snapshot.Viewport;
@@ -64,14 +64,14 @@ public sealed class MapCameraOptionsTests
         Assert.Equal(1.25, tile.LodZoomShift);
         Assert.Equal(TileLodMode.Distance, tile.LodMode);
 
-        var freeCameraCommandId = map.SetFreeCameraOptions(
+        var freeCameraCompletion = map.SetFreeCameraOptionsAsync(
             new FreeCameraOptions
             {
                 Position = new Vec3(0.5, 0.5, 0.125),
                 Orientation = new Quaternion(0, 0, 0, 1),
             }
         );
-        RuntimeEventTestHelpers.WaitForCommand(runtime, freeCameraCommandId);
+        RuntimeEventTestHelpers.WaitForCommand(runtime, freeCameraCompletion);
         var freeCamera = map.GetSnapshot().FreeCamera;
         Assert.NotNull(freeCamera.Position);
         Assert.Equal(0.5, freeCamera.Position.Value.X, 12);
@@ -132,7 +132,7 @@ public sealed class MapCameraOptionsTests
         );
 
         var bounds = new LatLngBounds(new LatLng(-10, -20), new LatLng(10, 20));
-        map.SetBounds(
+        map.SetBoundsAsync(
             new BoundOptions
             {
                 Bounds = new BoundsConstraint.Bounded(bounds),
@@ -142,7 +142,7 @@ public sealed class MapCameraOptionsTests
                 MaximumPitch = 60,
             }
         );
-        var commandId = map.SetProjectionMode(
+        var completion = map.SetProjectionModeAsync(
             new ProjectionModeOptions
             {
                 Axonometric = true,
@@ -150,7 +150,7 @@ public sealed class MapCameraOptionsTests
                 YSkew = 0.2,
             }
         );
-        RuntimeEventTestHelpers.WaitForCommand(runtime, commandId);
+        RuntimeEventTestHelpers.WaitForCommand(runtime, completion);
 
         var copiedBounds = map.GetSnapshot().Bounds;
         Assert.Equal(new BoundsConstraint.Bounded(bounds), copiedBounds.Bounds);
@@ -194,7 +194,7 @@ public sealed class MapCameraOptionsTests
         );
         var before = map.GetCameraSnapshot();
 
-        var commandId = map.UpdateCamera(
+        var command = map.UpdateCameraAsync(
             new CameraUpdate
             {
                 Mode = CameraUpdateMode.Jump,
@@ -209,7 +209,7 @@ public sealed class MapCameraOptionsTests
         );
         var ordered = await map.QueryCameraAsync(TestContext.Current.CancellationToken);
 
-        Assert.NotEqual(0ul, commandId);
+        RuntimeEventTestHelpers.AssertCommitted(command);
         Assert.True(ordered.Generation > before.Generation);
         Assert.Equal(12.5, ordered.Camera.Center!.Value.Latitude, 12);
         Assert.Equal(5.5, ordered.Camera.Zoom!.Value, 12);
@@ -218,7 +218,7 @@ public sealed class MapCameraOptionsTests
 
     [BindingSpecTest("BND-104")]
     [Fact]
-    public void InvalidCameraUpdatePropagatesNativeDiagnostic()
+    public async Task InvalidCameraUpdatePropagatesNativeDiagnostic()
     {
         using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
         using var map = TestHandles.CreateMap(
@@ -226,8 +226,8 @@ public sealed class MapCameraOptionsTests
             new MapOptions { Width = 512, Height = 512 }
         );
 
-        var error = Assert.Throws<InvalidArgumentException>(() =>
-            map.UpdateCamera(
+        var error = await Assert.ThrowsAsync<InvalidArgumentException>(() =>
+            map.UpdateCameraAsync(
                 new CameraUpdate
                 {
                     Mode = CameraUpdateMode.Jump,
@@ -330,7 +330,7 @@ public sealed class MapCameraOptionsTests
             new MapOptions { Width = 512, Height = 512 }
         );
         var center = new LatLng(40, -75);
-        map.UpdateCamera(
+        map.UpdateCameraAsync(
             new CameraUpdate
             {
                 Mode = CameraUpdateMode.Jump,
@@ -346,7 +346,7 @@ public sealed class MapCameraOptionsTests
         AssertClose(center, camera.Center.Value);
 
         // The projection never observes map changes made after creation.
-        map.UpdateCamera(
+        map.UpdateCameraAsync(
             new CameraUpdate
             {
                 Mode = CameraUpdateMode.Jump,

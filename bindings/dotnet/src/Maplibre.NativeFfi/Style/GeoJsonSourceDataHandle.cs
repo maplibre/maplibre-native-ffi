@@ -10,8 +10,8 @@ namespace Maplibre.NativeFfi.Style;
 /// <see cref="Create" /> parses and tiles one complete GeoJSON document with its source
 /// options baked in, without a runtime or a map. The prepared value is immutable, so one
 /// handle may be installed on any number of sources with
-/// <see cref="Map.MapHandle.AddGeoJsonSourceData" /> and
-/// <see cref="Map.MapHandle.SetGeoJsonSourceData" /> and released at any time afterward;
+/// <see cref="Map.MapHandle.AddGeoJsonSourceDataAsync" /> and
+/// <see cref="Map.MapHandle.SetGeoJsonSourceDataAsync" /> and released at any time afterward;
 /// release never invalidates a source the data was installed on.
 /// </remarks>
 public sealed unsafe class GeoJsonSourceDataHandle : IDisposable

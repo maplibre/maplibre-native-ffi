@@ -1,8 +1,9 @@
 package org.maplibre.nativeffi.render
 
 import kotlin.jvm.JvmInline
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.internal.status.Status
-import org.maplibre.nativeffi.runtime.OperationHandle
 
 /** Execution placement for a render session. Unknown native values remain representable. */
 @JvmInline
@@ -15,7 +16,7 @@ public value class RenderDriver public constructor(public val nativeValue: Int) 
   }
 }
 
-/** Attachment policy. The native notification endpoints inherit the map runtime's source. */
+/** Attachment policy for a render session. */
 public data class RenderSessionAttachOptions(
   public val driver: RenderDriver = RenderDriver.CORE_WORKER,
   public val requestedTextureRingDepth: Int = 0,
@@ -27,11 +28,23 @@ public data class RenderSessionAttachOptions(
   }
 }
 
-/** A session and the operation that completes its asynchronous attachment. */
+/** A session and the deferred result of its asynchronous attachment. */
 public data class RenderSessionAttachment(
   public val session: RenderSessionHandle,
-  public val operation: OperationHandle<Unit>,
+  public val completed: Deferred<Unit>,
 )
+
+internal fun retainSessionUntilComplete(
+  session: RenderSessionHandle,
+  source: Deferred<Unit>,
+): Deferred<Unit> {
+  val retained = CompletableDeferred<Unit>()
+  source.invokeOnCompletion { failure ->
+    if (failure == null) retained.complete(Unit) else retained.completeExceptionally(failure)
+    session.hashCode()
+  }
+  return retained
+}
 
 public data class RenderSessionCapabilities(
   public val driver: RenderDriver,

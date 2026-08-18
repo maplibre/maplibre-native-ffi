@@ -82,6 +82,33 @@ external int mln_acquired_frame_release(
 );
 
 @ffi.Native<
+  ffi.Int32 Function(
+    ffi.Uint32,
+    ffi.Size,
+    mln_adapter_completion_listener,
+    ffi.Pointer<ffi.Void>,
+    ffi.Pointer<mln_completion>,
+  )
+>()
+external int mln_adapter_completion_create(
+  int copy_kind,
+  int element_size,
+  mln_adapter_completion_listener listener,
+  ffi.Pointer<ffi.Void> user_data,
+  ffi.Pointer<mln_completion> out_completion,
+);
+
+@ffi.Native<ffi.Void Function(ffi.Pointer<mln_adapter_completion_record>)>()
+external void mln_adapter_completion_record_destroy(
+  ffi.Pointer<mln_adapter_completion_record> record,
+);
+
+@ffi.Native<ffi.Void Function(ffi.Pointer<mln_completion>)>()
+external void mln_adapter_completion_reject(
+  ffi.Pointer<mln_completion> completion,
+);
+
+@ffi.Native<
   ffi.Void Function(
     mln_custom_geometry_source_tile_callback,
     mln_custom_geometry_source_tile_callback,
@@ -161,13 +188,10 @@ external int mln_adapter_log_queue_acquire(
 external void mln_adapter_log_queue_close(int queue);
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_notification_source,
-    ffi.Pointer<mln_adapter_log_queue>,
-  )
+  ffi.Int32 Function(ffi.Pointer<mln_wake>, ffi.Pointer<mln_adapter_log_queue>)
 >()
 external int mln_adapter_log_queue_create(
-  int source,
+  ffi.Pointer<mln_wake> wake,
   ffi.Pointer<mln_adapter_log_queue> out_queue,
 );
 
@@ -226,12 +250,12 @@ external void mln_adapter_resource_request_queue_close(int queue);
 
 @ffi.Native<
   ffi.Int32 Function(
-    mln_notification_source,
+    ffi.Pointer<mln_wake>,
     ffi.Pointer<mln_adapter_resource_request_queue>,
   )
 >()
 external int mln_adapter_resource_request_queue_create(
-  int source,
+  ffi.Pointer<mln_wake> wake,
   ffi.Pointer<mln_adapter_resource_request_queue> out_queue,
 );
 
@@ -383,7 +407,7 @@ external int mln_log_set_callback(
     mln_buffer_view,
     mln_buffer_view,
     mln_buffer_view,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_add_color_relief_layer(
@@ -391,7 +415,7 @@ external int mln_map_add_color_relief_layer(
   mln_buffer_view layer_id,
   mln_buffer_view source_id,
   mln_buffer_view before_layer_id,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -399,14 +423,14 @@ external int mln_map_add_color_relief_layer(
     mln_map,
     mln_buffer_view,
     ffi.Pointer<mln_custom_geometry_source_options>,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_add_custom_geometry_source(
   int map,
   mln_buffer_view source_id,
   ffi.Pointer<mln_custom_geometry_source_options> options,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -414,14 +438,14 @@ external int mln_map_add_custom_geometry_source(
     mln_map,
     mln_buffer_view,
     mln_geojson_source_data,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_add_geojson_source_data(
   int map,
   mln_buffer_view source_id,
   int data,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -430,7 +454,7 @@ external int mln_map_add_geojson_source_data(
     mln_buffer_view,
     mln_buffer_view,
     ffi.Pointer<mln_geojson_source_options>,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_add_geojson_source_url(
@@ -438,7 +462,7 @@ external int mln_map_add_geojson_source_url(
   mln_buffer_view source_id,
   mln_buffer_view url,
   ffi.Pointer<mln_geojson_source_options> options,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -447,7 +471,7 @@ external int mln_map_add_geojson_source_url(
     mln_buffer_view,
     mln_buffer_view,
     mln_buffer_view,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_add_hillshade_layer(
@@ -455,7 +479,7 @@ external int mln_map_add_hillshade_layer(
   mln_buffer_view layer_id,
   mln_buffer_view source_id,
   mln_buffer_view before_layer_id,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -465,7 +489,7 @@ external int mln_map_add_hillshade_layer(
     ffi.Pointer<mln_lat_lng>,
     ffi.Size,
     ffi.Pointer<mln_premultiplied_rgba8_image>,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_add_image_source_image(
@@ -474,7 +498,7 @@ external int mln_map_add_image_source_image(
   ffi.Pointer<mln_lat_lng> coordinates,
   int coordinate_count,
   ffi.Pointer<mln_premultiplied_rgba8_image> image,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -484,7 +508,7 @@ external int mln_map_add_image_source_image(
     ffi.Pointer<mln_lat_lng>,
     ffi.Size,
     mln_buffer_view,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_add_image_source_url(
@@ -493,7 +517,7 @@ external int mln_map_add_image_source_url(
   ffi.Pointer<mln_lat_lng> coordinates,
   int coordinate_count,
   mln_buffer_view url,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -501,14 +525,14 @@ external int mln_map_add_image_source_url(
     mln_map,
     mln_buffer_view,
     mln_buffer_view,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_add_location_indicator_layer(
   int map,
   mln_buffer_view layer_id,
   mln_buffer_view before_layer_id,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -518,7 +542,7 @@ external int mln_map_add_location_indicator_layer(
     ffi.Pointer<mln_buffer_view>,
     ffi.Size,
     ffi.Pointer<mln_style_tile_source_options>,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_add_raster_dem_source_tiles(
@@ -527,7 +551,7 @@ external int mln_map_add_raster_dem_source_tiles(
   ffi.Pointer<mln_buffer_view> tiles,
   int tile_count,
   ffi.Pointer<mln_style_tile_source_options> options,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -536,7 +560,7 @@ external int mln_map_add_raster_dem_source_tiles(
     mln_buffer_view,
     mln_buffer_view,
     ffi.Pointer<mln_style_tile_source_options>,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_add_raster_dem_source_url(
@@ -544,7 +568,7 @@ external int mln_map_add_raster_dem_source_url(
   mln_buffer_view source_id,
   mln_buffer_view url,
   ffi.Pointer<mln_style_tile_source_options> options,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -554,7 +578,7 @@ external int mln_map_add_raster_dem_source_url(
     ffi.Pointer<mln_buffer_view>,
     ffi.Size,
     ffi.Pointer<mln_style_tile_source_options>,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_add_raster_source_tiles(
@@ -563,7 +587,7 @@ external int mln_map_add_raster_source_tiles(
   ffi.Pointer<mln_buffer_view> tiles,
   int tile_count,
   ffi.Pointer<mln_style_tile_source_options> options,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -572,7 +596,7 @@ external int mln_map_add_raster_source_tiles(
     mln_buffer_view,
     mln_buffer_view,
     ffi.Pointer<mln_style_tile_source_options>,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_add_raster_source_url(
@@ -580,7 +604,7 @@ external int mln_map_add_raster_source_url(
   mln_buffer_view source_id,
   mln_buffer_view url,
   ffi.Pointer<mln_style_tile_source_options> options,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -588,14 +612,14 @@ external int mln_map_add_raster_source_url(
     mln_map,
     mln_buffer_view,
     mln_buffer_view,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_add_style_layer_json(
   int map,
   mln_buffer_view layer_json,
   mln_buffer_view before_layer_id,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -603,14 +627,14 @@ external int mln_map_add_style_layer_json(
     mln_map,
     mln_buffer_view,
     mln_buffer_view,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_add_style_source_json(
   int map,
   mln_buffer_view source_id,
   mln_buffer_view source_json,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -620,7 +644,7 @@ external int mln_map_add_style_source_json(
     ffi.Pointer<mln_buffer_view>,
     ffi.Size,
     ffi.Pointer<mln_style_tile_source_options>,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_add_vector_source_tiles(
@@ -629,7 +653,7 @@ external int mln_map_add_vector_source_tiles(
   ffi.Pointer<mln_buffer_view> tiles,
   int tile_count,
   ffi.Pointer<mln_style_tile_source_options> options,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -638,7 +662,7 @@ external int mln_map_add_vector_source_tiles(
     mln_buffer_view,
     mln_buffer_view,
     ffi.Pointer<mln_style_tile_source_options>,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_add_vector_source_url(
@@ -646,20 +670,20 @@ external int mln_map_add_vector_source_url(
   mln_buffer_view source_id,
   mln_buffer_view url,
   ffi.Pointer<mln_style_tile_source_options> options,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_camera_delta>,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_apply_camera_delta(
   int map,
   ffi.Pointer<mln_camera_delta> delta,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -667,22 +691,14 @@ external int mln_map_apply_camera_delta(
     mln_map,
     mln_buffer_view,
     ffi.Pointer<mln_camera_fit_options>,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_map_camera_for_geometry_start(
+external int mln_map_camera_for_geometry(
   int map,
   mln_buffer_view geometry,
   ffi.Pointer<mln_camera_fit_options> fit_options,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_operation, ffi.Pointer<mln_camera_options>)
->()
-external int mln_map_camera_for_geometry_take_result(
-  int operation,
-  ffi.Pointer<mln_camera_options> out_camera,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -690,22 +706,14 @@ external int mln_map_camera_for_geometry_take_result(
     mln_map,
     mln_lat_lng_bounds,
     ffi.Pointer<mln_camera_fit_options>,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_map_camera_for_lat_lng_bounds_start(
+external int mln_map_camera_for_lat_lng_bounds(
   int map,
   mln_lat_lng_bounds bounds,
   ffi.Pointer<mln_camera_fit_options> fit_options,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_operation, ffi.Pointer<mln_camera_options>)
->()
-external int mln_map_camera_for_lat_lng_bounds_take_result(
-  int operation,
-  ffi.Pointer<mln_camera_options> out_camera,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -714,37 +722,21 @@ external int mln_map_camera_for_lat_lng_bounds_take_result(
     ffi.Pointer<mln_lat_lng>,
     ffi.Size,
     ffi.Pointer<mln_camera_fit_options>,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_map_camera_for_lat_lngs_start(
+external int mln_map_camera_for_lat_lngs(
   int map,
   ffi.Pointer<mln_lat_lng> coordinates,
   int coordinate_count,
   ffi.Pointer<mln_camera_fit_options> fit_options,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<
-  ffi.Int32 Function(mln_operation, ffi.Pointer<mln_camera_options>)
->()
-external int mln_map_camera_for_lat_lngs_take_result(
-  int operation,
-  ffi.Pointer<mln_camera_options> out_camera,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_operation>)>()
-external int mln_map_camera_query_start(
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
+external int mln_map_camera_query(
   int map,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_operation, ffi.Pointer<mln_camera_query_result>)
->()
-external int mln_map_camera_query_take_result(
-  int operation,
-  ffi.Pointer<mln_camera_query_result> out_result,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -761,197 +753,94 @@ external int mln_map_camera_snapshot_get(
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_operation>)
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
-external int mln_map_copy_layer_source_id_start(
+external int mln_map_copy_layer_source_id(
   int map,
   mln_buffer_view layer_id,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<mln_buffer>)>()
-external int mln_map_copy_layer_source_id_take_result(
-  int operation,
-  ffi.Pointer<mln_buffer> out_source_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_operation>)
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
-external int mln_map_copy_layer_source_layer_start(
+external int mln_map_copy_layer_source_layer(
   int map,
   mln_buffer_view layer_id,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<mln_buffer>)>()
-external int mln_map_copy_layer_source_layer_take_result(
-  int operation,
-  ffi.Pointer<mln_buffer> out_source_layer,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_operation>)
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
-external int mln_map_copy_style_image_premultiplied_rgba8_start(
+external int mln_map_copy_style_image_premultiplied_rgba8(
   int map,
   mln_buffer_view image_id,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_operation,
-    ffi.Pointer<mln_buffer>,
-    ffi.Pointer<ffi.Bool>,
-  )
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
-external int mln_map_copy_style_image_premultiplied_rgba8_take_result(
-  int operation,
-  ffi.Pointer<mln_buffer> out_pixels,
-  ffi.Pointer<ffi.Bool> out_found,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_operation>)
->()
-external int mln_map_copy_style_image_stretches_start(
+external int mln_map_copy_style_image_stretches(
   int map,
   mln_buffer_view image_id,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_operation,
-    ffi.Pointer<mln_image_stretch>,
-    ffi.Size,
-    ffi.Pointer<ffi.Size>,
-    ffi.Pointer<mln_image_stretch>,
-    ffi.Size,
-    ffi.Pointer<ffi.Size>,
-    ffi.Pointer<ffi.Bool>,
-  )
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
-external int mln_map_copy_style_image_stretches_take_result(
-  int operation,
-  ffi.Pointer<mln_image_stretch> out_stretch_x,
-  int stretch_x_capacity,
-  ffi.Pointer<ffi.Size> out_stretch_x_count,
-  ffi.Pointer<mln_image_stretch> out_stretch_y,
-  int stretch_y_capacity,
-  ffi.Pointer<ffi.Size> out_stretch_y_count,
-  ffi.Pointer<ffi.Bool> out_found,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_operation>)
->()
-external int mln_map_copy_style_source_attribution_start(
+external int mln_map_copy_style_source_attribution(
   int map,
   mln_buffer_view source_id,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_operation,
-    ffi.Pointer<mln_buffer>,
-    ffi.Pointer<ffi.Bool>,
-  )
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
-external int mln_map_copy_style_source_attribution_take_result(
-  int operation,
-  ffi.Pointer<mln_buffer> out_attribution,
-  ffi.Pointer<ffi.Bool> out_found,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_operation>)
->()
-external int mln_map_copy_style_source_url_start(
+external int mln_map_copy_style_source_url(
   int map,
   mln_buffer_view source_id,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_operation,
-    ffi.Pointer<mln_buffer>,
-    ffi.Pointer<ffi.Bool>,
-  )
->()
-external int mln_map_copy_style_source_url_take_result(
-  int operation,
-  ffi.Pointer<mln_buffer> out_url,
-  ffi.Pointer<ffi.Bool> out_found,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_runtime,
     ffi.Pointer<mln_map_options>,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_map_create_start(
+external int mln_map_create(
   int runtime,
   ffi.Pointer<mln_map_options> options,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<mln_map>)>()
-external int mln_map_create_take_result(
-  int operation,
-  ffi.Pointer<mln_map> out_map,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<ffi.Uint64>)>()
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
 external int mln_map_dump_debug_logs(
   int map,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_operation>)
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
-external int mln_map_get_image_source_coordinates_start(
+external int mln_map_get_image_source_coordinates(
   int map,
   mln_buffer_view source_id,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_operation,
-    ffi.Pointer<mln_lat_lng>,
-    ffi.Size,
-    ffi.Pointer<ffi.Size>,
-    ffi.Pointer<ffi.Bool>,
-  )
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
-external int mln_map_get_image_source_coordinates_take_result(
-  int operation,
-  ffi.Pointer<mln_lat_lng> out_coordinates,
-  int coordinate_capacity,
-  ffi.Pointer<ffi.Size> out_coordinate_count,
-  ffi.Pointer<ffi.Bool> out_found,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_operation>)
->()
-external int mln_map_get_layer_filter_start(
+external int mln_map_get_layer_filter(
   int map,
   mln_buffer_view layer_id,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<mln_buffer>)>()
-external int mln_map_get_layer_filter_take_result(
-  int operation,
-  ffi.Pointer<mln_buffer> out_filter,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -959,159 +848,74 @@ external int mln_map_get_layer_filter_take_result(
     mln_map,
     mln_buffer_view,
     mln_buffer_view,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_map_get_layer_property_start(
+external int mln_map_get_layer_property(
   int map,
   mln_buffer_view layer_id,
   mln_buffer_view property_name,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<mln_buffer>)>()
-external int mln_map_get_layer_property_take_result(
-  int operation,
-  ffi.Pointer<mln_buffer> out_value,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_operation>)
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
-external int mln_map_get_style_image_info_start(
+external int mln_map_get_style_image_info(
   int map,
   mln_buffer_view image_id,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_operation,
-    ffi.Pointer<mln_style_image_info>,
-    ffi.Pointer<ffi.Bool>,
-  )
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
-external int mln_map_get_style_image_info_take_result(
-  int operation,
-  ffi.Pointer<mln_style_image_info> out_info,
-  ffi.Pointer<ffi.Bool> out_found,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_operation>)
->()
-external int mln_map_get_style_layer_info_start(
+external int mln_map_get_style_layer_info(
   int map,
   mln_buffer_view layer_id,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_operation,
-    ffi.Pointer<mln_style_layer_info>,
-    ffi.Pointer<ffi.Bool>,
-  )
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
-external int mln_map_get_style_layer_info_take_result(
-  int operation,
-  ffi.Pointer<mln_style_layer_info> out_info,
-  ffi.Pointer<ffi.Bool> out_found,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_operation>)
->()
-external int mln_map_get_style_layer_json_start(
+external int mln_map_get_style_layer_json(
   int map,
   mln_buffer_view layer_id,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_operation,
-    ffi.Pointer<mln_buffer>,
-    ffi.Pointer<ffi.Bool>,
-  )
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
-external int mln_map_get_style_layer_json_take_result(
-  int operation,
-  ffi.Pointer<mln_buffer> out_layer,
-  ffi.Pointer<ffi.Bool> out_found,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_operation>)
->()
-external int mln_map_get_style_light_property_start(
+external int mln_map_get_style_light_property(
   int map,
   mln_buffer_view property_name,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<mln_buffer>)>()
-external int mln_map_get_style_light_property_take_result(
-  int operation,
-  ffi.Pointer<mln_buffer> out_value,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_operation>)
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
-external int mln_map_get_style_source_info_start(
+external int mln_map_get_style_source_info(
   int map,
   mln_buffer_view source_id,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(
-    mln_operation,
-    ffi.Pointer<mln_style_source_info>,
-    ffi.Pointer<ffi.Bool>,
-  )
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
-external int mln_map_get_style_source_info_take_result(
-  int operation,
-  ffi.Pointer<mln_style_source_info> out_info,
-  ffi.Pointer<ffi.Bool> out_found,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_operation>)
->()
-external int mln_map_get_style_source_tile_urls_start(
+external int mln_map_get_style_source_tile_urls(
   int map,
   mln_buffer_view source_id,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_operation,
-    ffi.Pointer<mln_style_string_list>,
-    ffi.Pointer<ffi.Bool>,
-  )
->()
-external int mln_map_get_style_source_tile_urls_take_result(
-  int operation,
-  ffi.Pointer<mln_style_string_list> out_tile_urls,
-  ffi.Pointer<ffi.Bool> out_found,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_operation>)>()
-external int mln_map_get_style_transition_options_start(
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
+external int mln_map_get_style_transition_options(
   int map,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_operation, ffi.Pointer<mln_style_transition_options>)
->()
-external int mln_map_get_style_transition_options_take_result(
-  int operation,
-  ffi.Pointer<mln_style_transition_options> out_options,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1119,14 +923,14 @@ external int mln_map_get_style_transition_options_take_result(
     mln_map,
     mln_buffer_view,
     mln_lat_lng_bounds,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_invalidate_custom_geometry_source_region(
   int map,
   mln_buffer_view source_id,
   mln_lat_lng_bounds bounds,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1134,71 +938,49 @@ external int mln_map_invalidate_custom_geometry_source_region(
     mln_map,
     mln_buffer_view,
     mln_canonical_tile_id,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_invalidate_custom_geometry_source_tile(
   int map,
   mln_buffer_view source_id,
   mln_canonical_tile_id tile_id,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_camera_options>,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_map_lat_lng_bounds_for_camera_start(
+external int mln_map_lat_lng_bounds_for_camera(
   int map,
   ffi.Pointer<mln_camera_options> camera,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_operation, ffi.Pointer<mln_lat_lng_bounds>)
->()
-external int mln_map_lat_lng_bounds_for_camera_take_result(
-  int operation,
-  ffi.Pointer<mln_lat_lng_bounds> out_bounds,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_camera_options>,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_map_lat_lng_bounds_for_camera_unwrapped_start(
+external int mln_map_lat_lng_bounds_for_camera_unwrapped(
   int map,
   ffi.Pointer<mln_camera_options> camera,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_operation, ffi.Pointer<mln_lat_lng_bounds>)
+  ffi.Int32 Function(mln_map, mln_screen_point, ffi.Pointer<mln_completion>)
 >()
-external int mln_map_lat_lng_bounds_for_camera_unwrapped_take_result(
-  int operation,
-  ffi.Pointer<mln_lat_lng_bounds> out_bounds,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_map, mln_screen_point, ffi.Pointer<mln_operation>)
->()
-external int mln_map_lat_lng_for_pixel_start(
+external int mln_map_lat_lng_for_pixel(
   int map,
   mln_screen_point point,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<mln_lat_lng>)>()
-external int mln_map_lat_lng_for_pixel_take_result(
-  int operation,
-  ffi.Pointer<mln_lat_lng> out_coordinate,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1206,65 +988,32 @@ external int mln_map_lat_lng_for_pixel_take_result(
     mln_map,
     ffi.Pointer<mln_screen_point>,
     ffi.Size,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_map_lat_lngs_for_pixels_start(
+external int mln_map_lat_lngs_for_pixels(
   int map,
   ffi.Pointer<mln_screen_point> points,
   int point_count,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_operation,
-    ffi.Pointer<mln_lat_lng>,
-    ffi.Size,
-    ffi.Pointer<ffi.Size>,
-  )
->()
-external int mln_map_lat_lngs_for_pixels_take_result(
-  int operation,
-  ffi.Pointer<mln_lat_lng> out_coordinates,
-  int coordinate_capacity,
-  ffi.Pointer<ffi.Size> out_coordinate_count,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_operation>)>()
-external int mln_map_list_style_layer_ids_start(
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
+external int mln_map_list_style_layer_ids(
   int map,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<mln_style_id_list>)>()
-external int mln_map_list_style_layer_ids_take_result(
-  int operation,
-  ffi.Pointer<mln_style_id_list> out_layer_ids,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_operation>)>()
-external int mln_map_list_style_source_ids_start(
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
+external int mln_map_list_style_source_ids(
   int map,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<mln_style_id_list>)>()
-external int mln_map_list_style_source_ids_take_result(
-  int operation,
-  ffi.Pointer<mln_style_id_list> out_source_ids,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_operation>)>()
-external int mln_map_loaded_style_json_start(
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
+external int mln_map_loaded_style_json(
   int map,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<mln_buffer>)>()
-external int mln_map_loaded_style_json_take_result(
-  int operation,
-  ffi.Pointer<mln_buffer> out_json,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1272,32 +1021,26 @@ external int mln_map_loaded_style_json_take_result(
     mln_map,
     mln_buffer_view,
     mln_buffer_view,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_move_style_layer(
   int map,
   mln_buffer_view layer_id,
   mln_buffer_view before_layer_id,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_map_options Function()>()
 external mln_map_options mln_map_options_default();
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_lat_lng, ffi.Pointer<mln_operation>)
+  ffi.Int32 Function(mln_map, mln_lat_lng, ffi.Pointer<mln_completion>)
 >()
-external int mln_map_pixel_for_lat_lng_start(
+external int mln_map_pixel_for_lat_lng(
   int map,
   mln_lat_lng coordinate,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<mln_screen_point>)>()
-external int mln_map_pixel_for_lat_lng_take_result(
-  int operation,
-  ffi.Pointer<mln_screen_point> out_point,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1305,46 +1048,23 @@ external int mln_map_pixel_for_lat_lng_take_result(
     mln_map,
     ffi.Pointer<mln_lat_lng>,
     ffi.Size,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_map_pixels_for_lat_lngs_start(
+external int mln_map_pixels_for_lat_lngs(
   int map,
   ffi.Pointer<mln_lat_lng> coordinates,
   int coordinate_count,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_operation,
-    ffi.Pointer<mln_screen_point>,
-    ffi.Size,
-    ffi.Pointer<ffi.Size>,
-  )
->()
-external int mln_map_pixels_for_lat_lngs_take_result(
-  int operation,
-  ffi.Pointer<mln_screen_point> out_points,
-  int point_capacity,
-  ffi.Pointer<ffi.Size> out_point_count,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<ffi.Int32 Function(mln_map_projection)>()
 external int mln_map_projection_close(int projection);
 
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_operation>)>()
-external int mln_map_projection_create_start(
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
+external int mln_map_projection_create(
   int map,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_operation, ffi.Pointer<mln_map_projection>)
->()
-external int mln_map_projection_create_take_result(
-  int operation,
-  ffi.Pointer<mln_map_projection> out_projection,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1417,64 +1137,64 @@ external int mln_map_projection_set_visible_geometry(
 external int mln_map_release(int map);
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<ffi.Uint64>)
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
 external int mln_map_remove_style_image(
   int map,
   mln_buffer_view image_id,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<ffi.Uint64>)
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
 external int mln_map_remove_style_layer(
   int map,
   mln_buffer_view layer_id,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<ffi.Uint64>)
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
 external int mln_map_remove_style_source(
   int map,
   mln_buffer_view source_id,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<ffi.Uint64>)>()
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
 external int mln_map_request_repaint(
   int map,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_operation>)>()
-external int mln_map_request_still_image_start(
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
+external int mln_map_request_still_image(
   int map,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_logical_extent, ffi.Pointer<ffi.Uint64>)
+  ffi.Int32 Function(mln_map, mln_logical_extent, ffi.Pointer<mln_completion>)
 >()
 external int mln_map_resize(
   int map,
   mln_logical_extent extent,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_bound_options>,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_bounds(
   int map,
   ffi.Pointer<mln_bound_options> options,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1483,7 +1203,7 @@ external int mln_map_set_bounds(
     mln_buffer_view,
     mln_canonical_tile_id,
     mln_buffer_view,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_custom_geometry_source_tile_data(
@@ -1491,34 +1211,38 @@ external int mln_map_set_custom_geometry_source_tile_data(
   mln_buffer_view source_id,
   mln_canonical_tile_id tile_id,
   mln_buffer_view data,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Uint32, ffi.Pointer<ffi.Uint64>)>()
+@ffi.Native<
+  ffi.Int32 Function(mln_map, ffi.Uint32, ffi.Pointer<mln_completion>)
+>()
 external int mln_map_set_debug_options(
   int map,
   int options,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Uint64, ffi.Pointer<ffi.Uint64>)>()
+@ffi.Native<
+  ffi.Int32 Function(mln_map, ffi.Uint64, ffi.Pointer<mln_completion>)
+>()
 external int mln_map_set_event_mask(
   int map,
   int mask,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_free_camera_options>,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_free_camera_options(
   int map,
   ffi.Pointer<mln_free_camera_options> options,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1526,14 +1250,14 @@ external int mln_map_set_free_camera_options(
     mln_map,
     mln_buffer_view,
     mln_geojson_source_data,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_geojson_source_data(
   int map,
   mln_buffer_view source_id,
   int data,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1541,14 +1265,14 @@ external int mln_map_set_geojson_source_data(
     mln_map,
     mln_buffer_view,
     ffi.Bool,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_geojson_source_synchronous_tiling(
   int map,
   mln_buffer_view source_id,
   bool enabled,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1556,14 +1280,14 @@ external int mln_map_set_geojson_source_synchronous_tiling(
     mln_map,
     mln_buffer_view,
     mln_buffer_view,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_geojson_source_url(
   int map,
   mln_buffer_view source_id,
   mln_buffer_view url,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1572,7 +1296,7 @@ external int mln_map_set_geojson_source_url(
     mln_buffer_view,
     ffi.Pointer<mln_lat_lng>,
     ffi.Size,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_image_source_coordinates(
@@ -1580,7 +1304,7 @@ external int mln_map_set_image_source_coordinates(
   mln_buffer_view source_id,
   ffi.Pointer<mln_lat_lng> coordinates,
   int coordinate_count,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1588,14 +1312,14 @@ external int mln_map_set_image_source_coordinates(
     mln_map,
     mln_buffer_view,
     ffi.Pointer<mln_premultiplied_rgba8_image>,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_image_source_image(
   int map,
   mln_buffer_view source_id,
   ffi.Pointer<mln_premultiplied_rgba8_image> image,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1603,14 +1327,14 @@ external int mln_map_set_image_source_image(
     mln_map,
     mln_buffer_view,
     mln_buffer_view,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_image_source_url(
   int map,
   mln_buffer_view source_id,
   mln_buffer_view url,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1618,14 +1342,14 @@ external int mln_map_set_image_source_url(
     mln_map,
     mln_buffer_view,
     ffi.Pointer<mln_buffer_view>,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_layer_filter(
   int map,
   mln_buffer_view layer_id,
   ffi.Pointer<mln_buffer_view> filter,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1633,14 +1357,14 @@ external int mln_map_set_layer_filter(
     mln_map,
     mln_buffer_view,
     ffi.Double,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_layer_max_zoom(
   int map,
   mln_buffer_view layer_id,
   double max_zoom,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1648,14 +1372,14 @@ external int mln_map_set_layer_max_zoom(
     mln_map,
     mln_buffer_view,
     ffi.Double,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_layer_min_zoom(
   int map,
   mln_buffer_view layer_id,
   double min_zoom,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1664,7 +1388,7 @@ external int mln_map_set_layer_min_zoom(
     mln_buffer_view,
     mln_buffer_view,
     mln_buffer_view,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_layer_property(
@@ -1672,7 +1396,7 @@ external int mln_map_set_layer_property(
   mln_buffer_view layer_id,
   mln_buffer_view property_name,
   mln_buffer_view value,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1680,14 +1404,14 @@ external int mln_map_set_layer_property(
     mln_map,
     mln_buffer_view,
     mln_buffer_view,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_layer_source_id(
   int map,
   mln_buffer_view layer_id,
   mln_buffer_view source_id,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1695,14 +1419,14 @@ external int mln_map_set_layer_source_id(
     mln_map,
     mln_buffer_view,
     mln_buffer_view,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_layer_source_layer(
   int map,
   mln_buffer_view layer_id,
   mln_buffer_view source_layer,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1710,14 +1434,14 @@ external int mln_map_set_layer_source_layer(
     mln_map,
     mln_buffer_view,
     ffi.Uint32,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_layer_visibility(
   int map,
   mln_buffer_view layer_id,
   int visibility,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1725,14 +1449,14 @@ external int mln_map_set_layer_visibility(
     mln_map,
     mln_buffer_view,
     ffi.Double,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_location_indicator_accuracy_radius(
   int map,
   mln_buffer_view layer_id,
   double radius,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1740,14 +1464,14 @@ external int mln_map_set_location_indicator_accuracy_radius(
     mln_map,
     mln_buffer_view,
     ffi.Double,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_location_indicator_bearing(
   int map,
   mln_buffer_view layer_id,
   double bearing,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1756,7 +1480,7 @@ external int mln_map_set_location_indicator_bearing(
     mln_buffer_view,
     ffi.Uint32,
     mln_buffer_view,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_location_indicator_image_name(
@@ -1764,7 +1488,7 @@ external int mln_map_set_location_indicator_image_name(
   mln_buffer_view layer_id,
   int image_kind,
   mln_buffer_view image_id,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1773,7 +1497,7 @@ external int mln_map_set_location_indicator_image_name(
     mln_buffer_view,
     mln_lat_lng,
     ffi.Double,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_location_indicator_location(
@@ -1781,27 +1505,29 @@ external int mln_map_set_location_indicator_location(
   mln_buffer_view layer_id,
   mln_lat_lng coordinate,
   double altitude,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_projection_mode>,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_projection_mode(
   int map,
   ffi.Pointer<mln_projection_mode> mode,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Bool, ffi.Pointer<ffi.Uint64>)>()
+@ffi.Native<
+  ffi.Int32 Function(mln_map, ffi.Bool, ffi.Pointer<mln_completion>)
+>()
 external int mln_map_set_rendering_stats_view_enabled(
   int map,
   bool enabled,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1810,7 +1536,7 @@ external int mln_map_set_rendering_stats_view_enabled(
     mln_buffer_view,
     ffi.Pointer<mln_premultiplied_rgba8_image>,
     ffi.Pointer<mln_style_image_options>,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_style_image(
@@ -1818,25 +1544,25 @@ external int mln_map_set_style_image(
   mln_buffer_view image_id,
   ffi.Pointer<mln_premultiplied_rgba8_image> image,
   ffi.Pointer<mln_style_image_options> options,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<ffi.Uint64>)
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
 external int mln_map_set_style_json(
   int map,
   mln_buffer_view json,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<ffi.Uint64>)
+  ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<mln_completion>)
 >()
 external int mln_map_set_style_light_json(
   int map,
   mln_buffer_view light_json,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1844,62 +1570,66 @@ external int mln_map_set_style_light_json(
     mln_map,
     mln_buffer_view,
     mln_buffer_view,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_style_light_property(
   int map,
   mln_buffer_view property_name,
   mln_buffer_view value,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_style_transition_options>,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_style_transition_options(
   int map,
   ffi.Pointer<mln_style_transition_options> options,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_map, ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Uint64>)
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Pointer<ffi.Char>,
+    ffi.Pointer<mln_completion>,
+  )
 >()
 external int mln_map_set_style_url(
   int map,
   ffi.Pointer<ffi.Char> url,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_map_tile_options>,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_tile_options(
   int map,
   ffi.Pointer<mln_map_tile_options> options,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_map_viewport_options>,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_set_viewport_options(
   int map,
   ffi.Pointer<mln_map_viewport_options> options,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_map_snapshot>)>()
@@ -1908,17 +1638,8 @@ external int mln_map_snapshot_get(
   ffi.Pointer<mln_map_snapshot> out_snapshot,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_operation>)>()
-external int mln_map_style_url_start(
-  int map,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<mln_buffer>)>()
-external int mln_map_style_url_take_result(
-  int operation,
-  ffi.Pointer<mln_buffer> out_url,
-);
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
+external int mln_map_style_url(int map, ffi.Pointer<mln_completion> completion);
 
 @ffi.Native<mln_map_tile_options Function()>()
 external mln_map_tile_options mln_map_tile_options_default();
@@ -1927,13 +1648,13 @@ external mln_map_tile_options mln_map_tile_options_default();
   ffi.Int32 Function(
     mln_map,
     ffi.Pointer<mln_camera_update>,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_map_update_camera(
   int map,
   ffi.Pointer<mln_camera_update> update,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_map_viewport_options Function()>()
@@ -1945,15 +1666,15 @@ external mln_map_viewport_options mln_map_viewport_options_default();
     ffi.Pointer<mln_metal_borrowed_texture_descriptor>,
     ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_metal_borrowed_texture_attach_start(
+external int mln_metal_borrowed_texture_attach(
   int map,
   ffi.Pointer<mln_metal_borrowed_texture_descriptor> descriptor,
   ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_metal_borrowed_texture_descriptor Function()>()
@@ -1964,13 +1685,13 @@ mln_metal_borrowed_texture_descriptor_default();
   ffi.Int32 Function(
     mln_render_session,
     ffi.Pointer<mln_metal_borrowed_texture_descriptor>,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_metal_borrowed_texture_set_target_start(
+external int mln_metal_borrowed_texture_set_target(
   int session,
   ffi.Pointer<mln_metal_borrowed_texture_descriptor> descriptor,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -1979,15 +1700,15 @@ external int mln_metal_borrowed_texture_set_target_start(
     ffi.Pointer<mln_metal_owned_texture_descriptor>,
     ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_metal_owned_texture_attach_start(
+external int mln_metal_owned_texture_attach(
   int map,
   ffi.Pointer<mln_metal_owned_texture_descriptor> descriptor,
   ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_metal_owned_texture_descriptor Function()>()
@@ -2000,15 +1721,15 @@ mln_metal_owned_texture_descriptor_default();
     ffi.Pointer<mln_metal_surface_descriptor>,
     ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_metal_surface_attach_start(
+external int mln_metal_surface_attach(
   int map,
   ffi.Pointer<mln_metal_surface_descriptor> descriptor,
   ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_metal_surface_descriptor Function()>()
@@ -2018,13 +1739,13 @@ external mln_metal_surface_descriptor mln_metal_surface_descriptor_default();
   ffi.Int32 Function(
     mln_render_session,
     ffi.Pointer<mln_metal_surface_descriptor>,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_metal_surface_set_target_start(
+external int mln_metal_surface_set_target(
   int session,
   ffi.Pointer<mln_metal_surface_descriptor> descriptor,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<ffi.Int32 Function(ffi.Pointer<ffi.Uint32>)>()
@@ -2032,38 +1753,6 @@ external int mln_network_status_get(ffi.Pointer<ffi.Uint32> out_status);
 
 @ffi.Native<ffi.Int32 Function(ffi.Uint32)>()
 external int mln_network_status_set(int status);
-
-@ffi.Native<ffi.Int32 Function(mln_notification_source)>()
-external int mln_notification_source_clear_callback(int source);
-
-@ffi.Native<ffi.Int32 Function(ffi.Pointer<mln_notification_source>)>()
-external int mln_notification_source_create(
-  ffi.Pointer<mln_notification_source> out_source,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_notification_source, ffi.Pointer<mln_ready_batch>)
->()
-external int mln_notification_source_drain_ready(
-  int source,
-  ffi.Pointer<mln_ready_batch> out_batch,
-);
-
-@ffi.Native<ffi.Void Function(mln_notification_source)>()
-external void mln_notification_source_release(int source);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_notification_source,
-    mln_notification_callback,
-    ffi.Pointer<ffi.Void>,
-  )
->()
-external int mln_notification_source_set_callback(
-  int source,
-  mln_notification_callback callback,
-  ffi.Pointer<ffi.Void> user_data,
-);
 
 @ffi.Native<
   ffi.Int32 Function(mln_offline_region_list, ffi.Pointer<ffi.Size>)
@@ -2109,15 +1798,15 @@ external int mln_offline_region_snapshot_get(
     ffi.Pointer<mln_opengl_borrowed_texture_descriptor>,
     ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_opengl_borrowed_texture_attach_start(
+external int mln_opengl_borrowed_texture_attach(
   int map,
   ffi.Pointer<mln_opengl_borrowed_texture_descriptor> descriptor,
   ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_opengl_borrowed_texture_descriptor Function()>()
@@ -2128,13 +1817,13 @@ mln_opengl_borrowed_texture_descriptor_default();
   ffi.Int32 Function(
     mln_render_session,
     ffi.Pointer<mln_opengl_borrowed_texture_descriptor>,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_opengl_borrowed_texture_set_target_start(
+external int mln_opengl_borrowed_texture_set_target(
   int session,
   ffi.Pointer<mln_opengl_borrowed_texture_descriptor> descriptor,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -2143,15 +1832,15 @@ external int mln_opengl_borrowed_texture_set_target_start(
     ffi.Pointer<mln_opengl_owned_texture_descriptor>,
     ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_opengl_owned_texture_attach_start(
+external int mln_opengl_owned_texture_attach(
   int map,
   ffi.Pointer<mln_opengl_owned_texture_descriptor> descriptor,
   ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_opengl_owned_texture_descriptor Function()>()
@@ -2167,15 +1856,15 @@ external int mln_opengl_supported_context_provider_mask();
     ffi.Pointer<mln_opengl_surface_descriptor>,
     ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_opengl_surface_attach_start(
+external int mln_opengl_surface_attach(
   int map,
   ffi.Pointer<mln_opengl_surface_descriptor> descriptor,
   ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_opengl_surface_descriptor Function()>()
@@ -2185,58 +1874,13 @@ external mln_opengl_surface_descriptor mln_opengl_surface_descriptor_default();
   ffi.Int32 Function(
     mln_render_session,
     ffi.Pointer<mln_opengl_surface_descriptor>,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_opengl_surface_set_target_start(
+external int mln_opengl_surface_set_target(
   int session,
   ffi.Pointer<mln_opengl_surface_descriptor> descriptor,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_operation)>()
-external int mln_operation_cancel(int operation);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_operation,
-    ffi.Pointer<ffi.Char>,
-    ffi.Size,
-    ffi.Pointer<ffi.Size>,
-  )
->()
-external int mln_operation_copy_diagnostic(
-  int operation,
-  ffi.Pointer<ffi.Char> out_diagnostic,
-  int diagnostic_capacity,
-  ffi.Pointer<ffi.Size> out_diagnostic_size,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_operation)>()
-external int mln_operation_finish(int operation);
-
-@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<ffi.Int32>)>()
-external int mln_operation_get_status(
-  int operation,
-  ffi.Pointer<ffi.Int32> out_status,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<ffi.Bool>)>()
-external int mln_operation_poll(
-  int operation,
-  ffi.Pointer<ffi.Bool> out_completed,
-);
-
-@ffi.Native<ffi.Void Function(mln_operation)>()
-external void mln_operation_release(int operation);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_operation, ffi.Int64, ffi.Pointer<ffi.Bool>)
->()
-external int mln_operation_wait(
-  int operation,
-  int timeout_ms,
-  ffi.Pointer<ffi.Bool> out_completed,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_premultiplied_rgba8_image Function()>()
@@ -2280,17 +1924,6 @@ external int mln_queried_feature_list_get(
   ffi.Pointer<mln_queried_feature> out_feature,
 );
 
-@ffi.Native<
-  ffi.Int32 Function(mln_ready_batch, ffi.Pointer<mln_ready_batch_view>)
->()
-external int mln_ready_batch_get(
-  int batch,
-  ffi.Pointer<mln_ready_batch_view> out_view,
-);
-
-@ffi.Native<ffi.Void Function(mln_ready_batch)>()
-external void mln_ready_batch_release(int batch);
-
 @ffi.Native<ffi.Int32 Function(mln_render_frame_batch, ffi.Pointer<ffi.Size>)>()
 external int mln_render_frame_batch_count(
   int batch,
@@ -2314,20 +1947,6 @@ external int mln_render_frame_batch_get(
 external void mln_render_frame_batch_release(int batch);
 
 @ffi.Native<
-  ffi.Int32 Function(mln_operation, ffi.Pointer<mln_queried_feature_list>)
->()
-external int mln_render_query_features_take_result(
-  int operation,
-  ffi.Pointer<mln_queried_feature_list> out_result,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<mln_buffer>)>()
-external int mln_render_query_take_result(
-  int operation,
-  ffi.Pointer<mln_buffer> out_result,
-);
-
-@ffi.Native<
   ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_render_abandon_result>)
 >()
 external int mln_render_session_abandon(
@@ -2348,30 +1967,30 @@ external mln_render_session_attach_options
 mln_render_session_attach_options_default();
 
 @ffi.Native<
-  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_operation>)
+  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_completion>)
 >()
-external int mln_render_session_barrier_start(
+external int mln_render_session_barrier(
   int session,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_operation>)
+  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_completion>)
 >()
-external int mln_render_session_clear_data_start(
+external int mln_render_session_clear_data(
   int session,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<ffi.Int32 Function(mln_render_session)>()
 external int mln_render_session_destroy(int session);
 
 @ffi.Native<
-  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_operation>)
+  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_completion>)
 >()
-external int mln_render_session_detach_start(
+external int mln_render_session_detach(
   int session,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -2383,11 +2002,11 @@ external int mln_render_session_drain_frame_results(
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_operation>)
+  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_completion>)
 >()
-external int mln_render_session_dump_debug_logs_start(
+external int mln_render_session_dump_debug_logs(
   int session,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -2407,21 +2026,15 @@ external int mln_render_session_get_capabilities(
     mln_buffer_view,
     mln_buffer_view,
     mln_buffer_view,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_render_session_get_feature_state_start(
+external int mln_render_session_get_feature_state(
   int session,
   mln_buffer_view source_id,
   mln_buffer_view source_layer_id,
   mln_buffer_view feature_id,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_operation, ffi.Pointer<mln_buffer>)>()
-external int mln_render_session_get_feature_state_take_result(
-  int operation,
-  ffi.Pointer<mln_buffer> out_state_json,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -2443,17 +2056,17 @@ external int mln_render_session_get_snapshot(
     mln_buffer_view,
     mln_buffer_view,
     ffi.Pointer<mln_buffer_view>,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_render_session_query_feature_extensions_start(
+external int mln_render_session_query_feature_extensions(
   int session,
   mln_buffer_view source_id,
   mln_buffer_view feature,
   mln_buffer_view extension,
   mln_buffer_view extension_field,
   ffi.Pointer<mln_buffer_view> arguments,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -2461,14 +2074,14 @@ external int mln_render_session_query_feature_extensions_start(
     mln_render_session,
     ffi.Pointer<mln_rendered_query_geometry>,
     ffi.Pointer<mln_rendered_feature_query_options>,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_render_session_query_rendered_features_start(
+external int mln_render_session_query_rendered_features(
   int session,
   ffi.Pointer<mln_rendered_query_geometry> geometry,
   ffi.Pointer<mln_rendered_feature_query_options> options,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -2476,22 +2089,22 @@ external int mln_render_session_query_rendered_features_start(
     mln_render_session,
     mln_buffer_view,
     ffi.Pointer<mln_source_feature_query_options>,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_render_session_query_source_features_start(
+external int mln_render_session_query_source_features(
   int session,
   mln_buffer_view source_id,
   ffi.Pointer<mln_source_feature_query_options> options,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_operation>)
+  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_completion>)
 >()
-external int mln_render_session_reduce_memory_use_start(
+external int mln_render_session_reduce_memory_use(
   int session,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -2501,16 +2114,16 @@ external int mln_render_session_reduce_memory_use_start(
     mln_buffer_view,
     mln_buffer_view,
     mln_buffer_view,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_render_session_remove_feature_state_start(
+external int mln_render_session_remove_feature_state(
   int session,
   mln_buffer_view source_id,
   mln_buffer_view source_layer_id,
   mln_buffer_view feature_id,
   mln_buffer_view state_key,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -2525,13 +2138,13 @@ external int mln_render_session_request_frame(
   ffi.Int32 Function(
     mln_render_session,
     ffi.Pointer<mln_render_target_extent>,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_render_session_resize_start(
+external int mln_render_session_resize(
   int session,
   ffi.Pointer<mln_render_target_extent> extent,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -2550,16 +2163,16 @@ external int mln_render_session_service_driver_work(
     mln_buffer_view,
     mln_buffer_view,
     mln_buffer_view,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_render_session_set_feature_state_start(
+external int mln_render_session_set_feature_state(
   int session,
   mln_buffer_view source_id,
   mln_buffer_view source_layer_id,
   mln_buffer_view feature_id,
   mln_buffer_view state_json,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -2635,28 +2248,28 @@ external int mln_resource_transform_response_set_url(
   int url_size,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_operation>)>()
-external int mln_runtime_barrier_start(
+@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_completion>)>()
+external int mln_runtime_barrier(
   int runtime,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<ffi.Uint64>)>()
+@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_completion>)>()
 external int mln_runtime_clear_http_header_transform(
   int runtime,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<ffi.Uint64>)>()
+@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_completion>)>()
 external int mln_runtime_clear_resource_provider(
   int runtime,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<ffi.Uint64>)>()
+@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_completion>)>()
 external int mln_runtime_clear_resource_transform(
   int runtime,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -2685,96 +2298,67 @@ external int mln_runtime_get_event_mask(
     ffi.Pointer<mln_offline_region_definition>,
     ffi.Pointer<ffi.Uint8>,
     ffi.Size,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_runtime_offline_region_create_start(
+external int mln_runtime_offline_region_create(
   int runtime,
   ffi.Pointer<mln_offline_region_definition> definition,
   ffi.Pointer<ffi.Uint8> metadata,
   int metadata_size,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_operation, ffi.Pointer<mln_offline_region_snapshot>)
->()
-external int mln_runtime_offline_region_create_take_result(
-  int operation,
-  ffi.Pointer<mln_offline_region_snapshot> out_region,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_runtime,
     mln_offline_region_id,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_runtime_offline_region_delete_start(
+external int mln_runtime_offline_region_delete(
   int runtime,
   int region_id,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_runtime,
     mln_offline_region_id,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_runtime_offline_region_get_start(
+external int mln_runtime_offline_region_get(
   int runtime,
   int region_id,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_runtime,
     mln_offline_region_id,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_runtime_offline_region_get_status_start(
+external int mln_runtime_offline_region_get_status(
   int runtime,
   int region_id,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_operation, ffi.Pointer<mln_offline_region_status>)
->()
-external int mln_runtime_offline_region_get_status_take_result(
-  int operation,
-  ffi.Pointer<mln_offline_region_status> out_status,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_operation,
-    ffi.Pointer<mln_offline_region_snapshot>,
-    ffi.Pointer<ffi.Bool>,
-  )
->()
-external int mln_runtime_offline_region_get_take_result(
-  int operation,
-  ffi.Pointer<mln_offline_region_snapshot> out_region,
-  ffi.Pointer<ffi.Bool> out_found,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_runtime,
     mln_offline_region_id,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_runtime_offline_region_invalidate_start(
+external int mln_runtime_offline_region_invalidate(
   int runtime,
   int region_id,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -2782,14 +2366,14 @@ external int mln_runtime_offline_region_invalidate_start(
     mln_runtime,
     mln_offline_region_id,
     ffi.Uint32,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_runtime_offline_region_set_download_state_start(
+external int mln_runtime_offline_region_set_download_state(
   int runtime,
   int region_id,
   int state,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -2797,14 +2381,14 @@ external int mln_runtime_offline_region_set_download_state_start(
     mln_runtime,
     mln_offline_region_id,
     ffi.Bool,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_runtime_offline_region_set_observed_start(
+external int mln_runtime_offline_region_set_observed(
   int runtime,
   int region_id,
   bool observed,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -2813,58 +2397,34 @@ external int mln_runtime_offline_region_set_observed_start(
     mln_offline_region_id,
     ffi.Pointer<ffi.Uint8>,
     ffi.Size,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_runtime_offline_region_update_metadata_start(
+external int mln_runtime_offline_region_update_metadata(
   int runtime,
   int region_id,
   ffi.Pointer<ffi.Uint8> metadata,
   int metadata_size,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
-@ffi.Native<
-  ffi.Int32 Function(mln_operation, ffi.Pointer<mln_offline_region_snapshot>)
->()
-external int mln_runtime_offline_region_update_metadata_take_result(
-  int operation,
-  ffi.Pointer<mln_offline_region_snapshot> out_region,
-);
-
-@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_operation>)>()
-external int mln_runtime_offline_regions_list_start(
+@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_completion>)>()
+external int mln_runtime_offline_regions_list(
   int runtime,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_operation, ffi.Pointer<mln_offline_region_list>)
->()
-external int mln_runtime_offline_regions_list_take_result(
-  int operation,
-  ffi.Pointer<mln_offline_region_list> out_regions,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_runtime,
     ffi.Pointer<ffi.Char>,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_runtime_offline_regions_merge_database_start(
+external int mln_runtime_offline_regions_merge_database(
   int runtime,
   ffi.Pointer<ffi.Char> side_database_path,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(mln_operation, ffi.Pointer<mln_offline_region_list>)
->()
-external int mln_runtime_offline_regions_merge_database_take_result(
-  int operation,
-  ffi.Pointer<mln_offline_region_list> out_regions,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_runtime_options Function()>()
@@ -2874,12 +2434,12 @@ external mln_runtime_options mln_runtime_options_default();
 external int mln_runtime_release(int runtime);
 
 @ffi.Native<
-  ffi.Int32 Function(mln_runtime, ffi.Uint32, ffi.Pointer<mln_operation>)
+  ffi.Int32 Function(mln_runtime, ffi.Uint32, ffi.Pointer<mln_completion>)
 >()
-external int mln_runtime_run_ambient_cache_operation_start(
+external int mln_runtime_run_ambient_cache_operation(
   int runtime,
   int operation,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Uint64)>()
@@ -2889,48 +2449,48 @@ external int mln_runtime_set_event_mask(int runtime, int mask);
   ffi.Int32 Function(
     mln_runtime,
     ffi.Pointer<mln_http_header_transform>,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_runtime_set_http_header_transform(
   int runtime,
   ffi.Pointer<mln_http_header_transform> transform,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
-  ffi.Int32 Function(mln_runtime, ffi.Uint64, ffi.Pointer<mln_operation>)
+  ffi.Int32 Function(mln_runtime, ffi.Uint64, ffi.Pointer<mln_completion>)
 >()
-external int mln_runtime_set_maximum_ambient_cache_size_start(
+external int mln_runtime_set_maximum_ambient_cache_size(
   int runtime,
   int size,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_runtime,
     ffi.Pointer<mln_resource_provider>,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_runtime_set_resource_provider(
   int runtime,
   ffi.Pointer<mln_resource_provider> provider,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
   ffi.Int32 Function(
     mln_runtime,
     ffi.Pointer<mln_resource_transform>,
-    ffi.Pointer<ffi.Uint64>,
+    ffi.Pointer<mln_completion>,
   )
 >()
 external int mln_runtime_set_resource_transform(
   int runtime,
   ffi.Pointer<mln_resource_transform> transform,
-  ffi.Pointer<ffi.Uint64> out_command_id,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_source_feature_query_options Function()>()
@@ -2993,24 +2553,11 @@ external int mln_supported_render_backend_mask();
 external mln_texture_image_info mln_texture_image_info_default();
 
 @ffi.Native<
-  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_operation>)
+  ffi.Int32 Function(mln_render_session, ffi.Pointer<mln_completion>)
 >()
-external int mln_texture_read_premultiplied_rgba8_start(
+external int mln_texture_read_premultiplied_rgba8(
   int session,
-  ffi.Pointer<mln_operation> out_operation,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_operation,
-    ffi.Pointer<mln_buffer>,
-    ffi.Pointer<mln_texture_image_info>,
-  )
->()
-external int mln_texture_read_premultiplied_rgba8_take_result(
-  int operation,
-  ffi.Pointer<mln_buffer> out_data,
-  ffi.Pointer<mln_texture_image_info> out_info,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<ffi.Pointer<ffi.Char> Function()>()
@@ -3022,15 +2569,15 @@ external ffi.Pointer<ffi.Char> mln_thread_last_error_message();
     ffi.Pointer<mln_vulkan_borrowed_texture_descriptor>,
     ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_vulkan_borrowed_texture_attach_start(
+external int mln_vulkan_borrowed_texture_attach(
   int map,
   ffi.Pointer<mln_vulkan_borrowed_texture_descriptor> descriptor,
   ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_vulkan_borrowed_texture_descriptor Function()>()
@@ -3041,13 +2588,13 @@ mln_vulkan_borrowed_texture_descriptor_default();
   ffi.Int32 Function(
     mln_render_session,
     ffi.Pointer<mln_vulkan_borrowed_texture_descriptor>,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_vulkan_borrowed_texture_set_target_start(
+external int mln_vulkan_borrowed_texture_set_target(
   int session,
   ffi.Pointer<mln_vulkan_borrowed_texture_descriptor> descriptor,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -3056,15 +2603,15 @@ external int mln_vulkan_borrowed_texture_set_target_start(
     ffi.Pointer<mln_vulkan_owned_texture_descriptor>,
     ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_vulkan_owned_texture_attach_start(
+external int mln_vulkan_owned_texture_attach(
   int map,
   ffi.Pointer<mln_vulkan_owned_texture_descriptor> descriptor,
   ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_vulkan_owned_texture_descriptor Function()>()
@@ -3077,15 +2624,15 @@ mln_vulkan_owned_texture_descriptor_default();
     ffi.Pointer<mln_vulkan_surface_descriptor>,
     ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_vulkan_surface_attach_start(
+external int mln_vulkan_surface_attach(
   int map,
   ffi.Pointer<mln_vulkan_surface_descriptor> descriptor,
   ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_vulkan_surface_descriptor Function()>()
@@ -3095,13 +2642,13 @@ external mln_vulkan_surface_descriptor mln_vulkan_surface_descriptor_default();
   ffi.Int32 Function(
     mln_render_session,
     ffi.Pointer<mln_vulkan_surface_descriptor>,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_vulkan_surface_set_target_start(
+external int mln_vulkan_surface_set_target(
   int session,
   ffi.Pointer<mln_vulkan_surface_descriptor> descriptor,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -3110,15 +2657,15 @@ external int mln_vulkan_surface_set_target_start(
     ffi.Pointer<mln_webgpu_borrowed_texture_descriptor>,
     ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_webgpu_borrowed_texture_attach_start(
+external int mln_webgpu_borrowed_texture_attach(
   int map,
   ffi.Pointer<mln_webgpu_borrowed_texture_descriptor> descriptor,
   ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_webgpu_borrowed_texture_descriptor Function()>()
@@ -3129,13 +2676,13 @@ mln_webgpu_borrowed_texture_descriptor_default();
   ffi.Int32 Function(
     mln_render_session,
     ffi.Pointer<mln_webgpu_borrowed_texture_descriptor>,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_webgpu_borrowed_texture_set_target_start(
+external int mln_webgpu_borrowed_texture_set_target(
   int session,
   ffi.Pointer<mln_webgpu_borrowed_texture_descriptor> descriptor,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<
@@ -3144,15 +2691,15 @@ external int mln_webgpu_borrowed_texture_set_target_start(
     ffi.Pointer<mln_webgpu_owned_texture_descriptor>,
     ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_webgpu_owned_texture_attach_start(
+external int mln_webgpu_owned_texture_attach(
   int map,
   ffi.Pointer<mln_webgpu_owned_texture_descriptor> descriptor,
   ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_webgpu_owned_texture_descriptor Function()>()
@@ -3165,15 +2712,15 @@ mln_webgpu_owned_texture_descriptor_default();
     ffi.Pointer<mln_webgpu_surface_descriptor>,
     ffi.Pointer<mln_render_session_attach_options>,
     ffi.Pointer<mln_render_session>,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_webgpu_surface_attach_start(
+external int mln_webgpu_surface_attach(
   int map,
   ffi.Pointer<mln_webgpu_surface_descriptor> descriptor,
   ffi.Pointer<mln_render_session_attach_options> options,
   ffi.Pointer<mln_render_session> out_session,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 @ffi.Native<mln_webgpu_surface_descriptor Function()>()
@@ -3183,13 +2730,13 @@ external mln_webgpu_surface_descriptor mln_webgpu_surface_descriptor_default();
   ffi.Int32 Function(
     mln_render_session,
     ffi.Pointer<mln_webgpu_surface_descriptor>,
-    ffi.Pointer<mln_operation>,
+    ffi.Pointer<mln_completion>,
   )
 >()
-external int mln_webgpu_surface_set_target_start(
+external int mln_webgpu_surface_set_target(
   int session,
   ffi.Pointer<mln_webgpu_surface_descriptor> descriptor,
-  ffi.Pointer<mln_operation> out_operation,
+  ffi.Pointer<mln_completion> completion,
 );
 
 const int MLN_ADAPTER_RESOURCE_KIND_ANY = 4294967295;
@@ -3220,6 +2767,56 @@ final class UnnamedUnion$2 extends ffi.Union {
 
 typedef mln_acquired_frame = ffi.Uint64;
 typedef Dartmln_acquired_frame = int;
+
+enum mln_adapter_completion_copy_kind {
+  MLN_ADAPTER_COMPLETION_COPY_FLAT(0),
+  MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEWS(1),
+  MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGIONS(2),
+  MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE(3),
+  MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER(4),
+  MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE(5),
+  MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_STRETCHES(6),
+  MLN_ADAPTER_COMPLETION_COPY_QUERIED_FEATURES(7),
+  MLN_ADAPTER_COMPLETION_COPY_TEXTURE_READBACK(8);
+
+  final int value;
+  const mln_adapter_completion_copy_kind(this.value);
+
+  static mln_adapter_completion_copy_kind fromValue(int value) =>
+      switch (value) {
+        0 => MLN_ADAPTER_COMPLETION_COPY_FLAT,
+        1 => MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEWS,
+        2 => MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGIONS,
+        3 => MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE,
+        4 => MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER,
+        5 => MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE,
+        6 => MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_STRETCHES,
+        7 => MLN_ADAPTER_COMPLETION_COPY_QUERIED_FEATURES,
+        8 => MLN_ADAPTER_COMPLETION_COPY_TEXTURE_READBACK,
+        _ => throw ArgumentError(
+          'Unknown value for mln_adapter_completion_copy_kind: $value',
+        ),
+      };
+}
+
+typedef mln_adapter_completion_listener =
+    ffi.Pointer<ffi.NativeFunction<mln_adapter_completion_listenerFunction>>;
+typedef mln_adapter_completion_listenerFunction =
+    ffi.Void Function(
+      ffi.Pointer<ffi.Void> user_data,
+      ffi.Pointer<mln_adapter_completion_record> record,
+    );
+typedef Dartmln_adapter_completion_listenerFunction =
+    void Function(
+      ffi.Pointer<ffi.Void> user_data,
+      ffi.Pointer<mln_adapter_completion_record> record,
+    );
+
+final class mln_adapter_completion_record extends ffi.Struct {
+  external ffi.Pointer<ffi.Void> owner;
+
+  external mln_completion_result result;
+}
 
 final class mln_adapter_http_header extends ffi.Struct {
   external ffi.Pointer<ffi.Char> name;
@@ -3945,6 +3542,72 @@ enum mln_command_disposition {
       'Unknown value for mln_command_disposition: $value',
     ),
   };
+}
+
+final class mln_completion extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  external mln_completion_callback callback;
+
+  external ffi.Pointer<ffi.Void> user_data;
+
+  external mln_completion_release release_user_data;
+
+  static ffi.Pointer<mln_completion> $allocate(
+    ffi.Allocator $allocator, {
+    required int size,
+    required mln_completion_callback callback,
+    required ffi.Pointer<ffi.Void> user_data,
+    required mln_completion_release release_user_data,
+  }) => $allocator<mln_completion>()
+    ..ref.size = size
+    ..ref.callback = callback
+    ..ref.user_data = user_data
+    ..ref.release_user_data = release_user_data;
+}
+
+typedef mln_completion_callback =
+    ffi.Pointer<ffi.NativeFunction<mln_completion_callbackFunction>>;
+typedef mln_completion_callbackFunction =
+    ffi.Void Function(
+      ffi.Pointer<ffi.Void> user_data,
+      ffi.Pointer<mln_completion_result> result,
+    );
+typedef Dartmln_completion_callbackFunction =
+    void Function(
+      ffi.Pointer<ffi.Void> user_data,
+      ffi.Pointer<mln_completion_result> result,
+    );
+typedef mln_completion_release =
+    ffi.Pointer<ffi.NativeFunction<mln_completion_releaseFunction>>;
+typedef mln_completion_releaseFunction =
+    ffi.Void Function(ffi.Pointer<ffi.Void> user_data);
+typedef Dartmln_completion_releaseFunction =
+    void Function(ffi.Pointer<ffi.Void> user_data);
+
+final class mln_completion_result extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Int32()
+  external int status;
+
+  @ffi.Uint32()
+  external int disposition;
+
+  @ffi.Uint32()
+  external int reserved;
+
+  @ffi.Uint64()
+  external int generation;
+
+  external mln_buffer_view diagnostic;
+
+  external ffi.Pointer<ffi.Void> value;
+
+  @ffi.Size()
+  external int value_count;
 }
 
 enum mln_constrain_mode {
@@ -5012,40 +4675,6 @@ enum mln_north_orientation {
   };
 }
 
-typedef mln_notification_callback =
-    ffi.Pointer<ffi.NativeFunction<mln_notification_callbackFunction>>;
-typedef mln_notification_callbackFunction =
-    ffi.Void Function(ffi.Pointer<ffi.Void> user_data);
-typedef Dartmln_notification_callbackFunction =
-    void Function(ffi.Pointer<ffi.Void> user_data);
-
-enum mln_notification_endpoint_kind {
-  MLN_NOTIFICATION_ENDPOINT_RUNTIME_EVENTS(1),
-  MLN_NOTIFICATION_ENDPOINT_OPERATION(2),
-  MLN_NOTIFICATION_ENDPOINT_ADAPTER_RESOURCE_REQUESTS(3),
-  MLN_NOTIFICATION_ENDPOINT_ADAPTER_LOG_RECORDS(4),
-  MLN_NOTIFICATION_ENDPOINT_RENDER_FRAMES(5),
-  MLN_NOTIFICATION_ENDPOINT_DRIVER_WORK(6);
-
-  final int value;
-  const mln_notification_endpoint_kind(this.value);
-
-  static mln_notification_endpoint_kind fromValue(int value) => switch (value) {
-    1 => MLN_NOTIFICATION_ENDPOINT_RUNTIME_EVENTS,
-    2 => MLN_NOTIFICATION_ENDPOINT_OPERATION,
-    3 => MLN_NOTIFICATION_ENDPOINT_ADAPTER_RESOURCE_REQUESTS,
-    4 => MLN_NOTIFICATION_ENDPOINT_ADAPTER_LOG_RECORDS,
-    5 => MLN_NOTIFICATION_ENDPOINT_RENDER_FRAMES,
-    6 => MLN_NOTIFICATION_ENDPOINT_DRIVER_WORK,
-    _ => throw ArgumentError(
-      'Unknown value for mln_notification_endpoint_kind: $value',
-    ),
-  };
-}
-
-typedef mln_notification_source = ffi.Uint64;
-typedef Dartmln_notification_source = int;
-
 final class mln_offline_geometry_region_definition extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -5408,9 +5037,6 @@ final class mln_opengl_surface_descriptor extends ffi.Struct {
   external ffi.Pointer<ffi.Void> surface;
 }
 
-typedef mln_operation = ffi.Uint64;
-typedef Dartmln_operation = int;
-
 final class mln_premultiplied_rgba8_image extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -5573,54 +5199,6 @@ enum mln_queried_feature_field {
 
 typedef mln_queried_feature_list = ffi.Uint64;
 typedef Dartmln_queried_feature_list = int;
-typedef mln_ready_batch = ffi.Uint64;
-typedef Dartmln_ready_batch = int;
-
-final class mln_ready_batch_view extends ffi.Struct {
-  @ffi.Uint32()
-  external int size;
-
-  @ffi.Uint32()
-  external int endpoint_size;
-
-  external ffi.Pointer<mln_ready_endpoint> endpoints;
-
-  @ffi.Size()
-  external int endpoint_count;
-
-  static ffi.Pointer<mln_ready_batch_view> $allocate(
-    ffi.Allocator $allocator, {
-    required int size,
-    required int endpoint_size,
-    required ffi.Pointer<mln_ready_endpoint> endpoints,
-    required int endpoint_count,
-  }) => $allocator<mln_ready_batch_view>()
-    ..ref.size = size
-    ..ref.endpoint_size = endpoint_size
-    ..ref.endpoints = endpoints
-    ..ref.endpoint_count = endpoint_count;
-}
-
-final class mln_ready_endpoint extends ffi.Struct {
-  @ffi.Uint32()
-  external int size;
-
-  @ffi.Uint32()
-  external int kind;
-
-  @ffi.Uint64()
-  external int id;
-
-  static ffi.Pointer<mln_ready_endpoint> $allocate(
-    ffi.Allocator $allocator, {
-    required int size,
-    required int kind,
-    required int id,
-  }) => $allocator<mln_ready_endpoint>()
-    ..ref.size = size
-    ..ref.kind = kind
-    ..ref.id = id;
-}
 
 enum mln_render_abandon_disposition {
   MLN_RENDER_ABANDON_DISPOSITION_CLEAN(0),
@@ -5796,32 +5374,9 @@ final class mln_render_session_attach_options extends ffi.Struct {
   @ffi.Uint32()
   external int reserved;
 
-  @mln_notification_source()
-  external int operation_source;
+  external mln_wake frame_wake;
 
-  @mln_notification_source()
-  external int frame_source;
-
-  @mln_notification_source()
-  external int driver_work_source;
-
-  static ffi.Pointer<mln_render_session_attach_options> $allocate(
-    ffi.Allocator $allocator, {
-    required int size,
-    required int driver,
-    required int requested_texture_ring_depth,
-    required int reserved,
-    required int operation_source,
-    required int frame_source,
-    required int driver_work_source,
-  }) => $allocator<mln_render_session_attach_options>()
-    ..ref.size = size
-    ..ref.driver = driver
-    ..ref.requested_texture_ring_depth = requested_texture_ring_depth
-    ..ref.reserved = reserved
-    ..ref.operation_source = operation_source
-    ..ref.frame_source = frame_source
-    ..ref.driver_work_source = driver_work_source;
+  external mln_wake driver_work_wake;
 }
 
 final class mln_render_session_capabilities extends ffi.Struct {
@@ -6564,32 +6119,6 @@ final class mln_runtime_event_camera_transition_finished extends ffi.Struct {
         ..ref.transition_id = transition_id;
 }
 
-final class mln_runtime_event_command_finished extends ffi.Struct {
-  @ffi.Uint64()
-  external int command_id;
-
-  @ffi.Uint32()
-  external int disposition;
-
-  @ffi.Uint32()
-  external int reserved;
-
-  @ffi.Uint64()
-  external int generation;
-
-  static ffi.Pointer<mln_runtime_event_command_finished> $allocate(
-    ffi.Allocator $allocator, {
-    required int command_id,
-    required int disposition,
-    required int reserved,
-    required int generation,
-  }) => $allocator<mln_runtime_event_command_finished>()
-    ..ref.command_id = command_id
-    ..ref.disposition = disposition
-    ..ref.reserved = reserved
-    ..ref.generation = generation;
-}
-
 enum mln_runtime_event_mask {
   MLN_RUNTIME_EVENT_MASK_NONE(0),
   MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_WILL_CHANGE(2),
@@ -6610,14 +6139,13 @@ enum mln_runtime_event_mask {
   MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_FINISHED(65536),
   MLN_RUNTIME_EVENT_MASK_MAP_STYLE_IMAGE_MISSING(131072),
   MLN_RUNTIME_EVENT_MASK_MAP_TILE_ACTION(262144),
-  MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED(8388608),
-  MLN_RUNTIME_EVENT_MASK_COMMAND_FINISHED(16777216),
+  MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED(4194304),
   MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED(524288),
   MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR(1048576),
   MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED(2097152),
-  MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS(25690110),
-  MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS(20447232),
-  MLN_RUNTIME_EVENT_MASK_ALL(29360126);
+  MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS(4718590),
+  MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS(3670016),
+  MLN_RUNTIME_EVENT_MASK_ALL(8388606);
 
   final int value;
   const mln_runtime_event_mask(this.value);
@@ -6642,14 +6170,13 @@ enum mln_runtime_event_mask {
     65536 => MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_FINISHED,
     131072 => MLN_RUNTIME_EVENT_MASK_MAP_STYLE_IMAGE_MISSING,
     262144 => MLN_RUNTIME_EVENT_MASK_MAP_TILE_ACTION,
-    8388608 => MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED,
-    16777216 => MLN_RUNTIME_EVENT_MASK_COMMAND_FINISHED,
+    4194304 => MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED,
     524288 => MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED,
     1048576 => MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR,
     2097152 => MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED,
-    25690110 => MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS,
-    20447232 => MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS,
-    29360126 => MLN_RUNTIME_EVENT_MASK_ALL,
+    4718590 => MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS,
+    3670016 => MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS,
+    8388606 => MLN_RUNTIME_EVENT_MASK_ALL,
     _ => throw ArgumentError(
       'Unknown value for mln_runtime_event_mask: $value',
     ),
@@ -6714,8 +6241,6 @@ final class mln_runtime_event_payload extends ffi.Union {
 
   external mln_runtime_event_camera_transition_finished
   camera_transition_finished;
-
-  external mln_runtime_event_command_finished command_finished;
 }
 
 enum mln_runtime_event_payload_type {
@@ -6726,8 +6251,7 @@ enum mln_runtime_event_payload_type {
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS(5),
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR(6),
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT(7),
-  MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED(9),
-  MLN_RUNTIME_EVENT_PAYLOAD_COMMAND_FINISHED(10);
+  MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED(8);
 
   final int value;
   const mln_runtime_event_payload_type(this.value);
@@ -6740,8 +6264,7 @@ enum mln_runtime_event_payload_type {
     5 => MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS,
     6 => MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR,
     7 => MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT,
-    9 => MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED,
-    10 => MLN_RUNTIME_EVENT_PAYLOAD_COMMAND_FINISHED,
+    8 => MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED,
     _ => throw ArgumentError(
       'Unknown value for mln_runtime_event_payload_type: $value',
     ),
@@ -6816,8 +6339,7 @@ enum mln_runtime_event_type {
   MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED(19),
   MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR(20),
   MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED(21),
-  MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED(23),
-  MLN_RUNTIME_EVENT_COMMAND_FINISHED(24);
+  MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED(22);
 
   final int value;
   const mln_runtime_event_type(this.value);
@@ -6844,8 +6366,7 @@ enum mln_runtime_event_type {
     19 => MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED,
     20 => MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR,
     21 => MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED,
-    23 => MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED,
-    24 => MLN_RUNTIME_EVENT_COMMAND_FINISHED,
+    22 => MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED,
     _ => throw ArgumentError(
       'Unknown value for mln_runtime_event_type: $value',
     ),
@@ -6866,24 +6387,7 @@ final class mln_runtime_options extends ffi.Struct {
   @ffi.Uint64()
   external int event_mask;
 
-  @mln_notification_source()
-  external int notification_source;
-
-  static ffi.Pointer<mln_runtime_options> $allocate(
-    ffi.Allocator $allocator, {
-    required int size,
-    required int flags,
-    required ffi.Pointer<ffi.Char> asset_path,
-    required ffi.Pointer<ffi.Char> cache_path,
-    required int event_mask,
-    required int notification_source,
-  }) => $allocator<mln_runtime_options>()
-    ..ref.size = size
-    ..ref.flags = flags
-    ..ref.asset_path = asset_path
-    ..ref.cache_path = cache_path
-    ..ref.event_mask = event_mask
-    ..ref.notification_source = notification_source;
+  external mln_wake event_wake;
 }
 
 final class mln_screen_box extends ffi.Struct {
@@ -7088,6 +6592,62 @@ final class mln_style_image_options extends ffi.Struct {
   external bool sdf;
 }
 
+final class mln_style_image_result extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Uint32()
+  external int reserved;
+
+  external mln_style_image_info info;
+
+  external mln_buffer_view pixels;
+
+  external ffi.Pointer<mln_image_stretch> stretch_x;
+
+  @ffi.Size()
+  external int stretch_x_count;
+
+  external ffi.Pointer<mln_image_stretch> stretch_y;
+
+  @ffi.Size()
+  external int stretch_y_count;
+}
+
+final class mln_style_image_stretches_result extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Uint32()
+  external int reserved;
+
+  external ffi.Pointer<mln_image_stretch> stretch_x;
+
+  @ffi.Size()
+  external int stretch_x_count;
+
+  external ffi.Pointer<mln_image_stretch> stretch_y;
+
+  @ffi.Size()
+  external int stretch_y_count;
+
+  static ffi.Pointer<mln_style_image_stretches_result> $allocate(
+    ffi.Allocator $allocator, {
+    required int size,
+    required int reserved,
+    required ffi.Pointer<mln_image_stretch> stretch_x,
+    required int stretch_x_count,
+    required ffi.Pointer<mln_image_stretch> stretch_y,
+    required int stretch_y_count,
+  }) => $allocator<mln_style_image_stretches_result>()
+    ..ref.size = size
+    ..ref.reserved = reserved
+    ..ref.stretch_x = stretch_x
+    ..ref.stretch_x_count = stretch_x_count
+    ..ref.stretch_y = stretch_y
+    ..ref.stretch_y_count = stretch_y_count;
+}
+
 enum mln_style_image_text_fit {
   MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK(0),
   MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY(1),
@@ -7145,6 +6705,20 @@ enum mln_style_layer_info_field {
       'Unknown value for mln_style_layer_info_field: $value',
     ),
   };
+}
+
+final class mln_style_layer_result extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Uint32()
+  external int reserved;
+
+  external mln_style_layer_info info;
+
+  external mln_buffer_view source_id;
+
+  external mln_buffer_view source_layer;
 }
 
 enum mln_style_layer_visibility {
@@ -7250,6 +6824,25 @@ enum mln_style_source_info_field {
       'Unknown value for mln_style_source_info_field: $value',
     ),
   };
+}
+
+final class mln_style_source_result extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Uint32()
+  external int reserved;
+
+  external mln_style_source_info info;
+
+  external mln_buffer_view attribution;
+
+  external mln_buffer_view url;
+
+  external ffi.Pointer<mln_buffer_view> tile_urls;
+
+  @ffi.Size()
+  external int tile_url_count;
 }
 
 enum mln_style_source_type {
@@ -7453,6 +7046,18 @@ final class mln_texture_image_info extends ffi.Struct {
     ..ref.height = height
     ..ref.stride = stride
     ..ref.byte_length = byte_length;
+}
+
+final class mln_texture_readback_result extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Uint32()
+  external int reserved;
+
+  external mln_buffer_view data;
+
+  external mln_texture_image_info info;
 }
 
 final class mln_tile_id extends ffi.Struct {
@@ -7734,6 +7339,42 @@ final class mln_vulkan_surface_descriptor extends ffi.Struct {
 
   external ffi.Pointer<ffi.Void> surface;
 }
+
+final class mln_wake extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  external mln_wake_callback callback;
+
+  external ffi.Pointer<ffi.Void> user_data;
+
+  external mln_wake_release release_user_data;
+
+  static ffi.Pointer<mln_wake> $allocate(
+    ffi.Allocator $allocator, {
+    required int size,
+    required mln_wake_callback callback,
+    required ffi.Pointer<ffi.Void> user_data,
+    required mln_wake_release release_user_data,
+  }) => $allocator<mln_wake>()
+    ..ref.size = size
+    ..ref.callback = callback
+    ..ref.user_data = user_data
+    ..ref.release_user_data = release_user_data;
+}
+
+typedef mln_wake_callback =
+    ffi.Pointer<ffi.NativeFunction<mln_wake_callbackFunction>>;
+typedef mln_wake_callbackFunction =
+    ffi.Void Function(ffi.Pointer<ffi.Void> user_data);
+typedef Dartmln_wake_callbackFunction =
+    void Function(ffi.Pointer<ffi.Void> user_data);
+typedef mln_wake_release =
+    ffi.Pointer<ffi.NativeFunction<mln_wake_releaseFunction>>;
+typedef mln_wake_releaseFunction =
+    ffi.Void Function(ffi.Pointer<ffi.Void> user_data);
+typedef Dartmln_wake_releaseFunction =
+    void Function(ffi.Pointer<ffi.Void> user_data);
 
 final class mln_webgl_context_descriptor extends ffi.Struct {
   @ffi.Uint32()

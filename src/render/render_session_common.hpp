@@ -27,8 +27,8 @@
 #include "diagnostics/diagnostics.hpp"
 #include "handles/handle_table.hpp"
 #include "maplibre_native_c.h"
-#include "notification/notification.hpp"
 #include "operation/operation.hpp"
+#include "wake/wake.hpp"
 
 struct mln_render_session_object;
 
@@ -526,9 +526,10 @@ struct mln_render_session_object
   // Attachment descriptors are copied into this closure. It creates every
   // graphics object on the selected driver.
   std::function<mln_status(mln_render_session_object&)> initialize_backend;
-  std::shared_ptr<mln::core::NotificationSourceObject> operation_source;
-  std::shared_ptr<mln::core::NotificationEndpoint> frame_endpoint;
-  std::shared_ptr<mln::core::NotificationEndpoint> driver_endpoint;
+  std::shared_ptr<mln::core::Wake> frame_wake;
+  std::shared_ptr<mln::core::Wake> driver_wake;
+  bool frame_wake_pending = false;
+  bool driver_wake_pending = false;
 
   // Declared before `renderer` so reverse-order destruction tears the renderer
   // down while the scheduler its mailboxes point at is still alive.
@@ -572,21 +573,6 @@ struct HandleTraits<mln_acquired_frame_object> {
   static constexpr auto leasable = true;
 };
 
-enum : std::uint32_t {
-  RENDER_OPERATION_VOID = 0x3000u,
-  RENDER_OPERATION_ATTACH,
-  RENDER_OPERATION_RESIZE,
-  RENDER_OPERATION_BARRIER,
-  RENDER_OPERATION_MAINTENANCE,
-  RENDER_OPERATION_FEATURE_STATE_GET,
-  RENDER_OPERATION_FEATURE_STATE_SET,
-  RENDER_OPERATION_FEATURE_STATE_REMOVE,
-  RENDER_OPERATION_DETACH,
-  RENDER_OPERATION_QUERY,
-  RENDER_OPERATION_QUERY_FEATURES,
-  RENDER_OPERATION_READBACK,
-};
-
 using RenderDriverCallable =
   std::function<mln_status(mln_render_session_object&)>;
 using RenderDriverResultCallable =
@@ -595,23 +581,25 @@ using RenderDriverResultCallable =
 [[nodiscard]] auto lease_render_session(mln_render_session session)
   -> std::shared_ptr<mln_render_session_object>;
 auto enqueue_driver_operation(
-  mln_render_session session, std::uint32_t operation_kind,
-  RenderDriverCallable work, mln_operation* out_operation
+  mln_render_session session, RenderDriverCallable work,
+  const mln_completion* completion
 ) -> mln_status;
+using RenderCompletionTransfer = std::function<
+  void(const std::shared_ptr<Completion>&, mln_status, std::string, std::any)>;
 auto enqueue_driver_result_operation(
-  mln_render_session session, std::uint32_t operation_kind,
-  RenderDriverResultCallable work, mln_operation* out_operation
+  mln_render_session session, RenderDriverResultCallable work,
+  const mln_completion* completion, RenderCompletionTransfer transfer
 ) -> mln_status;
 auto validate_render_session_attach_request(
   const mln_render_session_attach_options* options,
-  const mln_render_session* out_session, const mln_operation* out_operation
+  const mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status;
 
 auto start_attach_render_session(
   std::shared_ptr<mln_render_session_object> session, RenderSessionKind kind,
   const mln_render_session_attach_options* options,
   mln_render_session_capabilities capabilities, mln_render_session* out_session,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) -> mln_status;
 auto notify_render_session_map_update(
   mln_render_session_object* session
@@ -828,23 +816,19 @@ auto render_session_query_feature_extensions(
 auto render_session_query_rendered_features_start(
   mln_render_session session, const mln_rendered_query_geometry* geometry,
   const mln_rendered_feature_query_options* options,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) -> mln_status;
 auto render_session_query_source_features_start(
   mln_render_session session, mln_buffer_view source_id,
-  const mln_source_feature_query_options* options, mln_operation* out_operation
+  const mln_source_feature_query_options* options,
+  const mln_completion* completion
 ) -> mln_status;
 auto render_session_query_feature_extensions_start(
   mln_render_session session, mln_buffer_view source_id,
   mln_buffer_view feature, mln_buffer_view extension,
   mln_buffer_view extension_field, const mln_buffer_view* arguments,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) -> mln_status;
-auto render_query_features_take_result(
-  mln_operation operation, mln_queried_feature_list* out_result
-) -> mln_status;
-auto render_query_take_result(mln_operation operation, mln_buffer* out_result)
-  -> mln_status;
 
 auto render_session_get_capabilities(
   mln_render_session, mln_render_session_capabilities*
@@ -875,29 +859,27 @@ auto acquired_frame_get_producer_sync(mln_acquired_frame, mln_gpu_sync*)
 auto acquired_frame_release(mln_acquired_frame*, const mln_gpu_sync*)
   -> mln_status;
 auto render_session_resize_start(
-  mln_render_session, const mln_render_target_extent*, mln_operation*
+  mln_render_session, const mln_render_target_extent*, const mln_completion*
 ) -> mln_status;
-auto render_session_barrier_start(mln_render_session, mln_operation*)
+auto render_session_barrier_start(mln_render_session, const mln_completion*)
   -> mln_status;
 auto render_session_maintenance_start(
-  mln_render_session, std::uint32_t, mln_operation*
+  mln_render_session, std::uint32_t, const mln_completion*
 ) -> mln_status;
-auto render_session_detach_start(mln_render_session, mln_operation*)
+auto render_session_detach_start(mln_render_session, const mln_completion*)
   -> mln_status;
 auto render_session_abandon(mln_render_session, mln_render_abandon_result*)
   -> mln_status;
 auto render_session_set_feature_state_start(
   mln_render_session, mln_buffer_view, mln_buffer_view, mln_buffer_view,
-  mln_buffer_view, mln_operation*
+  mln_buffer_view, const mln_completion*
 ) -> mln_status;
 auto render_session_get_feature_state_start(
   mln_render_session, mln_buffer_view, mln_buffer_view, mln_buffer_view,
-  mln_operation*
+  const mln_completion*
 ) -> mln_status;
-auto render_session_get_feature_state_take_result(mln_operation, mln_buffer*)
-  -> mln_status;
 auto render_session_remove_feature_state_start(
   mln_render_session, mln_buffer_view, mln_buffer_view, mln_buffer_view,
-  mln_buffer_view, mln_operation*
+  mln_buffer_view, const mln_completion*
 ) -> mln_status;
 }  // namespace mln::core

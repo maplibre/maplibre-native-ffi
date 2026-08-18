@@ -50,13 +50,6 @@ public sealed interface RuntimeEventPayload {
     public val transitionId: Long
   ) : RuntimeEventPayload
 
-  /** Terminal outcome for one accepted runtime command. */
-  public data class CommandFinished(
-    public val commandId: ULong,
-    public val disposition: CommandDisposition,
-    public val generation: ULong,
-  ) : RuntimeEventPayload
-
   /**
    * Payload of a kind this version does not name.
    *

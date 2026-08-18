@@ -10,6 +10,7 @@
 #include <stdint.h>
 
 #include "base.h"
+#include "completion.h"
 #include "map.h"
 
 #ifdef __cplusplus
@@ -20,29 +21,18 @@ extern "C" {
  * Starts creation of a standalone projection from the map's ordered transform
  * state.
  *
- * The returned operation uses the map runtime's notification source. The
- * operation result is an independent projection handle that copies the map's
- * transform state after every earlier map command. Once creation completes,
- * the projection remains usable after its source map and runtime close. This
- * function may be called from any thread.
+ * The completion borrows an independent projection handle that copies the
+ * map's transform state after every earlier map command. A binding takes
+ * ownership of that handle before the callback returns. The projection remains
+ * usable after its source map and runtime close. This function may be called
+ * from any thread.
  *
  * Every later projection call is synchronous, runs on the calling thread, and
  * is internally serialized. A projection never observes map changes made after
  * its creation.
  */
-MLN_API mln_status mln_map_projection_create_start(
-  mln_map map, mln_operation* out_operation
-) MLN_NOEXCEPT;
-
-/**
- * Takes the projection handle from a successful creation operation.
- *
- * out_projection must point to the null handle. A failed transfer leaves the
- * result available for another take call. The returned projection may be used
- * from any thread.
- */
-MLN_API mln_status mln_map_projection_create_take_result(
-  mln_operation operation, mln_map_projection* out_projection
+MLN_API mln_status mln_map_projection_create(
+  mln_map map, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**

@@ -11,15 +11,14 @@ typedef struct map_observer {
 } map_observer;
 
 // #region subscribe
-mln_status select_map_events(mln_map map) {
-  uint64_t command_id = 0;
+mln_status select_map_events(mln_map map, const mln_completion* completion) {
   return mln_map_set_event_mask(
     map,
     MLN_RUNTIME_EVENT_MASK_MAP_STYLE_LOADED |
       MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED |
       MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE |
       MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED,
-    &command_id
+    completion
   );
 }
 // #endregion subscribe

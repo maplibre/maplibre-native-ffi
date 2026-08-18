@@ -26,8 +26,8 @@ when it expires before work begins, the demand terminates as deadline missed.
 The timeout does not supply cadence.
 
 A core-worker session wakes its serial graphics worker. A caller-driver session
-makes its driver-work notification endpoint ready. Map updates use the same
-paths, so progress does not depend on runtime-event drains or display callbacks.
+invokes its driver-work wake callback. Map updates use the same paths, so
+progress does not depend on runtime-event drains or display callbacks.
 
 The host may submit demand from a display source, after an earlier result, or
 from another scheduler. A demand captures the current extent generation. Its
@@ -46,10 +46,10 @@ and present flags and a fresh host token.
 
 ## Service a caller driver
 
-When the driver-work endpoint is ready, schedule the driver-service call on the
+When the driver-work callback wakes the host, schedule the driver-service call on the
 thread or realm where the target's graphics context is usable. The first
 successful call fixes that graphics-thread identity. Service work in serialized
-calls until the endpoint drains. Continue service while presentation callbacks
+calls until the mailbox drains. Continue service while presentation callbacks
 are paused, because attach, resize, queries, readback, barriers, and detach also
 use the mailbox.
 
@@ -67,7 +67,7 @@ unserviced can leave operations pending indefinitely.
 ## Drain results and present
 
 Frame readiness is level-triggered. Drain an owned frame-result batch from any
-thread when its endpoint is ready. Each batch remains stable until release. Keep
+thread after the frame wake runs. Each batch remains stable until release. Keep
 draining until the queue is empty.
 
 A rendered result means that a frame was presented or became available for

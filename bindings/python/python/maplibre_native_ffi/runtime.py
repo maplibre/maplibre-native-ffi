@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import weakref
 from collections.abc import Callable
+from concurrent.futures import Future
 from dataclasses import dataclass, field
 from enum import IntFlag
 from typing import Any
 
 from . import _native
 from ._enum import UnknownIntEnum
+from ._future import map_future
 from ._lifecycle import NativeHandleMixin
 from .errors import InvalidArgumentError
 from .resource import (
@@ -54,8 +56,7 @@ class RuntimeEventType(UnknownIntEnum):
     OFFLINE_REGION_STATUS_CHANGED = 19
     OFFLINE_REGION_RESPONSE_ERROR = 20
     OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 21
-    MAP_CAMERA_TRANSITION_FINISHED = 23
-    COMMAND_FINISHED = 24
+    MAP_CAMERA_TRANSITION_FINISHED = 22
 
 
 class RuntimeEventMask(IntFlag):
@@ -94,7 +95,6 @@ class RuntimeEventMask(IntFlag):
     MAP_CAMERA_TRANSITION_FINISHED = (
         1 << RuntimeEventType.MAP_CAMERA_TRANSITION_FINISHED
     )
-    COMMAND_FINISHED = 1 << RuntimeEventType.COMMAND_FINISHED
     OFFLINE_REGION_STATUS_CHANGED = 1 << RuntimeEventType.OFFLINE_REGION_STATUS_CHANGED
     OFFLINE_REGION_RESPONSE_ERROR = 1 << RuntimeEventType.OFFLINE_REGION_RESPONSE_ERROR
     OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = (
@@ -120,13 +120,11 @@ class RuntimeEventMask(IntFlag):
         | MAP_STYLE_IMAGE_MISSING
         | MAP_TILE_ACTION
         | MAP_CAMERA_TRANSITION_FINISHED
-        | COMMAND_FINISHED
     )
     ALL_RUNTIME_EVENTS = (
         OFFLINE_REGION_STATUS_CHANGED
         | OFFLINE_REGION_RESPONSE_ERROR
         | OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED
-        | COMMAND_FINISHED
     )
     ALL = ALL_MAP_EVENTS | ALL_RUNTIME_EVENTS
 
@@ -159,30 +157,24 @@ class CommandDisposition(UnknownIntEnum):
     CANCELLED = 3
 
 
+@dataclass(frozen=True, slots=True)
+class CommandCompletion:
+    """Terminal result of an accepted map command."""
+
+    disposition: CommandDisposition
+    generation: int
+    native_status_code: int
+    diagnostic: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "disposition", CommandDisposition(self.disposition))
+
+
 class RuntimeEventSourceType(UnknownIntEnum):
     """Runtime event source kind values reported by the C API."""
 
     RUNTIME = 0
     MAP = 1
-
-
-class NotificationEndpointKind(UnknownIntEnum):
-    """Kinds of service endpoint reported ready by a runtime receiver."""
-
-    RUNTIME_EVENTS = 1
-    OPERATION = 2
-    ADAPTER_RESOURCE_REQUESTS = 3
-    ADAPTER_LOG_RECORDS = 4
-    RENDER_FRAMES = 5
-    DRIVER_WORK = 6
-
-
-@dataclass(frozen=True, slots=True)
-class ReadyEndpoint:
-    """One copied endpoint reported by a runtime notification source."""
-
-    kind: NotificationEndpointKind
-    id: int
 
 
 class RenderMode(UnknownIntEnum):
@@ -307,30 +299,6 @@ class CameraTransitionFinishedPayload:
         cls, payload: dict[str, object]
     ) -> CameraTransitionFinishedPayload:
         return cls(transition_id=payload["transition_id"])
-
-
-@dataclass(frozen=True, slots=True)
-class CommandFinishedPayload:
-    """Terminal command result reported by a runtime event."""
-
-    command_id: int
-    disposition: CommandDisposition
-    generation: int
-    """Map snapshot generation that published a committed command's effect.
-
-    Every committed map command publishes a map snapshot; a snapshot whose
-    generation is at or past this value observes the commit.
-    """
-
-    @classmethod
-    def _from_runtime_payload(
-        cls, payload: dict[str, object]
-    ) -> CommandFinishedPayload:
-        return cls(
-            command_id=payload["command_id"],
-            disposition=CommandDisposition(payload["disposition"]),
-            generation=payload["generation"],
-        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -479,28 +447,21 @@ class RuntimeHandle(NativeHandleMixin):
         """Release this runtime handle exactly once."""
         self._native.close()
 
-    def barrier(self) -> None:
-        """Block until every previously accepted runtime command is committed."""
-        self._native.barrier()
+    def barrier(self) -> Future[None]:
+        """Return a future for all previously accepted runtime commands."""
+        return self._native.barrier()
 
-    def set_notification_callback(self, callback: Callable[[], None]) -> None:
-        """Install the callback that schedules a later :meth:`drain_ready`.
+    def set_event_wake_callback(self, callback: Callable[[], None]) -> None:
+        """Install the callback that schedules a later :meth:`drain_events`.
 
         Native code may invoke the callback from any thread. The callback must
         only arrange receiver work and must not call this binding directly.
         """
-        self._native.set_notification_callback(callback)
+        self._native.set_event_wake_callback(callback)
 
-    def clear_notification_callback(self) -> None:
+    def clear_event_wake_callback(self) -> None:
         """Clear the scheduling callback after in-flight entries return."""
-        self._native.clear_notification_callback()
-
-    def drain_ready(self) -> tuple[ReadyEndpoint, ...]:
-        """Drain and copy the receiver endpoints currently ready for service."""
-        return tuple(
-            ReadyEndpoint(NotificationEndpointKind(kind), endpoint_id)
-            for kind, endpoint_id in self._native.drain_ready()
-        )
+        self._native.clear_event_wake_callback()
 
     def _register_map(self, map_handle: MapHandle) -> None:
         self._maps[map_handle._native_id()] = weakref.ref(map_handle)
@@ -518,33 +479,17 @@ class RuntimeHandle(NativeHandleMixin):
             return None
         return map_handle
 
-    def _operation(
-        self,
-        start: Callable[..., int],
-        take_result: Callable[[int], object] | None,
-        adapt_result: Callable[[object], object] | None,
-        *args: object,
-    ) -> OperationHandle:
-        from .offline import OperationHandle
-
-        return OperationHandle._from_native(
-            self, start(*args), take_result, adapt_result
-        )
-
     def run_ambient_cache_operation(
         self, operation: AmbientCacheOperation
-    ) -> OperationHandle[None]:
+    ) -> Future[None]:
         """Start an ambient cache maintenance operation."""
         from .offline import AmbientCacheOperation
 
-        return self._operation(
-            self._native.run_ambient_cache_operation_start,
-            None,
-            None,
-            AmbientCacheOperation(operation).native_code,
+        return self._native.run_ambient_cache_operation(
+            AmbientCacheOperation(operation).native_code
         )
 
-    def set_maximum_ambient_cache_size(self, size: int) -> OperationHandle[None]:
+    def set_maximum_ambient_cache_size(self, size: int) -> Future[None]:
         """Start a change to this runtime's maximum ambient cache size.
 
         MapLibre evicts ambient resources to fit the new budget, so lowering it
@@ -556,126 +501,86 @@ class RuntimeHandle(NativeHandleMixin):
             raise InvalidArgumentError(
                 f"maximum ambient cache size must fit in 64 unsigned bits, not {size}"
             )
-        return self._operation(
-            self._native.set_maximum_ambient_cache_size_start,
-            None,
-            None,
-            size,
-        )
+        return self._native.set_maximum_ambient_cache_size(size)
 
     def create_offline_region(
         self, definition: OfflineRegionDefinition, metadata: bytes = b""
-    ) -> OperationHandle[OfflineRegionInfo]:
+    ) -> Future[OfflineRegionInfo]:
         """Start creating an offline region."""
-        return self._operation(
-            self._native.offline_region_create_start,
-            self._native.offline_region_create_take_result,
+        return map_future(
+            self._native.create_offline_region(definition, metadata),
             _adapt_region_result,
-            definition,
-            metadata,
         )
 
-    def get_offline_region(
-        self, region_id: int
-    ) -> OperationHandle[OfflineRegionInfo | None]:
+    def get_offline_region(self, region_id: int) -> Future[OfflineRegionInfo | None]:
         """Start getting an offline region snapshot by ID."""
-        return self._operation(
-            self._native.offline_region_get_start,
-            self._native.offline_region_get_take_result,
-            _adapt_optional_region_result,
-            region_id,
+        return map_future(
+            self._native.get_offline_region(region_id), _adapt_optional_region_result
         )
 
-    def list_offline_regions(self) -> OperationHandle[tuple[OfflineRegionInfo, ...]]:
+    def list_offline_regions(self) -> Future[tuple[OfflineRegionInfo, ...]]:
         """Start listing offline region snapshots."""
-        return self._operation(
-            self._native.offline_regions_list_start,
-            self._native.offline_regions_list_take_result,
-            _adapt_region_list_result,
+        return map_future(
+            self._native.list_offline_regions(), _adapt_region_list_result
         )
 
     def merge_offline_regions_database(
         self, side_database_path: str
-    ) -> OperationHandle[tuple[OfflineRegionInfo, ...]]:
+    ) -> Future[tuple[OfflineRegionInfo, ...]]:
         """Start merging offline regions from another database path."""
-        return self._operation(
-            self._native.offline_regions_merge_database_start,
-            self._native.offline_regions_merge_database_take_result,
+        return map_future(
+            self._native.merge_offline_regions_database(side_database_path),
             _adapt_region_list_result,
-            side_database_path,
         )
 
     def update_offline_region_metadata(
         self,
         region_id: int,
         metadata: bytes,
-    ) -> OperationHandle[OfflineRegionInfo]:
+    ) -> Future[OfflineRegionInfo]:
         """Start updating opaque binary metadata for an offline region."""
-        return self._operation(
-            self._native.offline_region_update_metadata_start,
-            self._native.offline_region_update_metadata_take_result,
+        return map_future(
+            self._native.update_offline_region_metadata(region_id, metadata),
             _adapt_region_result,
-            region_id,
-            metadata,
         )
 
-    def get_offline_region_status(
-        self, region_id: int
-    ) -> OperationHandle[OfflineRegionStatus]:
+    def get_offline_region_status(self, region_id: int) -> Future[OfflineRegionStatus]:
         """Start getting completed/download status for an offline region."""
-        return self._operation(
-            self._native.offline_region_get_status_start,
-            self._native.offline_region_get_status_take_result,
-            _adapt_status_result,
-            region_id,
+        return map_future(
+            self._native.get_offline_region_status(region_id), _adapt_status_result
         )
 
     def set_offline_region_observed(
         self, region_id: int, observed: bool
-    ) -> OperationHandle[None]:
+    ) -> Future[None]:
         """Start enabling or disabling runtime events for an offline region."""
-        return self._operation(
-            self._native.offline_region_set_observed_start,
-            None,
-            None,
-            region_id,
-            observed,
-        )
+        return self._native.set_offline_region_observed(region_id, observed)
 
     def set_offline_region_download_state(
         self,
         region_id: int,
         state: OfflineRegionDownloadState,
-    ) -> OperationHandle[None]:
+    ) -> Future[None]:
         """Start setting an offline region's native download state."""
         from .offline import OfflineRegionDownloadState
 
-        return self._operation(
-            self._native.offline_region_set_download_state_start,
-            None,
-            None,
-            region_id,
-            OfflineRegionDownloadState(state).native_code_for_set(),
-        )
+        native_state = OfflineRegionDownloadState(state).native_code_for_set()
+        return self._native.set_offline_region_download_state(region_id, native_state)
 
-    def invalidate_offline_region(self, region_id: int) -> OperationHandle[None]:
+    def invalidate_offline_region(self, region_id: int) -> Future[None]:
         """Start invalidating cached resources for an offline region."""
-        return self._operation(
-            self._native.offline_region_invalidate_start, None, None, region_id
-        )
+        return self._native.invalidate_offline_region(region_id)
 
-    def delete_offline_region(self, region_id: int) -> OperationHandle[None]:
+    def delete_offline_region(self, region_id: int) -> Future[None]:
         """Start deleting an offline region."""
-        return self._operation(
-            self._native.offline_region_delete_start, None, None, region_id
-        )
+        return self._native.delete_offline_region(region_id)
 
     def set_resource_transform(
         self,
         callback: ResourceTransformCallback,
         *,
         max_pending_callbacks: int = 64,
-    ) -> int:
+    ) -> Future[CommandCompletion]:
         """Install or replace the runtime-scoped network URL transform."""
         from .resource import _adapt_resource_transform_callback
 
@@ -684,7 +589,7 @@ class RuntimeHandle(NativeHandleMixin):
             max_pending_callbacks,
         )
 
-    def clear_resource_transform(self) -> int:
+    def clear_resource_transform(self) -> Future[CommandCompletion]:
         """Clear the runtime-scoped network URL transform."""
         return self._native.clear_resource_transform()
 
@@ -693,7 +598,7 @@ class RuntimeHandle(NativeHandleMixin):
         callback: HttpHeaderTransformCallback,
         *,
         max_pending_callbacks: int = 64,
-    ) -> int:
+    ) -> Future[CommandCompletion]:
         """Install or replace the outgoing HTTP header transform."""
         from .resource import _adapt_http_header_transform_callback
 
@@ -702,7 +607,7 @@ class RuntimeHandle(NativeHandleMixin):
             max_pending_callbacks,
         )
 
-    def clear_http_header_transform(self) -> int:
+    def clear_http_header_transform(self) -> Future[CommandCompletion]:
         """Clear the outgoing HTTP header transform."""
         return self._native.clear_http_header_transform()
 
@@ -711,7 +616,7 @@ class RuntimeHandle(NativeHandleMixin):
         callback: ResourceProviderCallback,
         *,
         max_pending_callbacks: int = 64,
-    ) -> int:
+    ) -> Future[CommandCompletion]:
         """Install or replace the runtime-scoped network resource provider.
 
         Replacement is allowed while maps are live. When this call returns, the
@@ -725,7 +630,7 @@ class RuntimeHandle(NativeHandleMixin):
             max_pending_callbacks,
         )
 
-    def clear_resource_provider(self) -> int:
+    def clear_resource_provider(self) -> Future[CommandCompletion]:
         """Clear the runtime-scoped network resource provider.
 
         Later requests go to MapLibre's online file source. Requests the
@@ -766,8 +671,8 @@ class RuntimeHandle(NativeHandleMixin):
         """
         return RuntimeEventMask(self._native.get_event_mask())
 
-    def create_map(self, options: MapOptions | None = None) -> MapHandle:
-        """Create a map owned by this runtime."""
+    def create_map(self, options: MapOptions | None = None) -> Future[MapHandle]:
+        """Return an eager future for a map owned by this runtime."""
         from .map import MapHandle
 
         return MapHandle._create(self, options)
@@ -791,16 +696,14 @@ def _runtime_payload_from_native(payload: dict[str, object]) -> RuntimeEventPayl
         return OfflineRegionTileCountLimitExceeded._from_runtime_payload(payload)
     if kind == "camera_transition_finished":
         return CameraTransitionFinishedPayload._from_runtime_payload(payload)
-    if kind == "command_finished":
-        return CommandFinishedPayload._from_runtime_payload(payload)
     return UnknownRuntimeEventPayload._from_runtime_payload(payload)
 
 
 __all__ = [
     "CameraChangeMode",
     "CameraTransitionFinishedPayload",
+    "CommandCompletion",
     "CommandDisposition",
-    "CommandFinishedPayload",
     "NetworkStatus",
     "RenderFramePayload",
     "RenderMapPayload",
@@ -831,7 +734,6 @@ from .offline import (
     OfflineRegionStatus,
     OfflineRegionStatusChanged,
     OfflineRegionTileCountLimitExceeded,
-    OperationHandle,
     _adapt_optional_region_result,
     _adapt_region_list_result,
     _adapt_region_result,
@@ -847,6 +749,5 @@ RuntimeEventPayload = (
     | OfflineRegionResponseError
     | OfflineRegionTileCountLimitExceeded
     | CameraTransitionFinishedPayload
-    | CommandFinishedPayload
     | UnknownRuntimeEventPayload
 )

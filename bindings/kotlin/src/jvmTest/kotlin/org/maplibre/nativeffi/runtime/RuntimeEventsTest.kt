@@ -27,9 +27,9 @@ class RuntimeEventsTest {
   fun oneDrainAfterStyleLoadReturnsEveryQueuedEvent(): Unit =
     org.maplibre.nativeffi.runtime.runSuspendTest {
       withMap { runtime, map ->
-        map.setStyleJson(STYLE_JSON.encodeToByteArray())
+        map.setStyleJson(STYLE_JSON.encodeToByteArray()).await()
         // Nothing drains while the style parses, so one drain reports the whole run.
-        repeat(20) { runtime.barrier() }
+        repeat(20) { runtime.barrier().await() }
 
         val batch = runtime.drainEvents()
         assertTrue(batch.events.size > 1, "expected several events, got ${batch.events}")
@@ -43,8 +43,8 @@ class RuntimeEventsTest {
     org.maplibre.nativeffi.runtime.runSuspendTest {
       withMap { runtime, map ->
         // One style load produces both types, so both are driven after this write.
-        map.eventMask = RuntimeEventMask.ALL - RuntimeEventMask.MAP_LOADING_STARTED
-        map.setStyleJson(STYLE_JSON.encodeToByteArray())
+        map.setEventMask(RuntimeEventMask.ALL - RuntimeEventMask.MAP_LOADING_STARTED).await()
+        map.setStyleJson(STYLE_JSON.encodeToByteArray()).await()
 
         val types = drainUntil(runtime) { RuntimeEventType.MAP_STYLE_LOADED in it }
         assertTrue(RuntimeEventType.MAP_LOADING_STARTED !in types, "cleared type was delivered")
@@ -57,17 +57,18 @@ class RuntimeEventsTest {
       RuntimeHandle.create(RuntimeOptions()).use { runtime ->
         val map =
           MapHandle.create(
-            runtime,
-            mapOptions().apply {
-              eventMask = RuntimeEventMask.ALL - RuntimeEventMask.MAP_LOADING_STARTED
-            },
-          )
+              runtime,
+              mapOptions().apply {
+                eventMask = RuntimeEventMask.ALL - RuntimeEventMask.MAP_LOADING_STARTED
+              },
+            )
+            .await()
         try {
           assertEquals(
             RuntimeEventMask.ALL_MAP_EVENTS - RuntimeEventMask.MAP_LOADING_STARTED,
             map.eventMask,
           )
-          map.setStyleJson(STYLE_JSON.encodeToByteArray())
+          map.setStyleJson(STYLE_JSON.encodeToByteArray()).await()
 
           val types = drainUntil(runtime) { RuntimeEventType.MAP_STYLE_LOADED in it }
           assertTrue(RuntimeEventType.MAP_LOADING_STARTED !in types, "cleared type was delivered")
@@ -86,13 +87,13 @@ class RuntimeEventsTest {
         assertEquals(RuntimeEventMask.ALL_MAP_EVENTS, map.eventMask)
 
         runtime.eventMask = RuntimeEventMask.ALL
-        map.eventMask = RuntimeEventMask.ALL
-        runtime.barrier()
+        map.setEventMask(RuntimeEventMask.ALL).await()
+        runtime.barrier().await()
         assertEquals(RuntimeEventMask.ALL, runtime.eventMask)
         assertEquals(RuntimeEventMask.ALL_MAP_EVENTS, map.eventMask)
 
         // Read, clear one bit, write back: every other bit survives.
-        map.eventMask = map.eventMask - RuntimeEventMask.MAP_TILE_ACTION
+        map.setEventMask(map.eventMask - RuntimeEventMask.MAP_TILE_ACTION).await()
         assertEquals(
           RuntimeEventMask.ALL_MAP_EVENTS - RuntimeEventMask.MAP_TILE_ACTION,
           map.eventMask,
@@ -119,10 +120,10 @@ class RuntimeEventsTest {
         }
         withMap { runtime, map ->
           assertFailsWith<InvalidArgumentException> { runtime.eventMask = unknownBit }
-          assertFailsWith<InvalidArgumentException> { map.eventMask = unknownBit }
+          assertFailsWith<InvalidArgumentException> { map.setEventMask(unknownBit).await() }
           assertFailsWith<InvalidArgumentException> {
             runSuspendTest {
-              MapHandle.create(runtime, mapOptions().apply { eventMask = unknownBit })
+              MapHandle.create(runtime, mapOptions().apply { eventMask = unknownBit }).await()
             }
           }
         }
@@ -158,32 +159,35 @@ class RuntimeEventsTest {
       RuntimeHandle.create(RuntimeOptions()).use { runtime ->
         assertCommandCommitted(
           runtime,
-          runtime.setResourceProvider(
-            ResourceProviderCallback { request, handle ->
-              if (request.requestedUrl != SERVED_STYLE_URL) {
-                return@ResourceProviderCallback ResourceProviderDecision.PASS_THROUGH
-              }
-              handle.complete(
-                ResourceResponse(ResourceResponseStatus.OK).apply {
-                  bytes = STYLE_JSON.encodeToByteArray()
+          runtime
+            .setResourceProvider(
+              ResourceProviderCallback { request, handle ->
+                if (request.requestedUrl != SERVED_STYLE_URL) {
+                  return@ResourceProviderCallback ResourceProviderDecision.PASS_THROUGH
                 }
-              )
-              ResourceProviderDecision.HANDLE
-            }
-          ),
+                handle.complete(
+                  ResourceResponse(ResourceResponseStatus.OK).apply {
+                    bytes = STYLE_JSON.encodeToByteArray()
+                  }
+                )
+                ResourceProviderDecision.HANDLE
+              }
+            )
+            .await(),
         )
         val map =
           MapHandle.create(
-            runtime,
-            mapOptions().apply {
-              eventMask = RuntimeEventMask.ALL - RuntimeEventMask.MAP_STYLE_LOADED
-            },
-          )
+              runtime,
+              mapOptions().apply {
+                eventMask = RuntimeEventMask.ALL - RuntimeEventMask.MAP_STYLE_LOADED
+              },
+            )
+            .await()
         try {
-          assertCommandCommitted(runtime, map.setStyleJson(STYLE_JSON.encodeToByteArray()))
+          assertCommandCommitted(runtime, map.setStyleJson(STYLE_JSON.encodeToByteArray()).await())
           assertCommandCommitted(
             runtime,
-            map.addCustomGeometrySource("custom", customGeometrySourceOptions()),
+            map.addCustomGeometrySource("custom", customGeometrySourceOptions()).await(),
           )
           assertEquals(1, map.customGeometrySourceCountForTesting())
           // The binding adds no subscription of its own, so the mask reads back as written.
@@ -195,7 +199,7 @@ class RuntimeEventsTest {
 
           // A URL load drops the source when the asynchronous load completes, and native
           // reports that through the release callback rather than through an event.
-          assertCommandCommitted(runtime, map.setStyleUrl(SERVED_STYLE_URL))
+          assertCommandCommitted(runtime, map.setStyleUrl(SERVED_STYLE_URL).await())
           val types = drainUntil(runtime) { map.customGeometrySourceCountForTesting() == 0 }
           assertTrue(
             RuntimeEventType.MAP_STYLE_LOADED !in types,
@@ -211,26 +215,26 @@ class RuntimeEventsTest {
   fun inlineStyleCommandsReleaseTheirSourcesAfterTheBarrier(): Unit =
     org.maplibre.nativeffi.runtime.runSuspendTest {
       withMap { runtime, map ->
-        map.setStyleJson(STYLE_JSON.encodeToByteArray())
-        runtime.barrier()
-        map.addCustomGeometrySource("removed", customGeometrySourceOptions())
-        map.addCustomGeometrySource("dropped", customGeometrySourceOptions())
-        runtime.barrier()
+        map.setStyleJson(STYLE_JSON.encodeToByteArray()).await()
+        runtime.barrier().await()
+        map.addCustomGeometrySource("removed", customGeometrySourceOptions()).await()
+        map.addCustomGeometrySource("dropped", customGeometrySourceOptions()).await()
+        runtime.barrier().await()
         assertEquals(2, map.customGeometrySourceCountForTesting())
 
-        map.removeStyleSource("removed")
-        runtime.barrier()
+        map.removeStyleSource("removed").await()
+        runtime.barrier().await()
         assertEquals(1, map.customGeometrySourceCountForTesting())
 
-        map.setStyleJson(STYLE_JSON.encodeToByteArray())
-        runtime.barrier()
+        map.setStyleJson(STYLE_JSON.encodeToByteArray()).await()
+        runtime.barrier().await()
         assertEquals(0, map.customGeometrySourceCountForTesting())
 
         // Closing the map quiesces and releases the source it still owns.
-        map.addCustomGeometrySource("surviving", customGeometrySourceOptions())
-        runtime.barrier()
+        map.addCustomGeometrySource("surviving", customGeometrySourceOptions()).await()
+        runtime.barrier().await()
         map.close()
-        runtime.barrier()
+        runtime.barrier().await()
         assertEquals(0, map.customGeometrySourceCountForTesting())
       }
     }
@@ -244,7 +248,7 @@ class RuntimeEventsTest {
           try {
             runtime.drainEvents()
             runtime.eventMask = RuntimeEventMask.ALL
-            map.eventMask = RuntimeEventMask.ALL
+            kotlinx.coroutines.runBlocking { map.setEventMask(RuntimeEventMask.ALL).await() }
           } catch (error: Throwable) {
             failures += error
           }
@@ -270,7 +274,7 @@ class RuntimeEventsTest {
 
   private suspend fun withMap(body: suspend (RuntimeHandle, MapHandle) -> Unit) {
     RuntimeHandle.create(RuntimeOptions()).use { runtime ->
-      val map = MapHandle.create(runtime, mapOptions())
+      val map = MapHandle.create(runtime, mapOptions()).await()
       try {
         body(runtime, map)
       } finally {
@@ -279,16 +283,11 @@ class RuntimeEventsTest {
     }
   }
 
-  private suspend fun assertCommandCommitted(runtime: RuntimeHandle, commandId: ULong) {
-    runtime.barrier()
-    val matches =
-      runtime
-        .drainEvents()
-        .events
-        .mapNotNull { it.payload as? RuntimeEventPayload.CommandFinished }
-        .filter { it.commandId == commandId }
-    assertEquals(1, matches.size, "terminal outcome count for command $commandId")
-    assertEquals(CommandDisposition.COMMITTED, matches.single().disposition)
+  private fun assertCommandCommitted(
+    @Suppress("UNUSED_PARAMETER") runtime: RuntimeHandle,
+    completion: CommandCompletion,
+  ) {
+    assertEquals(CommandDisposition.COMMITTED, completion.disposition)
   }
 
   /** Drains until [done] holds for the event types seen so far. */
@@ -298,7 +297,7 @@ class RuntimeEventsTest {
   ): Set<RuntimeEventType> {
     val types = mutableSetOf<RuntimeEventType>()
     repeat(10_000) {
-      runtime.barrier()
+      runtime.barrier().await()
       types += runtime.drainEvents().events.map { it.type }
       if (done(types)) return types
       Thread.sleep(1)

@@ -1,32 +1,47 @@
-// One turn of a display-paced host loop: drain scheduled notifications, service
-// caller-driver work, and submit a frame demand when the map invalidates.
+// One turn of a display-paced host loop: respond to direct wake callbacks,
+// service caller-driver work, and submit a frame demand when the map
+// invalidates.
 
 #include <maplibre_native_c.h>
 #include <stdatomic.h>
 
 typedef struct frame_receiver {
-  mln_notification_source notifications;
   mln_runtime runtime;
   mln_map map;
-  atomic_bool scheduled;
+  atomic_bool events_ready;
+  atomic_bool driver_ready;
+  atomic_bool frames_ready;
   void (*schedule)(void* user_data);
   void* schedule_user_data;
   uint64_t next_frame_token;
 } frame_receiver;
 
-void schedule_frame_receiver(void* user_data) {
-  frame_receiver* receiver = user_data;
-  atomic_store_explicit(&receiver->scheduled, true, memory_order_release);
+static void mark_ready(frame_receiver* receiver, atomic_bool* flag) {
+  atomic_store_explicit(flag, true, memory_order_release);
   receiver->schedule(receiver->schedule_user_data);
 }
 
-mln_status select_frame_events(mln_map map) {
-  uint64_t command_id = 0;
+void wake_events(void* user_data) {
+  frame_receiver* receiver = user_data;
+  mark_ready(receiver, &receiver->events_ready);
+}
+
+void wake_driver(void* user_data) {
+  frame_receiver* receiver = user_data;
+  mark_ready(receiver, &receiver->driver_ready);
+}
+
+void wake_frames(void* user_data) {
+  frame_receiver* receiver = user_data;
+  mark_ready(receiver, &receiver->frames_ready);
+}
+
+mln_status select_frame_events(mln_map map, const mln_completion* completion) {
   return mln_map_set_event_mask(
     map,
     MLN_RUNTIME_EVENT_MASK_MAP_RENDER_UPDATE_AVAILABLE |
       MLN_RUNTIME_EVENT_MASK_MAP_RENDER_FRAME_FINISHED,
-    &command_id
+    completion
   );
 }
 
@@ -68,8 +83,6 @@ static void drain_frame_results(mln_render_session session, bool* pending) {
       mln_render_frame_result result = {
         .size = sizeof(mln_render_frame_result)
       };
-      // A result other than rendered means no frame was presented, so this
-      // loop submits another demand on its next turn.
       if (
         mln_render_frame_batch_get(batch, index, &result) == MLN_STATUS_OK &&
         result.disposition != MLN_RENDER_RESULT_RENDERED
@@ -86,46 +99,28 @@ void run_one_frame(
   frame_receiver* receiver, mln_render_session session, bool* pending
 ) {
   if (
-    atomic_exchange_explicit(&receiver->scheduled, false, memory_order_acq_rel)
+    atomic_exchange_explicit(
+      &receiver->events_ready, false, memory_order_acq_rel
+    )
   ) {
-    mln_ready_batch ready = MLN_HANDLE_NULL;
-    if (
-      mln_notification_source_drain_ready(receiver->notifications, &ready) ==
-      MLN_STATUS_OK
-    ) {
-      mln_ready_batch_view view = {.size = sizeof(mln_ready_batch_view)};
-      if (mln_ready_batch_get(ready, &view) == MLN_STATUS_OK) {
-        for (size_t index = 0; index < view.endpoint_count; index++) {
-          const char* bytes =
-            (const char*)view.endpoints + index * view.endpoint_size;
-          const mln_ready_endpoint* endpoint = (const mln_ready_endpoint*)bytes;
-          if (
-            endpoint->id == receiver->runtime &&
-            endpoint->kind == MLN_NOTIFICATION_ENDPOINT_RUNTIME_EVENTS
-          ) {
-            drain_runtime_events(receiver, pending);
-          }
-          // #region service
-          if (
-            endpoint->id == session &&
-            endpoint->kind == MLN_NOTIFICATION_ENDPOINT_DRIVER_WORK
-          ) {
-            size_t serviced = 0;
-            (void)mln_render_session_service_driver_work(
-              session, 64, &serviced
-            );
-          }
-          // #endregion service
-          if (
-            endpoint->id == session &&
-            endpoint->kind == MLN_NOTIFICATION_ENDPOINT_RENDER_FRAMES
-          ) {
-            drain_frame_results(session, pending);
-          }
-        }
-      }
-      mln_ready_batch_release(ready);
-    }
+    drain_runtime_events(receiver, pending);
+  }
+  // #region service
+  if (
+    atomic_exchange_explicit(
+      &receiver->driver_ready, false, memory_order_acq_rel
+    )
+  ) {
+    size_t serviced = 0;
+    (void)mln_render_session_service_driver_work(session, 64, &serviced);
+  }
+  // #endregion service
+  if (
+    atomic_exchange_explicit(
+      &receiver->frames_ready, false, memory_order_acq_rel
+    )
+  ) {
+    drain_frame_results(session, pending);
   }
 
   // #region render

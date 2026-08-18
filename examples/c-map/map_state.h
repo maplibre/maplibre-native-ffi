@@ -8,16 +8,18 @@
 #include "types.h"
 
 typedef struct map_state {
-  mln_notification_source notification_source;
   mln_runtime runtime;
   mln_map map;
 } map_state;
 
 [[nodiscard]] app_error map_state_init(
-  map_state* out_state, viewport initial_viewport,
-  mln_notification_callback notification_callback, void* notification_user_data
+  map_state* out_state, viewport initial_viewport, mln_wake_callback event_wake,
+  void* event_wake_user_data
 );
 void map_state_deinit(map_state* state);
+
+/// Completion for accepted commands whose terminal metadata is not consumed.
+const mln_completion* map_state_discarded_completion(void);
 
 [[nodiscard]] app_error map_state_update_camera(
   map_state* state, const mln_camera_options* camera, uint32_t mode,
@@ -25,8 +27,8 @@ void map_state_deinit(map_state* state);
 );
 [[nodiscard]] app_error map_state_resize(map_state* state, viewport value);
 
-/// Drains owned notification and event batches on the render-loop receiver.
-[[nodiscard]] app_error map_state_drain_notifications(
+/// Drains the owned event queue on the render-loop receiver.
+[[nodiscard]] app_error map_state_drain_events(
   map_state* state, bool* out_render_update
 );
 

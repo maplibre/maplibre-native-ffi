@@ -19,9 +19,8 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  *     uint32_t driver;
  *     uint32_t requested_texture_ring_depth;
  *     uint32_t reserved;
- *     mln_notification_source operation_source;
- *     mln_notification_source frame_source;
- *     mln_notification_source driver_work_source;
+ *     mln_wake frame_wake;
+ *     mln_wake driver_work_wake;
  * }
  * }
  */
@@ -36,9 +35,8 @@ public class mln_render_session_attach_options {
         MapLibreNativeC.C_INT.withName("driver"),
         MapLibreNativeC.C_INT.withName("requested_texture_ring_depth"),
         MapLibreNativeC.C_INT.withName("reserved"),
-        MapLibreNativeC.C_LONG.withName("operation_source"),
-        MapLibreNativeC.C_LONG.withName("frame_source"),
-        MapLibreNativeC.C_LONG.withName("driver_work_source")
+        mln_wake.layout().withName("frame_wake"),
+        mln_wake.layout().withName("driver_work_wake")
     ).withName("mln_render_session_attach_options");
 
     /**
@@ -224,136 +222,92 @@ public class mln_render_session_attach_options {
         struct.set(reserved$LAYOUT, reserved$OFFSET, fieldValue);
     }
 
-    private static final OfLong operation_source$LAYOUT = (OfLong)$LAYOUT.select(groupElement("operation_source"));
+    private static final GroupLayout frame_wake$LAYOUT = (GroupLayout)$LAYOUT.select(groupElement("frame_wake"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * mln_notification_source operation_source
+     * mln_wake frame_wake
      * }
      */
-    public static final OfLong operation_source$layout() {
-        return operation_source$LAYOUT;
+    public static final GroupLayout frame_wake$layout() {
+        return frame_wake$LAYOUT;
     }
 
-    private static final long operation_source$OFFSET = $LAYOUT.byteOffset(groupElement("operation_source"));
+    private static final long frame_wake$OFFSET = $LAYOUT.byteOffset(groupElement("frame_wake"));
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * mln_notification_source operation_source
+     * mln_wake frame_wake
      * }
      */
-    public static final long operation_source$offset() {
-        return operation_source$OFFSET;
+    public static final long frame_wake$offset() {
+        return frame_wake$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * mln_notification_source operation_source
+     * mln_wake frame_wake
      * }
      */
-    public static long operation_source(MemorySegment struct) {
-        return struct.get(operation_source$LAYOUT, operation_source$OFFSET);
+    public static MemorySegment frame_wake(MemorySegment struct) {
+        return struct.asSlice(frame_wake$OFFSET, frame_wake$LAYOUT.byteSize());
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * mln_notification_source operation_source
+     * mln_wake frame_wake
      * }
      */
-    public static void operation_source(MemorySegment struct, long fieldValue) {
-        struct.set(operation_source$LAYOUT, operation_source$OFFSET, fieldValue);
+    public static void frame_wake(MemorySegment struct, MemorySegment fieldValue) {
+        MemorySegment.copy(fieldValue, 0L, struct, frame_wake$OFFSET, frame_wake$LAYOUT.byteSize());
     }
 
-    private static final OfLong frame_source$LAYOUT = (OfLong)$LAYOUT.select(groupElement("frame_source"));
+    private static final GroupLayout driver_work_wake$LAYOUT = (GroupLayout)$LAYOUT.select(groupElement("driver_work_wake"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * mln_notification_source frame_source
+     * mln_wake driver_work_wake
      * }
      */
-    public static final OfLong frame_source$layout() {
-        return frame_source$LAYOUT;
+    public static final GroupLayout driver_work_wake$layout() {
+        return driver_work_wake$LAYOUT;
     }
 
-    private static final long frame_source$OFFSET = $LAYOUT.byteOffset(groupElement("frame_source"));
+    private static final long driver_work_wake$OFFSET = $LAYOUT.byteOffset(groupElement("driver_work_wake"));
 
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * mln_notification_source frame_source
+     * mln_wake driver_work_wake
      * }
      */
-    public static final long frame_source$offset() {
-        return frame_source$OFFSET;
+    public static final long driver_work_wake$offset() {
+        return driver_work_wake$OFFSET;
     }
 
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * mln_notification_source frame_source
+     * mln_wake driver_work_wake
      * }
      */
-    public static long frame_source(MemorySegment struct) {
-        return struct.get(frame_source$LAYOUT, frame_source$OFFSET);
+    public static MemorySegment driver_work_wake(MemorySegment struct) {
+        return struct.asSlice(driver_work_wake$OFFSET, driver_work_wake$LAYOUT.byteSize());
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * mln_notification_source frame_source
+     * mln_wake driver_work_wake
      * }
      */
-    public static void frame_source(MemorySegment struct, long fieldValue) {
-        struct.set(frame_source$LAYOUT, frame_source$OFFSET, fieldValue);
-    }
-
-    private static final OfLong driver_work_source$LAYOUT = (OfLong)$LAYOUT.select(groupElement("driver_work_source"));
-
-    /**
-     * Layout for field:
-     * {@snippet lang=c :
-     * mln_notification_source driver_work_source
-     * }
-     */
-    public static final OfLong driver_work_source$layout() {
-        return driver_work_source$LAYOUT;
-    }
-
-    private static final long driver_work_source$OFFSET = $LAYOUT.byteOffset(groupElement("driver_work_source"));
-
-    /**
-     * Offset for field:
-     * {@snippet lang=c :
-     * mln_notification_source driver_work_source
-     * }
-     */
-    public static final long driver_work_source$offset() {
-        return driver_work_source$OFFSET;
-    }
-
-    /**
-     * Getter for field:
-     * {@snippet lang=c :
-     * mln_notification_source driver_work_source
-     * }
-     */
-    public static long driver_work_source(MemorySegment struct) {
-        return struct.get(driver_work_source$LAYOUT, driver_work_source$OFFSET);
-    }
-
-    /**
-     * Setter for field:
-     * {@snippet lang=c :
-     * mln_notification_source driver_work_source
-     * }
-     */
-    public static void driver_work_source(MemorySegment struct, long fieldValue) {
-        struct.set(driver_work_source$LAYOUT, driver_work_source$OFFSET, fieldValue);
+    public static void driver_work_wake(MemorySegment struct, MemorySegment fieldValue) {
+        MemorySegment.copy(fieldValue, 0L, struct, driver_work_wake$OFFSET, driver_work_wake$LAYOUT.byteSize());
     }
 
     /**

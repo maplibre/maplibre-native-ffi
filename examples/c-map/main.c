@@ -16,15 +16,15 @@
 #include "util.h"
 #include "viewport.h"
 
-typedef struct notification_receiver {
+typedef struct wake_receiver {
   atomic_bool scheduled;
   Uint32 event_type;
-} notification_receiver;
+} wake_receiver;
 
 /// Native callbacks only schedule receiver work. The SDL event loop performs
 /// every C API drain later on the render-loop thread.
-static void schedule_notification_drain(void* user_data) {
-  notification_receiver* receiver = user_data;
+static void schedule_event_drain(void* user_data) {
+  wake_receiver* receiver = user_data;
   if (
     atomic_exchange_explicit(&receiver->scheduled, true, memory_order_acq_rel)
   ) {
@@ -38,7 +38,7 @@ static void schedule_notification_drain(void* user_data) {
 
 static app_error render_loop_iteration(
   SDL_Window* window, render_target* target, viewport* current_viewport,
-  map_state* state, render_request* request, notification_receiver* receiver,
+  map_state* state, render_request* request, wake_receiver* receiver,
   input_controller* controller, bool* running
 ) {
   SDL_Event event;
@@ -46,7 +46,7 @@ static app_error render_loop_iteration(
     if (event.type == receiver->event_type) {
       atomic_store_explicit(&receiver->scheduled, false, memory_order_release);
       bool render_update = false;
-      MAP_TRY(map_state_drain_notifications(state, &render_update));
+      MAP_TRY(map_state_drain_events(state, &render_update));
       if (render_update) {
         render_request_set(request);
       }
@@ -101,7 +101,7 @@ static app_error render_loop_iteration(
 static app_error render_loop(
   SDL_Window* window, render_target_mode mode, render_target* target,
   viewport* current_viewport, map_state* state, render_request* request,
-  notification_receiver* receiver
+  wake_receiver* receiver
 ) {
   app_error error = render_target_attach(target, state->map, *current_viewport);
   if (error != APP_OK) {
@@ -223,7 +223,7 @@ int main(int argc, char** argv) {
     goto out_window;
   }
 
-  notification_receiver receiver = {
+  wake_receiver receiver = {
     .event_type = SDL_RegisterEvents(1),
   };
   atomic_init(&receiver.scheduled, false);
@@ -233,9 +233,8 @@ int main(int argc, char** argv) {
   }
 
   map_state state;
-  error = map_state_init(
-    &state, current_viewport, schedule_notification_drain, &receiver
-  );
+  error =
+    map_state_init(&state, current_viewport, schedule_event_drain, &receiver);
   if (error != APP_OK) {
     goto out_target;
   }

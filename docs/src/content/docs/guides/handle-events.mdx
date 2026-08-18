@@ -16,7 +16,7 @@ drains that queue from any thread.
 
 A host decides which event types it reads. A map and a runtime each carry a
 subscription, and an event of an unselected type is never built, never queued,
-and never makes the notification source readable.
+and never invokes the event wake.
 
 ## Select the event types you read
 
@@ -79,12 +79,10 @@ frame demand according to the host's cadence. Drain the session's frame-result
 source for terminal demand outcomes and pending-changes state.
 
 A loading-failed event carries the failure text for a style or resource request.
-A command-finished event carries the command ID, terminal disposition, final
-status, committed generation when present, and copied diagnostic.
-
 Immediate calls report validation and inspection failures through the binding's
-error idiom. Commands report acceptance synchronously and application failures
-through terminal events. Operations store their own final status and diagnostic.
+error idiom. Each accepted command or one-shot query completes exactly once
+through its completion callback, including its final status and diagnostic.
+Command completions also carry the terminal disposition and committed generation.
 
 Closing a map prevents future events from that source and leaves queued events
 unchanged. A queued event keeps the copied source ID even when its map is no

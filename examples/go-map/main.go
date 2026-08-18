@@ -110,15 +110,6 @@ func run(mode renderTargetMode) (result error) {
 		_ = graphics.Close()
 		return err
 	}
-	ready := make(chan struct{}, 1)
-	if err := mapState.runtime.SetNotificationCallback(func() {
-		select {
-		case ready <- struct{}{}:
-		default:
-		}
-	}); err != nil {
-		return errors.Join(err, mapState.Close(), graphics.Close())
-	}
 	state, err := newRenderMapState(graphics, mapState.mapRef, view, mode)
 	if err != nil {
 		return errors.Join(
@@ -189,20 +180,13 @@ func run(mode renderTargetMode) (result error) {
 				return err
 			}
 		}
-		select {
-		case <-ready:
-			if _, err := mapState.runtime.DrainReady(); err != nil {
-				return err
-			}
-			requested, err := drainEvents(mapState.runtime, mapState.mapID)
-			if err != nil {
-				return err
-			}
-			if requested {
-				renderRequested = true
-				didWork = true
-			}
-		default:
+		requested, err := drainEvents(mapState.runtime, mapState.mapID)
+		if err != nil {
+			return err
+		}
+		if requested {
+			renderRequested = true
+			didWork = true
 		}
 
 		if renderRequested && !view.empty() && running {

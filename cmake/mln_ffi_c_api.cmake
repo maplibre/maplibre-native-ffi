@@ -100,20 +100,18 @@ function(mln_ffi_configure_c_api_implementation target)
       ${PROJECT_SOURCE_DIR}/src/c_api/query.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/style.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/network.cpp
-      ${PROJECT_SOURCE_DIR}/src/c_api/notification.cpp
-      ${PROJECT_SOURCE_DIR}/src/c_api/operation.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/render_session.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/runtime.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/surface.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/texture.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/version.cpp
+      ${PROJECT_SOURCE_DIR}/src/completion/completion.cpp
       ${PROJECT_SOURCE_DIR}/src/diagnostics/diagnostics.cpp
       ${PROJECT_SOURCE_DIR}/src/geojson/geojson.cpp
       ${PROJECT_SOURCE_DIR}/src/geojson/geojson_source_data.cpp
       ${PROJECT_SOURCE_DIR}/src/handles/handle_table.cpp
       ${PROJECT_SOURCE_DIR}/src/execution/runtime_executor.cpp
       ${PROJECT_SOURCE_DIR}/src/logging/logging.cpp
-      ${PROJECT_SOURCE_DIR}/src/notification/notification.cpp
       ${PROJECT_SOURCE_DIR}/src/operation/operation.cpp
       ${PROJECT_SOURCE_DIR}/src/map/map.cpp
       ${PROJECT_SOURCE_DIR}/src/map/style.cpp
@@ -127,6 +125,7 @@ function(mln_ffi_configure_c_api_implementation target)
       ${PROJECT_SOURCE_DIR}/src/resources/resource_loader.cpp
       ${PROJECT_SOURCE_DIR}/src/style/style_value.cpp
       ${PROJECT_SOURCE_DIR}/src/runtime/runtime.cpp)
+  list(APPEND MLN_FFI_C_API_SOURCES ${PROJECT_SOURCE_DIR}/src/wake/wake.cpp)
 
   # Every Apple target needs the pool, not just the Metal backend: MoltenVK and
   # the platform frameworks hand back autoreleased objects under Vulkan and

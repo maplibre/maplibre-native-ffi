@@ -67,28 +67,7 @@ internal readonly struct MlnAcquiredFrame(ulong value) : IMlnHandle
     public bool IsNull => Value == 0;
 }
 
-internal readonly struct MlnOperation(ulong value) : IMlnHandle
-{
-    public ulong Value { get; } = value;
-
-    public bool IsNull => Value == 0;
-}
-
-internal readonly struct MlnNotificationSource(ulong value) : IMlnHandle
-{
-    public ulong Value { get; } = value;
-
-    public bool IsNull => Value == 0;
-}
-
 internal readonly struct MlnEventBatch(ulong value) : IMlnHandle
-{
-    public ulong Value { get; } = value;
-
-    public bool IsNull => Value == 0;
-}
-
-internal readonly struct MlnReadyBatch(ulong value) : IMlnHandle
 {
     public ulong Value { get; } = value;
 

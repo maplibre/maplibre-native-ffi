@@ -1,5 +1,6 @@
 package org.maplibre.nativeffi.map
 
+import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.camera.BoundOptions
 import org.maplibre.nativeffi.camera.CameraDelta
 import org.maplibre.nativeffi.camera.CameraSnapshot
@@ -8,6 +9,7 @@ import org.maplibre.nativeffi.camera.FreeCameraOptions
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
+import org.maplibre.nativeffi.internal.async.mapDeferred
 import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.lifecycle.NativeMap
@@ -25,6 +27,7 @@ import org.maplibre.nativeffi.render.RenderSessionHandle
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
+import org.maplibre.nativeffi.runtime.CommandCompletion
 import org.maplibre.nativeffi.runtime.RuntimeEventMask
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
@@ -64,103 +67,116 @@ private constructor(
 
   public actual fun runtime(): RuntimeHandle = runtime
 
-  public actual var eventMask: RuntimeEventMask
+  public actual val eventMask: RuntimeEventMask
     get() = cachedEventMask
-    set(value) {
-      NativeAccess.ensureLoaded()
-      NativeAccess.setMapEventMask(requireLiveHandle(), value.nativeValue)
+
+  public actual fun setEventMask(value: RuntimeEventMask): Deferred<CommandCompletion> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.setMapEventMask(requireLiveHandle(), value.nativeValue).mapDeferred {
       cachedEventMask =
         RuntimeEventMask(value.nativeValue and RuntimeEventMask.ALL_MAP_EVENTS.nativeValue)
+      it
     }
+  }
 
-  public actual fun setStyleUrl(url: String): ULong = command { outCommandId ->
+  public actual fun setStyleUrl(url: String): Deferred<CommandCompletion> = command {
     NativeAccess.ensureLoaded()
     NativeAccess.setMapStyleUrl(requireLiveHandle(), url)
   }
 
-  public actual fun setStyleJson(json: ByteArray): ULong = command { outCommandId ->
+  public actual fun setStyleJson(json: ByteArray): Deferred<CommandCompletion> = command {
     NativeAccess.ensureLoaded()
     NativeAccess.setMapStyleJson(requireLiveHandle(), json)
   }
 
-  public actual suspend fun loadedStyleJson(): ByteArray {
+  public actual fun loadedStyleJson(): Deferred<ByteArray> {
     NativeAccess.ensureLoaded()
-    return NativeAccess.loadedStyleJson(requireLiveHandle(), runtime::awaitOperation)
+    return NativeAccess.loadedStyleJson(requireLiveHandle())
   }
 
-  public actual suspend fun styleUrl(): String {
+  public actual fun styleUrl(): Deferred<String> {
     NativeAccess.ensureLoaded()
-    return NativeAccess.styleUrl(requireLiveHandle(), runtime::awaitOperation)
+    return NativeAccess.styleUrl(requireLiveHandle())
   }
 
-  public actual fun addStyleSourceJson(sourceId: String, sourceJson: ByteArray): ULong =
-    command { outCommandId ->
-      NativeAccess.ensureLoaded()
-      NativeAccess.addStyleSourceJson(requireLiveHandle(), sourceId, sourceJson)
-    }
+  public actual fun addStyleSourceJson(
+    sourceId: String,
+    sourceJson: ByteArray,
+  ): Deferred<CommandCompletion> = command {
+    NativeAccess.ensureLoaded()
+    NativeAccess.addStyleSourceJson(requireLiveHandle(), sourceId, sourceJson)
+  }
 
-  public actual fun removeStyleSource(sourceId: String): ULong = command { outCommandId ->
+  public actual fun removeStyleSource(sourceId: String): Deferred<CommandCompletion> = command {
     NativeAccess.ensureLoaded()
     NativeAccess.removeStyleSource(requireLiveHandle(), sourceId)
   }
 
-  public actual suspend fun styleSourceInfo(sourceId: String): SourceInfo? {
+  public actual fun styleSourceInfo(sourceId: String): Deferred<SourceInfo?> {
     NativeAccess.ensureLoaded()
-    return NativeAccess.styleSourceInfo(requireLiveHandle(), sourceId, runtime::awaitOperation)
+    return NativeAccess.styleSourceInfo(requireLiveHandle(), sourceId)
   }
 
-  public actual suspend fun styleSourceIds(): List<String> {
+  public actual fun styleSourceIds(): Deferred<List<String>> {
     NativeAccess.ensureLoaded()
-    return NativeAccess.styleSourceIds(requireLiveHandle(), runtime::awaitOperation)
+    return NativeAccess.styleSourceIds(requireLiveHandle())
   }
 
   public actual fun addGeoJsonSourceUrl(
     sourceId: String,
     url: String,
     options: GeoJsonSourceOptions?,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command {
     NativeAccess.ensureLoaded()
     NativeAccess.addGeoJsonSourceUrl(requireLiveHandle(), sourceId, url, options)
   }
 
-  public actual fun addGeoJsonSourceData(sourceId: String, data: GeoJsonSourceDataHandle): ULong =
-    command { outCommandId ->
-      NativeAccess.ensureLoaded()
-      data.withNativeHandle { nativeData ->
-        NativeAccess.addGeoJsonSourceData(requireLiveHandle(), sourceId, nativeData)
-      }
+  public actual fun addGeoJsonSourceData(
+    sourceId: String,
+    data: GeoJsonSourceDataHandle,
+  ): Deferred<CommandCompletion> = command {
+    NativeAccess.ensureLoaded()
+    data.withNativeHandle { nativeData ->
+      NativeAccess.addGeoJsonSourceData(requireLiveHandle(), sourceId, nativeData)
     }
+  }
 
-  public actual fun setGeoJsonSourceUrl(sourceId: String, url: String): ULong =
-    command { outCommandId ->
-      NativeAccess.ensureLoaded()
-      NativeAccess.setGeoJsonSourceUrl(requireLiveHandle(), sourceId, url)
-    }
+  public actual fun setGeoJsonSourceUrl(
+    sourceId: String,
+    url: String,
+  ): Deferred<CommandCompletion> = command {
+    NativeAccess.ensureLoaded()
+    NativeAccess.setGeoJsonSourceUrl(requireLiveHandle(), sourceId, url)
+  }
 
-  public actual fun setGeoJsonSourceData(sourceId: String, data: GeoJsonSourceDataHandle): ULong =
-    command { outCommandId ->
-      NativeAccess.ensureLoaded()
-      data.withNativeHandle { nativeData ->
-        NativeAccess.setGeoJsonSourceData(requireLiveHandle(), sourceId, nativeData)
-      }
+  public actual fun setGeoJsonSourceData(
+    sourceId: String,
+    data: GeoJsonSourceDataHandle,
+  ): Deferred<CommandCompletion> = command {
+    NativeAccess.ensureLoaded()
+    data.withNativeHandle { nativeData ->
+      NativeAccess.setGeoJsonSourceData(requireLiveHandle(), sourceId, nativeData)
     }
+  }
 
-  public actual fun setGeoJsonSourceSynchronousTiling(sourceId: String, enabled: Boolean): ULong =
-    command { outCommandId ->
-      NativeAccess.ensureLoaded()
-      NativeAccess.setGeoJsonSourceSynchronousTiling(requireLiveHandle(), sourceId, enabled)
-    }
+  public actual fun setGeoJsonSourceSynchronousTiling(
+    sourceId: String,
+    enabled: Boolean,
+  ): Deferred<CommandCompletion> = command {
+    NativeAccess.ensureLoaded()
+    NativeAccess.setGeoJsonSourceSynchronousTiling(requireLiveHandle(), sourceId, enabled)
+  }
 
   public actual fun addCustomGeometrySource(
     sourceId: String,
     options: CustomGeometrySourceOptions,
-  ): ULong {
+  ): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
     val registry = customGeometrySources
     val sourceState = CustomGeometrySourceState(options) { registry.remove(sourceId) }
-    var commandId = 0L
+    lateinit var completed: Deferred<CommandCompletion>
     registry.install(sourceId, sourceState) {
-      commandId =
+      completed =
         NativeAccess.addCustomGeometrySource(
           requireLiveHandle(),
           sourceId,
@@ -168,14 +184,14 @@ private constructor(
         )
       HandleLeakCleaner.retainNativeCallbackRoot(sourceState)
     }
-    return commandId.toULong()
+    return completed
   }
 
   public actual fun setCustomGeometrySourceTileData(
     sourceId: String,
     tileId: CanonicalTileId,
     data: ByteArray,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command {
     NativeAccess.ensureLoaded()
     NativeAccess.setCustomGeometrySourceTileData(requireLiveHandle(), sourceId, tileId, data)
   }
@@ -183,7 +199,7 @@ private constructor(
   public actual fun invalidateCustomGeometrySourceTile(
     sourceId: String,
     tileId: CanonicalTileId,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command {
     NativeAccess.ensureLoaded()
     NativeAccess.invalidateCustomGeometrySourceTile(requireLiveHandle(), sourceId, tileId)
   }
@@ -191,7 +207,7 @@ private constructor(
   public actual fun invalidateCustomGeometrySourceRegion(
     sourceId: String,
     bounds: LatLngBounds,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command {
     NativeAccess.ensureLoaded()
     NativeAccess.invalidateCustomGeometrySourceRegion(requireLiveHandle(), sourceId, bounds)
   }
@@ -200,7 +216,7 @@ private constructor(
     sourceId: String,
     url: String,
     options: TileSourceOptions?,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command {
     NativeAccess.ensureLoaded()
     NativeAccess.addVectorSourceUrl(requireLiveHandle(), sourceId, url, options)
   }
@@ -209,7 +225,7 @@ private constructor(
     sourceId: String,
     tiles: List<String>,
     options: TileSourceOptions?,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command {
     NativeAccess.ensureLoaded()
     NativeAccess.addVectorSourceTiles(requireLiveHandle(), sourceId, tiles, options)
   }
@@ -218,7 +234,7 @@ private constructor(
     sourceId: String,
     url: String,
     options: TileSourceOptions?,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command {
     NativeAccess.ensureLoaded()
     NativeAccess.addRasterSourceUrl(requireLiveHandle(), sourceId, url, options)
   }
@@ -227,7 +243,7 @@ private constructor(
     sourceId: String,
     tiles: List<String>,
     options: TileSourceOptions?,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command {
     NativeAccess.ensureLoaded()
     NativeAccess.addRasterSourceTiles(requireLiveHandle(), sourceId, tiles, options)
   }
@@ -236,7 +252,7 @@ private constructor(
     sourceId: String,
     url: String,
     options: TileSourceOptions?,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command {
     NativeAccess.ensureLoaded()
     NativeAccess.addRasterDemSourceUrl(requireLiveHandle(), sourceId, url, options)
   }
@@ -245,7 +261,7 @@ private constructor(
     sourceId: String,
     tiles: List<String>,
     options: TileSourceOptions?,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command {
     NativeAccess.ensureLoaded()
     NativeAccess.addRasterDemSourceTiles(requireLiveHandle(), sourceId, tiles, options)
   }
@@ -254,35 +270,31 @@ private constructor(
     imageId: String,
     image: PremultipliedRgba8Image,
     options: StyleImageOptions,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command {
     NativeAccess.ensureLoaded()
     NativeAccess.setStyleImage(requireLiveHandle(), imageId, image, options)
   }
 
-  public actual fun removeStyleImage(imageId: String): ULong = command { outCommandId ->
+  public actual fun removeStyleImage(imageId: String): Deferred<CommandCompletion> = command {
     NativeAccess.ensureLoaded()
     NativeAccess.removeStyleImage(requireLiveHandle(), imageId)
   }
 
-  public actual suspend fun styleImageInfo(imageId: String): StyleImageInfo? {
+  public actual fun styleImageInfo(imageId: String): Deferred<StyleImageInfo?> {
     NativeAccess.ensureLoaded()
-    return NativeAccess.styleImageInfo(requireLiveHandle(), imageId, runtime::awaitOperation)
+    return NativeAccess.styleImageInfo(requireLiveHandle(), imageId)
   }
 
-  public actual suspend fun copyStyleImagePremultipliedRgba8(imageId: String): StyleImage? {
+  public actual fun copyStyleImagePremultipliedRgba8(imageId: String): Deferred<StyleImage?> {
     NativeAccess.ensureLoaded()
-    return NativeAccess.copyStyleImagePremultipliedRgba8(
-      requireLiveHandle(),
-      imageId,
-      runtime::awaitOperation,
-    )
+    return NativeAccess.copyStyleImagePremultipliedRgba8(requireLiveHandle(), imageId)
   }
 
   public actual fun addImageSourceUrl(
     sourceId: String,
     coordinates: List<LatLng>,
     url: String,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command {
     NativeAccess.ensureLoaded()
     NativeAccess.addImageSourceUrl(requireLiveHandle(), sourceId, coordinates, url)
   }
@@ -291,49 +303,51 @@ private constructor(
     sourceId: String,
     coordinates: List<LatLng>,
     image: PremultipliedRgba8Image,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command {
     NativeAccess.ensureLoaded()
     NativeAccess.addImageSourceImage(requireLiveHandle(), sourceId, coordinates, image)
   }
 
-  public actual fun setImageSourceUrl(sourceId: String, url: String): ULong =
-    command { outCommandId ->
+  public actual fun setImageSourceUrl(sourceId: String, url: String): Deferred<CommandCompletion> =
+    command {
       NativeAccess.ensureLoaded()
       NativeAccess.setImageSourceUrl(requireLiveHandle(), sourceId, url)
     }
 
-  public actual fun setImageSourceImage(sourceId: String, image: PremultipliedRgba8Image): ULong =
-    command { outCommandId ->
-      NativeAccess.ensureLoaded()
-      NativeAccess.setImageSourceImage(requireLiveHandle(), sourceId, image)
-    }
-
-  public actual fun setImageSourceCoordinates(sourceId: String, coordinates: List<LatLng>): ULong =
-    command { outCommandId ->
-      NativeAccess.ensureLoaded()
-      NativeAccess.setImageSourceCoordinates(requireLiveHandle(), sourceId, coordinates)
-    }
-
-  public actual suspend fun imageSourceCoordinates(sourceId: String): List<LatLng>? {
+  public actual fun setImageSourceImage(
+    sourceId: String,
+    image: PremultipliedRgba8Image,
+  ): Deferred<CommandCompletion> = command {
     NativeAccess.ensureLoaded()
-    return NativeAccess.imageSourceCoordinates(
-      requireLiveHandle(),
-      sourceId,
-      runtime::awaitOperation,
-    )
+    NativeAccess.setImageSourceImage(requireLiveHandle(), sourceId, image)
   }
 
-  public actual fun addStyleLayerJson(layerJson: ByteArray, beforeLayerId: String): ULong =
-    command { outCommandId ->
-      NativeAccess.ensureLoaded()
-      NativeAccess.addStyleLayerJson(requireLiveHandle(), layerJson, beforeLayerId)
-    }
+  public actual fun setImageSourceCoordinates(
+    sourceId: String,
+    coordinates: List<LatLng>,
+  ): Deferred<CommandCompletion> = command {
+    NativeAccess.ensureLoaded()
+    NativeAccess.setImageSourceCoordinates(requireLiveHandle(), sourceId, coordinates)
+  }
+
+  public actual fun imageSourceCoordinates(sourceId: String): Deferred<List<LatLng>?> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.imageSourceCoordinates(requireLiveHandle(), sourceId)
+  }
+
+  public actual fun addStyleLayerJson(
+    layerJson: ByteArray,
+    beforeLayerId: String,
+  ): Deferred<CommandCompletion> = command {
+    NativeAccess.ensureLoaded()
+    NativeAccess.addStyleLayerJson(requireLiveHandle(), layerJson, beforeLayerId)
+  }
 
   public actual fun addHillshadeLayer(
     layerId: String,
     sourceId: String,
     beforeLayerId: String,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command {
     NativeAccess.ensureLoaded()
     NativeAccess.addHillshadeLayer(requireLiveHandle(), layerId, sourceId, beforeLayerId)
   }
@@ -342,199 +356,204 @@ private constructor(
     layerId: String,
     sourceId: String,
     beforeLayerId: String,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command {
     NativeAccess.ensureLoaded()
     NativeAccess.addColorReliefLayer(requireLiveHandle(), layerId, sourceId, beforeLayerId)
   }
 
-  public actual fun addLocationIndicatorLayer(layerId: String, beforeLayerId: String): ULong =
-    command { outCommandId ->
-      NativeAccess.ensureLoaded()
-      NativeAccess.addLocationIndicatorLayer(requireLiveHandle(), layerId, beforeLayerId)
-    }
+  public actual fun addLocationIndicatorLayer(
+    layerId: String,
+    beforeLayerId: String,
+  ): Deferred<CommandCompletion> = command {
+    NativeAccess.ensureLoaded()
+    NativeAccess.addLocationIndicatorLayer(requireLiveHandle(), layerId, beforeLayerId)
+  }
 
   public actual fun setLocationIndicatorLocation(
     layerId: String,
     coordinate: LatLng,
     altitude: Double,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command {
     NativeAccess.ensureLoaded()
     NativeAccess.setLocationIndicatorLocation(requireLiveHandle(), layerId, coordinate, altitude)
   }
 
-  public actual fun setLocationIndicatorBearing(layerId: String, bearing: Double): ULong =
-    command { outCommandId ->
-      NativeAccess.ensureLoaded()
-      NativeAccess.setLocationIndicatorBearing(requireLiveHandle(), layerId, bearing)
-    }
+  public actual fun setLocationIndicatorBearing(
+    layerId: String,
+    bearing: Double,
+  ): Deferred<CommandCompletion> = command {
+    NativeAccess.ensureLoaded()
+    NativeAccess.setLocationIndicatorBearing(requireLiveHandle(), layerId, bearing)
+  }
 
-  public actual fun setLocationIndicatorAccuracyRadius(layerId: String, radius: Double): ULong =
-    command { outCommandId ->
-      NativeAccess.ensureLoaded()
-      NativeAccess.setLocationIndicatorAccuracyRadius(requireLiveHandle(), layerId, radius)
-    }
+  public actual fun setLocationIndicatorAccuracyRadius(
+    layerId: String,
+    radius: Double,
+  ): Deferred<CommandCompletion> = command {
+    NativeAccess.ensureLoaded()
+    NativeAccess.setLocationIndicatorAccuracyRadius(requireLiveHandle(), layerId, radius)
+  }
 
   public actual fun setLocationIndicatorImageName(
     layerId: String,
     imageKind: LocationIndicatorImageKind,
     imageId: String,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command {
     NativeAccess.ensureLoaded()
     NativeAccess.setLocationIndicatorImageName(requireLiveHandle(), layerId, imageKind, imageId)
   }
 
-  public actual fun removeStyleLayer(layerId: String): ULong = command { outCommandId ->
+  public actual fun removeStyleLayer(layerId: String): Deferred<CommandCompletion> = command {
     NativeAccess.ensureLoaded()
     NativeAccess.removeStyleLayer(requireLiveHandle(), layerId)
   }
 
-  public actual suspend fun styleLayerInfo(layerId: String): LayerInfo? {
+  public actual fun styleLayerInfo(layerId: String): Deferred<LayerInfo?> {
     NativeAccess.ensureLoaded()
-    return NativeAccess.styleLayerInfo(requireLiveHandle(), layerId, runtime::awaitOperation)
+    return NativeAccess.styleLayerInfo(requireLiveHandle(), layerId)
   }
 
-  public actual suspend fun styleLayerIds(): List<String> {
+  public actual fun styleLayerIds(): Deferred<List<String>> {
     NativeAccess.ensureLoaded()
-    return NativeAccess.styleLayerIds(requireLiveHandle(), runtime::awaitOperation)
+    return NativeAccess.styleLayerIds(requireLiveHandle())
   }
 
-  public actual fun moveStyleLayer(layerId: String, beforeLayerId: String): ULong =
-    command { outCommandId ->
-      NativeAccess.ensureLoaded()
-      NativeAccess.moveStyleLayer(requireLiveHandle(), layerId, beforeLayerId)
-    }
-
-  public actual suspend fun styleLayerJson(layerId: String): ByteArray? {
+  public actual fun moveStyleLayer(
+    layerId: String,
+    beforeLayerId: String,
+  ): Deferred<CommandCompletion> = command {
     NativeAccess.ensureLoaded()
-    return NativeAccess.styleLayerJson(requireLiveHandle(), layerId, runtime::awaitOperation)
+    NativeAccess.moveStyleLayer(requireLiveHandle(), layerId, beforeLayerId)
   }
 
-  public actual fun setStyleLightJson(lightJson: ByteArray): ULong = command { outCommandId ->
+  public actual fun styleLayerJson(layerId: String): Deferred<ByteArray?> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.styleLayerJson(requireLiveHandle(), layerId)
+  }
+
+  public actual fun setStyleLightJson(lightJson: ByteArray): Deferred<CommandCompletion> = command {
     NativeAccess.ensureLoaded()
     NativeAccess.setStyleLightJson(requireLiveHandle(), lightJson)
   }
 
-  public actual fun setStyleLightProperty(propertyName: String, value: ByteArray): ULong =
-    command { outCommandId ->
-      NativeAccess.ensureLoaded()
-      NativeAccess.setStyleLightProperty(requireLiveHandle(), propertyName, value)
-    }
-
-  public actual suspend fun styleLightProperty(propertyName: String): ByteArray? {
+  public actual fun setStyleLightProperty(
+    propertyName: String,
+    value: ByteArray,
+  ): Deferred<CommandCompletion> = command {
     NativeAccess.ensureLoaded()
-    return NativeAccess.styleLightProperty(
-      requireLiveHandle(),
-      propertyName,
-      runtime::awaitOperation,
-    )
+    NativeAccess.setStyleLightProperty(requireLiveHandle(), propertyName, value)
   }
 
-  public actual fun setStyleTransitionOptions(options: StyleTransitionOptions): ULong =
-    command { outCommandId ->
-      NativeAccess.ensureLoaded()
-      NativeAccess.setStyleTransitionOptions(requireLiveHandle(), options)
-    }
-
-  public actual suspend fun styleTransitionOptions(): StyleTransitionOptions {
+  public actual fun styleLightProperty(propertyName: String): Deferred<ByteArray?> {
     NativeAccess.ensureLoaded()
-    return NativeAccess.styleTransitionOptions(requireLiveHandle(), runtime::awaitOperation)
+    return NativeAccess.styleLightProperty(requireLiveHandle(), propertyName)
+  }
+
+  public actual fun setStyleTransitionOptions(
+    options: StyleTransitionOptions
+  ): Deferred<CommandCompletion> = command {
+    NativeAccess.ensureLoaded()
+    NativeAccess.setStyleTransitionOptions(requireLiveHandle(), options)
+  }
+
+  public actual fun styleTransitionOptions(): Deferred<StyleTransitionOptions> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.styleTransitionOptions(requireLiveHandle())
   }
 
   public actual fun setLayerProperty(
     layerId: String,
     propertyName: String,
     value: ByteArray,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command {
     NativeAccess.ensureLoaded()
     NativeAccess.setLayerProperty(requireLiveHandle(), layerId, propertyName, value)
   }
 
-  public actual suspend fun layerProperty(layerId: String, propertyName: String): ByteArray? {
+  public actual fun layerProperty(layerId: String, propertyName: String): Deferred<ByteArray?> {
     NativeAccess.ensureLoaded()
-    return NativeAccess.layerProperty(
-      requireLiveHandle(),
-      layerId,
-      propertyName,
-      runtime::awaitOperation,
-    )
+    return NativeAccess.layerProperty(requireLiveHandle(), layerId, propertyName)
   }
 
-  public actual fun setLayerFilter(layerId: String, filter: ByteArray): ULong =
-    command { outCommandId ->
-      NativeAccess.ensureLoaded()
-      NativeAccess.setLayerFilter(requireLiveHandle(), layerId, filter)
-    }
+  public actual fun setLayerFilter(
+    layerId: String,
+    filter: ByteArray,
+  ): Deferred<CommandCompletion> = command {
+    NativeAccess.ensureLoaded()
+    NativeAccess.setLayerFilter(requireLiveHandle(), layerId, filter)
+  }
 
-  public actual fun clearLayerFilter(layerId: String): ULong = command { outCommandId ->
+  public actual fun clearLayerFilter(layerId: String): Deferred<CommandCompletion> = command {
     NativeAccess.ensureLoaded()
     NativeAccess.clearLayerFilter(requireLiveHandle(), layerId)
   }
 
-  public actual suspend fun layerFilter(layerId: String): ByteArray? {
+  public actual fun layerFilter(layerId: String): Deferred<ByteArray?> {
     NativeAccess.ensureLoaded()
-    return NativeAccess.layerFilter(requireLiveHandle(), layerId, runtime::awaitOperation)
+    return NativeAccess.layerFilter(requireLiveHandle(), layerId)
   }
 
-  public actual suspend fun styleImageStretches(
+  public actual fun styleImageStretches(
     imageId: String
-  ): Pair<List<ImageStretch>, List<ImageStretch>>? {
+  ): Deferred<Pair<List<ImageStretch>, List<ImageStretch>>?> {
     NativeAccess.ensureLoaded()
-    return NativeAccess.styleImageStretches(requireLiveHandle(), imageId, runtime::awaitOperation)
+    return NativeAccess.styleImageStretches(requireLiveHandle(), imageId)
   }
 
-  public actual fun setLayerSourceLayer(layerId: String, sourceLayer: String): ULong =
-    command { outCommandId ->
-      NativeAccess.ensureLoaded()
-      NativeAccess.setLayerSourceLayer(requireLiveHandle(), layerId, sourceLayer)
-    }
-
-  public actual suspend fun layerSourceLayer(layerId: String): String {
+  public actual fun setLayerSourceLayer(
+    layerId: String,
+    sourceLayer: String,
+  ): Deferred<CommandCompletion> = command {
     NativeAccess.ensureLoaded()
-    return NativeAccess.layerSourceLayer(requireLiveHandle(), layerId, runtime::awaitOperation)
+    NativeAccess.setLayerSourceLayer(requireLiveHandle(), layerId, sourceLayer)
   }
 
-  public actual fun setLayerSourceId(layerId: String, sourceId: String): ULong =
-    command { outCommandId ->
-      NativeAccess.ensureLoaded()
-      NativeAccess.setLayerSourceId(requireLiveHandle(), layerId, sourceId)
-    }
-
-  public actual suspend fun layerSourceId(layerId: String): String {
+  public actual fun layerSourceLayer(layerId: String): Deferred<String> {
     NativeAccess.ensureLoaded()
-    return NativeAccess.layerSourceId(requireLiveHandle(), layerId, runtime::awaitOperation)
+    return NativeAccess.layerSourceLayer(requireLiveHandle(), layerId)
   }
 
-  public actual fun setLayerMinZoom(layerId: String, minZoom: Double): ULong =
-    command { outCommandId ->
+  public actual fun setLayerSourceId(
+    layerId: String,
+    sourceId: String,
+  ): Deferred<CommandCompletion> = command {
+    NativeAccess.ensureLoaded()
+    NativeAccess.setLayerSourceId(requireLiveHandle(), layerId, sourceId)
+  }
+
+  public actual fun layerSourceId(layerId: String): Deferred<String> {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.layerSourceId(requireLiveHandle(), layerId)
+  }
+
+  public actual fun setLayerMinZoom(layerId: String, minZoom: Double): Deferred<CommandCompletion> =
+    command {
       NativeAccess.ensureLoaded()
       NativeAccess.setLayerMinZoom(requireLiveHandle(), layerId, minZoom)
     }
 
-  public actual fun setLayerMaxZoom(layerId: String, maxZoom: Double): ULong =
-    command { outCommandId ->
+  public actual fun setLayerMaxZoom(layerId: String, maxZoom: Double): Deferred<CommandCompletion> =
+    command {
       NativeAccess.ensureLoaded()
       NativeAccess.setLayerMaxZoom(requireLiveHandle(), layerId, maxZoom)
     }
 
-  public actual fun setLayerVisibility(layerId: String, visibility: StyleLayerVisibility): ULong =
-    command { outCommandId ->
-      NativeAccess.ensureLoaded()
-      NativeAccess.setLayerVisibility(requireLiveHandle(), layerId, visibility.nativeValue)
-    }
+  public actual fun setLayerVisibility(
+    layerId: String,
+    visibility: StyleLayerVisibility,
+  ): Deferred<CommandCompletion> = command {
+    NativeAccess.ensureLoaded()
+    NativeAccess.setLayerVisibility(requireLiveHandle(), layerId, visibility.nativeValue)
+  }
 
-  public actual fun requestRepaint(): Long {
+  public actual fun requestRepaint(): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
     return NativeAccess.requestRepaint(requireLiveHandle())
   }
 
-  public actual suspend fun requestStillImage() {
+  public actual fun requestStillImage(): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
-    val operation = NativeAccess.startStillImage(requireLiveHandle())
-    try {
-      runtime.awaitOperation(operation)
-    } finally {
-      NativeAccess.releaseOperation(operation)
-    }
+    return NativeAccess.requestStillImage(requireLiveHandle())
   }
 
   public actual fun snapshot(): MapSnapshot {
@@ -542,37 +561,37 @@ private constructor(
     return NativeAccess.mapSnapshot(requireLiveHandle())
   }
 
-  public actual fun setDebugOptions(options: Set<DebugOption>): Long {
+  public actual fun setDebugOptions(options: Set<DebugOption>): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
     return NativeAccess.setDebugOptions(requireLiveHandle(), options)
   }
 
-  public actual fun setRenderingStatsViewEnabled(enabled: Boolean): Long {
+  public actual fun setRenderingStatsViewEnabled(enabled: Boolean): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
     return NativeAccess.setRenderingStatsViewEnabled(requireLiveHandle(), enabled)
   }
 
-  public actual fun setViewportOptions(options: ViewportOptions): Long {
+  public actual fun setViewportOptions(options: ViewportOptions): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
     return NativeAccess.setViewportOptions(requireLiveHandle(), options)
   }
 
-  public actual fun setTileOptions(options: TileOptions): Long {
+  public actual fun setTileOptions(options: TileOptions): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
     return NativeAccess.setTileOptions(requireLiveHandle(), options)
   }
 
-  public actual fun setBounds(options: BoundOptions): Long {
+  public actual fun setBounds(options: BoundOptions): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
     return NativeAccess.setBounds(requireLiveHandle(), options)
   }
 
-  public actual fun setFreeCameraOptions(options: FreeCameraOptions): Long {
+  public actual fun setFreeCameraOptions(options: FreeCameraOptions): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
     return NativeAccess.setFreeCameraOptions(requireLiveHandle(), options)
   }
 
-  public actual fun resize(size: MapSize): Long {
+  public actual fun resize(size: MapSize): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
     return NativeAccess.resizeMap(requireLiveHandle(), size)
   }
@@ -582,23 +601,17 @@ private constructor(
     return NativeAccess.cameraSnapshot(requireLiveHandle())
   }
 
-  public actual fun updateCamera(update: CameraUpdate): Long {
+  public actual fun updateCamera(update: CameraUpdate): Deferred<CommandCompletion> {
     NativeAccess.ensureLoaded()
     return NativeAccess.updateCamera(requireLiveHandle(), update)
   }
 
-  public actual fun applyCameraDelta(delta: CameraDelta): Long =
+  public actual fun applyCameraDelta(delta: CameraDelta): Deferred<CommandCompletion> =
     NativeAccess.applyCameraDelta(requireLiveHandle(), delta)
 
-  public actual suspend fun queryCamera(): CameraSnapshot {
+  public actual fun queryCamera(): Deferred<CameraSnapshot> {
     NativeAccess.ensureLoaded()
-    val operation = NativeAccess.startCameraQuery(requireLiveHandle())
-    try {
-      runtime.awaitOperation(operation)
-      return NativeAccess.takeCameraQuery(operation)
-    } finally {
-      NativeAccess.releaseOperation(operation)
-    }
+    return NativeAccess.queryCamera(requireLiveHandle())
   }
 
   public actual fun attachMetalOwnedTexture(
@@ -652,15 +665,9 @@ private constructor(
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment = RenderSessionHandle.attachOpenGLSurface(this, descriptor, options)
 
-  public actual suspend fun createProjection(): MapProjectionHandle {
+  public actual fun createProjection(): Deferred<MapProjectionHandle> {
     NativeAccess.ensureLoaded()
-    val operation = NativeAccess.startCreateMapProjection(requireLiveHandle())
-    try {
-      runtime.awaitOperation(operation)
-      return MapProjectionHandle(NativeAccess.takeCreatedMapProjection(operation))
-    } finally {
-      NativeAccess.releaseOperation(operation)
-    }
+    return NativeAccess.createMapProjection(requireLiveHandle()).mapDeferred(::MapProjectionHandle)
   }
 
   public actual fun close() {
@@ -675,16 +682,10 @@ private constructor(
   }
 
   public actual companion object {
-    public actual suspend fun create(runtime: RuntimeHandle, options: MapOptions): MapHandle {
+    public actual fun create(runtime: RuntimeHandle, options: MapOptions): Deferred<MapHandle> {
       NativeAccess.ensureLoaded()
-      val operation = NativeAccess.startCreateMap(runtime.nativeHandle(), options)
-      try {
-        runtime.awaitOperation(operation)
-        return MapHandle(runtime, NativeAccess.takeCreatedMap(operation), options.eventMask).also {
-          runtime.registerMap(it)
-        }
-      } finally {
-        NativeAccess.releaseOperation(operation)
+      return NativeAccess.createMap(runtime.nativeHandle(), options).mapDeferred { handle ->
+        MapHandle(runtime, handle, options.eventMask).also { runtime.registerMap(it) }
       }
     }
   }
@@ -701,7 +702,8 @@ private constructor(
   }
 }
 
-private inline fun command(call: (Long) -> Long): ULong = call(0L).toULong()
+private inline fun command(call: () -> Deferred<CommandCompletion>): Deferred<CommandCompletion> =
+  call()
 
 private fun releaseCallbackRoot(root: AutoCloseable?) {
   HandleLeakCleaner.releaseNativeCallbackRoot(root)

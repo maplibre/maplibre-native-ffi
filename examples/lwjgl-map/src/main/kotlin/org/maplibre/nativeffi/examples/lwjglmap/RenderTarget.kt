@@ -1,6 +1,6 @@
 package org.maplibre.nativeffi.examples.lwjglmap
 
-import org.maplibre.nativeffi.error.MaplibreStatus
+import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.render.FrameDemand
 import org.maplibre.nativeffi.render.RenderDriver
@@ -9,7 +9,6 @@ import org.maplibre.nativeffi.render.RenderSessionAttachOptions
 import org.maplibre.nativeffi.render.RenderSessionAttachment
 import org.maplibre.nativeffi.render.RenderSessionHandle
 import org.maplibre.nativeffi.render.RenderTargetExtent
-import org.maplibre.nativeffi.runtime.OperationHandle
 
 /**
  * The render loop explicitly services caller-driver work on its graphics thread. Native code owns
@@ -58,7 +57,7 @@ internal interface RenderTarget : AutoCloseable {
      */
     fun detachSuppressed(error: RuntimeException, session: RenderSessionHandle) {
       try {
-        completeDriverOperation(session, session.startDetach())
+        completeDriverOperation(session, session.detach())
       } catch (cleanupError: Exception) {
         error.addSuppressed(cleanupError)
       }
@@ -69,7 +68,7 @@ internal interface RenderTarget : AutoCloseable {
 
     fun completeAttachment(attachment: RenderSessionAttachment): RenderSessionHandle {
       try {
-        completeDriverOperation(attachment.session, attachment.operation)
+        completeDriverOperation(attachment.session, attachment.completed)
         return attachment.session
       } catch (error: Throwable) {
         runCatching { attachment.session.abandon() }
@@ -78,13 +77,9 @@ internal interface RenderTarget : AutoCloseable {
       }
     }
 
-    fun completeDriverOperation(session: RenderSessionHandle, operation: OperationHandle<*>) {
-      operation.use {
-        while (!it.poll()) {
-          session.serviceDriverWork()
-        }
-        check(it.terminalStatus() == MaplibreStatus.OK) { it.diagnostic() }
-      }
+    fun completeDriverOperation(session: RenderSessionHandle, completed: Deferred<Unit>) {
+      while (!completed.isCompleted) session.serviceDriverWork()
+      runSuspend { completed.await() }
     }
 
     fun renderFrame(session: RenderSessionHandle): RenderFrameResult? {
@@ -94,7 +89,7 @@ internal interface RenderTarget : AutoCloseable {
     }
 
     fun closeSession(session: RenderSessionHandle) {
-      completeDriverOperation(session, session.startDetach())
+      completeDriverOperation(session, session.detach())
       session.close()
     }
 

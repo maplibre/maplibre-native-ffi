@@ -13,7 +13,6 @@ import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.map.MapOptions
 import org.maplibre.nativeffi.map.MapSize
-import org.maplibre.nativeffi.runtime.ReadyEndpoint
 import org.maplibre.nativeffi.runtime.RuntimeEventMask
 import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 import org.maplibre.nativeffi.runtime.RuntimeEventType
@@ -22,20 +21,7 @@ import org.maplibre.nativeffi.runtime.RuntimeOptions
 
 /** Runtime and map state driven by the core-owned runtime worker. */
 internal class MapState
-private constructor(
-  private val runtime: RuntimeHandle,
-  val map: MapHandle,
-  private val scheduleNotificationDrain: () -> Unit,
-) : AutoCloseable {
-  private val notificationPending = AtomicBoolean(false)
-
-  init {
-    runtime.setNotificationCallback {
-      if (notificationPending.compareAndSet(false, true)) {
-        scheduleNotificationDrain()
-      }
-    }
-  }
+private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : AutoCloseable {
 
   fun cancelTransitions() {
     map.updateCamera(CameraUpdate())
@@ -109,18 +95,9 @@ private constructor(
     map.requestRepaint()
   }
 
-  /** Drains owned readiness and event batches on the GLFW receiver thread. */
-  fun drainNotifications(renderRequest: RenderRequest) {
-    if (!notificationPending.getAndSet(false)) return
-    do {
-      val ready = runtime.drainReady()
-      if (ready.any { it.kind == ReadyEndpoint.Kind.DRIVER_WORK }) {
-        renderRequest.set()
-      }
-      if (ready.any { it.kind == ReadyEndpoint.Kind.RUNTIME_EVENTS } && drainEvents()) {
-        renderRequest.set()
-      }
-    } while (notificationPending.getAndSet(false))
+  /** Drains the runtime event stream during the host's paced loop turn. */
+  fun pollEvents(renderRequest: RenderRequest) {
+    if (drainEvents()) renderRequest.set()
   }
 
   private fun update(camera: CameraOptions, durationMs: Double? = null) {
@@ -154,18 +131,17 @@ private constructor(
   }
 
   override fun close() {
-    runtime.clearNotificationCallback()
     try {
-      runSuspend { map.close() }
+      map.close()
     } finally {
-      runSuspend { runtime.close() }
+      runtime.close()
     }
   }
 
   companion object {
     private const val STYLE_URL = "https://tiles.openfreemap.org/styles/bright"
 
-    fun create(viewport: Viewport, scheduleNotificationDrain: () -> Unit): MapState {
+    fun create(viewport: Viewport): MapState {
       val runtime = RuntimeHandle.create(RuntimeOptions().apply { cachePath = ":memory:" })
       val initialCamera =
         CameraOptions().apply {
@@ -178,37 +154,38 @@ private constructor(
         try {
           runSuspend {
             MapHandle.create(
-              runtime,
-              MapOptions().apply {
-                width = viewport.width()
-                height = viewport.height()
-                scaleFactor = viewport.scaleFactor()
-                mapMode = MapMode.CONTINUOUS
-                eventMask =
-                  RuntimeEventMask.MAP_RENDER_UPDATE_AVAILABLE +
-                    RuntimeEventMask.MAP_RENDER_FRAME_FINISHED
-              },
-            )
+                runtime,
+                MapOptions().apply {
+                  width = viewport.width()
+                  height = viewport.height()
+                  scaleFactor = viewport.scaleFactor()
+                  mapMode = MapMode.CONTINUOUS
+                  eventMask =
+                    RuntimeEventMask.MAP_RENDER_UPDATE_AVAILABLE +
+                      RuntimeEventMask.MAP_RENDER_FRAME_FINISHED
+                },
+              )
+              .await()
           }
         } catch (error: Throwable) {
-          runSuspend { runtime.close() }
+          runtime.close()
           throw error
         }
       try {
-        val state = MapState(runtime, map, scheduleNotificationDrain)
+        val state = MapState(runtime, map)
         map.setStyleUrl(STYLE_URL)
         map.updateCamera(CameraUpdate(camera = initialCamera))
         return state
       } catch (error: Throwable) {
-        runSuspend { map.close() }
-        runSuspend { runtime.close() }
+        map.close()
+        runtime.close()
         throw error
       }
     }
   }
 }
 
-/** A one-bit frame request shared with notification callbacks. */
+/** A one-bit frame request shared with native wake callbacks. */
 internal class RenderRequest {
   private val requested = AtomicBoolean(true)
 

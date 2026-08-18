@@ -79,8 +79,8 @@ contract is unchanged.
 
 - All map, runtime, and render access from application code through the
   project’s language binding for that language.
-- Continuous map mode: receiver-scoped notification draining and repaint driven
-  by map render events and user input.
+- Continuous map mode: full event and frame-result drains, independent
+  caller-driver service, and repaint driven by map render events and user input.
 - Initial style URL and camera per [Shared defaults](#shared-defaults).
 - Camera controls per the active profile ([Desktop profile → Input](#input) or
   [Mobile profile → Input](#input-1)).
@@ -179,12 +179,13 @@ runtime. The render target chooses one of the driver contracts described in
 - A core-worker session owns a native serial graphics worker.
 - A caller-driver session stores typed native work until the render loop
   services it with the graphics context usable.
-- Runtime, map, render-session control, operation, and notification calls may
-  run on any host thread.
-- The notification callback may run on any native thread. Examples MUST use it
-  to schedule a later drain on the host graphics thread, because a ready batch
-  can contain driver work that requires that thread. The C API also permits a
-  callback to drain and service suitable endpoints inline.
+- Runtime, map, and render-session control calls may run on any host thread.
+- Completion and wake callbacks may run on any native thread. A wake callback
+  MUST only schedule later receiver work and return promptly.
+- When the binding exposes wakes, event wakes schedule a full runtime-event
+  drain, frame-result wakes schedule a full result drain, and driver-work wakes
+  schedule service on the graphics thread. A binding that exposes only polling
+  uses an existing host cadence for the same work.
 - Driver service and thread-current accessors MUST run serially on the host
   graphics thread.
 
@@ -214,14 +215,16 @@ render loop thread is the only thread that makes it current.
 
 ##### Attaching the render session
 
-Startup waits for map creation, then starts target attachment with the selected
-driver. Attach returns both an attaching session and an operation. A
-caller-driver example MUST service ready work before awaiting that operation;
-otherwise initialization deadlocks.
+Startup awaits map creation, then starts target attachment with the selected
+driver. Attach returns an attaching session and a completion future. A
+caller-driver example MUST service work before awaiting that future, either when
+the driver wake fires or from an independent polling cadence; otherwise
+initialization deadlocks.
 
-The common options use the render-loop receiver's notification source for
-operation, frame-result, and driver-work readiness. A separate source MAY be
-used when the host has separate receivers.
+The C attach options carry independent frame-result and driver-work wakes, and
+the runtime options carry an event wake. A binding may expose those wakes or
+explicit polling. Each exposed wake targets the receiver that owns the
+corresponding drain or service call.
 
 For a caller driver, attach descriptors are produced where the graphics context
 is usable. Host-shared WGL and EGL contexts use the caller driver. A transferred
@@ -237,7 +240,7 @@ example MUST abandon the session before destroying it.
 
 The example architecture MUST model the active graphics API, render-target mode,
 and driver separately. Graphics context code owns API-level resources. Render
-target code owns the session, attach and detach operations, frame demand and
+target code owns the session, attachment and detach futures, frame demand and
 result drains, driver service, mode resources, resize, and presentation.
 
 The loaded native library reports one render backend per library artifact
@@ -273,17 +276,17 @@ Order MUST be:
 1. Parse profile entry configuration and validate the selected mode and driver.
 2. Validate the loaded library's backend and target capabilities.
 3. Create the host presentation surface and graphics resources.
-4. Create the receiver-scoped notification source and install a scheduling
-   callback.
-5. Create the runtime.
-6. Start and await map creation with the initial extent.
-7. Select the event types that the example reads.
-8. Submit the style and initial camera commands.
-9. Start render-target attachment and retain both returned handles.
-10. For a caller driver, service ready work on the graphics thread until the
-    attach operation completes.
-11. Inspect and release the operation, then read negotiated capabilities.
-12. Print the active mode and driver.
+4. Create the runtime and arrange an event drain through its wake or a host
+   polling cadence.
+5. Start and await map creation with the initial extent.
+6. Select the event types that the example reads.
+7. Submit the style and initial camera commands.
+8. Start render-target attachment and arrange frame-result drains and driver
+   service through wakes or an independent host polling cadence.
+9. For a caller driver, service work on the graphics thread until the attach
+   future resolves.
+10. Read negotiated capabilities.
+11. Print the active mode and driver.
 
 Failure cleanup follows the same detach or abandon path as normal shutdown.
 
@@ -299,20 +302,19 @@ On host termination or fatal error:
 5. Destroy the detached or abandoned session from any thread.
 6. Release compositor and target resources.
 7. Release the map, then the runtime.
-8. Release the notification source and graphics resources.
+8. Release graphics resources.
 
 A map release preflight rejects an attaching or attached session without
 changing map state.
 
 #### Handle ownership
 
-- One notification source per host receiver.
 - One runtime per process, with one native scheduler thread.
 - One map per runtime for the demo.
 - One attaching or attached session per map.
 - Frame-result batches own their records independently of the session.
-- Every acquired-frame handle leases one texture-ring slot until its release
-  operation completes.
+- Every acquired-frame handle leases one texture-ring slot until its synchronous
+  release returns.
 - Graphics handles stay valid through normal detach. Abandon quarantines
   resources that cannot be destroyed without graphics access.
 
@@ -326,10 +328,10 @@ mechanism.
 
 1. Handle window, input, and resize events. Submit any-thread map and session
    work directly.
-2. Drain ready notification batches.
-3. Service caller-driver work on the graphics thread while its endpoint is
-   ready, including when presentation is paused.
-4. Drain frame-result batches until empty and release each batch.
+2. Service caller-driver work on the graphics thread, when its wake fires or
+   from an independent polling cadence, including while presentation is paused.
+3. Drain the complete frame-result queue after its wake or on the host cadence.
+4. Drain the complete runtime-event queue after its wake or on the host cadence.
 5. For a rendered owned-texture result, acquire one frame, wait for producer
    synchronization, and submit the compositor pass.
 6. Present and release an acquired frame with consumer-completion
@@ -337,14 +339,15 @@ mechanism.
 
 ```mermaid
 sequenceDiagram
-  participant N as Notification source
+  participant W as Wake or host cadence
   participant RL as Render loop
   participant RS as Render session
   participant CP as Compositor
 
   RL->>RS: request frame(token, timestamp)
-  N-->>RL: schedule receiver
-  RL->>RS: service driver work when ready
+  W-->>RL: schedule driver service
+  RL->>RS: service driver work
+  W-->>RL: schedule frame-result drain
   RL->>RS: drain frame results
   RS-->>RL: disposition and generations
   RL->>RS: acquire frame
@@ -363,8 +366,8 @@ sequenceDiagram
   missed MUST remain distinct outcomes.
 - No update and size pending wait for a newer map update. Target not ready waits
   for target readiness or a paced retry.
-- Result readiness is level-triggered. The example MUST drain every result and
-  MUST release the batch before starting another drain.
+- Frame-result wake state is level-triggered. Each drain transfers every queued
+  result into an independently owned batch.
 - The frame result's map-update, extent, and frame generations determine what
   was rendered. Runtime event order MUST NOT be used as a substitute.
 - The example MAY keep presenting the previous completed texture when a newer
@@ -405,7 +408,7 @@ map-specific setup.
 #### Creation
 
 - Create the runtime with a `:memory:` cache.
-- Create and await the map operation with the current viewport extent and
+- Create and await the map future with the current viewport extent and
   continuous mode.
 - Select every event type the example reads before it loads the style. A map
   queues an event only while its subscription selects that type.
@@ -414,13 +417,17 @@ map-specific setup.
 - Attach a render target by dispatching on active graphics API and selected
   mode.
 
-#### Notification drain
+#### Wake and polling handling
 
-- Drain the notification source when its callback schedules the receiver.
-- Read every endpoint in each owned ready batch, then release the batch.
-- Drain runtime events, frame results, and operation completions through their
-  typed APIs while their endpoints remain ready.
-- Schedule graphics-thread service when the driver-work endpoint is ready.
+- Install direct event, frame-result, and driver-work wakes before the
+  corresponding producer can enqueue work when the binding exposes them.
+- Each wake schedules receiver work and returns without draining or calling
+  application code. A polling-only binding uses existing application and render
+  cadences instead of adding a worker.
+- Drain every queued runtime event or frame result in one call on its receiver.
+- Service caller-driver work on the graphics thread after its wake or from a
+  cadence that remains active while presentation is paused.
+- Await one-shot futures directly; their completion does not depend on a drain.
 
 #### Resize API
 
@@ -471,14 +478,14 @@ table:
 - Attach with the borrowed-texture descriptor referencing host-owned handles.
 - After a rendered result, sample that texture through the compositor path.
 - On resize, allocate a replacement and start the backend target-replacement
-  operation. Retain both allocations until its outcome is known.
+  future. Retain both allocations until its outcome is known.
 
 #### `native-surface`
 
 - Attach with the surface descriptor for host presentation.
 - Set the present flag on frame demand.
 - A rendered result means that the selected driver presented the frame.
-- On resize, start the session resize operation and rebuild host presentation.
+- On resize, start the session resize future and rebuild host presentation.
   Start target replacement when the toolkit supplies a new surface for the same
   graphics context.
 
@@ -499,14 +506,14 @@ that pass.
 ### Resize mechanics
 
 - Recompute the viewport on host size or scale changes.
-- Start one absolute session resize operation with the new logical extent.
-  Resize assigns a new extent generation and updates the map viewport through
-  the selected driver.
+- Start one absolute session resize future with the new logical extent. Resize
+  assigns a new extent generation and updates the map viewport through the
+  selected driver.
 - Resize API-level and compositor resources for owned textures and surfaces.
 - For a borrowed texture, allocate a matching host texture and start target
   replacement instead of resizing the fixed allocation.
 - Retain outgoing and replacement borrowed resources until replacement
-  completes. Release the replacement on a rejected operation. After an ambiguous
+  completes. Release the replacement when the future fails. After an ambiguous
   native failure, detach or abandon before releasing either target.
 - A Vulkan surface's outgoing `VkSurfaceKHR` MUST remain valid until replacement
   completes because graphics teardown is ordered through the driver.
@@ -724,8 +731,8 @@ continues while the view is off screen.
 
 When the host toolkit supplies a fresh presentation surface for the same
 graphics context, start target replacement and keep the outgoing surface alive
-until the operation completes. The session keeps its renderer, so the map
-returns warm.
+until the replacement future completes. The session keeps its renderer, so the
+map returns warm.
 
 When the graphics context is gone, stop demand and detach through the caller
 driver before destroying it. Abandon instead when the graphics thread can no

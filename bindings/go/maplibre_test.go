@@ -1,5 +1,15 @@
 package maplibre
 
+import "context"
+
+func awaitForTest[T any](future *Future[T], err error) (T, error) {
+	var zero T
+	if err != nil {
+		return zero, err
+	}
+	return future.Await(context.Background())
+}
+
 const minimalStyleJSON = `{
   "version": 8,
   "name": "go-binding-style-test",

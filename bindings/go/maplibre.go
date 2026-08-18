@@ -3,7 +3,7 @@
 //
 // Runtime, map, and projection handles are usable from any goroutine.
 // Render-session and acquired-frame graphics calls retain their native thread
-// affinity. OperationHandle methods are usable from any goroutine.
+// affinity. Futures may be awaited from any goroutine.
 package maplibre
 
 /*

@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 #include "base.h"
+#include "completion.h"
 #include "render_target.h"
 
 #ifdef __cplusplus
@@ -206,61 +207,56 @@ MLN_API mln_status mln_acquired_frame_release(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts an ordered logical resize. The operation completes after the selected
+ * Starts an ordered logical resize. The completion runs after the selected
  * driver applies the extent and updates the map viewport.
  */
-MLN_API mln_status mln_render_session_resize_start(
+MLN_API mln_status mln_render_session_resize(
   mln_render_session session, const mln_render_target_extent* extent,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
  * Starts a barrier that completes after all render work accepted before it has
  * a terminal result. A barrier does not request a frame.
  */
-MLN_API mln_status mln_render_session_barrier_start(
-  mln_render_session session, mln_operation* out_operation
+MLN_API mln_status mln_render_session_barrier(
+  mln_render_session session, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /** Starts best-effort release of renderer caches. */
-MLN_API mln_status mln_render_session_reduce_memory_use_start(
-  mln_render_session session, mln_operation* out_operation
+MLN_API mln_status mln_render_session_reduce_memory_use(
+  mln_render_session session, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /** Starts asynchronous renderer-data clearing. */
-MLN_API mln_status mln_render_session_clear_data_start(
-  mln_render_session session, mln_operation* out_operation
+MLN_API mln_status mln_render_session_clear_data(
+  mln_render_session session, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /** Starts asynchronous renderer diagnostic-log emission. */
-MLN_API mln_status mln_render_session_dump_debug_logs_start(
-  mln_render_session session, mln_operation* out_operation
+MLN_API mln_status mln_render_session_dump_debug_logs(
+  mln_render_session session, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /** Starts setting feature state from copied UTF-8 inputs. */
-MLN_API mln_status mln_render_session_set_feature_state_start(
+MLN_API mln_status mln_render_session_set_feature_state(
   mln_render_session session, mln_buffer_view source_id,
   mln_buffer_view source_layer_id, mln_buffer_view feature_id,
-  mln_buffer_view state_json, mln_operation* out_operation
+  mln_buffer_view state_json, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /** Starts reading feature state from copied UTF-8 inputs. */
-MLN_API mln_status mln_render_session_get_feature_state_start(
+MLN_API mln_status mln_render_session_get_feature_state(
   mln_render_session session, mln_buffer_view source_id,
   mln_buffer_view source_layer_id, mln_buffer_view feature_id,
-  mln_operation* out_operation
-) MLN_NOEXCEPT;
-
-/** Takes owned JSON bytes from a completed feature-state get operation. */
-MLN_API mln_status mln_render_session_get_feature_state_take_result(
-  mln_operation operation, mln_buffer* out_state_json
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /** Starts removal of feature state selected by copied UTF-8 inputs. */
-MLN_API mln_status mln_render_session_remove_feature_state_start(
+MLN_API mln_status mln_render_session_remove_feature_state(
   mln_render_session session, mln_buffer_view source_id,
   mln_buffer_view source_layer_id, mln_buffer_view feature_id,
-  mln_buffer_view state_key, mln_operation* out_operation
+  mln_buffer_view state_key, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -281,8 +277,8 @@ MLN_API mln_status mln_render_session_service_driver_work(
  * leave the session attached. Once accepted, earlier mailbox operations reach
  * a terminal result before graphics resources are destroyed.
  */
-MLN_API mln_status mln_render_session_detach_start(
-  mln_render_session session, mln_operation* out_operation
+MLN_API mln_status mln_render_session_detach(
+  mln_render_session session, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**

@@ -29,9 +29,10 @@ acceptance.
 
 Either command returns after copying and accepting its input. The native
 scheduler loads the style, sources, glyphs, and first tiles. A style-loaded
-event reports that the style parsed and its sources exist. A loading-failed event
-or failed command-finished event carries diagnostic text.
-[Handle events](/maplibre-native-ffi/guides/handle-events/) covers reading both.
+event reports that the style parsed and its sources exist. A rejected or failed
+command completes with diagnostic text; a later loading failure arrives as an
+event. [Handle events](/maplibre-native-ffi/guides/handle-events/) covers reading
+the event stream.
 
 ## Replay additions after a style load
 

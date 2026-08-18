@@ -37,8 +37,8 @@ class RuntimeEventsTest : org.maplibre.nativeffi.NativeTestBase() {
     org.maplibre.nativeffi.runtime.runSuspendTest {
       withMap { runtime, map ->
         // One style load produces both types, so both are driven after this write.
-        map.eventMask = RuntimeEventMask.ALL - RuntimeEventMask.MAP_LOADING_STARTED
-        map.setStyleJson(STYLE_JSON.encodeToByteArray())
+        map.setEventMask(RuntimeEventMask.ALL - RuntimeEventMask.MAP_LOADING_STARTED).await()
+        map.setStyleJson(STYLE_JSON.encodeToByteArray()).await()
 
         val types = drainUntil(runtime) { RuntimeEventType.MAP_STYLE_LOADED in it }
         assertTrue(RuntimeEventType.MAP_LOADING_STARTED !in types, "cleared type was delivered")
@@ -51,17 +51,18 @@ class RuntimeEventsTest : org.maplibre.nativeffi.NativeTestBase() {
       RuntimeHandle.create(RuntimeOptions()).use { runtime ->
         val map =
           MapHandle.create(
-            runtime,
-            mapOptions().apply {
-              eventMask = RuntimeEventMask.ALL - RuntimeEventMask.MAP_LOADING_STARTED
-            },
-          )
+              runtime,
+              mapOptions().apply {
+                eventMask = RuntimeEventMask.ALL - RuntimeEventMask.MAP_LOADING_STARTED
+              },
+            )
+            .await()
         try {
           assertEquals(
             RuntimeEventMask.ALL_MAP_EVENTS - RuntimeEventMask.MAP_LOADING_STARTED,
             map.eventMask,
           )
-          map.setStyleJson(STYLE_JSON.encodeToByteArray())
+          map.setStyleJson(STYLE_JSON.encodeToByteArray()).await()
 
           val types = drainUntil(runtime) { RuntimeEventType.MAP_STYLE_LOADED in it }
           assertTrue(RuntimeEventType.MAP_LOADING_STARTED !in types, "cleared type was delivered")
@@ -80,12 +81,12 @@ class RuntimeEventsTest : org.maplibre.nativeffi.NativeTestBase() {
         assertEquals(RuntimeEventMask.ALL_MAP_EVENTS, map.eventMask)
 
         runtime.eventMask = RuntimeEventMask.ALL
-        map.eventMask = RuntimeEventMask.ALL
+        map.setEventMask(RuntimeEventMask.ALL).await()
         assertEquals(RuntimeEventMask.ALL, runtime.eventMask)
         assertEquals(RuntimeEventMask.ALL_MAP_EVENTS, map.eventMask)
 
         // Read, clear one bit, write back: every other bit survives.
-        map.eventMask = map.eventMask - RuntimeEventMask.MAP_TILE_ACTION
+        map.setEventMask(map.eventMask - RuntimeEventMask.MAP_TILE_ACTION).await()
         assertEquals(
           RuntimeEventMask.ALL_MAP_EVENTS - RuntimeEventMask.MAP_TILE_ACTION,
           map.eventMask,
@@ -112,10 +113,10 @@ class RuntimeEventsTest : org.maplibre.nativeffi.NativeTestBase() {
         }
         withMap { runtime, map ->
           assertFailsWith<InvalidArgumentException> { runtime.eventMask = unknownBit }
-          assertFailsWith<InvalidArgumentException> { map.eventMask = unknownBit }
+          assertFailsWith<InvalidArgumentException> { map.setEventMask(unknownBit).await() }
           assertFailsWith<InvalidArgumentException> {
             runSuspendTest {
-              MapHandle.create(runtime, mapOptions().apply { eventMask = unknownBit })
+              MapHandle.create(runtime, mapOptions().apply { eventMask = unknownBit }).await()
             }
           }
         }
@@ -125,29 +126,32 @@ class RuntimeEventsTest : org.maplibre.nativeffi.NativeTestBase() {
   fun styleReplacementReleasesADroppedSourceWithNoStyleLoadedEvent(): Unit =
     org.maplibre.nativeffi.runtime.runSuspendTest {
       RuntimeHandle.create(RuntimeOptions()).use { runtime ->
-        runtime.setResourceProvider(
-          ResourceProviderCallback { request, handle ->
-            if (request.requestedUrl != SERVED_STYLE_URL) {
-              return@ResourceProviderCallback ResourceProviderDecision.PASS_THROUGH
-            }
-            handle.complete(
-              ResourceResponse(ResourceResponseStatus.OK).apply {
-                bytes = STYLE_JSON.encodeToByteArray()
+        runtime
+          .setResourceProvider(
+            ResourceProviderCallback { request, handle ->
+              if (request.requestedUrl != SERVED_STYLE_URL) {
+                return@ResourceProviderCallback ResourceProviderDecision.PASS_THROUGH
               }
-            )
-            ResourceProviderDecision.HANDLE
-          }
-        )
+              handle.complete(
+                ResourceResponse(ResourceResponseStatus.OK).apply {
+                  bytes = STYLE_JSON.encodeToByteArray()
+                }
+              )
+              ResourceProviderDecision.HANDLE
+            }
+          )
+          .await()
         val map =
           MapHandle.create(
-            runtime,
-            mapOptions().apply {
-              eventMask = RuntimeEventMask.ALL - RuntimeEventMask.MAP_STYLE_LOADED
-            },
-          )
+              runtime,
+              mapOptions().apply {
+                eventMask = RuntimeEventMask.ALL - RuntimeEventMask.MAP_STYLE_LOADED
+              },
+            )
+            .await()
         try {
-          map.setStyleJson(STYLE_JSON.encodeToByteArray())
-          map.addCustomGeometrySource("custom", customGeometrySourceOptions())
+          map.setStyleJson(STYLE_JSON.encodeToByteArray()).await()
+          map.addCustomGeometrySource("custom", customGeometrySourceOptions()).await()
           assertEquals(1, map.customGeometrySourceCountForTesting())
           // The binding adds no subscription of its own, so the mask reads back as written.
           assertEquals(
@@ -158,7 +162,7 @@ class RuntimeEventsTest : org.maplibre.nativeffi.NativeTestBase() {
 
           // A URL load drops the source when the asynchronous load completes, and native
           // reports that through the release callback rather than through an event.
-          map.setStyleUrl(SERVED_STYLE_URL)
+          map.setStyleUrl(SERVED_STYLE_URL).await()
           val types = drainUntil(runtime) { map.customGeometrySourceCountForTesting() == 0 }
           assertTrue(
             RuntimeEventType.MAP_STYLE_LOADED !in types,
@@ -174,25 +178,25 @@ class RuntimeEventsTest : org.maplibre.nativeffi.NativeTestBase() {
   fun orderedStyleReplacementReleasesDroppedSourcesBeforeCompletion(): Unit =
     org.maplibre.nativeffi.runtime.runSuspendTest {
       withMap { runtime, map ->
-        map.setStyleJson(STYLE_JSON.encodeToByteArray())
-        runtime.barrier()
-        map.addCustomGeometrySource("removed", customGeometrySourceOptions())
-        map.addCustomGeometrySource("dropped", customGeometrySourceOptions())
-        runtime.barrier()
+        map.setStyleJson(STYLE_JSON.encodeToByteArray()).await()
+        runtime.barrier().await()
+        map.addCustomGeometrySource("removed", customGeometrySourceOptions()).await()
+        map.addCustomGeometrySource("dropped", customGeometrySourceOptions()).await()
+        runtime.barrier().await()
         assertEquals(2, map.customGeometrySourceCountForTesting())
 
-        map.removeStyleSource("removed")
-        runtime.barrier()
+        map.removeStyleSource("removed").await()
+        runtime.barrier().await()
         assertEquals(1, map.customGeometrySourceCountForTesting())
 
-        map.setStyleJson(STYLE_JSON.encodeToByteArray())
-        runtime.barrier()
+        map.setStyleJson(STYLE_JSON.encodeToByteArray()).await()
+        runtime.barrier().await()
         assertEquals(0, map.customGeometrySourceCountForTesting())
 
-        map.addCustomGeometrySource("surviving", customGeometrySourceOptions())
-        runtime.barrier()
+        map.addCustomGeometrySource("surviving", customGeometrySourceOptions()).await()
+        runtime.barrier().await()
         map.close()
-        runtime.barrier()
+        runtime.barrier().await()
         assertEquals(0, map.customGeometrySourceCountForTesting())
       }
     }
@@ -202,8 +206,10 @@ class RuntimeEventsTest : org.maplibre.nativeffi.NativeTestBase() {
     org.maplibre.nativeffi.runtime.runSuspendTest {
       withMap { runtime, map ->
         val failure = AtomicReference<Throwable?>(null)
-        runOnNativeThread(BackgroundEventCalls(runtime, map, failure))
+        val completion = AtomicReference<kotlinx.coroutines.Deferred<CommandCompletion>?>(null)
+        runOnNativeThread(BackgroundEventCalls(runtime, map, failure, completion))
         failure.load()?.let { throw it }
+        completion.load()?.await()
         assertEquals(
           RuntimeEventMask.ALL - RuntimeEventMask.OFFLINE_REGION_STATUS_CHANGED,
           runtime.eventMask,
@@ -230,7 +236,7 @@ class RuntimeEventsTest : org.maplibre.nativeffi.NativeTestBase() {
 
   private suspend fun withMap(body: suspend (RuntimeHandle, MapHandle) -> Unit) {
     RuntimeHandle.create(RuntimeOptions()).use { runtime ->
-      val map = MapHandle.create(runtime, mapOptions())
+      val map = MapHandle.create(runtime, mapOptions()).await()
       try {
         body(runtime, map)
       } finally {
@@ -246,7 +252,7 @@ class RuntimeEventsTest : org.maplibre.nativeffi.NativeTestBase() {
   ): Set<RuntimeEventType> {
     val types = mutableSetOf<RuntimeEventType>()
     repeat(10_000) {
-      runtime.barrier()
+      runtime.barrier().await()
       types += runtime.drainEvents().events.map { it.type }
       if (done(types)) return types
       usleep(1_000U)
@@ -279,12 +285,13 @@ private class BackgroundEventCalls(
   private val runtime: RuntimeHandle,
   private val map: MapHandle,
   private val failure: AtomicReference<Throwable?>,
+  private val completion: AtomicReference<kotlinx.coroutines.Deferred<CommandCompletion>?>,
 ) {
   fun run() {
     try {
       runtime.drainEvents()
       runtime.eventMask = RuntimeEventMask.ALL - RuntimeEventMask.OFFLINE_REGION_STATUS_CHANGED
-      map.eventMask = RuntimeEventMask.ALL - RuntimeEventMask.MAP_TILE_ACTION
+      completion.store(map.setEventMask(RuntimeEventMask.ALL - RuntimeEventMask.MAP_TILE_ACTION))
     } catch (throwable: Throwable) {
       failure.store(throwable)
     }

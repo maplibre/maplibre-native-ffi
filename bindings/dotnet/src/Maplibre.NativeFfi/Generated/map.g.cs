@@ -458,7 +458,7 @@ namespace Maplibre.NativeFfi.Internal.C
         [NativeTypeName("uint32_t")]
         public uint type;
 
-        [NativeTypeName("__AnonymousRecord_map_L459_C3")]
+        [NativeTypeName("__AnonymousRecord_map_L460_C3")]
         public _data_e__Union data;
 
         [StructLayout(LayoutKind.Explicit)]
@@ -616,52 +616,34 @@ namespace Maplibre.NativeFfi.Internal.C
     internal static unsafe partial class NativeMethods
     {
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_offline_region_create_start([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("const mln_offline_region_definition *")] mln_offline_region_definition* definition, [NativeTypeName("const uint8_t *")] byte* metadata, [NativeTypeName("size_t")] nuint metadata_size, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
+        public static extern mln_status mln_runtime_offline_region_create([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("const mln_offline_region_definition *")] mln_offline_region_definition* definition, [NativeTypeName("const uint8_t *")] byte* metadata, [NativeTypeName("size_t")] nuint metadata_size, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_offline_region_get_start([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("mln_offline_region_id")] long region_id, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
+        public static extern mln_status mln_runtime_offline_region_get([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("mln_offline_region_id")] long region_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_offline_regions_list_start([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
+        public static extern mln_status mln_runtime_offline_regions_list([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_offline_regions_merge_database_start([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("const char *")] sbyte* side_database_path, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
+        public static extern mln_status mln_runtime_offline_regions_merge_database([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("const char *")] sbyte* side_database_path, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_offline_region_update_metadata_start([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("mln_offline_region_id")] long region_id, [NativeTypeName("const uint8_t *")] byte* metadata, [NativeTypeName("size_t")] nuint metadata_size, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
+        public static extern mln_status mln_runtime_offline_region_update_metadata([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("mln_offline_region_id")] long region_id, [NativeTypeName("const uint8_t *")] byte* metadata, [NativeTypeName("size_t")] nuint metadata_size, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_offline_region_get_status_start([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("mln_offline_region_id")] long region_id, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
+        public static extern mln_status mln_runtime_offline_region_get_status([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("mln_offline_region_id")] long region_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_offline_region_set_observed_start([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("mln_offline_region_id")] long region_id, [NativeTypeName("bool")] byte observed, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
+        public static extern mln_status mln_runtime_offline_region_set_observed([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("mln_offline_region_id")] long region_id, [NativeTypeName("bool")] byte observed, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_offline_region_set_download_state_start([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("mln_offline_region_id")] long region_id, [NativeTypeName("uint32_t")] uint state, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
+        public static extern mln_status mln_runtime_offline_region_set_download_state([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("mln_offline_region_id")] long region_id, [NativeTypeName("uint32_t")] uint state, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_offline_region_invalidate_start([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("mln_offline_region_id")] long region_id, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
+        public static extern mln_status mln_runtime_offline_region_invalidate([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("mln_offline_region_id")] long region_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_offline_region_delete_start([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("mln_offline_region_id")] long region_id, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_offline_region_create_take_result([NativeTypeName("mln_operation")] MlnOperation operation, [NativeTypeName("mln_offline_region_snapshot *")] MlnOfflineRegionSnapshot* out_region);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_offline_region_get_take_result([NativeTypeName("mln_operation")] MlnOperation operation, [NativeTypeName("mln_offline_region_snapshot *")] MlnOfflineRegionSnapshot* out_region, bool* out_found);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_offline_regions_list_take_result([NativeTypeName("mln_operation")] MlnOperation operation, [NativeTypeName("mln_offline_region_list *")] MlnOfflineRegionList* out_regions);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_offline_regions_merge_database_take_result([NativeTypeName("mln_operation")] MlnOperation operation, [NativeTypeName("mln_offline_region_list *")] MlnOfflineRegionList* out_regions);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_offline_region_update_metadata_take_result([NativeTypeName("mln_operation")] MlnOperation operation, [NativeTypeName("mln_offline_region_snapshot *")] MlnOfflineRegionSnapshot* out_region);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_offline_region_get_status_take_result([NativeTypeName("mln_operation")] MlnOperation operation, mln_offline_region_status* out_status);
+        public static extern mln_status mln_runtime_offline_region_delete([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("mln_offline_region_id")] long region_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_offline_region_snapshot_get([NativeTypeName("mln_offline_region_snapshot")] MlnOfflineRegionSnapshot snapshot, mln_offline_region_info* out_info);
@@ -682,45 +664,36 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_map_options mln_map_options_default();
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_create_start([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("const mln_map_options *")] mln_map_options* options, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_create_take_result([NativeTypeName("mln_operation")] MlnOperation operation, [NativeTypeName("mln_map *")] MlnMap* out_map);
+        public static extern mln_status mln_map_create([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("const mln_map_options *")] mln_map_options* options, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_snapshot_get([NativeTypeName("mln_map")] MlnMap map, mln_map_snapshot* out_snapshot);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_resize([NativeTypeName("mln_map")] MlnMap map, mln_logical_extent extent, [NativeTypeName("uint64_t *")] ulong* out_command_id);
+        public static extern mln_status mln_map_resize([NativeTypeName("mln_map")] MlnMap map, mln_logical_extent extent, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_request_repaint([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("uint64_t *")] ulong* out_command_id);
+        public static extern mln_status mln_map_request_repaint([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_request_still_image_start([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
+        public static extern mln_status mln_map_request_still_image([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_release([NativeTypeName("mln_map")] MlnMap map);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_set_style_url([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const char *")] sbyte* url, [NativeTypeName("uint64_t *")] ulong* out_command_id);
+        public static extern mln_status mln_map_set_style_url([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const char *")] sbyte* url, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_set_style_json([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view json, [NativeTypeName("uint64_t *")] ulong* out_command_id);
+        public static extern mln_status mln_map_set_style_json([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view json, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_loaded_style_json_start([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
+        public static extern mln_status mln_map_loaded_style_json([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_loaded_style_json_take_result([NativeTypeName("mln_operation")] MlnOperation operation, [NativeTypeName("mln_buffer *")] MlnBuffer* out_json);
+        public static extern mln_status mln_map_style_url([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_style_url_start([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_style_url_take_result([NativeTypeName("mln_operation")] MlnOperation operation, [NativeTypeName("mln_buffer *")] MlnBuffer* out_url);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_set_event_mask([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("uint64_t")] ulong mask, [NativeTypeName("uint64_t *")] ulong* out_command_id);
+        public static extern mln_status mln_map_set_event_mask([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("uint64_t")] ulong mask, [NativeTypeName("const mln_completion *")] mln_completion* completion);
     }
 }

@@ -312,9 +312,7 @@ final class RenderSessionAttachment {
 /// A render session attached to one map and render target.
 final class RenderSessionHandle implements Finalizable {
   RenderSessionHandle._(this._runtime, NativeRenderSession handle)
-    : _state = NativeHandleState(handle, 'RenderSessionHandle') {
-    _runtime._renderSessions[handle.raw] = WeakReference(this);
-  }
+    : _state = NativeHandleState(handle, 'RenderSessionHandle');
 
   final RuntimeHandle _runtime;
   final NativeHandleState<NativeRenderSession> _state;
@@ -331,7 +329,12 @@ final class RenderSessionHandle implements Finalizable {
   void _notifyDriverWorkReady() => _driverWorkReady.add(null);
   bool get isClosed => _state.isClosed;
   Future<void> _completeWhileRetained(Future<void> completion) async {
-    await completion;
+    final retained = this;
+    try {
+      await completion;
+    } finally {
+      retained.isClosed;
+    }
   }
 
   NativeRenderSession get _handle => _state.handle;
@@ -433,7 +436,7 @@ final class RenderSessionHandle implements Finalizable {
     (out) => withNativeArena((arena) {
       final native = arena<raw.mln_render_target_extent>()
         ..ref = _renderTargetExtentToNative(extent);
-      return raw.mln_render_session_resize_start(_handle.raw, native, out);
+      return raw.mln_render_session_resize(_handle.raw, native, out);
     }),
   );
 
@@ -442,11 +445,7 @@ final class RenderSessionHandle implements Finalizable {
         (out) => withNativeArena((arena) {
           final native = arena<raw.mln_metal_surface_descriptor>()
             ..ref = _metalSurfaceDescriptorToNative(descriptor);
-          return raw.mln_metal_surface_set_target_start(
-            _handle.raw,
-            native,
-            out,
-          );
+          return raw.mln_metal_surface_set_target(_handle.raw, native, out);
         }),
       );
 
@@ -455,11 +454,7 @@ final class RenderSessionHandle implements Finalizable {
         (out) => withNativeArena((arena) {
           final native = arena<raw.mln_vulkan_surface_descriptor>()
             ..ref = _vulkanSurfaceDescriptorToNative(descriptor);
-          return raw.mln_vulkan_surface_set_target_start(
-            _handle.raw,
-            native,
-            out,
-          );
+          return raw.mln_vulkan_surface_set_target(_handle.raw, native, out);
         }),
       );
 
@@ -468,11 +463,7 @@ final class RenderSessionHandle implements Finalizable {
         (out) => withNativeArena((arena) {
           final native = arena<raw.mln_opengl_surface_descriptor>()
             ..ref = _openglSurfaceDescriptorToNative(descriptor, arena);
-          return raw.mln_opengl_surface_set_target_start(
-            _handle.raw,
-            native,
-            out,
-          );
+          return raw.mln_opengl_surface_set_target(_handle.raw, native, out);
         }),
       );
 
@@ -481,11 +472,7 @@ final class RenderSessionHandle implements Finalizable {
         (out) => withNativeArena((arena) {
           final native = arena<raw.mln_webgpu_surface_descriptor>()
             ..ref = _webGPUSurfaceDescriptorToNative(descriptor);
-          return raw.mln_webgpu_surface_set_target_start(
-            _handle.raw,
-            native,
-            out,
-          );
+          return raw.mln_webgpu_surface_set_target(_handle.raw, native, out);
         }),
       );
 
@@ -495,7 +482,7 @@ final class RenderSessionHandle implements Finalizable {
     (out) => withNativeArena((arena) {
       final native = arena<raw.mln_metal_borrowed_texture_descriptor>()
         ..ref = _metalBorrowedTextureDescriptorToNative(descriptor);
-      return raw.mln_metal_borrowed_texture_set_target_start(
+      return raw.mln_metal_borrowed_texture_set_target(
         _handle.raw,
         native,
         out,
@@ -509,7 +496,7 @@ final class RenderSessionHandle implements Finalizable {
     (out) => withNativeArena((arena) {
       final native = arena<raw.mln_vulkan_borrowed_texture_descriptor>()
         ..ref = _vulkanBorrowedTextureDescriptorToNative(descriptor);
-      return raw.mln_vulkan_borrowed_texture_set_target_start(
+      return raw.mln_vulkan_borrowed_texture_set_target(
         _handle.raw,
         native,
         out,
@@ -523,7 +510,7 @@ final class RenderSessionHandle implements Finalizable {
     (out) => withNativeArena((arena) {
       final native = arena<raw.mln_opengl_borrowed_texture_descriptor>()
         ..ref = _openglBorrowedTextureDescriptorToNative(descriptor, arena);
-      return raw.mln_opengl_borrowed_texture_set_target_start(
+      return raw.mln_opengl_borrowed_texture_set_target(
         _handle.raw,
         native,
         out,
@@ -537,7 +524,7 @@ final class RenderSessionHandle implements Finalizable {
     (out) => withNativeArena((arena) {
       final native = arena<raw.mln_webgpu_borrowed_texture_descriptor>()
         ..ref = _webGPUBorrowedTextureDescriptorToNative(descriptor);
-      return raw.mln_webgpu_borrowed_texture_set_target_start(
+      return raw.mln_webgpu_borrowed_texture_set_target(
         _handle.raw,
         native,
         out,
@@ -545,61 +532,56 @@ final class RenderSessionHandle implements Finalizable {
     }),
   );
 
-  Future<void> barrier() => _voidOperation(
-    (out) => raw.mln_render_session_barrier_start(_handle.raw, out),
-  );
+  Future<void> barrier() =>
+      _voidOperation((out) => raw.mln_render_session_barrier(_handle.raw, out));
 
   Future<void> reduceMemoryUse() => _voidOperation(
-    (out) => raw.mln_render_session_reduce_memory_use_start(_handle.raw, out),
+    (out) => raw.mln_render_session_reduce_memory_use(_handle.raw, out),
   );
   Future<void> clearData() => _voidOperation(
-    (out) => raw.mln_render_session_clear_data_start(_handle.raw, out),
+    (out) => raw.mln_render_session_clear_data(_handle.raw, out),
   );
   Future<void> dumpDebugLogs() => _voidOperation(
-    (out) => raw.mln_render_session_dump_debug_logs_start(_handle.raw, out),
+    (out) => raw.mln_render_session_dump_debug_logs(_handle.raw, out),
   );
 
   Future<List<QueriedFeature>> queryRenderedFeatures(
     RenderedQueryGeometry geometry, {
     RenderedFeatureQueryOptions? options,
-  }) => withNativeArena((arena) {
-    final nativeGeometry = arena<raw.mln_rendered_query_geometry>()
-      ..ref = _renderedQueryGeometryToNative(geometry, arena);
-    final nativeOptions = _renderedFeatureQueryOptionsToNative(
-      options ?? RenderedFeatureQueryOptions(),
-      arena,
-    );
-    final operation = arena<Uint64>()..value = 0;
-    _check(
-      raw.mln_render_session_query_rendered_features_start(
+  }) => _queryFeatures(
+    (completion) => withNativeArena((arena) {
+      final nativeGeometry = arena<raw.mln_rendered_query_geometry>()
+        ..ref = _renderedQueryGeometryToNative(geometry, arena);
+      final nativeOptions = _renderedFeatureQueryOptionsToNative(
+        options ?? RenderedFeatureQueryOptions(),
+        arena,
+      );
+      return raw.mln_render_session_query_rendered_features(
         _handle.raw,
         nativeGeometry,
         nativeOptions,
-        operation,
-      ),
-    );
-    return _takeQueriedFeaturesOperation(operation.value);
-  });
+        completion,
+      );
+    }),
+  );
 
   Future<List<QueriedFeature>> querySourceFeatures(
     String sourceId, {
     SourceFeatureQueryOptions? options,
-  }) => withNativeArena((arena) {
-    final nativeOptions = _sourceFeatureQueryOptionsToNative(
-      options ?? SourceFeatureQueryOptions(),
-      arena,
-    );
-    final operation = arena<Uint64>()..value = 0;
-    _check(
-      raw.mln_render_session_query_source_features_start(
+  }) => _queryFeatures(
+    (completion) => withNativeArena((arena) {
+      final nativeOptions = _sourceFeatureQueryOptionsToNative(
+        options ?? SourceFeatureQueryOptions(),
+        arena,
+      );
+      return raw.mln_render_session_query_source_features(
         _handle.raw,
         nativeStringView(sourceId, arena).value,
         nativeOptions,
-        operation,
-      ),
-    );
-    return _takeQueriedFeaturesOperation(operation.value);
-  });
+        completion,
+      );
+    }),
+  );
 
   Future<Uint8List> queryFeatureExtensions({
     required String sourceId,
@@ -607,125 +589,108 @@ final class RenderSessionHandle implements Finalizable {
     required String extension,
     required String extensionField,
     Uint8List? arguments,
-  }) => withNativeArena((arena) {
-    final operation = arena<Uint64>()..value = 0;
-    final nativeArguments = arguments == null
-        ? nullptr.cast<raw.mln_buffer_view>()
-        : (arena<raw.mln_buffer_view>()
-            ..ref = nativeBufferView(arguments, arena));
-    _check(
-      raw.mln_render_session_query_feature_extensions_start(
+  }) => _bufferOperation(
+    (completion) => withNativeArena((arena) {
+      final nativeArguments = arguments == null
+          ? nullptr.cast<raw.mln_buffer_view>()
+          : (arena<raw.mln_buffer_view>()
+              ..ref = nativeBufferView(arguments, arena));
+      return raw.mln_render_session_query_feature_extensions(
         _handle.raw,
         nativeStringView(sourceId, arena).value,
         nativeBufferView(feature, arena),
         nativeStringView(extension, arena).value,
         nativeStringView(extensionField, arena).value,
         nativeArguments,
-        operation,
-      ),
-    );
-    return _takeBufferOperation(
-      operation.value,
-      raw.mln_render_query_take_result,
-    );
-  });
+        completion,
+      );
+    }),
+  );
 
-  Future<Uint8List> _takeBufferOperation(
-    int operation,
-    int Function(int, Pointer<raw.mln_buffer>) take,
-  ) => _runtime._takeOperation(operation, () {
-    return withNativeArena((arena) {
-      final result = arena<Uint64>()..value = 0;
-      _check(take(operation, result.cast<raw.mln_buffer>()));
-      return copyOwnedBuffer(NativeOwnedBufferHandle(result.value));
-    });
-  });
+  Future<Uint8List> _bufferOperation(NativeCompletionStart start) =>
+      _runtime._startValue(
+        copyKind: raw
+            .mln_adapter_completion_copy_kind
+            .MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEWS,
+        elementSize: sizeOf<raw.mln_buffer_view>(),
+        start: start,
+        decode: (result) =>
+            _copyBufferView(result.value.cast<raw.mln_buffer_view>().ref),
+      );
 
-  Future<List<QueriedFeature>> _takeQueriedFeaturesOperation(int operation) =>
-      _runtime._takeOperation(operation, () {
-        return withNativeArena((arena) {
-          final result = arena<Uint64>()..value = 0;
-          _check(raw.mln_render_query_features_take_result(operation, result));
-          return _copyQueriedFeatureList(
-            NativeQueriedFeatureList(result.value),
-          );
-        });
-      });
+  Future<List<QueriedFeature>> _queryFeatures(NativeCompletionStart start) =>
+      _runtime._startValue(
+        copyKind: raw
+            .mln_adapter_completion_copy_kind
+            .MLN_ADAPTER_COMPLETION_COPY_QUERIED_FEATURES,
+        elementSize: sizeOf<raw.mln_queried_feature>(),
+        start: start,
+        decode: (result) => [
+          for (var index = 0; index < result.value_count; index += 1)
+            _queriedFeatureFromNative(
+              result.value.cast<raw.mln_queried_feature>()[index],
+            ),
+        ],
+      );
 
   Future<void> setFeatureState(
     FeatureStateSelector selector,
     Uint8List state,
-  ) => withNativeArena((arena) {
-    final operation = arena<Uint64>()..value = 0;
-    _check(
-      raw.mln_render_session_set_feature_state_start(
+  ) => _voidOperation(
+    (completion) => withNativeArena((arena) {
+      return raw.mln_render_session_set_feature_state(
         _handle.raw,
         nativeStringView(selector.sourceId, arena).value,
         nativeStringView(selector.sourceLayerId ?? '', arena).value,
         nativeStringView(selector.featureId ?? '', arena).value,
         nativeBufferView(state, arena),
-        operation,
-      ),
-    );
-    return _runtime._finishOperation(operation.value);
-  });
+        completion,
+      );
+    }),
+  );
 
   Future<Uint8List> getFeatureState(FeatureStateSelector selector) =>
-      withNativeArena((arena) {
-        final operation = arena<Uint64>()..value = 0;
-        _check(
-          raw.mln_render_session_get_feature_state_start(
+      _bufferOperation(
+        (completion) => withNativeArena((arena) {
+          return raw.mln_render_session_get_feature_state(
             _handle.raw,
             nativeStringView(selector.sourceId, arena).value,
             nativeStringView(selector.sourceLayerId ?? '', arena).value,
             nativeStringView(selector.featureId ?? '', arena).value,
-            operation,
-          ),
-        );
-        return _takeBufferOperation(
-          operation.value,
-          raw.mln_render_session_get_feature_state_take_result,
-        );
-      });
+            completion,
+          );
+        }),
+      );
 
   Future<void> removeFeatureState(FeatureStateSelector selector) =>
-      withNativeArena((arena) {
-        final operation = arena<Uint64>()..value = 0;
-        _check(
-          raw.mln_render_session_remove_feature_state_start(
+      _voidOperation(
+        (completion) => withNativeArena((arena) {
+          return raw.mln_render_session_remove_feature_state(
             _handle.raw,
             nativeStringView(selector.sourceId, arena).value,
             nativeStringView(selector.sourceLayerId ?? '', arena).value,
             nativeStringView(selector.featureId ?? '', arena).value,
             nativeStringView(selector.stateKey ?? '', arena).value,
-            operation,
-          ),
-        );
-        return _runtime._finishOperation(operation.value);
-      });
+            completion,
+          );
+        }),
+      );
 
-  Future<TextureImage> readPremultipliedRgba8() => withNativeArena((arena) {
-    final operation = arena<Uint64>()..value = 0;
-    _check(
-      raw.mln_texture_read_premultiplied_rgba8_start(_handle.raw, operation),
-    );
-    final id = operation.value;
-    return _runtime._takeOperation(
-      id,
-      () => withNativeArena((resultArena) {
-        final data = resultArena<Uint64>()..value = 0;
-        final info = resultArena<raw.mln_texture_image_info>()
-          ..ref = raw.mln_texture_image_info_default();
-        _check(
-          raw.mln_texture_read_premultiplied_rgba8_take_result(id, data, info),
-        );
-        return TextureImage(
-          info: TextureImageInfo._fromNative(info.ref),
-          bytes: copyOwnedBuffer(NativeOwnedBufferHandle(data.value)),
-        );
-      }),
-    );
-  });
+  Future<TextureImage> readPremultipliedRgba8() => _runtime._startValue(
+    copyKind: raw
+        .mln_adapter_completion_copy_kind
+        .MLN_ADAPTER_COMPLETION_COPY_TEXTURE_READBACK,
+    elementSize: sizeOf<raw.mln_texture_readback_result>(),
+    start: (completion) =>
+        raw.mln_texture_read_premultiplied_rgba8(_handle.raw, completion),
+    decode: (result) {
+      final value = result.value.cast<raw.mln_texture_readback_result>().ref;
+      return TextureImage(
+        info: TextureImageInfo._fromNative(value.info),
+        bytes: _copyBufferView(value.data),
+      );
+    },
+  );
 
   AcquiredFrame acquireFrame() => withNativeArena((arena) {
     final out = arena<Uint64>()..value = 0;
@@ -733,9 +698,8 @@ final class RenderSessionHandle implements Finalizable {
     return AcquiredFrame._(out.value);
   });
 
-  Future<void> detach() => _voidOperation(
-    (out) => raw.mln_render_session_detach_start(_handle.raw, out),
-  );
+  Future<void> detach() =>
+      _voidOperation((out) => raw.mln_render_session_detach(_handle.raw, out));
 
   RenderAbandonResult abandon() => withNativeArena((arena) {
     final out = arena<raw.mln_render_abandon_result>()
@@ -747,21 +711,14 @@ final class RenderSessionHandle implements Finalizable {
     );
   });
 
-  Future<void> _voidOperation(
-    int Function(Pointer<Uint64> outOperation) start,
-  ) => withNativeArena((arena) {
-    final out = arena<Uint64>()..value = 0;
-    _check(start(out));
-    return _runtime._finishOperation(out.value);
-  });
+  Future<void> _voidOperation(NativeCompletionStart start) =>
+      _runtime._startUnit(start);
 
   void close() {
-    final id = _state.handleId;
     _state.close(
       (handle) => raw.mln_render_session_destroy(handle.raw),
       _c.threadLastErrorMessage,
     );
-    _runtime._renderSessions.remove(id);
     _frameResultsReady.close();
     _driverWorkReady.close();
   }
@@ -1161,7 +1118,7 @@ extension MapRenderAttachments on MapHandle {
       ..ref = _metalSurfaceDescriptorToNative(descriptor);
     return _startRenderAttachment(
       options,
-      (policy, session, operation) => raw.mln_metal_surface_attach_start(
+      (policy, session, operation) => raw.mln_metal_surface_attach(
         _handle.raw,
         native,
         policy,
@@ -1179,7 +1136,7 @@ extension MapRenderAttachments on MapHandle {
       ..ref = _vulkanSurfaceDescriptorToNative(descriptor);
     return _startRenderAttachment(
       options,
-      (policy, session, operation) => raw.mln_vulkan_surface_attach_start(
+      (policy, session, operation) => raw.mln_vulkan_surface_attach(
         _handle.raw,
         native,
         policy,
@@ -1199,7 +1156,7 @@ extension MapRenderAttachments on MapHandle {
       ..ref = _openglSurfaceDescriptorToNative(descriptor, arena);
     return _startRenderAttachment(
       options,
-      (policy, session, operation) => raw.mln_opengl_surface_attach_start(
+      (policy, session, operation) => raw.mln_opengl_surface_attach(
         _handle.raw,
         native,
         policy,
@@ -1217,7 +1174,7 @@ extension MapRenderAttachments on MapHandle {
       ..ref = _metalOwnedTextureDescriptorToNative(descriptor);
     return _startRenderAttachment(
       options,
-      (policy, session, operation) => raw.mln_metal_owned_texture_attach_start(
+      (policy, session, operation) => raw.mln_metal_owned_texture_attach(
         _handle.raw,
         native,
         policy,
@@ -1235,14 +1192,13 @@ extension MapRenderAttachments on MapHandle {
       ..ref = _metalBorrowedTextureDescriptorToNative(descriptor);
     return _startRenderAttachment(
       options,
-      (policy, session, operation) =>
-          raw.mln_metal_borrowed_texture_attach_start(
-            _handle.raw,
-            native,
-            policy,
-            session,
-            operation,
-          ),
+      (policy, session, operation) => raw.mln_metal_borrowed_texture_attach(
+        _handle.raw,
+        native,
+        policy,
+        session,
+        operation,
+      ),
     );
   });
 
@@ -1254,7 +1210,7 @@ extension MapRenderAttachments on MapHandle {
       ..ref = _vulkanOwnedTextureDescriptorToNative(descriptor);
     return _startRenderAttachment(
       options,
-      (policy, session, operation) => raw.mln_vulkan_owned_texture_attach_start(
+      (policy, session, operation) => raw.mln_vulkan_owned_texture_attach(
         _handle.raw,
         native,
         policy,
@@ -1272,14 +1228,13 @@ extension MapRenderAttachments on MapHandle {
       ..ref = _vulkanBorrowedTextureDescriptorToNative(descriptor);
     return _startRenderAttachment(
       options,
-      (policy, session, operation) =>
-          raw.mln_vulkan_borrowed_texture_attach_start(
-            _handle.raw,
-            native,
-            policy,
-            session,
-            operation,
-          ),
+      (policy, session, operation) => raw.mln_vulkan_borrowed_texture_attach(
+        _handle.raw,
+        native,
+        policy,
+        session,
+        operation,
+      ),
     );
   });
 
@@ -1293,7 +1248,7 @@ extension MapRenderAttachments on MapHandle {
       ..ref = _openglOwnedTextureDescriptorToNative(descriptor, arena);
     return _startRenderAttachment(
       options,
-      (policy, session, operation) => raw.mln_opengl_owned_texture_attach_start(
+      (policy, session, operation) => raw.mln_opengl_owned_texture_attach(
         _handle.raw,
         native,
         policy,
@@ -1313,14 +1268,13 @@ extension MapRenderAttachments on MapHandle {
       ..ref = _openglBorrowedTextureDescriptorToNative(descriptor, arena);
     return _startRenderAttachment(
       options,
-      (policy, session, operation) =>
-          raw.mln_opengl_borrowed_texture_attach_start(
-            _handle.raw,
-            native,
-            policy,
-            session,
-            operation,
-          ),
+      (policy, session, operation) => raw.mln_opengl_borrowed_texture_attach(
+        _handle.raw,
+        native,
+        policy,
+        session,
+        operation,
+      ),
     );
   });
 
@@ -1334,7 +1288,7 @@ extension MapRenderAttachments on MapHandle {
       ..ref = _webGPUSurfaceDescriptorToNative(descriptor);
     return _startRenderAttachment(
       options,
-      (policy, session, operation) => raw.mln_webgpu_surface_attach_start(
+      (policy, session, operation) => raw.mln_webgpu_surface_attach(
         _handle.raw,
         native,
         policy,
@@ -1354,7 +1308,7 @@ extension MapRenderAttachments on MapHandle {
       ..ref = _webGPUOwnedTextureDescriptorToNative(descriptor);
     return _startRenderAttachment(
       options,
-      (policy, session, operation) => raw.mln_webgpu_owned_texture_attach_start(
+      (policy, session, operation) => raw.mln_webgpu_owned_texture_attach(
         _handle.raw,
         native,
         policy,
@@ -1374,14 +1328,13 @@ extension MapRenderAttachments on MapHandle {
       ..ref = _webGPUBorrowedTextureDescriptorToNative(descriptor);
     return _startRenderAttachment(
       options,
-      (policy, session, operation) =>
-          raw.mln_webgpu_borrowed_texture_attach_start(
-            _handle.raw,
-            native,
-            policy,
-            session,
-            operation,
-          ),
+      (policy, session, operation) => raw.mln_webgpu_borrowed_texture_attach(
+        _handle.raw,
+        native,
+        policy,
+        session,
+        operation,
+      ),
     );
   });
 
@@ -1390,30 +1343,50 @@ extension MapRenderAttachments on MapHandle {
     int Function(
       Pointer<raw.mln_render_session_attach_options>,
       Pointer<Uint64>,
-      Pointer<Uint64>,
+      Pointer<raw.mln_completion>,
     )
     start,
   ) {
     ensureAbiVersion();
-    return withNativeArena((arena) {
-      final policy = arena<raw.mln_render_session_attach_options>()
-        ..ref = raw.mln_render_session_attach_options_default();
-      policy.ref.driver = options.driver.rawValue;
-      policy.ref.requested_texture_ring_depth =
-          options.requestedTextureRingDepth;
-      final session = arena<Uint64>()..value = 0;
-      final operation = arena<Uint64>()..value = 0;
-      _check(start(policy, session, operation));
-      final renderSession = RenderSessionHandle._(
-        _runtime,
-        NativeRenderSession(session.value),
-      );
-      return RenderSessionAttachment(
-        renderSession,
-        renderSession._completeWhileRetained(
-          _runtime._finishOperation(operation.value),
-        ),
-      );
+    RenderSessionHandle? renderSession;
+    final frameWake = NativeWakeState(() {
+      final target = renderSession;
+      if (target != null && !target.isClosed) target._notifyFramesReady();
     });
+    final driverWorkWake = NativeWakeState(() {
+      final target = renderSession;
+      if (target != null && !target.isClosed) target._notifyDriverWorkReady();
+    });
+    try {
+      final completed = _runtime._startUnit(
+        (completion) => withNativeArena((arena) {
+          final policy = arena<raw.mln_render_session_attach_options>()
+            ..ref = raw.mln_render_session_attach_options_default();
+          policy.ref.driver = options.driver.rawValue;
+          policy.ref.requested_texture_ring_depth =
+              options.requestedTextureRingDepth;
+          frameWake.writeTo(policy.ref.frame_wake);
+          driverWorkWake.writeTo(policy.ref.driver_work_wake);
+          final session = arena<Uint64>()..value = 0;
+          final status = start(policy, session, completion);
+          if (status == nativeStatusOk) {
+            renderSession = RenderSessionHandle._(
+              _runtime,
+              NativeRenderSession(session.value),
+            );
+          }
+          return status;
+        }),
+      );
+      final session = renderSession!;
+      return RenderSessionAttachment(
+        session,
+        session._completeWhileRetained(completed),
+      );
+    } catch (_) {
+      frameWake.reject();
+      driverWorkWake.reject();
+      rethrow;
+    }
   }
 }

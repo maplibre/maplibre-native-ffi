@@ -20,31 +20,20 @@ type MapProjectionHandle struct {
 // NewProjection creates a standalone projection helper that copies this map's
 // transform state after every earlier map command. Later map changes do not
 // update the helper.
-func (m *MapHandle) NewProjection() (*MapProjectionHandle, error) {
-	ptr, err := m.ptr()
-	if err != nil {
-		return nil, err
-	}
-
-	defer m.state.KeepAlive()
-	operation, err := waitMapOperation(func(out *C.mln_operation) int32 {
-		return int32(C.mln_map_projection_create_start(C.mln_map(ptr), out))
+func (m *MapHandle) NewProjection() (*Future[*MapProjectionHandle], error) {
+	return startMapCompletion(m, func(raw C.mln_map, completion *C.mln_completion) int32 {
+		return int32(C.mln_map_projection_create(raw, completion))
+	}, func(result *C.mln_completion_result) (*MapProjectionHandle, error) {
+		raw, err := completionValue[C.mln_map_projection](result)
+		if err != nil {
+			return nil, err
+		}
+		state, err := handle.New(nativeProjection(raw), "MapProjectionHandle")
+		if err != nil {
+			return nil, newBindingError(ErrInvalidArgument, err.Error())
+		}
+		return &MapProjectionHandle{state: state}, nil
 	})
-	if err != nil {
-		return nil, err
-	}
-	defer C.mln_operation_release(operation)
-	var raw C.mln_map_projection
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_projection_create_take_result(operation, &raw))
-	}); err != nil {
-		return nil, err
-	}
-	state, err := handle.New(nativeProjection(raw), "MapProjectionHandle")
-	if err != nil {
-		return nil, newBindingError(ErrInvalidArgument, err.Error())
-	}
-	return &MapProjectionHandle{state: state}, nil
 }
 
 func (projection *MapProjectionHandle) ptr() (nativeProjection, error) {

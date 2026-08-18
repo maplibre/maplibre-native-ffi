@@ -7,11 +7,11 @@ use maplibre_native_ffi_core::values::lat_lngs_to_native;
 use maplibre_native_ffi_sys as sys;
 
 use crate::camera::CameraOptionsNativeExt;
-use crate::handle::{ConcurrentNativeHandle, closed_handle_error, out_handle};
-use crate::runtime::wait_raw_operation_completed;
+use crate::handle::{ConcurrentNativeHandle, closed_handle_error};
 use crate::values::NativeValue;
 use crate::{
-    CameraOptions, EdgeInsets, Error, HandleOperationError, LatLng, MapHandle, Result, ScreenPoint,
+    CameraOptions, EdgeInsets, Error, HandleOperationError, LatLng, MapHandle, NativeFuture,
+    Result, ScreenPoint,
 };
 
 #[derive(Debug)]
@@ -75,28 +75,17 @@ impl fmt::Debug for MapProjectionHandle {
 }
 
 impl MapProjectionHandle {
-    pub(crate) fn new(map: &MapHandle) -> Result<Self> {
+    pub(crate) fn new(map: &MapHandle) -> Result<NativeFuture<Self>> {
         let map_ptr = map.inner.native()?;
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_map_projection_create_start(map_ptr, &mut operation)
-        })?;
-        let result = (|| {
-            wait_raw_operation_completed(operation)?;
-            let mut out = maplibre_core::ptr::OutHandle::<sys::mln_map_projection>::new();
-            maplibre_core::check(unsafe {
-                sys::mln_map_projection_create_take_result(operation, out.as_mut_ptr())
-            })?;
-            Ok(Self {
-                inner: Arc::new(MapProjectionState::new(out_handle(
-                    out,
-                    "mln_map_projection",
-                )?)?),
-            })
-        })();
-        // SAFETY: this call owns the operation observer.
-        unsafe { sys::mln_operation_release(operation) };
-        result
+        crate::completion::submit(
+            move |completion| unsafe { sys::mln_map_projection_create(map_ptr, completion) },
+            |result| {
+                let native = crate::completion::copy_value::<sys::mln_map_projection>(result)?;
+                Ok(Self {
+                    inner: Arc::new(MapProjectionState::new(native)?),
+                })
+            },
+        )
     }
 
     /// Closes the projection synchronously.
@@ -207,7 +196,10 @@ mod tests {
     // Spec coverage: BND-043 and BND-103.
     fn projection_observes_earlier_camera_commands_and_round_trips_synchronously() {
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-        let map = MapHandle::with_options(&runtime, &MapOptions::new(512, 512, 1.0)).unwrap();
+        let map = crate::completion::blocking(MapHandle::with_options(
+            &runtime,
+            &MapOptions::new(512, 512, 1.0),
+        ));
         let center = LatLng::new(37.7749, -122.4194);
         let mut camera_options = CameraOptions::default();
         camera_options.center = Some(center);
@@ -218,7 +210,7 @@ mod tests {
 
         // Creation is ordered after the accepted camera command, so the
         // projection observes it: the committed center is the viewport center.
-        let projection = map.create_projection().unwrap();
+        let projection = crate::completion::blocking(map.create_projection());
         let center_point = projection.pixel_for_lat_lng(center).unwrap();
         assert!((center_point.x - 256.0).abs() < 1e-6);
         assert!((center_point.y - 256.0).abs() < 1e-6);
@@ -236,7 +228,8 @@ mod tests {
     // attempt unsafe cleanup from an uncontrolled destructor path.
     fn projection_drops_without_explicit_close() {
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-        let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+        let map =
+            crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
 
         {
             let _projection = map.create_projection().unwrap();
@@ -250,8 +243,11 @@ mod tests {
     // Spec coverage: BND-103.
     fn projection_setters_change_later_conversions_synchronously() {
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-        let map = MapHandle::with_options(&runtime, &MapOptions::new(512, 512, 1.0)).unwrap();
-        let projection = map.create_projection().unwrap();
+        let map = crate::completion::blocking(MapHandle::with_options(
+            &runtime,
+            &MapOptions::new(512, 512, 1.0),
+        ));
+        let projection = crate::completion::blocking(map.create_projection());
 
         let center = LatLng::new(10.0, 20.0);
         let mut camera_options = CameraOptions::default();
@@ -297,8 +293,11 @@ mod tests {
     // Spec coverage: BND-049 and BND-190.
     fn projection_calls_work_from_a_second_thread_and_never_observe_later_map_changes() {
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-        let map = MapHandle::with_options(&runtime, &MapOptions::new(512, 512, 1.0)).unwrap();
-        let projection = map.create_projection().unwrap();
+        let map = crate::completion::blocking(MapHandle::with_options(
+            &runtime,
+            &MapOptions::new(512, 512, 1.0),
+        ));
+        let projection = crate::completion::blocking(map.create_projection());
         let creation_camera = projection.camera().unwrap();
 
         // A later map camera command leaves the projection's snapshot alone.
@@ -306,7 +305,7 @@ mod tests {
         update.camera.center = Some(LatLng::new(45.0, 45.0));
         update.camera.zoom = Some(9.0);
         map.update_camera(&update).unwrap();
-        let barrier = runtime.start_barrier().unwrap();
+        let barrier = runtime.barrier().unwrap();
         assert!(barrier.wait(std::time::Duration::from_secs(5)).unwrap());
         barrier.finish().unwrap();
         barrier.release();

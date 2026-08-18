@@ -9,7 +9,9 @@ const support = @import("support.zig");
 test "map debug options fence and round trip through the snapshot" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try maplibre.MapHandle.create(&runtime, .{});
+    var map_future = try maplibre.MapHandle.create(&runtime, .{});
+    defer map_future.deinit();
+    var map = try map_future.wait(null);
     defer map.close() catch @panic("map close failed");
 
     const debug = maplibre.DebugOptions{
@@ -17,8 +19,8 @@ test "map debug options fence and round trip through the snapshot" {
         .collision = true,
         .depth_buffer = true,
     };
-    const command_id = try map.setDebugOptions(debug);
-    const snapshot = try support.snapshotAfterCommand(&runtime, &map, command_id);
+    const completion = try map.setDebugOptions(debug);
+    const snapshot = try support.snapshotAfterCommand(&runtime, &map, completion);
     try testing.expect(snapshot.debug_options.tile_borders);
     try testing.expect(snapshot.debug_options.collision);
     try testing.expect(snapshot.debug_options.depth_buffer);
@@ -35,17 +37,19 @@ test "map debug options fence and round trip through the snapshot" {
 test "map viewport options update selected snapshot fields" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try maplibre.MapHandle.create(&runtime, .{});
+    var map_future = try maplibre.MapHandle.create(&runtime, .{});
+    defer map_future.deinit();
+    var map = try map_future.wait(null);
     defer map.close() catch @panic("map close failed");
 
-    const command_id = try map.setViewportOptions(.{
+    const completion = try map.setViewportOptions(.{
         .north_orientation = .right,
         .constrain_mode = .width_and_height,
         .viewport_mode = .flipped_y,
         .frustum_offset = .{ .top = 1.0, .left = 2.0, .bottom = 3.0, .right = 4.0 },
     });
 
-    var snapshot = try support.snapshotAfterCommand(&runtime, &map, command_id);
+    var snapshot = try support.snapshotAfterCommand(&runtime, &map, completion);
     try testing.expectEqual(maplibre.NorthOrientation.right, snapshot.viewport.north_orientation.?);
     try testing.expectEqual(maplibre.ConstrainMode.width_and_height, snapshot.viewport.constrain_mode.?);
     try testing.expectEqual(maplibre.ViewportMode.flipped_y, snapshot.viewport.viewport_mode.?);
@@ -63,10 +67,12 @@ test "map viewport options update selected snapshot fields" {
 test "map tile options update selected snapshot fields" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try maplibre.MapHandle.create(&runtime, .{});
+    var map_future = try maplibre.MapHandle.create(&runtime, .{});
+    defer map_future.deinit();
+    var map = try map_future.wait(null);
     defer map.close() catch @panic("map close failed");
 
-    const command_id = try map.setTileOptions(.{
+    const completion = try map.setTileOptions(.{
         .prefetch_zoom_delta = 2,
         .lod_min_radius = 1.5,
         .lod_scale = 2.5,
@@ -75,7 +81,7 @@ test "map tile options update selected snapshot fields" {
         .lod_mode = .distance,
     });
 
-    var snapshot = try support.snapshotAfterCommand(&runtime, &map, command_id);
+    var snapshot = try support.snapshotAfterCommand(&runtime, &map, completion);
     try testing.expectEqual(@as(u32, 2), snapshot.tile.prefetch_zoom_delta.?);
     try testing.expectApproxEqAbs(@as(f64, 1.5), snapshot.tile.lod_min_radius.?, 0.000001);
     try testing.expectApproxEqAbs(@as(f64, 2.5), snapshot.tile.lod_scale.?, 0.000001);
@@ -92,7 +98,9 @@ test "map tile options update selected snapshot fields" {
 test "map tuning public descriptors report invalid native arguments" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try maplibre.MapHandle.create(&runtime, .{});
+    var map_future = try maplibre.MapHandle.create(&runtime, .{});
+    defer map_future.deinit();
+    var map = try map_future.wait(null);
     defer map.close() catch @panic("map close failed");
 
     try testing.expectError(error.InvalidArgument, map.setViewportOptions(.{ .frustum_offset = .{ .top = std.math.inf(f64) } }));

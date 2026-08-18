@@ -101,12 +101,11 @@ impl RenderTarget {
                 );
                 let operation = session.set_metal_borrowed_texture_target(&descriptor)?;
                 wait_core(&operation, "Metal target replacement")?;
-                operation.release();
                 **texture = replacement;
                 Ok(())
             }
             Self::OwnedTexture { session, .. } | Self::Surface { session } => {
-                session.resize(&extent(viewport))?.release();
+                drop(session.resize(&extent(viewport))?);
                 Ok(())
             }
         }
@@ -185,28 +184,22 @@ impl RenderTarget {
 fn finish_attach(
     attachment: RenderSessionAttachment,
 ) -> maplibre_native_ffi::Result<RenderSessionHandle> {
-    if !attachment.operation.wait(Duration::from_secs(30))? {
+    if !attachment.completion.wait(Duration::from_secs(30))? {
         return Err(compositor_error("render attachment timed out"));
     }
-    if attachment.operation.terminal_status()? != 0 {
-        return Err(compositor_error(attachment.operation.diagnostic()?));
-    }
+    attachment.completion.take()?;
     let session = attachment.session;
-    attachment.operation.release();
     Ok(session)
 }
 
 fn wait_core(
-    operation: &maplibre_native_ffi::OperationHandle<()>,
+    operation: &maplibre_native_ffi::NativeFuture<()>,
     name: &str,
 ) -> maplibre_native_ffi::Result<()> {
     if !operation.wait(Duration::from_secs(30))? {
         return Err(compositor_error(format!("{name} timed out")));
     }
-    if operation.terminal_status()? != 0 {
-        return Err(compositor_error(operation.diagnostic()?));
-    }
-    Ok(())
+    operation.take()
 }
 
 fn detach_core(session: &RenderSessionHandle) -> Result<(), Box<dyn StdError>> {
@@ -214,10 +207,7 @@ fn detach_core(session: &RenderSessionHandle) -> Result<(), Box<dyn StdError>> {
     if !operation.wait(Duration::from_secs(30))? {
         return Err("render detach timed out".into());
     }
-    if operation.terminal_status()? != 0 {
-        return Err(operation.diagnostic()?.into());
-    }
-    operation.release();
+    operation.take()?;
     Ok(())
 }
 

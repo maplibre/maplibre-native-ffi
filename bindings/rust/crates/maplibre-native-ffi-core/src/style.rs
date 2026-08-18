@@ -446,6 +446,11 @@ pub struct StyleImage {
     pub image: PremultipliedRgba8Image,
     pub pixel_ratio: f32,
     pub sdf: bool,
+    pub stretch_x: Vec<ImageStretch>,
+    pub stretch_y: Vec<ImageStretch>,
+    pub content: Option<ImageContent>,
+    pub text_fit_width: Option<StyleImageTextFit>,
+    pub text_fit_height: Option<StyleImageTextFit>,
 }
 
 impl StyleImage {
@@ -454,6 +459,11 @@ impl StyleImage {
             image,
             pixel_ratio,
             sdf,
+            stretch_x: Vec::new(),
+            stretch_y: Vec::new(),
+            content: None,
+            text_fit_width: None,
+            text_fit_height: None,
         }
     }
 }

@@ -59,13 +59,23 @@ private func mapSize(_ map: NativeMapHandle) throws {
   // NativeMapHandle and NativeRuntimeHandle are distinct types, so this call
   // has no expression in the safe API and needs the raw id.
   let wrongKind = try map.requireLiveHandle().raw
-  var operation: mln_operation = 0
+  let state = NativeCompletionStateForTest()
+  var completion = state.descriptor
   do {
-    try checkStatus(mln_runtime_barrier_start(wrongKind, &operation))
+    try checkStatus(mln_runtime_barrier(wrongKind, &completion))
     Issue.record("a map id should not name a runtime")
   } catch let failure as NativeStatusFailure {
     #expect(failure.rawStatus == MLN_STATUS_INVALID_ARGUMENT.rawValue)
     #expect(failure.diagnostic.contains("map"))
     #expect(failure.diagnostic.contains("runtime"))
   }
+}
+
+private final class NativeCompletionStateForTest {
+  private(set) lazy var descriptor = mln_completion(
+    size: UInt32(MemoryLayout<mln_completion>.size),
+    callback: { _, _ in },
+    user_data: nil,
+    release_user_data: nil
+  )
 }

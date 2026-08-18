@@ -21,7 +21,7 @@ import Testing
   let map = try await MapHandle(runtime: runtime,
                                 options: MapOptions(width: 256, height: 256))
   defer { try? map.closeBlockingForTests() }
-  _ = try map.updateCamera(CameraUpdate(camera: CameraOptions(
+  _ = try await map.updateCamera(CameraUpdate(camera: CameraOptions(
     center: LatLng(latitude: 10, longitude: 20),
     zoom: 3
   )))

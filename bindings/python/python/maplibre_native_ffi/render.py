@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from concurrent.futures import Future
 from dataclasses import dataclass, field
 from enum import IntFlag
-from typing import Any, TypeVar, cast, overload
+from typing import Any, cast
 
 from . import _native
 from ._enum import UnknownIntEnum
+from ._future import map_future
 from ._lifecycle import NativeHandleMixin
 from .query import (
     FeatureStateSelector,
@@ -23,7 +25,6 @@ _METAL_FRAME_HANDLE_CREATE_KEY = object()
 _VULKAN_FRAME_HANDLE_CREATE_KEY = object()
 _OPENGL_FRAME_HANDLE_CREATE_KEY = object()
 _WEBGPU_FRAME_HANDLE_CREATE_KEY = object()
-_T = TypeVar("_T")
 
 
 def _identity(value: object) -> object:
@@ -749,34 +750,14 @@ class RenderSessionHandle(NativeHandleMixin):
         self._native.close()
         self._map = None
 
-    @overload
-    def _operation(
+    def _future(
         self,
-        start: Callable[..., int],
-        take_result: None = None,
-        adapt_result: None = None,
-        *args: object,
-    ) -> OperationHandle[None]: ...
-
-    @overload
-    def _operation(
-        self,
-        start: Callable[..., int],
-        take_result: Callable[[int], object],
-        adapt_result: Callable[[Any], _T],
-        *args: object,
-    ) -> OperationHandle[_T]: ...
-
-    def _operation(
-        self,
-        start: Callable[..., int],
-        take_result: Callable[[int], object] | None = None,
+        start: Callable[..., Future[Any]],
         adapt_result: Callable[[Any], Any] | None = None,
         *args: object,
-    ) -> OperationHandle[Any]:
-        if take_result is not None and adapt_result is None:
-            adapt_result = _identity
-        return self._runtime._operation(start, take_result, adapt_result, *args)
+    ) -> Future[Any]:
+        source = start(*args)
+        return source if adapt_result is None else map_future(source, adapt_result)
 
     @property
     def capabilities(self) -> RenderSessionCapabilities:
@@ -808,36 +789,35 @@ class RenderSessionHandle(NativeHandleMixin):
         """Service caller-driver work on this session's graphics thread."""
         return self._native.service_driver_work(max_work)
 
-    def resize(self, extent: RenderTargetExtent) -> OperationHandle[None]:
+    def resize(self, extent: RenderTargetExtent) -> Future[None]:
         """Start an ordered logical resize."""
-        return self._operation(
-            self._native.resize_start,
-            None,
+        return self._future(
+            self._native.resize,
             None,
             extent.width,
             extent.height,
             extent.scale_factor,
         )
 
-    def barrier(self) -> OperationHandle[None]:
+    def barrier(self) -> Future[None]:
         """Start a barrier for previously accepted render work."""
-        return self._operation(self._native.barrier_start)
+        return self._native.barrier()
 
-    def reduce_memory_use(self) -> OperationHandle[None]:
+    def reduce_memory_use(self) -> Future[None]:
         """Start best-effort renderer cache release."""
-        return self._operation(self._native.reduce_memory_use_start)
+        return self._native.reduce_memory_use()
 
-    def clear_data(self) -> OperationHandle[None]:
+    def clear_data(self) -> Future[None]:
         """Start clearing renderer data."""
-        return self._operation(self._native.clear_data_start)
+        return self._native.clear_data()
 
-    def dump_debug_logs(self) -> OperationHandle[None]:
+    def dump_debug_logs(self) -> Future[None]:
         """Start renderer diagnostic-log emission."""
-        return self._operation(self._native.dump_debug_logs_start)
+        return self._native.dump_debug_logs()
 
-    def detach(self) -> OperationHandle[None]:
+    def detach(self) -> Future[None]:
         """Start normal graphics-owner teardown and map detachment."""
-        return self._operation(self._native.detach_start)
+        return self._native.detach()
 
     def abandon(self) -> RenderAbandonResult:
         """Irreversibly abandon a lost target without graphics calls."""
@@ -847,14 +827,13 @@ class RenderSessionHandle(NativeHandleMixin):
 
     def _set_target(
         self,
-        start: Callable[..., int],
+        start: Callable[..., Future[None]],
         descriptor: Any,
         *args: object,
-    ) -> OperationHandle[None]:
+    ) -> Future[None]:
         extent = descriptor.extent
-        return self._operation(
+        return self._future(
             start,
-            None,
             None,
             extent.width,
             extent.height,
@@ -864,7 +843,7 @@ class RenderSessionHandle(NativeHandleMixin):
 
     def set_metal_surface_target(
         self, descriptor: MetalSurfaceDescriptor
-    ) -> OperationHandle[None]:
+    ) -> Future[None]:
         """Start an ordered Metal surface replacement."""
         return self._set_target(
             self._native.set_metal_surface_target,
@@ -875,7 +854,7 @@ class RenderSessionHandle(NativeHandleMixin):
 
     def set_vulkan_surface_target(
         self, descriptor: VulkanSurfaceDescriptor
-    ) -> OperationHandle[None]:
+    ) -> Future[None]:
         """Start an ordered Vulkan surface replacement."""
         context = descriptor.context
         return self._set_target(
@@ -893,7 +872,7 @@ class RenderSessionHandle(NativeHandleMixin):
 
     def set_webgpu_surface_target(
         self, descriptor: WebGPUSurfaceDescriptor
-    ) -> OperationHandle[None]:
+    ) -> Future[None]:
         """Start an ordered WebGPU surface replacement."""
         context = descriptor.context
         return self._set_target(
@@ -908,7 +887,7 @@ class RenderSessionHandle(NativeHandleMixin):
 
     def set_opengl_surface_target(
         self, descriptor: OpenGLSurfaceDescriptor
-    ) -> OperationHandle[None]:
+    ) -> Future[None]:
         """Start an ordered OpenGL surface replacement."""
         return self._set_target(
             self._native.set_opengl_surface_target,
@@ -919,7 +898,7 @@ class RenderSessionHandle(NativeHandleMixin):
 
     def set_metal_borrowed_texture_target(
         self, descriptor: MetalBorrowedTextureDescriptor
-    ) -> OperationHandle[None]:
+    ) -> Future[None]:
         """Start an ordered caller-owned Metal texture replacement."""
         return self._set_target(
             self._native.set_metal_borrowed_texture_target,
@@ -931,7 +910,7 @@ class RenderSessionHandle(NativeHandleMixin):
 
     def set_vulkan_borrowed_texture_target(
         self, descriptor: VulkanBorrowedTextureDescriptor
-    ) -> OperationHandle[None]:
+    ) -> Future[None]:
         """Start an ordered caller-owned Vulkan texture replacement."""
         context = descriptor.context
         return self._set_target(
@@ -955,7 +934,7 @@ class RenderSessionHandle(NativeHandleMixin):
 
     def set_webgpu_borrowed_texture_target(
         self, descriptor: WebGPUBorrowedTextureDescriptor
-    ) -> OperationHandle[None]:
+    ) -> Future[None]:
         """Start an ordered caller-owned WebGPU texture replacement."""
         context = descriptor.context
         return self._set_target(
@@ -973,7 +952,7 @@ class RenderSessionHandle(NativeHandleMixin):
 
     def set_opengl_borrowed_texture_target(
         self, descriptor: OpenGLBorrowedTextureDescriptor
-    ) -> OperationHandle[None]:
+    ) -> Future[None]:
         """Start an ordered caller-owned OpenGL texture replacement."""
         return self._set_target(
             self._native.set_opengl_borrowed_texture_target,
@@ -987,11 +966,10 @@ class RenderSessionHandle(NativeHandleMixin):
 
     def read_premultiplied_rgba8(
         self,
-    ) -> OperationHandle[PremultipliedRgba8Image]:
+    ) -> Future[PremultipliedRgba8Image]:
         """Start readback of the latest rendered texture frame."""
-        return self._operation(
-            self._native.read_premultiplied_rgba8_start,
-            self._native.read_premultiplied_rgba8_take_result,
+        return self._future(
+            self._native.read_premultiplied_rgba8,
             PremultipliedRgba8Image._from_native,
         )
 
@@ -999,13 +977,12 @@ class RenderSessionHandle(NativeHandleMixin):
         self,
         geometry: RenderedQueryGeometry,
         options: RenderedFeatureQueryOptions | None = None,
-    ) -> OperationHandle[list[QueriedFeature]]:
+    ) -> Future[list[QueriedFeature]]:
         """Start a rendered-feature query."""
         from .query import _geometry_to_native_wire
 
-        return self._operation(
-            self._native.query_rendered_features_start,
-            self._native.render_query_features_take_result,
+        return self._future(
+            self._native.query_rendered_features,
             _cast_queried_features,
             _geometry_to_native_wire(geometry),
             options.layer_ids if options is not None else None,
@@ -1016,11 +993,10 @@ class RenderSessionHandle(NativeHandleMixin):
         self,
         source_id: str,
         options: SourceFeatureQueryOptions | None = None,
-    ) -> OperationHandle[list[QueriedFeature]]:
+    ) -> Future[list[QueriedFeature]]:
         """Start a source-feature query."""
-        return self._operation(
-            self._native.query_source_features_start,
-            self._native.render_query_features_take_result,
+        return self._future(
+            self._native.query_source_features,
             _cast_queried_features,
             source_id,
             options.source_layer_ids if options is not None else None,
@@ -1034,11 +1010,10 @@ class RenderSessionHandle(NativeHandleMixin):
         extension: str,
         extension_field: str,
         arguments: bytes | None = None,
-    ) -> OperationHandle[bytes]:
+    ) -> Future[bytes]:
         """Start a feature-extension query."""
-        return self._operation(
-            self._native.query_feature_extensions_start,
-            self._native.render_query_take_result,
+        return self._future(
+            self._native.query_feature_extensions,
             _cast_bytes,
             source_id,
             feature,
@@ -1049,14 +1024,13 @@ class RenderSessionHandle(NativeHandleMixin):
 
     def set_feature_state(
         self, selector: FeatureStateSelector, state: bytes
-    ) -> OperationHandle[None]:
+    ) -> Future[None]:
         """Start setting per-feature render state."""
         if selector.state_key is not None:
             msg = "state_key is valid only when removing feature state"
             raise ValueError(msg)
-        return self._operation(
-            self._native.set_feature_state_start,
-            None,
+        return self._future(
+            self._native.set_feature_state,
             None,
             selector.source_id,
             selector.source_layer_id,
@@ -1064,29 +1038,23 @@ class RenderSessionHandle(NativeHandleMixin):
             state,
         )
 
-    def get_feature_state(
-        self, selector: FeatureStateSelector
-    ) -> OperationHandle[bytes]:
+    def get_feature_state(self, selector: FeatureStateSelector) -> Future[bytes]:
         """Start reading copied per-feature render state."""
         if selector.state_key is not None:
             msg = "state_key is valid only when removing feature state"
             raise ValueError(msg)
-        return self._operation(
-            self._native.get_feature_state_start,
-            self._native.get_feature_state_take_result,
+        return self._future(
+            self._native.get_feature_state,
             _cast_bytes,
             selector.source_id,
             selector.source_layer_id,
             selector.feature_id,
         )
 
-    def remove_feature_state(
-        self, selector: FeatureStateSelector
-    ) -> OperationHandle[None]:
+    def remove_feature_state(self, selector: FeatureStateSelector) -> Future[None]:
         """Start removing selected per-feature render state."""
-        return self._operation(
-            self._native.remove_feature_state_start,
-            None,
+        return self._future(
+            self._native.remove_feature_state,
             None,
             selector.source_id,
             selector.source_layer_id,
@@ -1345,8 +1313,6 @@ def _opengl_context_parts(
     msg = f"unsupported OpenGL context descriptor: {type(context)!r}"
     raise TypeError(msg)
 
-
-from .offline import OperationHandle
 
 __all__ = [
     "EglContextDescriptor",

@@ -11,15 +11,8 @@ import (
 func waitForRuntimeBarrier(t *testing.T, runtime *RuntimeHandle) {
 	t.Helper()
 	operation, err := runtime.Barrier()
-	if err != nil {
-		t.Fatalf("Barrier(): %v", err)
-	}
-	defer operation.Release()
-	if completed, err := operation.Wait(-1); err != nil || !completed {
-		t.Fatalf("Barrier Wait() = %v, %v; want true, nil", completed, err)
-	}
-	if err := operation.Finish(); err != nil {
-		t.Fatalf("Barrier Finish(): %v", err)
+	if _, err := awaitForTest(operation, err); err != nil {
+		t.Fatalf("Barrier completion: %v", err)
 	}
 }
 
@@ -107,9 +100,9 @@ func newRuntimeAndMap(t *testing.T, options *MapOptions) (*RuntimeHandle, *MapHa
 	}
 	var m *MapHandle
 	if options == nil {
-		m, err = runtime.NewMap()
+		m, err = awaitForTest(runtime.NewMap())
 	} else {
-		m, err = runtime.NewMapWithOptions(*options)
+		m, err = awaitForTest(runtime.NewMapWithOptions(*options))
 	}
 	if err != nil {
 		_ = runtime.Close()
@@ -262,10 +255,7 @@ func TestOptionsEventMaskRejectsUnknownBits(t *testing.T) {
 	runtime, _ := newRuntimeAndMap(t, nil)
 	mapOptions := NewMapOptions(64, 64, 1)
 	mapOptions.EventMask = RuntimeEventMaskAll | RuntimeEventMask(1)<<63
-	if m, err := runtime.NewMapWithOptions(mapOptions); !errors.Is(err, ErrInvalidArgument) {
-		if err == nil {
-			_ = m.Close()
-		}
+	if _, err := runtime.NewMapWithOptions(mapOptions); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("NewMapWithOptions(unknown bit) error = %v, want ErrInvalidArgument", err)
 	}
 }
@@ -435,20 +425,14 @@ func TestRuntimeEventKnownPayloadsDecodeFromTheUnion(t *testing.T) {
 			withOfflineRegionResponseError(RuntimeEventOfflineRegionResponseErrorPayload{RegionID: 5, RawReason: uint32(ResourceErrorReasonConnection)}),
 		newRuntimeEventForTest(RuntimeEventOfflineRegionTileCountLimitExceeded, RuntimeEventSourceRuntime, 0, 0).
 			withOfflineRegionTileCountLimit(RuntimeEventOfflineRegionTileCountLimitPayload{RegionID: 5, Limit: 6000}),
-		newRuntimeEventForTest(RuntimeEventCommandFinished, RuntimeEventSourceRuntime, 0, -5).
-			withCommandFinished(RuntimeEventCommandFinishedPayload{
-				CommandID:      42,
-				RawDisposition: uint32(CommandDispositionFailed),
-				Generation:     17,
-			}),
 		newRuntimeEventForTest(RuntimeEventMapStyleImageMissing, RuntimeEventSourceMap, 0, 0).
 			withMessage("marker-1"),
 	})
 	defer batch.free()
 
 	decoded := runtime.decodeForTest(batch)
-	if len(decoded.Events) != 7 {
-		t.Fatalf("decoded %d events, want 7", len(decoded.Events))
+	if len(decoded.Events) != 6 {
+		t.Fatalf("decoded %d events, want 6", len(decoded.Events))
 	}
 	renderMap, ok := decoded.Events[0].Payload.(RuntimeEventRenderMapPayload)
 	if !ok || renderMap.Mode != RenderModePartial {
@@ -473,16 +457,9 @@ func TestRuntimeEventKnownPayloadsDecodeFromTheUnion(t *testing.T) {
 	if !ok || tileLimit.Limit != 6000 {
 		t.Fatalf("tile count limit payload = %+v", decoded.Events[4].Payload)
 	}
-	command, ok := decoded.Events[5].Payload.(RuntimeEventCommandFinishedPayload)
-	if !ok || command.CommandID != 42 || command.Disposition != CommandDispositionFailed || command.Generation != 17 {
-		t.Fatalf("command-finished payload = %+v", decoded.Events[5].Payload)
-	}
-	if !errors.Is(command.Err, ErrNative) {
-		t.Fatalf("command-finished Err = %v, want ErrNative", command.Err)
-	}
 	// A style-image-missing event carries the image ID as its message, and its
 	// payload type of none carries no payload value at all.
-	missing := decoded.Events[6]
+	missing := decoded.Events[5]
 	if missing.Payload != nil || missing.PayloadType != RuntimeEventPayloadNone || missing.Message != "marker-1" {
 		t.Fatalf("style-image-missing event = %+v", missing)
 	}

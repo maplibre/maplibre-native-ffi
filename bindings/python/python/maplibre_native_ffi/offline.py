@@ -2,26 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator
-from contextlib import contextmanager, suppress
 from dataclasses import dataclass
-from threading import Condition, RLock
-from typing import Generic, TypeVar
 
 from ._enum import NativeIntEnum, UnknownIntEnum
-from ._lifecycle import ContextHandleMixin, WarnUnclosedMixin
-from .errors import (
-    InvalidStateError,
-    MaplibreStatus,
-    _from_native_status,
-    _OperationResultConsumedError,
-)
 from .geo import LatLngBounds
 from .resource import ResourceErrorReason
-
-_T = TypeVar("_T")
-
-_OPERATION_HANDLE_CREATE_KEY = object()
 
 
 class AmbientCacheOperation(NativeIntEnum):
@@ -49,204 +34,6 @@ class OfflineRegionDownloadState(UnknownIntEnum):
     def native_code_for_set(self) -> int:
         """Return the C enum value for setter calls, rejecting unknown values."""
         return self.known_native_code("offline region download state")
-
-
-class OperationHandle(
-    WarnUnclosedMixin,
-    ContextHandleMixin,
-    Generic[_T],  # noqa: UP046
-):
-    _handle_name = "OperationHandle"
-
-    def __init__(
-        self,
-        runtime: RuntimeHandle,
-        operation: int,
-        take_result: Callable[[int], object] | None,
-        adapt_result: Callable[[object], _T] | None,
-        retained_owner: object | None = None,
-        _create_key: object | None = None,
-    ) -> None:
-        if _create_key is not _OPERATION_HANDLE_CREATE_KEY:
-            msg = "OperationHandle instances are created by RuntimeHandle"
-            raise TypeError(msg)
-        self._runtime = runtime
-        self._operation = operation
-        self._take_result = take_result
-        self._adapt_result = adapt_result
-        self._retained_owner = retained_owner
-        self._state_lock = RLock()
-        self._idle = Condition(self._state_lock)
-        self._active_uses = 0
-        self._closing = False
-        self._closed = False
-        self._result_consumed = False
-        self._result_in_use = False
-
-    @staticmethod
-    def _from_native[U](
-        runtime: RuntimeHandle,
-        operation: int,
-        take_result: Callable[[int], object] | None = None,
-        adapt_result: Callable[[object], U] | None = None,
-        retained_owner: object | None = None,
-    ) -> OperationHandle[U]:
-        return OperationHandle(
-            runtime,
-            operation,
-            take_result,
-            adapt_result,
-            retained_owner,
-            _create_key=_OPERATION_HANDLE_CREATE_KEY,
-        )
-
-    @property
-    def closed(self) -> bool:
-        """Return whether this operation observer has been released."""
-        with self._state_lock:
-            return self._closed
-
-    @contextmanager
-    def _use(self, *, allow_while_closing: bool = False) -> Iterator[int]:
-        with self._state_lock:
-            if self._closed or (self._closing and not allow_while_closing):
-                from .errors import InvalidStateError
-
-                raise InvalidStateError(None, "operation handle is already closed")
-            self._active_uses += 1
-            operation = self._operation
-        try:
-            yield operation
-        finally:
-            with self._state_lock:
-                self._active_uses -= 1
-                if self._active_uses == 0:
-                    self._idle.notify_all()
-
-    def close(self) -> None:
-        """Release the public observer after in-flight calls return."""
-        with self._state_lock:
-            if self._closed:
-                return
-            if self._closing:
-                while not self._closed:
-                    self._idle.wait()
-                return
-            self._closing = True
-            while self._active_uses:
-                self._idle.wait()
-            self._runtime._native.operation_release(self._operation)
-            self._closed = True
-            self._closing = False
-            self._idle.notify_all()
-        self._retained_owner = None
-
-    def __del__(self) -> None:
-        super().__del__()
-        with suppress(BaseException):
-            self.close()
-
-    def poll(self) -> bool:
-        """Return whether this operation has completed."""
-        with self._use() as operation:
-            return self._runtime._native.operation_poll(operation)
-
-    def wait(self, timeout_ms: int = -1) -> bool:
-        """Wait for completion, or until the timeout expires."""
-        with self._use() as operation:
-            return self._runtime._native.operation_wait(operation, timeout_ms)
-
-    def cancel(self) -> None:
-        """Request cancellation of this operation."""
-        with self._use(allow_while_closing=True) as operation:
-            self._runtime._native.operation_cancel(operation)
-
-    def _status_and_diagnostic(self) -> tuple[int, str]:
-        with self._use() as operation:
-            return self._runtime._native.operation_status(operation)
-
-    @property
-    def status(self) -> MaplibreStatus:
-        """Return the terminal status category."""
-        raw_status, _ = self._status_and_diagnostic()
-        return MaplibreStatus._from_native(raw_status)
-
-    @property
-    def diagnostic(self) -> str:
-        """Return a copy of the terminal diagnostic."""
-        _, diagnostic = self._status_and_diagnostic()
-        return diagnostic
-
-    def raise_for_status(self) -> None:
-        """Raise the terminal operation error, if any."""
-        raw_status, diagnostic = self._status_and_diagnostic()
-        if raw_status != MaplibreStatus.OK.native_code:
-            raise _from_native_status(raw_status, diagnostic)
-
-    def finish(self) -> None:
-        """Finish the operation without taking its typed result."""
-        with self._use() as operation:
-            with self._state_lock:
-                if self._result_consumed or self._result_in_use:
-                    from .errors import InvalidStateError
-
-                    raise InvalidStateError(
-                        None, "operation result is already consumed"
-                    )
-                self._result_in_use = True
-            try:
-                self._runtime._native.operation_finish(operation)
-            except BaseException:
-                with self._state_lock:
-                    self._result_in_use = False
-                raise
-            with self._state_lock:
-                self._result_in_use = False
-                self._result_consumed = True
-        self._retire_consumed()
-
-    def take(self) -> _T:
-        """Take this operation's typed result and consume the operation."""
-        consumed = False
-        try:
-            with self._use() as operation:
-                with self._state_lock:
-                    if self._result_consumed or self._result_in_use:
-                        raise InvalidStateError(
-                            None, "operation result is already consumed"
-                        )
-                    take_result = self._take_result
-                    adapt_result = self._adapt_result
-                    if take_result is None or adapt_result is None:
-                        raise InvalidStateError(None, "operation has no typed result")
-                    self._result_in_use = True
-                try:
-                    self.raise_for_status()
-                    raw = take_result(operation)
-                    consumed = True
-                except _OperationResultConsumedError:
-                    consumed = True
-                    raise
-                finally:
-                    with self._state_lock:
-                        self._result_in_use = False
-                        self._result_consumed = consumed
-            return adapt_result(raw)
-        finally:
-            if consumed:
-                self._retire_consumed()
-
-    def _retire_consumed(self) -> None:
-        with self._state_lock:
-            if self._closed:
-                return
-            self._closing = True
-            while self._active_uses:
-                self._idle.wait()
-            self._closed = True
-            self._closing = False
-            self._idle.notify_all()
-        self._retained_owner = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -459,7 +246,4 @@ __all__ = [
     "OfflineRegionStatusChanged",
     "OfflineRegionTileCountLimitExceeded",
     "OfflineTilePyramidRegionDefinition",
-    "OperationHandle",
 ]
-
-from .runtime import RuntimeHandle

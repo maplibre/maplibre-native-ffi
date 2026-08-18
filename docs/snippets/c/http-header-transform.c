@@ -29,13 +29,14 @@ static mln_status add_authorization(
 }
 
 // #region install
-void install_header_transform(mln_runtime runtime, char* token) {
+mln_status install_header_transform(
+  mln_runtime runtime, char* token, const mln_completion* completion
+) {
   mln_http_header_transform transform = {
     .size = sizeof(transform),
     .callback = add_authorization,
     .user_data = token,
   };
-  uint64_t command_id = 0;
-  mln_runtime_set_http_header_transform(runtime, &transform, &command_id);
+  return mln_runtime_set_http_header_transform(runtime, &transform, completion);
 }
 // #endregion install

@@ -114,10 +114,7 @@ internal object OpenGLRenderTarget {
 
   private class Surface(private val session: RenderSessionHandle) : RenderTarget {
     override fun resize(viewport: Viewport) {
-      RenderTarget.completeDriverOperation(
-        session,
-        session.startResize(RenderTarget.extent(viewport)),
-      )
+      RenderTarget.completeDriverOperation(session, session.resize(RenderTarget.extent(viewport)))
     }
 
     override fun renderUpdate(): Boolean =
@@ -134,10 +131,7 @@ internal object OpenGLRenderTarget {
   ) : RenderTarget {
     override fun resize(viewport: Viewport) {
       compositor.resize(viewport)
-      RenderTarget.completeDriverOperation(
-        session,
-        session.startResize(RenderTarget.extent(viewport)),
-      )
+      RenderTarget.completeDriverOperation(session, session.resize(RenderTarget.extent(viewport)))
     }
 
     override fun renderUpdate(): Boolean {
@@ -154,7 +148,7 @@ internal object OpenGLRenderTarget {
         }
         compositor.drawTexture(frame.texture())
       } finally {
-        RenderTarget.completeDriverOperation(session, frameHandle.release())
+        frameHandle.release()
       }
       return true
     }
@@ -181,9 +175,7 @@ internal object OpenGLRenderTarget {
       try {
         RenderTarget.completeDriverOperation(
           session,
-          session.startSetOpenGLBorrowedTextureTarget(
-            borrowedDescriptor(context, viewport, replacement)
-          ),
+          session.setOpenGLBorrowedTextureTarget(borrowedDescriptor(context, viewport, replacement)),
         )
       } catch (error: RuntimeException) {
         // A failed handover leaves it unknown which target the session holds, so detach before

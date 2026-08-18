@@ -10,6 +10,7 @@
 #include <stdint.h>
 
 #include "base.h"
+#include "completion.h"
 #include "render_target.h"
 
 #ifdef __cplusplus
@@ -299,6 +300,15 @@ typedef struct mln_texture_image_info {
   size_t byte_length;
 } mln_texture_image_info;
 
+/** Texture readback borrowed for a completion callback. */
+typedef struct mln_texture_readback_result {
+  uint32_t size;
+  uint32_t reserved;
+  /** Borrowed pixel bytes, valid only during the callback. */
+  mln_buffer_view data;
+  mln_texture_image_info info;
+} mln_texture_readback_result;
+
 /**
  * Returns Metal owned-texture descriptor defaults for this C API version.
  */
@@ -359,31 +369,31 @@ mln_texture_image_info_default(void) MLN_NOEXCEPT;
  * The common options select driver placement and requested ring depth. The
  * descriptor and options are copied before return.
  */
-MLN_API mln_status mln_metal_owned_texture_attach_start(
+MLN_API mln_status mln_metal_owned_texture_attach(
   mln_map map, const mln_metal_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /** Starts attachment of a caller-owned Metal texture target. */
-MLN_API mln_status mln_metal_borrowed_texture_attach_start(
+MLN_API mln_status mln_metal_borrowed_texture_attach(
   mln_map map, const mln_metal_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /** Starts attachment of a session-owned Vulkan texture ring. */
-MLN_API mln_status mln_vulkan_owned_texture_attach_start(
+MLN_API mln_status mln_vulkan_owned_texture_attach(
   mln_map map, const mln_vulkan_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /** Starts attachment of a caller-owned Vulkan texture target. */
-MLN_API mln_status mln_vulkan_borrowed_texture_attach_start(
+MLN_API mln_status mln_vulkan_borrowed_texture_attach(
   mln_map map, const mln_vulkan_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -398,17 +408,17 @@ MLN_API mln_status mln_vulkan_borrowed_texture_attach_start(
  * detach. In particular, it keeps an EGLDisplay initialized while its session
  * is live.
  */
-MLN_API mln_status mln_opengl_owned_texture_attach_start(
+MLN_API mln_status mln_opengl_owned_texture_attach(
   mln_map map, const mln_opengl_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /** Starts attachment of a caller-owned OpenGL texture target. */
-MLN_API mln_status mln_opengl_borrowed_texture_attach_start(
+MLN_API mln_status mln_opengl_borrowed_texture_attach(
   mln_map map, const mln_opengl_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -416,56 +426,50 @@ MLN_API mln_status mln_opengl_borrowed_texture_attach_start(
  *
  * Browser targets require MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD.
  */
-MLN_API mln_status mln_webgpu_owned_texture_attach_start(
+MLN_API mln_status mln_webgpu_owned_texture_attach(
   mln_map map, const mln_webgpu_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /** Starts attachment of a caller-owned WebGPU texture target. */
-MLN_API mln_status mln_webgpu_borrowed_texture_attach_start(
+MLN_API mln_status mln_webgpu_borrowed_texture_attach(
   mln_map map, const mln_webgpu_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /** Starts an ordered caller-owned Metal texture replacement. */
-MLN_API mln_status mln_metal_borrowed_texture_set_target_start(
+MLN_API mln_status mln_metal_borrowed_texture_set_target(
   mln_render_session session,
   const mln_metal_borrowed_texture_descriptor* descriptor,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /** Starts an ordered caller-owned Vulkan texture replacement. */
-MLN_API mln_status mln_vulkan_borrowed_texture_set_target_start(
+MLN_API mln_status mln_vulkan_borrowed_texture_set_target(
   mln_render_session session,
   const mln_vulkan_borrowed_texture_descriptor* descriptor,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /** Starts an ordered caller-owned OpenGL texture replacement. */
-MLN_API mln_status mln_opengl_borrowed_texture_set_target_start(
+MLN_API mln_status mln_opengl_borrowed_texture_set_target(
   mln_render_session session,
   const mln_opengl_borrowed_texture_descriptor* descriptor,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /** Starts an ordered caller-owned WebGPU texture replacement. */
-MLN_API mln_status mln_webgpu_borrowed_texture_set_target_start(
+MLN_API mln_status mln_webgpu_borrowed_texture_set_target(
   mln_render_session session,
   const mln_webgpu_borrowed_texture_descriptor* descriptor,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /** Starts readback of the latest rendered texture frame. */
-MLN_API mln_status mln_texture_read_premultiplied_rgba8_start(
-  mln_render_session session, mln_operation* out_operation
-) MLN_NOEXCEPT;
-
-/** Takes owned readback bytes and their image layout. */
-MLN_API mln_status mln_texture_read_premultiplied_rgba8_take_result(
-  mln_operation operation, mln_buffer* out_data,
-  mln_texture_image_info* out_info
+MLN_API mln_status mln_texture_read_premultiplied_rgba8(
+  mln_render_session session, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /** Copies Metal-native metadata from an acquired frame. */

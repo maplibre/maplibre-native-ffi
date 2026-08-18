@@ -80,9 +80,8 @@ public struct MapLogicalExtent: Equatable, Sendable {
 
 /// The latest immutable map state, published by every committed map command.
 ///
-/// A command's finished event reports the generation its commit published, so
-/// a snapshot whose ``generation`` is at or past that value observes the
-/// commit.
+/// A command completion reports the generation its commit published, so a
+/// snapshot whose ``generation`` is at or past that value observes the commit.
 public struct MapSnapshot: Equatable, Sendable {
   public let generation: UInt64
   /// Debug overlays currently drawn over the map.
@@ -136,21 +135,15 @@ public final class MapHandle: @unchecked Sendable {
   private let mapId: MapId
 
   public init(runtime: RuntimeHandle, options: MapOptions) async throws {
-    let operation = try mapNativeFailure {
+    let future = try mapNativeFailure {
       try options.nativeInput.withNativeOptions { nativeOptions in
-        try NativeMap.createStart(
+        try NativeMap.create(
           runtime: runtime.requireLiveHandle(),
           options: nativeOptions
         )
       }
     }
-    defer { mln_operation_release(operation.raw) }
-    try await mapNativeFailure {
-      try await runtime.waitForOperation(operation)
-    }
-    let native = try mapNativeFailure {
-      try NativeMap.createTakeResult(operation)
-    }
+    let native = try await mapNativeFailure { try await future.value() }
     self.runtime = runtime
     mapId = MapId(value: native.raw)
     handle = try NativeHandleBox(typeName: "MapHandle", handle: native)
@@ -175,12 +168,18 @@ public final class MapHandle: @unchecked Sendable {
     runtime
   }
 
+  func startCommand(
+    _ submit: (mln_map, UnsafePointer<mln_completion>) -> mln_status
+  ) throws -> NativeFuture<CommandCompletion> {
+    let map = try requireLiveHandle()
+    return try NativeCompletion.startCommand { submit(map.raw, $0) }
+  }
+
   func submitCommand(
-    _ submit: (NativeMapHandle, UnsafeMutablePointer<UInt64>) throws -> Void
-  ) throws -> UInt64 {
-    try NativeMemory.withTemporary(UInt64(0)) { commandId in
-      try submit(requireLiveHandle(), commandId)
-    }.value
+    _ submit: (mln_map, UnsafePointer<mln_completion>) -> mln_status
+  ) async throws -> CommandCompletion {
+    let future = try mapNativeFailure { try startCommand(submit) }
+    return try await mapNativeFailure { try await future.value() }
   }
 
   /// Selects which map-originated event types this map queues.
@@ -195,10 +194,10 @@ public final class MapHandle: @unchecked Sendable {
   /// that a still-image request finished, and map-loading-failed and
   /// map-render-error carry native failure text.
   @discardableResult
-  public func setEventMask(_ mask: RuntimeEventMask) throws -> UInt64 {
-    try mapNativeFailure {
-      try NativeMap.setEventMask(handle.requireLive(), mask: mask.rawValue)
-    }
+  public func setEventMask(
+    _ mask: RuntimeEventMask
+  ) async throws -> CommandCompletion {
+    try await submitCommand { mln_map_set_event_mask($0, mask.rawValue, $1) }
   }
 
   /// The mask in the latest immutable map snapshot.
@@ -226,18 +225,13 @@ public final class MapHandle: @unchecked Sendable {
   /// event. A style MapLibre rejects semantically, such as one with an unknown
   /// `version`, produces neither an error nor an event.
   @discardableResult
-  public func setStyleURL(_ url: String) throws -> UInt64 {
-    try mapNativeFailure {
+  public func setStyleURL(_ url: String) async throws -> CommandCompletion {
+    let future = try mapNativeFailure {
       try NativeString.withCString(url) { url in
-        try NativeMemory.withTemporary(UInt64(0)) { commandId in
-          try checkStatus(mln_map_set_style_url(
-            handle.requireLive().raw,
-            url,
-            commandId
-          ))
-        }.value
+        try startCommand { mln_map_set_style_url($0, url, $1) }
       }
     }
+    return try await mapNativeFailure { try await future.value() }
   }
 
   /// Loads inline style JSON.
@@ -247,18 +241,15 @@ public final class MapHandle: @unchecked Sendable {
   /// MapLibre rejects semantically, such as one with an unknown `version`,
   /// produces neither an error nor an event.
   @discardableResult
-  public func setStyleJSON(_ json: Data) throws -> UInt64 {
-    try mapNativeFailure {
+  public func setStyleJSON(_ json: Data) async throws -> CommandCompletion {
+    let future = try mapNativeFailure {
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      return try NativeMemory.withTemporary(UInt64(0)) { commandId in
-        try checkStatus(mln_map_set_style_json(
-          handle.requireLive().raw,
-          arena.view(json),
-          commandId
-        ))
-      }.value
+      return try startCommand {
+        mln_map_set_style_json($0, arena.view(json), $1)
+      }
     }
+    return try await mapNativeFailure { try await future.value() }
   }
 
   /// Copies the style document this map's style was last parsed from, byte for
@@ -266,61 +257,39 @@ public final class MapHandle: @unchecked Sendable {
   /// not change it, and a failed parse leaves the previous document in place.
   /// The result is empty when no document has been parsed.
   public func loadedStyleJSON() async throws -> Data {
-    let operation = try mapNativeFailure {
-      try NativeStyle.mapReadStart(
-        handle.requireLive(),
-        start: mln_map_loaded_style_json_start
+    let map = try requireLiveHandle()
+    let future = try mapNativeFailure {
+      try NativeCompletion.start(
+        { mln_map_loaded_style_json(map.raw, $0) },
+        convert: NativeCompletion.data
       )
     }
-    defer { mln_operation_release(operation.raw) }
-    try await runtime.waitForOperation(operation)
-    return try mapNativeFailure {
-      try NativeStyle.mapDataTakeResult(
-        operation,
-        take: mln_map_loaded_style_json_take_result
-      )
-    }
+    return try await mapNativeFailure { try await future.value() }
   }
 
   public func styleURL() async throws -> String {
-    let operation = try mapNativeFailure {
-      try NativeStyle.mapReadStart(
-        handle.requireLive(),
-        start: mln_map_style_url_start
+    let map = try requireLiveHandle()
+    let future = try mapNativeFailure {
+      try NativeCompletion.start(
+        { mln_map_style_url(map.raw, $0) },
+        convert: NativeCompletion.string
       )
     }
-    defer { mln_operation_release(operation.raw) }
-    try await runtime.waitForOperation(operation)
-    return try mapNativeFailure {
-      try NativeStyle.mapTextTakeResult(
-        operation,
-        take: mln_map_style_url_take_result
-      )
-    }
+    return try await mapNativeFailure { try await future.value() }
   }
 
-  /// Requests a repaint and returns its runtime-wide command ID.
+  /// Requests a repaint.
   @discardableResult
-  public func requestRepaint() throws -> UInt64 {
-    try mapNativeFailure {
-      try NativeMemory.withTemporary(UInt64(0)) { commandId in
-        try checkStatus(mln_map_request_repaint(
-          handle.requireLive().raw,
-          commandId
-        ))
-      }.value
-    }
+  public func requestRepaint() async throws -> CommandCompletion {
+    try await submitCommand(mln_map_request_repaint)
   }
 
   /// Requests and awaits one noncoalescing still-image operation.
   public func requestStillImage() async throws {
-    let operation = try mapNativeFailure {
-      try NativeMap.requestStillImageStart(handle.requireLive())
+    let future = try mapNativeFailure {
+      try NativeMap.requestStillImage(handle.requireLive())
     }
-    defer { mln_operation_release(operation.raw) }
-    try await mapNativeFailure {
-      try await runtime.waitForOperation(operation)
-    }
+    try await mapNativeFailure { try await future.value() }
   }
 
   /// Copies the latest immutable map state.
@@ -345,65 +314,43 @@ public final class MapHandle: @unchecked Sendable {
 
   /// Reads the camera after every command accepted before this call.
   public func queryCamera() async throws -> CameraSnapshot {
-    let operation = try mapNativeFailure {
-      try NativeMap.cameraQueryStart(handle.requireLive())
+    let future = try mapNativeFailure {
+      try NativeMap.cameraQuery(handle.requireLive())
     }
-    defer { mln_operation_release(operation.raw) }
-    try await mapNativeFailure {
-      try await runtime.waitForOperation(operation)
-    }
-    return try mapNativeFailure {
-      let result = try NativeMap.cameraQueryTakeResult(operation)
-      return CameraSnapshot(
-        generation: result.generation,
-        camera: CameraOptions(native: NativeCameraOptionsInput(result.camera))
-      )
-    }
+    return try await mapNativeFailure { try await future.value() }
   }
 
-  /// Submits one atomic camera command and returns its runtime-wide command ID.
+  /// Submits one atomic camera command.
   @discardableResult
-  public func updateCamera(_ update: CameraUpdate) throws -> UInt64 {
-    try mapNativeFailure {
+  public func updateCamera(
+    _ update: CameraUpdate
+  ) async throws -> CommandCompletion {
+    let future = try mapNativeFailure {
       try update.withNativeUpdate { update in
-        try NativeMemory.withTemporary(UInt64(0)) { commandId in
-          try checkStatus(mln_map_update_camera(
-            handle.requireLive().raw,
-            update,
-            commandId
-          ))
-        }.value
+        try startCommand { mln_map_update_camera($0, update, $1) }
       }
     }
+    return try await mapNativeFailure { try await future.value() }
   }
 
   /// Submits one relative camera operation.
   @discardableResult
-  public func applyCameraDelta(_ delta: CameraDelta) throws -> UInt64 {
-    try mapNativeFailure {
+  public func applyCameraDelta(
+    _ delta: CameraDelta
+  ) async throws -> CommandCompletion {
+    let future = try mapNativeFailure {
       try delta.withNativeDelta { delta in
-        try submitCommand { map, commandId in
-          try checkStatus(mln_map_apply_camera_delta(
-            map.raw,
-            delta,
-            commandId
-          ))
-        }
+        try startCommand { mln_map_apply_camera_delta($0, delta, $1) }
       }
     }
+    return try await mapNativeFailure { try await future.value() }
   }
 
-  /// Resizes the logical map viewport and returns its command ID.
+  /// Resizes the logical map viewport.
   @discardableResult
-  public func resize(to extent: MapLogicalExtent) throws -> UInt64 {
-    try mapNativeFailure {
-      try NativeMemory.withTemporary(UInt64(0)) { commandId in
-        try checkStatus(mln_map_resize(
-          handle.requireLive().raw,
-          extent.native,
-          commandId
-        ))
-      }.value
-    }
+  public func resize(
+    to extent: MapLogicalExtent
+  ) async throws -> CommandCompletion {
+    try await submitCommand { mln_map_resize($0, extent.native, $1) }
   }
 }

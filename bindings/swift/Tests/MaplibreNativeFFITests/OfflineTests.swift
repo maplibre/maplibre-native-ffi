@@ -115,64 +115,22 @@ import Testing
   }
 }
 
-@Test func setMaximumAmbientCacheSizeReportsCompletion() throws {
+@Test func setMaximumAmbientCacheSizeReportsCompletion() async throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.closeBlockingForTests() }
 
-  let operation = try runtime.setMaximumAmbientCacheSizeStart(8 << 20)
-  #expect(!operation.isClosed)
-  #expect(try operation.wait(timeoutMilliseconds: 10000))
-  #expect(try operation.poll())
-  #expect(try operation.status() == MLN_STATUS_OK.rawValue)
-  #expect(try operation.diagnostic().isEmpty)
-  try operation.finish()
-  #expect(operation.isClosed)
-}
-
-@Test func operationObserverRemainsUsableAfterRuntimeClose() throws {
-  let runtime =
-    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
-  let operation = try runtime.setMaximumAmbientCacheSizeStart(8 << 20)
-
-  try runtime.close()
-  #expect(runtime.isClosed)
-
-  _ = try operation.wait(timeoutMilliseconds: 10000)
-  if try operation.poll() {
-    try operation.finish()
-  }
-  try operation.close()
-}
-
-@Test func typedTakeConsumesOperation() throws {
-  let runtime =
-    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
-  defer { try? runtime.closeBlockingForTests() }
-  let operation = try runtime.offlineRegionsListStart()
-
-  #expect(try operation.wait(timeoutMilliseconds: 10000))
-  #expect(try operation.status() == MLN_STATUS_OK.rawValue)
-  #expect(try runtime.offlineRegionsListTakeResult(operation: operation)
-    .isEmpty)
-  #expect(operation.isClosed)
-
-  do {
-    _ = try runtime.offlineRegionsListTakeResult(operation: operation)
-    Issue.record("a typed result should be consumed once")
-  } catch let error as MaplibreError {
-    #expect(error.kind == .invalidState)
-  }
+  try await runtime.setMaximumAmbientCacheSize(8 << 20)
 }
 
 @Test func closedRuntimeRejectsOfflineCallsThroughSwiftHandleState(
-) throws {
+) async throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   try runtime.close()
 
   do {
-    _ = try runtime.offlineRegionsListStart()
+    _ = try await runtime.offlineRegions()
     Issue.record("closed runtime should throw")
   } catch let error as MaplibreError {
     #expect(error.kind == .invalidState)

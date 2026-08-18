@@ -18,12 +18,12 @@ native teardown finishes after runtime release.
 
 Any host thread can submit runtime and map work. Submissions wake the native run
 loop, so progress never depends on a display callback or a host pump. One
-runtime may own multiple maps; their commands, operations, barriers, and release
+runtime may own multiple maps; their commands, queries, barriers, and release
 work share one ordered submission stream.
 
 Use a runtime barrier when later work must wait for every preceding submission
-to reach a terminal disposition. Use the runtime's receiver-scoped notification
-source to wait for events and operation completions without polling.
+to reach a terminal disposition. The runtime's direct event wake callback tells
+the host when its event queue is ready to drain.
 
 ## Map
 
@@ -39,15 +39,15 @@ cover behavior beyond construction, such as source-type validation and per-frame
 property updates.
 
 Map mutations are commands. A command copies its input before returning
-acceptance, receives an ID, and later reports a terminal disposition through the
-runtime event queue. Ordered queries and lifecycle transitions are operations.
-Bindings expose those operations through their normal future, task, suspension,
-or explicit-wait idiom.
+acceptance and later invokes one completion with its terminal disposition.
+Ordered queries and lifecycle transitions use typed completions. Bindings expose
+one-shot work through their normal future, promise, task, suspension, or
+explicit async idiom.
 
 Published snapshots provide synchronous copies of state needed by UI and display
 threads. Snapshot reads never call into mutable MapLibre map state. Each
-committed command reports the snapshot generation that its commit published, so
-a host that holds a command's terminal event can fence a snapshot read on it.
+committed command completion reports the snapshot generation that its commit
+published, so a host can fence a snapshot read on it.
 
 ## Render session
 
@@ -86,17 +86,17 @@ where the graphics context is usable. WGL targets, EGL surfaces, shared EGL
 textures, existing WebGL contexts, and browser WebGPU use the caller driver.
 
 Session control is separate from graphics execution. Any host thread may request
-a frame, read a snapshot, start an operation, abandon a target, or destroy a
-detached session. The first successful caller-driver service fixes its graphics
-thread identity. Later service calls and thread-current backend accessors remain
-affine to that thread. The host services ready work even while presentation
-callbacks are paused.
+a frame, read a snapshot, start an asynchronous call, abandon a target, or
+destroy a detached session. The first successful caller-driver service fixes its
+graphics thread identity. Later service calls and thread-current backend
+accessors remain affine to that thread. The host services ready work even while
+presentation callbacks are paused.
 
 A frame demand carries a host token, an optional timeout, and a coalescing
 boundary. Every accepted demand produces one terminal result. Result records
 identify the token and the map-update, extent, and frame generations that the
-driver used. A notification source remains ready until the host drains all frame
-results, so coalesced notifications do not lose results.
+driver used. A direct frame-result wake callback remains armed until the host
+drains all frame results, so coalesced wakeups do not lose results.
 
 Host-acquirable owned texture targets negotiate a ring of one to three slots.
 Acquiring a frame leases one slot and returns producer-completion
@@ -131,13 +131,13 @@ events from the runtime.
 Events report map lifecycle, rendering progress, resource activity, diagnostics,
 and asynchronous failures.
 
-Rendering observer events reach the runtime queue asynchronously. A
-receiver-scoped notification source reports that the queue is ready to drain.
+Rendering observer events reach the runtime queue asynchronously. The runtime's
+direct event wake callback reports that the queue is ready to drain.
 
 Each map and each runtime carries a subscription: the set of event types it
 queues. Default options select every event type the library reports, and a host
 narrows a subscription by naming the types it reads. An unselected event is
-never built, never queued, and never makes the notification source readable.
+never built, never queued, and never invokes the event wake callback.
 
 One drain transfers the queued event records and their message storage into an
 owned batch. A batch remains readable across later drains and runtime close.
@@ -149,11 +149,10 @@ copied source ID that remains meaningful after the source handle closes.
 
 ## Failures
 
-The status returned by an Immediate call reports validation or inspection
-failure. The status returned by a Command reports whether native code accepted
-and copied the submission; its terminal event reports an asynchronous
-application failure. An Operation stores its terminal status and a copied
-diagnostic for inspection from any thread.
+The status returned by an immediate call reports validation or inspection
+failure. The status returned by a one-shot submission reports whether native
+code accepted and copied it. Its completion reports an asynchronous application
+failure and a borrowed diagnostic that the binding copies before returning.
 
 Each binding surfaces these channels in its own idiom: an exception, a result
 type, an asynchronous result, or an event stream. Render-driver calls continue

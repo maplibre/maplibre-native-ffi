@@ -6,7 +6,6 @@ import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import org.maplibre.nativeffi.runtime.OperationLeakReport
 
 class HandleLeakCleanerTest {
   // BND-044. The cleaner reports; explicit close keeps native failures observable.
@@ -38,17 +37,6 @@ class HandleLeakCleanerTest {
 
       assertTrue(awaitReport(liveReports), "expected the cleaner to run")
       assertEquals(emptyList(), reports)
-    }
-
-  @Test
-  fun unreachableOperationReportsLeak(): Unit =
-    org.maplibre.nativeffi.runtime.runSuspendTest {
-      val reports = CopyOnWriteArrayList<String>()
-
-      HandleLeakCleaner.registerOperation(Any(), OperationLeakReport(reports::add))
-
-      assertTrue(awaitReport(reports), "expected the cleaner to report the operation")
-      assertEquals("Leaked OperationHandle; close the operation explicitly.", reports.single())
     }
 
   @Test

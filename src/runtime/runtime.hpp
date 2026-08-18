@@ -34,9 +34,9 @@ class RunLoop;
 namespace mln::core {
 
 struct RuntimeObject;
-class NotificationEndpoint;
+class Wake;
 class OperationObject;
-class NotificationSourceObject;
+class Completion;
 
 // Read on the runtime worker by map event producers, and on the mbgl
 // DatabaseFileSourceThread by offline producers. Held by shared_ptr so a camera
@@ -108,6 +108,9 @@ class RuntimeCallbackContext {
 
   void transfer_to_runtime() noexcept {
     owned_.store(true, std::memory_order_release);
+  }
+  void return_to_caller() noexcept {
+    owned_.store(false, std::memory_order_release);
   }
 
   [[nodiscard]] auto user_data() const noexcept -> void* { return user_data_; }
@@ -200,8 +203,7 @@ struct RuntimeEventQueueState {
   std::unordered_map<mln_map, std::shared_ptr<MapEventState>> event_maps;
   RuntimeEventStorage pending;
   std::unordered_set<mln_offline_region_id> observed_offline_regions;
-  std::shared_ptr<mln::core::NotificationSourceObject> notification_source;
-  std::shared_ptr<mln::core::NotificationEndpoint> notification_endpoint;
+  std::shared_ptr<mln::core::Wake> wake;
 };
 
 struct EventBatchObject {
@@ -216,7 +218,6 @@ struct RuntimeObject {
   RuntimeExecutor executor;
   // The single commit point for commands, operations, barriers, and close.
   std::mutex submission_mutex;
-  uint64_t next_command_id = 1;
   std::mutex terminal_mutex;
   std::condition_variable terminal_condition;
   uint64_t next_submission_sequence = 1;
@@ -244,8 +245,9 @@ struct HandleTraits<RuntimeObject> {
 auto create_runtime(
   const mln_runtime_options* options, mln_runtime* out_runtime
 ) -> mln_status;
-auto runtime_barrier_start(mln_runtime runtime, mln_operation* out_operation)
-  -> mln_status;
+auto runtime_barrier_start(
+  mln_runtime runtime, const mln_completion* completion
+) -> mln_status;
 auto release_runtime(mln_runtime runtime) -> mln_status;
 auto drain_runtime_events(mln_runtime runtime, mln_event_batch* out_batch)
   -> mln_status;
@@ -258,22 +260,24 @@ auto get_runtime_event_mask(mln_runtime runtime, uint64_t* out_mask)
   -> mln_status;
 auto set_resource_provider(
   mln_runtime runtime, const mln_resource_provider* provider,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) -> mln_status;
-auto clear_resource_provider(mln_runtime runtime, uint64_t* out_command_id)
-  -> mln_status;
+auto clear_resource_provider(
+  mln_runtime runtime, const mln_completion* completion
+) -> mln_status;
 auto set_resource_transform(
   mln_runtime runtime, const mln_resource_transform* transform,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) -> mln_status;
 auto resource_transform_response_set_url(
   mln_resource_transform_response* response, const char* url, size_t url_size
 ) -> mln_status;
-auto clear_resource_transform(mln_runtime runtime, uint64_t* out_command_id)
-  -> mln_status;
+auto clear_resource_transform(
+  mln_runtime runtime, const mln_completion* completion
+) -> mln_status;
 auto set_http_header_transform(
   mln_runtime runtime, const mln_http_header_transform* transform,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) -> mln_status;
 auto validate_http_header(
   const char* name, size_t name_size, const char* value, size_t value_size
@@ -282,8 +286,9 @@ auto http_header_transform_response_set(
   mln_http_header_transform_response* response, const char* name,
   size_t name_size, const char* value, size_t value_size
 ) -> mln_status;
-auto clear_http_header_transform(mln_runtime runtime, uint64_t* out_command_id)
-  -> mln_status;
+auto clear_http_header_transform(
+  mln_runtime runtime, const mln_completion* completion
+) -> mln_status;
 auto invoke_http_header_transform(
   void* platform_context, uint32_t kind, const char* url
 ) noexcept -> HttpHeaders;
@@ -292,37 +297,38 @@ auto invoke_resource_transform(
   std::string& out_replacement_url
 ) noexcept -> mln_status;
 auto run_ambient_cache_operation_start(
-  mln_runtime runtime, uint32_t operation, mln_operation* out_operation
+  mln_runtime runtime, uint32_t operation, const mln_completion* completion
 ) -> mln_status;
 auto set_maximum_ambient_cache_size_start(
-  mln_runtime runtime, std::uint64_t size, mln_operation* out_operation
+  mln_runtime runtime, std::uint64_t size, const mln_completion* completion
 ) -> mln_status;
 auto offline_region_create_start(
   mln_runtime runtime, const mln_offline_region_definition* definition,
-  const uint8_t* metadata, size_t metadata_size, mln_operation* out_operation
+  const uint8_t* metadata, size_t metadata_size,
+  const mln_completion* completion
 ) -> mln_status;
 auto offline_region_get_start(
   mln_runtime runtime, mln_offline_region_id region_id,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) -> mln_status;
 auto offline_regions_list_start(
-  mln_runtime runtime, mln_operation* out_operation
+  mln_runtime runtime, const mln_completion* completion
 ) -> mln_status;
 auto offline_regions_merge_database_start(
   mln_runtime runtime, const char* side_database_path,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) -> mln_status;
 auto offline_region_update_metadata_start(
   mln_runtime runtime, mln_offline_region_id region_id, const uint8_t* metadata,
-  size_t metadata_size, mln_operation* out_operation
+  size_t metadata_size, const mln_completion* completion
 ) -> mln_status;
 auto offline_region_get_status_start(
   mln_runtime runtime, mln_offline_region_id region_id,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) -> mln_status;
 auto offline_region_set_observed_start(
   mln_runtime runtime, mln_offline_region_id region_id, bool observed,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) -> mln_status;
 
 struct OfflineRegionDownloadStateRequest {
@@ -332,34 +338,15 @@ struct OfflineRegionDownloadStateRequest {
 
 auto offline_region_set_download_state_start(
   mln_runtime runtime, OfflineRegionDownloadStateRequest request,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) -> mln_status;
 auto offline_region_invalidate_start(
   mln_runtime runtime, mln_offline_region_id region_id,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) -> mln_status;
 auto offline_region_delete_start(
   mln_runtime runtime, mln_offline_region_id region_id,
-  mln_operation* out_operation
-) -> mln_status;
-auto offline_region_create_take_result(
-  mln_operation operation, mln_offline_region_snapshot* out_region
-) -> mln_status;
-auto offline_region_get_take_result(
-  mln_operation operation, mln_offline_region_snapshot* out_region,
-  bool* out_found
-) -> mln_status;
-auto offline_regions_list_take_result(
-  mln_operation operation, mln_offline_region_list* out_regions
-) -> mln_status;
-auto offline_regions_merge_database_take_result(
-  mln_operation operation, mln_offline_region_list* out_regions
-) -> mln_status;
-auto offline_region_update_metadata_take_result(
-  mln_operation operation, mln_offline_region_snapshot* out_region
-) -> mln_status;
-auto offline_region_get_status_take_result(
-  mln_operation operation, mln_offline_region_status* out_status
+  const mln_completion* completion
 ) -> mln_status;
 auto offline_region_snapshot_get(
   mln_offline_region_snapshot snapshot, mln_offline_region_info* out_info
@@ -384,8 +371,9 @@ auto dispatch_runtime_sync(
 ) -> mln_status;
 auto submit_runtime_command(
   const std::shared_ptr<RuntimeObject>& runtime,
-  std::function<void(uint64_t)> function, uint64_t* out_command_id,
-  std::atomic<uint64_t>* latest_command_id = nullptr
+  std::function<void(uint64_t)> function,
+  const std::shared_ptr<Completion>& completion,
+  std::atomic<uint64_t>* latest_submission = nullptr
 ) -> mln_status;
 auto submit_runtime_operation(
   const std::shared_ptr<RuntimeObject>& runtime,
@@ -423,11 +411,6 @@ auto push_runtime_map_event_payload(
   mln_runtime runtime, mln_map map, uint32_t type, uint32_t payload_type,
   const mln_runtime_event_payload& payload, int32_t code = 0,
   std::string message = {}
-) -> void;
-auto push_runtime_command_finished(
-  mln_runtime runtime, uint32_t source_type, uint64_t source,
-  uint64_t command_id, uint32_t disposition, mln_status status,
-  uint64_t generation, const char* message = nullptr
 ) -> void;
 auto register_runtime_map_events(
   mln_runtime runtime, mln_map map, std::shared_ptr<MapEventState> event_state

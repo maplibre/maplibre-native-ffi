@@ -37,16 +37,18 @@ class MapHandleNativeTest : org.maplibre.nativeffi.NativeTestBase() {
     val runtime = RuntimeHandle.create(RuntimeOptions())
     val map =
       MapHandle.create(
-        runtime,
-        MapOptions().apply {
-          width = 64
-          height = 64
-        },
-      )
-    val command = map.updateCamera(CameraUpdate(camera = CameraOptions().apply { zoom = 2.0 }))
-    assertTrue(command > 0)
-    runtime.barrier()
-    assertEquals(2.0, map.queryCamera().camera.zoom)
+          runtime,
+          MapOptions().apply {
+            width = 64
+            height = 64
+          },
+        )
+        .await()
+    val command =
+      map.updateCamera(CameraUpdate(camera = CameraOptions().apply { zoom = 2.0 })).await()
+    assertTrue(command.generation > 0uL)
+    runtime.barrier().await()
+    assertEquals(2.0, map.queryCamera().await().camera.zoom)
     map.close()
     runtime.close()
     assertTrue(map.isClosed)

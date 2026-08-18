@@ -12,15 +12,16 @@ class RuntimeExecutorJvmTest {
     val runtime = RuntimeHandle.create(RuntimeOptions())
     val map =
       MapHandle.create(
-        runtime,
-        MapOptions().apply {
-          width = 64
-          height = 64
-        },
-      )
+          runtime,
+          MapOptions().apply {
+            width = 64
+            height = 64
+          },
+        )
+        .await()
     val generation = CompletableFuture.supplyAsync { map.snapshot().generation }.get()
-    runtime.barrier()
-    assertTrue(map.queryCamera().generation >= generation)
+    runtime.barrier().await()
+    assertTrue(map.queryCamera().await().generation >= generation)
     map.close()
     runtime.close()
   }

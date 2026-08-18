@@ -58,47 +58,52 @@ pub fn waitForOwnedEvent(
     }
     return error.EventNotObserved;
 }
-/// Waits for `command_id`'s terminal event and returns its payload. See
-/// `waitForEvent` for its polling behavior.
-pub fn waitForCommandFinished(
+fn resolve(comptime T: type, future_value: maplibre.Future(T)) !T {
+    var future = future_value;
+    defer future.deinit();
+    return future.wait(null);
+}
+
+pub fn waitForCommandCompletion(
     runtime: *maplibre.RuntimeHandle,
-    command_id: u64,
-) !maplibre.CommandFinishedPayload {
-    for (0..5000) |_| {
-        var batch = try runtime.drainEvents(testing.allocator);
-        defer batch.deinit();
-        for (0..batch.len()) |index| {
-            const event = try batch.at(index);
-            switch (event.payload) {
-                .command_finished => |payload| {
-                    if (payload.command_id == command_id) return payload;
-                },
-                else => {},
-            }
-        }
-        try sleepOneMillisecond();
-    }
-    return error.EventNotObserved;
+    future: maplibre.Future(maplibre.CommandCompletion),
+) !maplibre.CommandCompletion {
+    _ = runtime;
+    return resolve(maplibre.CommandCompletion, future);
 }
 
 pub fn waitForCommandDisposition(
     runtime: *maplibre.RuntimeHandle,
-    command_id: u64,
+    future: maplibre.Future(maplibre.CommandCompletion),
 ) !maplibre.CommandDisposition {
-    return (try waitForCommandFinished(runtime, command_id)).disposition;
+    return (try waitForCommandCompletion(runtime, future)).disposition;
 }
 
-/// Awaits `command_id`'s commit and returns a map snapshot that observes it:
+/// Verifies that an accepted command completed with a native failure.
+pub fn expectCommandError(
+    runtime: *maplibre.RuntimeHandle,
+    future_value: maplibre.Future(maplibre.CommandCompletion),
+    expected: anyerror,
+) !void {
+    _ = runtime;
+    var future = future_value;
+    defer future.deinit();
+    const completion = try future.wait(null);
+    try testing.expectEqual(maplibre.CommandDisposition.failed, completion.disposition);
+    try testing.expectError(expected, completion.statusError());
+    try testing.expect((try future.diagnostic()).len != 0);
+}
+
+/// Awaits `completion`'s commit and returns a map snapshot that observes it:
 /// the committed event reports the published generation, and a snapshot at or
 /// past that generation carries the committed state.
 pub fn snapshotAfterCommand(
     runtime: *maplibre.RuntimeHandle,
     map: *maplibre.MapHandle,
-    command_id: u64,
+    future: maplibre.Future(maplibre.CommandCompletion),
 ) !maplibre.MapSnapshot {
-    const finished = try waitForCommandFinished(runtime, command_id);
+    const finished = try waitForCommandCompletion(runtime, future);
     try testing.expect(std.meta.eql(finished.disposition, maplibre.CommandDisposition.committed));
-    try finished.status;
     try testing.expect(finished.generation != 0);
     const snapshot = try map.snapshot();
     try testing.expect(snapshot.generation >= finished.generation);
@@ -114,28 +119,21 @@ pub fn drainEvents(runtime: *maplibre.RuntimeHandle) !usize {
 
 /// Creates a map with `style_json` loaded.
 pub fn createLoadedMap(runtime: *maplibre.RuntimeHandle) !maplibre.MapHandle {
-    var map = try maplibre.MapHandle.create(runtime, .{});
+    var map_future = try maplibre.MapHandle.create(runtime, .{});
+    defer map_future.deinit();
+    var map = try map_future.wait(null);
     errdefer map.close() catch {};
-    _ = try map.setStyleJson(testing.allocator, style_json);
+    _ = try resolve(maplibre.CommandCompletion, try map.setStyleJson(testing.allocator, style_json));
     try testing.expect(try waitForEvent(runtime, .map_style_loaded));
     return map;
 }
-pub fn waitOperation(operation: maplibre.OperationHandle) !void {
-    try testing.expect(try operation.waitForSuccess(-1));
-}
 pub fn waitForBarrier(runtime: *maplibre.RuntimeHandle) !void {
-    const operation = try runtime.barrierStart();
-    defer operation.release();
-    try waitOperation(operation);
-    try operation.finish();
+    _ = try resolve(void, try runtime.barrier());
 }
 
 /// Copies fixed source metadata, reporting null when no source has the ID.
 pub fn styleSourceMetadata(map: *maplibre.MapHandle, source_id: []const u8) !?maplibre.StyleSourceMetadata {
-    const operation = try map.getStyleSourceInfoStart(testing.allocator, source_id);
-    defer operation.release();
-    try waitOperation(operation);
-    return map.getStyleSourceInfoTakeResult(operation);
+    return resolve(?maplibre.StyleSourceMetadata, try map.getStyleSourceInfo(testing.allocator, source_id));
 }
 
 /// Existence via the info getter's found flag.
@@ -148,22 +146,22 @@ pub fn styleSourceType(map: *maplibre.MapHandle, source_id: []const u8) !?maplib
     return metadata.source_type;
 }
 
-/// Waits for a removal command's terminal event: true when the removal
-/// committed, false when the ID named nothing, and the command's reported
-/// failure otherwise.
-fn awaitRemoval(runtime: *maplibre.RuntimeHandle, command_id: u64) !bool {
-    const payload = try waitForCommandFinished(runtime, command_id);
-    switch (payload.disposition) {
-        .committed => return true,
+/// Waits for a removal command: true when it commits, false when the ID names
+/// nothing, and the command's reported failure otherwise.
+fn awaitRemoval(runtime: *maplibre.RuntimeHandle, future: maplibre.Future(maplibre.CommandCompletion)) !bool {
+    _ = runtime;
+    const completion_result = try resolve(maplibre.CommandCompletion, future);
+    return switch (completion_result.disposition) {
+        .committed => true,
         .failed => {
-            payload.status catch |err| {
+            completion_result.statusError() catch |err| {
                 if (err == error.NotFound) return false;
                 return err;
             };
-            return error.UnexpectedCommandStatus;
+            return error.UnexpectedCommandDisposition;
         },
-        else => return error.UnexpectedCommandDisposition,
-    }
+        else => error.UnexpectedCommandDisposition,
+    };
 }
 
 pub fn removeStyleSource(runtime: *maplibre.RuntimeHandle, map: *maplibre.MapHandle, source_id: []const u8) !bool {
@@ -180,10 +178,7 @@ pub fn removeStyleImage(runtime: *maplibre.RuntimeHandle, map: *maplibre.MapHand
 
 /// Copies fixed layer metadata, reporting null when no layer has the ID.
 pub fn styleLayerInfo(map: *maplibre.MapHandle, layer_id: []const u8) !?maplibre.StyleLayerInfo {
-    const operation = try map.getStyleLayerInfoStart(testing.allocator, layer_id);
-    defer operation.release();
-    try waitOperation(operation);
-    return map.getStyleLayerInfoTakeResult(operation);
+    return resolve(?maplibre.StyleLayerInfo, try map.getStyleLayerInfo(testing.allocator, layer_id));
 }
 
 /// Existence via the info getter's found flag.
@@ -192,45 +187,27 @@ pub fn styleLayerExists(map: *maplibre.MapHandle, layer_id: []const u8) !bool {
 }
 
 pub fn loadedStyleJson(map: *maplibre.MapHandle) !maplibre.OwnedString {
-    const operation = try map.loadedStyleJsonStart();
-    defer operation.release();
-    try waitOperation(operation);
-    return map.loadedStyleJsonTakeResult(testing.allocator, operation);
+    return resolve(maplibre.OwnedString, try map.loadedStyleJson(testing.allocator));
 }
 
 pub fn styleUrl(map: *maplibre.MapHandle) !maplibre.OwnedString {
-    const operation = try map.styleUrlStart();
-    defer operation.release();
-    try waitOperation(operation);
-    return map.styleUrlTakeResult(testing.allocator, operation);
+    return resolve(maplibre.OwnedString, try map.styleUrl(testing.allocator));
 }
 
 pub fn listStyleSourceIds(map: *maplibre.MapHandle) !maplibre.StringList {
-    const operation = try map.listStyleSourceIdsStart();
-    defer operation.release();
-    try waitOperation(operation);
-    return map.listStyleSourceIdsTakeResult(testing.allocator, operation);
+    return resolve(maplibre.StringList, try map.listStyleSourceIds(testing.allocator));
 }
 
 pub fn listStyleLayerIds(map: *maplibre.MapHandle) !maplibre.StringList {
-    const operation = try map.listStyleLayerIdsStart();
-    defer operation.release();
-    try waitOperation(operation);
-    return map.listStyleLayerIdsTakeResult(testing.allocator, operation);
+    return resolve(maplibre.StringList, try map.listStyleLayerIds(testing.allocator));
 }
 
 pub fn styleSourceAttribution(map: *maplibre.MapHandle, source_id: []const u8) !?maplibre.OwnedString {
-    const operation = try map.copyStyleSourceAttributionStart(testing.allocator, source_id);
-    defer operation.release();
-    try waitOperation(operation);
-    return map.copyStyleSourceAttributionTakeResult(testing.allocator, operation);
+    return resolve(?maplibre.OwnedString, try map.copyStyleSourceAttribution(testing.allocator, source_id));
 }
 
 pub fn styleSourceUrl(map: *maplibre.MapHandle, source_id: []const u8) !?maplibre.OwnedString {
-    const operation = try map.copyStyleSourceUrlStart(testing.allocator, source_id);
-    defer operation.release();
-    try waitOperation(operation);
-    return map.copyStyleSourceUrlTakeResult(testing.allocator, operation);
+    return resolve(?maplibre.OwnedString, try map.copyStyleSourceUrl(testing.allocator, source_id));
 }
 
 pub fn styleSourceInfo(map: *maplibre.MapHandle, source_id: []const u8) !?maplibre.StyleSourceInfo {
@@ -252,10 +229,7 @@ pub fn styleSourceInfo(map: *maplibre.MapHandle, source_id: []const u8) !?maplib
     var tile_urls: ?maplibre.StringList = null;
     errdefer if (tile_urls) |*list| list.deinit();
     if (metadata.has_tile_json) {
-        const tiles_operation = try map.getStyleSourceTileUrlsStart(testing.allocator, source_id);
-        defer tiles_operation.release();
-        try waitOperation(tiles_operation);
-        tile_urls = (try map.getStyleSourceTileUrlsTakeResult(testing.allocator, tiles_operation)) orelse return error.NativeError;
+        tile_urls = try resolve(maplibre.StringList, try map.getStyleSourceTileUrls(testing.allocator, source_id));
     }
     return .{
         .allocator = testing.allocator,
@@ -284,66 +258,39 @@ pub fn styleLayerType(map: *maplibre.MapHandle, layer_id: []const u8) !?[]const 
 }
 
 pub fn styleLayerJson(map: *maplibre.MapHandle, layer_id: []const u8) !?maplibre.OwnedString {
-    const operation = try map.getStyleLayerJsonStart(testing.allocator, layer_id);
-    defer operation.release();
-    try waitOperation(operation);
-    return map.getStyleLayerJsonTakeResult(testing.allocator, operation);
+    return resolve(?maplibre.OwnedString, try map.getStyleLayerJson(testing.allocator, layer_id));
 }
 
 pub fn styleImageInfo(map: *maplibre.MapHandle, image_id: []const u8) !?maplibre.StyleImageInfo {
-    const operation = try map.getStyleImageInfoStart(testing.allocator, image_id);
-    defer operation.release();
-    try waitOperation(operation);
-    return map.getStyleImageInfoTakeResult(operation);
+    return resolve(?maplibre.StyleImageInfo, try map.getStyleImageInfo(testing.allocator, image_id));
 }
 
 pub fn styleImageStretches(map: *maplibre.MapHandle, image_id: []const u8) !?maplibre.OwnedImageStretches {
-    const operation = try map.copyStyleImageStretchesStart(testing.allocator, image_id);
-    defer operation.release();
-    try waitOperation(operation);
-    return map.copyStyleImageStretchesTakeResult(testing.allocator, operation);
+    return resolve(?maplibre.OwnedImageStretches, try map.copyStyleImageStretches(testing.allocator, image_id));
 }
 
 pub fn imageSourceCoordinates(map: *maplibre.MapHandle, source_id: []const u8) !?[4]maplibre.LatLng {
-    const operation = try map.getImageSourceCoordinatesStart(testing.allocator, source_id);
-    defer operation.release();
-    try waitOperation(operation);
-    return map.getImageSourceCoordinatesTakeResult(operation);
+    return resolve(?[4]maplibre.LatLng, try map.getImageSourceCoordinates(testing.allocator, source_id));
 }
 
 pub fn layerSourceLayer(map: *maplibre.MapHandle, layer_id: []const u8) !maplibre.OwnedString {
-    const operation = try map.copyLayerSourceLayerStart(testing.allocator, layer_id);
-    defer operation.release();
-    try waitOperation(operation);
-    return map.copyLayerSourceLayerTakeResult(testing.allocator, operation);
+    return resolve(maplibre.OwnedString, try map.copyLayerSourceLayer(testing.allocator, layer_id));
 }
 
 pub fn layerSourceId(map: *maplibre.MapHandle, layer_id: []const u8) !maplibre.OwnedString {
-    const operation = try map.copyLayerSourceIdStart(testing.allocator, layer_id);
-    defer operation.release();
-    try waitOperation(operation);
-    return map.copyLayerSourceIdTakeResult(testing.allocator, operation);
+    return resolve(maplibre.OwnedString, try map.copyLayerSourceId(testing.allocator, layer_id));
 }
 
 pub fn layerProperty(map: *maplibre.MapHandle, layer_id: []const u8, property_name: []const u8) !?maplibre.OwnedString {
-    const operation = try map.getLayerPropertyStart(testing.allocator, layer_id, property_name);
-    defer operation.release();
-    try waitOperation(operation);
-    return map.getLayerPropertyTakeResult(testing.allocator, operation);
+    return resolve(?maplibre.OwnedString, try map.getLayerProperty(testing.allocator, layer_id, property_name));
 }
 
 pub fn layerFilter(map: *maplibre.MapHandle, layer_id: []const u8) !?maplibre.OwnedString {
-    const operation = try map.getLayerFilterStart(testing.allocator, layer_id);
-    defer operation.release();
-    try waitOperation(operation);
-    return map.getLayerFilterTakeResult(testing.allocator, operation);
+    return resolve(?maplibre.OwnedString, try map.getLayerFilter(testing.allocator, layer_id));
 }
 
 pub fn styleLightProperty(map: *maplibre.MapHandle, property_name: []const u8) !?maplibre.OwnedString {
-    const operation = try map.getStyleLightPropertyStart(testing.allocator, property_name);
-    defer operation.release();
-    try waitOperation(operation);
-    return map.getStyleLightPropertyTakeResult(testing.allocator, operation);
+    return resolve(?maplibre.OwnedString, try map.getStyleLightProperty(testing.allocator, property_name));
 }
 
 /// Existence via the info getter's found flag.
@@ -352,17 +299,11 @@ pub fn styleImageExists(map: *maplibre.MapHandle, image_id: []const u8) !bool {
 }
 
 pub fn styleImagePixels(map: *maplibre.MapHandle, image_id: []const u8) !?maplibre.OwnedString {
-    const operation = try map.copyStyleImagePremultipliedRgba8Start(testing.allocator, image_id);
-    defer operation.release();
-    try waitOperation(operation);
-    return map.copyStyleImagePremultipliedRgba8TakeResult(testing.allocator, operation);
+    return resolve(?maplibre.OwnedString, try map.copyStyleImagePremultipliedRgba8(testing.allocator, image_id));
 }
 
 pub fn styleTransitionOptions(map: *maplibre.MapHandle) !maplibre.StyleTransitionOptions {
-    const operation = try map.getStyleTransitionOptionsStart();
-    defer operation.release();
-    try waitOperation(operation);
-    return map.getStyleTransitionOptionsTakeResult(operation);
+    return resolve(maplibre.StyleTransitionOptions, try map.getStyleTransitionOptions());
 }
 
 fn sleepOneMillisecond() !void {

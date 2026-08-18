@@ -83,6 +83,7 @@
 #include "map/map.hpp"
 
 #include "bytes/buffer.hpp"
+#include "completion/completion.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "geojson/geojson.hpp"
 #include "handles/handle_table.hpp"
@@ -2115,13 +2116,6 @@ auto validate_map_locked(mln_map map, MapObject*& out_map) -> mln_status {
   return validate_map_live_locked(map, out_map);
 }
 
-constexpr uint32_t map_create_operation_kind = UINT32_C(0x4D01);
-constexpr uint32_t map_release_operation_kind = UINT32_C(0x4D02);
-constexpr uint32_t map_camera_query_operation_kind = UINT32_C(0x4D03);
-constexpr uint32_t map_still_image_operation_kind = UINT32_C(0x4D04);
-constexpr uint32_t map_loaded_style_json_operation_kind = UINT32_C(0x4D05);
-constexpr uint32_t map_style_url_operation_kind = UINT32_C(0x4D06);
-
 auto publish_map_snapshot(MapObject& live) -> uint64_t {
   const auto options = live.map->getMapOptions();
   auto snapshot = mln_map_snapshot{
@@ -2350,51 +2344,14 @@ auto acquire_map_submission(mln_map map, MapSubmissionContext& out_context)
   return MLN_STATUS_OK;
 }
 
-template <typename Work>
-auto submit_registered_map_operation(
-  mln_map map, uint32_t kind, Work work, mln_operation* out_operation
-) -> mln_status {
-  auto context = MapSubmissionContext{};
-  const auto acquire_status = acquire_map_submission(map, context);
-  if (acquire_status != MLN_STATUS_OK) {
-    return acquire_status;
-  }
-  auto state = std::shared_ptr<OperationObject>{};
-  const auto registration = register_operation(
-    context.runtime->event_queue->notification_source, kind, false, {},
-    out_operation, state
-  );
-  if (registration != MLN_STATUS_OK) {
-    return registration;
-  }
-
-  const auto operation = *out_operation;
-  const auto submission = submit_runtime_operation(
-    context.runtime, state,
-    [map = std::move(context.map), control = std::move(context.control), state,
-     work = std::move(work)]() mutable -> void {
-      // The captured map and lease keep the target alive through completion.
-      static_cast<void>(map);
-      static_cast<void>(control);
-      std::invoke(std::move(work), state);
-    }
-  );
-  if (submission != MLN_STATUS_OK) {
-    abandon_operation(operation);
-    *out_operation = MLN_HANDLE_NULL;
-  }
-  return submission;
-}
-
 }  // namespace
 
 auto submit_map_command(
-  mln_map map, std::function<mln_status()> work, uint64_t* out_command_id
+  mln_map map, std::function<mln_status()> work,
+  const mln_completion* completion
 ) -> mln_status {
-  if (out_command_id == nullptr || *out_command_id != 0) {
-    set_thread_error("out_command_id must point to zero");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  const auto completion_status = validate_completion(completion);
+  if (completion_status != MLN_STATUS_OK) return completion_status;
   auto context = MapSubmissionContext{};
   const auto acquire_status = acquire_map_submission(map, context);
   if (acquire_status != MLN_STATUS_OK) {
@@ -2403,10 +2360,11 @@ auto submit_map_command(
   auto live = std::move(context.map);
   auto map_lease = std::move(context.control);
   auto runtime = std::move(context.runtime);
+  auto completion_state = std::make_shared<Completion>(*completion);
   return submit_runtime_command(
     runtime,
-    [map, live = std::move(live), map_lease = std::move(map_lease), runtime,
-     work = std::move(work)](uint64_t command_id) mutable -> void {
+    [live = std::move(live), map_lease = std::move(map_lease), completion_state,
+     work = std::move(work)](uint64_t) mutable -> void {
       clear_thread_error();
       auto status = MLN_STATUS_NATIVE_ERROR;
       auto message = std::string{};
@@ -2414,10 +2372,7 @@ auto submit_map_command(
       try {
         status = std::invoke(std::move(work));
         message = thread_last_error_message();
-        // Committed commands republish so snapshot reads observe the commit
-        // and COMMAND_FINISHED generations share the snapshot generation
-        // namespace. The publish stays inside the try so an escaped exception
-        // cannot skip the terminal event below.
+        // Committed commands republish so snapshot reads observe the commit.
         if (status == MLN_STATUS_OK) {
           generation = publish_map_snapshot(*live);
         }
@@ -2430,26 +2385,185 @@ auto submit_map_command(
         generation = 0;
         message = "map command failed";
       }
-      push_runtime_command_finished(
-        runtime->self, MLN_RUNTIME_EVENT_SOURCE_MAP, map, command_id,
+      complete_command(
+        completion_state,
         status == MLN_STATUS_OK ? MLN_COMMAND_DISPOSITION_COMMITTED
                                 : MLN_COMMAND_DISPOSITION_FAILED,
-        status, generation, message.empty() ? nullptr : message.c_str()
+        status, generation, std::move(message)
       );
     },
-    out_command_id
+    completion_state
   );
 }
 
 auto start_style_operation(
   mln_map map, StyleOperationKind kind, StyleWork work,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) -> mln_status {
-  return submit_registered_map_operation(
-    map, static_cast<uint32_t>(kind),
-    [work = std::move(work)](
-      const std::shared_ptr<OperationObject>& state
-    ) mutable -> void {
+  const auto completion_status = validate_completion(completion);
+  if (completion_status != MLN_STATUS_OK) return completion_status;
+  auto completion_state = std::make_shared<Completion>(*completion);
+  auto result_callback = [completion_state, kind](
+                           mln_status status, std::string diagnostic,
+                           std::any result
+                         ) mutable {
+    auto shared = std::any_cast<std::shared_ptr<StyleOperationResult>>(&result);
+    if (status != MLN_STATUS_OK || shared == nullptr || *shared == nullptr) {
+      complete(
+        completion_state,
+        status == MLN_STATUS_OK ? MLN_STATUS_NATIVE_ERROR : status,
+        status == MLN_STATUS_OK ? "style operation produced an invalid result"
+                                : std::move(diagnostic)
+      );
+      return;
+    }
+    completion_state->resolve([kind, result = std::move(*shared)](
+                                const mln_completion& descriptor
+                              ) {
+      const void* value = nullptr;
+      auto count = std::size_t{0};
+      auto view = mln_buffer_view{};
+      auto views = std::vector<mln_buffer_view>{};
+      auto stretches = mln_style_image_stretches_result{};
+      auto source = mln_style_source_result{};
+      auto layer = mln_style_layer_result{};
+      auto image = mln_style_image_result{};
+      switch (kind) {
+        case StyleOperationKind::SourceInfo:
+          if (result->found) {
+            views.reserve(result->strings.size());
+            for (const auto& string : result->strings) {
+              views.push_back({.data = string.data(), .size = string.size()});
+            }
+            source = {
+              .size = sizeof(mln_style_source_result),
+              .reserved = 0,
+              .info = result->source_info,
+              .attribution =
+                {.data = result->attribution.data(),
+                 .size = result->attribution.size()},
+              .url = {.data = result->url.data(), .size = result->url.size()},
+              .tile_urls = views.data(),
+              .tile_url_count = views.size()
+            };
+            value = &source;
+            count = 1;
+          }
+          break;
+        case StyleOperationKind::LayerInfo:
+          if (result->found) {
+            layer = {
+              .size = sizeof(mln_style_layer_result),
+              .reserved = 0,
+              .info = result->layer_info,
+              .source_id =
+                {.data = result->source_id.data(),
+                 .size = result->source_id.size()},
+              .source_layer = {
+                .data = result->source_layer.data(),
+                .size = result->source_layer.size()
+              }
+            };
+            value = &layer;
+            count = 1;
+          }
+          break;
+        case StyleOperationKind::ImageInfo:
+          if (result->found) {
+            image = {
+              .size = sizeof(mln_style_image_result),
+              .reserved = 0,
+              .info = result->image_info,
+              .pixels =
+                {.data = result->bytes.data(), .size = result->bytes.size()},
+              .stretch_x = result->stretch_x.data(),
+              .stretch_x_count = result->stretch_x.size(),
+              .stretch_y = result->stretch_y.data(),
+              .stretch_y_count = result->stretch_y.size()
+            };
+            value = &image;
+            count = 1;
+          }
+          break;
+        case StyleOperationKind::TransitionOptions:
+          value = &result->transition_options;
+          count = 1;
+          break;
+        case StyleOperationKind::SourceIds:
+        case StyleOperationKind::LayerIds:
+          views.reserve(result->strings.size());
+          for (const auto& string : result->strings) {
+            views.push_back({.data = string.data(), .size = string.size()});
+          }
+          value = views.data();
+          count = views.size();
+          break;
+        case StyleOperationKind::SourceTileUrls:
+          if (result->found) {
+            views.reserve(result->strings.size());
+            for (const auto& string : result->strings) {
+              views.push_back({.data = string.data(), .size = string.size()});
+            }
+            value = views.data();
+            count = views.size();
+          }
+          break;
+        case StyleOperationKind::ImageStretches:
+          if (result->found) {
+            stretches = mln_style_image_stretches_result{
+              .size = sizeof(mln_style_image_stretches_result),
+              .reserved = 0,
+              .stretch_x = result->stretch_x.data(),
+              .stretch_x_count = result->stretch_x.size(),
+              .stretch_y = result->stretch_y.data(),
+              .stretch_y_count = result->stretch_y.size(),
+            };
+            value = &stretches;
+            count = 1;
+          }
+          break;
+        case StyleOperationKind::ImageCoordinates:
+          value = result->found ? result->coordinates.data() : nullptr;
+          count = result->found ? result->coordinates.size() : 0;
+          break;
+        case StyleOperationKind::SourceAttribution:
+        case StyleOperationKind::SourceUrl:
+        case StyleOperationKind::LayerJson:
+        case StyleOperationKind::LightProperty:
+        case StyleOperationKind::LayerProperty:
+          if (result->found) {
+            view = {.data = result->bytes.data(), .size = result->bytes.size()};
+            value = &view;
+            count = 1;
+          }
+          break;
+        default:
+          if (
+            result->found || (kind != StyleOperationKind::ImagePixels &&
+                              kind != StyleOperationKind::LayerFilter)
+          ) {
+            view = {.data = result->bytes.data(), .size = result->bytes.size()};
+            value = &view;
+            count = 1;
+          }
+          break;
+      }
+      invoke_completion(
+        descriptor, MLN_STATUS_OK, MLN_COMMAND_DISPOSITION_COMMITTED, 0, {},
+        value, count
+      );
+    });
+  };
+  auto context = MapSubmissionContext{};
+  const auto acquire_status = acquire_map_submission(map, context);
+  if (acquire_status != MLN_STATUS_OK) return acquire_status;
+  auto state = std::make_shared<OperationObject>(std::move(result_callback));
+  const auto submission = submit_runtime_operation(
+    context.runtime, state,
+    [map = std::move(context.map), control = std::move(context.control), state,
+     work = std::move(work)]() mutable -> void {
+      static_cast<void>(map);
+      static_cast<void>(control);
       auto result = std::make_shared<StyleOperationResult>();
       clear_thread_error();
       try {
@@ -2462,34 +2576,82 @@ auto start_style_operation(
           MLN_STATUS_NATIVE_ERROR, "style operation failed", result
         );
       }
-    },
-    out_operation
-  );
-}
-
-auto take_style_operation(
-  mln_operation operation, StyleOperationKind kind,
-  std::function<mln_status(StyleOperationResult&)> transfer
-) -> mln_status {
-  return take_operation_result<std::shared_ptr<StyleOperationResult>>(
-    operation, static_cast<uint32_t>(kind),
-    [transfer = std::move(transfer)](
-      std::shared_ptr<StyleOperationResult>& result
-    ) mutable -> mln_status {
-      return std::invoke(std::move(transfer), *result);
     }
   );
+  if (submission == MLN_STATUS_OK)
+    completion_state->accept();
+  else
+    completion_state->reject();
+  return submission;
 }
 
 auto start_geometry_operation(
   mln_map map, GeometryOperationKind kind, GeometryWork work,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) -> mln_status {
-  return submit_registered_map_operation(
-    map, static_cast<uint32_t>(kind),
-    [work = std::move(work)](
-      const std::shared_ptr<OperationObject>& state
-    ) mutable -> void {
+  const auto completion_status = validate_completion(completion);
+  if (completion_status != MLN_STATUS_OK) return completion_status;
+  auto completion_state = std::make_shared<Completion>(*completion);
+  auto context = MapSubmissionContext{};
+  const auto acquire_status = acquire_map_submission(map, context);
+  if (acquire_status != MLN_STATUS_OK) return acquire_status;
+  auto state = std::make_shared<OperationObject>(
+    [completion_state,
+     kind](mln_status status, std::string diagnostic, std::any result) mutable {
+      auto* value = std::any_cast<GeometryOperationResult>(&result);
+      if (status != MLN_STATUS_OK || value == nullptr) {
+        complete(
+          completion_state,
+          status == MLN_STATUS_OK ? MLN_STATUS_NATIVE_ERROR : status,
+          status == MLN_STATUS_OK
+            ? "geometry operation produced an invalid result"
+            : std::move(diagnostic)
+        );
+        return;
+      }
+      completion_state->resolve(
+        [kind, value = std::move(*value)](const mln_completion& descriptor) {
+          const void* pointer = nullptr;
+          auto count = std::size_t{1};
+          switch (kind) {
+            case GeometryOperationKind::CameraForBounds:
+            case GeometryOperationKind::CameraForCoordinates:
+            case GeometryOperationKind::CameraForGeometry:
+              pointer = &value.camera;
+              break;
+            case GeometryOperationKind::BoundsForCamera:
+            case GeometryOperationKind::UnwrappedBoundsForCamera:
+              pointer = &value.bounds;
+              break;
+            case GeometryOperationKind::PixelForCoordinate:
+              pointer = &value.point;
+              break;
+            case GeometryOperationKind::CoordinateForPixel:
+              pointer = &value.coordinate;
+              break;
+            case GeometryOperationKind::PixelsForCoordinates:
+              pointer = value.points.data();
+              count = value.points.size();
+              break;
+            case GeometryOperationKind::CoordinatesForPixels:
+              pointer = value.coordinates.data();
+              count = value.coordinates.size();
+              break;
+          }
+          invoke_completion(
+            descriptor, MLN_STATUS_OK, MLN_COMMAND_DISPOSITION_COMMITTED, 0, {},
+            pointer, count
+          );
+        }
+      );
+    }
+  );
+  const auto submission = submit_runtime_operation(
+    context.runtime, state,
+    [map = std::move(context.map), control = std::move(context.control), state,
+     work = std::move(work)]() mutable {
+      static_cast<void>(map);
+      static_cast<void>(control);
       auto result = GeometryOperationResult{};
       clear_thread_error();
       try {
@@ -2507,25 +2669,16 @@ auto start_geometry_operation(
           std::any{std::move(result)}
         );
       }
-    },
-    out_operation
+    }
   );
-}
-
-auto take_geometry_operation(
-  mln_operation operation, GeometryOperationKind kind,
-  std::function<mln_status(GeometryOperationResult&)> transfer
-) -> mln_status {
-  return take_operation_result<GeometryOperationResult>(
-    operation, static_cast<uint32_t>(kind), std::move(transfer)
-  );
+  if (submission == MLN_STATUS_OK)
+    completion_state->accept();
+  else
+    completion_state->reject();
+  return submission;
 }
 
 namespace {
-
-enum : uint32_t {
-  projection_operation_create = 0x50520001U,
-};
 
 // Runs work against a live projection on the calling thread, serialized with
 // every other projection call, including close, by the per-projection mutex.
@@ -2642,7 +2795,7 @@ auto create_map(
 }
 auto create_map_start(
   mln_runtime runtime, const mln_map_options* options,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) -> mln_status {
   const auto options_status = validate_map_options(options);
   if (options_status != MLN_STATUS_OK) {
@@ -2657,16 +2810,33 @@ auto create_map_start(
     return reserve_status;
   }
   const auto effective = options == nullptr ? map_options_default() : *options;
-  auto state = std::shared_ptr<OperationObject>{};
-  const auto register_status = register_operation(
-    runtime_state->event_queue->notification_source, map_create_operation_kind,
-    false, {}, out_operation, state
-  );
-  if (register_status != MLN_STATUS_OK) {
+  const auto completion_status = validate_completion(completion);
+  if (completion_status != MLN_STATUS_OK) {
     release_runtime_map(runtime);
-    return register_status;
+    return completion_status;
   }
-  const auto operation = *out_operation;
+  auto completion_state = std::make_shared<Completion>(*completion);
+  auto state =
+    std::make_shared<OperationObject>([completion_state](
+                                        mln_status status,
+                                        std::string diagnostic, std::any result
+                                      ) mutable {
+      if (status != MLN_STATUS_OK) {
+        complete(completion_state, status, std::move(diagnostic));
+        return;
+      }
+      auto* pending = std::any_cast<std::shared_ptr<PendingMapResult>>(&result);
+      if (pending == nullptr || *pending == nullptr) {
+        complete(
+          completion_state, MLN_STATUS_NATIVE_ERROR,
+          "map creation produced an invalid result"
+        );
+        return;
+      }
+      const auto map = (*pending)->value();
+      (*pending)->transfer();
+      complete_value(completion_state, MLN_STATUS_OK, {}, map);
+    });
   const auto submit_status = submit_runtime_operation(
     runtime_state, state, [runtime, effective, state]() mutable -> void {
       auto result = mln_map{MLN_HANDLE_NULL};
@@ -2694,27 +2864,12 @@ auto create_map_start(
     }
   );
   if (submit_status != MLN_STATUS_OK) {
-    abandon_operation(operation);
-    *out_operation = MLN_HANDLE_NULL;
+    completion_state->reject();
     release_runtime_map(runtime);
+  } else {
+    completion_state->accept();
   }
   return submit_status;
-}
-
-auto create_map_take_result(mln_operation operation, mln_map* out_map)
-  -> mln_status {
-  if (out_map == nullptr || *out_map != MLN_HANDLE_NULL) {
-    set_thread_error("out_map must point to the null handle");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return take_operation_result<std::shared_ptr<PendingMapResult>>(
-    operation, map_create_operation_kind,
-    [out_map](std::shared_ptr<PendingMapResult>& result) -> mln_status {
-      *out_map = result->value();
-      result->transfer();
-      return MLN_STATUS_OK;
-    }
-  );
 }
 
 auto map_snapshot_get(mln_map map, mln_map_snapshot* out_snapshot)
@@ -2738,14 +2893,16 @@ auto map_snapshot_get(mln_map map, mln_map_snapshot* out_snapshot)
 }
 
 auto map_resize(
-  mln_map map, mln_logical_extent extent, uint64_t* out_command_id
+  mln_map map, mln_logical_extent extent, const mln_completion* completion
 ) -> mln_status {
+  const auto completion_status = validate_completion(completion);
   if (
-    out_command_id == nullptr || *out_command_id != 0 || extent.width == 0 ||
+    completion_status != MLN_STATUS_OK || extent.width == 0 ||
     extent.height == 0 || !std::isfinite(extent.scale_factor) ||
     extent.scale_factor <= 0
   ) {
-    set_thread_error("extent and out_command_id must be valid");
+    if (completion_status == MLN_STATUS_OK)
+      set_thread_error("extent must be valid");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   auto live = handle_table<MapObject>().lease(map);
@@ -2756,14 +2913,14 @@ auto map_resize(
     return MLN_STATUS_INVALID_STATE;
   }
   auto submission = std::make_shared<ControlLease>(&live->control);
+  auto completion_state = std::make_shared<Completion>(*completion);
   const auto status = submit_runtime_command(
     live->runtime_state,
-    [map, live, submission = std::move(submission),
-     extent](uint64_t command_id) mutable -> void {
-      if (command_id != live->latest_resize_command_id.load()) {
-        push_runtime_command_finished(
-          live->runtime, MLN_RUNTIME_EVENT_SOURCE_MAP, map, command_id,
-          MLN_COMMAND_DISPOSITION_SUPERSEDED, MLN_STATUS_OK, 0
+    [live, submission = std::move(submission), completion_state,
+     extent](uint64_t sequence) mutable -> void {
+      if (sequence != live->latest_resize_submission.load()) {
+        complete_command(
+          completion_state, MLN_COMMAND_DISPOSITION_SUPERSEDED, MLN_STATUS_OK
         );
         return;
       }
@@ -2771,20 +2928,19 @@ auto map_resize(
         live->logical_extent = extent;
         live->map->setSize(mbgl::Size{extent.width, extent.height});
         const auto generation = publish_map_snapshot(*live);
-        push_runtime_command_finished(
-          live->runtime, MLN_RUNTIME_EVENT_SOURCE_MAP, map, command_id,
-          MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, generation
+        complete_command(
+          completion_state, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK,
+          generation
         );
       } catch (...) {
-        const auto diagnostic = exception_message(std::current_exception());
-        push_runtime_command_finished(
-          live->runtime, MLN_RUNTIME_EVENT_SOURCE_MAP, map, command_id,
-          MLN_COMMAND_DISPOSITION_FAILED, MLN_STATUS_NATIVE_ERROR, 0,
-          diagnostic.c_str()
+        complete_command(
+          completion_state, MLN_COMMAND_DISPOSITION_FAILED,
+          MLN_STATUS_NATIVE_ERROR, 0,
+          exception_message(std::current_exception())
         );
       }
     },
-    out_command_id, &live->latest_resize_command_id
+    completion_state, &live->latest_resize_submission
   );
   return status;
 }
@@ -2794,12 +2950,26 @@ auto release_map(mln_map map) -> mln_status {
   if (owned_map == nullptr) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  {
+    const std::scoped_lock lock(handle_table<MapObject>().mutex());
+    auto* live = handle_table<MapObject>().resolve_locked(map);
+    if (live == nullptr || live != owned_map.get()) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    if (live->render_target_session != nullptr) {
+      set_thread_error("map still has an attached render session");
+      return MLN_STATUS_INVALID_STATE;
+    }
+    const auto close_status = live->control.begin_close();
+    if (close_status != MLN_STATUS_OK) {
+      return close_status;
+    }
+  }
   auto state = std::shared_ptr<OperationObject>{};
   try {
-    state = std::make_shared<OperationObject>(
-      map_release_operation_kind, false, OperationObject::CancelCallback{}
-    );
+    state = std::make_shared<OperationObject>();
   } catch (...) {
+    owned_map->control.abort_close();
     set_thread_error("map release could not allocate its teardown state");
     return MLN_STATUS_NATIVE_ERROR;
   }
@@ -2817,6 +2987,7 @@ auto release_map(mln_map map) -> mln_status {
   try {
     gate = std::make_shared<CloseGate>();
   } catch (...) {
+    owned_map->control.abort_close();
     set_thread_error("map release could not allocate its teardown gate");
     return MLN_STATUS_NATIVE_ERROR;
   }
@@ -2848,7 +3019,10 @@ auto release_map(mln_map map) -> mln_status {
       try {
         owned_map->runtime_state->executor.invoke_sync([&]() -> void {
           if (owned_map->still_image_operation != nullptr) {
-            static_cast<void>(owned_map->still_image_operation->cancel());
+            owned_map->still_image_operation->complete(
+              MLN_STATUS_CANCELLED, "map closed before still image completed",
+              {}
+            );
           }
         });
         owned_map->control.wait_for_submissions();
@@ -2873,6 +3047,7 @@ auto release_map(mln_map map) -> mln_status {
     });
   } catch (...) {
     signal_abort();
+    owned_map->control.abort_close();
     set_thread_error("map release could not start its teardown waiter");
     return MLN_STATUS_NATIVE_ERROR;
   }
@@ -2883,26 +3058,9 @@ auto release_map(mln_map map) -> mln_status {
     if (waiter.joinable()) {
       waiter.join();
     }
+    owned_map->control.abort_close();
     set_thread_error("map release could not detach its teardown waiter");
     return MLN_STATUS_NATIVE_ERROR;
-  }
-  {
-    const std::scoped_lock lock(handle_table<MapObject>().mutex());
-    auto* live = handle_table<MapObject>().resolve_locked(map);
-    if (live == nullptr || live != owned_map.get()) {
-      signal_abort();
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    if (live->render_target_session != nullptr) {
-      signal_abort();
-      set_thread_error("map still has an attached render session");
-      return MLN_STATUS_INVALID_STATE;
-    }
-    const auto close_status = live->control.begin_close();
-    if (close_status != MLN_STATUS_OK) {
-      signal_abort();
-      return close_status;
-    }
   }
   const auto submit_status = submit_runtime_operation(
     owned_map->runtime_state, state, [gate]() mutable -> void {
@@ -2940,11 +3098,10 @@ PendingMapResult::~PendingMapResult() {
   }
 }
 
-auto map_request_repaint(mln_map map, uint64_t* out_command_id) -> mln_status {
-  if (out_command_id == nullptr || *out_command_id != 0) {
-    set_thread_error("out_command_id must point to zero");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+auto map_request_repaint(mln_map map, const mln_completion* completion)
+  -> mln_status {
+  const auto completion_status = validate_completion(completion);
+  if (completion_status != MLN_STATUS_OK) return completion_status;
   auto live = handle_table<MapObject>().lease(map);
   if (live == nullptr) {
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -2953,40 +3110,42 @@ auto map_request_repaint(mln_map map, uint64_t* out_command_id) -> mln_status {
     return MLN_STATUS_INVALID_STATE;
   }
   auto submission = std::make_shared<ControlLease>(&live->control);
+  auto completion_state = std::make_shared<Completion>(*completion);
   return submit_runtime_command(
     live->runtime_state,
-    [map, live,
-     submission = std::move(submission)](uint64_t command_id) mutable -> void {
+    [live, submission = std::move(submission),
+     completion_state](uint64_t) mutable -> void {
       if (live->map_mode != MLN_MAP_MODE_CONTINUOUS) {
-        push_runtime_command_finished(
-          live->runtime, MLN_RUNTIME_EVENT_SOURCE_MAP, map, command_id,
-          MLN_COMMAND_DISPOSITION_FAILED, MLN_STATUS_INVALID_STATE, 0,
-          "map is not in continuous mode"
+        complete_command(
+          completion_state, MLN_COMMAND_DISPOSITION_FAILED,
+          MLN_STATUS_INVALID_STATE, 0, "map is not in continuous mode"
         );
         return;
       }
       try {
         live->map->triggerRepaint();
         const auto generation = publish_map_snapshot(*live);
-        push_runtime_command_finished(
-          live->runtime, MLN_RUNTIME_EVENT_SOURCE_MAP, map, command_id,
-          MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, generation
+        complete_command(
+          completion_state, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK,
+          generation
         );
       } catch (...) {
-        const auto diagnostic = exception_message(std::current_exception());
-        push_runtime_command_finished(
-          live->runtime, MLN_RUNTIME_EVENT_SOURCE_MAP, map, command_id,
-          MLN_COMMAND_DISPOSITION_FAILED, MLN_STATUS_NATIVE_ERROR, 0,
-          diagnostic.c_str()
+        complete_command(
+          completion_state, MLN_COMMAND_DISPOSITION_FAILED,
+          MLN_STATUS_NATIVE_ERROR, 0,
+          exception_message(std::current_exception())
         );
       }
     },
-    out_command_id
+    completion_state
   );
 }
 
-auto map_request_still_image_start(mln_map map, mln_operation* out_operation)
-  -> mln_status {
+auto map_request_still_image_start(
+  mln_map map, const mln_completion* completion
+) -> mln_status {
+  const auto completion_status = validate_completion(completion);
+  if (completion_status != MLN_STATUS_OK) return completion_status;
   auto live = handle_table<MapObject>().lease(map);
   if (live == nullptr) {
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -3007,16 +3166,12 @@ auto map_request_still_image_start(mln_map map, mln_operation* out_operation)
       submission->reset();
     }
   };
-  auto state = std::shared_ptr<OperationObject>{};
-  const auto register_status = register_operation(
-    live->runtime_state->event_queue->notification_source,
-    map_still_image_operation_kind, true, release_submission, out_operation,
-    state
+  auto completion_state = std::make_shared<Completion>(*completion);
+  auto state = std::make_shared<OperationObject>(
+    [completion_state](mln_status status, std::string diagnostic, std::any) {
+      complete(completion_state, status, std::move(diagnostic));
+    }
   );
-  if (register_status != MLN_STATUS_OK) {
-    return register_status;
-  }
-  const auto operation = *out_operation;
   const auto submit_status = submit_runtime_operation(
     live->runtime_state, state,
     [map, live = std::move(live), state, release_submission]() mutable -> void {
@@ -3047,8 +3202,9 @@ auto map_request_still_image_start(mln_map map, mln_operation* out_operation)
     }
   );
   if (submit_status != MLN_STATUS_OK) {
-    abandon_operation(operation);
-    *out_operation = MLN_HANDLE_NULL;
+    completion_state->reject();
+  } else {
+    completion_state->accept();
   }
   return submit_status;
 }
@@ -3065,16 +3221,31 @@ auto map_scale_factor(mln_map map) -> double {
 // worker or use the posting helpers below.
 auto map_native(MapObject* map) -> mbgl::Map* { return map->map.get(); }
 
+namespace {
+
+void discard_completion(void*, const mln_completion_result*) noexcept {}
+
+auto discarded_completion() noexcept -> mln_completion {
+  return mln_completion{
+    .size = sizeof(mln_completion),
+    .callback = discard_completion,
+    .user_data = nullptr,
+    .release_user_data = nullptr,
+  };
+}
+
+}  // namespace
+
 // Render-session resize enters the same ordered extent command as public
 // resize, so one path owns logical extent and scale after map creation.
 auto map_post_resize(mln_map map, mln_logical_extent extent) -> mln_status {
-  auto command_id = uint64_t{0};
-  return map_resize(map, extent, &command_id);
+  const auto completion = discarded_completion();
+  return map_resize(map, extent, &completion);
 }
 
 auto map_post_trigger_repaint(mln_map map) -> mln_status {
-  auto command_id = uint64_t{0};
-  return map_request_repaint(map, &command_id);
+  const auto completion = discarded_completion();
+  return map_request_repaint(map, &completion);
 }
 
 auto map_latest_update(mln_map map) -> std::shared_ptr<mbgl::UpdateParameters> {
@@ -3228,9 +3399,11 @@ auto map_set_style_json(mln_map map, mln_buffer_view json) -> mln_status {
 }
 
 auto start_map_string_operation(
-  mln_map map, uint32_t kind, mln_operation* out_operation,
+  mln_map map, const mln_completion* completion,
   std::function<std::string(MapObject&)> read
 ) -> mln_status {
+  const auto completion_status = validate_completion(completion);
+  if (completion_status != MLN_STATUS_OK) return completion_status;
   auto live = handle_table<MapObject>().lease(map);
   if (live == nullptr) {
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -3239,15 +3412,35 @@ auto start_map_string_operation(
     return MLN_STATUS_INVALID_STATE;
   }
   auto submission = std::make_shared<ControlLease>(&live->control);
-  auto state = std::shared_ptr<OperationObject>{};
-  const auto register_status = register_operation(
-    live->runtime_state->event_queue->notification_source, kind, false, {},
-    out_operation, state
-  );
-  if (register_status != MLN_STATUS_OK) {
-    return register_status;
-  }
-  const auto operation = *out_operation;
+  auto completion_state = std::make_shared<Completion>(*completion);
+  auto state =
+    std::make_shared<OperationObject>([completion_state](
+                                        mln_status status,
+                                        std::string diagnostic, std::any result
+                                      ) {
+      if (status != MLN_STATUS_OK) {
+        complete(completion_state, status, std::move(diagnostic));
+        return;
+      }
+      auto* text = std::any_cast<std::string>(&result);
+      if (text == nullptr) {
+        complete(
+          completion_state, MLN_STATUS_NATIVE_ERROR,
+          "map string operation produced an invalid result"
+        );
+        return;
+      }
+      completion_state->resolve(
+        [text = std::move(*text)](const mln_completion& descriptor) {
+          const auto view =
+            mln_buffer_view{.data = text.data(), .size = text.size()};
+          invoke_completion(
+            descriptor, MLN_STATUS_OK, MLN_COMMAND_DISPOSITION_COMMITTED, 0, {},
+            &view, 1
+          );
+        }
+      );
+    });
   const auto submit_status = submit_runtime_operation(
     live->runtime_state, state,
     [live = std::move(live), state, read = std::move(read),
@@ -3262,67 +3455,40 @@ auto start_map_string_operation(
       }
     }
   );
-  if (submit_status != MLN_STATUS_OK) {
-    abandon_operation(operation);
-    *out_operation = MLN_HANDLE_NULL;
-  }
+  if (submit_status == MLN_STATUS_OK)
+    completion_state->accept();
+  else
+    completion_state->reject();
   return submit_status;
 }
 
-auto map_loaded_style_json_start(mln_map map, mln_operation* out_operation)
+auto map_loaded_style_json_start(mln_map map, const mln_completion* completion)
   -> mln_status {
   return start_map_string_operation(
-    map, map_loaded_style_json_operation_kind, out_operation,
-    [](MapObject& live) -> std::string {
+    map, completion, [](MapObject& live) -> std::string {
       return live.map->getStyle().getJSON();
     }
   );
 }
 
-auto map_loaded_style_json_take_result(
-  mln_operation operation, mln_buffer* out_json
-) -> mln_status {
-  if (out_json == nullptr || *out_json != MLN_HANDLE_NULL) {
-    set_thread_error("out_json must point to the null handle");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return take_operation_result<std::string>(
-    operation, map_loaded_style_json_operation_kind,
-    [out_json](std::string& result) -> mln_status {
-      return create_buffer(std::move(result), out_json);
-    }
-  );
-}
-
-auto map_style_url_start(mln_map map, mln_operation* out_operation)
+auto map_style_url_start(mln_map map, const mln_completion* completion)
   -> mln_status {
   return start_map_string_operation(
-    map, map_style_url_operation_kind, out_operation,
+    map, completion,
     [](MapObject& live) -> std::string { return live.map->getStyle().getURL(); }
   );
 }
 
-auto map_style_url_take_result(mln_operation operation, mln_buffer* out_url)
-  -> mln_status {
-  if (out_url == nullptr || *out_url != MLN_HANDLE_NULL) {
-    set_thread_error("out_url must point to the null handle");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return take_operation_result<std::string>(
-    operation, map_style_url_operation_kind,
-    [out_url](std::string& result) -> mln_status {
-      return create_buffer(std::move(result), out_url);
-    }
-  );
-}
-
-auto map_set_event_mask(mln_map map, uint64_t mask, uint64_t* out_command_id)
-  -> mln_status {
+auto map_set_event_mask(
+  mln_map map, uint64_t mask, const mln_completion* completion
+) -> mln_status {
+  const auto completion_status = validate_completion(completion);
   if (
-    out_command_id == nullptr || *out_command_id != 0 ||
+    completion_status != MLN_STATUS_OK ||
     (mask & ~static_cast<uint64_t>(MLN_RUNTIME_EVENT_MASK_ALL)) != 0U
   ) {
-    set_thread_error("mask and out_command_id must be valid");
+    if (completion_status == MLN_STATUS_OK)
+      set_thread_error("mask must be valid");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   auto live = handle_table<MapObject>().lease(map);
@@ -3333,27 +3499,27 @@ auto map_set_event_mask(mln_map map, uint64_t mask, uint64_t* out_command_id)
     return MLN_STATUS_INVALID_STATE;
   }
   auto submission = std::make_shared<ControlLease>(&live->control);
+  auto completion_state = std::make_shared<Completion>(*completion);
   return submit_runtime_command(
     live->runtime_state,
-    [map, live, mask,
-     submission = std::move(submission)](uint64_t command_id) mutable -> void {
+    [live, mask, submission = std::move(submission),
+     completion_state](uint64_t) mutable -> void {
       try {
         live->event_state->mask.store(mask, std::memory_order_relaxed);
         const auto generation = publish_map_snapshot(*live);
-        push_runtime_command_finished(
-          live->runtime, MLN_RUNTIME_EVENT_SOURCE_MAP, map, command_id,
-          MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, generation
+        complete_command(
+          completion_state, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK,
+          generation
         );
       } catch (...) {
-        const auto diagnostic = exception_message(std::current_exception());
-        push_runtime_command_finished(
-          live->runtime, MLN_RUNTIME_EVENT_SOURCE_MAP, map, command_id,
-          MLN_COMMAND_DISPOSITION_FAILED, MLN_STATUS_NATIVE_ERROR, 0,
-          diagnostic.c_str()
+        complete_command(
+          completion_state, MLN_COMMAND_DISPOSITION_FAILED,
+          MLN_STATUS_NATIVE_ERROR, 0,
+          exception_message(std::current_exception())
         );
       }
     },
-    out_command_id
+    completion_state
   );
 }
 
@@ -3382,44 +3548,43 @@ namespace {
 
 template <typename Mutation>
 auto submit_camera_command(
-  mln_map map, Mutation mutation, uint64_t* out_command_id
+  mln_map map, Mutation mutation, const mln_completion* completion
 ) -> mln_status {
-  if (out_command_id == nullptr || *out_command_id != 0) {
-    set_thread_error("out_command_id must point to zero");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  const auto completion_status = validate_completion(completion);
+  if (completion_status != MLN_STATUS_OK) return completion_status;
   auto live = handle_table<MapObject>().lease(map);
   if (live == nullptr) return MLN_STATUS_INVALID_ARGUMENT;
   if (!live->control.acquire()) return MLN_STATUS_INVALID_STATE;
   auto submission = std::make_shared<ControlLease>(&live->control);
+  auto completion_state = std::make_shared<Completion>(*completion);
   return submit_runtime_command(
     live->runtime_state,
     [map, live, mutation = std::move(mutation),
-     submission = std::move(submission)](uint64_t command_id) mutable -> void {
+     submission = std::move(submission),
+     completion_state](uint64_t) mutable -> void {
       try {
         mutation(*live, map);
         const auto generation = publish_map_snapshot(*live);
-        push_runtime_command_finished(
-          live->runtime, MLN_RUNTIME_EVENT_SOURCE_MAP, map, command_id,
-          MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, generation
+        complete_command(
+          completion_state, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK,
+          generation
         );
       } catch (...) {
-        const auto diagnostic = exception_message(std::current_exception());
-        push_runtime_command_finished(
-          live->runtime, MLN_RUNTIME_EVENT_SOURCE_MAP, map, command_id,
-          MLN_COMMAND_DISPOSITION_FAILED, MLN_STATUS_NATIVE_ERROR, 0,
-          diagnostic.c_str()
+        complete_command(
+          completion_state, MLN_COMMAND_DISPOSITION_FAILED,
+          MLN_STATUS_NATIVE_ERROR, 0,
+          exception_message(std::current_exception())
         );
       }
     },
-    out_command_id
+    completion_state
   );
 }
 
 }  // namespace
 
 auto map_update_camera(
-  mln_map map, const mln_camera_update* update, uint64_t* out_command_id
+  mln_map map, const mln_camera_update* update, const mln_completion* completion
 ) -> mln_status {
   if (update == nullptr || update->size < sizeof(mln_camera_update)) {
     set_thread_error("camera update must have a valid size");
@@ -3483,12 +3648,12 @@ auto map_update_camera(
         live.map->setGestureInProgress(false);
       }
     },
-    out_command_id
+    completion
   );
 }
 
 auto map_apply_camera_delta(
-  mln_map map, const mln_camera_delta* delta, uint64_t* out_command_id
+  mln_map map, const mln_camera_delta* delta, const mln_completion* completion
 ) -> mln_status {
   if (delta == nullptr || delta->size < sizeof(mln_camera_delta)) {
     set_thread_error("camera delta must have a valid size");
@@ -3570,12 +3735,14 @@ auto map_apply_camera_delta(
           break;
       }
     },
-    out_command_id
+    completion
   );
 }
 
-auto map_camera_query_start(mln_map map, mln_operation* out_operation)
+auto map_camera_query_start(mln_map map, const mln_completion* completion)
   -> mln_status {
+  const auto completion_status = validate_completion(completion);
+  if (completion_status != MLN_STATUS_OK) return completion_status;
   auto live = handle_table<MapObject>().lease(map);
   if (live == nullptr) {
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -3584,15 +3751,24 @@ auto map_camera_query_start(mln_map map, mln_operation* out_operation)
     return MLN_STATUS_INVALID_STATE;
   }
   auto submission = std::make_shared<ControlLease>(&live->control);
-  auto state = std::shared_ptr<OperationObject>{};
-  const auto register_status = register_operation(
-    live->runtime_state->event_queue->notification_source,
-    map_camera_query_operation_kind, false, {}, out_operation, state
-  );
-  if (register_status != MLN_STATUS_OK) {
-    return register_status;
-  }
-  const auto operation = *out_operation;
+  auto completion_state = std::make_shared<Completion>(*completion);
+  auto state =
+    std::make_shared<OperationObject>([completion_state](
+                                        mln_status status,
+                                        std::string diagnostic, std::any result
+                                      ) {
+      auto* value = std::any_cast<mln_camera_query_result>(&result);
+      if (status != MLN_STATUS_OK || value == nullptr) {
+        complete(
+          completion_state,
+          status == MLN_STATUS_OK ? MLN_STATUS_NATIVE_ERROR : status,
+          status == MLN_STATUS_OK ? "camera query produced an invalid result"
+                                  : std::move(diagnostic)
+        );
+        return;
+      }
+      complete_value(completion_state, MLN_STATUS_OK, {}, *value);
+    });
   const auto submit_status = submit_runtime_operation(
     live->runtime_state, state,
     [live = std::move(live), state,
@@ -3616,29 +3792,11 @@ auto map_camera_query_start(mln_map map, mln_operation* out_operation)
       }
     }
   );
-  if (submit_status != MLN_STATUS_OK) {
-    abandon_operation(operation);
-    *out_operation = MLN_HANDLE_NULL;
-  }
+  if (submit_status == MLN_STATUS_OK)
+    completion_state->accept();
+  else
+    completion_state->reject();
   return submit_status;
-}
-
-auto map_camera_query_take_result(
-  mln_operation operation, mln_camera_query_result* out_result
-) -> mln_status {
-  if (
-    out_result == nullptr || out_result->size < sizeof(mln_camera_query_result)
-  ) {
-    set_thread_error("out_result must not be null and must have a valid size");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return take_operation_result<mln_camera_query_result>(
-    operation, map_camera_query_operation_kind,
-    [out_result](mln_camera_query_result& result) -> mln_status {
-      *out_result = result;
-      return MLN_STATUS_OK;
-    }
-  );
 }
 
 auto map_set_debug_options(mln_map map, uint32_t options) -> mln_status {
@@ -3860,7 +4018,7 @@ auto map_lat_lngs_for_pixels(
 }
 
 auto map_pixel_for_lat_lng_start(
-  mln_map map, mln_lat_lng coordinate, mln_operation* out_operation
+  mln_map map, mln_lat_lng coordinate, const mln_completion* completion
 ) -> mln_status {
   if (validate_lat_lng(coordinate) != MLN_STATUS_OK) {
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -3870,28 +4028,12 @@ auto map_pixel_for_lat_lng_start(
     [map, coordinate](GeometryOperationResult& result) {
       return map_pixel_for_lat_lng(map, coordinate, &result.point);
     },
-    out_operation
-  );
-}
-
-auto map_pixel_for_lat_lng_take_result(
-  mln_operation operation, mln_screen_point* out_point
-) -> mln_status {
-  if (out_point == nullptr) {
-    set_thread_error("out_point must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return take_geometry_operation(
-    operation, GeometryOperationKind::PixelForCoordinate,
-    [out_point](GeometryOperationResult& result) {
-      *out_point = result.point;
-      return MLN_STATUS_OK;
-    }
+    completion
   );
 }
 
 auto map_lat_lng_for_pixel_start(
-  mln_map map, mln_screen_point point, mln_operation* out_operation
+  mln_map map, mln_screen_point point, const mln_completion* completion
 ) -> mln_status {
   if (validate_screen_point(point) != MLN_STATUS_OK) {
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -3901,29 +4043,13 @@ auto map_lat_lng_for_pixel_start(
     [map, point](GeometryOperationResult& result) {
       return map_lat_lng_for_pixel(map, point, &result.coordinate);
     },
-    out_operation
-  );
-}
-
-auto map_lat_lng_for_pixel_take_result(
-  mln_operation operation, mln_lat_lng* out_coordinate
-) -> mln_status {
-  if (out_coordinate == nullptr) {
-    set_thread_error("out_coordinate must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return take_geometry_operation(
-    operation, GeometryOperationKind::CoordinateForPixel,
-    [out_coordinate](GeometryOperationResult& result) {
-      *out_coordinate = result.coordinate;
-      return MLN_STATUS_OK;
-    }
+    completion
   );
 }
 
 auto map_pixels_for_lat_lngs_start(
   mln_map map, const mln_lat_lng* coordinates, size_t coordinate_count,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) -> mln_status {
   if (
     validate_lat_lng_array(coordinates, coordinate_count, true) != MLN_STATUS_OK
@@ -3942,39 +4068,13 @@ auto map_pixels_for_lat_lngs_start(
         map, copied.data(), copied.size(), result.points.data()
       );
     },
-    out_operation
-  );
-}
-
-auto map_pixels_for_lat_lngs_take_result(
-  mln_operation operation, mln_screen_point* out_points, size_t point_capacity,
-  size_t* out_point_count
-) -> mln_status {
-  if (out_point_count == nullptr) {
-    set_thread_error("out_point_count must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return take_geometry_operation(
-    operation, GeometryOperationKind::PixelsForCoordinates,
-    [out_points, point_capacity,
-     out_point_count](GeometryOperationResult& result) {
-      *out_point_count = result.points.size();
-      if (
-        point_capacity < result.points.size() ||
-        (!result.points.empty() && out_points == nullptr)
-      ) {
-        set_thread_error("out_points capacity is too small");
-        return MLN_STATUS_INVALID_ARGUMENT;
-      }
-      std::copy(result.points.begin(), result.points.end(), out_points);
-      return MLN_STATUS_OK;
-    }
+    completion
   );
 }
 
 auto map_lat_lngs_for_pixels_start(
   mln_map map, const mln_screen_point* points, size_t point_count,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) -> mln_status {
   if (validate_screen_point_array(points, point_count) != MLN_STATUS_OK) {
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -3991,48 +4091,14 @@ auto map_lat_lngs_for_pixels_start(
         map, copied.data(), copied.size(), result.coordinates.data()
       );
     },
-    out_operation
+    completion
   );
 }
 
-auto map_lat_lngs_for_pixels_take_result(
-  mln_operation operation, mln_lat_lng* out_coordinates,
-  size_t coordinate_capacity, size_t* out_coordinate_count
-) -> mln_status {
-  if (out_coordinate_count == nullptr) {
-    set_thread_error("out_coordinate_count must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return take_geometry_operation(
-    operation, GeometryOperationKind::CoordinatesForPixels,
-    [out_coordinates, coordinate_capacity,
-     out_coordinate_count](GeometryOperationResult& result) {
-      *out_coordinate_count = result.coordinates.size();
-      if (
-        coordinate_capacity < result.coordinates.size() ||
-        (!result.coordinates.empty() && out_coordinates == nullptr)
-      ) {
-        set_thread_error("out_coordinates capacity is too small");
-        return MLN_STATUS_INVALID_ARGUMENT;
-      }
-      std::copy(
-        result.coordinates.begin(), result.coordinates.end(), out_coordinates
-      );
-      return MLN_STATUS_OK;
-    }
-  );
-}
-
-auto map_projection_create_start(mln_map map, mln_operation* out_operation)
+auto map_projection_create_start(mln_map map, const mln_completion* completion)
   -> mln_status {
-  if (out_operation == nullptr) {
-    set_thread_error("out_operation must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (*out_operation != MLN_HANDLE_NULL) {
-    set_thread_error("out_operation must point to the null handle");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  const auto completion_status = validate_completion(completion);
+  if (completion_status != MLN_STATUS_OK) return completion_status;
 
   auto& table = handle_table<MapObject>();
   const std::scoped_lock lock(table.mutex());
@@ -4044,15 +4110,29 @@ auto map_projection_create_start(mln_map map, mln_operation* out_operation)
   if (runtime == nullptr) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto state = std::shared_ptr<OperationObject>{};
-  const auto register_status = register_operation(
-    runtime->event_queue->notification_source, projection_operation_create,
-    false, {}, out_operation, state
-  );
-  if (register_status != MLN_STATUS_OK) {
-    return register_status;
-  }
-  const auto operation = *out_operation;
+  auto completion_state = std::make_shared<Completion>(*completion);
+  auto state = std::make_shared<OperationObject>([completion_state](
+                                                   mln_status status,
+                                                   std::string diagnostic,
+                                                   std::any result
+                                                 ) {
+    auto* projection =
+      std::any_cast<std::shared_ptr<MapProjectionObject>>(&result);
+    if (
+      status != MLN_STATUS_OK || projection == nullptr || *projection == nullptr
+    ) {
+      complete(
+        completion_state,
+        status == MLN_STATUS_OK ? MLN_STATUS_NATIVE_ERROR : status,
+        status == MLN_STATUS_OK
+          ? "projection creation produced an invalid result"
+          : std::move(diagnostic)
+      );
+      return;
+    }
+    const auto handle = handle_table<MapProjectionObject>().insert(*projection);
+    complete_value(completion_state, MLN_STATUS_OK, {}, handle);
+  });
   const auto submit_status =
     submit_runtime_operation(runtime, state, [parent, state]() mutable -> void {
       try {
@@ -4067,32 +4147,11 @@ auto map_projection_create_start(mln_map map, mln_operation* out_operation)
         );
       }
     });
-  if (submit_status != MLN_STATUS_OK) {
-    abandon_operation(operation);
-    *out_operation = MLN_HANDLE_NULL;
-  }
+  if (submit_status == MLN_STATUS_OK)
+    completion_state->accept();
+  else
+    completion_state->reject();
   return submit_status;
-}
-
-auto map_projection_create_take_result(
-  mln_operation operation, mln_map_projection* out_projection
-) -> mln_status {
-  return take_operation_result<std::shared_ptr<MapProjectionObject>>(
-    operation, projection_operation_create,
-    [out_projection](std::shared_ptr<MapProjectionObject>& result)
-      -> mln_status {
-      if (out_projection == nullptr) {
-        set_thread_error("out_projection must not be null");
-        return MLN_STATUS_INVALID_ARGUMENT;
-      }
-      if (*out_projection != MLN_HANDLE_NULL) {
-        set_thread_error("out_projection must point to the null handle");
-        return MLN_STATUS_INVALID_ARGUMENT;
-      }
-      *out_projection = handle_table<MapProjectionObject>().insert(result);
-      return MLN_STATUS_OK;
-    }
-  );
 }
 
 auto map_projection_close(mln_map_projection projection) -> mln_status {
@@ -4422,7 +4481,7 @@ auto map_lat_lng_bounds_for_camera_unwrapped(
 
 auto map_camera_for_lat_lng_bounds_start(
   mln_map map, mln_lat_lng_bounds bounds,
-  const mln_camera_fit_options* fit_options, mln_operation* out_operation
+  const mln_camera_fit_options* fit_options, const mln_completion* completion
 ) -> mln_status {
   if (
     validate_lat_lng_bounds(bounds) != MLN_STATUS_OK ||
@@ -4441,36 +4500,13 @@ auto map_camera_for_lat_lng_bounds_start(
         map, bounds, has_fit ? &fit : nullptr, &result.camera
       );
     },
-    out_operation
-  );
-}
-
-auto take_camera_result(
-  mln_operation operation, GeometryOperationKind kind,
-  mln_camera_options* out_camera
-) -> mln_status {
-  if (validate_camera_output(out_camera) != MLN_STATUS_OK) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return take_geometry_operation(
-    operation, kind, [out_camera](GeometryOperationResult& result) {
-      *out_camera = result.camera;
-      return MLN_STATUS_OK;
-    }
-  );
-}
-
-auto map_camera_for_lat_lng_bounds_take_result(
-  mln_operation operation, mln_camera_options* out_camera
-) -> mln_status {
-  return take_camera_result(
-    operation, GeometryOperationKind::CameraForBounds, out_camera
+    completion
   );
 }
 
 auto map_camera_for_lat_lngs_start(
   mln_map map, const mln_lat_lng* coordinates, size_t coordinate_count,
-  const mln_camera_fit_options* fit_options, mln_operation* out_operation
+  const mln_camera_fit_options* fit_options, const mln_completion* completion
 ) -> mln_status {
   if (
     validate_lat_lng_array(coordinates, coordinate_count, false) !=
@@ -4494,21 +4530,13 @@ auto map_camera_for_lat_lngs_start(
         &result.camera
       );
     },
-    out_operation
-  );
-}
-
-auto map_camera_for_lat_lngs_take_result(
-  mln_operation operation, mln_camera_options* out_camera
-) -> mln_status {
-  return take_camera_result(
-    operation, GeometryOperationKind::CameraForCoordinates, out_camera
+    completion
   );
 }
 
 auto map_camera_for_geometry_start(
   mln_map map, mln_buffer_view geometry,
-  const mln_camera_fit_options* fit_options, mln_operation* out_operation
+  const mln_camera_fit_options* fit_options, const mln_completion* completion
 ) -> mln_status {
   const auto parsed = to_native_geometry(geometry);
   if (!parsed || geometry_lat_lngs(*parsed).empty()) {
@@ -4537,21 +4565,13 @@ auto map_camera_for_geometry_start(
         map, view, has_fit ? &fit : nullptr, &result.camera
       );
     },
-    out_operation
-  );
-}
-
-auto map_camera_for_geometry_take_result(
-  mln_operation operation, mln_camera_options* out_camera
-) -> mln_status {
-  return take_camera_result(
-    operation, GeometryOperationKind::CameraForGeometry, out_camera
+    completion
   );
 }
 
 auto start_bounds_for_camera(
   mln_map map, const mln_camera_options* camera, bool unwrapped,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) -> mln_status {
   if (validate_camera_options(camera) != MLN_STATUS_OK) {
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -4568,52 +4588,22 @@ auto start_bounds_for_camera(
                  )
                : map_lat_lng_bounds_for_camera(map, &copied, &result.bounds);
     },
-    out_operation
+    completion
   );
 }
 
 auto map_lat_lng_bounds_for_camera_start(
-  mln_map map, const mln_camera_options* camera, mln_operation* out_operation
+  mln_map map, const mln_camera_options* camera,
+  const mln_completion* completion
 ) -> mln_status {
-  return start_bounds_for_camera(map, camera, false, out_operation);
-}
-
-auto take_bounds_result(
-  mln_operation operation, GeometryOperationKind kind,
-  mln_lat_lng_bounds* out_bounds
-) -> mln_status {
-  if (out_bounds == nullptr) {
-    set_thread_error("out_bounds must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return take_geometry_operation(
-    operation, kind, [out_bounds](GeometryOperationResult& result) {
-      *out_bounds = result.bounds;
-      return MLN_STATUS_OK;
-    }
-  );
-}
-
-auto map_lat_lng_bounds_for_camera_take_result(
-  mln_operation operation, mln_lat_lng_bounds* out_bounds
-) -> mln_status {
-  return take_bounds_result(
-    operation, GeometryOperationKind::BoundsForCamera, out_bounds
-  );
+  return start_bounds_for_camera(map, camera, false, completion);
 }
 
 auto map_lat_lng_bounds_for_camera_unwrapped_start(
-  mln_map map, const mln_camera_options* camera, mln_operation* out_operation
+  mln_map map, const mln_camera_options* camera,
+  const mln_completion* completion
 ) -> mln_status {
-  return start_bounds_for_camera(map, camera, true, out_operation);
-}
-
-auto map_lat_lng_bounds_for_camera_unwrapped_take_result(
-  mln_operation operation, mln_lat_lng_bounds* out_bounds
-) -> mln_status {
-  return take_bounds_result(
-    operation, GeometryOperationKind::UnwrappedBoundsForCamera, out_bounds
-  );
+  return start_bounds_for_camera(map, camera, true, completion);
 }
 
 auto map_set_bounds(mln_map map, const mln_bound_options* options)
@@ -4652,7 +4642,7 @@ auto map_set_free_camera_options(
 }
 
 auto map_set_projection_mode(
-  mln_map map, const mln_projection_mode* mode, uint64_t* out_command_id
+  mln_map map, const mln_projection_mode* mode, const mln_completion* completion
 ) -> mln_status {
   if (mode == nullptr || mode->size < sizeof(mln_projection_mode)) {
     set_thread_error("mode must not be null and must have a valid size");
@@ -4696,7 +4686,7 @@ auto map_set_projection_mode(
       live->map->setProjectionMode(std::move(copied));
       return MLN_STATUS_OK;
     },
-    out_command_id
+    completion
   );
 }
 

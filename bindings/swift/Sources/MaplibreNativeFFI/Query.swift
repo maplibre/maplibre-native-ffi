@@ -100,39 +100,44 @@ public extension RenderSessionHandle {
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions = RenderedFeatureQueryOptions()
   ) async throws -> [QueriedFeature] {
-    let operation = try mapNativeFailure {
-      try geometry.nativeGeometry.withNativeGeometry { geometry in
+    let future = try mapNativeFailure {
+      let session = try requireLiveHandle()
+      return try geometry.nativeGeometry.withNativeGeometry { geometry in
         try options.nativeOptions.withNativeOptions { options in
-          try startOperation { session, operation in
-            mln_render_session_query_rendered_features_start(
-              session, geometry, options, operation
-            )
-          }
+          try NativeCompletion.start(
+            {
+              mln_render_session_query_rendered_features(
+                session.raw, geometry, options, $0
+              )
+            },
+            convert: NativeQuery.copyQueriedFeatures
+          )
         }
       }
     }
-    return try await takeFeatureQuery(operation)
+    return try await mapNativeFailure { try await future.value() }
   }
 
   func querySourceFeatures(
     sourceId: String,
     options: SourceFeatureQueryOptions = SourceFeatureQueryOptions()
   ) async throws -> [QueriedFeature] {
-    let operation = try mapNativeFailure {
+    let future = try mapNativeFailure {
+      let session = try requireLiveHandle()
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try options.nativeOptions.withNativeOptions { options in
-        try startOperation { session, operation in
-          mln_render_session_query_source_features_start(
-            session,
-            arena.view(sourceId),
-            options,
-            operation
-          )
-        }
+        try NativeCompletion.start(
+          {
+            mln_render_session_query_source_features(
+              session.raw, arena.view(sourceId), options, $0
+            )
+          },
+          convert: NativeQuery.copyQueriedFeatures
+        )
       }
     }
-    return try await takeFeatureQuery(operation)
+    return try await mapNativeFailure { try await future.value() }
   }
 
   func queryFeatureExtension(
@@ -142,23 +147,25 @@ public extension RenderSessionHandle {
     extensionField: String,
     arguments: Data? = nil
   ) async throws -> Data {
-    let operation = try mapNativeFailure {
+    let future = try mapNativeFailure {
+      let session = try requireLiveHandle()
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
-      let start = {
-        (arguments: UnsafePointer<mln_buffer_view>?) throws
-        -> NativeOperationHandle in
-        try self.startOperation { session, operation in
-          mln_render_session_query_feature_extensions_start(
-            session,
-            arena.view(sourceId),
-            arena.view(feature),
-            arena.view(extensionName),
-            arena.view(extensionField),
-            arguments,
-            operation
-          )
-        }
+      let start = { (arguments: UnsafePointer<mln_buffer_view>?) throws in
+        try NativeCompletion.start(
+          {
+            mln_render_session_query_feature_extensions(
+              session.raw,
+              arena.view(sourceId),
+              arena.view(feature),
+              arena.view(extensionName),
+              arena.view(extensionField),
+              arguments,
+              $0
+            )
+          },
+          convert: NativeCompletion.data
+        )
       }
       if let arguments {
         var view = arena.view(arguments)
@@ -166,102 +173,70 @@ public extension RenderSessionHandle {
       }
       return try start(nil)
     }
-    return try await takeRenderQuery(operation)
+    return try await mapNativeFailure { try await future.value() }
   }
 
   func setFeatureState(
     selector: FeatureStateSelector,
     state: Data
   ) async throws {
-    let operation = try mapNativeFailure {
+    let future = try mapNativeFailure {
+      let session = try requireLiveHandle()
       let arena = NativeInputArena()
       defer { withExtendedLifetime(arena) {} }
       return try selector.nativeSelector.withNativeSelector { selector in
-        try startOperation { session, operation in
-          mln_render_session_set_feature_state_start(
-            session,
+        try NativeCompletion.startUnit {
+          mln_render_session_set_feature_state(
+            session.raw,
             selector.pointee.source_id,
             selector.pointee.source_layer_id,
             selector.pointee.feature_id,
             arena.view(state),
-            operation
+            $0
           )
         }
       }
     }
-    defer { mln_operation_release(operation.raw) }
-    try await waitForOperation(operation)
+    try await mapNativeFailure { try await future.value() }
   }
 
   func featureState(selector: FeatureStateSelector) async throws -> Data {
-    let operation = try mapNativeFailure {
-      try selector.nativeSelector.withNativeSelector { selector in
-        try startOperation { session, operation in
-          mln_render_session_get_feature_state_start(
-            session,
-            selector.pointee.source_id,
-            selector.pointee.source_layer_id,
-            selector.pointee.feature_id,
-            operation
-          )
-        }
+    let future = try mapNativeFailure {
+      let session = try requireLiveHandle()
+      return try selector.nativeSelector.withNativeSelector { selector in
+        try NativeCompletion.start(
+          {
+            mln_render_session_get_feature_state(
+              session.raw,
+              selector.pointee.source_id,
+              selector.pointee.source_layer_id,
+              selector.pointee.feature_id,
+              $0
+            )
+          },
+          convert: NativeCompletion.data
+        )
       }
     }
-    defer { mln_operation_release(operation.raw) }
-    try await waitForOperation(operation)
-    return try mapNativeFailure {
-      var buffer: mln_buffer = 0
-      try checkStatus(mln_render_session_get_feature_state_take_result(
-        operation.raw, &buffer
-      ))
-      return try NativeMemory.copyBuffer(NativeBufferHandle(raw: buffer))
-    }
+    return try await mapNativeFailure { try await future.value() }
   }
 
   func removeFeatureState(selector: FeatureStateSelector) async throws {
-    let operation = try mapNativeFailure {
-      try selector.nativeSelector.withNativeSelector { selector in
-        try startOperation { session, operation in
-          mln_render_session_remove_feature_state_start(
-            session,
+    let future = try mapNativeFailure {
+      let session = try requireLiveHandle()
+      return try selector.nativeSelector.withNativeSelector { selector in
+        try NativeCompletion.startUnit {
+          mln_render_session_remove_feature_state(
+            session.raw,
             selector.pointee.source_id,
             selector.pointee.source_layer_id,
             selector.pointee.feature_id,
             selector.pointee.state_key,
-            operation
+            $0
           )
         }
       }
     }
-    defer { mln_operation_release(operation.raw) }
-    try await waitForOperation(operation)
-  }
-
-  private func takeRenderQuery(
-    _ operation: NativeOperationHandle
-  ) async throws -> Data {
-    defer { mln_operation_release(operation.raw) }
-    try await waitForOperation(operation)
-    return try mapNativeFailure {
-      var buffer: mln_buffer = 0
-      try checkStatus(mln_render_query_take_result(operation.raw, &buffer))
-      return try NativeMemory.copyBuffer(NativeBufferHandle(raw: buffer))
-    }
-  }
-
-  private func takeFeatureQuery(
-    _ operation: NativeOperationHandle
-  ) async throws -> [QueriedFeature] {
-    defer { mln_operation_release(operation.raw) }
-    try await waitForOperation(operation)
-    return try mapNativeFailure {
-      var list: mln_queried_feature_list = 0
-      try checkStatus(mln_render_query_features_take_result(
-        operation.raw, &list
-      ))
-      return try NativeQuery.copyQueriedFeatureList(
-        NativeQueriedFeatureListHandle(raw: list)
-      )
-    }
+    try await mapNativeFailure { try await future.value() }
   }
 }

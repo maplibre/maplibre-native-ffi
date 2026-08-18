@@ -75,18 +75,18 @@ private final class ResourceHandleStateCapture: @unchecked Sendable {
   #expect(runtime.isClosed)
 }
 
-@Test func runtimeResourceTransformCanInstallAndClear() throws {
+@Test func runtimeResourceTransformCanInstallAndClear() async throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.closeBlockingForTests() }
 
-  try runtime.setResourceTransform { request in
+  try await runtime.setResourceTransform { request in
     request.url.replacingOccurrences(
       of: "example.test",
       with: "example.invalid"
     )
   }
-  try runtime.clearResourceTransform()
+  try await runtime.clearResourceTransform()
 }
 
 /// Requests a style URL whose scheme no file source serves, drains until the
@@ -105,7 +105,7 @@ private func loadProbeStyle(
   map: MapHandle,
   styleURL: String
 ) async throws -> String? {
-  _ = try map.setStyleURL(styleURL)
+  _ = try await map.setStyleURL(styleURL)
   return try await drainUntilEvent(
     runtime,
     waitingFor: "a loading failure for \(styleURL)"
@@ -122,7 +122,7 @@ private func loadProbeStyle(
   defer { try? map.closeBlockingForTests() }
 
   let firstCalls = ResourceProviderCallCounter()
-  try runtime.setResourceProvider { _, _ in
+  try await runtime.setResourceProvider { _, _ in
     firstCalls.recordCall()
     return .passThrough
   }
@@ -137,7 +137,7 @@ private func loadProbeStyle(
 
   // The previous provider stops being consulted once the call returns.
   let secondCalls = ResourceProviderCallCounter()
-  try runtime.setResourceProvider { _, _ in
+  try await runtime.setResourceProvider { _, _ in
     secondCalls.recordCall()
     return .passThrough
   }
@@ -152,7 +152,7 @@ private func loadProbeStyle(
   #expect(secondCalls.callCount > 0)
   #expect(firstCalls.callCount == firstCallsAfterReplace)
 
-  try runtime.clearResourceProvider()
+  try await runtime.clearResourceProvider()
   let secondCallsAfterClear = secondCalls.callCount
 
   let clearedFailure = try await loadProbeStyle(
@@ -165,7 +165,7 @@ private func loadProbeStyle(
   #expect(secondCalls.callCount == secondCallsAfterClear)
 
   // Clearing an already cleared provider stays a successful no-op.
-  try runtime.clearResourceProvider()
+  try await runtime.clearResourceProvider()
 }
 
 private let providerStyleJSON = #"{"version":8,"sources":{},"layers":[]}"#
@@ -192,7 +192,7 @@ private final class ResolvedURLCapture: @unchecked Sendable {
   defer { try? runtime.closeBlockingForTests() }
 
   let resolved = ResolvedURLCapture()
-  try runtime.setResourceProvider { request, handle in
+  try await runtime.setResourceProvider { request, handle in
     guard request.requestedUrl == "maplibre://maps/style" else {
       return .passThrough
     }
@@ -208,7 +208,7 @@ private final class ResolvedURLCapture: @unchecked Sendable {
                                 options: MapOptions(width: 64, height: 64))
   defer { try? map.closeBlockingForTests() }
 
-  try map.setStyleURL("maplibre://maps/style")
+  try await map.setStyleURL("maplibre://maps/style")
   let loaded = try await drainUntilEvent(
     runtime,
     waitingFor: "the provider-served style to load"

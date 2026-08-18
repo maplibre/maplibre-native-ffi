@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -22,7 +23,12 @@ func newRuntimeMapState(v viewport) (*runtimeMapState, error) {
 	mapOptions := maplibre.NewMapOptions(v.logicalWidth, v.logicalHeight, v.scaleFactor)
 	mapOptions.EventMask = maplibre.RuntimeEventMaskMapRenderUpdateAvailable |
 		maplibre.RuntimeEventMaskMapRenderFrameFinished
-	mapHandle, err := runtimeHandle.NewMapWithOptions(mapOptions)
+	mapFuture, err := runtimeHandle.NewMapWithOptions(mapOptions)
+	if err != nil {
+		_ = state.Close()
+		return nil, fmt.Errorf("map create failed: %w", err)
+	}
+	mapHandle, err := mapFuture.Await(context.Background())
 	if err != nil {
 		_ = state.Close()
 		return nil, fmt.Errorf("map create failed: %w", err)

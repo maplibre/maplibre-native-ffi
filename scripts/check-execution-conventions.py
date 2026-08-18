@@ -1,23 +1,11 @@
 #!/usr/bin/env python3
-"""Derives and checks execution classifications from the public C headers.
+"""Checks execution categories derived from public C declarations.
 
-Every public function's execution form follows from its name and signature,
-so the headers are the single source of truth:
-
-- ``_start`` suffix: operation. Declares ``mln_operation* out_operation`` and
-  carries a documentation comment.
-- ``_take_result`` suffix: immediate result accessor taking ``mln_operation``.
-- ``_destroy`` or ``_release`` suffix: immediate.
-- ``_drain_`` in the name: event batch.
-- ``_service_driver_work`` suffix: render-driver call. Takes a session and
-  documents its graphics-thread contract.
-- ``snapshot`` in the name with a live ``mln_map`` or ``mln_render_session``
-  parameter: published snapshot.
-- ``uint64_t* out_command_id`` parameter: command.
-- Anything else: immediate.
-
-EXCEPTIONS lists the functions whose form is not derivable; each entry says
-why. The table is empty today; growth is a design smell, not a checker gap.
+A ``const mln_completion* completion`` parameter identifies one-shot
+asynchronous work. Drains transfer queued stream records, driver service keeps
+its graphics-thread contract, published snapshots are synchronous copies, and
+everything else is immediate. Public operation handles, result-taking
+accessors, and command IDs are forbidden.
 """
 
 from __future__ import annotations
@@ -26,9 +14,6 @@ import argparse
 import pathlib
 import re
 import sys
-
-# Irregular forms, with the reason each one cannot follow the conventions.
-EXCEPTIONS: dict[str, str] = {}
 
 FUNCTION = re.compile(
     r"MLN_API\s+[^;]*?\b(mln_[A-Za-z0-9_]+)\s*\([^;]*?\)\s*MLN_NOEXCEPT\s*;",
@@ -70,14 +55,8 @@ def exported_functions(
 
 
 def derive_category(name: str, declaration: str) -> str:
-    if name in EXCEPTIONS:
-        return EXCEPTIONS[name]
-    if name.endswith("_take_result"):
-        return "immediate"
-    if name.endswith("_start"):
-        return "operation"
-    if name.endswith(("_destroy", "_release")):
-        return "immediate"
+    if re.search(r"\bconst\s+mln_completion\s*\*\s*completion\b", declaration):
+        return "completion"
     if "_drain_" in name:
         return "event_batch"
     if name.endswith("_service_driver_work"):
@@ -86,8 +65,6 @@ def derive_category(name: str, declaration: str) -> str:
         r"\b(mln_map|mln_render_session)\s+\w+", declaration
     ):
         return "published_snapshot"
-    if re.search(r"\buint64_t\s*\*\s*out_command_id\b", declaration):
-        return "command"
     return "immediate"
 
 
@@ -95,16 +72,14 @@ def convention_errors(
     name: str, category: str, declaration: str, documentation: str
 ) -> list[str]:
     errors: list[str] = []
-    if name.endswith("_start"):
-        if not re.search(r"\bmln_operation\s*\*\s*out_operation\b", declaration):
-            errors.append(f"operation starter has no out_operation boundary: {name}")
+    legacy = re.search(
+        r"\bmln_operation\b|\bout_(?:command_id|operation)\b", declaration
+    )
+    if legacy or name.endswith(("_start", "_take_result")):
+        errors.append(f"legacy asynchronous shape remains public: {name}")
+    if category == "completion":
         if not documentation:
-            errors.append(f"operation starter has no boundary documentation: {name}")
-        if re.search(r"\bout_command_id\b", declaration):
-            errors.append(f"operation starter also takes out_command_id: {name}")
-    elif name.endswith("_take_result"):
-        if not re.search(r"\bmln_operation\s+operation\b", declaration):
-            errors.append(f"operation result accessor has no operation input: {name}")
+            errors.append(f"completion function has no boundary documentation: {name}")
     elif category == "render_driver_call":
         if not re.search(r"\bmln_render_session\s+session\b", declaration):
             errors.append(f"render-driver call has no session boundary: {name}")
@@ -115,9 +90,6 @@ def convention_errors(
             or "context must be current" in thread_contract
         ):
             errors.append(f"render-driver call does not document its thread: {name}")
-    elif category == "command" and name not in EXCEPTIONS:
-        if not documentation:
-            errors.append(f"command has no boundary documentation: {name}")
     return errors
 
 
@@ -134,9 +106,6 @@ def main() -> int:
     except (OSError, ValueError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
-
-    for name in sorted(EXCEPTIONS.keys() - declarations.keys()):
-        errors.append(f"stale exception: {name}")
 
     counts: dict[str, int] = {}
     for name in sorted(declarations):

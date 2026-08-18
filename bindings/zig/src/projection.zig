@@ -1,9 +1,9 @@
 const c = @import("c.zig").raw;
+const completion = @import("completion.zig");
 const diagnostics = @import("diagnostics.zig");
 const map_module = @import("map.zig");
 const MapHandle = map_module.MapHandle;
 const native_temp = @import("native_temp.zig");
-const runtime_module = @import("runtime.zig");
 const status = @import("status.zig");
 const std = @import("std");
 const values = @import("values.zig");
@@ -37,19 +37,21 @@ var projection_registry: std.AutoHashMapUnmanaged(c.mln_map_projection, *Project
 pub const MapProjectionHandle = enum(c.mln_map_projection) {
     _,
 
-    pub fn create(map: *MapHandle) status.Error!MapProjectionHandle {
-        var operation: c.mln_operation = 0;
+    pub fn create(map: *MapHandle) status.Error!completion.Future(MapProjectionHandle) {
         const diagnostic_store = map_module.diagnosticStore(map);
-        try status.checkStatus(c.mln_map_projection_create_start(try map_module.native(map), &operation), diagnostic_store);
-        defer c.mln_operation_release(operation);
-        try runtime_module.waitNativeOperation(operation, diagnostic_store);
-        var projection: c.mln_map_projection = 0;
-        try status.checkStatus(c.mln_map_projection_create_take_result(operation, &projection), diagnostic_store);
-
-        const projection_state = try std.heap.smp_allocator.create(ProjectionState);
-        projection_state.* = .{ .diagnostic_store = diagnostic_store };
-        errdefer std.heap.smp_allocator.destroy(projection_state);
-        return try registerProjectionState(projection, projection_state);
+        return completion.submitWithCopyContext(MapProjectionHandle, ?*diagnostics.DiagnosticStore, diagnostic_store, struct {
+            fn copyResult(result: *const c.mln_completion_result, store: *?*diagnostics.DiagnosticStore) status.Error!MapProjectionHandle {
+                const projection = try completion.value(c.mln_map_projection)(result);
+                const projection_state = try std.heap.smp_allocator.create(ProjectionState);
+                projection_state.* = .{ .diagnostic_store = store.* };
+                errdefer std.heap.smp_allocator.destroy(projection_state);
+                return registerProjectionState(projection, projection_state);
+            }
+        }.copyResult, diagnostic_store, try map_module.native(map), struct {
+            fn start(native_map: c.mln_map, descriptor: *const c.mln_completion) c.mln_status {
+                return c.mln_map_projection_create(native_map, descriptor);
+            }
+        }.start);
     }
 
     /// Copies the projection camera. Synchronous, callable from any thread; the

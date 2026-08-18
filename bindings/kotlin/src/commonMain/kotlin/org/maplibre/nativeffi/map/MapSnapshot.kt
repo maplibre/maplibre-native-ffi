@@ -7,9 +7,8 @@ import org.maplibre.nativeffi.camera.FreeCameraOptions
 /**
  * One immutable state generation published by the map worker.
  *
- * Every committed map command publishes a new generation and reports it in its terminal
- * [org.maplibre.nativeffi.runtime.RuntimeEventPayload.CommandFinished] event, so a snapshot whose
- * [generation] is at or past a commit's observes that commit.
+ * Every committed map command publishes a new generation in its completion, so a snapshot whose
+ * [generation] is at or past that value observes the commit.
  */
 public data class MapSnapshot(
   public val generation: Long,

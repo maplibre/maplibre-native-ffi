@@ -336,7 +336,6 @@ const (
 )
 
 // RenderSessionAttachOptions configures execution placement and an owned-texture ring.
-// Notifications inherit the map runtime's receiver-scoped source.
 type RenderSessionAttachOptions struct {
 	Driver                    RenderDriver
 	RequestedTextureRingDepth uint32

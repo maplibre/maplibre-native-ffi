@@ -18,23 +18,9 @@ static mln_feature_state_selector select_poi(const char* feature_id) {
   // #endregion select
   return selector;
 }
-static mln_status finish_operation(
-  mln_status started, mln_operation operation
-) {
-  if (started != MLN_STATUS_OK) return started;
-  bool completed = false;
-  mln_status status = mln_operation_wait(operation, -1, &completed);
-  mln_status terminal = MLN_STATUS_INVALID_STATE;
-  if (status == MLN_STATUS_OK && completed) {
-    status = mln_operation_get_status(operation, &terminal);
-  }
-  if (status == MLN_STATUS_OK) status = terminal;
-  mln_operation_release(operation);
-  return status;
-}
-
 mln_status set_selected(
-  mln_render_session session, const char* feature_id, bool selected
+  mln_render_session session, const char* feature_id, bool selected,
+  const mln_completion* completion
 ) {
   const mln_feature_state_selector selector = select_poi(feature_id);
 
@@ -45,26 +31,25 @@ mln_status set_selected(
 
   // #region set
   // The start call parses or copies the bytes before returning.
-  mln_operation operation = MLN_HANDLE_NULL;
-  const mln_status started = mln_render_session_set_feature_state_start(
+  return mln_render_session_set_feature_state(
     session, selector.source_id, selector.source_layer_id, selector.feature_id,
-    state, &operation
+    state, completion
   );
-  return finish_operation(started, operation);
   // #endregion set
 }
 
-mln_status clear_selected(mln_render_session session, const char* feature_id) {
+mln_status clear_selected(
+  mln_render_session session, const char* feature_id,
+  const mln_completion* completion
+) {
   // #region remove
   mln_feature_state_selector selector = select_poi(feature_id);
   selector.fields |= MLN_FEATURE_STATE_SELECTOR_STATE_KEY;
   selector.state_key = view("selected");
 
-  mln_operation operation = MLN_HANDLE_NULL;
-  const mln_status started = mln_render_session_remove_feature_state_start(
+  return mln_render_session_remove_feature_state(
     session, selector.source_id, selector.source_layer_id, selector.feature_id,
-    selector.state_key, &operation
+    selector.state_key, completion
   );
-  return finish_operation(started, operation);
   // #endregion remove
 }

@@ -45,7 +45,7 @@ public sealed record MapOptions
     /// <summary>
     /// Map-originated event types this map queues, every event type this library reports
     /// by default. The mask applies during construction. See
-    /// <see cref="MapHandle.SetEventMask" />.
+    /// <see cref="MapHandle.SetEventMaskAsync" />.
     /// </summary>
     public RuntimeEventMask EventMask { get; set; } = DefaultEventMask();
 

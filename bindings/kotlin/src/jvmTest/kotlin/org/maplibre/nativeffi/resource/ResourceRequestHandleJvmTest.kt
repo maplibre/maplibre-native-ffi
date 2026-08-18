@@ -36,10 +36,7 @@ class ResourceRequestHandleJvmTest {
         ResourceRequestHandle(
           SyntheticHandles.resourceRequest(),
           completer = { _, _ -> MapLibreNativeC.mln_network_status_set(999_999) },
-          releaser = {
-            releases.incrementAndGet()
-            MapLibreNativeC.mln_operation_release(0L)
-          },
+          releaser = { releases.incrementAndGet() },
         )
       assertEquals(
         ResourceProviderDecision.HANDLE.nativeValue,

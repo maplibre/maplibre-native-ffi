@@ -15,7 +15,7 @@ func TestReleasedMapIDReplayedAfterANewMapReportsItStale(t *testing.T) {
 	}
 	defer runtime.Close()
 
-	first, err := runtime.NewMap()
+	first, err := awaitForTest(runtime.NewMap())
 	if err != nil {
 		t.Fatalf("NewMap(): %v", err)
 	}
@@ -29,7 +29,7 @@ func TestReleasedMapIDReplayedAfterANewMapReportsItStale(t *testing.T) {
 
 	// The released slot is the one the next map takes, so the replayed id
 	// names a retired generation of a slot that is live again.
-	second, err := runtime.NewMap()
+	second, err := awaitForTest(runtime.NewMap())
 	if err != nil {
 		t.Fatalf("second NewMap(): %v", err)
 	}

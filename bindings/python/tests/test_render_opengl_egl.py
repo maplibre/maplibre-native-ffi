@@ -74,7 +74,7 @@ class OpenGLOwnedSession:
                     scale_factor=scale_factor,
                     mode=mln.MapMode.CONTINUOUS,
                 )
-            )
+            ).result(timeout=5)
             try:
                 session, attach = map_handle.attach_opengl_owned_texture(
                     context.owned_texture_descriptor(width, height, scale_factor)
@@ -186,7 +186,7 @@ def _egl_borrowed_texture(
         texture.close()
 
 
-def request_still_image(map_handle: mln.MapHandle) -> mln.OperationHandle[None]:
+def request_still_image(map_handle: mln.MapHandle):
     return map_handle.request_still_image()
 
 
@@ -200,7 +200,7 @@ def wait_for_texture_info(
     image = finish_render_operation(
         fixture.session,
         fixture.session.read_premultiplied_rgba8(),
-        take_result=True,
+        return_result=True,
     )
     return image.info
 
@@ -247,7 +247,7 @@ def test_caller_driver_reads_owned_opengl_texture(
     image = finish_render_operation(
         opengl_owned_session.session,
         opengl_owned_session.session.read_premultiplied_rgba8(),
-        take_result=True,
+        return_result=True,
     )
     assert image.info == info
     assert len(image.data) == info.byte_length

@@ -475,7 +475,7 @@ const VulkanBorrowedTextureBackend = struct {
 
         var replacement = try BorrowedImage.init(&self.compositor.context, viewport);
         errdefer replacement.deinit(self.compositor.context.device);
-        var operation = session.setVulkanBorrowedTextureTargetStart(.{
+        var completion = session.setVulkanBorrowedTextureTarget(.{
             .extent = render_target.extent(viewport),
             .physical_width = viewport.physical_width,
             .physical_height = viewport.physical_height,
@@ -489,8 +489,8 @@ const VulkanBorrowedTextureBackend = struct {
             diagnostics.logError("Vulkan borrowed texture set target failed", err, null);
             return types.AppError.TextureResizeFailed;
         };
-        defer operation.release();
-        render_target.serviceUntilComplete(session, operation) catch |err| {
+        defer completion.deinit();
+        render_target.serviceUntilComplete(session, &completion) catch |err| {
             diagnostics.logError("Vulkan borrowed texture replacement failed", err, null);
             return types.AppError.TextureResizeFailed;
         };

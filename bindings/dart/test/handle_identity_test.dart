@@ -13,6 +13,13 @@ import 'package:test/test.dart';
 
 final _c = MaplibreNativeCApi.open();
 
+void _discardCompletion(
+  Pointer<Void> _,
+  Pointer<raw.mln_completion_result> _,
+) {}
+
+void _discardCompletionState(Pointer<Void> _) {}
+
 /// Calls the C snapshot accessor with a raw map ID.
 void _mapSnapshotById(NativeMap map) {
   final arena = Arena();
@@ -31,9 +38,20 @@ void _mapSnapshotById(NativeMap map) {
 void _runtimeBarrierById(int handle) {
   final arena = Arena();
   try {
-    final operation = arena<Uint64>();
+    final completion = raw.mln_completion.$allocate(
+      arena,
+      size: sizeOf<raw.mln_completion>(),
+      callback: Pointer.fromFunction<raw.mln_completion_callbackFunction>(
+        _discardCompletion,
+      ),
+      user_data: nullptr,
+      release_user_data:
+          Pointer.fromFunction<raw.mln_completion_releaseFunction>(
+            _discardCompletionState,
+          ),
+    );
     checkNativeStatus(
-      raw.mln_runtime_barrier_start(handle, operation),
+      raw.mln_runtime_barrier(handle, completion),
       _c.threadLastErrorMessage,
     );
   } finally {

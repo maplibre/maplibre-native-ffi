@@ -1,6 +1,7 @@
 package maplibre
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -36,20 +37,14 @@ func TestRuntimeBarrierProgressesAutonomously(t *testing.T) {
 	}
 	defer runtime.Close()
 
-	operation, err := runtime.Barrier()
+	future, err := runtime.Barrier()
 	if err != nil {
 		t.Fatalf("Barrier(): %v", err)
 	}
-	defer operation.Release()
-	completed, err := operation.Wait(2 * time.Second)
-	if err != nil {
-		t.Fatalf("Wait(): %v", err)
-	}
-	if !completed {
-		t.Fatal("runtime barrier did not progress autonomously")
-	}
-	if err := operation.Finish(); err != nil {
-		t.Fatalf("Finish(): %v", err)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if _, err := future.Await(ctx); err != nil {
+		t.Fatalf("Await(): %v", err)
 	}
 }
 
@@ -71,7 +66,7 @@ func TestRuntimeLifecycleMigratesAcrossGoroutines(t *testing.T) {
 		t.Fatalf("NewRuntime() on goroutine: %v", err)
 	case runtime = <-runtimeCh:
 	}
-	m, err := runtime.NewMapWithOptions(NewMapOptions(128, 128, 1))
+	m, err := awaitForTest(runtime.NewMapWithOptions(NewMapOptions(128, 128, 1)))
 	if err != nil {
 		t.Fatalf("NewMap() after goroutine migration: %v", err)
 	}
@@ -83,42 +78,5 @@ func TestRuntimeLifecycleMigratesAcrossGoroutines(t *testing.T) {
 	go func() { closed <- runtime.Close() }()
 	if err := <-closed; err != nil {
 		t.Fatalf("Runtime Close() on another goroutine: %v", err)
-	}
-}
-
-func TestNotificationCallbackOnlySchedulesOwnedReadyDrain(t *testing.T) {
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	defer runtime.Close()
-
-	scheduled := make(chan struct{}, 1)
-	if err := runtime.SetNotificationCallback(func() {
-		select {
-		case scheduled <- struct{}{}:
-		default:
-		}
-	}); err != nil {
-		t.Fatalf("SetNotificationCallback(): %v", err)
-	}
-	operation, err := runtime.Barrier()
-	if err != nil {
-		t.Fatalf("Barrier(): %v", err)
-	}
-	defer operation.Release()
-	select {
-	case <-scheduled:
-	case <-time.After(2 * time.Second):
-		t.Fatal("notification callback did not schedule the receiver")
-	}
-	if _, err := runtime.DrainReady(); err != nil {
-		t.Fatalf("DrainReady(): %v", err)
-	}
-	if completed, err := operation.Wait(-1); err != nil || !completed {
-		t.Fatalf("Wait() = %v, %v; want true, nil", completed, err)
-	}
-	if err := operation.Finish(); err != nil {
-		t.Fatalf("Finish(): %v", err)
 	}
 }

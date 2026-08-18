@@ -15,6 +15,7 @@
 #include <stdint.h>
 
 #include "base.h"
+#include "completion.h"
 #include "runtime.h"
 
 #ifdef __cplusplus
@@ -477,74 +478,65 @@ typedef struct mln_offline_region_info {
  * Starts creating an offline region.
  *
  * Input strings, GeoJSON geometry bytes, and metadata are copied before this
- * call returns. The returned operation uses the runtime's notification source.
- * After successful completion, call
- * mln_runtime_offline_region_create_take_result() to take the snapshot.
- *
- * out_operation must point to the null handle. The caller releases the
- * operation with mln_operation_release().
+ * call returns. A successful completion borrows one
+ * mln_offline_region_snapshot value.
  */
-MLN_API mln_status mln_runtime_offline_region_create_start(
+MLN_API mln_status mln_runtime_offline_region_create(
   mln_runtime runtime, const mln_offline_region_definition* definition,
-  const uint8_t* metadata, size_t metadata_size, mln_operation* out_operation
+  const uint8_t* metadata, size_t metadata_size,
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
  * Starts getting an offline region snapshot by ID.
  *
- * The returned operation uses the runtime's notification source. After
- * successful completion, call mln_runtime_offline_region_get_take_result().
- * out_operation must point to the null handle.
+ * A successful completion borrows zero or one mln_offline_region_snapshot
+ * value, depending on whether the region exists.
  */
-MLN_API mln_status mln_runtime_offline_region_get_start(
+MLN_API mln_status mln_runtime_offline_region_get(
   mln_runtime runtime, mln_offline_region_id region_id,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
  * Starts listing offline region snapshots in the runtime database.
  *
- * The returned operation uses the runtime's notification source.
- * out_operation must point to the null handle.
+ * A successful completion borrows one mln_offline_region_list value.
  */
-MLN_API mln_status mln_runtime_offline_regions_list_start(
-  mln_runtime runtime, mln_operation* out_operation
+MLN_API mln_status mln_runtime_offline_regions_list(
+  mln_runtime runtime, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
  * Starts merging offline regions from another database path.
  *
  * The side database may be upgraded in place by native code and must be
- * writable when native merge requires it. The returned operation uses the
- * runtime's notification source. out_operation must point to the null handle.
+ * writable when native merge requires it. A successful completion borrows one
+ * mln_offline_region_list value.
  */
-MLN_API mln_status mln_runtime_offline_regions_merge_database_start(
+MLN_API mln_status mln_runtime_offline_regions_merge_database(
   mln_runtime runtime, const char* side_database_path,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
  * Starts updating opaque binary metadata for an offline region.
  *
- * After successful completion, call
- * mln_runtime_offline_region_update_metadata_take_result(). The returned
- * operation uses the runtime's notification source. out_operation must point
- * to the null handle.
+ * A successful completion borrows one mln_offline_region_snapshot value.
  */
-MLN_API mln_status mln_runtime_offline_region_update_metadata_start(
+MLN_API mln_status mln_runtime_offline_region_update_metadata(
   mln_runtime runtime, mln_offline_region_id region_id, const uint8_t* metadata,
-  size_t metadata_size, mln_operation* out_operation
+  size_t metadata_size, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
  * Starts getting the current download status for an offline region.
  *
- * The returned operation uses the runtime's notification source.
- * out_operation must point to the null handle.
+ * A successful completion borrows one mln_offline_region_status value.
  */
-MLN_API mln_status mln_runtime_offline_region_get_status_start(
+MLN_API mln_status mln_runtime_offline_region_get_status(
   mln_runtime runtime, mln_offline_region_id region_id,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -552,115 +544,43 @@ MLN_API mln_status mln_runtime_offline_region_get_status_start(
  *
  * Observer callbacks are copied into runtime events. Disabling observation
  * prevents future events for this region and leaves queued events unchanged.
- * The returned operation uses the runtime's notification source. out_operation
- * must point to the null handle.
+ * The completion reports the terminal status.
  */
-MLN_API mln_status mln_runtime_offline_region_set_observed_start(
+MLN_API mln_status mln_runtime_offline_region_set_observed(
   mln_runtime runtime, mln_offline_region_id region_id, bool observed,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
  * Sets an offline region's native download state.
  *
  * Register observation separately with
- * mln_runtime_offline_region_set_observed_start() to receive progress and error
- * events. The returned operation uses the runtime's notification source.
- * out_operation must point to the null handle.
+ * mln_runtime_offline_region_set_observed() to receive progress and error
+ * events. The completion reports the terminal status.
  */
-MLN_API mln_status mln_runtime_offline_region_set_download_state_start(
+MLN_API mln_status mln_runtime_offline_region_set_download_state(
   mln_runtime runtime, mln_offline_region_id region_id, uint32_t state,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
  * Invalidates cached resources for an offline region.
  *
- * The returned operation uses the runtime's notification source.
- * out_operation must point to the null handle.
+ * The completion reports the terminal status.
  */
-MLN_API mln_status mln_runtime_offline_region_invalidate_start(
+MLN_API mln_status mln_runtime_offline_region_invalidate(
   mln_runtime runtime, mln_offline_region_id region_id,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
  * Deletes an offline region.
  *
- * The returned operation uses the runtime's notification source.
- * out_operation must point to the null handle.
+ * The completion reports the terminal status.
  */
-MLN_API mln_status mln_runtime_offline_region_delete_start(
+MLN_API mln_status mln_runtime_offline_region_delete(
   mln_runtime runtime, mln_offline_region_id region_id,
-  mln_operation* out_operation
-) MLN_NOEXCEPT;
-
-/**
- * Takes the snapshot from a completed create operation.
- *
- * A successful take transfers the snapshot exactly once. A failed take leaves
- * the operation result available for retry. The caller destroys the snapshot
- * with mln_offline_region_snapshot_destroy(). This function may be called from
- * any thread.
- */
-MLN_API mln_status mln_runtime_offline_region_create_take_result(
-  mln_operation operation, mln_offline_region_snapshot* out_region
-) MLN_NOEXCEPT;
-
-/**
- * Takes the optional snapshot from a completed get operation.
- *
- * out_found reports whether the requested region existed. A successful take
- * transfers the result exactly once. This function may be called from any
- * thread.
- */
-MLN_API mln_status mln_runtime_offline_region_get_take_result(
-  mln_operation operation, mln_offline_region_snapshot* out_region,
-  bool* out_found
-) MLN_NOEXCEPT;
-
-/**
- * Takes the list from a completed regions-list operation.
- *
- * A successful take transfers the list exactly once. The caller destroys the
- * list with mln_offline_region_list_destroy(). This function may be called from
- * any thread.
- */
-MLN_API mln_status mln_runtime_offline_regions_list_take_result(
-  mln_operation operation, mln_offline_region_list* out_regions
-) MLN_NOEXCEPT;
-
-/**
- * Takes the list from a completed database-merge operation.
- *
- * A successful take transfers the list exactly once. The caller destroys the
- * list with mln_offline_region_list_destroy(). This function may be called from
- * any thread.
- */
-MLN_API mln_status mln_runtime_offline_regions_merge_database_take_result(
-  mln_operation operation, mln_offline_region_list* out_regions
-) MLN_NOEXCEPT;
-
-/**
- * Takes the snapshot from a completed metadata-update operation.
- *
- * A successful take transfers the snapshot exactly once. The caller destroys
- * the snapshot with mln_offline_region_snapshot_destroy(). This function may be
- * called from any thread.
- */
-MLN_API mln_status mln_runtime_offline_region_update_metadata_take_result(
-  mln_operation operation, mln_offline_region_snapshot* out_region
-) MLN_NOEXCEPT;
-
-/**
- * Takes the status from a completed get-status operation.
- *
- * A successful take copies the status exactly once. out_status->size must cover
- * this version of mln_offline_region_status. This function may be called from
- * any thread.
- */
-MLN_API mln_status mln_runtime_offline_region_get_status_take_result(
-  mln_operation operation, mln_offline_region_status* out_status
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -779,9 +699,8 @@ typedef struct mln_map_tile_options {
  *
  * Every field is unkeyed, fixed-size map state that changes only through this
  * map's own commands or through load progress. Each committed map command
- * publishes a new generation and reports it in
- * MLN_RUNTIME_EVENT_COMMAND_FINISHED, so a snapshot whose generation is at or
- * past a commit's observes that commit.
+ * publishes a new generation and reports it through its completion, so a
+ * snapshot whose generation is at or past a completion observes that commit.
  */
 typedef struct mln_map_snapshot {
   uint32_t size;
@@ -804,7 +723,7 @@ typedef struct mln_map_snapshot {
   mln_free_camera_options free_camera;
 } mln_map_snapshot;
 
-/** Camera result produced by an ordered camera operation. */
+/** Camera result borrowed for an ordered camera-query completion. */
 typedef struct mln_camera_query_result {
   uint32_t size;
   uint32_t reserved;
@@ -818,19 +737,14 @@ typedef struct mln_camera_query_result {
 MLN_API mln_map_options mln_map_options_default(void) MLN_NOEXCEPT;
 
 /**
- * Starts map creation on the runtime worker.
+ * Creates a map on the runtime worker.
  *
- * Input is copied before this function returns. out_operation must point to the
- * null handle.
+ * Input is copied before this function returns. The completion value points to
+ * one mln_map handle when status is MLN_STATUS_OK.
  */
-MLN_API mln_status mln_map_create_start(
+MLN_API mln_status mln_map_create(
   mln_runtime runtime, const mln_map_options* options,
-  mln_operation* out_operation
-) MLN_NOEXCEPT;
-
-/** Takes the map handle from a completed create operation exactly once. */
-MLN_API mln_status mln_map_create_take_result(
-  mln_operation operation, mln_map* out_map
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /** Copies the latest immutable state published by the map worker. */
@@ -840,11 +754,11 @@ mln_map_snapshot_get(mln_map map, mln_map_snapshot* out_snapshot) MLN_NOEXCEPT;
 /**
  * Submits the sole post-creation logical extent update.
  *
- * out_command_id must point to zero. An accepted command receives a
- * runtime-wide monotonic ID and later reports a command-finished disposition.
+ * The completion reports terminal disposition and the snapshot generation
+ * published by a committed resize.
  */
 MLN_API mln_status mln_map_resize(
-  mln_map map, mln_logical_extent extent, uint64_t* out_command_id
+  mln_map map, mln_logical_extent extent, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -859,27 +773,25 @@ MLN_API mln_status mln_map_resize(
  * MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED or
  * MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED events.
  *
- * out_command_id must point to zero.
- *
  * Returns:
  * - MLN_STATUS_OK when the request was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is not live or out_command_id does
- *   not point to zero.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is not live or completion is invalid.
  * - MLN_STATUS_INVALID_STATE when map is not continuous or is closing.
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
-MLN_API mln_status
-mln_map_request_repaint(mln_map map, uint64_t* out_command_id) MLN_NOEXCEPT;
+MLN_API mln_status mln_map_request_repaint(
+  mln_map map, const mln_completion* completion
+) MLN_NOEXCEPT;
 
 /**
  * Requests one still image for a static or tile map.
  *
- * Keep servicing the selected render driver while this operation is pending.
+ * Keep servicing the selected render driver while this request is pending.
  * Submit frame demands with mln_render_session_request_frame() and drain their
  * terminal results with mln_render_session_drain_frame_results(). A
  * caller-graphics-thread driver also requires calls to
  * mln_render_session_service_driver_work() on its graphics thread. A rendered
- * frame may be acquired or read back after this operation completes.
+ * frame may be acquired or read back after the completion runs.
  *
  * Returns:
  * - MLN_STATUS_OK when the request was accepted.
@@ -888,8 +800,8 @@ mln_map_request_repaint(mln_map map, uint64_t* out_command_id) MLN_NOEXCEPT;
  *   MLN_MAP_MODE_TILE, or when a still-image request is already pending.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_request_still_image_start(
-  mln_map map, mln_operation* out_operation
+MLN_API mln_status mln_map_request_still_image(
+  mln_map map, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -897,7 +809,7 @@ MLN_API mln_status mln_map_request_still_image_start(
  *
  * A successful call consumes the public handle before returning. Previously
  * accepted work and native teardown continue in submission order without
- * requiring a caller-owned close operation.
+ * requiring caller-owned close state.
  *
  * Returns:
  * - MLN_STATUS_OK when the handle was consumed.
@@ -910,63 +822,51 @@ MLN_API mln_status mln_map_release(mln_map map) MLN_NOEXCEPT;
 /**
  * Queues a style URL command.
  *
- * The function copies url before returning acceptance. out_command_id must
- * point to zero. The command-finished event reports committed or failed
- * application. Style loading events continue to report network, decode, and
- * parse results after a committed command.
+ * The function copies url before returning acceptance. The completion reports
+ * committed or failed application. Style loading events continue to report
+ * network, decode, and parse results after a committed command.
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is not live, url is null, or
- *   out_command_id does not point to zero.
+ *   completion is invalid.
  * - MLN_STATUS_INVALID_STATE when the runtime is closing.
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
 MLN_API mln_status mln_map_set_style_url(
-  mln_map map, const char* url, uint64_t* out_command_id
+  mln_map map, const char* url, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
  * Queues an inline style JSON command.
  *
- * The function copies json before returning acceptance. out_command_id must
- * point to zero. The command-finished event reports committed or failed
- * application. Style loading events continue to report later resource and
- * parse results after a committed command.
+ * The function copies json before returning acceptance. The completion reports
+ * committed or failed application. Style loading events continue to report
+ * later resource and parse results after a committed command.
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is not live, json is invalid, or
- *   out_command_id does not point to zero.
+ *   completion is invalid.
  * - MLN_STATUS_INVALID_STATE when the runtime is closing.
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
 MLN_API mln_status mln_map_set_style_json(
-  mln_map map, mln_buffer_view json, uint64_t* out_command_id
+  mln_map map, mln_buffer_view json, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
  * Starts an ordered copy of the last successfully parsed style document.
  *
- * The operation result is an owned byte buffer.
+ * The completion borrows the copied UTF-8 bytes for the callback.
  */
-MLN_API mln_status mln_map_loaded_style_json_start(
-  mln_map map, mln_operation* out_operation
-) MLN_NOEXCEPT;
-
-/** Takes the loaded style JSON bytes exactly once. */
-MLN_API mln_status mln_map_loaded_style_json_take_result(
-  mln_operation operation, mln_buffer* out_json
+MLN_API mln_status mln_map_loaded_style_json(
+  mln_map map, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /** Starts an ordered copy of the last requested style URL. */
 MLN_API mln_status
-mln_map_style_url_start(mln_map map, mln_operation* out_operation) MLN_NOEXCEPT;
-
-/** Takes the style URL bytes exactly once. */
-MLN_API mln_status mln_map_style_url_take_result(
-  mln_operation operation, mln_buffer* out_url
-) MLN_NOEXCEPT;
+mln_map_style_url(mln_map map, const mln_completion* completion) MLN_NOEXCEPT;
 
 /**
  * Selects which map-originated event types this map queues.
@@ -996,7 +896,7 @@ MLN_API mln_status mln_map_style_url_take_result(
  *   invalidation report. See mln_map_request_repaint().
  * - MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED and
  *   MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED report observer completion
- *   in addition to the still-image operation.
+ *   in addition to the still-image completion.
  * - MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED carries the
  *   transition identity a caller set on an animation, and
  *   MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_DID_CHANGE distinguishes a completed
@@ -1004,20 +904,18 @@ MLN_API mln_status mln_map_style_url_take_result(
  * - MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED and
  *   MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR carry native failure text.
  *
- * Style commands report application failures through command-finished events
+ * Style commands report application failures through their completions
  * regardless of this mask.
- *
- * out_command_id must point to zero.
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is not live, mask contains an unknown
- *   bit, or out_command_id does not point to zero.
+ *   bit, or completion is invalid.
  * - MLN_STATUS_INVALID_STATE when the map is closing.
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
 MLN_API mln_status mln_map_set_event_mask(
-  mln_map map, uint64_t mask, uint64_t* out_command_id
+  mln_map map, uint64_t mask, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

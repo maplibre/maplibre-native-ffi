@@ -59,10 +59,9 @@ static app_error pan(
   delta.offset = (mln_screen_point){.x = dx, .y = dy};
   if (mode != MLN_CAMERA_UPDATE_MODE_JUMP)
     delta.animation = animation(duration_ms);
-  uint64_t command_id = 0;
-  return camera_status(
-    mln_map_apply_camera_delta(state->map, &delta, &command_id)
-  );
+  return camera_status(mln_map_apply_camera_delta(
+    state->map, &delta, map_state_discarded_completion()
+  ));
 }
 
 static app_error zoom(
@@ -76,10 +75,9 @@ static app_error zoom(
   delta.anchor = anchor;
   if (mode != MLN_CAMERA_UPDATE_MODE_JUMP)
     delta.animation = animation(duration_ms);
-  uint64_t command_id = 0;
-  return camera_status(
-    mln_map_apply_camera_delta(state->map, &delta, &command_id)
-  );
+  return camera_status(mln_map_apply_camera_delta(
+    state->map, &delta, map_state_discarded_completion()
+  ));
 }
 
 static app_error adjust_orientation(
@@ -89,18 +87,20 @@ static app_error adjust_orientation(
   mln_camera_delta delta = mln_camera_delta_default();
   if (mode != MLN_CAMERA_UPDATE_MODE_JUMP)
     delta.animation = animation(duration_ms);
-  uint64_t command_id = 0;
   mln_status status = MLN_STATUS_OK;
   if (bearing_delta != 0.0) {
     delta.kind = MLN_CAMERA_DELTA_BEARING;
     delta.amount = bearing_delta;
-    status = mln_map_apply_camera_delta(state->map, &delta, &command_id);
+    status = mln_map_apply_camera_delta(
+      state->map, &delta, map_state_discarded_completion()
+    );
   }
   if (status == MLN_STATUS_OK && pitch_delta != 0.0) {
     delta.kind = MLN_CAMERA_DELTA_PITCH;
     delta.amount = pitch_delta;
-    command_id = 0;
-    status = mln_map_apply_camera_delta(state->map, &delta, &command_id);
+    status = mln_map_apply_camera_delta(
+      state->map, &delta, map_state_discarded_completion()
+    );
   }
   return camera_status(status);
 }

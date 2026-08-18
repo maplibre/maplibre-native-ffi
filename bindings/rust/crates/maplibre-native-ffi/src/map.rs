@@ -3,9 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use maplibre_native_ffi_core as maplibre_core;
 use maplibre_native_ffi_core::ptr::{const_ptr_or_null, option_ptr};
-use maplibre_native_ffi_core::values::{
-    empty_lat_lng_bounds, lat_lngs_to_native, screen_points_to_native,
-};
+use maplibre_native_ffi_core::values::{lat_lngs_to_native, screen_points_to_native};
 use maplibre_native_ffi_sys as sys;
 
 #[cfg(test)]
@@ -17,7 +15,7 @@ use crate::camera::{
 #[cfg(test)]
 use crate::custom_geometry::CanonicalTileId;
 use crate::events::MapId;
-use crate::handle::{ConcurrentNativeHandle, closed_handle_error, out_handle};
+use crate::handle::{ConcurrentNativeHandle, closed_handle_error};
 use crate::options::{MapOptionsNativeExt, MapTileOptionsNativeExt, MapViewportOptionsNativeExt};
 use crate::render::{
     MetalBorrowedTextureDescriptor, MetalOwnedTextureDescriptor, MetalSurfaceDescriptor,
@@ -26,23 +24,20 @@ use crate::render::{
     VulkanBorrowedTextureDescriptor, VulkanOwnedTextureDescriptor, VulkanSurfaceDescriptor,
     WebGpuBorrowedTextureDescriptor, WebGpuOwnedTextureDescriptor, WebGpuSurfaceDescriptor,
 };
-use crate::runtime::{
-    OperationHandle, OperationKind, RuntimeHandle, RuntimeState, wait_raw_operation_completed,
-};
+use crate::runtime::{RuntimeHandle, RuntimeState};
 use crate::values::NativeValue;
 use crate::{
     BoundOptions, CameraDelta, CameraFitOptions, CameraOptions, CameraSnapshot, CameraUpdate,
-    Error, ErrorKind, FreeCameraOptions, HandleOperationError, LatLng, LatLngBounds,
-    MapDebugOptions, MapOptions, MapProjectionHandle, MapTileOptions, MapViewportOptions,
+    Error, FreeCameraOptions, HandleOperationError, LatLng, LatLngBounds, MapDebugOptions,
+    MapOptions, MapProjectionHandle, MapTileOptions, MapViewportOptions, NativeFuture,
     ProjectionMode, Result, RuntimeEventMask, ScreenPoint,
 };
 
 mod style;
 pub use style::{
     GeoJsonSourceOptions, ImageContent, ImageStretch, LocationIndicatorImageKind, SourceInfo,
-    SourceType, StyleImage, StyleImageInfo, StyleImageOperation, StyleImageOptions,
-    StyleImageStretches, StyleImageTextFit, StyleLayerInfo, StyleLayerInfoOperation,
-    StyleLayerVisibility, StyleSourceInfoOperation, StyleTransitionOptions, TileJsonInfo,
+    SourceType, StyleImage, StyleImageInfo, StyleImageOptions, StyleImageStretches,
+    StyleImageTextFit, StyleLayerInfo, StyleLayerVisibility, StyleTransitionOptions, TileJsonInfo,
     TileScheme, TileSourceOptions, VectorTileEncoding,
 };
 
@@ -115,9 +110,9 @@ pub struct LogicalExtent {
 
 /// Immutable map state copied from the latest worker publication.
 ///
-/// Every committed map command publishes a new generation and reports it in
-/// its command-finished event, so a snapshot whose `generation` is at or past
-/// a commit's observes that commit.
+/// Every committed map command publishes a new generation in its completion,
+/// so a snapshot whose `generation` is at or past that value observes the
+/// commit.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MapSnapshot {
     pub generation: u64,
@@ -147,39 +142,29 @@ impl fmt::Debug for MapHandle {
 }
 
 impl MapHandle {
-    /// Creates a map and waits for the worker-side creation operation.
-    pub fn with_options(runtime: &RuntimeHandle, options: &MapOptions) -> Result<Self> {
+    /// Creates a map on the runtime worker.
+    pub fn with_options(
+        runtime: &RuntimeHandle,
+        options: &MapOptions,
+    ) -> Result<NativeFuture<Self>> {
         let runtime_ptr = runtime.inner.native()?;
         let raw_options = options.to_native()?;
-        let mut operation = sys::mln_operation(0);
-        // SAFETY: inputs remain readable and operation is null writable storage.
-        maplibre_core::check(unsafe {
-            sys::mln_map_create_start(runtime_ptr, &raw_options, &mut operation)
-        })?;
-        let result = (|| {
-            wait_raw_operation_completed(operation)?;
-            let mut out = maplibre_core::ptr::OutHandle::<sys::mln_map>::new();
-            // SAFETY: creation completed successfully and out is null writable.
-            maplibre_core::check(unsafe {
-                sys::mln_map_create_take_result(operation, out.as_mut_ptr())
-            })?;
-            let native = out_handle(out, "mln_map")?;
-            let id = MapId::new(native.0);
-            Ok(Self {
-                inner: MapState::new(native, Arc::clone(&runtime.inner), id)?,
-            })
-        })();
-        // SAFETY: this call owns the creation observer.
-        unsafe { sys::mln_operation_release(operation) };
-        result
-    }
-
-    fn start_operation<T>(
-        &self,
-        operation: sys::mln_operation,
-        kind: OperationKind,
-    ) -> Result<OperationHandle<T>> {
-        OperationHandle::new(operation, kind)
+        let runtime_state = Arc::clone(&runtime.inner);
+        crate::completion::submit(
+            move |completion| unsafe { sys::mln_map_create(runtime_ptr, &raw_options, completion) },
+            move |result| {
+                let native = crate::completion::copy_value::<sys::mln_map>(result)?;
+                if native.0 == 0 {
+                    return Err(Error::invalid_argument(
+                        "map creation returned a null handle",
+                    ));
+                }
+                let id = MapId::new(native.0);
+                Ok(Self {
+                    inner: MapState::new(native, runtime_state, id)?,
+                })
+            },
+        )
     }
 
     /// Returns this map's runtime-local event source identity.
@@ -247,38 +232,36 @@ impl MapHandle {
         })
     }
 
-    /// Submits the map's logical extent update and returns its command ID.
-    pub fn resize(&self, extent: LogicalExtent) -> Result<u64> {
+    /// Submits the map's logical extent update.
+    pub fn resize(&self, extent: LogicalExtent) -> Result<NativeFuture<crate::CommandCompletion>> {
         let map = self.inner.native()?;
-        let mut command_id = 0;
         let raw = sys::mln_logical_extent {
             width: extent.width,
             height: extent.height,
             scale_factor: extent.scale_factor,
         };
-        // SAFETY: map is live and command_id is zero writable storage.
-        maplibre_core::check(unsafe { sys::mln_map_resize(map, raw, &mut command_id) })?;
-        Ok(command_id)
+        crate::completion::submit(
+            move |completion| unsafe { sys::mln_map_resize(map, raw, completion) },
+            crate::completion::command,
+        )
     }
 
-    /// Requests a continuous-map repaint and returns its command ID.
-    pub fn request_repaint(&self) -> Result<u64> {
+    /// Requests a continuous-map repaint and returns its completion future.
+    pub fn request_repaint(&self) -> Result<NativeFuture<crate::CommandCompletion>> {
         let map = self.inner.native()?;
-        let mut command_id = 0;
-        // SAFETY: map is live and command_id is zero writable storage.
-        maplibre_core::check(unsafe { sys::mln_map_request_repaint(map, &mut command_id) })?;
-        Ok(command_id)
+        crate::completion::submit(
+            move |completion| unsafe { sys::mln_map_request_repaint(map, completion) },
+            crate::completion::command,
+        )
     }
 
     /// Starts one noncoalescing still-image operation.
-    pub fn request_still_image(&self) -> Result<OperationHandle<()>> {
+    pub fn request_still_image(&self) -> Result<NativeFuture<()>> {
         let map = self.inner.native()?;
-        let mut operation = sys::mln_operation(0);
-        // SAFETY: map is live and operation is null writable storage.
-        maplibre_core::check(unsafe {
-            sys::mln_map_request_still_image_start(map, &mut operation)
-        })?;
-        OperationHandle::new(operation, OperationKind::MapStillImage)
+        crate::completion::submit(
+            move |completion| unsafe { sys::mln_map_request_still_image(map, completion) },
+            crate::completion::unit,
+        )
     }
 
     /// Copies the latest published camera without entering the runtime queue.
@@ -297,453 +280,358 @@ impl MapHandle {
         })
     }
 
-    /// Submits one copied atomic camera update and returns its command ID.
-    pub fn update_camera(&self, update: &CameraUpdate) -> Result<u64> {
+    /// Submits one copied atomic camera update.
+    pub fn update_camera(
+        &self,
+        update: &CameraUpdate,
+    ) -> Result<NativeFuture<crate::CommandCompletion>> {
         let map = self.inner.native()?;
         let raw = update.to_native();
-        let mut command_id = 0;
-        // SAFETY: raw is readable for this call and command_id is writable.
-        maplibre_core::check(unsafe { sys::mln_map_update_camera(map, &raw, &mut command_id) })?;
-        Ok(command_id)
+        crate::completion::submit(
+            move |completion| unsafe { sys::mln_map_update_camera(map, &raw, completion) },
+            crate::completion::command,
+        )
     }
 
-    /// Submits one relative camera operation and returns its command ID.
-    pub fn apply_camera_delta(&self, delta: &CameraDelta) -> Result<u64> {
+    /// Submits one relative camera update.
+    pub fn apply_camera_delta(
+        &self,
+        delta: &CameraDelta,
+    ) -> Result<NativeFuture<crate::CommandCompletion>> {
         let map = self.inner.native()?;
         let raw = delta.to_native();
-        let mut command_id = 0;
-        maplibre_core::check(unsafe {
-            sys::mln_map_apply_camera_delta(map, &raw, &mut command_id)
-        })?;
-        Ok(command_id)
+        crate::completion::submit(
+            move |completion| unsafe { sys::mln_map_apply_camera_delta(map, &raw, completion) },
+            crate::completion::command,
+        )
     }
 
     /// Starts an ordered camera query.
-    pub fn start_camera_query(&self) -> Result<OperationHandle<CameraSnapshot>> {
+    pub fn camera_query(&self) -> Result<NativeFuture<CameraSnapshot>> {
         let map = self.inner.native()?;
-        let mut operation = sys::mln_operation(0);
-        // SAFETY: map is live and operation is null writable storage.
-        maplibre_core::check(unsafe { sys::mln_map_camera_query_start(map, &mut operation) })?;
-        OperationHandle::new(operation, OperationKind::CameraQuery)
+        crate::completion::submit(
+            move |completion| unsafe { sys::mln_map_camera_query(map, completion) },
+            |result| {
+                let value = crate::completion::copy_value::<sys::mln_camera_query_result>(result)?;
+                Ok(CameraSnapshot {
+                    generation: value.generation,
+                    camera: CameraOptions::from_native(value.camera),
+                })
+            },
+        )
     }
 
     /// Selects which map-originated event types this map queues and returns the
-    /// accepted command ID.
-    pub fn set_event_mask(&self, mask: RuntimeEventMask) -> Result<u64> {
+    /// completion future.
+    pub fn set_event_mask(
+        &self,
+        mask: RuntimeEventMask,
+    ) -> Result<NativeFuture<crate::CommandCompletion>> {
         let map = self.inner.native()?;
-        let mut command_id = 0;
-        // SAFETY: map is live and command_id is zero writable storage.
-        maplibre_core::check(unsafe {
-            sys::mln_map_set_event_mask(map, mask.bits(), &mut command_id)
-        })?;
-        Ok(command_id)
+        crate::completion::submit(
+            move |completion| unsafe { sys::mln_map_set_event_mask(map, mask.bits(), completion) },
+            crate::completion::command,
+        )
     }
 
-    /// Submits a debug-overlay command and returns its command ID.
+    /// Submits a debug-overlay command.
     ///
     /// The committed mask is visible as [`MapSnapshot::debug_options`].
-    pub fn set_debug_options(&self, options: MapDebugOptions) -> Result<u64> {
+    pub fn set_debug_options(
+        &self,
+        options: MapDebugOptions,
+    ) -> Result<NativeFuture<crate::CommandCompletion>> {
         let map = self.inner.native()?;
-        let mut command_id = 0;
-        // SAFETY: map is live and command_id is zero writable storage.
-        maplibre_core::check(unsafe {
-            sys::mln_map_set_debug_options(map, options.bits(), &mut command_id)
-        })?;
-        Ok(command_id)
+        crate::completion::submit(
+            move |completion| unsafe {
+                sys::mln_map_set_debug_options(map, options.bits(), completion)
+            },
+            crate::completion::command,
+        )
     }
 
-    /// Submits a rendering-stats visibility command and returns its command ID.
+    /// Submits a rendering-stats visibility command.
     ///
     /// The committed value is visible as
     /// [`MapSnapshot::rendering_stats_view_enabled`].
-    pub fn set_rendering_stats_view_enabled(&self, enabled: bool) -> Result<u64> {
+    pub fn set_rendering_stats_view_enabled(
+        &self,
+        enabled: bool,
+    ) -> Result<NativeFuture<crate::CommandCompletion>> {
         let map = self.inner.native()?;
-        let mut command_id = 0;
-        // SAFETY: map is live and command_id is zero writable storage.
-        maplibre_core::check(unsafe {
-            sys::mln_map_set_rendering_stats_view_enabled(map, enabled, &mut command_id)
-        })?;
-        Ok(command_id)
+        crate::completion::submit(
+            move |completion| unsafe {
+                sys::mln_map_set_rendering_stats_view_enabled(map, enabled, completion)
+            },
+            crate::completion::command,
+        )
     }
 
     /// Submits a viewport-options command; the committed options are visible
     /// as [`MapSnapshot::viewport`].
-    pub fn set_viewport_options(&self, options: &MapViewportOptions) -> Result<u64> {
+    pub fn set_viewport_options(
+        &self,
+        options: &MapViewportOptions,
+    ) -> Result<NativeFuture<crate::CommandCompletion>> {
         let map = self.inner.native()?;
-        let mut command_id = 0;
-        maplibre_core::check(unsafe {
-            sys::mln_map_set_viewport_options(map, &options.to_native(), &mut command_id)
-        })?;
-        Ok(command_id)
+        let raw = options.to_native();
+        crate::completion::submit(
+            move |completion| unsafe { sys::mln_map_set_viewport_options(map, &raw, completion) },
+            crate::completion::command,
+        )
     }
 
     /// Submits a tile-options command; the committed options are visible as
     /// [`MapSnapshot::tile`].
-    pub fn set_tile_options(&self, options: &MapTileOptions) -> Result<u64> {
+    pub fn set_tile_options(
+        &self,
+        options: &MapTileOptions,
+    ) -> Result<NativeFuture<crate::CommandCompletion>> {
         let map = self.inner.native()?;
-        let mut command_id = 0;
-        maplibre_core::check(unsafe {
-            sys::mln_map_set_tile_options(map, &options.to_native(), &mut command_id)
-        })?;
-        Ok(command_id)
+        let raw = options.to_native();
+        crate::completion::submit(
+            move |completion| unsafe { sys::mln_map_set_tile_options(map, &raw, completion) },
+            crate::completion::command,
+        )
     }
 
     /// Submits a camera-constraint command; the committed constraints are
     /// visible as [`MapSnapshot::bounds`].
-    pub fn set_bounds(&self, options: &BoundOptions) -> Result<u64> {
+    pub fn set_bounds(
+        &self,
+        options: &BoundOptions,
+    ) -> Result<NativeFuture<crate::CommandCompletion>> {
         let map = self.inner.native()?;
-        let mut command_id = 0;
-        maplibre_core::check(unsafe {
-            sys::mln_map_set_bounds(map, &options.to_native(), &mut command_id)
-        })?;
-        Ok(command_id)
+        let raw = options.to_native();
+        crate::completion::submit(
+            move |completion| unsafe { sys::mln_map_set_bounds(map, &raw, completion) },
+            crate::completion::command,
+        )
     }
 
     /// Submits a free-camera command; the committed options are visible as
     /// [`MapSnapshot::free_camera`].
-    pub fn set_free_camera_options(&self, options: &FreeCameraOptions) -> Result<u64> {
+    pub fn set_free_camera_options(
+        &self,
+        options: &FreeCameraOptions,
+    ) -> Result<NativeFuture<crate::CommandCompletion>> {
         let map = self.inner.native()?;
-        let mut command_id = 0;
-        maplibre_core::check(unsafe {
-            sys::mln_map_set_free_camera_options(map, &options.to_native(), &mut command_id)
-        })?;
-        Ok(command_id)
+        let raw = options.to_native();
+        crate::completion::submit(
+            move |completion| unsafe {
+                sys::mln_map_set_free_camera_options(map, &raw, completion)
+            },
+            crate::completion::command,
+        )
     }
 
     pub fn projection_mode(&self) -> Result<ProjectionMode> {
         Ok(self.snapshot()?.projection_mode)
     }
 
-    pub fn set_projection_mode(&self, mode: &ProjectionMode) -> Result<u64> {
+    pub fn set_projection_mode(
+        &self,
+        mode: &ProjectionMode,
+    ) -> Result<NativeFuture<crate::CommandCompletion>> {
         let map = self.inner.native()?;
-        let mut command_id = 0;
-        maplibre_core::check(unsafe {
-            sys::mln_map_set_projection_mode(map, &mode.to_native(), &mut command_id)
-        })?;
-        Ok(command_id)
+        let raw = mode.to_native();
+        crate::completion::submit(
+            move |completion| unsafe { sys::mln_map_set_projection_mode(map, &raw, completion) },
+            crate::completion::command,
+        )
     }
 
-    pub fn start_camera_for_lat_lng_bounds(
+    pub fn camera_for_lat_lng_bounds(
         &self,
         bounds: LatLngBounds,
         fit_options: Option<&CameraFitOptions>,
-    ) -> Result<OperationHandle<CameraOptions>> {
+    ) -> Result<NativeFuture<CameraOptions>> {
         let map = self.inner.native()?;
         let fit = fit_options.map(CameraFitOptions::to_native);
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_map_camera_for_lat_lng_bounds_start(
-                map,
-                bounds.to_native(),
-                option_ptr(fit.as_ref()),
-                &mut operation,
-            )
-        })?;
-        self.start_operation(operation, OperationKind::CameraFitBounds)
+        crate::completion::submit(
+            move |completion| unsafe {
+                sys::mln_map_camera_for_lat_lng_bounds(
+                    map,
+                    bounds.to_native(),
+                    option_ptr(fit.as_ref()),
+                    completion,
+                )
+            },
+            |result| {
+                Ok(CameraOptions::from_native(crate::completion::copy_value(
+                    result,
+                )?))
+            },
+        )
     }
 
-    pub fn start_camera_for_lat_lngs(
+    pub fn camera_for_lat_lngs(
         &self,
         coordinates: &[LatLng],
         fit_options: Option<&CameraFitOptions>,
-    ) -> Result<OperationHandle<CameraOptions>> {
+    ) -> Result<NativeFuture<CameraOptions>> {
         if coordinates.is_empty() {
             return Err(Error::invalid_argument(
-                "start_camera_for_lat_lngs requires at least one coordinate",
+                "camera_for_lat_lngs requires at least one coordinate",
             ));
         }
         let map = self.inner.native()?;
         let coordinates = lat_lngs_to_native(coordinates);
         let fit = fit_options.map(CameraFitOptions::to_native);
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_map_camera_for_lat_lngs_start(
-                map,
-                const_ptr_or_null(&coordinates),
-                coordinates.len(),
-                option_ptr(fit.as_ref()),
-                &mut operation,
-            )
-        })?;
-        self.start_operation(operation, OperationKind::CameraFitCoordinates)
+        crate::completion::submit(
+            move |completion| unsafe {
+                sys::mln_map_camera_for_lat_lngs(
+                    map,
+                    const_ptr_or_null(&coordinates),
+                    coordinates.len(),
+                    option_ptr(fit.as_ref()),
+                    completion,
+                )
+            },
+            |result| {
+                Ok(CameraOptions::from_native(crate::completion::copy_value(
+                    result,
+                )?))
+            },
+        )
     }
 
-    pub fn start_camera_for_geometry(
+    pub fn camera_for_geometry(
         &self,
         geometry: &[u8],
         fit_options: Option<&CameraFitOptions>,
-    ) -> Result<OperationHandle<CameraOptions>> {
+    ) -> Result<NativeFuture<CameraOptions>> {
         let map = self.inner.native()?;
         let fit = fit_options.map(CameraFitOptions::to_native);
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_map_camera_for_geometry_start(
-                map,
-                maplibre_core::string::buffer_view(geometry),
-                option_ptr(fit.as_ref()),
-                &mut operation,
-            )
-        })?;
-        self.start_operation(operation, OperationKind::CameraFitGeometry)
+        let geometry = geometry.to_vec();
+        crate::completion::submit(
+            move |completion| unsafe {
+                sys::mln_map_camera_for_geometry(
+                    map,
+                    maplibre_core::string::buffer_view(&geometry),
+                    option_ptr(fit.as_ref()),
+                    completion,
+                )
+            },
+            |result| {
+                Ok(CameraOptions::from_native(crate::completion::copy_value(
+                    result,
+                )?))
+            },
+        )
     }
 
-    fn start_bounds_for_camera(
+    fn bounds_for_camera(
         &self,
         camera: &CameraOptions,
-        kind: OperationKind,
-    ) -> Result<OperationHandle<LatLngBounds>> {
+        unwrapped: bool,
+    ) -> Result<NativeFuture<LatLngBounds>> {
         let map = self.inner.native()?;
         let camera = camera.to_native();
-        let mut operation = sys::mln_operation(0);
-        let status = unsafe {
-            match kind {
-                OperationKind::BoundsForCamera => {
-                    sys::mln_map_lat_lng_bounds_for_camera_start(map, &camera, &mut operation)
+        crate::completion::submit(
+            move |completion| unsafe {
+                if unwrapped {
+                    sys::mln_map_lat_lng_bounds_for_camera_unwrapped(map, &camera, completion)
+                } else {
+                    sys::mln_map_lat_lng_bounds_for_camera(map, &camera, completion)
                 }
-                OperationKind::BoundsForCameraUnwrapped => {
-                    sys::mln_map_lat_lng_bounds_for_camera_unwrapped_start(
-                        map,
-                        &camera,
-                        &mut operation,
-                    )
-                }
-                _ => sys::MLN_STATUS_INVALID_STATE,
-            }
-        };
-        maplibre_core::check(status)?;
-        self.start_operation(operation, kind)
+            },
+            |result| {
+                Ok(LatLngBounds::from_native(crate::completion::copy_value(
+                    result,
+                )?))
+            },
+        )
     }
 
-    pub fn start_lat_lng_bounds_for_camera(
+    pub fn lat_lng_bounds_for_camera(
         &self,
         camera: &CameraOptions,
-    ) -> Result<OperationHandle<LatLngBounds>> {
-        self.start_bounds_for_camera(camera, OperationKind::BoundsForCamera)
+    ) -> Result<NativeFuture<LatLngBounds>> {
+        self.bounds_for_camera(camera, false)
     }
 
-    pub fn start_lat_lng_bounds_for_camera_unwrapped(
+    pub fn lat_lng_bounds_for_camera_unwrapped(
         &self,
         camera: &CameraOptions,
-    ) -> Result<OperationHandle<LatLngBounds>> {
-        self.start_bounds_for_camera(camera, OperationKind::BoundsForCameraUnwrapped)
+    ) -> Result<NativeFuture<LatLngBounds>> {
+        self.bounds_for_camera(camera, true)
     }
 
-    pub fn start_pixel_for_lat_lng(
-        &self,
-        coordinate: LatLng,
-    ) -> Result<OperationHandle<ScreenPoint>> {
+    pub fn pixel_for_lat_lng(&self, coordinate: LatLng) -> Result<NativeFuture<ScreenPoint>> {
         let map = self.inner.native()?;
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_map_pixel_for_lat_lng_start(map, coordinate.to_native(), &mut operation)
-        })?;
-        self.start_operation(operation, OperationKind::PixelForLatLng)
+        crate::completion::submit(
+            move |completion| unsafe {
+                sys::mln_map_pixel_for_lat_lng(map, coordinate.to_native(), completion)
+            },
+            |result| {
+                Ok(ScreenPoint::from_native(crate::completion::copy_value(
+                    result,
+                )?))
+            },
+        )
     }
 
-    pub fn start_lat_lng_for_pixel(&self, point: ScreenPoint) -> Result<OperationHandle<LatLng>> {
+    pub fn lat_lng_for_pixel(&self, point: ScreenPoint) -> Result<NativeFuture<LatLng>> {
         let map = self.inner.native()?;
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_map_lat_lng_for_pixel_start(map, point.to_native(), &mut operation)
-        })?;
-        self.start_operation(operation, OperationKind::LatLngForPixel)
+        crate::completion::submit(
+            move |completion| unsafe {
+                sys::mln_map_lat_lng_for_pixel(map, point.to_native(), completion)
+            },
+            |result| Ok(LatLng::from_native(crate::completion::copy_value(result)?)),
+        )
     }
 
-    pub fn start_pixels_for_lat_lngs(
+    pub fn pixels_for_lat_lngs(
         &self,
         coordinates: &[LatLng],
-    ) -> Result<OperationHandle<Vec<ScreenPoint>>> {
+    ) -> Result<NativeFuture<Vec<ScreenPoint>>> {
         let map = self.inner.native()?;
         let coordinates = lat_lngs_to_native(coordinates);
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_map_pixels_for_lat_lngs_start(
-                map,
-                const_ptr_or_null(&coordinates),
-                coordinates.len(),
-                &mut operation,
-            )
-        })?;
-        self.start_operation(operation, OperationKind::PixelsForLatLngs)
+        crate::completion::submit(
+            move |completion| unsafe {
+                sys::mln_map_pixels_for_lat_lngs(
+                    map,
+                    const_ptr_or_null(&coordinates),
+                    coordinates.len(),
+                    completion,
+                )
+            },
+            |result| {
+                Ok(
+                    crate::completion::copy_slice::<sys::mln_screen_point>(result)?
+                        .into_iter()
+                        .map(ScreenPoint::from_native)
+                        .collect(),
+                )
+            },
+        )
     }
 
-    pub fn start_lat_lngs_for_pixels(
-        &self,
-        points: &[ScreenPoint],
-    ) -> Result<OperationHandle<Vec<LatLng>>> {
+    pub fn lat_lngs_for_pixels(&self, points: &[ScreenPoint]) -> Result<NativeFuture<Vec<LatLng>>> {
         let map = self.inner.native()?;
         let points = screen_points_to_native(points);
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_map_lat_lngs_for_pixels_start(
-                map,
-                const_ptr_or_null(&points),
-                points.len(),
-                &mut operation,
-            )
-        })?;
-        self.start_operation(operation, OperationKind::LatLngsForPixels)
+        crate::completion::submit(
+            move |completion| unsafe {
+                sys::mln_map_lat_lngs_for_pixels(
+                    map,
+                    const_ptr_or_null(&points),
+                    points.len(),
+                    completion,
+                )
+            },
+            |result| {
+                Ok(crate::completion::copy_slice::<sys::mln_lat_lng>(result)?
+                    .into_iter()
+                    .map(LatLng::from_native)
+                    .collect())
+            },
+        )
     }
 
     /// Creates a standalone projection snapshot from the current map transform.
-    pub fn create_projection(&self) -> Result<MapProjectionHandle> {
+    pub fn create_projection(&self) -> Result<NativeFuture<MapProjectionHandle>> {
         MapProjectionHandle::new(self)
-    }
-}
-
-impl OperationHandle<CameraOptions> {
-    pub fn take(&self) -> Result<CameraOptions> {
-        let mut raw = unsafe { sys::mln_camera_options_default() };
-        self.with_result_operation(|operation| {
-            let status = unsafe {
-                match self.operation_kind {
-                    OperationKind::CameraFitBounds => {
-                        sys::mln_map_camera_for_lat_lng_bounds_take_result(operation, &mut raw)
-                    }
-                    OperationKind::CameraFitCoordinates => {
-                        sys::mln_map_camera_for_lat_lngs_take_result(operation, &mut raw)
-                    }
-                    OperationKind::CameraFitGeometry => {
-                        sys::mln_map_camera_for_geometry_take_result(operation, &mut raw)
-                    }
-                    _ => sys::MLN_STATUS_INVALID_STATE,
-                }
-            };
-            maplibre_core::check(status)
-        })?;
-        Ok(CameraOptions::from_native(raw))
-    }
-}
-
-impl OperationHandle<LatLngBounds> {
-    pub fn take(&self) -> Result<LatLngBounds> {
-        let mut raw = empty_lat_lng_bounds();
-        self.with_result_operation(|operation| {
-            let status = unsafe {
-                match self.operation_kind {
-                    OperationKind::BoundsForCamera => {
-                        sys::mln_map_lat_lng_bounds_for_camera_take_result(operation, &mut raw)
-                    }
-                    OperationKind::BoundsForCameraUnwrapped => {
-                        sys::mln_map_lat_lng_bounds_for_camera_unwrapped_take_result(
-                            operation, &mut raw,
-                        )
-                    }
-                    _ => sys::MLN_STATUS_INVALID_STATE,
-                }
-            };
-            maplibre_core::check(status)
-        })?;
-        Ok(LatLngBounds::from_native(raw))
-    }
-}
-
-impl OperationHandle<ScreenPoint> {
-    pub fn take(&self) -> Result<ScreenPoint> {
-        let mut raw = sys::mln_screen_point { x: 0.0, y: 0.0 };
-        self.with_result_operation(|operation| {
-            if self.operation_kind != OperationKind::PixelForLatLng {
-                return Err(Error::new(
-                    ErrorKind::InvalidState,
-                    None,
-                    "operation does not contain a screen point",
-                ));
-            }
-            maplibre_core::check(unsafe {
-                sys::mln_map_pixel_for_lat_lng_take_result(operation, &mut raw)
-            })
-        })?;
-        Ok(ScreenPoint::from_native(raw))
-    }
-}
-
-impl OperationHandle<LatLng> {
-    pub fn take(&self) -> Result<LatLng> {
-        let mut raw = sys::mln_lat_lng {
-            latitude: 0.0,
-            longitude: 0.0,
-        };
-        self.with_result_operation(|operation| {
-            if self.operation_kind != OperationKind::LatLngForPixel {
-                return Err(Error::new(
-                    ErrorKind::InvalidState,
-                    None,
-                    "operation does not contain a geographic coordinate",
-                ));
-            }
-            maplibre_core::check(unsafe {
-                sys::mln_map_lat_lng_for_pixel_take_result(operation, &mut raw)
-            })
-        })?;
-        Ok(LatLng::from_native(raw))
-    }
-}
-
-impl OperationHandle<Vec<ScreenPoint>> {
-    pub fn take(&self) -> Result<Vec<ScreenPoint>> {
-        let mut count = 0;
-        self.with_operation(|operation| {
-            // SAFETY: null/zero is a required-count probe. Native may report a
-            // capacity status while still filling count and preserving result.
-            unsafe {
-                sys::mln_map_pixels_for_lat_lngs_take_result(
-                    operation,
-                    std::ptr::null_mut(),
-                    0,
-                    &mut count,
-                );
-            }
-            Ok(())
-        })?;
-        let mut raw = vec![sys::mln_screen_point { x: 0.0, y: 0.0 }; count];
-        self.with_result_operation(|operation| {
-            maplibre_core::check(unsafe {
-                sys::mln_map_pixels_for_lat_lngs_take_result(
-                    operation,
-                    raw.as_mut_ptr(),
-                    raw.len(),
-                    &mut count,
-                )
-            })
-        })?;
-        Ok(raw.into_iter().map(ScreenPoint::from_native).collect())
-    }
-}
-
-impl OperationHandle<Vec<LatLng>> {
-    pub fn take(&self) -> Result<Vec<LatLng>> {
-        let mut count = 0;
-        self.with_operation(|operation| {
-            // SAFETY: null/zero is a required-count probe. Native may report a
-            // capacity status while still filling count and preserving result.
-            unsafe {
-                sys::mln_map_lat_lngs_for_pixels_take_result(
-                    operation,
-                    std::ptr::null_mut(),
-                    0,
-                    &mut count,
-                );
-            }
-            Ok(())
-        })?;
-        let mut raw = vec![
-            sys::mln_lat_lng {
-                latitude: 0.0,
-                longitude: 0.0,
-            };
-            count
-        ];
-        self.with_result_operation(|operation| {
-            maplibre_core::check(unsafe {
-                sys::mln_map_lat_lngs_for_pixels_take_result(
-                    operation,
-                    raw.as_mut_ptr(),
-                    raw.len(),
-                    &mut count,
-                )
-            })
-        })?;
-        Ok(raw.into_iter().map(LatLng::from_native).collect())
     }
 }
 
@@ -755,7 +643,7 @@ impl MapHandle {
     ) -> Result<RenderSessionAttachment> {
         let raw = value.to_native();
         RenderSessionHandle::attach(self, options, |map, options, session, operation| unsafe {
-            sys::mln_metal_surface_attach_start(map, &raw, options, session, operation)
+            sys::mln_metal_surface_attach(map, &raw, options, session, operation)
         })
     }
 
@@ -766,7 +654,7 @@ impl MapHandle {
     ) -> Result<RenderSessionAttachment> {
         let raw = value.to_native();
         RenderSessionHandle::attach(self, options, |map, options, session, operation| unsafe {
-            sys::mln_vulkan_surface_attach_start(map, &raw, options, session, operation)
+            sys::mln_vulkan_surface_attach(map, &raw, options, session, operation)
         })
     }
 
@@ -777,7 +665,7 @@ impl MapHandle {
     ) -> Result<RenderSessionAttachment> {
         let raw = value.to_native();
         RenderSessionHandle::attach(self, options, |map, options, session, operation| unsafe {
-            sys::mln_webgpu_surface_attach_start(map, &raw, options, session, operation)
+            sys::mln_webgpu_surface_attach(map, &raw, options, session, operation)
         })
     }
 
@@ -788,7 +676,7 @@ impl MapHandle {
     ) -> Result<RenderSessionAttachment> {
         let raw = value.to_native();
         RenderSessionHandle::attach(self, options, |map, options, session, operation| unsafe {
-            sys::mln_opengl_surface_attach_start(map, &raw, options, session, operation)
+            sys::mln_opengl_surface_attach(map, &raw, options, session, operation)
         })
     }
 
@@ -799,7 +687,7 @@ impl MapHandle {
     ) -> Result<RenderSessionAttachment> {
         let raw = value.to_native();
         RenderSessionHandle::attach(self, options, |map, options, session, operation| unsafe {
-            sys::mln_metal_owned_texture_attach_start(map, &raw, options, session, operation)
+            sys::mln_metal_owned_texture_attach(map, &raw, options, session, operation)
         })
     }
 
@@ -810,7 +698,7 @@ impl MapHandle {
     ) -> Result<RenderSessionAttachment> {
         let raw = value.to_native();
         RenderSessionHandle::attach(self, options, |map, options, session, operation| unsafe {
-            sys::mln_metal_borrowed_texture_attach_start(map, &raw, options, session, operation)
+            sys::mln_metal_borrowed_texture_attach(map, &raw, options, session, operation)
         })
     }
 
@@ -821,7 +709,7 @@ impl MapHandle {
     ) -> Result<RenderSessionAttachment> {
         let raw = value.to_native();
         RenderSessionHandle::attach(self, options, |map, options, session, operation| unsafe {
-            sys::mln_vulkan_owned_texture_attach_start(map, &raw, options, session, operation)
+            sys::mln_vulkan_owned_texture_attach(map, &raw, options, session, operation)
         })
     }
 
@@ -832,7 +720,7 @@ impl MapHandle {
     ) -> Result<RenderSessionAttachment> {
         let raw = value.to_native();
         RenderSessionHandle::attach(self, options, |map, options, session, operation| unsafe {
-            sys::mln_vulkan_borrowed_texture_attach_start(map, &raw, options, session, operation)
+            sys::mln_vulkan_borrowed_texture_attach(map, &raw, options, session, operation)
         })
     }
 
@@ -843,7 +731,7 @@ impl MapHandle {
     ) -> Result<RenderSessionAttachment> {
         let raw = value.to_native();
         RenderSessionHandle::attach(self, options, |map, options, session, operation| unsafe {
-            sys::mln_webgpu_owned_texture_attach_start(map, &raw, options, session, operation)
+            sys::mln_webgpu_owned_texture_attach(map, &raw, options, session, operation)
         })
     }
 
@@ -854,7 +742,7 @@ impl MapHandle {
     ) -> Result<RenderSessionAttachment> {
         let raw = value.to_native();
         RenderSessionHandle::attach(self, options, |map, options, session, operation| unsafe {
-            sys::mln_webgpu_borrowed_texture_attach_start(map, &raw, options, session, operation)
+            sys::mln_webgpu_borrowed_texture_attach(map, &raw, options, session, operation)
         })
     }
 
@@ -865,7 +753,7 @@ impl MapHandle {
     ) -> Result<RenderSessionAttachment> {
         let raw = value.to_native();
         RenderSessionHandle::attach(self, options, |map, options, session, operation| unsafe {
-            sys::mln_opengl_owned_texture_attach_start(map, &raw, options, session, operation)
+            sys::mln_opengl_owned_texture_attach(map, &raw, options, session, operation)
         })
     }
 
@@ -876,7 +764,7 @@ impl MapHandle {
     ) -> Result<RenderSessionAttachment> {
         let raw = value.to_native();
         RenderSessionHandle::attach(self, options, |map, options, session, operation| unsafe {
-            sys::mln_opengl_borrowed_texture_attach_start(map, &raw, options, session, operation)
+            sys::mln_opengl_borrowed_texture_attach(map, &raw, options, session, operation)
         })
     }
 }

@@ -1,12 +1,12 @@
 package org.maplibre.nativeffi.render
 
+import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.query.FeatureStateSelector
 import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
-import org.maplibre.nativeffi.runtime.OperationHandle
 
 /** Owned render session control handle. Driver methods remain graphics-thread-affine. */
 public expect class RenderSessionHandle : AutoCloseable {
@@ -27,76 +27,61 @@ public expect class RenderSessionHandle : AutoCloseable {
 
   public fun acquireFrame(): AcquiredFrameHandle?
 
-  public fun startResize(extent: RenderTargetExtent): OperationHandle<Unit>
+  public fun resize(extent: RenderTargetExtent): Deferred<Unit>
 
-  public fun startSetMetalSurfaceTarget(descriptor: MetalSurfaceDescriptor): OperationHandle<Unit>
+  public fun setMetalSurfaceTarget(descriptor: MetalSurfaceDescriptor): Deferred<Unit>
 
-  public fun startSetVulkanSurfaceTarget(descriptor: VulkanSurfaceDescriptor): OperationHandle<Unit>
+  public fun setVulkanSurfaceTarget(descriptor: VulkanSurfaceDescriptor): Deferred<Unit>
 
-  public fun startSetOpenGLSurfaceTarget(descriptor: OpenGLSurfaceDescriptor): OperationHandle<Unit>
+  public fun setOpenGLSurfaceTarget(descriptor: OpenGLSurfaceDescriptor): Deferred<Unit>
 
-  public fun startSetMetalBorrowedTextureTarget(
+  public fun setMetalBorrowedTextureTarget(
     descriptor: MetalBorrowedTextureDescriptor
-  ): OperationHandle<Unit>
+  ): Deferred<Unit>
 
-  public fun startSetVulkanBorrowedTextureTarget(
+  public fun setVulkanBorrowedTextureTarget(
     descriptor: VulkanBorrowedTextureDescriptor
-  ): OperationHandle<Unit>
+  ): Deferred<Unit>
 
-  public fun startSetOpenGLBorrowedTextureTarget(
+  public fun setOpenGLBorrowedTextureTarget(
     descriptor: OpenGLBorrowedTextureDescriptor
-  ): OperationHandle<Unit>
+  ): Deferred<Unit>
 
-  public fun startReduceMemoryUse(): OperationHandle<Unit>
+  public fun reduceMemoryUse(): Deferred<Unit>
 
-  public fun startClearData(): OperationHandle<Unit>
+  public fun clearData(): Deferred<Unit>
 
-  public fun startDumpDebugLogs(): OperationHandle<Unit>
+  public fun dumpDebugLogs(): Deferred<Unit>
 
-  public fun startBarrier(): OperationHandle<Unit>
+  public fun barrier(): Deferred<Unit>
 
-  public fun startDetach(): OperationHandle<Unit>
+  public fun detach(): Deferred<Unit>
 
-  public fun startSetFeatureState(
-    selector: FeatureStateSelector,
-    value: ByteArray,
-  ): OperationHandle<Unit>
+  public fun setFeatureState(selector: FeatureStateSelector, value: ByteArray): Deferred<Unit>
 
-  public fun startGetFeatureState(selector: FeatureStateSelector): OperationHandle<ByteArray>
+  public fun getFeatureState(selector: FeatureStateSelector): Deferred<ByteArray>
 
-  public fun takeFeatureStateResult(operation: OperationHandle<ByteArray>): ByteArray
+  public fun removeFeatureState(selector: FeatureStateSelector): Deferred<Unit>
 
-  public fun startRemoveFeatureState(selector: FeatureStateSelector): OperationHandle<Unit>
-
-  public fun startQueryRenderedFeatures(
+  public fun queryRenderedFeatures(
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions?,
-  ): OperationHandle<List<QueriedFeature>>
+  ): Deferred<List<QueriedFeature>>
 
-  public fun startQuerySourceFeatures(
+  public fun querySourceFeatures(
     sourceId: String,
     options: SourceFeatureQueryOptions?,
-  ): OperationHandle<List<QueriedFeature>>
+  ): Deferred<List<QueriedFeature>>
 
-  public fun takeQueryFeaturesResult(
-    operation: OperationHandle<List<QueriedFeature>>
-  ): List<QueriedFeature>
-
-  public fun startQueryFeatureExtension(
+  public fun queryFeatureExtension(
     sourceId: String,
     feature: ByteArray,
     extension: String,
     extensionField: String,
     arguments: ByteArray?,
-  ): OperationHandle<ByteArray>
+  ): Deferred<ByteArray>
 
-  public fun takeQueryResult(operation: OperationHandle<ByteArray>): ByteArray
-
-  public fun startReadPremultipliedRgba8(): OperationHandle<TextureReadback>
-
-  public fun takeReadPremultipliedRgba8Result(
-    operation: OperationHandle<TextureReadback>
-  ): TextureReadback
+  public fun readPremultipliedRgba8(): Deferred<TextureReadback>
 
   /** Irreversibly abandons a lost target without graphics calls. */
   public fun abandon(): RenderAbandonResult

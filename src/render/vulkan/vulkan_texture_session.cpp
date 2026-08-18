@@ -198,7 +198,7 @@ auto supported_render_backend_mask() noexcept -> uint32_t {
 auto vulkan_owned_texture_attach_start(
   mln_map map, const mln_vulkan_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
   MapObject* live_map = nullptr;
   const auto map_status = validate_map_live(map, live_map);
@@ -249,14 +249,14 @@ auto vulkan_owned_texture_attach_start(
   };
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Texture, options, capabilities,
-    out_session, out_operation
+    out_session, completion
   );
 }
 
 auto vulkan_borrowed_texture_attach_start(
   mln_map map, const mln_vulkan_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
   MapObject* live_map = nullptr;
   const auto map_status = validate_map_live(map, live_map);
@@ -307,14 +307,14 @@ auto vulkan_borrowed_texture_attach_start(
   };
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Texture, options, capabilities,
-    out_session, out_operation
+    out_session, completion
   );
 }
 
 auto vulkan_borrowed_texture_set_target_start(
   mln_render_session session,
   const mln_vulkan_borrowed_texture_descriptor* descriptor,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) -> mln_status {
   const auto descriptor_status =
     validate_vulkan_borrowed_texture_descriptor(descriptor);
@@ -329,7 +329,7 @@ auto vulkan_borrowed_texture_set_target_start(
   }
   const auto copied = *descriptor;
   return enqueue_driver_operation(
-    session, RENDER_OPERATION_MAINTENANCE,
+    session,
     [copied](mln_render_session_object& target) {
       return render_session_set_target(
         target.self, RetargetTargetKind::BorrowedTexture, copied.extent,
@@ -339,7 +339,7 @@ auto vulkan_borrowed_texture_set_target_start(
         }
       );
     },
-    out_operation
+    completion
   );
 }
 

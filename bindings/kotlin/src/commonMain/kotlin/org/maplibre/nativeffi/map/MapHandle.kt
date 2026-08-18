@@ -1,5 +1,6 @@
 package org.maplibre.nativeffi.map
 
+import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.camera.BoundOptions
 import org.maplibre.nativeffi.camera.CameraDelta
 import org.maplibre.nativeffi.camera.CameraSnapshot
@@ -21,6 +22,7 @@ import org.maplibre.nativeffi.render.RenderSessionAttachment
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
+import org.maplibre.nativeffi.runtime.CommandCompletion
 import org.maplibre.nativeffi.runtime.RuntimeEventMask
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
@@ -51,7 +53,10 @@ public expect class MapHandle {
    * reads this mask, changes one bit, and writes it back. Narrowing gates later events and keeps
    * queued ones.
    */
-  public var eventMask: RuntimeEventMask
+  public val eventMask: RuntimeEventMask
+
+  /** Changes the map-originated event types queued after this command commits. */
+  public fun setEventMask(value: RuntimeEventMask): Deferred<CommandCompletion>
 
   /**
    * Starts loading the style at [url]. The call returns once the request is queued; a load failure
@@ -59,7 +64,7 @@ public expect class MapHandle {
    *
    * @see org.maplibre.nativeffi.runtime.RuntimeHandle.drainEvents
    */
-  public fun setStyleUrl(url: String): ULong
+  public fun setStyleUrl(url: String): Deferred<CommandCompletion>
 
   /**
    * Loads [json] as the map style.
@@ -69,61 +74,73 @@ public expect class MapHandle {
    *
    * @see org.maplibre.nativeffi.runtime.RuntimeHandle.drainEvents
    */
-  public fun setStyleJson(json: ByteArray): ULong
+  public fun setStyleJson(json: ByteArray): Deferred<CommandCompletion>
 
   /**
    * Returns the style document this map's style was last parsed from, byte-for-byte, or an empty
    * byte array when no document has been parsed. Runtime mutations do not change it.
    */
-  public suspend fun loadedStyleJson(): ByteArray
+  public fun loadedStyleJson(): Deferred<ByteArray>
 
   /**
    * Returns the URL this map's style was last requested from, recorded when the request is made
    * rather than when it completes, or an empty string when no URL is available.
    */
-  public suspend fun styleUrl(): String
+  public fun styleUrl(): Deferred<String>
 
-  public fun addStyleSourceJson(sourceId: String, sourceJson: ByteArray): ULong
+  public fun addStyleSourceJson(
+    sourceId: String,
+    sourceJson: ByteArray,
+  ): Deferred<CommandCompletion>
 
   /**
-   * Submits a command that removes one style source. Its `COMMAND_FINISHED` event reports
+   * Removes one style source. The returned deferred fails with
    * [org.maplibre.nativeffi.error.MaplibreStatus.NOT_FOUND] when no source has [sourceId] and
    * [org.maplibre.nativeffi.error.MaplibreStatus.INVALID_STATE] when a layer still uses the source.
    */
-  public fun removeStyleSource(sourceId: String): ULong
+  public fun removeStyleSource(sourceId: String): Deferred<CommandCompletion>
 
   /** Returns one source's copied metadata, or null when no source carries [sourceId]. */
-  public suspend fun styleSourceInfo(sourceId: String): SourceInfo?
+  public fun styleSourceInfo(sourceId: String): Deferred<SourceInfo?>
 
-  public suspend fun styleSourceIds(): List<String>
+  public fun styleSourceIds(): Deferred<List<String>>
 
   public fun addGeoJsonSourceUrl(
     sourceId: String,
     url: String,
     options: GeoJsonSourceOptions?,
-  ): ULong
+  ): Deferred<CommandCompletion>
 
   /**
    * Adds a GeoJSON source with prepared inline data. The call borrows [data], and the source adopts
    * the options the data was prepared with, fixed for the lifetime of the source.
    */
-  public fun addGeoJsonSourceData(sourceId: String, data: GeoJsonSourceDataHandle): ULong
+  public fun addGeoJsonSourceData(
+    sourceId: String,
+    data: GeoJsonSourceDataHandle,
+  ): Deferred<CommandCompletion>
 
-  public fun setGeoJsonSourceUrl(sourceId: String, url: String): ULong
+  public fun setGeoJsonSourceUrl(sourceId: String, url: String): Deferred<CommandCompletion>
 
   /**
    * Updates one GeoJSON source with prepared inline data. The call borrows [data]. The data must
    * have been prepared with options equal to the options the source was added with,
    * `clusterProperties` excepted; a mismatch is rejected.
    */
-  public fun setGeoJsonSourceData(sourceId: String, data: GeoJsonSourceDataHandle): ULong
+  public fun setGeoJsonSourceData(
+    sourceId: String,
+    data: GeoJsonSourceDataHandle,
+  ): Deferred<CommandCompletion>
 
   /**
    * Overrides one GeoJSON source's synchronous tiling at runtime. While [enabled] is true, the
    * source slices requested tiles inline during the update pass, as if the source's options had set
    * [GeoJsonSourceOptions.synchronousTiling]; false restores the option the source was added with.
    */
-  public fun setGeoJsonSourceSynchronousTiling(sourceId: String, enabled: Boolean): ULong
+  public fun setGeoJsonSourceSynchronousTiling(
+    sourceId: String,
+    enabled: Boolean,
+  ): Deferred<CommandCompletion>
 
   /**
    * Adds a custom geometry source that calls [options] back for tile data.
@@ -134,232 +151,289 @@ public expect class MapHandle {
    * worker, and the binding closes the source's callbacks there, waiting for any in-flight tile
    * callback to return.
    */
-  public fun addCustomGeometrySource(sourceId: String, options: CustomGeometrySourceOptions): ULong
+  public fun addCustomGeometrySource(
+    sourceId: String,
+    options: CustomGeometrySourceOptions,
+  ): Deferred<CommandCompletion>
 
   public fun setCustomGeometrySourceTileData(
     sourceId: String,
     tileId: CanonicalTileId,
     data: ByteArray,
-  ): ULong
+  ): Deferred<CommandCompletion>
 
-  public fun invalidateCustomGeometrySourceTile(sourceId: String, tileId: CanonicalTileId): ULong
+  public fun invalidateCustomGeometrySourceTile(
+    sourceId: String,
+    tileId: CanonicalTileId,
+  ): Deferred<CommandCompletion>
 
-  public fun invalidateCustomGeometrySourceRegion(sourceId: String, bounds: LatLngBounds): ULong
+  public fun invalidateCustomGeometrySourceRegion(
+    sourceId: String,
+    bounds: LatLngBounds,
+  ): Deferred<CommandCompletion>
 
-  public fun addVectorSourceUrl(sourceId: String, url: String, options: TileSourceOptions?): ULong
+  public fun addVectorSourceUrl(
+    sourceId: String,
+    url: String,
+    options: TileSourceOptions?,
+  ): Deferred<CommandCompletion>
 
   public fun addVectorSourceTiles(
     sourceId: String,
     tiles: List<String>,
     options: TileSourceOptions?,
-  ): ULong
+  ): Deferred<CommandCompletion>
 
-  public fun addRasterSourceUrl(sourceId: String, url: String, options: TileSourceOptions?): ULong
+  public fun addRasterSourceUrl(
+    sourceId: String,
+    url: String,
+    options: TileSourceOptions?,
+  ): Deferred<CommandCompletion>
 
   public fun addRasterSourceTiles(
     sourceId: String,
     tiles: List<String>,
     options: TileSourceOptions?,
-  ): ULong
+  ): Deferred<CommandCompletion>
 
   public fun addRasterDemSourceUrl(
     sourceId: String,
     url: String,
     options: TileSourceOptions?,
-  ): ULong
+  ): Deferred<CommandCompletion>
 
   public fun addRasterDemSourceTiles(
     sourceId: String,
     tiles: List<String>,
     options: TileSourceOptions?,
-  ): ULong
+  ): Deferred<CommandCompletion>
 
   public fun setStyleImage(
     imageId: String,
     image: PremultipliedRgba8Image,
     options: StyleImageOptions,
-  ): ULong
+  ): Deferred<CommandCompletion>
 
   /**
-   * Submits a command that removes one runtime style image. Its `COMMAND_FINISHED` event reports
+   * Removes one runtime style image. The returned deferred fails with
    * [org.maplibre.nativeffi.error.MaplibreStatus.NOT_FOUND] when no image has [imageId].
    */
-  public fun removeStyleImage(imageId: String): ULong
+  public fun removeStyleImage(imageId: String): Deferred<CommandCompletion>
 
   /** Returns one image's copied metadata, or null when no image carries [imageId]. */
-  public suspend fun styleImageInfo(imageId: String): StyleImageInfo?
+  public fun styleImageInfo(imageId: String): Deferred<StyleImageInfo?>
 
   /**
    * Returns one runtime style image's stretchable intervals, or null when no image carries
    * [imageId]. The pair holds the horizontal intervals first.
    */
-  public suspend fun styleImageStretches(
+  public fun styleImageStretches(
     imageId: String
-  ): Pair<List<ImageStretch>, List<ImageStretch>>?
+  ): Deferred<Pair<List<ImageStretch>, List<ImageStretch>>?>
 
-  public suspend fun copyStyleImagePremultipliedRgba8(imageId: String): StyleImage?
+  public fun copyStyleImagePremultipliedRgba8(imageId: String): Deferred<StyleImage?>
 
-  public fun addImageSourceUrl(sourceId: String, coordinates: List<LatLng>, url: String): ULong
+  public fun addImageSourceUrl(
+    sourceId: String,
+    coordinates: List<LatLng>,
+    url: String,
+  ): Deferred<CommandCompletion>
 
   public fun addImageSourceImage(
     sourceId: String,
     coordinates: List<LatLng>,
     image: PremultipliedRgba8Image,
-  ): ULong
+  ): Deferred<CommandCompletion>
 
-  public fun setImageSourceUrl(sourceId: String, url: String): ULong
+  public fun setImageSourceUrl(sourceId: String, url: String): Deferred<CommandCompletion>
 
-  public fun setImageSourceImage(sourceId: String, image: PremultipliedRgba8Image): ULong
+  public fun setImageSourceImage(
+    sourceId: String,
+    image: PremultipliedRgba8Image,
+  ): Deferred<CommandCompletion>
 
-  public fun setImageSourceCoordinates(sourceId: String, coordinates: List<LatLng>): ULong
+  public fun setImageSourceCoordinates(
+    sourceId: String,
+    coordinates: List<LatLng>,
+  ): Deferred<CommandCompletion>
 
-  public suspend fun imageSourceCoordinates(sourceId: String): List<LatLng>?
+  public fun imageSourceCoordinates(sourceId: String): Deferred<List<LatLng>?>
 
-  public fun addStyleLayerJson(layerJson: ByteArray, beforeLayerId: String): ULong
+  public fun addStyleLayerJson(
+    layerJson: ByteArray,
+    beforeLayerId: String,
+  ): Deferred<CommandCompletion>
 
-  public fun addHillshadeLayer(layerId: String, sourceId: String, beforeLayerId: String): ULong
+  public fun addHillshadeLayer(
+    layerId: String,
+    sourceId: String,
+    beforeLayerId: String,
+  ): Deferred<CommandCompletion>
 
-  public fun addColorReliefLayer(layerId: String, sourceId: String, beforeLayerId: String): ULong
+  public fun addColorReliefLayer(
+    layerId: String,
+    sourceId: String,
+    beforeLayerId: String,
+  ): Deferred<CommandCompletion>
 
-  public fun addLocationIndicatorLayer(layerId: String, beforeLayerId: String): ULong
+  public fun addLocationIndicatorLayer(
+    layerId: String,
+    beforeLayerId: String,
+  ): Deferred<CommandCompletion>
 
   public fun setLocationIndicatorLocation(
     layerId: String,
     coordinate: LatLng,
     altitude: Double,
-  ): ULong
+  ): Deferred<CommandCompletion>
 
-  public fun setLocationIndicatorBearing(layerId: String, bearing: Double): ULong
+  public fun setLocationIndicatorBearing(
+    layerId: String,
+    bearing: Double,
+  ): Deferred<CommandCompletion>
 
-  public fun setLocationIndicatorAccuracyRadius(layerId: String, radius: Double): ULong
+  public fun setLocationIndicatorAccuracyRadius(
+    layerId: String,
+    radius: Double,
+  ): Deferred<CommandCompletion>
 
   public fun setLocationIndicatorImageName(
     layerId: String,
     imageKind: LocationIndicatorImageKind,
     imageId: String,
-  ): ULong
+  ): Deferred<CommandCompletion>
 
   /**
-   * Submits a command that removes one style layer. Its `COMMAND_FINISHED` event reports
+   * Removes one style layer. The returned deferred fails with
    * [org.maplibre.nativeffi.error.MaplibreStatus.NOT_FOUND] when no layer has [layerId].
    */
-  public fun removeStyleLayer(layerId: String): ULong
+  public fun removeStyleLayer(layerId: String): Deferred<CommandCompletion>
 
   /** Returns one layer's copied metadata, or null when no layer carries [layerId]. */
-  public suspend fun styleLayerInfo(layerId: String): LayerInfo?
+  public fun styleLayerInfo(layerId: String): Deferred<LayerInfo?>
 
-  public suspend fun styleLayerIds(): List<String>
+  public fun styleLayerIds(): Deferred<List<String>>
 
-  public fun moveStyleLayer(layerId: String, beforeLayerId: String): ULong
+  public fun moveStyleLayer(layerId: String, beforeLayerId: String): Deferred<CommandCompletion>
 
-  public suspend fun styleLayerJson(layerId: String): ByteArray?
+  public fun styleLayerJson(layerId: String): Deferred<ByteArray?>
 
-  public fun setStyleLightJson(lightJson: ByteArray): ULong
+  public fun setStyleLightJson(lightJson: ByteArray): Deferred<CommandCompletion>
 
-  public fun setStyleLightProperty(propertyName: String, value: ByteArray): ULong
+  public fun setStyleLightProperty(
+    propertyName: String,
+    value: ByteArray,
+  ): Deferred<CommandCompletion>
 
-  public suspend fun styleLightProperty(propertyName: String): ByteArray?
+  public fun styleLightProperty(propertyName: String): Deferred<ByteArray?>
 
   /**
    * Sets the style's global transition options, replacing rather than merging. Loading a style
    * replaces these options with the ones that style declares, so apply an override after the load.
    */
-  public fun setStyleTransitionOptions(options: StyleTransitionOptions): ULong
+  public fun setStyleTransitionOptions(options: StyleTransitionOptions): Deferred<CommandCompletion>
 
-  public suspend fun styleTransitionOptions(): StyleTransitionOptions
+  public fun styleTransitionOptions(): Deferred<StyleTransitionOptions>
 
-  public fun setLayerProperty(layerId: String, propertyName: String, value: ByteArray): ULong
+  public fun setLayerProperty(
+    layerId: String,
+    propertyName: String,
+    value: ByteArray,
+  ): Deferred<CommandCompletion>
 
-  public suspend fun layerProperty(layerId: String, propertyName: String): ByteArray?
+  public fun layerProperty(layerId: String, propertyName: String): Deferred<ByteArray?>
 
-  public fun setLayerFilter(layerId: String, filter: ByteArray): ULong
+  public fun setLayerFilter(layerId: String, filter: ByteArray): Deferred<CommandCompletion>
 
-  public fun clearLayerFilter(layerId: String): ULong
+  public fun clearLayerFilter(layerId: String): Deferred<CommandCompletion>
 
-  public suspend fun layerFilter(layerId: String): ByteArray?
+  public fun layerFilter(layerId: String): Deferred<ByteArray?>
 
   /** Sets one layer's source-layer ID. Layer types that take no source are rejected. */
-  public fun setLayerSourceLayer(layerId: String, sourceLayer: String): ULong
+  public fun setLayerSourceLayer(layerId: String, sourceLayer: String): Deferred<CommandCompletion>
 
   /** Returns one layer's source-layer ID, empty when the layer carries none. */
-  public suspend fun layerSourceLayer(layerId: String): String
+  public fun layerSourceLayer(layerId: String): Deferred<String>
 
   /**
    * Sets one layer's source ID. Layer types that take no source are rejected. The named source need
    * not exist yet.
    */
-  public fun setLayerSourceId(layerId: String, sourceId: String): ULong
+  public fun setLayerSourceId(layerId: String, sourceId: String): Deferred<CommandCompletion>
 
   /** Returns one layer's source ID, empty when the layer carries none. */
-  public suspend fun layerSourceId(layerId: String): String
+  public fun layerSourceId(layerId: String): Deferred<String>
 
   /** Sets the lowest zoom at which one layer draws. Pass negative infinity for no lower bound. */
-  public fun setLayerMinZoom(layerId: String, minZoom: Double): ULong
+  public fun setLayerMinZoom(layerId: String, minZoom: Double): Deferred<CommandCompletion>
 
   /** Sets the highest zoom at which one layer draws. Pass positive infinity for no upper bound. */
-  public fun setLayerMaxZoom(layerId: String, maxZoom: Double): ULong
+  public fun setLayerMaxZoom(layerId: String, maxZoom: Double): Deferred<CommandCompletion>
 
-  public fun setLayerVisibility(layerId: String, visibility: StyleLayerVisibility): ULong
+  public fun setLayerVisibility(
+    layerId: String,
+    visibility: StyleLayerVisibility,
+  ): Deferred<CommandCompletion>
 
-  /** Submits a repaint command and returns its runtime-wide command ID. */
-  public fun requestRepaint(): Long
+  /** Submits a repaint command. */
+  public fun requestRepaint(): Deferred<CommandCompletion>
 
   /** Suspends until one noncoalescing still-image request completes. */
-  public suspend fun requestStillImage()
+  public fun requestStillImage(): Deferred<CommandCompletion>
 
   /** Copies the latest immutable state generation published by the map worker. */
   public fun snapshot(): MapSnapshot
 
   /**
-   * Submits a debug-overlay command and returns its runtime-wide command ID. The committed mask is
-   * visible through [snapshot] as [MapSnapshot.debugOptions].
+   * Submits a debug-overlay command. The committed mask is visible through [snapshot] as
+   * [MapSnapshot.debugOptions].
    */
-  public fun setDebugOptions(options: Set<DebugOption>): Long
+  public fun setDebugOptions(options: Set<DebugOption>): Deferred<CommandCompletion>
 
   /**
-   * Submits a rendering-stats visibility command and returns its runtime-wide command ID. The
-   * committed value is visible through [snapshot] as [MapSnapshot.renderingStatsViewEnabled].
+   * Submits a rendering-stats visibility command. The committed value is visible through [snapshot]
+   * as [MapSnapshot.renderingStatsViewEnabled].
    */
-  public fun setRenderingStatsViewEnabled(enabled: Boolean): Long
+  public fun setRenderingStatsViewEnabled(enabled: Boolean): Deferred<CommandCompletion>
 
   /**
-   * Submits a copied viewport-options command and returns its runtime-wide command ID. The
-   * committed options are visible through [snapshot] as [MapSnapshot.viewportOptions].
+   * Submits a copied viewport-options command. The committed options are visible through [snapshot]
+   * as [MapSnapshot.viewportOptions].
    */
-  public fun setViewportOptions(options: ViewportOptions): Long
+  public fun setViewportOptions(options: ViewportOptions): Deferred<CommandCompletion>
 
   /**
-   * Submits a copied tile-options command and returns its runtime-wide command ID. The committed
-   * options are visible through [snapshot] as [MapSnapshot.tileOptions].
+   * Submits a copied tile-options command. The committed options are visible through [snapshot] as
+   * [MapSnapshot.tileOptions].
    */
-  public fun setTileOptions(options: TileOptions): Long
+  public fun setTileOptions(options: TileOptions): Deferred<CommandCompletion>
 
   /**
-   * Submits a copied camera-constraint command and returns its runtime-wide command ID. The
-   * committed constraints are visible through [snapshot] as [MapSnapshot.bounds].
+   * Submits a copied camera-constraint command. The committed constraints are visible through
+   * [snapshot] as [MapSnapshot.bounds].
    */
-  public fun setBounds(options: BoundOptions): Long
+  public fun setBounds(options: BoundOptions): Deferred<CommandCompletion>
 
   /**
-   * Submits a copied free-camera command and returns its runtime-wide command ID. The committed
-   * options are visible through [snapshot] as [MapSnapshot.freeCameraOptions].
+   * Submits a copied free-camera command. The committed options are visible through [snapshot] as
+   * [MapSnapshot.freeCameraOptions].
    */
-  public fun setFreeCameraOptions(options: FreeCameraOptions): Long
+  public fun setFreeCameraOptions(options: FreeCameraOptions): Deferred<CommandCompletion>
 
-  /** Submits the map's logical extent and returns its runtime-wide command ID. */
-  public fun resize(size: MapSize): Long
+  /** Submits the map's logical extent. */
+  public fun resize(size: MapSize): Deferred<CommandCompletion>
 
   /** Copies the latest camera generation published by the map worker. */
   public fun cameraSnapshot(): CameraSnapshot
 
-  /** Submits one atomic camera update and returns its runtime-wide command ID. */
-  public fun updateCamera(update: CameraUpdate): Long
+  /** Submits one atomic camera update. */
+  public fun updateCamera(update: CameraUpdate): Deferred<CommandCompletion>
 
   /** Submits one relative camera operation. */
-  public fun applyCameraDelta(delta: CameraDelta): Long
+  public fun applyCameraDelta(delta: CameraDelta): Deferred<CommandCompletion>
 
   /** Suspends for an ordered camera observation behind commands accepted before this call. */
-  public suspend fun queryCamera(): CameraSnapshot
+  public fun queryCamera(): Deferred<CameraSnapshot>
 
   /**
    * Starts attaching a render target and returns its immediately usable session plus completion
@@ -414,13 +488,13 @@ public expect class MapHandle {
       RenderSessionAttachOptions(driver = RenderDriver.CALLER_GRAPHICS_THREAD),
   ): RenderSessionAttachment
 
-  public suspend fun createProjection(): MapProjectionHandle
+  public fun createProjection(): Deferred<MapProjectionHandle>
 
   /** Suspends until native map retirement completes. Queued events keep this map's source ID. */
   public fun close()
 
   public companion object {
     /** Creates a map without blocking the caller's coroutine. */
-    public suspend fun create(runtime: RuntimeHandle, options: MapOptions): MapHandle
+    public fun create(runtime: RuntimeHandle, options: MapOptions): Deferred<MapHandle>
   }
 }

@@ -95,7 +95,7 @@ public sealed class RuntimeMapLifecycleTests
         var options = DebugOptions.TileBorders | DebugOptions.ParseStatus;
         var completion = RuntimeEventTestHelpers.AssertCommandFinishes(
             runtime,
-            map.SetDebugOptions(options),
+            map.SetDebugOptionsAsync(options),
             MaplibreStatus.Ok
         );
 
@@ -105,7 +105,7 @@ public sealed class RuntimeMapLifecycleTests
         Assert.True(snapshot.Generation >= completion.Generation);
         Assert.Equal(options, snapshot.DebugOptions);
         Assert.False(snapshot.FullyLoaded);
-        map.DumpDebugLogs();
+        map.DumpDebugLogsAsync();
     }
 
     [BindingSpecTest("BND-100")]
@@ -121,7 +121,7 @@ public sealed class RuntimeMapLifecycleTests
         Assert.False(map.GetSnapshot().RenderingStatsViewEnabled);
         RuntimeEventTestHelpers.AssertCommandFinishes(
             runtime,
-            map.SetRenderingStatsViewEnabled(true),
+            map.SetRenderingStatsViewEnabledAsync(true),
             MaplibreStatus.Ok
         );
         Assert.True(map.GetSnapshot().RenderingStatsViewEnabled);
@@ -155,11 +155,11 @@ public sealed class RuntimeMapLifecycleTests
             TestContext.Current.CancellationToken
         );
 
-        var commandId = await Task.Run(map.RequestRepaint);
+        var completion = await Task.Run(map.RequestRepaintAsync);
         var snapshot = await Task.Run(map.GetSnapshot);
-        await Task.Run(() => runtime.BarrierAsync(TestContext.Current.CancellationToken));
+        await runtime.BarrierAsync();
 
-        Assert.NotEqual(0ul, commandId);
+        Assert.Equal(CommandDisposition.Committed, completion.Disposition);
         Assert.Equal(new LogicalExtent(512, 512, 1), snapshot.LogicalExtent);
     }
 
@@ -174,7 +174,7 @@ public sealed class RuntimeMapLifecycleTests
 
         var error = Assert.Throws<InvalidStateException>(() =>
         {
-            _ = map.RequestRepaint();
+            _ = map.RequestRepaintAsync();
         });
 
         Assert.Equal(MaplibreStatus.InvalidState, error.Status);

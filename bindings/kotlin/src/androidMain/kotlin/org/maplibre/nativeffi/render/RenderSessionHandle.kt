@@ -2,6 +2,7 @@ package org.maplibre.nativeffi.render
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.Deferred
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.LongPointer
 import org.bytedeco.javacpp.Pointer
@@ -11,10 +12,10 @@ import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ScreenBox
 import org.maplibre.nativeffi.geo.ScreenPoint
+import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.javacpp.ByteArrayViewScope
 import org.maplibre.nativeffi.internal.javacpp.JavaCppSupport
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
-import org.maplibre.nativeffi.internal.javacpp.ownedBuffer
 import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
@@ -24,10 +25,6 @@ import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
-import org.maplibre.nativeffi.runtime.OperationHandle
-import org.maplibre.nativeffi.runtime.OperationKind
-import org.maplibre.nativeffi.runtime.OperationResultKind
-import org.maplibre.nativeffi.runtime.startOperation
 
 /** Owned Android JNI render session handle. */
 public actual class RenderSessionHandle
@@ -158,267 +155,228 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
     }
   }
 
-  public actual fun startResize(extent: RenderTargetExtent): OperationHandle<Unit> =
-    unitOperation { outOperation ->
-      MaplibreNativeC.mln_render_target_extent().use { nativeExtent ->
-        nativeExtent.size(nativeExtent.sizeof())
-        setExtent(nativeExtent, extent)
-        MaplibreNativeC.mln_render_session_resize_start(
-          requireLiveHandle(),
-          nativeExtent,
-          outOperation,
-        )
+  public actual fun resize(extent: RenderTargetExtent): Deferred<Unit> =
+    MaplibreNativeC.mln_render_target_extent().use { nativeExtent ->
+      nativeExtent.size(nativeExtent.sizeof())
+      setExtent(nativeExtent, extent)
+      unit { completion ->
+        MaplibreNativeC.mln_render_session_resize(requireLiveHandle(), nativeExtent, completion)
       }
     }
 
-  public actual fun startSetMetalSurfaceTarget(
-    descriptor: MetalSurfaceDescriptor
-  ): OperationHandle<Unit> = unitOperation {
-    MaplibreNativeC.mln_metal_surface_set_target_start(
-      requireLiveHandle(),
-      metalSurfaceDescriptor(descriptor),
-      it,
-    )
-  }
+  public actual fun setMetalSurfaceTarget(descriptor: MetalSurfaceDescriptor): Deferred<Unit> =
+    unit { completion ->
+      MaplibreNativeC.mln_metal_surface_set_target(
+        requireLiveHandle(),
+        metalSurfaceDescriptor(descriptor),
+        completion,
+      )
+    }
 
-  public actual fun startSetVulkanSurfaceTarget(
-    descriptor: VulkanSurfaceDescriptor
-  ): OperationHandle<Unit> = unitOperation {
-    MaplibreNativeC.mln_vulkan_surface_set_target_start(
-      requireLiveHandle(),
-      vulkanSurfaceDescriptor(descriptor),
-      it,
-    )
-  }
+  public actual fun setVulkanSurfaceTarget(descriptor: VulkanSurfaceDescriptor): Deferred<Unit> =
+    unit { completion ->
+      MaplibreNativeC.mln_vulkan_surface_set_target(
+        requireLiveHandle(),
+        vulkanSurfaceDescriptor(descriptor),
+        completion,
+      )
+    }
 
-  public actual fun startSetOpenGLSurfaceTarget(
-    descriptor: OpenGLSurfaceDescriptor
-  ): OperationHandle<Unit> = unitOperation {
-    MaplibreNativeC.mln_opengl_surface_set_target_start(
-      requireLiveHandle(),
-      openglSurfaceDescriptor(descriptor),
-      it,
-    )
-  }
+  public actual fun setOpenGLSurfaceTarget(descriptor: OpenGLSurfaceDescriptor): Deferred<Unit> =
+    unit { completion ->
+      MaplibreNativeC.mln_opengl_surface_set_target(
+        requireLiveHandle(),
+        openglSurfaceDescriptor(descriptor),
+        completion,
+      )
+    }
 
-  public actual fun startSetMetalBorrowedTextureTarget(
+  public actual fun setMetalBorrowedTextureTarget(
     descriptor: MetalBorrowedTextureDescriptor
-  ): OperationHandle<Unit> = unitOperation {
-    MaplibreNativeC.mln_metal_borrowed_texture_set_target_start(
+  ): Deferred<Unit> = unit { completion ->
+    MaplibreNativeC.mln_metal_borrowed_texture_set_target(
       requireLiveHandle(),
       metalBorrowedTextureDescriptor(descriptor),
-      it,
+      completion,
     )
   }
 
-  public actual fun startSetVulkanBorrowedTextureTarget(
+  public actual fun setVulkanBorrowedTextureTarget(
     descriptor: VulkanBorrowedTextureDescriptor
-  ): OperationHandle<Unit> = unitOperation {
-    MaplibreNativeC.mln_vulkan_borrowed_texture_set_target_start(
+  ): Deferred<Unit> = unit { completion ->
+    MaplibreNativeC.mln_vulkan_borrowed_texture_set_target(
       requireLiveHandle(),
       vulkanBorrowedTextureDescriptor(descriptor),
-      it,
+      completion,
     )
   }
 
-  public actual fun startSetOpenGLBorrowedTextureTarget(
+  public actual fun setOpenGLBorrowedTextureTarget(
     descriptor: OpenGLBorrowedTextureDescriptor
-  ): OperationHandle<Unit> = unitOperation {
-    MaplibreNativeC.mln_opengl_borrowed_texture_set_target_start(
+  ): Deferred<Unit> = unit { completion ->
+    MaplibreNativeC.mln_opengl_borrowed_texture_set_target(
       requireLiveHandle(),
       openglBorrowedTextureDescriptor(descriptor),
-      it,
+      completion,
     )
   }
 
-  public actual fun startReduceMemoryUse(): OperationHandle<Unit> = unitOperation {
-    MaplibreNativeC.mln_render_session_reduce_memory_use_start(requireLiveHandle(), it)
+  public actual fun reduceMemoryUse(): Deferred<Unit> = unit {
+    MaplibreNativeC.mln_render_session_reduce_memory_use(requireLiveHandle(), it)
   }
 
-  public actual fun startClearData(): OperationHandle<Unit> = unitOperation {
-    MaplibreNativeC.mln_render_session_clear_data_start(requireLiveHandle(), it)
+  public actual fun clearData(): Deferred<Unit> = unit {
+    MaplibreNativeC.mln_render_session_clear_data(requireLiveHandle(), it)
   }
 
-  public actual fun startDumpDebugLogs(): OperationHandle<Unit> = unitOperation {
-    MaplibreNativeC.mln_render_session_dump_debug_logs_start(requireLiveHandle(), it)
+  public actual fun dumpDebugLogs(): Deferred<Unit> = unit {
+    MaplibreNativeC.mln_render_session_dump_debug_logs(requireLiveHandle(), it)
   }
 
-  public actual fun startBarrier(): OperationHandle<Unit> = unitOperation {
-    MaplibreNativeC.mln_render_session_barrier_start(requireLiveHandle(), it)
+  public actual fun barrier(): Deferred<Unit> = unit {
+    MaplibreNativeC.mln_render_session_barrier(requireLiveHandle(), it)
   }
 
-  public actual fun startDetach(): OperationHandle<Unit> = unitOperation {
-    MaplibreNativeC.mln_render_session_detach_start(requireLiveHandle(), it)
+  public actual fun detach(): Deferred<Unit> = unit {
+    MaplibreNativeC.mln_render_session_detach(requireLiveHandle(), it)
   }
 
-  public actual fun startSetFeatureState(
+  public actual fun setFeatureState(
     selector: FeatureStateSelector,
     value: ByteArray,
-  ): OperationHandle<Unit> =
+  ): Deferred<Unit> =
     withSelectorViews(selector) { sourceId, sourceLayerId, featureId ->
       ByteArrayViewScope(value).use { nativeValue ->
-        unitOperation {
-          MaplibreNativeC.mln_render_session_set_feature_state_start(
+        unit { completion ->
+          MaplibreNativeC.mln_render_session_set_feature_state(
             requireLiveHandle(),
             sourceId,
             sourceLayerId,
             featureId,
             nativeValue.view,
-            it,
+            completion,
           )
         }
       }
     }
 
-  public actual fun startGetFeatureState(
-    selector: FeatureStateSelector
-  ): OperationHandle<ByteArray> =
+  public actual fun getFeatureState(selector: FeatureStateSelector): Deferred<ByteArray> =
     withSelectorViews(selector) { sourceId, sourceLayerId, featureId ->
-      bufferOperation(OperationKind.RENDER_FEATURE_STATE_GET) {
-        MaplibreNativeC.mln_render_session_get_feature_state_start(
-          requireLiveHandle(),
-          sourceId,
-          sourceLayerId,
-          featureId,
-          it,
-        )
-      }
+      CompletionBridge.submit(
+        ::requiredBuffer,
+        { completion ->
+          MaplibreNativeC.mln_render_session_get_feature_state(
+            requireLiveHandle(),
+            sourceId,
+            sourceLayerId,
+            featureId,
+            completion,
+          )
+        },
+      )
     }
 
-  public actual fun takeFeatureStateResult(operation: OperationHandle<ByteArray>): ByteArray =
-    takeBuffer(
-      operation,
-      OperationKind.RENDER_FEATURE_STATE_GET,
-      MaplibreNativeC::mln_render_session_get_feature_state_take_result,
-    )
-
-  public actual fun startRemoveFeatureState(selector: FeatureStateSelector): OperationHandle<Unit> =
+  public actual fun removeFeatureState(selector: FeatureStateSelector): Deferred<Unit> =
     withSelectorViews(selector) { sourceId, sourceLayerId, featureId ->
       StringViewScope(selector.stateKey ?: "").use { stateKey ->
-        unitOperation {
-          MaplibreNativeC.mln_render_session_remove_feature_state_start(
+        unit { completion ->
+          MaplibreNativeC.mln_render_session_remove_feature_state(
             requireLiveHandle(),
             sourceId,
             sourceLayerId,
             featureId,
             stateKey.view,
-            it,
+            completion,
           )
         }
       }
     }
 
-  public actual fun startQueryRenderedFeatures(
+  public actual fun queryRenderedFeatures(
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions?,
-  ): OperationHandle<List<QueriedFeature>> =
+  ): Deferred<List<QueriedFeature>> =
     RenderedQueryGeometryScope(geometry).use { nativeGeometry ->
       RenderedFeatureQueryOptionsScope(options).use { nativeOptions ->
-        queryFeaturesOperation {
-          MaplibreNativeC.mln_render_session_query_rendered_features_start(
-            requireLiveHandle(),
-            nativeGeometry.geometry,
-            nativeOptions.options,
-            it,
-          )
-        }
+        CompletionBridge.submit(
+          ::queriedFeatures,
+          { completion ->
+            MaplibreNativeC.mln_render_session_query_rendered_features(
+              requireLiveHandle(),
+              nativeGeometry.geometry,
+              nativeOptions.options,
+              completion,
+            )
+          },
+        )
       }
     }
 
-  public actual fun startQuerySourceFeatures(
+  public actual fun querySourceFeatures(
     sourceId: String,
     options: SourceFeatureQueryOptions?,
-  ): OperationHandle<List<QueriedFeature>> =
+  ): Deferred<List<QueriedFeature>> =
     StringViewScope(sourceId).use { nativeSourceId ->
       SourceFeatureQueryOptionsScope(options).use { nativeOptions ->
-        queryFeaturesOperation {
-          MaplibreNativeC.mln_render_session_query_source_features_start(
-            requireLiveHandle(),
-            nativeSourceId.view,
-            nativeOptions.options,
-            it,
-          )
-        }
+        CompletionBridge.submit(
+          ::queriedFeatures,
+          { completion ->
+            MaplibreNativeC.mln_render_session_query_source_features(
+              requireLiveHandle(),
+              nativeSourceId.view,
+              nativeOptions.options,
+              completion,
+            )
+          },
+        )
       }
     }
 
-  public actual fun startQueryFeatureExtension(
+  public actual fun queryFeatureExtension(
     sourceId: String,
     feature: ByteArray,
     extension: String,
     extensionField: String,
     arguments: ByteArray?,
-  ): OperationHandle<ByteArray> =
+  ): Deferred<ByteArray> =
     StringViewScope(sourceId).use { nativeSourceId ->
       ByteArrayViewScope(feature).use { nativeFeature ->
         StringViewScope(extension).use { nativeExtension ->
           StringViewScope(extensionField).use { nativeExtensionField ->
             ByteArrayViewScope(arguments ?: byteArrayOf()).use { nativeArguments ->
-              bufferOperation {
-                MaplibreNativeC.mln_render_session_query_feature_extensions_start(
-                  requireLiveHandle(),
-                  nativeSourceId.view,
-                  nativeFeature.view,
-                  nativeExtension.view,
-                  nativeExtensionField.view,
-                  if (arguments == null) null else nativeArguments.view,
-                  it,
-                )
-              }
+              CompletionBridge.submit(
+                ::requiredBuffer,
+                { completion ->
+                  MaplibreNativeC.mln_render_session_query_feature_extensions(
+                    requireLiveHandle(),
+                    nativeSourceId.view,
+                    nativeFeature.view,
+                    nativeExtension.view,
+                    nativeExtensionField.view,
+                    if (arguments == null) null else nativeArguments.view,
+                    completion,
+                  )
+                },
+              )
             }
           }
         }
       }
     }
 
-  public actual fun takeQueryResult(operation: OperationHandle<ByteArray>): ByteArray =
-    takeBuffer(operation, OperationKind.RENDER_QUERY, MaplibreNativeC::mln_render_query_take_result)
-
-  public actual fun takeQueryFeaturesResult(
-    operation: OperationHandle<List<QueriedFeature>>
-  ): List<QueriedFeature> =
-    operation.withResultUse(OperationKind.RENDER_QUERY, OperationResultKind.QUERIED_FEATURE_LIST) {
-      operationId ->
-      LongPointer(1).use { outList ->
-        outList.put(0, 0L)
-        Status.check(MaplibreNativeC.mln_render_query_features_take_result(operationId, outList))
-        operation.markResultConsumed()
-        queriedFeatureList(outList.get())
-      }
-    }
-
-  public actual fun startReadPremultipliedRgba8(): OperationHandle<TextureReadback> {
-    val operation = startOperation {
-      MaplibreNativeC.mln_texture_read_premultiplied_rgba8_start(requireLiveHandle(), it)
-    }
-    return this.operation(
-      operation,
-      OperationKind.RENDER_READBACK,
-      OperationResultKind.TEXTURE_READBACK,
+  public actual fun readPremultipliedRgba8(): Deferred<TextureReadback> =
+    CompletionBridge.submit(
+      { result ->
+        val raw = MaplibreNativeC.mln_texture_readback_result(result.value())
+        TextureReadback(
+          JavaCppSupport.byteArray(raw.data().data(), raw.data().size()),
+          textureImageInfo(raw.info()),
+        )
+      },
+      { completion ->
+        MaplibreNativeC.mln_texture_read_premultiplied_rgba8(requireLiveHandle(), completion)
+      },
     )
-  }
-
-  public actual fun takeReadPremultipliedRgba8Result(
-    operation: OperationHandle<TextureReadback>
-  ): TextureReadback =
-    operation.withResultUse(OperationKind.RENDER_READBACK, OperationResultKind.TEXTURE_READBACK) {
-      operationId ->
-      LongPointer(1).use { outBuffer ->
-        outBuffer.put(0, 0L)
-        MaplibreNativeC.mln_texture_image_info().use { outInfo ->
-          outInfo.size(outInfo.sizeof())
-          Status.check(
-            MaplibreNativeC.mln_texture_read_premultiplied_rgba8_take_result(
-              operationId,
-              outBuffer,
-              outInfo,
-            )
-          )
-          operation.markResultConsumed()
-          TextureReadback(ownedBuffer(outBuffer.get()), textureImageInfo(outInfo))
-        }
-      }
-    }
 
   public actual fun abandon(): RenderAbandonResult {
     NativeAccess.ensureLoaded()
@@ -447,42 +405,21 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
     return handleId
   }
 
-  private fun unitOperation(start: (LongPointer) -> Int): OperationHandle<Unit> =
-    operation(startOperation(start), OperationKind.RENDER_CONTROL, OperationResultKind.NONE)
+  private fun unit(start: (MaplibreNativeC.mln_completion) -> Int): Deferred<Unit> =
+    CompletionBridge.unit(start)
 
-  private fun bufferOperation(
-    kind: OperationKind = OperationKind.RENDER_QUERY,
-    start: (LongPointer) -> Int,
-  ): OperationHandle<ByteArray> = operation(startOperation(start), kind, OperationResultKind.BUFFER)
+  private fun requiredBuffer(result: MaplibreNativeC.mln_completion_result): ByteArray {
+    require(result.value_count() == 1L) { "native completion omitted its byte result" }
+    val view = MaplibreNativeC.mln_buffer_view(result.value())
+    return JavaCppSupport.byteArray(view.data(), view.size())
+  }
 
-  private fun queryFeaturesOperation(
-    start: (LongPointer) -> Int
-  ): OperationHandle<List<QueriedFeature>> =
-    operation(
-      startOperation(start),
-      OperationKind.RENDER_QUERY,
-      OperationResultKind.QUERIED_FEATURE_LIST,
-    )
-
-  internal fun <T> operation(
-    id: Long,
-    kind: OperationKind,
-    resultKind: OperationResultKind,
-  ): OperationHandle<T> = OperationHandle(map.runtime(), id, kind, resultKind)
-
-  private fun takeBuffer(
-    operation: OperationHandle<ByteArray>,
-    kind: OperationKind,
-    take: (Long, LongPointer) -> Int,
-  ): ByteArray =
-    operation.withResultUse(kind, OperationResultKind.BUFFER) { operationId ->
-      LongPointer(1).use { outBuffer ->
-        outBuffer.put(0, 0L)
-        Status.check(take(operationId, outBuffer))
-        operation.markResultConsumed()
-        ownedBuffer(outBuffer.get())
-      }
-    }
+  private fun queriedFeatures(result: MaplibreNativeC.mln_completion_result): List<QueriedFeature> {
+    val count = Math.toIntExact(result.value_count())
+    if (count == 0) return emptyList()
+    val values = MaplibreNativeC.mln_queried_feature(result.value())
+    return List(count) { index -> queriedFeature(values.position(index.toLong())) }
+  }
 
   private inline fun <T> withSelectorViews(
     selector: FeatureStateSelector,
@@ -505,7 +442,12 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
     private fun attach(
       map: MapHandle,
       options: RenderSessionAttachOptions,
-      call: (MaplibreNativeC.mln_render_session_attach_options, LongPointer, LongPointer) -> Int,
+      call:
+        (
+          MaplibreNativeC.mln_render_session_attach_options,
+          LongPointer,
+          MaplibreNativeC.mln_completion,
+        ) -> Int,
     ): RenderSessionAttachment {
       NativeAccess.ensureLoaded()
       Status.requireArgument(options.requestedTextureRingDepth >= 0) {
@@ -516,28 +458,19 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
           .driver(options.driver.nativeValue)
           .requested_texture_ring_depth(options.requestedTextureRingDepth)
         LongPointer(1).use { outSession ->
-          LongPointer(1).use { outOperation ->
-            outSession.put(0, 0L)
-            outOperation.put(0, 0L)
-            Status.check(call(nativeOptions, outSession, outOperation))
-            val sessionId = outSession.get()
-            require(sessionId != 0L) { "render session attach returned a null session" }
-            val session = RenderSessionHandle(map, sessionId)
-            return try {
-              RenderSessionAttachment(
-                session,
-                OperationHandle(
-                  map.runtime(),
-                  outOperation.get(),
-                  OperationKind.RENDER_ATTACH,
-                  OperationResultKind.NONE,
-                ),
-              )
-            } catch (error: Throwable) {
-              runCatching { session.abandon() }
-              runCatching { session.close() }
-              throw error
-            }
+          outSession.put(0, 0L)
+          val completed = CompletionBridge.unitChecked { completion ->
+            call(nativeOptions, outSession, completion)
+          }
+          val sessionId = outSession.get()
+          require(sessionId != 0L) { "render session attach returned a null session" }
+          val session = RenderSessionHandle(map, sessionId)
+          return try {
+            RenderSessionAttachment(session, retainSessionUntilComplete(session, completed))
+          } catch (error: Throwable) {
+            runCatching { session.abandon() }
+            runCatching { session.close() }
+            throw error
           }
         }
       }
@@ -548,13 +481,13 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
       descriptor: MetalOwnedTextureDescriptor,
       options: RenderSessionAttachOptions,
     ): RenderSessionAttachment =
-      attach(map, options) { nativeOptions, outSession, outOperation ->
-        MaplibreNativeC.mln_metal_owned_texture_attach_start(
+      attach(map, options) { nativeOptions, outSession, completion ->
+        MaplibreNativeC.mln_metal_owned_texture_attach(
           map.nativeHandleId(),
           metalOwnedTextureDescriptor(descriptor),
           nativeOptions,
           outSession,
-          outOperation,
+          completion,
         )
       }
 
@@ -563,13 +496,13 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
       descriptor: MetalBorrowedTextureDescriptor,
       options: RenderSessionAttachOptions,
     ): RenderSessionAttachment =
-      attach(map, options) { nativeOptions, outSession, outOperation ->
-        MaplibreNativeC.mln_metal_borrowed_texture_attach_start(
+      attach(map, options) { nativeOptions, outSession, completion ->
+        MaplibreNativeC.mln_metal_borrowed_texture_attach(
           map.nativeHandleId(),
           metalBorrowedTextureDescriptor(descriptor),
           nativeOptions,
           outSession,
-          outOperation,
+          completion,
         )
       }
 
@@ -578,13 +511,13 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
       descriptor: VulkanOwnedTextureDescriptor,
       options: RenderSessionAttachOptions,
     ): RenderSessionAttachment =
-      attach(map, options) { nativeOptions, outSession, outOperation ->
-        MaplibreNativeC.mln_vulkan_owned_texture_attach_start(
+      attach(map, options) { nativeOptions, outSession, completion ->
+        MaplibreNativeC.mln_vulkan_owned_texture_attach(
           map.nativeHandleId(),
           vulkanOwnedTextureDescriptor(descriptor),
           nativeOptions,
           outSession,
-          outOperation,
+          completion,
         )
       }
 
@@ -593,13 +526,13 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
       descriptor: VulkanBorrowedTextureDescriptor,
       options: RenderSessionAttachOptions,
     ): RenderSessionAttachment =
-      attach(map, options) { nativeOptions, outSession, outOperation ->
-        MaplibreNativeC.mln_vulkan_borrowed_texture_attach_start(
+      attach(map, options) { nativeOptions, outSession, completion ->
+        MaplibreNativeC.mln_vulkan_borrowed_texture_attach(
           map.nativeHandleId(),
           vulkanBorrowedTextureDescriptor(descriptor),
           nativeOptions,
           outSession,
-          outOperation,
+          completion,
         )
       }
 
@@ -608,13 +541,13 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
       descriptor: OpenGLOwnedTextureDescriptor,
       options: RenderSessionAttachOptions,
     ): RenderSessionAttachment =
-      attach(map, options) { nativeOptions, outSession, outOperation ->
-        MaplibreNativeC.mln_opengl_owned_texture_attach_start(
+      attach(map, options) { nativeOptions, outSession, completion ->
+        MaplibreNativeC.mln_opengl_owned_texture_attach(
           map.nativeHandleId(),
           openglOwnedTextureDescriptor(descriptor),
           nativeOptions,
           outSession,
-          outOperation,
+          completion,
         )
       }
 
@@ -623,13 +556,13 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
       descriptor: OpenGLBorrowedTextureDescriptor,
       options: RenderSessionAttachOptions,
     ): RenderSessionAttachment =
-      attach(map, options) { nativeOptions, outSession, outOperation ->
-        MaplibreNativeC.mln_opengl_borrowed_texture_attach_start(
+      attach(map, options) { nativeOptions, outSession, completion ->
+        MaplibreNativeC.mln_opengl_borrowed_texture_attach(
           map.nativeHandleId(),
           openglBorrowedTextureDescriptor(descriptor),
           nativeOptions,
           outSession,
-          outOperation,
+          completion,
         )
       }
 
@@ -638,13 +571,13 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
       descriptor: MetalSurfaceDescriptor,
       options: RenderSessionAttachOptions,
     ): RenderSessionAttachment =
-      attach(map, options) { nativeOptions, outSession, outOperation ->
-        MaplibreNativeC.mln_metal_surface_attach_start(
+      attach(map, options) { nativeOptions, outSession, completion ->
+        MaplibreNativeC.mln_metal_surface_attach(
           map.nativeHandleId(),
           metalSurfaceDescriptor(descriptor),
           nativeOptions,
           outSession,
-          outOperation,
+          completion,
         )
       }
 
@@ -653,13 +586,13 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
       descriptor: VulkanSurfaceDescriptor,
       options: RenderSessionAttachOptions,
     ): RenderSessionAttachment =
-      attach(map, options) { nativeOptions, outSession, outOperation ->
-        MaplibreNativeC.mln_vulkan_surface_attach_start(
+      attach(map, options) { nativeOptions, outSession, completion ->
+        MaplibreNativeC.mln_vulkan_surface_attach(
           map.nativeHandleId(),
           vulkanSurfaceDescriptor(descriptor),
           nativeOptions,
           outSession,
-          outOperation,
+          completion,
         )
       }
 
@@ -668,13 +601,13 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
       descriptor: OpenGLSurfaceDescriptor,
       options: RenderSessionAttachOptions,
     ): RenderSessionAttachment =
-      attach(map, options) { nativeOptions, outSession, outOperation ->
-        MaplibreNativeC.mln_opengl_surface_attach_start(
+      attach(map, options) { nativeOptions, outSession, completion ->
+        MaplibreNativeC.mln_opengl_surface_attach(
           map.nativeHandleId(),
           openglSurfaceDescriptor(descriptor),
           nativeOptions,
           outSession,
-          outOperation,
+          completion,
         )
       }
   }

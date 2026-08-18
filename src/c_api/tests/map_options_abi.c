@@ -39,34 +39,15 @@ static mln_camera_options test_camera(void) {
   return camera;
 }
 
-static void wait_for_operation(mln_operation operation) {
-  bool completed = false;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_operation_wait(operation, -1, &completed)
-  );
-  TEST_ASSERT_TRUE(completed);
-}
-
-static uint64_t wait_for_committed_command(
-  map_fixture fixture, uint64_t command_id
-) {
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_runtime_barrier(fixture.runtime)
-  );
-  mln_runtime_event event = {0};
-  TEST_ASSERT_TRUE(mln_test_drain_find(
-    fixture.runtime, MLN_RUNTIME_EVENT_COMMAND_FINISHED, fixture.map, &event,
-    NULL, 0
-  ));
-  TEST_ASSERT_EQUAL_UINT64(
-    command_id, event.payload.command_finished.command_id
-  );
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_COMMAND_DISPOSITION_COMMITTED,
-    event.payload.command_finished.disposition
-  );
-  return event.payload.command_finished.generation;
-}
+#define EXPECT_COMMAND_COMPLETES(expected_status, expression)        \
+  do {                                                               \
+    mln_test_completion completion = mln_test_completion_default(0); \
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, (expression));              \
+    TEST_ASSERT_EQUAL_INT(                                           \
+      (expected_status), mln_test_completion_finish(&completion)     \
+    );                                                               \
+    mln_test_completion_destroy(&completion);                        \
+  } while (false)
 
 static map_fixture create_static_map_fixture(void) {
   map_fixture fixture = {.runtime = mln_test_create_runtime()};
@@ -78,23 +59,21 @@ static map_fixture create_static_map_fixture(void) {
   return fixture;
 }
 
-static mln_operation start_pending_still_image(map_fixture fixture) {
-  mln_operation pending = MLN_HANDLE_NULL;
+static mln_test_completion start_pending_still_image(map_fixture fixture) {
+  mln_test_completion pending = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_request_still_image_start(fixture.map, &pending)
+    MLN_STATUS_OK, mln_map_request_still_image(fixture.map, &pending.descriptor)
   );
 
-  mln_operation duplicate = MLN_HANDLE_NULL;
+  mln_test_completion duplicate = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_request_still_image_start(fixture.map, &duplicate)
+    MLN_STATUS_OK,
+    mln_map_request_still_image(fixture.map, &duplicate.descriptor)
   );
-  wait_for_operation(duplicate);
-  mln_status result = MLN_STATUS_OK;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_operation_get_status(duplicate, &result)
+    MLN_STATUS_INVALID_STATE, mln_test_completion_finish(&duplicate)
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_INVALID_STATE, result);
-  mln_operation_release(duplicate);
+  mln_test_completion_destroy(&duplicate);
   return pending;
 }
 static mln_map_snapshot read_settled_snapshot(map_fixture fixture) {
@@ -124,33 +103,22 @@ static void camera_rejects_invalid_arguments(void) {
     MLN_STATUS_INVALID_ARGUMENT,
     mln_map_camera_snapshot_get(fixture.map, &camera, NULL)
   );
-  uint64_t command_id = 0;
+  mln_completion rejected = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_update_camera(fixture.map, NULL, &command_id)
+    mln_map_update_camera(fixture.map, NULL, &rejected)
   );
   mln_camera_update update = mln_camera_update_default();
   update.size -= 1;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_update_camera(fixture.map, &update, &command_id)
+    mln_map_update_camera(fixture.map, &update, &rejected)
   );
   update = mln_camera_update_default();
   update.mode = UINT32_MAX;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_update_camera(fixture.map, &update, &command_id)
-  );
-  update = mln_camera_update_default();
-  command_id = UINT64_C(1);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_update_camera(fixture.map, &update, &command_id)
-  );
-  mln_operation operation = UINT64_C(1);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_camera_query_start(fixture.map, &operation)
+    mln_map_update_camera(fixture.map, &update, &rejected)
   );
   destroy_map_fixture(fixture);
 }
@@ -169,49 +137,38 @@ static void camera_snapshot_command_copy_and_disposition_are_ordered(void) {
   update.gesture_phase = MLN_GESTURE_PHASE_BEGIN;
   update.animation.fields |= MLN_ANIMATION_OPTION_TRANSITION_ID;
   update.animation.transition_id = UINT64_C(77);
-  uint64_t command_id = 0;
+  mln_test_completion command = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_update_camera(fixture.map, &update, &command_id)
+    MLN_STATUS_OK,
+    mln_map_update_camera(fixture.map, &update, &command.descriptor)
   );
-  TEST_ASSERT_NOT_EQUAL_UINT64(0, command_id);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&command));
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_COMMAND_DISPOSITION_COMMITTED, mln_test_completion_disposition(&command)
+  );
+  const uint64_t command_generation = mln_test_completion_generation(&command);
+  TEST_ASSERT_GREATER_THAN_UINT64(before.generation, command_generation);
+  mln_test_completion_destroy(&command);
 
   update.camera.longitude = 12.0;
   update.camera.zoom = 1.0;
   update.camera.padding.left = 999.0;
 
-  mln_operation query = MLN_HANDLE_NULL;
+  mln_test_completion query =
+    mln_test_completion_default(sizeof(mln_camera_query_result));
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_camera_query_start(fixture.map, &query)
+    MLN_STATUS_OK, mln_map_camera_query(fixture.map, &query.descriptor)
   );
-  wait_for_operation(query);
   mln_camera_query_result result = {.size = sizeof(mln_camera_query_result)};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_camera_query_take_result(query, &result)
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&query));
+  TEST_ASSERT_TRUE(
+    mln_test_completion_copy_value(&query, &result, sizeof(result))
   );
-  mln_operation_release(query);
+  mln_test_completion_destroy(&query);
   TEST_ASSERT_EQUAL_DOUBLE(-122.4194, result.camera.longitude);
   TEST_ASSERT_EQUAL_DOUBLE(11.0, result.camera.zoom);
   TEST_ASSERT_EQUAL_DOUBLE(2.0, result.camera.padding.left);
   TEST_ASSERT_GREATER_THAN_UINT64(before.generation, result.generation);
-
-  mln_runtime_event event = {0};
-  TEST_ASSERT_TRUE(mln_test_drain_find(
-    fixture.runtime, MLN_RUNTIME_EVENT_COMMAND_FINISHED, fixture.map, &event,
-    NULL, 0
-  ));
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RUNTIME_EVENT_PAYLOAD_COMMAND_FINISHED, event.payload_type
-  );
-  TEST_ASSERT_EQUAL_UINT64(
-    command_id, event.payload.command_finished.command_id
-  );
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_COMMAND_DISPOSITION_COMMITTED,
-    event.payload.command_finished.disposition
-  );
-  TEST_ASSERT_GREATER_THAN_UINT64(
-    before.generation, event.payload.command_finished.generation
-  );
 
   mln_map_snapshot after = {.size = sizeof(mln_map_snapshot)};
   TEST_ASSERT_EQUAL_INT(
@@ -226,81 +183,82 @@ static void relative_camera_commands_compose_in_runtime_order(void) {
   map_fixture fixture = create_map_fixture();
   mln_camera_update update = mln_camera_update_default();
   update.camera = test_camera();
-  uint64_t command_id = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_update_camera(fixture.map, &update, &command_id)
+  EXPECT_COMMAND_COMPLETES(
+    MLN_STATUS_OK,
+    mln_map_update_camera(fixture.map, &update, &completion.descriptor)
   );
 
   const mln_screen_point anchor = {.x = 25.0, .y = 30.0};
   mln_camera_delta delta = mln_camera_delta_default();
   delta.offset = (mln_screen_point){.x = 5.0, .y = -3.0};
-  command_id = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_apply_camera_delta(fixture.map, &delta, &command_id)
+  EXPECT_COMMAND_COMPLETES(
+    MLN_STATUS_OK,
+    mln_map_apply_camera_delta(fixture.map, &delta, &completion.descriptor)
   );
   delta.kind = MLN_CAMERA_DELTA_SCALE;
   delta.amount = 2.0;
   delta.has_anchor = true;
   delta.anchor = anchor;
-  command_id = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_apply_camera_delta(fixture.map, &delta, &command_id)
+  EXPECT_COMMAND_COMPLETES(
+    MLN_STATUS_OK,
+    mln_map_apply_camera_delta(fixture.map, &delta, &completion.descriptor)
   );
   delta.kind = MLN_CAMERA_DELTA_BEARING;
   delta.amount = 15.0;
-  command_id = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_apply_camera_delta(fixture.map, &delta, &command_id)
+  EXPECT_COMMAND_COMPLETES(
+    MLN_STATUS_OK,
+    mln_map_apply_camera_delta(fixture.map, &delta, &completion.descriptor)
   );
   delta.kind = MLN_CAMERA_DELTA_PITCH;
   delta.amount = 5.0;
   delta.has_anchor = false;
-  command_id = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_apply_camera_delta(fixture.map, &delta, &command_id)
+  EXPECT_COMMAND_COMPLETES(
+    MLN_STATUS_OK,
+    mln_map_apply_camera_delta(fixture.map, &delta, &completion.descriptor)
   );
 
-  mln_operation query = MLN_HANDLE_NULL;
+  mln_test_completion query =
+    mln_test_completion_default(sizeof(mln_camera_query_result));
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_camera_query_start(fixture.map, &query)
+    MLN_STATUS_OK, mln_map_camera_query(fixture.map, &query.descriptor)
   );
-  wait_for_operation(query);
   mln_camera_query_result result = {.size = sizeof(mln_camera_query_result)};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_camera_query_take_result(query, &result)
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&query));
+  TEST_ASSERT_TRUE(
+    mln_test_completion_copy_value(&query, &result, sizeof(result))
   );
-  mln_operation_release(query);
+  mln_test_completion_destroy(&query);
   TEST_ASSERT_EQUAL_DOUBLE(12.0, result.camera.zoom);
   TEST_ASSERT_EQUAL_DOUBLE(27.0, result.camera.bearing);
   TEST_ASSERT_EQUAL_DOUBLE(35.0, result.camera.pitch);
 
   delta.kind = MLN_CAMERA_DELTA_SCALE;
   delta.amount = 0.0;
-  command_id = 0;
+  mln_completion rejected = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_apply_camera_delta(fixture.map, &delta, &command_id)
+    mln_map_apply_camera_delta(fixture.map, &delta, &rejected)
   );
 
   delta = mln_camera_delta_default();
   delta.kind = UINT32_MAX;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_apply_camera_delta(fixture.map, &delta, &command_id)
+    mln_map_apply_camera_delta(fixture.map, &delta, &rejected)
   );
 
   delta = mln_camera_delta_default();
   delta.has_anchor = true;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_apply_camera_delta(fixture.map, &delta, &command_id)
+    mln_map_apply_camera_delta(fixture.map, &delta, &rejected)
   );
   destroy_map_fixture(fixture);
 }
 
 static void camera_fitting_rejects_invalid_arguments(void) {
   map_fixture fixture = create_map_fixture();
-  mln_operation operation = MLN_HANDLE_NULL;
+  mln_completion operation = mln_test_discard_completion();
   mln_camera_fit_options fit = mln_camera_fit_options_default();
   fit.size = sizeof(mln_camera_fit_options) - 1;
   const mln_lat_lng_bounds bounds = {
@@ -308,28 +266,27 @@ static void camera_fitting_rejects_invalid_arguments(void) {
     .northeast = {.latitude = 10.0, .longitude = 10.0},
   };
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_camera_for_lat_lng_bounds_start(
-                                   fixture.map, bounds, &fit, &operation
-                                 )
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_camera_for_lat_lng_bounds(fixture.map, bounds, &fit, &operation)
   );
   const mln_lat_lng coordinate = {.latitude = 0.0, .longitude = 0.0};
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_camera_for_lat_lngs_start(fixture.map, NULL, 1, NULL, &operation)
+    mln_map_camera_for_lat_lngs(fixture.map, NULL, 1, NULL, &operation)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_camera_for_lat_lngs_start(fixture.map, &coordinate, 1, NULL, NULL)
+    mln_map_camera_for_lat_lngs(fixture.map, &coordinate, 1, NULL, NULL)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_camera_for_geometry_start(
+    mln_map_camera_for_geometry(
       fixture.map, (mln_buffer_view){0}, NULL, &operation
     )
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_lat_lng_bounds_for_camera_start(fixture.map, NULL, &operation)
+    mln_map_lat_lng_bounds_for_camera(fixture.map, NULL, &operation)
   );
   destroy_map_fixture(fixture);
 }
@@ -338,27 +295,25 @@ static void camera_bounds_constraints_reject_invalid_arguments(void) {
   map_fixture fixture = create_map_fixture();
   mln_bound_options options = mln_bound_options_default();
   options.size = sizeof(mln_bound_options) - 1;
-  uint64_t command_id = 0;
+  mln_completion command = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_bounds(fixture.map, NULL, &command_id)
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_set_bounds(fixture.map, NULL, &command)
   );
-  TEST_ASSERT_EQUAL_UINT64(0, command_id);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_bounds(fixture.map, &options, &command_id)
+    mln_map_set_bounds(fixture.map, &options, &command)
   );
   options = mln_bound_options_default();
   options.fields = UINT32_C(1) << 31;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_bounds(fixture.map, &options, &command_id)
+    mln_map_set_bounds(fixture.map, &options, &command)
   );
   options = mln_bound_options_default();
   options.fields = MLN_BOUND_OPTION_BOUNDS | MLN_BOUND_OPTION_UNBOUNDED;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_bounds(fixture.map, &options, &command_id)
+    mln_map_set_bounds(fixture.map, &options, &command)
   );
   destroy_map_fixture(fixture);
 }
@@ -374,18 +329,20 @@ static double jumped_longitude(mln_map map, double longitude) {
   update.camera.latitude = 0.0;
   update.camera.longitude = longitude;
   update.camera.zoom = 2.0;
-  uint64_t command_id = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_update_camera(map, &update, &command_id)
+  EXPECT_COMMAND_COMPLETES(
+    MLN_STATUS_OK, mln_map_update_camera(map, &update, &completion.descriptor)
   );
-  mln_operation query = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_camera_query_start(map, &query));
-  wait_for_operation(query);
+  mln_test_completion query =
+    mln_test_completion_default(sizeof(mln_camera_query_result));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_camera_query(map, &query.descriptor)
+  );
   mln_camera_query_result result = {.size = sizeof(mln_camera_query_result)};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_camera_query_take_result(query, &result)
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&query));
+  TEST_ASSERT_TRUE(
+    mln_test_completion_copy_value(&query, &result, sizeof(result))
   );
-  mln_operation_release(query);
+  mln_test_completion_destroy(&query);
   return result.camera.longitude;
 }
 
@@ -407,9 +364,9 @@ static void camera_bounds_distinguish_unbounded_from_world(void) {
   world.bounds.southwest.longitude = -180.0;
   world.bounds.northeast.latitude = 90.0;
   world.bounds.northeast.longitude = 180.0;
-  uint64_t command_id = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_bounds(fixture.map, &world, &command_id)
+  EXPECT_COMMAND_COMPLETES(
+    MLN_STATUS_OK,
+    mln_map_set_bounds(fixture.map, &world, &completion.descriptor)
   );
 
   snapshot = read_bounds(fixture);
@@ -420,9 +377,9 @@ static void camera_bounds_distinguish_unbounded_from_world(void) {
 
   mln_bound_options unbounded = mln_bound_options_default();
   unbounded.fields = MLN_BOUND_OPTION_UNBOUNDED;
-  command_id = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_bounds(fixture.map, &unbounded, &command_id)
+  EXPECT_COMMAND_COMPLETES(
+    MLN_STATUS_OK,
+    mln_map_set_bounds(fixture.map, &unbounded, &completion.descriptor)
   );
 
   snapshot = read_bounds(fixture);
@@ -439,48 +396,42 @@ static void free_camera_options_reject_raw_invalid_arguments(void) {
   map_fixture fixture = create_map_fixture();
   mln_free_camera_options options = mln_free_camera_options_default();
   options.size = sizeof(mln_free_camera_options) - 1;
-  uint64_t command_id = 0;
+  mln_completion completion = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_free_camera_options(fixture.map, NULL, &command_id)
+    mln_map_set_free_camera_options(fixture.map, NULL, &completion)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_free_camera_options(fixture.map, &options, &command_id)
+    mln_map_set_free_camera_options(fixture.map, &options, &completion)
   );
   options = mln_free_camera_options_default();
   options.fields = UINT32_C(1) << 31;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_free_camera_options(fixture.map, &options, &command_id)
+    mln_map_set_free_camera_options(fixture.map, &options, &completion)
   );
   destroy_map_fixture(fixture);
 }
 
 static void map_projection_mode_rejects_invalid_arguments(void) {
   map_fixture fixture = create_map_fixture();
-  uint64_t command_id = 0;
+  mln_completion completion = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_projection_mode(fixture.map, NULL, &command_id)
+    mln_map_set_projection_mode(fixture.map, NULL, &completion)
   );
   mln_projection_mode mode = mln_projection_mode_default();
   mode.size = sizeof(mln_projection_mode) - 1;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_projection_mode(fixture.map, &mode, &command_id)
+    mln_map_set_projection_mode(fixture.map, &mode, &completion)
   );
   mode = mln_projection_mode_default();
   mode.fields = UINT32_C(1) << 31;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_projection_mode(fixture.map, &mode, &command_id)
-  );
-  mode = mln_projection_mode_default();
-  command_id = 1;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_projection_mode(fixture.map, &mode, &command_id)
+    mln_map_set_projection_mode(fixture.map, &mode, &completion)
   );
   destroy_map_fixture(fixture);
 }
@@ -489,24 +440,24 @@ static const mln_lat_lng center = {.latitude = 37.7749, .longitude = -122.4194};
 
 static void map_coordinate_conversion_rejects_invalid_arguments(void) {
   map_fixture fixture = create_map_fixture();
-  mln_operation operation = MLN_HANDLE_NULL;
+  mln_completion operation = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_pixel_for_lat_lng_start(fixture.map, center, NULL)
+    mln_map_pixel_for_lat_lng(fixture.map, center, NULL)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_lat_lng_for_pixel_start(
+    mln_map_lat_lng_for_pixel(
       fixture.map, (mln_screen_point){.x = 0.0, .y = 0.0}, NULL
     )
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_pixels_for_lat_lngs_start(fixture.map, NULL, 1, &operation)
+    mln_map_pixels_for_lat_lngs(fixture.map, NULL, 1, &operation)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_lat_lngs_for_pixels_start(fixture.map, NULL, 1, &operation)
+    mln_map_lat_lngs_for_pixels(fixture.map, NULL, 1, &operation)
   );
   destroy_map_fixture(fixture);
 }
@@ -523,23 +474,23 @@ static void projected_meters_reject_invalid_arguments(void) {
 
 static void map_debug_options_reject_raw_invalid_arguments(void) {
   map_fixture fixture = create_map_fixture();
-  uint64_t command_id = 0;
+  mln_completion completion = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_debug_options(MLN_HANDLE_NULL, 0, &command_id)
+    mln_map_set_debug_options(MLN_HANDLE_NULL, 0, &completion)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_debug_options(fixture.map, UINT32_C(1) << 31, &command_id)
+    mln_map_set_debug_options(fixture.map, UINT32_C(1) << 31, &completion)
   );
 
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_rendering_stats_view_enabled(MLN_HANDLE_NULL, true, &command_id)
+    mln_map_set_rendering_stats_view_enabled(MLN_HANDLE_NULL, true, &completion)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_dump_debug_logs(MLN_HANDLE_NULL, &command_id)
+    mln_map_dump_debug_logs(MLN_HANDLE_NULL, &completion)
   );
   destroy_map_fixture(fixture);
 }
@@ -573,13 +524,12 @@ static void map_extent_snapshot_tracks_resize_and_scale_factor(void) {
   TEST_ASSERT_EQUAL_DOUBLE(1.1, snapshot.logical_extent.scale_factor);
   const uint64_t initial_generation = snapshot.generation;
 
-  uint64_t command_id = 0;
-  TEST_ASSERT_EQUAL_INT(
+  EXPECT_COMMAND_COMPLETES(
     MLN_STATUS_OK,
     mln_map_resize(
       map,
       (mln_logical_extent){.width = 96, .height = 48, .scale_factor = 2.25},
-      &command_id
+      &completion.descriptor
     )
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
@@ -590,21 +540,12 @@ static void map_extent_snapshot_tracks_resize_and_scale_factor(void) {
   TEST_ASSERT_EQUAL_UINT32(48, snapshot.logical_extent.height);
   TEST_ASSERT_EQUAL_DOUBLE(2.25, snapshot.logical_extent.scale_factor);
 
-  command_id = UINT64_C(1);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_resize(
-      map,
-      (mln_logical_extent){.width = 96, .height = 48, .scale_factor = 2.25},
-      &command_id
-    )
-  );
-  command_id = 0;
+  mln_completion rejected = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_map_resize(
       map, (mln_logical_extent){.width = 0, .height = 48, .scale_factor = 2.25},
-      &command_id
+      &rejected
     )
   );
   TEST_ASSERT_EQUAL_INT(
@@ -615,26 +556,15 @@ static void map_extent_snapshot_tracks_resize_and_scale_factor(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static void released_pending_still_image_does_not_block_map_close(void) {
-  map_fixture fixture = create_static_map_fixture();
-  mln_operation pending = start_pending_still_image(fixture);
-
-  mln_operation_release(pending);
-  destroy_map_fixture(fixture);
-}
-
 static void map_close_cancels_observed_pending_still_image(void) {
   map_fixture fixture = create_static_map_fixture();
-  mln_operation pending = start_pending_still_image(fixture);
+  mln_test_completion pending = start_pending_still_image(fixture);
 
   mln_test_destroy_map(fixture.map);
-  wait_for_operation(pending);
-  mln_status result = MLN_STATUS_OK;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_operation_get_status(pending, &result)
+    MLN_STATUS_CANCELLED, mln_test_completion_finish(&pending)
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_CANCELLED, result);
-  mln_operation_release(pending);
+  mln_test_completion_destroy(&pending);
   mln_test_destroy_runtime(fixture.runtime);
 }
 
@@ -642,41 +572,41 @@ static void map_viewport_options_reject_invalid_arguments(void) {
   map_fixture fixture = create_map_fixture();
   mln_map_viewport_options options = mln_map_viewport_options_default();
   options.size = sizeof(mln_map_viewport_options) - 1;
-  uint64_t command_id = 0;
+  mln_completion completion = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_viewport_options(fixture.map, NULL, &command_id)
+    mln_map_set_viewport_options(fixture.map, NULL, &completion)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_viewport_options(fixture.map, &options, &command_id)
+    mln_map_set_viewport_options(fixture.map, &options, &completion)
   );
   options = mln_map_viewport_options_default();
   options.fields = UINT32_C(1) << 31;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_viewport_options(fixture.map, &options, &command_id)
+    mln_map_set_viewport_options(fixture.map, &options, &completion)
   );
   options = mln_map_viewport_options_default();
   options.fields = MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION;
   options.north_orientation = 99;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_viewport_options(fixture.map, &options, &command_id)
+    mln_map_set_viewport_options(fixture.map, &options, &completion)
   );
   options = mln_map_viewport_options_default();
   options.fields = MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE;
   options.constrain_mode = 99;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_viewport_options(fixture.map, &options, &command_id)
+    mln_map_set_viewport_options(fixture.map, &options, &completion)
   );
   options = mln_map_viewport_options_default();
   options.fields = MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE;
   options.viewport_mode = 99;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_viewport_options(fixture.map, &options, &command_id)
+    mln_map_set_viewport_options(fixture.map, &options, &completion)
   );
   destroy_map_fixture(fixture);
 }
@@ -685,46 +615,46 @@ static void map_tile_options_reject_invalid_arguments(void) {
   map_fixture fixture = create_map_fixture();
   mln_map_tile_options options = mln_map_tile_options_default();
   options.size = sizeof(mln_map_tile_options) - 1;
-  uint64_t command_id = 0;
+  mln_completion completion = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_tile_options(fixture.map, NULL, &command_id)
+    mln_map_set_tile_options(fixture.map, NULL, &completion)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_tile_options(fixture.map, &options, &command_id)
+    mln_map_set_tile_options(fixture.map, &options, &completion)
   );
   options = mln_map_tile_options_default();
   options.fields = UINT32_C(1) << 31;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_tile_options(fixture.map, &options, &command_id)
+    mln_map_set_tile_options(fixture.map, &options, &completion)
   );
   options = mln_map_tile_options_default();
   options.fields = MLN_MAP_TILE_OPTION_LOD_MODE;
   options.lod_mode = 99;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_tile_options(fixture.map, &options, &command_id)
+    mln_map_set_tile_options(fixture.map, &options, &completion)
   );
   destroy_map_fixture(fixture);
 }
 
-// Committed COMMAND_FINISHED events carry the snapshot generation the commit
-// published, so a snapshot at or past that generation shows the committed
-// value.
+// A committed completion carries the snapshot generation it published.
 static void committed_command_generation_matches_snapshot(void) {
   map_fixture fixture = create_map_fixture();
   mln_test_drain_all(fixture.runtime);
 
-  uint64_t command_id = 0;
+  mln_test_completion completion = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_debug_options(
-                     fixture.map, MLN_MAP_DEBUG_TILE_BORDERS, &command_id
-                   )
+    MLN_STATUS_OK,
+    mln_map_set_debug_options(
+      fixture.map, MLN_MAP_DEBUG_TILE_BORDERS, &completion.descriptor
+    )
   );
-  TEST_ASSERT_NOT_EQUAL_UINT64(0, command_id);
-  const uint64_t committed = wait_for_committed_command(fixture, command_id);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
+  const uint64_t committed = mln_test_completion_generation(&completion);
+  mln_test_completion_destroy(&completion);
   TEST_ASSERT_NOT_EQUAL_UINT64(0, committed);
 
   mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
@@ -745,11 +675,14 @@ static void committed_option_commands_are_visible_in_snapshot(void) {
   mln_map_tile_options tile = mln_map_tile_options_default();
   tile.fields = MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA;
   tile.prefetch_zoom_delta = 3;
-  uint64_t command_id = 0;
+  mln_test_completion completion = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_tile_options(fixture.map, &tile, &command_id)
+    MLN_STATUS_OK,
+    mln_map_set_tile_options(fixture.map, &tile, &completion.descriptor)
   );
-  uint64_t committed = wait_for_committed_command(fixture, command_id);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
+  uint64_t committed = mln_test_completion_generation(&completion);
+  mln_test_completion_destroy(&completion);
   mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_snapshot_get(fixture.map, &snapshot)
@@ -760,12 +693,14 @@ static void committed_option_commands_are_visible_in_snapshot(void) {
   mln_map_viewport_options viewport = mln_map_viewport_options_default();
   viewport.fields = MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION;
   viewport.north_orientation = MLN_NORTH_ORIENTATION_RIGHT;
-  command_id = 0;
+  completion = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_map_set_viewport_options(fixture.map, &viewport, &command_id)
+    mln_map_set_viewport_options(fixture.map, &viewport, &completion.descriptor)
   );
-  committed = wait_for_committed_command(fixture, command_id);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
+  committed = mln_test_completion_generation(&completion);
+  mln_test_completion_destroy(&completion);
   snapshot = (mln_map_snapshot){.size = sizeof(mln_map_snapshot)};
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_snapshot_get(fixture.map, &snapshot)
@@ -792,7 +727,6 @@ void run_map_options_abi_tests(void) {
   RUN_TEST(map_debug_options_reject_raw_invalid_arguments);
   RUN_TEST(map_options_default_leaves_fast_pfor_decoding_off);
   RUN_TEST(map_extent_snapshot_tracks_resize_and_scale_factor);
-  RUN_TEST(released_pending_still_image_does_not_block_map_close);
   RUN_TEST(map_close_cancels_observed_pending_still_image);
   RUN_TEST(map_viewport_options_reject_invalid_arguments);
   RUN_TEST(map_tile_options_reject_invalid_arguments);

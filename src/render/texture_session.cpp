@@ -543,10 +543,10 @@ struct TextureReadbackResult {
 };
 
 auto texture_read_premultiplied_rgba8_start(
-  mln_render_session texture, mln_operation* out_operation
+  mln_render_session texture, const mln_completion* completion
 ) -> mln_status {
   return enqueue_driver_result_operation(
-    texture, RENDER_OPERATION_READBACK,
+    texture,
     [](mln_render_session_object& target, std::any& result) {
       auto readback = TextureReadbackResult{
         .bytes = {},
@@ -564,27 +564,35 @@ auto texture_read_premultiplied_rgba8_start(
       if (status == MLN_STATUS_OK) result = std::move(readback);
       return status;
     },
-    out_operation
-  );
-}
-
-auto texture_read_premultiplied_rgba8_take_result(
-  mln_operation operation, mln_buffer* out_data,
-  mln_texture_image_info* out_info
-) -> mln_status {
-  if (
-    out_data == nullptr || *out_data != MLN_HANDLE_NULL ||
-    out_info == nullptr || out_info->size < sizeof(*out_info)
-  ) {
-    set_thread_error("readback outputs must be valid and initially null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return take_operation_result<TextureReadbackResult>(
-    operation, RENDER_OPERATION_READBACK,
-    [out_data, out_info](TextureReadbackResult& result) {
-      const auto status = create_buffer(std::move(result.bytes), out_data);
-      if (status == MLN_STATUS_OK) *out_info = result.info;
-      return status;
+    completion,
+    [](
+      const std::shared_ptr<Completion>& state, mln_status status,
+      std::string diagnostic, std::any result
+    ) {
+      auto* readback = std::any_cast<TextureReadbackResult>(&result);
+      if (status == MLN_STATUS_OK && readback != nullptr) {
+        state->resolve([bytes = std::move(readback->bytes),
+                        info =
+                          readback->info](const mln_completion& descriptor) {
+          const auto value = mln_texture_readback_result{
+            .size = sizeof(mln_texture_readback_result),
+            .reserved = 0,
+            .data = {.data = bytes.data(), .size = bytes.size()},
+            .info = info,
+          };
+          invoke_completion(
+            descriptor, MLN_STATUS_OK, MLN_COMMAND_DISPOSITION_COMMITTED, 0, {},
+            &value, 1
+          );
+        });
+      } else {
+        complete(
+          state, status == MLN_STATUS_OK ? MLN_STATUS_NATIVE_ERROR : status,
+          status == MLN_STATUS_OK
+            ? "texture readback produced an invalid result"
+            : std::move(diagnostic)
+        );
+      }
     }
   );
 }

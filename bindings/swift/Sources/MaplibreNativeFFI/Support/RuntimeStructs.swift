@@ -16,7 +16,7 @@ struct NativeRuntimeOptionsInput: Equatable {
   }
 
   func withNativeOptions<Result>(
-    notificationSource: mln_notification_source,
+    eventWake: mln_wake,
     _ body: (UnsafePointer<mln_runtime_options>) throws -> Result
   ) throws -> Result {
     try NativeString.withOptionalCString(assetPath) { assetPath in
@@ -25,7 +25,7 @@ struct NativeRuntimeOptionsInput: Equatable {
         options.asset_path = assetPath
         options.cache_path = cachePath
         options.event_mask = eventMask
-        options.notification_source = notificationSource
+        options.event_wake = eventWake
         return try withUnsafePointer(to: &options, body)
       }
     }
@@ -158,18 +158,6 @@ struct NativeOfflineRegionTileCountLimitEvent: Equatable {
   }
 }
 
-struct NativeCommandFinishedEvent: Equatable {
-  let commandId: UInt64
-  let disposition: UInt32
-  let generation: UInt64
-
-  init(_ raw: mln_runtime_event_command_finished) {
-    commandId = raw.command_id
-    disposition = raw.disposition
-    generation = raw.generation
-  }
-}
-
 enum NativeRuntimeEventPayload: Equatable {
   case none
   case renderFrame(NativeRenderFrameEvent)
@@ -179,7 +167,6 @@ enum NativeRuntimeEventPayload: Equatable {
   case offlineRegionResponseError(NativeOfflineRegionResponseErrorEvent)
   case offlineRegionTileCountLimit(NativeOfflineRegionTileCountLimitEvent)
   case cameraTransitionFinished(NativeCameraTransitionFinishedEvent)
-  case commandFinished(NativeCommandFinishedEvent)
   /// A payload kind this binding does not name, carrying the payload union's
   /// fixed byte window copied out of the batch.
   case unknown(type: UInt32, bytes: [UInt8])
@@ -290,10 +277,6 @@ struct NativeRuntimeEventBatch: Equatable {
         NativeCameraTransitionFinishedEvent(
           raw.payload.camera_transition_finished
         )
-      )
-    case MLN_RUNTIME_EVENT_PAYLOAD_COMMAND_FINISHED.rawValue:
-      return .commandFinished(
-        NativeCommandFinishedEvent(raw.payload.command_finished)
       )
     default:
       return try .unknown(

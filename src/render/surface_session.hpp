@@ -38,38 +38,38 @@ auto validate_webgpu_surface_descriptor(
 auto metal_surface_attach_start(
   mln_map map, const mln_metal_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status;
 auto vulkan_surface_attach_start(
   mln_map map, const mln_vulkan_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status;
 auto opengl_surface_attach_start(
   mln_map map, const mln_opengl_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status;
 auto webgpu_surface_attach_start(
   mln_map map, const mln_webgpu_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status;
 auto metal_surface_set_target_start(
   mln_render_session session, const mln_metal_surface_descriptor* descriptor,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) -> mln_status;
 auto vulkan_surface_set_target_start(
   mln_render_session session, const mln_vulkan_surface_descriptor* descriptor,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) -> mln_status;
 auto opengl_surface_set_target_start(
   mln_render_session session, const mln_opengl_surface_descriptor* descriptor,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) -> mln_status;
 auto webgpu_surface_set_target_start(
   mln_render_session session, const mln_webgpu_surface_descriptor* descriptor,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) -> mln_status;
 
 }  // namespace mln::core

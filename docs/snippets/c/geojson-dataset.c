@@ -9,7 +9,10 @@ static mln_buffer_view view(const char* text) {
   return (mln_buffer_view){.data = text, .size = strlen(text)};
 }
 
-mln_status show_earthquakes(mln_map map, const char* geojson_url) {
+mln_status show_earthquakes(
+  mln_map map, const char* geojson_url, const mln_completion* source_completion,
+  const mln_completion* layer_completion
+) {
   // #region options
   // Each value applies when its field bit is set.
   mln_geojson_source_options options = mln_geojson_source_options_default();
@@ -18,11 +21,9 @@ mln_status show_earthquakes(mln_map map, const char* geojson_url) {
   options.cluster = true;
   options.cluster_radius = 60;  // pixels
   // #endregion options
-  uint64_t command_id = 0;
-
   // #region source
   mln_status status = mln_map_add_geojson_source_url(
-    map, view("earthquakes"), view(geojson_url), &options, &command_id
+    map, view("earthquakes"), view(geojson_url), &options, source_completion
   );
   if (status != MLN_STATUS_OK) return status;
   // #endregion source
@@ -34,11 +35,15 @@ mln_status show_earthquakes(mln_map map, const char* geojson_url) {
   // #endregion layer
 
   // #region add-layer
-  return mln_map_add_style_layer_json(map, view(layer), view(""), &command_id);
+  return mln_map_add_style_layer_json(
+    map, view(layer), view(""), layer_completion
+  );
   // #endregion add-layer
 }
 
-mln_status show_one_point(mln_map map, mln_lat_lng position) {
+mln_status show_one_point(
+  mln_map map, mln_lat_lng position, const mln_completion* completion
+) {
   // #region inline-data
   char data[256];
   const int length = snprintf(
@@ -58,9 +63,8 @@ mln_status show_one_point(mln_map map, mln_lat_lng position) {
     mln_geojson_source_data_create(view(data), NULL, &prepared);
   if (status != MLN_STATUS_OK) return status;
 
-  uint64_t command_id = 0;
   status =
-    mln_map_add_geojson_source_data(map, view("pins"), prepared, &command_id);
+    mln_map_add_geojson_source_data(map, view("pins"), prepared, completion);
   mln_geojson_source_data_destroy(prepared);
   return status;
   // #endregion inline-data

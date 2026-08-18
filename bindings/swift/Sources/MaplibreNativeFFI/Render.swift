@@ -688,16 +688,15 @@ public struct RenderSessionAttachOptions: Sendable, Hashable {
   }
 
   func withNative<Result>(
-    notificationSource: mln_notification_source,
+    frameWake: mln_wake,
+    driverWorkWake: mln_wake,
     _ body: (UnsafePointer<mln_render_session_attach_options>) throws -> Result
   ) rethrows -> Result {
     var value = mln_render_session_attach_options_default()
     value.driver = driver.rawValue
     value.requested_texture_ring_depth = requestedTextureRingDepth
-    value.operation_source = notificationSource
-    // The frame and driver-work endpoints inherit the operation source.
-    value.frame_source = 0
-    value.driver_work_source = 0
+    value.frame_wake = frameWake
+    value.driver_work_wake = driverWorkWake
     return try withUnsafePointer(to: &value, body)
   }
 }
@@ -1112,13 +1111,16 @@ public final class AcquiredFrameHandle: @unchecked Sendable {
 
 public final class RenderSessionHandle: @unchecked Sendable {
   private let handle: NativeHandleBox<NativeRenderSessionHandle>
-  private let runtime: RuntimeHandle
+  private let frameWake: NativeWakeState
+  private let driverWorkWake: NativeWakeState
 
   fileprivate init(
-    runtime: RuntimeHandle,
-    session: NativeRenderSessionHandle
+    session: NativeRenderSessionHandle,
+    frameWake: NativeWakeState,
+    driverWorkWake: NativeWakeState
   ) throws {
-    self.runtime = runtime
+    self.frameWake = frameWake
+    self.driverWorkWake = driverWorkWake
     handle = try NativeHandleBox(
       typeName: "RenderSessionHandle",
       handle: session
@@ -1133,20 +1135,14 @@ public final class RenderSessionHandle: @unchecked Sendable {
     try handle.requireLive()
   }
 
-  func waitForOperation(_ operation: NativeOperationHandle)
-    async throws
-  {
-    try await mapNativeFailure { try await runtime.waitForOperation(operation) }
-  }
-
   public func setFrameReadyHandler(_ handler: (@Sendable () -> Void)?) throws {
-    try handle.withLive { runtime.setRenderFramesHandler(for: $0, handler) }
+    try handle.withLive { _ in frameWake.setHandler(handler) }
   }
 
   public func setDriverWorkReadyHandler(
     _ handler: (@Sendable () -> Void)?
   ) throws {
-    try handle.withLive { runtime.setDriverWorkHandler(for: $0, handler) }
+    try handle.withLive { _ in driverWorkWake.setHandler(handler) }
   }
 
   public func capabilities() throws -> RenderSessionCapabilities {
@@ -1260,128 +1256,117 @@ public final class RenderSessionHandle: @unchecked Sendable {
   }
 
   public func resize(_ extent: RenderTargetExtent) async throws {
-    try await performOperation { session, operation in
+    try await performCompletion { session, completion in
       var value = extent.nativeInput.native
-      return mln_render_session_resize_start(session, &value, operation)
+      return mln_render_session_resize(session, &value, completion)
     }
   }
 
   public func setMetalBorrowedTextureTarget(
     _ descriptor: MetalBorrowedTextureDescriptor
   ) async throws {
-    let operation = try mapNativeFailure {
+    let future = try mapNativeFailure {
       try descriptor.nativeInput.withNativeDescriptor { descriptor in
-        try startOperation { session, operation in
-          mln_metal_borrowed_texture_set_target_start(
-            session, descriptor, operation
+        try startCompletion { session, completion in
+          mln_metal_borrowed_texture_set_target(
+            session, descriptor, completion
           )
         }
       }
     }
-    defer { mln_operation_release(operation.raw) }
-    try await waitForOperation(operation)
+    try await future.value()
   }
 
   public func setMetalSurfaceTarget(
     _ descriptor: MetalSurfaceDescriptor
   ) async throws {
-    let operation = try mapNativeFailure {
+    let future = try mapNativeFailure {
       try descriptor.nativeInput.withNativeDescriptor { descriptor in
-        try startOperation { session, operation in
-          mln_metal_surface_set_target_start(session, descriptor, operation)
+        try startCompletion { session, completion in
+          mln_metal_surface_set_target(session, descriptor, completion)
         }
       }
     }
-    defer { mln_operation_release(operation.raw) }
-    try await waitForOperation(operation)
+    try await future.value()
   }
 
   public func setVulkanSurfaceTarget(
     _ descriptor: VulkanSurfaceDescriptor
   ) async throws {
-    let operation = try mapNativeFailure {
+    let future = try mapNativeFailure {
       try descriptor.nativeInput.withNativeDescriptor { descriptor in
-        try startOperation { session, operation in
-          mln_vulkan_surface_set_target_start(session, descriptor, operation)
+        try startCompletion { session, completion in
+          mln_vulkan_surface_set_target(session, descriptor, completion)
         }
       }
     }
-    defer { mln_operation_release(operation.raw) }
-    try await waitForOperation(operation)
+    try await future.value()
   }
 
   public func setOpenGLSurfaceTarget(
     _ descriptor: OpenGLSurfaceDescriptor
   ) async throws {
-    let operation = try mapNativeFailure {
+    let future = try mapNativeFailure {
       try descriptor.nativeInput.withNativeDescriptor { descriptor in
-        try startOperation { session, operation in
-          mln_opengl_surface_set_target_start(session, descriptor, operation)
+        try startCompletion { session, completion in
+          mln_opengl_surface_set_target(session, descriptor, completion)
         }
       }
     }
-    defer { mln_operation_release(operation.raw) }
-    try await waitForOperation(operation)
+    try await future.value()
   }
 
   public func setWebGPUSurfaceTarget(
     _ descriptor: WebGPUSurfaceDescriptor
   ) async throws {
-    let operation = try mapNativeFailure {
+    let future = try mapNativeFailure {
       try descriptor.nativeInput.withNativeDescriptor { descriptor in
-        try startOperation { session, operation in
-          mln_webgpu_surface_set_target_start(session, descriptor, operation)
+        try startCompletion { session, completion in
+          mln_webgpu_surface_set_target(session, descriptor, completion)
         }
       }
     }
-    defer { mln_operation_release(operation.raw) }
-    try await waitForOperation(operation)
+    try await future.value()
   }
 
   public func barrier() async throws {
-    try await performOperation {
-      mln_render_session_barrier_start($0, $1)
+    try await performCompletion {
+      mln_render_session_barrier($0, $1)
     }
   }
 
   public func reduceMemoryUse() async throws {
-    try await performOperation(mln_render_session_reduce_memory_use_start)
+    try await performCompletion(mln_render_session_reduce_memory_use)
   }
 
   public func clearData() async throws {
-    try await performOperation(mln_render_session_clear_data_start)
+    try await performCompletion(mln_render_session_clear_data)
   }
 
   public func dumpDebugLogs() async throws {
-    try await performOperation(mln_render_session_dump_debug_logs_start)
+    try await performCompletion(mln_render_session_dump_debug_logs)
   }
 
   public func readPremultipliedRGBA8() async throws
     -> PremultipliedRGBA8Image
   {
-    let operation = try startOperation(
-      mln_texture_read_premultiplied_rgba8_start
-    )
-    defer { mln_operation_release(operation.raw) }
-    try await waitForOperation(operation)
-    return try mapNativeFailure {
-      var buffer: mln_buffer = 0
-      var info = mln_texture_image_info_default()
-      try checkStatus(mln_texture_read_premultiplied_rgba8_take_result(
-        operation.raw, &buffer, &info
-      ))
+    let future = try startCompletion(
+      mln_texture_read_premultiplied_rgba8
+    ) { result in
+      let value: mln_texture_readback_result = try NativeCompletion
+        .value(result)
       return try PremultipliedRGBA8Image(
-        info: TextureImageInfo(native: NativeTextureImageInfo(info)),
-        data: NativeMemory.copyBuffer(NativeBufferHandle(raw: buffer))
+        info: TextureImageInfo(native: NativeTextureImageInfo(value.info)),
+        data: NativeCompletion.dataView(value.data)
       )
     }
+    return try await future.value()
   }
 
   public func detach() async throws {
-    let session = try requireLiveHandle()
-    try await performOperation(mln_render_session_detach_start)
-    runtime.setRenderFramesHandler(for: session, nil)
-    runtime.setDriverWorkHandler(for: session, nil)
+    try await performCompletion(mln_render_session_detach)
+    frameWake.setHandler(nil)
+    driverWorkWake.setHandler(nil)
   }
 
   public func abandon() throws -> RenderAbandonResult {
@@ -1390,8 +1375,8 @@ public final class RenderSessionHandle: @unchecked Sendable {
         var value = mln_render_abandon_result()
         value.size = UInt32(MemoryLayout<mln_render_abandon_result>.size)
         try checkStatus(mln_render_session_abandon(session.raw, &value))
-        runtime.setRenderFramesHandler(for: session, nil)
-        runtime.setDriverWorkHandler(for: session, nil)
+        frameWake.setHandler(nil)
+        driverWorkWake.setHandler(nil)
         guard let disposition = RenderAbandonResult.Disposition(
           rawValue: value.disposition
         ) else {
@@ -1410,59 +1395,80 @@ public final class RenderSessionHandle: @unchecked Sendable {
   public func close() throws {
     try mapNativeFailure {
       try handle.closeOnce { session in
-        runtime.setRenderFramesHandler(for: session, nil)
-        runtime.setDriverWorkHandler(for: session, nil)
+        frameWake.setHandler(nil)
+        driverWorkWake.setHandler(nil)
         try checkStatus(mln_render_session_destroy(session.raw))
       }
     }
   }
 
-  func startOperation(
-    _ body: (mln_render_session, UnsafeMutablePointer<mln_operation>)
-      -> mln_status
-  ) throws -> NativeOperationHandle {
+  func startCompletion<Value: Sendable>(
+    _ body: (mln_render_session, UnsafePointer<mln_completion>) -> mln_status,
+    convert: @escaping (UnsafePointer<mln_completion_result>) throws -> Value
+  ) throws -> NativeFuture<Value> {
     try handle.withLive { session in
-      var operation: mln_operation = 0
-      try checkStatus(body(session.raw, &operation))
-      return NativeOperationHandle(raw: operation)
-    }
-  }
-
-  func performOperation(
-    _ body: (mln_render_session, UnsafeMutablePointer<mln_operation>)
-      -> mln_status
-  ) async throws {
-    let operation = try mapNativeFailure { try startOperation(body) }
-    defer { mln_operation_release(operation.raw) }
-    try await waitForOperation(operation)
-  }
-}
-
-public extension MapHandle {
-  private func startRenderSession(
-    options: RenderSessionAttachOptions,
-    _ start: (UnsafePointer<mln_render_session_attach_options>) throws
-      -> NativeRender.Attachment
-  ) throws -> NativeRender.Attachment {
-    try mapNativeFailure {
-      try options.withNative(
-        notificationSource: runtimeForOperations
-          .notificationSourceForOperations,
-        start
+      try NativeCompletion.start(
+        { completion in body(session.raw, completion) },
+        convert: convert
       )
     }
   }
 
+  func startCompletion(
+    _ body: (mln_render_session, UnsafePointer<mln_completion>) -> mln_status
+  ) throws -> NativeFuture<Void> {
+    try startCompletion(body) { _ in () }
+  }
+
+  func performCompletion(
+    _ body: (mln_render_session, UnsafePointer<mln_completion>) -> mln_status
+  ) async throws {
+    try await mapNativeFailure { try startCompletion(body) }.value()
+  }
+}
+
+public extension MapHandle {
+  private typealias StartedRenderSession = (
+    attachment: NativeRender.Attachment,
+    frameWake: NativeWakeState,
+    driverWorkWake: NativeWakeState
+  )
+
+  private func startRenderSession(
+    options: RenderSessionAttachOptions,
+    _ start: (UnsafePointer<mln_render_session_attach_options>) throws
+      -> NativeRender.Attachment
+  ) throws -> StartedRenderSession {
+    let frameWake = NativeWakeState()
+    let driverWorkWake = NativeWakeState()
+    let frameDescriptor = frameWake.makeDescriptor()
+    let driverDescriptor = driverWorkWake.makeDescriptor()
+    do {
+      let attachment = try mapNativeFailure {
+        try options.withNative(
+          frameWake: frameDescriptor,
+          driverWorkWake: driverDescriptor,
+          start
+        )
+      }
+      return (attachment, frameWake, driverWorkWake)
+    } catch {
+      frameWake.releaseRejectedDescriptor()
+      driverWorkWake.releaseRejectedDescriptor()
+      throw error
+    }
+  }
+
   private func finishRenderSession(
-    _ attachment: NativeRender.Attachment
+    _ started: StartedRenderSession
   ) async throws -> RenderSessionHandle {
     let session = try RenderSessionHandle(
-      runtime: runtimeForOperations,
-      session: attachment.session
+      session: started.attachment.session,
+      frameWake: started.frameWake,
+      driverWorkWake: started.driverWorkWake
     )
-    defer { mln_operation_release(attachment.operation.raw) }
     do {
-      try await session.waitForOperation(attachment.operation)
+      try await started.attachment.completion.value()
       return session
     } catch {
       _ = try? session.abandon()

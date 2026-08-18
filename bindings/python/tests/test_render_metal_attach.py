@@ -143,7 +143,10 @@ def _descriptor_snapshot(
 
 
 def test_invalid_metal_surface_attach_reports_native_status() -> None:
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         with pytest.raises(
             (mln.InvalidArgumentError, mln.UnsupportedFeatureError)
         ) as raised:
@@ -162,7 +165,7 @@ def test_metal_surface_attach_reports_public_render_session_shape() -> None:
         mln.RuntimeHandle() as runtime,
         runtime.create_map(
             mln.MapOptions(width=surface.width, height=surface.height)
-        ) as map_handle,
+        ).result(timeout=5) as map_handle,
     ):
         session, attach = map_handle.attach_metal_surface(surface.descriptor())
         try:
@@ -186,7 +189,7 @@ def test_metal_borrowed_texture_attach_reports_public_render_session_shape() -> 
                     width=descriptor.extent.width,
                     height=descriptor.extent.height,
                 )
-            ) as map_handle,
+            ).result(timeout=5) as map_handle,
         ):
             session, attach = map_handle.attach_metal_borrowed_texture(descriptor)
             try:
@@ -216,7 +219,7 @@ def test_metal_borrowed_texture_session_close_preserves_caller_resources() -> No
                     width=descriptor.extent.width,
                     height=descriptor.extent.height,
                 )
-            ) as map_handle,
+            ).result(timeout=5) as map_handle,
         ):
             session, attach = map_handle.attach_metal_borrowed_texture(descriptor)
             finish_attach(session, attach)
@@ -248,7 +251,7 @@ def test_metal_borrowed_texture_set_target_renders_into_the_replacement() -> Non
                     width=descriptor.extent.width,
                     height=descriptor.extent.height,
                 )
-            ) as map_handle,
+            ).result(timeout=5) as map_handle,
         ):
             session, attach = map_handle.attach_metal_borrowed_texture(descriptor)
             finish_attach(session, attach)
@@ -277,7 +280,7 @@ def test_metal_borrowed_texture_set_target_renders_into_the_replacement() -> Non
                         ),
                     )
                     map_handle.resize(96, 48, 1.0)
-                    runtime.barrier()
+                    runtime.barrier().result(timeout=5)
 
                     # The session kept its renderer and paints the
                     # texture it was handed, at the extent handed with
@@ -311,7 +314,7 @@ def test_metal_surface_set_target_presents_through_a_new_surface() -> None:
         mln.RuntimeHandle() as runtime,
         runtime.create_map(
             mln.MapOptions(width=surface.width, height=surface.height)
-        ) as map_handle,
+        ).result(timeout=5) as map_handle,
     ):
         session, attach = map_handle.attach_metal_surface(surface.descriptor())
         finish_attach(session, attach)
@@ -324,7 +327,7 @@ def test_metal_surface_set_target_presents_through_a_new_surface() -> None:
                     session, session.set_metal_surface_target(replacement.descriptor())
                 )
                 map_handle.resize(48, 24, 1.0)
-                runtime.barrier()
+                runtime.barrier().result(timeout=5)
 
                 render_until(
                     runtime,
@@ -354,7 +357,7 @@ def test_metal_set_target_reports_unsupported_for_another_target_kind() -> None:
         mln.RuntimeHandle() as runtime,
         runtime.create_map(
             mln.MapOptions(width=surface.width, height=surface.height)
-        ) as map_handle,
+        ).result(timeout=5) as map_handle,
     ):
         session, attach = map_handle.attach_metal_borrowed_texture(texture.descriptor())
         finish_attach(session, attach)

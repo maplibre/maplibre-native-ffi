@@ -142,7 +142,7 @@ test "layer base accessors round-trip source, zoom range, and visibility" {
     }
 
     // Semantic rejection is reported asynchronously after command acceptance.
-    try testing.expect((try map.setLayerSourceLayer(testing.allocator, "background", "roads")) != 0);
+    try support.expectCommandError(&runtime, try map.setLayerSourceLayer(testing.allocator, "background", "roads"), error.InvalidArgument);
     {
         var background_source = try support.layerSourceId(&map, "background");
         defer background_source.deinit();
@@ -182,10 +182,7 @@ test "layer base accessors round-trip source, zoom range, and visibility" {
     // An unknown raw visibility is accepted into the ordered queue, then fails.
     const rejected_visibility =
         try map.setLayerVisibility(testing.allocator, "point-circle", .{ .unknown = 900 });
-    try testing.expect(std.meta.eql(
-        try support.waitForCommandDisposition(&runtime, rejected_visibility),
-        maplibre.CommandDisposition.failed,
-    ));
+    try support.expectCommandError(&runtime, rejected_visibility, error.InvalidArgument);
     // A missing layer reports not-found through the info getter's found flag.
     try testing.expect((try support.styleLayerInfo(&map, "missing")) == null);
 }
@@ -237,7 +234,7 @@ test "style light accepts full JSON and property updates" {
     try testing.expectEqualStrings("0.75", updated.value);
 
     try testing.expect((try support.styleLightProperty(&map, "unknown-light-property")) == null);
-    try testing.expect((try map.setStyleLightProperty(testing.allocator, "intensity", "false")) != 0);
+    try support.expectCommandError(&runtime, try map.setStyleLightProperty(testing.allocator, "intensity", "false"), error.InvalidArgument);
 }
 
 test "runtime style images copy premultiplied RGBA8 pixels" {
@@ -320,8 +317,8 @@ test "location indicator helpers set focused properties" {
     _ = try map.setLocationIndicatorImageName(testing.allocator, "location", .bearing, "bearing-icon");
     _ = try map.setLocationIndicatorImageName(testing.allocator, "location", .shadow, "shadow-icon");
 
-    try testing.expect((try map.setLocationIndicatorAccuracyRadius(testing.allocator, "location", -1.0)) != 0);
-    try testing.expect((try map.setLocationIndicatorBearing(testing.allocator, "point-circle", 1.0)) != 0);
+    try support.expectCommandError(&runtime, try map.setLocationIndicatorAccuracyRadius(testing.allocator, "location", -1.0), error.InvalidArgument);
+    try support.expectCommandError(&runtime, try map.setLocationIndicatorBearing(testing.allocator, "point-circle", 1.0), error.InvalidArgument);
 }
 
 test "style JSON buffers reject invalid values" {
@@ -330,8 +327,8 @@ test "style JSON buffers reject invalid values" {
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
-    try testing.expect((try map.setLayerProperty(testing.allocator, "point-circle", "circle-radius", "1e999")) != 0);
-    try testing.expect((try map.setLayerProperty(testing.allocator, "point-circle", "circle-radius", "\"not a radius\"")) != 0);
+    try support.expectCommandError(&runtime, try map.setLayerProperty(testing.allocator, "point-circle", "circle-radius", "1e999"), error.InvalidArgument);
+    try support.expectCommandError(&runtime, try map.setLayerProperty(testing.allocator, "point-circle", "circle-radius", "\"not a radius\""), error.InvalidArgument);
 }
 
 const transition_style_json =
@@ -375,5 +372,5 @@ test "style transition options round trip through the C API" {
     _ = try map.setStyleJson(testing.allocator, transition_style_json);
     try testing.expectEqual(declared, try support.styleTransitionOptions(&map));
 
-    try testing.expect((try map.setStyleTransitionOptions(.{ .delay_ms = -1.0 })) != 0);
+    try support.expectCommandError(&runtime, try map.setStyleTransitionOptions(.{ .delay_ms = -1.0 }), error.InvalidArgument);
 }

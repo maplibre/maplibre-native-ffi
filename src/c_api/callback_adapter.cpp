@@ -15,6 +15,7 @@
 #include <limits>
 #include <memory>
 #include <mutex>
+#include <new>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -23,11 +24,12 @@
 
 #include "maplibre_native_c/callback_adapter.h"
 
+#include "c_api/boundary.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "handles/handle_table.hpp"
 #include "maplibre_native_c.h"
-#include "notification/notification.hpp"
 #include "runtime/runtime.hpp"
+#include "wake/wake.hpp"
 
 namespace mln::core {
 
@@ -44,16 +46,33 @@ struct AdapterLogRecord {
   std::string message;
 };
 
+struct AdapterCompletionRecord {
+  mln_adapter_completion_record view{};
+  std::vector<std::byte> flat;
+  std::deque<std::string> strings;
+  std::vector<mln_buffer_view> views;
+  std::vector<mln_offline_region_info> offline_regions;
+  mln_style_source_result style_source{};
+  mln_style_layer_result style_layer{};
+  mln_style_image_result style_image{};
+  mln_style_image_stretches_result image_stretches{};
+  std::vector<mln_image_stretch> stretch_x;
+  std::vector<mln_image_stretch> stretch_y;
+  std::vector<mln_queried_feature> queried_features;
+  mln_texture_readback_result texture_readback{};
+};
+
 struct AdapterResourceRequestQueueObject {
   std::mutex mutex;
   std::mutex drain_mutex;
   std::deque<std::unique_ptr<AdapterQueuedResourceRequest>> records;
-  std::shared_ptr<NotificationEndpoint> endpoint;
+  std::shared_ptr<Wake> wake;
+  bool wake_pending = false;
   bool closed = false;
 
   auto close() noexcept -> void {
     auto discarded = decltype(records){};
-    auto detached_endpoint = std::shared_ptr<NotificationEndpoint>{};
+    auto detached_wake = std::shared_ptr<Wake>{};
     {
       const std::scoped_lock lock(mutex);
       if (closed) {
@@ -61,11 +80,9 @@ struct AdapterResourceRequestQueueObject {
       }
       closed = true;
       discarded.swap(records);
-      detached_endpoint = std::move(endpoint);
+      detached_wake = std::move(wake);
     }
-    if (detached_endpoint != nullptr) {
-      detached_endpoint->detach();
-    }
+    detached_wake.reset();
     for (const auto& record : discarded) {
       mln_resource_request_release(record->view.handle);
     }
@@ -78,12 +95,13 @@ struct AdapterLogQueueObject {
   std::mutex mutex;
   std::mutex drain_mutex;
   std::deque<std::unique_ptr<AdapterLogRecord>> records;
-  std::shared_ptr<NotificationEndpoint> endpoint;
+  std::shared_ptr<Wake> wake;
+  bool wake_pending = false;
   bool closed = false;
 
   auto close() noexcept -> void {
     auto discarded = decltype(records){};
-    auto detached_endpoint = std::shared_ptr<NotificationEndpoint>{};
+    auto detached_wake = std::shared_ptr<Wake>{};
     {
       const std::scoped_lock lock(mutex);
       if (closed) {
@@ -91,11 +109,9 @@ struct AdapterLogQueueObject {
       }
       closed = true;
       discarded.swap(records);
-      detached_endpoint = std::move(endpoint);
+      detached_wake = std::move(wake);
     }
-    if (detached_endpoint != nullptr) {
-      detached_endpoint->detach();
-    }
+    detached_wake.reset();
   }
 
   ~AdapterLogQueueObject() { close(); }
@@ -127,6 +143,7 @@ using AdapterQueuedResourceRequest = mln::core::AdapterQueuedResourceRequest;
 using AdapterQueuedResourceRequestView = mln_adapter_queued_resource_request;
 using AdapterLogCallbackState = mln_adapter_log_callback_state;
 using AdapterLogRecord = mln::core::AdapterLogRecord;
+using AdapterCompletionRecord = mln::core::AdapterCompletionRecord;
 
 struct AdapterHandleLeakToken {
   std::string type_name;
@@ -135,6 +152,251 @@ struct AdapterHandleLeakToken {
 using AdapterLogRecordView = mln_adapter_log_record;
 
 std::mutex log_setter_mutex;
+
+struct AdapterCompletionState {
+  std::uint32_t copy_kind = MLN_ADAPTER_COMPLETION_COPY_FLAT;
+  std::size_t element_size = 0;
+  mln_adapter_completion_listener listener = nullptr;
+  void* user_data = nullptr;
+};
+
+auto copy_bytes(
+  AdapterCompletionRecord& record, const void* data, std::size_t size
+) -> mln_buffer_view {
+  if (size == 0) return {};
+  if (data == nullptr) throw std::invalid_argument{"completion view is null"};
+  const auto* first = static_cast<const char*>(data);
+  record.strings.emplace_back(first, size);
+  const auto& copy = record.strings.back();
+  return {.data = copy.data(), .size = copy.size()};
+}
+
+auto copy_c_string(AdapterCompletionRecord& record, const char* value) -> const
+  char* {
+  if (value == nullptr) return nullptr;
+  record.strings.emplace_back(value);
+  return record.strings.back().c_str();
+}
+
+auto copy_view(AdapterCompletionRecord& record, mln_buffer_view value)
+  -> mln_buffer_view {
+  return copy_bytes(record, value.data, value.size);
+}
+
+auto copy_offline_region(
+  AdapterCompletionRecord& record, mln_offline_region_info value
+) -> mln_offline_region_info {
+  switch (value.definition.type) {
+    case MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID:
+      value.definition.data.tile_pyramid.style_url =
+        copy_c_string(record, value.definition.data.tile_pyramid.style_url);
+      break;
+    case MLN_OFFLINE_REGION_DEFINITION_GEOMETRY:
+      value.definition.data.geometry.style_url =
+        copy_c_string(record, value.definition.data.geometry.style_url);
+      value.definition.data.geometry.geometry =
+        copy_view(record, value.definition.data.geometry.geometry);
+      break;
+    default:
+      throw std::invalid_argument{"completion has an unknown offline region"};
+  }
+  const auto metadata = copy_bytes(record, value.metadata, value.metadata_size);
+  value.metadata = static_cast<const std::uint8_t*>(metadata.data);
+  value.metadata_size = metadata.size;
+  return value;
+}
+
+auto copy_completion_value(
+  AdapterCompletionRecord& record, const mln_completion_result& result,
+  const AdapterCompletionState& state
+) -> void {
+  if (result.value_count == 0) return;
+  if (result.value == nullptr) {
+    throw std::invalid_argument{"completion value is null"};
+  }
+  switch (state.copy_kind) {
+    case MLN_ADAPTER_COMPLETION_COPY_FLAT: {
+      if (
+        state.element_size == 0 ||
+        result.value_count >
+          std::numeric_limits<std::size_t>::max() / state.element_size
+      ) {
+        throw std::invalid_argument{"completion element size is invalid"};
+      }
+      const auto size = result.value_count * state.element_size;
+      record.flat.resize(size);
+      std::memcpy(record.flat.data(), result.value, size);
+      record.view.result.value = record.flat.data();
+      break;
+    }
+    case MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEWS: {
+      const auto values = std::span{
+        static_cast<const mln_buffer_view*>(result.value), result.value_count
+      };
+      record.views.reserve(values.size());
+      for (const auto& value : values) {
+        record.views.push_back(copy_view(record, value));
+      }
+      record.view.result.value = record.views.data();
+      break;
+    }
+    case MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGIONS: {
+      const auto values = std::span{
+        static_cast<const mln_offline_region_info*>(result.value),
+        result.value_count
+      };
+      record.offline_regions.reserve(values.size());
+      for (const auto& value : values) {
+        record.offline_regions.push_back(copy_offline_region(record, value));
+      }
+      record.view.result.value = record.offline_regions.data();
+      break;
+    }
+    case MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE: {
+      if (result.value_count != 1)
+        throw std::invalid_argument{"invalid source result"};
+      record.style_source =
+        *static_cast<const mln_style_source_result*>(result.value);
+      record.style_source.attribution =
+        copy_view(record, record.style_source.attribution);
+      record.style_source.url = copy_view(record, record.style_source.url);
+      const auto urls = std::span{
+        record.style_source.tile_urls, record.style_source.tile_url_count
+      };
+      record.views.reserve(urls.size());
+      for (const auto url : urls)
+        record.views.push_back(copy_view(record, url));
+      record.style_source.tile_urls = record.views.data();
+      record.view.result.value = &record.style_source;
+      break;
+    }
+    case MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER: {
+      if (result.value_count != 1)
+        throw std::invalid_argument{"invalid layer result"};
+      record.style_layer =
+        *static_cast<const mln_style_layer_result*>(result.value);
+      record.style_layer.info.type =
+        copy_view(record, record.style_layer.info.type);
+      record.style_layer.source_id =
+        copy_view(record, record.style_layer.source_id);
+      record.style_layer.source_layer =
+        copy_view(record, record.style_layer.source_layer);
+      record.view.result.value = &record.style_layer;
+      break;
+    }
+    case MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE: {
+      if (result.value_count != 1)
+        throw std::invalid_argument{"invalid image result"};
+      record.style_image =
+        *static_cast<const mln_style_image_result*>(result.value);
+      record.style_image.pixels = copy_view(record, record.style_image.pixels);
+      if (record.style_image.stretch_x_count != 0) {
+        record.stretch_x.assign(
+          record.style_image.stretch_x,
+          record.style_image.stretch_x + record.style_image.stretch_x_count
+        );
+      }
+      if (record.style_image.stretch_y_count != 0) {
+        record.stretch_y.assign(
+          record.style_image.stretch_y,
+          record.style_image.stretch_y + record.style_image.stretch_y_count
+        );
+      }
+      record.style_image.stretch_x = record.stretch_x.data();
+      record.style_image.stretch_y = record.stretch_y.data();
+      record.view.result.value = &record.style_image;
+      break;
+    }
+    case MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_STRETCHES: {
+      if (result.value_count != 1)
+        throw std::invalid_argument{"invalid stretch result"};
+      record.image_stretches =
+        *static_cast<const mln_style_image_stretches_result*>(result.value);
+      if (record.image_stretches.stretch_x_count != 0) {
+        record.stretch_x.assign(
+          record.image_stretches.stretch_x,
+          record.image_stretches.stretch_x +
+            record.image_stretches.stretch_x_count
+        );
+      }
+      if (record.image_stretches.stretch_y_count != 0) {
+        record.stretch_y.assign(
+          record.image_stretches.stretch_y,
+          record.image_stretches.stretch_y +
+            record.image_stretches.stretch_y_count
+        );
+      }
+      record.image_stretches.stretch_x = record.stretch_x.data();
+      record.image_stretches.stretch_y = record.stretch_y.data();
+      record.view.result.value = &record.image_stretches;
+      break;
+    }
+    case MLN_ADAPTER_COMPLETION_COPY_QUERIED_FEATURES: {
+      const auto values = std::span{
+        static_cast<const mln_queried_feature*>(result.value),
+        result.value_count
+      };
+      record.queried_features.reserve(values.size());
+      for (auto value : values) {
+        value.feature = copy_view(record, value.feature);
+        value.source_id = copy_view(record, value.source_id);
+        value.source_layer_id = copy_view(record, value.source_layer_id);
+        value.state = copy_view(record, value.state);
+        record.queried_features.push_back(value);
+      }
+      record.view.result.value = record.queried_features.data();
+      break;
+    }
+    case MLN_ADAPTER_COMPLETION_COPY_TEXTURE_READBACK: {
+      if (result.value_count != 1)
+        throw std::invalid_argument{"invalid readback result"};
+      record.texture_readback =
+        *static_cast<const mln_texture_readback_result*>(result.value);
+      record.texture_readback.data =
+        copy_view(record, record.texture_readback.data);
+      record.view.result.value = &record.texture_readback;
+      break;
+    }
+    default:
+      throw std::invalid_argument{"unknown completion copy kind"};
+  }
+}
+
+auto adapter_completion_callback(
+  void* user_data, const mln_completion_result* result
+) noexcept -> void {
+  const auto* state = static_cast<const AdapterCompletionState*>(user_data);
+  if (state == nullptr || result == nullptr || state->listener == nullptr)
+    return;
+  auto record =
+    std::unique_ptr<AdapterCompletionRecord>{new (std::nothrow)
+                                               AdapterCompletionRecord{}};
+  if (!record) {
+    state->listener(state->user_data, nullptr);
+    return;
+  }
+  record->view.owner = record.get();
+  record->view.result = *result;
+  record->view.result.diagnostic = {};
+  record->view.result.value = nullptr;
+  try {
+    record->view.result.diagnostic = copy_view(*record, result->diagnostic);
+    if (result->status == MLN_STATUS_OK) {
+      copy_completion_value(*record, *result, *state);
+    } else {
+      record->view.result.value_count = 0;
+    }
+  } catch (...) {
+    state->listener(state->user_data, nullptr);
+    return;
+  }
+  auto* delivered = &record.release()->view;
+  state->listener(state->user_data, delivered);
+}
+
+auto adapter_completion_release(void* user_data) noexcept -> void {
+  delete static_cast<AdapterCompletionState*>(user_data);
+}
 
 auto matches_rule(std::uint32_t rule_kind, std::uint32_t request_kind) -> bool {
   return rule_kind == MLN_ADAPTER_RESOURCE_KIND_ANY ||
@@ -390,16 +652,19 @@ auto enqueue_request(
   const std::shared_ptr<mln::core::AdapterResourceRequestQueueObject>& queue,
   std::unique_ptr<AdapterQueuedResourceRequest> request
 ) -> bool {
-  auto endpoint = std::shared_ptr<mln::core::NotificationEndpoint>{};
+  auto wake = std::shared_ptr<mln::core::Wake>{};
+  auto should_wake = false;
   {
     const std::scoped_lock lock(queue->mutex);
     if (queue->closed) {
       return false;
     }
+    should_wake = queue->records.empty();
     queue->records.push_back(std::move(request));
-    endpoint = queue->endpoint;
+    queue->wake_pending = true;
+    wake = queue->wake;
   }
-  endpoint->mark_ready();
+  if (should_wake) wake->notify();
   return true;
 }
 
@@ -407,16 +672,19 @@ auto enqueue_log(
   const std::shared_ptr<mln::core::AdapterLogQueueObject>& queue,
   std::unique_ptr<AdapterLogRecord> record
 ) -> bool {
-  auto endpoint = std::shared_ptr<mln::core::NotificationEndpoint>{};
+  auto wake = std::shared_ptr<mln::core::Wake>{};
+  auto should_wake = false;
   {
     const std::scoped_lock lock(queue->mutex);
     if (queue->closed) {
       return false;
     }
+    should_wake = queue->records.empty();
     queue->records.push_back(std::move(record));
-    endpoint = queue->endpoint;
+    queue->wake_pending = true;
+    wake = queue->wake;
   }
-  endpoint->mark_ready();
+  if (should_wake) wake->notify();
   return true;
 }
 
@@ -427,6 +695,59 @@ void destroy_handle_leak_token(void* token) noexcept {
 }
 
 }  // namespace
+
+extern "C" MLN_API auto mln_adapter_completion_create(
+  std::uint32_t copy_kind, std::size_t element_size,
+  mln_adapter_completion_listener listener, void* user_data,
+  mln_completion* out_completion
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    if (
+      out_completion == nullptr || out_completion->size != 0 ||
+      out_completion->callback != nullptr ||
+      out_completion->user_data != nullptr ||
+      out_completion->release_user_data != nullptr || listener == nullptr ||
+      copy_kind > MLN_ADAPTER_COMPLETION_COPY_TEXTURE_READBACK
+    ) {
+      mln::core::set_thread_error("completion adapter arguments are invalid");
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    auto state = std::make_unique<AdapterCompletionState>();
+    state->copy_kind = copy_kind;
+    state->element_size = element_size;
+    state->listener = listener;
+    state->user_data = user_data;
+    *out_completion = mln_completion{
+      .size = sizeof(mln_completion),
+      .callback = adapter_completion_callback,
+      .user_data = state.get(),
+      .release_user_data = adapter_completion_release,
+    };
+    static_cast<void>(state.release());
+    return MLN_STATUS_OK;
+  });
+}
+
+extern "C" MLN_API void mln_adapter_completion_reject(
+  mln_completion* completion
+) noexcept {
+  if (
+    completion == nullptr ||
+    completion->callback != adapter_completion_callback ||
+    completion->release_user_data != adapter_completion_release
+  ) {
+    return;
+  }
+  adapter_completion_release(completion->user_data);
+  *completion = {};
+}
+
+extern "C" MLN_API void mln_adapter_completion_record_destroy(
+  mln_adapter_completion_record* record
+) noexcept {
+  if (record == nullptr || record->owner == nullptr) return;
+  delete static_cast<AdapterCompletionRecord*>(record->owner);
+}
 
 extern "C" MLN_API auto mln_adapter_handle_leak_token_create(
   const char* type_name, std::uint64_t handle
@@ -465,40 +786,22 @@ extern "C" MLN_API void mln_adapter_handle_leak_report(void* token) noexcept {
 }
 
 extern "C" MLN_API auto mln_adapter_resource_request_queue_create(
-  mln_notification_source source, mln_adapter_resource_request_queue* out_queue
+  const mln_wake* wake, mln_adapter_resource_request_queue* out_queue
 ) noexcept -> mln_status {
   try {
     if (out_queue == nullptr || *out_queue != MLN_HANDLE_NULL) {
       mln::core::set_thread_error("out_queue must point to the null handle");
       return MLN_STATUS_INVALID_ARGUMENT;
     }
-    const auto notification_source =
-      mln::core::notification_source_from_handle(source);
-    if (notification_source == nullptr) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
+    const auto wake_status = mln::core::validate_wake(wake);
+    if (wake_status != MLN_STATUS_OK) return wake_status;
     auto owned =
       std::make_shared<mln::core::AdapterResourceRequestQueueObject>();
+    owned->wake = std::make_shared<mln::core::Wake>(*wake);
     const auto handle =
       mln::core::handle_table<mln::core::AdapterResourceRequestQueueObject>()
         .insert(owned);
-    try {
-      owned->endpoint = notification_source->associate(
-        handle, MLN_NOTIFICATION_ENDPOINT_ADAPTER_RESOURCE_REQUESTS, true
-      );
-      if (owned->endpoint == nullptr) {
-        static_cast<void>(mln::core::handle_table<
-                            mln::core::AdapterResourceRequestQueueObject>()
-                            .remove(handle));
-        return MLN_STATUS_INVALID_STATE;
-      }
-    } catch (...) {
-      static_cast<void>(
-        mln::core::handle_table<mln::core::AdapterResourceRequestQueueObject>()
-          .remove(handle)
-      );
-      throw;
-    }
+    owned->wake->accept();
     *out_queue = handle;
     return MLN_STATUS_OK;
   } catch (...) {
@@ -532,14 +835,14 @@ extern "C" MLN_API auto mln_adapter_resource_request_queue_acquire(
       return MLN_STATUS_INVALID_STATE;
     }
     if (live->records.empty()) {
-      live->endpoint->clear_ready();
+      live->wake_pending = false;
       return MLN_STATUS_OK;
     }
     auto record = std::move(live->records.front());
     live->records.pop_front();
     *out_request = &record.release()->view;
     if (live->records.empty()) {
-      live->endpoint->clear_ready();
+      live->wake_pending = false;
     }
     return MLN_STATUS_OK;
   } catch (...) {
@@ -559,41 +862,20 @@ extern "C" MLN_API void mln_adapter_resource_request_queue_close(
 }
 
 extern "C" MLN_API auto mln_adapter_log_queue_create(
-  mln_notification_source source, mln_adapter_log_queue* out_queue
+  const mln_wake* wake, mln_adapter_log_queue* out_queue
 ) noexcept -> mln_status {
   try {
     if (out_queue == nullptr || *out_queue != MLN_HANDLE_NULL) {
       mln::core::set_thread_error("out_queue must point to the null handle");
       return MLN_STATUS_INVALID_ARGUMENT;
     }
-    const auto notification_source =
-      mln::core::notification_source_from_handle(source);
-    if (notification_source == nullptr) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
+    const auto wake_status = mln::core::validate_wake(wake);
+    if (wake_status != MLN_STATUS_OK) return wake_status;
     auto owned = std::make_shared<mln::core::AdapterLogQueueObject>();
+    owned->wake = std::make_shared<mln::core::Wake>(*wake);
     const auto handle =
       mln::core::handle_table<mln::core::AdapterLogQueueObject>().insert(owned);
-    try {
-      owned->endpoint = notification_source->associate(
-        handle, MLN_NOTIFICATION_ENDPOINT_ADAPTER_LOG_RECORDS, true
-      );
-      if (owned->endpoint == nullptr) {
-        static_cast<void>(
-          mln::core::handle_table<mln::core::AdapterLogQueueObject>().remove(
-            handle
-          )
-        );
-        return MLN_STATUS_INVALID_STATE;
-      }
-    } catch (...) {
-      static_cast<void>(
-        mln::core::handle_table<mln::core::AdapterLogQueueObject>().remove(
-          handle
-        )
-      );
-      throw;
-    }
+    owned->wake->accept();
     *out_queue = handle;
     return MLN_STATUS_OK;
   } catch (...) {
@@ -624,14 +906,14 @@ extern "C" MLN_API auto mln_adapter_log_queue_acquire(
       return MLN_STATUS_INVALID_STATE;
     }
     if (live->records.empty()) {
-      live->endpoint->clear_ready();
+      live->wake_pending = false;
       return MLN_STATUS_OK;
     }
     auto record = std::move(live->records.front());
     live->records.pop_front();
     *out_record = &record.release()->view;
     if (live->records.empty()) {
-      live->endpoint->clear_ready();
+      live->wake_pending = false;
     }
     return MLN_STATUS_OK;
   } catch (...) {

@@ -112,7 +112,10 @@ def _descriptor_snapshot(
 
 
 def test_invalid_vulkan_surface_attach_reports_native_status() -> None:
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         with pytest.raises(
             (mln.InvalidArgumentError, mln.UnsupportedFeatureError)
         ) as raised:
@@ -137,7 +140,7 @@ def test_vulkan_borrowed_texture_attach_reports_public_render_session_shape() ->
                     width=descriptor.extent.width,
                     height=descriptor.extent.height,
                 )
-            ) as map_handle,
+            ).result(timeout=5) as map_handle,
         ):
             session, attach = map_handle.attach_vulkan_borrowed_texture(descriptor)
             try:
@@ -169,7 +172,7 @@ def test_vulkan_borrowed_texture_session_close_preserves_caller_resources() -> N
                     width=descriptor.extent.width,
                     height=descriptor.extent.height,
                 )
-            ) as map_handle,
+            ).result(timeout=5) as map_handle,
         ):
             session, attach = map_handle.attach_vulkan_borrowed_texture(descriptor)
             finish_attach(session, attach)
@@ -204,7 +207,7 @@ def test_vulkan_borrowed_texture_set_target_hands_over_a_replacement() -> None:
                     width=descriptor.extent.width,
                     height=descriptor.extent.height,
                 )
-            ) as map_handle,
+            ).result(timeout=5) as map_handle,
         ):
             session, attach = map_handle.attach_vulkan_borrowed_texture(descriptor)
             finish_attach(session, attach)
@@ -227,7 +230,7 @@ def test_vulkan_borrowed_texture_set_target_hands_over_a_replacement() -> None:
                         ),
                     )
                     map_handle.resize(48, 24, 1.0)
-                    runtime.barrier()
+                    runtime.barrier().result(timeout=5)
 
                     # The session kept its renderer and renders at the
                     # extent it was handed, once the map has caught up.

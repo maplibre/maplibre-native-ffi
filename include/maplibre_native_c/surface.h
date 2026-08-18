@@ -9,6 +9,7 @@
 #include <stdint.h>
 
 #include "base.h"
+#include "completion.h"
 #include "render_target.h"
 
 #ifdef __cplusplus
@@ -102,23 +103,23 @@ mln_webgpu_surface_descriptor_default(void) MLN_NOEXCEPT;
 /**
  * Starts attachment of a Metal surface target.
  *
- * The descriptor and options are copied before return. The operation completes
+ * The descriptor and options are copied before return. The completion runs
  * only after the selected driver initializes the target. A core-worker driver
  * retains the Metal layer and device on its worker. A caller driver performs
  * initialization when the host services driver work with the Metal context
  * usable on that thread.
  */
-MLN_API mln_status mln_metal_surface_attach_start(
+MLN_API mln_status mln_metal_surface_attach(
   mln_map map, const mln_metal_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /** Starts attachment of a Vulkan surface target. */
-MLN_API mln_status mln_vulkan_surface_attach_start(
+MLN_API mln_status mln_vulkan_surface_attach(
   mln_map map, const mln_vulkan_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -128,10 +129,10 @@ MLN_API mln_status mln_vulkan_surface_attach_start(
  * MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD. A transferred WebGL canvas supports
  * MLN_RENDER_DRIVER_CORE_WORKER. Context ownership remains independent.
  */
-MLN_API mln_status mln_opengl_surface_attach_start(
+MLN_API mln_status mln_opengl_surface_attach(
   mln_map map, const mln_opengl_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -140,34 +141,34 @@ MLN_API mln_status mln_opengl_surface_attach_start(
  * Browser targets require MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD because
  * WebGPU objects remain in their creating agent.
  */
-MLN_API mln_status mln_webgpu_surface_attach_start(
+MLN_API mln_status mln_webgpu_surface_attach(
   mln_map map, const mln_webgpu_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /** Starts an ordered Metal surface replacement. */
-MLN_API mln_status mln_metal_surface_set_target_start(
+MLN_API mln_status mln_metal_surface_set_target(
   mln_render_session session, const mln_metal_surface_descriptor* descriptor,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /** Starts an ordered Vulkan surface replacement. */
-MLN_API mln_status mln_vulkan_surface_set_target_start(
+MLN_API mln_status mln_vulkan_surface_set_target(
   mln_render_session session, const mln_vulkan_surface_descriptor* descriptor,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /** Starts an ordered OpenGL surface replacement. */
-MLN_API mln_status mln_opengl_surface_set_target_start(
+MLN_API mln_status mln_opengl_surface_set_target(
   mln_render_session session, const mln_opengl_surface_descriptor* descriptor,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /** Starts an ordered WebGPU surface replacement. */
-MLN_API mln_status mln_webgpu_surface_set_target_start(
+MLN_API mln_status mln_webgpu_surface_set_target(
   mln_render_session session, const mln_webgpu_surface_descriptor* descriptor,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

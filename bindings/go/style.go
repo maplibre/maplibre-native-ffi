@@ -59,12 +59,14 @@ type StyleLayerInfo struct {
 	HasSourceID bool
 	// SourceIDSize is the source ID byte length, 0 when HasSourceID is false.
 	SourceIDSize uint64
+	SourceID     *string
 	// HasSourceLayer reports whether the layer carries a source-layer ID. Copy
 	// it with StartLayerSourceLayer.
 	HasSourceLayer bool
 	// SourceLayerSize is the source-layer byte length, 0 when HasSourceLayer is
 	// false.
 	SourceLayerSize uint64
+	SourceLayer     *string
 }
 
 // StyleSourceTileJSON contains the retained TileJSON fields of an inline tile source.
@@ -761,6 +763,14 @@ type StyleImageInfo struct {
 	TextFitHeight *StyleImageTextFit
 }
 
+// StyleImage is a complete copied runtime style image.
+type StyleImage struct {
+	Info     StyleImageInfo
+	Pixels   []byte
+	StretchX []ImageStretch
+	StretchY []ImageStretch
+}
+
 type cPremultipliedRGBA8Image struct {
 	raw        C.mln_premultiplied_rgba8_image
 	allocation unsafe.Pointer
@@ -884,10 +894,10 @@ func styleLayerInfoFromC(info C.mln_style_layer_info) StyleLayerInfo {
 // AddGeoJSONSourceURL adds a GeoJSON source that loads from a URL. Later
 // SetGeoJSONSourceURL calls keep the options passed here, and later
 // SetGeoJSONSourceData calls require data prepared with matching options.
-func (m *MapHandle) AddGeoJSONSourceURL(sourceID string, url string, options *StyleGeoJSONSourceOptions) (uint64, error) {
+func (m *MapHandle) AddGeoJSONSourceURL(sourceID string, url string, options *StyleGeoJSONSourceOptions) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
@@ -897,23 +907,19 @@ func (m *MapHandle) AddGeoJSONSourceURL(sourceID string, url string, options *St
 	defer urlView.free()
 	rawOptions, err := newCStyleGeoJSONSourceOptions(options)
 	if err != nil {
-		return 0, newBindingError(ErrInvalidArgument, err.Error())
+		return nil, newBindingError(ErrInvalidArgument, err.Error())
 	}
 	defer rawOptions.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_add_geojson_source_url(C.mln_map(ptr), sourceView.raw(), urlView.raw(), rawOptions.ptr(), &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_add_geojson_source_url(C.mln_map(ptr), sourceView.raw(), urlView.raw(), rawOptions.ptr(), completion))
+	}, completionCommand)
 }
 
 // SetGeoJSONSourceURL updates a GeoJSON source to load from a URL.
-func (m *MapHandle) SetGeoJSONSourceURL(sourceID string, url string) (uint64, error) {
+func (m *MapHandle) SetGeoJSONSourceURL(sourceID string, url string) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
@@ -921,98 +927,82 @@ func (m *MapHandle) SetGeoJSONSourceURL(sourceID string, url string) (uint64, er
 	defer sourceView.free()
 	urlView := newCStringView(url)
 	defer urlView.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_set_geojson_source_url(C.mln_map(ptr), sourceView.raw(), urlView.raw(), &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_set_geojson_source_url(C.mln_map(ptr), sourceView.raw(), urlView.raw(), completion))
+	}, completionCommand)
 }
 
 // AddGeoJSONSourceData adds a GeoJSON source with prepared inline data. The
 // call borrows the handle and retains the prepared index, and the source
 // adopts the options the data was prepared with, fixed for the lifetime of the
 // source.
-func (m *MapHandle) AddGeoJSONSourceData(sourceID string, data *GeoJSONSourceDataHandle) (uint64, error) {
+func (m *MapHandle) AddGeoJSONSourceData(sourceID string, data *GeoJSONSourceDataHandle) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
 	dataPtr, err := data.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer data.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_add_geojson_source_data(C.mln_map(ptr), sourceView.raw(), C.mln_geojson_source_data(dataPtr), &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_add_geojson_source_data(C.mln_map(ptr), sourceView.raw(), C.mln_geojson_source_data(dataPtr), completion))
+	}, completionCommand)
 }
 
 // SetGeoJSONSourceData updates a GeoJSON source with prepared inline data. The
 // call borrows the handle and retains the prepared index. The data must have
 // been prepared with options equal to the options the source was added with,
 // ClusterProperties excepted.
-func (m *MapHandle) SetGeoJSONSourceData(sourceID string, data *GeoJSONSourceDataHandle) (uint64, error) {
+func (m *MapHandle) SetGeoJSONSourceData(sourceID string, data *GeoJSONSourceDataHandle) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
 	dataPtr, err := data.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer data.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_set_geojson_source_data(C.mln_map(ptr), sourceView.raw(), C.mln_geojson_source_data(dataPtr), &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_set_geojson_source_data(C.mln_map(ptr), sourceView.raw(), C.mln_geojson_source_data(dataPtr), completion))
+	}, completionCommand)
 }
 
 // SetGeoJSONSourceSynchronousTiling overrides a GeoJSON source's synchronous
 // tiling at runtime. While enabled is true, the source slices requested tiles
 // inline during the update pass, as if its options had set SynchronousTiling;
 // false restores the option the source was added with.
-func (m *MapHandle) SetGeoJSONSourceSynchronousTiling(sourceID string, enabled bool) (uint64, error) {
+func (m *MapHandle) SetGeoJSONSourceSynchronousTiling(sourceID string, enabled bool) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_set_geojson_source_synchronous_tiling(C.mln_map(ptr), sourceView.raw(), C.bool(enabled), &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_set_geojson_source_synchronous_tiling(C.mln_map(ptr), sourceView.raw(), C.bool(enabled), completion))
+	}, completionCommand)
 }
 
 // SetCustomGeometrySourceTileData sets custom geometry data for one tile.
-func (m *MapHandle) SetCustomGeometrySourceTileData(sourceID string, tileID CanonicalTileID, data []byte) (uint64, error) {
+func (m *MapHandle) SetCustomGeometrySourceTileData(sourceID string, tileID CanonicalTileID, data []byte) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
@@ -1020,64 +1010,52 @@ func (m *MapHandle) SetCustomGeometrySourceTileData(sourceID string, tileID Cano
 	defer sourceView.free()
 	rawData := newCBufferView(data)
 	defer rawData.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
+	return startCompletion(func(completion *C.mln_completion) int32 {
 		return int32(C.mln_map_set_custom_geometry_source_tile_data(
 			C.mln_map(ptr),
 			sourceView.raw(),
 			cCanonicalTileID(tileID),
 			rawData.raw(),
-			&commandID,
+			completion,
 		))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	}, completionCommand)
 }
 
 // InvalidateCustomGeometrySourceTile invalidates custom geometry data for one tile.
-func (m *MapHandle) InvalidateCustomGeometrySourceTile(sourceID string, tileID CanonicalTileID) (uint64, error) {
+func (m *MapHandle) InvalidateCustomGeometrySourceTile(sourceID string, tileID CanonicalTileID) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_invalidate_custom_geometry_source_tile(C.mln_map(ptr), sourceView.raw(), cCanonicalTileID(tileID), &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_invalidate_custom_geometry_source_tile(C.mln_map(ptr), sourceView.raw(), cCanonicalTileID(tileID), completion))
+	}, completionCommand)
 }
 
 // InvalidateCustomGeometrySourceRegion invalidates custom geometry data inside one geographic region.
-func (m *MapHandle) InvalidateCustomGeometrySourceRegion(sourceID string, bounds LatLngBounds) (uint64, error) {
+func (m *MapHandle) InvalidateCustomGeometrySourceRegion(sourceID string, bounds LatLngBounds) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_invalidate_custom_geometry_source_region(C.mln_map(ptr), sourceView.raw(), cLatLngBounds(bounds), &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_invalidate_custom_geometry_source_region(C.mln_map(ptr), sourceView.raw(), cLatLngBounds(bounds), completion))
+	}, completionCommand)
 }
 
 // SetStyleImage sets or replaces one runtime style image.
-func (m *MapHandle) SetStyleImage(imageID string, image PremultipliedRGBA8Image, options StyleImageOptions) (uint64, error) {
+func (m *MapHandle) SetStyleImage(imageID string, image PremultipliedRGBA8Image, options StyleImageOptions) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
@@ -1087,35 +1065,27 @@ func (m *MapHandle) SetStyleImage(imageID string, image PremultipliedRGBA8Image,
 	defer rawImage.free()
 	rawOptions := newCStyleImageOptions(options)
 	defer rawOptions.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_set_style_image(C.mln_map(ptr), imageView.raw(), &rawImage.raw, &rawOptions.raw, &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_set_style_image(C.mln_map(ptr), imageView.raw(), &rawImage.raw, &rawOptions.raw, completion))
+	}, completionCommand)
 }
 
 // RemoveStyleImage submits a command that removes one runtime style image. The
 // command commits when an image with the ID existed and was removed, and fails
 // with ErrNotFound reported through its terminal event's Err payload field when
-// none does. Check existence with StartStyleImageInfo's found flag.
-func (m *MapHandle) RemoveStyleImage(imageID string) (uint64, error) {
+// none does. Check existence with StyleImageInfo's found flag.
+func (m *MapHandle) RemoveStyleImage(imageID string) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
 	imageView := newCStringView(imageID)
 	defer imageView.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_remove_style_image(C.mln_map(ptr), imageView.raw(), &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_remove_style_image(C.mln_map(ptr), imageView.raw(), completion))
+	}, completionCommand)
 }
 
 // StyleImageInfo returns copied metadata for one runtime style image.
@@ -1125,10 +1095,10 @@ func (m *MapHandle) RemoveStyleImage(imageID string) (uint64, error) {
 // StyleImagePremultipliedRGBA8Into copies tightly packed premultiplied RGBA8 pixels into buffer.
 
 // AddImageSourceURL adds an image source that loads its image from a URL.
-func (m *MapHandle) AddImageSourceURL(sourceID string, coordinates []LatLng, url string) (uint64, error) {
+func (m *MapHandle) AddImageSourceURL(sourceID string, coordinates []LatLng, url string) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
@@ -1141,27 +1111,23 @@ func (m *MapHandle) AddImageSourceURL(sourceID string, coordinates []LatLng, url
 	if len(rawCoordinates) > 0 {
 		rawCoordinatesPtr = &rawCoordinates[0]
 	}
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
+	return startCompletion(func(completion *C.mln_completion) int32 {
 		return int32(C.mln_map_add_image_source_url(
 			C.mln_map(ptr),
 			sourceView.raw(),
 			rawCoordinatesPtr,
 			C.size_t(len(rawCoordinates)),
 			urlView.raw(),
-			&commandID,
+			completion,
 		))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	}, completionCommand)
 }
 
 // AddImageSourceImage adds an image source with inline image pixels.
-func (m *MapHandle) AddImageSourceImage(sourceID string, coordinates []LatLng, image PremultipliedRGBA8Image) (uint64, error) {
+func (m *MapHandle) AddImageSourceImage(sourceID string, coordinates []LatLng, image PremultipliedRGBA8Image) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
@@ -1174,27 +1140,23 @@ func (m *MapHandle) AddImageSourceImage(sourceID string, coordinates []LatLng, i
 	}
 	rawImage := newCPremultipliedRGBA8Image(image)
 	defer rawImage.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
+	return startCompletion(func(completion *C.mln_completion) int32 {
 		return int32(C.mln_map_add_image_source_image(
 			C.mln_map(ptr),
 			sourceView.raw(),
 			rawCoordinatesPtr,
 			C.size_t(len(rawCoordinates)),
 			&rawImage.raw,
-			&commandID,
+			completion,
 		))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	}, completionCommand)
 }
 
 // SetImageSourceURL updates an image source to load its image from a URL.
-func (m *MapHandle) SetImageSourceURL(sourceID string, url string) (uint64, error) {
+func (m *MapHandle) SetImageSourceURL(sourceID string, url string) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
@@ -1202,20 +1164,16 @@ func (m *MapHandle) SetImageSourceURL(sourceID string, url string) (uint64, erro
 	defer sourceView.free()
 	urlView := newCStringView(url)
 	defer urlView.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_set_image_source_url(C.mln_map(ptr), sourceView.raw(), urlView.raw(), &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_set_image_source_url(C.mln_map(ptr), sourceView.raw(), urlView.raw(), completion))
+	}, completionCommand)
 }
 
 // SetImageSourceImage updates an image source with inline image pixels.
-func (m *MapHandle) SetImageSourceImage(sourceID string, image PremultipliedRGBA8Image) (uint64, error) {
+func (m *MapHandle) SetImageSourceImage(sourceID string, image PremultipliedRGBA8Image) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
@@ -1223,20 +1181,16 @@ func (m *MapHandle) SetImageSourceImage(sourceID string, image PremultipliedRGBA
 	defer sourceView.free()
 	rawImage := newCPremultipliedRGBA8Image(image)
 	defer rawImage.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_set_image_source_image(C.mln_map(ptr), sourceView.raw(), &rawImage.raw, &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_set_image_source_image(C.mln_map(ptr), sourceView.raw(), &rawImage.raw, completion))
+	}, completionCommand)
 }
 
 // SetImageSourceCoordinates updates image source coordinates.
-func (m *MapHandle) SetImageSourceCoordinates(sourceID string, coordinates []LatLng) (uint64, error) {
+func (m *MapHandle) SetImageSourceCoordinates(sourceID string, coordinates []LatLng) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
@@ -1247,28 +1201,24 @@ func (m *MapHandle) SetImageSourceCoordinates(sourceID string, coordinates []Lat
 	if len(rawCoordinates) > 0 {
 		rawCoordinatesPtr = &rawCoordinates[0]
 	}
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
+	return startCompletion(func(completion *C.mln_completion) int32 {
 		return int32(C.mln_map_set_image_source_coordinates(
 			C.mln_map(ptr),
 			sourceView.raw(),
 			rawCoordinatesPtr,
 			C.size_t(len(rawCoordinates)),
-			&commandID,
+			completion,
 		))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	}, completionCommand)
 }
 
 // ImageSourceCoordinates returns copied image source coordinates.
 
 // AddVectorSourceURL adds a vector source with a TileJSON URL.
-func (m *MapHandle) AddVectorSourceURL(sourceID string, url string, options *StyleTileSourceOptions) (uint64, error) {
+func (m *MapHandle) AddVectorSourceURL(sourceID string, url string, options *StyleTileSourceOptions) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
@@ -1278,20 +1228,16 @@ func (m *MapHandle) AddVectorSourceURL(sourceID string, url string, options *Sty
 	defer urlView.free()
 	rawOptions, rawOptionsPtr := cStyleTileSourceOptionsPointer(options)
 	defer rawOptions.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_add_vector_source_url(C.mln_map(ptr), sourceView.raw(), urlView.raw(), rawOptionsPtr, &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_add_vector_source_url(C.mln_map(ptr), sourceView.raw(), urlView.raw(), rawOptionsPtr, completion))
+	}, completionCommand)
 }
 
 // AddVectorSourceTiles adds a vector source with inline tile URLs.
-func (m *MapHandle) AddVectorSourceTiles(sourceID string, tiles []string, options *StyleTileSourceOptions) (uint64, error) {
+func (m *MapHandle) AddVectorSourceTiles(sourceID string, tiles []string, options *StyleTileSourceOptions) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
@@ -1301,20 +1247,16 @@ func (m *MapHandle) AddVectorSourceTiles(sourceID string, tiles []string, option
 	defer rawTiles.free()
 	rawOptions, rawOptionsPtr := cStyleTileSourceOptionsPointer(options)
 	defer rawOptions.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_add_vector_source_tiles(C.mln_map(ptr), sourceView.raw(), rawTiles.ptr(), rawTiles.count(), rawOptionsPtr, &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_add_vector_source_tiles(C.mln_map(ptr), sourceView.raw(), rawTiles.ptr(), rawTiles.count(), rawOptionsPtr, completion))
+	}, completionCommand)
 }
 
 // AddRasterSourceURL adds a raster source with a TileJSON URL.
-func (m *MapHandle) AddRasterSourceURL(sourceID string, url string, options *StyleTileSourceOptions) (uint64, error) {
+func (m *MapHandle) AddRasterSourceURL(sourceID string, url string, options *StyleTileSourceOptions) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
@@ -1324,20 +1266,16 @@ func (m *MapHandle) AddRasterSourceURL(sourceID string, url string, options *Sty
 	defer urlView.free()
 	rawOptions, rawOptionsPtr := cStyleTileSourceOptionsPointer(options)
 	defer rawOptions.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_add_raster_source_url(C.mln_map(ptr), sourceView.raw(), urlView.raw(), rawOptionsPtr, &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_add_raster_source_url(C.mln_map(ptr), sourceView.raw(), urlView.raw(), rawOptionsPtr, completion))
+	}, completionCommand)
 }
 
 // AddRasterSourceTiles adds a raster source with inline tile URLs.
-func (m *MapHandle) AddRasterSourceTiles(sourceID string, tiles []string, options *StyleTileSourceOptions) (uint64, error) {
+func (m *MapHandle) AddRasterSourceTiles(sourceID string, tiles []string, options *StyleTileSourceOptions) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
@@ -1347,20 +1285,16 @@ func (m *MapHandle) AddRasterSourceTiles(sourceID string, tiles []string, option
 	defer rawTiles.free()
 	rawOptions, rawOptionsPtr := cStyleTileSourceOptionsPointer(options)
 	defer rawOptions.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_add_raster_source_tiles(C.mln_map(ptr), sourceView.raw(), rawTiles.ptr(), rawTiles.count(), rawOptionsPtr, &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_add_raster_source_tiles(C.mln_map(ptr), sourceView.raw(), rawTiles.ptr(), rawTiles.count(), rawOptionsPtr, completion))
+	}, completionCommand)
 }
 
 // AddRasterDEMSourceURL adds a raster DEM source with a TileJSON URL.
-func (m *MapHandle) AddRasterDEMSourceURL(sourceID string, url string, options *StyleTileSourceOptions) (uint64, error) {
+func (m *MapHandle) AddRasterDEMSourceURL(sourceID string, url string, options *StyleTileSourceOptions) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
@@ -1370,20 +1304,16 @@ func (m *MapHandle) AddRasterDEMSourceURL(sourceID string, url string, options *
 	defer urlView.free()
 	rawOptions, rawOptionsPtr := cStyleTileSourceOptionsPointer(options)
 	defer rawOptions.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_add_raster_dem_source_url(C.mln_map(ptr), sourceView.raw(), urlView.raw(), rawOptionsPtr, &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_add_raster_dem_source_url(C.mln_map(ptr), sourceView.raw(), urlView.raw(), rawOptionsPtr, completion))
+	}, completionCommand)
 }
 
 // AddRasterDEMSourceTiles adds a raster DEM source with inline tile URLs.
-func (m *MapHandle) AddRasterDEMSourceTiles(sourceID string, tiles []string, options *StyleTileSourceOptions) (uint64, error) {
+func (m *MapHandle) AddRasterDEMSourceTiles(sourceID string, tiles []string, options *StyleTileSourceOptions) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
@@ -1393,20 +1323,16 @@ func (m *MapHandle) AddRasterDEMSourceTiles(sourceID string, tiles []string, opt
 	defer rawTiles.free()
 	rawOptions, rawOptionsPtr := cStyleTileSourceOptionsPointer(options)
 	defer rawOptions.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_add_raster_dem_source_tiles(C.mln_map(ptr), sourceView.raw(), rawTiles.ptr(), rawTiles.count(), rawOptionsPtr, &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_add_raster_dem_source_tiles(C.mln_map(ptr), sourceView.raw(), rawTiles.ptr(), rawTiles.count(), rawOptionsPtr, completion))
+	}, completionCommand)
 }
 
 // AddStyleSourceJSON adds one style source from a style-spec source JSON object.
-func (m *MapHandle) AddStyleSourceJSON(sourceID string, sourceJSON []byte) (uint64, error) {
+func (m *MapHandle) AddStyleSourceJSON(sourceID string, sourceJSON []byte) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
@@ -1414,36 +1340,28 @@ func (m *MapHandle) AddStyleSourceJSON(sourceID string, sourceJSON []byte) (uint
 	defer sourceView.free()
 	rawJSON := newCBufferView(sourceJSON)
 	defer rawJSON.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_add_style_source_json(C.mln_map(ptr), sourceView.raw(), rawJSON.raw(), &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_add_style_source_json(C.mln_map(ptr), sourceView.raw(), rawJSON.raw(), completion))
+	}, completionCommand)
 }
 
 // RemoveStyleSource submits a command that removes one style source by ID. The
 // command commits when a source with the ID existed and was removed. It fails
 // with ErrNotFound reported through its terminal event's Err payload field when
 // none does, and with ErrInvalidState when a layer still uses the source. Check
-// existence with StartStyleSourceInfo's found flag.
-func (m *MapHandle) RemoveStyleSource(sourceID string) (uint64, error) {
+// existence with StyleSourceInfo's found flag.
+func (m *MapHandle) RemoveStyleSource(sourceID string) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_remove_style_source(C.mln_map(ptr), sourceView.raw(), &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_remove_style_source(C.mln_map(ptr), sourceView.raw(), completion))
+	}, completionCommand)
 }
 
 // StyleSourceInfo returns copied source metadata and whether the source exists.
@@ -1491,10 +1409,10 @@ func styleStringListStrings(list C.mln_style_string_list) ([]string, error) {
 
 // AddHillshadeLayer adds a hillshade layer for a raster DEM source. Passing an
 // empty beforeLayerID appends the layer.
-func (m *MapHandle) AddHillshadeLayer(layerID string, sourceID string, beforeLayerID string) (uint64, error) {
+func (m *MapHandle) AddHillshadeLayer(layerID string, sourceID string, beforeLayerID string) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
@@ -1504,21 +1422,17 @@ func (m *MapHandle) AddHillshadeLayer(layerID string, sourceID string, beforeLay
 	defer sourceView.free()
 	beforeView := newCStringView(beforeLayerID)
 	defer beforeView.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_add_hillshade_layer(C.mln_map(ptr), layerView.raw(), sourceView.raw(), beforeView.raw(), &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_add_hillshade_layer(C.mln_map(ptr), layerView.raw(), sourceView.raw(), beforeView.raw(), completion))
+	}, completionCommand)
 }
 
 // AddColorReliefLayer adds a color-relief layer for a raster DEM source.
 // Passing an empty beforeLayerID appends the layer.
-func (m *MapHandle) AddColorReliefLayer(layerID string, sourceID string, beforeLayerID string) (uint64, error) {
+func (m *MapHandle) AddColorReliefLayer(layerID string, sourceID string, beforeLayerID string) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
@@ -1528,21 +1442,17 @@ func (m *MapHandle) AddColorReliefLayer(layerID string, sourceID string, beforeL
 	defer sourceView.free()
 	beforeView := newCStringView(beforeLayerID)
 	defer beforeView.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_add_color_relief_layer(C.mln_map(ptr), layerView.raw(), sourceView.raw(), beforeView.raw(), &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_add_color_relief_layer(C.mln_map(ptr), layerView.raw(), sourceView.raw(), beforeView.raw(), completion))
+	}, completionCommand)
 }
 
 // AddLocationIndicatorLayer adds a source-free location indicator layer. Passing
 // an empty beforeLayerID appends the layer.
-func (m *MapHandle) AddLocationIndicatorLayer(layerID string, beforeLayerID string) (uint64, error) {
+func (m *MapHandle) AddLocationIndicatorLayer(layerID string, beforeLayerID string) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
@@ -1550,77 +1460,61 @@ func (m *MapHandle) AddLocationIndicatorLayer(layerID string, beforeLayerID stri
 	defer layerView.free()
 	beforeView := newCStringView(beforeLayerID)
 	defer beforeView.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_add_location_indicator_layer(C.mln_map(ptr), layerView.raw(), beforeView.raw(), &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_add_location_indicator_layer(C.mln_map(ptr), layerView.raw(), beforeView.raw(), completion))
+	}, completionCommand)
 }
 
 // SetLocationIndicatorLocation sets a location indicator layer location.
-func (m *MapHandle) SetLocationIndicatorLocation(layerID string, coordinate LatLng, altitude float64) (uint64, error) {
+func (m *MapHandle) SetLocationIndicatorLocation(layerID string, coordinate LatLng, altitude float64) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
 	layerView := newCStringView(layerID)
 	defer layerView.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_set_location_indicator_location(C.mln_map(ptr), layerView.raw(), cLatLng(coordinate), C.double(altitude), &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_set_location_indicator_location(C.mln_map(ptr), layerView.raw(), cLatLng(coordinate), C.double(altitude), completion))
+	}, completionCommand)
 }
 
 // SetLocationIndicatorBearing sets a location indicator layer bearing in degrees.
-func (m *MapHandle) SetLocationIndicatorBearing(layerID string, bearing float64) (uint64, error) {
+func (m *MapHandle) SetLocationIndicatorBearing(layerID string, bearing float64) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
 	layerView := newCStringView(layerID)
 	defer layerView.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_set_location_indicator_bearing(C.mln_map(ptr), layerView.raw(), C.double(bearing), &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_set_location_indicator_bearing(C.mln_map(ptr), layerView.raw(), C.double(bearing), completion))
+	}, completionCommand)
 }
 
 // SetLocationIndicatorAccuracyRadius sets a location indicator layer accuracy radius.
-func (m *MapHandle) SetLocationIndicatorAccuracyRadius(layerID string, radius float64) (uint64, error) {
+func (m *MapHandle) SetLocationIndicatorAccuracyRadius(layerID string, radius float64) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
 	layerView := newCStringView(layerID)
 	defer layerView.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_set_location_indicator_accuracy_radius(C.mln_map(ptr), layerView.raw(), C.double(radius), &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_set_location_indicator_accuracy_radius(C.mln_map(ptr), layerView.raw(), C.double(radius), completion))
+	}, completionCommand)
 }
 
 // SetLocationIndicatorImageName sets one location indicator image-name property.
-func (m *MapHandle) SetLocationIndicatorImageName(layerID string, imageKind LocationIndicatorImageKind, imageID string) (uint64, error) {
+func (m *MapHandle) SetLocationIndicatorImageName(layerID string, imageKind LocationIndicatorImageKind, imageID string) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
@@ -1628,21 +1522,17 @@ func (m *MapHandle) SetLocationIndicatorImageName(layerID string, imageKind Loca
 	defer layerView.free()
 	imageView := newCStringView(imageID)
 	defer imageView.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_set_location_indicator_image_name(C.mln_map(ptr), layerView.raw(), C.uint32_t(imageKind), imageView.raw(), &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_set_location_indicator_image_name(C.mln_map(ptr), layerView.raw(), C.uint32_t(imageKind), imageView.raw(), completion))
+	}, completionCommand)
 }
 
 // AddStyleLayerJSON adds one style layer from a style-spec layer JSON object.
 // Passing an empty beforeLayerID appends the layer.
-func (m *MapHandle) AddStyleLayerJSON(layerJSON []byte, beforeLayerID string) (uint64, error) {
+func (m *MapHandle) AddStyleLayerJSON(layerJSON []byte, beforeLayerID string) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
@@ -1650,35 +1540,27 @@ func (m *MapHandle) AddStyleLayerJSON(layerJSON []byte, beforeLayerID string) (u
 	defer beforeView.free()
 	rawJSON := newCBufferView(layerJSON)
 	defer rawJSON.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_add_style_layer_json(C.mln_map(ptr), rawJSON.raw(), beforeView.raw(), &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_add_style_layer_json(C.mln_map(ptr), rawJSON.raw(), beforeView.raw(), completion))
+	}, completionCommand)
 }
 
 // RemoveStyleLayer submits a command that removes one style layer by ID. The
 // command commits when a layer with the ID existed and was removed, and fails
 // with ErrNotFound reported through its terminal event's Err payload field when
-// none does. Check existence with StartStyleLayerInfo's found flag.
-func (m *MapHandle) RemoveStyleLayer(layerID string) (uint64, error) {
+// none does. Check existence with StyleLayerInfo's found flag.
+func (m *MapHandle) RemoveStyleLayer(layerID string) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
 	layerView := newCStringView(layerID)
 	defer layerView.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_remove_style_layer(C.mln_map(ptr), layerView.raw(), &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_remove_style_layer(C.mln_map(ptr), layerView.raw(), completion))
+	}, completionCommand)
 }
 
 // StyleLayerInfo returns copied layer metadata and whether the layer exists.
@@ -1687,10 +1569,10 @@ func (m *MapHandle) RemoveStyleLayer(layerID string) (uint64, error) {
 
 // MoveStyleLayer moves one style layer before another layer. Passing an empty
 // beforeLayerID moves layerID to the top of the style order.
-func (m *MapHandle) MoveStyleLayer(layerID string, beforeLayerID string) (uint64, error) {
+func (m *MapHandle) MoveStyleLayer(layerID string, beforeLayerID string) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
@@ -1698,42 +1580,34 @@ func (m *MapHandle) MoveStyleLayer(layerID string, beforeLayerID string) (uint64
 	defer layerView.free()
 	beforeView := newCStringView(beforeLayerID)
 	defer beforeView.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_move_style_layer(C.mln_map(ptr), layerView.raw(), beforeView.raw(), &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_move_style_layer(C.mln_map(ptr), layerView.raw(), beforeView.raw(), completion))
+	}, completionCommand)
 }
 
 // StyleLayerJSON returns one copied style layer as a style-spec JSON object and
 // whether the layer exists.
 
 // SetStyleLightJSON sets the style light from a style-spec light JSON object.
-func (m *MapHandle) SetStyleLightJSON(lightJSON []byte) (uint64, error) {
+func (m *MapHandle) SetStyleLightJSON(lightJSON []byte) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
 	rawJSON := newCBufferView(lightJSON)
 	defer rawJSON.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_set_style_light_json(C.mln_map(ptr), rawJSON.raw(), &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_set_style_light_json(C.mln_map(ptr), rawJSON.raw(), completion))
+	}, completionCommand)
 }
 
 // SetStyleLightProperty sets one style light property.
-func (m *MapHandle) SetStyleLightProperty(propertyName string, value []byte) (uint64, error) {
+func (m *MapHandle) SetStyleLightProperty(propertyName string, value []byte) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
@@ -1741,13 +1615,9 @@ func (m *MapHandle) SetStyleLightProperty(propertyName string, value []byte) (ui
 	defer propertyView.free()
 	rawValue := newCBufferView(value)
 	defer rawValue.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_set_style_light_property(C.mln_map(ptr), propertyView.raw(), rawValue.raw(), &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_set_style_light_property(C.mln_map(ptr), propertyView.raw(), rawValue.raw(), completion))
+	}, completionCommand)
 }
 
 // StyleLightProperty returns one copied style light property as a style-spec
@@ -1757,30 +1627,26 @@ func (m *MapHandle) SetStyleLightProperty(propertyName string, value []byte) (ui
 // rather than merging into them, so absent duration and delay clear the
 // style-wide override. Loading a style replaces these options with the ones
 // that style declares, so apply an override after the style loads.
-func (m *MapHandle) SetStyleTransitionOptions(options StyleTransitionOptions) (uint64, error) {
+func (m *MapHandle) SetStyleTransitionOptions(options StyleTransitionOptions) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
 	raw := newCStyleTransitionOptions(options)
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_set_style_transition_options(C.mln_map(ptr), &raw, &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_set_style_transition_options(C.mln_map(ptr), &raw, completion))
+	}, completionCommand)
 }
 
 // StyleTransitionOptions returns the style's copied global transition options.
 
 // SetLayerProperty sets one style layer property.
-func (m *MapHandle) SetLayerProperty(layerID string, propertyName string, value []byte) (uint64, error) {
+func (m *MapHandle) SetLayerProperty(layerID string, propertyName string, value []byte) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
@@ -1790,13 +1656,9 @@ func (m *MapHandle) SetLayerProperty(layerID string, propertyName string, value 
 	defer propertyView.free()
 	rawValue := newCBufferView(value)
 	defer rawValue.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_set_layer_property(C.mln_map(ptr), layerView.raw(), propertyView.raw(), rawValue.raw(), &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_set_layer_property(C.mln_map(ptr), layerView.raw(), propertyView.raw(), rawValue.raw(), completion))
+	}, completionCommand)
 }
 
 // LayerProperty returns one copied style layer property as a style-spec JSON
@@ -1825,30 +1687,26 @@ const (
 
 // SetLayerMinZoom sets the lowest zoom at which one layer draws. Pass
 // math.Inf(-1) for no lower bound. Read the committed range with
-// StartStyleLayerInfo.
+// StyleLayerInfo.
 
 // SetLayerMaxZoom sets the highest zoom at which one layer draws. Pass
 // math.Inf(1) for no upper bound. Read the committed range with
-// StartStyleLayerInfo.
+// StyleLayerInfo.
 
 // SetLayerVisibility sets whether one layer draws. Read the committed value
-// with StartStyleLayerInfo.
-func (m *MapHandle) SetLayerVisibility(layerID string, visibility StyleLayerVisibility) (uint64, error) {
+// with StyleLayerInfo.
+func (m *MapHandle) SetLayerVisibility(layerID string, visibility StyleLayerVisibility) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
 	layerView := newCStringView(layerID)
 	defer layerView.free()
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_set_layer_visibility(C.mln_map(ptr), layerView.raw(), C.uint32_t(visibility), &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_set_layer_visibility(C.mln_map(ptr), layerView.raw(), C.uint32_t(visibility), completion))
+	}, completionCommand)
 }
 
 // copyMapText probes the required length, then copies. A null buffer with zero
@@ -1908,10 +1766,10 @@ func (m *MapHandle) copyMapBytes(copy func(C.mln_map, *C.uint8_t, C.size_t, *C.s
 
 // SetLayerFilter sets or clears one style layer filter. Passing nil clears the
 // filter.
-func (m *MapHandle) SetLayerFilter(layerID string, filter []byte) (uint64, error) {
+func (m *MapHandle) SetLayerFilter(layerID string, filter []byte) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
@@ -1924,13 +1782,9 @@ func (m *MapHandle) SetLayerFilter(layerID string, filter []byte) (uint64, error
 		defer filterView.free()
 		rawFilter = filterView.ptr()
 	}
-	var commandID C.uint64_t
-	if err := checkNative(func() int32 {
-		return int32(C.mln_map_set_layer_filter(C.mln_map(ptr), layerView.raw(), rawFilter, &commandID))
-	}); err != nil {
-		return 0, err
-	}
-	return uint64(commandID), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_set_layer_filter(C.mln_map(ptr), layerView.raw(), rawFilter, completion))
+	}, completionCommand)
 }
 
 // LayerFilter returns one copied style layer filter as a style-spec JSON value.
@@ -1947,350 +1801,221 @@ type StyleImageStretchResult struct {
 	Y []ImageStretch
 }
 
-func startMapStyleOperation[T any](m *MapHandle, start func(C.mln_map, *C.mln_operation) int32, take func(C.mln_operation) (T, bool, error)) (*OperationHandle[T], error) {
-	ptr, err := m.ptr()
+func copyStyleViews(raw *C.mln_buffer_view, count C.size_t) ([]string, error) {
+	if count == 0 {
+		return []string{}, nil
+	}
+	if raw == nil {
+		return nil, newBindingError(ErrNative, "native style string array is invalid")
+	}
+	views := unsafe.Slice(raw, int(count))
+	values := make([]string, len(views))
+	for index := range views {
+		values[index] = goStringView(views[index])
+	}
+	return values, nil
+}
+
+func completionOptionalBuffer(result *C.mln_completion_result) (StyleOptional[[]byte], error) {
+	if result.value_count == 0 {
+		return StyleOptional[[]byte]{}, nil
+	}
+	value, err := completionBuffer(result)
+	return StyleOptional[[]byte]{Value: value, Found: err == nil}, err
+}
+
+func completionStyleImage(result *C.mln_completion_result) (StyleOptional[StyleImage], error) {
+	if result.value_count == 0 {
+		return StyleOptional[StyleImage]{}, nil
+	}
+	raw, err := completionValue[C.mln_style_image_result](result)
 	if err != nil {
-		return nil, err
+		return StyleOptional[StyleImage]{}, err
 	}
-
-	defer m.state.KeepAlive()
-	var id C.mln_operation
-	if err := checkNative(func() int32 { return start(C.mln_map(ptr), &id) }); err != nil {
-		return nil, err
+	pixels, ok := goByteSlice(raw.pixels.data, raw.pixels.size)
+	if !ok {
+		return StyleOptional[StyleImage]{}, newBindingError(ErrNative, "native style image pixels are invalid")
 	}
-	if id == 0 {
-		return nil, newBindingError(ErrInvalidState, "style operation did not return a handle")
-	}
-	operation := newOperationHandle[T](m.runtime, uint64(id), 0, 0)
-	operation.takeResult = func(raw uint64) (T, bool, error) { return take(C.mln_operation(raw)) }
-	return operation, nil
+	x := append([]C.mln_image_stretch(nil), unsafe.Slice(raw.stretch_x, int(raw.stretch_x_count))...)
+	y := append([]C.mln_image_stretch(nil), unsafe.Slice(raw.stretch_y, int(raw.stretch_y_count))...)
+	return StyleOptional[StyleImage]{
+		Found: true,
+		Value: StyleImage{
+			Info: styleImageInfoFromC(raw.info), Pixels: pixels,
+			StretchX: stretchesFromC(x), StretchY: stretchesFromC(y),
+		},
+	}, nil
 }
 
-func takeStyleBuffer(operation C.mln_operation, take func(C.mln_operation, *C.mln_buffer) int32) ([]byte, bool, error) {
-	var buffer C.mln_buffer
-	if err := checkNative(func() int32 { return take(operation, &buffer) }); err != nil {
-		return nil, false, err
+func completionStyleSource(result *C.mln_completion_result) (StyleOptional[StyleSourceInfo], error) {
+	if result.value_count == 0 {
+		return StyleOptional[StyleSourceInfo]{}, nil
 	}
-	value, err := goOwnedBuffer(buffer)
-	return value, true, err
-}
-
-func takeOptionalStyleBuffer(operation C.mln_operation, take func(C.mln_operation, *C.mln_buffer, *C.bool) int32) (StyleOptional[[]byte], bool, error) {
-	var buffer C.mln_buffer
-	var found C.bool
-	if err := checkNative(func() int32 { return take(operation, &buffer, &found) }); err != nil {
-		return StyleOptional[[]byte]{}, false, err
+	raw, err := completionValue[C.mln_style_source_result](result)
+	if err != nil {
+		return StyleOptional[StyleSourceInfo]{}, err
 	}
-	value, err := goOwnedBuffer(buffer)
-	return StyleOptional[[]byte]{Value: value, Found: bool(found)}, true, err
+	info := styleSourceInfoFromC(raw.info)
+	if bool(raw.info.has_attribution) {
+		value := goStringView(raw.attribution)
+		info.Attribution = &value
+	}
+	if raw.info.fields&C.MLN_STYLE_SOURCE_INFO_URL != 0 {
+		value := goStringView(raw.url)
+		info.URL = &value
+	}
+	if info.TileJSON != nil {
+		info.TileJSON.TileURLs, err = copyStyleViews(raw.tile_urls, raw.tile_url_count)
+		if err != nil {
+			return StyleOptional[StyleSourceInfo]{}, err
+		}
+	}
+	return StyleOptional[StyleSourceInfo]{Value: info, Found: true}, nil
 }
 
-func takeOptionalStyleString(operation C.mln_operation, take func(C.mln_operation, *C.mln_buffer, *C.bool) int32) (StyleOptional[string], bool, error) {
-	result, transferred, err := takeOptionalStyleBuffer(operation, take)
-	return StyleOptional[string]{Value: string(result.Value), Found: result.Found}, transferred, err
+func completionStyleLayer(result *C.mln_completion_result) (StyleOptional[StyleLayerInfo], error) {
+	if result.value_count == 0 {
+		return StyleOptional[StyleLayerInfo]{}, nil
+	}
+	raw, err := completionValue[C.mln_style_layer_result](result)
+	if err != nil {
+		return StyleOptional[StyleLayerInfo]{}, err
+	}
+	info := styleLayerInfoFromC(raw.info)
+	if info.HasSourceID {
+		value := goStringView(raw.source_id)
+		info.SourceID = &value
+	}
+	if info.HasSourceLayer {
+		value := goStringView(raw.source_layer)
+		info.SourceLayer = &value
+	}
+	return StyleOptional[StyleLayerInfo]{Value: info, Found: true}, nil
 }
 
-func (m *MapHandle) AddCustomGeometrySource(sourceID string, options CustomGeometrySourceOptions) (uint64, error) {
+func completionStyleIDs(result *C.mln_completion_result) ([]string, error) {
+	return copyStyleViews((*C.mln_buffer_view)(result.value), C.size_t(result.value_count))
+}
+
+func (m *MapHandle) AddCustomGeometrySource(sourceID string, options CustomGeometrySourceOptions) (*Future[CommandCompletion], error) {
 	if sourceID == "" {
-		return 0, newBindingError(ErrInvalidArgument, "source ID is empty")
+		return nil, newBindingError(ErrInvalidArgument, "source ID is empty")
 	}
 	if options.FetchTile == nil {
-		return 0, newBindingError(ErrInvalidArgument, "CustomGeometrySourceOptions.FetchTile is nil")
+		return nil, newBindingError(ErrInvalidArgument, "CustomGeometrySourceOptions.FetchTile is nil")
 	}
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-
 	defer m.state.KeepAlive()
-	var commandID uint64
-	if err := checkNative(func() int32 {
-		id, status := callback.AddCustomGeometrySource(uint64(ptr), sourceID, options.toCallback())
-		commandID = id
-		return status
-	}); err != nil {
-		return 0, err
-	}
-	return commandID, nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return callback.AddCustomGeometrySource(
+			uint64(ptr), sourceID, options.toCallback(), unsafe.Pointer(completion),
+		)
+	}, completionCommand)
 }
 
-func (m *MapHandle) StartStyleImageInfo(imageID string) (*OperationHandle[StyleOptional[StyleImageInfo]], error) {
+func (m *MapHandle) StyleImage(imageID string) (*Future[StyleOptional[StyleImage]], error) {
 	view := newCStringView(imageID)
 	defer view.free()
-	return startMapStyleOperation(m, func(raw C.mln_map, out *C.mln_operation) int32 {
-		return int32(C.mln_map_get_style_image_info_start(raw, view.raw(), out))
-	}, func(op C.mln_operation) (StyleOptional[StyleImageInfo], bool, error) {
-		raw := C.mln_style_image_info{size: C.uint32_t(unsafe.Sizeof(C.mln_style_image_info{}))}
-		var found C.bool
-		err := checkNative(func() int32 { return int32(C.mln_map_get_style_image_info_take_result(op, &raw, &found)) })
-		return StyleOptional[StyleImageInfo]{Value: styleImageInfoFromC(raw), Found: bool(found)}, err == nil, err
-	})
+	return startMapCompletion(m, func(raw C.mln_map, completion *C.mln_completion) int32 {
+		return int32(C.mln_map_get_style_image_info(raw, view.raw(), completion))
+	}, completionStyleImage)
 }
 
-func (m *MapHandle) StartStyleImagePremultipliedRGBA8(imageID string) (*OperationHandle[StyleOptional[[]byte]], error) {
-	view := newCStringView(imageID)
-	defer view.free()
-	return startMapStyleOperation(m, func(raw C.mln_map, out *C.mln_operation) int32 {
-		return int32(C.mln_map_copy_style_image_premultiplied_rgba8_start(raw, view.raw(), out))
-	}, func(op C.mln_operation) (StyleOptional[[]byte], bool, error) {
-		return takeOptionalStyleBuffer(op, func(id C.mln_operation, out *C.mln_buffer, found *C.bool) int32 {
-			return int32(C.mln_map_copy_style_image_premultiplied_rgba8_take_result(id, out, found))
-		})
-	})
-}
-
-func (m *MapHandle) StartStyleImageStretches(imageID string) (*OperationHandle[StyleOptional[StyleImageStretchResult]], error) {
-	view := newCStringView(imageID)
-	defer view.free()
-	return startMapStyleOperation(m, func(raw C.mln_map, out *C.mln_operation) int32 {
-		return int32(C.mln_map_copy_style_image_stretches_start(raw, view.raw(), out))
-	}, func(op C.mln_operation) (StyleOptional[StyleImageStretchResult], bool, error) {
-		var nx, ny C.size_t
-		var found C.bool
-		var probe C.mln_image_stretch
-		probeStatus := int32(C.mln_map_copy_style_image_stretches_take_result(op, &probe, 0, &nx, &probe, 0, &ny, &found))
-		if probeStatus == int32(C.MLN_STATUS_OK) {
-			return StyleOptional[StyleImageStretchResult]{Value: StyleImageStretchResult{}, Found: bool(found)}, true, nil
-		}
-		if probeStatus != int32(C.MLN_STATUS_INVALID_ARGUMENT) {
-			err := checkNative(func() int32 { return probeStatus })
-			return StyleOptional[StyleImageStretchResult]{}, false, err
-		}
-		x := make([]C.mln_image_stretch, int(nx))
-		y := make([]C.mln_image_stretch, int(ny))
-		var xp, yp *C.mln_image_stretch
-		if len(x) > 0 {
-			xp = &x[0]
-		}
-		if len(y) > 0 {
-			yp = &y[0]
-		}
-		if err := checkNative(func() int32 {
-			return int32(C.mln_map_copy_style_image_stretches_take_result(op, xp, C.size_t(len(x)), &nx, yp, C.size_t(len(y)), &ny, &found))
-		}); err != nil {
-			return StyleOptional[StyleImageStretchResult]{}, false, err
-		}
-		return StyleOptional[StyleImageStretchResult]{Value: StyleImageStretchResult{X: stretchesFromC(x), Y: stretchesFromC(y)}, Found: bool(found)}, true, nil
-	})
-}
-
-func (m *MapHandle) StartImageSourceCoordinates(sourceID string) (*OperationHandle[StyleOptional[[]LatLng]], error) {
+func (m *MapHandle) ImageSourceCoordinates(sourceID string) (*Future[StyleOptional[[]LatLng]], error) {
 	view := newCStringView(sourceID)
 	defer view.free()
-	return startMapStyleOperation(m, func(raw C.mln_map, out *C.mln_operation) int32 {
-		return int32(C.mln_map_get_image_source_coordinates_start(raw, view.raw(), out))
-	}, func(op C.mln_operation) (StyleOptional[[]LatLng], bool, error) {
-		var count C.size_t
-		var found C.bool
-		var probe C.mln_lat_lng
-		probeStatus := int32(C.mln_map_get_image_source_coordinates_take_result(op, &probe, 0, &count, &found))
-		if probeStatus == int32(C.MLN_STATUS_OK) {
-			return StyleOptional[[]LatLng]{Found: bool(found)}, true, nil
+	return startMapCompletion(m, func(raw C.mln_map, completion *C.mln_completion) int32 {
+		return int32(C.mln_map_get_image_source_coordinates(raw, view.raw(), completion))
+	}, func(result *C.mln_completion_result) (StyleOptional[[]LatLng], error) {
+		raw, err := completionSlice[C.mln_lat_lng](result)
+		if err != nil {
+			return StyleOptional[[]LatLng]{}, err
 		}
-		if probeStatus != int32(C.MLN_STATUS_INVALID_ARGUMENT) {
-			err := checkNative(func() int32 { return probeStatus })
-			return StyleOptional[[]LatLng]{}, false, err
+		if len(raw) == 0 {
+			return StyleOptional[[]LatLng]{}, nil
 		}
-		raw := make([]C.mln_lat_lng, int(count))
-		var ptr *C.mln_lat_lng
-		if len(raw) > 0 {
-			ptr = &raw[0]
-		}
-		if err := checkNative(func() int32 {
-			return int32(C.mln_map_get_image_source_coordinates_take_result(op, ptr, C.size_t(len(raw)), &count, &found))
-		}); err != nil {
-			return StyleOptional[[]LatLng]{}, false, err
-		}
-		values := make([]LatLng, len(raw))
-		for i := range raw {
-			values[i] = goLatLng(raw[i])
-		}
-		return StyleOptional[[]LatLng]{Value: values, Found: bool(found)}, true, nil
+		return StyleOptional[[]LatLng]{Value: goLatLngSlice(raw), Found: true}, nil
 	})
 }
 
-func (m *MapHandle) StartStyleSourceInfo(sourceID string) (*OperationHandle[StyleOptional[StyleSourceInfo]], error) {
+func (m *MapHandle) StyleSourceInfo(sourceID string) (*Future[StyleOptional[StyleSourceInfo]], error) {
 	view := newCStringView(sourceID)
 	defer view.free()
-	return startMapStyleOperation(m, func(raw C.mln_map, out *C.mln_operation) int32 {
-		return int32(C.mln_map_get_style_source_info_start(raw, view.raw(), out))
-	}, func(op C.mln_operation) (StyleOptional[StyleSourceInfo], bool, error) {
-		v := C.mln_style_source_info{size: C.uint32_t(unsafe.Sizeof(C.mln_style_source_info{}))}
-		var found C.bool
-		err := checkNative(func() int32 { return int32(C.mln_map_get_style_source_info_take_result(op, &v, &found)) })
-		return StyleOptional[StyleSourceInfo]{Value: styleSourceInfoFromC(v), Found: bool(found)}, err == nil, err
-	})
+	return startMapCompletion(m, func(raw C.mln_map, completion *C.mln_completion) int32 {
+		return int32(C.mln_map_get_style_source_info(raw, view.raw(), completion))
+	}, completionStyleSource)
 }
 
-func (m *MapHandle) StartStyleSourceAttribution(sourceID string) (*OperationHandle[StyleOptional[string]], error) {
-	view := newCStringView(sourceID)
-	defer view.free()
-	return startMapStyleOperation(m, func(raw C.mln_map, out *C.mln_operation) int32 {
-		return int32(C.mln_map_copy_style_source_attribution_start(raw, view.raw(), out))
-	}, func(op C.mln_operation) (StyleOptional[string], bool, error) {
-		return takeOptionalStyleString(op, func(id C.mln_operation, out *C.mln_buffer, found *C.bool) int32 {
-			return int32(C.mln_map_copy_style_source_attribution_take_result(id, out, found))
-		})
-	})
+func (m *MapHandle) StyleSourceIDs() (*Future[[]string], error) {
+	return startMapCompletion(m, func(raw C.mln_map, completion *C.mln_completion) int32 {
+		return int32(C.mln_map_list_style_source_ids(raw, completion))
+	}, completionStyleIDs)
 }
 
-func (m *MapHandle) StartStyleSourceURL(sourceID string) (*OperationHandle[StyleOptional[string]], error) {
-	view := newCStringView(sourceID)
-	defer view.free()
-	return startMapStyleOperation(m, func(raw C.mln_map, out *C.mln_operation) int32 {
-		return int32(C.mln_map_copy_style_source_url_start(raw, view.raw(), out))
-	}, func(op C.mln_operation) (StyleOptional[string], bool, error) {
-		return takeOptionalStyleString(op, func(id C.mln_operation, out *C.mln_buffer, found *C.bool) int32 {
-			return int32(C.mln_map_copy_style_source_url_take_result(id, out, found))
-		})
-	})
-}
-
-func (m *MapHandle) StartStyleSourceTileURLs(sourceID string) (*OperationHandle[StyleOptional[[]string]], error) {
-	view := newCStringView(sourceID)
-	defer view.free()
-	return startMapStyleOperation(m, func(raw C.mln_map, out *C.mln_operation) int32 {
-		return int32(C.mln_map_get_style_source_tile_urls_start(raw, view.raw(), out))
-	}, func(op C.mln_operation) (StyleOptional[[]string], bool, error) {
-		var list C.mln_style_string_list
-		var found C.bool
-		if err := checkNative(func() int32 { return int32(C.mln_map_get_style_source_tile_urls_take_result(op, &list, &found)) }); err != nil {
-			return StyleOptional[[]string]{}, false, err
-		}
-		values, err := styleStringListStrings(list)
-		return StyleOptional[[]string]{Value: values, Found: bool(found)}, true, err
-	})
-}
-
-func (m *MapHandle) StartStyleSourceIDs() (*OperationHandle[[]string], error) {
-	return startMapStyleOperation(m, func(raw C.mln_map, out *C.mln_operation) int32 {
-		return int32(C.mln_map_list_style_source_ids_start(raw, out))
-	}, func(op C.mln_operation) ([]string, bool, error) {
-		var list C.mln_style_id_list
-		if err := checkNative(func() int32 { return int32(C.mln_map_list_style_source_ids_take_result(op, &list)) }); err != nil {
-			return nil, false, err
-		}
-		values, err := styleIDListStrings(list)
-		return values, true, err
-	})
-}
-
-func (m *MapHandle) StartStyleLayerInfo(layerID string) (*OperationHandle[StyleOptional[StyleLayerInfo]], error) {
+func (m *MapHandle) StyleLayerInfo(layerID string) (*Future[StyleOptional[StyleLayerInfo]], error) {
 	view := newCStringView(layerID)
 	defer view.free()
-	return startMapStyleOperation(m, func(raw C.mln_map, out *C.mln_operation) int32 {
-		return int32(C.mln_map_get_style_layer_info_start(raw, view.raw(), out))
-	}, func(op C.mln_operation) (StyleOptional[StyleLayerInfo], bool, error) {
-		v := C.mln_style_layer_info{size: C.uint32_t(unsafe.Sizeof(C.mln_style_layer_info{}))}
-		var found C.bool
-		err := checkNative(func() int32 { return int32(C.mln_map_get_style_layer_info_take_result(op, &v, &found)) })
-		return StyleOptional[StyleLayerInfo]{Value: styleLayerInfoFromC(v), Found: bool(found)}, err == nil, err
-	})
+	return startMapCompletion(m, func(raw C.mln_map, completion *C.mln_completion) int32 {
+		return int32(C.mln_map_get_style_layer_info(raw, view.raw(), completion))
+	}, completionStyleLayer)
 }
 
-func (m *MapHandle) StartStyleLayerIDs() (*OperationHandle[[]string], error) {
-	return startMapStyleOperation(m, func(raw C.mln_map, out *C.mln_operation) int32 {
-		return int32(C.mln_map_list_style_layer_ids_start(raw, out))
-	}, func(op C.mln_operation) ([]string, bool, error) {
-		var list C.mln_style_id_list
-		if err := checkNative(func() int32 { return int32(C.mln_map_list_style_layer_ids_take_result(op, &list)) }); err != nil {
-			return nil, false, err
-		}
-		values, err := styleIDListStrings(list)
-		return values, true, err
-	})
+func (m *MapHandle) StyleLayerIDs() (*Future[[]string], error) {
+	return startMapCompletion(m, func(raw C.mln_map, completion *C.mln_completion) int32 {
+		return int32(C.mln_map_list_style_layer_ids(raw, completion))
+	}, completionStyleIDs)
 }
 
-func (m *MapHandle) StartStyleLayerJSON(layerID string) (*OperationHandle[StyleOptional[[]byte]], error) {
+func (m *MapHandle) StyleLayerJSON(layerID string) (*Future[StyleOptional[[]byte]], error) {
 	view := newCStringView(layerID)
 	defer view.free()
-	return startMapStyleOperation(m, func(raw C.mln_map, out *C.mln_operation) int32 {
-		return int32(C.mln_map_get_style_layer_json_start(raw, view.raw(), out))
-	}, func(op C.mln_operation) (StyleOptional[[]byte], bool, error) {
-		return takeOptionalStyleBuffer(op, func(id C.mln_operation, out *C.mln_buffer, found *C.bool) int32 {
-			return int32(C.mln_map_get_style_layer_json_take_result(id, out, found))
-		})
-	})
+	return startMapCompletion(m, func(raw C.mln_map, completion *C.mln_completion) int32 {
+		return int32(C.mln_map_get_style_layer_json(raw, view.raw(), completion))
+	}, completionOptionalBuffer)
 }
 
-func (m *MapHandle) StartStyleLightProperty(name string) (*OperationHandle[[]byte], error) {
+func (m *MapHandle) StyleLightProperty(name string) (*Future[[]byte], error) {
 	view := newCStringView(name)
 	defer view.free()
-	return startMapStyleOperation(m, func(raw C.mln_map, out *C.mln_operation) int32 {
-		return int32(C.mln_map_get_style_light_property_start(raw, view.raw(), out))
-	}, func(op C.mln_operation) ([]byte, bool, error) {
-		return takeStyleBuffer(op, func(id C.mln_operation, out *C.mln_buffer) int32 {
-			return int32(C.mln_map_get_style_light_property_take_result(id, out))
-		})
+	return startMapCompletion(m, func(raw C.mln_map, completion *C.mln_completion) int32 {
+		return int32(C.mln_map_get_style_light_property(raw, view.raw(), completion))
+	}, completionNullableBuffer)
+}
+
+func (m *MapHandle) StyleTransitionOptions() (*Future[StyleTransitionOptions], error) {
+	return startMapCompletion(m, func(raw C.mln_map, completion *C.mln_completion) int32 {
+		return int32(C.mln_map_get_style_transition_options(raw, completion))
+	}, func(result *C.mln_completion_result) (StyleTransitionOptions, error) {
+		raw, err := completionValue[C.mln_style_transition_options](result)
+		return styleTransitionOptionsFromC(raw), err
 	})
 }
 
-func (m *MapHandle) StartStyleTransitionOptions() (*OperationHandle[StyleTransitionOptions], error) {
-	return startMapStyleOperation(m, func(raw C.mln_map, out *C.mln_operation) int32 {
-		return int32(C.mln_map_get_style_transition_options_start(raw, out))
-	}, func(op C.mln_operation) (StyleTransitionOptions, bool, error) {
-		v := C.mln_style_transition_options{size: C.uint32_t(unsafe.Sizeof(C.mln_style_transition_options{}))}
-		err := checkNative(func() int32 { return int32(C.mln_map_get_style_transition_options_take_result(op, &v)) })
-		return styleTransitionOptionsFromC(v), err == nil, err
-	})
-}
-
-func (m *MapHandle) StartLayerProperty(layerID, name string) (*OperationHandle[[]byte], error) {
+func (m *MapHandle) LayerProperty(layerID, name string) (*Future[[]byte], error) {
 	layer := newCStringView(layerID)
 	defer layer.free()
 	property := newCStringView(name)
 	defer property.free()
-	return startMapStyleOperation(m, func(raw C.mln_map, out *C.mln_operation) int32 {
-		return int32(C.mln_map_get_layer_property_start(raw, layer.raw(), property.raw(), out))
-	}, func(op C.mln_operation) ([]byte, bool, error) {
-		return takeStyleBuffer(op, func(id C.mln_operation, out *C.mln_buffer) int32 {
-			return int32(C.mln_map_get_layer_property_take_result(id, out))
-		})
-	})
+	return startMapCompletion(m, func(raw C.mln_map, completion *C.mln_completion) int32 {
+		return int32(C.mln_map_get_layer_property(raw, layer.raw(), property.raw(), completion))
+	}, completionNullableBuffer)
 }
 
-func (m *MapHandle) StartLayerFilter(layerID string) (*OperationHandle[[]byte], error) {
+func (m *MapHandle) LayerFilter(layerID string) (*Future[StyleOptional[[]byte]], error) {
 	view := newCStringView(layerID)
 	defer view.free()
-	return startMapStyleOperation(m, func(raw C.mln_map, out *C.mln_operation) int32 {
-		return int32(C.mln_map_get_layer_filter_start(raw, view.raw(), out))
-	}, func(op C.mln_operation) ([]byte, bool, error) {
-		return takeStyleBuffer(op, func(id C.mln_operation, out *C.mln_buffer) int32 {
-			return int32(C.mln_map_get_layer_filter_take_result(id, out))
-		})
-	})
+	return startMapCompletion(m, func(raw C.mln_map, completion *C.mln_completion) int32 {
+		return int32(C.mln_map_get_layer_filter(raw, view.raw(), completion))
+	}, completionOptionalBuffer)
 }
 
-func (m *MapHandle) StartLayerSourceLayer(layerID string) (*OperationHandle[string], error) {
-	view := newCStringView(layerID)
-	defer view.free()
-	return startMapStyleOperation(m, func(raw C.mln_map, out *C.mln_operation) int32 {
-		return int32(C.mln_map_copy_layer_source_layer_start(raw, view.raw(), out))
-	}, func(op C.mln_operation) (string, bool, error) {
-		value, transferred, err := takeStyleBuffer(op, func(id C.mln_operation, out *C.mln_buffer) int32 {
-			return int32(C.mln_map_copy_layer_source_layer_take_result(id, out))
-		})
-		return string(value), transferred, err
-	})
-}
-
-func (m *MapHandle) StartLayerSourceID(layerID string) (*OperationHandle[string], error) {
-	view := newCStringView(layerID)
-	defer view.free()
-	return startMapStyleOperation(m, func(raw C.mln_map, out *C.mln_operation) int32 {
-		return int32(C.mln_map_copy_layer_source_id_start(raw, view.raw(), out))
-	}, func(op C.mln_operation) (string, bool, error) {
-		value, transferred, err := takeStyleBuffer(op, func(id C.mln_operation, out *C.mln_buffer) int32 {
-			return int32(C.mln_map_copy_layer_source_id_take_result(id, out))
-		})
-		return string(value), transferred, err
-	})
-}
-
-func submitLayerTextCommand(m *MapHandle, layerID, text string, submit func(C.mln_map, C.mln_buffer_view, C.mln_buffer_view, *C.uint64_t) int32) (uint64, error) {
+func submitLayerTextCommand(m *MapHandle, layerID, text string, submit func(C.mln_map, C.mln_buffer_view, C.mln_buffer_view, *C.mln_completion) int32) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
@@ -2298,49 +2023,45 @@ func submitLayerTextCommand(m *MapHandle, layerID, text string, submit func(C.ml
 	defer layer.free()
 	value := newCStringView(text)
 	defer value.free()
-	var id C.uint64_t
-	if err := checkNative(func() int32 { return submit(C.mln_map(ptr), layer.raw(), value.raw(), &id) }); err != nil {
-		return 0, err
-	}
-	return uint64(id), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return submit(C.mln_map(ptr), layer.raw(), value.raw(), completion)
+	}, completionCommand)
 }
 
-func (m *MapHandle) SetLayerSourceLayer(layerID, sourceLayer string) (uint64, error) {
-	return submitLayerTextCommand(m, layerID, sourceLayer, func(raw C.mln_map, layer, value C.mln_buffer_view, id *C.uint64_t) int32 {
-		return int32(C.mln_map_set_layer_source_layer(raw, layer, value, id))
+func (m *MapHandle) SetLayerSourceLayer(layerID, sourceLayer string) (*Future[CommandCompletion], error) {
+	return submitLayerTextCommand(m, layerID, sourceLayer, func(raw C.mln_map, layer, value C.mln_buffer_view, completion *C.mln_completion) int32 {
+		return int32(C.mln_map_set_layer_source_layer(raw, layer, value, completion))
 	})
 }
 
-func (m *MapHandle) SetLayerSourceID(layerID, sourceID string) (uint64, error) {
-	return submitLayerTextCommand(m, layerID, sourceID, func(raw C.mln_map, layer, value C.mln_buffer_view, id *C.uint64_t) int32 {
-		return int32(C.mln_map_set_layer_source_id(raw, layer, value, id))
+func (m *MapHandle) SetLayerSourceID(layerID, sourceID string) (*Future[CommandCompletion], error) {
+	return submitLayerTextCommand(m, layerID, sourceID, func(raw C.mln_map, layer, value C.mln_buffer_view, completion *C.mln_completion) int32 {
+		return int32(C.mln_map_set_layer_source_id(raw, layer, value, completion))
 	})
 }
 
-func submitLayerZoomCommand(m *MapHandle, layerID string, zoom float64, submit func(C.mln_map, C.mln_buffer_view, C.double, *C.uint64_t) int32) (uint64, error) {
+func submitLayerZoomCommand(m *MapHandle, layerID string, zoom float64, submit func(C.mln_map, C.mln_buffer_view, C.double, *C.mln_completion) int32) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	defer m.state.KeepAlive()
 	layer := newCStringView(layerID)
 	defer layer.free()
-	var id C.uint64_t
-	if err := checkNative(func() int32 { return submit(C.mln_map(ptr), layer.raw(), C.double(zoom), &id) }); err != nil {
-		return 0, err
-	}
-	return uint64(id), nil
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return submit(C.mln_map(ptr), layer.raw(), C.double(zoom), completion)
+	}, completionCommand)
 }
 
-func (m *MapHandle) SetLayerMinZoom(layerID string, zoom float64) (uint64, error) {
-	return submitLayerZoomCommand(m, layerID, zoom, func(raw C.mln_map, layer C.mln_buffer_view, value C.double, id *C.uint64_t) int32 {
-		return int32(C.mln_map_set_layer_min_zoom(raw, layer, value, id))
+func (m *MapHandle) SetLayerMinZoom(layerID string, zoom float64) (*Future[CommandCompletion], error) {
+	return submitLayerZoomCommand(m, layerID, zoom, func(raw C.mln_map, layer C.mln_buffer_view, value C.double, completion *C.mln_completion) int32 {
+		return int32(C.mln_map_set_layer_min_zoom(raw, layer, value, completion))
 	})
 }
 
-func (m *MapHandle) SetLayerMaxZoom(layerID string, zoom float64) (uint64, error) {
-	return submitLayerZoomCommand(m, layerID, zoom, func(raw C.mln_map, layer C.mln_buffer_view, value C.double, id *C.uint64_t) int32 {
-		return int32(C.mln_map_set_layer_max_zoom(raw, layer, value, id))
+func (m *MapHandle) SetLayerMaxZoom(layerID string, zoom float64) (*Future[CommandCompletion], error) {
+	return submitLayerZoomCommand(m, layerID, zoom, func(raw C.mln_map, layer C.mln_buffer_view, value C.double, completion *C.mln_completion) int32 {
+		return int32(C.mln_map_set_layer_max_zoom(raw, layer, value, completion))
 	})
 }

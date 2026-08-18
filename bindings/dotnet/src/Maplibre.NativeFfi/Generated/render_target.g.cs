@@ -46,14 +46,9 @@ namespace Maplibre.NativeFfi.Internal.C
         [NativeTypeName("uint32_t")]
         public uint reserved;
 
-        [NativeTypeName("mln_notification_source")]
-        public MlnNotificationSource operation_source;
+        public mln_wake frame_wake;
 
-        [NativeTypeName("mln_notification_source")]
-        public MlnNotificationSource frame_source;
-
-        [NativeTypeName("mln_notification_source")]
-        public MlnNotificationSource driver_work_source;
+        public mln_wake driver_work_wake;
     }
 
     internal partial struct mln_render_session_capabilities
@@ -226,7 +221,7 @@ namespace Maplibre.NativeFfi.Internal.C
 
         public mln_opengl_context_ownership ownership;
 
-        [NativeTypeName("__AnonymousRecord_render_target_L290_C3")]
+        [NativeTypeName("__AnonymousRecord_render_target_L287_C3")]
         public _data_e__Union data;
 
         [StructLayout(LayoutKind.Explicit)]

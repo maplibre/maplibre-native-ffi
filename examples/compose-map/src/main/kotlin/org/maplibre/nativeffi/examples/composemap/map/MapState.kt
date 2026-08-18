@@ -14,7 +14,6 @@ import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.map.MapOptions
 import org.maplibre.nativeffi.map.MapSize
-import org.maplibre.nativeffi.runtime.ReadyEndpoint
 import org.maplibre.nativeffi.runtime.RuntimeEventMask
 import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 import org.maplibre.nativeffi.runtime.RuntimeEventType
@@ -22,12 +21,8 @@ import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
 
 /** Runtime and map state driven by the core-owned runtime worker. */
-internal class MapState(
-  initialExtent: SurfaceExtent,
-  private val scheduleNotificationDrain: () -> Unit,
-  private val requestRender: () -> Unit,
-) : AutoCloseable {
-  private val notificationPending = AtomicBoolean(false)
+internal class MapState(initialExtent: SurfaceExtent, private val requestRender: () -> Unit) :
+  AutoCloseable {
   private var closed = false
   private var currentSize =
     MapSize(initialExtent.width, initialExtent.height, initialExtent.scaleFactor)
@@ -45,32 +40,27 @@ internal class MapState(
     get() = ownedMap
 
   init {
-    runtime.setNotificationCallback {
-      if (notificationPending.compareAndSet(false, true)) {
-        scheduleNotificationDrain()
-      }
-    }
     try {
       ownedMap = runSuspend {
         MapHandle.create(
-          runtime,
-          MapOptions().apply {
-            width = initialExtent.width
-            height = initialExtent.height
-            scaleFactor = initialExtent.scaleFactor
-            mapMode = MapMode.CONTINUOUS
-            eventMask =
-              RuntimeEventMask.MAP_RENDER_UPDATE_AVAILABLE +
-                RuntimeEventMask.MAP_RENDER_FRAME_FINISHED
-          },
-        )
+            runtime,
+            MapOptions().apply {
+              width = initialExtent.width
+              height = initialExtent.height
+              scaleFactor = initialExtent.scaleFactor
+              mapMode = MapMode.CONTINUOUS
+              eventMask =
+                RuntimeEventMask.MAP_RENDER_UPDATE_AVAILABLE +
+                  RuntimeEventMask.MAP_RENDER_FRAME_FINISHED
+            },
+          )
+          .await()
       }
       map.setStyleUrl(STYLE_URL)
       map.updateCamera(CameraUpdate(camera = initialCamera))
     } catch (error: Throwable) {
-      runtime.clearNotificationCallback()
-      if (::ownedMap.isInitialized) runSuspend { ownedMap.close() }
-      runSuspend { runtime.close() }
+      if (::ownedMap.isInitialized) ownedMap.close()
+      runtime.close()
       throw error
     }
   }
@@ -158,16 +148,9 @@ internal class MapState(
     }
   }
 
-  /** Drains owned readiness and event batches on the native-surface producer thread. */
-  fun drainNotifications() {
-    if (!notificationPending.getAndSet(false)) return
-    do {
-      val ready = runtime.drainReady()
-      if (ready.any { it.kind == ReadyEndpoint.Kind.DRIVER_WORK }) requestRender()
-      if (ready.any { it.kind == ReadyEndpoint.Kind.RUNTIME_EVENTS } && drainEvents()) {
-        requestRender()
-      }
-    } while (notificationPending.getAndSet(false))
+  /** Drains runtime events during the native-surface producer's render turn. */
+  fun pollEvents() {
+    if (drainEvents()) requestRender()
   }
 
   private fun update(camera: CameraOptions, durationMs: Double? = null) {
@@ -202,11 +185,10 @@ internal class MapState(
   override fun close() {
     if (closed) return
     closed = true
-    runtime.clearNotificationCallback()
     try {
-      runSuspend { map.close() }
+      map.close()
     } finally {
-      runSuspend { runtime.close() }
+      runtime.close()
     }
   }
 
@@ -217,7 +199,7 @@ internal class MapState(
   }
 }
 
-/** A one-bit frame request shared with notification callbacks. */
+/** A one-bit frame request shared with native wake callbacks. */
 internal class RenderRequest {
   private val value = AtomicBoolean(true)
 

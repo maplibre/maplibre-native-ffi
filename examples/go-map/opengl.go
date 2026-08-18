@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"runtime"
@@ -23,15 +24,13 @@ type renderTarget interface {
 	DriveFrame() (bool, error)
 }
 
-func serviceOperation(session *maplibre.RenderSessionHandle, operation *maplibre.OperationHandle[struct{}]) error {
-	defer operation.Release()
+func serviceFuture(session *maplibre.RenderSessionHandle, future *maplibre.Future[struct{}]) error {
 	for {
-		done, err := operation.Poll()
-		if err != nil {
+		select {
+		case <-future.Done():
+			_, err := future.Await(context.Background())
 			return err
-		}
-		if done {
-			return operation.Finish()
+		default:
 		}
 		if _, err := session.ServiceDriverWork(16); err != nil {
 			return err
@@ -40,11 +39,11 @@ func serviceOperation(session *maplibre.RenderSessionHandle, operation *maplibre
 }
 
 func detachCallerSession(session *maplibre.RenderSessionHandle) error {
-	operation, err := session.DetachStart()
+	completed, err := session.Detach()
 	if err != nil {
 		return err
 	}
-	return serviceOperation(session, operation)
+	return serviceFuture(session, completed)
 }
 
 func closeCallerSession(session *maplibre.RenderSessionHandle) error {
@@ -373,7 +372,7 @@ func newOpenGLOwnedTextureTarget(context *openGLContext, v viewport, m *maplibre
 	)
 	if err == nil {
 		target.session = session
-		err = serviceOperation(session, operation)
+		err = serviceFuture(session, operation)
 	}
 	if err != nil {
 		_ = target.Close()
@@ -401,11 +400,11 @@ func (target *openGLOwnedTextureTarget) Resize(v viewport) error {
 	if err := target.compositor.Resize(v); err != nil {
 		return err
 	}
-	operation, err := target.session.ResizeStart(v.extent())
+	operation, err := target.session.Resize(v.extent())
 	if err != nil {
 		return err
 	}
-	return serviceOperation(target.session, operation)
+	return serviceFuture(target.session, operation)
 }
 
 func (target *openGLOwnedTextureTarget) FinishFrame() error {
@@ -470,7 +469,7 @@ func newOpenGLBorrowedTextureTarget(context *openGLContext, v viewport, m *mapli
 	}, options)
 	if err == nil {
 		target.session = session
-		err = serviceOperation(session, operation)
+		err = serviceFuture(session, operation)
 	}
 	if err != nil {
 		_ = target.Close()
@@ -512,7 +511,7 @@ func (target *openGLBorrowedTextureTarget) Resize(v viewport) error {
 	if err != nil {
 		return err
 	}
-	operation, err := target.session.SetOpenGLBorrowedTextureTargetStart(maplibre.OpenGLBorrowedTextureDescriptor{
+	operation, err := target.session.SetOpenGLBorrowedTextureTarget(maplibre.OpenGLBorrowedTextureDescriptor{
 		Extent:         v.extent(),
 		PhysicalWidth:  v.physicalWidth,
 		PhysicalHeight: v.physicalHeight,
@@ -521,7 +520,7 @@ func (target *openGLBorrowedTextureTarget) Resize(v viewport) error {
 		Target:         glTexture2D,
 	})
 	if err == nil {
-		err = serviceOperation(target.session, operation)
+		err = serviceFuture(target.session, operation)
 	}
 	if err != nil {
 		glDeleteTexture(replacement)
@@ -595,7 +594,7 @@ func newOpenGLSurfaceTarget(context *openGLContext, v viewport, m *maplibre.MapH
 	)
 	if err == nil {
 		target.session = session
-		err = serviceOperation(session, operation)
+		err = serviceFuture(session, operation)
 	}
 	if err != nil {
 		_ = target.Close()
@@ -626,23 +625,23 @@ func (target *openGLSurfaceTarget) Resize(v viewport) error {
 		return err
 	}
 	if target.context.surface() == outgoing {
-		operation, err := target.session.ResizeStart(v.extent())
+		operation, err := target.session.Resize(v.extent())
 		if err != nil {
 			return err
 		}
-		return serviceOperation(target.session, operation)
+		return serviceFuture(target.session, operation)
 	}
 	descriptor, err := target.context.descriptor(false)
 	if err != nil {
 		return err
 	}
-	operation, err := target.session.SetOpenGLSurfaceTargetStart(maplibre.OpenGLSurfaceDescriptor{
+	operation, err := target.session.SetOpenGLSurfaceTarget(maplibre.OpenGLSurfaceDescriptor{
 		Extent:  v.extent(),
 		Context: descriptor,
 		Surface: target.context.surface(),
 	})
 	if err == nil {
-		err = serviceOperation(target.session, operation)
+		err = serviceFuture(target.session, operation)
 	}
 	if err != nil {
 		_ = detachCallerSession(target.session)

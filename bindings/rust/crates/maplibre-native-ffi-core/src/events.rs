@@ -194,7 +194,7 @@ pub enum CommandDisposition {
 }
 
 impl CommandDisposition {
-    fn from_native(raw: u32) -> Self {
+    pub fn from_native(raw: u32) -> Self {
         match raw {
             sys::MLN_COMMAND_DISPOSITION_COMMITTED => Self::Committed,
             sys::MLN_COMMAND_DISPOSITION_SUPERSEDED => Self::Superseded,
@@ -203,17 +203,6 @@ impl CommandDisposition {
             value => Self::Unknown(value),
         }
     }
-}
-
-/// Completion payload for one accepted runtime or map command.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct CommandFinishedEvent {
-    pub command_id: u64,
-    pub disposition: CommandDisposition,
-    /// The map snapshot generation the commit published, or zero when the
-    /// command committed no generation. A later map snapshot that reports
-    /// this generation or a newer one observes the commit.
-    pub generation: u64,
 }
 
 /// Payload of a type this version does not define, preserved for forward
@@ -239,7 +228,6 @@ pub enum RuntimeEventPayload {
     OfflineRegionResponseError(OfflineRegionResponseErrorEvent),
     OfflineRegionTileCountLimit(OfflineRegionTileCountLimitEvent),
     CameraTransitionFinished(CameraTransitionFinishedEvent),
-    CommandFinished(CommandFinishedEvent),
     Unknown(UnknownRuntimeEventPayload),
 }
 
@@ -464,14 +452,6 @@ pub unsafe fn payload_from_view(view: &NativeEventView<'_>) -> RuntimeEventPaylo
             sys::MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED => {
                 RuntimeEventPayload::CameraTransitionFinished(CameraTransitionFinishedEvent {
                     transition_id: raw.payload.camera_transition_finished.transition_id,
-                })
-            }
-            sys::MLN_RUNTIME_EVENT_PAYLOAD_COMMAND_FINISHED => {
-                let payload = raw.payload.command_finished;
-                RuntimeEventPayload::CommandFinished(CommandFinishedEvent {
-                    command_id: payload.command_id,
-                    disposition: CommandDisposition::from_native(payload.disposition),
-                    generation: payload.generation,
                 })
             }
             raw_type => RuntimeEventPayload::Unknown(UnknownRuntimeEventPayload {

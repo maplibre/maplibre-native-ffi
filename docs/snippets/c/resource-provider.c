@@ -44,13 +44,14 @@ static uint32_t serve_bundled_asset(
 }
 
 // #region install
-void install_provider(mln_runtime runtime, asset_store* store) {
+mln_status install_provider(
+  mln_runtime runtime, asset_store* store, const mln_completion* completion
+) {
   const mln_resource_provider provider = {
     .size = sizeof(provider),
     .callback = serve_bundled_asset,
     .user_data = store,
   };
-  uint64_t command_id = 0;
-  mln_runtime_set_resource_provider(runtime, &provider, &command_id);
+  return mln_runtime_set_resource_provider(runtime, &provider, completion);
 }
 // #endregion install

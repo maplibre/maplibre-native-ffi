@@ -52,14 +52,8 @@ auto handle_kind_name(std::uint8_t kind) noexcept -> const char* {
       return "mln_resource_request_handle";
     case HandleKind::StyleStringList:
       return "mln_style_string_list";
-    case HandleKind::Operation:
-      return "mln_operation";
-    case HandleKind::NotificationSource:
-      return "mln_notification_source";
     case HandleKind::EventBatch:
       return "mln_event_batch";
-    case HandleKind::ReadyBatch:
-      return "mln_ready_batch";
     case HandleKind::AdapterResourceRequestQueue:
       return "mln_adapter_resource_request_queue";
     case HandleKind::AdapterLogQueue:

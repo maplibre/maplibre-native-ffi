@@ -50,7 +50,6 @@ public enum RuntimeEventType: Sendable, Hashable {
   case offlineRegionResponseError
   case offlineRegionTileCountLimitExceeded
   case mapCameraTransitionFinished
-  case commandFinished
   case unknown(UInt32)
 
   public static func fromNative(_ rawValue: UInt32) -> Self {
@@ -77,7 +76,6 @@ public enum RuntimeEventType: Sendable, Hashable {
     case 20: .offlineRegionResponseError
     case 21: .offlineRegionTileCountLimitExceeded
     case 23: .mapCameraTransitionFinished
-    case 24: .commandFinished
     default: .unknown(rawValue)
     }
   }
@@ -149,8 +147,6 @@ public struct RuntimeEventMask: OptionSet, Sendable, Hashable {
     native(MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR)
   public static let offlineRegionTileCountLimitExceeded =
     native(MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED)
-  public static let commandFinished =
-    native(MLN_RUNTIME_EVENT_MASK_COMMAND_FINISHED)
 
   /// Every map-originated event type, which is what
   /// ``MapHandle/setEventMask(_:)`` reads.
@@ -392,21 +388,6 @@ public struct CameraTransitionFinishedEvent: Equatable, Sendable {
   }
 }
 
-public struct CommandFinishedEvent: Equatable, Sendable {
-  public let commandId: UInt64
-  public let disposition: UInt32
-  /// The map snapshot generation the commit published, or zero when the
-  /// command committed no generation. A later ``MapHandle/snapshot()`` whose
-  /// ``MapSnapshot/generation`` is at or past this value observes the commit.
-  public let generation: UInt64
-
-  init(native: NativeCommandFinishedEvent) {
-    commandId = native.commandId
-    disposition = native.disposition
-    generation = native.generation
-  }
-}
-
 public enum RuntimeEventPayload: Equatable, Sendable {
   case none
   case renderFrame(RenderFrameEvent)
@@ -416,7 +397,6 @@ public enum RuntimeEventPayload: Equatable, Sendable {
   case offlineRegionResponseError(OfflineRegionResponseErrorEvent)
   case offlineRegionTileCountLimit(OfflineRegionTileCountLimitEvent)
   case cameraTransitionFinished(CameraTransitionFinishedEvent)
-  case commandFinished(CommandFinishedEvent)
   /// A payload kind this version of the binding does not name, carrying the
   /// payload's fixed byte window so a host forwards it unchanged.
   case unknown(type: UInt32, bytes: [UInt8])
@@ -448,8 +428,6 @@ public enum RuntimeEventPayload: Equatable, Sendable {
         .cameraTransitionFinished(
           CameraTransitionFinishedEvent(native: event)
         )
-    case let .commandFinished(event):
-      self = .commandFinished(CommandFinishedEvent(native: event))
     case let .unknown(type, bytes):
       self = .unknown(type: type, bytes: bytes)
     }
@@ -500,14 +478,15 @@ public struct RuntimeEventBatch: Equatable, Sendable {
 
 public final class RuntimeHandle: @unchecked Sendable {
   private let handle: NativeHandleBox<NativeRuntimeHandle>
-  private let notificationReceiver: NativeNotificationReceiver
+  private let eventWake: NativeWakeState
 
   public init(options: RuntimeOptions = RuntimeOptions()) throws {
-    let receiver = try mapNativeFailure { try NativeNotificationReceiver() }
+    let eventWake = NativeWakeState()
+    let wake = eventWake.makeDescriptor()
     do {
       let runtime = try mapNativeFailure {
         try options.nativeInput.withNativeOptions(
-          notificationSource: receiver.source
+          eventWake: wake
         ) { nativeOptions in
           try NativeRuntime.create(nativeOptions)
         }
@@ -516,9 +495,9 @@ public final class RuntimeHandle: @unchecked Sendable {
         typeName: "RuntimeHandle",
         handle: runtime
       )
-      notificationReceiver = receiver
+      self.eventWake = eventWake
     } catch {
-      try? receiver.close()
+      eventWake.releaseRejectedDescriptor()
       throw error
     }
   }
@@ -531,7 +510,6 @@ public final class RuntimeHandle: @unchecked Sendable {
     try mapNativeFailure {
       try handle.closeOnce { try NativeRuntime.release($0) }
     }
-    try mapNativeFailure { try notificationReceiver.close() }
   }
 
   func closeBlockingForTests() throws {
@@ -540,51 +518,16 @@ public final class RuntimeHandle: @unchecked Sendable {
 
   /// Waits until every command accepted before this call has committed.
   public func barrier() async throws {
-    let operation = try mapNativeFailure {
-      try NativeRuntime.barrierStart(requireLiveHandle())
-    }
-    defer { mln_operation_release(operation.raw) }
     try await mapNativeFailure {
-      try await NativeOperation.waitForSuccess(
-        operation,
-        receiver: notificationReceiver
-      )
+      let runtime = try requireLiveHandle()
+      try await NativeCompletion.unit { completion in
+        mln_runtime_barrier(runtime.raw, completion)
+      }
     }
   }
 
   func requireLiveHandle() throws -> NativeRuntimeHandle {
     try handle.requireLive()
-  }
-
-  func forgetOperation(_ operation: NativeOperationHandle) {
-    notificationReceiver.forget(operation)
-  }
-
-  func waitForOperation(_ operation: NativeOperationHandle) async throws {
-    try await mapNativeFailure {
-      try await NativeOperation.waitForSuccess(
-        operation,
-        receiver: notificationReceiver
-      )
-    }
-  }
-
-  var notificationSourceForOperations: mln_notification_source {
-    notificationReceiver.source
-  }
-
-  func setRenderFramesHandler(
-    for session: NativeRenderSessionHandle,
-    _ handler: (@Sendable () -> Void)?
-  ) {
-    notificationReceiver.setRenderFramesHandler(for: session, handler)
-  }
-
-  func setDriverWorkHandler(
-    for session: NativeRenderSessionHandle,
-    _ handler: (@Sendable () -> Void)?
-  ) {
-    notificationReceiver.setDriverWorkHandler(for: session, handler)
   }
 
   /// Drains this runtime's queued events, copying every event out of the owned
@@ -609,7 +552,7 @@ public final class RuntimeHandle: @unchecked Sendable {
   public func setEventReadyHandler(
     _ handler: (@Sendable () -> Void)?
   ) {
-    notificationReceiver.setRuntimeEventsHandler(handler)
+    eventWake.setHandler(handler)
   }
 
   /// Selects which runtime-originated event types this runtime queues.
@@ -634,45 +577,47 @@ public final class RuntimeHandle: @unchecked Sendable {
   public func setResourceTransform(_ callback: @escaping @Sendable (
     ResourceTransformRequest
   )
-    -> String?) throws -> UInt64
+    -> String?) async throws -> CommandCompletion
   {
     let replacement = NativeResourceTransformState {
       callback(ResourceTransformRequest(native: $0))
     }
-    return try replacement.withDescriptor { try submitCallbackSet(
+    let future = try replacement.withDescriptor { try startCallbackSet(
       $0,
       mln_runtime_set_resource_transform
     ) }
+    return try await mapNativeFailure { try await future.value() }
   }
 
   @discardableResult
-  public func clearResourceTransform() throws -> UInt64 {
-    try submitCallbackClear(mln_runtime_clear_resource_transform)
+  public func clearResourceTransform() async throws -> CommandCompletion {
+    try await submitCallbackClear(mln_runtime_clear_resource_transform)
   }
 
   @discardableResult
   public func setHttpHeaderTransform(_ callback: @escaping @Sendable (
     HttpHeaderTransformRequest
   )
-    -> [HttpHeader]) throws -> UInt64
+    -> [HttpHeader]) async throws -> CommandCompletion
   {
     let replacement = NativeHttpHeaderTransformState(callback)
-    return try replacement.withDescriptor { try submitCallbackSet(
+    let future = try replacement.withDescriptor { try startCallbackSet(
       $0,
       mln_runtime_set_http_header_transform
     ) }
+    return try await mapNativeFailure { try await future.value() }
   }
 
   @discardableResult
-  public func clearHttpHeaderTransform() throws -> UInt64 {
-    try submitCallbackClear(mln_runtime_clear_http_header_transform)
+  public func clearHttpHeaderTransform() async throws -> CommandCompletion {
+    try await submitCallbackClear(mln_runtime_clear_http_header_transform)
   }
 
   @discardableResult
   public func setResourceProvider(_ callback: @escaping @Sendable (
     ResourceRequest,
     ResourceRequestHandle
-  ) -> ResourceProviderDecision) throws -> UInt64 {
+  ) -> ResourceProviderDecision) async throws -> CommandCompletion {
     let replacement = NativeResourceProviderState { request, handle in
       switch callback(
         ResourceRequest(native: request),
@@ -682,43 +627,68 @@ public final class RuntimeHandle: @unchecked Sendable {
       case .handle: return 1
       }
     }
-    return try replacement.withDescriptor { try submitCallbackSet(
+    let future = try replacement.withDescriptor { try startCallbackSet(
       $0,
       mln_runtime_set_resource_provider
     ) }
+    return try await mapNativeFailure { try await future.value() }
   }
 
   @discardableResult
-  public func clearResourceProvider() throws -> UInt64 {
-    try submitCallbackClear(mln_runtime_clear_resource_provider)
+  public func clearResourceProvider() async throws -> CommandCompletion {
+    try await submitCallbackClear(mln_runtime_clear_resource_provider)
   }
 
-  private func submitCallbackSet<Descriptor>(
+  private func startCallbackSet<Descriptor>(
     _ descriptor: UnsafePointer<Descriptor>,
     _ submit: (
       mln_runtime,
       UnsafePointer<Descriptor>,
-      UnsafeMutablePointer<UInt64>
+      UnsafePointer<mln_completion>
     ) -> mln_status
-  ) throws -> UInt64 {
+  ) throws -> NativeFuture<CommandCompletion> {
     try mapNativeFailure {
-      try NativeMemory.withTemporary(UInt64(0)) { try checkStatus(submit(
-        handle.requireLive().raw,
-        descriptor,
-        $0
-      )) }.value
+      let runtime = try handle.requireLive()
+      return try NativeCompletion.startCommand { completion in
+        submit(runtime.raw, descriptor, completion)
+      }
     }
   }
 
   private func submitCallbackClear(_ submit: (
     mln_runtime,
-    UnsafeMutablePointer<UInt64>
-  ) -> mln_status) throws -> UInt64 {
-    try mapNativeFailure {
-      try NativeMemory.withTemporary(UInt64(0)) { try checkStatus(submit(
-        handle.requireLive().raw,
-        $0
-      )) }.value
+    UnsafePointer<mln_completion>
+  ) -> mln_status) async throws -> CommandCompletion {
+    try await mapNativeFailure {
+      let runtime = try handle.requireLive()
+      return try await NativeCompletion.command { completion in
+        submit(runtime.raw, completion)
+      }
     }
   }
+}
+
+public enum CommandDisposition: Sendable, Hashable {
+  case committed
+  case superseded
+  case failed
+  case cancelled
+  case unknown(UInt32)
+
+  static func fromNative(_ raw: UInt32) -> Self {
+    switch raw {
+    case MLN_COMMAND_DISPOSITION_COMMITTED.rawValue: .committed
+    case MLN_COMMAND_DISPOSITION_SUPERSEDED.rawValue: .superseded
+    case MLN_COMMAND_DISPOSITION_FAILED.rawValue: .failed
+    case MLN_COMMAND_DISPOSITION_CANCELLED.rawValue: .cancelled
+    default: .unknown(raw)
+    }
+  }
+}
+
+public struct CommandCompletion: Sendable, Hashable {
+  public let disposition: CommandDisposition
+  public let generation: UInt64
+  public let rawStatus: Int32
+  public let diagnostic: String
 }

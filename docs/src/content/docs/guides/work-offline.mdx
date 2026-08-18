@@ -22,18 +22,10 @@ contains every resource that a defined area needs and remains outside the
 ambient budget. Download a region when the host must draw a known area without
 a network.
 
-Database operations are asynchronous. A start call validates its arguments,
-returns an operation handle, and queues the work. Poll or wait on that common
-handle to detect completion. The operation's terminal status is separate from
-the start call's status, and its diagnostic bytes describe a terminal failure.
-Copy diagnostic bytes that the host keeps.
-
-An operation publishes readiness through the notification source that the
-runtime received at creation. Cancellation is available through the common
-operation API when the underlying work supports it. Inspect terminal status and
-diagnostics before taking a typed result or finishing an operation whose result
-is not needed. A successful take or finish consumes the operation handle.
-Release is for abandoning a pending operation or an untaken completed result.
+Database operations are asynchronous. A submission validates its arguments and
+queues the work. Each accepted submission invokes its one-shot completion with
+the terminal status, diagnostic, and any borrowed result. Copy values that must
+outlive the callback.
 
 ## Download a region
 
@@ -55,10 +47,8 @@ call returns.
 
 <Code code={region(offlineRegion, "create")} lang="c" title="offline-region.c" />
 
-Taking the result produces a snapshot handle that contains the region record. A
-failed take before ownership transfers leaves the result available to retry.
-After a successful take or discard, the operation remains available for status
-and diagnostic inspection until the host releases it.
+The completion receives the region record directly. Its definition and metadata
+are borrowed for the callback, while the numeric region ID remains valid.
 
 <Code code={region(offlineRegion, "result")} lang="c" title="offline-region.c" />
 
@@ -90,8 +80,8 @@ operation covers the whole database.
 
 <Code code={region(offlineStorage, "list")} lang="c" title="offline-storage.c" />
 
-Taking the result produces a list handle that the host owns. Destroy that handle
-after reading the entries.
+The list completion borrows a contiguous array of region records. Copy the
+records and nested definition or metadata values that the host keeps.
 
 <Code code={region(offlineStorage, "result")} lang="c" title="offline-storage.c" />
 

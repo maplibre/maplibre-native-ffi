@@ -1,8 +1,9 @@
 use std::error::Error;
+use std::time::{Duration, Instant};
 
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
-use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy};
+use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::{Window, WindowAttributes, WindowId};
 
 use crate::app::App;
@@ -16,8 +17,8 @@ pub fn run(
     mode: Mode,
     backends: maplibre_native_ffi::RenderBackendMask,
 ) -> Result<(), Box<dyn Error>> {
-    let event_loop = EventLoop::<()>::with_user_event().build()?;
-    let mut shell = Shell::new(mode, backends, event_loop.create_proxy());
+    let event_loop = EventLoop::new()?;
+    let mut shell = Shell::new(mode, backends);
     let run_result = event_loop.run_app(&mut shell);
     if let Some(error) = shell.startup_error {
         return Err(error);
@@ -28,21 +29,15 @@ pub fn run(
 struct Shell {
     mode: Mode,
     backends: maplibre_native_ffi::RenderBackendMask,
-    event_loop_proxy: EventLoopProxy<()>,
     app: Option<App>,
     startup_error: Option<Box<dyn Error>>,
 }
 
 impl Shell {
-    fn new(
-        mode: Mode,
-        backends: maplibre_native_ffi::RenderBackendMask,
-        event_loop_proxy: EventLoopProxy<()>,
-    ) -> Self {
+    fn new(mode: Mode, backends: maplibre_native_ffi::RenderBackendMask) -> Self {
         Self {
             mode,
             backends,
-            event_loop_proxy,
             app: None,
             startup_error: None,
         }
@@ -51,7 +46,7 @@ impl Shell {
     fn startup(&mut self, event_loop: &ActiveEventLoop) -> Result<(), Box<dyn Error>> {
         let (window, graphics) =
             GraphicsContext::create_window(event_loop, window_attributes(), self.backends)?;
-        let app = App::new(window, graphics, self.mode, self.event_loop_proxy.clone())?;
+        let app = App::new(window, graphics, self.mode)?;
         app.print_status();
         self.app = Some(app);
         Ok(())
@@ -60,7 +55,9 @@ impl Shell {
 
 impl ApplicationHandler for Shell {
     fn new_events(&mut self, event_loop: &ActiveEventLoop, _cause: winit::event::StartCause) {
-        event_loop.set_control_flow(ControlFlow::Wait);
+        event_loop.set_control_flow(ControlFlow::WaitUntil(
+            Instant::now() + Duration::from_millis(16),
+        ));
     }
 
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {

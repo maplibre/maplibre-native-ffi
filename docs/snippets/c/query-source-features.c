@@ -8,18 +8,20 @@ static mln_buffer_view view(const char* text) {
   return (mln_buffer_view){.data = text, .size = strlen(text)};
 }
 
-static void read_features(mln_queried_feature_list result) {
+static void read_features(
+  void* user_data, const mln_completion_result* result
+) {
+  (void)user_data;
   // #region read
-  size_t count = 0;
-  if (mln_queried_feature_list_count(result, &count) != MLN_STATUS_OK) return;
-  if (count == 0) return;
-  mln_queried_feature hit = mln_queried_feature_default();
-  if (mln_queried_feature_list_get(result, 0, &hit) != MLN_STATUS_OK) return;
-  // Copy hit.feature and any identifier or state view you keep.
+  if (result->status != MLN_STATUS_OK || result->value_count == 0) return;
+  const mln_queried_feature* features = result->value;
+  const mln_queried_feature hit = features[0];
+  (void)hit;
+  // Copy hit.feature and any identifier or state view you keep before return.
   // #endregion read
 }
 
-void list_source_features(mln_render_session session) {
+mln_status list_source_features(mln_render_session session) {
   // #region options
   const mln_buffer_view source_layers[] = {view("poi")};
   mln_source_feature_query_options options =
@@ -30,27 +32,12 @@ void list_source_features(mln_render_session session) {
   // #endregion options
 
   // #region query
-  mln_operation operation = MLN_HANDLE_NULL;
-  mln_status queried = mln_render_session_query_source_features_start(
-    session, view("places"), &options, &operation
+  const mln_completion completion = {
+    .size = sizeof(mln_completion),
+    .callback = read_features,
+  };
+  return mln_render_session_query_source_features(
+    session, view("places"), &options, &completion
   );
-  bool completed = false;
-  if (queried == MLN_STATUS_OK) {
-    queried = mln_operation_wait(operation, -1, &completed);
-  }
-  mln_status terminal = MLN_STATUS_INVALID_STATE;
-  if (queried == MLN_STATUS_OK && completed) {
-    queried = mln_operation_get_status(operation, &terminal);
-  }
-  mln_queried_feature_list result = MLN_HANDLE_NULL;
-  if (queried == MLN_STATUS_OK) queried = terminal;
-  if (queried == MLN_STATUS_OK) {
-    queried = mln_render_query_features_take_result(operation, &result);
-  }
-  mln_operation_release(operation);
-  if (queried != MLN_STATUS_OK) return;
-
-  read_features(result);
-  mln_queried_feature_list_destroy(result);
   // #endregion query
 }

@@ -16,27 +16,18 @@
 #include "c_api/boundary.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "maplibre_native_c.h"
-#include "operation/operation.hpp"
 #include "runtime/runtime.hpp"
 
 auto mln_map_options_default(void) noexcept -> mln_map_options {
   return mln::core::map_options_default();
 }
 
-auto mln_map_create_start(
+auto mln_map_create(
   mln_runtime runtime, const mln_map_options* options,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::create_map_start(runtime, options, out_operation);
-  });
-}
-
-auto mln_map_create_take_result(
-  mln_operation operation, mln_map* out_map
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::create_map_take_result(operation, out_map);
+    return mln::core::create_map_start(runtime, options, completion);
   });
 }
 
@@ -54,32 +45,33 @@ auto mln_map_snapshot_get(mln_map map, mln_map_snapshot* out_snapshot) noexcept
 }
 
 auto mln_map_resize(
-  mln_map map, mln_logical_extent extent, uint64_t* out_command_id
+  mln_map map, mln_logical_extent extent, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::map_resize(map, extent, out_command_id);
+    return mln::core::map_resize(map, extent, completion);
   });
 }
 
-auto mln_map_request_repaint(mln_map map, uint64_t* out_command_id) noexcept
-  -> mln_status {
+auto mln_map_request_repaint(
+  mln_map map, const mln_completion* completion
+) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::map_request_repaint(map, out_command_id);
+    return mln::core::map_request_repaint(map, completion);
   });
 }
 
-auto mln_map_request_still_image_start(
-  mln_map map, mln_operation* out_operation
+auto mln_map_request_still_image(
+  mln_map map, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::map_request_still_image_start(map, out_operation);
+    return mln::core::map_request_still_image_start(map, completion);
   });
 }
 
 auto mln_map_set_event_mask(
-  mln_map map, uint64_t mask, uint64_t* out_command_id
+  mln_map map, uint64_t mask, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::map_set_event_mask(map, mask, out_command_id);
+    return mln::core::map_set_event_mask(map, mask, completion);
   });
 }

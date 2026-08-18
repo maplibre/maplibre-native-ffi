@@ -87,14 +87,9 @@ public sealed class ResourceTransformTests
         var failInstall = false;
         ResourceTransformState? failedReplacement = null;
         using var install = RuntimeHandle.UseResourceCallbackInstallMethodsForTest(
-            (_, _, commandId) =>
+            (_, _, _) => mln_status.MLN_STATUS_OK,
+            (_, transform, _) =>
             {
-                *commandId = 1;
-                return mln_status.MLN_STATUS_OK;
-            },
-            (_, transform, commandId) =>
-            {
-                *commandId = 1;
                 if (!failInstall)
                 {
                     return mln_status.MLN_STATUS_OK;
@@ -106,11 +101,14 @@ public sealed class ResourceTransformTests
             }
         );
         using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
-        runtime.SetResourceTransform(request => request.Url + "?first");
+        runtime.SetResourceTransformAsync(request => request.Url + "?first");
 
         failInstall = true;
         Assert.Throws<InvalidStateException>(() =>
-            runtime.SetResourceTransform(request => request.Url + "?second")
+            runtime
+                .SetResourceTransformAsync(request => request.Url + "?second")
+                .GetAwaiter()
+                .GetResult()
         );
 
         Assert.NotNull(failedReplacement);
@@ -123,8 +121,8 @@ public sealed class ResourceTransformTests
     {
         using var runtime = TestHandles.CreateRuntime(new RuntimeOptions());
 
-        runtime.SetResourceTransform(request => request.Url + "?first");
-        runtime.SetResourceTransform(request => request.Url + "?second");
-        runtime.ClearResourceTransform();
+        runtime.SetResourceTransformAsync(request => request.Url + "?first");
+        runtime.SetResourceTransformAsync(request => request.Url + "?second");
+        runtime.ClearResourceTransformAsync();
     }
 }

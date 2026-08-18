@@ -12,7 +12,6 @@ import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.map.MapOptions
 import org.maplibre.nativeffi.runtime.CommandDisposition
-import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
 import org.maplibre.nativeffi.runtime.runSuspendTest
@@ -44,11 +43,11 @@ class GeoJsonSourceDataHandleTest {
   fun onePreparedHandleInstallsOnManySources(): Unit = runSuspendTest {
     withMap { _, map ->
       GeoJsonSourceDataHandle.create(featureCollection(), baseOptions()).use { data ->
-        map.addGeoJsonSourceData("places-a", data)
-        map.addGeoJsonSourceData("places-b", data)
-        assertEquals(SourceType.GEOJSON, map.styleSourceInfo("places-a")?.type)
-        assertEquals(SourceType.GEOJSON, map.styleSourceInfo("places-b")?.type)
-        map.setGeoJsonSourceData("places-a", data)
+        map.addGeoJsonSourceData("places-a", data).await()
+        map.addGeoJsonSourceData("places-b", data).await()
+        assertEquals(SourceType.GEOJSON, map.styleSourceInfo("places-a").await()?.type)
+        assertEquals(SourceType.GEOJSON, map.styleSourceInfo("places-b").await()?.type)
+        map.setGeoJsonSourceData("places-a", data).await()
       }
     }
   }
@@ -57,30 +56,32 @@ class GeoJsonSourceDataHandleTest {
   fun releaseNeverInvalidatesAnInstalledSource(): Unit = runSuspendTest {
     withMap { _, map ->
       val data = GeoJsonSourceDataHandle.create(featureCollection())
-      map.addGeoJsonSourceData("places", data)
+      map.addGeoJsonSourceData("places", data).await()
       data.close()
 
       // The source keeps its own reference and remains usable after the handle is gone.
-      assertEquals(SourceType.GEOJSON, map.styleSourceInfo("places")?.type)
+      assertEquals(SourceType.GEOJSON, map.styleSourceInfo("places").await()?.type)
       GeoJsonSourceDataHandle.create(featureCollection()).use { replacement ->
-        map.setGeoJsonSourceData("places", replacement)
+        map.setGeoJsonSourceData("places", replacement).await()
       }
 
       // A released handle is no longer installable.
-      assertFailsWith<InvalidStateException> { map.addGeoJsonSourceData("more-places", data) }
+      assertFailsWith<InvalidStateException> {
+        map.addGeoJsonSourceData("more-places", data).await()
+      }
     }
   }
 
   @Test
   fun setRejectsDataPreparedWithMismatchedOptions(): Unit = runSuspendTest {
-    withMap { runtime, map ->
+    withMap { _, map ->
       GeoJsonSourceDataHandle.create(featureCollection(), baseOptions()).use { data ->
-        map.addGeoJsonSourceData("places", data)
+        map.addGeoJsonSourceData("places", data).await()
       }
 
       GeoJsonSourceDataHandle.create(featureCollection(), baseOptions().copy { buffer = 32 }).use {
         mismatched ->
-        assertCommandRejected(runtime, map.setGeoJsonSourceData("places", mismatched))
+        assertCommandFailed(map.setGeoJsonSourceData("places", mismatched).await())
       }
 
       // Cluster aggregations are part of the options comparison, so data
@@ -92,52 +93,46 @@ class GeoJsonSourceDataHandleTest {
           },
         )
         .use { mismatched ->
-          assertCommandRejected(runtime, map.setGeoJsonSourceData("places", mismatched))
+          assertCommandFailed(map.setGeoJsonSourceData("places", mismatched).await())
         }
     }
   }
 
   @Test
   fun synchronousTilingOverridesALiveSource(): Unit = runSuspendTest {
-    withMap { runtime, map ->
+    withMap { _, map ->
       GeoJsonSourceDataHandle.create(featureCollection()).use { data ->
-        map.addGeoJsonSourceData("places", data)
-        map.setGeoJsonSourceSynchronousTiling("places", true)
+        map.addGeoJsonSourceData("places", data).await()
+        map.setGeoJsonSourceSynchronousTiling("places", true).await()
         GeoJsonSourceDataHandle.create(featureCollection()).use { update ->
-          map.setGeoJsonSourceData("places", update)
+          map.setGeoJsonSourceData("places", update).await()
         }
-        map.setGeoJsonSourceSynchronousTiling("places", false)
+        map.setGeoJsonSourceSynchronousTiling("places", false).await()
       }
-      assertCommandRejected(runtime, map.setGeoJsonSourceSynchronousTiling("missing", true))
+      assertCommandFailed(map.setGeoJsonSourceSynchronousTiling("missing", true).await())
     }
   }
 
-  /** Asserts the command's terminal outcome is FAILED with INVALID_ARGUMENT detail. */
-  private suspend fun assertCommandRejected(runtime: RuntimeHandle, commandId: ULong) {
-    runtime.barrier()
-    val matches =
-      runtime.drainEvents().events.filter {
-        (it.payload as? RuntimeEventPayload.CommandFinished)?.commandId == commandId
-      }
-    assertEquals(1, matches.size, "terminal outcome count for command $commandId")
-    val payload = matches.single().payload as RuntimeEventPayload.CommandFinished
-    assertEquals(CommandDisposition.FAILED, payload.disposition)
-    assertEquals(MaplibreStatus.INVALID_ARGUMENT.nativeCode, matches.single().code)
+  private fun assertCommandFailed(completion: org.maplibre.nativeffi.runtime.CommandCompletion) {
+    assertEquals(CommandDisposition.FAILED, completion.disposition)
+    assertEquals(MaplibreStatus.INVALID_ARGUMENT, completion.status)
+    assertTrue(completion.diagnostic.isNotEmpty())
   }
 
   private suspend fun withMap(block: suspend (RuntimeHandle, MapHandle) -> Unit) {
     val runtime = RuntimeHandle.create(RuntimeOptions())
     val map =
       MapHandle.create(
-        runtime,
-        MapOptions().apply {
-          width = 64
-          height = 64
-          mapMode = MapMode.STATIC
-        },
-      )
+          runtime,
+          MapOptions().apply {
+            width = 64
+            height = 64
+            mapMode = MapMode.STATIC
+          },
+        )
+        .await()
     try {
-      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
+      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray()).await()
       block(runtime, map)
     } finally {
       map.close()

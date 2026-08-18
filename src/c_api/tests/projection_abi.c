@@ -8,30 +8,18 @@
 #include "test_support.h"
 #include "unity.h"
 
-static void wait_completed(mln_operation operation) {
-  bool completed = false;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_operation_wait(operation, 10000, &completed)
-  );
-  TEST_ASSERT_TRUE(completed);
-  mln_status terminal = MLN_STATUS_INVALID_STATE;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_operation_get_status(operation, &terminal)
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, terminal);
-}
-
 static mln_map_projection create_projection(mln_map map) {
-  mln_operation operation = MLN_HANDLE_NULL;
+  mln_test_completion completion =
+    mln_test_completion_default(sizeof(mln_map_projection));
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_projection_create_start(map, &operation)
+    MLN_STATUS_OK, mln_map_projection_create(map, &completion.descriptor)
   );
-  wait_completed(operation);
   mln_map_projection projection = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_projection_create_take_result(operation, &projection)
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
+  TEST_ASSERT_TRUE(
+    mln_test_completion_copy_value(&completion, &projection, sizeof(projection))
   );
-  mln_operation_release(operation);
+  mln_test_completion_destroy(&completion);
   return projection;
 }
 
@@ -48,31 +36,21 @@ static void projection_outlives_its_source_map_and_runtime(void) {
   mln_map map = mln_test_create_map(runtime);
 
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_projection_create_start(map, NULL)
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_projection_create(map, NULL)
   );
-  mln_operation operation = UINT64_C(99);
+  mln_test_completion completion =
+    mln_test_completion_default(sizeof(mln_map_projection));
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_projection_create_start(map, &operation)
-  );
-
-  operation = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_projection_create_start(map, &operation)
+    MLN_STATUS_OK, mln_map_projection_create(map, &completion.descriptor)
   );
   mln_test_destroy_map(map);
-  wait_completed(operation);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
 
-  mln_map_projection projection = UINT64_C(77);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_projection_create_take_result(operation, &projection)
+  mln_map_projection projection = MLN_HANDLE_NULL;
+  TEST_ASSERT_TRUE(
+    mln_test_completion_copy_value(&completion, &projection, sizeof(projection))
   );
-  projection = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_projection_create_take_result(operation, &projection)
-  );
-  mln_operation_release(operation);
+  mln_test_completion_destroy(&completion);
 
   mln_test_destroy_runtime(runtime);
   const mln_camera_options source_camera = read_camera(projection);
@@ -115,10 +93,12 @@ static void creation_observes_earlier_map_camera_commands(void) {
   update.camera.latitude = 12.0;
   update.camera.longitude = 34.0;
   update.camera.zoom = 4.0;
-  uint64_t command_id = 0;
+  mln_test_completion completion = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_update_camera(map, &update, &command_id)
+    MLN_STATUS_OK, mln_map_update_camera(map, &update, &completion.descriptor)
   );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
+  mln_test_completion_destroy(&completion);
 
   // Creation is ordered after the accepted camera command, so the projection
   // copies the committed transform state.

@@ -1,6 +1,7 @@
 package org.maplibre.nativeffi.render
 
 import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.lifecycle.NativeRenderSession
@@ -12,9 +13,6 @@ import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
-import org.maplibre.nativeffi.runtime.OperationHandle
-import org.maplibre.nativeffi.runtime.OperationKind
-import org.maplibre.nativeffi.runtime.OperationResultKind
 
 /** Owned JVM FFM render-session control handle. */
 public actual class RenderSessionHandle
@@ -67,159 +65,85 @@ internal constructor(private val ownerMap: MapHandle, private val handle: Native
     return AcquiredFrameHandle(this, nativeFrame, scope)
   }
 
-  public actual fun startResize(extent: RenderTargetExtent): OperationHandle<Unit> =
-    controlOperation(NativeAccess.startResizeRenderSession(requireLiveHandle(), extent))
+  public actual fun resize(extent: RenderTargetExtent): Deferred<Unit> =
+    NativeAccess.resizeRenderSession(requireLiveHandle(), extent)
 
-  public actual fun startSetMetalSurfaceTarget(
-    descriptor: MetalSurfaceDescriptor
-  ): OperationHandle<Unit> =
-    controlOperation(NativeAccess.startSetMetalSurfaceTarget(requireLiveHandle(), descriptor))
+  public actual fun setMetalSurfaceTarget(descriptor: MetalSurfaceDescriptor): Deferred<Unit> =
+    NativeAccess.setMetalSurfaceTarget(requireLiveHandle(), descriptor)
 
-  public actual fun startSetVulkanSurfaceTarget(
-    descriptor: VulkanSurfaceDescriptor
-  ): OperationHandle<Unit> =
-    controlOperation(NativeAccess.startSetVulkanSurfaceTarget(requireLiveHandle(), descriptor))
+  public actual fun setVulkanSurfaceTarget(descriptor: VulkanSurfaceDescriptor): Deferred<Unit> =
+    NativeAccess.setVulkanSurfaceTarget(requireLiveHandle(), descriptor)
 
-  public actual fun startSetOpenGLSurfaceTarget(
-    descriptor: OpenGLSurfaceDescriptor
-  ): OperationHandle<Unit> =
-    controlOperation(NativeAccess.startSetOpenGLSurfaceTarget(requireLiveHandle(), descriptor))
+  public actual fun setOpenGLSurfaceTarget(descriptor: OpenGLSurfaceDescriptor): Deferred<Unit> =
+    NativeAccess.setOpenGLSurfaceTarget(requireLiveHandle(), descriptor)
 
-  public actual fun startSetMetalBorrowedTextureTarget(
+  public actual fun setMetalBorrowedTextureTarget(
     descriptor: MetalBorrowedTextureDescriptor
-  ): OperationHandle<Unit> =
-    controlOperation(
-      NativeAccess.startSetMetalBorrowedTextureTarget(requireLiveHandle(), descriptor)
-    )
+  ): Deferred<Unit> = NativeAccess.setMetalBorrowedTextureTarget(requireLiveHandle(), descriptor)
 
-  public actual fun startSetVulkanBorrowedTextureTarget(
+  public actual fun setVulkanBorrowedTextureTarget(
     descriptor: VulkanBorrowedTextureDescriptor
-  ): OperationHandle<Unit> =
-    controlOperation(
-      NativeAccess.startSetVulkanBorrowedTextureTarget(requireLiveHandle(), descriptor)
-    )
+  ): Deferred<Unit> = NativeAccess.setVulkanBorrowedTextureTarget(requireLiveHandle(), descriptor)
 
-  public actual fun startSetOpenGLBorrowedTextureTarget(
+  public actual fun setOpenGLBorrowedTextureTarget(
     descriptor: OpenGLBorrowedTextureDescriptor
-  ): OperationHandle<Unit> =
-    controlOperation(
-      NativeAccess.startSetOpenGLBorrowedTextureTarget(requireLiveHandle(), descriptor)
-    )
+  ): Deferred<Unit> = NativeAccess.setOpenGLBorrowedTextureTarget(requireLiveHandle(), descriptor)
 
-  public actual fun startReduceMemoryUse(): OperationHandle<Unit> =
-    controlOperation(
-      NativeAccess.startRenderControl(
-        requireLiveHandle(),
-        "mln_render_session_reduce_memory_use_start",
-      )
-    )
+  public actual fun reduceMemoryUse(): Deferred<Unit> =
+    NativeAccess.renderControl(requireLiveHandle(), "mln_render_session_reduce_memory_use")
 
-  public actual fun startClearData(): OperationHandle<Unit> =
-    controlOperation(
-      NativeAccess.startRenderControl(requireLiveHandle(), "mln_render_session_clear_data_start")
-    )
+  public actual fun clearData(): Deferred<Unit> =
+    NativeAccess.renderControl(requireLiveHandle(), "mln_render_session_clear_data")
 
-  public actual fun startDumpDebugLogs(): OperationHandle<Unit> =
-    controlOperation(
-      NativeAccess.startRenderControl(
-        requireLiveHandle(),
-        "mln_render_session_dump_debug_logs_start",
-      )
-    )
+  public actual fun dumpDebugLogs(): Deferred<Unit> =
+    NativeAccess.renderControl(requireLiveHandle(), "mln_render_session_dump_debug_logs")
 
-  public actual fun startBarrier(): OperationHandle<Unit> =
-    controlOperation(NativeAccess.startRenderBarrier(requireLiveHandle()))
+  public actual fun barrier(): Deferred<Unit> = NativeAccess.renderBarrier(requireLiveHandle())
 
-  public actual fun startDetach(): OperationHandle<Unit> =
-    controlOperation(
-      NativeAccess.startRenderControl(requireLiveHandle(), "mln_render_session_detach_start")
-    )
+  public actual fun detach(): Deferred<Unit> =
+    NativeAccess.renderControl(requireLiveHandle(), "mln_render_session_detach")
 
-  public actual fun startSetFeatureState(
+  public actual fun setFeatureState(
     selector: FeatureStateSelector,
     value: ByteArray,
-  ): OperationHandle<Unit> =
-    controlOperation(NativeAccess.startSetFeatureState(requireLiveHandle(), selector, value))
+  ): Deferred<Unit> = NativeAccess.setFeatureState(requireLiveHandle(), selector, value)
 
-  public actual fun startGetFeatureState(
-    selector: FeatureStateSelector
-  ): OperationHandle<ByteArray> =
-    operation(
-      NativeAccess.startGetFeatureState(requireLiveHandle(), selector),
-      OperationKind.RENDER_FEATURE_STATE_GET,
-      OperationResultKind.BUFFER,
-    )
+  public actual fun getFeatureState(selector: FeatureStateSelector): Deferred<ByteArray> =
+    NativeAccess.getFeatureState(requireLiveHandle(), selector)
 
-  public actual fun takeFeatureStateResult(operation: OperationHandle<ByteArray>): ByteArray =
-    operation.withResultUse(OperationKind.RENDER_FEATURE_STATE_GET, OperationResultKind.BUFFER) { id
-      ->
-      NativeAccess.takeFeatureStateResult(id).also { operation.markResultConsumed() }
-    }
+  public actual fun removeFeatureState(selector: FeatureStateSelector): Deferred<Unit> =
+    NativeAccess.removeFeatureState(requireLiveHandle(), selector)
 
-  public actual fun startRemoveFeatureState(selector: FeatureStateSelector): OperationHandle<Unit> =
-    controlOperation(NativeAccess.startRemoveFeatureState(requireLiveHandle(), selector))
-
-  public actual fun startQueryRenderedFeatures(
+  public actual fun queryRenderedFeatures(
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions?,
-  ): OperationHandle<List<QueriedFeature>> =
-    queryFeaturesOperation(
-      NativeAccess.startQueryRenderedFeatures(requireLiveHandle(), geometry, options)
-    )
+  ): Deferred<List<QueriedFeature>> =
+    NativeAccess.queryRenderedFeatures(requireLiveHandle(), geometry, options)
 
-  public actual fun startQuerySourceFeatures(
+  public actual fun querySourceFeatures(
     sourceId: String,
     options: SourceFeatureQueryOptions?,
-  ): OperationHandle<List<QueriedFeature>> =
-    queryFeaturesOperation(
-      NativeAccess.startQuerySourceFeatures(requireLiveHandle(), sourceId, options)
-    )
+  ): Deferred<List<QueriedFeature>> =
+    NativeAccess.querySourceFeatures(requireLiveHandle(), sourceId, options)
 
-  public actual fun takeQueryFeaturesResult(
-    operation: OperationHandle<List<QueriedFeature>>
-  ): List<QueriedFeature> =
-    operation.withResultUse(OperationKind.RENDER_QUERY, OperationResultKind.QUERIED_FEATURE_LIST) {
-      id ->
-      NativeAccess.takeQueryFeaturesResult(id).also { operation.markResultConsumed() }
-    }
-
-  public actual fun startQueryFeatureExtension(
+  public actual fun queryFeatureExtension(
     sourceId: String,
     feature: ByteArray,
     extension: String,
     extensionField: String,
     arguments: ByteArray?,
-  ): OperationHandle<ByteArray> =
-    queryOperation(
-      NativeAccess.startQueryFeatureExtension(
-        requireLiveHandle(),
-        sourceId,
-        feature,
-        extension,
-        extensionField,
-        arguments,
-      )
+  ): Deferred<ByteArray> =
+    NativeAccess.queryFeatureExtension(
+      requireLiveHandle(),
+      sourceId,
+      feature,
+      extension,
+      extensionField,
+      arguments,
     )
 
-  public actual fun takeQueryResult(operation: OperationHandle<ByteArray>): ByteArray =
-    operation.withResultUse(OperationKind.RENDER_QUERY, OperationResultKind.BUFFER) { id ->
-      NativeAccess.takeQueryResult(id).also { operation.markResultConsumed() }
-    }
-
-  public actual fun startReadPremultipliedRgba8(): OperationHandle<TextureReadback> =
-    operation(
-      NativeAccess.startTextureReadback(requireLiveHandle()),
-      OperationKind.RENDER_READBACK,
-      OperationResultKind.TEXTURE_READBACK,
-    )
-
-  public actual fun takeReadPremultipliedRgba8Result(
-    operation: OperationHandle<TextureReadback>
-  ): TextureReadback =
-    operation.withResultUse(OperationKind.RENDER_READBACK, OperationResultKind.TEXTURE_READBACK) {
-      id ->
-      NativeAccess.takeTextureReadbackResult(id).also { operation.markResultConsumed() }
-    }
+  public actual fun readPremultipliedRgba8(): Deferred<TextureReadback> =
+    NativeAccess.textureReadback(requireLiveHandle())
 
   public actual fun abandon(): RenderAbandonResult {
     NativeAccess.ensureLoaded()
@@ -241,21 +165,6 @@ internal constructor(private val ownerMap: MapHandle, private val handle: Native
     core.requireLive()
     return handle
   }
-
-  private fun controlOperation(id: Long): OperationHandle<Unit> =
-    operation(id, OperationKind.RENDER_CONTROL, OperationResultKind.NONE)
-
-  private fun queryOperation(id: Long): OperationHandle<ByteArray> =
-    operation(id, OperationKind.RENDER_QUERY, OperationResultKind.BUFFER)
-
-  private fun queryFeaturesOperation(id: Long): OperationHandle<List<QueriedFeature>> =
-    operation(id, OperationKind.RENDER_QUERY, OperationResultKind.QUERIED_FEATURE_LIST)
-
-  private fun <T> operation(
-    id: Long,
-    kind: OperationKind,
-    resultKind: OperationResultKind,
-  ): OperationHandle<T> = OperationHandle(runtime, id, kind, resultKind)
 
   internal companion object {
     fun attachMetalOwnedTexture(
@@ -338,20 +247,12 @@ internal constructor(private val ownerMap: MapHandle, private val handle: Native
 
     private fun attachment(
       map: MapHandle,
-      native: Pair<NativeRenderSession, Long>,
+      native: Pair<NativeRenderSession, Deferred<Unit>>,
     ): RenderSessionAttachment {
       NativeAccess.ensureLoaded()
       val session = RenderSessionHandle(map, native.first)
       return try {
-        RenderSessionAttachment(
-          session,
-          OperationHandle(
-            map.runtime(),
-            native.second,
-            OperationKind.RENDER_ATTACH,
-            OperationResultKind.NONE,
-          ),
-        )
+        RenderSessionAttachment(session, retainSessionUntilComplete(session, native.second))
       } catch (error: Throwable) {
         runCatching { session.abandon() }
         runCatching { session.close() }

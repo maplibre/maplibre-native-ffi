@@ -317,7 +317,7 @@ namespace mln::core {
 auto metal_surface_attach_start(
   mln_map map, const mln_metal_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
   MapObject* live_map = nullptr;
   const auto map_status = validate_map_live(map, live_map);
@@ -336,7 +336,7 @@ auto metal_surface_attach_start(
     return physical_status;
   }
   const auto request_status =
-    validate_render_session_attach_request(options, out_session, out_operation);
+    validate_render_session_attach_request(options, out_session, completion);
   if (request_status != MLN_STATUS_OK) {
     return request_status;
   }
@@ -364,13 +364,13 @@ auto metal_surface_attach_start(
   };
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Surface, options, capabilities,
-    out_session, out_operation
+    out_session, completion
   );
 }
 
 auto metal_surface_set_target_start(
   mln_render_session session, const mln_metal_surface_descriptor* descriptor,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) -> mln_status {
   const auto descriptor_status = validate_metal_surface_descriptor(descriptor);
   if (descriptor_status != MLN_STATUS_OK) {
@@ -378,7 +378,7 @@ auto metal_surface_set_target_start(
   }
   const auto copied = *descriptor;
   return enqueue_driver_operation(
-    session, RENDER_OPERATION_MAINTENANCE,
+    session,
     [copied](mln_render_session_object& target) {
       return surface_session_set_target(
         target.self, copied.extent, [&copied](mln_render_session_object& live) {
@@ -386,7 +386,7 @@ auto metal_surface_set_target_start(
         }
       );
     },
-    out_operation
+    completion
   );
 }
 

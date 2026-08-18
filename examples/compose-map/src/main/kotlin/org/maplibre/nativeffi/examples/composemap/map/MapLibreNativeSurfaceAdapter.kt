@@ -1,5 +1,6 @@
 package org.maplibre.nativeffi.examples.composemap.map
 
+import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.examples.composemap.surface.EglContextHandles
 import org.maplibre.nativeffi.examples.composemap.surface.MetalTextureTarget
@@ -27,7 +28,6 @@ import org.maplibre.nativeffi.render.RenderTargetExtent
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanContextDescriptor
 import org.maplibre.nativeffi.render.WglContextDescriptor
-import org.maplibre.nativeffi.runtime.OperationHandle
 
 internal object MapLibreNativeSurfaceAdapter {
   val backend: ProducerBackend =
@@ -55,7 +55,7 @@ internal object MapLibreNativeSurfaceAdapter {
       sessionKey = SessionKey.Metal(target.device, target.pixelFormat),
       targetKey = TargetKey(target.generation, extent),
       attach = { map -> map.attachMetalBorrowedTexture(descriptor, callerDriverOptions) },
-      setTarget = { session -> session.startSetMetalBorrowedTextureTarget(descriptor) },
+      setTarget = { session -> session.setMetalBorrowedTextureTarget(descriptor) },
     )
   }
 
@@ -82,7 +82,7 @@ internal object MapLibreNativeSurfaceAdapter {
         ),
       targetKey = TargetKey(target.generation, extent),
       attach = { map -> map.attachVulkanBorrowedTexture(descriptor, callerDriverOptions) },
-      setTarget = { session -> session.startSetVulkanBorrowedTextureTarget(descriptor) },
+      setTarget = { session -> session.setVulkanBorrowedTextureTarget(descriptor) },
     )
   }
 
@@ -100,7 +100,7 @@ internal object MapLibreNativeSurfaceAdapter {
       sessionKey = SessionKey.OpenGl(target.context),
       targetKey = TargetKey(target.generation, extent),
       attach = { map -> map.attachOpenGLBorrowedTexture(descriptor, callerDriverOptions) },
-      setTarget = { session -> session.startSetOpenGLBorrowedTextureTarget(descriptor) },
+      setTarget = { session -> session.setOpenGLBorrowedTextureTarget(descriptor) },
     )
   }
 
@@ -138,7 +138,7 @@ internal object MapLibreNativeSurfaceAdapter {
     val sessionKey: SessionKey,
     val targetKey: TargetKey,
     val attach: (MapHandle) -> RenderSessionAttachment,
-    val setTarget: (RenderSessionHandle) -> OperationHandle<Unit>,
+    val setTarget: (RenderSessionHandle) -> Deferred<Unit>,
   )
 
   private val callerDriverOptions =

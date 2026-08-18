@@ -23,7 +23,7 @@ public sealed class GeoJsonSourceTests
             runtime,
             new MapOptions { Width = 512, Height = 512 }
         );
-        map.SetStyleJson("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
+        map.SetStyleJsonAsync("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
 
         using var initial = GeoJsonSourceDataHandle.Create(EmptyFeatureCollection, null);
         using var updated = GeoJsonSourceDataHandle.Create(
@@ -33,12 +33,12 @@ public sealed class GeoJsonSourceTests
 
         RuntimeEventTestHelpers.AssertCommandFinishes(
             runtime,
-            map.AddGeoJsonSourceData("geo-data", initial),
+            map.AddGeoJsonSourceDataAsync("geo-data", initial),
             MaplibreStatus.Ok
         );
         RuntimeEventTestHelpers.AssertCommandFinishes(
             runtime,
-            map.SetGeoJsonSourceData("geo-data", updated),
+            map.SetGeoJsonSourceDataAsync("geo-data", updated),
             MaplibreStatus.Ok
         );
 
@@ -56,9 +56,9 @@ public sealed class GeoJsonSourceTests
             runtime,
             new MapOptions { Width = 512, Height = 512 }
         );
-        map.SetStyleJson("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
+        map.SetStyleJsonAsync("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
 
-        map.AddGeoJsonSourceData("clustered", prepared);
+        map.AddGeoJsonSourceDataAsync("clustered", prepared);
 
         Assert.Equal(SourceType.GeoJson, (await map.StyleSourceInfoAsync("clustered"))?.Type);
 
@@ -82,13 +82,13 @@ public sealed class GeoJsonSourceTests
             runtime,
             new MapOptions { Width = 512, Height = 512 }
         );
-        map.SetStyleJson("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
+        map.SetStyleJsonAsync("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
 
         var prepared = GeoJsonSourceDataHandle.Create(NearbyPoints, null);
 
-        map.AddGeoJsonSourceData("geo-a", prepared);
-        map.AddGeoJsonSourceData("geo-b", prepared);
-        var setCommand = map.SetGeoJsonSourceData("geo-a", prepared);
+        map.AddGeoJsonSourceDataAsync("geo-a", prepared);
+        map.AddGeoJsonSourceDataAsync("geo-b", prepared);
+        var setCommand = map.SetGeoJsonSourceDataAsync("geo-a", prepared);
 
         // Install calls borrow the handle; releasing it right after submitting the
         // commands never invalidates the sources.
@@ -109,12 +109,12 @@ public sealed class GeoJsonSourceTests
             runtime,
             new MapOptions { Width = 512, Height = 512 }
         );
-        map.SetStyleJson("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
+        map.SetStyleJsonAsync("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
 
         using var clustered = GeoJsonSourceDataHandle.Create(NearbyPoints, ClusterOptions());
         RuntimeEventTestHelpers.AssertCommandFinishes(
             runtime,
-            map.AddGeoJsonSourceData("clustered", clustered),
+            map.AddGeoJsonSourceDataAsync("clustered", clustered),
             MaplibreStatus.Ok
         );
 
@@ -123,7 +123,7 @@ public sealed class GeoJsonSourceTests
         using var unclustered = GeoJsonSourceDataHandle.Create(NearbyPoints, null);
         RuntimeEventTestHelpers.AssertCommandFinishes(
             runtime,
-            map.SetGeoJsonSourceData("clustered", unclustered),
+            map.SetGeoJsonSourceDataAsync("clustered", unclustered),
             MaplibreStatus.InvalidArgument
         );
 
@@ -134,7 +134,7 @@ public sealed class GeoJsonSourceTests
         using var mismatched = GeoJsonSourceDataHandle.Create(NearbyPoints, reaggregated);
         RuntimeEventTestHelpers.AssertCommandFinishes(
             runtime,
-            map.SetGeoJsonSourceData("clustered", mismatched),
+            map.SetGeoJsonSourceDataAsync("clustered", mismatched),
             MaplibreStatus.InvalidArgument
         );
 
@@ -150,7 +150,7 @@ public sealed class GeoJsonSourceTests
             runtime,
             new MapOptions { Width = 512, Height = 512 }
         );
-        map.SetStyleJson("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
+        map.SetStyleJsonAsync("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
 
         var prepared = GeoJsonSourceDataHandle.Create(EmptyFeatureCollection, null);
         prepared.Close();
@@ -159,7 +159,7 @@ public sealed class GeoJsonSourceTests
         Assert.True(prepared.IsClosed);
 
         var error = Assert.Throws<InvalidStateException>(() =>
-            map.AddGeoJsonSourceData("geo-closed", prepared)
+            map.AddGeoJsonSourceDataAsync("geo-closed", prepared).GetAwaiter().GetResult()
         );
         Assert.Equal(MaplibreStatus.InvalidState, error.Status);
         Assert.Null(await map.StyleSourceInfoAsync("geo-closed"));
@@ -174,7 +174,7 @@ public sealed class GeoJsonSourceTests
             runtime,
             new MapOptions { Width = 512, Height = 512 }
         );
-        map.SetStyleJson("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
+        map.SetStyleJsonAsync("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
 
         // Preparation is legal from any thread, so it runs on a dedicated worker.
         GeoJsonSourceDataHandle? worked = null;
@@ -195,7 +195,7 @@ public sealed class GeoJsonSourceTests
         Assert.Null(failure);
         using var prepared = Assert.IsType<GeoJsonSourceDataHandle>(worked);
 
-        map.AddGeoJsonSourceData("geo-worker", prepared);
+        map.AddGeoJsonSourceDataAsync("geo-worker", prepared);
         Assert.Equal(SourceType.GeoJson, (await map.StyleSourceInfoAsync("geo-worker"))?.Type);
     }
 
@@ -208,24 +208,24 @@ public sealed class GeoJsonSourceTests
             runtime,
             new MapOptions { Width = 512, Height = 512 }
         );
-        map.SetStyleJson("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
+        map.SetStyleJsonAsync("""{"version":8,"sources":{},"layers":[]}"""u8.ToArray());
 
         using var prepared = GeoJsonSourceDataHandle.Create(NearbyPoints, null);
-        map.AddGeoJsonSourceData("geo-sync", prepared);
+        map.AddGeoJsonSourceDataAsync("geo-sync", prepared);
 
         RuntimeEventTestHelpers.AssertCommandFinishes(
             runtime,
-            map.SetGeoJsonSourceSynchronousTiling("geo-sync", true),
+            map.SetGeoJsonSourceSynchronousTilingAsync("geo-sync", true),
             MaplibreStatus.Ok
         );
         RuntimeEventTestHelpers.AssertCommandFinishes(
             runtime,
-            map.SetGeoJsonSourceData("geo-sync", prepared),
+            map.SetGeoJsonSourceDataAsync("geo-sync", prepared),
             MaplibreStatus.Ok
         );
         RuntimeEventTestHelpers.AssertCommandFinishes(
             runtime,
-            map.SetGeoJsonSourceSynchronousTiling("geo-sync", false),
+            map.SetGeoJsonSourceSynchronousTilingAsync("geo-sync", false),
             MaplibreStatus.Ok
         );
 
@@ -233,7 +233,7 @@ public sealed class GeoJsonSourceTests
         // asynchronous command failure.
         RuntimeEventTestHelpers.AssertCommandFinishes(
             runtime,
-            map.SetGeoJsonSourceSynchronousTiling("geo-missing", true),
+            map.SetGeoJsonSourceSynchronousTilingAsync("geo-missing", true),
             MaplibreStatus.InvalidArgument
         );
     }

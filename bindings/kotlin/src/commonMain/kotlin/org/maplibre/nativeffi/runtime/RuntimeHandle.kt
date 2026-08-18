@@ -1,5 +1,6 @@
 package org.maplibre.nativeffi.runtime
 
+import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.offline.OfflineRegionDefinition
 import org.maplibre.nativeffi.offline.OfflineRegionDownloadState
 import org.maplibre.nativeffi.offline.OfflineRegionInfo
@@ -12,95 +13,56 @@ import org.maplibre.nativeffi.resource.ResourceTransformCallback
 public expect class RuntimeHandle {
   public val isClosed: Boolean
 
-  /**
-   * Installs the receiver callback for this runtime's notification source. Native threads call the
-   * callback only to schedule [drainReady] on the receiver.
-   */
-  public fun setNotificationCallback(callback: () -> Unit)
+  /** Completes after every command accepted before this call reaches a terminal disposition. */
+  public fun barrier(): Deferred<Unit>
 
-  /** Clears the receiver callback after every callback invocation has returned. */
-  public fun clearNotificationCallback()
-
-  /** Drains one owned copy of the endpoints that are currently ready. */
-  public fun drainReady(): List<ReadyEndpoint>
-
-  /** Suspends until every command accepted before this call has reached a terminal disposition. */
-  public suspend fun barrier()
-
-  public fun startAmbientCacheOperation(operation: AmbientCacheOperation): OperationHandle<Unit>
+  public fun runAmbientCacheOperation(operation: AmbientCacheOperation): Deferred<Unit>
 
   /**
    * Starts a change to this runtime's maximum ambient cache size. Lowering it evicts cached ambient
    * resources; offline regions are unaffected.
    */
-  public fun startSetMaximumAmbientCacheSize(size: Long): OperationHandle<Unit>
+  public fun setMaximumAmbientCacheSize(size: Long): Deferred<Unit>
 
-  public fun startCreateOfflineRegion(
+  public fun createOfflineRegion(
     definition: OfflineRegionDefinition,
     metadata: ByteArray,
-  ): OperationHandle<OfflineRegionInfo>
+  ): Deferred<OfflineRegionInfo>
 
-  public fun startOfflineRegion(id: Long): OperationHandle<OfflineRegionInfo?>
+  public fun offlineRegion(id: Long): Deferred<OfflineRegionInfo?>
 
-  public fun startOfflineRegions(): OperationHandle<List<OfflineRegionInfo>>
+  public fun offlineRegions(): Deferred<List<OfflineRegionInfo>>
 
-  public fun startMergeOfflineRegionsDatabase(
-    path: String
-  ): OperationHandle<List<OfflineRegionInfo>>
+  public fun mergeOfflineRegionsDatabase(path: String): Deferred<List<OfflineRegionInfo>>
 
-  public fun startUpdateOfflineRegionMetadata(
-    id: Long,
-    metadata: ByteArray,
-  ): OperationHandle<OfflineRegionInfo>
+  public fun updateOfflineRegionMetadata(id: Long, metadata: ByteArray): Deferred<OfflineRegionInfo>
 
-  public fun startOfflineRegionStatus(id: Long): OperationHandle<OfflineRegionStatus>
+  public fun offlineRegionStatus(id: Long): Deferred<OfflineRegionStatus>
 
-  public fun startSetOfflineRegionObserved(id: Long, observed: Boolean): OperationHandle<Unit>
+  public fun setOfflineRegionObserved(id: Long, observed: Boolean): Deferred<Unit>
 
-  public fun startSetOfflineRegionDownloadState(
+  public fun setOfflineRegionDownloadState(
     id: Long,
     downloadState: OfflineRegionDownloadState,
-  ): OperationHandle<Unit>
+  ): Deferred<Unit>
 
-  public fun startInvalidateOfflineRegion(id: Long): OperationHandle<Unit>
+  public fun invalidateOfflineRegion(id: Long): Deferred<Unit>
 
-  public fun startDeleteOfflineRegion(id: Long): OperationHandle<Unit>
+  public fun deleteOfflineRegion(id: Long): Deferred<Unit>
 
-  public fun takeCreateOfflineRegionResult(
-    operation: OperationHandle<OfflineRegionInfo>
-  ): OfflineRegionInfo
+  public fun setResourceProvider(callback: ResourceProviderCallback): Deferred<CommandCompletion>
 
-  public fun takeOfflineRegionResult(
-    operation: OperationHandle<OfflineRegionInfo?>
-  ): OfflineRegionInfo?
+  public fun clearResourceProvider(): Deferred<CommandCompletion>
 
-  public fun takeOfflineRegionsResult(
-    operation: OperationHandle<List<OfflineRegionInfo>>
-  ): List<OfflineRegionInfo>
+  public fun setResourceTransform(callback: ResourceTransformCallback): Deferred<CommandCompletion>
 
-  public fun takeMergeOfflineRegionsDatabaseResult(
-    operation: OperationHandle<List<OfflineRegionInfo>>
-  ): List<OfflineRegionInfo>
+  public fun clearResourceTransform(): Deferred<CommandCompletion>
 
-  public fun takeUpdateOfflineRegionMetadataResult(
-    operation: OperationHandle<OfflineRegionInfo>
-  ): OfflineRegionInfo
+  public fun setHttpHeaderTransform(
+    callback: HttpHeaderTransformCallback
+  ): Deferred<CommandCompletion>
 
-  public fun takeOfflineRegionStatusResult(
-    operation: OperationHandle<OfflineRegionStatus>
-  ): OfflineRegionStatus
-
-  public fun setResourceProvider(callback: ResourceProviderCallback): ULong
-
-  public fun clearResourceProvider(): ULong
-
-  public fun setResourceTransform(callback: ResourceTransformCallback): ULong
-
-  public fun clearResourceTransform(): ULong
-
-  public fun setHttpHeaderTransform(callback: HttpHeaderTransformCallback): ULong
-
-  public fun clearHttpHeaderTransform(): ULong
+  public fun clearHttpHeaderTransform(): Deferred<CommandCompletion>
 
   /**
    * Drains this runtime's queued events into one batch, in queue order.
@@ -120,10 +82,7 @@ public expect class RuntimeHandle {
    */
   public var eventMask: RuntimeEventMask
 
-  /**
-   * Suspends until native runtime retirement completes, then releases callbacks and notification
-   * resources.
-   */
+  /** Releases this runtime and its callback state synchronously. */
   public fun close()
 
   public companion object {

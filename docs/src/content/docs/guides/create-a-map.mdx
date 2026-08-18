@@ -15,16 +15,15 @@ and any host thread can submit later runtime or map work. One runtime serves any
 number of maps and holds their shared scheduler, event queue, network stack, and
 cache database.
 
-Create one notification source for each host receiver and pass it in the runtime
-options. Runtime events and operations publish readiness through that source.
-The host can register a callback or drain ready endpoints from the source. A
-ready drain returns an owned batch; release it after reading its endpoint view.
+Pass an event wake in the runtime options when the host wants a prompt signal
+that runtime events are ready to drain. The callback only schedules work on the
+host receiver; the receiver drains and copies the complete queued batch.
 
 <Code code={region(createMap, "runtime")} lang="c" title="create-map.c" />
 
 Runtime creation returns its handle after the scheduler thread is ready. Map
-creation is ordered runtime work: wait for its operation, then take the map
-result once. The take consumes the operation.
+creation is ordered runtime work. Its one-shot completion reports the map
+handle, or a terminal error, exactly once.
 
 ## Choose the initial map state
 
@@ -50,11 +49,10 @@ Enable it at creation when your tile sets use that encoding.
 
 ## Close in order
 
-Release the map before releasing the runtime, then release the notification
-source. A runtime release preflight reports invalid state and leaves the handle
-open while a live child or pending child creation prevents release. Successful
-map and runtime release consumes the public handle immediately; native teardown
-continues in submission order. A standalone projection snapshot does not keep
-either source handle open.
+Release the map before releasing the runtime. A runtime release preflight
+reports invalid state and leaves the handle open while a live child or pending
+child creation prevents release. Successful map and runtime release consumes
+the public handle immediately; native teardown continues in submission order.
+A standalone projection snapshot does not keep either source handle open.
 
 <Code code={region(createMap, "release")} lang="c" title="create-map.c" />

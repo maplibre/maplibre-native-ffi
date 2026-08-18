@@ -35,15 +35,16 @@ class RuntimeHandleNativeTest : org.maplibre.nativeffi.NativeTestBase() {
     assertFalse(runtime.isClosed)
     val map =
       MapHandle.create(
-        runtime,
-        MapOptions().apply {
-          width = 128
-          height = 128
-        },
-      )
+          runtime,
+          MapOptions().apply {
+            width = 128
+            height = 128
+          },
+        )
+        .await()
     val snapshot = map.snapshot()
-    runtime.barrier()
-    assertTrue(map.queryCamera().generation >= snapshot.generation)
+    runtime.barrier().await()
+    assertTrue(map.queryCamera().await().generation >= snapshot.generation)
     map.close()
     assertTrue(map.isClosed)
     runtime.close()

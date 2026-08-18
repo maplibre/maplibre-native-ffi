@@ -61,16 +61,20 @@ import Testing
   }
 }
 
-@Test func attachmentOptionsShareTheRuntimeNotificationReceiver() {
+@Test func attachmentOptionsCarryDirectWakes() {
   let options = RenderSessionAttachOptions(
     driver: .coreWorker,
     requestedTextureRingDepth: 3
   )
-  options.withNative(notificationSource: 17) { native in
-    #expect(native.pointee.driver == MLN_RENDER_DRIVER_CORE_WORKER.rawValue)
-    #expect(native.pointee.requested_texture_ring_depth == 3)
-    #expect(native.pointee.operation_source == 17)
-    #expect(native.pointee.frame_source == 0)
-    #expect(native.pointee.driver_work_source == 0)
-  }
+  var frameWake = mln_wake()
+  frameWake.user_data = UnsafeMutableRawPointer(bitPattern: 17)
+  var driverWake = mln_wake()
+  driverWake.user_data = UnsafeMutableRawPointer(bitPattern: 23)
+  options
+    .withNative(frameWake: frameWake, driverWorkWake: driverWake) { native in
+      #expect(native.pointee.driver == MLN_RENDER_DRIVER_CORE_WORKER.rawValue)
+      #expect(native.pointee.requested_texture_ring_depth == 3)
+      #expect(native.pointee.frame_wake.user_data == frameWake.user_data)
+      #expect(native.pointee.driver_work_wake.user_data == driverWake.user_data)
+    }
 }

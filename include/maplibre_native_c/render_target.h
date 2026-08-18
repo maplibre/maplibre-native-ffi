@@ -9,6 +9,7 @@
 #include <stdint.h>
 
 #include "base.h"
+#include "wake.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -50,13 +51,8 @@ typedef enum mln_render_session_capability_flag : uint32_t {
 /**
  * Common attachment policy copied before an attach call returns.
  *
- * operation_source is the receiver for attach and later session-operation
- * completions. A null operation_source inherits the map runtime's source.
- * Null frame_source and driver_work_source values inherit operation_source.
- * The receiver roles may use one source or independent sources.
- *
  * A successful backend attach-start call publishes a session in ATTACHING
- * state and its completion operation together. Hosts may service caller-driver
+ * state and accepts its completion together. Hosts may service caller-driver
  * work through that session before attachment completes. A failed completion
  * still requires normal detach or abandonment before session destruction.
  */
@@ -70,9 +66,10 @@ typedef struct mln_render_session_attach_options {
    */
   uint32_t requested_texture_ring_depth;
   uint32_t reserved;
-  mln_notification_source operation_source;
-  mln_notification_source frame_source;
-  mln_notification_source driver_work_source;
+  /** Wakes the receiver when the frame-result queue becomes nonempty. */
+  mln_wake frame_wake;
+  /** Wakes the graphics receiver when caller-driver work is available. */
+  mln_wake driver_work_wake;
 } mln_render_session_attach_options;
 
 /** Driver and target capabilities fixed for one attached render session. */

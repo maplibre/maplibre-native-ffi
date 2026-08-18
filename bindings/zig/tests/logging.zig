@@ -33,13 +33,17 @@ test "log callback receives and consumes native logs" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
+    var map_future = try maplibre.MapHandle.create(&runtime, .{});
+
+    defer map_future.deinit();
+
+    var map = try map_future.wait(null);
     defer map.close() catch @panic("map close failed");
 
     _ = try map.setStyleJson(testing.allocator, "{");
-    const barrier = try runtime.barrierStart();
-    defer barrier.release();
-    try testing.expect(try barrier.wait(-1));
+    var barrier = try runtime.barrier();
+    defer barrier.deinit();
+    _ = try barrier.wait(null);
     try testing.expect(state.count > 0);
     try testing.expect(state.saw_parse_style);
     try testing.expect(state.saw_message);
@@ -63,13 +67,17 @@ test "log callback can be cleared" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
+    var map_future = try maplibre.MapHandle.create(&runtime, .{});
+
+    defer map_future.deinit();
+
+    var map = try map_future.wait(null);
     defer map.close() catch @panic("map close failed");
 
     _ = try map.setStyleJson(testing.allocator, "{");
-    const barrier = try runtime.barrierStart();
-    defer barrier.release();
-    try testing.expect(try barrier.wait(-1));
+    var barrier = try runtime.barrier();
+    defer barrier.deinit();
+    _ = try barrier.wait(null);
     try testing.expectEqual(@as(usize, 0), state.count);
 }
 
@@ -87,13 +95,17 @@ test "log callback replacement invokes only the replacement" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
 
-    var map = try maplibre.MapHandle.create(&runtime, .{});
+    var map_future = try maplibre.MapHandle.create(&runtime, .{});
+
+    defer map_future.deinit();
+
+    var map = try map_future.wait(null);
     defer map.close() catch @panic("map close failed");
 
     _ = try map.setStyleJson(testing.allocator, "{");
-    const barrier = try runtime.barrierStart();
-    defer barrier.release();
-    try testing.expect(try barrier.wait(-1));
+    var barrier = try runtime.barrier();
+    defer barrier.deinit();
+    _ = try barrier.wait(null);
     try testing.expectEqual(@as(usize, 0), first_state.count);
     try testing.expect(replacement_state.count > 0);
     try testing.expect(replacement_state.saw_parse_style);

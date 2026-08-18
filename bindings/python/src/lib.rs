@@ -45,13 +45,9 @@ mod py_errors {
 #[pyclass(name = "_RuntimeHandle")]
 struct RuntimeHandle {
     state: Mutex<maplibre_core::handle::NativeHandleState<sys::mln_runtime>>,
-    notification_source: Mutex<sys::mln_notification_source>,
-    notification_callback: Mutex<Option<Box<PyNotificationCallbackState>>>,
+    event_wake: Arc<Mutex<Option<Py<PyAny>>>>,
 }
 
-struct PyNotificationCallbackState {
-    callback: Py<PyAny>,
-}
 struct PyResourceProviderState {
     callback: Py<PyAny>,
     pending_callbacks: AtomicUsize,
@@ -208,37 +204,43 @@ impl RuntimeHandle {
     }
 }
 
-unsafe extern "C" fn notification_callback_trampoline(user_data: *mut c_void) {
+unsafe extern "C" fn event_wake_trampoline(user_data: *mut c_void) {
     if user_data.is_null() {
         return;
     }
     let _ = catch_unwind(AssertUnwindSafe(|| {
-        // SAFETY: user_data points to boxed state retained until native clears
-        // or closes the callback and waits for every in-flight invocation.
-        let state = unsafe { &*user_data.cast::<PyNotificationCallbackState>() };
+        // SAFETY: user_data points to an Arc retained by the runtime wake
+        // descriptor until native invokes its release callback.
+        let state = unsafe { &*user_data.cast::<Arc<Mutex<Option<Py<PyAny>>>>>() };
         Python::attach(|py| {
-            if let Err(error) = state.callback.bind(py).call0() {
-                error.write_unraisable(py, None);
+            let callback = state
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .as_ref()
+                .map(|callback| callback.clone_ref(py));
+            if let Some(callback) = callback {
+                if let Err(error) = callback.bind(py).call0() {
+                    error.write_unraisable(py, None);
+                }
             }
         });
     }));
 }
 
-struct OwnedOperation(sys::mln_operation);
-
-impl Drop for OwnedOperation {
-    fn drop(&mut self) {
-        unsafe { sys::mln_operation_release(self.0) };
+unsafe extern "C" fn release_event_wake(user_data: *mut c_void) {
+    if !user_data.is_null() {
+        // SAFETY: native releases the one Arc box accepted at runtime creation.
+        drop(unsafe { Box::from_raw(user_data.cast::<Arc<Mutex<Option<Py<PyAny>>>>>()) });
     }
 }
 
-struct OwnedReadyBatch(sys::mln_ready_batch);
+type PyCompletionConverter =
+    Box<dyn FnOnce(Python<'_>, &sys::mln_completion_result) -> PyResult<Py<PyAny>> + Send>;
 
-impl Drop for OwnedReadyBatch {
-    fn drop(&mut self) {
-        // SAFETY: this wrapper owns the batch until drop.
-        unsafe { sys::mln_ready_batch_release(self.0) };
-    }
+struct PyCompletionBridge {
+    future: Py<PyAny>,
+    convert: Mutex<Option<PyCompletionConverter>>,
+    accept_error_status: bool,
 }
 
 struct OwnedRenderFrameBatch(sys::mln_render_frame_batch);
@@ -248,79 +250,429 @@ impl Drop for OwnedRenderFrameBatch {
         unsafe { sys::mln_render_frame_batch_release(self.0) };
     }
 }
-fn wait_operation(py: Python<'_>, operation: sys::mln_operation) -> PyResult<()> {
-    let mut completed = false;
-    let status = py.detach(|| unsafe { sys::mln_operation_wait(operation, -1, &mut completed) });
-    maplibre_core::check(status).map_err(map_error)?;
-    if !completed {
-        return Err(invalid_state_error(
-            "unbounded native operation wait returned before completion",
-        ));
-    }
-
-    let mut operation_status = sys::MLN_STATUS_OK;
-    maplibre_core::check(unsafe {
-        sys::mln_operation_get_status(operation, &mut operation_status)
-    })
-    .map_err(map_error)?;
-    if operation_status == sys::MLN_STATUS_OK {
-        return Ok(());
-    }
-
-    let mut diagnostic_size = 0;
-    maplibre_core::check(unsafe {
-        sys::mln_operation_copy_diagnostic(operation, ptr::null_mut(), 0, &mut diagnostic_size)
-    })
-    .map_err(map_error)?;
-    let mut diagnostic = vec![0u8; diagnostic_size];
-    maplibre_core::check(unsafe {
-        sys::mln_operation_copy_diagnostic(
-            operation,
-            diagnostic.as_mut_ptr().cast(),
-            diagnostic.len(),
-            &mut diagnostic_size,
-        )
-    })
-    .map_err(map_error)?;
-    diagnostic.truncate(diagnostic_size);
-    Err(map_error(Error::from_status_and_diagnostic(
-        operation_status,
-        String::from_utf8_lossy(&diagnostic).into_owned(),
-    )))
-}
-
-fn start_offline_operation<F>(runtime: &RuntimeHandle, start: F) -> PyResult<u64>
-where
-    F: FnOnce(sys::mln_runtime, *mut sys::mln_operation) -> i32,
-{
-    let runtime = runtime.native()?;
-    let mut operation = sys::mln_operation(0);
-    maplibre_core::check(start(runtime, &mut operation)).map_err(map_error)?;
-    Ok(operation.0)
-}
-
-fn leak_optional_box<T>(slot: &Mutex<Option<Box<T>>>) {
-    let Some(value) = slot
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .take()
-    else {
+unsafe extern "C" fn complete_python_future(
+    user_data: *mut c_void,
+    result: *const sys::mln_completion_result,
+) {
+    if user_data.is_null() || result.is_null() {
         return;
-    };
-    Box::leak(value);
+    }
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        // SAFETY: native owns the bridge from accepted submission through its
+        // release callback. The result is borrowed for this callback.
+        let bridge = unsafe { &*user_data.cast::<PyCompletionBridge>() };
+        let result = unsafe { &*result };
+        Python::attach(|py| {
+            let converted = if result.status == sys::MLN_STATUS_OK || bridge.accept_error_status {
+                match bridge
+                    .convert
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                    .take()
+                {
+                    Some(convert) => convert(py, result),
+                    None => Err(invalid_state_error("native completion ran more than once")),
+                }
+            } else {
+                let diagnostic = if result.diagnostic.data.is_null() || result.diagnostic.size == 0
+                {
+                    String::new()
+                } else {
+                    // SAFETY: the diagnostic is borrowed for this callback.
+                    String::from_utf8_lossy(unsafe {
+                        std::slice::from_raw_parts(
+                            result.diagnostic.data.cast::<u8>(),
+                            result.diagnostic.size,
+                        )
+                    })
+                    .into_owned()
+                };
+                Err(map_error(Error::from_status_and_diagnostic(
+                    result.status,
+                    diagnostic,
+                )))
+            };
+            let call = match converted {
+                Ok(value) => bridge.future.bind(py).call_method1("set_result", (value,)),
+                Err(error) => bridge
+                    .future
+                    .bind(py)
+                    .call_method1("set_exception", (error.value(py),)),
+            };
+            if let Err(error) = call {
+                error.write_unraisable(py, None);
+            }
+        });
+    }));
 }
 
-impl Drop for RuntimeHandle {
-    fn drop(&mut self) {
-        let native_live = self
-            .state
-            .lock()
-            .map(|state| !state.is_closed())
-            .unwrap_or(true);
-        if native_live {
-            leak_optional_box(&self.notification_callback);
+unsafe extern "C" fn release_python_future(user_data: *mut c_void) {
+    if !user_data.is_null() {
+        // SAFETY: native releases accepted completion state exactly once.
+        drop(unsafe { Box::from_raw(user_data.cast::<PyCompletionBridge>()) });
+    }
+}
+
+fn submit_python_future<S, C>(py: Python<'_>, submit: S, convert: C) -> PyResult<Py<PyAny>>
+where
+    S: FnOnce(*const sys::mln_completion) -> sys::mln_status,
+    C: FnOnce(Python<'_>, &sys::mln_completion_result) -> PyResult<Py<PyAny>> + Send + 'static,
+{
+    let future = py
+        .import("concurrent.futures")?
+        .getattr("Future")?
+        .call0()?
+        .unbind();
+    let bridge = Box::new(PyCompletionBridge {
+        future: future.clone_ref(py),
+        convert: Mutex::new(Some(Box::new(convert))),
+        accept_error_status: false,
+    });
+    let bridge = Box::into_raw(bridge);
+    let completion = sys::mln_completion {
+        size: std::mem::size_of::<sys::mln_completion>() as u32,
+        callback: Some(complete_python_future),
+        user_data: bridge.cast(),
+        release_user_data: Some(release_python_future),
+    };
+    let status = submit(&completion);
+    if status != sys::MLN_STATUS_OK {
+        // SAFETY: rejected submissions retain no callback state.
+        drop(unsafe { Box::from_raw(bridge) });
+        return maplibre_core::check(status)
+            .map(|()| unreachable!())
+            .map_err(map_error);
+    }
+    Ok(future)
+}
+
+fn submit_python_command_future<S>(py: Python<'_>, submit: S) -> PyResult<Py<PyAny>>
+where
+    S: FnOnce(*const sys::mln_completion) -> sys::mln_status,
+{
+    let future = py
+        .import("concurrent.futures")?
+        .getattr("Future")?
+        .call0()?
+        .unbind();
+    let bridge = Box::new(PyCompletionBridge {
+        future: future.clone_ref(py),
+        convert: Mutex::new(Some(Box::new(py_command))),
+        accept_error_status: true,
+    });
+    let bridge = Box::into_raw(bridge);
+    let completion = sys::mln_completion {
+        size: std::mem::size_of::<sys::mln_completion>() as u32,
+        callback: Some(complete_python_future),
+        user_data: bridge.cast(),
+        release_user_data: Some(release_python_future),
+    };
+    let status = submit(&completion);
+    if status != sys::MLN_STATUS_OK {
+        // SAFETY: rejected submissions retain no callback state.
+        drop(unsafe { Box::from_raw(bridge) });
+        return maplibre_core::check(status)
+            .map(|()| unreachable!())
+            .map_err(map_error);
+    }
+    Ok(future)
+}
+
+fn py_none(py: Python<'_>, result: &sys::mln_completion_result) -> PyResult<Py<PyAny>> {
+    if !result.value.is_null() || result.value_count != 0 {
+        return Err(py_errors::NativeError::new_err((
+            Option::<i32>::None,
+            "unit completion returned a value",
+        )));
+    }
+    Ok(py.None())
+}
+
+fn py_command(py: Python<'_>, result: &sys::mln_completion_result) -> PyResult<Py<PyAny>> {
+    if !result.value.is_null() || result.value_count != 0 {
+        return Err(py_errors::NativeError::new_err((
+            Option::<i32>::None,
+            "command completion returned a value",
+        )));
+    }
+    Ok(py
+        .import("maplibre_native_ffi.runtime")?
+        .getattr("CommandCompletion")?
+        .call1((
+            result.disposition,
+            result.generation,
+            result.status,
+            copy_completion_diagnostic(result),
+        ))?
+        .unbind())
+}
+
+fn copy_completion_diagnostic(result: &sys::mln_completion_result) -> String {
+    if result.diagnostic.data.is_null() || result.diagnostic.size == 0 {
+        return String::new();
+    }
+    // SAFETY: completion diagnostics are borrowed for this callback.
+    String::from_utf8_lossy(unsafe {
+        std::slice::from_raw_parts(result.diagnostic.data.cast::<u8>(), result.diagnostic.size)
+    })
+    .into_owned()
+}
+
+fn completion_value<T: Copy>(result: &sys::mln_completion_result) -> PyResult<T> {
+    if result.value.is_null() || result.value_count != 1 {
+        return Err(py_errors::NativeError::new_err((
+            Option::<i32>::None,
+            "native completion returned no value",
+        )));
+    }
+    // SAFETY: each caller supplies the result type documented by the
+    // submitting C function, and the value is borrowed for this callback.
+    Ok(unsafe { result.value.cast::<T>().read_unaligned() })
+}
+
+fn completion_slice<T: Copy>(result: &sys::mln_completion_result) -> PyResult<Vec<T>> {
+    if result.value_count == 0 {
+        return Ok(Vec::new());
+    }
+    if result.value.is_null() {
+        return Err(py_errors::NativeError::new_err((
+            Option::<i32>::None,
+            "native completion returned a null slice",
+        )));
+    }
+    // SAFETY: each caller supplies the element type documented by the
+    // submitting C function, and the slice is borrowed for this callback.
+    Ok(
+        unsafe {
+            std::slice::from_raw_parts(result.value.cast::<T>(), result.value_count).to_vec()
+        },
+    )
+}
+
+fn py_offline_region(py: Python<'_>, result: &sys::mln_completion_result) -> PyResult<Py<PyAny>> {
+    let raw = completion_value::<sys::mln_offline_region_info>(result)?;
+    let info = maplibre_core::runtime::copy_offline_region_info(&raw).map_err(map_error)?;
+    offline_region_info_to_py(py, &info)
+}
+
+fn py_optional_offline_region(
+    py: Python<'_>,
+    result: &sys::mln_completion_result,
+) -> PyResult<Py<PyAny>> {
+    if result.value_count == 0 {
+        return Ok(py.None());
+    }
+    py_offline_region(py, result)
+}
+
+fn py_offline_regions(py: Python<'_>, result: &sys::mln_completion_result) -> PyResult<Py<PyAny>> {
+    let regions = completion_slice::<sys::mln_offline_region_info>(result)?
+        .iter()
+        .map(maplibre_core::runtime::copy_offline_region_info)
+        .collect::<maplibre_core::Result<Vec<_>>>()
+        .map_err(map_error)?;
+    offline_region_list_to_py(py, &regions)
+}
+
+fn py_offline_region_status(
+    py: Python<'_>,
+    result: &sys::mln_completion_result,
+) -> PyResult<Py<PyAny>> {
+    let raw = completion_value::<sys::mln_offline_region_status>(result)?;
+    offline_region_status_to_py(py, &raw)
+}
+
+fn copied_string_view(view: sys::mln_buffer_view) -> PyResult<String> {
+    unsafe { maplibre_core::string::copy_string_view(view) }.map_err(map_error)
+}
+
+fn py_buffer(py: Python<'_>, result: &sys::mln_completion_result) -> PyResult<Py<PyAny>> {
+    let view = completion_value::<sys::mln_buffer_view>(result)?;
+    let bytes =
+        unsafe { maplibre_core::string::copy_string_view_bytes(view) }.map_err(map_error)?;
+    Ok(PyBytes::new(py, &bytes).into_any().unbind())
+}
+
+fn py_optional_buffer(py: Python<'_>, result: &sys::mln_completion_result) -> PyResult<Py<PyAny>> {
+    if result.value_count == 0 {
+        Ok(py.None())
+    } else {
+        py_buffer(py, result)
+    }
+}
+
+fn py_string(py: Python<'_>, result: &sys::mln_completion_result) -> PyResult<Py<PyAny>> {
+    Ok(copied_string_view(completion_value(result)?)?
+        .into_pyobject(py)?
+        .into_any()
+        .unbind())
+}
+
+fn py_string_list(py: Python<'_>, result: &sys::mln_completion_result) -> PyResult<Py<PyAny>> {
+    let values = completion_slice::<sys::mln_buffer_view>(result)?;
+    let list = PyList::empty(py);
+    for value in values {
+        list.append(copied_string_view(value)?)?;
+    }
+    Ok(list.into_any().unbind())
+}
+
+fn py_source_info(py: Python<'_>, result: &sys::mln_completion_result) -> PyResult<Py<PyAny>> {
+    if result.value_count == 0 {
+        return Ok(py.None());
+    }
+    let raw = completion_value::<sys::mln_style_source_result>(result)?;
+    let attribution = raw
+        .info
+        .has_attribution
+        .then(|| copied_string_view(raw.attribution))
+        .transpose()?;
+    let url = (raw.info.fields & sys::MLN_STYLE_SOURCE_INFO_URL != 0)
+        .then(|| copied_string_view(raw.url))
+        .transpose()?;
+    let mut tiles = Vec::with_capacity(raw.tile_url_count);
+    if raw.tile_url_count != 0 {
+        if raw.tile_urls.is_null() {
+            return Err(py_errors::NativeError::new_err((
+                Option::<i32>::None,
+                "source completion returned a null tile URL array",
+            )));
+        }
+        for view in unsafe { std::slice::from_raw_parts(raw.tile_urls, raw.tile_url_count) } {
+            tiles.push(copied_string_view(*view)?);
         }
     }
+    source_info_to_py(
+        py,
+        maplibre_core::style::style_source_info_from_native(&raw.info, attribution, url, tiles),
+    )
+}
+
+fn py_layer_info(py: Python<'_>, result: &sys::mln_completion_result) -> PyResult<Py<PyAny>> {
+    if result.value_count == 0 {
+        return Ok(py.None());
+    }
+    let raw = completion_value::<sys::mln_style_layer_result>(result)?;
+    let source_id = (raw.info.fields & sys::MLN_STYLE_LAYER_INFO_SOURCE_ID != 0)
+        .then(|| copied_string_view(raw.source_id))
+        .transpose()?;
+    let source_layer = (raw.info.fields & sys::MLN_STYLE_LAYER_INFO_SOURCE_LAYER != 0)
+        .then(|| copied_string_view(raw.source_layer))
+        .transpose()?;
+    let info = unsafe {
+        maplibre_core::style::style_layer_info_from_native(&raw.info, source_id, source_layer)
+    }
+    .map_err(map_error)?;
+    let dict = PyDict::new(py);
+    dict.set_item("layer_type", info.layer_type)?;
+    dict.set_item("min_zoom", info.min_zoom)?;
+    dict.set_item("max_zoom", info.max_zoom)?;
+    dict.set_item("visibility", info.visibility.raw_value())?;
+    dict.set_item("source_id", info.source_id)?;
+    dict.set_item("source_layer", info.source_layer)?;
+    Ok(dict.into_any().unbind())
+}
+
+fn py_style_image_info(py: Python<'_>, result: &sys::mln_completion_result) -> PyResult<Py<PyAny>> {
+    if result.value_count == 0 {
+        return Ok(py.None());
+    }
+    let raw = completion_value::<sys::mln_style_image_result>(result)?;
+    style_image_info_to_py(py, &raw.info)
+}
+
+fn copy_stretches(
+    values: *const sys::mln_image_stretch,
+    count: usize,
+) -> PyResult<Vec<(f32, f32)>> {
+    if count == 0 {
+        return Ok(Vec::new());
+    }
+    if values.is_null() {
+        return Err(py_errors::NativeError::new_err((
+            Option::<i32>::None,
+            "native style image returned a null stretch array",
+        )));
+    }
+    Ok(unsafe { std::slice::from_raw_parts(values, count) }
+        .iter()
+        .map(|value| (value.from, value.to))
+        .collect())
+}
+
+fn py_style_image(py: Python<'_>, result: &sys::mln_completion_result) -> PyResult<Py<PyAny>> {
+    if result.value_count == 0 {
+        return Ok(py.None());
+    }
+    let raw = completion_value::<sys::mln_style_image_result>(result)?;
+    let value = style_image_info_to_py(py, &raw.info)?;
+    let dict = value.bind(py).cast::<PyDict>()?;
+    let pixels =
+        unsafe { maplibre_core::string::copy_string_view_bytes(raw.pixels) }.map_err(map_error)?;
+    dict.set_item("pixels", PyBytes::new(py, &pixels))?;
+    dict.set_item(
+        "stretch_x",
+        copy_stretches(raw.stretch_x, raw.stretch_x_count)?,
+    )?;
+    dict.set_item(
+        "stretch_y",
+        copy_stretches(raw.stretch_y, raw.stretch_y_count)?,
+    )?;
+    Ok(value)
+}
+
+fn py_style_image_stretches(
+    py: Python<'_>,
+    result: &sys::mln_completion_result,
+) -> PyResult<Py<PyAny>> {
+    if result.value_count == 0 {
+        return Ok(py.None());
+    }
+    let raw = completion_value::<sys::mln_style_image_stretches_result>(result)?;
+    (
+        copy_stretches(raw.stretch_x, raw.stretch_x_count)?,
+        copy_stretches(raw.stretch_y, raw.stretch_y_count)?,
+    )
+        .into_pyobject(py)
+        .map(|value| value.into_any().unbind())
+}
+
+fn py_optional_lat_lngs(
+    py: Python<'_>,
+    result: &sys::mln_completion_result,
+) -> PyResult<Py<PyAny>> {
+    let coordinates = completion_slice::<sys::mln_lat_lng>(result)?;
+    if coordinates.is_empty() {
+        Ok(py.None())
+    } else {
+        lat_lng_list_to_py(py, &coordinates)
+    }
+}
+
+fn py_queried_features(py: Python<'_>, result: &sys::mln_completion_result) -> PyResult<Py<PyAny>> {
+    let raw = completion_slice::<sys::mln_queried_feature>(result)?;
+    // SAFETY: the completion keeps every nested feature view alive while this
+    // callback copies it into Python-owned values.
+    let features =
+        unsafe { maplibre_core::query::copy_queried_features(&raw) }.map_err(map_error)?;
+    Ok(queried_features_to_py(py, features)?.into_any())
+}
+
+fn py_texture_readback(py: Python<'_>, result: &sys::mln_completion_result) -> PyResult<Py<PyAny>> {
+    let raw = completion_value::<sys::mln_texture_readback_result>(result)?;
+    let dict = PyDict::new(py);
+    dict.set_item(
+        "info",
+        texture_image_info_to_py(
+            py,
+            maplibre_core::values::texture_image_info_from_native(&raw.info),
+        )?
+        .bind(py),
+    )?;
+    let bytes =
+        unsafe { maplibre_core::string::copy_string_view_bytes(raw.data) }.map_err(map_error)?;
+    dict.set_item("data", PyBytes::new(py, &bytes))?;
+    Ok(dict.into_any().unbind())
 }
 
 impl PyLogCallbackState {
@@ -372,9 +724,9 @@ impl MapHandle {
             sys::mln_buffer_view,
             sys::mln_buffer_view,
             *const sys::mln_style_tile_source_options,
-            *mut u64,
+            *const sys::mln_completion,
         ) -> sys::mln_status,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let source_id = maplibre_core::string::string_view(&source_id);
         let url = maplibre_core::string::string_view(&url);
         let options = tile_source_options_from_parts(
@@ -388,8 +740,14 @@ impl MapHandle {
             raster_dem_encoding,
         )?;
         let options = maplibre_core::style::tile_source_options_to_native(&options);
-        self.run_style_command(|map, out| unsafe {
-            add(map, source_id.raw(), url.raw(), options.as_ptr(), out)
+        self.run_style_command(|map, completion| unsafe {
+            add(
+                map,
+                source_id.raw(),
+                url.raw(),
+                options.as_ptr(),
+                completion,
+            )
         })
     }
 
@@ -412,9 +770,9 @@ impl MapHandle {
             *const sys::mln_buffer_view,
             usize,
             *const sys::mln_style_tile_source_options,
-            *mut u64,
+            *const sys::mln_completion,
         ) -> sys::mln_status,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let source_id = maplibre_core::string::string_view(&source_id);
         let tiles = maplibre_core::style::NativeTileUrls::new(&tiles);
         let options = tile_source_options_from_parts(
@@ -428,41 +786,38 @@ impl MapHandle {
             raster_dem_encoding,
         )?;
         let options = maplibre_core::style::tile_source_options_to_native(&options);
-        self.run_style_command(|map, out| unsafe {
+        self.run_style_command(|map, completion| unsafe {
             add(
                 map,
                 source_id.raw(),
                 tiles.as_ptr(),
                 tiles.len(),
                 options.as_ptr(),
-                out,
+                completion,
             )
         })
     }
 
-    fn run_style_operation<T>(
+    fn run_style_operation(
         &self,
         py: Python<'_>,
-        start: impl FnOnce(sys::mln_map, *mut sys::mln_operation) -> sys::mln_status,
-        take: impl FnOnce(sys::mln_operation) -> PyResult<T>,
-    ) -> PyResult<T> {
+        start: impl FnOnce(sys::mln_map, *const sys::mln_completion) -> sys::mln_status,
+        convert: impl FnOnce(Python<'_>, &sys::mln_completion_result) -> PyResult<Py<PyAny>>
+        + Send
+        + 'static,
+    ) -> PyResult<Py<PyAny>> {
         let state = self.state();
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(start(state.handle(), &mut operation)).map_err(map_error)?;
-        drop(state);
-        let operation = OwnedOperation(operation);
-        wait_operation(py, operation.0)?;
-        take(operation.0)
+        submit_python_future(py, |completion| start(state.handle(), completion), convert)
     }
 
     fn run_style_command(
         &self,
-        accept: impl FnOnce(sys::mln_map, *mut u64) -> sys::mln_status,
-    ) -> PyResult<u64> {
+        accept: impl FnOnce(sys::mln_map, *const sys::mln_completion) -> sys::mln_status,
+    ) -> PyResult<Py<PyAny>> {
         let state = self.state();
-        let mut command_id = 0;
-        maplibre_core::check(accept(state.handle(), &mut command_id)).map_err(map_error)?;
-        Ok(command_id)
+        Python::attach(|py| {
+            submit_python_command_future(py, |completion| accept(state.handle(), completion))
+        })
     }
 }
 
@@ -707,10 +1062,6 @@ impl RenderSessionState {
         self.handle.is_closed()
     }
 }
-fn operation_result_consumed(error: PyErr) -> PyErr {
-    py_errors::_OperationResultConsumedError::new_err(error.to_string())
-}
-
 #[pymethods]
 impl RuntimeHandle {
     fn close(&self, py: Python<'_>) -> PyResult<()> {
@@ -727,449 +1078,225 @@ impl RuntimeHandle {
             state.mark_closed();
         }
 
-        let mut callback = self
-            .notification_callback
+        self.event_wake
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        let source = *self
-            .notification_source
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        if source.0 != 0 {
-            py.detach(|| unsafe { sys::mln_notification_source_release(source) });
-            *self
-                .notification_source
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner()) = sys::mln_notification_source(0);
-        }
-        callback.take();
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take();
         Ok(())
     }
 
-    fn barrier(&self, py: Python<'_>) -> PyResult<()> {
+    fn barrier(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let runtime = self.native()?;
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe { sys::mln_runtime_barrier_start(runtime, &mut operation) })
-            .map_err(map_error)?;
-        let operation = OwnedOperation(operation);
-        wait_operation(py, operation.0)
+        submit_python_future(
+            py,
+            |completion| unsafe { sys::mln_runtime_barrier(runtime, completion) },
+            py_none,
+        )
     }
 
-    fn set_notification_callback(&self, py: Python<'_>, callback: Py<PyAny>) -> PyResult<()> {
+    fn set_event_wake_callback(&self, py: Python<'_>, callback: Py<PyAny>) -> PyResult<()> {
         self.ensure_open()?;
-        let replacement = Box::new(PyNotificationCallbackState { callback });
-        let user_data = ptr::from_ref(&*replacement).cast_mut().cast::<c_void>() as usize;
-        let mut callback_slot = self
-            .notification_callback
+        self.event_wake
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        let source = *self
-            .notification_source
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        let status = py.detach(|| unsafe {
-            sys::mln_notification_source_set_callback(
-                source,
-                Some(notification_callback_trampoline),
-                user_data as *mut c_void,
-            )
-        });
-        maplibre_core::check(status).map_err(map_error)?;
-        callback_slot.replace(replacement);
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .replace(callback.clone_ref(py));
         Ok(())
     }
 
-    fn clear_notification_callback(&self, py: Python<'_>) -> PyResult<()> {
+    fn clear_event_wake_callback(&self) -> PyResult<()> {
         self.ensure_open()?;
-        let mut callback_slot = self
-            .notification_callback
+        self.event_wake
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        let source = *self
-            .notification_source
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        let status = py.detach(|| unsafe { sys::mln_notification_source_clear_callback(source) });
-        maplibre_core::check(status).map_err(map_error)?;
-        callback_slot.take();
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take();
         Ok(())
     }
 
-    fn drain_ready(&self) -> PyResult<Vec<(u32, u64)>> {
-        self.ensure_open()?;
-        let source = *self
-            .notification_source
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        let mut batch = sys::mln_ready_batch(0);
-        maplibre_core::check(unsafe {
-            sys::mln_notification_source_drain_ready(source, &mut batch)
-        })
-        .map_err(map_error)?;
-        let batch = OwnedReadyBatch(batch);
-        let mut view = sys::mln_ready_batch_view {
-            size: std::mem::size_of::<sys::mln_ready_batch_view>() as u32,
-            endpoint_size: 0,
-            endpoints: ptr::null(),
-            endpoint_count: 0,
-        };
-        maplibre_core::check(unsafe { sys::mln_ready_batch_get(batch.0, &mut view) })
-            .map_err(map_error)?;
-        if view.endpoint_size < std::mem::size_of::<sys::mln_ready_endpoint>() as u32
-            || (view.endpoint_count != 0 && view.endpoints.is_null())
-        {
-            return Err(py_errors::NativeError::new_err((
-                Option::<i32>::None,
-                "native returned an invalid ready-batch view",
-            )));
-        }
-        let mut endpoints = Vec::with_capacity(view.endpoint_count);
-        for index in 0..view.endpoint_count {
-            // SAFETY: the validated view contains endpoint_count records at
-            // endpoint_size strides until batch drops.
-            let endpoint = unsafe {
-                ptr::read_unaligned(
-                    view.endpoints
-                        .cast::<u8>()
-                        .add(index * view.endpoint_size as usize)
-                        .cast::<sys::mln_ready_endpoint>(),
-                )
-            };
-            endpoints.push((endpoint.kind, endpoint.id));
-        }
-        Ok(endpoints)
-    }
-
-    fn run_ambient_cache_operation_start(&self, ambient_operation: u32) -> PyResult<u64> {
-        let runtime = self.native()?;
-        let mut operation = sys::mln_operation(0);
-        // SAFETY: The C API validates the runtime handle, operation enum value,
-        // and writable operation pointer.
-        maplibre_core::check(unsafe {
-            sys::mln_runtime_run_ambient_cache_operation_start(
-                runtime,
-                ambient_operation,
-                &mut operation,
-            )
-        })
-        .map_err(map_error)?;
-        Ok(operation.0)
-    }
-
-    fn set_maximum_ambient_cache_size_start(&self, size: u64) -> PyResult<u64> {
-        let runtime = self.native()?;
-        let mut operation = sys::mln_operation(0);
-        // SAFETY: The C API validates the runtime handle and writable operation
-        // pointer.
-        maplibre_core::check(unsafe {
-            sys::mln_runtime_set_maximum_ambient_cache_size_start(runtime, size, &mut operation)
-        })
-        .map_err(map_error)?;
-        Ok(operation.0)
-    }
-
-    fn offline_region_create_start(
+    fn run_ambient_cache_operation(
         &self,
+        py: Python<'_>,
+        ambient_operation: u32,
+    ) -> PyResult<Py<PyAny>> {
+        let runtime = self.native()?;
+        submit_python_future(
+            py,
+            |completion| unsafe {
+                sys::mln_runtime_run_ambient_cache_operation(runtime, ambient_operation, completion)
+            },
+            py_none,
+        )
+    }
+
+    fn set_maximum_ambient_cache_size(&self, py: Python<'_>, size: u64) -> PyResult<Py<PyAny>> {
+        let runtime = self.native()?;
+        submit_python_future(
+            py,
+            |completion| unsafe {
+                sys::mln_runtime_set_maximum_ambient_cache_size(runtime, size, completion)
+            },
+            py_none,
+        )
+    }
+
+    fn create_offline_region(
+        &self,
+        py: Python<'_>,
         definition: &Bound<'_, PyAny>,
         metadata: Vec<u8>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let runtime = self.native()?;
         let definition = offline_region_definition_from_wire(definition)?;
         let definition = maplibre_core::runtime::offline_region_definition_to_native(&definition)
             .map_err(map_error)?;
         let raw = definition.to_raw();
-        let mut operation = sys::mln_operation(0);
-        // SAFETY: The C API validates the runtime, definition, metadata pointer/length, and output pointer.
-        maplibre_core::check(unsafe {
-            sys::mln_runtime_offline_region_create_start(
-                runtime,
-                &raw,
-                maplibre_core::runtime::metadata_ptr(&metadata),
-                metadata.len(),
-                &mut operation,
-            )
-        })
-        .map_err(map_error)?;
-        Ok(operation.0)
+        submit_python_future(
+            py,
+            |completion| unsafe {
+                sys::mln_runtime_offline_region_create(
+                    runtime,
+                    &raw,
+                    maplibre_core::runtime::metadata_ptr(&metadata),
+                    metadata.len(),
+                    completion,
+                )
+            },
+            py_offline_region,
+        )
     }
 
-    fn offline_region_get_start(&self, region_id: i64) -> PyResult<u64> {
-        start_offline_operation(self, |runtime, out| unsafe {
-            sys::mln_runtime_offline_region_get_start(runtime, region_id, out)
-        })
+    fn get_offline_region(&self, py: Python<'_>, region_id: i64) -> PyResult<Py<PyAny>> {
+        let runtime = self.native()?;
+        submit_python_future(
+            py,
+            |completion| unsafe {
+                sys::mln_runtime_offline_region_get(runtime, region_id, completion)
+            },
+            py_optional_offline_region,
+        )
     }
 
-    fn offline_regions_list_start(&self) -> PyResult<u64> {
-        start_offline_operation(self, |runtime, out| unsafe {
-            sys::mln_runtime_offline_regions_list_start(runtime, out)
-        })
+    fn list_offline_regions(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let runtime = self.native()?;
+        submit_python_future(
+            py,
+            |completion| unsafe { sys::mln_runtime_offline_regions_list(runtime, completion) },
+            py_offline_regions,
+        )
     }
 
-    fn offline_regions_merge_database_start(&self, side_database_path: String) -> PyResult<u64> {
-        let path = maplibre_core::string::c_string(&side_database_path).map_err(map_error)?;
-        start_offline_operation(self, |runtime, out| unsafe {
-            sys::mln_runtime_offline_regions_merge_database_start(runtime, path.as_ptr(), out)
-        })
-    }
-
-    fn offline_region_update_metadata_start(
+    fn merge_offline_regions_database(
         &self,
+        py: Python<'_>,
+        side_database_path: String,
+    ) -> PyResult<Py<PyAny>> {
+        let runtime = self.native()?;
+        let path = maplibre_core::string::c_string(&side_database_path).map_err(map_error)?;
+        submit_python_future(
+            py,
+            |completion| unsafe {
+                sys::mln_runtime_offline_regions_merge_database(runtime, path.as_ptr(), completion)
+            },
+            py_offline_regions,
+        )
+    }
+
+    fn update_offline_region_metadata(
+        &self,
+        py: Python<'_>,
         region_id: i64,
         metadata: Vec<u8>,
-    ) -> PyResult<u64> {
-        start_offline_operation(self, |runtime, out| unsafe {
-            sys::mln_runtime_offline_region_update_metadata_start(
-                runtime,
-                region_id,
-                maplibre_core::runtime::metadata_ptr(&metadata),
-                metadata.len(),
-                out,
-            )
-        })
-    }
-
-    fn offline_region_get_status_start(&self, region_id: i64) -> PyResult<u64> {
-        start_offline_operation(self, |runtime, out| unsafe {
-            sys::mln_runtime_offline_region_get_status_start(runtime, region_id, out)
-        })
-    }
-
-    fn offline_region_set_observed_start(&self, region_id: i64, observed: bool) -> PyResult<u64> {
-        start_offline_operation(self, |runtime, out| unsafe {
-            sys::mln_runtime_offline_region_set_observed_start(runtime, region_id, observed, out)
-        })
-    }
-
-    fn offline_region_set_download_state_start(&self, region_id: i64, state: u32) -> PyResult<u64> {
-        start_offline_operation(self, |runtime, out| unsafe {
-            sys::mln_runtime_offline_region_set_download_state_start(runtime, region_id, state, out)
-        })
-    }
-
-    fn offline_region_invalidate_start(&self, region_id: i64) -> PyResult<u64> {
-        start_offline_operation(self, |runtime, out| unsafe {
-            sys::mln_runtime_offline_region_invalidate_start(runtime, region_id, out)
-        })
-    }
-
-    fn offline_region_delete_start(&self, region_id: i64) -> PyResult<u64> {
-        start_offline_operation(self, |runtime, out| unsafe {
-            sys::mln_runtime_offline_region_delete_start(runtime, region_id, out)
-        })
-    }
-
-    fn operation_poll(&self, operation: u64) -> PyResult<bool> {
-        let mut completed = false;
-        maplibre_core::check(unsafe {
-            sys::mln_operation_poll(sys::mln_operation(operation), &mut completed)
-        })
-        .map_err(map_error)?;
-        Ok(completed)
-    }
-
-    fn operation_wait(&self, py: Python<'_>, operation: u64, timeout_ms: i64) -> PyResult<bool> {
-        let mut completed = false;
-        let status = py.detach(|| unsafe {
-            sys::mln_operation_wait(sys::mln_operation(operation), timeout_ms, &mut completed)
-        });
-        maplibre_core::check(status).map_err(map_error)?;
-        Ok(completed)
-    }
-
-    fn operation_cancel(&self, operation: u64) -> PyResult<()> {
-        maplibre_core::check(unsafe { sys::mln_operation_cancel(sys::mln_operation(operation)) })
-            .map_err(map_error)
-    }
-
-    fn operation_status(&self, operation: u64) -> PyResult<(sys::mln_status, String)> {
-        let mut operation_status = sys::MLN_STATUS_OK;
-        maplibre_core::check(unsafe {
-            sys::mln_operation_get_status(sys::mln_operation(operation), &mut operation_status)
-        })
-        .map_err(map_error)?;
-
-        let mut diagnostic_size = 0;
-        maplibre_core::check(unsafe {
-            sys::mln_operation_copy_diagnostic(
-                sys::mln_operation(operation),
-                ptr::null_mut(),
-                0,
-                &mut diagnostic_size,
-            )
-        })
-        .map_err(map_error)?;
-        let mut diagnostic = vec![0u8; diagnostic_size];
-        maplibre_core::check(unsafe {
-            sys::mln_operation_copy_diagnostic(
-                sys::mln_operation(operation),
-                diagnostic.as_mut_ptr().cast(),
-                diagnostic.len(),
-                &mut diagnostic_size,
-            )
-        })
-        .map_err(map_error)?;
-        diagnostic.truncate(diagnostic_size);
-        Ok((
-            operation_status,
-            String::from_utf8_lossy(&diagnostic).into_owned(),
-        ))
-    }
-
-    fn operation_release(&self, operation: u64) {
-        unsafe { sys::mln_operation_release(sys::mln_operation(operation)) };
-    }
-
-    fn offline_region_create_take_result(
-        &self,
-        py: Python<'_>,
-        operation_id: u64,
     ) -> PyResult<Py<PyAny>> {
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_offline_region_snapshot>::new();
-        maplibre_core::check(unsafe {
-            sys::mln_runtime_offline_region_create_take_result(
-                sys::mln_operation(operation_id),
-                out.as_mut_ptr(),
-            )
-        })
-        .map_err(map_error)?;
-        (|| {
-            let native = out
-                .into_live("mln_offline_region_snapshot")
-                .map_err(map_error)?;
-            let info = unsafe { maplibre_core::runtime::copy_offline_region_snapshot(native) }
-                .map_err(map_error)?;
-            offline_region_info_to_py(py, &info)
-        })()
-        .map_err(operation_result_consumed)
+        let runtime = self.native()?;
+        submit_python_future(
+            py,
+            |completion| unsafe {
+                sys::mln_runtime_offline_region_update_metadata(
+                    runtime,
+                    region_id,
+                    maplibre_core::runtime::metadata_ptr(&metadata),
+                    metadata.len(),
+                    completion,
+                )
+            },
+            py_offline_region,
+        )
     }
 
-    fn offline_region_get_take_result(
-        &self,
-        py: Python<'_>,
-        operation_id: u64,
-    ) -> PyResult<Option<Py<PyAny>>> {
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_offline_region_snapshot>::new();
-        let mut found = false;
-        maplibre_core::check(unsafe {
-            sys::mln_runtime_offline_region_get_take_result(
-                sys::mln_operation(operation_id),
-                out.as_mut_ptr(),
-                &mut found,
-            )
-        })
-        .map_err(map_error)?;
-        if !found {
-            return Ok(None);
-        }
-        (|| {
-            let native = out
-                .into_live("mln_offline_region_snapshot")
-                .map_err(map_error)?;
-            let info = unsafe { maplibre_core::runtime::copy_offline_region_snapshot(native) }
-                .map_err(map_error)?;
-            offline_region_info_to_py(py, &info).map(Some)
-        })()
-        .map_err(operation_result_consumed)
+    fn get_offline_region_status(&self, py: Python<'_>, region_id: i64) -> PyResult<Py<PyAny>> {
+        let runtime = self.native()?;
+        submit_python_future(
+            py,
+            |completion| unsafe {
+                sys::mln_runtime_offline_region_get_status(runtime, region_id, completion)
+            },
+            py_offline_region_status,
+        )
     }
 
-    fn offline_regions_list_take_result(
+    fn set_offline_region_observed(
         &self,
         py: Python<'_>,
-        operation_id: u64,
+        region_id: i64,
+        observed: bool,
     ) -> PyResult<Py<PyAny>> {
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_offline_region_list>::new();
-        maplibre_core::check(unsafe {
-            sys::mln_runtime_offline_regions_list_take_result(
-                sys::mln_operation(operation_id),
-                out.as_mut_ptr(),
-            )
-        })
-        .map_err(map_error)?;
-        (|| {
-            let native = out
-                .into_live("mln_offline_region_list")
-                .map_err(map_error)?;
-            let regions = unsafe { maplibre_core::runtime::copy_offline_region_list(native) }
-                .map_err(map_error)?;
-            offline_region_list_to_py(py, &regions)
-        })()
-        .map_err(operation_result_consumed)
+        let runtime = self.native()?;
+        submit_python_future(
+            py,
+            |completion| unsafe {
+                sys::mln_runtime_offline_region_set_observed(
+                    runtime, region_id, observed, completion,
+                )
+            },
+            py_none,
+        )
     }
 
-    fn offline_regions_merge_database_take_result(
+    fn set_offline_region_download_state(
         &self,
         py: Python<'_>,
-        operation_id: u64,
+        region_id: i64,
+        state: u32,
     ) -> PyResult<Py<PyAny>> {
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_offline_region_list>::new();
-        maplibre_core::check(unsafe {
-            sys::mln_runtime_offline_regions_merge_database_take_result(
-                sys::mln_operation(operation_id),
-                out.as_mut_ptr(),
-            )
-        })
-        .map_err(map_error)?;
-        (|| {
-            let native = out
-                .into_live("mln_offline_region_list")
-                .map_err(map_error)?;
-            let regions = unsafe { maplibre_core::runtime::copy_offline_region_list(native) }
-                .map_err(map_error)?;
-            offline_region_list_to_py(py, &regions)
-        })()
-        .map_err(operation_result_consumed)
+        let runtime = self.native()?;
+        submit_python_future(
+            py,
+            |completion| unsafe {
+                sys::mln_runtime_offline_region_set_download_state(
+                    runtime, region_id, state, completion,
+                )
+            },
+            py_none,
+        )
     }
 
-    fn offline_region_update_metadata_take_result(
-        &self,
-        py: Python<'_>,
-        operation_id: u64,
-    ) -> PyResult<Py<PyAny>> {
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_offline_region_snapshot>::new();
-        maplibre_core::check(unsafe {
-            sys::mln_runtime_offline_region_update_metadata_take_result(
-                sys::mln_operation(operation_id),
-                out.as_mut_ptr(),
-            )
-        })
-        .map_err(map_error)?;
-        (|| {
-            let native = out
-                .into_live("mln_offline_region_snapshot")
-                .map_err(map_error)?;
-            let info = unsafe { maplibre_core::runtime::copy_offline_region_snapshot(native) }
-                .map_err(map_error)?;
-            offline_region_info_to_py(py, &info)
-        })()
-        .map_err(operation_result_consumed)
+    fn invalidate_offline_region(&self, py: Python<'_>, region_id: i64) -> PyResult<Py<PyAny>> {
+        let runtime = self.native()?;
+        submit_python_future(
+            py,
+            |completion| unsafe {
+                sys::mln_runtime_offline_region_invalidate(runtime, region_id, completion)
+            },
+            py_none,
+        )
     }
 
-    fn offline_region_get_status_take_result(
-        &self,
-        py: Python<'_>,
-        operation_id: u64,
-    ) -> PyResult<Py<PyAny>> {
-        let mut status = empty_offline_region_status();
-        maplibre_core::check(unsafe {
-            sys::mln_runtime_offline_region_get_status_take_result(
-                sys::mln_operation(operation_id),
-                &mut status,
-            )
-        })
-        .map_err(map_error)?;
-        offline_region_status_to_py(py, &status).map_err(operation_result_consumed)
-    }
-
-    fn operation_finish(&self, operation_id: u64) -> PyResult<()> {
-        maplibre_core::check(unsafe { sys::mln_operation_finish(sys::mln_operation(operation_id)) })
-            .map_err(map_error)
+    fn delete_offline_region(&self, py: Python<'_>, region_id: i64) -> PyResult<Py<PyAny>> {
+        let runtime = self.native()?;
+        submit_python_future(
+            py,
+            |completion| unsafe {
+                sys::mln_runtime_offline_region_delete(runtime, region_id, completion)
+            },
+            py_none,
+        )
     }
 
     fn set_resource_provider(
         &self,
+        py: Python<'_>,
         callback: Py<PyAny>,
         max_pending_callbacks: usize,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         if max_pending_callbacks == 0 {
             return Err(invalid_argument_error(
                 "max_pending_callbacks must be greater than zero",
@@ -1181,35 +1308,33 @@ impl RuntimeHandle {
         ));
         let descriptor = replacement.descriptor();
         let runtime = self.native()?;
-        let mut command_id = 0;
         let replacement = Box::into_raw(replacement);
-        let result = maplibre_core::check(unsafe {
-            sys::mln_runtime_set_resource_provider(runtime, &descriptor, &mut command_id)
-        })
-        .map_err(map_error);
-        if let Err(error) = result {
-            // SAFETY: native never invokes release_user_data for a rejected registration.
-            drop(unsafe { Box::from_raw(replacement) });
-            return Err(error);
+        let result = submit_python_command_future(py, |completion| unsafe {
+            sys::mln_runtime_set_resource_provider(runtime, &descriptor, completion)
+        });
+        match result {
+            Ok(future) => Ok(future),
+            Err(error) => {
+                // SAFETY: native never invokes release_user_data for a rejected registration.
+                drop(unsafe { Box::from_raw(replacement) });
+                Err(error)
+            }
         }
-        Ok(command_id)
     }
 
-    fn clear_resource_provider(&self) -> PyResult<u64> {
+    fn clear_resource_provider(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let runtime = self.native()?;
-        let mut command_id = 0;
-        maplibre_core::check(unsafe {
-            sys::mln_runtime_clear_resource_provider(runtime, &mut command_id)
+        submit_python_command_future(py, |completion| unsafe {
+            sys::mln_runtime_clear_resource_provider(runtime, completion)
         })
-        .map_err(map_error)?;
-        Ok(command_id)
     }
 
     fn set_resource_transform(
         &self,
+        py: Python<'_>,
         callback: Py<PyAny>,
         max_pending_callbacks: usize,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         if max_pending_callbacks == 0 {
             return Err(invalid_argument_error(
                 "max_pending_callbacks must be greater than zero",
@@ -1221,35 +1346,33 @@ impl RuntimeHandle {
         ));
         let descriptor = replacement.descriptor();
         let runtime = self.native()?;
-        let mut command_id = 0;
         let replacement = Box::into_raw(replacement);
-        let result = maplibre_core::check(unsafe {
-            sys::mln_runtime_set_resource_transform(runtime, &descriptor, &mut command_id)
-        })
-        .map_err(map_error);
-        if let Err(error) = result {
-            // SAFETY: native never invokes release_user_data for a rejected registration.
-            drop(unsafe { Box::from_raw(replacement) });
-            return Err(error);
+        let result = submit_python_command_future(py, |completion| unsafe {
+            sys::mln_runtime_set_resource_transform(runtime, &descriptor, completion)
+        });
+        match result {
+            Ok(future) => Ok(future),
+            Err(error) => {
+                // SAFETY: native never invokes release_user_data for a rejected registration.
+                drop(unsafe { Box::from_raw(replacement) });
+                Err(error)
+            }
         }
-        Ok(command_id)
     }
 
-    fn clear_resource_transform(&self) -> PyResult<u64> {
+    fn clear_resource_transform(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let runtime = self.native()?;
-        let mut command_id = 0;
-        maplibre_core::check(unsafe {
-            sys::mln_runtime_clear_resource_transform(runtime, &mut command_id)
+        submit_python_command_future(py, |completion| unsafe {
+            sys::mln_runtime_clear_resource_transform(runtime, completion)
         })
-        .map_err(map_error)?;
-        Ok(command_id)
     }
 
     fn set_http_header_transform(
         &self,
+        py: Python<'_>,
         callback: Py<PyAny>,
         max_pending_callbacks: usize,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         if max_pending_callbacks == 0 {
             return Err(invalid_argument_error(
                 "max_pending_callbacks must be greater than zero",
@@ -1261,28 +1384,25 @@ impl RuntimeHandle {
         ));
         let descriptor = replacement.descriptor();
         let runtime = self.native()?;
-        let mut command_id = 0;
         let replacement = Box::into_raw(replacement);
-        let result = maplibre_core::check(unsafe {
-            sys::mln_runtime_set_http_header_transform(runtime, &descriptor, &mut command_id)
-        })
-        .map_err(map_error);
-        if let Err(error) = result {
-            // SAFETY: native never invokes release_user_data for a rejected registration.
-            drop(unsafe { Box::from_raw(replacement) });
-            return Err(error);
+        let result = submit_python_command_future(py, |completion| unsafe {
+            sys::mln_runtime_set_http_header_transform(runtime, &descriptor, completion)
+        });
+        match result {
+            Ok(future) => Ok(future),
+            Err(error) => {
+                // SAFETY: native never invokes release_user_data for a rejected registration.
+                drop(unsafe { Box::from_raw(replacement) });
+                Err(error)
+            }
         }
-        Ok(command_id)
     }
 
-    fn clear_http_header_transform(&self) -> PyResult<u64> {
+    fn clear_http_header_transform(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let runtime = self.native()?;
-        let mut command_id = 0;
-        maplibre_core::check(unsafe {
-            sys::mln_runtime_clear_http_header_transform(runtime, &mut command_id)
+        submit_python_command_future(py, |completion| unsafe {
+            sys::mln_runtime_clear_http_header_transform(runtime, completion)
         })
-        .map_err(map_error)?;
-        Ok(command_id)
     }
 
     fn drain_events(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -1348,31 +1468,26 @@ impl MapHandle {
         Ok(state.handle().0)
     }
 
-    fn request_repaint(&self) -> PyResult<u64> {
-        let state = self.state();
-        let mut command_id = 0;
-        maplibre_core::check(unsafe {
-            sys::mln_map_request_repaint(state.handle(), &mut command_id)
+    fn request_repaint(&self) -> PyResult<Py<PyAny>> {
+        self.run_style_command(|map, completion| unsafe {
+            sys::mln_map_request_repaint(map, completion)
         })
-        .map_err(map_error)?;
-        Ok(command_id)
     }
 
-    fn request_still_image_start(&self) -> PyResult<u64> {
+    fn request_still_image(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let state = self.state();
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_map_request_still_image_start(state.handle(), &mut operation)
-        })
-        .map_err(map_error)?;
-        Ok(operation.0)
+        submit_python_future(
+            py,
+            |completion| unsafe { sys::mln_map_request_still_image(state.handle(), completion) },
+            py_none,
+        )
     }
 
-    fn dump_debug_logs(&self) -> PyResult<u64> {
+    fn dump_debug_logs(&self) -> PyResult<Py<PyAny>> {
         self.run_style_command(|map, out| unsafe { sys::mln_map_dump_debug_logs(map, out) })
     }
 
-    fn set_event_mask(&self, mask: u64) -> PyResult<u64> {
+    fn set_event_mask(&self, mask: u64) -> PyResult<Py<PyAny>> {
         self.run_style_command(|map, out| unsafe { sys::mln_map_set_event_mask(map, mask, out) })
     }
 
@@ -1385,13 +1500,13 @@ impl MapHandle {
         Ok(snapshot.event_mask)
     }
 
-    fn set_debug_options(&self, options: u32) -> PyResult<u64> {
+    fn set_debug_options(&self, options: u32) -> PyResult<Py<PyAny>> {
         self.run_style_command(|map, out| unsafe {
             sys::mln_map_set_debug_options(map, options, out)
         })
     }
 
-    fn set_rendering_stats_view_enabled(&self, enabled: bool) -> PyResult<u64> {
+    fn set_rendering_stats_view_enabled(&self, enabled: bool) -> PyResult<Py<PyAny>> {
         self.run_style_command(|map, out| unsafe {
             sys::mln_map_set_rendering_stats_view_enabled(map, enabled, out)
         })
@@ -1410,19 +1525,15 @@ impl MapHandle {
         ))
     }
 
-    fn resize(&self, width: u32, height: u32, scale_factor: f64) -> PyResult<u64> {
-        let state = self.state();
+    fn resize(&self, width: u32, height: u32, scale_factor: f64) -> PyResult<Py<PyAny>> {
         let extent = sys::mln_logical_extent {
             width,
             height,
             scale_factor,
         };
-        let mut command_id = 0;
-        maplibre_core::check(unsafe {
-            sys::mln_map_resize(state.handle(), extent, &mut command_id)
+        self.run_style_command(|map, completion| unsafe {
+            sys::mln_map_resize(map, extent, completion)
         })
-        .map_err(map_error)?;
-        Ok(command_id)
     }
     fn snapshot(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let state = self.state();
@@ -1468,7 +1579,7 @@ impl MapHandle {
         constrain_mode: Option<u32>,
         viewport_mode: Option<u32>,
         frustum_offset: Option<(f64, f64, f64, f64)>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let options = viewport_options_from_parts(
             north_orientation,
             constrain_mode,
@@ -1488,7 +1599,7 @@ impl MapHandle {
         lod_pitch_threshold: Option<f64>,
         lod_zoom_shift: Option<f64>,
         lod_mode: Option<u32>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let options = tile_options_from_parts(
             prefetch_zoom_delta,
             lod_min_radius,
@@ -1502,69 +1613,68 @@ impl MapHandle {
         })
     }
 
-    fn create_projection(&self, py: Python<'_>) -> PyResult<MapProjectionHandle> {
+    fn create_projection(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let state = self.state();
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_map_projection_create_start(state.handle(), &mut operation)
-        })
-        .map_err(map_error)?;
-        drop(state);
-        let operation = OwnedOperation(operation);
-        wait_operation(py, operation.0)?;
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_map_projection>::new();
-        maplibre_core::check(unsafe {
-            sys::mln_map_projection_create_take_result(operation.0, out.as_mut_ptr())
-        })
-        .map_err(map_error)?;
-        let native = out.into_live("mln_map_projection").map_err(map_error)?;
-        let handle = unsafe {
-            maplibre_core::handle::NativeHandleState::from_handle(native, "mln_map_projection")
-        }
-        .map_err(map_error)?;
-        Ok(MapProjectionHandle {
-            state: Mutex::new(handle),
-        })
+        submit_python_future(
+            py,
+            |completion| unsafe { sys::mln_map_projection_create(state.handle(), completion) },
+            |py, result| {
+                let native = completion_value::<sys::mln_map_projection>(result)?;
+                let handle = unsafe {
+                    maplibre_core::handle::NativeHandleState::from_handle(
+                        native,
+                        "mln_map_projection",
+                    )
+                }
+                .map_err(map_error)?;
+                Py::new(
+                    py,
+                    MapProjectionHandle {
+                        state: Mutex::new(handle),
+                    },
+                )
+                .map(|value| value.into_any())
+            },
+        )
     }
 
-    fn set_style_url(&self, url: String) -> PyResult<u64> {
+    fn set_style_url(&self, url: String) -> PyResult<Py<PyAny>> {
         let url = maplibre_core::string::c_string(&url).map_err(map_error)?;
         self.run_style_command(|map, out| unsafe {
             sys::mln_map_set_style_url(map, url.as_ptr(), out)
         })
     }
 
-    fn set_style_json(&self, json: &Bound<'_, PyBytes>) -> PyResult<u64> {
+    fn set_style_json(&self, json: &Bound<'_, PyBytes>) -> PyResult<Py<PyAny>> {
         let json = maplibre_core::string::buffer_view(json.as_bytes());
         self.run_style_command(|map, out| unsafe { sys::mln_map_set_style_json(map, json, out) })
     }
 
-    fn copy_loaded_style_json(&self, py: Python<'_>) -> PyResult<Py<PyBytes>> {
+    fn copy_loaded_style_json(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         self.run_style_operation(
             py,
-            |map, out| unsafe { sys::mln_map_loaded_style_json_start(map, out) },
-            |operation| {
-                let mut buffer = sys::mln_buffer(0);
-                maplibre_core::check(unsafe {
-                    sys::mln_map_loaded_style_json_take_result(operation, &mut buffer)
-                })
-                .map_err(map_error)?;
-                owned_buffer_to_py(py, buffer)
+            |map, completion| unsafe { sys::mln_map_loaded_style_json(map, completion) },
+            |py, result| {
+                let view = completion_value::<sys::mln_buffer_view>(result)?;
+                let bytes = unsafe { maplibre_core::string::copy_string_view_bytes(view) }
+                    .map_err(map_error)?;
+                Ok(PyBytes::new(py, &bytes).into_any().unbind())
             },
         )
     }
 
-    fn copy_style_url(&self, py: Python<'_>) -> PyResult<String> {
+    fn copy_style_url(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         self.run_style_operation(
             py,
-            |map, out| unsafe { sys::mln_map_style_url_start(map, out) },
-            |operation| {
-                let mut buffer = sys::mln_buffer(0);
-                maplibre_core::check(unsafe {
-                    sys::mln_map_style_url_take_result(operation, &mut buffer)
-                })
-                .map_err(map_error)?;
-                owned_buffer_to_string(buffer)
+            |map, completion| unsafe { sys::mln_map_style_url(map, completion) },
+            |py, result| {
+                let view = completion_value::<sys::mln_buffer_view>(result)?;
+                let bytes = unsafe { maplibre_core::string::copy_string_view_bytes(view) }
+                    .map_err(map_error)?;
+                let text = String::from_utf8(bytes).map_err(|error| {
+                    invalid_argument_error(format!("native text is not UTF-8: {error}"))
+                })?;
+                Ok(text.into_pyobject(py)?.into_any().unbind())
             },
         )
     }
@@ -1582,24 +1692,17 @@ impl MapHandle {
 
     fn get_camera_ordered(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let state = self.state();
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_map_camera_query_start(state.handle(), &mut operation)
-        })
-        .map_err(map_error)?;
-        drop(state);
-        let operation = OwnedOperation(operation);
-        wait_operation(py, operation.0)?;
-        let mut result: sys::mln_camera_query_result = unsafe { std::mem::zeroed() };
-        result.size = std::mem::size_of::<sys::mln_camera_query_result>() as u32;
-        maplibre_core::check(unsafe {
-            sys::mln_map_camera_query_take_result(operation.0, &mut result)
-        })
-        .map_err(map_error)?;
-        let raw = PyDict::new(py);
-        raw.set_item("generation", result.generation)?;
-        raw.set_item("camera", camera_options_to_py(py, &result.camera)?)?;
-        Ok(raw.into_any().unbind())
+        submit_python_future(
+            py,
+            |completion| unsafe { sys::mln_map_camera_query(state.handle(), completion) },
+            |py, completion| {
+                let result = completion_value::<sys::mln_camera_query_result>(completion)?;
+                let raw = PyDict::new(py);
+                raw.set_item("generation", result.generation)?;
+                raw.set_item("camera", camera_options_to_py(py, &result.camera)?)?;
+                Ok(raw.into_any().unbind())
+            },
+        )
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1614,8 +1717,7 @@ impl MapHandle {
         anchor: Option<(f64, f64)>,
         roll: Option<f64>,
         field_of_view: Option<f64>,
-    ) -> PyResult<u64> {
-        let state = self.state();
+    ) -> PyResult<Py<PyAny>> {
         let mut update = unsafe { sys::mln_camera_update_default() };
         update.mode = sys::MLN_CAMERA_UPDATE_MODE_JUMP;
         update.camera = camera_options_from_parts(
@@ -1629,12 +1731,9 @@ impl MapHandle {
             roll,
             field_of_view,
         );
-        let mut command_id = 0;
-        maplibre_core::check(unsafe {
-            sys::mln_map_update_camera(state.handle(), &update, &mut command_id)
+        self.run_style_command(|map, completion| unsafe {
+            sys::mln_map_update_camera(map, &update, completion)
         })
-        .map_err(map_error)?;
-        Ok(command_id)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1650,8 +1749,7 @@ impl MapHandle {
         roll: Option<f64>,
         field_of_view: Option<f64>,
         animation: Option<AnimationParts>,
-    ) -> PyResult<u64> {
-        let state = self.state();
+    ) -> PyResult<Py<PyAny>> {
         let mut update = unsafe { sys::mln_camera_update_default() };
         update.mode = sys::MLN_CAMERA_UPDATE_MODE_EASE;
         update.camera = camera_options_from_parts(
@@ -1668,12 +1766,9 @@ impl MapHandle {
         if let Some(animation) = animation {
             update.animation = animation_options_from_parts(animation);
         }
-        let mut command_id = 0;
-        maplibre_core::check(unsafe {
-            sys::mln_map_update_camera(state.handle(), &update, &mut command_id)
+        self.run_style_command(|map, completion| unsafe {
+            sys::mln_map_update_camera(map, &update, completion)
         })
-        .map_err(map_error)?;
-        Ok(command_id)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1689,8 +1784,7 @@ impl MapHandle {
         roll: Option<f64>,
         field_of_view: Option<f64>,
         animation: Option<AnimationParts>,
-    ) -> PyResult<u64> {
-        let state = self.state();
+    ) -> PyResult<Py<PyAny>> {
         let mut update = unsafe { sys::mln_camera_update_default() };
         update.mode = sys::MLN_CAMERA_UPDATE_MODE_FLY;
         update.camera = camera_options_from_parts(
@@ -1707,12 +1801,9 @@ impl MapHandle {
         if let Some(animation) = animation {
             update.animation = animation_options_from_parts(animation);
         }
-        let mut command_id = 0;
-        maplibre_core::check(unsafe {
-            sys::mln_map_update_camera(state.handle(), &update, &mut command_id)
+        self.run_style_command(|map, completion| unsafe {
+            sys::mln_map_update_camera(map, &update, completion)
         })
-        .map_err(map_error)?;
-        Ok(command_id)
     }
 
     fn apply_camera_delta(
@@ -1722,8 +1813,7 @@ impl MapHandle {
         amount: f64,
         anchor: Option<(f64, f64)>,
         animation: Option<AnimationParts>,
-    ) -> PyResult<u64> {
-        let state = self.state();
+    ) -> PyResult<Py<PyAny>> {
         let mut delta = unsafe { sys::mln_camera_delta_default() };
         delta.kind = kind;
         delta.offset = screen_point_from_tuple(offset);
@@ -1735,12 +1825,9 @@ impl MapHandle {
         if let Some(animation) = animation {
             delta.animation = animation_options_from_parts(animation);
         }
-        let mut command_id = 0;
-        maplibre_core::check(unsafe {
-            sys::mln_map_apply_camera_delta(state.handle(), &delta, &mut command_id)
+        self.run_style_command(|map, completion| unsafe {
+            sys::mln_map_apply_camera_delta(map, &delta, completion)
         })
-        .map_err(map_error)?;
-        Ok(command_id)
     }
 
     fn camera_for_lat_lng_bounds(
@@ -1755,25 +1842,15 @@ impl MapHandle {
         let state = self.state();
         let bounds = lat_lng_bounds_from_tuple((southwest, northeast));
         let fit = camera_fit_options_from_parts(fit_padding, fit_bearing, fit_pitch);
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_map_camera_for_lat_lng_bounds_start(
-                state.handle(),
-                bounds,
-                &fit,
-                &mut operation,
-            )
-        })
-        .map_err(map_error)?;
-        drop(state);
-        let operation = OwnedOperation(operation);
-        wait_operation(py, operation.0)?;
-        let mut camera = unsafe { sys::mln_camera_options_default() };
-        maplibre_core::check(unsafe {
-            sys::mln_map_camera_for_lat_lng_bounds_take_result(operation.0, &mut camera)
-        })
-        .map_err(map_error)?;
-        camera_options_to_py(py, &camera)
+        submit_python_future(
+            py,
+            |completion| unsafe {
+                sys::mln_map_camera_for_lat_lng_bounds(state.handle(), bounds, &fit, completion)
+            },
+            |py, result| {
+                camera_options_to_py(py, &completion_value::<sys::mln_camera_options>(result)?)
+            },
+        )
     }
 
     fn camera_for_lat_lngs(
@@ -1787,26 +1864,21 @@ impl MapHandle {
         let state = self.state();
         let coordinates = lat_lngs_from_tuples(coordinates);
         let fit = camera_fit_options_from_parts(fit_padding, fit_bearing, fit_pitch);
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_map_camera_for_lat_lngs_start(
-                state.handle(),
-                coordinates.as_ptr(),
-                coordinates.len(),
-                &fit,
-                &mut operation,
-            )
-        })
-        .map_err(map_error)?;
-        drop(state);
-        let operation = OwnedOperation(operation);
-        wait_operation(py, operation.0)?;
-        let mut camera = unsafe { sys::mln_camera_options_default() };
-        maplibre_core::check(unsafe {
-            sys::mln_map_camera_for_lat_lngs_take_result(operation.0, &mut camera)
-        })
-        .map_err(map_error)?;
-        camera_options_to_py(py, &camera)
+        submit_python_future(
+            py,
+            |completion| unsafe {
+                sys::mln_map_camera_for_lat_lngs(
+                    state.handle(),
+                    coordinates.as_ptr(),
+                    coordinates.len(),
+                    &fit,
+                    completion,
+                )
+            },
+            |py, result| {
+                camera_options_to_py(py, &completion_value::<sys::mln_camera_options>(result)?)
+            },
+        )
     }
 
     fn camera_for_geometry(
@@ -1820,20 +1892,15 @@ impl MapHandle {
         let state = self.state();
         let geometry = maplibre_core::string::buffer_view(geometry.as_bytes());
         let fit = camera_fit_options_from_parts(fit_padding, fit_bearing, fit_pitch);
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_map_camera_for_geometry_start(state.handle(), geometry, &fit, &mut operation)
-        })
-        .map_err(map_error)?;
-        drop(state);
-        let operation = OwnedOperation(operation);
-        wait_operation(py, operation.0)?;
-        let mut camera = unsafe { sys::mln_camera_options_default() };
-        maplibre_core::check(unsafe {
-            sys::mln_map_camera_for_geometry_take_result(operation.0, &mut camera)
-        })
-        .map_err(map_error)?;
-        camera_options_to_py(py, &camera)
+        submit_python_future(
+            py,
+            |completion| unsafe {
+                sys::mln_map_camera_for_geometry(state.handle(), geometry, &fit, completion)
+            },
+            |py, result| {
+                camera_options_to_py(py, &completion_value::<sys::mln_camera_options>(result)?)
+            },
+        )
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1863,41 +1930,27 @@ impl MapHandle {
             roll,
             field_of_view,
         );
-        let mut operation = sys::mln_operation(0);
-        let status = if unwrapped {
-            unsafe {
-                sys::mln_map_lat_lng_bounds_for_camera_unwrapped_start(
-                    state.handle(),
-                    &camera,
-                    &mut operation,
-                )
-            }
-        } else {
-            unsafe {
-                sys::mln_map_lat_lng_bounds_for_camera_start(
-                    state.handle(),
-                    &camera,
-                    &mut operation,
-                )
-            }
-        };
-        maplibre_core::check(status).map_err(map_error)?;
-        drop(state);
-        let operation = OwnedOperation(operation);
-        wait_operation(py, operation.0)?;
-        let mut bounds = empty_lat_lng_bounds();
-        let status = if unwrapped {
-            unsafe {
-                sys::mln_map_lat_lng_bounds_for_camera_unwrapped_take_result(
-                    operation.0,
-                    &mut bounds,
-                )
-            }
-        } else {
-            unsafe { sys::mln_map_lat_lng_bounds_for_camera_take_result(operation.0, &mut bounds) }
-        };
-        maplibre_core::check(status).map_err(map_error)?;
-        lat_lng_bounds_to_py(py, bounds)
+        submit_python_future(
+            py,
+            |completion| {
+                if unwrapped {
+                    unsafe {
+                        sys::mln_map_lat_lng_bounds_for_camera_unwrapped(
+                            state.handle(),
+                            &camera,
+                            completion,
+                        )
+                    }
+                } else {
+                    unsafe {
+                        sys::mln_map_lat_lng_bounds_for_camera(state.handle(), &camera, completion)
+                    }
+                }
+            },
+            |py, result| {
+                lat_lng_bounds_to_py(py, completion_value::<sys::mln_lat_lng_bounds>(result)?)
+            },
+        )
     }
 
     fn set_bounds(
@@ -1908,7 +1961,7 @@ impl MapHandle {
         max_zoom: Option<f64>,
         min_pitch: Option<f64>,
         max_pitch: Option<f64>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let bounds =
             bound_options_from_parts(bounds, unbounded, min_zoom, max_zoom, min_pitch, max_pitch);
         self.run_style_command(|map, out| unsafe { sys::mln_map_set_bounds(map, &bounds, out) })
@@ -1918,7 +1971,7 @@ impl MapHandle {
         &self,
         position: Option<(f64, f64, f64)>,
         orientation: Option<(f64, f64, f64, f64)>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let options = free_camera_options_from_parts(position, orientation);
         self.run_style_command(|map, out| unsafe {
             sys::mln_map_set_free_camera_options(map, &options, out)
@@ -1930,7 +1983,7 @@ impl MapHandle {
         axonometric: Option<bool>,
         x_skew: Option<f64>,
         y_skew: Option<f64>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let mode = projection_mode_from_parts(axonometric, x_skew, y_skew);
         self.run_style_command(|map, out| unsafe {
             sys::mln_map_set_projection_mode(map, &mode, out)
@@ -1944,52 +1997,35 @@ impl MapHandle {
         longitude: f64,
     ) -> PyResult<Py<PyAny>> {
         let state = self.state();
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_map_pixel_for_lat_lng_start(
-                state.handle(),
-                sys::mln_lat_lng {
-                    latitude,
-                    longitude,
-                },
-                &mut operation,
-            )
-        })
-        .map_err(map_error)?;
-        drop(state);
-        let operation = OwnedOperation(operation);
-        wait_operation(py, operation.0)?;
-        let mut point = sys::mln_screen_point { x: 0.0, y: 0.0 };
-        maplibre_core::check(unsafe {
-            sys::mln_map_pixel_for_lat_lng_take_result(operation.0, &mut point)
-        })
-        .map_err(map_error)?;
-        screen_point_to_py(py, point)
+        submit_python_future(
+            py,
+            |completion| unsafe {
+                sys::mln_map_pixel_for_lat_lng(
+                    state.handle(),
+                    sys::mln_lat_lng {
+                        latitude,
+                        longitude,
+                    },
+                    completion,
+                )
+            },
+            |py, result| screen_point_to_py(py, completion_value::<sys::mln_screen_point>(result)?),
+        )
     }
 
     fn lat_lng_for_pixel(&self, py: Python<'_>, x: f64, y: f64) -> PyResult<Py<PyAny>> {
         let state = self.state();
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_map_lat_lng_for_pixel_start(
-                state.handle(),
-                sys::mln_screen_point { x, y },
-                &mut operation,
-            )
-        })
-        .map_err(map_error)?;
-        drop(state);
-        let operation = OwnedOperation(operation);
-        wait_operation(py, operation.0)?;
-        let mut coordinate = sys::mln_lat_lng {
-            latitude: 0.0,
-            longitude: 0.0,
-        };
-        maplibre_core::check(unsafe {
-            sys::mln_map_lat_lng_for_pixel_take_result(operation.0, &mut coordinate)
-        })
-        .map_err(map_error)?;
-        lat_lng_to_py(py, coordinate)
+        submit_python_future(
+            py,
+            |completion| unsafe {
+                sys::mln_map_lat_lng_for_pixel(
+                    state.handle(),
+                    sys::mln_screen_point { x, y },
+                    completion,
+                )
+            },
+            |py, result| lat_lng_to_py(py, completion_value::<sys::mln_lat_lng>(result)?),
+        )
     }
 
     fn pixels_for_lat_lngs(
@@ -1999,78 +2035,42 @@ impl MapHandle {
     ) -> PyResult<Py<PyAny>> {
         let state = self.state();
         let coordinates = lat_lngs_from_tuples(coordinates);
-        let result_count = coordinates.len();
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_map_pixels_for_lat_lngs_start(
-                state.handle(),
-                coordinates.as_ptr(),
-                coordinates.len(),
-                &mut operation,
-            )
-        })
-        .map_err(map_error)?;
-        drop(state);
-        let operation = OwnedOperation(operation);
-        wait_operation(py, operation.0)?;
-        let mut points = vec![sys::mln_screen_point { x: 0.0, y: 0.0 }; result_count];
-        let mut point_count = 0;
-        maplibre_core::check(unsafe {
-            sys::mln_map_pixels_for_lat_lngs_take_result(
-                operation.0,
-                points.as_mut_ptr(),
-                points.len(),
-                &mut point_count,
-            )
-        })
-        .map_err(map_error)?;
-        points.truncate(point_count);
-        screen_point_list_to_py(py, &points)
+        submit_python_future(
+            py,
+            |completion| unsafe {
+                sys::mln_map_pixels_for_lat_lngs(
+                    state.handle(),
+                    coordinates.as_ptr(),
+                    coordinates.len(),
+                    completion,
+                )
+            },
+            |py, result| screen_point_list_to_py(py, &completion_slice(result)?),
+        )
     }
 
     fn lat_lngs_for_pixels(&self, py: Python<'_>, points: Vec<(f64, f64)>) -> PyResult<Py<PyAny>> {
         let state = self.state();
         let points: Vec<_> = points.into_iter().map(screen_point_from_tuple).collect();
-        let result_count = points.len();
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_map_lat_lngs_for_pixels_start(
-                state.handle(),
-                points.as_ptr(),
-                points.len(),
-                &mut operation,
-            )
-        })
-        .map_err(map_error)?;
-        drop(state);
-        let operation = OwnedOperation(operation);
-        wait_operation(py, operation.0)?;
-        let mut coordinates = vec![
-            sys::mln_lat_lng {
-                latitude: 0.0,
-                longitude: 0.0
-            };
-            result_count
-        ];
-        let mut coordinate_count = 0;
-        maplibre_core::check(unsafe {
-            sys::mln_map_lat_lngs_for_pixels_take_result(
-                operation.0,
-                coordinates.as_mut_ptr(),
-                coordinates.len(),
-                &mut coordinate_count,
-            )
-        })
-        .map_err(map_error)?;
-        coordinates.truncate(coordinate_count);
-        lat_lng_list_to_py(py, &coordinates)
+        submit_python_future(
+            py,
+            |completion| unsafe {
+                sys::mln_map_lat_lngs_for_pixels(
+                    state.handle(),
+                    points.as_ptr(),
+                    points.len(),
+                    completion,
+                )
+            },
+            |py, result| lat_lng_list_to_py(py, &completion_slice(result)?),
+        )
     }
 
     fn add_style_source_json(
         &self,
         source_id: String,
         source_json: &Bound<'_, PyBytes>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let source_id = maplibre_core::string::string_view(&source_id);
         let source_json = maplibre_core::string::buffer_view(source_json.as_bytes());
         self.run_style_command(|map, out| unsafe {
@@ -2095,7 +2095,7 @@ impl MapHandle {
         line_metrics: Option<bool>,
         cluster: Option<bool>,
         synchronous_tiling: Option<bool>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let source_id = maplibre_core::string::string_view(&source_id);
         let url = maplibre_core::string::string_view(&url);
         let options = geojson_source_options_from_parts(
@@ -2130,7 +2130,7 @@ impl MapHandle {
         &self,
         source_id: String,
         data: &GeoJsonSourceDataHandle,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let data_state = data.state();
         let Some(data_handle) = data_state.live_handle() else {
             return Err(invalid_state_error("GeoJSON source data handle is closed"));
@@ -2144,7 +2144,7 @@ impl MapHandle {
         })
     }
 
-    fn set_geojson_source_url(&self, source_id: String, url: String) -> PyResult<u64> {
+    fn set_geojson_source_url(&self, source_id: String, url: String) -> PyResult<Py<PyAny>> {
         let source_id = maplibre_core::string::string_view(&source_id);
         let url = maplibre_core::string::string_view(&url);
         // SAFETY: The C API validates the map pointer and borrowed string views.
@@ -2157,7 +2157,7 @@ impl MapHandle {
         &self,
         source_id: String,
         data: &GeoJsonSourceDataHandle,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let data_state = data.state();
         let Some(data_handle) = data_state.live_handle() else {
             return Err(invalid_state_error("GeoJSON source data handle is closed"));
@@ -2175,7 +2175,7 @@ impl MapHandle {
         &self,
         source_id: String,
         enabled: bool,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let source_id = maplibre_core::string::string_view(&source_id);
         // SAFETY: The C API validates the map pointer and source ID.
         self.run_style_command(|map, out| unsafe {
@@ -2196,7 +2196,7 @@ impl MapHandle {
         tile_size: Option<u32>,
         vector_encoding: Option<u32>,
         raster_dem_encoding: Option<u32>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         self.add_tile_source_url_with(
             source_id,
             url,
@@ -2225,7 +2225,7 @@ impl MapHandle {
         tile_size: Option<u32>,
         vector_encoding: Option<u32>,
         raster_dem_encoding: Option<u32>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         self.add_tile_source_url_with(
             source_id,
             url,
@@ -2254,7 +2254,7 @@ impl MapHandle {
         tile_size: Option<u32>,
         vector_encoding: Option<u32>,
         raster_dem_encoding: Option<u32>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         self.add_tile_source_url_with(
             source_id,
             url,
@@ -2283,7 +2283,7 @@ impl MapHandle {
         tile_size: Option<u32>,
         vector_encoding: Option<u32>,
         raster_dem_encoding: Option<u32>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         self.add_tile_source_tiles_with(
             source_id,
             tiles,
@@ -2312,7 +2312,7 @@ impl MapHandle {
         tile_size: Option<u32>,
         vector_encoding: Option<u32>,
         raster_dem_encoding: Option<u32>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         self.add_tile_source_tiles_with(
             source_id,
             tiles,
@@ -2341,7 +2341,7 @@ impl MapHandle {
         tile_size: Option<u32>,
         vector_encoding: Option<u32>,
         raster_dem_encoding: Option<u32>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         self.add_tile_source_tiles_with(
             source_id,
             tiles,
@@ -2357,130 +2357,29 @@ impl MapHandle {
         )
     }
 
-    fn remove_style_source(&self, source_id: String) -> PyResult<u64> {
+    fn remove_style_source(&self, source_id: String) -> PyResult<Py<PyAny>> {
         let source_id = maplibre_core::string::string_view(&source_id);
         self.run_style_command(|map, out| unsafe {
             sys::mln_map_remove_style_source(map, source_id.raw(), out)
         })
     }
 
-    fn get_style_source_info(
-        &self,
-        py: Python<'_>,
-        source_id: String,
-    ) -> PyResult<Option<Py<PyAny>>> {
+    fn get_style_source_info(&self, py: Python<'_>, source_id: String) -> PyResult<Py<PyAny>> {
         let source_id_view = maplibre_core::string::string_view(&source_id);
-        let (info, found) = self.run_style_operation(
-            py,
-            |map, out| unsafe {
-                sys::mln_map_get_style_source_info_start(map, source_id_view.raw(), out)
-            },
-            |operation| {
-                let mut info = maplibre_core::style::empty_style_source_info();
-                let mut found = false;
-                maplibre_core::check(unsafe {
-                    sys::mln_map_get_style_source_info_take_result(operation, &mut info, &mut found)
-                })
-                .map_err(map_error)?;
-                Ok((info, found))
-            },
-        )?;
-        if !found {
-            return Ok(None);
-        }
-        let attribution = if info.has_attribution {
-            self.run_style_operation(
-                py,
-                |map, out| unsafe {
-                    sys::mln_map_copy_style_source_attribution_start(map, source_id_view.raw(), out)
-                },
-                |operation| {
-                    let mut buffer = sys::mln_buffer(0);
-                    let mut found = false;
-                    maplibre_core::check(unsafe {
-                        sys::mln_map_copy_style_source_attribution_take_result(
-                            operation,
-                            &mut buffer,
-                            &mut found,
-                        )
-                    })
-                    .map_err(map_error)?;
-                    found.then(|| owned_buffer_to_string(buffer)).transpose()
-                },
-            )?
-        } else {
-            None
-        };
-        let url = if info.fields & sys::MLN_STYLE_SOURCE_INFO_URL != 0 {
-            self.run_style_operation(
-                py,
-                |map, out| unsafe {
-                    sys::mln_map_copy_style_source_url_start(map, source_id_view.raw(), out)
-                },
-                |operation| {
-                    let mut buffer = sys::mln_buffer(0);
-                    let mut found = false;
-                    maplibre_core::check(unsafe {
-                        sys::mln_map_copy_style_source_url_take_result(
-                            operation,
-                            &mut buffer,
-                            &mut found,
-                        )
-                    })
-                    .map_err(map_error)?;
-                    found.then(|| owned_buffer_to_string(buffer)).transpose()
-                },
-            )?
-        } else {
-            None
-        };
-        let tiles = if info.fields & sys::MLN_STYLE_SOURCE_INFO_TILEJSON != 0 {
-            self.run_style_operation(
-                py,
-                |map, out| unsafe {
-                    sys::mln_map_get_style_source_tile_urls_start(map, source_id_view.raw(), out)
-                },
-                |operation| {
-                    let mut out =
-                        maplibre_core::ptr::OutHandle::<sys::mln_style_string_list>::new();
-                    let mut found = false;
-                    maplibre_core::check(unsafe {
-                        sys::mln_map_get_style_source_tile_urls_take_result(
-                            operation,
-                            out.as_mut_ptr(),
-                            &mut found,
-                        )
-                    })
-                    .map_err(map_error)?;
-                    if !found {
-                        return Ok(Vec::new());
-                    }
-                    let native = out.into_live("mln_style_string_list").map_err(map_error)?;
-                    unsafe { maplibre_core::style::copy_style_string_list(native) }
-                        .map_err(map_error)
-                },
-            )?
-        } else {
-            Vec::new()
-        };
-        let copied =
-            maplibre_core::style::style_source_info_from_native(&info, attribution, url, tiles);
-        source_info_to_py(py, copied).map(Some)
-    }
-
-    fn list_style_source_ids(&self, py: Python<'_>) -> PyResult<Vec<String>> {
         self.run_style_operation(
             py,
-            |map, out| unsafe { sys::mln_map_list_style_source_ids_start(map, out) },
-            |operation| {
-                let mut out = maplibre_core::ptr::OutHandle::<sys::mln_style_id_list>::new();
-                maplibre_core::check(unsafe {
-                    sys::mln_map_list_style_source_ids_take_result(operation, out.as_mut_ptr())
-                })
-                .map_err(map_error)?;
-                let native = out.into_live("mln_style_id_list").map_err(map_error)?;
-                unsafe { maplibre_core::style::copy_style_id_list(native) }.map_err(map_error)
+            |map, completion| unsafe {
+                sys::mln_map_get_style_source_info(map, source_id_view.raw(), completion)
             },
+            py_source_info,
+        )
+    }
+
+    fn list_style_source_ids(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        self.run_style_operation(
+            py,
+            |map, completion| unsafe { sys::mln_map_list_style_source_ids(map, completion) },
+            py_string_list,
         )
     }
 
@@ -2489,7 +2388,7 @@ impl MapHandle {
         layer_id: String,
         source_id: String,
         before_layer_id: Option<String>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let layer_id = maplibre_core::string::string_view(&layer_id);
         let source_id = maplibre_core::string::string_view(&source_id);
         let before_layer_id = before_layer_id.unwrap_or_default();
@@ -2511,7 +2410,7 @@ impl MapHandle {
         layer_id: String,
         source_id: String,
         before_layer_id: Option<String>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let layer_id = maplibre_core::string::string_view(&layer_id);
         let source_id = maplibre_core::string::string_view(&source_id);
         let before_layer_id = before_layer_id.unwrap_or_default();
@@ -2532,7 +2431,7 @@ impl MapHandle {
         &self,
         layer_id: String,
         before_layer_id: Option<String>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let layer_id = maplibre_core::string::string_view(&layer_id);
         let before_layer_id = before_layer_id.unwrap_or_default();
         let before_layer_id = maplibre_core::string::string_view(&before_layer_id);
@@ -2553,7 +2452,7 @@ impl MapHandle {
         latitude: f64,
         longitude: f64,
         altitude: f64,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let layer_id = maplibre_core::string::string_view(&layer_id);
         // SAFETY: The C API validates the map pointer, layer ID, coordinate, and altitude.
         self.run_style_command(|map, out| unsafe {
@@ -2570,7 +2469,11 @@ impl MapHandle {
         })
     }
 
-    fn set_location_indicator_bearing(&self, layer_id: String, bearing: f64) -> PyResult<u64> {
+    fn set_location_indicator_bearing(
+        &self,
+        layer_id: String,
+        bearing: f64,
+    ) -> PyResult<Py<PyAny>> {
         let layer_id = maplibre_core::string::string_view(&layer_id);
         // SAFETY: The C API validates the map pointer, layer ID, and bearing.
         self.run_style_command(|map, out| unsafe {
@@ -2582,7 +2485,7 @@ impl MapHandle {
         &self,
         layer_id: String,
         radius: f64,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let layer_id = maplibre_core::string::string_view(&layer_id);
         // SAFETY: The C API validates the map pointer, layer ID, and radius.
         self.run_style_command(|map, out| unsafe {
@@ -2595,7 +2498,7 @@ impl MapHandle {
         layer_id: String,
         image_kind: u32,
         image_id: String,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let layer_id = maplibre_core::string::string_view(&layer_id);
         let image_id = maplibre_core::string::string_view(&image_id);
         // SAFETY: The C API validates the map pointer, layer ID, image kind, and image ID.
@@ -2614,7 +2517,7 @@ impl MapHandle {
         &self,
         layer_json: &Bound<'_, PyBytes>,
         before_layer_id: Option<String>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let layer_json = maplibre_core::string::buffer_view(layer_json.as_bytes());
         let before_layer_id = before_layer_id.unwrap_or_default();
         let before_layer_id = maplibre_core::string::string_view(&before_layer_id);
@@ -2623,32 +2526,18 @@ impl MapHandle {
         })
     }
 
-    fn get_style_layer_json(
-        &self,
-        py: Python<'_>,
-        layer_id: String,
-    ) -> PyResult<Option<Py<PyBytes>>> {
+    fn get_style_layer_json(&self, py: Python<'_>, layer_id: String) -> PyResult<Py<PyAny>> {
         let layer_id = maplibre_core::string::string_view(&layer_id);
         self.run_style_operation(
             py,
-            |map, out| unsafe { sys::mln_map_get_style_layer_json_start(map, layer_id.raw(), out) },
-            |operation| {
-                let mut buffer = sys::mln_buffer(0);
-                let mut found = false;
-                maplibre_core::check(unsafe {
-                    sys::mln_map_get_style_layer_json_take_result(
-                        operation,
-                        &mut buffer,
-                        &mut found,
-                    )
-                })
-                .map_err(map_error)?;
-                found.then(|| owned_buffer_to_py(py, buffer)).transpose()
+            |map, completion| unsafe {
+                sys::mln_map_get_style_layer_json(map, layer_id.raw(), completion)
             },
+            py_optional_buffer,
         )
     }
 
-    fn set_style_light_json(&self, light_json: &Bound<'_, PyBytes>) -> PyResult<u64> {
+    fn set_style_light_json(&self, light_json: &Bound<'_, PyBytes>) -> PyResult<Py<PyAny>> {
         let light_json = maplibre_core::string::buffer_view(light_json.as_bytes());
         self.run_style_command(|map, out| unsafe {
             sys::mln_map_set_style_light_json(map, light_json, out)
@@ -2659,7 +2548,7 @@ impl MapHandle {
         &self,
         property_name: String,
         value: &Bound<'_, PyBytes>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let property_name = maplibre_core::string::string_view(&property_name);
         let value = maplibre_core::string::buffer_view(value.as_bytes());
         self.run_style_command(|map, out| unsafe {
@@ -2671,25 +2560,14 @@ impl MapHandle {
         &self,
         py: Python<'_>,
         property_name: String,
-    ) -> PyResult<Option<Py<PyBytes>>> {
+    ) -> PyResult<Py<PyAny>> {
         let property_name = maplibre_core::string::string_view(&property_name);
         self.run_style_operation(
             py,
-            |map, out| unsafe {
-                sys::mln_map_get_style_light_property_start(map, property_name.raw(), out)
+            |map, completion| unsafe {
+                sys::mln_map_get_style_light_property(map, property_name.raw(), completion)
             },
-            |operation| {
-                let mut buffer = sys::mln_buffer(0);
-                maplibre_core::check(unsafe {
-                    sys::mln_map_get_style_light_property_take_result(operation, &mut buffer)
-                })
-                .map_err(map_error)?;
-                if buffer.0 == 0 {
-                    Ok(None)
-                } else {
-                    owned_buffer_to_py(py, buffer).map(Some)
-                }
-            },
+            py_optional_buffer,
         )
     }
 
@@ -2698,7 +2576,7 @@ impl MapHandle {
         duration_ms: Option<f64>,
         delay_ms: Option<f64>,
         enable_placement_transitions: Option<bool>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let mut options = maplibre_core::StyleTransitionOptions::default();
         options.duration_ms = duration_ms;
         options.delay_ms = delay_ms;
@@ -2710,27 +2588,22 @@ impl MapHandle {
     }
 
     fn get_style_transition_options(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let options = self.run_style_operation(
+        self.run_style_operation(
             py,
-            |map, out| unsafe { sys::mln_map_get_style_transition_options_start(map, out) },
-            |operation| {
-                let mut options = maplibre_core::style::empty_style_transition_options();
-                maplibre_core::check(unsafe {
-                    sys::mln_map_get_style_transition_options_take_result(operation, &mut options)
-                })
-                .map_err(map_error)?;
-                Ok(options)
+            |map, completion| unsafe { sys::mln_map_get_style_transition_options(map, completion) },
+            |py, result| {
+                let raw = completion_value::<sys::mln_style_transition_options>(result)?;
+                let options = maplibre_core::style::style_transition_options_from_native(&raw);
+                let dict = PyDict::new(py);
+                dict.set_item("duration_ms", options.duration_ms)?;
+                dict.set_item("delay_ms", options.delay_ms)?;
+                dict.set_item(
+                    "enable_placement_transitions",
+                    options.enable_placement_transitions,
+                )?;
+                Ok(dict.into_any().unbind())
             },
-        )?;
-        let options = maplibre_core::style::style_transition_options_from_native(&options);
-        let dict = PyDict::new(py);
-        dict.set_item("duration_ms", options.duration_ms)?;
-        dict.set_item("delay_ms", options.delay_ms)?;
-        dict.set_item(
-            "enable_placement_transitions",
-            options.enable_placement_transitions,
-        )?;
-        Ok(dict.into_any().unbind())
+        )
     }
 
     fn set_layer_property(
@@ -2738,7 +2611,7 @@ impl MapHandle {
         layer_id: String,
         property_name: String,
         value: &Bound<'_, PyBytes>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let layer_id = maplibre_core::string::string_view(&layer_id);
         let property_name = maplibre_core::string::string_view(&property_name);
         let value = maplibre_core::string::buffer_view(value.as_bytes());
@@ -2752,30 +2625,28 @@ impl MapHandle {
         py: Python<'_>,
         layer_id: String,
         property_name: String,
-    ) -> PyResult<Option<Py<PyBytes>>> {
+    ) -> PyResult<Py<PyAny>> {
         let layer_id = maplibre_core::string::string_view(&layer_id);
         let property_name = maplibre_core::string::string_view(&property_name);
         self.run_style_operation(
             py,
-            |map, out| unsafe {
-                sys::mln_map_get_layer_property_start(map, layer_id.raw(), property_name.raw(), out)
+            |map, completion| unsafe {
+                sys::mln_map_get_layer_property(
+                    map,
+                    layer_id.raw(),
+                    property_name.raw(),
+                    completion,
+                )
             },
-            |operation| {
-                let mut buffer = sys::mln_buffer(0);
-                maplibre_core::check(unsafe {
-                    sys::mln_map_get_layer_property_take_result(operation, &mut buffer)
-                })
-                .map_err(map_error)?;
-                if buffer.0 == 0 {
-                    Ok(None)
-                } else {
-                    owned_buffer_to_py(py, buffer).map(Some)
-                }
-            },
+            py_optional_buffer,
         )
     }
 
-    fn set_layer_source_layer(&self, layer_id: String, source_layer: String) -> PyResult<u64> {
+    fn set_layer_source_layer(
+        &self,
+        layer_id: String,
+        source_layer: String,
+    ) -> PyResult<Py<PyAny>> {
         let layer_id = maplibre_core::string::string_view(&layer_id);
         let source_layer = maplibre_core::string::string_view(&source_layer);
         self.run_style_command(|map, out| unsafe {
@@ -2783,25 +2654,18 @@ impl MapHandle {
         })
     }
 
-    fn copy_layer_source_layer(&self, py: Python<'_>, layer_id: String) -> PyResult<String> {
+    fn copy_layer_source_layer(&self, py: Python<'_>, layer_id: String) -> PyResult<Py<PyAny>> {
         let layer_id = maplibre_core::string::string_view(&layer_id);
         self.run_style_operation(
             py,
-            |map, out| unsafe {
-                sys::mln_map_copy_layer_source_layer_start(map, layer_id.raw(), out)
+            |map, completion| unsafe {
+                sys::mln_map_copy_layer_source_layer(map, layer_id.raw(), completion)
             },
-            |operation| {
-                let mut buffer = sys::mln_buffer(0);
-                maplibre_core::check(unsafe {
-                    sys::mln_map_copy_layer_source_layer_take_result(operation, &mut buffer)
-                })
-                .map_err(map_error)?;
-                owned_buffer_to_string(buffer)
-            },
+            py_string,
         )
     }
 
-    fn set_layer_source_id(&self, layer_id: String, source_id: String) -> PyResult<u64> {
+    fn set_layer_source_id(&self, layer_id: String, source_id: String) -> PyResult<Py<PyAny>> {
         let layer_id = maplibre_core::string::string_view(&layer_id);
         let source_id = maplibre_core::string::string_view(&source_id);
         self.run_style_command(|map, out| unsafe {
@@ -2809,37 +2673,32 @@ impl MapHandle {
         })
     }
 
-    fn copy_layer_source_id(&self, py: Python<'_>, layer_id: String) -> PyResult<String> {
+    fn copy_layer_source_id(&self, py: Python<'_>, layer_id: String) -> PyResult<Py<PyAny>> {
         let layer_id = maplibre_core::string::string_view(&layer_id);
         self.run_style_operation(
             py,
-            |map, out| unsafe { sys::mln_map_copy_layer_source_id_start(map, layer_id.raw(), out) },
-            |operation| {
-                let mut buffer = sys::mln_buffer(0);
-                maplibre_core::check(unsafe {
-                    sys::mln_map_copy_layer_source_id_take_result(operation, &mut buffer)
-                })
-                .map_err(map_error)?;
-                owned_buffer_to_string(buffer)
+            |map, completion| unsafe {
+                sys::mln_map_copy_layer_source_id(map, layer_id.raw(), completion)
             },
+            py_string,
         )
     }
 
-    fn set_layer_min_zoom(&self, layer_id: String, min_zoom: f64) -> PyResult<u64> {
+    fn set_layer_min_zoom(&self, layer_id: String, min_zoom: f64) -> PyResult<Py<PyAny>> {
         let layer_id = maplibre_core::string::string_view(&layer_id);
         self.run_style_command(|map, out| unsafe {
             sys::mln_map_set_layer_min_zoom(map, layer_id.raw(), min_zoom, out)
         })
     }
 
-    fn set_layer_max_zoom(&self, layer_id: String, max_zoom: f64) -> PyResult<u64> {
+    fn set_layer_max_zoom(&self, layer_id: String, max_zoom: f64) -> PyResult<Py<PyAny>> {
         let layer_id = maplibre_core::string::string_view(&layer_id);
         self.run_style_command(|map, out| unsafe {
             sys::mln_map_set_layer_max_zoom(map, layer_id.raw(), max_zoom, out)
         })
     }
 
-    fn set_layer_visibility(&self, layer_id: String, visibility: u32) -> PyResult<u64> {
+    fn set_layer_visibility(&self, layer_id: String, visibility: u32) -> PyResult<Py<PyAny>> {
         let layer_id = maplibre_core::string::string_view(&layer_id);
         self.run_style_command(|map, out| unsafe {
             sys::mln_map_set_layer_visibility(map, layer_id.raw(), visibility, out)
@@ -2850,7 +2709,7 @@ impl MapHandle {
         &self,
         layer_id: String,
         filter: Option<&Bound<'_, PyBytes>>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let layer_id = maplibre_core::string::string_view(&layer_id);
         let filter = filter.map(|value| maplibre_core::string::buffer_view(value.as_bytes()));
         self.run_style_command(|map, out| unsafe {
@@ -2863,116 +2722,48 @@ impl MapHandle {
         })
     }
 
-    fn get_layer_filter(&self, py: Python<'_>, layer_id: String) -> PyResult<Option<Py<PyBytes>>> {
+    fn get_layer_filter(&self, py: Python<'_>, layer_id: String) -> PyResult<Py<PyAny>> {
         let layer_id = maplibre_core::string::string_view(&layer_id);
         self.run_style_operation(
             py,
-            |map, out| unsafe { sys::mln_map_get_layer_filter_start(map, layer_id.raw(), out) },
-            |operation| {
-                let mut buffer = sys::mln_buffer(0);
-                maplibre_core::check(unsafe {
-                    sys::mln_map_get_layer_filter_take_result(operation, &mut buffer)
-                })
-                .map_err(map_error)?;
-                if buffer.0 == 0 {
-                    Ok(None)
-                } else {
-                    owned_buffer_to_py(py, buffer).map(Some)
-                }
+            |map, completion| unsafe {
+                sys::mln_map_get_layer_filter(map, layer_id.raw(), completion)
             },
+            py_optional_buffer,
         )
     }
 
-    fn remove_style_layer(&self, layer_id: String) -> PyResult<u64> {
+    fn remove_style_layer(&self, layer_id: String) -> PyResult<Py<PyAny>> {
         let layer_id = maplibre_core::string::string_view(&layer_id);
         self.run_style_command(|map, out| unsafe {
             sys::mln_map_remove_style_layer(map, layer_id.raw(), out)
         })
     }
 
-    fn get_style_layer_info(
-        &self,
-        py: Python<'_>,
-        layer_id: String,
-    ) -> PyResult<Option<Py<PyAny>>> {
+    fn get_style_layer_info(&self, py: Python<'_>, layer_id: String) -> PyResult<Py<PyAny>> {
         let layer_id_view = maplibre_core::string::string_view(&layer_id);
-        let (info, found) = self.run_style_operation(
-            py,
-            |map, out| unsafe {
-                sys::mln_map_get_style_layer_info_start(map, layer_id_view.raw(), out)
-            },
-            |operation| {
-                let mut info: sys::mln_style_layer_info = unsafe { std::mem::zeroed() };
-                info.size = std::mem::size_of::<sys::mln_style_layer_info>() as u32;
-                let mut found = false;
-                maplibre_core::check(unsafe {
-                    sys::mln_map_get_style_layer_info_take_result(operation, &mut info, &mut found)
-                })
-                .map_err(map_error)?;
-                Ok((info, found))
-            },
-        )?;
-        if !found {
-            return Ok(None);
-        }
-        // The type view names a static style-spec string that stays valid for
-        // the life of the process; copy it into a Python-owned string.
-        let layer_type = if info.type_.data.is_null() || info.type_.size == 0 {
-            String::new()
-        } else {
-            let bytes = unsafe {
-                std::slice::from_raw_parts(info.type_.data.cast::<u8>(), info.type_.size)
-            };
-            String::from_utf8_lossy(bytes).into_owned()
-        };
-        // The field bits report whether the layer carries the strings and the
-        // sizes report their lengths; the unchanged copy operations transfer
-        // any non-empty contents.
-        let source_id = if info.fields & sys::MLN_STYLE_LAYER_INFO_SOURCE_ID != 0 {
-            Some(if info.source_id_size > 0 {
-                self.copy_layer_source_id(py, layer_id.clone())?
-            } else {
-                String::new()
-            })
-        } else {
-            None
-        };
-        let source_layer = if info.fields & sys::MLN_STYLE_LAYER_INFO_SOURCE_LAYER != 0 {
-            Some(if info.source_layer_size > 0 {
-                self.copy_layer_source_layer(py, layer_id.clone())?
-            } else {
-                String::new()
-            })
-        } else {
-            None
-        };
-        let dict = PyDict::new(py);
-        dict.set_item("layer_type", layer_type)?;
-        dict.set_item("min_zoom", info.min_zoom)?;
-        dict.set_item("max_zoom", info.max_zoom)?;
-        dict.set_item("visibility", info.visibility)?;
-        dict.set_item("source_id", source_id)?;
-        dict.set_item("source_layer", source_layer)?;
-        Ok(Some(dict.into_any().unbind()))
-    }
-
-    fn list_style_layer_ids(&self, py: Python<'_>) -> PyResult<Vec<String>> {
         self.run_style_operation(
             py,
-            |map, out| unsafe { sys::mln_map_list_style_layer_ids_start(map, out) },
-            |operation| {
-                let mut out = maplibre_core::ptr::OutHandle::<sys::mln_style_id_list>::new();
-                maplibre_core::check(unsafe {
-                    sys::mln_map_list_style_layer_ids_take_result(operation, out.as_mut_ptr())
-                })
-                .map_err(map_error)?;
-                let native = out.into_live("mln_style_id_list").map_err(map_error)?;
-                unsafe { maplibre_core::style::copy_style_id_list(native) }.map_err(map_error)
+            |map, completion| unsafe {
+                sys::mln_map_get_style_layer_info(map, layer_id_view.raw(), completion)
             },
+            py_layer_info,
         )
     }
 
-    fn move_style_layer(&self, layer_id: String, before_layer_id: Option<String>) -> PyResult<u64> {
+    fn list_style_layer_ids(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        self.run_style_operation(
+            py,
+            |map, completion| unsafe { sys::mln_map_list_style_layer_ids(map, completion) },
+            py_string_list,
+        )
+    }
+
+    fn move_style_layer(
+        &self,
+        layer_id: String,
+        before_layer_id: Option<String>,
+    ) -> PyResult<Py<PyAny>> {
         let layer_id = maplibre_core::string::string_view(&layer_id);
         let before_layer_id = before_layer_id.unwrap_or_default();
         let before_layer_id = maplibre_core::string::string_view(&before_layer_id);
@@ -2996,7 +2787,7 @@ impl MapHandle {
         content: Option<(f32, f32, f32, f32)>,
         text_fit_width: Option<u32>,
         text_fit_height: Option<u32>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let image_id = maplibre_core::string::string_view(&image_id);
         let mut image = unsafe { sys::mln_premultiplied_rgba8_image_default() };
         image.width = width;
@@ -3022,91 +2813,32 @@ impl MapHandle {
         })
     }
 
-    fn remove_style_image(&self, image_id: String) -> PyResult<u64> {
+    fn remove_style_image(&self, image_id: String) -> PyResult<Py<PyAny>> {
         let image_id = maplibre_core::string::string_view(&image_id);
         self.run_style_command(|map, out| unsafe {
             sys::mln_map_remove_style_image(map, image_id.raw(), out)
         })
     }
 
-    fn copy_style_image_stretches(
-        &self,
-        py: Python<'_>,
-        image_id: String,
-    ) -> PyResult<Option<(Vec<(f32, f32)>, Vec<(f32, f32)>)>> {
+    fn copy_style_image_stretches(&self, py: Python<'_>, image_id: String) -> PyResult<Py<PyAny>> {
         let image_id = maplibre_core::string::string_view(&image_id);
         self.run_style_operation(
             py,
-            |map, out| unsafe {
-                sys::mln_map_copy_style_image_stretches_start(map, image_id.raw(), out)
+            |map, completion| unsafe {
+                sys::mln_map_copy_style_image_stretches(map, image_id.raw(), completion)
             },
-            |operation| {
-                let mut x_count = 0;
-                let mut y_count = 0;
-                let mut found = false;
-                maplibre_core::check(unsafe {
-                    sys::mln_map_copy_style_image_stretches_take_result(
-                        operation,
-                        ptr::null_mut(),
-                        0,
-                        &mut x_count,
-                        ptr::null_mut(),
-                        0,
-                        &mut y_count,
-                        &mut found,
-                    )
-                })
-                .map_err(map_error)?;
-                if !found {
-                    return Ok(None);
-                }
-                let mut raw_x = vec![sys::mln_image_stretch { from: 0.0, to: 0.0 }; x_count];
-                let mut raw_y = vec![sys::mln_image_stretch { from: 0.0, to: 0.0 }; y_count];
-                maplibre_core::check(unsafe {
-                    sys::mln_map_copy_style_image_stretches_take_result(
-                        operation,
-                        raw_x.as_mut_ptr(),
-                        raw_x.len(),
-                        &mut x_count,
-                        raw_y.as_mut_ptr(),
-                        raw_y.len(),
-                        &mut y_count,
-                        &mut found,
-                    )
-                })
-                .map_err(map_error)?;
-                raw_x.truncate(x_count);
-                raw_y.truncate(y_count);
-                let copy = |values: &[sys::mln_image_stretch]| {
-                    values.iter().map(|value| (value.from, value.to)).collect()
-                };
-                Ok(Some((copy(&raw_x), copy(&raw_y))))
-            },
+            py_style_image_stretches,
         )
     }
 
-    fn get_style_image_info(
-        &self,
-        py: Python<'_>,
-        image_id: String,
-    ) -> PyResult<Option<Py<PyAny>>> {
+    fn get_style_image_info(&self, py: Python<'_>, image_id: String) -> PyResult<Py<PyAny>> {
         let image_id = maplibre_core::string::string_view(&image_id);
         self.run_style_operation(
             py,
-            |map, out| unsafe { sys::mln_map_get_style_image_info_start(map, image_id.raw(), out) },
-            |operation| {
-                let mut info = maplibre_core::style::empty_style_image_info();
-                let mut found = false;
-                maplibre_core::check(unsafe {
-                    sys::mln_map_get_style_image_info_take_result(operation, &mut info, &mut found)
-                })
-                .map_err(map_error)?;
-                if found {
-                    style_image_info_to_py(py, &info).map(Some)
-                } else {
-                    Ok(None)
-                }
+            |map, completion| unsafe {
+                sys::mln_map_get_style_image_info(map, image_id.raw(), completion)
             },
+            py_style_image_info,
         )
     }
 
@@ -3114,38 +2846,14 @@ impl MapHandle {
         &self,
         py: Python<'_>,
         image_id: String,
-    ) -> PyResult<Option<Py<PyAny>>> {
-        let info = self.get_style_image_info(py, image_id.clone())?;
+    ) -> PyResult<Py<PyAny>> {
         let image_id = maplibre_core::string::string_view(&image_id);
-        let Some(info) = info else {
-            return Ok(None);
-        };
         self.run_style_operation(
             py,
-            |map, out| unsafe {
-                sys::mln_map_copy_style_image_premultiplied_rgba8_start(map, image_id.raw(), out)
+            |map, completion| unsafe {
+                sys::mln_map_get_style_image_info(map, image_id.raw(), completion)
             },
-            |operation| {
-                let mut buffer = sys::mln_buffer(0);
-                let mut found = false;
-                maplibre_core::check(unsafe {
-                    sys::mln_map_copy_style_image_premultiplied_rgba8_take_result(
-                        operation,
-                        &mut buffer,
-                        &mut found,
-                    )
-                })
-                .map_err(map_error)?;
-                if !found {
-                    return Ok(None);
-                }
-                let pixels = unsafe { maplibre_core::string::copy_owned_buffer(buffer) }
-                    .map_err(map_error)?;
-                let raw = info.bind(py);
-                let dict = raw.cast::<PyDict>()?;
-                dict.set_item("pixels", PyBytes::new(py, &pixels))?;
-                Ok(Some(info))
-            },
+            py_style_image,
         )
     }
 
@@ -3154,7 +2862,7 @@ impl MapHandle {
         source_id: String,
         coordinates: Vec<(f64, f64)>,
         url: String,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let source_id = maplibre_core::string::string_view(&source_id);
         let url = maplibre_core::string::string_view(&url);
         let coordinates = lat_lngs_from_tuples(coordinates);
@@ -3179,7 +2887,7 @@ impl MapHandle {
         height: u32,
         stride: u32,
         pixels: Vec<u8>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let source_id = maplibre_core::string::string_view(&source_id);
         let coordinates = lat_lngs_from_tuples(coordinates);
         let image = premultiplied_rgba8_image_from_parts(width, height, stride, &pixels);
@@ -3197,7 +2905,7 @@ impl MapHandle {
         })
     }
 
-    fn set_image_source_url(&self, source_id: String, url: String) -> PyResult<u64> {
+    fn set_image_source_url(&self, source_id: String, url: String) -> PyResult<Py<PyAny>> {
         let source_id = maplibre_core::string::string_view(&source_id);
         let url = maplibre_core::string::string_view(&url);
         // SAFETY: The C API validates the map pointer and borrowed string views.
@@ -3213,7 +2921,7 @@ impl MapHandle {
         height: u32,
         stride: u32,
         pixels: Vec<u8>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let source_id = maplibre_core::string::string_view(&source_id);
         let image = premultiplied_rgba8_image_from_parts(width, height, stride, &pixels);
         // SAFETY: The C API validates the map pointer, source ID, image descriptor,
@@ -3227,7 +2935,7 @@ impl MapHandle {
         &self,
         source_id: String,
         coordinates: Vec<(f64, f64)>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let source_id = maplibre_core::string::string_view(&source_id);
         let coordinates = lat_lngs_from_tuples(coordinates);
         // SAFETY: The C API validates the map pointer, source ID, and coordinate slice.
@@ -3246,45 +2954,21 @@ impl MapHandle {
         &self,
         py: Python<'_>,
         source_id: String,
-    ) -> PyResult<Option<Py<PyAny>>> {
+    ) -> PyResult<Py<PyAny>> {
         let source_id = maplibre_core::string::string_view(&source_id);
         self.run_style_operation(
             py,
-            |map, out| unsafe {
-                sys::mln_map_get_image_source_coordinates_start(map, source_id.raw(), out)
+            |map, completion| unsafe {
+                sys::mln_map_get_image_source_coordinates(map, source_id.raw(), completion)
             },
-            |operation| {
-                let mut coordinates = vec![
-                    sys::mln_lat_lng {
-                        latitude: 0.0,
-                        longitude: 0.0,
-                    };
-                    4
-                ];
-                let mut count = 0;
-                let mut found = false;
-                maplibre_core::check(unsafe {
-                    sys::mln_map_get_image_source_coordinates_take_result(
-                        operation,
-                        coordinates.as_mut_ptr(),
-                        coordinates.len(),
-                        &mut count,
-                        &mut found,
-                    )
-                })
-                .map_err(map_error)?;
-                if !found {
-                    return Ok(None);
-                }
-                coordinates.truncate(count);
-                lat_lng_list_to_py(py, &coordinates).map(Some)
-            },
+            py_optional_lat_lngs,
         )
     }
 
     #[allow(clippy::too_many_arguments)]
     fn add_custom_geometry_source(
         &self,
+        py: Python<'_>,
         source_id: String,
         max_queued_events: usize,
         min_zoom: Option<f64>,
@@ -3295,7 +2979,7 @@ impl MapHandle {
         clip: Option<bool>,
         wrap: Option<bool>,
         has_cancel_tile: bool,
-    ) -> PyResult<(CustomGeometrySourceHandle, u64)> {
+    ) -> PyResult<(CustomGeometrySourceHandle, Py<PyAny>)> {
         if max_queued_events == 0 {
             return Err(invalid_argument_error(
                 "max_queued_events must be greater than zero",
@@ -3318,24 +3002,26 @@ impl MapHandle {
         };
         let source_id_view = maplibre_core::string::string_view(&source_id);
         let map_state = self.state();
-        let mut command_id = 0;
+        let state = Box::into_raw(state);
         // SAFETY: map_state owns or has released the map pointer. The C API
         // validates that it is live. source_id_view and descriptor are valid for
         // this call, and descriptor's release callback takes the leaked state
         // back once the C API stops referencing it.
-        maplibre_core::check(unsafe {
+        match submit_python_command_future(py, |completion| unsafe {
             sys::mln_map_add_custom_geometry_source(
                 map_state.handle(),
                 source_id_view.raw(),
                 &descriptor,
-                &mut command_id,
+                completion,
             )
-        })
-        .map_err(map_error)?;
-        // A rejected add owes no release, so the state only leaves this box
-        // after the C API accepted it.
-        Box::leak(state);
-        Ok((handle, command_id))
+        }) {
+            Ok(completion) => Ok((handle, completion)),
+            Err(error) => {
+                // SAFETY: rejected submissions retain no source callback state.
+                drop(unsafe { Box::from_raw(state) });
+                Err(error)
+            }
+        }
     }
 
     fn set_custom_geometry_source_tile_data(
@@ -3345,7 +3031,7 @@ impl MapHandle {
         x: u32,
         y: u32,
         data: &Bound<'_, PyBytes>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let source_id = maplibre_core::string::string_view(&source_id);
         let data = maplibre_core::string::buffer_view(data.as_bytes());
         // SAFETY: The C API validates the map pointer, source ID, tile ID, and GeoJSON buffer view.
@@ -3366,7 +3052,7 @@ impl MapHandle {
         z: u32,
         x: u32,
         y: u32,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let source_id = maplibre_core::string::string_view(&source_id);
         // SAFETY: The C API validates the map pointer, source ID, and tile ID.
         self.run_style_command(|map, out| unsafe {
@@ -3384,7 +3070,7 @@ impl MapHandle {
         source_id: String,
         southwest: (f64, f64),
         northeast: (f64, f64),
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let source_id = maplibre_core::string::string_view(&source_id);
         let bounds = lat_lng_bounds_from_tuple((southwest, northeast));
         // SAFETY: The C API validates the map pointer, source ID, and bounds.
@@ -3564,12 +3250,23 @@ impl RenderSessionHandle {
 
     fn start_target<D>(
         &self,
+        py: Python<'_>,
         raw: D,
-        start: impl FnOnce(sys::mln_render_session, &D, *mut sys::mln_operation) -> sys::mln_status,
-    ) -> PyResult<u64> {
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(start(self.native(), &raw, &mut operation)).map_err(map_error)?;
-        Ok(operation.0)
+        start: impl FnOnce(sys::mln_render_session, &D, *const sys::mln_completion) -> sys::mln_status,
+    ) -> PyResult<Py<PyAny>> {
+        submit_python_future(
+            py,
+            |completion| start(self.native(), &raw, completion),
+            py_none,
+        )
+    }
+
+    fn start_unit(
+        &self,
+        py: Python<'_>,
+        start: impl FnOnce(sys::mln_render_session, *const sys::mln_completion) -> sys::mln_status,
+    ) -> PyResult<Py<PyAny>> {
+        submit_python_future(py, |completion| start(self.native(), completion), py_none)
     }
 }
 
@@ -3586,48 +3283,55 @@ impl RenderSessionHandle {
         unsafe { state.handle.close_status(sys::mln_render_session_destroy) }.map_err(map_error)
     }
 
-    fn resize_start(&self, width: u32, height: u32, scale_factor: f64) -> PyResult<u64> {
+    fn resize(
+        &self,
+        py: Python<'_>,
+        width: u32,
+        height: u32,
+        scale_factor: f64,
+    ) -> PyResult<Py<PyAny>> {
         let extent = sys::mln_render_target_extent {
             size: std::mem::size_of::<sys::mln_render_target_extent>() as u32,
             width,
             height,
             scale_factor,
         };
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_render_session_resize_start(self.native(), &extent, &mut operation)
-        })
-        .map_err(map_error)?;
-        Ok(operation.0)
+        submit_python_future(
+            py,
+            |completion| unsafe {
+                sys::mln_render_session_resize(self.native(), &extent, completion)
+            },
+            py_none,
+        )
     }
 
-    fn barrier_start(&self) -> PyResult<u64> {
-        start_session_operation(self.native(), |session, operation| unsafe {
-            sys::mln_render_session_barrier_start(session, operation)
-        })
-    }
-
-    fn reduce_memory_use_start(&self) -> PyResult<u64> {
-        start_session_operation(self.native(), |session, operation| unsafe {
-            sys::mln_render_session_reduce_memory_use_start(session, operation)
+    fn barrier(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        self.start_unit(py, |session, completion| unsafe {
+            sys::mln_render_session_barrier(session, completion)
         })
     }
 
-    fn clear_data_start(&self) -> PyResult<u64> {
-        start_session_operation(self.native(), |session, operation| unsafe {
-            sys::mln_render_session_clear_data_start(session, operation)
+    fn reduce_memory_use(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        self.start_unit(py, |session, completion| unsafe {
+            sys::mln_render_session_reduce_memory_use(session, completion)
         })
     }
 
-    fn dump_debug_logs_start(&self) -> PyResult<u64> {
-        start_session_operation(self.native(), |session, operation| unsafe {
-            sys::mln_render_session_dump_debug_logs_start(session, operation)
+    fn clear_data(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        self.start_unit(py, |session, completion| unsafe {
+            sys::mln_render_session_clear_data(session, completion)
         })
     }
 
-    fn detach_start(&self) -> PyResult<u64> {
-        start_session_operation(self.native(), |session, operation| unsafe {
-            sys::mln_render_session_detach_start(session, operation)
+    fn dump_debug_logs(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        self.start_unit(py, |session, completion| unsafe {
+            sys::mln_render_session_dump_debug_logs(session, completion)
+        })
+    }
+
+    fn detach(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        self.start_unit(py, |session, completion| unsafe {
+            sys::mln_render_session_detach(session, completion)
         })
     }
 
@@ -3725,12 +3429,13 @@ impl RenderSessionHandle {
 
     fn set_metal_surface_target(
         &self,
+        py: Python<'_>,
         width: u32,
         height: u32,
         scale_factor: f64,
         device_address: usize,
         layer_address: usize,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let descriptor = maplibre_core::render::metal_surface_descriptor_to_native(
             maplibre_core::render::MetalSurfaceDescriptorFields {
                 extent: maplibre_core::render::RenderTargetExtentFields {
@@ -3744,15 +3449,16 @@ impl RenderSessionHandle {
                 layer: layer_address as *mut c_void,
             },
         );
-        self.start_target(descriptor, |session, raw, operation| {
+        self.start_target(py, descriptor, |session, raw, completion| {
             // SAFETY: raw and operation are valid for this copied submission.
-            unsafe { sys::mln_metal_surface_set_target_start(session, raw, operation) }
+            unsafe { sys::mln_metal_surface_set_target(session, raw, completion) }
         })
     }
 
     #[allow(clippy::too_many_arguments)]
     fn set_vulkan_surface_target(
         &self,
+        py: Python<'_>,
         width: u32,
         height: u32,
         scale_factor: f64,
@@ -3764,7 +3470,7 @@ impl RenderSessionHandle {
         get_instance_proc_addr: usize,
         get_device_proc_addr: usize,
         surface_address: usize,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let descriptor = maplibre_core::render::vulkan_surface_descriptor_to_native(
             maplibre_core::render::VulkanSurfaceDescriptorFields {
                 extent: maplibre_core::render::RenderTargetExtentFields {
@@ -3784,15 +3490,16 @@ impl RenderSessionHandle {
                 surface: surface_address as *mut c_void,
             },
         );
-        self.start_target(descriptor, |session, raw, operation| {
+        self.start_target(py, descriptor, |session, raw, completion| {
             // SAFETY: raw and operation are valid for this copied submission.
-            unsafe { sys::mln_vulkan_surface_set_target_start(session, raw, operation) }
+            unsafe { sys::mln_vulkan_surface_set_target(session, raw, completion) }
         })
     }
 
     #[allow(clippy::too_many_arguments)]
     fn set_webgpu_surface_target(
         &self,
+        py: Python<'_>,
         width: u32,
         height: u32,
         scale_factor: f64,
@@ -3801,7 +3508,7 @@ impl RenderSessionHandle {
         queue_address: usize,
         surface_address: usize,
         format: u32,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let descriptor = maplibre_core::render::webgpu_surface_descriptor_to_native(
             maplibre_core::render::WebGpuSurfaceDescriptorFields {
                 extent: maplibre_core::render::RenderTargetExtentFields {
@@ -3814,14 +3521,15 @@ impl RenderSessionHandle {
                 format,
             },
         );
-        self.start_target(descriptor, |session, raw, operation| unsafe {
-            sys::mln_webgpu_surface_set_target_start(session, raw, operation)
+        self.start_target(py, descriptor, |session, raw, completion| unsafe {
+            sys::mln_webgpu_surface_set_target(session, raw, completion)
         })
     }
 
     #[allow(clippy::too_many_arguments)]
     fn set_opengl_surface_target(
         &self,
+        py: Python<'_>,
         width: u32,
         height: u32,
         scale_factor: f64,
@@ -3833,7 +3541,7 @@ impl RenderSessionHandle {
         client_api: u32,
         get_proc_address: usize,
         surface_address: usize,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let descriptor = maplibre_core::render::opengl_surface_descriptor_to_native(
             maplibre_core::render::OpenGLSurfaceDescriptorFields {
                 extent: maplibre_core::render::RenderTargetExtentFields {
@@ -3853,21 +3561,22 @@ impl RenderSessionHandle {
                 surface: surface_address as *mut c_void,
             },
         );
-        self.start_target(descriptor, |session, raw, operation| {
+        self.start_target(py, descriptor, |session, raw, completion| {
             // SAFETY: raw and operation are valid for this copied submission.
-            unsafe { sys::mln_opengl_surface_set_target_start(session, raw, operation) }
+            unsafe { sys::mln_opengl_surface_set_target(session, raw, completion) }
         })
     }
 
     fn set_metal_borrowed_texture_target(
         &self,
+        py: Python<'_>,
         width: u32,
         height: u32,
         scale_factor: f64,
         physical_width: u32,
         physical_height: u32,
         texture_address: usize,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let descriptor = maplibre_core::render::metal_borrowed_texture_descriptor_to_native(
             maplibre_core::render::MetalBorrowedTextureDescriptorFields {
                 extent: maplibre_core::render::RenderTargetExtentFields {
@@ -3880,15 +3589,16 @@ impl RenderSessionHandle {
                 texture: texture_address as *mut c_void,
             },
         );
-        self.start_target(descriptor, |session, raw, operation| {
+        self.start_target(py, descriptor, |session, raw, completion| {
             // SAFETY: raw and operation are valid for this copied submission.
-            unsafe { sys::mln_metal_borrowed_texture_set_target_start(session, raw, operation) }
+            unsafe { sys::mln_metal_borrowed_texture_set_target(session, raw, completion) }
         })
     }
 
     #[allow(clippy::too_many_arguments)]
     fn set_vulkan_borrowed_texture_target(
         &self,
+        py: Python<'_>,
         width: u32,
         height: u32,
         scale_factor: f64,
@@ -3906,7 +3616,7 @@ impl RenderSessionHandle {
         format: u32,
         initial_layout: u32,
         final_layout: u32,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let descriptor = maplibre_core::render::vulkan_borrowed_texture_descriptor_to_native(
             maplibre_core::render::VulkanBorrowedTextureDescriptorFields {
                 extent: maplibre_core::render::RenderTargetExtentFields {
@@ -3932,15 +3642,16 @@ impl RenderSessionHandle {
                 final_layout,
             },
         );
-        self.start_target(descriptor, |session, raw, operation| {
+        self.start_target(py, descriptor, |session, raw, completion| {
             // SAFETY: raw and operation are valid for this copied submission.
-            unsafe { sys::mln_vulkan_borrowed_texture_set_target_start(session, raw, operation) }
+            unsafe { sys::mln_vulkan_borrowed_texture_set_target(session, raw, completion) }
         })
     }
 
     #[allow(clippy::too_many_arguments)]
     fn set_webgpu_borrowed_texture_target(
         &self,
+        py: Python<'_>,
         width: u32,
         height: u32,
         scale_factor: f64,
@@ -3952,7 +3663,7 @@ impl RenderSessionHandle {
         texture_address: usize,
         texture_view_address: usize,
         format: u32,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let descriptor = maplibre_core::render::webgpu_borrowed_texture_descriptor_to_native(
             maplibre_core::render::WebGpuBorrowedTextureDescriptorFields {
                 extent: maplibre_core::render::RenderTargetExtentFields {
@@ -3968,14 +3679,15 @@ impl RenderSessionHandle {
                 format,
             },
         );
-        self.start_target(descriptor, |session, raw, operation| unsafe {
-            sys::mln_webgpu_borrowed_texture_set_target_start(session, raw, operation)
+        self.start_target(py, descriptor, |session, raw, completion| unsafe {
+            sys::mln_webgpu_borrowed_texture_set_target(session, raw, completion)
         })
     }
 
     #[allow(clippy::too_many_arguments)]
     fn set_opengl_borrowed_texture_target(
         &self,
+        py: Python<'_>,
         width: u32,
         height: u32,
         scale_factor: f64,
@@ -3990,7 +3702,7 @@ impl RenderSessionHandle {
         get_proc_address: usize,
         texture: u32,
         target: u32,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let descriptor = maplibre_core::render::opengl_borrowed_texture_descriptor_to_native(
             maplibre_core::render::OpenGLBorrowedTextureDescriptorFields {
                 extent: maplibre_core::render::RenderTargetExtentFields {
@@ -4013,18 +3725,19 @@ impl RenderSessionHandle {
                 target,
             },
         );
-        self.start_target(descriptor, |session, raw, operation| {
+        self.start_target(py, descriptor, |session, raw, completion| {
             // SAFETY: raw and operation are valid for this copied submission.
-            unsafe { sys::mln_opengl_borrowed_texture_set_target_start(session, raw, operation) }
+            unsafe { sys::mln_opengl_borrowed_texture_set_target(session, raw, completion) }
         })
     }
 
-    fn query_rendered_features_start(
+    fn query_rendered_features(
         &self,
+        py: Python<'_>,
         geometry: &Bound<'_, PyAny>,
         layer_ids: Option<Vec<String>>,
         filter: Option<&Bound<'_, PyBytes>>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let geometry = rendered_query_geometry_from_wire(geometry)?;
         let geometry = maplibre_core::query::rendered_query_geometry_to_native(&geometry);
         let mut options = maplibre_core::RenderedFeatureQueryOptions::default();
@@ -4032,235 +3745,170 @@ impl RenderSessionHandle {
         options.filter = filter.map(|value| value.as_bytes().to_vec());
         let options = maplibre_core::query::rendered_feature_query_options_to_native(&options)
             .map_err(map_error)?;
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_render_session_query_rendered_features_start(
-                self.native(),
-                geometry.as_ptr(),
-                options.as_ptr(),
-                &mut operation,
-            )
-        })
-        .map_err(map_error)?;
-        Ok(operation.0)
+        submit_python_future(
+            py,
+            |completion| unsafe {
+                sys::mln_render_session_query_rendered_features(
+                    self.native(),
+                    geometry.as_ptr(),
+                    options.as_ptr(),
+                    completion,
+                )
+            },
+            py_queried_features,
+        )
     }
 
-    fn query_source_features_start(
+    fn query_source_features(
         &self,
+        py: Python<'_>,
         source_id: String,
         source_layer_ids: Option<Vec<String>>,
         filter: Option<&Bound<'_, PyBytes>>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let source_id = maplibre_core::string::string_view(&source_id);
         let mut options = maplibre_core::SourceFeatureQueryOptions::default();
         options.source_layer_ids = source_layer_ids;
         options.filter = filter.map(|value| value.as_bytes().to_vec());
         let options = maplibre_core::query::source_feature_query_options_to_native(&options)
             .map_err(map_error)?;
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_render_session_query_source_features_start(
-                self.native(),
-                source_id.raw(),
-                options.as_ptr(),
-                &mut operation,
-            )
-        })
-        .map_err(map_error)?;
-        Ok(operation.0)
+        submit_python_future(
+            py,
+            |completion| unsafe {
+                sys::mln_render_session_query_source_features(
+                    self.native(),
+                    source_id.raw(),
+                    options.as_ptr(),
+                    completion,
+                )
+            },
+            py_queried_features,
+        )
     }
 
-    fn query_feature_extensions_start(
+    fn query_feature_extensions(
         &self,
+        py: Python<'_>,
         source_id: String,
         feature: &Bound<'_, PyBytes>,
         extension: String,
         extension_field: String,
         arguments: Option<&Bound<'_, PyBytes>>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let source_id = maplibre_core::string::string_view(&source_id);
         let feature = maplibre_core::string::buffer_view(feature.as_bytes());
         let extension = maplibre_core::string::string_view(&extension);
         let extension_field = maplibre_core::string::string_view(&extension_field);
         let arguments = arguments.map(|value| maplibre_core::string::buffer_view(value.as_bytes()));
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_render_session_query_feature_extensions_start(
-                self.native(),
-                source_id.raw(),
-                feature,
-                extension.raw(),
-                extension_field.raw(),
-                optional_ref_ptr(arguments.as_ref()),
-                &mut operation,
-            )
-        })
-        .map_err(map_error)?;
-        Ok(operation.0)
+        submit_python_future(
+            py,
+            |completion| unsafe {
+                sys::mln_render_session_query_feature_extensions(
+                    self.native(),
+                    source_id.raw(),
+                    feature,
+                    extension.raw(),
+                    extension_field.raw(),
+                    optional_ref_ptr(arguments.as_ref()),
+                    completion,
+                )
+            },
+            py_buffer,
+        )
     }
 
-    fn render_query_take_result(&self, py: Python<'_>, operation: u64) -> PyResult<Py<PyBytes>> {
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
-        maplibre_core::check(unsafe {
-            sys::mln_render_query_take_result(sys::mln_operation(operation), out.as_mut_ptr())
-        })
-        .map_err(map_error)
-        .map_err(operation_result_consumed)?;
-        owned_buffer_to_py(py, out.get())
-    }
-
-    fn render_query_features_take_result(
+    fn set_feature_state(
         &self,
         py: Python<'_>,
-        operation: u64,
-    ) -> PyResult<Py<PyList>> {
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_queried_feature_list>::new();
-        maplibre_core::check(unsafe {
-            sys::mln_render_query_features_take_result(
-                sys::mln_operation(operation),
-                out.as_mut_ptr(),
-            )
-        })
-        .map_err(map_error)
-        .map_err(operation_result_consumed)?;
-        let native = out
-            .into_live("mln_queried_feature_list")
-            .map_err(map_error)?;
-        // SAFETY: native is an owned queried-feature list returned by native.
-        let features = unsafe { maplibre_core::query::copy_queried_feature_list(native) }
-            .map_err(map_error)?;
-        queried_features_to_py(py, features)
-    }
-
-    fn set_feature_state_start(
-        &self,
         source_id: String,
         source_layer_id: Option<String>,
         feature_id: Option<String>,
         state_value: &Bound<'_, PyBytes>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let source_id = maplibre_core::string::string_view(&source_id);
         let source_layer_id =
             maplibre_core::string::string_view(source_layer_id.as_deref().unwrap_or(""));
         let feature_id = maplibre_core::string::string_view(feature_id.as_deref().unwrap_or(""));
         let state_value = maplibre_core::string::buffer_view(state_value.as_bytes());
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_render_session_set_feature_state_start(
-                self.native(),
-                source_id.raw(),
-                source_layer_id.raw(),
-                feature_id.raw(),
-                state_value,
-                &mut operation,
-            )
-        })
-        .map_err(map_error)?;
-        Ok(operation.0)
+        submit_python_future(
+            py,
+            |completion| unsafe {
+                sys::mln_render_session_set_feature_state(
+                    self.native(),
+                    source_id.raw(),
+                    source_layer_id.raw(),
+                    feature_id.raw(),
+                    state_value,
+                    completion,
+                )
+            },
+            py_none,
+        )
     }
 
-    fn get_feature_state_start(
+    fn get_feature_state(
         &self,
+        py: Python<'_>,
         source_id: String,
         source_layer_id: Option<String>,
         feature_id: Option<String>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let source_id = maplibre_core::string::string_view(&source_id);
         let source_layer_id =
             maplibre_core::string::string_view(source_layer_id.as_deref().unwrap_or(""));
         let feature_id = maplibre_core::string::string_view(feature_id.as_deref().unwrap_or(""));
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_render_session_get_feature_state_start(
-                self.native(),
-                source_id.raw(),
-                source_layer_id.raw(),
-                feature_id.raw(),
-                &mut operation,
-            )
-        })
-        .map_err(map_error)?;
-        Ok(operation.0)
+        submit_python_future(
+            py,
+            |completion| unsafe {
+                sys::mln_render_session_get_feature_state(
+                    self.native(),
+                    source_id.raw(),
+                    source_layer_id.raw(),
+                    feature_id.raw(),
+                    completion,
+                )
+            },
+            py_buffer,
+        )
     }
 
-    fn get_feature_state_take_result(
+    fn remove_feature_state(
         &self,
         py: Python<'_>,
-        operation: u64,
-    ) -> PyResult<Py<PyBytes>> {
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
-        maplibre_core::check(unsafe {
-            sys::mln_render_session_get_feature_state_take_result(
-                sys::mln_operation(operation),
-                out.as_mut_ptr(),
-            )
-        })
-        .map_err(map_error)
-        .map_err(operation_result_consumed)?;
-        owned_buffer_to_py(py, out.get())
-    }
-
-    fn remove_feature_state_start(
-        &self,
         source_id: String,
         source_layer_id: Option<String>,
         feature_id: Option<String>,
         state_key: Option<String>,
-    ) -> PyResult<u64> {
+    ) -> PyResult<Py<PyAny>> {
         let source_id = maplibre_core::string::string_view(&source_id);
         let source_layer_id =
             maplibre_core::string::string_view(source_layer_id.as_deref().unwrap_or(""));
         let feature_id = maplibre_core::string::string_view(feature_id.as_deref().unwrap_or(""));
         let state_key = maplibre_core::string::string_view(state_key.as_deref().unwrap_or(""));
-        let mut operation = sys::mln_operation(0);
-        maplibre_core::check(unsafe {
-            sys::mln_render_session_remove_feature_state_start(
-                self.native(),
-                source_id.raw(),
-                source_layer_id.raw(),
-                feature_id.raw(),
-                state_key.raw(),
-                &mut operation,
-            )
-        })
-        .map_err(map_error)?;
-        Ok(operation.0)
+        submit_python_future(
+            py,
+            |completion| unsafe {
+                sys::mln_render_session_remove_feature_state(
+                    self.native(),
+                    source_id.raw(),
+                    source_layer_id.raw(),
+                    feature_id.raw(),
+                    state_key.raw(),
+                    completion,
+                )
+            },
+            py_none,
+        )
     }
 
-    fn read_premultiplied_rgba8_start(&self) -> PyResult<u64> {
-        start_session_operation(self.native(), |session, operation| unsafe {
-            sys::mln_texture_read_premultiplied_rgba8_start(session, operation)
-        })
-    }
-
-    fn read_premultiplied_rgba8_take_result(
-        &self,
-        py: Python<'_>,
-        operation: u64,
-    ) -> PyResult<Py<PyAny>> {
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
-        let mut info = unsafe { sys::mln_texture_image_info_default() };
-        maplibre_core::check(unsafe {
-            sys::mln_texture_read_premultiplied_rgba8_take_result(
-                sys::mln_operation(operation),
-                out.as_mut_ptr(),
-                &mut info,
-            )
-        })
-        .map_err(map_error)
-        .map_err(operation_result_consumed)?;
-        let bytes = owned_buffer_to_py(py, out.get())?;
-        let dict = PyDict::new(py);
-        dict.set_item(
-            "info",
-            texture_image_info_to_py(
-                py,
-                maplibre_core::values::texture_image_info_from_native(&info),
-            )?
-            .bind(py),
-        )?;
-        dict.set_item("data", bytes.bind(py))?;
-        Ok(dict.into_any().unbind())
+    fn read_premultiplied_rgba8(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        submit_python_future(
+            py,
+            |completion| unsafe {
+                sys::mln_texture_read_premultiplied_rgba8(self.native(), completion)
+            },
+            py_texture_readback,
+        )
     }
 
     fn acquire_metal_owned_texture_frame(
@@ -4831,27 +4479,6 @@ fn payload_to_py(py: Python<'_>, payload: RuntimeEventPayload) -> PyResult<Py<Py
             dict.set_item("kind", "camera_transition_finished")?;
             dict.set_item("transition_id", payload.transition_id)?;
         }
-        RuntimeEventPayload::CommandFinished(payload) => {
-            dict.set_item("kind", "command_finished")?;
-            dict.set_item("command_id", payload.command_id)?;
-            let disposition = match payload.disposition {
-                maplibre_core::events::CommandDisposition::Committed => {
-                    sys::MLN_COMMAND_DISPOSITION_COMMITTED
-                }
-                maplibre_core::events::CommandDisposition::Superseded => {
-                    sys::MLN_COMMAND_DISPOSITION_SUPERSEDED
-                }
-                maplibre_core::events::CommandDisposition::Failed => {
-                    sys::MLN_COMMAND_DISPOSITION_FAILED
-                }
-                maplibre_core::events::CommandDisposition::Cancelled => {
-                    sys::MLN_COMMAND_DISPOSITION_CANCELLED
-                }
-                maplibre_core::events::CommandDisposition::Unknown(value) => value,
-            };
-            dict.set_item("disposition", disposition)?;
-            dict.set_item("generation", payload.generation)?;
-        }
         RuntimeEventPayload::Unknown(payload) => {
             dict.set_item("kind", "unknown")?;
             dict.set_item("raw_type", payload.raw_type)?;
@@ -5009,17 +4636,6 @@ fn texture_image_info_to_py(
     Ok(dict.into_any().unbind())
 }
 
-fn image_to_py(
-    py: Python<'_>,
-    info: maplibre_core::TextureImageInfo,
-    data: &[u8],
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("info", texture_image_info_to_py(py, info)?)?;
-    dict.set_item("data", PyBytes::new(py, data))?;
-    Ok(dict.into_any().unbind())
-}
-
 fn log_record_to_py(py: Python<'_>, record: CopiedLogRecordRaw) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item("severity", record.severity)?;
@@ -5120,19 +4736,6 @@ fn lat_lng_bounds_core_from_tuple(
         maplibre_core::LatLng::new(southwest.0, southwest.1),
         maplibre_core::LatLng::new(northeast.0, northeast.1),
     )
-}
-
-fn empty_lat_lng_bounds() -> sys::mln_lat_lng_bounds {
-    sys::mln_lat_lng_bounds {
-        southwest: sys::mln_lat_lng {
-            latitude: 0.0,
-            longitude: 0.0,
-        },
-        northeast: sys::mln_lat_lng {
-            latitude: 0.0,
-            longitude: 0.0,
-        },
-    }
 }
 
 fn lat_lng_to_py(py: Python<'_>, coordinate: sys::mln_lat_lng) -> PyResult<Py<PyAny>> {
@@ -6144,15 +5747,6 @@ fn resource_response_status_from_raw(raw: u32) -> PyResult<ResourceResponseStatu
     }
 }
 
-fn start_session_operation(
-    session: sys::mln_render_session,
-    start: impl FnOnce(sys::mln_render_session, *mut sys::mln_operation) -> sys::mln_status,
-) -> PyResult<u64> {
-    let mut operation = sys::mln_operation(0);
-    maplibre_core::check(start(session, &mut operation)).map_err(map_error)?;
-    Ok(operation.0)
-}
-
 fn acquire_frame(session: sys::mln_render_session) -> PyResult<sys::mln_acquired_frame> {
     let mut frame = sys::mln_acquired_frame(0);
     maplibre_core::check(unsafe { sys::mln_render_session_acquire_frame(session, &mut frame) })
@@ -7052,18 +6646,6 @@ fn runtime_event_stride_for_test(runtime: &RuntimeHandle) -> PyResult<(u32, u32)
     ))
 }
 
-fn owned_buffer_to_py(py: Python<'_>, buffer: sys::mln_buffer) -> PyResult<Py<PyBytes>> {
-    // SAFETY: The buffer is an owned handle returned by the C API.
-    let bytes = unsafe { maplibre_core::string::copy_owned_buffer(buffer) }.map_err(map_error)?;
-    Ok(PyBytes::new(py, &bytes).unbind())
-}
-
-fn owned_buffer_to_string(buffer: sys::mln_buffer) -> PyResult<String> {
-    let bytes = unsafe { maplibre_core::string::copy_owned_buffer(buffer) }.map_err(map_error)?;
-    String::from_utf8(bytes)
-        .map_err(|error| invalid_argument_error(format!("native text is not UTF-8: {error}")))
-}
-
 /// Returns the raw event mask a runtime selects by default.
 ///
 /// The value carries every bit the linked library's creation default selects,
@@ -7100,10 +6682,14 @@ fn create_runtime(
         maplibre_core::runtime::runtime_options_to_native(&options).map_err(map_error)?;
     let mut raw_options = native_options.to_raw();
     raw_options.event_mask = event_mask;
-    let mut source = sys::mln_notification_source(0);
-    maplibre_core::check(unsafe { sys::mln_notification_source_create(&mut source) })
-        .map_err(map_error)?;
-    raw_options.notification_source = source;
+    let event_wake = Arc::new(Mutex::new(None));
+    let event_wake_native = Box::into_raw(Box::new(Arc::clone(&event_wake)));
+    raw_options.event_wake = sys::mln_wake {
+        size: std::mem::size_of::<sys::mln_wake>() as u32,
+        callback: Some(event_wake_trampoline),
+        user_data: event_wake_native.cast(),
+        release_user_data: Some(release_event_wake),
+    };
 
     let mut out = maplibre_core::ptr::OutHandle::<sys::mln_runtime>::new();
     let options_address = std::ptr::addr_of!(raw_options) as usize;
@@ -7115,7 +6701,8 @@ fn create_runtime(
         )
     });
     if let Err(error) = maplibre_core::check(create_status) {
-        unsafe { sys::mln_notification_source_release(source) };
+        // SAFETY: rejected creation retains no wake state.
+        drop(unsafe { Box::from_raw(event_wake_native) });
         return Err(map_error(error));
     }
     let native = out.into_live("mln_runtime").map_err(map_error)?;
@@ -7124,8 +6711,7 @@ fn create_runtime(
             .map_err(map_error)?;
     Ok(RuntimeHandle {
         state: Mutex::new(state),
-        notification_source: Mutex::new(source),
-        notification_callback: Mutex::new(None),
+        event_wake,
     })
 }
 
@@ -7140,7 +6726,7 @@ fn create_map(
     map_mode: Option<u32>,
     fast_pfor_enabled: Option<bool>,
     event_mask: u64,
-) -> PyResult<MapHandle> {
+) -> PyResult<Py<PyAny>> {
     let mut options = maplibre_core::MapOptions::default();
     if let Some(width) = width {
         options.width = width;
@@ -7161,36 +6747,38 @@ fn create_map(
         maplibre_core::options::map_options_to_native(&options).map_err(map_error)?;
     raw_options.event_mask = event_mask;
     let runtime = runtime.native()?;
-    let mut operation = sys::mln_operation(0);
-    maplibre_core::check(unsafe {
-        sys::mln_map_create_start(runtime, &raw_options, &mut operation)
-    })
-    .map_err(map_error)?;
-    let operation = OwnedOperation(operation);
-    wait_operation(py, operation.0)?;
-    let mut out = maplibre_core::ptr::OutHandle::<sys::mln_map>::new();
-    maplibre_core::check(unsafe { sys::mln_map_create_take_result(operation.0, out.as_mut_ptr()) })
-        .map_err(map_error)?;
-    let native = out.into_live("mln_map").map_err(map_error)?;
-    let state = unsafe { maplibre_core::handle::NativeHandleState::from_handle(native, "mln_map") }
-        .map_err(map_error)?;
-    Ok(MapHandle {
-        state: Mutex::new(state),
-    })
+    submit_python_future(
+        py,
+        |completion| unsafe { sys::mln_map_create(runtime, &raw_options, completion) },
+        |py, result| {
+            let native = completion_value::<sys::mln_map>(result)?;
+            let state =
+                unsafe { maplibre_core::handle::NativeHandleState::from_handle(native, "mln_map") }
+                    .map_err(map_error)?;
+            Ok(Py::new(
+                py,
+                MapHandle {
+                    state: Mutex::new(state),
+                },
+            )?
+            .into_any())
+        },
+    )
 }
 
 fn attach_render_session<F>(
+    py: Python<'_>,
     map: &MapHandle,
     driver: u32,
     texture_ring_depth: u32,
     attach: F,
-) -> PyResult<(RenderSessionHandle, u64)>
+) -> PyResult<(RenderSessionHandle, Py<PyAny>)>
 where
     F: FnOnce(
         sys::mln_map,
         *const sys::mln_render_session_attach_options,
         *mut sys::mln_render_session,
-        *mut sys::mln_operation,
+        *const sys::mln_completion,
     ) -> sys::mln_status,
 {
     let map_state = map.state();
@@ -7198,25 +6786,23 @@ where
     options.driver = driver;
     options.requested_texture_ring_depth = texture_ring_depth;
     let mut out = maplibre_core::ptr::OutHandle::<sys::mln_render_session>::new();
-    let mut operation = sys::mln_operation(0);
-    maplibre_core::check(attach(
-        map_state.handle(),
-        &options,
-        out.as_mut_ptr(),
-        &mut operation,
-    ))
-    .map_err(map_error)?;
+    let completion = submit_python_future(
+        py,
+        |completion| attach(map_state.handle(), &options, out.as_mut_ptr(), completion),
+        py_none,
+    )?;
     let native = out.into_live("mln_render_session").map_err(map_error)?;
     Ok((
         RenderSessionHandle {
             state: Arc::new(Mutex::new(RenderSessionState::new(native)?)),
         },
-        operation.0,
+        completion,
     ))
 }
 
 #[pyfunction]
 fn attach_metal_surface(
+    py: Python<'_>,
     map: &MapHandle,
     width: u32,
     height: u32,
@@ -7225,7 +6811,7 @@ fn attach_metal_surface(
     layer_address: usize,
     driver: u32,
     texture_ring_depth: u32,
-) -> PyResult<(RenderSessionHandle, u64)> {
+) -> PyResult<(RenderSessionHandle, Py<PyAny>)> {
     let descriptor = maplibre_core::render::metal_surface_descriptor_to_native(
         maplibre_core::render::MetalSurfaceDescriptorFields {
             extent: maplibre_core::render::RenderTargetExtentFields {
@@ -7240,17 +6826,19 @@ fn attach_metal_surface(
         },
     );
     attach_render_session(
+        py,
         map,
         driver,
         texture_ring_depth,
         |map, options, session, operation| unsafe {
-            sys::mln_metal_surface_attach_start(map, &descriptor, options, session, operation)
+            sys::mln_metal_surface_attach(map, &descriptor, options, session, operation)
         },
     )
 }
 
 #[pyfunction]
 fn attach_vulkan_surface(
+    py: Python<'_>,
     map: &MapHandle,
     width: u32,
     height: u32,
@@ -7265,7 +6853,7 @@ fn attach_vulkan_surface(
     surface_address: usize,
     driver: u32,
     texture_ring_depth: u32,
-) -> PyResult<(RenderSessionHandle, u64)> {
+) -> PyResult<(RenderSessionHandle, Py<PyAny>)> {
     let descriptor = maplibre_core::render::vulkan_surface_descriptor_to_native(
         maplibre_core::render::VulkanSurfaceDescriptorFields {
             extent: maplibre_core::render::RenderTargetExtentFields {
@@ -7286,17 +6874,19 @@ fn attach_vulkan_surface(
         },
     );
     attach_render_session(
+        py,
         map,
         driver,
         texture_ring_depth,
         |map, options, session, operation| unsafe {
-            sys::mln_vulkan_surface_attach_start(map, &descriptor, options, session, operation)
+            sys::mln_vulkan_surface_attach(map, &descriptor, options, session, operation)
         },
     )
 }
 
 #[pyfunction]
 fn attach_metal_owned_texture(
+    py: Python<'_>,
     map: &MapHandle,
     width: u32,
     height: u32,
@@ -7304,7 +6894,7 @@ fn attach_metal_owned_texture(
     device_address: usize,
     driver: u32,
     texture_ring_depth: u32,
-) -> PyResult<(RenderSessionHandle, u64)> {
+) -> PyResult<(RenderSessionHandle, Py<PyAny>)> {
     let descriptor = maplibre_core::render::metal_owned_texture_descriptor_to_native(
         maplibre_core::render::MetalOwnedTextureDescriptorFields {
             extent: maplibre_core::render::RenderTargetExtentFields {
@@ -7318,17 +6908,19 @@ fn attach_metal_owned_texture(
         },
     );
     attach_render_session(
+        py,
         map,
         driver,
         texture_ring_depth,
         |map, options, session, operation| unsafe {
-            sys::mln_metal_owned_texture_attach_start(map, &descriptor, options, session, operation)
+            sys::mln_metal_owned_texture_attach(map, &descriptor, options, session, operation)
         },
     )
 }
 
 #[pyfunction]
 fn attach_metal_borrowed_texture(
+    py: Python<'_>,
     map: &MapHandle,
     width: u32,
     height: u32,
@@ -7338,7 +6930,7 @@ fn attach_metal_borrowed_texture(
     texture_address: usize,
     driver: u32,
     texture_ring_depth: u32,
-) -> PyResult<(RenderSessionHandle, u64)> {
+) -> PyResult<(RenderSessionHandle, Py<PyAny>)> {
     let descriptor = maplibre_core::render::metal_borrowed_texture_descriptor_to_native(
         maplibre_core::render::MetalBorrowedTextureDescriptorFields {
             extent: maplibre_core::render::RenderTargetExtentFields {
@@ -7352,23 +6944,19 @@ fn attach_metal_borrowed_texture(
         },
     );
     attach_render_session(
+        py,
         map,
         driver,
         texture_ring_depth,
         |map, options, session, operation| unsafe {
-            sys::mln_metal_borrowed_texture_attach_start(
-                map,
-                &descriptor,
-                options,
-                session,
-                operation,
-            )
+            sys::mln_metal_borrowed_texture_attach(map, &descriptor, options, session, operation)
         },
     )
 }
 
 #[pyfunction]
 fn attach_vulkan_owned_texture(
+    py: Python<'_>,
     map: &MapHandle,
     width: u32,
     height: u32,
@@ -7382,7 +6970,7 @@ fn attach_vulkan_owned_texture(
     get_device_proc_addr: usize,
     driver: u32,
     texture_ring_depth: u32,
-) -> PyResult<(RenderSessionHandle, u64)> {
+) -> PyResult<(RenderSessionHandle, Py<PyAny>)> {
     let descriptor = maplibre_core::render::vulkan_owned_texture_descriptor_to_native(
         maplibre_core::render::VulkanOwnedTextureDescriptorFields {
             extent: maplibre_core::render::RenderTargetExtentFields {
@@ -7402,17 +6990,12 @@ fn attach_vulkan_owned_texture(
         },
     );
     attach_render_session(
+        py,
         map,
         driver,
         texture_ring_depth,
         |map, options, session, operation| unsafe {
-            sys::mln_vulkan_owned_texture_attach_start(
-                map,
-                &descriptor,
-                options,
-                session,
-                operation,
-            )
+            sys::mln_vulkan_owned_texture_attach(map, &descriptor, options, session, operation)
         },
     )
 }
@@ -7420,6 +7003,7 @@ fn attach_vulkan_owned_texture(
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
 fn attach_vulkan_borrowed_texture(
+    py: Python<'_>,
     map: &MapHandle,
     width: u32,
     height: u32,
@@ -7440,7 +7024,7 @@ fn attach_vulkan_borrowed_texture(
     final_layout: u32,
     driver: u32,
     texture_ring_depth: u32,
-) -> PyResult<(RenderSessionHandle, u64)> {
+) -> PyResult<(RenderSessionHandle, Py<PyAny>)> {
     let descriptor = maplibre_core::render::vulkan_borrowed_texture_descriptor_to_native(
         maplibre_core::render::VulkanBorrowedTextureDescriptorFields {
             extent: maplibre_core::render::RenderTargetExtentFields {
@@ -7467,17 +7051,12 @@ fn attach_vulkan_borrowed_texture(
         },
     );
     attach_render_session(
+        py,
         map,
         driver,
         texture_ring_depth,
         |map, options, session, operation| unsafe {
-            sys::mln_vulkan_borrowed_texture_attach_start(
-                map,
-                &descriptor,
-                options,
-                session,
-                operation,
-            )
+            sys::mln_vulkan_borrowed_texture_attach(map, &descriptor, options, session, operation)
         },
     )
 }
@@ -7485,6 +7064,7 @@ fn attach_vulkan_borrowed_texture(
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
 fn attach_webgpu_surface(
+    py: Python<'_>,
     map: &MapHandle,
     width: u32,
     height: u32,
@@ -7496,7 +7076,7 @@ fn attach_webgpu_surface(
     format: u32,
     driver: u32,
     texture_ring_depth: u32,
-) -> PyResult<(RenderSessionHandle, u64)> {
+) -> PyResult<(RenderSessionHandle, Py<PyAny>)> {
     let descriptor = maplibre_core::render::webgpu_surface_descriptor_to_native(
         maplibre_core::render::WebGpuSurfaceDescriptorFields {
             extent: maplibre_core::render::RenderTargetExtentFields {
@@ -7510,17 +7090,19 @@ fn attach_webgpu_surface(
         },
     );
     attach_render_session(
+        py,
         map,
         driver,
         texture_ring_depth,
         |map, options, session, operation| unsafe {
-            sys::mln_webgpu_surface_attach_start(map, &descriptor, options, session, operation)
+            sys::mln_webgpu_surface_attach(map, &descriptor, options, session, operation)
         },
     )
 }
 
 #[pyfunction]
 fn attach_webgpu_owned_texture(
+    py: Python<'_>,
     map: &MapHandle,
     width: u32,
     height: u32,
@@ -7530,7 +7112,7 @@ fn attach_webgpu_owned_texture(
     queue_address: usize,
     driver: u32,
     texture_ring_depth: u32,
-) -> PyResult<(RenderSessionHandle, u64)> {
+) -> PyResult<(RenderSessionHandle, Py<PyAny>)> {
     let descriptor = maplibre_core::render::webgpu_owned_texture_descriptor_to_native(
         maplibre_core::render::WebGpuOwnedTextureDescriptorFields {
             extent: maplibre_core::render::RenderTargetExtentFields {
@@ -7542,17 +7124,12 @@ fn attach_webgpu_owned_texture(
         },
     );
     attach_render_session(
+        py,
         map,
         driver,
         texture_ring_depth,
         |map, options, session, operation| unsafe {
-            sys::mln_webgpu_owned_texture_attach_start(
-                map,
-                &descriptor,
-                options,
-                session,
-                operation,
-            )
+            sys::mln_webgpu_owned_texture_attach(map, &descriptor, options, session, operation)
         },
     )
 }
@@ -7560,6 +7137,7 @@ fn attach_webgpu_owned_texture(
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
 fn attach_webgpu_borrowed_texture(
+    py: Python<'_>,
     map: &MapHandle,
     width: u32,
     height: u32,
@@ -7574,7 +7152,7 @@ fn attach_webgpu_borrowed_texture(
     format: u32,
     driver: u32,
     texture_ring_depth: u32,
-) -> PyResult<(RenderSessionHandle, u64)> {
+) -> PyResult<(RenderSessionHandle, Py<PyAny>)> {
     let descriptor = maplibre_core::render::webgpu_borrowed_texture_descriptor_to_native(
         maplibre_core::render::WebGpuBorrowedTextureDescriptorFields {
             extent: maplibre_core::render::RenderTargetExtentFields {
@@ -7591,17 +7169,12 @@ fn attach_webgpu_borrowed_texture(
         },
     );
     attach_render_session(
+        py,
         map,
         driver,
         texture_ring_depth,
         |map, options, session, operation| unsafe {
-            sys::mln_webgpu_borrowed_texture_attach_start(
-                map,
-                &descriptor,
-                options,
-                session,
-                operation,
-            )
+            sys::mln_webgpu_borrowed_texture_attach(map, &descriptor, options, session, operation)
         },
     )
 }
@@ -7609,6 +7182,7 @@ fn attach_webgpu_borrowed_texture(
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
 fn attach_opengl_surface(
+    py: Python<'_>,
     map: &MapHandle,
     width: u32,
     height: u32,
@@ -7623,7 +7197,7 @@ fn attach_opengl_surface(
     surface_address: usize,
     driver: u32,
     texture_ring_depth: u32,
-) -> PyResult<(RenderSessionHandle, u64)> {
+) -> PyResult<(RenderSessionHandle, Py<PyAny>)> {
     let descriptor = maplibre_core::render::opengl_surface_descriptor_to_native(
         maplibre_core::render::OpenGLSurfaceDescriptorFields {
             extent: maplibre_core::render::RenderTargetExtentFields {
@@ -7644,11 +7218,12 @@ fn attach_opengl_surface(
         },
     );
     attach_render_session(
+        py,
         map,
         driver,
         texture_ring_depth,
         |map, options, session, operation| unsafe {
-            sys::mln_opengl_surface_attach_start(map, &descriptor, options, session, operation)
+            sys::mln_opengl_surface_attach(map, &descriptor, options, session, operation)
         },
     )
 }
@@ -7656,6 +7231,7 @@ fn attach_opengl_surface(
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
 fn attach_opengl_owned_texture(
+    py: Python<'_>,
     map: &MapHandle,
     width: u32,
     height: u32,
@@ -7669,7 +7245,7 @@ fn attach_opengl_owned_texture(
     get_proc_address: usize,
     driver: u32,
     texture_ring_depth: u32,
-) -> PyResult<(RenderSessionHandle, u64)> {
+) -> PyResult<(RenderSessionHandle, Py<PyAny>)> {
     let descriptor = maplibre_core::render::opengl_owned_texture_descriptor_to_native(
         maplibre_core::render::OpenGLOwnedTextureDescriptorFields {
             extent: maplibre_core::render::RenderTargetExtentFields {
@@ -7689,17 +7265,12 @@ fn attach_opengl_owned_texture(
         },
     );
     attach_render_session(
+        py,
         map,
         driver,
         texture_ring_depth,
         |map, options, session, operation| unsafe {
-            sys::mln_opengl_owned_texture_attach_start(
-                map,
-                &descriptor,
-                options,
-                session,
-                operation,
-            )
+            sys::mln_opengl_owned_texture_attach(map, &descriptor, options, session, operation)
         },
     )
 }
@@ -7707,6 +7278,7 @@ fn attach_opengl_owned_texture(
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
 fn attach_opengl_borrowed_texture(
+    py: Python<'_>,
     map: &MapHandle,
     width: u32,
     height: u32,
@@ -7724,7 +7296,7 @@ fn attach_opengl_borrowed_texture(
     target: u32,
     driver: u32,
     texture_ring_depth: u32,
-) -> PyResult<(RenderSessionHandle, u64)> {
+) -> PyResult<(RenderSessionHandle, Py<PyAny>)> {
     let descriptor = maplibre_core::render::opengl_borrowed_texture_descriptor_to_native(
         maplibre_core::render::OpenGLBorrowedTextureDescriptorFields {
             extent: maplibre_core::render::RenderTargetExtentFields {
@@ -7748,17 +7320,12 @@ fn attach_opengl_borrowed_texture(
         },
     );
     attach_render_session(
+        py,
         map,
         driver,
         texture_ring_depth,
         |map, options, session, operation| unsafe {
-            sys::mln_opengl_borrowed_texture_attach_start(
-                map,
-                &descriptor,
-                options,
-                session,
-                operation,
-            )
+            sys::mln_opengl_borrowed_texture_attach(map, &descriptor, options, session, operation)
         },
     )
 }

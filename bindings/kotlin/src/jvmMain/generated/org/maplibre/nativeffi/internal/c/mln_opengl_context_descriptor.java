@@ -198,7 +198,7 @@ public class mln_opengl_context_descriptor {
             mln_wgl_context_descriptor.layout().withName("wgl"),
             mln_egl_context_descriptor.layout().withName("egl"),
             mln_webgl_context_descriptor.layout().withName("webgl")
-        ).withName("$anon$290:3");
+        ).withName("$anon$287:3");
 
         /**
          * The layout of this union

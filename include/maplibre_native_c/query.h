@@ -10,6 +10,7 @@
 #include <stdint.h>
 
 #include "base.h"
+#include "completion.h"
 #include "map.h"
 
 #ifdef __cplusplus
@@ -175,55 +176,39 @@ MLN_API void mln_queried_feature_list_destroy(
  *
  * All inputs are copied before return. Core-worker sessions execute on their
  * worker. Caller-driver sessions publish driver work and complete only after
- * the host services it on the graphics thread. Take the completed result with
- * mln_render_query_features_take_result().
+ * the host services it on the graphics thread. The completion value is an
+ * owned mln_queried_feature_list handle.
  *
  * Box geometry is normalized and clipped to the viewport, so a box that
  * over-covers the viewport queries everything visible. A box that lies entirely
  * outside the viewport yields an empty result. Point and line-string geometry
  * are queried as given.
  */
-MLN_API mln_status mln_render_session_query_rendered_features_start(
+MLN_API mln_status mln_render_session_query_rendered_features(
   mln_render_session session, const mln_rendered_query_geometry* geometry,
   const mln_rendered_feature_query_options* options,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
  * Starts a source-feature query against the session's latest driver state.
- * Take the completed result with mln_render_query_features_take_result().
+ * The completion value is an owned mln_queried_feature_list handle.
  */
-MLN_API mln_status mln_render_session_query_source_features_start(
+MLN_API mln_status mln_render_session_query_source_features(
   mln_render_session session, mln_buffer_view source_id,
-  const mln_source_feature_query_options* options, mln_operation* out_operation
+  const mln_source_feature_query_options* options,
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
- * Starts a feature-extension query against the latest driver state. Take the
- * completed result with mln_render_query_take_result().
+ * Starts a feature-extension query against the latest driver state. The
+ * completion value is an owned mln_buffer handle containing JSON.
  */
-MLN_API mln_status mln_render_session_query_feature_extensions_start(
+MLN_API mln_status mln_render_session_query_feature_extensions(
   mln_render_session session, mln_buffer_view source_id,
   mln_buffer_view feature, mln_buffer_view extension,
   mln_buffer_view extension_field, const mln_buffer_view* arguments,
-  mln_operation* out_operation
-) MLN_NOEXCEPT;
-
-/**
- * Takes the owned queried-feature list from a completed rendered- or
- * source-feature query operation. Destroy the list with
- * mln_queried_feature_list_destroy().
- */
-MLN_API mln_status mln_render_query_features_take_result(
-  mln_operation operation, mln_queried_feature_list* out_result
-) MLN_NOEXCEPT;
-
-/**
- * Takes the owned JSON bytes from a completed feature-extension query
- * operation.
- */
-MLN_API mln_status mln_render_query_take_result(
-  mln_operation operation, mln_buffer* out_result
+  const mln_completion* completion
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

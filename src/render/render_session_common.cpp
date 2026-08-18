@@ -39,7 +39,6 @@
 #include "map/map.hpp"
 #include "map/map_internal.hpp"
 #include "maplibre_native_c.h"
-#include "notification/notification.hpp"
 #include "operation/operation.hpp"
 #include "render/render_session_test_support.hpp"
 #include "runtime/runtime.hpp"
@@ -1036,8 +1035,9 @@ auto publish_driver_work_locked(mln_render_session_object& session) noexcept
   -> void {
   if (session.capabilities.driver == MLN_RENDER_DRIVER_CORE_WORKER) {
     session.worker_condition.notify_one();
-  } else if (session.driver_endpoint != nullptr) {
-    session.driver_endpoint->mark_ready();
+  } else if (session.driver_wake != nullptr && !session.driver_wake_pending) {
+    session.driver_wake_pending = true;
+    session.driver_wake->notify();
   }
 }
 auto run_core_worker(
@@ -1112,13 +1112,11 @@ auto lease_render_session(mln_render_session session)
 }
 
 auto enqueue_driver_operation(
-  mln_render_session session, std::uint32_t operation_kind,
-  RenderDriverCallable work, mln_operation* out_operation
+  mln_render_session session, RenderDriverCallable work,
+  const mln_completion* completion
 ) -> mln_status {
-  if (out_operation == nullptr || *out_operation != MLN_HANDLE_NULL) {
-    set_thread_error("out_operation must point to a null operation handle");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  const auto completion_status = validate_completion(completion);
+  if (completion_status != MLN_STATUS_OK) return completion_status;
   auto live = lease_render_session(session);
   if (live == nullptr) {
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -1130,13 +1128,12 @@ auto enqueue_driver_operation(
       return MLN_STATUS_INVALID_STATE;
     }
   }
-  auto operation = std::shared_ptr<OperationObject>{};
-  const auto status = register_operation(
-    live->operation_source, operation_kind, false, {}, out_operation, operation
+  auto completion_state = std::make_shared<Completion>(*completion);
+  auto operation = std::make_shared<OperationObject>(
+    [completion_state](mln_status status, std::string diagnostic, std::any) {
+      complete(completion_state, status, std::move(diagnostic));
+    }
   );
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto enqueued = enqueue_work_if_attached(
     live, RenderDriverWork{
             [live, operation, work = std::move(work)]() {
@@ -1150,21 +1147,19 @@ auto enqueue_driver_operation(
           }
   );
   if (!enqueued) {
-    abandon_operation(*out_operation);
-    *out_operation = MLN_HANDLE_NULL;
+    completion_state->reject();
     set_thread_error("render session is not attached");
     return MLN_STATUS_INVALID_STATE;
   }
+  completion_state->accept();
   return MLN_STATUS_OK;
 }
 auto enqueue_driver_result_operation(
-  mln_render_session session, std::uint32_t operation_kind,
-  RenderDriverResultCallable work, mln_operation* out_operation
+  mln_render_session session, RenderDriverResultCallable work,
+  const mln_completion* completion, RenderCompletionTransfer transfer
 ) -> mln_status {
-  if (out_operation == nullptr || *out_operation != MLN_HANDLE_NULL) {
-    set_thread_error("out_operation must point to a null operation handle");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  const auto completion_status = validate_completion(completion);
+  if (completion_status != MLN_STATUS_OK) return completion_status;
   auto live = lease_render_session(session);
   if (live == nullptr) {
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -1176,13 +1171,16 @@ auto enqueue_driver_result_operation(
       return MLN_STATUS_INVALID_STATE;
     }
   }
-  auto operation = std::shared_ptr<OperationObject>{};
-  const auto status = register_operation(
-    live->operation_source, operation_kind, false, {}, out_operation, operation
+  auto completion_state = std::make_shared<Completion>(*completion);
+  auto operation = std::make_shared<OperationObject>(
+    [completion_state, transfer = std::move(transfer)](
+      mln_status status, std::string diagnostic, std::any result
+    ) mutable {
+      transfer(
+        completion_state, status, std::move(diagnostic), std::move(result)
+      );
+    }
   );
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
   const auto enqueued = enqueue_work_if_attached(
     live, RenderDriverWork{
             [live, operation, work = std::move(work)]() {
@@ -1211,22 +1209,22 @@ auto enqueue_driver_result_operation(
           }
   );
   if (!enqueued) {
-    abandon_operation(*out_operation);
-    *out_operation = MLN_HANDLE_NULL;
+    completion_state->reject();
     set_thread_error("render session is not attached");
     return MLN_STATUS_INVALID_STATE;
   }
+  completion_state->accept();
   return MLN_STATUS_OK;
 }
 auto enqueue_blocking_test_render_operation(
   mln_render_session session, std::atomic_bool* entered,
-  const std::atomic_bool* release, mln_operation* out_operation
+  const std::atomic_bool* release, const mln_completion* completion
 ) -> mln_status {
   if (entered == nullptr || release == nullptr) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   return enqueue_driver_operation(
-    session, RENDER_OPERATION_MAINTENANCE,
+    session,
     [entered, release](mln_render_session_object&) {
       entered->store(true, std::memory_order_release);
       while (!release->load(std::memory_order_acquire)) {
@@ -1234,13 +1232,13 @@ auto enqueue_blocking_test_render_operation(
       }
       return MLN_STATUS_OK;
     },
-    out_operation
+    completion
   );
 }
 
 auto validate_render_session_attach_request(
   const mln_render_session_attach_options* options,
-  const mln_render_session* out_session, const mln_operation* out_operation
+  const mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
   if (options == nullptr) {
     set_thread_error("render session attach options must not be null");
@@ -1250,13 +1248,12 @@ auto validate_render_session_attach_request(
     set_thread_error("render session attach options size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    out_session == nullptr || *out_session != MLN_HANDLE_NULL ||
-    out_operation == nullptr || *out_operation != MLN_HANDLE_NULL
-  ) {
-    set_thread_error("attach outputs must point to null handles");
+  if (out_session == nullptr || *out_session != MLN_HANDLE_NULL) {
+    set_thread_error("out_session must point to a null handle");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  const auto completion_status = validate_completion(completion);
+  if (completion_status != MLN_STATUS_OK) return completion_status;
   if (
     options->driver != MLN_RENDER_DRIVER_CORE_WORKER &&
     options->driver != MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
@@ -1271,14 +1268,14 @@ auto start_attach_render_session(
   std::shared_ptr<mln_render_session_object> session, RenderSessionKind kind,
   const mln_render_session_attach_options* options,
   mln_render_session_capabilities capabilities, mln_render_session* out_session,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) -> mln_status {
   if (session == nullptr) {
     set_thread_error("render session must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto request_status =
-    validate_render_session_attach_request(options, out_session, out_operation);
+    validate_render_session_attach_request(options, out_session, completion);
   if (request_status != MLN_STATUS_OK) {
     return request_status;
   }
@@ -1294,30 +1291,16 @@ auto start_attach_render_session(
   ) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto operation_source =
-    options->operation_source == MLN_HANDLE_NULL
-      ? map->runtime_state->event_queue->notification_source
-      : notification_source_from_handle(options->operation_source);
-  if (operation_source == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  auto frame_source =
-    options->frame_source == MLN_HANDLE_NULL
-      ? operation_source
-      : notification_source_from_handle(options->frame_source);
-  auto driver_source =
-    options->driver_work_source == MLN_HANDLE_NULL
-      ? operation_source
-      : notification_source_from_handle(options->driver_work_source);
-  if (frame_source == nullptr || driver_source == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  const auto frame_wake_status = validate_wake(&options->frame_wake);
+  if (frame_wake_status != MLN_STATUS_OK) return frame_wake_status;
+  const auto driver_wake_status = validate_wake(&options->driver_work_wake);
+  if (driver_wake_status != MLN_STATUS_OK) return driver_wake_status;
+  auto frame_wake = std::make_shared<Wake>(options->frame_wake);
+  auto driver_wake = std::make_shared<Wake>(options->driver_work_wake);
 
-  auto attach_operation = std::shared_ptr<OperationObject>{};
-  const auto operation_status = register_operation(
-    operation_source, RENDER_OPERATION_ATTACH, false, {}, out_operation,
-    attach_operation
-  );
+  auto async = CompletionOperation{};
+  const auto operation_status =
+    create_completion_operation(completion, {}, async);
   if (operation_status != MLN_STATUS_OK) {
     return operation_status;
   }
@@ -1332,30 +1315,21 @@ auto start_attach_render_session(
     session->texture.slots.resize(depth);
   }
   session->capabilities.driver = options->driver;
-  session->operation_source = std::move(operation_source);
+  session->frame_wake = frame_wake;
+  session->driver_wake = driver_wake;
   session->state = MLN_RENDER_SESSION_STATE_ATTACHING;
   const auto attach_status =
     map_attach_render_target_session(session->map, session.get());
   if (attach_status != MLN_STATUS_OK) {
-    abandon_operation(*out_operation);
-    *out_operation = MLN_HANDLE_NULL;
+    async.completion->reject();
     return attach_status;
   }
   session->attached = true;
-  // Handle insertion and endpoint association can throw (table exhaustion,
-  // allocation failure) after the map's session slot is claimed; without the
-  // rollback the map would keep a dangling session pointer.
+  // Handle insertion can throw after the map's session slot is claimed;
+  // without the rollback the map would keep a dangling session pointer.
   try {
     session->self = register_render_session(session);
-    session->frame_endpoint = frame_source->associate(
-      session->self, MLN_NOTIFICATION_ENDPOINT_RENDER_FRAMES, true
-    );
-    session->driver_endpoint = driver_source->associate(
-      session->self, MLN_NOTIFICATION_ENDPOINT_DRIVER_WORK, true
-    );
   } catch (...) {
-    session->frame_endpoint.reset();
-    session->driver_endpoint.reset();
     static_cast<void>(
       map_detach_render_target_session(session->map, session.get())
     );
@@ -1364,24 +1338,8 @@ auto start_attach_render_session(
         handle_table<mln_render_session_object>().remove(session->self)
       );
     }
-    abandon_operation(*out_operation);
-    *out_operation = MLN_HANDLE_NULL;
+    async.completion->reject();
     throw;
-  }
-  if (
-    session->frame_endpoint == nullptr || session->driver_endpoint == nullptr
-  ) {
-    session->frame_endpoint.reset();
-    session->driver_endpoint.reset();
-    static_cast<void>(
-      map_detach_render_target_session(session->map, session.get())
-    );
-    static_cast<void>(
-      handle_table<mln_render_session_object>().remove(session->self)
-    );
-    abandon_operation(*out_operation);
-    *out_operation = MLN_HANDLE_NULL;
-    return MLN_STATUS_INVALID_STATE;
   }
   const auto weak_session = std::weak_ptr<mln_render_session_object>{session};
   const auto publish_status = map_set_render_session_publish_callback(
@@ -1392,16 +1350,13 @@ auto start_attach_render_session(
     }
   );
   if (publish_status != MLN_STATUS_OK) {
-    session->frame_endpoint.reset();
-    session->driver_endpoint.reset();
     static_cast<void>(
       map_detach_render_target_session(session->map, session.get())
     );
     static_cast<void>(
       handle_table<mln_render_session_object>().remove(session->self)
     );
-    abandon_operation(*out_operation);
-    *out_operation = MLN_HANDLE_NULL;
+    async.completion->reject();
     return publish_status;
   }
   try {
@@ -1410,8 +1365,6 @@ auto start_attach_render_session(
         const auto worker_status =
           session->start_worker([session]() { run_core_worker(session); });
         if (worker_status != MLN_STATUS_OK) {
-          session->frame_endpoint.reset();
-          session->driver_endpoint.reset();
           static_cast<void>(
             map_set_render_session_publish_callback(session->map, {})
           );
@@ -1421,8 +1374,7 @@ auto start_attach_render_session(
           static_cast<void>(
             handle_table<mln_render_session_object>().remove(session->self)
           );
-          abandon_operation(*out_operation);
-          *out_operation = MLN_HANDLE_NULL;
+          async.completion->reject();
           return worker_status;
         }
       } else {
@@ -1433,7 +1385,7 @@ auto start_attach_render_session(
     enqueue_work(
       session,
       RenderDriverWork{
-        [session, attach_operation]() {
+        [session, attach_operation = async.operation]() {
           try {
             if (session->initialize_backend) {
               const auto initialize_status =
@@ -1476,7 +1428,7 @@ auto start_attach_render_session(
             );
           }
         },
-        [attach_operation]() {
+        [attach_operation = async.operation]() {
           attach_operation->complete(
             MLN_STATUS_TARGET_LOST, "render target was abandoned", {}
           );
@@ -1496,19 +1448,22 @@ auto start_attach_render_session(
     static_cast<void>(
       map_set_render_session_publish_callback(session->map, {})
     );
-    session->frame_endpoint.reset();
-    session->driver_endpoint.reset();
     static_cast<void>(
       map_detach_render_target_session(session->map, session.get())
     );
     static_cast<void>(
       handle_table<mln_render_session_object>().remove(session->self)
     );
-    abandon_operation(*out_operation);
-    *out_operation = MLN_HANDLE_NULL;
+    async.completion->reject();
     throw;
   }
   *out_session = session->self;
+  frame_wake->accept();
+  driver_wake->accept();
+  async.completion->accept();
+  if (options->driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {
+    driver_wake->notify();
+  }
   return MLN_STATUS_OK;
 }
 
@@ -1533,9 +1488,9 @@ auto notify_render_session_map_update(
   if (
     !session->demands.empty() &&
     session->capabilities.driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD &&
-    session->driver_endpoint != nullptr
+    session->driver_wake != nullptr
   ) {
-    session->driver_endpoint->mark_ready();
+    session->driver_wake->notify();
   }
   session->worker_condition.notify_one();
 }
@@ -1944,8 +1899,8 @@ auto render_session_destroy(mln_render_session session) -> mln_status {
     live->join_worker();
   else if (live->worker.joinable())
     live->worker.join();
-  live->frame_endpoint.reset();
-  live->driver_endpoint.reset();
+  live->frame_wake.reset();
+  live->driver_wake.reset();
   static_cast<void>(handle_table<mln_render_session_object>().remove(session));
   return MLN_STATUS_OK;
 }
@@ -2377,7 +2332,10 @@ auto publish_frame_result(
   session->latest_result = static_cast<mln_render_result>(result.disposition);
   session->latest_demand_token = result.token;
   session->frame_results.push_back(result);
-  if (session->frame_endpoint) session->frame_endpoint->mark_ready();
+  if (session->frame_wake && !session->frame_wake_pending) {
+    session->frame_wake_pending = true;
+    session->frame_wake->notify();
+  }
 }
 
 auto run_frame_demand(
@@ -2637,11 +2595,9 @@ auto render_session_service_driver_work(
     ~DriverCallGuard() {
       const auto lock = std::scoped_lock{session->control_mutex};
       session->driver_call_in_flight = false;
-      if (session->driver_endpoint) {
-        if (session->driver_work.empty())
-          session->driver_endpoint->clear_ready();
-        else
-          session->driver_endpoint->mark_ready();
+      session->driver_wake_pending = !session->driver_work.empty();
+      if (session->driver_wake_pending && session->driver_wake) {
+        session->driver_wake->notify();
       }
     }
   } guard{s};
@@ -2671,7 +2627,7 @@ auto render_session_drain_frame_results(
   {
     const auto lock = std::scoped_lock{s->control_mutex};
     batch->results.swap(s->frame_results);
-    if (s->frame_endpoint) s->frame_endpoint->clear_ready();
+    s->frame_wake_pending = false;
   }
   if (batch->results.empty()) {
     static_cast<void>(
@@ -2963,10 +2919,9 @@ auto make_ordered_barrier_work(
 
 auto render_session_resize_start(
   mln_render_session handle, const mln_render_target_extent* extent,
-  mln_operation* out
+  const mln_completion* completion
 ) -> mln_status {
-  if (!extent || !out || *out != MLN_HANDLE_NULL)
-    return MLN_STATUS_INVALID_ARGUMENT;
+  if (!extent) return MLN_STATUS_INVALID_ARGUMENT;
   const auto valid = validate_render_target_extent(
     *extent, "render target dimensions and scale factor must be positive"
   );
@@ -2988,10 +2943,8 @@ auto render_session_resize_start(
       return MLN_STATUS_UNSUPPORTED;
     }
   }
-  auto operation = std::shared_ptr<OperationObject>{};
-  const auto registered = register_operation(
-    s->operation_source, RENDER_OPERATION_RESIZE, false, {}, out, operation
-  );
+  auto async = CompletionOperation{};
+  const auto registered = create_completion_operation(completion, {}, async);
   if (registered != MLN_STATUS_OK) return registered;
   const auto copied = *extent;
   {
@@ -3007,16 +2960,18 @@ auto render_session_resize_start(
             }
   );
   if (post != MLN_STATUS_OK) {
-    operation->complete(post, {}, {});
+    async.operation->complete(post, {}, {});
+    async.completion->accept();
     return MLN_STATUS_OK;
   }
-  enqueue_work(s, make_ordered_resize_work(s, operation, copied));
+  enqueue_work(s, make_ordered_resize_work(s, async.operation, copied));
+  async.completion->accept();
   return MLN_STATUS_OK;
 }
 
-auto render_session_barrier_start(mln_render_session handle, mln_operation* out)
-  -> mln_status {
-  if (!out || *out != MLN_HANDLE_NULL) return MLN_STATUS_INVALID_ARGUMENT;
+auto render_session_barrier_start(
+  mln_render_session handle, const mln_completion* completion
+) -> mln_status {
   const auto s = lease_render_session(handle);
   if (!s) return MLN_STATUS_INVALID_ARGUMENT;
   {
@@ -3024,17 +2979,14 @@ auto render_session_barrier_start(mln_render_session handle, mln_operation* out)
     if (s->state != MLN_RENDER_SESSION_STATE_ATTACHED)
       return MLN_STATUS_INVALID_STATE;
   }
-  auto operation = std::shared_ptr<OperationObject>{};
-  const auto status = register_operation(
-    s->operation_source, RENDER_OPERATION_BARRIER, false, {}, out, operation
-  );
+  auto async = CompletionOperation{};
+  const auto status = create_completion_operation(completion, {}, async);
   if (status != MLN_STATUS_OK) return status;
-  auto item = make_ordered_barrier_work(operation);
+  auto item = make_ordered_barrier_work(async.operation);
   {
     const auto lock = std::scoped_lock{s->control_mutex};
     if (s->state != MLN_RENDER_SESSION_STATE_ATTACHED) {
-      abandon_operation(*out);
-      *out = MLN_HANDLE_NULL;
+      async.completion->reject();
       return MLN_STATUS_INVALID_STATE;
     }
     ++s->barrier_epoch;
@@ -3043,14 +2995,15 @@ auto render_session_barrier_start(mln_render_session handle, mln_operation* out)
     queue.push_back(std::move(item));
     if (s->waiting_update_work.empty()) publish_driver_work_locked(*s);
   }
+  async.completion->accept();
   return MLN_STATUS_OK;
 }
 
 auto render_session_maintenance_start(
-  mln_render_session handle, std::uint32_t kind, mln_operation* out
+  mln_render_session handle, std::uint32_t kind, const mln_completion* out
 ) -> mln_status {
   return enqueue_driver_operation(
-    handle, RENDER_OPERATION_MAINTENANCE,
+    handle,
     [kind](mln_render_session_object& s) {
       switch (kind) {
         case 0:
@@ -3065,20 +3018,19 @@ auto render_session_maintenance_start(
   );
 }
 
-auto render_session_detach_start(mln_render_session handle, mln_operation* out)
-  -> mln_status {
+auto render_session_detach_start(
+  mln_render_session handle, const mln_completion* completion
+) -> mln_status {
   const auto s = lease_render_session(handle);
-  if (!s || !out || *out != MLN_HANDLE_NULL) return MLN_STATUS_INVALID_ARGUMENT;
+  if (!s) return MLN_STATUS_INVALID_ARGUMENT;
   {
     const auto lock = std::scoped_lock{s->control_mutex};
     if (s->state != MLN_RENDER_SESSION_STATE_ATTACHED)
       return MLN_STATUS_INVALID_STATE;
     if (s->acquired_frame_count != 0) return MLN_STATUS_INVALID_STATE;
   }
-  auto operation = std::shared_ptr<OperationObject>{};
-  const auto status = register_operation(
-    s->operation_source, RENDER_OPERATION_DETACH, false, {}, out, operation
-  );
+  auto async = CompletionOperation{};
+  const auto status = create_completion_operation(completion, {}, async);
   if (status != MLN_STATUS_OK) return status;
   {
     const auto lock = std::scoped_lock{s->control_mutex};
@@ -3086,8 +3038,7 @@ auto render_session_detach_start(mln_render_session handle, mln_operation* out)
       s->state != MLN_RENDER_SESSION_STATE_ATTACHED ||
       s->acquired_frame_count != 0
     ) {
-      abandon_operation(*out);
-      *out = MLN_HANDLE_NULL;
+      async.completion->reject();
       return MLN_STATUS_INVALID_STATE;
     }
     s->state = MLN_RENDER_SESSION_STATE_DETACHING;
@@ -3097,7 +3048,7 @@ auto render_session_detach_start(mln_render_session handle, mln_operation* out)
   enqueue_work(
     s,
     RenderDriverWork{
-      [s, operation]() {
+      [s, operation = async.operation]() {
         static_cast<void>(map_set_render_session_publish_callback(s->map, {}));
         const auto status = render_session_detach(s->self);
         {
@@ -3109,11 +3060,12 @@ auto render_session_detach_start(mln_render_session handle, mln_operation* out)
         }
         operation->complete(status, {}, {});
       },
-      [operation]() {
+      [operation = async.operation]() {
         operation->complete(MLN_STATUS_TARGET_LOST, "target abandoned", {});
       }
     }
   );
+  async.completion->accept();
   return MLN_STATUS_OK;
 }
 
@@ -3166,8 +3118,8 @@ auto render_session_abandon(
   if (s->texture.backend.release() != nullptr) ++quarantined;
   s->scheduler.set_repaint_request({});
   s->scheduler.discard();
-  s->frame_endpoint.reset();
-  s->driver_endpoint.reset();
+  s->frame_wake.reset();
+  s->driver_wake.reset();
   *out = mln_render_abandon_result{
     sizeof(*out),
     quarantined == 0 ? MLN_RENDER_ABANDON_DISPOSITION_CLEAN
@@ -3179,7 +3131,7 @@ auto render_session_abandon(
 
 auto render_session_set_feature_state_start(
   mln_render_session handle, mln_buffer_view source, mln_buffer_view layer,
-  mln_buffer_view feature, mln_buffer_view state, mln_operation* out
+  mln_buffer_view feature, mln_buffer_view state, const mln_completion* out
 ) -> mln_status {
   if (
     !validate_string_view(source) || !validate_string_view(layer) ||
@@ -3193,7 +3145,7 @@ auto render_session_set_feature_state_start(
       ? std::string{}
       : std::string{static_cast<const char*>(state.data), state.size};
   return enqueue_driver_operation(
-    handle, RENDER_OPERATION_FEATURE_STATE_SET,
+    handle,
     [a, b, c, d](mln_render_session_object& s) {
       auto selector = mln_feature_state_selector{
         sizeof(mln_feature_state_selector),
@@ -3214,7 +3166,7 @@ auto render_session_set_feature_state_start(
 
 auto render_session_remove_feature_state_start(
   mln_render_session handle, mln_buffer_view source, mln_buffer_view layer,
-  mln_buffer_view feature, mln_buffer_view key, mln_operation* out
+  mln_buffer_view feature, mln_buffer_view key, const mln_completion* out
 ) -> mln_status {
   if (
     !validate_string_view(source) || !validate_string_view(layer) ||
@@ -3224,7 +3176,7 @@ auto render_session_remove_feature_state_start(
   const auto a = string_from_view(source), b = string_from_view(layer);
   const auto c = string_from_view(feature), d = string_from_view(key);
   return enqueue_driver_operation(
-    handle, RENDER_OPERATION_FEATURE_STATE_REMOVE,
+    handle,
     [a, b, c, d](mln_render_session_object& s) {
       auto fields = uint32_t{0};
       if (!b.empty()) fields |= MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID;
@@ -3246,68 +3198,64 @@ auto render_session_remove_feature_state_start(
 
 auto render_session_get_feature_state_start(
   mln_render_session handle, mln_buffer_view source, mln_buffer_view layer,
-  mln_buffer_view feature, mln_operation* out
+  mln_buffer_view feature, const mln_completion* completion
 ) -> mln_status {
   if (
     !validate_string_view(source) || !validate_string_view(layer) ||
-    !validate_string_view(feature) || !out || *out != MLN_HANDLE_NULL
+    !validate_string_view(feature)
   )
     return MLN_STATUS_INVALID_ARGUMENT;
-  const auto s = lease_render_session(handle);
-  if (!s) return MLN_STATUS_INVALID_ARGUMENT;
-  auto operation = std::shared_ptr<OperationObject>{};
-  const auto status = register_operation(
-    s->operation_source, RENDER_OPERATION_FEATURE_STATE_GET, false, {}, out,
-    operation
-  );
-  if (status != MLN_STATUS_OK) return status;
   const auto a = string_from_view(source), b = string_from_view(layer);
   const auto c = string_from_view(feature);
-  enqueue_work(
-    s, RenderDriverWork{
-         [s, operation, a, b, c]() {
-           auto selector = mln_feature_state_selector{
-             sizeof(mln_feature_state_selector),
-             MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID |
-               MLN_FEATURE_STATE_SELECTOR_FEATURE_ID,
-             {a.data(), a.size()},
-             {b.data(), b.size()},
-             {c.data(), c.size()},
-             {}
-           };
-           auto result = mln_buffer{MLN_HANDLE_NULL};
-           const auto status =
-             render_session_get_feature_state(s->self, &selector, &result);
-           if (status != MLN_STATUS_OK) {
-             operation->complete(status, {}, {});
-             return;
-           }
-           const auto owned = buffer_table().remove(result);
-           if (!owned) {
-             operation->complete(
-               MLN_STATUS_NATIVE_ERROR, "feature-state result was lost", {}
-             );
-             return;
-           }
-           operation->complete(
-             MLN_STATUS_OK, {}, std::any{std::move(owned->bytes)}
-           );
-         },
-         [operation]() {
-           operation->complete(MLN_STATUS_TARGET_LOST, "target abandoned", {});
-         }
-       }
-  );
-  return MLN_STATUS_OK;
-}
-
-auto render_session_get_feature_state_take_result(
-  mln_operation operation, mln_buffer* out
-) -> mln_status {
-  if (!out || *out != MLN_HANDLE_NULL) return MLN_STATUS_INVALID_ARGUMENT;
-  return take_operation_result<std::string>(
-    operation, RENDER_OPERATION_FEATURE_STATE_GET,
-    [out](std::string& value) { return create_buffer(std::move(value), out); }
+  return enqueue_driver_result_operation(
+    handle,
+    [a, b, c](mln_render_session_object& session, std::any& result) {
+      auto selector = mln_feature_state_selector{
+        sizeof(mln_feature_state_selector),
+        MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID |
+          MLN_FEATURE_STATE_SELECTOR_FEATURE_ID,
+        {a.data(), a.size()},
+        {b.data(), b.size()},
+        {c.data(), c.size()},
+        {}
+      };
+      auto buffer = mln_buffer{MLN_HANDLE_NULL};
+      const auto status =
+        render_session_get_feature_state(session.self, &selector, &buffer);
+      if (status != MLN_STATUS_OK) return status;
+      const auto owned = buffer_table().remove(buffer);
+      if (!owned) {
+        set_thread_error("feature-state result was lost");
+        return MLN_STATUS_NATIVE_ERROR;
+      }
+      result = std::move(owned->bytes);
+      return MLN_STATUS_OK;
+    },
+    completion,
+    [](
+      const std::shared_ptr<Completion>& state, mln_status status,
+      std::string diagnostic, std::any result
+    ) {
+      auto* bytes = std::any_cast<std::string>(&result);
+      if (status == MLN_STATUS_OK && bytes != nullptr) {
+        state->resolve([bytes =
+                          std::move(*bytes)](const mln_completion& descriptor) {
+          const auto view =
+            mln_buffer_view{.data = bytes.data(), .size = bytes.size()};
+          invoke_completion(
+            descriptor, MLN_STATUS_OK, MLN_COMMAND_DISPOSITION_COMMITTED, 0, {},
+            &view, 1
+          );
+        });
+      } else {
+        complete(
+          state, status == MLN_STATUS_OK ? MLN_STATUS_NATIVE_ERROR : status,
+          status == MLN_STATUS_OK
+            ? "feature-state query produced an invalid result"
+            : std::move(diagnostic)
+        );
+      }
+    }
   );
 }
 

@@ -107,10 +107,7 @@ internal object MetalRenderTarget {
     override fun needsMetalAutoreleasePool(): Boolean = true
 
     override fun resize(viewport: Viewport) {
-      RenderTarget.completeDriverOperation(
-        session,
-        session.startResize(RenderTarget.extent(viewport)),
-      )
+      RenderTarget.completeDriverOperation(session, session.resize(RenderTarget.extent(viewport)))
     }
 
     override fun renderUpdate(): Boolean =
@@ -128,10 +125,7 @@ internal object MetalRenderTarget {
     override fun needsMetalAutoreleasePool(): Boolean = true
 
     override fun resize(viewport: Viewport) {
-      RenderTarget.completeDriverOperation(
-        session,
-        session.startResize(RenderTarget.extent(viewport)),
-      )
+      RenderTarget.completeDriverOperation(session, session.resize(RenderTarget.extent(viewport)))
     }
 
     override fun renderUpdate(): Boolean {
@@ -145,7 +139,7 @@ internal object MetalRenderTarget {
         }
         compositor.drawTexture(frame.texture().address)
       } finally {
-        RenderTarget.completeDriverOperation(session, frameHandle.release())
+        frameHandle.release()
       }
     }
 
@@ -172,7 +166,7 @@ internal object MetalRenderTarget {
       try {
         RenderTarget.completeDriverOperation(
           session,
-          session.startSetMetalBorrowedTextureTarget(borrowedDescriptor(viewport, replacement)),
+          session.setMetalBorrowedTextureTarget(borrowedDescriptor(viewport, replacement)),
         )
       } catch (error: RuntimeException) {
         // A failed handover leaves it unknown which texture the session holds, so detach before

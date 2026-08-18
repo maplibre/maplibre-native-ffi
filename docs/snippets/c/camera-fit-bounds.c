@@ -2,16 +2,27 @@
 
 #include <maplibre_native_c.h>
 
-static mln_status wait_ok(mln_operation operation) {
-  bool completed = false;
-  mln_status status = mln_operation_wait(operation, -1, &completed);
-  if (status != MLN_STATUS_OK || !completed) return status;
-  return mln_operation_get_status(operation, &status) == MLN_STATUS_OK
-           ? status
-           : MLN_STATUS_NATIVE_ERROR;
+typedef struct fly_to_bounds_state {
+  mln_map map;
+  mln_completion fly_completion;
+} fly_to_bounds_state;
+
+static void fitted(void* user_data, const mln_completion_result* result) {
+  fly_to_bounds_state* state = user_data;
+  if (result->status != MLN_STATUS_OK || result->value_count != 1) return;
+
+  // #region fit
+  mln_camera_update update = mln_camera_update_default();
+  update.mode = MLN_CAMERA_UPDATE_MODE_FLY;
+  update.camera = *(const mln_camera_options*)result->value;
+  mln_map_update_camera(state->map, &update, &state->fly_completion);
+  // #endregion fit
 }
 
-mln_status fly_to_bounds(mln_map map, mln_lat_lng_bounds bounds) {
+mln_status fly_to_bounds(
+  mln_map map, mln_lat_lng_bounds bounds, fly_to_bounds_state* state,
+  const mln_completion* fly_completion
+) {
   // #region padding
   mln_camera_fit_options fit = mln_camera_fit_options_default();
   fit.fields = MLN_CAMERA_FIT_OPTION_PADDING;
@@ -19,22 +30,12 @@ mln_status fly_to_bounds(mln_map map, mln_lat_lng_bounds bounds) {
     (mln_edge_insets){.top = 24, .left = 24, .bottom = 24, .right = 24};
   // #endregion padding
 
-  // #region fit
-  mln_operation operation = MLN_HANDLE_NULL;
-  mln_status status =
-    mln_map_camera_for_lat_lng_bounds_start(map, bounds, &fit, &operation);
-  if (status == MLN_STATUS_OK) status = wait_ok(operation);
-  mln_camera_options fitted = mln_camera_options_default();
-  if (status == MLN_STATUS_OK) {
-    status = mln_map_camera_for_lat_lng_bounds_take_result(operation, &fitted);
-  }
-  mln_operation_release(operation);
-  if (status != MLN_STATUS_OK) return status;
-
-  mln_camera_update update = mln_camera_update_default();
-  update.mode = MLN_CAMERA_UPDATE_MODE_FLY;
-  update.camera = fitted;
-  uint64_t command_id = 0;
-  return mln_map_update_camera(map, &update, &command_id);
-  // #endregion fit
+  state->map = map;
+  state->fly_completion = *fly_completion;
+  const mln_completion fit_completion = {
+    .size = sizeof(mln_completion),
+    .callback = fitted,
+    .user_data = state,
+  };
+  return mln_map_camera_for_lat_lng_bounds(map, bounds, &fit, &fit_completion);
 }

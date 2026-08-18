@@ -51,10 +51,7 @@ public value class RuntimeEventType(public val nativeValue: Int) {
     public val OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: RuntimeEventType = RuntimeEventType(21)
 
     /** [RuntimeEvent.payload] carries [RuntimeEventPayload.CameraTransitionFinished]. */
-    public val MAP_CAMERA_TRANSITION_FINISHED: RuntimeEventType = RuntimeEventType(23)
-
-    /** [RuntimeEvent.payload] carries [RuntimeEventPayload.CommandFinished]. */
-    public val COMMAND_FINISHED: RuntimeEventType = RuntimeEventType(24)
+    public val MAP_CAMERA_TRANSITION_FINISHED: RuntimeEventType = RuntimeEventType(22)
 
     internal fun fromNative(nativeValue: UInt): RuntimeEventType = fromNative(nativeValue.toInt())
 

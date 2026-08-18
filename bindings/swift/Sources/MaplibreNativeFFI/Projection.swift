@@ -22,17 +22,17 @@ public final class MapProjectionHandle: @unchecked Sendable {
   private let handle: NativeHandleBox<NativeMapProjectionHandle>
 
   public init(map: MapHandle) async throws {
-    let operationRuntime = map.runtimeForOperations
-    let operation = try mapNativeFailure {
-      try NativeProjection.createStart(map.requireLiveHandle())
+    let nativeMap = try map.requireLiveHandle()
+    let future = try mapNativeFailure {
+      try NativeCompletion.start(
+        { mln_map_projection_create(nativeMap.raw, $0) }
+      ) { result in
+        try NativeMapProjectionHandle(
+          raw: NativeCompletion.value(result, as: mln_map_projection.self)
+        )
+      }
     }
-    defer { mln_operation_release(operation.raw) }
-    try await mapNativeFailure {
-      try await operationRuntime.waitForOperation(operation)
-    }
-    let projection = try mapNativeFailure {
-      try NativeProjection.createTakeResult(operation)
-    }
+    let projection = try await mapNativeFailure { try await future.value() }
     handle = try NativeHandleBox(
       typeName: "MapProjectionHandle",
       handle: projection

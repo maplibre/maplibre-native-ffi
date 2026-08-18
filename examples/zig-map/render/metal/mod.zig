@@ -321,7 +321,7 @@ const MetalBorrowedTextureBackend = struct {
 
         const replacement = try createBorrowedTexture(self.compositor.view.device, viewport);
         errdefer replacement.release();
-        var operation = session.setMetalBorrowedTextureTargetStart(.{
+        var completion = session.setMetalBorrowedTextureTarget(.{
             .extent = render_target.extent(viewport),
             .physical_width = viewport.physical_width,
             .physical_height = viewport.physical_height,
@@ -330,8 +330,8 @@ const MetalBorrowedTextureBackend = struct {
             diagnostics.logError("Metal borrowed texture set target failed", err, null);
             return types.AppError.TextureResizeFailed;
         };
-        defer operation.release();
-        render_target.serviceUntilComplete(session, operation) catch |err| {
+        defer completion.deinit();
+        render_target.serviceUntilComplete(session, &completion) catch |err| {
             diagnostics.logError("Metal borrowed texture replacement failed", err, null);
             return types.AppError.TextureResizeFailed;
         };

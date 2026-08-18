@@ -17,9 +17,9 @@ void main() {
       await Isolate.run(() {});
 
       final before = map.snapshot();
-      final commandId = map.requestRepaint();
+      final completion = map.requestRepaint();
       final camera = await map.queryCamera();
-      expect(commandId, greaterThan(BigInt.zero));
+      expect((await completion).disposition, CommandDisposition.committed);
       expect(camera.generation, greaterThanOrEqualTo(before.generation));
 
       await map.close();

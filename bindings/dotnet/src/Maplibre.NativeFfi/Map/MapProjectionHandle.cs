@@ -35,26 +35,14 @@ public sealed unsafe class MapProjectionHandle : IDisposable
     {
         ArgumentNullException.ThrowIfNull(map);
         cancellationToken.ThrowIfCancellationRequested();
-        var operation = StartCreate(map.Handle);
-        return OperationAwaiter.WaitThen(
-            map.Runtime.WaitForOperationAsync(operation, cancellationToken),
-            () =>
-            {
-                MlnMapProjection projection = default;
-                NativeStatus.Check(
-                    NativeMethods.mln_map_projection_create_take_result(operation, &projection)
-                );
-                return new MapProjectionHandle(projection);
-            },
-            () => NativeMethods.mln_operation_release(operation)
-        );
-    }
-
-    private static MlnOperation StartCreate(MlnMap map)
-    {
-        MlnOperation operation = default;
-        NativeStatus.Check(NativeMethods.mln_map_projection_create_start(map, &operation));
-        return operation;
+        return NativeCompletion
+            .Submit(
+                completion => NativeMethods.mln_map_projection_create(map.Handle, completion),
+                static result => new MapProjectionHandle(
+                    NativeCompletion.Value<MlnMapProjection>(result)
+                )
+            )
+            .WaitAsync(cancellationToken);
     }
 
     internal MlnMapProjection Handle => state.Handle;

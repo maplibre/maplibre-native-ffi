@@ -21,7 +21,7 @@ public sealed class RuntimeEventDrainTests
             new MapOptions { Width = 512, Height = 512 }
         );
 
-        map.SetStyleJson(StyleJson);
+        map.SetStyleJsonAsync(StyleJson);
         var batch = DriveUntil(runtime, RuntimeEventType.MapStyleLoaded).Batch;
 
         var types = batch.Select(runtimeEvent => runtimeEvent.Type).ToArray();
@@ -45,7 +45,7 @@ public sealed class RuntimeEventDrainTests
             new MapOptions { Width = 512, Height = 512 }
         );
 
-        map.SetStyleUrl("first-unsupported-scheme://style.json");
+        map.SetStyleUrlAsync("first-unsupported-scheme://style.json");
         var first = DriveUntil(runtime, RuntimeEventType.MapLoadingFailed).Batch;
         var failure = first.Single(runtimeEvent =>
             runtimeEvent.Type == RuntimeEventType.MapLoadingFailed
@@ -53,7 +53,7 @@ public sealed class RuntimeEventDrainTests
         Assert.Contains("first-unsupported-scheme", failure.Message, StringComparison.Ordinal);
 
         // The second drain refills the arena the first batch was copied from.
-        map.SetStyleUrl("second-unsupported-scheme://style.json");
+        map.SetStyleUrlAsync("second-unsupported-scheme://style.json");
         var second = DriveUntil(runtime, RuntimeEventType.MapLoadingFailed).Batch;
         Assert.Contains(
             "second-unsupported-scheme",
@@ -79,8 +79,8 @@ public sealed class RuntimeEventDrainTests
         Assert.Equal(RuntimeEventMask.All, runtime.GetEventMask());
         Assert.Equal(RuntimeEventMask.All, map.GetEventMask());
 
-        map.SetStyleJson(StyleJson);
-        map.UpdateCamera(
+        map.SetStyleJsonAsync(StyleJson);
+        map.UpdateCameraAsync(
             new CameraUpdate
             {
                 Mode = CameraUpdateMode.Jump,
@@ -105,9 +105,9 @@ public sealed class RuntimeEventDrainTests
             runtime,
             new MapOptions { Width = 512, Height = 512 }
         );
-        map.SetEventMask(RuntimeEventMask.All & ~RuntimeEventMask.MapLoadingStarted);
+        map.SetEventMaskAsync(RuntimeEventMask.All & ~RuntimeEventMask.MapLoadingStarted);
 
-        map.SetStyleJson(StyleJson);
+        map.SetStyleJsonAsync(StyleJson);
         var types = DriveUntil(runtime, RuntimeEventType.MapStyleLoaded)
             .Everything.Select(runtimeEvent => runtimeEvent.Type)
             .ToArray();
@@ -127,12 +127,12 @@ public sealed class RuntimeEventDrainTests
         );
 
         runtime.SetEventMask(RuntimeEventMask.All);
-        map.SetEventMask(RuntimeEventMask.All);
+        map.SetEventMaskAsync(RuntimeEventMask.All);
         Assert.Equal(RuntimeEventMask.All, runtime.GetEventMask());
         Assert.Equal(RuntimeEventMask.All, map.GetEventMask());
 
-        map.SetEventMask(map.GetEventMask() & ~RuntimeEventMask.MapIdle);
-        await runtime.BarrierAsync(TestContext.Current.CancellationToken);
+        map.SetEventMaskAsync(map.GetEventMask() & ~RuntimeEventMask.MapIdle);
+        await runtime.BarrierAsync();
         Assert.Equal(RuntimeEventMask.All & ~RuntimeEventMask.MapIdle, map.GetEventMask());
 
         runtime.SetEventMask(runtime.GetEventMask() & ~RuntimeEventMask.OfflineRegionStatusChanged);
@@ -154,7 +154,9 @@ public sealed class RuntimeEventDrainTests
         var undeclared = (RuntimeEventMask)(1UL << 63);
 
         Assert.Throws<InvalidArgumentException>(() => runtime.SetEventMask(undeclared));
-        Assert.Throws<InvalidArgumentException>(() => map.SetEventMask(undeclared));
+        Assert.Throws<InvalidArgumentException>(() =>
+            map.SetEventMaskAsync(undeclared).GetAwaiter().GetResult()
+        );
         Assert.Throws<InvalidArgumentException>(() =>
             TestHandles.CreateMap(
                 runtime,
@@ -188,7 +190,12 @@ public sealed class RuntimeEventDrainTests
         {
             thrown.Add(Record.Exception(() => runtime.DrainEvents()));
             thrown.Add(Record.Exception(() => runtime.SetEventMask(RuntimeEventMask.All)));
-            thrown.Add(Record.Exception(() => map.SetEventMask(RuntimeEventMask.All)));
+            thrown.Add(
+                Record.Exception(() =>
+                {
+                    _ = map.SetEventMaskAsync(RuntimeEventMask.All);
+                })
+            );
         });
         thread.Start();
         thread.Join();

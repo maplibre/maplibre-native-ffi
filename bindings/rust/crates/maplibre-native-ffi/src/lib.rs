@@ -8,6 +8,7 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 mod camera;
+mod completion;
 mod custom_geometry;
 mod events;
 mod geojson;
@@ -30,21 +31,21 @@ pub use camera::{
     CameraFitOptions, CameraOptions, CameraSnapshot, CameraUpdate, CameraUpdateMode,
     FreeCameraOptions, GesturePhase, ProjectionMode,
 };
+pub use completion::{CommandCompletion, NativeFuture};
 pub use custom_geometry::{CanonicalTileId, CustomGeometrySourceOptions};
 pub use events::{
-    CameraTransitionFinishedEvent, CommandDisposition, CommandFinishedEvent, MapId,
-    OfflineRegionResponseErrorEvent, OfflineRegionStatus, OfflineRegionStatusEvent,
-    OfflineRegionTileCountLimitEvent, RenderFrameEvent, RenderMapEvent, RenderingStats,
-    RuntimeEvent, RuntimeEventBatch, RuntimeEventPayload, RuntimeEventRef, RuntimeEventSource,
-    TileActionEvent, TileId, UnknownRuntimeEventPayload,
+    CameraTransitionFinishedEvent, CommandDisposition, MapId, OfflineRegionResponseErrorEvent,
+    OfflineRegionStatus, OfflineRegionStatusEvent, OfflineRegionTileCountLimitEvent,
+    RenderFrameEvent, RenderMapEvent, RenderingStats, RuntimeEvent, RuntimeEventBatch,
+    RuntimeEventPayload, RuntimeEventRef, RuntimeEventSource, TileActionEvent, TileId,
+    UnknownRuntimeEventPayload,
 };
 pub use geojson::GeoJsonSourceDataHandle;
 pub use logging::{LogRecord, clear_log_callback, set_async_log_severity_mask, set_log_callback};
 pub use map::{
     GeoJsonSourceOptions, ImageContent, ImageStretch, LocationIndicatorImageKind, LogicalExtent,
-    MapHandle, MapSnapshot, SourceInfo, SourceType, StyleImage, StyleImageInfo,
-    StyleImageOperation, StyleImageOptions, StyleImageStretches, StyleImageTextFit, StyleLayerInfo,
-    StyleLayerInfoOperation, StyleLayerVisibility, StyleSourceInfoOperation,
+    MapHandle, MapSnapshot, SourceInfo, SourceType, StyleImage, StyleImageInfo, StyleImageOptions,
+    StyleImageStretches, StyleImageTextFit, StyleLayerInfo, StyleLayerVisibility,
     StyleTransitionOptions, TileJsonInfo, TileScheme, TileSourceOptions, VectorTileEncoding,
 };
 pub use maplibre_core::{
@@ -78,10 +79,7 @@ pub use resource::{
     ByteRange, HttpHeader, HttpHeaderTransformRequest, ResourceProviderDecision, ResourceRequest,
     ResourceRequestHandle, ResourceResponse, ResourceTransformRequest,
 };
-pub use runtime::{
-    OfflineRegionDefinition, OfflineRegionInfo, OperationHandle, ReadyEndpoint, ReadyEndpointKind,
-    RuntimeHandle, RuntimeOptions,
-};
+pub use runtime::{OfflineRegionDefinition, OfflineRegionInfo, RuntimeHandle, RuntimeOptions};
 pub use values::{
     EdgeInsets, LatLng, LatLngBounds, ProjectedMeters, Quaternion, ScreenBox, ScreenPoint,
     UnitBezier, Vec3,

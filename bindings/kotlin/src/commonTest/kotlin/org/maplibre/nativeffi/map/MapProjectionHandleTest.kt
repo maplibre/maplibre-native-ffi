@@ -25,14 +25,15 @@ class MapProjectionHandleTest {
       val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
       val map =
         MapHandle.create(
-          runtime,
-          MapOptions().apply {
-            width = 64
-            height = 64
-            scaleFactor = 1.0
-          },
-        )
-      val projection = map.createProjection()
+            runtime,
+            MapOptions().apply {
+              width = 64
+              height = 64
+              scaleFactor = 1.0
+            },
+          )
+          .await()
+      val projection = map.createProjection().await()
 
       assertFalse(projection.isClosed)
       // Every projection call is synchronous: a setter is applied before it returns, so the
@@ -91,33 +92,36 @@ class MapProjectionHandleTest {
       val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
       val map =
         MapHandle.create(
-          runtime,
-          MapOptions().apply {
-            width = 64
-            height = 64
-            scaleFactor = 1.0
-          },
-        )
-      try {
-        map.updateCamera(
-          CameraUpdate(
-            camera =
-              CameraOptions().apply {
-                center = LatLng(30.0, 40.0)
-                zoom = 5.0
-              }
+            runtime,
+            MapOptions().apply {
+              width = 64
+              height = 64
+              scaleFactor = 1.0
+            },
           )
-        )
+          .await()
+      try {
+        map
+          .updateCamera(
+            CameraUpdate(
+              camera =
+                CameraOptions().apply {
+                  center = LatLng(30.0, 40.0)
+                  zoom = 5.0
+                }
+            )
+          )
+          .await()
 
         // Creation copies the map transform after every earlier map command.
-        val projection = map.createProjection()
+        val projection = map.createProjection().await()
         try {
           assertEquals(5.0, projection.camera().zoom)
           assertEquals(30.0, assertNotNull(projection.camera().center).latitude, 0.000001)
 
           // A later map camera command is never observed by the existing projection.
-          map.updateCamera(CameraUpdate(camera = CameraOptions().apply { zoom = 9.0 }))
-          map.queryCamera()
+          map.updateCamera(CameraUpdate(camera = CameraOptions().apply { zoom = 9.0 })).await()
+          map.queryCamera().await()
           assertEquals(5.0, projection.camera().zoom)
 
           // The commands accepted before this call reached the map: the center maps back to

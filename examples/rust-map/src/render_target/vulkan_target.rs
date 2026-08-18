@@ -94,7 +94,7 @@ impl RenderTarget {
                 compositor.resize(viewport).map_err(|error| {
                     compositor_error(format!("Vulkan resize failed: {error:?}"))
                 })?;
-                session.resize(&extent(viewport))?.release();
+                drop(session.resize(&extent(viewport))?);
                 Ok(())
             }
             Self::BorrowedTexture {
@@ -109,7 +109,6 @@ impl RenderTarget {
                 let descriptor = borrowed_descriptor(graphics.vulkan(), viewport, &replacement);
                 let operation = session.set_vulkan_borrowed_texture_target(&descriptor)?;
                 wait_core(&operation, "Vulkan target replacement")?;
-                operation.release();
                 **image = replacement;
                 compositor.resize(viewport).map_err(|error| {
                     compositor_error(format!("Vulkan resize failed: {error:?}"))
@@ -117,7 +116,7 @@ impl RenderTarget {
                 Ok(())
             }
             Self::Surface { session } => {
-                session.resize(&extent(viewport))?.release();
+                drop(session.resize(&extent(viewport))?);
                 Ok(())
             }
         }
@@ -193,28 +192,22 @@ impl RenderTarget {
 fn finish_attach(
     attachment: RenderSessionAttachment,
 ) -> maplibre_native_ffi::Result<RenderSessionHandle> {
-    if !attachment.operation.wait(Duration::from_secs(30))? {
+    if !attachment.completion.wait(Duration::from_secs(30))? {
         return Err(compositor_error("render attachment timed out"));
     }
-    if attachment.operation.terminal_status()? != 0 {
-        return Err(compositor_error(attachment.operation.diagnostic()?));
-    }
+    attachment.completion.take()?;
     let session = attachment.session;
-    attachment.operation.release();
     Ok(session)
 }
 
 fn wait_core(
-    operation: &maplibre_native_ffi::OperationHandle<()>,
+    operation: &maplibre_native_ffi::NativeFuture<()>,
     name: &str,
 ) -> maplibre_native_ffi::Result<()> {
     if !operation.wait(Duration::from_secs(30))? {
         return Err(compositor_error(format!("{name} timed out")));
     }
-    if operation.terminal_status()? != 0 {
-        return Err(compositor_error(operation.diagnostic()?));
-    }
-    Ok(())
+    operation.take()
 }
 
 fn detach(session: &RenderSessionHandle) -> Result<(), Box<dyn StdError>> {
@@ -222,10 +215,7 @@ fn detach(session: &RenderSessionHandle) -> Result<(), Box<dyn StdError>> {
     if !operation.wait(Duration::from_secs(30))? {
         return Err("render detach timed out".into());
     }
-    if operation.terminal_status()? != 0 {
-        return Err(operation.diagnostic()?.into());
-    }
-    operation.release();
+    operation.take()?;
     Ok(())
 }
 

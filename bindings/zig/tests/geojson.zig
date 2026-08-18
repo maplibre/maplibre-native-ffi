@@ -42,7 +42,7 @@ test "prepared GeoJSON data adds and updates sources through public binding" {
         .line_metrics = true,
     });
     try testing.expectEqual(maplibre.StyleSourceType.geojson, (try support.styleSourceType(&map, "geo-url")).?);
-    try testing.expect((try map.addGeoJsonSourceUrl(testing.allocator, "empty", "https://example.com/again.geojson", null)) != 0);
+    try support.expectCommandError(&runtime, try map.addGeoJsonSourceUrl(testing.allocator, "empty", "https://example.com/again.geojson", null), error.InvalidArgument);
 }
 
 test "prepared GeoJSON data supports nested geometry collections" {
@@ -73,10 +73,7 @@ test "GeoJSON preparation rejects invalid data and passes explicit-length string
     defer empty_data.release();
     // An empty source ID submits, then the command reports the rejection.
     const empty_id = try map.addGeoJsonSourceData(testing.allocator, "", empty_data);
-    try testing.expectEqual(
-        try support.waitForCommandDisposition(&runtime, empty_id),
-        maplibre.CommandDisposition.failed,
-    );
+    try support.expectCommandError(&runtime, empty_id, error.InvalidArgument);
 
     const embedded_nul_id = "{\"type\":\"Feature\",\"id\":\"bad\\u0000id\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[0,0]},\"properties\":{}}";
     const nul_data = try maplibre.GeoJsonSourceDataHandle.create(testing.allocator, embedded_nul_id, null);
@@ -122,20 +119,14 @@ test "GeoJSON preparation bakes in options and validates clustering" {
     const unclustered = try maplibre.GeoJsonSourceDataHandle.create(testing.allocator, features, null);
     defer unclustered.release();
     const unclustered_set = try map.setGeoJsonSourceData(testing.allocator, "clustered", unclustered);
-    try testing.expectEqual(
-        try support.waitForCommandDisposition(&runtime, unclustered_set),
-        maplibre.CommandDisposition.failed,
-    );
+    try support.expectCommandError(&runtime, unclustered_set, error.InvalidArgument);
 
     var reproperty_options = cluster_options;
     reproperty_options.cluster_properties = "{\"total\":[\"max\",[\"get\",\"rank\"]]}";
     const repropertied = try maplibre.GeoJsonSourceDataHandle.create(testing.allocator, features, reproperty_options);
     defer repropertied.release();
     const repropertied_set = try map.setGeoJsonSourceData(testing.allocator, "clustered", repropertied);
-    try testing.expectEqual(
-        try support.waitForCommandDisposition(&runtime, repropertied_set),
-        maplibre.CommandDisposition.failed,
-    );
+    try support.expectCommandError(&runtime, repropertied_set, error.InvalidArgument);
 
     // Aggregations compare by parsed equality, so equivalent JSON with
     // different formatting still matches.
@@ -218,8 +209,5 @@ test "synchronous tiling override applies at runtime" {
     // The override rejects a source ID that names nothing, reported by the
     // command since the style is only readable at commit.
     const missing_id = try map.setGeoJsonSourceSynchronousTiling(testing.allocator, "missing", true);
-    try testing.expectEqual(
-        try support.waitForCommandDisposition(&runtime, missing_id),
-        maplibre.CommandDisposition.failed,
-    );
+    try support.expectCommandError(&runtime, missing_id, error.InvalidArgument);
 }

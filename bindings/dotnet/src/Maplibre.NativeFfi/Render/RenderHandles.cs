@@ -14,11 +14,11 @@ internal unsafe delegate mln_status AttachNative<T>(
     T* descriptor,
     mln_render_session_attach_options* options,
     MlnRenderSession* outSession,
-    MlnOperation* outOperation
+    mln_completion* completion
 )
     where T : unmanaged;
 
-internal unsafe delegate mln_status StartRenderOperation(MlnOperation* outOperation);
+internal unsafe delegate mln_status StartRenderOperation(mln_completion* completion);
 
 /// <summary>A render session and its asynchronous attachment completion.</summary>
 public sealed unsafe class RenderSessionHandle : IDisposable
@@ -28,7 +28,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     private readonly object frameGate = new();
     private readonly HashSet<AcquiredFrameHandle> acquiredFrames = [];
 
-    private RenderSessionHandle(MapHandle map, MlnRenderSession handle, MlnOperation attachment)
+    private RenderSessionHandle(MapHandle map, MlnRenderSession handle, Task attachment)
     {
         this.map = map;
         state = new NativeHandleState<MlnRenderSession>(
@@ -36,7 +36,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             static value => NativeMethods.mln_render_session_destroy(value),
             nameof(RenderSessionHandle)
         );
-        Attachment = CompleteOperationAsync(attachment, default);
+        Attachment = RetainUntilCompletedAsync(attachment, this);
     }
 
     /// <summary>
@@ -44,6 +44,21 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     /// services driver work on the graphics thread while this task is pending.
     /// </summary>
     public Task Attachment { get; }
+
+    private static Task RetainUntilCompletedAsync(Task attachment, RenderSessionHandle session) =>
+        attachment
+            .ContinueWith(
+                static (completed, retained) =>
+                {
+                    GC.KeepAlive(retained);
+                    return completed;
+                },
+                session,
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default
+            )
+            .Unwrap();
 
     public RenderSessionCapabilityInfo Capabilities
     {
@@ -101,7 +116,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             map,
             RenderStructs.ToNative(descriptor),
             options,
-            static (m, d, o, s, p) => NativeMethods.mln_metal_surface_attach_start(m, d, o, s, p)
+            static (m, d, o, s, p) => NativeMethods.mln_metal_surface_attach(m, d, o, s, p)
         );
 
     public static RenderSessionHandle AttachVulkanSurface(
@@ -113,7 +128,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             map,
             RenderStructs.ToNative(descriptor),
             options,
-            static (m, d, o, s, p) => NativeMethods.mln_vulkan_surface_attach_start(m, d, o, s, p)
+            static (m, d, o, s, p) => NativeMethods.mln_vulkan_surface_attach(m, d, o, s, p)
         );
 
     public static RenderSessionHandle AttachOpenGLSurface(
@@ -128,7 +143,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             map,
             native,
             options ?? DefaultOpenGLHostOptions(descriptor.Context),
-            static (m, d, o, s, p) => NativeMethods.mln_opengl_surface_attach_start(m, d, o, s, p)
+            static (m, d, o, s, p) => NativeMethods.mln_opengl_surface_attach(m, d, o, s, p)
         );
     }
 
@@ -141,7 +156,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             map,
             RenderStructs.ToNative(descriptor),
             options ?? CallerGraphicsOptions(),
-            static (m, d, o, s, p) => NativeMethods.mln_webgpu_surface_attach_start(m, d, o, s, p)
+            static (m, d, o, s, p) => NativeMethods.mln_webgpu_surface_attach(m, d, o, s, p)
         );
 
     public static RenderSessionHandle AttachMetalOwnedTexture(
@@ -153,8 +168,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             map,
             RenderStructs.ToNative(descriptor),
             options,
-            static (m, d, o, s, p) =>
-                NativeMethods.mln_metal_owned_texture_attach_start(m, d, o, s, p)
+            static (m, d, o, s, p) => NativeMethods.mln_metal_owned_texture_attach(m, d, o, s, p)
         );
 
     public static RenderSessionHandle AttachMetalBorrowedTexture(
@@ -166,8 +180,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             map,
             RenderStructs.ToNative(descriptor),
             options,
-            static (m, d, o, s, p) =>
-                NativeMethods.mln_metal_borrowed_texture_attach_start(m, d, o, s, p)
+            static (m, d, o, s, p) => NativeMethods.mln_metal_borrowed_texture_attach(m, d, o, s, p)
         );
 
     public static RenderSessionHandle AttachVulkanOwnedTexture(
@@ -179,8 +192,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             map,
             RenderStructs.ToNative(descriptor),
             options,
-            static (m, d, o, s, p) =>
-                NativeMethods.mln_vulkan_owned_texture_attach_start(m, d, o, s, p)
+            static (m, d, o, s, p) => NativeMethods.mln_vulkan_owned_texture_attach(m, d, o, s, p)
         );
 
     public static RenderSessionHandle AttachVulkanBorrowedTexture(
@@ -193,7 +205,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             RenderStructs.ToNative(descriptor),
             options,
             static (m, d, o, s, p) =>
-                NativeMethods.mln_vulkan_borrowed_texture_attach_start(m, d, o, s, p)
+                NativeMethods.mln_vulkan_borrowed_texture_attach(m, d, o, s, p)
         );
 
     public static RenderSessionHandle AttachOpenGLOwnedTexture(
@@ -208,8 +220,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             map,
             native,
             options ?? DefaultOpenGLOwnedTextureOptions(descriptor.Context),
-            static (m, d, o, s, p) =>
-                NativeMethods.mln_opengl_owned_texture_attach_start(m, d, o, s, p)
+            static (m, d, o, s, p) => NativeMethods.mln_opengl_owned_texture_attach(m, d, o, s, p)
         );
     }
 
@@ -226,7 +237,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             native,
             options ?? DefaultOpenGLHostOptions(descriptor.Context),
             static (m, d, o, s, p) =>
-                NativeMethods.mln_opengl_borrowed_texture_attach_start(m, d, o, s, p)
+                NativeMethods.mln_opengl_borrowed_texture_attach(m, d, o, s, p)
         );
     }
 
@@ -239,8 +250,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             map,
             RenderStructs.ToNative(descriptor),
             options ?? CallerGraphicsOptions(),
-            static (m, d, o, s, p) =>
-                NativeMethods.mln_webgpu_owned_texture_attach_start(m, d, o, s, p)
+            static (m, d, o, s, p) => NativeMethods.mln_webgpu_owned_texture_attach(m, d, o, s, p)
         );
 
     public static RenderSessionHandle AttachWebGpuBorrowedTexture(
@@ -253,7 +263,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             RenderStructs.ToNative(descriptor),
             options ?? CallerGraphicsOptions(),
             static (m, d, o, s, p) =>
-                NativeMethods.mln_webgpu_borrowed_texture_attach_start(m, d, o, s, p)
+                NativeMethods.mln_webgpu_borrowed_texture_attach(m, d, o, s, p)
         );
 
     public void RequestFrame(FrameDemand demand)
@@ -322,12 +332,13 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         CancellationToken cancellationToken = default
     )
     {
-        var native = RenderStructs.ToNative(descriptor);
-        MlnOperation operation = default;
-        NativeStatus.Check(
-            NativeMethods.mln_metal_surface_set_target_start(Handle, &native, &operation)
-        );
-        return CompleteOperationAsync(operation, cancellationToken);
+        return NativeCompletion
+            .SubmitUnit(completion =>
+            {
+                var native = RenderStructs.ToNative(descriptor);
+                return NativeMethods.mln_metal_surface_set_target(Handle, &native, completion);
+            })
+            .WaitAsync(cancellationToken);
     }
 
     public Task SetVulkanSurfaceAsync(
@@ -335,12 +346,13 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         CancellationToken cancellationToken = default
     )
     {
-        var native = RenderStructs.ToNative(descriptor);
-        MlnOperation operation = default;
-        NativeStatus.Check(
-            NativeMethods.mln_vulkan_surface_set_target_start(Handle, &native, &operation)
-        );
-        return CompleteOperationAsync(operation, cancellationToken);
+        return NativeCompletion
+            .SubmitUnit(completion =>
+            {
+                var native = RenderStructs.ToNative(descriptor);
+                return NativeMethods.mln_vulkan_surface_set_target(Handle, &native, completion);
+            })
+            .WaitAsync(cancellationToken);
     }
 
     public Task SetOpenGLSurfaceAsync(
@@ -348,13 +360,14 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         CancellationToken cancellationToken = default
     )
     {
-        var native = RenderStructs.ToNative(descriptor);
-        using var selector = ApplyCanvasSelector(descriptor.Context, ref native.context);
-        MlnOperation operation = default;
-        NativeStatus.Check(
-            NativeMethods.mln_opengl_surface_set_target_start(Handle, &native, &operation)
-        );
-        return CompleteOperationAsync(operation, cancellationToken);
+        return NativeCompletion
+            .SubmitUnit(completion =>
+            {
+                var native = RenderStructs.ToNative(descriptor);
+                using var selector = ApplyCanvasSelector(descriptor.Context, ref native.context);
+                return NativeMethods.mln_opengl_surface_set_target(Handle, &native, completion);
+            })
+            .WaitAsync(cancellationToken);
     }
 
     public Task SetWebGpuSurfaceAsync(
@@ -362,12 +375,13 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         CancellationToken cancellationToken = default
     )
     {
-        var native = RenderStructs.ToNative(descriptor);
-        MlnOperation operation = default;
-        NativeStatus.Check(
-            NativeMethods.mln_webgpu_surface_set_target_start(Handle, &native, &operation)
-        );
-        return CompleteOperationAsync(operation, cancellationToken);
+        return NativeCompletion
+            .SubmitUnit(completion =>
+            {
+                var native = RenderStructs.ToNative(descriptor);
+                return NativeMethods.mln_webgpu_surface_set_target(Handle, &native, completion);
+            })
+            .WaitAsync(cancellationToken);
     }
 
     public Task SetMetalBorrowedTextureAsync(
@@ -375,12 +389,17 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         CancellationToken cancellationToken = default
     )
     {
-        var native = RenderStructs.ToNative(descriptor);
-        MlnOperation operation = default;
-        NativeStatus.Check(
-            NativeMethods.mln_metal_borrowed_texture_set_target_start(Handle, &native, &operation)
-        );
-        return CompleteOperationAsync(operation, cancellationToken);
+        return NativeCompletion
+            .SubmitUnit(completion =>
+            {
+                var native = RenderStructs.ToNative(descriptor);
+                return NativeMethods.mln_metal_borrowed_texture_set_target(
+                    Handle,
+                    &native,
+                    completion
+                );
+            })
+            .WaitAsync(cancellationToken);
     }
 
     public Task SetVulkanBorrowedTextureAsync(
@@ -388,12 +407,17 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         CancellationToken cancellationToken = default
     )
     {
-        var native = RenderStructs.ToNative(descriptor);
-        MlnOperation operation = default;
-        NativeStatus.Check(
-            NativeMethods.mln_vulkan_borrowed_texture_set_target_start(Handle, &native, &operation)
-        );
-        return CompleteOperationAsync(operation, cancellationToken);
+        return NativeCompletion
+            .SubmitUnit(completion =>
+            {
+                var native = RenderStructs.ToNative(descriptor);
+                return NativeMethods.mln_vulkan_borrowed_texture_set_target(
+                    Handle,
+                    &native,
+                    completion
+                );
+            })
+            .WaitAsync(cancellationToken);
     }
 
     public Task SetOpenGLBorrowedTextureAsync(
@@ -401,13 +425,18 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         CancellationToken cancellationToken = default
     )
     {
-        var native = RenderStructs.ToNative(descriptor);
-        using var selector = ApplyCanvasSelector(descriptor.Context, ref native.context);
-        MlnOperation operation = default;
-        NativeStatus.Check(
-            NativeMethods.mln_opengl_borrowed_texture_set_target_start(Handle, &native, &operation)
-        );
-        return CompleteOperationAsync(operation, cancellationToken);
+        return NativeCompletion
+            .SubmitUnit(completion =>
+            {
+                var native = RenderStructs.ToNative(descriptor);
+                using var selector = ApplyCanvasSelector(descriptor.Context, ref native.context);
+                return NativeMethods.mln_opengl_borrowed_texture_set_target(
+                    Handle,
+                    &native,
+                    completion
+                );
+            })
+            .WaitAsync(cancellationToken);
     }
 
     public Task SetWebGpuBorrowedTextureAsync(
@@ -415,12 +444,17 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         CancellationToken cancellationToken = default
     )
     {
-        var native = RenderStructs.ToNative(descriptor);
-        MlnOperation operation = default;
-        NativeStatus.Check(
-            NativeMethods.mln_webgpu_borrowed_texture_set_target_start(Handle, &native, &operation)
-        );
-        return CompleteOperationAsync(operation, cancellationToken);
+        return NativeCompletion
+            .SubmitUnit(completion =>
+            {
+                var native = RenderStructs.ToNative(descriptor);
+                return NativeMethods.mln_webgpu_borrowed_texture_set_target(
+                    Handle,
+                    &native,
+                    completion
+                );
+            })
+            .WaitAsync(cancellationToken);
     }
 
     public Task ResizeAsync(
@@ -428,91 +462,71 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         CancellationToken cancellationToken = default
     )
     {
-        var native = RenderStructs.ToNative(extent);
-        MlnOperation operation = default;
-        NativeStatus.Check(
-            NativeMethods.mln_render_session_resize_start(Handle, &native, &operation)
-        );
-        return CompleteOperationAsync(operation, cancellationToken);
+        return NativeCompletion
+            .SubmitUnit(completion =>
+            {
+                var native = RenderStructs.ToNative(extent);
+                return NativeMethods.mln_render_session_resize(Handle, &native, completion);
+            })
+            .WaitAsync(cancellationToken);
     }
 
     public Task BarrierAsync(CancellationToken cancellationToken = default) =>
         StartOperationAsync(
-            operation => NativeMethods.mln_render_session_barrier_start(Handle, operation),
+            operation => NativeMethods.mln_render_session_barrier(Handle, operation),
             cancellationToken
         );
 
     public Task ReduceMemoryUseAsync(CancellationToken cancellationToken = default) =>
         StartOperationAsync(
-            operation =>
-                NativeMethods.mln_render_session_reduce_memory_use_start(Handle, operation),
+            operation => NativeMethods.mln_render_session_reduce_memory_use(Handle, operation),
             cancellationToken
         );
 
     public Task ClearDataAsync(CancellationToken cancellationToken = default) =>
         StartOperationAsync(
-            operation => NativeMethods.mln_render_session_clear_data_start(Handle, operation),
+            operation => NativeMethods.mln_render_session_clear_data(Handle, operation),
             cancellationToken
         );
 
     public Task DumpDebugLogsAsync(CancellationToken cancellationToken = default) =>
         StartOperationAsync(
-            operation => NativeMethods.mln_render_session_dump_debug_logs_start(Handle, operation),
+            operation => NativeMethods.mln_render_session_dump_debug_logs(Handle, operation),
             cancellationToken
         );
 
     public Task<byte[]> ReadPremultipliedRgba8Async(
         CancellationToken cancellationToken = default
     ) =>
-        StartBufferOperationAsync(
-            operation =>
-                NativeMethods.mln_texture_read_premultiplied_rgba8_start(Handle, operation),
-            static operation =>
-            {
-                MlnBuffer data = default;
-                var info = new mln_texture_image_info
+        NativeCompletion
+            .Submit(
+                completion =>
+                    NativeMethods.mln_texture_read_premultiplied_rgba8(Handle, completion),
+                static result =>
                 {
-                    size = (uint)sizeof(mln_texture_image_info),
-                };
-                NativeStatus.Check(
-                    NativeMethods.mln_texture_read_premultiplied_rgba8_take_result(
-                        operation,
-                        &data,
-                        &info
-                    )
-                );
-                return ValueStructs.ReadBuffer(data);
-            },
-            cancellationToken
-        );
+                    var value = NativeCompletion.Value<mln_texture_readback_result>(result);
+                    return ValueStructs.CopyBufferView(value.data);
+                }
+            )
+            .WaitAsync(cancellationToken);
 
     public Task<PremultipliedRgba8Image> ReadImageAsync(
         CancellationToken cancellationToken = default
     ) =>
-        StartBufferOperationAsync(
-            operation =>
-                NativeMethods.mln_texture_read_premultiplied_rgba8_start(Handle, operation),
-            static operation =>
-            {
-                MlnBuffer data = default;
-                var info = new mln_texture_image_info
+        NativeCompletion
+            .Submit(
+                completion =>
+                    NativeMethods.mln_texture_read_premultiplied_rgba8(Handle, completion),
+                static result =>
                 {
-                    size = (uint)sizeof(mln_texture_image_info),
-                };
-                NativeStatus.Check(
-                    NativeMethods.mln_texture_read_premultiplied_rgba8_take_result(
-                        operation,
-                        &data,
-                        &info
-                    )
-                );
-                return new PremultipliedRgba8Image(
-                    ValueStructs.ReadBuffer(data),
-                    RenderStructs.FromNative(info)
-                );
-            },
-            cancellationToken
-        );
+                    var value = NativeCompletion.Value<mln_texture_readback_result>(result);
+                    return new PremultipliedRgba8Image(
+                        ValueStructs.CopyBufferView(value.data),
+                        RenderStructs.FromNative(value.info)
+                    );
+                }
+            )
+            .WaitAsync(cancellationToken);
 
     public Task<IReadOnlyList<QueriedFeature>> QueryRenderedFeaturesAsync(
         RenderedQueryGeometry geometry,
@@ -524,18 +538,22 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         using var nativeOptions = options is null
             ? null
             : NativeRenderedFeatureQueryOptions.From(options);
-        var geometryValue = nativeGeometry.Value;
-        var optionsValue = nativeOptions?.Value ?? default;
-        MlnOperation operation = default;
-        NativeStatus.Check(
-            NativeMethods.mln_render_session_query_rendered_features_start(
-                Handle,
-                &geometryValue,
-                nativeOptions is null ? null : &optionsValue,
-                &operation
+        return NativeCompletion
+            .Submit(
+                completion =>
+                {
+                    var geometryValue = nativeGeometry.Value;
+                    var optionsValue = nativeOptions?.Value ?? default;
+                    return NativeMethods.mln_render_session_query_rendered_features(
+                        Handle,
+                        &geometryValue,
+                        nativeOptions is null ? null : &optionsValue,
+                        completion
+                    );
+                },
+                CopyQueriedFeatures
             )
-        );
-        return AwaitBufferOperationAsync(operation, TakeQueriedFeaturesResult, cancellationToken);
+            .WaitAsync(cancellationToken);
     }
 
     public Task<IReadOnlyList<QueriedFeature>> QuerySourceFeaturesAsync(
@@ -548,17 +566,21 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         using var nativeOptions = options is null
             ? null
             : NativeSourceFeatureQueryOptions.From(options);
-        var optionsValue = nativeOptions?.Value ?? default;
-        MlnOperation operation = default;
-        NativeStatus.Check(
-            NativeMethods.mln_render_session_query_source_features_start(
-                Handle,
-                source.Value,
-                nativeOptions is null ? null : &optionsValue,
-                &operation
+        return NativeCompletion
+            .Submit(
+                completion =>
+                {
+                    var optionsValue = nativeOptions?.Value ?? default;
+                    return NativeMethods.mln_render_session_query_source_features(
+                        Handle,
+                        source.Value,
+                        nativeOptions is null ? null : &optionsValue,
+                        completion
+                    );
+                },
+                CopyQueriedFeatures
             )
-        );
-        return AwaitBufferOperationAsync(operation, TakeQueriedFeaturesResult, cancellationToken);
+            .WaitAsync(cancellationToken);
     }
 
     public Task<byte[]> QueryFeatureExtensionAsync(
@@ -577,20 +599,24 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         using var nativeArguments = arguments is null
             ? null
             : NativeStringView.From(arguments, nameof(arguments));
-        var argumentValue = nativeArguments?.Value ?? default;
-        MlnOperation operation = default;
-        NativeStatus.Check(
-            NativeMethods.mln_render_session_query_feature_extensions_start(
-                Handle,
-                source.Value,
-                nativeFeature.Value,
-                nativeExtension.Value,
-                field.Value,
-                nativeArguments is null ? null : &argumentValue,
-                &operation
+        return NativeCompletion
+            .Submit(
+                completion =>
+                {
+                    var argumentValue = nativeArguments?.Value ?? default;
+                    return NativeMethods.mln_render_session_query_feature_extensions(
+                        Handle,
+                        source.Value,
+                        nativeFeature.Value,
+                        nativeExtension.Value,
+                        field.Value,
+                        nativeArguments is null ? null : &argumentValue,
+                        completion
+                    );
+                },
+                CopyBuffer
             )
-        );
-        return AwaitBufferOperationAsync(operation, TakeRenderQueryResult, cancellationToken);
+            .WaitAsync(cancellationToken);
     }
 
     public Task SetFeatureStateAsync(
@@ -612,7 +638,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         using var state = NativeStringView.From(stateJson, nameof(stateJson));
         return StartOperationAsync(
             operation =>
-                NativeMethods.mln_render_session_set_feature_state_start(
+                NativeMethods.mln_render_session_set_feature_state(
                     Handle,
                     source.Value,
                     layer.Value,
@@ -639,28 +665,19 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             selector.FeatureId ?? string.Empty,
             nameof(selector.FeatureId)
         );
-        return StartBufferOperationAsync(
-            operation =>
-                NativeMethods.mln_render_session_get_feature_state_start(
-                    Handle,
-                    source.Value,
-                    layer.Value,
-                    feature.Value,
-                    operation
-                ),
-            static operation =>
-            {
-                MlnBuffer value = default;
-                NativeStatus.Check(
-                    NativeMethods.mln_render_session_get_feature_state_take_result(
-                        operation,
-                        &value
-                    )
-                );
-                return ValueStructs.ReadBuffer(value);
-            },
-            cancellationToken
-        );
+        return NativeCompletion
+            .Submit(
+                completion =>
+                    NativeMethods.mln_render_session_get_feature_state(
+                        Handle,
+                        source.Value,
+                        layer.Value,
+                        feature.Value,
+                        completion
+                    ),
+                CopyBuffer
+            )
+            .WaitAsync(cancellationToken);
     }
 
     public Task RemoveFeatureStateAsync(
@@ -684,7 +701,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         );
         return StartOperationAsync(
             operation =>
-                NativeMethods.mln_render_session_remove_feature_state_start(
+                NativeMethods.mln_render_session_remove_feature_state(
                     Handle,
                     source.Value,
                     layer.Value,
@@ -698,7 +715,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
 
     public Task DetachAsync(CancellationToken cancellationToken = default) =>
         StartOperationAsync(
-            operation => NativeMethods.mln_render_session_detach_start(Handle, operation),
+            operation => NativeMethods.mln_render_session_detach(Handle, operation),
             cancellationToken
         );
 
@@ -769,10 +786,14 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     {
         ArgumentNullException.ThrowIfNull(map);
         var nativeOptions = RenderStructs.ToNative(options);
-        MlnRenderSession session = default;
-        MlnOperation operation = default;
-        NativeStatus.Check(attach(map.Handle, &descriptor, &nativeOptions, &session, &operation));
-        return new RenderSessionHandle(map, session, operation);
+        MlnRenderSession* session = stackalloc MlnRenderSession[1];
+        var attachment = NativeCompletion.SubmitUnit(completion =>
+        {
+            var descriptorValue = descriptor;
+            var optionsValue = nativeOptions;
+            return attach(map.Handle, &descriptorValue, &optionsValue, session, completion);
+        });
+        return new RenderSessionHandle(map, *session, attachment);
     }
 
     private static NativeStringView? ApplyCanvasSelector(
@@ -792,125 +813,36 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     private Task StartOperationAsync(
         StartRenderOperation start,
         CancellationToken cancellationToken
-    )
+    ) => NativeCompletion.SubmitUnit(completion => start(completion)).WaitAsync(cancellationToken);
+
+    private static byte[] CopyBuffer(mln_completion_result* result) =>
+        ValueStructs.CopyBufferView(NativeCompletion.Value<mln_buffer_view>(result));
+
+    private static IReadOnlyList<QueriedFeature> CopyQueriedFeatures(mln_completion_result* result)
     {
-        MlnOperation operation = default;
-        NativeStatus.Check(start(&operation));
-        return CompleteOperationAsync(operation, cancellationToken);
-    }
-
-    private Task CompleteOperationAsync(
-        MlnOperation operation,
-        CancellationToken cancellationToken
-    ) =>
-        OperationAwaiter.WaitThen(
-            map.Runtime.WaitForOperationAsync(operation, cancellationToken),
-            () => RuntimeHandle.CheckOperationCompletion(operation),
-            () => ReleaseOperation(operation)
-        );
-
-    private Task<T> StartBufferOperationAsync<T>(
-        StartRenderOperation start,
-        Func<MlnOperation, T> take,
-        CancellationToken cancellationToken
-    )
-    {
-        MlnOperation operation = default;
-        NativeStatus.Check(start(&operation));
-        var completedOperation = operation;
-        return OperationAwaiter.WaitThen(
-            map.Runtime.WaitForOperationAsync(completedOperation, cancellationToken),
-            () =>
-            {
-                RuntimeHandle.CheckOperationCompletion(completedOperation);
-                return take(completedOperation);
-            },
-            () => ReleaseOperation(completedOperation)
-        );
-    }
-
-    private Task<T> AwaitBufferOperationAsync<T>(
-        MlnOperation operation,
-        Func<MlnOperation, T> take,
-        CancellationToken cancellationToken
-    ) =>
-        OperationAwaiter.WaitThen(
-            map.Runtime.WaitForOperationAsync(operation, cancellationToken),
-            () =>
-            {
-                RuntimeHandle.CheckOperationCompletion(operation);
-                return take(operation);
-            },
-            () => ReleaseOperation(operation)
-        );
-
-    internal Task WaitForOperationAsync(
-        MlnOperation operation,
-        CancellationToken cancellationToken
-    ) => map.Runtime.WaitForOperationAsync(operation, cancellationToken);
-
-    private void ReleaseOperation(MlnOperation operation)
-    {
-        NativeMethods.mln_operation_release(operation);
-        GC.KeepAlive(this);
-    }
-
-    private static byte[] TakeRenderQueryResult(MlnOperation operation)
-    {
-        MlnBuffer value = default;
-        NativeStatus.Check(NativeMethods.mln_render_query_take_result(operation, &value));
-        return ValueStructs.ReadBuffer(value);
-    }
-
-    private static IReadOnlyList<QueriedFeature> TakeQueriedFeaturesResult(MlnOperation operation)
-    {
-        MlnQueriedFeatureList list = default;
-        NativeStatus.Check(NativeMethods.mln_render_query_features_take_result(operation, &list));
-        return CopyQueriedFeatureList(list);
-    }
-
-    private static IReadOnlyList<QueriedFeature> CopyQueriedFeatureList(MlnQueriedFeatureList list)
-    {
-        if (list.IsNull)
+        var values = NativeCompletion.Values<mln_queried_feature>(result);
+        var features = new QueriedFeature[values.Length];
+        for (var index = 0; index < features.Length; index++)
         {
-            return [];
+            var native = values[index];
+            var fields = (mln_queried_feature_field)native.fields;
+            features[index] = new QueriedFeature(
+                ValueStructs.CopyBufferView(native.feature),
+                fields.HasFlag(mln_queried_feature_field.MLN_QUERIED_FEATURE_SOURCE_ID)
+                    ? RuntimeStructs.CopyUtf8(native.source_id.data, native.source_id.size)
+                    : null,
+                fields.HasFlag(mln_queried_feature_field.MLN_QUERIED_FEATURE_SOURCE_LAYER_ID)
+                    ? RuntimeStructs.CopyUtf8(
+                        native.source_layer_id.data,
+                        native.source_layer_id.size
+                    )
+                    : null,
+                fields.HasFlag(mln_queried_feature_field.MLN_QUERIED_FEATURE_STATE)
+                    ? ValueStructs.CopyBufferView(native.state)
+                    : null
+            );
         }
-
-        try
-        {
-            nuint count = 0;
-            NativeStatus.Check(NativeMethods.mln_queried_feature_list_count(list, &count));
-            var features = new QueriedFeature[checked((int)count)];
-            for (var index = 0; index < features.Length; index++)
-            {
-                var native = NativeMethods.mln_queried_feature_default();
-                NativeStatus.Check(
-                    NativeMethods.mln_queried_feature_list_get(list, (nuint)index, &native)
-                );
-                var fields = (mln_queried_feature_field)native.fields;
-                features[index] = new QueriedFeature(
-                    ValueStructs.CopyBufferView(native.feature),
-                    fields.HasFlag(mln_queried_feature_field.MLN_QUERIED_FEATURE_SOURCE_ID)
-                        ? RuntimeStructs.CopyUtf8(native.source_id.data, native.source_id.size)
-                        : null,
-                    fields.HasFlag(mln_queried_feature_field.MLN_QUERIED_FEATURE_SOURCE_LAYER_ID)
-                        ? RuntimeStructs.CopyUtf8(
-                            native.source_layer_id.data,
-                            native.source_layer_id.size
-                        )
-                        : null,
-                    fields.HasFlag(mln_queried_feature_field.MLN_QUERIED_FEATURE_STATE)
-                        ? ValueStructs.CopyBufferView(native.state)
-                        : null
-                );
-            }
-
-            return features;
-        }
-        finally
-        {
-            NativeMethods.mln_queried_feature_list_destroy(list);
-        }
+        return features;
     }
 
     internal static RenderFrameResult FromNative(mln_render_frame_result value) =>

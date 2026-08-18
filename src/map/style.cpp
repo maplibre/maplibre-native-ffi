@@ -1515,53 +1515,6 @@ auto style_transition_options_default() noexcept
   };
 }
 
-StyleOperationResult::StyleOperationResult(
-  StyleOperationResult&& other
-) noexcept
-    : found(other.found),
-      source_info(other.source_info),
-      layer_info(other.layer_info),
-      image_info(other.image_info),
-      transition_options(other.transition_options),
-      buffer(std::exchange(other.buffer, MLN_HANDLE_NULL)),
-      id_list(std::exchange(other.id_list, MLN_HANDLE_NULL)),
-      string_list(std::exchange(other.string_list, MLN_HANDLE_NULL)),
-      stretch_x(std::move(other.stretch_x)),
-      stretch_y(std::move(other.stretch_y)),
-      coordinates(std::move(other.coordinates)) {}
-
-auto StyleOperationResult::operator=(StyleOperationResult&& other) noexcept
-  -> StyleOperationResult& {
-  if (this == &other) {
-    return *this;
-  }
-  if (buffer != MLN_HANDLE_NULL) {
-    buffer_destroy(buffer);
-  }
-  style_id_list_destroy(id_list);
-  style_string_list_destroy(string_list);
-  found = other.found;
-  source_info = other.source_info;
-  layer_info = other.layer_info;
-  image_info = other.image_info;
-  transition_options = other.transition_options;
-  buffer = std::exchange(other.buffer, MLN_HANDLE_NULL);
-  id_list = std::exchange(other.id_list, MLN_HANDLE_NULL);
-  string_list = std::exchange(other.string_list, MLN_HANDLE_NULL);
-  stretch_x = std::move(other.stretch_x);
-  stretch_y = std::move(other.stretch_y);
-  coordinates = std::move(other.coordinates);
-  return *this;
-}
-
-StyleOperationResult::~StyleOperationResult() {
-  if (buffer != MLN_HANDLE_NULL) {
-    buffer_destroy(buffer);
-  }
-  style_id_list_destroy(id_list);
-  style_string_list_destroy(string_list);
-}
-
 auto validate_geojson_command_options(const mln_geojson_source_options* options)
   -> mln_status {
   return validate_geojson_source_options(options);

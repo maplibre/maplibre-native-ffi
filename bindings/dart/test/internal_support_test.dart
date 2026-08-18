@@ -322,10 +322,10 @@ void main() {
         final transition = (events + 2 * eventSize)
             .cast<raw.mln_runtime_event>()
             .ref;
-        transition.type = 23;
+        transition.type = 22;
         transition.source_type = 0;
         transition.code = 0;
-        transition.payload_type = 9;
+        transition.payload_type = 8;
         transition.payload.camera_transition_finished.transition_id = -1;
         transition.message_offset = 15;
         transition.message_size = 11;

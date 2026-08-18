@@ -22,12 +22,12 @@ pub const Session = union(enum) {
             .texture => |*value| value,
             .surface => |*value| value,
         };
-        var operation = session.resizeStart(extent(viewport)) catch |err| {
+        var completion = session.resize(extent(viewport)) catch |err| {
             diagnostics.logError("render target resize failed", err, diagnostic_store);
             return types.AppError.TextureResizeFailed;
         };
-        defer operation.release();
-        try serviceUntilComplete(session, operation);
+        defer completion.deinit();
+        try serviceUntilComplete(session, &completion);
     }
 
     pub fn textureHandle(self: *Session) !*maplibre.RenderSessionHandle {
@@ -75,8 +75,8 @@ pub fn textureSession(attachment: maplibre.RenderSessionAttachment) !Session {
         _ = owned.session.abandon() catch {};
         owned.session.destroy() catch {};
     }
-    defer owned.operation.release();
-    try serviceUntilComplete(&owned.session, owned.operation);
+    defer owned.completion.deinit();
+    try serviceUntilComplete(&owned.session, &owned.completion);
     return .{ .texture = owned.session };
 }
 
@@ -86,24 +86,24 @@ pub fn surfaceSession(attachment: maplibre.RenderSessionAttachment) !Session {
         _ = owned.session.abandon() catch {};
         owned.session.destroy() catch {};
     }
-    defer owned.operation.release();
-    try serviceUntilComplete(&owned.session, owned.operation);
+    defer owned.completion.deinit();
+    try serviceUntilComplete(&owned.session, &owned.completion);
     return .{ .surface = owned.session };
 }
 
-pub fn serviceUntilComplete(session: *maplibre.RenderSessionHandle, operation: maplibre.OperationHandle) !void {
-    while (!try operation.poll()) _ = try session.serviceDriverWork(0);
-    if (try operation.resultStatus() != 0) return error.NativeOperationFailed;
+pub fn serviceUntilComplete(session: *maplibre.RenderSessionHandle, completion: *maplibre.Future(void)) !void {
+    while (!try completion.poll()) _ = try session.serviceDriverWork(0);
+    try completion.wait(null);
 }
 
 fn closeSession(session: *maplibre.RenderSessionHandle) void {
-    var operation = session.detachStart() catch {
+    var completion = session.detach() catch {
         _ = session.abandon() catch {};
         session.destroy() catch {};
         return;
     };
-    defer operation.release();
-    serviceUntilComplete(session, operation) catch {
+    defer completion.deinit();
+    serviceUntilComplete(session, &completion) catch {
         _ = session.abandon() catch {};
     };
     session.destroy() catch {};

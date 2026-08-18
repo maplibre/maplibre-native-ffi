@@ -1,12 +1,9 @@
 package maplibre
 
 import (
+	"context"
 	"errors"
-	"sync/atomic"
 	"testing"
-	"time"
-
-	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/handle"
 )
 
 func testOfflineTileDefinition() OfflineTilePyramidRegionDefinition {
@@ -34,9 +31,7 @@ func testOfflineGeometryDefinition() OfflineGeometryRegionDefinition {
 	}
 }
 
-func requireReleaseOperation[T any](t *testing.T, operation *OperationHandle[T]) {
-	t.Helper()
-	operation.Release()
+func requireReleaseOperation[T any](_ *testing.T, _ *Future[T]) {
 }
 
 func TestOfflineRegionStartOperationsReturnTypedHandles(t *testing.T) {
@@ -50,63 +45,63 @@ func TestOfflineRegionStartOperationsReturnTypedHandles(t *testing.T) {
 		}
 	}()
 
-	create, err := runtime.StartCreateOfflineRegion(testOfflineTileDefinition(), []byte{1, 2, 3})
+	create, err := runtime.CreateOfflineRegion(testOfflineTileDefinition(), []byte{1, 2, 3})
 	if err != nil {
-		t.Fatalf("StartCreateOfflineRegion(): %v", err)
+		t.Fatalf("CreateOfflineRegion(): %v", err)
 	}
 	requireReleaseOperation(t, create)
 
-	createGeometry, err := runtime.StartCreateOfflineRegion(testOfflineGeometryDefinition(), []byte{1, 2, 3})
+	createGeometry, err := runtime.CreateOfflineRegion(testOfflineGeometryDefinition(), []byte{1, 2, 3})
 	if err != nil {
-		t.Fatalf("StartCreateOfflineRegion(geometry): %v", err)
+		t.Fatalf("CreateOfflineRegion(geometry): %v", err)
 	}
 	requireReleaseOperation(t, createGeometry)
 
-	get, err := runtime.StartOfflineRegion(1)
+	get, err := runtime.OfflineRegion(1)
 	if err != nil {
-		t.Fatalf("StartOfflineRegion(): %v", err)
+		t.Fatalf("OfflineRegion(): %v", err)
 	}
 	requireReleaseOperation(t, get)
 
-	list, err := runtime.StartOfflineRegions()
+	list, err := runtime.OfflineRegions()
 	if err != nil {
-		t.Fatalf("StartOfflineRegions(): %v", err)
+		t.Fatalf("OfflineRegions(): %v", err)
 	}
 	requireReleaseOperation(t, list)
 
-	update, err := runtime.StartUpdateOfflineRegionMetadata(1, []byte{4, 5, 6})
+	update, err := runtime.UpdateOfflineRegionMetadata(1, []byte{4, 5, 6})
 	if err != nil {
-		t.Fatalf("StartUpdateOfflineRegionMetadata(): %v", err)
+		t.Fatalf("UpdateOfflineRegionMetadata(): %v", err)
 	}
 	requireReleaseOperation(t, update)
 
-	status, err := runtime.StartOfflineRegionStatus(1)
+	status, err := runtime.OfflineRegionStatus(1)
 	if err != nil {
-		t.Fatalf("StartOfflineRegionStatus(): %v", err)
+		t.Fatalf("OfflineRegionStatus(): %v", err)
 	}
 	requireReleaseOperation(t, status)
 
-	observed, err := runtime.StartSetOfflineRegionObserved(1, true)
+	observed, err := runtime.SetOfflineRegionObserved(1, true)
 	if err != nil {
-		t.Fatalf("StartSetOfflineRegionObserved(): %v", err)
+		t.Fatalf("SetOfflineRegionObserved(): %v", err)
 	}
 	requireReleaseOperation(t, observed)
 
-	download, err := runtime.StartSetOfflineRegionDownloadState(1, OfflineRegionDownloadInactive)
+	download, err := runtime.SetOfflineRegionDownloadState(1, OfflineRegionDownloadInactive)
 	if err != nil {
-		t.Fatalf("StartSetOfflineRegionDownloadState(): %v", err)
+		t.Fatalf("SetOfflineRegionDownloadState(): %v", err)
 	}
 	requireReleaseOperation(t, download)
 
-	invalidate, err := runtime.StartInvalidateOfflineRegion(1)
+	invalidate, err := runtime.InvalidateOfflineRegion(1)
 	if err != nil {
-		t.Fatalf("StartInvalidateOfflineRegion(): %v", err)
+		t.Fatalf("InvalidateOfflineRegion(): %v", err)
 	}
 	requireReleaseOperation(t, invalidate)
 
-	deleteOperation, err := runtime.StartDeleteOfflineRegion(1)
+	deleteOperation, err := runtime.DeleteOfflineRegion(1)
 	if err != nil {
-		t.Fatalf("StartDeleteOfflineRegion(): %v", err)
+		t.Fatalf("DeleteOfflineRegion(): %v", err)
 	}
 	requireReleaseOperation(t, deleteOperation)
 }
@@ -124,11 +119,10 @@ func TestOfflineOperationResultDoesNotUseRuntimeEventQueue(t *testing.T) {
 		}
 	}()
 
-	operation, err := runtime.StartOfflineRegions()
+	operation, err := runtime.OfflineRegions()
 	if err != nil {
-		t.Fatalf("StartOfflineRegions(): %v", err)
+		t.Fatalf("OfflineRegions(): %v", err)
 	}
-	defer operation.Release()
 	regions := waitTakeOperation(t, runtime, operation)
 	if regions == nil {
 		t.Fatal("Take() returned a nil region list")
@@ -142,22 +136,13 @@ func TestOfflineOperationResultDoesNotUseRuntimeEventQueue(t *testing.T) {
 	}
 }
 
-func waitTakeOperation[T any](t *testing.T, runtime *RuntimeHandle, operation *OperationHandle[T]) T {
+func waitTakeOperation[T any](t *testing.T, _ *RuntimeHandle, future *Future[T]) T {
 	t.Helper()
-	for range make([]struct{}, 5000) {
-		time.Sleep(time.Millisecond)
-		result, err := operation.Take()
-		if err == nil {
-			return result
-		}
-		if !errors.Is(err, ErrInvalidState) {
-			t.Fatalf("Take(): %v", err)
-		}
-		time.Sleep(time.Millisecond)
+	result, err := future.Await(context.Background())
+	if err != nil {
+		t.Fatalf("Await(): %v", err)
 	}
-	t.Fatal("offline operation did not complete")
-	var zero T
-	return zero
+	return result
 }
 
 func TestOfflineCreateAndListTakeResultsCopyNativeData(t *testing.T) {
@@ -172,20 +157,13 @@ func TestOfflineCreateAndListTakeResultsCopyNativeData(t *testing.T) {
 	}()
 
 	metadata := []byte{9, 8, 7}
-	create, err := runtime.StartCreateOfflineRegion(testOfflineTileDefinition(), metadata)
+	create, err := runtime.CreateOfflineRegion(testOfflineTileDefinition(), metadata)
 	if err != nil {
-		t.Fatalf("StartCreateOfflineRegion(): %v", err)
+		t.Fatalf("CreateOfflineRegion(): %v", err)
 	}
-	defer create.Release()
 	info := waitTakeOperation(t, runtime, create)
 	if info.ID == 0 {
 		t.Fatal("created offline region ID is zero")
-	}
-	if !errors.Is(create.Finish(), ErrInvalidState) {
-		t.Fatal("Finish() after Take did not report a consumed result")
-	}
-	if _, err := create.Status(); !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("Status() after Take = %v, want ErrInvalidState", err)
 	}
 	if got := info.Metadata; len(got) != len(metadata) || got[0] != metadata[0] || got[1] != metadata[1] || got[2] != metadata[2] {
 		t.Fatalf("metadata = %v, want %v", got, metadata)
@@ -198,56 +176,14 @@ func TestOfflineCreateAndListTakeResultsCopyNativeData(t *testing.T) {
 		t.Fatalf("StyleURL = %q, want %q", tile.StyleURL, testOfflineTileDefinition().StyleURL)
 	}
 
-	list, err := runtime.StartOfflineRegions()
+	list, err := runtime.OfflineRegions()
 	if err != nil {
-		t.Fatalf("StartOfflineRegions(): %v", err)
+		t.Fatalf("OfflineRegions(): %v", err)
 	}
-	defer list.Release()
 	regions := waitTakeOperation(t, runtime, list)
 	if len(regions) == 0 {
 		t.Fatal("offline region list is empty after creating a region")
 	}
-}
-
-func TestOfflineOperationPollAndStatusReportCompletion(t *testing.T) {
-	runtime, err := NewRuntime()
-	if err != nil {
-		t.Fatalf("NewRuntime(): %v", err)
-	}
-	defer func() {
-		if err := runtime.Close(); err != nil {
-			t.Errorf("Close(): %v", err)
-		}
-	}()
-
-	operation, err := runtime.StartOfflineRegions()
-	if err != nil {
-		t.Fatalf("StartOfflineRegions(): %v", err)
-	}
-	defer operation.Release()
-	for range make([]struct{}, 5000) {
-		time.Sleep(time.Millisecond)
-		completed, err := operation.Poll()
-		if err != nil {
-			t.Fatalf("Poll(): %v", err)
-		}
-		if completed {
-			status, err := operation.Status()
-			if err != nil || status != 0 {
-				t.Fatalf("Status() = (%d, %v), want (0, nil)", status, err)
-			}
-			diagnostic, err := operation.Diagnostic()
-			if err != nil || diagnostic != "" {
-				t.Fatalf("Diagnostic() = (%q, %v), want (empty, nil)", diagnostic, err)
-			}
-			if err := operation.Finish(); err != nil {
-				t.Fatalf("Finish(): %v", err)
-			}
-			return
-		}
-		time.Sleep(time.Millisecond)
-	}
-	t.Fatal("offline operation did not complete")
 }
 
 func TestSetMaximumAmbientCacheSizeReportsCompletion(t *testing.T) {
@@ -255,36 +191,12 @@ func TestSetMaximumAmbientCacheSizeReportsCompletion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRuntimeWithOptions(): %v", err)
 	}
-	defer func() {
-		if err := runtime.Close(); err != nil {
-			t.Errorf("Close(): %v", err)
-		}
-	}()
+	defer runtime.Close()
 
-	operation, err := runtime.StartSetMaximumAmbientCacheSize(8 << 20)
-	if err != nil {
-		t.Fatalf("StartSetMaximumAmbientCacheSize(): %v", err)
+	future, err := runtime.SetMaximumAmbientCacheSize(8 << 20)
+	if _, err := awaitForTest(future, err); err != nil {
+		t.Fatalf("SetMaximumAmbientCacheSize completion: %v", err)
 	}
-	defer operation.Release()
-	for range make([]struct{}, 5000) {
-		time.Sleep(time.Millisecond)
-		completed, err := operation.Poll()
-		if err != nil {
-			t.Fatalf("Poll(): %v", err)
-		}
-		if completed {
-			status, err := operation.Status()
-			if err != nil || status != 0 {
-				t.Fatalf("Status() = (%d, %v), want (0, nil)", status, err)
-			}
-			if err := operation.Finish(); err != nil {
-				t.Fatalf("Finish(): %v", err)
-			}
-			return
-		}
-		time.Sleep(time.Millisecond)
-	}
-	t.Fatal("maximum ambient cache size operation did not complete")
 }
 
 func TestOfflineRegionStartOperationsValidateGoInputs(t *testing.T) {
@@ -300,24 +212,24 @@ func TestOfflineRegionStartOperationsValidateGoInputs(t *testing.T) {
 
 	definition := testOfflineTileDefinition()
 	definition.StyleURL = "http://example.com/\x00style.json"
-	if _, err := runtime.StartCreateOfflineRegion(definition, nil); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("StartCreateOfflineRegion embedded NUL error = %v, want ErrInvalidArgument", err)
+	if _, err := runtime.CreateOfflineRegion(definition, nil); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("CreateOfflineRegion embedded NUL error = %v, want ErrInvalidArgument", err)
 	}
 	geometryDefinition := testOfflineGeometryDefinition()
 	geometryDefinition.StyleURL = "http://example.com/\x00style.json"
-	if _, err := runtime.StartCreateOfflineRegion(geometryDefinition, nil); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("StartCreateOfflineRegion geometry embedded NUL error = %v, want ErrInvalidArgument", err)
+	if _, err := runtime.CreateOfflineRegion(geometryDefinition, nil); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("CreateOfflineRegion geometry embedded NUL error = %v, want ErrInvalidArgument", err)
 	}
 	geometryDefinition = testOfflineGeometryDefinition()
 	geometryDefinition.Geometry = []byte(`{"type":"Unsupported"}`)
-	if _, err := runtime.StartCreateOfflineRegion(geometryDefinition, nil); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("StartCreateOfflineRegion bad geometry error = %v, want ErrInvalidArgument", err)
+	if _, err := runtime.CreateOfflineRegion(geometryDefinition, nil); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("CreateOfflineRegion bad geometry error = %v, want ErrInvalidArgument", err)
 	}
-	if _, err := runtime.StartMergeOfflineRegionsDatabase("/tmp/\x00side.db"); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("StartMergeOfflineRegionsDatabase embedded NUL error = %v, want ErrInvalidArgument", err)
+	if _, err := runtime.MergeOfflineRegionsDatabase("/tmp/\x00side.db"); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("MergeOfflineRegionsDatabase embedded NUL error = %v, want ErrInvalidArgument", err)
 	}
-	if _, err := runtime.StartSetOfflineRegionDownloadState(1, OfflineRegionDownloadState(999_999)); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("StartSetOfflineRegionDownloadState unknown error = %v, want ErrInvalidArgument", err)
+	if _, err := runtime.SetOfflineRegionDownloadState(1, OfflineRegionDownloadState(999_999)); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("SetOfflineRegionDownloadState unknown error = %v, want ErrInvalidArgument", err)
 	}
 }
 
@@ -342,242 +254,5 @@ func TestOfflineGeometryDefinitionMaterializesAndCopies(t *testing.T) {
 	}
 	if string(copied.Geometry) != string(definition.Geometry) {
 		t.Fatalf("copied geometry = %q, want %q", copied.Geometry, definition.Geometry)
-	}
-}
-
-func TestOfflineOperationSecondFinishFailsAfterSuccess(t *testing.T) {
-	runtime := newFakeRuntimeHandle(t)
-	defer closeFakeRuntimeHandle(t, runtime)
-
-	var calls int
-	restore := replaceOperationFinishForTest(func(id uint64) int32 {
-		calls++
-		return 0
-	})
-	defer restore()
-
-	operation := newOperationHandle[struct{}](runtime, 1, operationRegionSetObserved, operationResultNone)
-	defer operation.Release()
-	if err := operation.Finish(); err != nil {
-		t.Fatalf("Finish(): %v", err)
-	}
-	if err := operation.Finish(); !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("second Finish() = %v, want ErrInvalidState", err)
-	}
-	if calls != 1 {
-		t.Fatalf("finish calls = %d, want 1", calls)
-	}
-}
-
-func TestOfflineOperationFinishFailureLeavesHandleRetryable(t *testing.T) {
-	runtime := newFakeRuntimeHandle(t)
-	defer closeFakeRuntimeHandle(t, runtime)
-
-	statuses := []int32{-2, 0, 0}
-	restore := replaceOperationFinishForTest(func(id uint64) int32 {
-		status := statuses[0]
-		statuses = statuses[1:]
-		return status
-	})
-	defer restore()
-
-	operation := newOperationHandle[struct{}](runtime, 1, operationRegionSetObserved, operationResultNone)
-	defer operation.Release()
-	if err := operation.Finish(); !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("Finish() failure = %v, want ErrInvalidState", err)
-	}
-	if err := operation.Finish(); err != nil {
-		t.Fatalf("Finish() retry: %v", err)
-	}
-}
-
-func TestOfflineOperationRemainsUsableAfterRuntimeClose(t *testing.T) {
-	runtime := newFakeRuntimeHandle(t)
-	defer closeFakeRuntimeHandle(t, runtime)
-
-	restore := replaceOperationFinishForTest(func(id uint64) int32 {
-		return 0
-	})
-	defer restore()
-	restoreRuntimeDestroy := replaceRuntimeDestroyForTest(func(nativeRuntime) int32 {
-		return 0
-	})
-	defer restoreRuntimeDestroy()
-
-	operation := newOperationHandle[struct{}](runtime, 1, operationRegionSetObserved, operationResultNone)
-	if err := runtime.Close(); err != nil {
-		t.Fatalf("Runtime Close() with live offline operation: %v", err)
-	}
-	if err := operation.Finish(); err != nil {
-		t.Fatalf("Finish() after runtime close: %v", err)
-	}
-}
-
-func TestOfflineOperationFinishSerializesConcurrentCalls(t *testing.T) {
-	runtime := newFakeRuntimeHandle(t)
-	defer closeFakeRuntimeHandle(t, runtime)
-
-	entered := make(chan struct{})
-	release := make(chan struct{})
-	var calls atomic.Int32
-	restore := replaceOperationFinishForTest(func(id uint64) int32 {
-		if calls.Add(1) == 1 {
-			close(entered)
-			<-release
-		}
-		return 0
-	})
-	defer restore()
-
-	operation := newOperationHandle[struct{}](runtime, 1, operationRegionSetObserved, operationResultNone)
-	defer operation.Release()
-	firstDone := make(chan error, 1)
-	secondDone := make(chan error, 1)
-	go func() { firstDone <- operation.Finish() }()
-	<-entered
-	secondStarted := make(chan struct{})
-	go func() {
-		close(secondStarted)
-		secondDone <- operation.Finish()
-	}()
-	<-secondStarted
-	select {
-	case err := <-secondDone:
-		t.Fatalf("second Finish() completed while first finish was in flight: %v", err)
-	case <-time.After(25 * time.Millisecond):
-	}
-
-	close(release)
-	if err := <-firstDone; err != nil {
-		t.Fatalf("first Finish(): %v", err)
-	}
-	if err := <-secondDone; !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("second Finish() = %v, want ErrInvalidState", err)
-	}
-	if calls.Load() != 1 {
-		t.Fatalf("native finish calls = %d, want 1", calls.Load())
-	}
-}
-
-func TestOperationReleaseWaitsForActiveUses(t *testing.T) {
-	runtime := newFakeRuntimeHandle(t)
-	defer closeFakeRuntimeHandle(t, runtime)
-	operation := newOperationHandle[struct{}](runtime, 1, operationRegionSetObserved, operationResultNone)
-
-	if _, err := operation.beginUse(); err != nil {
-		t.Fatalf("beginUse(): %v", err)
-	}
-	if _, err := operation.beginUse(); err != nil {
-		t.Fatalf("concurrent beginUse(): %v", err)
-	}
-	released := make(chan struct{})
-	go func() {
-		operation.Release()
-		close(released)
-	}()
-	select {
-	case <-released:
-		t.Fatal("Release() completed during an active native use")
-	case <-time.After(25 * time.Millisecond):
-	}
-	operation.endUse()
-	select {
-	case <-released:
-		t.Fatal("Release() completed while a second native use remained active")
-	case <-time.After(25 * time.Millisecond):
-	}
-	operation.endUse()
-	select {
-	case <-released:
-	case <-time.After(time.Second):
-		t.Fatal("Release() did not complete after the active use ended")
-	}
-}
-
-func TestOfflineOperationTakeRejectsNoResultOperationWithoutFinishing(t *testing.T) {
-	runtime := newFakeRuntimeHandle(t)
-	defer closeFakeRuntimeHandle(t, runtime)
-
-	var calls int
-	restore := replaceOperationFinishForTest(func(id uint64) int32 {
-		calls++
-		return 0
-	})
-	defer restore()
-
-	operation := newOperationHandle[struct{}](runtime, 1, operationRegionSetObserved, operationResultNone)
-	defer operation.Release()
-	if _, err := operation.Take(); !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("Take() no-result operation = %v, want ErrInvalidState", err)
-	}
-	if err := operation.Finish(); err != nil {
-		t.Fatalf("Finish() after rejected Take: %v", err)
-	}
-	if calls != 1 {
-		t.Fatalf("finish calls = %d, want 1", calls)
-	}
-}
-
-func TestOfflineOperationTakePreConsumeMismatchRemainsRetryable(t *testing.T) {
-	runtime := newFakeRuntimeHandle(t)
-	defer closeFakeRuntimeHandle(t, runtime)
-
-	restore := replaceOperationFinishForTest(func(id uint64) int32 {
-		return 0
-	})
-	defer restore()
-
-	preConsume := newOperationHandle[struct{}](runtime, 2, operationRegionSetObserved, operationResultKind(255))
-	defer preConsume.Release()
-	if _, err := preConsume.Take(); !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("Take() pre-consume mismatch = %v, want ErrInvalidState", err)
-	}
-	if err := preConsume.Finish(); err != nil {
-		t.Fatalf("Finish() after pre-consume mismatch: %v", err)
-	}
-}
-
-func TestStartOperationRejectsZeroHandle(t *testing.T) {
-	runtime := newFakeRuntimeHandle(t)
-	defer closeFakeRuntimeHandle(t, runtime)
-
-	operation, err := startOperationZeroIDForTest(runtime)
-	if !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("startOperation() error = %v, want ErrInvalidState", err)
-	}
-	if operation != nil {
-		t.Fatalf("startOperation() operation = %#v, want nil", operation)
-	}
-}
-
-func newFakeRuntimeHandle(t *testing.T) *RuntimeHandle {
-	t.Helper()
-	state, err := handle.New(nativeRuntime(0x0100_0000_0000_002a), "RuntimeHandle")
-	if err != nil {
-		t.Fatal(err)
-	}
-	return &RuntimeHandle{state: state}
-}
-
-func closeFakeRuntimeHandle(t *testing.T, runtime *RuntimeHandle) {
-	t.Helper()
-	if status := runtime.state.Close(func(nativeRuntime) int32 { return 0 }); status != 0 {
-		t.Fatalf("fake runtime close status = %d, want 0", status)
-	}
-}
-
-func replaceOperationFinishForTest(finish func(uint64) int32) func() {
-	previous := operationFinish
-	operationFinish = finish
-	return func() {
-		operationFinish = previous
-	}
-}
-
-func replaceRuntimeDestroyForTest(destroy func(nativeRuntime) int32) func() {
-	previous := destroyRuntimeHandle
-	destroyRuntimeHandle = destroy
-	return func() {
-		destroyRuntimeHandle = previous
 	}
 }

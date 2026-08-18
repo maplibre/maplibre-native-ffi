@@ -23,108 +23,86 @@ static const char credentialed_unsupported_scheme_style_url[] =
 static const uint8_t inline_style_json[] =
   "{\"version\":8,\"sources\":{},\"layers\":[]}";
 
-static mln_status wait_for_resource_command(
-  mln_runtime runtime, uint64_t command_id
-) {
-  for (size_t attempt = 0; attempt < 5000; attempt += 1) {
-    mln_test_event_batch batch = mln_test_event_batch_default();
-    if (mln_test_drain_events(runtime, &batch) != MLN_STATUS_OK) {
-      return MLN_STATUS_INVALID_STATE;
-    }
-    for (size_t index = 0; index < batch.event_count; index += 1) {
-      const mln_runtime_event* event =
-        (const mln_runtime_event*)((const char*)batch.events +
-                                   (index * batch.event_size));
-      if (
-        event->type == MLN_RUNTIME_EVENT_COMMAND_FINISHED &&
-        event->source == runtime &&
-        event->payload.command_finished.command_id == command_id
-      ) {
-        return (mln_status)event->code;
-      }
-    }
-    mln_test_sleep_millisecond();
-  }
-  return MLN_STATUS_INVALID_STATE;
-}
-
 static mln_status set_resource_provider_committed(
   mln_runtime runtime, const mln_resource_provider* provider
 ) {
-  uint64_t command_id = 0;
-  const mln_status status =
-    mln_runtime_set_resource_provider(runtime, provider, &command_id);
-  return status == MLN_STATUS_OK
-           ? wait_for_resource_command(runtime, command_id)
-           : status;
+  mln_test_completion completion = mln_test_completion_default(0);
+  const mln_status status = mln_runtime_set_resource_provider(
+    runtime, provider, &completion.descriptor
+  );
+  if (status != MLN_STATUS_OK) mln_test_completion_reject(&completion);
+  const mln_status result =
+    status == MLN_STATUS_OK ? mln_test_completion_finish(&completion) : status;
+  mln_test_completion_destroy(&completion);
+  return result;
 }
 
 static mln_status clear_resource_provider_committed(mln_runtime runtime) {
-  uint64_t command_id = 0;
+  mln_test_completion completion = mln_test_completion_default(0);
   const mln_status status =
-    mln_runtime_clear_resource_provider(runtime, &command_id);
-  return status == MLN_STATUS_OK
-           ? wait_for_resource_command(runtime, command_id)
-           : status;
+    mln_runtime_clear_resource_provider(runtime, &completion.descriptor);
+  if (status != MLN_STATUS_OK) mln_test_completion_reject(&completion);
+  const mln_status result =
+    status == MLN_STATUS_OK ? mln_test_completion_finish(&completion) : status;
+  mln_test_completion_destroy(&completion);
+  return result;
 }
 
 static mln_status set_resource_transform_committed(
   mln_runtime runtime, const mln_resource_transform* transform
 ) {
-  uint64_t command_id = 0;
-  const mln_status status =
-    mln_runtime_set_resource_transform(runtime, transform, &command_id);
-  return status == MLN_STATUS_OK
-           ? wait_for_resource_command(runtime, command_id)
-           : status;
+  mln_test_completion completion = mln_test_completion_default(0);
+  const mln_status status = mln_runtime_set_resource_transform(
+    runtime, transform, &completion.descriptor
+  );
+  if (status != MLN_STATUS_OK) mln_test_completion_reject(&completion);
+  const mln_status result =
+    status == MLN_STATUS_OK ? mln_test_completion_finish(&completion) : status;
+  mln_test_completion_destroy(&completion);
+  return result;
 }
 
 static mln_status clear_resource_transform_committed(mln_runtime runtime) {
-  uint64_t command_id = 0;
+  mln_test_completion completion = mln_test_completion_default(0);
   const mln_status status =
-    mln_runtime_clear_resource_transform(runtime, &command_id);
-  return status == MLN_STATUS_OK
-           ? wait_for_resource_command(runtime, command_id)
-           : status;
+    mln_runtime_clear_resource_transform(runtime, &completion.descriptor);
+  if (status != MLN_STATUS_OK) mln_test_completion_reject(&completion);
+  const mln_status result =
+    status == MLN_STATUS_OK ? mln_test_completion_finish(&completion) : status;
+  mln_test_completion_destroy(&completion);
+  return result;
 }
 
 static mln_status set_http_header_transform_committed(
   mln_runtime runtime, const mln_http_header_transform* transform
 ) {
-  uint64_t command_id = 0;
-  const mln_status status =
-    mln_runtime_set_http_header_transform(runtime, transform, &command_id);
-  return status == MLN_STATUS_OK
-           ? wait_for_resource_command(runtime, command_id)
-           : status;
+  mln_test_completion completion = mln_test_completion_default(0);
+  const mln_status status = mln_runtime_set_http_header_transform(
+    runtime, transform, &completion.descriptor
+  );
+  if (status != MLN_STATUS_OK) mln_test_completion_reject(&completion);
+  const mln_status result =
+    status == MLN_STATUS_OK ? mln_test_completion_finish(&completion) : status;
+  mln_test_completion_destroy(&completion);
+  return result;
 }
 
 static mln_status clear_http_header_transform_committed(mln_runtime runtime) {
-  uint64_t command_id = 0;
+  mln_test_completion completion = mln_test_completion_default(0);
   const mln_status status =
-    mln_runtime_clear_http_header_transform(runtime, &command_id);
-  return status == MLN_STATUS_OK
-           ? wait_for_resource_command(runtime, command_id)
-           : status;
+    mln_runtime_clear_http_header_transform(runtime, &completion.descriptor);
+  if (status != MLN_STATUS_OK) mln_test_completion_reject(&completion);
+  const mln_status result =
+    status == MLN_STATUS_OK ? mln_test_completion_finish(&completion) : status;
+  mln_test_completion_destroy(&completion);
+  return result;
 }
 
 static bool wait_for_offline_completion(
-  mln_runtime runtime, mln_operation operation
+  mln_runtime runtime, mln_test_completion* completion
 ) {
-  for (size_t attempt = 0; attempt < 5000; attempt += 1) {
-    if (mln_test_runtime_barrier(runtime) != MLN_STATUS_OK) {
-      return false;
-    }
-    bool completed = false;
-    if (mln_operation_poll(operation, &completed) != MLN_STATUS_OK) {
-      return false;
-    }
-    if (completed) {
-      return true;
-    }
-    mln_test_sleep_millisecond();
-  }
-  return false;
+  (void)runtime;
+  return mln_test_completion_wait(completion, 5000);
 }
 
 static bool wait_for_map_loading_failure(
@@ -197,6 +175,47 @@ static mln_offline_region_definition offline_geometry_definition(
   };
 }
 
+static bool create_and_activate_offline_region(
+  mln_runtime runtime, const mln_offline_region_definition* definition,
+  mln_offline_region_id* out_region_id
+) {
+  const uint8_t metadata[] = {1, 2, 3};
+  mln_test_completion creation =
+    mln_test_completion_default(sizeof(mln_offline_region_info));
+  const mln_status submission = mln_runtime_offline_region_create(
+    runtime, definition, metadata, sizeof(metadata), &creation.descriptor
+  );
+  if (submission != MLN_STATUS_OK) {
+    mln_test_completion_reject(&creation);
+    mln_test_completion_destroy(&creation);
+    return false;
+  }
+  if (
+    !wait_for_offline_completion(runtime, &creation) ||
+    mln_test_completion_status(&creation) != MLN_STATUS_OK
+  ) {
+    mln_test_completion_destroy(&creation);
+    return false;
+  }
+  mln_offline_region_info info = {.size = sizeof(mln_offline_region_info)};
+  if (!mln_test_completion_copy_value(&creation, &info, sizeof(info))) {
+    mln_test_completion_destroy(&creation);
+    return false;
+  }
+  mln_test_completion_destroy(&creation);
+
+  mln_completion download = mln_test_discard_completion();
+  if (
+    mln_runtime_offline_region_set_download_state(
+      runtime, info.id, MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE, &download
+    ) != MLN_STATUS_OK
+  ) {
+    return false;
+  }
+  if (out_region_id != NULL) *out_region_id = info.id;
+  return true;
+}
+
 static mln_resource_response style_response(void) {
   return (mln_resource_response){
     .size = sizeof(mln_resource_response),
@@ -229,12 +248,10 @@ static void resource_provider_registration_releases_owned_state(void) {
     .release_user_data = count_runtime_callback_release,
   };
 
-  uint64_t rejected_command_id = 0;
+  mln_completion rejected = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_set_resource_provider(
-      MLN_HANDLE_NULL, &provider, &rejected_command_id
-    )
+    mln_runtime_set_resource_provider(MLN_HANDLE_NULL, &provider, &rejected)
   );
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&release_count));
 
@@ -334,14 +351,13 @@ static void network_status_get_rejects_raw_null_output(void) {
 
 static void ambient_cache_operations_validate_raw_operation_values(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_operation operation_id = MLN_HANDLE_NULL;
+  mln_completion completion = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_run_ambient_cache_operation_start(
-      runtime, (mln_ambient_cache_operation)999, &operation_id
+    mln_runtime_run_ambient_cache_operation(
+      runtime, (mln_ambient_cache_operation)999, &completion
     )
   );
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, operation_id);
   mln_test_destroy_runtime(runtime);
 }
 
@@ -349,7 +365,7 @@ static void set_maximum_ambient_cache_size_rejects_raw_null_output(void) {
   mln_runtime runtime = mln_test_create_runtime();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_set_maximum_ambient_cache_size_start(runtime, 1024, NULL)
+    mln_runtime_set_maximum_ambient_cache_size(runtime, 1024, NULL)
   );
   mln_test_destroy_runtime(runtime);
 }
@@ -358,122 +374,61 @@ static void offline_regions_reject_raw_invalid_descriptors(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_offline_region_definition definition = offline_tile_definition();
   const uint8_t metadata[] = {1, 2, 3};
-  mln_operation operation_id = MLN_HANDLE_NULL;
+  mln_completion completion = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_offline_region_create_start(
-      runtime, NULL, metadata, sizeof(metadata), &operation_id
+    mln_runtime_offline_region_create(
+      runtime, NULL, metadata, sizeof(metadata), &completion
     )
   );
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, operation_id);
 
   definition.type = (mln_offline_region_definition_type)999;
-  operation_id = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_offline_region_create_start(
-      runtime, &definition, metadata, sizeof(metadata), &operation_id
+    mln_runtime_offline_region_create(
+      runtime, &definition, metadata, sizeof(metadata), &completion
     )
   );
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, operation_id);
 
   definition = offline_tile_definition();
   definition.data.tile_pyramid.style_url = NULL;
-  operation_id = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_offline_region_create_start(
-      runtime, &definition, metadata, sizeof(metadata), &operation_id
+    mln_runtime_offline_region_create(
+      runtime, &definition, metadata, sizeof(metadata), &completion
     )
   );
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, operation_id);
 
   const mln_buffer_view geometry = MLN_BUFFER_LITERAL(
     "{\"type\":\"LineString\",\"coordinates\":[[2,1],[4,3]]}"
   );
   definition = offline_geometry_definition(geometry);
   definition.data.geometry.style_url = NULL;
-  operation_id = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_offline_region_create_start(
-      runtime, &definition, metadata, sizeof(metadata), &operation_id
+    mln_runtime_offline_region_create(
+      runtime, &definition, metadata, sizeof(metadata), &completion
     )
   );
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, operation_id);
 
   definition = offline_geometry_definition(geometry);
   definition.data.geometry.geometry = (mln_buffer_view){0};
-  operation_id = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_offline_region_create_start(
-      runtime, &definition, metadata, sizeof(metadata), &operation_id
+    mln_runtime_offline_region_create(
+      runtime, &definition, metadata, sizeof(metadata), &completion
     )
   );
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, operation_id);
   mln_test_destroy_runtime(runtime);
 }
 
 static void offline_database_merge_rejects_raw_null_path(void) {
   mln_runtime runtime = mln_test_create_runtime();
-  mln_operation operation_id = MLN_HANDLE_NULL;
+  mln_completion completion = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_offline_regions_merge_database_start(
-      runtime, NULL, &operation_id
-    )
+    mln_runtime_offline_regions_merge_database(runtime, NULL, &completion)
   );
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, operation_id);
-  mln_test_destroy_runtime(runtime);
-}
-
-static void offline_take_rejects_mismatched_result_kind(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  const uint8_t metadata[] = {1, 2, 3};
-  const mln_offline_region_definition definition = offline_tile_definition();
-  mln_operation operation_id = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_runtime_offline_region_create_start(
-      runtime, &definition, metadata, sizeof(metadata), &operation_id
-    )
-  );
-  TEST_ASSERT_NOT_EQUAL(0, operation_id);
-  TEST_ASSERT_TRUE(wait_for_offline_completion(runtime, operation_id));
-  mln_offline_region_list wrong_list = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_offline_regions_list_take_result(operation_id, &wrong_list)
-  );
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, wrong_list);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_operation_finish(operation_id));
-  mln_test_destroy_runtime(runtime);
-}
-
-static void offline_operations_are_uncancellable(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  const uint8_t metadata[] = {1, 2, 3};
-  const mln_offline_region_definition definition = offline_tile_definition();
-  mln_operation operation = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_runtime_offline_region_create_start(
-      runtime, &definition, metadata, sizeof(metadata), &operation
-    )
-  );
-  TEST_ASSERT_NOT_EQUAL(MLN_HANDLE_NULL, operation);
-  // The create may reach its terminal state before the cancel call, which
-  // reports invalid state instead of unsupported. Either status proves the
-  // cancel never took effect.
-  const mln_status cancel_status = mln_operation_cancel(operation);
-  TEST_ASSERT_TRUE(
-    cancel_status == MLN_STATUS_UNSUPPORTED ||
-    cancel_status == MLN_STATUS_INVALID_STATE
-  );
-  TEST_ASSERT_TRUE(wait_for_offline_completion(runtime, operation));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_operation_finish(operation));
-  mln_operation_release(operation);
   mln_test_destroy_runtime(runtime);
 }
 
@@ -659,16 +614,10 @@ static mln_status blocking_resource_transform(
 // inside teardown.
 static void other_runtime_entry(void* argument) {
   teardown_probe* probe = argument;
-  mln_notification_source source = MLN_HANDLE_NULL;
-  mln_status create_status = mln_notification_source_create(&source);
   mln_runtime runtime = MLN_HANDLE_NULL;
-  mln_runtime_options options = mln_runtime_options_default();
-  options.notification_source = source;
-  if (create_status == MLN_STATUS_OK) {
-    create_status = mln_test_runtime_create(&options, &runtime);
-  }
+  const mln_runtime_options options = mln_runtime_options_default();
+  const mln_status create_status = mln_test_runtime_create(&options, &runtime);
   if (create_status != MLN_STATUS_OK) {
-    mln_notification_source_release(source);
     atomic_store(&probe->other_runtime_status, create_status);
     atomic_store(&probe->other_runtime_call_done, true);
     return;
@@ -681,7 +630,6 @@ static void other_runtime_entry(void* argument) {
   atomic_store(&probe->other_runtime_status, mln_test_runtime_barrier(runtime));
   atomic_store(&probe->other_runtime_call_done, true);
   (void)mln_test_runtime_close(runtime);
-  mln_notification_source_release(source);
 }
 
 // Creates a region for `style_url` and activates its download, which requests
@@ -692,46 +640,7 @@ static bool activate_style_download(
 ) {
   const mln_offline_region_definition definition =
     offline_tile_definition_for_style(style_url);
-  const uint8_t metadata[] = {1, 2, 3};
-  mln_operation operation_id = MLN_HANDLE_NULL;
-  if (
-    mln_runtime_offline_region_create_start(
-      runtime, &definition, metadata, sizeof(metadata), &operation_id
-    ) != MLN_STATUS_OK ||
-    !wait_for_offline_completion(runtime, operation_id)
-  ) {
-    return false;
-  }
-
-  mln_offline_region_snapshot snapshot = MLN_HANDLE_NULL;
-  if (
-    mln_runtime_offline_region_create_take_result(operation_id, &snapshot) !=
-    MLN_STATUS_OK
-  ) {
-    mln_operation_release(operation_id);
-    return false;
-  }
-  mln_operation_release(operation_id);
-  mln_offline_region_info info = {.size = sizeof(mln_offline_region_info)};
-  const mln_status info_status =
-    mln_offline_region_snapshot_get(snapshot, &info);
-  const mln_offline_region_id region_id = info.id;
-  mln_offline_region_snapshot_destroy(snapshot);
-  if (info_status != MLN_STATUS_OK) {
-    return false;
-  }
-
-  mln_operation download_operation_id = MLN_HANDLE_NULL;
-  if (
-    mln_runtime_offline_region_set_download_state_start(
-      runtime, region_id, MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE,
-      &download_operation_id
-    ) != MLN_STATUS_OK
-  ) {
-    return false;
-  }
-  mln_operation_release(download_operation_id);
-  return true;
+  return create_and_activate_offline_region(runtime, &definition, NULL);
 }
 
 // Waits until `flag` is set by a MapLibre thread.
@@ -874,16 +783,10 @@ static uint32_t lookup_probe_resource_provider(
 // the resource transform lookup for the first runtime.
 static void lookup_other_runtime_entry(void* argument) {
   lookup_probe* probe = argument;
-  mln_notification_source source = MLN_HANDLE_NULL;
-  mln_status create_status = mln_notification_source_create(&source);
   mln_runtime runtime = MLN_HANDLE_NULL;
-  mln_runtime_options options = mln_runtime_options_default();
-  options.notification_source = source;
-  if (create_status == MLN_STATUS_OK) {
-    create_status = mln_test_runtime_create(&options, &runtime);
-  }
+  const mln_runtime_options options = mln_runtime_options_default();
+  const mln_status create_status = mln_test_runtime_create(&options, &runtime);
   if (create_status != MLN_STATUS_OK) {
-    mln_notification_source_release(source);
     atomic_store(&probe->other_runtime_status, create_status);
     atomic_store(&probe->other_runtime_call_done, true);
     return;
@@ -896,7 +799,6 @@ static void lookup_other_runtime_entry(void* argument) {
   atomic_store(&probe->other_runtime_status, mln_test_runtime_barrier(runtime));
   atomic_store(&probe->other_runtime_call_done, true);
   (void)mln_test_runtime_close(runtime);
-  mln_notification_source_release(source);
 }
 
 // A file source resource transform lookup releases the process-global runtime
@@ -1016,45 +918,9 @@ static bool wait_for_clear_provider_callback(
   mln_runtime runtime, provider_quiescence_probe* probe
 ) {
   const mln_offline_region_definition definition = offline_tile_definition();
-  const uint8_t metadata[] = {1, 2, 3};
-  mln_operation operation_id = MLN_HANDLE_NULL;
-  if (
-    mln_runtime_offline_region_create_start(
-      runtime, &definition, metadata, sizeof(metadata), &operation_id
-    ) != MLN_STATUS_OK ||
-    !wait_for_offline_completion(runtime, operation_id)
-  ) {
+  if (!create_and_activate_offline_region(runtime, &definition, NULL)) {
     return false;
   }
-
-  mln_offline_region_snapshot snapshot = MLN_HANDLE_NULL;
-  if (
-    mln_runtime_offline_region_create_take_result(operation_id, &snapshot) !=
-    MLN_STATUS_OK
-  ) {
-    mln_operation_release(operation_id);
-    return false;
-  }
-  mln_operation_release(operation_id);
-  mln_offline_region_info info = {.size = sizeof(mln_offline_region_info)};
-  const mln_status info_status =
-    mln_offline_region_snapshot_get(snapshot, &info);
-  const mln_offline_region_id region_id = info.id;
-  mln_offline_region_snapshot_destroy(snapshot);
-  if (info_status != MLN_STATUS_OK) {
-    return false;
-  }
-
-  mln_operation download_operation_id = MLN_HANDLE_NULL;
-  if (
-    mln_runtime_offline_region_set_download_state_start(
-      runtime, region_id, MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE,
-      &download_operation_id
-    ) != MLN_STATUS_OK
-  ) {
-    return false;
-  }
-  mln_operation_release(download_operation_id);
 
   for (size_t attempt = 0; attempt < teardown_probe_wait_attempts;
        attempt += 1) {
@@ -1072,13 +938,14 @@ typedef struct cross_thread_provider_submission {
   mln_runtime runtime;
   mln_resource_provider provider;
   mln_status status;
-  uint64_t command_id;
+  mln_test_completion completion;
 } cross_thread_provider_submission;
 
 static void submit_provider_from_thread(void* user_data) {
   cross_thread_provider_submission* submission = user_data;
   submission->status = mln_runtime_set_resource_provider(
-    submission->runtime, &submission->provider, &submission->command_id
+    submission->runtime, &submission->provider,
+    &submission->completion.descriptor
   );
 }
 
@@ -1105,21 +972,21 @@ static void resource_provider_command_copies_cross_thread_descriptor(void) {
         .user_data = &probe,
       },
     .status = MLN_STATUS_NATIVE_ERROR,
-    .command_id = 0,
+    .completion = mln_test_completion_default(0),
   };
   mln_test_thread* thread =
     mln_test_thread_start(submit_provider_from_thread, &submission);
   TEST_ASSERT_NOT_NULL(thread);
   mln_test_thread_join(thread);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, submission.status);
-  TEST_ASSERT_NOT_EQUAL(0, submission.command_id);
 
   // The accepted command owns the descriptor shape, not this binding storage.
   submission.provider.callback = NULL;
   submission.provider.user_data = NULL;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, wait_for_resource_command(runtime, submission.command_id)
+    MLN_STATUS_OK, mln_test_completion_finish(&submission.completion)
   );
+  mln_test_completion_destroy(&submission.completion);
   TEST_ASSERT_TRUE(wait_for_clear_provider_callback(runtime, &probe));
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, clear_resource_provider_committed(runtime)
@@ -1149,7 +1016,7 @@ static void clearing_resource_provider_waits_for_in_flight_callback(void) {
   );
   TEST_ASSERT_TRUE_MESSAGE(
     atomic_load(&probe.callback_returned),
-    "the clear command finished while a provider callback was still running"
+    "the clear completion ran while a provider callback was still running"
   );
 
   mln_test_destroy_runtime(runtime);
@@ -1296,45 +1163,9 @@ static bool wait_for_provider_callback(
   mln_runtime runtime, provider_teardown_probe* probe
 ) {
   const mln_offline_region_definition definition = offline_tile_definition();
-  const uint8_t metadata[] = {1, 2, 3};
-  mln_operation operation_id = MLN_HANDLE_NULL;
-  if (
-    mln_runtime_offline_region_create_start(
-      runtime, &definition, metadata, sizeof(metadata), &operation_id
-    ) != MLN_STATUS_OK ||
-    !wait_for_offline_completion(runtime, operation_id)
-  ) {
+  if (!create_and_activate_offline_region(runtime, &definition, NULL)) {
     return false;
   }
-
-  mln_offline_region_snapshot snapshot = MLN_HANDLE_NULL;
-  if (
-    mln_runtime_offline_region_create_take_result(operation_id, &snapshot) !=
-    MLN_STATUS_OK
-  ) {
-    mln_operation_release(operation_id);
-    return false;
-  }
-  mln_operation_release(operation_id);
-  mln_offline_region_info info = {.size = sizeof(mln_offline_region_info)};
-  const mln_status info_status =
-    mln_offline_region_snapshot_get(snapshot, &info);
-  const mln_offline_region_id region_id = info.id;
-  mln_offline_region_snapshot_destroy(snapshot);
-  if (info_status != MLN_STATUS_OK) {
-    return false;
-  }
-
-  mln_operation download_operation_id = MLN_HANDLE_NULL;
-  if (
-    mln_runtime_offline_region_set_download_state_start(
-      runtime, region_id, MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE,
-      &download_operation_id
-    ) != MLN_STATUS_OK
-  ) {
-    return false;
-  }
-  mln_operation_release(download_operation_id);
 
   for (size_t attempt = 0; attempt < provider_teardown_wait_attempts;
        attempt += 1) {
@@ -1382,8 +1213,6 @@ void run_resources_abi_tests(void) {
   RUN_TEST(set_maximum_ambient_cache_size_rejects_raw_null_output);
   RUN_TEST(offline_regions_reject_raw_invalid_descriptors);
   RUN_TEST(offline_database_merge_rejects_raw_null_path);
-  RUN_TEST(offline_take_rejects_mismatched_result_kind);
-  RUN_TEST(offline_operations_are_uncancellable);
   RUN_TEST(resource_transform_rejects_raw_invalid_descriptors);
   RUN_TEST(http_header_transform_registration_follows_the_transport);
   RUN_TEST(http_header_transform_rejects_raw_invalid_inputs);

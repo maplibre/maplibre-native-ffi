@@ -93,6 +93,7 @@ internal class AndroidMapView(context: Context) :
     val state = mapState
     if (state != null) {
       try {
+        state.pollEvents()
         val target = ensureRenderTarget(state)
         if (target != null && state.renderRequest.consume()) {
           if (target.renderUpdate()) {

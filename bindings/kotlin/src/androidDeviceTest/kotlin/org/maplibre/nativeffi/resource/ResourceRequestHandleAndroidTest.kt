@@ -35,7 +35,7 @@ class ResourceRequestHandleAndroidTest {
           completer = { _, _ -> MaplibreNativeC.mln_network_status_set(999_999) },
           releaser = {
             releases.incrementAndGet()
-            MaplibreNativeC.mln_operation_release(0L)
+            MaplibreNativeC.mln_runtime_release(0L)
           },
         )
       assertEquals(

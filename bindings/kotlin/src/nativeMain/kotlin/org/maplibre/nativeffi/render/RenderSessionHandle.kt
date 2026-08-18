@@ -4,6 +4,8 @@ import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlinx.cinterop.*
+import kotlinx.coroutines.Deferred
+import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.c.*
 import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.status.Status
@@ -32,10 +34,10 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
     RenderSessionCapabilities(
       RenderDriver.fromNative(value.driver.toInt()),
       value.texture_ring_depth.toInt(),
-      value.flags and MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION.toUInt() != 0u,
-      value.flags and MLN_RENDER_SESSION_CAPABILITY_READBACK.toUInt() != 0u,
-      value.flags and MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC.toUInt() != 0u,
-      value.flags and MLN_RENDER_SESSION_CAPABILITY_PRESENTATION.toUInt() != 0u,
+      value.flags and MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION != 0u,
+      value.flags and MLN_RENDER_SESSION_CAPABILITY_READBACK != 0u,
+      value.flags and MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC != 0u,
+      value.flags and MLN_RENDER_SESSION_CAPABILITY_PRESENTATION != 0u,
     )
   }
 
@@ -69,8 +71,8 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
     val value = alloc<mln_frame_demand>()
     mln_frame_demand_default().place(value.ptr)
     value.flags =
-      (if (demand.ifNeeded) MLN_FRAME_DEMAND_IF_NEEDED.toUInt() else 0u) or
-        (if (demand.present) MLN_FRAME_DEMAND_PRESENT.toUInt() else 0u)
+      (if (demand.ifNeeded) MLN_FRAME_DEMAND_IF_NEEDED else 0u) or
+        (if (demand.present) MLN_FRAME_DEMAND_PRESENT else 0u)
     value.token = demand.token
     value.coalescing_boundary = demand.coalescingBoundary
     value.timeout_ns = demand.timeoutNanoseconds
@@ -114,57 +116,61 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
     AcquiredFrameHandle(this@RenderSessionHandle, outFrame.value, scope)
   }
 
-  public actual fun startResize(extent: RenderTargetExtent): OperationHandle<Unit> = memScoped {
+  public actual fun resize(extent: RenderTargetExtent): Deferred<Unit> = memScoped {
     val native = extent(extent, this)
-    unitOperation { mln_render_session_resize_start(id(), native, it) }
+    unit { mln_render_session_resize(id(), native, it) }
   }
 
-  public actual fun startSetMetalSurfaceTarget(descriptor: MetalSurfaceDescriptor) = memScoped {
-    unitOperation {
-      mln_metal_surface_set_target_start(
-        id(),
-        RenderStructs.metalSurfaceDescriptor(descriptor, this),
-        it,
-      )
-    }
-  }
-
-  public actual fun startSetVulkanSurfaceTarget(descriptor: VulkanSurfaceDescriptor) = memScoped {
-    unitOperation {
-      mln_vulkan_surface_set_target_start(
-        id(),
-        RenderStructs.vulkanSurfaceDescriptor(descriptor, this),
-        it,
-      )
-    }
-  }
-
-  public actual fun startSetOpenGLSurfaceTarget(descriptor: OpenGLSurfaceDescriptor) = memScoped {
-    unitOperation {
-      mln_opengl_surface_set_target_start(
-        id(),
-        RenderStructs.openglSurfaceDescriptor(descriptor, this),
-        it,
-      )
-    }
-  }
-
-  public actual fun startSetMetalBorrowedTextureTarget(descriptor: MetalBorrowedTextureDescriptor) =
+  public actual fun setMetalSurfaceTarget(descriptor: MetalSurfaceDescriptor): Deferred<Unit> =
     memScoped {
-      unitOperation {
-        mln_metal_borrowed_texture_set_target_start(
+      unit {
+        mln_metal_surface_set_target(
           id(),
-          RenderStructs.metalBorrowedTextureDescriptor(descriptor, this),
+          RenderStructs.metalSurfaceDescriptor(descriptor, this),
           it,
         )
       }
     }
 
-  public actual fun startSetVulkanBorrowedTextureTarget(
+  public actual fun setVulkanSurfaceTarget(descriptor: VulkanSurfaceDescriptor): Deferred<Unit> =
+    memScoped {
+      unit {
+        mln_vulkan_surface_set_target(
+          id(),
+          RenderStructs.vulkanSurfaceDescriptor(descriptor, this),
+          it,
+        )
+      }
+    }
+
+  public actual fun setOpenGLSurfaceTarget(descriptor: OpenGLSurfaceDescriptor): Deferred<Unit> =
+    memScoped {
+      unit {
+        mln_opengl_surface_set_target(
+          id(),
+          RenderStructs.openglSurfaceDescriptor(descriptor, this),
+          it,
+        )
+      }
+    }
+
+  public actual fun setMetalBorrowedTextureTarget(
+    descriptor: MetalBorrowedTextureDescriptor
+  ): Deferred<Unit> = memScoped {
+    unit {
+      mln_metal_borrowed_texture_set_target(
+        id(),
+        RenderStructs.metalBorrowedTextureDescriptor(descriptor, this),
+        it,
+      )
+    }
+  }
+
+  public actual fun setVulkanBorrowedTextureTarget(
     descriptor: VulkanBorrowedTextureDescriptor
-  ) = memScoped {
-    unitOperation {
-      mln_vulkan_borrowed_texture_set_target_start(
+  ): Deferred<Unit> = memScoped {
+    unit {
+      mln_vulkan_borrowed_texture_set_target(
         id(),
         RenderStructs.vulkanBorrowedTextureDescriptor(descriptor, this),
         it,
@@ -172,11 +178,11 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
     }
   }
 
-  public actual fun startSetOpenGLBorrowedTextureTarget(
+  public actual fun setOpenGLBorrowedTextureTarget(
     descriptor: OpenGLBorrowedTextureDescriptor
-  ) = memScoped {
-    unitOperation {
-      mln_opengl_borrowed_texture_set_target_start(
+  ): Deferred<Unit> = memScoped {
+    unit {
+      mln_opengl_borrowed_texture_set_target(
         id(),
         RenderStructs.openglBorrowedTextureDescriptor(descriptor, this),
         it,
@@ -184,62 +190,52 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
     }
   }
 
-  public actual fun startReduceMemoryUse() = unitOperation {
-    mln_render_session_reduce_memory_use_start(id(), it)
+  public actual fun reduceMemoryUse(): Deferred<Unit> = unit {
+    mln_render_session_reduce_memory_use(id(), it)
   }
 
-  public actual fun startClearData() = unitOperation {
-    mln_render_session_clear_data_start(id(), it)
+  public actual fun clearData(): Deferred<Unit> = unit { mln_render_session_clear_data(id(), it) }
+
+  public actual fun dumpDebugLogs(): Deferred<Unit> = unit {
+    mln_render_session_dump_debug_logs(id(), it)
   }
 
-  public actual fun startDumpDebugLogs() = unitOperation {
-    mln_render_session_dump_debug_logs_start(id(), it)
+  public actual fun barrier(): Deferred<Unit> = unit { mln_render_session_barrier(id(), it) }
+
+  public actual fun detach(): Deferred<Unit> = unit { mln_render_session_detach(id(), it) }
+
+  public actual fun setFeatureState(
+    selector: FeatureStateSelector,
+    value: ByteArray,
+  ): Deferred<Unit> = memScoped {
+    val views = selectorViews(selector, this)
+    unit {
+      mln_render_session_set_feature_state(
+        id(),
+        views[0],
+        views[1],
+        views[2],
+        ByteStructs.bufferView(value, this),
+        it,
+      )
+    }
   }
 
-  public actual fun startBarrier() = unitOperation { mln_render_session_barrier_start(id(), it) }
-
-  public actual fun startDetach() = unitOperation { mln_render_session_detach_start(id(), it) }
-
-  public actual fun startSetFeatureState(selector: FeatureStateSelector, value: ByteArray) =
+  public actual fun getFeatureState(selector: FeatureStateSelector): Deferred<ByteArray> =
     memScoped {
       val views = selectorViews(selector, this)
-      unitOperation {
-        mln_render_session_set_feature_state_start(
-          id(),
-          views[0],
-          views[1],
-          views[2],
-          ByteStructs.bufferView(value, this),
-          it,
-        )
-      }
+      CompletionBridge.submit(
+        { result -> requiredBuffer(result) },
+        { completion ->
+          mln_render_session_get_feature_state(id(), views[0], views[1], views[2], completion)
+        },
+      )
     }
 
-  public actual fun startGetFeatureState(
-    selector: FeatureStateSelector
-  ): OperationHandle<ByteArray> = memScoped {
+  public actual fun removeFeatureState(selector: FeatureStateSelector): Deferred<Unit> = memScoped {
     val views = selectorViews(selector, this)
-    val operation = startOperation {
-      mln_render_session_get_feature_state_start(id(), views[0], views[1], views[2], it)
-    }
-    this@RenderSessionHandle.operation(
-      operation,
-      OperationKind.RENDER_FEATURE_STATE_GET,
-      OperationResultKind.BUFFER,
-    )
-  }
-
-  public actual fun takeFeatureStateResult(operation: OperationHandle<ByteArray>): ByteArray =
-    takeBuffer(
-      operation,
-      OperationKind.RENDER_FEATURE_STATE_GET,
-      ::mln_render_session_get_feature_state_take_result,
-    )
-
-  public actual fun startRemoveFeatureState(selector: FeatureStateSelector) = memScoped {
-    val views = selectorViews(selector, this)
-    unitOperation {
-      mln_render_session_remove_feature_state_start(
+    unit {
+      mln_render_session_remove_feature_state(
         id(),
         views[0],
         views[1],
@@ -250,101 +246,85 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
     }
   }
 
-  public actual fun startQueryRenderedFeatures(
+  public actual fun queryRenderedFeatures(
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions?,
-  ) = memScoped {
-    queryFeaturesOperation {
-      mln_render_session_query_rendered_features_start(
-        id(),
-        QueryStructs.renderedQueryGeometry(geometry, this),
-        QueryStructs.renderedFeatureQueryOptions(options, this),
-        it,
-      )
-    }
+  ): Deferred<List<QueriedFeature>> = memScoped {
+    CompletionBridge.submit(
+      { result ->
+        QueryStructs.queriedFeatures(
+          result.pointed.value?.reinterpret(),
+          result.pointed.value_count,
+        )
+      },
+      { completion ->
+        mln_render_session_query_rendered_features(
+          id(),
+          QueryStructs.renderedQueryGeometry(geometry, this),
+          QueryStructs.renderedFeatureQueryOptions(options, this),
+          completion,
+        )
+      },
+    )
   }
 
-  public actual fun startQuerySourceFeatures(
+  public actual fun querySourceFeatures(
     sourceId: String,
     options: SourceFeatureQueryOptions?,
-  ) = memScoped {
-    queryFeaturesOperation {
-      mln_render_session_query_source_features_start(
-        id(),
-        ByteStructs.bufferView(sourceId.encodeToByteArray(), this),
-        QueryStructs.sourceFeatureQueryOptions(options, this),
-        it,
-      )
-    }
+  ): Deferred<List<QueriedFeature>> = memScoped {
+    CompletionBridge.submit(
+      { result ->
+        QueryStructs.queriedFeatures(
+          result.pointed.value?.reinterpret(),
+          result.pointed.value_count,
+        )
+      },
+      { completion ->
+        mln_render_session_query_source_features(
+          id(),
+          ByteStructs.bufferView(sourceId.encodeToByteArray(), this),
+          QueryStructs.sourceFeatureQueryOptions(options, this),
+          completion,
+        )
+      },
+    )
   }
 
-  public actual fun startQueryFeatureExtension(
+  public actual fun queryFeatureExtension(
     sourceId: String,
     feature: ByteArray,
     extension: String,
     extensionField: String,
     arguments: ByteArray?,
-  ) = memScoped {
+  ): Deferred<ByteArray> = memScoped {
     val argument = arguments?.let { ByteStructs.bufferView(it, this) }
-    bufferOperation {
-      mln_render_session_query_feature_extensions_start(
-        id(),
-        ByteStructs.bufferView(sourceId.encodeToByteArray(), this),
-        ByteStructs.bufferView(feature, this),
-        ByteStructs.bufferView(extension.encodeToByteArray(), this),
-        ByteStructs.bufferView(extensionField.encodeToByteArray(), this),
-        argument?.getPointer(this),
-        it,
-      )
-    }
-  }
-
-  public actual fun takeQueryResult(operation: OperationHandle<ByteArray>): ByteArray =
-    takeBuffer(operation, OperationKind.RENDER_QUERY, ::mln_render_query_take_result)
-
-  public actual fun takeQueryFeaturesResult(
-    operation: OperationHandle<List<QueriedFeature>>
-  ): List<QueriedFeature> =
-    operation.withResultUse(OperationKind.RENDER_QUERY, OperationResultKind.QUERIED_FEATURE_LIST) {
-      op ->
-      memScoped {
-        val out = alloc<ULongVar>()
-        out.value = 0u
-        Status.check(mln_render_query_features_take_result(op, out.ptr))
-        operation.markResultConsumed()
-        QueryStructs.queriedFeatureList(
-          out.value.asHandle("mln_queried_feature_list", ::queriedFeatureListHandle)
+    CompletionBridge.submit(
+      { result -> requiredBuffer(result) },
+      { completion ->
+        mln_render_session_query_feature_extensions(
+          id(),
+          ByteStructs.bufferView(sourceId.encodeToByteArray(), this),
+          ByteStructs.bufferView(feature, this),
+          ByteStructs.bufferView(extension.encodeToByteArray(), this),
+          ByteStructs.bufferView(extensionField.encodeToByteArray(), this),
+          argument?.getPointer(this),
+          completion,
         )
-      }
-    }
-
-  public actual fun startReadPremultipliedRgba8(): OperationHandle<TextureReadback> {
-    val operation = startOperation { mln_texture_read_premultiplied_rgba8_start(id(), it) }
-    return this.operation(
-      operation,
-      OperationKind.RENDER_READBACK,
-      OperationResultKind.TEXTURE_READBACK,
+      },
     )
   }
 
-  public actual fun takeReadPremultipliedRgba8Result(
-    operation: OperationHandle<TextureReadback>
-  ): TextureReadback =
-    operation.withResultUse(OperationKind.RENDER_READBACK, OperationResultKind.TEXTURE_READBACK) {
-      op ->
-      memScoped {
-        val data = alloc<ULongVar>()
-        data.value = 0u
-        val info = alloc<mln_texture_image_info>()
-        info.size = sizeOf<mln_texture_image_info>().toUInt()
-        Status.check(mln_texture_read_premultiplied_rgba8_take_result(op, data.ptr, info.ptr))
-        operation.markResultConsumed()
+  public actual fun readPremultipliedRgba8(): Deferred<TextureReadback> =
+    CompletionBridge.submit(
+      { result ->
+        val raw = result.pointed.value!!.reinterpret<mln_texture_readback_result>().pointed
         TextureReadback(
-          ByteStructs.ownedBuffer(data.value.asHandle("mln_buffer", ::ownedBufferHandle)),
-          RenderStructs.textureImageInfo(info),
+          ByteStructs.copyBufferView(raw.data),
+          RenderStructs.textureImageInfo(raw.info),
         )
-      }
-    }
+      },
+      { completion -> mln_texture_read_premultiplied_rgba8(id(), completion) },
+    )
 
   public actual fun abandon(): RenderAbandonResult = memScoped {
     val value = alloc<mln_render_abandon_result>()
@@ -377,48 +357,22 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
 
   private fun id(): ULong = state.requireLive().rawHandleValue
 
-  private fun unitOperation(start: (CPointer<ULongVar>) -> Int): OperationHandle<Unit> =
-    operation(startOperation(start), OperationKind.RENDER_CONTROL, OperationResultKind.NONE)
+  private fun unit(start: (CPointer<mln_completion>) -> Int): Deferred<Unit> =
+    CompletionBridge.unit(start)
 
-  private fun bufferOperation(start: (CPointer<ULongVar>) -> Int): OperationHandle<ByteArray> =
-    operation(startOperation(start), OperationKind.RENDER_QUERY, OperationResultKind.BUFFER)
-
-  private fun queryFeaturesOperation(
-    start: (CPointer<ULongVar>) -> Int
-  ): OperationHandle<List<QueriedFeature>> =
-    operation(
-      startOperation(start),
-      OperationKind.RENDER_QUERY,
-      OperationResultKind.QUERIED_FEATURE_LIST,
-    )
-
-  internal fun <T> operation(
-    id: ULong,
-    kind: OperationKind,
-    resultKind: OperationResultKind,
-  ): OperationHandle<T> = OperationHandle(map.runtime(), id, kind, resultKind)
-
-  private fun takeBuffer(
-    operation: OperationHandle<ByteArray>,
-    kind: OperationKind,
-    take: (ULong, CPointer<ULongVar>) -> Int,
-  ): ByteArray =
-    operation.withResultUse(kind, OperationResultKind.BUFFER) { op ->
-      memScoped {
-        val out = alloc<ULongVar>()
-        out.value = 0u
-        Status.check(take(op, out.ptr))
-        operation.markResultConsumed()
-        ByteStructs.ownedBuffer(out.value.asHandle("mln_buffer", ::ownedBufferHandle))
-      }
-    }
+  private fun requiredBuffer(result: CPointer<mln_completion_result>): ByteArray {
+    require(result.pointed.value_count == 1uL) { "native completion omitted its byte result" }
+    return ByteStructs.copyBufferView(result.pointed.value!!.reinterpret<mln_buffer_view>().pointed)
+  }
 
   internal companion object {
     private fun attach(
       map: MapHandle,
       options: RenderSessionAttachOptions,
       call:
-        (CPointer<mln_render_session_attach_options>, CPointer<ULongVar>, CPointer<ULongVar>) -> Int,
+        (
+          CPointer<mln_render_session_attach_options>, CPointer<ULongVar>, CPointer<mln_completion>,
+        ) -> Int,
     ): RenderSessionAttachment = memScoped {
       val nativeOptions = alloc<mln_render_session_attach_options>()
       mln_render_session_attach_options_default().place(nativeOptions.ptr)
@@ -426,24 +380,16 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
       nativeOptions.requested_texture_ring_depth = options.requestedTextureRingDepth.toUInt()
       val session = alloc<ULongVar>()
       session.value = 0u
-      val operation = alloc<ULongVar>()
-      operation.value = 0u
-      Status.check(call(nativeOptions.ptr, session.ptr, operation.ptr))
+      val completed = CompletionBridge.unitChecked { completion ->
+        call(nativeOptions.ptr, session.ptr, completion)
+      }
       val handle =
         RenderSessionHandle(
           map,
           session.value.asHandle("mln_render_session", ::renderSessionHandle),
         )
       try {
-        RenderSessionAttachment(
-          handle,
-          OperationHandle(
-            map.runtime(),
-            operation.value,
-            OperationKind.RENDER_ATTACH,
-            OperationResultKind.NONE,
-          ),
-        )
+        RenderSessionAttachment(handle, retainSessionUntilComplete(handle, completed))
       } catch (error: Throwable) {
         runCatching { handle.abandon() }
         runCatching { handle.close() }
@@ -457,7 +403,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
       options: RenderSessionAttachOptions,
     ) = memScoped {
       attach(map, options) { o, s, p ->
-        mln_metal_owned_texture_attach_start(
+        mln_metal_owned_texture_attach(
           map.nativeHandle().rawHandleValue,
           RenderStructs.metalOwnedTextureDescriptor(descriptor, this),
           o,
@@ -473,7 +419,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
       options: RenderSessionAttachOptions,
     ) = memScoped {
       attach(map, options) { o, s, p ->
-        mln_metal_borrowed_texture_attach_start(
+        mln_metal_borrowed_texture_attach(
           map.nativeHandle().rawHandleValue,
           RenderStructs.metalBorrowedTextureDescriptor(descriptor, this),
           o,
@@ -489,7 +435,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
       options: RenderSessionAttachOptions,
     ) = memScoped {
       attach(map, options) { o, s, p ->
-        mln_vulkan_owned_texture_attach_start(
+        mln_vulkan_owned_texture_attach(
           map.nativeHandle().rawHandleValue,
           RenderStructs.vulkanOwnedTextureDescriptor(descriptor, this),
           o,
@@ -505,7 +451,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
       options: RenderSessionAttachOptions,
     ) = memScoped {
       attach(map, options) { o, s, p ->
-        mln_vulkan_borrowed_texture_attach_start(
+        mln_vulkan_borrowed_texture_attach(
           map.nativeHandle().rawHandleValue,
           RenderStructs.vulkanBorrowedTextureDescriptor(descriptor, this),
           o,
@@ -521,7 +467,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
       options: RenderSessionAttachOptions,
     ) = memScoped {
       attach(map, options) { o, s, p ->
-        mln_opengl_owned_texture_attach_start(
+        mln_opengl_owned_texture_attach(
           map.nativeHandle().rawHandleValue,
           RenderStructs.openglOwnedTextureDescriptor(descriptor, this),
           o,
@@ -537,7 +483,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
       options: RenderSessionAttachOptions,
     ) = memScoped {
       attach(map, options) { o, s, p ->
-        mln_opengl_borrowed_texture_attach_start(
+        mln_opengl_borrowed_texture_attach(
           map.nativeHandle().rawHandleValue,
           RenderStructs.openglBorrowedTextureDescriptor(descriptor, this),
           o,
@@ -553,7 +499,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
       options: RenderSessionAttachOptions,
     ) = memScoped {
       attach(map, options) { o, s, p ->
-        mln_metal_surface_attach_start(
+        mln_metal_surface_attach(
           map.nativeHandle().rawHandleValue,
           RenderStructs.metalSurfaceDescriptor(descriptor, this),
           o,
@@ -569,7 +515,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
       options: RenderSessionAttachOptions,
     ) = memScoped {
       attach(map, options) { o, s, p ->
-        mln_vulkan_surface_attach_start(
+        mln_vulkan_surface_attach(
           map.nativeHandle().rawHandleValue,
           RenderStructs.vulkanSurfaceDescriptor(descriptor, this),
           o,
@@ -585,7 +531,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
       options: RenderSessionAttachOptions,
     ) = memScoped {
       attach(map, options) { o, s, p ->
-        mln_opengl_surface_attach_start(
+        mln_opengl_surface_attach(
           map.nativeHandle().rawHandleValue,
           RenderStructs.openglSurfaceDescriptor(descriptor, this),
           o,

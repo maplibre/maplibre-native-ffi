@@ -23,33 +23,28 @@ func drainUntilEvent(
   return nil
 }
 
-/// Drains until `commandId` finishes, and returns its finished event alongside
-/// the raw event that carried it (whose `code` is the final status).
-func commandFinished(
-  _ commandId: UInt64,
-  runtime: RuntimeHandle
-) async throws -> (finished: CommandFinishedEvent, code: Int32)? {
-  try await drainUntilEvent(
-    runtime,
-    waitingFor: "command \(commandId) to finish"
-  ) { event in
-    guard case let .commandFinished(finished) = event.payload else {
-      return false
-    }
-    return finished.commandId == commandId
-  }.flatMap { event in
-    guard case let .commandFinished(finished) = event.payload else {
-      return nil
-    }
-    return (finished, event.code)
+func rawCommandDisposition(_ completion: CommandCompletion) -> UInt32 {
+  switch completion.disposition {
+  case .committed: MLN_COMMAND_DISPOSITION_COMMITTED.rawValue
+  case .superseded: MLN_COMMAND_DISPOSITION_SUPERSEDED.rawValue
+  case .failed: MLN_COMMAND_DISPOSITION_FAILED.rawValue
+  case .cancelled: MLN_COMMAND_DISPOSITION_CANCELLED.rawValue
+  case let .unknown(raw): raw
   }
 }
 
+func expectCommandFailure(_ completion: CommandCompletion, status: mln_status) {
+  #expect(completion.disposition == .failed)
+  #expect(completion.rawStatus == status.rawValue)
+  #expect(!completion.diagnostic.isEmpty)
+}
+
 func commandDisposition(
-  _ commandId: UInt64,
+  _ completion: CommandCompletion,
   runtime: RuntimeHandle
 ) async throws -> UInt32? {
-  try await commandFinished(commandId, runtime: runtime)?.finished.disposition
+  _ = runtime
+  return rawCommandDisposition(completion)
 }
 
 /// Drains until autonomous execution stops producing events.

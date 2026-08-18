@@ -33,7 +33,7 @@ struct MapObject {
   mutable std::mutex snapshot_mutex;
   mln_map_snapshot snapshot{};
   uint64_t next_snapshot_generation = 1;
-  std::atomic<uint64_t> latest_resize_command_id{0};
+  std::atomic<uint64_t> latest_resize_submission{0};
   bool still_image_request_pending = false;
   std::shared_ptr<OperationObject> still_image_operation;
   // Declared first so reverse-order destruction runs the release callbacks it

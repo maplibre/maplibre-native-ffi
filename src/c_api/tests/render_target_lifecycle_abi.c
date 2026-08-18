@@ -10,14 +10,15 @@ static void normal_detach_runs_on_the_driver_and_retires_map_attachment(void) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
 
-  mln_operation detach = MLN_HANDLE_NULL;
+  mln_test_completion detach = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_render_session_detach_start(fixture.session, &detach)
+    MLN_STATUS_OK,
+    mln_render_session_detach(fixture.session, &detach.descriptor)
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, detach)
+    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, &detach)
   );
-  mln_operation_release(detach);
+  mln_test_completion_destroy(&detach);
 
   mln_render_session_snapshot snapshot = {
     .size = sizeof(mln_render_session_snapshot)
@@ -26,12 +27,11 @@ static void normal_detach_runs_on_the_driver_and_retires_map_attachment(void) {
     MLN_STATUS_OK, mln_render_session_get_snapshot(fixture.session, &snapshot)
   );
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_SESSION_STATE_DETACHED, snapshot.state);
-  mln_operation rejected = MLN_HANDLE_NULL;
+  mln_completion rejected = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_STATE,
-    mln_render_session_barrier_start(fixture.session, &rejected)
+    mln_render_session_barrier(fixture.session, &rejected)
   );
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, rejected);
 
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
@@ -39,18 +39,18 @@ static void normal_detach_runs_on_the_driver_and_retires_map_attachment(void) {
 }
 
 static void stale_and_null_sessions_reject_the_new_control_surface(void) {
-  mln_operation operation = MLN_HANDLE_NULL;
+  mln_completion operation = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_render_session_reduce_memory_use_start(MLN_HANDLE_NULL, &operation)
+    mln_render_session_reduce_memory_use(MLN_HANDLE_NULL, &operation)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_render_session_clear_data_start(MLN_HANDLE_NULL, &operation)
+    mln_render_session_clear_data(MLN_HANDLE_NULL, &operation)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_render_session_dump_debug_logs_start(MLN_HANDLE_NULL, &operation)
+    mln_render_session_dump_debug_logs(MLN_HANDLE_NULL, &operation)
   );
 
   mln_runtime runtime = mln_test_create_runtime();

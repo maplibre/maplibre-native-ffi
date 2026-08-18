@@ -5,7 +5,7 @@ import java.nio.Buffer
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.charset.StandardCharsets
-import org.bytedeco.javacpp.BoolPointer
+import kotlinx.coroutines.Deferred
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.LongPointer
 import org.bytedeco.javacpp.Pointer
@@ -14,6 +14,7 @@ import org.maplibre.nativeffi.NativeAccess
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.TileId
+import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.callback.HttpHeaderTransformState
 import org.maplibre.nativeffi.internal.callback.ResourceProviderState
 import org.maplibre.nativeffi.internal.callback.ResourceTransformState
@@ -37,373 +38,226 @@ import org.maplibre.nativeffi.resource.ResourceProviderCallback
 import org.maplibre.nativeffi.resource.ResourceTransformCallback
 
 /** Owned runtime handle backed by the Android JNI bridge. */
-public actual class RuntimeHandle
-private constructor(
-  private val handleId: Long,
-  private var notificationSource: Long,
-  private val notifications: NotificationDispatcher,
-) {
+public actual class RuntimeHandle private constructor(private val handleId: Long) {
   private val core = HandleStateCore("RuntimeHandle", handleId)
+  private val liveMaps = mutableMapOf<Long, WeakReference<MapHandle>>()
 
   init {
     HandleLeakCleaner.register(this, core.leakReport)
   }
 
-  private val liveMaps = mutableMapOf<Long, WeakReference<MapHandle>>()
-
   public actual val isClosed: Boolean
     get() = core.isReleased()
 
-  public actual fun setNotificationCallback(callback: () -> Unit) {
-    NativeAccess.ensureLoaded()
-    core.requireLive()
-    notifications.setCallback(callback)
+  public actual fun barrier(): Deferred<Unit> = CompletionBridge.unit { completion ->
+    MaplibreNativeC.mln_runtime_barrier(requireLiveHandle(), completion)
   }
 
-  public actual fun clearNotificationCallback() {
-    NativeAccess.ensureLoaded()
-    core.requireLive()
-    notifications.clearCallback()
-  }
-
-  public actual fun drainReady(): List<ReadyEndpoint> {
-    NativeAccess.ensureLoaded()
-    core.requireLive()
-    return notifications.drainReady()
-  }
-
-  public actual suspend fun barrier() {
-    NativeAccess.ensureLoaded()
-    val operation = startOperation { outOperation ->
-      MaplibreNativeC.mln_runtime_barrier_start(requireLiveHandle(), outOperation)
-    }
-    try {
-      notifications.await(operation)
-    } finally {
-      MaplibreNativeC.mln_operation_release(operation)
-    }
-  }
-
-  public actual fun startAmbientCacheOperation(
-    operation: AmbientCacheOperation
-  ): OperationHandle<Unit> {
-    NativeAccess.ensureLoaded()
-    val outOperationId = longArrayOf(0L)
-    Status.check(
-      MaplibreNativeC.mln_runtime_run_ambient_cache_operation_start(
+  public actual fun runAmbientCacheOperation(operation: AmbientCacheOperation): Deferred<Unit> =
+    CompletionBridge.unit { completion ->
+      MaplibreNativeC.mln_runtime_run_ambient_cache_operation(
         requireLiveHandle(),
         operation.nativeValue,
-        outOperationId,
-      )
-    )
-    return offlineOperation(
-      outOperationId[0],
-      OperationKind.AMBIENT_CACHE,
-      OperationResultKind.NONE,
-    )
-  }
-
-  public actual fun startSetMaximumAmbientCacheSize(size: Long): OperationHandle<Unit> {
-    NativeAccess.ensureLoaded()
-    Status.requireArgument(size >= 0) { "size must be non-negative" }
-    val outOperationId = longArrayOf(0L)
-    Status.check(
-      MaplibreNativeC.mln_runtime_set_maximum_ambient_cache_size_start(
-        requireLiveHandle(),
-        size,
-        outOperationId,
-      )
-    )
-    return offlineOperation(
-      outOperationId[0],
-      OperationKind.SET_MAXIMUM_AMBIENT_CACHE_SIZE,
-      OperationResultKind.NONE,
-    )
-  }
-
-  public actual fun startCreateOfflineRegion(
-    definition: OfflineRegionDefinition,
-    metadata: ByteArray,
-  ): OperationHandle<OfflineRegionInfo> {
-    val outOperationId = longArrayOf(0L)
-    OfflineRegionDefinitionScope(definition).use { nativeDefinition ->
-      Status.check(
-        MaplibreNativeC.mln_runtime_offline_region_create_start(
-          requireLiveHandle(),
-          nativeDefinition.definition,
-          metadata,
-          metadata.size.toLong(),
-          outOperationId,
-        )
+        completion,
       )
     }
-    return offlineOperation(
-      outOperationId[0],
-      OperationKind.REGION_CREATE,
-      OperationResultKind.REGION,
-    )
-  }
 
-  public actual fun startOfflineRegion(id: Long): OperationHandle<OfflineRegionInfo?> =
-    offlineOperation(
-      startOfflineLongOperation(id, MaplibreNativeC::mln_runtime_offline_region_get_start),
-      OperationKind.REGION_GET,
-      OperationResultKind.OPTIONAL_REGION,
-    )
-
-  public actual fun startOfflineRegions(): OperationHandle<List<OfflineRegionInfo>> =
-    offlineOperation(
-      startOfflineOperation(MaplibreNativeC::mln_runtime_offline_regions_list_start),
-      OperationKind.REGIONS_LIST,
-      OperationResultKind.REGION_LIST,
-    )
-
-  public actual fun startMergeOfflineRegionsDatabase(
-    path: String
-  ): OperationHandle<List<OfflineRegionInfo>> {
-    JavaCppSupport.requireValidCString(path)
-    val outOperationId = longArrayOf(0L)
-    Status.check(
-      MaplibreNativeC.mln_runtime_offline_regions_merge_database_start(
+  public actual fun setMaximumAmbientCacheSize(size: Long): Deferred<Unit> {
+    Status.requireArgument(size >= 0) { "size must be non-negative" }
+    return CompletionBridge.unit { completion ->
+      MaplibreNativeC.mln_runtime_set_maximum_ambient_cache_size(
         requireLiveHandle(),
-        path,
-        outOperationId,
+        size,
+        completion,
       )
-    )
-    return offlineOperation(
-      outOperationId[0],
-      OperationKind.REGIONS_MERGE_DATABASE,
-      OperationResultKind.REGION_LIST,
-    )
+    }
   }
 
-  public actual fun startUpdateOfflineRegionMetadata(
+  public actual fun createOfflineRegion(
+    definition: OfflineRegionDefinition,
+    metadata: ByteArray,
+  ): Deferred<OfflineRegionInfo> =
+    OfflineRegionDefinitionScope(definition).use { nativeDefinition ->
+      bytePointer(metadata).use { nativeMetadata ->
+        CompletionBridge.submit(
+          { result -> requireNotNull(offlineRegionInfo(result)) },
+          { completion ->
+            MaplibreNativeC.mln_runtime_offline_region_create(
+              requireLiveHandle(),
+              nativeDefinition.definition,
+              nativeMetadata,
+              metadata.size.toLong(),
+              completion,
+            )
+          },
+        )
+      }
+    }
+
+  public actual fun offlineRegion(id: Long): Deferred<OfflineRegionInfo?> =
+    CompletionBridge.submit(
+      ::offlineRegionInfo,
+      { completion ->
+        MaplibreNativeC.mln_runtime_offline_region_get(requireLiveHandle(), id, completion)
+      },
+    )
+
+  public actual fun offlineRegions(): Deferred<List<OfflineRegionInfo>> =
+    CompletionBridge.submit(
+      ::offlineRegionList,
+      { completion ->
+        MaplibreNativeC.mln_runtime_offline_regions_list(requireLiveHandle(), completion)
+      },
+    )
+
+  public actual fun mergeOfflineRegionsDatabase(path: String): Deferred<List<OfflineRegionInfo>> {
+    JavaCppSupport.requireValidCString(path)
+    return JavaCppSupport.cString(path).use { nativePath ->
+      CompletionBridge.submit(
+        ::offlineRegionList,
+        { completion ->
+          MaplibreNativeC.mln_runtime_offline_regions_merge_database(
+            requireLiveHandle(),
+            nativePath,
+            completion,
+          )
+        },
+      )
+    }
+  }
+
+  public actual fun updateOfflineRegionMetadata(
     id: Long,
     metadata: ByteArray,
-  ): OperationHandle<OfflineRegionInfo> {
-    val outOperationId = longArrayOf(0L)
-    Status.check(
-      MaplibreNativeC.mln_runtime_offline_region_update_metadata_start(
-        requireLiveHandle(),
-        id,
-        metadata,
-        metadata.size.toLong(),
-        outOperationId,
+  ): Deferred<OfflineRegionInfo> =
+    bytePointer(metadata).use { nativeMetadata ->
+      CompletionBridge.submit(
+        { result -> requireNotNull(offlineRegionInfo(result)) },
+        { completion ->
+          MaplibreNativeC.mln_runtime_offline_region_update_metadata(
+            requireLiveHandle(),
+            id,
+            nativeMetadata,
+            metadata.size.toLong(),
+            completion,
+          )
+        },
       )
-    )
-    return offlineOperation(
-      outOperationId[0],
-      OperationKind.REGION_UPDATE_METADATA,
-      OperationResultKind.REGION,
-    )
-  }
+    }
 
-  public actual fun startOfflineRegionStatus(id: Long): OperationHandle<OfflineRegionStatus> =
-    offlineOperation(
-      startOfflineLongOperation(id, MaplibreNativeC::mln_runtime_offline_region_get_status_start),
-      OperationKind.REGION_GET_STATUS,
-      OperationResultKind.REGION_STATUS,
+  public actual fun offlineRegionStatus(id: Long): Deferred<OfflineRegionStatus> =
+    CompletionBridge.submit(
+      { result -> offlineRegionStatus(MaplibreNativeC.mln_offline_region_status(result.value())) },
+      { completion ->
+        MaplibreNativeC.mln_runtime_offline_region_get_status(requireLiveHandle(), id, completion)
+      },
     )
 
-  public actual fun startSetOfflineRegionObserved(
-    id: Long,
-    observed: Boolean,
-  ): OperationHandle<Unit> {
-    val outOperationId = longArrayOf(0L)
-    Status.check(
-      MaplibreNativeC.mln_runtime_offline_region_set_observed_start(
+  public actual fun setOfflineRegionObserved(id: Long, observed: Boolean): Deferred<Unit> =
+    CompletionBridge.unit { completion ->
+      MaplibreNativeC.mln_runtime_offline_region_set_observed(
         requireLiveHandle(),
         id,
         observed,
-        outOperationId,
+        completion,
       )
-    )
-    return offlineOperation(
-      outOperationId[0],
-      OperationKind.REGION_SET_OBSERVED,
-      OperationResultKind.NONE,
-    )
-  }
+    }
 
-  public actual fun startSetOfflineRegionDownloadState(
+  public actual fun setOfflineRegionDownloadState(
     id: Long,
     downloadState: OfflineRegionDownloadState,
-  ): OperationHandle<Unit> {
+  ): Deferred<Unit> {
     Status.requireArgument(downloadState.isKnown) {
       "Unknown offline region download state cannot be used as input: ${downloadState.nativeValue}"
     }
-    val outOperationId = longArrayOf(0L)
-    Status.check(
-      MaplibreNativeC.mln_runtime_offline_region_set_download_state_start(
+    return CompletionBridge.unit { completion ->
+      MaplibreNativeC.mln_runtime_offline_region_set_download_state(
         requireLiveHandle(),
         id,
         downloadState.nativeValue,
-        outOperationId,
+        completion,
       )
-    )
-    return offlineOperation(
-      outOperationId[0],
-      OperationKind.REGION_SET_DOWNLOAD_STATE,
-      OperationResultKind.NONE,
-    )
+    }
   }
 
-  public actual fun startInvalidateOfflineRegion(id: Long): OperationHandle<Unit> =
-    offlineOperation(
-      startOfflineLongOperation(id, MaplibreNativeC::mln_runtime_offline_region_invalidate_start),
-      OperationKind.REGION_INVALIDATE,
-      OperationResultKind.NONE,
-    )
-
-  public actual fun startDeleteOfflineRegion(id: Long): OperationHandle<Unit> =
-    offlineOperation(
-      startOfflineLongOperation(id, MaplibreNativeC::mln_runtime_offline_region_delete_start),
-      OperationKind.REGION_DELETE,
-      OperationResultKind.NONE,
-    )
-
-  public actual fun takeCreateOfflineRegionResult(
-    operation: OperationHandle<OfflineRegionInfo>
-  ): OfflineRegionInfo =
-    operation.withResultUse(OperationKind.REGION_CREATE, OperationResultKind.REGION) {
-      takeOfflineRegionSnapshot(
-        it,
-        MaplibreNativeC::mln_runtime_offline_region_create_take_result,
-        operation::markResultConsumed,
-      )
+  public actual fun invalidateOfflineRegion(id: Long): Deferred<Unit> =
+    CompletionBridge.unit { completion ->
+      MaplibreNativeC.mln_runtime_offline_region_invalidate(requireLiveHandle(), id, completion)
     }
 
-  public actual fun takeOfflineRegionResult(
-    operation: OperationHandle<OfflineRegionInfo?>
-  ): OfflineRegionInfo? =
-    operation.withResultUse(OperationKind.REGION_GET, OperationResultKind.OPTIONAL_REGION) {
-      operationId ->
-      LongPointer(1).use { outSnapshot ->
-        outSnapshot.put(0, 0L)
-        BoolPointer(1).use { outFound ->
-          Status.check(
-            MaplibreNativeC.mln_runtime_offline_region_get_take_result(
-              operationId,
-              outSnapshot,
-              outFound,
-            )
-          )
-          operation.markResultConsumed()
-          if (outFound.get()) offlineRegionSnapshot(outSnapshot) else null
-        }
-      }
+  public actual fun deleteOfflineRegion(id: Long): Deferred<Unit> =
+    CompletionBridge.unit { completion ->
+      MaplibreNativeC.mln_runtime_offline_region_delete(requireLiveHandle(), id, completion)
     }
 
-  public actual fun takeOfflineRegionsResult(
-    operation: OperationHandle<List<OfflineRegionInfo>>
-  ): List<OfflineRegionInfo> =
-    operation.withResultUse(OperationKind.REGIONS_LIST, OperationResultKind.REGION_LIST) {
-      takeOfflineRegionList(
-        it,
-        MaplibreNativeC::mln_runtime_offline_regions_list_take_result,
-        operation::markResultConsumed,
-      )
-    }
+  private fun offlineRegionInfo(result: MaplibreNativeC.mln_completion_result): OfflineRegionInfo? {
+    if (result.value_count() == 0L) return null
+    return offlineRegionInfo(MaplibreNativeC.mln_offline_region_info(result.value()))
+  }
 
-  public actual fun takeMergeOfflineRegionsDatabaseResult(
-    operation: OperationHandle<List<OfflineRegionInfo>>
-  ): List<OfflineRegionInfo> =
-    operation.withResultUse(OperationKind.REGIONS_MERGE_DATABASE, OperationResultKind.REGION_LIST) {
-      takeOfflineRegionList(
-        it,
-        MaplibreNativeC::mln_runtime_offline_regions_merge_database_take_result,
-        operation::markResultConsumed,
-      )
-    }
+  private fun offlineRegionList(
+    result: MaplibreNativeC.mln_completion_result
+  ): List<OfflineRegionInfo> {
+    val count = Math.toIntExact(result.value_count())
+    if (count == 0) return emptyList()
+    val values = MaplibreNativeC.mln_offline_region_info(result.value())
+    return List(count) { index -> offlineRegionInfo(values.position(index.toLong())) }
+  }
 
-  public actual fun takeUpdateOfflineRegionMetadataResult(
-    operation: OperationHandle<OfflineRegionInfo>
-  ): OfflineRegionInfo =
-    operation.withResultUse(OperationKind.REGION_UPDATE_METADATA, OperationResultKind.REGION) {
-      takeOfflineRegionSnapshot(
-        it,
-        MaplibreNativeC::mln_runtime_offline_region_update_metadata_take_result,
-        operation::markResultConsumed,
-      )
-    }
-
-  public actual fun takeOfflineRegionStatusResult(
-    operation: OperationHandle<OfflineRegionStatus>
-  ): OfflineRegionStatus =
-    operation.withResultUse(OperationKind.REGION_GET_STATUS, OperationResultKind.REGION_STATUS) {
-      operationId ->
-      MaplibreNativeC.mln_offline_region_status().use { status ->
-        status.size(status.sizeof())
-        Status.check(
-          MaplibreNativeC.mln_runtime_offline_region_get_status_take_result(operationId, status)
-        )
-        operation.markResultConsumed()
-        offlineRegionStatus(status)
-      }
-    }
-
-  public actual fun setResourceProvider(callback: ResourceProviderCallback): ULong {
+  public actual fun setResourceProvider(
+    callback: ResourceProviderCallback
+  ): Deferred<CommandCompletion> {
     val replacement = ResourceProviderState(callback)
     HandleLeakCleaner.retainNativeCallbackRoot(replacement)
-    return try {
-      command { outCommandId ->
-        MaplibreNativeC.mln_runtime_set_resource_provider(
-          requireLiveHandle(),
-          replacement.descriptor(),
-          outCommandId,
-        )
-      }
-    } catch (error: Throwable) {
-      releaseCallbackRoot(replacement)
-      throw error
+    return command { completion ->
+      MaplibreNativeC.mln_runtime_set_resource_provider(
+        requireLiveHandle(),
+        replacement.descriptor(),
+        completion,
+      )
     }
   }
 
-  public actual fun clearResourceProvider(): ULong = command { outCommandId ->
-    MaplibreNativeC.mln_runtime_clear_resource_provider(requireLiveHandle(), outCommandId)
+  public actual fun clearResourceProvider(): Deferred<CommandCompletion> = command { completion ->
+    MaplibreNativeC.mln_runtime_clear_resource_provider(requireLiveHandle(), completion)
   }
 
-  public actual fun setResourceTransform(callback: ResourceTransformCallback): ULong {
+  public actual fun setResourceTransform(
+    callback: ResourceTransformCallback
+  ): Deferred<CommandCompletion> {
     val replacement = ResourceTransformState(callback)
     HandleLeakCleaner.retainNativeCallbackRoot(replacement)
-    return try {
-      command { outCommandId ->
-        MaplibreNativeC.mln_runtime_set_resource_transform(
-          requireLiveHandle(),
-          replacement.descriptor(),
-          outCommandId,
-        )
-      }
-    } catch (error: Throwable) {
-      releaseCallbackRoot(replacement)
-      throw error
+    return command { completion ->
+      MaplibreNativeC.mln_runtime_set_resource_transform(
+        requireLiveHandle(),
+        replacement.descriptor(),
+        completion,
+      )
     }
   }
 
-  public actual fun clearResourceTransform(): ULong = command { outCommandId ->
-    MaplibreNativeC.mln_runtime_clear_resource_transform(requireLiveHandle(), outCommandId)
+  public actual fun clearResourceTransform(): Deferred<CommandCompletion> = command { completion ->
+    MaplibreNativeC.mln_runtime_clear_resource_transform(requireLiveHandle(), completion)
   }
 
-  public actual fun setHttpHeaderTransform(callback: HttpHeaderTransformCallback): ULong {
+  public actual fun setHttpHeaderTransform(
+    callback: HttpHeaderTransformCallback
+  ): Deferred<CommandCompletion> {
     val replacement = HttpHeaderTransformState(callback)
     HandleLeakCleaner.retainNativeCallbackRoot(replacement)
-    return try {
-      command { outCommandId ->
-        MaplibreNativeC.mln_runtime_set_http_header_transform(
-          requireLiveHandle(),
-          replacement.descriptor(),
-          outCommandId,
-        )
-      }
-    } catch (error: Throwable) {
-      releaseCallbackRoot(replacement)
-      throw error
+    return command { completion ->
+      MaplibreNativeC.mln_runtime_set_http_header_transform(
+        requireLiveHandle(),
+        replacement.descriptor(),
+        completion,
+      )
     }
   }
 
-  public actual fun clearHttpHeaderTransform(): ULong = command { outCommandId ->
-    MaplibreNativeC.mln_runtime_clear_http_header_transform(requireLiveHandle(), outCommandId)
-  }
+  public actual fun clearHttpHeaderTransform(): Deferred<CommandCompletion> =
+    command { completion ->
+      MaplibreNativeC.mln_runtime_clear_http_header_transform(requireLiveHandle(), completion)
+    }
 
   public actual fun drainEvents(): RuntimeEventBatch {
     NativeAccess.ensureLoaded()
@@ -418,10 +272,7 @@ private constructor(
           view.size(view.sizeof())
           Status.check(MaplibreNativeC.mln_event_batch_get(batch, view))
           val eventCount = Math.toIntExact(view.event_count())
-          if (eventCount == 0) {
-            return RuntimeEventBatch(emptyList())
-          }
-          // The stride the batch reports can exceed the probed record, so index by it.
+          if (eventCount == 0) return RuntimeEventBatch(emptyList())
           val eventSize = view.event_size()
           require(eventSize >= EventLayout.EVENT_SIZE) {
             "Loaded native library reports a ${eventSize}-byte runtime event, " +
@@ -429,16 +280,14 @@ private constructor(
           }
           val events = directBuffer(view.events(), eventCount.toLong() * eventSize)
           val messages =
-            if (view.messages() == null || view.messages().isNull || view.messages_size() == 0L) {
+            if (view.messages() == null || view.messages().isNull || view.messages_size() == 0L)
               null
-            } else {
-              directBuffer(view.messages(), view.messages_size())
-            }
-          val copied =
+            else directBuffer(view.messages(), view.messages_size())
+          return RuntimeEventBatch(
             List(eventCount) { index ->
               copiedEvent(events, index * eventSize, eventSize, messages).toRuntimeEvent()
             }
-          return RuntimeEventBatch(copied)
+          )
         }
       } finally {
         MaplibreNativeC.mln_event_batch_release(batch)
@@ -469,72 +318,24 @@ private constructor(
       throw error
     }
     core.completeClose { liveMaps.clear() }
-    notifications.close()
-    val source = notificationSource
-    if (source != 0L) {
-      MaplibreNativeC.mln_notification_source_release(source)
-      notificationSource = 0L
-    }
   }
 
   public actual companion object {
     public actual fun create(options: RuntimeOptions): RuntimeHandle {
       NativeAccess.ensureLoaded()
       RuntimeOptionsScope(options).use { nativeOptions ->
-        LongPointer(1).use { outSource ->
-          outSource.put(0, 0L)
-          Status.check(MaplibreNativeC.mln_notification_source_create(outSource))
-          val source = outSource.get()
-          require(source != 0L) {
-            "mln_notification_source_create returned a null notification source"
-          }
-          nativeOptions.options.notification_source(source)
-          val notifications = NotificationDispatcher(source)
-          try {
-            LongPointer(1).use { outRuntime ->
-              outRuntime.put(0, 0L)
-              Status.check(MaplibreNativeC.mln_runtime_create(nativeOptions.options, outRuntime))
-              val runtime = outRuntime.get()
-              require(runtime != 0L) { "mln_runtime_create returned a null runtime" }
-              return RuntimeHandle(runtime, source, notifications)
-            }
-          } catch (error: Throwable) {
-            notifications.close()
-            MaplibreNativeC.mln_notification_source_release(source)
-            throw error
-          }
+        LongPointer(1).use { outRuntime ->
+          outRuntime.put(0, 0L)
+          Status.check(MaplibreNativeC.mln_runtime_create(nativeOptions.options, outRuntime))
+          val runtime = outRuntime.get()
+          require(runtime != 0L) { "mln_runtime_create returned a null runtime" }
+          return RuntimeHandle(runtime)
         }
       }
     }
   }
 
-  private fun <T> offlineOperation(
-    operationId: Long,
-    kind: OperationKind,
-    resultKind: OperationResultKind,
-  ): OperationHandle<T> = OperationHandle(this, operationId, kind, resultKind)
-
-  private fun startOfflineOperation(start: (Long, LongArray) -> Int): Long {
-    val outOperationId = longArrayOf(0L)
-    Status.check(start(requireLiveHandle(), outOperationId))
-    return outOperationId[0]
-  }
-
-  private fun startOfflineLongOperation(value: Long, start: (Long, Long, LongArray) -> Int): Long {
-    val outOperationId = longArrayOf(0L)
-    Status.check(start(requireLiveHandle(), value, outOperationId))
-    return outOperationId[0]
-  }
-
   internal fun nativeHandleId(): Long = requireLiveHandle()
-
-  internal suspend fun awaitOperation(operation: Long) {
-    notifications.await(operation)
-  }
-
-  internal fun forgetOperation(operation: Long) {
-    notifications.forget(operation)
-  }
 
   internal fun registerMap(map: MapHandle) {
     liveMaps[map.nativeHandleId()] = WeakReference(map)
@@ -607,67 +408,11 @@ private constructor(
     }
     return map
   }
-
-  private fun takeOfflineRegionSnapshot(
-    operationId: Long,
-    take: (Long, LongPointer) -> Int,
-    markTaken: () -> Unit,
-  ): OfflineRegionInfo =
-    LongPointer(1).use { outSnapshot ->
-      outSnapshot.put(0, 0L)
-      Status.check(take(operationId, outSnapshot))
-      markTaken()
-      offlineRegionSnapshot(outSnapshot)
-    }
-
-  private fun takeOfflineRegionList(
-    operationId: Long,
-    take: (Long, LongPointer) -> Int,
-    markTaken: () -> Unit,
-  ): List<OfflineRegionInfo> =
-    LongPointer(1).use { outList ->
-      outList.put(0, 0L)
-      Status.check(take(operationId, outList))
-      markTaken()
-      offlineRegionList(outList)
-    }
 }
 
-internal inline fun startOperation(call: (LongPointer) -> Int): Long =
-  LongPointer(1).use { outOperation ->
-    outOperation.put(0, 0L)
-    Status.check(call(outOperation))
-    outOperation.get()
-  }
-
-internal fun drainNativeReady(source: Long): List<ReadyEndpoint> {
-  LongPointer(1).use { outBatch ->
-    outBatch.put(0, 0L)
-    Status.check(MaplibreNativeC.mln_notification_source_drain_ready(source, outBatch))
-    val batch = outBatch.get()
-    try {
-      MaplibreNativeC.mln_ready_batch_view().use { view ->
-        view.size(view.sizeof())
-        Status.check(MaplibreNativeC.mln_ready_batch_get(batch, view))
-        val count = Math.toIntExact(view.endpoint_count())
-        val endpoints = view.endpoints()
-        return List(count) { index ->
-          val endpoint = endpoints.position(index.toLong())
-          ReadyEndpoint(ReadyEndpoint.Kind.fromNative(endpoint.kind()), endpoint.id())
-        }
-      }
-    } finally {
-      MaplibreNativeC.mln_ready_batch_release(batch)
-    }
-  }
-}
-
-private inline fun command(call: (LongPointer) -> Int): ULong =
-  LongPointer(1).use { outCommandId ->
-    outCommandId.put(0, 0L)
-    Status.check(call(outCommandId))
-    outCommandId.get().toULong()
-  }
+private inline fun command(
+  crossinline call: (MaplibreNativeC.mln_completion) -> Int
+): Deferred<CommandCompletion> = CompletionBridge.command { call(it) }
 
 private fun releaseCallbackRoot(root: AutoCloseable?) {
   HandleLeakCleaner.releaseNativeCallbackRoot(root)
@@ -699,6 +444,9 @@ private fun byteArray(pointer: Pointer?, byteCount: Long): ByteArray {
   BytePointer(pointer).get(bytes, 0, bytes.size)
   return bytes
 }
+
+private fun bytePointer(bytes: ByteArray): BytePointer =
+  BytePointer(bytes.size.toLong()).also { pointer -> pointer.put(bytes, 0, bytes.size) }
 
 /** One event's fields, copied out of the drained batch before the drain returns. */
 private class CopiedEvent(
@@ -762,12 +510,6 @@ private fun runtimeEventPayload(
       )
     MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED ->
       RuntimeEventPayload.CameraTransitionFinished(events.getLong(base + EventLayout.TRANSITION_ID))
-    MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_COMMAND_FINISHED ->
-      RuntimeEventPayload.CommandFinished(
-        events.getLong(base + EventLayout.COMMAND_ID).toULong(),
-        CommandDisposition.fromNative(events.getInt(base + EventLayout.COMMAND_DISPOSITION)),
-        events.getLong(base + EventLayout.COMMAND_GENERATION).toULong(),
-      )
     else -> unknownPayload(payloadType, events, base, eventSize)
   }
 
@@ -1076,14 +818,6 @@ private object EventLayout {
     it.payload().camera_transition_finished().transition_id(LONG_SENTINEL)
   }
 
-  val COMMAND_ID: Int = probeLong { it.payload().command_finished().command_id(LONG_SENTINEL) }
-  val COMMAND_DISPOSITION: Int = probeInt {
-    it.payload().command_finished().disposition(INT_SENTINEL)
-  }
-  val COMMAND_GENERATION: Int = probeLong {
-    it.payload().command_finished().generation(LONG_SENTINEL)
-  }
-
   /**
    * Offset of the inline payload union, taken as the lowest offset any payload member landed on.
    * The payload is the last member of the record, so this bounds the window of a payload kind this
@@ -1098,7 +832,6 @@ private object EventLayout {
       RESPONSE_ERROR_REGION_ID,
       TILE_COUNT_LIMIT_REGION_ID,
       TRANSITION_ID,
-      COMMAND_ID,
     )
 
   private val SENTINEL_DOUBLE: Double

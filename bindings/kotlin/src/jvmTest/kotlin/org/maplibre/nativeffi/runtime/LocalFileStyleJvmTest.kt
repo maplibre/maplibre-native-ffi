@@ -20,14 +20,15 @@ class LocalFileStyleJvmTest {
         RuntimeHandle.create(RuntimeOptions()).use { runtime ->
           val map =
             MapHandle.create(
-              runtime,
-              MapOptions().apply {
-                width = 64
-                height = 64
-              },
-            )
+                runtime,
+                MapOptions().apply {
+                  width = 64
+                  height = 64
+                },
+              )
+              .await()
           try {
-            map.setStyleUrl(styleFile.toUri().toASCIIString())
+            map.setStyleUrl(styleFile.toUri().toASCIIString()).await()
             assertTrue(waitForStyleLoaded(runtime, map))
           } finally {
             map.close()
@@ -40,7 +41,7 @@ class LocalFileStyleJvmTest {
 
   private suspend fun waitForStyleLoaded(runtime: RuntimeHandle, map: MapHandle): Boolean {
     repeat(10_000) {
-      runtime.barrier()
+      runtime.barrier().await()
       if (
         runtime.drainEvents().events.any {
           it.type == RuntimeEventType.MAP_STYLE_LOADED && it.mapSource == map

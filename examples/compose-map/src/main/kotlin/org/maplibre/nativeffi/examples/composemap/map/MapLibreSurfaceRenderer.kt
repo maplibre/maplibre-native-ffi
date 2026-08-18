@@ -1,7 +1,7 @@
 package org.maplibre.nativeffi.examples.composemap.map
 
 import java.util.concurrent.atomic.AtomicBoolean
-import org.maplibre.nativeffi.error.MaplibreStatus
+import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceFrame
 import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceRenderResult
 import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceRenderer
@@ -13,7 +13,6 @@ import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.render.FrameDemand
 import org.maplibre.nativeffi.render.RenderResult
 import org.maplibre.nativeffi.render.RenderSessionHandle
-import org.maplibre.nativeffi.runtime.OperationHandle
 
 /**
  * The native-surface render loop.
@@ -54,7 +53,7 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
 
     val state = ensureMapState(frame.extent)
     state.resize(frame.extent)
-    state.drainNotifications()
+    state.pollEvents()
     return try {
       renderAttached(state.map, frame)
     } catch (error: Throwable) {
@@ -108,10 +107,6 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
 
   fun requestRender() {
     renderRequest.set()
-    surfaceSession?.requestFrame()
-  }
-
-  private fun scheduleNotificationDrain() {
     surfaceSession?.requestFrame()
   }
 
@@ -172,7 +167,7 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
     mapState?.let {
       return it
     }
-    return MapState(extent, ::scheduleNotificationDrain, ::requestRender).also { mapState = it }
+    return MapState(extent, ::requestRender).also { mapState = it }
   }
 
   private fun stopMapState() {
@@ -218,7 +213,7 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
     closeRenderSession()
     val attachment = borrowed.attach(map)
     try {
-      completeDriverOperation(attachment.session, attachment.operation)
+      completeDriverOperation(attachment.session, attachment.completed)
     } catch (error: Throwable) {
       runCatching { attachment.session.abandon() }
       runCatching { attachment.session.close() }
@@ -235,7 +230,7 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
     val closing = renderSession
     renderSession = null
     closing?.session?.let { session ->
-      completeDriverOperation(session, session.startDetach())
+      completeDriverOperation(session, session.detach())
       session.close()
     }
   }
@@ -249,11 +244,9 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
     }
   }
 
-  private fun completeDriverOperation(session: RenderSessionHandle, operation: OperationHandle<*>) {
-    operation.use {
-      while (!it.poll()) session.serviceDriverWork()
-      check(it.terminalStatus() == MaplibreStatus.OK) { it.diagnostic() }
-    }
+  private fun completeDriverOperation(session: RenderSessionHandle, completed: Deferred<Unit>) {
+    while (!completed.isCompleted) session.serviceDriverWork()
+    runSuspend { completed.await() }
   }
 
   private fun viewportCenter(): ScreenPoint {

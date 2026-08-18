@@ -20,9 +20,8 @@ auto mln_render_session_attach_options_default() noexcept
     .driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD,
     .requested_texture_ring_depth = 1,
     .reserved = 0,
-    .operation_source = MLN_HANDLE_NULL,
-    .frame_source = MLN_HANDLE_NULL,
-    .driver_work_source = MLN_HANDLE_NULL,
+    .frame_wake = mln_wake{sizeof(mln_wake), nullptr, nullptr, nullptr},
+    .driver_work_wake = mln_wake{sizeof(mln_wake), nullptr, nullptr, nullptr},
   };
 }
 
@@ -119,50 +118,50 @@ auto mln_acquired_frame_release(
   });
 }
 
-auto mln_render_session_resize_start(
+auto mln_render_session_resize(
   mln_render_session session, const mln_render_target_extent* extent,
-  mln_operation* out
+  const mln_completion* out
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&] {
     return mln::core::render_session_resize_start(session, extent, out);
   });
 }
 
-auto mln_render_session_barrier_start(
-  mln_render_session session, mln_operation* out
+auto mln_render_session_barrier(
+  mln_render_session session, const mln_completion* out
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&] {
     return mln::core::render_session_barrier_start(session, out);
   });
 }
 
-auto mln_render_session_reduce_memory_use_start(
-  mln_render_session session, mln_operation* out
+auto mln_render_session_reduce_memory_use(
+  mln_render_session session, const mln_completion* out
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&] {
     return mln::core::render_session_maintenance_start(session, 0, out);
   });
 }
 
-auto mln_render_session_clear_data_start(
-  mln_render_session session, mln_operation* out
+auto mln_render_session_clear_data(
+  mln_render_session session, const mln_completion* out
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&] {
     return mln::core::render_session_maintenance_start(session, 1, out);
   });
 }
 
-auto mln_render_session_dump_debug_logs_start(
-  mln_render_session session, mln_operation* out
+auto mln_render_session_dump_debug_logs(
+  mln_render_session session, const mln_completion* out
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&] {
     return mln::core::render_session_maintenance_start(session, 2, out);
   });
 }
 
-auto mln_render_session_set_feature_state_start(
+auto mln_render_session_set_feature_state(
   mln_render_session session, mln_buffer_view source, mln_buffer_view layer,
-  mln_buffer_view feature, mln_buffer_view state, mln_operation* out
+  mln_buffer_view feature, mln_buffer_view state, const mln_completion* out
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&] {
     return mln::core::render_session_set_feature_state_start(
@@ -171,9 +170,9 @@ auto mln_render_session_set_feature_state_start(
   });
 }
 
-auto mln_render_session_get_feature_state_start(
+auto mln_render_session_get_feature_state(
   mln_render_session session, mln_buffer_view source, mln_buffer_view layer,
-  mln_buffer_view feature, mln_operation* out
+  mln_buffer_view feature, const mln_completion* out
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&] {
     return mln::core::render_session_get_feature_state_start(
@@ -182,19 +181,9 @@ auto mln_render_session_get_feature_state_start(
   });
 }
 
-auto mln_render_session_get_feature_state_take_result(
-  mln_operation operation, mln_buffer* out
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&] {
-    return mln::core::render_session_get_feature_state_take_result(
-      operation, out
-    );
-  });
-}
-
-auto mln_render_session_remove_feature_state_start(
+auto mln_render_session_remove_feature_state(
   mln_render_session session, mln_buffer_view source, mln_buffer_view layer,
-  mln_buffer_view feature, mln_buffer_view key, mln_operation* out
+  mln_buffer_view feature, mln_buffer_view key, const mln_completion* out
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&] {
     return mln::core::render_session_remove_feature_state_start(
@@ -213,8 +202,8 @@ auto mln_render_session_service_driver_work(
   });
 }
 
-auto mln_render_session_detach_start(
-  mln_render_session session, mln_operation* out
+auto mln_render_session_detach(
+  mln_render_session session, const mln_completion* out
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&] {
     return mln::core::render_session_detach_start(session, out);

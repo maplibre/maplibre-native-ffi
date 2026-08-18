@@ -180,7 +180,6 @@ private func makeMap(_ runtime: RuntimeHandle) async throws -> MapHandle {
 /// bits this build does not name included, and a mask the host writes reaches
 /// the struct as it stands.
 @Test func mapAndRuntimeOptionsAlwaysEncodeAnEventMask() throws {
-  #expect(RuntimeEventMask.allRuntimeEvents.contains(.commandFinished))
   try MapOptions(width: 8, height: 8).nativeInput.withNativeOptions { native in
     #expect(native.pointee.event_mask == mln_map_options_default().event_mask)
   }
@@ -194,19 +193,20 @@ private func makeMap(_ runtime: RuntimeHandle) async throws -> MapHandle {
       #expect(native.pointee.event_mask == 0)
     }
 
-  try RuntimeOptions().nativeInput.withNativeOptions(notificationSource: 1) {
+  let wake = mln_wake()
+  try RuntimeOptions().nativeInput.withNativeOptions(eventWake: wake) {
     native in
     #expect(
       native.pointee.event_mask == mln_runtime_options_default().event_mask
     )
-    #expect(native.pointee.notification_source == 1)
+    #expect(native.pointee.event_wake.callback == nil)
   }
   try RuntimeOptions(eventMask: .allRuntimeEvents).nativeInput
-    .withNativeOptions(notificationSource: 1) { native in
+    .withNativeOptions(eventWake: wake) { native in
       #expect(
         native.pointee.event_mask == RuntimeEventMask.allRuntimeEvents.rawValue
       )
-      #expect(native.pointee.notification_source == 1)
+      #expect(native.pointee.event_wake.callback == nil)
     }
 }
 
@@ -221,7 +221,7 @@ private func makeMap(_ runtime: RuntimeHandle) async throws -> MapHandle {
   defer { try? map.closeBlockingForTests() }
   _ = try runtime.drainEvents()
 
-  try map.setStyleJSON(emptyStyleJSON)
+  try await map.setStyleJSON(emptyStyleJSON)
   try await runtime.barrier()
   let batch = try runtime.drainEvents()
 
@@ -239,7 +239,7 @@ private func makeMap(_ runtime: RuntimeHandle) async throws -> MapHandle {
   defer { try? map.closeBlockingForTests() }
   _ = try runtime.drainEvents()
 
-  try? map.setStyleJSON(Data(#"{"version":8,"#.utf8))
+  _ = try? await map.setStyleJSON(Data(#"{"version":8,"#.utf8))
   try await runtime.barrier()
   let failure = try #require(
     try runtime.drainEvents().events.first { $0.type == .mapLoadingFailed }
@@ -247,7 +247,7 @@ private func makeMap(_ runtime: RuntimeHandle) async throws -> MapHandle {
   #expect(!failure.message.isEmpty)
   let copied = failure
 
-  try map.setStyleJSON(emptyStyleJSON)
+  try await map.setStyleJSON(emptyStyleJSON)
   try await runtime.barrier()
   let second = try runtime.drainEvents()
 
@@ -270,8 +270,8 @@ private func makeMap(_ runtime: RuntimeHandle) async throws -> MapHandle {
   #expect(try map.eventMask == .all)
 
   _ = try runtime.drainEvents()
-  try map.setStyleJSON(emptyStyleJSON)
-  _ = try map.updateCamera(CameraUpdate(camera: CameraOptions(zoom: 4)))
+  try await map.setStyleJSON(emptyStyleJSON)
+  _ = try await map.updateCamera(CameraUpdate(camera: CameraOptions(zoom: 4)))
   try await runtime.barrier()
   let types = try Set(runtime.drainEvents().events.map(\.type))
 
@@ -280,13 +280,17 @@ private func makeMap(_ runtime: RuntimeHandle) async throws -> MapHandle {
   #expect(types.contains(.mapRenderUpdateAvailable))
 
   let unnamed = RuntimeEventMask(rawValue: 1 << 63)
-  for setMask in [runtime.setEventMask, map.setEventMask] {
-    do {
-      try setMask(unnamed)
-      Issue.record("a mask bit outside all should be rejected")
-    } catch let error as MaplibreError {
-      #expect(error.kind == .invalidArgument)
-    }
+  do {
+    try runtime.setEventMask(unnamed)
+    Issue.record("a runtime mask bit outside all should be rejected")
+  } catch let error as MaplibreError {
+    #expect(error.kind == .invalidArgument)
+  }
+  do {
+    _ = try await map.setEventMask(unnamed)
+    Issue.record("a map mask bit outside all should be rejected")
+  } catch let error as MaplibreError {
+    #expect(error.kind == .invalidArgument)
   }
   do {
     _ = try await MapHandle(runtime: runtime,
@@ -309,9 +313,10 @@ private func makeMap(_ runtime: RuntimeHandle) async throws -> MapHandle {
   defer { try? map.closeBlockingForTests() }
   _ = try runtime.drainEvents()
 
-  _ = try map.setStyleJSON(emptyStyleJSON)
+  _ = try await map.setStyleJSON(emptyStyleJSON)
   try await runtime.barrier()
-  _ = try map.setEventMask(RuntimeEventMask.all.subtracting(.mapStyleLoaded))
+  _ = try await map
+    .setEventMask(RuntimeEventMask.all.subtracting(.mapStyleLoaded))
   try await runtime.barrier()
   #expect(try runtime.drainEvents().events.map(\.type)
     .contains(.mapStyleLoaded))
@@ -325,14 +330,14 @@ private func makeMap(_ runtime: RuntimeHandle) async throws -> MapHandle {
   defer { try? map.closeBlockingForTests() }
 
   try runtime.setEventMask(.all)
-  _ = try map.setEventMask(.all)
+  _ = try await map.setEventMask(.all)
   try await runtime.barrier()
   #expect(try runtime.eventMask == .all)
   #expect(try map.eventMask == .all)
 
   var mapMask = try map.eventMask
   mapMask.remove(.mapRenderUpdateAvailable)
-  _ = try map.setEventMask(mapMask)
+  _ = try await map.setEventMask(mapMask)
   try await runtime.barrier()
   let readBackMapMask = try map.eventMask
   #expect(readBackMapMask == mapMask)
@@ -356,8 +361,8 @@ private func makeMap(_ runtime: RuntimeHandle) async throws -> MapHandle {
 
   await Task.yield()
   try runtime.setEventMask(.all)
-  try map.setEventMask(.all)
-  _ = try map.updateCamera(CameraUpdate(camera: CameraOptions(zoom: 3)))
+  try await map.setEventMask(.all)
+  _ = try await map.updateCamera(CameraUpdate(camera: CameraOptions(zoom: 3)))
   let camera = try await map.queryCamera()
   #expect(camera.camera.zoom == 3)
 }

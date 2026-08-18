@@ -42,52 +42,44 @@ static void runtime_rejects_stale_handles(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_runtime_release(runtime)
   );
-  mln_operation operation = MLN_HANDLE_NULL;
+  mln_completion completion = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_barrier_start(runtime, &operation)
+    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_barrier(runtime, &completion)
   );
 }
 
 static void runtime_barrier_rejects_null_runtime(void) {
-  mln_operation operation = MLN_HANDLE_NULL;
+  mln_completion completion = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_runtime_barrier_start(MLN_HANDLE_NULL, &operation)
+    mln_runtime_barrier(MLN_HANDLE_NULL, &completion)
   );
 }
 
 static void map_create_rejects_invalid_arguments(void) {
   const mln_map_options options = mln_map_options_default();
-  mln_operation operation = MLN_HANDLE_NULL;
+  mln_completion completion = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_create_start(MLN_HANDLE_NULL, &options, &operation)
+    mln_map_create(MLN_HANDLE_NULL, &options, &completion)
   );
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, operation);
 
   mln_runtime runtime = mln_test_create_runtime();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_create_start(runtime, &options, NULL)
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_create(runtime, &options, NULL)
   );
-  operation = 1;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_create_start(runtime, &options, &operation)
-  );
-
-  operation = MLN_HANDLE_NULL;
   mln_map_options small_options = mln_map_options_default();
   small_options.size = sizeof(mln_map_options) - 1;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_create_start(runtime, &small_options, &operation)
+    mln_map_create(runtime, &small_options, &completion)
   );
 
   mln_map_options invalid_options = mln_map_options_default();
   invalid_options.map_mode = (mln_map_mode)999;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_create_start(runtime, &invalid_options, &operation)
+    mln_map_create(runtime, &invalid_options, &completion)
   );
   mln_test_destroy_runtime(runtime);
 }
@@ -104,10 +96,9 @@ static void map_lifecycle_rejects_invalid_state_and_stale_handles(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_test_map_request_repaint(map)
   );
-  mln_operation operation = MLN_HANDLE_NULL;
+  mln_completion completion = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_request_still_image_start(map, &operation)
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_request_still_image(map, &completion)
   );
   mln_camera_options camera = mln_camera_options_default();
   TEST_ASSERT_EQUAL_INT(

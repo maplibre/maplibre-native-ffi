@@ -21,7 +21,7 @@ void run_render_target_lifecycle_abi_tests(void);
 void run_render_thread_abi_tests(void);
 void run_query_abi_tests(void);
 void run_mlt_decode_abi_tests(void);
-void run_notification_operation_abi_tests(void);
+void run_completion_abi_tests(void);
 void run_projection_abi_tests(void);
 void run_resources_abi_tests(void);
 void run_runtime_events_abi_tests(void);

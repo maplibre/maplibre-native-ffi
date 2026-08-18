@@ -24,6 +24,17 @@ final _maskWithoutStyleLoaded = RuntimeEventMask(
 
 Uint8List _jsonBytes(String value) => Uint8List.fromList(utf8.encode(value));
 
+Future<CommandCompletion> _expectCommandFailure(
+  Future<CommandCompletion> future,
+  MaplibreStatus status,
+) async {
+  final completion = await future;
+  expect(completion.disposition, CommandDisposition.failed);
+  expect(completion.status, status);
+  expect(completion.diagnostic, isNotEmpty);
+  return completion;
+}
+
 /// Dispatches one record through the registered adapter log callback, the way
 /// MapLibre's logging threads do, and reports the consume value native code
 /// sees.
@@ -167,8 +178,8 @@ void main() {
         options: MapOptions(eventMask: _maskWithoutStyleLoaded),
       );
       addTearDown(map.close);
-      map.setStyleJson(_jsonBytes(_emptyStyleJson));
-      map.addCustomGeometrySource(
+      await map.setStyleJson(_jsonBytes(_emptyStyleJson));
+      await map.addCustomGeometrySource(
         sourceId,
         CustomGeometrySourceOptions(fetchTile: (_) {}),
       );
@@ -178,7 +189,7 @@ void main() {
       // nothing of its own.
       expect(map.eventMask, _maskWithoutStyleLoaded);
 
-      map.setStyleJson(_jsonBytes(_emptyStyleJson));
+      await map.setStyleJson(_jsonBytes(_emptyStyleJson));
       final types = <RuntimeEventType>{};
       await _waitUntil(() {
         types.addAll(
@@ -875,9 +886,9 @@ void main() {
     const sourceId = 'dart-lifecycle-source';
     final runtime = RuntimeHandle.create();
     final map = await runtime.createMap();
-    map.setStyleJson(_jsonBytes(_emptyStyleJson));
+    await map.setStyleJson(_jsonBytes(_emptyStyleJson));
 
-    map.addCustomGeometrySource(
+    await map.addCustomGeometrySource(
       sourceId,
       CustomGeometrySourceOptions(fetchTile: (_) {}),
     );
@@ -892,7 +903,7 @@ void main() {
     await _waitUntil(() => removedProbe.retirementQueued);
     expect(customGeometryCallbackProbeForTesting(map, sourceId), isNull);
 
-    map.addCustomGeometrySource(
+    await map.addCustomGeometrySource(
       sourceId,
       CustomGeometrySourceOptions(fetchTile: (_) {}),
     );
@@ -973,7 +984,7 @@ void main() {
     final runtime = RuntimeHandle.create();
     final map = await runtime.createMap();
     try {
-      map.setStyleJson(
+      await map.setStyleJson(
         _jsonBytes(
           '{"version":8,"sources":{"geo":{"type":"geojson","data":'
           '{"type":"FeatureCollection","features":[]}}},"layers":['
@@ -983,13 +994,16 @@ void main() {
       );
 
       expect(await map.getLayerSourceLayer('fill'), '');
-      map.setLayerSourceLayer('fill', 'roads');
+      await map.setLayerSourceLayer('fill', 'roads');
       expect(await map.getLayerSourceLayer('fill'), 'roads');
       expect(await map.getLayerSourceId('fill'), 'geo');
 
-      // A layer type that takes no source ignores a rejected source-layer
-      // command and preserves its previous value.
-      map.setLayerSourceLayer('bg', 'roads');
+      // A layer type that takes no source rejects a source-layer command and
+      // preserves its previous value.
+      await _expectCommandFailure(
+        map.setLayerSourceLayer('bg', 'roads'),
+        MaplibreStatus.invalidArgument,
+      );
       expect(await map.getLayerSourceId('bg'), '');
 
       // An unset zoom range crosses the boundary as infinities, and the
@@ -1082,9 +1096,11 @@ void main() {
         final rejectedCommand = map.setStyleTransitionOptions(
           const StyleTransitionOptions(delayMs: -1),
         );
-        expect(rejectedCommand, greaterThan(BigInt.zero));
-        // The semantic rejection is terminal command disposition, so the next
-        // ordered read observes the last committed options unchanged.
+        await _expectCommandFailure(
+          rejectedCommand,
+          MaplibreStatus.invalidArgument,
+        );
+        // The next ordered read observes the last committed options unchanged.
         expect(await map.getStyleTransitionOptions(), declared);
       } finally {
         await map.close();
@@ -1102,25 +1118,7 @@ void main() {
       () => cacheSizeRuntime.setMaximumAmbientCacheSize(BigInt.from(-1)),
       throwsA(isA<InvalidArgumentException>()),
     );
-    final cacheSizeOperation = cacheSizeRuntime.setMaximumAmbientCacheSize(
-      BigInt.zero,
-    );
-    expect(cacheSizeOperation.isReleased, isFalse);
-    await _waitUntil(() {
-      return cacheSizeOperation.poll();
-    });
-    expect(cacheSizeOperation.terminalStatus, MaplibreStatus.ok);
-    expect(cacheSizeOperation.wait(timeout: Duration.zero), isTrue);
-    expect(
-      cacheSizeOperation.wait(timeout: const Duration(milliseconds: -1)),
-      isTrue,
-    );
-    expect(cacheSizeOperation.wait(), isTrue);
-    expect(cacheSizeOperation.diagnostic, isEmpty);
-    cacheSizeOperation.finish();
-    expect(cacheSizeOperation.isReleased, isTrue);
-    cacheSizeOperation.release();
-    expect(cacheSizeOperation.isReleased, isTrue);
+    await cacheSizeRuntime.setMaximumAmbientCacheSize(BigInt.zero);
     await cacheSizeRuntime.close();
 
     final runtime = RuntimeHandle.create();
@@ -1254,36 +1252,9 @@ void main() {
         },
       ),
     );
-    final offlineOperation = runtime.runAmbientCacheOperation(
-      AmbientCacheOperation.clear,
-    );
-    expect(offlineOperation.isReleased, isFalse);
-    await _waitUntil(offlineOperation.poll);
-    expect(offlineOperation.terminalStatus, MaplibreStatus.ok);
-    expect(offlineOperation.wait(timeout: Duration.zero), isTrue);
-    expect(offlineOperation.wait(timeout: const Duration(seconds: 1)), isTrue);
-    expect(offlineOperation.diagnostic, isEmpty);
-    offlineOperation.finish();
-    expect(offlineOperation.isReleased, isTrue);
-    offlineOperation.release();
-    expect(offlineOperation.isReleased, isTrue);
-    final offlineListOperation = runtime.listOfflineRegions();
-    expect(offlineListOperation.isReleased, isFalse);
-    expect(
-      () => offlineListOperation.takeRegionStatus(),
-      throwsA(isA<InvalidStateException>()),
-    );
-    await _waitUntil(() {
-      return offlineListOperation.poll();
-    });
-    expect(offlineListOperation.takeRegionList(), isEmpty);
-    expect(offlineListOperation.isReleased, isTrue);
-    expect(
-      () => offlineListOperation.takeRegionList(),
-      throwsA(isA<InvalidStateException>()),
-    );
-    offlineListOperation.release();
-    final offlineCreateOperation = runtime.createOfflineRegion(
+    await runtime.runAmbientCacheOperation(AmbientCacheOperation.clear);
+    expect(await runtime.listOfflineRegions(), isEmpty);
+    final offlineRegion = await runtime.createOfflineRegion(
       const OfflineTilePyramidRegionDefinition(
         styleUrl: 'https://example.com/style.json',
         bounds: LatLngBounds(
@@ -1296,9 +1267,7 @@ void main() {
       ),
       metadata: Uint8List.fromList([1, 2, 3]),
     );
-    expect(offlineCreateOperation.isReleased, isFalse);
-    offlineCreateOperation.release();
-    expect(offlineCreateOperation.isReleased, isTrue);
+    expect(offlineRegion.metadata, [1, 2, 3]);
 
     final map = await runtime.createMap(
       options: const MapOptions(mapMode: MapMode.staticMap),
@@ -1316,8 +1285,11 @@ void main() {
       ),
     );
     runtime.clearResourceProvider();
-    map.setStyleJson(_jsonBytes(_emptyStyleJson));
-    map.requestRepaint();
+    await map.setStyleJson(_jsonBytes(_emptyStyleJson));
+    await _expectCommandFailure(
+      map.requestRepaint(),
+      MaplibreStatus.invalidState,
+    );
     var throwingLogCalls = 0;
     Maplibre.setLogCallback((_) {
       throwingLogCalls += 1;
@@ -1337,7 +1309,10 @@ void main() {
     // A committed command reports the published snapshot generation, and a
     // snapshot at or past that generation observes the commit.
     final debugCommand = map.setDebugOptions(MapDebugOptions.tileBorders);
-    final debugFinished = await _waitForCommandFinished(runtime, debugCommand);
+    final debugFinished = await _waitForCommandCompletion(
+      runtime,
+      debugCommand,
+    );
     expect(debugFinished.disposition, CommandDisposition.committed);
     expect(debugFinished.generation, greaterThan(BigInt.zero));
     final debugSnapshot = map.snapshot();
@@ -1380,16 +1355,8 @@ void main() {
       CommandDisposition.committed,
     );
     expect(await map.getStyleImageInfo('dart-image'), isNull);
-    final missingImageEvent = await _waitForCommandFinishedEvent(
-      runtime,
+    await _expectCommandFailure(
       map.removeStyleImage('dart-image'),
-    );
-    expect(
-      (missingImageEvent.payload as RuntimeEventCommandFinished).disposition,
-      CommandDisposition.failed,
-    );
-    expect(
-      MaplibreStatus.fromNativeStatusCode(missingImageEvent.code),
       MaplibreStatus.notFound,
     );
 
@@ -1397,7 +1364,7 @@ void main() {
       const CameraOptions(center: LatLng(0, 0), zoom: 1),
     );
     final camera = await map.queryCamera();
-    expect(jumpCommand, greaterThan(BigInt.zero));
+    expect((await jumpCommand).disposition, CommandDisposition.committed);
     expect(camera.camera.center, const LatLng(0, 0));
     expect(camera.camera.zoom, closeTo(1, 0.0001));
     runtime.drainEvents();
@@ -1427,7 +1394,7 @@ void main() {
       contains(CameraChangeMode.immediate),
     );
     // Each new snapshot field round-trips through its set command.
-    final statsFinished = await _waitForCommandFinished(
+    final statsFinished = await _waitForCommandCompletion(
       runtime,
       map.setRenderingStatsViewEnabled(true),
     );
@@ -1438,7 +1405,7 @@ void main() {
       greaterThanOrEqualTo(statsFinished.generation),
     );
     map.setRenderingStatsViewEnabled(false);
-    await _waitForCommandFinished(
+    await _waitForCommandCompletion(
       runtime,
       map.setViewportOptions(
         const MapViewportOptions(viewportMode: ViewportMode.flippedY),
@@ -1448,7 +1415,7 @@ void main() {
     map.setViewportOptions(
       const MapViewportOptions(viewportMode: ViewportMode.defaultMode),
     );
-    await _waitForCommandFinished(
+    await _waitForCommandCompletion(
       runtime,
       map.setTileOptions(const MapTileOptions(prefetchZoomDelta: 0)),
     );
@@ -1457,7 +1424,7 @@ void main() {
       southwest: LatLng(-10, -20),
       northeast: LatLng(10, 20),
     );
-    await _waitForCommandFinished(
+    await _waitForCommandCompletion(
       runtime,
       map.setBounds(
         const BoundOptions(
@@ -1471,7 +1438,7 @@ void main() {
       map.snapshot().bounds.bounds,
       const BoundsConstraint.bounded(cameraBounds),
     );
-    await _waitForCommandFinished(
+    await _waitForCommandCompletion(
       runtime,
       map.setBounds(const BoundOptions(bounds: BoundsConstraint.unbounded())),
     );
@@ -1479,7 +1446,7 @@ void main() {
     final projectionMode = map.projectionMode();
     expect(projectionMode.axonometric, isNotNull);
     map.setProjectionMode(const ProjectionModeOptions(axonometric: false));
-    await _waitForCommandFinished(
+    await _waitForCommandCompletion(
       runtime,
       map.setFreeCameraOptions(
         const FreeCameraOptions(orientation: Quaternion(0, 0, 0, 1)),
@@ -1616,28 +1583,12 @@ void main() {
     // missing object fails with not-found.
     expect(await map.getStyleSourceInfo('missing-source'), isNull);
     expect(await map.getStyleLayerInfo('missing-layer'), isNull);
-    final missingSourceEvent = await _waitForCommandFinishedEvent(
-      runtime,
+    await _expectCommandFailure(
       map.removeStyleSource('missing-source'),
-    );
-    expect(
-      (missingSourceEvent.payload as RuntimeEventCommandFinished).disposition,
-      CommandDisposition.failed,
-    );
-    expect(
-      MaplibreStatus.fromNativeStatusCode(missingSourceEvent.code),
       MaplibreStatus.notFound,
     );
-    final missingLayerEvent = await _waitForCommandFinishedEvent(
-      runtime,
+    await _expectCommandFailure(
       map.removeStyleLayer('missing-layer'),
-    );
-    expect(
-      (missingLayerEvent.payload as RuntimeEventCommandFinished).disposition,
-      CommandDisposition.failed,
-    );
-    expect(
-      MaplibreStatus.fromNativeStatusCode(missingLayerEvent.code),
       MaplibreStatus.notFound,
     );
 
@@ -1695,17 +1646,8 @@ void main() {
     );
     // A prepared handle may close as soon as the install command is submitted.
     plainData.close();
-    final mismatchedInstallEvent = await _waitForCommandFinishedEvent(
-      runtime,
+    await _expectCommandFailure(
       mismatchedInstallCommand,
-    );
-    expect(
-      (mismatchedInstallEvent.payload as RuntimeEventCommandFinished)
-          .disposition,
-      CommandDisposition.failed,
-    );
-    expect(
-      MaplibreStatus.fromNativeStatusCode(mismatchedInstallEvent.code),
       MaplibreStatus.invalidArgument,
     );
     await _expectCommandCommitted(
@@ -1722,12 +1664,9 @@ void main() {
         false,
       ),
     );
-    expect(
-      await _waitForCommandDisposition(
-        runtime,
-        map.setGeoJsonSourceSynchronousTiling('missing-source', true),
-      ),
-      CommandDisposition.failed,
+    await _expectCommandFailure(
+      map.setGeoJsonSourceSynchronousTiling('missing-source', true),
+      MaplibreStatus.invalidArgument,
     );
     // One prepared handle installs on any number of sources.
     await _expectCommandCommitted(
@@ -2060,11 +1999,7 @@ void main() {
     );
     await runtime.close();
     expect(runtime.isClosed, isTrue);
-    expect(
-      operationAfterClose.wait(timeout: const Duration(seconds: 10)),
-      isTrue,
-    );
-    operationAfterClose.finish();
+    await operationAfterClose;
   });
 
   test('native pointer preserves address value semantics', () async {
@@ -2256,9 +2191,9 @@ void main() {
       await Isolate.run(() {});
 
       final before = map.snapshot();
-      final commandId = map.requestRepaint();
+      final completion = map.requestRepaint();
       final camera = await map.queryCamera();
-      expect(commandId, greaterThan(BigInt.zero));
+      expect((await completion).disposition, CommandDisposition.committed);
       expect(camera.generation, greaterThanOrEqualTo(before.generation));
 
       await map.close();
@@ -2340,38 +2275,21 @@ Future<void> _waitUntilCondition(
   }, timeout: timeout);
 }
 
-Future<RuntimeEvent> _waitForCommandFinishedEvent(
+Future<CommandCompletion> _waitForCommandCompletion(
   RuntimeHandle runtime,
-  BigInt commandId,
-) {
-  return _waitUntilEvent(runtime, (candidate) {
-    final payload = candidate.payload;
-    return payload is RuntimeEventCommandFinished &&
-        payload.commandId == commandId;
-  });
-}
-
-Future<RuntimeEventCommandFinished> _waitForCommandFinished(
-  RuntimeHandle runtime,
-  BigInt commandId,
-) async {
-  final event = await _waitForCommandFinishedEvent(runtime, commandId);
-  return event.payload as RuntimeEventCommandFinished;
-}
+  Future<CommandCompletion> completion,
+) => completion;
 
 Future<CommandDisposition> _waitForCommandDisposition(
   RuntimeHandle runtime,
-  BigInt commandId,
-) async => (await _waitForCommandFinished(runtime, commandId)).disposition;
+  Future<CommandCompletion> completion,
+) async => (await completion).disposition;
 
 Future<void> _expectCommandCommitted(
   RuntimeHandle runtime,
-  BigInt commandId,
+  Future<CommandCompletion> completion,
 ) async {
-  expect(
-    await _waitForCommandDisposition(runtime, commandId),
-    CommandDisposition.committed,
-  );
+  expect((await completion).disposition, CommandDisposition.committed);
 }
 
 Future<RuntimeEvent> _waitUntilEvent(

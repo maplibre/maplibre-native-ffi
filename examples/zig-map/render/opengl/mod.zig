@@ -651,7 +651,7 @@ const OpenGLBorrowedTextureBackend = struct {
             viewport,
         );
         errdefer replacement.deinit(&self.compositor.context, self.compositor.procs);
-        var operation = session.setOpenGLBorrowedTextureTargetStart(.{
+        var completion = session.setOpenGLBorrowedTextureTarget(.{
             .extent = render_target.extent(viewport),
             .physical_width = viewport.physical_width,
             .physical_height = viewport.physical_height,
@@ -662,8 +662,8 @@ const OpenGLBorrowedTextureBackend = struct {
             diagnostics.logError("OpenGL borrowed texture set target failed", err, null);
             return types.AppError.TextureResizeFailed;
         };
-        defer operation.release();
-        render_target.serviceUntilComplete(session, operation) catch |err| {
+        defer completion.deinit();
+        render_target.serviceUntilComplete(session, &completion) catch |err| {
             diagnostics.logError("OpenGL borrowed texture replacement failed", err, null);
             return types.AppError.TextureResizeFailed;
         };
@@ -754,7 +754,7 @@ const OpenGLSurfaceBackend = struct {
             return;
         }
         const handle = try self.session.surfaceHandle();
-        var operation = handle.setOpenGLSurfaceTargetStart(.{
+        var completion = handle.setOpenGLSurfaceTarget(.{
             .extent = render_target.extent(viewport),
             .context = self.context.descriptor(),
             .surface = self.context.surface(),
@@ -762,8 +762,8 @@ const OpenGLSurfaceBackend = struct {
             diagnostics.logError("OpenGL surface set target failed", err, null);
             return types.AppError.SurfaceAttachFailed;
         };
-        defer operation.release();
-        render_target.serviceUntilComplete(handle, operation) catch |err| {
+        defer completion.deinit();
+        render_target.serviceUntilComplete(handle, &completion) catch |err| {
             diagnostics.logError("OpenGL surface replacement failed", err, null);
             return types.AppError.SurfaceAttachFailed;
         };
@@ -773,9 +773,9 @@ const OpenGLSurfaceBackend = struct {
     /// failure.
     fn detachSuppressed(self: *OpenGLSurfaceBackend) void {
         const handle = self.session.surfaceHandle() catch return;
-        var operation = handle.detachStart() catch return;
-        defer operation.release();
-        render_target.serviceUntilComplete(handle, operation) catch {};
+        var completion = handle.detach() catch return;
+        defer completion.deinit();
+        render_target.serviceUntilComplete(handle, &completion) catch {};
     }
 
     fn finishFrame(self: *OpenGLSurfaceBackend) !void {

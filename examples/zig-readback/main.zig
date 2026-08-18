@@ -17,14 +17,13 @@ const sdl = if (build_options.supports_opengl and builtin.os.tag == .windows) @i
 const width = 512;
 const height = 512;
 const style_url = "https://tiles.openfreemap.org/styles/bright";
-fn waitForOperation(operation: maplibre.OperationHandle) !void {
-    if (!try operation.wait(-1)) return error.OperationWaitTimedOut;
-    if (try operation.resultStatus() != 0) return error.NativeOperationFailed;
+fn waitForFuture(future: *maplibre.Future(void), diagnostic_store: ?*maplibre.DiagnosticStore) !void {
+    try future.wait(diagnostic_store);
 }
-fn waitForSessionOperation(session: *maplibre.RenderSessionHandle, operation: maplibre.OperationHandle) !void {
-    if (!uses_caller_driver) return waitForOperation(operation);
-    while (!try operation.poll()) _ = try session.serviceDriverWork(0);
-    if (try operation.resultStatus() != 0) return error.NativeOperationFailed;
+fn waitForSessionFuture(session: *maplibre.RenderSessionHandle, future: *maplibre.Future(void), diagnostic_store: ?*maplibre.DiagnosticStore) !void {
+    if (!uses_caller_driver) return waitForFuture(future, diagnostic_store);
+    while (!try future.poll()) _ = try session.serviceDriverWork(0);
+    try future.wait(diagnostic_store);
 }
 
 pub fn main(init_args: std.process.Init) !void {
@@ -44,22 +43,27 @@ pub fn main(init_args: std.process.Init) !void {
     var runtime = try maplibre.RuntimeHandle.create(allocator, .{ .cache_path = ":memory:" }, &diagnostic_store);
     defer runtime.close() catch {};
 
-    var map = try maplibre.MapHandle.create(&runtime, .{ .mode = .static });
+    var map_future = try maplibre.MapHandle.create(&runtime, .{ .mode = .static });
+    defer map_future.deinit();
+    var map = try map_future.wait(&diagnostic_store);
     defer map.close() catch {};
-    _ = try map.setEventMask(.{
+    var event_mask = try map.setEventMask(.{
         .map_render_update_available = true,
         .map_still_image_finished = true,
         .map_still_image_failed = true,
         .map_loading_failed = true,
         .map_render_error = true,
     });
-    _ = try map.resize(width, height, 1.0);
+    event_mask.deinit();
+    var resize = try map.resize(width, height, 1.0);
+    resize.deinit();
     try setInitialCamera(&map);
-    _ = try map.setStyleUrl(allocator, style_url);
+    var style = try map.setStyleUrl(allocator, style_url);
+    style.deinit();
 
-    const barrier = try runtime.barrierStart();
-    defer barrier.release();
-    try waitForOperation(barrier);
+    var barrier = try runtime.barrier();
+    defer barrier.deinit();
+    try waitForFuture(&barrier, &diagnostic_store);
 
     var context = try OwnedTextureContext.init();
     defer context.deinit();
@@ -89,15 +93,15 @@ fn renderWithDriver(
         _ = attachment.session.abandon() catch {};
         attachment.session.destroy() catch {};
     };
-    defer attachment.operation.release();
-    try waitForSessionOperation(&attachment.session, attachment.operation);
+    defer attachment.completion.deinit();
+    try waitForSessionFuture(&attachment.session, &attachment.completion, null);
 
     var session = attachment.session;
     defer {
-        const detach = session.detachStart() catch null;
-        if (detach) |operation| {
-            defer operation.release();
-            waitForSessionOperation(&session, operation) catch {
+        var detach = session.detach() catch null;
+        if (detach) |*completion| {
+            defer completion.deinit();
+            waitForSessionFuture(&session, completion, null) catch {
                 _ = session.abandon() catch {};
             };
         } else {
@@ -107,11 +111,11 @@ fn renderWithDriver(
     }
     attachment_needs_cleanup = false;
 
-    const still_image = try map.requestStillImage();
-    defer still_image.release();
+    var still_image = try map.requestStillImage();
+    defer still_image.deinit();
 
     try session.requestFrame(.{ .token = 1, .if_needed = false });
-    try waitForRenderedFrame(io, &session, still_image, 1);
+    try waitForRenderedFrame(io, &session, &still_image, 1);
 
     const capabilities = try session.capabilities();
     if (capabilities.frame_acquisition) {
@@ -123,10 +127,12 @@ fn renderWithDriver(
         frame_owned = false;
     }
 
-    const readback = try session.readbackStart();
-    defer readback.release();
-    try waitForSessionOperation(&session, readback);
-    var image = try session.takeReadback(allocator, readback);
+    var readback = try session.readback(allocator);
+    defer readback.deinit();
+    if (uses_caller_driver) {
+        while (!try readback.poll()) _ = try session.serviceDriverWork(0);
+    }
+    var image = try readback.wait(null);
     defer image.deinit();
 
     try writePpm(io, allocator, output_path, image.data, image.info);
@@ -136,7 +142,7 @@ fn renderWithDriver(
 fn waitForRenderedFrame(
     io: std.Io,
     session: *maplibre.RenderSessionHandle,
-    still_image: maplibre.OperationHandle,
+    still_image: *maplibre.Future(void),
     token: u64,
 ) !void {
     var rendered = false;
@@ -163,7 +169,7 @@ fn waitForRenderedFrame(
         }
         const still_completed = try still_image.poll();
         if (still_completed) {
-            if (try still_image.resultStatus() != 0) return error.NativeOperationFailed;
+            try still_image.wait(null);
             if (rendered) return;
         }
         if (!demand_pending) {
@@ -559,12 +565,13 @@ fn expectVk(result: if (build_options.supports_vulkan) vk.VkResult else i32) !vo
 }
 
 fn setInitialCamera(map: *maplibre.MapHandle) !void {
-    _ = try map.updateCamera(.{ .camera = .{
+    var completion = try map.updateCamera(.{ .camera = .{
         .center = .{ .latitude = 37.7749, .longitude = -122.4194 },
         .zoom = 13.0,
         .bearing = 12.0,
         .pitch = 30.0,
     } });
+    completion.deinit();
 }
 
 fn writePpm(

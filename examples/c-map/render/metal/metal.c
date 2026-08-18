@@ -453,7 +453,8 @@ app_error render_target_attach(
   render_target* target, mln_map map, viewport current_viewport
 ) {
   mln_render_session session = MLN_HANDLE_NULL;
-  mln_operation operation = MLN_HANDLE_NULL;
+  render_completion completion;
+  render_completion_init(&completion);
   const mln_render_session_attach_options options =
     render_session_attach_options();
   render_session_kind kind = RENDER_SESSION_TEXTURE;
@@ -466,16 +467,16 @@ app_error render_target_attach(
       descriptor.extent = render_target_extent(current_viewport);
       descriptor.context =
         metal_context_descriptor(target->as.owned.compositor.view.device);
-      status = mln_metal_owned_texture_attach_start(
-        map, &descriptor, &options, &session, &operation
+      status = mln_metal_owned_texture_attach(
+        map, &descriptor, &options, &session, &completion.descriptor
       );
       break;
     }
     case RENDER_TARGET_MODE_BORROWED_TEXTURE: {
       const mln_metal_borrowed_texture_descriptor descriptor =
         borrowed_texture_descriptor(target, current_viewport);
-      status = mln_metal_borrowed_texture_attach_start(
-        map, &descriptor, &options, &session, &operation
+      status = mln_metal_borrowed_texture_attach(
+        map, &descriptor, &options, &session, &completion.descriptor
       );
       break;
     }
@@ -488,8 +489,8 @@ app_error render_target_attach(
       descriptor.layer = target->as.surface.view.layer;
       kind = RENDER_SESSION_SURFACE;
       error = APP_ERROR_SURFACE_ATTACH_FAILED;
-      status = mln_metal_surface_attach_start(
-        map, &descriptor, &options, &session, &operation
+      status = mln_metal_surface_attach(
+        map, &descriptor, &options, &session, &completion.descriptor
       );
       break;
     }
@@ -499,8 +500,8 @@ app_error render_target_attach(
     return error;
   }
   target->session = (render_session){.kind = kind, .handle = session};
-  return render_session_complete_operation(
-    &target->session, operation, error, "Metal render target attach failed"
+  return render_session_await_completion(
+    &target->session, &completion, error, "Metal render target attach failed"
   );
 }
 
@@ -542,9 +543,10 @@ static app_error resize_borrowed(
   target->as.borrowed.texture = replacement;
   const mln_metal_borrowed_texture_descriptor descriptor =
     borrowed_texture_descriptor(target, current_viewport);
-  mln_operation operation = MLN_HANDLE_NULL;
-  const mln_status status = mln_metal_borrowed_texture_set_target_start(
-    target->session.handle, &descriptor, &operation
+  render_completion completion;
+  render_completion_init(&completion);
+  const mln_status status = mln_metal_borrowed_texture_set_target(
+    target->session.handle, &descriptor, &completion.descriptor
   );
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status("Metal borrowed texture set target failed", status);
@@ -552,8 +554,8 @@ static app_error resize_borrowed(
     release_object(&replacement);
     return APP_ERROR_TEXTURE_RESIZE_FAILED;
   }
-  const app_error completed = render_session_complete_operation(
-    &target->session, operation, APP_ERROR_TEXTURE_RESIZE_FAILED,
+  const app_error completed = render_session_await_completion(
+    &target->session, &completion, APP_ERROR_TEXTURE_RESIZE_FAILED,
     "Metal borrowed texture set target failed"
   );
   if (completed != APP_OK) {

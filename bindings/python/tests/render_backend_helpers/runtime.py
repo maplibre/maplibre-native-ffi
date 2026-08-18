@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Callable
+from concurrent.futures import Future
 
 import maplibre_native_ffi as mln
 import pytest
@@ -109,7 +110,7 @@ def wait_for_runtime_event(
 
 def finish_attach(
     session: render.RenderSessionHandle,
-    operation: mln.OperationHandle[None],
+    operation: Future[None],
     *,
     iterations: int = 5000,
 ) -> None:
@@ -117,13 +118,13 @@ def finish_attach(
     if session.snapshot.driver == render.RenderDriver.CALLER_GRAPHICS_THREAD:
         for _ in range(iterations):
             session.service_driver_work(16)
-            if operation.poll():
+            if operation.done():
                 break
             time.sleep(0.001)
     else:
-        operation.wait()
-    operation.raise_for_status()
-    operation.close()
+        operation.result(timeout=5)
+        return
+    operation.result(timeout=0)
 
 
 def request_and_finish_frame(
@@ -149,23 +150,19 @@ def request_and_finish_frame(
 
 def finish_render_operation(
     session: render.RenderSessionHandle,
-    operation: mln.OperationHandle[object],
+    operation: Future[object],
     *,
-    take_result: bool = False,
+    return_result: bool = False,
     iterations: int = 5000,
 ) -> object:
     """Complete renderer-affine work through either driver."""
     for _ in range(iterations):
         if session.snapshot.driver == render.RenderDriver.CALLER_GRAPHICS_THREAD:
             session.service_driver_work(16)
-        if operation.poll():
-            try:
-                operation.raise_for_status()
-                return operation.take() if take_result else None
-            finally:
-                operation.close()
+        if operation.done():
+            result = operation.result(timeout=0)
+            return result if return_result else None
         time.sleep(0.001)
-    operation.close()
     raise AssertionError("render operation did not complete")
 
 
@@ -248,7 +245,7 @@ def wait_for_rendered_layer_feature(
             features = finish_render_operation(
                 session,
                 session.query_rendered_features(geometry, options),
-                take_result=True,
+                return_result=True,
             )
         except mln.InvalidStateError:
             features = []
@@ -273,7 +270,7 @@ def wait_for_rendered_cluster(
     """Load the cluster style and return the first rendered cluster feature."""
     map_handle.jump_to(camera.CameraOptions(center=geo.LatLng(0.0, 0.0), zoom=0.0))
     map_handle.set_style_json(CLUSTER_STYLE_JSON.encode())
-    runtime.barrier()
+    runtime.barrier().result(timeout=5)
     return wait_for_rendered_layer_feature(
         runtime,
         map_handle,
@@ -303,7 +300,7 @@ def single_cluster_leaf(
             "leaves",
             json.dumps({"limit": 1, "offset": offset}, separators=(",", ":")).encode(),
         ),
-        take_result=True,
+        return_result=True,
     )
     assert isinstance(leaves, bytes)
     collection = json.loads(leaves)
@@ -336,7 +333,7 @@ def assert_geojson_cluster_source(
         b'"source":"typed-cluster-source","filter":["has","point_count"],'
         b'"paint":{"circle-color":"#2563eb","circle-radius":20}}'
     )
-    runtime.barrier()
+    runtime.barrier().result(timeout=5)
 
     queried = wait_for_rendered_layer_feature(
         runtime, map_handle, session, "typed-cluster-circle"
@@ -369,7 +366,7 @@ def assert_cluster_feature_extensions(
         session.query_feature_extensions(
             "cluster-source", cluster.feature, "supercluster", "children", None
         ),
-        take_result=True,
+        return_result=True,
     )
     assert isinstance(children, bytes)
     assert json.loads(children)["features"]
@@ -379,7 +376,7 @@ def assert_cluster_feature_extensions(
         session.query_feature_extensions(
             "cluster-source", cluster.feature, "supercluster", "expansion-zoom", None
         ),
-        take_result=True,
+        return_result=True,
     )
     assert isinstance(expansion_zoom, bytes)
     assert isinstance(json.loads(expansion_zoom), int)

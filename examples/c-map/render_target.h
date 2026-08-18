@@ -5,6 +5,7 @@
 #define C_MAP_RENDER_TARGET_H
 
 #include <maplibre_native_c.h>
+#include <stdatomic.h>
 
 #include "types.h"
 
@@ -20,11 +21,19 @@ typedef struct render_session {
   uint64_t next_frame_token;
 } render_session;
 
+typedef struct render_completion {
+  atomic_bool completed;
+  mln_status status;
+  mln_completion descriptor;
+} render_completion;
+
+void render_completion_init(render_completion* completion);
+
 void render_session_close(render_session* session);
 
-/// Services a caller-driver operation to completion and releases the operation.
-[[nodiscard]] app_error render_session_complete_operation(
-  render_session* session, mln_operation operation, app_error error,
+/// Services caller-driver work until one accepted completion arrives.
+[[nodiscard]] app_error render_session_await_completion(
+  render_session* session, render_completion* completion, app_error error,
   const char* message
 );
 

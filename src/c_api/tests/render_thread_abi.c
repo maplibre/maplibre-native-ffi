@@ -72,25 +72,6 @@ static bool wait_for_results(
   return false;
 }
 
-static bool source_reports_kind(mln_notification_source source, uint32_t kind) {
-  mln_ready_batch batch = MLN_HANDLE_NULL;
-  if (mln_notification_source_drain_ready(source, &batch) != MLN_STATUS_OK) {
-    return false;
-  }
-  mln_ready_batch_view view = {.size = sizeof(mln_ready_batch_view)};
-  bool found = false;
-  if (mln_ready_batch_get(batch, &view) == MLN_STATUS_OK) {
-    for (size_t index = 0; index < view.endpoint_count; index += 1) {
-      const mln_ready_endpoint* endpoint =
-        (const mln_ready_endpoint*)((const char*)view.endpoints +
-                                    index * view.endpoint_size);
-      found = found || endpoint->kind == kind;
-    }
-  }
-  mln_ready_batch_release(batch);
-  return found;
-}
-
 static mln_render_frame_result batch_result(
   mln_render_frame_batch batch, size_t index
 ) {
@@ -160,10 +141,10 @@ static void demand_coalescing_preserves_boundaries_and_generations(void) {
   atomic_bool release;
   atomic_init(&entered, false);
   atomic_init(&release, false);
-  mln_operation blocker = MLN_HANDLE_NULL;
+  mln_test_completion blocker = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_test_render_session_blocking_operation_create(
-                     fixture.session, &entered, &release, &blocker
+                     fixture.session, &entered, &release, &blocker.descriptor
                    )
   );
   if (fixture.driver == MLN_RENDER_DRIVER_CORE_WORKER) {
@@ -194,9 +175,9 @@ static void demand_coalescing_preserves_boundaries_and_generations(void) {
   );
   atomic_store(&release, true);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, blocker)
+    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, &blocker)
   );
-  mln_operation_release(blocker);
+  mln_test_completion_destroy(&blocker);
 
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
   TEST_ASSERT_TRUE(wait_for_results(&fixture, 3, &batch));
@@ -268,7 +249,7 @@ static mln_acquired_frame render_and_acquire(
   TEST_ASSERT_NOT_EQUAL(MLN_HANDLE_NULL, frame);
   return frame;
 }
-static void frame_readiness_is_level_triggered_until_results_are_drained(void) {
+static void frame_wake_runs_when_the_result_queue_becomes_nonempty(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   prepare_renderable_map(runtime, map);
@@ -279,29 +260,25 @@ static void frame_readiness_is_level_triggered_until_results_are_drained(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_render_session_request_frame(fixture.session, &demand)
   );
-  bool ready = false;
-  for (unsigned int attempt = 0; attempt < 10000 && !ready; attempt += 1) {
+  const unsigned int before = atomic_load(&fixture.frame_wakes);
+  for (unsigned int attempt = 0;
+       attempt < 10000 && atomic_load(&fixture.frame_wakes) == before;
+       attempt += 1) {
     TEST_ASSERT_TRUE(service_fixture(&fixture));
-    ready = source_reports_kind(
-      fixture.source, MLN_NOTIFICATION_ENDPOINT_RENDER_FRAMES
-    );
-    if (!ready) {
+    if (atomic_load(&fixture.frame_wakes) == before) {
       mln_test_sleep_millisecond();
     }
   }
-  TEST_ASSERT_TRUE(ready);
-  TEST_ASSERT_TRUE(
-    source_reports_kind(fixture.source, MLN_NOTIFICATION_ENDPOINT_RENDER_FRAMES)
-  );
+  TEST_ASSERT_GREATER_THAN_UINT32(before, atomic_load(&fixture.frame_wakes));
+  const unsigned int woke = atomic_load(&fixture.frame_wakes);
+  TEST_ASSERT_EQUAL_UINT32(woke, atomic_load(&fixture.frame_wakes));
   mln_render_frame_batch results = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
     mln_render_session_drain_frame_results(fixture.session, &results)
   );
   mln_render_frame_batch_release(results);
-  TEST_ASSERT_FALSE(
-    source_reports_kind(fixture.source, MLN_NOTIFICATION_ENDPOINT_RENDER_FRAMES)
-  );
+  TEST_ASSERT_EQUAL_UINT32(woke, atomic_load(&fixture.frame_wakes));
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -336,12 +313,11 @@ static void texture_ring_leases_apply_backpressure_until_cpu_release(void) {
     MLN_STATUS_OK, mln_render_session_get_snapshot(fixture.session, &snapshot)
   );
   TEST_ASSERT_EQUAL_UINT32(2, snapshot.acquired_frame_count);
-  mln_operation rejected_detach = MLN_HANDLE_NULL;
+  mln_completion rejected_detach = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_STATE,
-    mln_render_session_detach_start(fixture.session, &rejected_detach)
+    mln_render_session_detach(fixture.session, &rejected_detach)
   );
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, rejected_detach);
   TEST_ASSERT_EQUAL_UINT32(1, snapshot.pending_demand_count);
 
   mln_gpu_sync cpu_complete = mln_gpu_sync_default();
@@ -410,31 +386,28 @@ static void texture_readback_is_an_ordered_owned_operation_result(void) {
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   mln_acquired_frame frame = render_and_acquire(&fixture, 260);
 
-  mln_operation readback = MLN_HANDLE_NULL;
+  mln_test_completion readback = mln_test_completion_readback();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_texture_read_premultiplied_rgba8_start(fixture.session, &readback)
+    mln_texture_read_premultiplied_rgba8(fixture.session, &readback.descriptor)
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, readback)
+    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, &readback)
   );
-  mln_buffer pixels = MLN_HANDLE_NULL;
-  mln_texture_image_info info = mln_texture_image_info_default();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_texture_read_premultiplied_rgba8_take_result(readback, &pixels, &info)
+  mln_texture_readback_result result = {0};
+  TEST_ASSERT_TRUE(
+    mln_test_completion_copy_value(&readback, &result, sizeof(result))
   );
-  mln_operation_release(readback);
+  mln_buffer_view bytes = result.data;
+  mln_texture_image_info info = result.info;
   TEST_ASSERT_EQUAL_UINT32(64, info.width);
   TEST_ASSERT_EQUAL_UINT32(64, info.height);
-  mln_buffer_view bytes = {0};
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_buffer_get(pixels, &bytes));
   TEST_ASSERT_GREATER_OR_EQUAL_UINT32(4, (uint32_t)bytes.size);
   TEST_ASSERT_EQUAL_UINT8(255, ((const uint8_t*)bytes.data)[0]);
   TEST_ASSERT_EQUAL_UINT8(0, ((const uint8_t*)bytes.data)[1]);
   TEST_ASSERT_EQUAL_UINT8(0, ((const uint8_t*)bytes.data)[2]);
   TEST_ASSERT_EQUAL_UINT8(255, ((const uint8_t*)bytes.data)[3]);
-  mln_buffer_destroy(pixels);
+  mln_test_completion_destroy(&readback);
 
   mln_gpu_sync sync = mln_gpu_sync_default();
   TEST_ASSERT_EQUAL_INT(
@@ -458,14 +431,15 @@ static void resize_and_barrier_order_frame_and_extent_generations(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_render_session_request_frame(fixture.session, &before)
   );
-  mln_operation barrier = MLN_HANDLE_NULL;
+  mln_test_completion barrier = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_render_session_barrier_start(fixture.session, &barrier)
+    MLN_STATUS_OK,
+    mln_render_session_barrier(fixture.session, &barrier.descriptor)
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, barrier)
+    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, &barrier)
   );
-  mln_operation_release(barrier);
+  mln_test_completion_destroy(&barrier);
   mln_render_frame_batch batch = MLN_HANDLE_NULL;
   TEST_ASSERT_TRUE(wait_for_results(&fixture, 1, &batch));
   const mln_render_frame_result old_frame = batch_result(batch, 0);
@@ -483,15 +457,15 @@ static void resize_and_barrier_order_frame_and_extent_generations(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_render_session_request_frame(fixture.session, &during)
   );
-  mln_operation resize = MLN_HANDLE_NULL;
+  mln_test_completion resize = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_render_session_resize_start(fixture.session, &extent, &resize)
+    mln_render_session_resize(fixture.session, &extent, &resize.descriptor)
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, resize)
+    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, &resize)
   );
-  mln_operation_release(resize);
+  mln_test_completion_destroy(&resize);
   batch = MLN_HANDLE_NULL;
   TEST_ASSERT_TRUE(wait_for_results(&fixture, 1, &batch));
   const mln_render_frame_result resizing_frame = batch_result(batch, 0);
@@ -601,10 +575,10 @@ static void abandon_is_busy_during_a_driver_call_and_changes_nothing(void) {
   atomic_bool release;
   atomic_init(&entered, false);
   atomic_init(&release, false);
-  mln_operation operation = MLN_HANDLE_NULL;
+  mln_test_completion operation = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_test_render_session_blocking_operation_create(
-                     fixture.session, &entered, &release, &operation
+                     fixture.session, &entered, &release, &operation.descriptor
                    )
   );
 
@@ -637,9 +611,10 @@ static void abandon_is_busy_during_a_driver_call_and_changes_nothing(void) {
   }
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_BUSY, abandon_status);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_test_render_fixture_finish_operation(&fixture, operation)
+    MLN_STATUS_OK,
+    mln_test_render_fixture_finish_operation(&fixture, &operation)
   );
-  mln_operation_release(operation);
+  mln_test_completion_destroy(&operation);
   mln_render_session_snapshot snapshot = {
     .size = sizeof(mln_render_session_snapshot)
   };
@@ -653,22 +628,21 @@ static void abandon_is_busy_during_a_driver_call_and_changes_nothing(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static void receiver_loss_abandons_pending_work_and_invalidates_accessors(
-  void
-) {
+static void abandon_completes_pending_work_and_invalidates_accessors(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
 
-  mln_operation pending = MLN_HANDLE_NULL;
+  mln_test_completion pending = mln_test_completion_default(0);
+  bool submitted = false;
   if (fixture.driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK,
-      mln_render_session_reduce_memory_use_start(fixture.session, &pending)
+      mln_render_session_reduce_memory_use(fixture.session, &pending.descriptor)
     );
+    submitted = true;
   }
-  mln_notification_source_release(fixture.source);
   mln_render_abandon_result abandoned = {
     .size = sizeof(mln_render_abandon_result)
   };
@@ -679,19 +653,15 @@ static void receiver_loss_abandons_pending_work_and_invalidates_accessors(
     abandoned.disposition == MLN_RENDER_ABANDON_DISPOSITION_CLEAN ||
     abandoned.disposition == MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED
   );
-  if (pending != MLN_HANDLE_NULL) {
-    bool completed = false;
+  if (submitted) {
+    TEST_ASSERT_TRUE(mln_test_completion_wait(&pending, 10000));
     TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_operation_wait(pending, 10000, &completed)
+      MLN_STATUS_TARGET_LOST, mln_test_completion_status(&pending)
     );
-    TEST_ASSERT_TRUE(completed);
-    mln_status terminal = MLN_STATUS_OK;
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_operation_get_status(pending, &terminal)
-    );
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_TARGET_LOST, terminal);
-    mln_operation_release(pending);
+  } else {
+    pending.descriptor.release_user_data(pending.descriptor.user_data);
   }
+  mln_test_completion_destroy(&pending);
 
   mln_render_session_snapshot snapshot = {
     .size = sizeof(mln_render_session_snapshot)
@@ -753,11 +723,11 @@ void run_render_thread_abi_tests(void) {
   RUN_TEST(demand_coalescing_preserves_boundaries_and_generations);
   RUN_TEST(driver_service_fixes_and_enforces_graphics_thread_identity);
   RUN_TEST(abandon_is_busy_during_a_driver_call_and_changes_nothing);
-  RUN_TEST(frame_readiness_is_level_triggered_until_results_are_drained);
+  RUN_TEST(frame_wake_runs_when_the_result_queue_becomes_nonempty);
   RUN_TEST(texture_ring_leases_apply_backpressure_until_cpu_release);
   RUN_TEST(texture_readback_is_an_ordered_owned_operation_result);
   RUN_TEST(resize_and_barrier_order_frame_and_extent_generations);
-  RUN_TEST(receiver_loss_abandons_pending_work_and_invalidates_accessors);
+  RUN_TEST(abandon_completes_pending_work_and_invalidates_accessors);
   RUN_TEST(acquired_frame_release_after_abandon_is_cpu_only);
 #if defined(MLN_FFI_TEST_BACKEND_OPENGL) && defined(MLN_FFI_TEST_OPENGL_WEBGL)
   RUN_TEST(transferred_offscreen_canvas_runs_on_core_worker);

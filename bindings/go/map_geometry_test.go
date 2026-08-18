@@ -10,7 +10,7 @@ func TestMapCameraGeometryAndCoordinateConversions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
-	m, err := runtime.NewMapWithOptions(NewMapOptions(512, 512, 1))
+	m, err := awaitForTest(runtime.NewMapWithOptions(NewMapOptions(512, 512, 1)))
 	if err != nil {
 		_ = runtime.Close()
 		t.Fatalf("NewMapWithOptions(): %v", err)
@@ -25,39 +25,39 @@ func TestMapCameraGeometryAndCoordinateConversions(t *testing.T) {
 	}()
 
 	geometry := []byte(`{"type":"LineString","coordinates":[[0,0],[1,1]]}`)
-	camera, err := m.CameraForGeometry(geometry, nil)
+	camera, err := awaitForTest(m.CameraForGeometry(geometry, nil))
 	if err != nil {
 		t.Fatalf("CameraForGeometry(): %v", err)
 	}
 	if camera.Center == nil || camera.Zoom == nil {
 		t.Fatalf("CameraForGeometry() = %+v, want center and zoom", camera)
 	}
-	point, err := m.PixelForLatLng(LatLng{Latitude: 0, Longitude: 0})
+	point, err := awaitForTest(m.PixelForLatLng(LatLng{Latitude: 0, Longitude: 0}))
 	if err != nil {
 		t.Fatalf("PixelForLatLng(): %v", err)
 	}
-	coordinate, err := m.LatLngForPixel(point)
+	coordinate, err := awaitForTest(m.LatLngForPixel(point))
 	if err != nil {
 		t.Fatalf("LatLngForPixel(): %v", err)
 	}
 	if coordinate.Latitude < -90 || coordinate.Latitude > 90 || coordinate.Longitude < -180 || coordinate.Longitude > 180 {
 		t.Fatalf("LatLngForPixel(PixelForLatLng()) = %+v, want valid coordinate", coordinate)
 	}
-	points, err := m.PixelsForLatLngs([]LatLng{{Latitude: 0, Longitude: 0}, {Latitude: 1, Longitude: 1}})
+	points, err := awaitForTest(m.PixelsForLatLngs([]LatLng{{Latitude: 0, Longitude: 0}, {Latitude: 1, Longitude: 1}}))
 	if err != nil {
 		t.Fatalf("PixelsForLatLngs(): %v", err)
 	}
 	if len(points) != 2 {
 		t.Fatalf("PixelsForLatLngs() length = %d, want 2", len(points))
 	}
-	coordinates, err := m.LatLngsForPixels(points)
+	coordinates, err := awaitForTest(m.LatLngsForPixels(points))
 	if err != nil {
 		t.Fatalf("LatLngsForPixels(): %v", err)
 	}
 	if len(coordinates) != 2 {
 		t.Fatalf("LatLngsForPixels() length = %d, want 2", len(coordinates))
 	}
-	projection, err := m.NewProjection()
+	projection, err := awaitForTest(m.NewProjection())
 	if err != nil {
 		t.Fatalf("Projection(): %v", err)
 	}

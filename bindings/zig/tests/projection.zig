@@ -22,16 +22,17 @@ fn expectLatLngApprox(expected: maplibre.LatLng, actual: maplibre.LatLng) !void 
 }
 
 fn waitForCameraCommands(map: *maplibre.MapHandle) !void {
-    const operation = try map.cameraQueryStart();
-    defer operation.release();
-    try testing.expect(try operation.wait(-1));
-    _ = try map.cameraQueryTakeResult(operation);
+    var future = try map.cameraQuery();
+    defer future.deinit();
+    _ = try future.wait(null);
 }
 
 test "map projection mode updates snapshot fields through public binding" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try maplibre.MapHandle.create(&runtime, .{});
+    var map_future = try maplibre.MapHandle.create(&runtime, .{});
+    defer map_future.deinit();
+    var map = try map_future.wait(null);
     defer map.close() catch @panic("map close failed");
 
     _ = try map.setProjectionMode(.{ .axonometric = true, .x_skew = 0.25, .y_skew = -0.125 });
@@ -46,16 +47,22 @@ test "map projection mode updates snapshot fields through public binding" {
 test "map converts between lat lngs and screen points" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try maplibre.MapHandle.create(&runtime, .{ .width = viewport_extent, .height = viewport_extent });
+    var map_future = try maplibre.MapHandle.create(&runtime, .{ .width = viewport_extent, .height = viewport_extent });
+    defer map_future.deinit();
+    var map = try map_future.wait(null);
     defer map.close() catch @panic("map close failed");
 
     _ = try map.updateCamera(.{ .camera = .{ .center = center, .zoom = 10.0 } });
     try waitForCameraCommands(&map);
 
-    const point = try map.pixelForLatLng(center);
+    var point_future = try map.pixelForLatLng(center);
+    defer point_future.deinit();
+    const point = try point_future.wait(null);
     try expectCenterPoint(point);
 
-    const coordinate = try map.latLngForPixel(point);
+    var coordinate_future = try map.latLngForPixel(point);
+    defer coordinate_future.deinit();
+    const coordinate = try coordinate_future.wait(null);
     try expectLatLngApprox(center, coordinate);
 
     const coordinates = [_]maplibre.LatLng{
@@ -63,16 +70,33 @@ test "map converts between lat lngs and screen points" {
         .{ .latitude = 0.0, .longitude = 0.0 },
     };
     var points: [coordinates.len]maplibre.ScreenPoint = undefined;
-    try map.pixelsForLatLngs(testing.allocator, coordinates[0..], points[0..]);
+    var points_future = try map.pixelsForLatLngs(testing.allocator, coordinates[0..]);
+    defer points_future.deinit();
+    var owned_points = try points_future.wait(null);
+    defer owned_points.deinit();
+    @memcpy(points[0..], owned_points.items);
     try expectCenterPoint(points[0]);
 
     var roundtrip: [points.len]maplibre.LatLng = undefined;
-    try map.latLngsForPixels(testing.allocator, points[0..], roundtrip[0..]);
+    var coordinates_future = try map.latLngsForPixels(testing.allocator, points[0..]);
+    defer coordinates_future.deinit();
+    var owned_coordinates = try coordinates_future.wait(null);
+    defer owned_coordinates.deinit();
+    @memcpy(roundtrip[0..], owned_coordinates.items);
     try expectLatLngApprox(coordinates[0], roundtrip[0]);
     try expectLatLngApprox(coordinates[1], roundtrip[1]);
 
-    try map.pixelsForLatLngs(testing.allocator, &.{}, &.{});
-    try map.latLngsForPixels(testing.allocator, &.{}, &.{});
+    var empty_points_future = try map.pixelsForLatLngs(testing.allocator, &.{});
+    defer empty_points_future.deinit();
+    var empty_points = try empty_points_future.wait(null);
+    defer empty_points.deinit();
+    try testing.expectEqual(@as(usize, 0), empty_points.items.len);
+
+    var empty_coordinates_future = try map.latLngsForPixels(testing.allocator, &.{});
+    defer empty_coordinates_future.deinit();
+    var empty_coordinates = try empty_coordinates_future.wait(null);
+    defer empty_coordinates.deinit();
+    try testing.expectEqual(@as(usize, 0), empty_coordinates.items.len);
 }
 
 // Creation is ordered after every earlier map command, so a projection created
@@ -80,11 +104,15 @@ test "map converts between lat lngs and screen points" {
 test "standalone projection converts and updates camera" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try maplibre.MapHandle.create(&runtime, .{ .width = viewport_extent, .height = viewport_extent });
+    var map_future = try maplibre.MapHandle.create(&runtime, .{ .width = viewport_extent, .height = viewport_extent });
+    defer map_future.deinit();
+    var map = try map_future.wait(null);
     defer map.close() catch @panic("map close failed");
 
     _ = try map.updateCamera(.{ .camera = .{ .center = center, .zoom = 10.0 } });
-    var projection = try maplibre.MapProjectionHandle.create(&map);
+    var projection_future = try maplibre.MapProjectionHandle.create(&map);
+    defer projection_future.deinit();
+    var projection = try projection_future.wait(null);
     defer projection.close() catch @panic("projection close failed");
 
     const point = try projection.pixelForLatLng(center);
@@ -134,11 +162,15 @@ fn convertOnThread(projection: *maplibre.MapProjectionHandle, out_point: *maplib
 test "standalone projection conversions run from another thread" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try maplibre.MapHandle.create(&runtime, .{ .width = viewport_extent, .height = viewport_extent });
+    var map_future = try maplibre.MapHandle.create(&runtime, .{ .width = viewport_extent, .height = viewport_extent });
+    defer map_future.deinit();
+    var map = try map_future.wait(null);
     defer map.close() catch @panic("map close failed");
 
     _ = try map.updateCamera(.{ .camera = .{ .center = center, .zoom = 10.0 } });
-    var projection = try maplibre.MapProjectionHandle.create(&map);
+    var projection_future = try maplibre.MapProjectionHandle.create(&map);
+    defer projection_future.deinit();
+    var projection = try projection_future.wait(null);
     defer projection.close() catch @panic("projection close failed");
 
     var point = maplibre.ScreenPoint{ .x = 0.0, .y = 0.0 };
@@ -163,14 +195,20 @@ test "projected meters convert to and from lat lng" {
 test "projection public descriptors report invalid native arguments" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try maplibre.MapHandle.create(&runtime, .{});
+    var map_future = try maplibre.MapHandle.create(&runtime, .{});
+    defer map_future.deinit();
+    var map = try map_future.wait(null);
     defer map.close() catch @panic("map close failed");
 
     try testing.expectError(error.InvalidArgument, map.setProjectionMode(.{ .x_skew = std.math.inf(f64) }));
     try testing.expectError(error.InvalidArgument, map.pixelForLatLng(.{ .latitude = 91.0, .longitude = 0.0 }));
     try testing.expectError(error.InvalidArgument, map.latLngForPixel(.{ .x = std.math.inf(f64), .y = 0.0 }));
 
-    var projection = try maplibre.MapProjectionHandle.create(&map);
+    var projection_future = try maplibre.MapProjectionHandle.create(&map);
+
+    defer projection_future.deinit();
+
+    var projection = try projection_future.wait(null);
     defer projection.close() catch @panic("projection close failed");
 
     try testing.expectError(error.InvalidArgument, projection.setCamera(.{ .center = .{ .latitude = std.math.inf(f64), .longitude = 0.0 } }));

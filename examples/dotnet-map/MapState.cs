@@ -43,20 +43,22 @@ internal sealed class MapState : IDisposable
                 )
                 .GetAwaiter()
                 .GetResult();
-            map.SetStyleUrl(StyleUrl);
-            map.UpdateCamera(
-                new CameraUpdate
-                {
-                    Mode = CameraUpdateMode.Jump,
-                    Camera = new CameraOptions
+            map.SetStyleUrlAsync(StyleUrl).GetAwaiter().GetResult();
+            map.UpdateCameraAsync(
+                    new CameraUpdate
                     {
-                        Center = new LatLng(37.7749, -122.4194),
-                        Zoom = 13.0,
-                        Bearing = 12.0,
-                        Pitch = 30.0,
-                    },
-                }
-            );
+                        Mode = CameraUpdateMode.Jump,
+                        Camera = new CameraOptions
+                        {
+                            Center = new LatLng(37.7749, -122.4194),
+                            Zoom = 13.0,
+                            Bearing = 12.0,
+                            Pitch = 30.0,
+                        },
+                    }
+                )
+                .GetAwaiter()
+                .GetResult();
             return new MapState(runtime, map);
         }
         catch
@@ -69,19 +71,19 @@ internal sealed class MapState : IDisposable
 
     public void CancelTransitions()
     {
-        _ = Map.UpdateCamera(new CameraUpdate());
+        _ = Map.UpdateCameraAsync(new CameraUpdate());
     }
 
     public void SetGestureInProgress(bool inProgress)
     {
-        _ = Map.UpdateCamera(
+        _ = Map.UpdateCameraAsync(
             new CameraUpdate { GesturePhase = inProgress ? GesturePhase.Begin : GesturePhase.End }
         );
     }
 
     public void MoveBy(double deltaX, double deltaY, AnimationOptions? animation = null)
     {
-        _ = Map.ApplyCameraDelta(
+        _ = Map.ApplyCameraDeltaAsync(
             new CameraDelta
             {
                 Offset = new ScreenPoint(deltaX, deltaY),
@@ -92,7 +94,7 @@ internal sealed class MapState : IDisposable
 
     public void ScaleBy(double scale, ScreenPoint? anchor, AnimationOptions? animation = null)
     {
-        _ = Map.ApplyCameraDelta(
+        _ = Map.ApplyCameraDeltaAsync(
             new CameraDelta
             {
                 Kind = CameraDeltaKind.Scale,
@@ -105,7 +107,7 @@ internal sealed class MapState : IDisposable
 
     public void AdjustBearing(double delta, AnimationOptions? animation = null)
     {
-        _ = Map.ApplyCameraDelta(
+        _ = Map.ApplyCameraDeltaAsync(
             new CameraDelta
             {
                 Kind = CameraDeltaKind.Bearing,
@@ -117,7 +119,7 @@ internal sealed class MapState : IDisposable
 
     public void AdjustPitch(double delta, AnimationOptions? animation = null)
     {
-        _ = Map.ApplyCameraDelta(
+        _ = Map.ApplyCameraDeltaAsync(
             new CameraDelta
             {
                 Kind = CameraDeltaKind.Pitch,
@@ -173,7 +175,7 @@ internal sealed class MapState : IDisposable
 
     private void Update(CameraOptions camera, AnimationOptions? animation)
     {
-        _ = Map.UpdateCamera(
+        _ = Map.UpdateCameraAsync(
             new CameraUpdate
             {
                 Mode = animation is null ? CameraUpdateMode.Jump : CameraUpdateMode.Ease,

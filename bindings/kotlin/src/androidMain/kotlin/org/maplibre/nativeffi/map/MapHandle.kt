@@ -2,7 +2,7 @@ package org.maplibre.nativeffi.map
 
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
-import org.bytedeco.javacpp.BoolPointer
+import kotlinx.coroutines.Deferred
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.LongPointer
 import org.bytedeco.javacpp.Pointer
@@ -17,19 +17,19 @@ import org.maplibre.nativeffi.camera.CameraSnapshot
 import org.maplibre.nativeffi.camera.CameraUpdate
 import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.camera.FreeCameraOptions
-import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.Quaternion
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.geo.Vec3
+import org.maplibre.nativeffi.internal.async.CompletionBridge
+import org.maplibre.nativeffi.internal.async.mapDeferred
 import org.maplibre.nativeffi.internal.callback.CallbackGate
 import org.maplibre.nativeffi.internal.javacpp.ByteArrayViewScope
 import org.maplibre.nativeffi.internal.javacpp.GeoJsonSourceOptionsScope
 import org.maplibre.nativeffi.internal.javacpp.JavaCppSupport
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
-import org.maplibre.nativeffi.internal.javacpp.ownedBuffer
 import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
@@ -46,9 +46,9 @@ import org.maplibre.nativeffi.render.RenderSessionHandle
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
+import org.maplibre.nativeffi.runtime.CommandCompletion
 import org.maplibre.nativeffi.runtime.RuntimeEventMask
 import org.maplibre.nativeffi.runtime.RuntimeHandle
-import org.maplibre.nativeffi.runtime.startOperation
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceDataHandle
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
@@ -93,173 +93,147 @@ private constructor(
 
   public actual fun runtime(): RuntimeHandle = runtime
 
-  public actual var eventMask: RuntimeEventMask
+  public actual val eventMask: RuntimeEventMask
     get() = cachedEventMask
-    set(value) {
-      NativeAccess.ensureLoaded()
-      command { outCommandId ->
+
+  public actual fun setEventMask(value: RuntimeEventMask): Deferred<CommandCompletion> {
+    NativeAccess.ensureLoaded()
+    return command { completion ->
         Status.check(
-          MaplibreNativeC.mln_map_set_event_mask(
-            requireLiveHandle(),
-            value.nativeValue,
-            outCommandId,
-          )
+          MaplibreNativeC.mln_map_set_event_mask(requireLiveHandle(), value.nativeValue, completion)
         )
       }
-      cachedEventMask =
-        RuntimeEventMask(value.nativeValue and RuntimeEventMask.ALL_MAP_EVENTS.nativeValue)
-    }
+      .mapDeferred {
+        cachedEventMask =
+          RuntimeEventMask(value.nativeValue and RuntimeEventMask.ALL_MAP_EVENTS.nativeValue)
+        it
+      }
+  }
 
-  public actual fun setStyleUrl(url: String): ULong = command { outCommandId ->
+  public actual fun setStyleUrl(url: String): Deferred<CommandCompletion> = command { completion ->
     NativeAccess.ensureLoaded()
     optionalCString(url).use { nativeUrl ->
       Status.check(
-        MaplibreNativeC.mln_map_set_style_url(requireLiveHandle(), nativeUrl, outCommandId)
+        MaplibreNativeC.mln_map_set_style_url(requireLiveHandle(), nativeUrl, completion)
       )
     }
   }
 
-  public actual fun setStyleJson(json: ByteArray): ULong = command { outCommandId ->
+  public actual fun setStyleJson(json: ByteArray): Deferred<CommandCompletion> =
+    command { completion ->
+      NativeAccess.ensureLoaded()
+      ByteArrayViewScope(json).use { nativeJson ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_style_json(requireLiveHandle(), nativeJson.view, completion)
+        )
+      }
+    }
+
+  public actual fun loadedStyleJson(): Deferred<ByteArray> =
+    CompletionBridge.submit(::requiredBuffer) { completion ->
+      MaplibreNativeC.mln_map_loaded_style_json(requireLiveHandle(), completion)
+    }
+
+  public actual fun styleUrl(): Deferred<String> =
+    CompletionBridge.submit({ result -> requiredBuffer(result).decodeToString() }) { completion ->
+      MaplibreNativeC.mln_map_style_url(requireLiveHandle(), completion)
+    }
+
+  public actual fun addStyleSourceJson(
+    sourceId: String,
+    sourceJson: ByteArray,
+  ): Deferred<CommandCompletion> = command { completion ->
     NativeAccess.ensureLoaded()
-    ByteArrayViewScope(json).use { nativeJson ->
-      Status.check(
-        MaplibreNativeC.mln_map_set_style_json(requireLiveHandle(), nativeJson.view, outCommandId)
-      )
+    StringViewScope(sourceId).use { nativeSourceId ->
+      ByteArrayViewScope(sourceJson).use { nativeSourceJson ->
+        Status.check(
+          MaplibreNativeC.mln_map_add_style_source_json(
+            requireLiveHandle(),
+            nativeSourceId.view,
+            nativeSourceJson.view,
+            completion,
+          )
+        )
+      }
     }
   }
 
-  public actual suspend fun loadedStyleJson(): ByteArray =
-    takeStyleBuffer(
-      MaplibreNativeC::mln_map_loaded_style_json_start,
-      MaplibreNativeC::mln_map_loaded_style_json_take_result,
-    )
-
-  public actual suspend fun styleUrl(): String =
-    takeStyleBuffer(
-        MaplibreNativeC::mln_map_style_url_start,
-        MaplibreNativeC::mln_map_style_url_take_result,
-      )
-      .toString(java.nio.charset.StandardCharsets.UTF_8)
-
-  public actual fun addStyleSourceJson(sourceId: String, sourceJson: ByteArray): ULong =
-    command { outCommandId ->
+  public actual fun removeStyleSource(sourceId: String): Deferred<CommandCompletion> =
+    command { completion ->
       NativeAccess.ensureLoaded()
       StringViewScope(sourceId).use { nativeSourceId ->
-        ByteArrayViewScope(sourceJson).use { nativeSourceJson ->
-          Status.check(
-            MaplibreNativeC.mln_map_add_style_source_json(
-              requireLiveHandle(),
-              nativeSourceId.view,
-              nativeSourceJson.view,
-              outCommandId,
-            )
-          )
-        }
-      }
-    }
-
-  public actual fun removeStyleSource(sourceId: String): ULong = command { outCommandId ->
-    NativeAccess.ensureLoaded()
-    StringViewScope(sourceId).use { nativeSourceId ->
-      Status.check(
-        MaplibreNativeC.mln_map_remove_style_source(
-          requireLiveHandle(),
-          nativeSourceId.view,
-          outCommandId,
-        )
-      )
-    }
-  }
-
-  public actual suspend fun styleSourceInfo(sourceId: String): SourceInfo? {
-    NativeAccess.ensureLoaded()
-    StringViewScope(sourceId).use { nativeSourceId ->
-      MaplibreNativeC.mln_style_source_info().use { outInfo ->
-        outInfo.size(outInfo.sizeof())
-        val outFound = booleanArrayOf(false)
         Status.check(
-          ordered(
-            { outOperation ->
-              MaplibreNativeC.mln_map_get_style_source_info_start(
-                requireLiveHandle(),
-                nativeSourceId.view,
-                outOperation,
-              )
-            },
-            { operation ->
-              MaplibreNativeC.mln_map_get_style_source_info_take_result(
-                operation,
-                outInfo,
-                outFound,
-              )
-            },
+          MaplibreNativeC.mln_map_remove_style_source(
+            requireLiveHandle(),
+            nativeSourceId.view,
+            completion,
           )
-        )
-        if (!outFound[0]) return null
-        val attribution =
-          if (outInfo.has_attribution())
-            copyStyleSourceAttribution(runtime, requireLiveHandle(), nativeSourceId, outInfo)
-          else null
-        val fields = outInfo.fields()
-        val url =
-          if (fields and STYLE_SOURCE_INFO_URL != 0)
-            copyStyleSourceUrl(runtime, requireLiveHandle(), nativeSourceId, outInfo.url_size())
-          else null
-        val tileJson =
-          if (fields and STYLE_SOURCE_INFO_TILEJSON != 0)
-            TileJson(
-              copyStyleSourceTileUrls(runtime, requireLiveHandle(), nativeSourceId),
-              outInfo.min_zoom(),
-              outInfo.max_zoom(),
-              TileScheme.fromNative(outInfo.scheme()),
-              if (fields and STYLE_SOURCE_INFO_BOUNDS != 0) latLngBounds(outInfo.bounds()) else null,
-            )
-          else null
-        return SourceInfo(
-          SourceType.fromNative(outInfo.type()),
-          outInfo.is_volatile(),
-          attribution,
-          url,
-          tileJson,
-          if (fields and STYLE_SOURCE_INFO_TILE_SIZE != 0)
-            Math.toIntExact(Integer.toUnsignedLong(outInfo.tile_size()))
-          else null,
-          if (fields and STYLE_SOURCE_INFO_VECTOR_ENCODING != 0)
-            VectorTileEncoding.fromNative(outInfo.vector_encoding())
-          else null,
-          if (fields and STYLE_SOURCE_INFO_RASTER_ENCODING != 0)
-            RasterDemEncoding.fromNative(outInfo.raster_encoding())
-          else null,
         )
       }
     }
-  }
 
-  public actual suspend fun styleSourceIds(): List<String> {
+  public actual fun styleSourceInfo(sourceId: String): Deferred<SourceInfo?> {
     NativeAccess.ensureLoaded()
-    LongPointer(1).use { outList ->
-      outList.put(0, 0L)
-      Status.check(
-        ordered(
-          { outOperation ->
-            MaplibreNativeC.mln_map_list_style_source_ids_start(requireLiveHandle(), outOperation)
-          },
-          { operation ->
-            MaplibreNativeC.mln_map_list_style_source_ids_take_result(operation, outList)
-          },
-        )
+    return StringViewScope(sourceId).use { nativeSourceId ->
+      CompletionBridge.submit(
+        { result ->
+          if (result.value_count() == 0L) null
+          else {
+            val raw = MaplibreNativeC.mln_style_source_result(result.value())
+            val info = raw.info()
+            val fields = info.fields()
+            val tileUrls =
+              List(Math.toIntExact(raw.tile_url_count())) { index ->
+                stringView(raw.tile_urls().position(index.toLong()))
+              }
+            SourceInfo(
+              SourceType.fromNative(info.type()),
+              info.is_volatile(),
+              if (info.has_attribution()) stringView(raw.attribution()) else null,
+              if (fields and STYLE_SOURCE_INFO_URL != 0) stringView(raw.url()) else null,
+              if (fields and STYLE_SOURCE_INFO_TILEJSON != 0)
+                TileJson(
+                  tileUrls,
+                  info.min_zoom(),
+                  info.max_zoom(),
+                  TileScheme.fromNative(info.scheme()),
+                  if (fields and STYLE_SOURCE_INFO_BOUNDS != 0) latLngBounds(info.bounds())
+                  else null,
+                )
+              else null,
+              if (fields and STYLE_SOURCE_INFO_TILE_SIZE != 0)
+                Math.toIntExact(Integer.toUnsignedLong(info.tile_size()))
+              else null,
+              if (fields and STYLE_SOURCE_INFO_VECTOR_ENCODING != 0)
+                VectorTileEncoding.fromNative(info.vector_encoding())
+              else null,
+              if (fields and STYLE_SOURCE_INFO_RASTER_ENCODING != 0)
+                RasterDemEncoding.fromNative(info.raster_encoding())
+              else null,
+            )
+          }
+        },
+        { completion ->
+          MaplibreNativeC.mln_map_get_style_source_info(
+            requireLiveHandle(),
+            nativeSourceId.view,
+            completion,
+          )
+        },
       )
-      val list = outList.get()
-      require(list != 0L) { "mln_map_list_style_source_ids returned the null handle" }
-      return styleIdList(list)
     }
   }
+
+  public actual fun styleSourceIds(): Deferred<List<String>> =
+    CompletionBridge.submit(::stringList) { completion ->
+      MaplibreNativeC.mln_map_list_style_source_ids(requireLiveHandle(), completion)
+    }
 
   public actual fun addGeoJsonSourceUrl(
     sourceId: String,
     url: String,
     options: GeoJsonSourceOptions?,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     NativeAccess.ensureLoaded()
     StringViewScope(sourceId).use { nativeSourceId ->
       StringViewScope(url).use { nativeUrl ->
@@ -270,7 +244,7 @@ private constructor(
               nativeSourceId.view,
               nativeUrl.view,
               nativeOptions.options,
-              outCommandId,
+              completion,
             )
           )
         }
@@ -278,76 +252,84 @@ private constructor(
     }
   }
 
-  public actual fun addGeoJsonSourceData(sourceId: String, data: GeoJsonSourceDataHandle): ULong =
-    command { outCommandId ->
-      NativeAccess.ensureLoaded()
-      data.withNativeHandle { nativeData ->
-        StringViewScope(sourceId).use { nativeSourceId ->
-          Status.check(
-            MaplibreNativeC.mln_map_add_geojson_source_data(
-              requireLiveHandle(),
-              nativeSourceId.view,
-              nativeData,
-              outCommandId,
-            )
-          )
-        }
-      }
-    }
-
-  public actual fun setGeoJsonSourceUrl(sourceId: String, url: String): ULong =
-    command { outCommandId ->
-      NativeAccess.ensureLoaded()
-      StringViewScope(sourceId).use { nativeSourceId ->
-        StringViewScope(url).use { nativeUrl ->
-          Status.check(
-            MaplibreNativeC.mln_map_set_geojson_source_url(
-              requireLiveHandle(),
-              nativeSourceId.view,
-              nativeUrl.view,
-              outCommandId,
-            )
-          )
-        }
-      }
-    }
-
-  public actual fun setGeoJsonSourceData(sourceId: String, data: GeoJsonSourceDataHandle): ULong =
-    command { outCommandId ->
-      NativeAccess.ensureLoaded()
-      data.withNativeHandle { nativeData ->
-        StringViewScope(sourceId).use { nativeSourceId ->
-          Status.check(
-            MaplibreNativeC.mln_map_set_geojson_source_data(
-              requireLiveHandle(),
-              nativeSourceId.view,
-              nativeData,
-              outCommandId,
-            )
-          )
-        }
-      }
-    }
-
-  public actual fun setGeoJsonSourceSynchronousTiling(sourceId: String, enabled: Boolean): ULong =
-    command { outCommandId ->
-      NativeAccess.ensureLoaded()
+  public actual fun addGeoJsonSourceData(
+    sourceId: String,
+    data: GeoJsonSourceDataHandle,
+  ): Deferred<CommandCompletion> = command { completion ->
+    NativeAccess.ensureLoaded()
+    data.withNativeHandle { nativeData ->
       StringViewScope(sourceId).use { nativeSourceId ->
         Status.check(
-          MaplibreNativeC.mln_map_set_geojson_source_synchronous_tiling(
+          MaplibreNativeC.mln_map_add_geojson_source_data(
             requireLiveHandle(),
             nativeSourceId.view,
-            enabled,
-            outCommandId,
+            nativeData,
+            completion,
           )
         )
       }
     }
+  }
+
+  public actual fun setGeoJsonSourceUrl(
+    sourceId: String,
+    url: String,
+  ): Deferred<CommandCompletion> = command { completion ->
+    NativeAccess.ensureLoaded()
+    StringViewScope(sourceId).use { nativeSourceId ->
+      StringViewScope(url).use { nativeUrl ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_geojson_source_url(
+            requireLiveHandle(),
+            nativeSourceId.view,
+            nativeUrl.view,
+            completion,
+          )
+        )
+      }
+    }
+  }
+
+  public actual fun setGeoJsonSourceData(
+    sourceId: String,
+    data: GeoJsonSourceDataHandle,
+  ): Deferred<CommandCompletion> = command { completion ->
+    NativeAccess.ensureLoaded()
+    data.withNativeHandle { nativeData ->
+      StringViewScope(sourceId).use { nativeSourceId ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_geojson_source_data(
+            requireLiveHandle(),
+            nativeSourceId.view,
+            nativeData,
+            completion,
+          )
+        )
+      }
+    }
+  }
+
+  public actual fun setGeoJsonSourceSynchronousTiling(
+    sourceId: String,
+    enabled: Boolean,
+  ): Deferred<CommandCompletion> = command { completion ->
+    NativeAccess.ensureLoaded()
+    StringViewScope(sourceId).use { nativeSourceId ->
+      Status.check(
+        MaplibreNativeC.mln_map_set_geojson_source_synchronous_tiling(
+          requireLiveHandle(),
+          nativeSourceId.view,
+          enabled,
+          completion,
+        )
+      )
+    }
+  }
 
   public actual fun addCustomGeometrySource(
     sourceId: String,
     options: CustomGeometrySourceOptions,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     NativeAccess.ensureLoaded()
     // The release callback captures the registry rather than this map, so a map a
     // host leaks with a live source still reports as leaked.
@@ -360,7 +342,7 @@ private constructor(
             requireLiveHandle(),
             nativeSourceId.view,
             sourceState.descriptor,
-            outCommandId,
+            completion,
           )
         )
       }
@@ -372,7 +354,7 @@ private constructor(
     sourceId: String,
     tileId: CanonicalTileId,
     data: ByteArray,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     NativeAccess.ensureLoaded()
     StringViewScope(sourceId).use { nativeSourceId ->
       CanonicalTileIdScope(tileId).use { nativeTileId ->
@@ -383,7 +365,7 @@ private constructor(
               nativeSourceId.view,
               nativeTileId.tileId,
               nativeData.view,
-              outCommandId,
+              completion,
             )
           )
         }
@@ -394,7 +376,7 @@ private constructor(
   public actual fun invalidateCustomGeometrySourceTile(
     sourceId: String,
     tileId: CanonicalTileId,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     NativeAccess.ensureLoaded()
     StringViewScope(sourceId).use { nativeSourceId ->
       CanonicalTileIdScope(tileId).use { nativeTileId ->
@@ -403,7 +385,7 @@ private constructor(
             requireLiveHandle(),
             nativeSourceId.view,
             nativeTileId.tileId,
-            outCommandId,
+            completion,
           )
         )
       }
@@ -413,7 +395,7 @@ private constructor(
   public actual fun invalidateCustomGeometrySourceRegion(
     sourceId: String,
     bounds: LatLngBounds,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     NativeAccess.ensureLoaded()
     StringViewScope(sourceId).use { nativeSourceId ->
       Status.check(
@@ -421,7 +403,7 @@ private constructor(
           requireLiveHandle(),
           nativeSourceId.view,
           latLngBounds(bounds),
-          outCommandId,
+          completion,
         )
       )
     }
@@ -431,14 +413,14 @@ private constructor(
     sourceId: String,
     url: String,
     options: TileSourceOptions?,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     NativeAccess.ensureLoaded()
     addTileSourceUrl(
       MaplibreNativeC::mln_map_add_vector_source_url,
       sourceId,
       url,
       options,
-      outCommandId,
+      completion,
     )
   }
 
@@ -446,14 +428,14 @@ private constructor(
     sourceId: String,
     tiles: List<String>,
     options: TileSourceOptions?,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     NativeAccess.ensureLoaded()
     addTileSourceTiles(
       MaplibreNativeC::mln_map_add_vector_source_tiles,
       sourceId,
       tiles,
       options,
-      outCommandId,
+      completion,
     )
   }
 
@@ -461,14 +443,14 @@ private constructor(
     sourceId: String,
     url: String,
     options: TileSourceOptions?,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     NativeAccess.ensureLoaded()
     addTileSourceUrl(
       MaplibreNativeC::mln_map_add_raster_source_url,
       sourceId,
       url,
       options,
-      outCommandId,
+      completion,
     )
   }
 
@@ -476,14 +458,14 @@ private constructor(
     sourceId: String,
     tiles: List<String>,
     options: TileSourceOptions?,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     NativeAccess.ensureLoaded()
     addTileSourceTiles(
       MaplibreNativeC::mln_map_add_raster_source_tiles,
       sourceId,
       tiles,
       options,
-      outCommandId,
+      completion,
     )
   }
 
@@ -491,14 +473,14 @@ private constructor(
     sourceId: String,
     url: String,
     options: TileSourceOptions?,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     NativeAccess.ensureLoaded()
     addTileSourceUrl(
       MaplibreNativeC::mln_map_add_raster_dem_source_url,
       sourceId,
       url,
       options,
-      outCommandId,
+      completion,
     )
   }
 
@@ -506,14 +488,14 @@ private constructor(
     sourceId: String,
     tiles: List<String>,
     options: TileSourceOptions?,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     NativeAccess.ensureLoaded()
     addTileSourceTiles(
       MaplibreNativeC::mln_map_add_raster_dem_source_tiles,
       sourceId,
       tiles,
       options,
-      outCommandId,
+      completion,
     )
   }
 
@@ -521,7 +503,7 @@ private constructor(
     imageId: String,
     image: PremultipliedRgba8Image,
     options: StyleImageOptions,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     NativeAccess.ensureLoaded()
     StringViewScope(imageId).use { nativeImageId ->
       PremultipliedImageScope(image).use { nativeImage ->
@@ -532,7 +514,7 @@ private constructor(
               nativeImageId.view,
               nativeImage.image,
               nativeOptions.options,
-              outCommandId,
+              completion,
             )
           )
         }
@@ -540,89 +522,72 @@ private constructor(
     }
   }
 
-  public actual fun removeStyleImage(imageId: String): ULong = command { outCommandId ->
-    NativeAccess.ensureLoaded()
-    StringViewScope(imageId).use { nativeImageId ->
-      Status.check(
-        MaplibreNativeC.mln_map_remove_style_image(
-          requireLiveHandle(),
-          nativeImageId.view,
-          outCommandId,
+  public actual fun removeStyleImage(imageId: String): Deferred<CommandCompletion> =
+    command { completion ->
+      NativeAccess.ensureLoaded()
+      StringViewScope(imageId).use { nativeImageId ->
+        Status.check(
+          MaplibreNativeC.mln_map_remove_style_image(
+            requireLiveHandle(),
+            nativeImageId.view,
+            completion,
+          )
         )
+      }
+    }
+
+  public actual fun styleImageInfo(imageId: String): Deferred<StyleImageInfo?> =
+    StringViewScope(imageId).use { nativeImageId ->
+      CompletionBridge.submit(
+        { result ->
+          if (result.value_count() == 0L) null
+          else styleImageInfo(MaplibreNativeC.mln_style_image_result(result.value()).info())
+        },
+        { completion ->
+          MaplibreNativeC.mln_map_get_style_image_info(
+            requireLiveHandle(),
+            nativeImageId.view,
+            completion,
+          )
+        },
       )
     }
-  }
 
-  public actual suspend fun styleImageInfo(imageId: String): StyleImageInfo? {
-    NativeAccess.ensureLoaded()
+  public actual fun copyStyleImagePremultipliedRgba8(imageId: String): Deferred<StyleImage?> =
     StringViewScope(imageId).use { nativeImageId ->
-      MaplibreNativeC.mln_style_image_info_default().use { outInfo ->
-        val outFound = booleanArrayOf(false)
-        Status.check(
-          ordered(
-            { outOperation ->
-              MaplibreNativeC.mln_map_get_style_image_info_start(
-                requireLiveHandle(),
-                nativeImageId.view,
-                outOperation,
-              )
-            },
-            { operation ->
-              MaplibreNativeC.mln_map_get_style_image_info_take_result(operation, outInfo, outFound)
-            },
+      CompletionBridge.submit(
+        { result ->
+          if (result.value_count() == 0L) null
+          else {
+            val raw = MaplibreNativeC.mln_style_image_result(result.value())
+            val info = styleImageInfo(raw.info())
+            StyleImage(
+              PremultipliedRgba8Image(
+                info.width,
+                info.height,
+                info.stride,
+                bufferView(raw.pixels()),
+              ),
+              info.pixelRatio,
+              info.sdf,
+            )
+          }
+        },
+        { completion ->
+          MaplibreNativeC.mln_map_get_style_image_info(
+            requireLiveHandle(),
+            nativeImageId.view,
+            completion,
           )
-        )
-        return if (outFound[0]) styleImageInfo(outInfo) else null
-      }
+        },
+      )
     }
-  }
-
-  public actual suspend fun copyStyleImagePremultipliedRgba8(imageId: String): StyleImage? {
-    NativeAccess.ensureLoaded()
-    val info = styleImageInfo(imageId) ?: return null
-    val outFound = booleanArrayOf(false)
-    return StringViewScope(imageId).use { nativeImageId ->
-      LongPointer(1).use { outPixels ->
-        outPixels.put(0, 0L)
-        Status.check(
-          ordered(
-            { outOperation ->
-              MaplibreNativeC.mln_map_copy_style_image_premultiplied_rgba8_start(
-                requireLiveHandle(),
-                nativeImageId.view,
-                outOperation,
-              )
-            },
-            { operation ->
-              MaplibreNativeC.mln_map_copy_style_image_premultiplied_rgba8_take_result(
-                operation,
-                outPixels,
-                outFound,
-              )
-            },
-          )
-        )
-        if (outFound[0]) {
-          StyleImage(
-            PremultipliedRgba8Image(
-              info.width,
-              info.height,
-              info.stride,
-              ownedBuffer(outPixels.get()),
-            ),
-            info.pixelRatio,
-            info.sdf,
-          )
-        } else null
-      }
-    }
-  }
 
   public actual fun addImageSourceUrl(
     sourceId: String,
     coordinates: List<LatLng>,
     url: String,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     NativeAccess.ensureLoaded()
     StringViewScope(sourceId).use { nativeSourceId ->
       LatLngArrayScope(coordinates).use { nativeCoordinates ->
@@ -634,7 +599,7 @@ private constructor(
               nativeCoordinates.coordinates,
               nativeCoordinates.count,
               nativeUrl.view,
-              outCommandId,
+              completion,
             )
           )
         }
@@ -646,7 +611,7 @@ private constructor(
     sourceId: String,
     coordinates: List<LatLng>,
     image: PremultipliedRgba8Image,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     NativeAccess.ensureLoaded()
     StringViewScope(sourceId).use { nativeSourceId ->
       LatLngArrayScope(coordinates).use { nativeCoordinates ->
@@ -658,7 +623,7 @@ private constructor(
               nativeCoordinates.coordinates,
               nativeCoordinates.count,
               nativeImage.image,
-              outCommandId,
+              completion,
             )
           )
         }
@@ -666,8 +631,8 @@ private constructor(
     }
   }
 
-  public actual fun setImageSourceUrl(sourceId: String, url: String): ULong =
-    command { outCommandId ->
+  public actual fun setImageSourceUrl(sourceId: String, url: String): Deferred<CommandCompletion> =
+    command { completion ->
       NativeAccess.ensureLoaded()
       StringViewScope(sourceId).use { nativeSourceId ->
         StringViewScope(url).use { nativeUrl ->
@@ -676,104 +641,98 @@ private constructor(
               requireLiveHandle(),
               nativeSourceId.view,
               nativeUrl.view,
-              outCommandId,
+              completion,
             )
           )
         }
       }
     }
 
-  public actual fun setImageSourceImage(sourceId: String, image: PremultipliedRgba8Image): ULong =
-    command { outCommandId ->
-      NativeAccess.ensureLoaded()
-      StringViewScope(sourceId).use { nativeSourceId ->
-        PremultipliedImageScope(image).use { nativeImage ->
-          Status.check(
-            MaplibreNativeC.mln_map_set_image_source_image(
-              requireLiveHandle(),
-              nativeSourceId.view,
-              nativeImage.image,
-              outCommandId,
-            )
-          )
-        }
-      }
-    }
-
-  public actual fun setImageSourceCoordinates(sourceId: String, coordinates: List<LatLng>): ULong =
-    command { outCommandId ->
-      NativeAccess.ensureLoaded()
-      StringViewScope(sourceId).use { nativeSourceId ->
-        LatLngArrayScope(coordinates).use { nativeCoordinates ->
-          Status.check(
-            MaplibreNativeC.mln_map_set_image_source_coordinates(
-              requireLiveHandle(),
-              nativeSourceId.view,
-              nativeCoordinates.coordinates,
-              nativeCoordinates.count,
-              outCommandId,
-            )
-          )
-        }
-      }
-    }
-
-  public actual suspend fun imageSourceCoordinates(sourceId: String): List<LatLng>? {
+  public actual fun setImageSourceImage(
+    sourceId: String,
+    image: PremultipliedRgba8Image,
+  ): Deferred<CommandCompletion> = command { completion ->
     NativeAccess.ensureLoaded()
-    val outFound = booleanArrayOf(false)
     StringViewScope(sourceId).use { nativeSourceId ->
-      LatLngArrayScope(IMAGE_SOURCE_COORDINATE_COUNT).use { outCoordinates ->
-        SizeTPointer(1).use { outCoordinateCount ->
-          Status.check(
-            ordered(
-              { outOperation ->
-                MaplibreNativeC.mln_map_get_image_source_coordinates_start(
-                  requireLiveHandle(),
-                  nativeSourceId.view,
-                  outOperation,
-                )
-              },
-              { operation ->
-                MaplibreNativeC.mln_map_get_image_source_coordinates_take_result(
-                  operation,
-                  outCoordinates.coordinates,
-                  outCoordinates.count,
-                  outCoordinateCount,
-                  outFound,
-                )
-              },
-            )
+      PremultipliedImageScope(image).use { nativeImage ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_image_source_image(
+            requireLiveHandle(),
+            nativeSourceId.view,
+            nativeImage.image,
+            completion,
           )
-          return if (outFound[0]) {
-            outCoordinates.toList(Math.toIntExact(outCoordinateCount.get()))
-          } else null
-        }
+        )
       }
     }
   }
 
-  public actual fun addStyleLayerJson(layerJson: ByteArray, beforeLayerId: String): ULong =
-    command { outCommandId ->
-      NativeAccess.ensureLoaded()
-      ByteArrayViewScope(layerJson).use { nativeLayerJson ->
-        StringViewScope(beforeLayerId).use { nativeBeforeLayerId ->
-          Status.check(
-            MaplibreNativeC.mln_map_add_style_layer_json(
-              requireLiveHandle(),
-              nativeLayerJson.view,
-              nativeBeforeLayerId.view,
-              outCommandId,
-            )
+  public actual fun setImageSourceCoordinates(
+    sourceId: String,
+    coordinates: List<LatLng>,
+  ): Deferred<CommandCompletion> = command { completion ->
+    NativeAccess.ensureLoaded()
+    StringViewScope(sourceId).use { nativeSourceId ->
+      LatLngArrayScope(coordinates).use { nativeCoordinates ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_image_source_coordinates(
+            requireLiveHandle(),
+            nativeSourceId.view,
+            nativeCoordinates.coordinates,
+            nativeCoordinates.count,
+            completion,
           )
-        }
+        )
       }
     }
+  }
+
+  public actual fun imageSourceCoordinates(sourceId: String): Deferred<List<LatLng>?> =
+    StringViewScope(sourceId).use { nativeSourceId ->
+      CompletionBridge.submit(
+        { result ->
+          if (result.value_count() == 0L) null
+          else {
+            val values = MaplibreNativeC.mln_lat_lng(result.value())
+            List(Math.toIntExact(result.value_count())) { index ->
+              latLng(values.position(index.toLong()))
+            }
+          }
+        },
+        { completion ->
+          MaplibreNativeC.mln_map_get_image_source_coordinates(
+            requireLiveHandle(),
+            nativeSourceId.view,
+            completion,
+          )
+        },
+      )
+    }
+
+  public actual fun addStyleLayerJson(
+    layerJson: ByteArray,
+    beforeLayerId: String,
+  ): Deferred<CommandCompletion> = command { completion ->
+    NativeAccess.ensureLoaded()
+    ByteArrayViewScope(layerJson).use { nativeLayerJson ->
+      StringViewScope(beforeLayerId).use { nativeBeforeLayerId ->
+        Status.check(
+          MaplibreNativeC.mln_map_add_style_layer_json(
+            requireLiveHandle(),
+            nativeLayerJson.view,
+            nativeBeforeLayerId.view,
+            completion,
+          )
+        )
+      }
+    }
+  }
 
   public actual fun addHillshadeLayer(
     layerId: String,
     sourceId: String,
     beforeLayerId: String,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     NativeAccess.ensureLoaded()
     StringViewScope(layerId).use { nativeLayerId ->
       StringViewScope(sourceId).use { nativeSourceId ->
@@ -784,7 +743,7 @@ private constructor(
               nativeLayerId.view,
               nativeSourceId.view,
               nativeBeforeLayerId.view,
-              outCommandId,
+              completion,
             )
           )
         }
@@ -796,7 +755,7 @@ private constructor(
     layerId: String,
     sourceId: String,
     beforeLayerId: String,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     NativeAccess.ensureLoaded()
     StringViewScope(layerId).use { nativeLayerId ->
       StringViewScope(sourceId).use { nativeSourceId ->
@@ -807,7 +766,7 @@ private constructor(
               nativeLayerId.view,
               nativeSourceId.view,
               nativeBeforeLayerId.view,
-              outCommandId,
+              completion,
             )
           )
         }
@@ -815,28 +774,30 @@ private constructor(
     }
   }
 
-  public actual fun addLocationIndicatorLayer(layerId: String, beforeLayerId: String): ULong =
-    command { outCommandId ->
-      NativeAccess.ensureLoaded()
-      StringViewScope(layerId).use { nativeLayerId ->
-        StringViewScope(beforeLayerId).use { nativeBeforeLayerId ->
-          Status.check(
-            MaplibreNativeC.mln_map_add_location_indicator_layer(
-              requireLiveHandle(),
-              nativeLayerId.view,
-              nativeBeforeLayerId.view,
-              outCommandId,
-            )
+  public actual fun addLocationIndicatorLayer(
+    layerId: String,
+    beforeLayerId: String,
+  ): Deferred<CommandCompletion> = command { completion ->
+    NativeAccess.ensureLoaded()
+    StringViewScope(layerId).use { nativeLayerId ->
+      StringViewScope(beforeLayerId).use { nativeBeforeLayerId ->
+        Status.check(
+          MaplibreNativeC.mln_map_add_location_indicator_layer(
+            requireLiveHandle(),
+            nativeLayerId.view,
+            nativeBeforeLayerId.view,
+            completion,
           )
-        }
+        )
       }
     }
+  }
 
   public actual fun setLocationIndicatorLocation(
     layerId: String,
     coordinate: LatLng,
     altitude: Double,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     NativeAccess.ensureLoaded()
     StringViewScope(layerId).use { nativeLayerId ->
       latLng(coordinate).use { nativeCoordinate ->
@@ -846,48 +807,52 @@ private constructor(
             nativeLayerId.view,
             nativeCoordinate,
             altitude,
-            outCommandId,
+            completion,
           )
         )
       }
     }
   }
 
-  public actual fun setLocationIndicatorBearing(layerId: String, bearing: Double): ULong =
-    command { outCommandId ->
-      NativeAccess.ensureLoaded()
-      StringViewScope(layerId).use { nativeLayerId ->
-        Status.check(
-          MaplibreNativeC.mln_map_set_location_indicator_bearing(
-            requireLiveHandle(),
-            nativeLayerId.view,
-            bearing,
-            outCommandId,
-          )
+  public actual fun setLocationIndicatorBearing(
+    layerId: String,
+    bearing: Double,
+  ): Deferred<CommandCompletion> = command { completion ->
+    NativeAccess.ensureLoaded()
+    StringViewScope(layerId).use { nativeLayerId ->
+      Status.check(
+        MaplibreNativeC.mln_map_set_location_indicator_bearing(
+          requireLiveHandle(),
+          nativeLayerId.view,
+          bearing,
+          completion,
         )
-      }
+      )
     }
+  }
 
-  public actual fun setLocationIndicatorAccuracyRadius(layerId: String, radius: Double): ULong =
-    command { outCommandId ->
-      NativeAccess.ensureLoaded()
-      StringViewScope(layerId).use { nativeLayerId ->
-        Status.check(
-          MaplibreNativeC.mln_map_set_location_indicator_accuracy_radius(
-            requireLiveHandle(),
-            nativeLayerId.view,
-            radius,
-            outCommandId,
-          )
+  public actual fun setLocationIndicatorAccuracyRadius(
+    layerId: String,
+    radius: Double,
+  ): Deferred<CommandCompletion> = command { completion ->
+    NativeAccess.ensureLoaded()
+    StringViewScope(layerId).use { nativeLayerId ->
+      Status.check(
+        MaplibreNativeC.mln_map_set_location_indicator_accuracy_radius(
+          requireLiveHandle(),
+          nativeLayerId.view,
+          radius,
+          completion,
         )
-      }
+      )
     }
+  }
 
   public actual fun setLocationIndicatorImageName(
     layerId: String,
     imageKind: LocationIndicatorImageKind,
     imageId: String,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     NativeAccess.ensureLoaded()
     StringViewScope(layerId).use { nativeLayerId ->
       StringViewScope(imageId).use { nativeImageId ->
@@ -897,241 +862,175 @@ private constructor(
             nativeLayerId.view,
             imageKind.nativeValue,
             nativeImageId.view,
-            outCommandId,
+            completion,
           )
         )
       }
     }
   }
 
-  public actual fun removeStyleLayer(layerId: String): ULong = command { outCommandId ->
-    NativeAccess.ensureLoaded()
-    StringViewScope(layerId).use { nativeLayerId ->
-      Status.check(
-        MaplibreNativeC.mln_map_remove_style_layer(
-          requireLiveHandle(),
-          nativeLayerId.view,
-          outCommandId,
-        )
-      )
-    }
-  }
-
-  public actual suspend fun styleLayerInfo(layerId: String): LayerInfo? {
-    NativeAccess.ensureLoaded()
-    var type = ""
-    var minZoom = 0.0
-    var maxZoom = 0.0
-    var visibility = StyleLayerVisibility.VISIBLE
-    var hasSourceId = false
-    var hasSourceLayer = false
-    StringViewScope(layerId).use { nativeLayerId ->
-      MaplibreNativeC.mln_style_layer_info().use { outInfo ->
-        outInfo.size(outInfo.sizeof())
-        val outFound = booleanArrayOf(false)
-        Status.check(
-          ordered(
-            { outOperation ->
-              MaplibreNativeC.mln_map_get_style_layer_info_start(
-                requireLiveHandle(),
-                nativeLayerId.view,
-                outOperation,
-              )
-            },
-            { operation ->
-              MaplibreNativeC.mln_map_get_style_layer_info_take_result(operation, outInfo, outFound)
-            },
-          )
-        )
-        if (!outFound[0]) return null
-        val fields = outInfo.fields()
-        type = stringView(outInfo.type())
-        minZoom = outInfo.min_zoom()
-        maxZoom = outInfo.max_zoom()
-        visibility = StyleLayerVisibility.fromNative(outInfo.visibility())
-        hasSourceId = (fields and MaplibreNativeC.MLN_STYLE_LAYER_INFO_SOURCE_ID) != 0
-        hasSourceLayer = (fields and MaplibreNativeC.MLN_STYLE_LAYER_INFO_SOURCE_LAYER) != 0
-      }
-    }
-    val sourceId =
-      if (hasSourceId) {
-        try {
-          layerSourceId(layerId)
-        } catch (_: InvalidArgumentException) {
-          return null
-        }
-      } else null
-    val sourceLayer =
-      if (hasSourceLayer) {
-        try {
-          layerSourceLayer(layerId)
-        } catch (_: InvalidArgumentException) {
-          return null
-        }
-      } else null
-    return LayerInfo(type, minZoom, maxZoom, visibility, sourceId, sourceLayer)
-  }
-
-  public actual suspend fun styleLayerIds(): List<String> {
-    NativeAccess.ensureLoaded()
-    LongPointer(1).use { outList ->
-      outList.put(0, 0L)
-      Status.check(
-        ordered(
-          { outOperation ->
-            MaplibreNativeC.mln_map_list_style_layer_ids_start(requireLiveHandle(), outOperation)
-          },
-          { operation ->
-            MaplibreNativeC.mln_map_list_style_layer_ids_take_result(operation, outList)
-          },
-        )
-      )
-      val list = outList.get()
-      require(list != 0L) { "mln_map_list_style_layer_ids returned the null handle" }
-      return styleIdList(list)
-    }
-  }
-
-  public actual fun moveStyleLayer(layerId: String, beforeLayerId: String): ULong =
-    command { outCommandId ->
+  public actual fun removeStyleLayer(layerId: String): Deferred<CommandCompletion> =
+    command { completion ->
       NativeAccess.ensureLoaded()
       StringViewScope(layerId).use { nativeLayerId ->
-        StringViewScope(beforeLayerId).use { nativeBeforeLayerId ->
-          Status.check(
-            MaplibreNativeC.mln_map_move_style_layer(
-              requireLiveHandle(),
-              nativeLayerId.view,
-              nativeBeforeLayerId.view,
-              outCommandId,
-            )
+        Status.check(
+          MaplibreNativeC.mln_map_remove_style_layer(
+            requireLiveHandle(),
+            nativeLayerId.view,
+            completion,
           )
-        }
+        )
       }
     }
 
-  public actual suspend fun styleLayerJson(layerId: String): ByteArray? {
+  public actual fun styleLayerInfo(layerId: String): Deferred<LayerInfo?> =
+    StringViewScope(layerId).use { nativeLayerId ->
+      CompletionBridge.submit(
+        { result ->
+          if (result.value_count() == 0L) null
+          else {
+            val raw = MaplibreNativeC.mln_style_layer_result(result.value())
+            val info = raw.info()
+            val fields = info.fields()
+            LayerInfo(
+              stringView(info.type()),
+              info.min_zoom(),
+              info.max_zoom(),
+              StyleLayerVisibility.fromNative(info.visibility()),
+              if (fields and MaplibreNativeC.MLN_STYLE_LAYER_INFO_SOURCE_ID != 0)
+                stringView(raw.source_id())
+              else null,
+              if (fields and MaplibreNativeC.MLN_STYLE_LAYER_INFO_SOURCE_LAYER != 0)
+                stringView(raw.source_layer())
+              else null,
+            )
+          }
+        },
+        { completion ->
+          MaplibreNativeC.mln_map_get_style_layer_info(
+            requireLiveHandle(),
+            nativeLayerId.view,
+            completion,
+          )
+        },
+      )
+    }
+
+  public actual fun styleLayerIds(): Deferred<List<String>> =
+    CompletionBridge.submit(::stringList) { completion ->
+      MaplibreNativeC.mln_map_list_style_layer_ids(requireLiveHandle(), completion)
+    }
+
+  public actual fun moveStyleLayer(
+    layerId: String,
+    beforeLayerId: String,
+  ): Deferred<CommandCompletion> = command { completion ->
     NativeAccess.ensureLoaded()
     StringViewScope(layerId).use { nativeLayerId ->
-      LongPointer(1).use { outSnapshot ->
-        BoolPointer(1).use { outFound ->
-          outSnapshot.put(0, 0L)
-          Status.check(
-            ordered(
-              { outOperation ->
-                MaplibreNativeC.mln_map_get_style_layer_json_start(
-                  requireLiveHandle(),
-                  nativeLayerId.view,
-                  outOperation,
-                )
-              },
-              { operation ->
-                MaplibreNativeC.mln_map_get_style_layer_json_take_result(
-                  operation,
-                  outSnapshot,
-                  outFound,
-                )
-              },
-            )
+      StringViewScope(beforeLayerId).use { nativeBeforeLayerId ->
+        Status.check(
+          MaplibreNativeC.mln_map_move_style_layer(
+            requireLiveHandle(),
+            nativeLayerId.view,
+            nativeBeforeLayerId.view,
+            completion,
           )
-          return if (outFound.get()) ownedBuffer(outSnapshot.get()) else null
-        }
+        )
       }
     }
   }
 
-  public actual fun setStyleLightJson(lightJson: ByteArray): ULong = command { outCommandId ->
-    NativeAccess.ensureLoaded()
-    ByteArrayViewScope(lightJson).use { nativeLightJson ->
-      Status.check(
-        MaplibreNativeC.mln_map_set_style_light_json(
-          requireLiveHandle(),
-          nativeLightJson.view,
-          outCommandId,
-        )
+  public actual fun styleLayerJson(layerId: String): Deferred<ByteArray?> =
+    StringViewScope(layerId).use { nativeLayerId ->
+      CompletionBridge.submit(
+        ::optionalBuffer,
+        { completion ->
+          MaplibreNativeC.mln_map_get_style_layer_json(
+            requireLiveHandle(),
+            nativeLayerId.view,
+            completion,
+          )
+        },
       )
     }
-  }
 
-  public actual fun setStyleLightProperty(propertyName: String, value: ByteArray): ULong =
-    command { outCommandId ->
+  public actual fun setStyleLightJson(lightJson: ByteArray): Deferred<CommandCompletion> =
+    command { completion ->
       NativeAccess.ensureLoaded()
-      StringViewScope(propertyName).use { nativePropertyName ->
-        ByteArrayViewScope(value).use { nativeValue ->
-          Status.check(
-            MaplibreNativeC.mln_map_set_style_light_property(
-              requireLiveHandle(),
-              nativePropertyName.view,
-              nativeValue.view,
-              outCommandId,
-            )
+      ByteArrayViewScope(lightJson).use { nativeLightJson ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_style_light_json(
+            requireLiveHandle(),
+            nativeLightJson.view,
+            completion,
           )
-        }
+        )
       }
     }
 
-  public actual suspend fun styleLightProperty(propertyName: String): ByteArray? {
+  public actual fun setStyleLightProperty(
+    propertyName: String,
+    value: ByteArray,
+  ): Deferred<CommandCompletion> = command { completion ->
     NativeAccess.ensureLoaded()
     StringViewScope(propertyName).use { nativePropertyName ->
-      LongPointer(1).use { outSnapshot ->
-        outSnapshot.put(0, 0L)
+      ByteArrayViewScope(value).use { nativeValue ->
         Status.check(
-          ordered(
-            { outOperation ->
-              MaplibreNativeC.mln_map_get_style_light_property_start(
-                requireLiveHandle(),
-                nativePropertyName.view,
-                outOperation,
-              )
-            },
-            { operation ->
-              MaplibreNativeC.mln_map_get_style_light_property_take_result(operation, outSnapshot)
-            },
+          MaplibreNativeC.mln_map_set_style_light_property(
+            requireLiveHandle(),
+            nativePropertyName.view,
+            nativeValue.view,
+            completion,
           )
         )
-        return outSnapshot.get().takeIf { it != 0L }?.let(::ownedBuffer)
       }
     }
   }
 
-  public actual fun setStyleTransitionOptions(options: StyleTransitionOptions): ULong =
-    command { outCommandId ->
-      NativeAccess.ensureLoaded()
-      StyleTransitionOptionsScope(options).use { nativeOptions ->
-        Status.check(
-          MaplibreNativeC.mln_map_set_style_transition_options(
+  public actual fun styleLightProperty(propertyName: String): Deferred<ByteArray?> =
+    StringViewScope(propertyName).use { nativePropertyName ->
+      CompletionBridge.submit(
+        ::optionalBuffer,
+        { completion ->
+          MaplibreNativeC.mln_map_get_style_light_property(
             requireLiveHandle(),
-            nativeOptions.options,
-            outCommandId,
+            nativePropertyName.view,
+            completion,
           )
-        )
-      }
+        },
+      )
     }
 
-  public actual suspend fun styleTransitionOptions(): StyleTransitionOptions {
+  public actual fun setStyleTransitionOptions(
+    options: StyleTransitionOptions
+  ): Deferred<CommandCompletion> = command { completion ->
     NativeAccess.ensureLoaded()
-    MaplibreNativeC.mln_style_transition_options_default().use { outOptions ->
+    StyleTransitionOptionsScope(options).use { nativeOptions ->
       Status.check(
-        ordered(
-          { outOperation ->
-            MaplibreNativeC.mln_map_get_style_transition_options_start(
-              requireLiveHandle(),
-              outOperation,
-            )
-          },
-          { operation ->
-            MaplibreNativeC.mln_map_get_style_transition_options_take_result(operation, outOptions)
-          },
+        MaplibreNativeC.mln_map_set_style_transition_options(
+          requireLiveHandle(),
+          nativeOptions.options,
+          completion,
         )
       )
-      return styleTransitionOptions(outOptions)
     }
   }
+
+  public actual fun styleTransitionOptions(): Deferred<StyleTransitionOptions> =
+    CompletionBridge.submit(
+      { result ->
+        styleTransitionOptions(MaplibreNativeC.mln_style_transition_options(result.value()))
+      },
+      { completion ->
+        MaplibreNativeC.mln_map_get_style_transition_options(requireLiveHandle(), completion)
+      },
+    )
 
   public actual fun setLayerProperty(
     layerId: String,
     propertyName: String,
     value: ByteArray,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     NativeAccess.ensureLoaded()
     StringViewScope(layerId).use { nativeLayerId ->
       StringViewScope(propertyName).use { nativePropertyName ->
@@ -1142,7 +1041,7 @@ private constructor(
               nativeLayerId.view,
               nativePropertyName.view,
               nativeValue.view,
-              outCommandId,
+              completion,
             )
           )
         }
@@ -1150,213 +1049,156 @@ private constructor(
     }
   }
 
-  public actual suspend fun layerProperty(layerId: String, propertyName: String): ByteArray? {
-    NativeAccess.ensureLoaded()
+  public actual fun layerProperty(layerId: String, propertyName: String): Deferred<ByteArray?> =
     StringViewScope(layerId).use { nativeLayerId ->
       StringViewScope(propertyName).use { nativePropertyName ->
-        LongPointer(1).use { outSnapshot ->
-          outSnapshot.put(0, 0L)
-          Status.check(
-            ordered(
-              { outOperation ->
-                MaplibreNativeC.mln_map_get_layer_property_start(
-                  requireLiveHandle(),
-                  nativeLayerId.view,
-                  nativePropertyName.view,
-                  outOperation,
-                )
-              },
-              { operation ->
-                MaplibreNativeC.mln_map_get_layer_property_take_result(operation, outSnapshot)
-              },
+        CompletionBridge.submit(
+          ::optionalBuffer,
+          { completion ->
+            MaplibreNativeC.mln_map_get_layer_property(
+              requireLiveHandle(),
+              nativeLayerId.view,
+              nativePropertyName.view,
+              completion,
             )
+          },
+        )
+      }
+    }
+
+  public actual fun setLayerFilter(
+    layerId: String,
+    filter: ByteArray,
+  ): Deferred<CommandCompletion> = command { completion ->
+    NativeAccess.ensureLoaded()
+    StringViewScope(layerId).use { nativeLayerId ->
+      ByteArrayViewScope(filter).use { nativeFilter ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_layer_filter(
+            requireLiveHandle(),
+            nativeLayerId.view,
+            nativeFilter.view,
+            completion,
           )
-          return outSnapshot.get().takeIf { it != 0L }?.let(::ownedBuffer)
-        }
+        )
       }
     }
   }
 
-  public actual fun setLayerFilter(layerId: String, filter: ByteArray): ULong =
-    command { outCommandId ->
+  public actual fun clearLayerFilter(layerId: String): Deferred<CommandCompletion> =
+    command { completion ->
       NativeAccess.ensureLoaded()
       StringViewScope(layerId).use { nativeLayerId ->
-        ByteArrayViewScope(filter).use { nativeFilter ->
-          Status.check(
-            MaplibreNativeC.mln_map_set_layer_filter(
-              requireLiveHandle(),
-              nativeLayerId.view,
-              nativeFilter.view,
-              outCommandId,
-            )
+        Status.check(
+          MaplibreNativeC.mln_map_set_layer_filter(
+            requireLiveHandle(),
+            nativeLayerId.view,
+            null,
+            completion,
           )
-        }
+        )
       }
     }
 
-  public actual fun clearLayerFilter(layerId: String): ULong = command { outCommandId ->
-    NativeAccess.ensureLoaded()
+  public actual fun layerFilter(layerId: String): Deferred<ByteArray?> =
     StringViewScope(layerId).use { nativeLayerId ->
-      Status.check(
-        MaplibreNativeC.mln_map_set_layer_filter(
-          requireLiveHandle(),
-          nativeLayerId.view,
-          null,
-          outCommandId,
-        )
+      CompletionBridge.submit(
+        ::optionalBuffer,
+        { completion ->
+          MaplibreNativeC.mln_map_get_layer_filter(
+            requireLiveHandle(),
+            nativeLayerId.view,
+            completion,
+          )
+        },
       )
     }
-  }
 
-  public actual suspend fun layerFilter(layerId: String): ByteArray? {
+  public actual fun styleImageStretches(
+    imageId: String
+  ): Deferred<Pair<List<ImageStretch>, List<ImageStretch>>?> =
+    StringViewScope(imageId).use { nativeImageId ->
+      CompletionBridge.submit(
+        { result ->
+          if (result.value_count() == 0L) null
+          else {
+            val raw = MaplibreNativeC.mln_style_image_stretches_result(result.value())
+            readStretches(raw.stretch_x(), Math.toIntExact(raw.stretch_x_count())) to
+              readStretches(raw.stretch_y(), Math.toIntExact(raw.stretch_y_count()))
+          }
+        },
+        { completion ->
+          MaplibreNativeC.mln_map_copy_style_image_stretches(
+            requireLiveHandle(),
+            nativeImageId.view,
+            completion,
+          )
+        },
+      )
+    }
+
+  public actual fun setLayerSourceLayer(
+    layerId: String,
+    sourceLayer: String,
+  ): Deferred<CommandCompletion> = command { completion ->
     NativeAccess.ensureLoaded()
     StringViewScope(layerId).use { nativeLayerId ->
-      LongPointer(1).use { outSnapshot ->
-        outSnapshot.put(0, 0L)
+      StringViewScope(sourceLayer).use { nativeSourceLayer ->
         Status.check(
-          ordered(
-            { outOperation ->
-              MaplibreNativeC.mln_map_get_layer_filter_start(
-                requireLiveHandle(),
-                nativeLayerId.view,
-                outOperation,
-              )
-            },
-            { operation ->
-              MaplibreNativeC.mln_map_get_layer_filter_take_result(operation, outSnapshot)
-            },
+          MaplibreNativeC.mln_map_set_layer_source_layer(
+            requireLiveHandle(),
+            nativeLayerId.view,
+            nativeSourceLayer.view,
+            completion,
           )
         )
-        return outSnapshot.get().takeIf { it != 0L }?.let(::ownedBuffer)
       }
     }
   }
 
-  public actual suspend fun styleImageStretches(
-    imageId: String
-  ): Pair<List<ImageStretch>, List<ImageStretch>>? {
+  public actual fun layerSourceLayer(layerId: String): Deferred<String> =
+    StringViewScope(layerId).use { nativeLayerId ->
+      CompletionBridge.submit({ result -> requiredBuffer(result).decodeToString() }) { completion ->
+        MaplibreNativeC.mln_map_copy_layer_source_layer(
+          requireLiveHandle(),
+          nativeLayerId.view,
+          completion,
+        )
+      }
+    }
+
+  public actual fun setLayerSourceId(
+    layerId: String,
+    sourceId: String,
+  ): Deferred<CommandCompletion> = command { completion ->
     NativeAccess.ensureLoaded()
-    StringViewScope(imageId).use { nativeImageId ->
-      SizeTPointer(1).use { outXCount ->
-        SizeTPointer(1).use { outYCount ->
-          val outFound = booleanArrayOf(false)
-          Status.check(
-            ordered(
-              { outOperation ->
-                MaplibreNativeC.mln_map_copy_style_image_stretches_start(
-                  requireLiveHandle(),
-                  nativeImageId.view,
-                  outOperation,
-                )
-              },
-              { operation ->
-                MaplibreNativeC.mln_map_copy_style_image_stretches_take_result(
-                  operation,
-                  null,
-                  0L,
-                  outXCount,
-                  null,
-                  0L,
-                  outYCount,
-                  outFound,
-                )
-              },
-            )
+    StringViewScope(layerId).use { nativeLayerId ->
+      StringViewScope(sourceId).use { nativeSourceId ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_layer_source_id(
+            requireLiveHandle(),
+            nativeLayerId.view,
+            nativeSourceId.view,
+            completion,
           )
-          if (!outFound[0]) return null
-
-          val xCount = Math.toIntExact(outXCount.get())
-          val yCount = Math.toIntExact(outYCount.get())
-          val rawX = if (xCount == 0) null else MaplibreNativeC.mln_image_stretch(xCount.toLong())
-          val rawY = if (yCount == 0) null else MaplibreNativeC.mln_image_stretch(yCount.toLong())
-          try {
-            Status.check(
-              ordered(
-                { outOperation ->
-                  MaplibreNativeC.mln_map_copy_style_image_stretches_start(
-                    requireLiveHandle(),
-                    nativeImageId.view,
-                    outOperation,
-                  )
-                },
-                { operation ->
-                  MaplibreNativeC.mln_map_copy_style_image_stretches_take_result(
-                    operation,
-                    rawX,
-                    xCount.toLong(),
-                    outXCount,
-                    rawY,
-                    yCount.toLong(),
-                    outYCount,
-                    outFound,
-                  )
-                },
-              )
-            )
-            return readStretches(rawX, xCount) to readStretches(rawY, yCount)
-          } finally {
-            rawX?.close()
-            rawY?.close()
-          }
-        }
+        )
       }
     }
   }
 
-  public actual fun setLayerSourceLayer(layerId: String, sourceLayer: String): ULong =
-    command { outCommandId ->
-      NativeAccess.ensureLoaded()
-      StringViewScope(layerId).use { nativeLayerId ->
-        StringViewScope(sourceLayer).use { nativeSourceLayer ->
-          Status.check(
-            MaplibreNativeC.mln_map_set_layer_source_layer(
-              requireLiveHandle(),
-              nativeLayerId.view,
-              nativeSourceLayer.view,
-              outCommandId,
-            )
-          )
-        }
+  public actual fun layerSourceId(layerId: String): Deferred<String> =
+    StringViewScope(layerId).use { nativeLayerId ->
+      CompletionBridge.submit({ result -> requiredBuffer(result).decodeToString() }) { completion ->
+        MaplibreNativeC.mln_map_copy_layer_source_id(
+          requireLiveHandle(),
+          nativeLayerId.view,
+          completion,
+        )
       }
     }
 
-  public actual suspend fun layerSourceLayer(layerId: String): String =
-    copyLayerText(
-      runtime,
-      requireLiveHandle(),
-      layerId,
-      MaplibreNativeC::mln_map_copy_layer_source_layer_start,
-      MaplibreNativeC::mln_map_copy_layer_source_layer_take_result,
-    )
-
-  public actual fun setLayerSourceId(layerId: String, sourceId: String): ULong =
-    command { outCommandId ->
-      NativeAccess.ensureLoaded()
-      StringViewScope(layerId).use { nativeLayerId ->
-        StringViewScope(sourceId).use { nativeSourceId ->
-          Status.check(
-            MaplibreNativeC.mln_map_set_layer_source_id(
-              requireLiveHandle(),
-              nativeLayerId.view,
-              nativeSourceId.view,
-              outCommandId,
-            )
-          )
-        }
-      }
-    }
-
-  public actual suspend fun layerSourceId(layerId: String): String =
-    copyLayerText(
-      runtime,
-      requireLiveHandle(),
-      layerId,
-      MaplibreNativeC::mln_map_copy_layer_source_id_start,
-      MaplibreNativeC::mln_map_copy_layer_source_id_take_result,
-    )
-
-  public actual fun setLayerMinZoom(layerId: String, minZoom: Double): ULong =
-    command { outCommandId ->
+  public actual fun setLayerMinZoom(layerId: String, minZoom: Double): Deferred<CommandCompletion> =
+    command { completion ->
       NativeAccess.ensureLoaded()
       StringViewScope(layerId).use { nativeLayerId ->
         Status.check(
@@ -1364,14 +1206,14 @@ private constructor(
             requireLiveHandle(),
             nativeLayerId.view,
             minZoom,
-            outCommandId,
+            completion,
           )
         )
       }
     }
 
-  public actual fun setLayerMaxZoom(layerId: String, maxZoom: Double): ULong =
-    command { outCommandId ->
+  public actual fun setLayerMaxZoom(layerId: String, maxZoom: Double): Deferred<CommandCompletion> =
+    command { completion ->
       NativeAccess.ensureLoaded()
       StringViewScope(layerId).use { nativeLayerId ->
         Status.check(
@@ -1379,45 +1221,38 @@ private constructor(
             requireLiveHandle(),
             nativeLayerId.view,
             maxZoom,
-            outCommandId,
+            completion,
           )
         )
       }
     }
 
-  public actual fun setLayerVisibility(layerId: String, visibility: StyleLayerVisibility): ULong =
-    command { outCommandId ->
-      NativeAccess.ensureLoaded()
-      StringViewScope(layerId).use { nativeLayerId ->
-        Status.check(
-          MaplibreNativeC.mln_map_set_layer_visibility(
-            requireLiveHandle(),
-            nativeLayerId.view,
-            visibility.nativeValue,
-            outCommandId,
-          )
+  public actual fun setLayerVisibility(
+    layerId: String,
+    visibility: StyleLayerVisibility,
+  ): Deferred<CommandCompletion> = command { completion ->
+    NativeAccess.ensureLoaded()
+    StringViewScope(layerId).use { nativeLayerId ->
+      Status.check(
+        MaplibreNativeC.mln_map_set_layer_visibility(
+          requireLiveHandle(),
+          nativeLayerId.view,
+          visibility.nativeValue,
+          completion,
         )
-      }
-    }
-
-  public actual fun requestRepaint(): Long {
-    NativeAccess.ensureLoaded()
-    val outCommand = longArrayOf(0L)
-    Status.check(MaplibreNativeC.mln_map_request_repaint(requireLiveHandle(), outCommand))
-    return outCommand[0]
-  }
-
-  public actual suspend fun requestStillImage() {
-    NativeAccess.ensureLoaded()
-    val operation = startOperation { outOperation ->
-      MaplibreNativeC.mln_map_request_still_image_start(requireLiveHandle(), outOperation)
-    }
-    try {
-      runtime.awaitOperation(operation)
-    } finally {
-      MaplibreNativeC.mln_operation_release(operation)
+      )
     }
   }
+
+  public actual fun requestRepaint(): Deferred<CommandCompletion> = command { completion ->
+    NativeAccess.ensureLoaded()
+    Status.check(MaplibreNativeC.mln_map_request_repaint(requireLiveHandle(), completion))
+  }
+
+  public actual fun requestStillImage(): Deferred<CommandCompletion> =
+    CompletionBridge.command { completion ->
+      MaplibreNativeC.mln_map_request_still_image(requireLiveHandle(), completion)
+    }
 
   public actual fun snapshot(): MapSnapshot {
     NativeAccess.ensureLoaded()
@@ -1443,97 +1278,85 @@ private constructor(
     }
   }
 
-  public actual fun setDebugOptions(options: Set<DebugOption>): Long {
-    NativeAccess.ensureLoaded()
-    val outCommand = longArrayOf(0L)
-    Status.check(
-      MaplibreNativeC.mln_map_set_debug_options(
-        requireLiveHandle(),
-        debugOptionMask(options),
-        outCommand,
+  public actual fun setDebugOptions(options: Set<DebugOption>): Deferred<CommandCompletion> =
+    command { completion ->
+      NativeAccess.ensureLoaded()
+      Status.check(
+        MaplibreNativeC.mln_map_set_debug_options(
+          requireLiveHandle(),
+          debugOptionMask(options),
+          completion,
+        )
       )
-    )
-    return outCommand[0]
-  }
+    }
 
-  public actual fun setRenderingStatsViewEnabled(enabled: Boolean): Long {
-    NativeAccess.ensureLoaded()
-    val outCommand = longArrayOf(0L)
-    Status.check(
-      MaplibreNativeC.mln_map_set_rendering_stats_view_enabled(
-        requireLiveHandle(),
-        enabled,
-        outCommand,
+  public actual fun setRenderingStatsViewEnabled(enabled: Boolean): Deferred<CommandCompletion> =
+    command { completion ->
+      NativeAccess.ensureLoaded()
+      Status.check(
+        MaplibreNativeC.mln_map_set_rendering_stats_view_enabled(
+          requireLiveHandle(),
+          enabled,
+          completion,
+        )
       )
-    )
-    return outCommand[0]
-  }
+    }
 
-  public actual fun setViewportOptions(options: ViewportOptions): Long {
-    NativeAccess.ensureLoaded()
+  public actual fun setViewportOptions(options: ViewportOptions): Deferred<CommandCompletion> =
     ViewportOptionsScope(options).use { nativeOptions ->
-      val outCommand = longArrayOf(0L)
-      Status.check(
-        MaplibreNativeC.mln_map_set_viewport_options(
-          requireLiveHandle(),
-          nativeOptions.options,
-          outCommand,
+      command { completion ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_viewport_options(
+            requireLiveHandle(),
+            nativeOptions.options,
+            completion,
+          )
         )
-      )
-      return outCommand[0]
+      }
     }
-  }
 
-  public actual fun setTileOptions(options: TileOptions): Long {
-    NativeAccess.ensureLoaded()
+  public actual fun setTileOptions(options: TileOptions): Deferred<CommandCompletion> =
     TileOptionsScope(options).use { nativeOptions ->
-      val outCommand = longArrayOf(0L)
-      Status.check(
-        MaplibreNativeC.mln_map_set_tile_options(
-          requireLiveHandle(),
-          nativeOptions.options,
-          outCommand,
+      command { completion ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_tile_options(
+            requireLiveHandle(),
+            nativeOptions.options,
+            completion,
+          )
         )
-      )
-      return outCommand[0]
+      }
     }
-  }
 
-  public actual fun setBounds(options: BoundOptions): Long {
-    NativeAccess.ensureLoaded()
+  public actual fun setBounds(options: BoundOptions): Deferred<CommandCompletion> =
     BoundOptionsScope(options).use { nativeOptions ->
-      val outCommand = longArrayOf(0L)
-      Status.check(
-        MaplibreNativeC.mln_map_set_bounds(requireLiveHandle(), nativeOptions.options, outCommand)
-      )
-      return outCommand[0]
-    }
-  }
-
-  public actual fun setFreeCameraOptions(options: FreeCameraOptions): Long {
-    NativeAccess.ensureLoaded()
-    FreeCameraOptionsScope(options).use { nativeOptions ->
-      val outCommand = longArrayOf(0L)
-      Status.check(
-        MaplibreNativeC.mln_map_set_free_camera_options(
-          requireLiveHandle(),
-          nativeOptions.options,
-          outCommand,
+      command { completion ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_bounds(requireLiveHandle(), nativeOptions.options, completion)
         )
-      )
-      return outCommand[0]
+      }
     }
-  }
 
-  public actual fun resize(size: MapSize): Long {
-    NativeAccess.ensureLoaded()
+  public actual fun setFreeCameraOptions(options: FreeCameraOptions): Deferred<CommandCompletion> =
+    FreeCameraOptionsScope(options).use { nativeOptions ->
+      command { completion ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_free_camera_options(
+            requireLiveHandle(),
+            nativeOptions.options,
+            completion,
+          )
+        )
+      }
+    }
+
+  public actual fun resize(size: MapSize): Deferred<CommandCompletion> =
     MaplibreNativeC.mln_logical_extent().use { extent ->
       extent.width(size.width).height(size.height).scale_factor(size.scaleFactor)
-      val outCommand = longArrayOf(0L)
-      Status.check(MaplibreNativeC.mln_map_resize(requireLiveHandle(), extent, outCommand))
-      return outCommand[0]
+      command { completion ->
+        Status.check(MaplibreNativeC.mln_map_resize(requireLiveHandle(), extent, completion))
+      }
     }
-  }
 
   public actual fun cameraSnapshot(): CameraSnapshot {
     NativeAccess.ensureLoaded()
@@ -1546,8 +1369,7 @@ private constructor(
     }
   }
 
-  public actual fun updateCamera(update: CameraUpdate): Long {
-    NativeAccess.ensureLoaded()
+  public actual fun updateCamera(update: CameraUpdate): Deferred<CommandCompletion> =
     CameraOptionsScope(update.camera).use { nativeCamera ->
       AnimationOptionsScope(update.animation).use { nativeAnimation ->
         MaplibreNativeC.mln_camera_update_default().use { nativeUpdate ->
@@ -1556,18 +1378,16 @@ private constructor(
             .camera(nativeCamera.options)
             .animation(nativeAnimation.options)
             .gesture_phase(update.gesturePhase.nativeValue)
-          val outCommand = longArrayOf(0L)
-          Status.check(
-            MaplibreNativeC.mln_map_update_camera(requireLiveHandle(), nativeUpdate, outCommand)
-          )
-          return outCommand[0]
+          command { completion ->
+            Status.check(
+              MaplibreNativeC.mln_map_update_camera(requireLiveHandle(), nativeUpdate, completion)
+            )
+          }
         }
       }
     }
-  }
 
-  public actual fun applyCameraDelta(delta: CameraDelta): Long {
-    NativeAccess.ensureLoaded()
+  public actual fun applyCameraDelta(delta: CameraDelta): Deferred<CommandCompletion> =
     AnimationOptionsScope(delta.animation).use { nativeAnimation ->
       screenPoint(delta.offset).use { nativeOffset ->
         val nativeAnchor = delta.anchor?.let(::screenPoint)
@@ -1580,39 +1400,30 @@ private constructor(
               .has_anchor(nativeAnchor != null)
               .animation(nativeAnimation.options)
             nativeAnchor?.let(nativeDelta::anchor)
-            val outCommand = longArrayOf(0L)
-            Status.check(
-              MaplibreNativeC.mln_map_apply_camera_delta(
-                requireLiveHandle(),
-                nativeDelta,
-                outCommand,
+            command { completion ->
+              Status.check(
+                MaplibreNativeC.mln_map_apply_camera_delta(
+                  requireLiveHandle(),
+                  nativeDelta,
+                  completion,
+                )
               )
-            )
-            return outCommand[0]
+            }
           }
         } finally {
           nativeAnchor?.close()
         }
       }
     }
-  }
 
-  public actual suspend fun queryCamera(): CameraSnapshot {
-    NativeAccess.ensureLoaded()
-    val operation = startOperation { outOperation ->
-      MaplibreNativeC.mln_map_camera_query_start(requireLiveHandle(), outOperation)
-    }
-    try {
-      runtime.awaitOperation(operation)
-      MaplibreNativeC.mln_camera_query_result().use { result ->
-        result.size(result.sizeof())
-        Status.check(MaplibreNativeC.mln_map_camera_query_take_result(operation, result))
-        return CameraSnapshot(result.generation(), cameraOptions(result.camera()))
-      }
-    } finally {
-      MaplibreNativeC.mln_operation_release(operation)
-    }
-  }
+  public actual fun queryCamera(): Deferred<CameraSnapshot> =
+    CompletionBridge.submit(
+      { result ->
+        val raw = MaplibreNativeC.mln_camera_query_result(result.value())
+        CameraSnapshot(raw.generation(), cameraOptions(raw.camera()))
+      },
+      { completion -> MaplibreNativeC.mln_map_camera_query(requireLiveHandle(), completion) },
+    )
 
   public actual fun attachMetalOwnedTexture(
     descriptor: MetalOwnedTextureDescriptor,
@@ -1665,28 +1476,15 @@ private constructor(
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment = RenderSessionHandle.attachOpenGLSurface(this, descriptor, options)
 
-  public actual suspend fun createProjection(): MapProjectionHandle {
-    NativeAccess.ensureLoaded()
-    val operation = startOperation { outOperation ->
-      MaplibreNativeC.mln_map_projection_create_start(requireLiveHandle(), outOperation)
-    }
-    try {
-      runtime.awaitOperation(operation)
-      LongPointer(1).use { outProjection ->
-        outProjection.put(0, 0L)
-        Status.check(
-          MaplibreNativeC.mln_map_projection_create_take_result(operation, outProjection)
-        )
-        val address = outProjection.get()
-        require(address != 0L) {
-          "mln_map_projection_create_take_result returned a null projection"
-        }
-        return MapProjectionHandle(address)
-      }
-    } finally {
-      MaplibreNativeC.mln_operation_release(operation)
-    }
-  }
+  public actual fun createProjection(): Deferred<MapProjectionHandle> =
+    CompletionBridge.submit(
+      { result ->
+        val address = LongPointer(result.value()).get()
+        require(address != 0L) { "mln_map_projection_create returned a null projection" }
+        MapProjectionHandle(address)
+      },
+      { completion -> MaplibreNativeC.mln_map_projection_create(requireLiveHandle(), completion) },
+    )
 
   public actual fun close() {
     if (!core.beginClose()) return
@@ -1708,12 +1506,12 @@ private constructor(
         MaplibreNativeC.mln_buffer_view,
         MaplibreNativeC.mln_buffer_view,
         MaplibreNativeC.mln_style_tile_source_options,
-        LongPointer,
+        MaplibreNativeC.mln_completion,
       ) -> Int,
     sourceId: String,
     url: String,
     options: TileSourceOptions?,
-    outCommandId: LongPointer,
+    completion: MaplibreNativeC.mln_completion,
   ) {
     StringViewScope(sourceId).use { nativeSourceId ->
       StringViewScope(url).use { nativeUrl ->
@@ -1724,7 +1522,7 @@ private constructor(
               nativeSourceId.view,
               nativeUrl.view,
               nativeOptions.options,
-              outCommandId,
+              completion,
             )
           )
         }
@@ -1740,12 +1538,12 @@ private constructor(
         MaplibreNativeC.mln_buffer_view?,
         Long,
         MaplibreNativeC.mln_style_tile_source_options,
-        LongPointer,
+        MaplibreNativeC.mln_completion,
       ) -> Int,
     sourceId: String,
     tiles: List<String>,
     options: TileSourceOptions?,
-    outCommandId: LongPointer,
+    completion: MaplibreNativeC.mln_completion,
   ) {
     val tileSnapshot = tiles.toList()
     StringViewScope(sourceId).use { nativeSourceId ->
@@ -1758,7 +1556,7 @@ private constructor(
               nativeTiles.views,
               nativeTiles.count,
               nativeOptions.options,
-              outCommandId,
+              completion,
             )
           )
         }
@@ -1767,28 +1565,23 @@ private constructor(
   }
 
   public actual companion object {
-    public actual suspend fun create(runtime: RuntimeHandle, options: MapOptions): MapHandle {
+    public actual fun create(runtime: RuntimeHandle, options: MapOptions): Deferred<MapHandle> {
       NativeAccess.ensureLoaded()
-      MapOptionsScope(options).use { nativeOptions ->
-        val operation = startOperation { outOperation ->
-          MaplibreNativeC.mln_map_create_start(
-            runtime.nativeHandleId(),
-            nativeOptions.options,
-            outOperation,
-          )
-        }
-        try {
-          runtime.awaitOperation(operation)
-          LongPointer(1).use { outMap ->
-            outMap.put(0, 0L)
-            Status.check(MaplibreNativeC.mln_map_create_take_result(operation, outMap))
-            val address = outMap.get()
-            require(address != 0L) { "mln_map_create_take_result returned a null map" }
-            return MapHandle(runtime, address, options.eventMask).also { runtime.registerMap(it) }
-          }
-        } finally {
-          MaplibreNativeC.mln_operation_release(operation)
-        }
+      return MapOptionsScope(options).use { nativeOptions ->
+        CompletionBridge.submit(
+          { result ->
+            val address = LongPointer(result.value()).get()
+            require(address != 0L) { "mln_map_create returned a null map" }
+            MapHandle(runtime, address, options.eventMask).also(runtime::registerMap)
+          },
+          { completion ->
+            MaplibreNativeC.mln_map_create(
+              runtime.nativeHandleId(),
+              nativeOptions.options,
+              completion,
+            )
+          },
+        )
       }
     }
   }
@@ -1797,39 +1590,14 @@ private constructor(
     core.requireLive()
     return handleId
   }
-
-  private suspend inline fun ordered(start: (LongPointer) -> Int, take: (Long) -> Int): Int {
-    val operation = startOperation(start)
-    try {
-      runtime.awaitOperation(operation)
-      return take(operation)
-    } finally {
-      MaplibreNativeC.mln_operation_release(operation)
-    }
-  }
-
-  private suspend fun takeStyleBuffer(
-    start: (Long, LongPointer) -> Int,
-    take: (Long, LongPointer) -> Int,
-  ): ByteArray =
-    LongPointer(1).use { outBuffer ->
-      outBuffer.put(0, 0L)
-      Status.check(
-        ordered(
-          { outOperation -> start(requireLiveHandle(), outOperation) },
-          { operation -> take(operation, outBuffer) },
-        )
-      )
-      ownedBuffer(outBuffer.get())
-    }
 }
 
-private inline fun command(call: (LongPointer) -> Unit): ULong =
-  LongPointer(1).use { outCommandId ->
-    outCommandId.put(0, 0L)
-    call(outCommandId)
-    outCommandId.get().toULong()
-  }
+private inline fun command(
+  crossinline call: (MaplibreNativeC.mln_completion) -> Unit
+): Deferred<CommandCompletion> = CompletionBridge.command { completion ->
+  call(completion)
+  MaplibreNativeC.MLN_STATUS_OK
+}
 
 private fun latLng(value: LatLng): MaplibreNativeC.mln_lat_lng =
   MaplibreNativeC.mln_lat_lng().latitude(value.latitude).longitude(value.longitude)
@@ -1862,6 +1630,23 @@ private fun stringView(view: MaplibreNativeC.mln_buffer_view): String {
   val bytes = ByteArray(Math.toIntExact(view.size()))
   BytePointer(view.data()).get(bytes, 0, bytes.size)
   return String(bytes, java.nio.charset.StandardCharsets.UTF_8)
+}
+
+private fun bufferView(view: MaplibreNativeC.mln_buffer_view): ByteArray =
+  JavaCppSupport.byteArray(view.data(), view.size())
+
+private fun optionalBuffer(result: MaplibreNativeC.mln_completion_result): ByteArray? =
+  if (result.value_count() == 0L) null
+  else bufferView(MaplibreNativeC.mln_buffer_view(result.value()))
+
+private fun requiredBuffer(result: MaplibreNativeC.mln_completion_result): ByteArray =
+  requireNotNull(optionalBuffer(result)) { "native completion omitted its byte result" }
+
+private fun stringList(result: MaplibreNativeC.mln_completion_result): List<String> {
+  val count = Math.toIntExact(result.value_count())
+  if (count == 0) return emptyList()
+  val views = MaplibreNativeC.mln_buffer_view(result.value())
+  return List(count) { index -> stringView(views.position(index.toLong())) }
 }
 
 private fun styleIdList(list: Long): List<String> =
@@ -1906,151 +1691,6 @@ private fun styleStringList(
   } finally {
     destroyer(list)
   }
-
-/**
- * Probes the required length, then copies. A null buffer with zero capacity is a size probe the C
- * API answers with OK.
- */
-private suspend inline fun ordered(
-  runtime: RuntimeHandle,
-  start: (LongPointer) -> Int,
-  take: (Long) -> Int,
-): Int {
-  val operation = startOperation(start)
-  try {
-    runtime.awaitOperation(operation)
-    return take(operation)
-  } finally {
-    MaplibreNativeC.mln_operation_release(operation)
-  }
-}
-
-private inline fun copyMapBytes(
-  mapId: Long,
-  copy: (Long, BytePointer?, Long, SizeTPointer) -> Int,
-): ByteArray {
-  SizeTPointer(1).use { outSize ->
-    Status.check(copy(mapId, null, 0L, outSize))
-    val required = Math.toIntExact(outSize.get())
-    if (required == 0) return byteArrayOf()
-    BytePointer(required.toLong()).use { buffer ->
-      SizeTPointer(1).use { outCopied ->
-        Status.check(copy(mapId, buffer, required.toLong(), outCopied))
-        val bytes = ByteArray(Math.toIntExact(outCopied.get()))
-        buffer.get(bytes, 0, bytes.size)
-        return bytes
-      }
-    }
-  }
-}
-
-private suspend fun copyLayerText(
-  runtime: RuntimeHandle,
-  mapId: Long,
-  layerId: String,
-  start: (Long, MaplibreNativeC.mln_buffer_view, LongPointer) -> Int,
-  take: (Long, LongPointer) -> Int,
-): String =
-  StringViewScope(layerId).use { nativeLayerId ->
-    LongPointer(1).use { outBuffer ->
-      outBuffer.put(0, 0L)
-      Status.check(
-        ordered(
-          runtime,
-          { outOperation -> start(mapId, nativeLayerId.view, outOperation) },
-          { operation -> take(operation, outBuffer) },
-        )
-      )
-      String(ownedBuffer(outBuffer.get()), java.nio.charset.StandardCharsets.UTF_8)
-    }
-  }
-
-private suspend fun copyStyleSourceAttribution(
-  runtime: RuntimeHandle,
-  mapId: Long,
-  sourceId: StringViewScope,
-  info: MaplibreNativeC.mln_style_source_info,
-): String {
-  if (info.attribution_size() == 0L) return ""
-  return copyStyleSourceText(
-    runtime,
-    mapId,
-    sourceId,
-    MaplibreNativeC::mln_map_copy_style_source_attribution_start,
-    MaplibreNativeC::mln_map_copy_style_source_attribution_take_result,
-  )
-}
-
-private suspend fun copyStyleSourceUrl(
-  runtime: RuntimeHandle,
-  mapId: Long,
-  sourceId: StringViewScope,
-  urlSize: Long,
-): String {
-  if (urlSize == 0L) return ""
-  return copyStyleSourceText(
-    runtime,
-    mapId,
-    sourceId,
-    MaplibreNativeC::mln_map_copy_style_source_url_start,
-    MaplibreNativeC::mln_map_copy_style_source_url_take_result,
-  )
-}
-
-private suspend fun copyStyleSourceText(
-  runtime: RuntimeHandle,
-  mapId: Long,
-  sourceId: StringViewScope,
-  start: (Long, MaplibreNativeC.mln_buffer_view, LongPointer) -> Int,
-  take: (Long, LongPointer, BooleanArray) -> Int,
-): String =
-  LongPointer(1).use { outBuffer ->
-    outBuffer.put(0, 0L)
-    val outFound = booleanArrayOf(false)
-    Status.check(
-      ordered(
-        runtime,
-        { outOperation -> start(mapId, sourceId.view, outOperation) },
-        { operation -> take(operation, outBuffer, outFound) },
-      )
-    )
-    if (outFound[0]) String(ownedBuffer(outBuffer.get()), java.nio.charset.StandardCharsets.UTF_8)
-    else ""
-  }
-
-private suspend fun copyStyleSourceTileUrls(
-  runtime: RuntimeHandle,
-  mapId: Long,
-  sourceId: StringViewScope,
-): List<String> {
-  LongPointer(1).use { outList ->
-    outList.put(0, 0L)
-    val outFound = booleanArrayOf(false)
-    Status.check(
-      ordered(
-        runtime,
-        { outOperation ->
-          MaplibreNativeC.mln_map_get_style_source_tile_urls_start(
-            mapId,
-            sourceId.view,
-            outOperation,
-          )
-        },
-        { operation ->
-          MaplibreNativeC.mln_map_get_style_source_tile_urls_take_result(
-            operation,
-            outList,
-            outFound,
-          )
-        },
-      )
-    )
-    check(outFound[0]) { "style source disappeared while its metadata was copied" }
-    val list = outList.get()
-    require(list != 0L) { "mln_map_get_style_source_tile_urls returned the null handle" }
-    return styleStringList(list)
-  }
-}
 
 private const val STYLE_SOURCE_INFO_URL: Int = 1 shl 0
 private const val STYLE_SOURCE_INFO_TILEJSON: Int = 1 shl 1

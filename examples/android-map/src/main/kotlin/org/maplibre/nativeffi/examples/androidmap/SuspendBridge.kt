@@ -19,5 +19,5 @@ internal fun <T> runSuspend(block: suspend () -> T): T {
     }
   )
   completed.await()
-  return outcome?.getOrThrow() ?: error("suspend operation completed without a result")
+  return outcome?.getOrThrow() ?: error("suspend call completed without a result")
 }

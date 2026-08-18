@@ -2,27 +2,30 @@ package org.maplibre.nativeffi.runtime
 
 import kotlin.experimental.ExperimentalNativeApi
 import kotlin.native.ref.WeakReference
-import kotlinx.cinterop.BooleanVar
 import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ULongVar
 import kotlinx.cinterop.alloc
+import kotlinx.cinterop.get
 import kotlinx.cinterop.interpretCPointer
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
+import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.toLong
 import kotlinx.cinterop.value
+import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.Maplibre
+import org.maplibre.nativeffi.internal.async.CompletionBridge
+import org.maplibre.nativeffi.internal.c.mln_completion
+import org.maplibre.nativeffi.internal.c.mln_completion_result
 import org.maplibre.nativeffi.internal.c.mln_event_batch_get
 import org.maplibre.nativeffi.internal.c.mln_event_batch_release
-import org.maplibre.nativeffi.internal.c.mln_notification_source_create
-import org.maplibre.nativeffi.internal.c.mln_notification_source_release
+import org.maplibre.nativeffi.internal.c.mln_offline_region_info
 import org.maplibre.nativeffi.internal.c.mln_offline_region_status
-import org.maplibre.nativeffi.internal.c.mln_operation_release
-import org.maplibre.nativeffi.internal.c.mln_runtime_barrier_start
+import org.maplibre.nativeffi.internal.c.mln_runtime_barrier
 import org.maplibre.nativeffi.internal.c.mln_runtime_clear_http_header_transform
 import org.maplibre.nativeffi.internal.c.mln_runtime_clear_resource_provider
 import org.maplibre.nativeffi.internal.c.mln_runtime_clear_resource_transform
@@ -31,29 +34,23 @@ import org.maplibre.nativeffi.internal.c.mln_runtime_drain_events
 import org.maplibre.nativeffi.internal.c.mln_runtime_event
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_batch_view
 import org.maplibre.nativeffi.internal.c.mln_runtime_get_event_mask
-import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_create_start
-import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_create_take_result
-import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_delete_start
-import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_get_start
-import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_get_status_start
-import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_get_status_take_result
-import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_get_take_result
-import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_invalidate_start
-import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_set_download_state_start
-import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_set_observed_start
-import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_update_metadata_start
-import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_update_metadata_take_result
-import org.maplibre.nativeffi.internal.c.mln_runtime_offline_regions_list_start
-import org.maplibre.nativeffi.internal.c.mln_runtime_offline_regions_list_take_result
-import org.maplibre.nativeffi.internal.c.mln_runtime_offline_regions_merge_database_start
-import org.maplibre.nativeffi.internal.c.mln_runtime_offline_regions_merge_database_take_result
+import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_create
+import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_delete
+import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_get
+import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_get_status
+import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_invalidate
+import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_set_download_state
+import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_set_observed
+import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_update_metadata
+import org.maplibre.nativeffi.internal.c.mln_runtime_offline_regions_list
+import org.maplibre.nativeffi.internal.c.mln_runtime_offline_regions_merge_database
 import org.maplibre.nativeffi.internal.c.mln_runtime_options
 import org.maplibre.nativeffi.internal.c.mln_runtime_options_default
 import org.maplibre.nativeffi.internal.c.mln_runtime_release
-import org.maplibre.nativeffi.internal.c.mln_runtime_run_ambient_cache_operation_start
+import org.maplibre.nativeffi.internal.c.mln_runtime_run_ambient_cache_operation
 import org.maplibre.nativeffi.internal.c.mln_runtime_set_event_mask
 import org.maplibre.nativeffi.internal.c.mln_runtime_set_http_header_transform
-import org.maplibre.nativeffi.internal.c.mln_runtime_set_maximum_ambient_cache_size_start
+import org.maplibre.nativeffi.internal.c.mln_runtime_set_maximum_ambient_cache_size
 import org.maplibre.nativeffi.internal.c.mln_runtime_set_resource_provider
 import org.maplibre.nativeffi.internal.c.mln_runtime_set_resource_transform
 import org.maplibre.nativeffi.internal.callback.HttpHeaderTransformState
@@ -62,8 +59,6 @@ import org.maplibre.nativeffi.internal.callback.ResourceTransformState
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
 import org.maplibre.nativeffi.internal.lifecycle.NativeRuntime
 import org.maplibre.nativeffi.internal.lifecycle.asHandle
-import org.maplibre.nativeffi.internal.lifecycle.offlineRegionListHandle
-import org.maplibre.nativeffi.internal.lifecycle.offlineRegionSnapshotHandle
 import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
 import org.maplibre.nativeffi.internal.lifecycle.runtimeHandle
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
@@ -80,415 +75,216 @@ import org.maplibre.nativeffi.resource.ResourceTransformCallback
 
 /** Owned native runtime handle. */
 @OptIn(ExperimentalForeignApi::class, ExperimentalNativeApi::class)
-public actual class RuntimeHandle
-internal constructor(
-  handle: NativeRuntime,
-  private var notificationSource: ULong,
-  private val notifications: NotificationDispatcher,
-) {
+public actual class RuntimeHandle internal constructor(handle: NativeRuntime) {
   private val state = HandleState("RuntimeHandle", handle)
   private val liveMaps = mutableMapOf<Long, WeakReference<MapHandle>>()
 
-  public actual fun setNotificationCallback(callback: () -> Unit) {
-    state.requireLive()
-    notifications.setCallback(callback)
+  public actual fun barrier(): Deferred<Unit> = CompletionBridge.unit { completion ->
+    mln_runtime_barrier(state.requireLive().rawHandleValue, completion)
   }
 
-  public actual fun clearNotificationCallback() {
-    state.requireLive()
-    notifications.clearCallback()
-  }
-
-  public actual fun drainReady(): List<ReadyEndpoint> {
-    state.requireLive()
-    return notifications.drainReady()
-  }
-
-  public actual suspend fun barrier() {
-    val operation = startOperation { outOperation ->
-      mln_runtime_barrier_start(state.requireLive().rawHandleValue, outOperation)
-    }
-    try {
-      notifications.await(operation)
-    } finally {
-      mln_operation_release(operation)
-    }
-  }
-
-  public actual fun startAmbientCacheOperation(
-    operation: AmbientCacheOperation
-  ): OperationHandle<Unit> = memScoped {
-    val outOperationId = alloc<ULongVar>()
-    Status.check(
-      mln_runtime_run_ambient_cache_operation_start(
+  public actual fun runAmbientCacheOperation(operation: AmbientCacheOperation): Deferred<Unit> =
+    CompletionBridge.unit { completion ->
+      mln_runtime_run_ambient_cache_operation(
         state.requireLive().rawHandleValue,
         operation.nativeValue.toUInt(),
-        outOperationId.ptr,
-      )
-    )
-    offlineOperation(outOperationId.value, OperationKind.AMBIENT_CACHE, OperationResultKind.NONE)
-  }
-
-  public actual fun startSetMaximumAmbientCacheSize(size: Long): OperationHandle<Unit> = memScoped {
-    Status.requireArgument(size >= 0) { "size must be non-negative" }
-    val outOperationId = alloc<ULongVar>()
-    Status.check(
-      mln_runtime_set_maximum_ambient_cache_size_start(
-        state.requireLive().rawHandleValue,
-        size.toULong(),
-        outOperationId.ptr,
-      )
-    )
-    offlineOperation(
-      outOperationId.value,
-      OperationKind.SET_MAXIMUM_AMBIENT_CACHE_SIZE,
-      OperationResultKind.NONE,
-    )
-  }
-
-  public actual fun startCreateOfflineRegion(
-    definition: OfflineRegionDefinition,
-    metadata: ByteArray,
-  ): OperationHandle<OfflineRegionInfo> = memScoped {
-    val outOperationId = alloc<ULongVar>()
-    Status.check(
-      mln_runtime_offline_region_create_start(
-        state.requireLive().rawHandleValue,
-        RuntimeStructs.offlineRegionDefinition(definition, this),
-        RuntimeStructs.metadata(metadata, this),
-        metadata.size.toULong(),
-        outOperationId.ptr,
-      )
-    )
-    offlineOperation(outOperationId.value, OperationKind.REGION_CREATE, OperationResultKind.REGION)
-  }
-
-  public actual fun startOfflineRegion(id: Long): OperationHandle<OfflineRegionInfo?> = memScoped {
-    val outOperationId = alloc<ULongVar>()
-    Status.check(
-      mln_runtime_offline_region_get_start(
-        state.requireLive().rawHandleValue,
-        id,
-        outOperationId.ptr,
-      )
-    )
-    offlineOperation(
-      outOperationId.value,
-      OperationKind.REGION_GET,
-      OperationResultKind.OPTIONAL_REGION,
-    )
-  }
-
-  public actual fun startOfflineRegions(): OperationHandle<List<OfflineRegionInfo>> = memScoped {
-    val outOperationId = alloc<ULongVar>()
-    Status.check(
-      mln_runtime_offline_regions_list_start(state.requireLive().rawHandleValue, outOperationId.ptr)
-    )
-    offlineOperation(
-      outOperationId.value,
-      OperationKind.REGIONS_LIST,
-      OperationResultKind.REGION_LIST,
-    )
-  }
-
-  public actual fun startMergeOfflineRegionsDatabase(
-    path: String
-  ): OperationHandle<List<OfflineRegionInfo>> = memScoped {
-    MemoryUtil.requireValidCString(path)
-    val outOperationId = alloc<ULongVar>()
-    Status.check(
-      mln_runtime_offline_regions_merge_database_start(
-        state.requireLive().rawHandleValue,
-        path,
-        outOperationId.ptr,
-      )
-    )
-    offlineOperation(
-      outOperationId.value,
-      OperationKind.REGIONS_MERGE_DATABASE,
-      OperationResultKind.REGION_LIST,
-    )
-  }
-
-  public actual fun startUpdateOfflineRegionMetadata(
-    id: Long,
-    metadata: ByteArray,
-  ): OperationHandle<OfflineRegionInfo> = memScoped {
-    val outOperationId = alloc<ULongVar>()
-    Status.check(
-      mln_runtime_offline_region_update_metadata_start(
-        state.requireLive().rawHandleValue,
-        id,
-        RuntimeStructs.metadata(metadata, this),
-        metadata.size.toULong(),
-        outOperationId.ptr,
-      )
-    )
-    offlineOperation(
-      outOperationId.value,
-      OperationKind.REGION_UPDATE_METADATA,
-      OperationResultKind.REGION,
-    )
-  }
-
-  public actual fun startOfflineRegionStatus(id: Long): OperationHandle<OfflineRegionStatus> =
-    memScoped {
-      val outOperationId = alloc<ULongVar>()
-      Status.check(
-        mln_runtime_offline_region_get_status_start(
-          state.requireLive().rawHandleValue,
-          id,
-          outOperationId.ptr,
-        )
-      )
-      offlineOperation(
-        outOperationId.value,
-        OperationKind.REGION_GET_STATUS,
-        OperationResultKind.REGION_STATUS,
+        completion,
       )
     }
 
-  public actual fun startSetOfflineRegionObserved(
+  public actual fun setMaximumAmbientCacheSize(size: Long): Deferred<Unit> {
+    Status.requireArgument(size >= 0) { "size must be non-negative" }
+    return CompletionBridge.unit { completion ->
+      mln_runtime_set_maximum_ambient_cache_size(
+        state.requireLive().rawHandleValue,
+        size.toULong(),
+        completion,
+      )
+    }
+  }
+
+  public actual fun createOfflineRegion(
+    definition: OfflineRegionDefinition,
+    metadata: ByteArray,
+  ): Deferred<OfflineRegionInfo> = memScoped {
+    CompletionBridge.submit(
+      { result -> offlineRegionInfo(result)!! },
+      { completion ->
+        mln_runtime_offline_region_create(
+          state.requireLive().rawHandleValue,
+          RuntimeStructs.offlineRegionDefinition(definition, this),
+          RuntimeStructs.metadata(metadata, this),
+          metadata.size.toULong(),
+          completion,
+        )
+      },
+    )
+  }
+
+  public actual fun offlineRegion(id: Long): Deferred<OfflineRegionInfo?> =
+    CompletionBridge.submit(
+      ::offlineRegionInfo,
+      { completion ->
+        mln_runtime_offline_region_get(state.requireLive().rawHandleValue, id, completion)
+      },
+    )
+
+  public actual fun offlineRegions(): Deferred<List<OfflineRegionInfo>> =
+    CompletionBridge.submit(
+      ::offlineRegionList,
+      { completion ->
+        mln_runtime_offline_regions_list(state.requireLive().rawHandleValue, completion)
+      },
+    )
+
+  public actual fun mergeOfflineRegionsDatabase(path: String): Deferred<List<OfflineRegionInfo>> =
+    memScoped {
+      MemoryUtil.requireValidCString(path)
+      CompletionBridge.submit(
+        ::offlineRegionList,
+        { completion ->
+          mln_runtime_offline_regions_merge_database(
+            state.requireLive().rawHandleValue,
+            path,
+            completion,
+          )
+        },
+      )
+    }
+
+  public actual fun updateOfflineRegionMetadata(
     id: Long,
-    observed: Boolean,
-  ): OperationHandle<Unit> = memScoped {
-    val outOperationId = alloc<ULongVar>()
-    Status.check(
-      mln_runtime_offline_region_set_observed_start(
+    metadata: ByteArray,
+  ): Deferred<OfflineRegionInfo> = memScoped {
+    CompletionBridge.submit(
+      { result -> offlineRegionInfo(result)!! },
+      { completion ->
+        mln_runtime_offline_region_update_metadata(
+          state.requireLive().rawHandleValue,
+          id,
+          RuntimeStructs.metadata(metadata, this),
+          metadata.size.toULong(),
+          completion,
+        )
+      },
+    )
+  }
+
+  public actual fun offlineRegionStatus(id: Long): Deferred<OfflineRegionStatus> =
+    CompletionBridge.submit(
+      { result ->
+        RuntimeStructs.offlineRegionStatus(
+          result.pointed.value!!.reinterpret<mln_offline_region_status>().pointed
+        )
+      },
+      { completion ->
+        mln_runtime_offline_region_get_status(state.requireLive().rawHandleValue, id, completion)
+      },
+    )
+
+  public actual fun setOfflineRegionObserved(id: Long, observed: Boolean): Deferred<Unit> =
+    CompletionBridge.unit { completion ->
+      mln_runtime_offline_region_set_observed(
         state.requireLive().rawHandleValue,
         id,
         observed,
-        outOperationId.ptr,
+        completion,
       )
-    )
-    offlineOperation(
-      outOperationId.value,
-      OperationKind.REGION_SET_OBSERVED,
-      OperationResultKind.NONE,
-    )
-  }
+    }
 
-  public actual fun startSetOfflineRegionDownloadState(
+  public actual fun setOfflineRegionDownloadState(
     id: Long,
     downloadState: OfflineRegionDownloadState,
-  ): OperationHandle<Unit> = memScoped {
+  ): Deferred<Unit> {
     Status.requireArgument(downloadState.isKnown) {
       "Unknown offline region download state cannot be used as input: ${downloadState.nativeValue}"
     }
-    val outOperationId = alloc<ULongVar>()
-    Status.check(
-      mln_runtime_offline_region_set_download_state_start(
+    return CompletionBridge.unit { completion ->
+      mln_runtime_offline_region_set_download_state(
         state.requireLive().rawHandleValue,
         id,
         downloadState.nativeValue.toUInt(),
-        outOperationId.ptr,
+        completion,
       )
-    )
-    offlineOperation(
-      outOperationId.value,
-      OperationKind.REGION_SET_DOWNLOAD_STATE,
-      OperationResultKind.NONE,
+    }
+  }
+
+  public actual fun invalidateOfflineRegion(id: Long): Deferred<Unit> =
+    CompletionBridge.unit { completion ->
+      mln_runtime_offline_region_invalidate(state.requireLive().rawHandleValue, id, completion)
+    }
+
+  public actual fun deleteOfflineRegion(id: Long): Deferred<Unit> =
+    CompletionBridge.unit { completion ->
+      mln_runtime_offline_region_delete(state.requireLive().rawHandleValue, id, completion)
+    }
+
+  private fun offlineRegionInfo(result: CPointer<mln_completion_result>): OfflineRegionInfo? {
+    if (result.pointed.value_count == 0uL) return null
+    return RuntimeStructs.offlineRegionInfo(
+      result.pointed.value!!.reinterpret<mln_offline_region_info>().pointed
     )
   }
 
-  public actual fun startInvalidateOfflineRegion(id: Long): OperationHandle<Unit> = memScoped {
-    val outOperationId = alloc<ULongVar>()
-    Status.check(
-      mln_runtime_offline_region_invalidate_start(
-        state.requireLive().rawHandleValue,
-        id,
-        outOperationId.ptr,
-      )
-    )
-    offlineOperation(
-      outOperationId.value,
-      OperationKind.REGION_INVALIDATE,
-      OperationResultKind.NONE,
-    )
+  private fun offlineRegionList(result: CPointer<mln_completion_result>): List<OfflineRegionInfo> {
+    val count = result.pointed.value_count
+    if (count == 0uL) return emptyList()
+    require(count <= Int.MAX_VALUE.toULong()) { "offline region count exceeds Int.MAX_VALUE" }
+    val regions = result.pointed.value!!.reinterpret<mln_offline_region_info>()
+    return List(count.toInt()) { index -> RuntimeStructs.offlineRegionInfo(regions[index]) }
   }
 
-  public actual fun startDeleteOfflineRegion(id: Long): OperationHandle<Unit> = memScoped {
-    val outOperationId = alloc<ULongVar>()
-    Status.check(
-      mln_runtime_offline_region_delete_start(
-        state.requireLive().rawHandleValue,
-        id,
-        outOperationId.ptr,
-      )
-    )
-    offlineOperation(outOperationId.value, OperationKind.REGION_DELETE, OperationResultKind.NONE)
-  }
-
-  public actual fun takeCreateOfflineRegionResult(
-    operation: OperationHandle<OfflineRegionInfo>
-  ): OfflineRegionInfo =
-    operation.withResultUse(OperationKind.REGION_CREATE, OperationResultKind.REGION) { operationId
-      ->
-      memScoped {
-        val outRegion = alloc<ULongVar>()
-        outRegion.value = 0uL
-        Status.check(mln_runtime_offline_region_create_take_result(operationId, outRegion.ptr))
-        operation.markResultConsumed()
-        RuntimeStructs.offlineRegionSnapshot(
-          outRegion.value.asHandle("mln_offline_region_snapshot", ::offlineRegionSnapshotHandle)
-        )
-      }
-    }
-
-  public actual fun takeOfflineRegionResult(
-    operation: OperationHandle<OfflineRegionInfo?>
-  ): OfflineRegionInfo? =
-    operation.withResultUse(OperationKind.REGION_GET, OperationResultKind.OPTIONAL_REGION) {
-      operationId ->
-      memScoped {
-        val outRegion = alloc<ULongVar>()
-        val outFound = alloc<BooleanVar>()
-        outRegion.value = 0uL
-        Status.check(
-          mln_runtime_offline_region_get_take_result(operationId, outRegion.ptr, outFound.ptr)
-        )
-        operation.markResultConsumed()
-        if (!outFound.value) null
-        else
-          RuntimeStructs.offlineRegionSnapshot(
-            outRegion.value.asHandle("mln_offline_region_snapshot", ::offlineRegionSnapshotHandle)
-          )
-      }
-    }
-
-  public actual fun takeOfflineRegionsResult(
-    operation: OperationHandle<List<OfflineRegionInfo>>
-  ): List<OfflineRegionInfo> =
-    operation.withResultUse(OperationKind.REGIONS_LIST, OperationResultKind.REGION_LIST) {
-      operationId ->
-      memScoped {
-        val outRegions = alloc<ULongVar>()
-        outRegions.value = 0uL
-        Status.check(mln_runtime_offline_regions_list_take_result(operationId, outRegions.ptr))
-        operation.markResultConsumed()
-        RuntimeStructs.offlineRegionList(
-          outRegions.value.asHandle("mln_offline_region_list", ::offlineRegionListHandle)
-        )
-      }
-    }
-
-  public actual fun takeMergeOfflineRegionsDatabaseResult(
-    operation: OperationHandle<List<OfflineRegionInfo>>
-  ): List<OfflineRegionInfo> =
-    operation.withResultUse(
-      OperationKind.REGIONS_MERGE_DATABASE,
-      OperationResultKind.REGION_LIST,
-    ) { operationId ->
-      memScoped {
-        val outRegions = alloc<ULongVar>()
-        outRegions.value = 0uL
-        Status.check(
-          mln_runtime_offline_regions_merge_database_take_result(operationId, outRegions.ptr)
-        )
-        operation.markResultConsumed()
-        RuntimeStructs.offlineRegionList(
-          outRegions.value.asHandle("mln_offline_region_list", ::offlineRegionListHandle)
-        )
-      }
-    }
-
-  public actual fun takeUpdateOfflineRegionMetadataResult(
-    operation: OperationHandle<OfflineRegionInfo>
-  ): OfflineRegionInfo =
-    operation.withResultUse(OperationKind.REGION_UPDATE_METADATA, OperationResultKind.REGION) {
-      operationId ->
-      memScoped {
-        val outRegion = alloc<ULongVar>()
-        outRegion.value = 0uL
-        Status.check(
-          mln_runtime_offline_region_update_metadata_take_result(operationId, outRegion.ptr)
-        )
-        operation.markResultConsumed()
-        RuntimeStructs.offlineRegionSnapshot(
-          outRegion.value.asHandle("mln_offline_region_snapshot", ::offlineRegionSnapshotHandle)
-        )
-      }
-    }
-
-  public actual fun takeOfflineRegionStatusResult(
-    operation: OperationHandle<OfflineRegionStatus>
-  ): OfflineRegionStatus =
-    operation.withResultUse(OperationKind.REGION_GET_STATUS, OperationResultKind.REGION_STATUS) {
-      operationId ->
-      memScoped {
-        val outStatus = alloc<mln_offline_region_status>()
-        outStatus.size = sizeOf<mln_offline_region_status>().toUInt()
-        Status.check(mln_runtime_offline_region_get_status_take_result(operationId, outStatus.ptr))
-        operation.markResultConsumed()
-        RuntimeStructs.offlineRegionStatus(outStatus)
-      }
-    }
-
-  private fun <T> offlineOperation(
-    operationId: ULong,
-    kind: OperationKind,
-    resultKind: OperationResultKind,
-  ): OperationHandle<T> = OperationHandle(this, operationId, kind, resultKind)
-
-  public actual fun setResourceProvider(callback: ResourceProviderCallback): ULong {
+  public actual fun setResourceProvider(
+    callback: ResourceProviderCallback
+  ): Deferred<CommandCompletion> {
     val replacement = ResourceProviderState(callback)
-    return try {
-      command { outCommandId ->
-        mln_runtime_set_resource_provider(
-          state.requireLive().rawHandleValue,
-          replacement.descriptor(),
-          outCommandId,
-        )
-      }
-    } catch (error: Throwable) {
-      replacement.close()
-      throw error
+    return command(replacement::close) { completion ->
+      mln_runtime_set_resource_provider(
+        state.requireLive().rawHandleValue,
+        replacement.descriptor(),
+        completion,
+      )
     }
   }
 
-  public actual fun clearResourceProvider(): ULong = command { outCommandId ->
-    mln_runtime_clear_resource_provider(state.requireLive().rawHandleValue, outCommandId)
+  public actual fun clearResourceProvider(): Deferred<CommandCompletion> = command { completion ->
+    mln_runtime_clear_resource_provider(state.requireLive().rawHandleValue, completion)
   }
 
-  public actual fun setResourceTransform(callback: ResourceTransformCallback): ULong {
+  public actual fun setResourceTransform(
+    callback: ResourceTransformCallback
+  ): Deferred<CommandCompletion> {
     val replacement = ResourceTransformState(callback)
-    return try {
-      command { outCommandId ->
-        mln_runtime_set_resource_transform(
-          state.requireLive().rawHandleValue,
-          replacement.descriptor(),
-          outCommandId,
-        )
-      }
-    } catch (error: Throwable) {
-      replacement.close()
-      throw error
+    return command(replacement::close) { completion ->
+      mln_runtime_set_resource_transform(
+        state.requireLive().rawHandleValue,
+        replacement.descriptor(),
+        completion,
+      )
     }
   }
 
-  public actual fun clearResourceTransform(): ULong = command { outCommandId ->
-    mln_runtime_clear_resource_transform(state.requireLive().rawHandleValue, outCommandId)
+  public actual fun clearResourceTransform(): Deferred<CommandCompletion> = command { completion ->
+    mln_runtime_clear_resource_transform(state.requireLive().rawHandleValue, completion)
   }
 
-  public actual fun setHttpHeaderTransform(callback: HttpHeaderTransformCallback): ULong {
+  public actual fun setHttpHeaderTransform(
+    callback: HttpHeaderTransformCallback
+  ): Deferred<CommandCompletion> {
     val replacement = HttpHeaderTransformState(callback)
-    return try {
-      command { outCommandId ->
-        mln_runtime_set_http_header_transform(
-          state.requireLive().rawHandleValue,
-          replacement.descriptor(),
-          outCommandId,
-        )
-      }
-    } catch (error: Throwable) {
-      replacement.close()
-      throw error
+    return command(replacement::close) { completion ->
+      mln_runtime_set_http_header_transform(
+        state.requireLive().rawHandleValue,
+        replacement.descriptor(),
+        completion,
+      )
     }
   }
 
-  public actual fun clearHttpHeaderTransform(): ULong = command { outCommandId ->
-    mln_runtime_clear_http_header_transform(state.requireLive().rawHandleValue, outCommandId)
-  }
+  public actual fun clearHttpHeaderTransform(): Deferred<CommandCompletion> =
+    command { completion ->
+      mln_runtime_clear_http_header_transform(state.requireLive().rawHandleValue, completion)
+    }
 
   public actual fun drainEvents(): RuntimeEventBatch = memScoped {
     val outBatch = alloc<ULongVar>()
@@ -541,11 +337,6 @@ internal constructor(
       throw error
     }
     state.completeClose {}
-    notifications.close()
-    if (notificationSource != 0uL) {
-      mln_notification_source_release(notificationSource)
-      notificationSource = 0uL
-    }
   }
 
   public actual val isClosed: Boolean
@@ -554,14 +345,6 @@ internal constructor(
   internal fun nativeHandle(): NativeRuntime = state.requireLive()
 
   internal fun nativeHandleId(): Long = state.handleId()
-
-  internal suspend fun awaitOperation(operation: ULong) {
-    notifications.await(operation)
-  }
-
-  internal fun forgetOperation(operation: ULong) {
-    notifications.forget(operation)
-  }
 
   internal fun copyEventForTesting(
     event: mln_runtime_event,
@@ -619,48 +402,23 @@ internal constructor(
       creator: (CPointer<mln_runtime_options>, CPointer<ULongVar>) -> Int,
     ): RuntimeHandle = memScoped {
       Maplibre.checkCompatibleCAbi(actualAbiVersion)
-      val outSource = alloc<ULongVar>()
-      outSource.value = 0uL
-      Status.check(mln_notification_source_create(outSource.ptr))
-      val source = outSource.value
       val nativeOptions = alloc<mln_runtime_options>()
       mln_runtime_options_default().place(nativeOptions.ptr)
       options.assetPath?.let { nativeOptions.asset_path = MemoryUtil.cString(this, it) }
       options.cachePath?.let { nativeOptions.cache_path = MemoryUtil.cString(this, it) }
       nativeOptions.event_mask = options.eventMask.nativeValue.toULong()
-      nativeOptions.notification_source = source
-
-      val notifications = NotificationDispatcher(source)
-      try {
-        val outRuntime = alloc<ULongVar>()
-        outRuntime.value = 0uL
-        Status.check(creator(nativeOptions.ptr, outRuntime.ptr))
-        RuntimeHandle(
-          outRuntime.value.asHandle("mln_runtime_create", ::runtimeHandle),
-          source,
-          notifications,
-        )
-      } catch (error: Throwable) {
-        notifications.close()
-        mln_notification_source_release(source)
-        throw error
-      }
+      val outRuntime = alloc<ULongVar>()
+      outRuntime.value = 0uL
+      Status.check(creator(nativeOptions.ptr, outRuntime.ptr))
+      RuntimeHandle(outRuntime.value.asHandle("mln_runtime_create", ::runtimeHandle))
     }
   }
 }
 
 @OptIn(ExperimentalForeignApi::class)
-private inline fun command(call: (CPointer<ULongVar>) -> Int): ULong = memScoped {
-  val outCommandId = alloc<ULongVar>()
-  outCommandId.value = 0uL
-  Status.check(call(outCommandId.ptr))
-  outCommandId.value
-}
-
-@OptIn(ExperimentalForeignApi::class)
-internal inline fun startOperation(call: (CPointer<ULongVar>) -> Int): ULong = memScoped {
-  val outOperation = alloc<ULongVar>()
-  outOperation.value = 0uL
-  Status.check(call(outOperation.ptr))
-  outOperation.value
+private inline fun command(
+  crossinline rejected: () -> Unit = {},
+  crossinline call: (CPointer<mln_completion>) -> Int,
+): Deferred<CommandCompletion> = CompletionBridge.command {
+  call(it).also { status -> if (status != 0) rejected() }
 }

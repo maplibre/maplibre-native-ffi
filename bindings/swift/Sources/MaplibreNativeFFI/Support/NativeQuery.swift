@@ -1,50 +1,32 @@
 internal import CMaplibreNativeC
 import Foundation
 
-// Render-session queries use the common operation and notification adapters
-// directly from Query.swift so their typed result transfer remains visible.
-// This file copies native queried-feature lists into Swift values.
-
 enum NativeQuery {
-  static func copyQueriedFeatureList(
-    _ list: NativeQueriedFeatureListHandle
+  static func copyQueriedFeatures(
+    _ result: UnsafePointer<mln_completion_result>
   ) throws -> [QueriedFeature] {
-    guard !list.isNull else {
-      throw NativeStatusFailure
-        .swiftNativeError("queried feature list was null")
-    }
-    defer { mln_queried_feature_list_destroy(list.raw) }
-    let count = try NativeMemory.withTemporary(0) { count in
-      try checkStatus(mln_queried_feature_list_count(list.raw, count))
-    }.value
-    return try (0 ..< count).map { index in
-      var hit = mln_queried_feature_default()
-      try checkStatus(mln_queried_feature_list_get(list.raw, index, &hit))
-      return try copyQueriedFeature(hit)
+    try NativeCompletion.values(result, as: mln_queried_feature.self).map {
+      try copyQueriedFeature($0)
     }
   }
 
-  private static func copyQueriedFeature(_ hit: mln_queried_feature) throws
-    -> QueriedFeature
-  {
+  private static func copyQueriedFeature(
+    _ hit: mln_queried_feature
+  ) throws -> QueriedFeature {
     let sourceId = hasField(hit, MLN_QUERIED_FEATURE_SOURCE_ID.rawValue)
       ? try NativeString.copyUTF8(
         data: hit.source_id.data,
         size: hit.source_id.size
-      )
-      : nil
+      ) : nil
     let sourceLayerId = hasField(
       hit,
       MLN_QUERIED_FEATURE_SOURCE_LAYER_ID.rawValue
-    )
-      ? try NativeString.copyUTF8(
-        data: hit.source_layer_id.data,
-        size: hit.source_layer_id.size
-      )
-      : nil
+    ) ? try NativeString.copyUTF8(
+      data: hit.source_layer_id.data,
+      size: hit.source_layer_id.size
+    ) : nil
     let state = hasField(hit, MLN_QUERIED_FEATURE_STATE.rawValue)
-      ? try copyView(hit.state)
-      : nil
+      ? try copyView(hit.state) : nil
     return try QueriedFeature(
       feature: copyView(hit.feature),
       sourceId: sourceId,

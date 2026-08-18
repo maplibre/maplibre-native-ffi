@@ -29,10 +29,6 @@ struct NativeRenderSessionHandle: NativeHandle {
   let raw: UInt64
 }
 
-struct NativeOperationHandle: NativeHandle {
-  let raw: UInt64
-}
-
 struct NativeOfflineRegionSnapshotHandle: NativeHandle {
   let raw: UInt64
 }

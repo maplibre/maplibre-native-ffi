@@ -16,9 +16,9 @@ The MapLibre [Android](https://maplibre.org/maplibre-native/android/api/) and
 SDKs provide a map view that owns a window, a frame loop, and gesture handling.
 This API provides the map and render session. The host supplies a render target,
 selects native-worker or caller-graphics-thread execution where the target
-permits it, drains receiver-scoped notifications, and submits frame demand from
-its own cadence. A texture render target supports image export and compositing
-into a host scene.
+permits it, drains events and frame results, and submits frame demand from its
+own cadence. A texture render target supports image export and compositing into
+a host scene.
 
 See the [examples](https://github.com/maplibre/maplibre-native-ffi/tree/main/examples)
 in the repository for complete integration examples for each language binding.

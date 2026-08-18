@@ -59,7 +59,7 @@ internal static class Shell
                     {
                         graphics.Resize(viewport);
                         target.Resize(viewport);
-                        _ = state.Map.Resize(
+                        _ = state.Map.ResizeAsync(
                             new global::Maplibre.NativeFfi.Map.LogicalExtent(
                                 viewport.LogicalWidth,
                                 viewport.LogicalHeight,

@@ -181,37 +181,34 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_status mln_acquired_frame_release([NativeTypeName("mln_acquired_frame *")] MlnAcquiredFrame* frame, [NativeTypeName("const mln_gpu_sync *")] mln_gpu_sync* consumer_completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_resize_start([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_render_target_extent *")] mln_render_target_extent* extent, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
+        public static extern mln_status mln_render_session_resize([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_render_target_extent *")] mln_render_target_extent* extent, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_barrier_start([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
+        public static extern mln_status mln_render_session_barrier([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_reduce_memory_use_start([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
+        public static extern mln_status mln_render_session_reduce_memory_use([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_clear_data_start([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
+        public static extern mln_status mln_render_session_clear_data([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_dump_debug_logs_start([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
+        public static extern mln_status mln_render_session_dump_debug_logs([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_set_feature_state_start([NativeTypeName("mln_render_session")] MlnRenderSession session, mln_buffer_view source_id, mln_buffer_view source_layer_id, mln_buffer_view feature_id, mln_buffer_view state_json, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
+        public static extern mln_status mln_render_session_set_feature_state([NativeTypeName("mln_render_session")] MlnRenderSession session, mln_buffer_view source_id, mln_buffer_view source_layer_id, mln_buffer_view feature_id, mln_buffer_view state_json, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_get_feature_state_start([NativeTypeName("mln_render_session")] MlnRenderSession session, mln_buffer_view source_id, mln_buffer_view source_layer_id, mln_buffer_view feature_id, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
+        public static extern mln_status mln_render_session_get_feature_state([NativeTypeName("mln_render_session")] MlnRenderSession session, mln_buffer_view source_id, mln_buffer_view source_layer_id, mln_buffer_view feature_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_get_feature_state_take_result([NativeTypeName("mln_operation")] MlnOperation operation, [NativeTypeName("mln_buffer *")] MlnBuffer* out_state_json);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_remove_feature_state_start([NativeTypeName("mln_render_session")] MlnRenderSession session, mln_buffer_view source_id, mln_buffer_view source_layer_id, mln_buffer_view feature_id, mln_buffer_view state_key, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
+        public static extern mln_status mln_render_session_remove_feature_state([NativeTypeName("mln_render_session")] MlnRenderSession session, mln_buffer_view source_id, mln_buffer_view source_layer_id, mln_buffer_view feature_id, mln_buffer_view state_key, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_render_session_service_driver_work([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("size_t")] nuint max_work, [NativeTypeName("size_t *")] nuint* out_serviced);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_detach_start([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("mln_operation *")] MlnOperation* out_operation);
+        public static extern mln_status mln_render_session_detach([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_render_session_abandon([NativeTypeName("mln_render_session")] MlnRenderSession session, mln_render_abandon_result* out_result);

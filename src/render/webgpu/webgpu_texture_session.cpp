@@ -1116,7 +1116,7 @@ auto supported_render_backend_mask() noexcept -> uint32_t {
 auto webgpu_owned_texture_attach_start(
   mln_map map, const mln_webgpu_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
 #if !defined(MLN_RENDER_BACKEND_WEBGPU)
   set_thread_error("WebGPU texture sessions are not supported by this build");
@@ -1175,7 +1175,7 @@ auto webgpu_owned_texture_attach_start(
   };
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Texture, options, capabilities,
-    out_session, out_operation
+    out_session, completion
   );
 #endif
 }
@@ -1183,7 +1183,7 @@ auto webgpu_owned_texture_attach_start(
 auto webgpu_borrowed_texture_attach_start(
   mln_map map, const mln_webgpu_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
 #if !defined(MLN_RENDER_BACKEND_WEBGPU)
   set_thread_error(
@@ -1244,7 +1244,7 @@ auto webgpu_borrowed_texture_attach_start(
   };
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Texture, options, capabilities,
-    out_session, out_operation
+    out_session, completion
   );
 #endif
 }
@@ -1252,7 +1252,7 @@ auto webgpu_borrowed_texture_attach_start(
 auto webgpu_borrowed_texture_set_target_start(
   mln_render_session session,
   const mln_webgpu_borrowed_texture_descriptor* descriptor,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) -> mln_status {
   const auto descriptor_status =
     validate_webgpu_borrowed_texture_descriptor(descriptor);
@@ -1267,7 +1267,7 @@ auto webgpu_borrowed_texture_set_target_start(
   }
   const auto copied = *descriptor;
   return enqueue_driver_operation(
-    session, RENDER_OPERATION_MAINTENANCE,
+    session,
     [copied](mln_render_session_object& target) {
       const auto texture_status = validate_webgpu_texture(
         copied, mbgl::Size{copied.physical_width, copied.physical_height}
@@ -1283,14 +1283,14 @@ auto webgpu_borrowed_texture_set_target_start(
         }
       );
     },
-    out_operation
+    completion
   );
 }
 
 auto webgpu_surface_attach_start(
   mln_map map, const mln_webgpu_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
 #if !defined(MLN_RENDER_BACKEND_WEBGPU)
   set_thread_error("WebGPU surface sessions are not supported by this build");
@@ -1339,14 +1339,14 @@ auto webgpu_surface_attach_start(
   };
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Surface, options, capabilities,
-    out_session, out_operation
+    out_session, completion
   );
 #endif
 }
 
 auto webgpu_surface_set_target_start(
   mln_render_session session, const mln_webgpu_surface_descriptor* descriptor,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) -> mln_status {
   const auto descriptor_status = validate_webgpu_surface_descriptor(descriptor);
   if (descriptor_status != MLN_STATUS_OK) {
@@ -1354,7 +1354,7 @@ auto webgpu_surface_set_target_start(
   }
   const auto copied = *descriptor;
   return enqueue_driver_operation(
-    session, RENDER_OPERATION_MAINTENANCE,
+    session,
     [copied](mln_render_session_object& target) {
       return surface_session_set_target(
         target.self, copied.extent, [&copied](mln_render_session_object& live) {
@@ -1362,7 +1362,7 @@ auto webgpu_surface_set_target_start(
         }
       );
     },
-    out_operation
+    completion
   );
 }
 

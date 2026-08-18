@@ -585,40 +585,32 @@ const TestOwnedTextureSession = struct {
             self.context.deinit();
             self.context_active = false;
         }
-        const operation = try self.session.detachStart();
-        try finishOperation(self.session, operation);
+        try finishOperation(self.session, try self.session.detach());
         try self.session.destroy();
     }
 };
 
-fn waitOperationSuccess(session: maplibre.RenderSessionHandle, operation: maplibre.OperationHandle) !void {
+fn resolveFuture(comptime T: type, session: maplibre.RenderSessionHandle, future_value: maplibre.Future(T)) !T {
+    var future = future_value;
+    defer future.deinit();
     for (0..100_000) |_| {
-        if (try operation.poll()) {
-            try testing.expect(try operation.waitForSuccess(0));
-            return;
-        }
+        if (try future.poll()) return future.wait(null);
         _ = session.serviceDriverWork(64) catch 0;
         try std.Thread.yield();
     }
     return error.OperationTimedOut;
 }
 
-fn finishOperation(session: maplibre.RenderSessionHandle, operation: maplibre.OperationHandle) !void {
-    defer operation.release();
-    try waitOperationSuccess(session, operation);
-    try operation.finish();
+fn finishOperation(session: maplibre.RenderSessionHandle, future: maplibre.Future(void)) !void {
+    _ = try resolveFuture(void, session, future);
 }
 
-fn takeQueryResult(session: maplibre.RenderSessionHandle, operation: maplibre.OperationHandle) !maplibre.OwnedString {
-    defer operation.release();
-    try waitOperationSuccess(session, operation);
-    return session.takeQueryResult(testing.allocator, operation);
+fn takeQueryResult(session: maplibre.RenderSessionHandle, future: maplibre.Future(maplibre.OwnedString)) !maplibre.OwnedString {
+    return resolveFuture(maplibre.OwnedString, session, future);
 }
 
-fn takeQueryFeaturesResult(session: maplibre.RenderSessionHandle, operation: maplibre.OperationHandle) !maplibre.QueriedFeatureList {
-    defer operation.release();
-    try waitOperationSuccess(session, operation);
-    return session.takeQueryFeaturesResult(testing.allocator, operation);
+fn takeQueryFeaturesResult(session: maplibre.RenderSessionHandle, future: maplibre.Future(maplibre.QueriedFeatureList)) !maplibre.QueriedFeatureList {
+    return resolveFuture(maplibre.QueriedFeatureList, session, future);
 }
 
 fn finishAttachment(attachment: maplibre.RenderSessionAttachment) !maplibre.RenderSessionHandle {
@@ -626,7 +618,7 @@ fn finishAttachment(attachment: maplibre.RenderSessionAttachment) !maplibre.Rend
         var session = attachment.session;
         session.destroy() catch {};
     }
-    try finishOperation(attachment.session, attachment.operation);
+    try finishOperation(attachment.session, attachment.completion);
     return attachment.session;
 }
 
@@ -653,7 +645,7 @@ fn attachTestOwnedTexture(map: *maplibre.MapHandle, descriptor: TestOwnedTexture
     else
         unreachable;
     errdefer {
-        if (session.detachStart()) |operation| {
+        if (session.detach()) |operation| {
             finishOperation(session, operation) catch {};
         } else |_| {}
         session.destroy() catch {};
@@ -1011,10 +1003,9 @@ fn findVulkanMemoryType(dispatch: *const VulkanDispatch, physical_device: if (bu
 var next_frame_token: u64 = 1;
 
 fn awaitRuntimeBarrier(runtime: *maplibre.RuntimeHandle) !void {
-    const operation = try runtime.barrierStart();
-    defer operation.release();
-    try testing.expect(try operation.waitForSuccess(5_000));
-    try operation.finish();
+    var future = try runtime.barrier();
+    defer future.deinit();
+    _ = try future.wait(null);
 }
 
 fn renderFrame(session: maplibre.RenderSessionHandle, if_needed: bool) !maplibre.FrameResult {
@@ -1080,7 +1071,7 @@ fn expectOwnedFrameExtent(
 }
 
 fn closeSession(session: *maplibre.RenderSessionHandle) !void {
-    const operation = try session.detachStart();
+    const operation = try session.detach();
     try finishOperation(session.*, operation);
     try session.destroy();
 }
@@ -1089,7 +1080,9 @@ test "owned texture session renders acquires resizes and reads back" {
     if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try maplibre.MapHandle.create(&runtime, .{ .width = 32, .height = 16 });
+    var map_future = try maplibre.MapHandle.create(&runtime, .{ .width = 32, .height = 16 });
+    defer map_future.deinit();
+    var map = try map_future.wait(null);
     defer map.close() catch @panic("map close failed");
 
     const initial_extent = maplibre.RenderTargetExtent{ .width = 32, .height = 16 };
@@ -1105,10 +1098,7 @@ test "owned texture session renders acquires resizes and reads back" {
     try expectOwnedFrameExtent(owned.session, initial_extent);
 
     if (capabilities.readback) {
-        const operation = try owned.session.readbackStart();
-        defer operation.release();
-        try waitOperationSuccess(owned.session, operation);
-        var image = try owned.session.takeReadback(testing.allocator, operation);
+        var image = try resolveFuture(maplibre.OwnedReadback, owned.session, try owned.session.readback(testing.allocator));
         defer image.deinit();
         try testing.expectEqual(@as(u32, 32), image.info.width);
         try testing.expectEqual(@as(u32, 16), image.info.height);
@@ -1117,7 +1107,7 @@ test "owned texture session renders acquires resizes and reads back" {
     }
 
     const resized_extent = maplibre.RenderTargetExtent{ .width = 48, .height = 24 };
-    try finishOperation(owned.session, try owned.session.resizeStart(resized_extent));
+    try finishOperation(owned.session, try owned.session.resize(resized_extent));
     _ = try map.resize(48, 24, 1.0);
     try awaitRuntimeBarrier(&runtime);
     for (0..1000) |_| {
@@ -1137,15 +1127,15 @@ test "texture readback before a frame completes with invalid state" {
     if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try maplibre.MapHandle.create(&runtime, .{ .width = 16, .height = 16 });
+    var map_future = try maplibre.MapHandle.create(&runtime, .{ .width = 16, .height = 16 });
+    defer map_future.deinit();
+    var map = try map_future.wait(null);
     defer map.close() catch @panic("map close failed");
     var owned = try attachTestOwnedTexture(&map, .{ .extent = .{ .width = 16, .height = 16 } });
     defer owned.close() catch @panic("render session close failed");
 
     if ((try owned.session.capabilities()).readback) {
-        const operation = try owned.session.readbackStart();
-        defer operation.release();
-        try testing.expectError(error.InvalidState, waitOperationSuccess(owned.session, operation));
+        try testing.expectError(error.InvalidState, resolveFuture(maplibre.OwnedReadback, owned.session, try owned.session.readback(testing.allocator)));
     }
 }
 
@@ -1156,7 +1146,9 @@ test "live render session blocks map close until detached" {
 
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, &diagnostics);
     errdefer runtime.close() catch {};
-    var map = try maplibre.MapHandle.create(&runtime, .{ .width = 32, .height = 32 });
+    var map_future = try maplibre.MapHandle.create(&runtime, .{ .width = 32, .height = 32 });
+    defer map_future.deinit();
+    var map = try map_future.wait(null);
     errdefer map.close() catch {};
     var owned = try attachTestOwnedTexture(&map, .{ .extent = .{ .width = 32, .height = 32 } });
     errdefer owned.close() catch {};
@@ -1174,22 +1166,23 @@ test "still-image map modes complete owned texture renders" {
     inline for (.{ maplibre.MapMode.static, maplibre.MapMode.tile }) |mode| {
         var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
         defer runtime.close() catch @panic("runtime close failed");
-        var map = try maplibre.MapHandle.create(&runtime, .{ .width = 32, .height = 32, .mode = mode });
+        var map_future = try maplibre.MapHandle.create(&runtime, .{ .width = 32, .height = 32, .mode = mode });
+        defer map_future.deinit();
+        var map = try map_future.wait(null);
         defer map.close() catch @panic("map close failed");
         var owned = try attachTestOwnedTexture(&map, .{ .extent = .{ .width = 32, .height = 32 } });
         defer owned.close() catch @panic("render session close failed");
 
         _ = try map.setStyleJson(testing.allocator, support.style_json);
         try awaitRuntimeBarrier(&runtime);
-        const operation = try map.requestStillImage();
-        defer operation.release();
+        var future = try map.requestStillImage();
+        defer future.deinit();
         for (0..1000) |_| {
             _ = try renderFrame(owned.session, false);
-            if (try operation.poll()) break;
+            if (try future.poll()) break;
             try std.Thread.yield();
         } else return error.StillImageDidNotComplete;
-        try waitOperationSuccess(owned.session, operation);
-        try operation.finish();
+        _ = try future.wait(null);
         try expectOwnedFrameExtent(owned.session, .{ .width = 32, .height = 32 });
     }
 }
@@ -1281,7 +1274,9 @@ test "feature state and rendered queries copy operation results" {
     if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try maplibre.MapHandle.create(&runtime, .{ .width = 64, .height = 64 });
+    var map_future = try maplibre.MapHandle.create(&runtime, .{ .width = 64, .height = 64 });
+    defer map_future.deinit();
+    var map = try map_future.wait(null);
     defer map.close() catch @panic("map close failed");
     var owned = try attachTestOwnedTexture(&map, .{ .extent = .{ .width = 64, .height = 64 } });
     defer owned.close() catch @panic("render session close failed");
@@ -1293,19 +1288,16 @@ test "feature state and rendered queries copy operation results" {
     const selector = maplibre.FeatureStateSelector{ .source_id = "point", .feature_id = "feature-1" };
     try finishOperation(
         owned.session,
-        try owned.session.setFeatureStateStart(testing.allocator, selector, "{\"hover\":true,\"count\":3}"),
+        try owned.session.setFeatureState(testing.allocator, selector, "{\"hover\":true,\"count\":3}"),
     );
-    const get_operation = try owned.session.getFeatureStateStart(testing.allocator, selector);
-    defer get_operation.release();
-    try waitOperationSuccess(owned.session, get_operation);
-    var state = try owned.session.takeFeatureState(testing.allocator, get_operation);
+    var state = try resolveFuture(maplibre.OwnedString, owned.session, try owned.session.getFeatureState(testing.allocator, selector));
     defer state.deinit();
     try testing.expect(std.mem.indexOf(u8, state.value, "\"hover\":true") != null);
 
     for (0..1000) |_| {
         var result = try takeQueryFeaturesResult(
             owned.session,
-            try owned.session.queryRenderedFeaturesStart(
+            try owned.session.queryRenderedFeatures(
                 testing.allocator,
                 .{ .box = .{
                     .min = .{ .x = 0, .y = 0 },
@@ -1327,7 +1319,7 @@ test "feature state and rendered queries copy operation results" {
 
     var source = try takeQueryFeaturesResult(
         owned.session,
-        try owned.session.querySourceFeaturesStart(testing.allocator, "point", null),
+        try owned.session.querySourceFeatures(testing.allocator, "point", null),
     );
     defer source.deinit();
     try testing.expectEqualStrings("point", source.items[0].source_id.?);
@@ -1335,7 +1327,7 @@ test "feature state and rendered queries copy operation results" {
 
     try finishOperation(
         owned.session,
-        try owned.session.removeFeatureStateStart(testing.allocator, selector),
+        try owned.session.removeFeatureState(testing.allocator, selector),
     );
 }
 
@@ -1343,7 +1335,9 @@ test "cluster feature extensions copy values and feature collections" {
     if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try maplibre.MapHandle.create(&runtime, .{ .width = 64, .height = 64 });
+    var map_future = try maplibre.MapHandle.create(&runtime, .{ .width = 64, .height = 64 });
+    defer map_future.deinit();
+    var map = try map_future.wait(null);
     defer map.close() catch @panic("map close failed");
     var owned = try attachTestOwnedTexture(&map, .{ .extent = .{ .width = 64, .height = 64 } });
     defer owned.close() catch @panic("render session close failed");
@@ -1356,7 +1350,7 @@ test "cluster feature extensions copy values and feature collections" {
     for (0..1000) |_| {
         var result = try takeQueryFeaturesResult(
             owned.session,
-            try owned.session.queryRenderedFeaturesStart(
+            try owned.session.queryRenderedFeatures(
                 testing.allocator,
                 .{ .box = .{
                     .min = .{ .x = 0, .y = 0 },
@@ -1383,7 +1377,7 @@ test "cluster feature extensions copy values and feature collections" {
 
     var children = try takeQueryResult(
         owned.session,
-        try owned.session.queryFeatureExtensionStart(
+        try owned.session.queryFeatureExtension(
             testing.allocator,
             "cluster-source",
             feature,
@@ -1397,7 +1391,7 @@ test "cluster feature extensions copy values and feature collections" {
 
     var expansion_zoom = try takeQueryResult(
         owned.session,
-        try owned.session.queryFeatureExtensionStart(
+        try owned.session.queryFeatureExtension(
             testing.allocator,
             "cluster-source",
             feature,
@@ -1411,7 +1405,7 @@ test "cluster feature extensions copy values and feature collections" {
 
     var first_leaf = try takeQueryResult(
         owned.session,
-        try owned.session.queryFeatureExtensionStart(
+        try owned.session.queryFeatureExtension(
             testing.allocator,
             "cluster-source",
             feature,
@@ -1423,7 +1417,7 @@ test "cluster feature extensions copy values and feature collections" {
     defer first_leaf.deinit();
     var second_leaf = try takeQueryResult(
         owned.session,
-        try owned.session.queryFeatureExtensionStart(
+        try owned.session.queryFeatureExtension(
             testing.allocator,
             "cluster-source",
             feature,
@@ -1440,7 +1434,9 @@ test "sustained frame demands outlast the texture ring depth" {
     if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try maplibre.MapHandle.create(&runtime, .{ .width = 32, .height = 32 });
+    var map_future = try maplibre.MapHandle.create(&runtime, .{ .width = 32, .height = 32 });
+    defer map_future.deinit();
+    var map = try map_future.wait(null);
     defer map.close() catch @panic("map close failed");
     var owned = try attachTestOwnedTexture(&map, .{ .extent = .{ .width = 32, .height = 32 } });
     defer owned.close() catch @panic("render session close failed");
@@ -1459,7 +1455,9 @@ test "a rendered frame during an ease reports needs repaint" {
     if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try maplibre.MapHandle.create(&runtime, .{ .width = 32, .height = 16 });
+    var map_future = try maplibre.MapHandle.create(&runtime, .{ .width = 32, .height = 16 });
+    defer map_future.deinit();
+    var map = try map_future.wait(null);
     defer map.close() catch @panic("map close failed");
     var owned = try attachTestOwnedTexture(&map, .{ .extent = .{ .width = 32, .height = 16 } });
     defer owned.close() catch @panic("render session close failed");
@@ -1502,7 +1500,9 @@ test "render session controls are usable from another thread" {
     if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try maplibre.MapHandle.create(&runtime, .{ .width = 16, .height = 16 });
+    var map_future = try maplibre.MapHandle.create(&runtime, .{ .width = 16, .height = 16 });
+    defer map_future.deinit();
+    var map = try map_future.wait(null);
     defer map.close() catch @panic("map close failed");
     var owned = try attachTestOwnedTexture(&map, .{ .extent = .{ .width = 16, .height = 16 } });
     defer owned.close() catch @panic("render session close failed");
@@ -1517,7 +1517,9 @@ test "Vulkan borrowed texture replaces its target" {
     if (!build_options.supports_vulkan) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try maplibre.MapHandle.create(&runtime, .{ .width = 32, .height = 16 });
+    var map_future = try maplibre.MapHandle.create(&runtime, .{ .width = 32, .height = 16 });
+    defer map_future.deinit();
+    var map = try map_future.wait(null);
     defer map.close() catch @panic("map close failed");
     var borrowed = try VulkanBorrowedImage.create(32, 16);
     defer borrowed.deinit();
@@ -1540,7 +1542,7 @@ test "Vulkan borrowed texture replaces its target" {
     errdefer borrowed.release(replacement);
     try finishOperation(
         session,
-        try session.setVulkanBorrowedTextureTargetStart(borrowed.descriptorFor(replacement, 48, 24)),
+        try session.setVulkanBorrowedTextureTarget(borrowed.descriptorFor(replacement, 48, 24)),
     );
     borrowed.adopt(replacement, 48, 24);
     _ = try map.resize(48, 24, 1.0);
@@ -1559,7 +1561,9 @@ test "OpenGL borrowed texture replaces its target" {
     if (!build_options.supports_opengl) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try maplibre.MapHandle.create(&runtime, .{ .width = 32, .height = 16 });
+    var map_future = try maplibre.MapHandle.create(&runtime, .{ .width = 32, .height = 16 });
+    defer map_future.deinit();
+    var map = try map_future.wait(null);
     defer map.close() catch @panic("map close failed");
     var borrowed = try OpenGLBorrowedTexture.create(32, 16);
     defer borrowed.deinit();
@@ -1581,7 +1585,7 @@ test "OpenGL borrowed texture replaces its target" {
     errdefer borrowed.context.destroyTexture(replacement);
     try finishOperation(
         session,
-        try session.setOpenGLBorrowedTextureTargetStart(borrowed.descriptorFor(replacement, 48, 24)),
+        try session.setOpenGLBorrowedTextureTarget(borrowed.descriptorFor(replacement, 48, 24)),
     );
     borrowed.adopt(replacement, 48, 24);
     _ = try map.resize(48, 24, 1.0);

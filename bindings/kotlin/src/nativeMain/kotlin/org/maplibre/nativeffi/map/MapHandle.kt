@@ -1,6 +1,5 @@
 package org.maplibre.nativeffi.map
 
-import kotlinx.cinterop.BooleanVar
 import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CValue
@@ -19,24 +18,26 @@ import kotlinx.cinterop.readValue
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.value
+import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.camera.BoundOptions
 import org.maplibre.nativeffi.camera.CameraDelta
 import org.maplibre.nativeffi.camera.CameraSnapshot
 import org.maplibre.nativeffi.camera.CameraUpdate
 import org.maplibre.nativeffi.camera.FreeCameraOptions
-import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
+import org.maplibre.nativeffi.internal.async.CompletionBridge
+import org.maplibre.nativeffi.internal.async.mapDeferred
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_LAYER_INFO_SOURCE_ID
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_LAYER_INFO_SOURCE_LAYER
-import org.maplibre.nativeffi.internal.c.MLN_STYLE_SOURCE_INFO_TILEJSON
-import org.maplibre.nativeffi.internal.c.MLN_STYLE_SOURCE_INFO_URL
 import org.maplibre.nativeffi.internal.c.mln_buffer_view
 import org.maplibre.nativeffi.internal.c.mln_camera_delta_default
 import org.maplibre.nativeffi.internal.c.mln_camera_options_default
 import org.maplibre.nativeffi.internal.c.mln_camera_query_result
 import org.maplibre.nativeffi.internal.c.mln_camera_update_default
+import org.maplibre.nativeffi.internal.c.mln_completion
+import org.maplibre.nativeffi.internal.c.mln_completion_result
 import org.maplibre.nativeffi.internal.c.mln_image_stretch
 import org.maplibre.nativeffi.internal.c.mln_lat_lng
 import org.maplibre.nativeffi.internal.c.mln_logical_extent
@@ -57,62 +58,36 @@ import org.maplibre.nativeffi.internal.c.mln_map_add_style_source_json
 import org.maplibre.nativeffi.internal.c.mln_map_add_vector_source_tiles
 import org.maplibre.nativeffi.internal.c.mln_map_add_vector_source_url
 import org.maplibre.nativeffi.internal.c.mln_map_apply_camera_delta
-import org.maplibre.nativeffi.internal.c.mln_map_camera_query_start
-import org.maplibre.nativeffi.internal.c.mln_map_camera_query_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_camera_query
 import org.maplibre.nativeffi.internal.c.mln_map_camera_snapshot_get
-import org.maplibre.nativeffi.internal.c.mln_map_copy_layer_source_id_start
-import org.maplibre.nativeffi.internal.c.mln_map_copy_layer_source_id_take_result
-import org.maplibre.nativeffi.internal.c.mln_map_copy_layer_source_layer_start
-import org.maplibre.nativeffi.internal.c.mln_map_copy_layer_source_layer_take_result
-import org.maplibre.nativeffi.internal.c.mln_map_copy_style_image_premultiplied_rgba8_start
-import org.maplibre.nativeffi.internal.c.mln_map_copy_style_image_premultiplied_rgba8_take_result
-import org.maplibre.nativeffi.internal.c.mln_map_copy_style_image_stretches_start
-import org.maplibre.nativeffi.internal.c.mln_map_copy_style_image_stretches_take_result
-import org.maplibre.nativeffi.internal.c.mln_map_copy_style_source_attribution_start
-import org.maplibre.nativeffi.internal.c.mln_map_copy_style_source_attribution_take_result
-import org.maplibre.nativeffi.internal.c.mln_map_copy_style_source_url_start
-import org.maplibre.nativeffi.internal.c.mln_map_copy_style_source_url_take_result
-import org.maplibre.nativeffi.internal.c.mln_map_create_start
-import org.maplibre.nativeffi.internal.c.mln_map_create_take_result
-import org.maplibre.nativeffi.internal.c.mln_map_get_image_source_coordinates_start
-import org.maplibre.nativeffi.internal.c.mln_map_get_image_source_coordinates_take_result
-import org.maplibre.nativeffi.internal.c.mln_map_get_layer_filter_start
-import org.maplibre.nativeffi.internal.c.mln_map_get_layer_filter_take_result
-import org.maplibre.nativeffi.internal.c.mln_map_get_layer_property_start
-import org.maplibre.nativeffi.internal.c.mln_map_get_layer_property_take_result
-import org.maplibre.nativeffi.internal.c.mln_map_get_style_image_info_start
-import org.maplibre.nativeffi.internal.c.mln_map_get_style_image_info_take_result
-import org.maplibre.nativeffi.internal.c.mln_map_get_style_layer_info_start
-import org.maplibre.nativeffi.internal.c.mln_map_get_style_layer_info_take_result
-import org.maplibre.nativeffi.internal.c.mln_map_get_style_layer_json_start
-import org.maplibre.nativeffi.internal.c.mln_map_get_style_layer_json_take_result
-import org.maplibre.nativeffi.internal.c.mln_map_get_style_light_property_start
-import org.maplibre.nativeffi.internal.c.mln_map_get_style_light_property_take_result
-import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_info_start
-import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_info_take_result
-import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_tile_urls_start
-import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_tile_urls_take_result
-import org.maplibre.nativeffi.internal.c.mln_map_get_style_transition_options_start
-import org.maplibre.nativeffi.internal.c.mln_map_get_style_transition_options_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_copy_layer_source_id
+import org.maplibre.nativeffi.internal.c.mln_map_copy_layer_source_layer
+import org.maplibre.nativeffi.internal.c.mln_map_copy_style_image_stretches
+import org.maplibre.nativeffi.internal.c.mln_map_create
+import org.maplibre.nativeffi.internal.c.mln_map_get_image_source_coordinates
+import org.maplibre.nativeffi.internal.c.mln_map_get_layer_filter
+import org.maplibre.nativeffi.internal.c.mln_map_get_layer_property
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_image_info
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_layer_info
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_layer_json
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_light_property
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_info
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_transition_options
 import org.maplibre.nativeffi.internal.c.mln_map_invalidate_custom_geometry_source_region
 import org.maplibre.nativeffi.internal.c.mln_map_invalidate_custom_geometry_source_tile
-import org.maplibre.nativeffi.internal.c.mln_map_list_style_layer_ids_start
-import org.maplibre.nativeffi.internal.c.mln_map_list_style_layer_ids_take_result
-import org.maplibre.nativeffi.internal.c.mln_map_list_style_source_ids_start
-import org.maplibre.nativeffi.internal.c.mln_map_list_style_source_ids_take_result
-import org.maplibre.nativeffi.internal.c.mln_map_loaded_style_json_start
-import org.maplibre.nativeffi.internal.c.mln_map_loaded_style_json_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_list_style_layer_ids
+import org.maplibre.nativeffi.internal.c.mln_map_list_style_source_ids
+import org.maplibre.nativeffi.internal.c.mln_map_loaded_style_json
 import org.maplibre.nativeffi.internal.c.mln_map_move_style_layer
 import org.maplibre.nativeffi.internal.c.mln_map_options
 import org.maplibre.nativeffi.internal.c.mln_map_options_default
-import org.maplibre.nativeffi.internal.c.mln_map_projection_create_start
-import org.maplibre.nativeffi.internal.c.mln_map_projection_create_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_projection_create
 import org.maplibre.nativeffi.internal.c.mln_map_release
 import org.maplibre.nativeffi.internal.c.mln_map_remove_style_image
 import org.maplibre.nativeffi.internal.c.mln_map_remove_style_layer
 import org.maplibre.nativeffi.internal.c.mln_map_remove_style_source
 import org.maplibre.nativeffi.internal.c.mln_map_request_repaint
-import org.maplibre.nativeffi.internal.c.mln_map_request_still_image_start
+import org.maplibre.nativeffi.internal.c.mln_map_request_still_image
 import org.maplibre.nativeffi.internal.c.mln_map_resize
 import org.maplibre.nativeffi.internal.c.mln_map_set_bounds
 import org.maplibre.nativeffi.internal.c.mln_map_set_custom_geometry_source_tile_data
@@ -147,23 +122,18 @@ import org.maplibre.nativeffi.internal.c.mln_map_set_tile_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_viewport_options
 import org.maplibre.nativeffi.internal.c.mln_map_snapshot
 import org.maplibre.nativeffi.internal.c.mln_map_snapshot_get
-import org.maplibre.nativeffi.internal.c.mln_map_style_url_start
-import org.maplibre.nativeffi.internal.c.mln_map_style_url_take_result
+import org.maplibre.nativeffi.internal.c.mln_map_style_url
 import org.maplibre.nativeffi.internal.c.mln_map_update_camera
-import org.maplibre.nativeffi.internal.c.mln_operation_release
-import org.maplibre.nativeffi.internal.c.mln_style_image_info_default
-import org.maplibre.nativeffi.internal.c.mln_style_layer_info
-import org.maplibre.nativeffi.internal.c.mln_style_source_info
-import org.maplibre.nativeffi.internal.c.mln_style_transition_options_default
+import org.maplibre.nativeffi.internal.c.mln_style_image_result
+import org.maplibre.nativeffi.internal.c.mln_style_image_stretches_result
+import org.maplibre.nativeffi.internal.c.mln_style_layer_result
+import org.maplibre.nativeffi.internal.c.mln_style_source_result
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
 import org.maplibre.nativeffi.internal.lifecycle.NativeMap
 import org.maplibre.nativeffi.internal.lifecycle.asHandle
 import org.maplibre.nativeffi.internal.lifecycle.mapHandle
 import org.maplibre.nativeffi.internal.lifecycle.mapProjectionHandle
-import org.maplibre.nativeffi.internal.lifecycle.ownedBufferHandle
 import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
-import org.maplibre.nativeffi.internal.lifecycle.styleIdListHandle
-import org.maplibre.nativeffi.internal.lifecycle.styleStringListHandle
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.struct.ByteStructs
@@ -183,9 +153,9 @@ import org.maplibre.nativeffi.render.RenderSessionHandle
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
+import org.maplibre.nativeffi.runtime.CommandCompletion
 import org.maplibre.nativeffi.runtime.RuntimeEventMask
 import org.maplibre.nativeffi.runtime.RuntimeHandle
-import org.maplibre.nativeffi.runtime.startOperation
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceDataHandle
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
@@ -214,115 +184,125 @@ private constructor(
   private val customGeometrySources =
     CustomGeometrySourceRegistry<CustomGeometrySourceState> { it.close() }
 
-  public actual var eventMask: RuntimeEventMask
+  public actual val eventMask: RuntimeEventMask
     get() = cachedEventMask
-    set(value) {
-      command { outCommandId ->
+
+  public actual fun setEventMask(value: RuntimeEventMask): Deferred<CommandCompletion> =
+    command { completion ->
         Status.check(
           mln_map_set_event_mask(
             state.requireLive().rawHandleValue,
             value.nativeValue.toULong(),
-            outCommandId,
+            completion,
           )
         )
       }
-      cachedEventMask =
-        RuntimeEventMask(value.nativeValue and RuntimeEventMask.ALL_MAP_EVENTS.nativeValue)
-    }
+      .mapDeferred {
+        cachedEventMask =
+          RuntimeEventMask(value.nativeValue and RuntimeEventMask.ALL_MAP_EVENTS.nativeValue)
+        it
+      }
 
-  public actual fun setStyleUrl(url: String): ULong = command { outCommandId ->
+  public actual fun setStyleUrl(url: String): Deferred<CommandCompletion> = command { completion ->
     MemoryUtil.requireValidCString(url)
-    Status.check(mln_map_set_style_url(state.requireLive().rawHandleValue, url, outCommandId))
+    Status.check(mln_map_set_style_url(state.requireLive().rawHandleValue, url, completion))
   }
 
-  public actual fun setStyleJson(json: ByteArray): ULong = command { outCommandId ->
-    memScoped {
-      Status.check(
-        mln_map_set_style_json(
-          state.requireLive().rawHandleValue,
-          ByteStructs.bufferView(json, this),
-          outCommandId,
-        )
-      )
-    }
-  }
-
-  public actual suspend fun loadedStyleJson(): ByteArray =
-    takeStyleBuffer(::mln_map_loaded_style_json_start, ::mln_map_loaded_style_json_take_result)
-
-  public actual suspend fun styleUrl(): String =
-    takeStyleBuffer(::mln_map_style_url_start, ::mln_map_style_url_take_result).decodeToString()
-
-  public actual fun addStyleSourceJson(sourceId: String, sourceJson: ByteArray): ULong =
-    command { outCommandId ->
+  public actual fun setStyleJson(json: ByteArray): Deferred<CommandCompletion> =
+    command { completion ->
       memScoped {
         Status.check(
-          mln_map_add_style_source_json(
+          mln_map_set_style_json(
             state.requireLive().rawHandleValue,
-            CoreStructs.stringView(sourceId, this),
-            ByteStructs.bufferView(sourceJson, this),
-            outCommandId,
+            ByteStructs.bufferView(json, this),
+            completion,
           )
         )
       }
     }
 
-  public actual fun removeStyleSource(sourceId: String): ULong = command { outCommandId ->
+  public actual fun loadedStyleJson(): Deferred<ByteArray> =
+    CompletionBridge.submit(
+      { result -> checkNotNull(bufferCompletion(result)) },
+      { completion -> mln_map_loaded_style_json(state.requireLive().rawHandleValue, completion) },
+    )
+
+  public actual fun styleUrl(): Deferred<String> =
+    CompletionBridge.submit(
+      { result -> checkNotNull(bufferCompletion(result)).decodeToString() },
+      { completion -> mln_map_style_url(state.requireLive().rawHandleValue, completion) },
+    )
+
+  public actual fun addStyleSourceJson(
+    sourceId: String,
+    sourceJson: ByteArray,
+  ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
       Status.check(
-        mln_map_remove_style_source(
+        mln_map_add_style_source_json(
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
-          outCommandId,
+          ByteStructs.bufferView(sourceJson, this),
+          completion,
         )
       )
     }
   }
 
-  public actual suspend fun styleSourceInfo(sourceId: String): SourceInfo? = memScoped {
-    val outInfo = alloc<mln_style_source_info>()
-    outInfo.size = sizeOf<mln_style_source_info>().toUInt()
-    val outFound = alloc<BooleanVar>()
-    Status.check(
-      ordered(
-        { outOperation ->
-          mln_map_get_style_source_info_start(
+  public actual fun removeStyleSource(sourceId: String): Deferred<CommandCompletion> =
+    command { completion ->
+      memScoped {
+        Status.check(
+          mln_map_remove_style_source(
             state.requireLive().rawHandleValue,
             CoreStructs.stringView(sourceId, this),
-            outOperation,
+            completion,
           )
-        },
-        { operation ->
-          mln_map_get_style_source_info_take_result(operation, outInfo.ptr, outFound.ptr)
-        },
-      )
+        )
+      }
+    }
+
+  public actual fun styleSourceInfo(sourceId: String): Deferred<SourceInfo?> = memScoped {
+    CompletionBridge.submit(
+      { result ->
+        if (result.pointed.value_count == 0uL) null
+        else {
+          val value = result.pointed.value!!.reinterpret<mln_style_source_result>().pointed
+          val tileUrls =
+            List(value.tile_url_count.toInt()) { index ->
+              CoreStructs.stringView(value.tile_urls!![index])
+            }
+          StyleStructs.sourceInfo(
+            value.info,
+            if (value.info.has_attribution) CoreStructs.stringView(value.attribution) else null,
+            CoreStructs.stringView(value.url),
+            tileUrls,
+          )
+        }
+      },
+      { completion ->
+        mln_map_get_style_source_info(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(sourceId, this),
+          completion,
+        )
+      },
     )
-    if (!outFound.value) return@memScoped null
-    val attribution = copyStyleSourceAttribution(sourceId, outInfo)
-    val url = copyStyleSourceUrl(sourceId, outInfo)
-    val tileUrls = copyStyleSourceTileUrls(sourceId, outInfo)
-    StyleStructs.sourceInfo(outInfo, attribution, url, tileUrls)
   }
 
-  public actual suspend fun styleSourceIds(): List<String> = memScoped {
-    val outList = alloc<ULongVar>()
-    outList.value = 0uL
-    Status.check(
-      ordered(
-        { outOperation ->
-          mln_map_list_style_source_ids_start(state.requireLive().rawHandleValue, outOperation)
-        },
-        { operation -> mln_map_list_style_source_ids_take_result(operation, outList.ptr) },
-      )
+  public actual fun styleSourceIds(): Deferred<List<String>> =
+    CompletionBridge.submit(
+      ::stringViewsCompletion,
+      { completion ->
+        mln_map_list_style_source_ids(state.requireLive().rawHandleValue, completion)
+      },
     )
-    StyleStructs.styleIdList(outList.value.asHandle("mln_map_list_style_ids", ::styleIdListHandle))
-  }
 
   public actual fun addGeoJsonSourceUrl(
     sourceId: String,
     url: String,
     options: GeoJsonSourceOptions?,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
       Status.check(
         mln_map_add_geojson_source_url(
@@ -330,77 +310,85 @@ private constructor(
           CoreStructs.stringView(sourceId, this),
           CoreStructs.stringView(url, this),
           StyleStructs.geoJsonSourceOptions(options, this),
-          outCommandId,
+          completion,
         )
       )
     }
   }
 
-  public actual fun addGeoJsonSourceData(sourceId: String, data: GeoJsonSourceDataHandle): ULong =
-    command { outCommandId ->
-      data.withNativeHandle { nativeData ->
-        memScoped {
-          Status.check(
-            mln_map_add_geojson_source_data(
-              state.requireLive().rawHandleValue,
-              CoreStructs.stringView(sourceId, this),
-              nativeData.rawHandleValue,
-              outCommandId,
-            )
-          )
-        }
-      }
-    }
-
-  public actual fun setGeoJsonSourceUrl(sourceId: String, url: String): ULong =
-    command { outCommandId ->
+  public actual fun addGeoJsonSourceData(
+    sourceId: String,
+    data: GeoJsonSourceDataHandle,
+  ): Deferred<CommandCompletion> = command { completion ->
+    data.withNativeHandle { nativeData ->
       memScoped {
         Status.check(
-          mln_map_set_geojson_source_url(
+          mln_map_add_geojson_source_data(
             state.requireLive().rawHandleValue,
             CoreStructs.stringView(sourceId, this),
-            CoreStructs.stringView(url, this),
-            outCommandId,
+            nativeData.rawHandleValue,
+            completion,
           )
         )
       }
     }
+  }
 
-  public actual fun setGeoJsonSourceData(sourceId: String, data: GeoJsonSourceDataHandle): ULong =
-    command { outCommandId ->
-      data.withNativeHandle { nativeData ->
-        memScoped {
-          Status.check(
-            mln_map_set_geojson_source_data(
-              state.requireLive().rawHandleValue,
-              CoreStructs.stringView(sourceId, this),
-              nativeData.rawHandleValue,
-              outCommandId,
-            )
-          )
-        }
-      }
+  public actual fun setGeoJsonSourceUrl(
+    sourceId: String,
+    url: String,
+  ): Deferred<CommandCompletion> = command { completion ->
+    memScoped {
+      Status.check(
+        mln_map_set_geojson_source_url(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(sourceId, this),
+          CoreStructs.stringView(url, this),
+          completion,
+        )
+      )
     }
+  }
 
-  public actual fun setGeoJsonSourceSynchronousTiling(sourceId: String, enabled: Boolean): ULong =
-    command { outCommandId ->
+  public actual fun setGeoJsonSourceData(
+    sourceId: String,
+    data: GeoJsonSourceDataHandle,
+  ): Deferred<CommandCompletion> = command { completion ->
+    data.withNativeHandle { nativeData ->
       memScoped {
         Status.check(
-          mln_map_set_geojson_source_synchronous_tiling(
+          mln_map_set_geojson_source_data(
             state.requireLive().rawHandleValue,
             CoreStructs.stringView(sourceId, this),
-            enabled,
-            outCommandId,
+            nativeData.rawHandleValue,
+            completion,
           )
         )
       }
     }
+  }
+
+  public actual fun setGeoJsonSourceSynchronousTiling(
+    sourceId: String,
+    enabled: Boolean,
+  ): Deferred<CommandCompletion> = command { completion ->
+    memScoped {
+      Status.check(
+        mln_map_set_geojson_source_synchronous_tiling(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(sourceId, this),
+          enabled,
+          completion,
+        )
+      )
+    }
+  }
 
   public actual fun addCustomGeometrySource(
     sourceId: String,
     options: CustomGeometrySourceOptions,
-  ): ULong =
-    command { outCommandId
+  ): Deferred<CommandCompletion> =
+    command { completion
       -> // The release callback captures the registry rather than this map, so a map a
       // host leaks with a live source still reports as leaked.
       val registry = customGeometrySources
@@ -412,7 +400,7 @@ private constructor(
               state.requireLive().rawHandleValue,
               CoreStructs.stringView(sourceId, this),
               sourceState.descriptor(),
-              outCommandId,
+              completion,
             )
           )
         }
@@ -423,7 +411,7 @@ private constructor(
     sourceId: String,
     tileId: CanonicalTileId,
     data: ByteArray,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
       Status.check(
         mln_map_set_custom_geometry_source_tile_data(
@@ -431,7 +419,7 @@ private constructor(
           CoreStructs.stringView(sourceId, this),
           StyleStructs.canonicalTileId(tileId),
           ByteStructs.bufferView(data, this),
-          outCommandId,
+          completion,
         )
       )
     }
@@ -440,14 +428,14 @@ private constructor(
   public actual fun invalidateCustomGeometrySourceTile(
     sourceId: String,
     tileId: CanonicalTileId,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
       Status.check(
         mln_map_invalidate_custom_geometry_source_tile(
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           StyleStructs.canonicalTileId(tileId),
-          outCommandId,
+          completion,
         )
       )
     }
@@ -456,14 +444,14 @@ private constructor(
   public actual fun invalidateCustomGeometrySourceRegion(
     sourceId: String,
     bounds: LatLngBounds,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
       Status.check(
         mln_map_invalidate_custom_geometry_source_region(
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           CoreStructs.latLngBounds(bounds),
-          outCommandId,
+          completion,
         )
       )
     }
@@ -475,7 +463,7 @@ private constructor(
     sourceId: String,
     url: String,
     options: TileSourceOptions?,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
       Status.check(
         mln_map_add_vector_source_url(
@@ -483,7 +471,7 @@ private constructor(
           CoreStructs.stringView(sourceId, this),
           CoreStructs.stringView(url, this),
           StyleStructs.tileSourceOptions(options, this),
-          outCommandId,
+          completion,
         )
       )
     }
@@ -493,7 +481,7 @@ private constructor(
     sourceId: String,
     tiles: List<String>,
     options: TileSourceOptions?,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     val tileSnapshot = tiles.toList()
     memScoped {
       Status.check(
@@ -503,7 +491,7 @@ private constructor(
           StyleStructs.stringViewArray(tileSnapshot, this),
           tileSnapshot.size.toULong(),
           StyleStructs.tileSourceOptions(options, this),
-          outCommandId,
+          completion,
         )
       )
     }
@@ -513,7 +501,7 @@ private constructor(
     sourceId: String,
     url: String,
     options: TileSourceOptions?,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
       Status.check(
         mln_map_add_raster_source_url(
@@ -521,7 +509,7 @@ private constructor(
           CoreStructs.stringView(sourceId, this),
           CoreStructs.stringView(url, this),
           StyleStructs.tileSourceOptions(options, this),
-          outCommandId,
+          completion,
         )
       )
     }
@@ -531,7 +519,7 @@ private constructor(
     sourceId: String,
     tiles: List<String>,
     options: TileSourceOptions?,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     val tileSnapshot = tiles.toList()
     memScoped {
       Status.check(
@@ -541,7 +529,7 @@ private constructor(
           StyleStructs.stringViewArray(tileSnapshot, this),
           tileSnapshot.size.toULong(),
           StyleStructs.tileSourceOptions(options, this),
-          outCommandId,
+          completion,
         )
       )
     }
@@ -551,7 +539,7 @@ private constructor(
     sourceId: String,
     url: String,
     options: TileSourceOptions?,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
       Status.check(
         mln_map_add_raster_dem_source_url(
@@ -559,7 +547,7 @@ private constructor(
           CoreStructs.stringView(sourceId, this),
           CoreStructs.stringView(url, this),
           StyleStructs.tileSourceOptions(options, this),
-          outCommandId,
+          completion,
         )
       )
     }
@@ -569,7 +557,7 @@ private constructor(
     sourceId: String,
     tiles: List<String>,
     options: TileSourceOptions?,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     val tileSnapshot = tiles.toList()
     memScoped {
       Status.check(
@@ -579,7 +567,7 @@ private constructor(
           StyleStructs.stringViewArray(tileSnapshot, this),
           tileSnapshot.size.toULong(),
           StyleStructs.tileSourceOptions(options, this),
-          outCommandId,
+          completion,
         )
       )
     }
@@ -589,7 +577,7 @@ private constructor(
     imageId: String,
     image: PremultipliedRgba8Image,
     options: StyleImageOptions,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
       Status.check(
         mln_map_set_style_image(
@@ -597,141 +585,96 @@ private constructor(
           CoreStructs.stringView(imageId, this),
           StyleStructs.premultipliedRgba8Image(image, this),
           StyleStructs.styleImageOptions(options, this),
-          outCommandId,
+          completion,
         )
       )
     }
   }
 
-  public actual fun removeStyleImage(imageId: String): ULong = command { outCommandId ->
-    memScoped {
-      Status.check(
-        mln_map_remove_style_image(
-          state.requireLive().rawHandleValue,
-          CoreStructs.stringView(imageId, this),
-          outCommandId,
-        )
-      )
-    }
-  }
-
-  public actual suspend fun styleImageInfo(imageId: String): StyleImageInfo? = memScoped {
-    val outInfo = mln_style_image_info_default().getPointer(this)
-    val outFound = alloc<BooleanVar>()
-    Status.check(
-      ordered(
-        { outOperation ->
-          mln_map_get_style_image_info_start(
+  public actual fun removeStyleImage(imageId: String): Deferred<CommandCompletion> =
+    command { completion ->
+      memScoped {
+        Status.check(
+          mln_map_remove_style_image(
             state.requireLive().rawHandleValue,
             CoreStructs.stringView(imageId, this),
-            outOperation,
+            completion,
           )
-        },
-        { operation -> mln_map_get_style_image_info_take_result(operation, outInfo, outFound.ptr) },
-      )
-    )
-    if (outFound.value) StyleStructs.styleImageInfo(outInfo.pointed) else null
-  }
-
-  public actual suspend fun styleImageStretches(
-    imageId: String
-  ): Pair<List<ImageStretch>, List<ImageStretch>>? = memScoped {
-    val handle = state.requireLive().rawHandleValue
-    val outXCount = alloc<ULongVar>()
-    val outYCount = alloc<ULongVar>()
-    val outFound = alloc<BooleanVar>()
-    Status.check(
-      ordered(
-        { outOperation ->
-          mln_map_copy_style_image_stretches_start(
-            handle,
-            CoreStructs.stringView(imageId, this),
-            outOperation,
-          )
-        },
-        { operation ->
-          mln_map_copy_style_image_stretches_take_result(
-            operation,
-            null,
-            0UL,
-            outXCount.ptr,
-            null,
-            0UL,
-            outYCount.ptr,
-            outFound.ptr,
-          )
-        },
-      )
-    )
-    if (!outFound.value) return@memScoped null
-
-    val xCount = checkedInt(outXCount.value, "style image stretch x count")
-    val yCount = checkedInt(outYCount.value, "style image stretch y count")
-    val rawX = if (xCount == 0) null else allocArray<mln_image_stretch>(xCount)
-    val rawY = if (yCount == 0) null else allocArray<mln_image_stretch>(yCount)
-    Status.check(
-      ordered(
-        { outOperation ->
-          mln_map_copy_style_image_stretches_start(
-            handle,
-            CoreStructs.stringView(imageId, this),
-            outOperation,
-          )
-        },
-        { operation ->
-          mln_map_copy_style_image_stretches_take_result(
-            operation,
-            rawX,
-            xCount.toULong(),
-            outXCount.ptr,
-            rawY,
-            yCount.toULong(),
-            outYCount.ptr,
-            outFound.ptr,
-          )
-        },
-      )
-    )
-    val toList = { array: CPointer<mln_image_stretch>?, count: Int ->
-      List(count) { index -> ImageStretch(array!![index].from, array[index].to) }
-    }
-    toList(rawX, xCount) to toList(rawY, yCount)
-  }
-
-  public actual suspend fun copyStyleImagePremultipliedRgba8(imageId: String): StyleImage? =
-    memScoped {
-      val info = styleImageInfo(imageId) ?: return@memScoped null
-      val outPixels = alloc<ULongVar>()
-      outPixels.value = 0uL
-      val outFound = alloc<BooleanVar>()
-      Status.check(
-        ordered(
-          { outOperation ->
-            mln_map_copy_style_image_premultiplied_rgba8_start(
-              state.requireLive().rawHandleValue,
-              CoreStructs.stringView(imageId, this),
-              outOperation,
-            )
-          },
-          { operation ->
-            mln_map_copy_style_image_premultiplied_rgba8_take_result(
-              operation,
-              outPixels.ptr,
-              outFound.ptr,
-            )
-          },
         )
-      )
-      if (!outFound.value) return@memScoped null
-      StyleImage(
-        PremultipliedRgba8Image(
-          info.width,
-          info.height,
-          info.stride,
-          ByteStructs.ownedBuffer(outPixels.value.asHandle("mln_buffer", ::ownedBufferHandle)),
-        ),
-        info.pixelRatio,
-        info.sdf,
+      }
+    }
+
+  public actual fun styleImageInfo(imageId: String): Deferred<StyleImageInfo?> = memScoped {
+    CompletionBridge.submit(
+      { result ->
+        if (result.pointed.value_count == 0uL) null
+        else
+          StyleStructs.styleImageInfo(
+            result.pointed.value!!.reinterpret<mln_style_image_result>().pointed.info
+          )
+      },
+      { completion ->
+        mln_map_get_style_image_info(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(imageId, this),
+          completion,
+        )
+      },
+    )
+  }
+
+  public actual fun styleImageStretches(
+    imageId: String
+  ): Deferred<Pair<List<ImageStretch>, List<ImageStretch>>?> = memScoped {
+    CompletionBridge.submit(
+      { result ->
+        if (result.pointed.value_count == 0uL) null
+        else {
+          val value = result.pointed.value!!.reinterpret<mln_style_image_stretches_result>().pointed
+          val copy = { values: CPointer<mln_image_stretch>?, count: ULong ->
+            List(count.toInt()) { index -> ImageStretch(values!![index].from, values[index].to) }
+          }
+          copy(value.stretch_x, value.stretch_x_count) to
+            copy(value.stretch_y, value.stretch_y_count)
+        }
+      },
+      { completion ->
+        mln_map_copy_style_image_stretches(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(imageId, this),
+          completion,
+        )
+      },
+    )
+  }
+
+  public actual fun copyStyleImagePremultipliedRgba8(imageId: String): Deferred<StyleImage?> =
+    memScoped {
+      CompletionBridge.submit(
+        { result ->
+          if (result.pointed.value_count == 0uL) null
+          else {
+            val value = result.pointed.value!!.reinterpret<mln_style_image_result>().pointed
+            val info = StyleStructs.styleImageInfo(value.info)
+            StyleImage(
+              PremultipliedRgba8Image(
+                info.width,
+                info.height,
+                info.stride,
+                ByteStructs.copyBufferView(value.pixels),
+              ),
+              info.pixelRatio,
+              info.sdf,
+            )
+          }
+        },
+        { completion ->
+          mln_map_get_style_image_info(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(imageId, this),
+            completion,
+          )
+        },
       )
     }
 
@@ -739,7 +682,7 @@ private constructor(
     sourceId: String,
     coordinates: List<LatLng>,
     url: String,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     val coordinateSnapshot = coordinates.toList()
     memScoped {
       Status.check(
@@ -749,7 +692,7 @@ private constructor(
           CoreStructs.latLngArray(coordinateSnapshot, this),
           coordinateSnapshot.size.toULong(),
           CoreStructs.stringView(url, this),
-          outCommandId,
+          completion,
         )
       )
     }
@@ -759,7 +702,7 @@ private constructor(
     sourceId: String,
     coordinates: List<LatLng>,
     image: PremultipliedRgba8Image,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     val coordinateSnapshot = coordinates.toList()
     memScoped {
       Status.check(
@@ -769,198 +712,99 @@ private constructor(
           CoreStructs.latLngArray(coordinateSnapshot, this),
           coordinateSnapshot.size.toULong(),
           StyleStructs.premultipliedRgba8Image(image, this),
-          outCommandId,
+          completion,
         )
       )
     }
   }
 
-  public actual fun setImageSourceUrl(sourceId: String, url: String): ULong =
-    command { outCommandId ->
+  public actual fun setImageSourceUrl(sourceId: String, url: String): Deferred<CommandCompletion> =
+    command { completion ->
       memScoped {
         Status.check(
           mln_map_set_image_source_url(
             state.requireLive().rawHandleValue,
             CoreStructs.stringView(sourceId, this),
             CoreStructs.stringView(url, this),
-            outCommandId,
+            completion,
           )
         )
       }
     }
 
-  public actual fun setImageSourceImage(sourceId: String, image: PremultipliedRgba8Image): ULong =
-    command { outCommandId ->
-      memScoped {
-        Status.check(
-          mln_map_set_image_source_image(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(sourceId, this),
-            StyleStructs.premultipliedRgba8Image(image, this),
-            outCommandId,
-          )
+  public actual fun setImageSourceImage(
+    sourceId: String,
+    image: PremultipliedRgba8Image,
+  ): Deferred<CommandCompletion> = command { completion ->
+    memScoped {
+      Status.check(
+        mln_map_set_image_source_image(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(sourceId, this),
+          StyleStructs.premultipliedRgba8Image(image, this),
+          completion,
         )
-      }
-    }
-
-  public actual fun setImageSourceCoordinates(sourceId: String, coordinates: List<LatLng>): ULong =
-    command { outCommandId ->
-      val coordinateSnapshot = coordinates.toList()
-      memScoped {
-        Status.check(
-          mln_map_set_image_source_coordinates(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(sourceId, this),
-            CoreStructs.latLngArray(coordinateSnapshot, this),
-            coordinateSnapshot.size.toULong(),
-            outCommandId,
-          )
-        )
-      }
-    }
-
-  public actual suspend fun imageSourceCoordinates(sourceId: String): List<LatLng>? = memScoped {
-    val outCoordinates = allocArray<mln_lat_lng>(4)
-    val outCoordinateCount = alloc<ULongVar>()
-    val outFound = alloc<BooleanVar>()
-    Status.check(
-      ordered(
-        { outOperation ->
-          mln_map_get_image_source_coordinates_start(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(sourceId, this),
-            outOperation,
-          )
-        },
-        { operation ->
-          mln_map_get_image_source_coordinates_take_result(
-            operation,
-            outCoordinates,
-            4UL,
-            outCoordinateCount.ptr,
-            outFound.ptr,
-          )
-        },
       )
+    }
+  }
+
+  public actual fun setImageSourceCoordinates(
+    sourceId: String,
+    coordinates: List<LatLng>,
+  ): Deferred<CommandCompletion> = command { completion ->
+    val coordinateSnapshot = coordinates.toList()
+    memScoped {
+      Status.check(
+        mln_map_set_image_source_coordinates(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(sourceId, this),
+          CoreStructs.latLngArray(coordinateSnapshot, this),
+          coordinateSnapshot.size.toULong(),
+          completion,
+        )
+      )
+    }
+  }
+
+  public actual fun imageSourceCoordinates(sourceId: String): Deferred<List<LatLng>?> = memScoped {
+    CompletionBridge.submit(
+      { result ->
+        val count = result.pointed.value_count
+        if (count == 0uL) null
+        else
+          CoreStructs.latLngArray(result.pointed.value!!.reinterpret<mln_lat_lng>(), count.toInt())
+      },
+      { completion ->
+        mln_map_get_image_source_coordinates(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(sourceId, this),
+          completion,
+        )
+      },
     )
-    if (outFound.value)
-      CoreStructs.latLngArray(
-        outCoordinates,
-        checkedInt(outCoordinateCount.value, "image source coordinate count"),
-      )
-    else null
   }
 
-  private suspend fun copyStyleSourceAttribution(
-    sourceId: String,
-    info: mln_style_source_info,
-  ): String? {
-    if (!info.has_attribution) return null
-    return memScoped {
-      val outAttribution = alloc<ULongVar>()
-      outAttribution.value = 0uL
-      val outFound = alloc<BooleanVar>()
+  public actual fun addStyleLayerJson(
+    layerJson: ByteArray,
+    beforeLayerId: String,
+  ): Deferred<CommandCompletion> = command { completion ->
+    memScoped {
       Status.check(
-        ordered(
-          { outOperation ->
-            mln_map_copy_style_source_attribution_start(
-              state.requireLive().rawHandleValue,
-              CoreStructs.stringView(sourceId, this),
-              outOperation,
-            )
-          },
-          { operation ->
-            mln_map_copy_style_source_attribution_take_result(
-              operation,
-              outAttribution.ptr,
-              outFound.ptr,
-            )
-          },
+        mln_map_add_style_layer_json(
+          state.requireLive().rawHandleValue,
+          ByteStructs.bufferView(layerJson, this),
+          CoreStructs.stringView(beforeLayerId, this),
+          completion,
         )
-      )
-      if (outFound.value)
-        ByteStructs.ownedBuffer(outAttribution.value.asHandle("mln_buffer", ::ownedBufferHandle))
-          .decodeToString()
-      else null
-    }
-  }
-
-  private suspend fun copyStyleSourceUrl(sourceId: String, info: mln_style_source_info): String? {
-    if (info.fields and MLN_STYLE_SOURCE_INFO_URL == 0u) return null
-    return memScoped {
-      val outUrl = alloc<ULongVar>()
-      outUrl.value = 0uL
-      val outFound = alloc<BooleanVar>()
-      Status.check(
-        ordered(
-          { outOperation ->
-            mln_map_copy_style_source_url_start(
-              state.requireLive().rawHandleValue,
-              CoreStructs.stringView(sourceId, this),
-              outOperation,
-            )
-          },
-          { operation ->
-            mln_map_copy_style_source_url_take_result(operation, outUrl.ptr, outFound.ptr)
-          },
-        )
-      )
-      if (outFound.value)
-        ByteStructs.ownedBuffer(outUrl.value.asHandle("mln_buffer", ::ownedBufferHandle))
-          .decodeToString()
-      else null
-    }
-  }
-
-  private suspend fun copyStyleSourceTileUrls(
-    sourceId: String,
-    info: mln_style_source_info,
-  ): List<String>? {
-    if (info.fields and MLN_STYLE_SOURCE_INFO_TILEJSON == 0u) return null
-    return memScoped {
-      val outList = alloc<ULongVar>()
-      outList.value = 0uL
-      val outFound = alloc<BooleanVar>()
-      Status.check(
-        ordered(
-          { outOperation ->
-            mln_map_get_style_source_tile_urls_start(
-              state.requireLive().rawHandleValue,
-              CoreStructs.stringView(sourceId, this),
-              outOperation,
-            )
-          },
-          { operation ->
-            mln_map_get_style_source_tile_urls_take_result(operation, outList.ptr, outFound.ptr)
-          },
-        )
-      )
-      check(outFound.value) { "style source disappeared while its metadata was copied" }
-      StyleStructs.styleStringList(
-        outList.value.asHandle("mln_map_get_style_source_tile_urls", ::styleStringListHandle)
       )
     }
   }
-
-  public actual fun addStyleLayerJson(layerJson: ByteArray, beforeLayerId: String): ULong =
-    command { outCommandId ->
-      memScoped {
-        Status.check(
-          mln_map_add_style_layer_json(
-            state.requireLive().rawHandleValue,
-            ByteStructs.bufferView(layerJson, this),
-            CoreStructs.stringView(beforeLayerId, this),
-            outCommandId,
-          )
-        )
-      }
-    }
 
   public actual fun addHillshadeLayer(
     layerId: String,
     sourceId: String,
     beforeLayerId: String,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
       Status.check(
         mln_map_add_hillshade_layer(
@@ -968,7 +812,7 @@ private constructor(
           CoreStructs.stringView(layerId, this),
           CoreStructs.stringView(sourceId, this),
           CoreStructs.stringView(beforeLayerId, this),
-          outCommandId,
+          completion,
         )
       )
     }
@@ -978,7 +822,7 @@ private constructor(
     layerId: String,
     sourceId: String,
     beforeLayerId: String,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
       Status.check(
         mln_map_add_color_relief_layer(
@@ -986,31 +830,33 @@ private constructor(
           CoreStructs.stringView(layerId, this),
           CoreStructs.stringView(sourceId, this),
           CoreStructs.stringView(beforeLayerId, this),
-          outCommandId,
+          completion,
         )
       )
     }
   }
 
-  public actual fun addLocationIndicatorLayer(layerId: String, beforeLayerId: String): ULong =
-    command { outCommandId ->
-      memScoped {
-        Status.check(
-          mln_map_add_location_indicator_layer(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(layerId, this),
-            CoreStructs.stringView(beforeLayerId, this),
-            outCommandId,
-          )
+  public actual fun addLocationIndicatorLayer(
+    layerId: String,
+    beforeLayerId: String,
+  ): Deferred<CommandCompletion> = command { completion ->
+    memScoped {
+      Status.check(
+        mln_map_add_location_indicator_layer(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(layerId, this),
+          CoreStructs.stringView(beforeLayerId, this),
+          completion,
         )
-      }
+      )
     }
+  }
 
   public actual fun setLocationIndicatorLocation(
     layerId: String,
     coordinate: LatLng,
     altitude: Double,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
       Status.check(
         mln_map_set_location_indicator_location(
@@ -1018,45 +864,49 @@ private constructor(
           CoreStructs.stringView(layerId, this),
           CoreStructs.latLng(coordinate),
           altitude,
-          outCommandId,
+          completion,
         )
       )
     }
   }
 
-  public actual fun setLocationIndicatorBearing(layerId: String, bearing: Double): ULong =
-    command { outCommandId ->
-      memScoped {
-        Status.check(
-          mln_map_set_location_indicator_bearing(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(layerId, this),
-            bearing,
-            outCommandId,
-          )
+  public actual fun setLocationIndicatorBearing(
+    layerId: String,
+    bearing: Double,
+  ): Deferred<CommandCompletion> = command { completion ->
+    memScoped {
+      Status.check(
+        mln_map_set_location_indicator_bearing(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(layerId, this),
+          bearing,
+          completion,
         )
-      }
+      )
     }
+  }
 
-  public actual fun setLocationIndicatorAccuracyRadius(layerId: String, radius: Double): ULong =
-    command { outCommandId ->
-      memScoped {
-        Status.check(
-          mln_map_set_location_indicator_accuracy_radius(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(layerId, this),
-            radius,
-            outCommandId,
-          )
+  public actual fun setLocationIndicatorAccuracyRadius(
+    layerId: String,
+    radius: Double,
+  ): Deferred<CommandCompletion> = command { completion ->
+    memScoped {
+      Status.check(
+        mln_map_set_location_indicator_accuracy_radius(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(layerId, this),
+          radius,
+          completion,
         )
-      }
+      )
     }
+  }
 
   public actual fun setLocationIndicatorImageName(
     layerId: String,
     imageKind: LocationIndicatorImageKind,
     imageId: String,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
       Status.check(
         mln_map_set_location_indicator_image_name(
@@ -1064,201 +914,167 @@ private constructor(
           CoreStructs.stringView(layerId, this),
           imageKind.nativeValue.toUInt(),
           CoreStructs.stringView(imageId, this),
-          outCommandId,
+          completion,
         )
       )
     }
   }
 
-  public actual fun removeStyleLayer(layerId: String): ULong = command { outCommandId ->
-    memScoped {
-      Status.check(
-        mln_map_remove_style_layer(
+  public actual fun removeStyleLayer(layerId: String): Deferred<CommandCompletion> =
+    command { completion ->
+      memScoped {
+        Status.check(
+          mln_map_remove_style_layer(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(layerId, this),
+            completion,
+          )
+        )
+      }
+    }
+
+  public actual fun styleLayerInfo(layerId: String): Deferred<LayerInfo?> = memScoped {
+    CompletionBridge.submit(
+      { result ->
+        if (result.pointed.value_count == 0uL) null
+        else {
+          val raw = result.pointed.value!!.reinterpret<mln_style_layer_result>().pointed
+          val info = raw.info
+          val fields = info.fields
+          LayerInfo(
+            ByteStructs.copyBufferView(info.type).decodeToString(),
+            info.min_zoom,
+            info.max_zoom,
+            StyleLayerVisibility.fromNative(info.visibility),
+            if ((fields and MLN_STYLE_LAYER_INFO_SOURCE_ID) != 0u)
+              ByteStructs.copyBufferView(raw.source_id).decodeToString()
+            else null,
+            if ((fields and MLN_STYLE_LAYER_INFO_SOURCE_LAYER) != 0u)
+              ByteStructs.copyBufferView(raw.source_layer).decodeToString()
+            else null,
+          )
+        }
+      },
+      { completion ->
+        mln_map_get_style_layer_info(
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(layerId, this),
-          outCommandId,
+          completion,
         )
-      )
-    }
-  }
-
-  public actual suspend fun styleLayerInfo(layerId: String): LayerInfo? = memScoped {
-    val outInfo = alloc<mln_style_layer_info>()
-    outInfo.size = sizeOf<mln_style_layer_info>().toUInt()
-    val outFound = alloc<BooleanVar>()
-    Status.check(
-      ordered(
-        { outOperation ->
-          mln_map_get_style_layer_info_start(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(layerId, this),
-            outOperation,
-          )
-        },
-        { operation ->
-          mln_map_get_style_layer_info_take_result(operation, outInfo.ptr, outFound.ptr)
-        },
-      )
-    )
-    if (!outFound.value) return@memScoped null
-    val hasSourceId = (outInfo.fields and MLN_STYLE_LAYER_INFO_SOURCE_ID.toUInt()) != 0u
-    val hasSourceLayer = (outInfo.fields and MLN_STYLE_LAYER_INFO_SOURCE_LAYER.toUInt()) != 0u
-    val sourceId =
-      if (hasSourceId) {
-        try {
-          layerSourceId(layerId)
-        } catch (_: InvalidArgumentException) {
-          return@memScoped null
-        }
-      } else null
-    val sourceLayer =
-      if (hasSourceLayer) {
-        try {
-          layerSourceLayer(layerId)
-        } catch (_: InvalidArgumentException) {
-          return@memScoped null
-        }
-      } else null
-    LayerInfo(
-      ByteStructs.copyBufferView(outInfo.type).decodeToString(),
-      outInfo.min_zoom,
-      outInfo.max_zoom,
-      StyleLayerVisibility.fromNative(outInfo.visibility),
-      sourceId,
-      sourceLayer,
+      },
     )
   }
 
-  public actual suspend fun styleLayerIds(): List<String> = memScoped {
-    val outList = alloc<ULongVar>()
-    outList.value = 0uL
-    Status.check(
-      ordered(
-        { outOperation ->
-          mln_map_list_style_layer_ids_start(state.requireLive().rawHandleValue, outOperation)
-        },
-        { operation -> mln_map_list_style_layer_ids_take_result(operation, outList.ptr) },
-      )
+  public actual fun styleLayerIds(): Deferred<List<String>> =
+    CompletionBridge.submit(
+      ::stringViewsCompletion,
+      { completion -> mln_map_list_style_layer_ids(state.requireLive().rawHandleValue, completion) },
     )
-    StyleStructs.styleIdList(outList.value.asHandle("mln_map_list_style_ids", ::styleIdListHandle))
-  }
 
-  public actual fun moveStyleLayer(layerId: String, beforeLayerId: String): ULong =
-    command { outCommandId ->
-      memScoped {
-        Status.check(
-          mln_map_move_style_layer(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(layerId, this),
-            CoreStructs.stringView(beforeLayerId, this),
-            outCommandId,
-          )
-        )
-      }
-    }
-
-  public actual suspend fun styleLayerJson(layerId: String): ByteArray? = memScoped {
-    val outLayer = alloc<ULongVar>()
-    val outFound = alloc<BooleanVar>()
-    outLayer.value = 0uL
-    Status.check(
-      ordered(
-        { outOperation ->
-          mln_map_get_style_layer_json_start(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(layerId, this),
-            outOperation,
-          )
-        },
-        { operation ->
-          mln_map_get_style_layer_json_take_result(operation, outLayer.ptr, outFound.ptr)
-        },
-      )
-    )
-    if (outFound.value)
-      ByteStructs.ownedBuffer(outLayer.value.asHandle("mln_buffer", ::ownedBufferHandle))
-    else null
-  }
-
-  public actual fun setStyleLightJson(lightJson: ByteArray): ULong = command { outCommandId ->
+  public actual fun moveStyleLayer(
+    layerId: String,
+    beforeLayerId: String,
+  ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
       Status.check(
-        mln_map_set_style_light_json(
+        mln_map_move_style_layer(
           state.requireLive().rawHandleValue,
-          ByteStructs.bufferView(lightJson, this),
-          outCommandId,
+          CoreStructs.stringView(layerId, this),
+          CoreStructs.stringView(beforeLayerId, this),
+          completion,
         )
       )
     }
   }
 
-  public actual fun setStyleLightProperty(propertyName: String, value: ByteArray): ULong =
-    command { outCommandId ->
+  public actual fun styleLayerJson(layerId: String): Deferred<ByteArray?> = memScoped {
+    CompletionBridge.submit(
+      ::bufferCompletion,
+      { completion ->
+        mln_map_get_style_layer_json(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(layerId, this),
+          completion,
+        )
+      },
+    )
+  }
+
+  public actual fun setStyleLightJson(lightJson: ByteArray): Deferred<CommandCompletion> =
+    command { completion ->
       memScoped {
         Status.check(
-          mln_map_set_style_light_property(
+          mln_map_set_style_light_json(
             state.requireLive().rawHandleValue,
-            CoreStructs.stringView(propertyName, this),
-            ByteStructs.bufferView(value, this),
-            outCommandId,
+            ByteStructs.bufferView(lightJson, this),
+            completion,
           )
         )
       }
     }
 
-  public actual suspend fun styleLightProperty(propertyName: String): ByteArray? = memScoped {
-    val outValue = alloc<ULongVar>()
-    outValue.value = 0uL
-    Status.check(
-      ordered(
-        { outOperation ->
-          mln_map_get_style_light_property_start(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(propertyName, this),
-            outOperation,
-          )
-        },
-        { operation -> mln_map_get_style_light_property_take_result(operation, outValue.ptr) },
-      )
-    )
-    if (outValue.value == 0uL) null
-    else ByteStructs.ownedBuffer(outValue.value.asHandle("mln_buffer", ::ownedBufferHandle))
-  }
-
-  public actual fun setStyleTransitionOptions(options: StyleTransitionOptions): ULong =
-    command { outCommandId ->
-      memScoped {
-        Status.check(
-          mln_map_set_style_transition_options(
-            state.requireLive().rawHandleValue,
-            StyleStructs.styleTransitionOptions(options, this),
-            outCommandId,
-          )
+  public actual fun setStyleLightProperty(
+    propertyName: String,
+    value: ByteArray,
+  ): Deferred<CommandCompletion> = command { completion ->
+    memScoped {
+      Status.check(
+        mln_map_set_style_light_property(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(propertyName, this),
+          ByteStructs.bufferView(value, this),
+          completion,
         )
-      }
-    }
-
-  public actual suspend fun styleTransitionOptions(): StyleTransitionOptions = memScoped {
-    val outOptions = mln_style_transition_options_default().getPointer(this)
-    Status.check(
-      ordered(
-        { outOperation ->
-          mln_map_get_style_transition_options_start(
-            state.requireLive().rawHandleValue,
-            outOperation,
-          )
-        },
-        { operation -> mln_map_get_style_transition_options_take_result(operation, outOptions) },
       )
-    )
-    StyleStructs.styleTransitionOptions(outOptions.pointed)
+    }
   }
+
+  public actual fun styleLightProperty(propertyName: String): Deferred<ByteArray?> = memScoped {
+    CompletionBridge.submit(
+      ::bufferCompletion,
+      { completion ->
+        mln_map_get_style_light_property(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(propertyName, this),
+          completion,
+        )
+      },
+    )
+  }
+
+  public actual fun setStyleTransitionOptions(
+    options: StyleTransitionOptions
+  ): Deferred<CommandCompletion> = command { completion ->
+    memScoped {
+      Status.check(
+        mln_map_set_style_transition_options(
+          state.requireLive().rawHandleValue,
+          StyleStructs.styleTransitionOptions(options, this),
+          completion,
+        )
+      )
+    }
+  }
+
+  public actual fun styleTransitionOptions(): Deferred<StyleTransitionOptions> =
+    CompletionBridge.submit(
+      { result ->
+        StyleStructs.styleTransitionOptions(
+          result.pointed.value!!
+            .reinterpret<org.maplibre.nativeffi.internal.c.mln_style_transition_options>()
+            .pointed
+        )
+      },
+      { completion ->
+        mln_map_get_style_transition_options(state.requireLive().rawHandleValue, completion)
+      },
+    )
 
   public actual fun setLayerProperty(
     layerId: String,
     propertyName: String,
     value: ByteArray,
-  ): ULong = command { outCommandId ->
+  ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
       Status.check(
         mln_map_set_layer_property(
@@ -1266,122 +1082,127 @@ private constructor(
           CoreStructs.stringView(layerId, this),
           CoreStructs.stringView(propertyName, this),
           ByteStructs.bufferView(value, this),
-          outCommandId,
+          completion,
         )
       )
     }
   }
 
-  public actual suspend fun layerProperty(layerId: String, propertyName: String): ByteArray? =
+  public actual fun layerProperty(layerId: String, propertyName: String): Deferred<ByteArray?> =
     memScoped {
-      val outValue = alloc<ULongVar>()
-      outValue.value = 0uL
-      Status.check(
-        ordered(
-          { outOperation ->
-            mln_map_get_layer_property_start(
-              state.requireLive().rawHandleValue,
-              CoreStructs.stringView(layerId, this),
-              CoreStructs.stringView(propertyName, this),
-              outOperation,
-            )
-          },
-          { operation -> mln_map_get_layer_property_take_result(operation, outValue.ptr) },
-        )
-      )
-      if (outValue.value == 0uL) null
-      else ByteStructs.ownedBuffer(outValue.value.asHandle("mln_buffer", ::ownedBufferHandle))
-    }
-
-  public actual fun setLayerFilter(layerId: String, filter: ByteArray): ULong =
-    command { outCommandId ->
-      memScoped {
-        Status.check(
-          mln_map_set_layer_filter(
+      CompletionBridge.submit(
+        ::bufferCompletion,
+        { completion ->
+          mln_map_get_layer_property(
             state.requireLive().rawHandleValue,
             CoreStructs.stringView(layerId, this),
-            ByteStructs.bufferViewPointer(filter, this),
-            outCommandId,
+            CoreStructs.stringView(propertyName, this),
+            completion,
           )
-        )
-      }
+        },
+      )
     }
 
-  public actual fun clearLayerFilter(layerId: String): ULong = command { outCommandId ->
+  public actual fun setLayerFilter(
+    layerId: String,
+    filter: ByteArray,
+  ): Deferred<CommandCompletion> = command { completion ->
     memScoped {
       Status.check(
         mln_map_set_layer_filter(
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(layerId, this),
-          null,
-          outCommandId,
+          ByteStructs.bufferViewPointer(filter, this),
+          completion,
         )
       )
     }
   }
 
-  public actual suspend fun layerFilter(layerId: String): ByteArray? = memScoped {
-    val outFilter = alloc<ULongVar>()
-    outFilter.value = 0uL
-    Status.check(
-      ordered(
-        { outOperation ->
-          mln_map_get_layer_filter_start(
+  public actual fun clearLayerFilter(layerId: String): Deferred<CommandCompletion> =
+    command { completion ->
+      memScoped {
+        Status.check(
+          mln_map_set_layer_filter(
             state.requireLive().rawHandleValue,
             CoreStructs.stringView(layerId, this),
-            outOperation,
+            null,
+            completion,
           )
-        },
-        { operation -> mln_map_get_layer_filter_take_result(operation, outFilter.ptr) },
-      )
+        )
+      }
+    }
+
+  public actual fun layerFilter(layerId: String): Deferred<ByteArray?> = memScoped {
+    CompletionBridge.submit(
+      ::bufferCompletion,
+      { completion ->
+        mln_map_get_layer_filter(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(layerId, this),
+          completion,
+        )
+      },
     )
-    if (outFilter.value == 0uL) null
-    else ByteStructs.ownedBuffer(outFilter.value.asHandle("mln_buffer", ::ownedBufferHandle))
   }
 
-  public actual fun setLayerSourceLayer(layerId: String, sourceLayer: String): ULong =
-    command { outCommandId ->
-      memScoped {
-        Status.check(
-          mln_map_set_layer_source_layer(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(layerId, this),
-            CoreStructs.stringView(sourceLayer, this),
-            outCommandId,
-          )
+  public actual fun setLayerSourceLayer(
+    layerId: String,
+    sourceLayer: String,
+  ): Deferred<CommandCompletion> = command { completion ->
+    memScoped {
+      Status.check(
+        mln_map_set_layer_source_layer(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(layerId, this),
+          CoreStructs.stringView(sourceLayer, this),
+          completion,
         )
-      }
-    }
-
-  public actual suspend fun layerSourceLayer(layerId: String): String =
-    takeLayerBuffer(
-        layerId,
-        ::mln_map_copy_layer_source_layer_start,
-        ::mln_map_copy_layer_source_layer_take_result,
       )
-      .decodeToString()
+    }
+  }
 
-  public actual fun setLayerSourceId(layerId: String, sourceId: String): ULong =
-    command { outCommandId ->
-      memScoped {
-        Status.check(
-          mln_map_set_layer_source_id(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(layerId, this),
-            CoreStructs.stringView(sourceId, this),
-            outCommandId,
-          )
+  public actual fun layerSourceLayer(layerId: String): Deferred<String> = memScoped {
+    CompletionBridge.submit(
+      { result -> checkNotNull(bufferCompletion(result)).decodeToString() },
+      { completion ->
+        mln_map_copy_layer_source_layer(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(layerId, this),
+          completion,
         )
-      }
-    }
+      },
+    )
+  }
 
-  public actual suspend fun layerSourceId(layerId: String): String =
-    takeLayerBuffer(
-        layerId,
-        ::mln_map_copy_layer_source_id_start,
-        ::mln_map_copy_layer_source_id_take_result,
+  public actual fun setLayerSourceId(
+    layerId: String,
+    sourceId: String,
+  ): Deferred<CommandCompletion> = command { completion ->
+    memScoped {
+      Status.check(
+        mln_map_set_layer_source_id(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(layerId, this),
+          CoreStructs.stringView(sourceId, this),
+          completion,
+        )
       )
-      .decodeToString()
+    }
+  }
+
+  public actual fun layerSourceId(layerId: String): Deferred<String> = memScoped {
+    CompletionBridge.submit(
+      { result -> checkNotNull(bufferCompletion(result)).decodeToString() },
+      { completion ->
+        mln_map_copy_layer_source_id(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(layerId, this),
+          completion,
+        )
+      },
+    )
+  }
 
   private fun copyMapBytes(
     copy: (ULong, CPointer<UByteVar>?, ULong, CPointer<ULongVar>) -> Int
@@ -1416,63 +1237,56 @@ private constructor(
     buffer.readBytes(checkedInt(outCopied.value, "layer copied text size")).decodeToString()
   }
 
-  public actual fun setLayerMinZoom(layerId: String, minZoom: Double): ULong =
-    command { outCommandId ->
+  public actual fun setLayerMinZoom(layerId: String, minZoom: Double): Deferred<CommandCompletion> =
+    command { completion ->
       memScoped {
         Status.check(
           mln_map_set_layer_min_zoom(
             state.requireLive().rawHandleValue,
             CoreStructs.stringView(layerId, this),
             minZoom,
-            outCommandId,
+            completion,
           )
         )
       }
     }
 
-  public actual fun setLayerMaxZoom(layerId: String, maxZoom: Double): ULong =
-    command { outCommandId ->
+  public actual fun setLayerMaxZoom(layerId: String, maxZoom: Double): Deferred<CommandCompletion> =
+    command { completion ->
       memScoped {
         Status.check(
           mln_map_set_layer_max_zoom(
             state.requireLive().rawHandleValue,
             CoreStructs.stringView(layerId, this),
             maxZoom,
-            outCommandId,
+            completion,
           )
         )
       }
     }
 
-  public actual fun setLayerVisibility(layerId: String, visibility: StyleLayerVisibility): ULong =
-    command { outCommandId ->
-      memScoped {
-        Status.check(
-          mln_map_set_layer_visibility(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(layerId, this),
-            visibility.nativeValue.toUInt(),
-            outCommandId,
-          )
+  public actual fun setLayerVisibility(
+    layerId: String,
+    visibility: StyleLayerVisibility,
+  ): Deferred<CommandCompletion> = command { completion ->
+    memScoped {
+      Status.check(
+        mln_map_set_layer_visibility(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(layerId, this),
+          visibility.nativeValue.toUInt(),
+          completion,
         )
-      }
+      )
     }
-
-  public actual fun requestRepaint(): Long = memScoped {
-    val outCommand = alloc<ULongVar>()
-    Status.check(mln_map_request_repaint(state.requireLive().rawHandleValue, outCommand.ptr))
-    outCommand.value.toLong()
   }
 
-  public actual suspend fun requestStillImage() {
-    val operation = startOperation { outOperation ->
-      mln_map_request_still_image_start(state.requireLive().rawHandleValue, outOperation)
-    }
-    try {
-      runtime.awaitOperation(operation)
-    } finally {
-      mln_operation_release(operation)
-    }
+  public actual fun requestRepaint(): Deferred<CommandCompletion> = command { completion ->
+    Status.check(mln_map_request_repaint(state.requireLive().rawHandleValue, completion))
+  }
+
+  public actual fun requestStillImage(): Deferred<CommandCompletion> = command { completion ->
+    Status.check(mln_map_request_still_image(state.requireLive().rawHandleValue, completion))
   }
 
   public actual fun snapshot(): MapSnapshot = memScoped {
@@ -1497,88 +1311,88 @@ private constructor(
     )
   }
 
-  public actual fun setDebugOptions(options: Set<DebugOption>): Long = memScoped {
-    val outCommand = alloc<ULongVar>()
-    Status.check(
-      mln_map_set_debug_options(
-        state.requireLive().rawHandleValue,
-        MapStructs.debugOptionMask(options),
-        outCommand.ptr,
+  public actual fun setDebugOptions(options: Set<DebugOption>): Deferred<CommandCompletion> =
+    command { completion ->
+      Status.check(
+        mln_map_set_debug_options(
+          state.requireLive().rawHandleValue,
+          MapStructs.debugOptionMask(options),
+          completion,
+        )
       )
-    )
-    outCommand.value.toLong()
+    }
+
+  public actual fun setRenderingStatsViewEnabled(enabled: Boolean): Deferred<CommandCompletion> =
+    command { completion ->
+      Status.check(
+        mln_map_set_rendering_stats_view_enabled(
+          state.requireLive().rawHandleValue,
+          enabled,
+          completion,
+        )
+      )
+    }
+
+  public actual fun setViewportOptions(options: ViewportOptions): Deferred<CommandCompletion> =
+    memScoped {
+      command { completion ->
+        Status.check(
+          mln_map_set_viewport_options(
+            state.requireLive().rawHandleValue,
+            MapStructs.viewportOptions(options, this),
+            completion,
+          )
+        )
+      }
+    }
+
+  public actual fun setTileOptions(options: TileOptions): Deferred<CommandCompletion> = memScoped {
+    command { completion ->
+      Status.check(
+        mln_map_set_tile_options(
+          state.requireLive().rawHandleValue,
+          MapStructs.tileOptions(options, this),
+          completion,
+        )
+      )
+    }
   }
 
-  public actual fun setRenderingStatsViewEnabled(enabled: Boolean): Long = memScoped {
-    val outCommand = alloc<ULongVar>()
-    Status.check(
-      mln_map_set_rendering_stats_view_enabled(
-        state.requireLive().rawHandleValue,
-        enabled,
-        outCommand.ptr,
+  public actual fun setBounds(options: BoundOptions): Deferred<CommandCompletion> = memScoped {
+    command { completion ->
+      Status.check(
+        mln_map_set_bounds(
+          state.requireLive().rawHandleValue,
+          MapStructs.boundOptions(options, this),
+          completion,
+        )
       )
-    )
-    outCommand.value.toLong()
+    }
   }
 
-  public actual fun setViewportOptions(options: ViewportOptions): Long = memScoped {
-    val outCommand = alloc<ULongVar>()
-    Status.check(
-      mln_map_set_viewport_options(
-        state.requireLive().rawHandleValue,
-        MapStructs.viewportOptions(options, this),
-        outCommand.ptr,
-      )
-    )
-    outCommand.value.toLong()
-  }
+  public actual fun setFreeCameraOptions(options: FreeCameraOptions): Deferred<CommandCompletion> =
+    memScoped {
+      command { completion ->
+        Status.check(
+          mln_map_set_free_camera_options(
+            state.requireLive().rawHandleValue,
+            MapStructs.freeCameraOptions(options, this),
+            completion,
+          )
+        )
+      }
+    }
 
-  public actual fun setTileOptions(options: TileOptions): Long = memScoped {
-    val outCommand = alloc<ULongVar>()
-    Status.check(
-      mln_map_set_tile_options(
-        state.requireLive().rawHandleValue,
-        MapStructs.tileOptions(options, this),
-        outCommand.ptr,
-      )
-    )
-    outCommand.value.toLong()
-  }
-
-  public actual fun setBounds(options: BoundOptions): Long = memScoped {
-    val outCommand = alloc<ULongVar>()
-    Status.check(
-      mln_map_set_bounds(
-        state.requireLive().rawHandleValue,
-        MapStructs.boundOptions(options, this),
-        outCommand.ptr,
-      )
-    )
-    outCommand.value.toLong()
-  }
-
-  public actual fun setFreeCameraOptions(options: FreeCameraOptions): Long = memScoped {
-    val outCommand = alloc<ULongVar>()
-    Status.check(
-      mln_map_set_free_camera_options(
-        state.requireLive().rawHandleValue,
-        MapStructs.freeCameraOptions(options, this),
-        outCommand.ptr,
-      )
-    )
-    outCommand.value.toLong()
-  }
-
-  public actual fun resize(size: MapSize): Long = memScoped {
+  public actual fun resize(size: MapSize): Deferred<CommandCompletion> = memScoped {
     val extent = alloc<mln_logical_extent>()
     extent.width = size.width.toUInt()
     extent.height = size.height.toUInt()
     extent.scale_factor = size.scaleFactor
-    val outCommand = alloc<ULongVar>()
-    Status.check(
-      mln_map_resize(state.requireLive().rawHandleValue, extent.readValue(), outCommand.ptr)
-    )
-    outCommand.value.toLong()
+    command { completion ->
+      Status.check(
+        mln_map_resize(state.requireLive().rawHandleValue, extent.readValue(), completion)
+      )
+    }
   }
 
   public actual fun cameraSnapshot(): CameraSnapshot = memScoped {
@@ -1590,7 +1404,7 @@ private constructor(
     CameraSnapshot(outGeneration.value.toLong(), MapStructs.cameraOptions(outCamera.pointed))
   }
 
-  public actual fun updateCamera(update: CameraUpdate): Long = memScoped {
+  public actual fun updateCamera(update: CameraUpdate): Deferred<CommandCompletion> = memScoped {
     val nativeUpdate = mln_camera_update_default().getPointer(this)
     nativeUpdate.pointed.mode = update.mode.nativeValue.toUInt()
     val camera = MapStructs.cameraOptions(update.camera, this).pointed
@@ -1622,14 +1436,14 @@ private constructor(
     nativeUpdate.pointed.animation.easing.y2 = animation.easing.y2
     nativeUpdate.pointed.animation.transition_id = animation.transition_id
     nativeUpdate.pointed.gesture_phase = update.gesturePhase.nativeValue.toUInt()
-    val outCommand = alloc<ULongVar>()
-    Status.check(
-      mln_map_update_camera(state.requireLive().rawHandleValue, nativeUpdate, outCommand.ptr)
-    )
-    outCommand.value.toLong()
+    command { completion ->
+      Status.check(
+        mln_map_update_camera(state.requireLive().rawHandleValue, nativeUpdate, completion)
+      )
+    }
   }
 
-  public actual fun applyCameraDelta(delta: CameraDelta): Long = memScoped {
+  public actual fun applyCameraDelta(delta: CameraDelta): Deferred<CommandCompletion> = memScoped {
     val nativeDelta = mln_camera_delta_default().getPointer(this)
     nativeDelta.pointed.kind = delta.kind.nativeValue.toUInt()
     nativeDelta.pointed.offset.x = delta.offset.x
@@ -1651,29 +1465,21 @@ private constructor(
     nativeDelta.pointed.animation.easing.x2 = animation.easing.x2
     nativeDelta.pointed.animation.easing.y2 = animation.easing.y2
     nativeDelta.pointed.animation.transition_id = animation.transition_id
-    val outCommand = alloc<ULongVar>()
-    Status.check(
-      mln_map_apply_camera_delta(state.requireLive().rawHandleValue, nativeDelta, outCommand.ptr)
-    )
-    outCommand.value.toLong()
+    command { completion ->
+      Status.check(
+        mln_map_apply_camera_delta(state.requireLive().rawHandleValue, nativeDelta, completion)
+      )
+    }
   }
 
-  public actual suspend fun queryCamera(): CameraSnapshot {
-    val operation = startOperation { outOperation ->
-      mln_map_camera_query_start(state.requireLive().rawHandleValue, outOperation)
-    }
-    try {
-      runtime.awaitOperation(operation)
-      return memScoped {
-        val result = alloc<mln_camera_query_result>()
-        result.size = sizeOf<mln_camera_query_result>().toUInt()
-        Status.check(mln_map_camera_query_take_result(operation, result.ptr))
+  public actual fun queryCamera(): Deferred<CameraSnapshot> =
+    CompletionBridge.submit(
+      { completion ->
+        val result = completion.pointed.value!!.reinterpret<mln_camera_query_result>().pointed
         CameraSnapshot(result.generation.toLong(), MapStructs.cameraOptions(result.camera))
-      }
-    } finally {
-      mln_operation_release(operation)
-    }
-  }
+      },
+      { completion -> mln_map_camera_query(state.requireLive().rawHandleValue, completion) },
+    )
 
   public actual fun attachMetalOwnedTexture(
     descriptor: MetalOwnedTextureDescriptor,
@@ -1726,27 +1532,19 @@ private constructor(
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment = RenderSessionHandle.attachOpenGLSurface(this, descriptor, options)
 
-  public actual suspend fun createProjection(): MapProjectionHandle {
-    val operation = startOperation { outOperation ->
-      mln_map_projection_create_start(state.requireLive().rawHandleValue, outOperation)
-    }
-    try {
-      runtime.awaitOperation(operation)
-      return memScoped {
-        val outProjection = alloc<ULongVar>()
-        outProjection.value = 0uL
-        Status.check(mln_map_projection_create_take_result(operation, outProjection.ptr))
+  public actual fun createProjection(): Deferred<MapProjectionHandle> =
+    CompletionBridge.submit(
+      { result ->
         MapProjectionHandle(
-          outProjection.value.asHandle(
-            "mln_map_projection_create_take_result",
-            ::mapProjectionHandle,
-          )
+          result.pointed.value!!
+            .reinterpret<ULongVar>()
+            .pointed
+            .value
+            .asHandle("mln_map_projection_create", ::mapProjectionHandle)
         )
-      }
-    } finally {
-      mln_operation_release(operation)
-    }
-  }
+      },
+      { completion -> mln_map_projection_create(state.requireLive().rawHandleValue, completion) },
+    )
 
   public actual fun close() {
     if (!state.beginClose()) return
@@ -1773,69 +1571,30 @@ private constructor(
     return value.toInt()
   }
 
-  private suspend fun takeStyleBuffer(
-    start: (ULong, CPointer<ULongVar>) -> Int,
-    take: (ULong, CPointer<ULongVar>) -> Int,
-  ): ByteArray = memScoped {
-    val outBuffer = alloc<ULongVar>()
-    outBuffer.value = 0uL
-    Status.check(
-      ordered(
-        { outOperation -> start(state.requireLive().rawHandleValue, outOperation) },
-        { operation -> take(operation, outBuffer.ptr) },
-      )
-    )
-    ByteStructs.ownedBuffer(outBuffer.value.asHandle("mln_buffer", ::ownedBufferHandle))
-  }
-
-  private suspend fun takeLayerBuffer(
-    layerId: String,
-    start: (ULong, CValue<mln_buffer_view>, CPointer<ULongVar>) -> Int,
-    take: (ULong, CPointer<ULongVar>) -> Int,
-  ): ByteArray = memScoped {
-    val outBuffer = alloc<ULongVar>()
-    outBuffer.value = 0uL
-    Status.check(
-      ordered(
-        { outOperation ->
-          start(
-            state.requireLive().rawHandleValue,
-            CoreStructs.stringView(layerId, this),
-            outOperation,
-          )
-        },
-        { operation -> take(operation, outBuffer.ptr) },
-      )
-    )
-    ByteStructs.ownedBuffer(outBuffer.value.asHandle("mln_buffer", ::ownedBufferHandle))
-  }
-
   public actual companion object {
-    public actual suspend fun create(runtime: RuntimeHandle, options: MapOptions): MapHandle =
+    public actual fun create(runtime: RuntimeHandle, options: MapOptions): Deferred<MapHandle> =
       memScoped {
-        val operation = startOperation { outOperation ->
-          mln_map_create_start(
-            runtime.nativeHandle().rawHandleValue,
-            mapOptions(options, this),
-            outOperation,
-          )
-        }
-        try {
-          runtime.awaitOperation(operation)
-          val outMap = alloc<ULongVar>()
-          outMap.value = 0uL
-          Status.check(mln_map_create_take_result(operation, outMap.ptr))
-          val map =
+        CompletionBridge.submit(
+          { result ->
             MapHandle(
-              runtime,
-              outMap.value.asHandle("mln_map_create_take_result", ::mapHandle),
-              options.eventMask,
+                runtime,
+                result.pointed.value!!
+                  .reinterpret<ULongVar>()
+                  .pointed
+                  .value
+                  .asHandle("mln_map_create", ::mapHandle),
+                options.eventMask,
+              )
+              .also(runtime::registerMap)
+          },
+          { completion ->
+            mln_map_create(
+              runtime.nativeHandle().rawHandleValue,
+              mapOptions(options, this),
+              completion,
             )
-          runtime.registerMap(map)
-          map
-        } finally {
-          mln_operation_release(operation)
-        }
+          },
+        )
       }
 
     internal fun mapOptionsForTesting(options: MapOptions, inspect: (mln_map_options) -> Unit) {
@@ -1865,25 +1624,27 @@ private constructor(
       return nativeOptions.ptr
     }
   }
-
-  private suspend inline fun ordered(
-    start: (CPointer<ULongVar>) -> Int,
-    take: (ULong) -> Int,
-  ): Int {
-    val operation = startOperation(start)
-    try {
-      runtime.awaitOperation(operation)
-      return take(operation)
-    } finally {
-      mln_operation_release(operation)
-    }
-  }
 }
 
 @OptIn(ExperimentalForeignApi::class)
-private inline fun command(call: (CPointer<ULongVar>) -> Unit): ULong = memScoped {
-  val outCommandId = alloc<ULongVar>()
-  outCommandId.value = 0uL
-  call(outCommandId.ptr)
-  outCommandId.value
+private fun bufferCompletion(result: CPointer<mln_completion_result>): ByteArray? {
+  if (result.pointed.value_count == 0uL) return null
+  return ByteStructs.copyBufferView(result.pointed.value!!.reinterpret<mln_buffer_view>().pointed)
+}
+
+@OptIn(ExperimentalForeignApi::class)
+private fun stringViewsCompletion(result: CPointer<mln_completion_result>): List<String> {
+  val count = result.pointed.value_count
+  if (count == 0uL) return emptyList()
+  require(count <= Int.MAX_VALUE.toULong()) { "string count exceeds Int.MAX_VALUE" }
+  val values = result.pointed.value!!.reinterpret<mln_buffer_view>()
+  return List(count.toInt()) { index -> CoreStructs.stringView(values[index]) }
+}
+
+@OptIn(ExperimentalForeignApi::class)
+private inline fun command(
+  crossinline call: (CPointer<mln_completion>) -> Unit
+): Deferred<CommandCompletion> = CompletionBridge.command {
+  call(it)
+  0
 }

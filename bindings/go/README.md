@@ -2,11 +2,11 @@
 
 These draft low-level bindings expose the MapLibre Native C API through
 goroutine-safe runtime, map, and camera handles. Native workers make progress
-autonomously, and commands return runtime-wide monotonic IDs.
+autonomously. Commands return futures with terminal disposition and snapshot
+generation.
 
-Runtime and map creation and closure wait for their native operations to
-complete. Ordered camera reads return typed operation handles. Render-session
-graphics calls remain thread-affine.
-
-Install a runtime notification callback to schedule receiver work. The receiver
-calls `DrainReady` and then drains the ready typed queues.
+Runtime creation and public handle retirement are synchronous. Map creation,
+ordered queries, and lifecycle transitions return typed futures. Render-session
+graphics calls remain thread-affine. Poll event and frame-result drains from an
+existing host cadence, and keep caller-driver service active while presentation
+is paused.

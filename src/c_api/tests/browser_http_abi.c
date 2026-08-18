@@ -97,42 +97,20 @@ static void style_loads_over_http_from_the_runner_origin(void) {
     return;
   }
 
-  // Checks which document loaded: a response from anywhere else carries a
-  // different layer.
-  mln_operation operation = MLN_HANDLE_NULL;
+  // Checks which document loaded: a response from anywhere else lacks this
+  // layer.
+  mln_test_completion completion =
+    mln_test_completion_default(sizeof(mln_style_layer_result));
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_list_style_layer_ids_start(map, &operation)
+    MLN_STATUS_OK,
+    mln_map_get_style_layer_info(
+      map, mln_test_buffer_view(fixture_layer_id, strlen(fixture_layer_id)),
+      &completion.descriptor
+    )
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
-  mln_style_id_list layers = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_list_style_layer_ids_take_result(operation, &layers)
-  );
-  mln_operation_release(operation);
-  size_t count = 0;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_style_id_list_count(layers, &count));
-
-  bool found = false;
-  char seen[256];
-  seen[0] = '\0';
-  for (size_t index = 0; index < count; index += 1) {
-    mln_buffer_view id = {0};
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_style_id_list_get(layers, index, &id)
-    );
-    if (
-      id.size == strlen(fixture_layer_id) &&
-      memcmp(id.data, fixture_layer_id, id.size) == 0
-    ) {
-      found = true;
-    }
-    const size_t used = strlen(seen);
-    (void)snprintf(
-      seen + used, sizeof(seen) - used, "%s%.*s", used == 0 ? "" : ", ",
-      (int)id.size, (const char*)id.data
-    );
-  }
-  mln_style_id_list_destroy(layers);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
+  const bool found = mln_test_completion_value_count(&completion) == 1;
+  mln_test_completion_destroy(&completion);
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -142,8 +120,8 @@ static void style_loads_over_http_from_the_runner_origin(void) {
     (void)snprintf(
       message, sizeof(message),
       "the loaded style has no %s layer, so it did not come from the runner's "
-      "document; layers: [%s]",
-      fixture_layer_id, seen
+      "document",
+      fixture_layer_id
     );
     TEST_FAIL_MESSAGE(message);
   }

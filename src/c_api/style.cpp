@@ -16,7 +16,6 @@
 #include "geojson/geojson_source_data.hpp"
 #include "map/map.hpp"
 #include "maplibre_native_c.h"
-#include "operation/operation.hpp"
 #include "runtime/runtime.hpp"
 
 namespace {
@@ -116,8 +115,15 @@ struct OwnedImageOptions {
   }
 };
 struct OwnedCustomGeometryOptions {
+  enum class Ownership : std::uint8_t {
+    pending,
+    accepted,
+    adopted,
+    rejected,
+  };
+
   mln_custom_geometry_source_options value{};
-  std::atomic<bool> referenced = false;
+  std::atomic<Ownership> ownership = Ownership::pending;
 
   explicit OwnedCustomGeometryOptions(
     const mln_custom_geometry_source_options& options
@@ -126,7 +132,7 @@ struct OwnedCustomGeometryOptions {
 
   ~OwnedCustomGeometryOptions() {
     if (
-      referenced.load(std::memory_order_acquire) &&
+      ownership.load(std::memory_order_acquire) == Ownership::accepted &&
       value.release_user_data != nullptr
     ) {
       try {
@@ -144,41 +150,66 @@ auto valid_view(mln_buffer_view view, const char* name) -> bool {
   return true;
 }
 
+auto take_buffer(mln_buffer buffer, std::string& out) -> mln_status {
+  mln_buffer_view view{};
+  const auto status = mln::core::buffer_get(buffer, &view);
+  if (status == MLN_STATUS_OK) {
+    const auto* bytes = static_cast<const char*>(view.data);
+    out.assign(bytes == nullptr ? "" : bytes, view.size);
+  }
+  mln::core::buffer_destroy(buffer);
+  return status;
+}
+
+auto take_id_list(mln_style_id_list list, std::vector<std::string>& out)
+  -> mln_status {
+  size_t count = 0;
+  auto status = mln::core::style_id_list_count(list, &count);
+  if (status == MLN_STATUS_OK) {
+    out.reserve(count);
+    for (size_t index = 0; index < count; ++index) {
+      mln_buffer_view view{};
+      status = mln::core::style_id_list_get(list, index, &view);
+      if (status != MLN_STATUS_OK) break;
+      const auto* bytes = static_cast<const char*>(view.data);
+      out.emplace_back(bytes == nullptr ? "" : bytes, view.size);
+    }
+  }
+  mln::core::style_id_list_destroy(list);
+  return status;
+}
+
+auto take_string_list(mln_style_string_list list, std::vector<std::string>& out)
+  -> mln_status {
+  size_t count = 0;
+  auto status = mln::core::style_string_list_count(list, &count);
+  if (status == MLN_STATUS_OK) {
+    out.reserve(count);
+    for (size_t index = 0; index < count; ++index) {
+      mln_buffer_view view{};
+      status = mln::core::style_string_list_get(list, index, &view);
+      if (status != MLN_STATUS_OK) break;
+      const auto* bytes = static_cast<const char*>(view.data);
+      out.emplace_back(bytes == nullptr ? "" : bytes, view.size);
+    }
+  }
+  mln::core::style_string_list_destroy(list);
+  return status;
+}
+
 auto command(
-  mln_map map, std::function<mln_status()> work, uint64_t* out_command_id
+  mln_map map, std::function<mln_status()> work,
+  const mln_completion* completion
 ) -> mln_status {
-  return mln::core::submit_map_command(map, std::move(work), out_command_id);
+  return mln::core::submit_map_command(map, std::move(work), completion);
 }
 
 auto operation(
   mln_map map, mln::core::StyleOperationKind kind, mln::core::StyleWork work,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) -> mln_status {
   return mln::core::start_style_operation(
-    map, kind, std::move(work), out_operation
-  );
-}
-
-auto take(
-  mln_operation operation, mln::core::StyleOperationKind kind,
-  std::function<mln_status(mln::core::StyleOperationResult&)> transfer
-) -> mln_status {
-  return mln::core::take_style_operation(operation, kind, std::move(transfer));
-}
-auto take_preserving(
-  mln_operation operation, mln::core::StyleOperationKind kind,
-  std::function<
-    mln::core::OperationResultTransfer(mln::core::StyleOperationResult&)>
-    transfer
-) -> mln_status {
-  return mln::core::take_operation_result<
-    std::shared_ptr<mln::core::StyleOperationResult>>(
-    operation, static_cast<uint32_t>(kind),
-    [transfer = std::move(transfer)](
-      std::shared_ptr<mln::core::StyleOperationResult>& result
-    ) mutable -> mln::core::OperationResultTransfer {
-      return std::invoke(std::move(transfer), *result);
-    }
+    map, kind, std::move(work), completion
   );
 }
 
@@ -187,7 +218,7 @@ using TextCopy =
 
 auto start_text_copy(
   mln_map map, mln_buffer_view id, mln::core::StyleOperationKind kind,
-  TextCopy copy, mln_operation* out_operation
+  TextCopy copy, const mln_completion* completion
 ) -> mln_status {
   if (!valid_view(id, "style ID is invalid")) {
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -205,27 +236,10 @@ auto start_text_copy(
       }
       auto bytes = std::string(size, '\0');
       status = copy(map, owned.view(), bytes.data(), bytes.size(), &size);
-      return status == MLN_STATUS_OK
-               ? mln::core::create_buffer(std::move(bytes), &result.buffer)
-               : status;
+      if (status == MLN_STATUS_OK) result.bytes = std::move(bytes);
+      return status;
     },
-    out_operation
-  );
-}
-
-auto take_text_copy(
-  mln_operation operation_id, mln::core::StyleOperationKind kind,
-  mln_buffer* out_value
-) -> mln_status {
-  if (out_value == nullptr || *out_value != MLN_HANDLE_NULL) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return take(
-    operation_id, kind,
-    [out_value](mln::core::StyleOperationResult& result) -> mln_status {
-      *out_value = std::exchange(result.buffer, MLN_HANDLE_NULL);
-      return MLN_STATUS_OK;
-    }
+    completion
   );
 }
 
@@ -264,7 +278,7 @@ auto mln_style_transition_options_default(void) noexcept
   return mln::core::style_transition_options_default();
 }
 auto mln_map_set_style_url(
-  mln_map map, const char* url, uint64_t* out_command_id
+  mln_map map, const char* url, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (url == nullptr) {
@@ -276,13 +290,13 @@ auto mln_map_set_style_url(
       [map, owned = std::move(owned)]() -> mln_status {
         return mln::core::map_set_style_url(map, owned.c_str());
       },
-      out_command_id
+      completion
     );
   });
 }
 
 auto mln_map_set_style_json(
-  mln_map map, mln_buffer_view json, uint64_t* out_command_id
+  mln_map map, mln_buffer_view json, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (json.size == 0 || !valid_view(json, "style JSON is invalid")) {
@@ -294,39 +308,23 @@ auto mln_map_set_style_json(
       [map, owned = std::move(owned)]() -> mln_status {
         return mln::core::map_set_style_json(map, owned.view());
       },
-      out_command_id
+      completion
     );
   });
 }
 
-auto mln_map_loaded_style_json_start(
-  mln_map map, mln_operation* out_operation
+auto mln_map_loaded_style_json(
+  mln_map map, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::map_loaded_style_json_start(map, out_operation);
+    return mln::core::map_loaded_style_json_start(map, completion);
   });
 }
 
-auto mln_map_loaded_style_json_take_result(
-  mln_operation operation, mln_buffer* out_json
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::map_loaded_style_json_take_result(operation, out_json);
-  });
-}
-
-auto mln_map_style_url_start(mln_map map, mln_operation* out_operation) noexcept
+auto mln_map_style_url(mln_map map, const mln_completion* completion) noexcept
   -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::map_style_url_start(map, out_operation);
-  });
-}
-
-auto mln_map_style_url_take_result(
-  mln_operation operation, mln_buffer* out_url
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::map_style_url_take_result(operation, out_url);
+    return mln::core::map_style_url_start(map, completion);
   });
 }
 
@@ -372,7 +370,7 @@ auto mln_style_string_list_destroy(mln_style_string_list list) noexcept
 
 auto mln_map_add_style_source_json(
   mln_map map, mln_buffer_view source_id, mln_buffer_view source_json,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (
@@ -390,13 +388,13 @@ auto mln_map_add_style_source_json(
           map, id.view(), json.view()
         );
       },
-      out_command_id
+      completion
     );
   });
 }
 
 auto mln_map_remove_style_source(
-  mln_map map, mln_buffer_view source_id, uint64_t* out_command_id
+  mln_map map, mln_buffer_view source_id, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (!valid_view(source_id, "source_id is invalid")) {
@@ -408,13 +406,13 @@ auto mln_map_remove_style_source(
       [map, id = std::move(id)]() -> mln_status {
         return mln::core::map_remove_style_source(map, id.view());
       },
-      out_command_id
+      completion
     );
   });
 }
 
-auto mln_map_get_style_source_info_start(
-  mln_map map, mln_buffer_view source_id, mln_operation* out_operation
+auto mln_map_get_style_source_info(
+  mln_map map, mln_buffer_view source_id, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (!valid_view(source_id, "source_id is invalid")) {
@@ -427,16 +425,42 @@ auto mln_map_get_style_source_info_start(
         -> mln_status {
         result.source_info = {};
         result.source_info.size = sizeof(mln_style_source_info);
-        return mln::core::map_get_style_source_info(
+        auto status = mln::core::map_get_style_source_info(
           map, id.view(), &result.source_info, &result.found
         );
+        if (status != MLN_STATUS_OK || !result.found) return status;
+        auto copy_text = [&](auto copy, std::string& destination) {
+          size_t size = 0;
+          bool found = false;
+          auto copy_status = copy(map, id.view(), nullptr, 0, &size, &found);
+          if (copy_status != MLN_STATUS_OK || !found) return copy_status;
+          destination.resize(size);
+          return copy(
+            map, id.view(), destination.data(), destination.size(), &size,
+            &found
+          );
+        };
+        status = copy_text(
+          mln::core::map_copy_style_source_attribution, result.attribution
+        );
+        if (status != MLN_STATUS_OK) return status;
+        status = copy_text(mln::core::map_copy_style_source_url, result.url);
+        if (status != MLN_STATUS_OK) return status;
+        auto list = mln_style_string_list{MLN_HANDLE_NULL};
+        bool found = false;
+        status = mln::core::map_get_style_source_tile_urls(
+          map, id.view(), &list, &found
+        );
+        return status == MLN_STATUS_OK && found
+                 ? take_string_list(list, result.strings)
+                 : status;
       },
-      out_operation
+      completion
     );
   });
 }
-auto mln_map_copy_style_source_attribution_start(
-  mln_map map, mln_buffer_view source_id, mln_operation* out_operation
+auto mln_map_copy_style_source_attribution(
+  mln_map map, mln_buffer_view source_id, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (!valid_view(source_id, "source_id is invalid")) {
@@ -458,38 +482,16 @@ auto mln_map_copy_style_source_attribution_start(
         status = mln::core::map_copy_style_source_attribution(
           map, id.view(), bytes.data(), bytes.size(), &size, &result.found
         );
-        return status == MLN_STATUS_OK
-                 ? mln::core::create_buffer(std::move(bytes), &result.buffer)
-                 : status;
+        if (status == MLN_STATUS_OK) result.bytes = std::move(bytes);
+        return status;
       },
-      out_operation
+      completion
     );
   });
 }
 
-auto mln_map_copy_style_source_attribution_take_result(
-  mln_operation operation_id, mln_buffer* out_attribution, bool* out_found
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    if (
-      out_attribution == nullptr || *out_attribution != MLN_HANDLE_NULL ||
-      out_found == nullptr
-    ) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    return take(
-      operation_id, mln::core::StyleOperationKind::SourceAttribution,
-      [=](mln::core::StyleOperationResult& result) -> mln_status {
-        *out_attribution = std::exchange(result.buffer, MLN_HANDLE_NULL);
-        *out_found = result.found;
-        return MLN_STATUS_OK;
-      }
-    );
-  });
-}
-
-auto mln_map_copy_style_source_url_start(
-  mln_map map, mln_buffer_view source_id, mln_operation* out_operation
+auto mln_map_copy_style_source_url(
+  mln_map map, mln_buffer_view source_id, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (!valid_view(source_id, "source_id is invalid")) {
@@ -511,58 +513,16 @@ auto mln_map_copy_style_source_url_start(
         status = mln::core::map_copy_style_source_url(
           map, id.view(), bytes.data(), bytes.size(), &size, &result.found
         );
-        return status == MLN_STATUS_OK
-                 ? mln::core::create_buffer(std::move(bytes), &result.buffer)
-                 : status;
+        if (status == MLN_STATUS_OK) result.bytes = std::move(bytes);
+        return status;
       },
-      out_operation
+      completion
     );
   });
 }
 
-auto mln_map_copy_style_source_url_take_result(
-  mln_operation operation_id, mln_buffer* out_url, bool* out_found
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    if (
-      out_url == nullptr || *out_url != MLN_HANDLE_NULL || out_found == nullptr
-    ) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    return take(
-      operation_id, mln::core::StyleOperationKind::SourceUrl,
-      [=](mln::core::StyleOperationResult& result) -> mln_status {
-        *out_url = std::exchange(result.buffer, MLN_HANDLE_NULL);
-        *out_found = result.found;
-        return MLN_STATUS_OK;
-      }
-    );
-  });
-}
-
-auto mln_map_get_style_source_info_take_result(
-  mln_operation operation_id, mln_style_source_info* out_info, bool* out_found
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    if (
-      out_info == nullptr || out_info->size < sizeof(mln_style_source_info) ||
-      out_found == nullptr
-    ) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    return take(
-      operation_id, mln::core::StyleOperationKind::SourceInfo,
-      [=](mln::core::StyleOperationResult& result) -> mln_status {
-        *out_info = result.source_info;
-        *out_found = result.found;
-        return MLN_STATUS_OK;
-      }
-    );
-  });
-}
-
-auto mln_map_get_style_source_tile_urls_start(
-  mln_map map, mln_buffer_view source_id, mln_operation* out_operation
+auto mln_map_get_style_source_tile_urls(
+  mln_map map, mln_buffer_view source_id, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (!valid_view(source_id, "source_id is invalid")) {
@@ -573,64 +533,32 @@ auto mln_map_get_style_source_tile_urls_start(
       map, mln::core::StyleOperationKind::SourceTileUrls,
       [map, id = std::move(id)](mln::core::StyleOperationResult& result)
         -> mln_status {
-        return mln::core::map_get_style_source_tile_urls(
-          map, id.view(), &result.string_list, &result.found
+        auto list = mln_style_string_list{MLN_HANDLE_NULL};
+        const auto status = mln::core::map_get_style_source_tile_urls(
+          map, id.view(), &list, &result.found
         );
+        return status == MLN_STATUS_OK && result.found
+                 ? take_string_list(list, result.strings)
+                 : status;
       },
-      out_operation
+      completion
     );
   });
 }
 
-auto mln_map_get_style_source_tile_urls_take_result(
-  mln_operation operation_id, mln_style_string_list* out_tile_urls,
-  bool* out_found
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    if (
-      out_tile_urls == nullptr || *out_tile_urls != MLN_HANDLE_NULL ||
-      out_found == nullptr
-    ) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    return take(
-      operation_id, mln::core::StyleOperationKind::SourceTileUrls,
-      [=](mln::core::StyleOperationResult& result) -> mln_status {
-        *out_tile_urls = std::exchange(result.string_list, MLN_HANDLE_NULL);
-        *out_found = result.found;
-        return MLN_STATUS_OK;
-      }
-    );
-  });
-}
-
-auto mln_map_list_style_source_ids_start(
-  mln_map map, mln_operation* out_operation
+auto mln_map_list_style_source_ids(
+  mln_map map, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return operation(
       map, mln::core::StyleOperationKind::SourceIds,
       [map](mln::core::StyleOperationResult& result) -> mln_status {
-        return mln::core::map_list_style_source_ids(map, &result.id_list);
+        auto list = mln_style_id_list{MLN_HANDLE_NULL};
+        const auto status = mln::core::map_list_style_source_ids(map, &list);
+        return status == MLN_STATUS_OK ? take_id_list(list, result.strings)
+                                       : status;
       },
-      out_operation
-    );
-  });
-}
-
-auto mln_map_list_style_source_ids_take_result(
-  mln_operation operation_id, mln_style_id_list* out_source_ids
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    if (out_source_ids == nullptr || *out_source_ids != MLN_HANDLE_NULL) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    return take(
-      operation_id, mln::core::StyleOperationKind::SourceIds,
-      [out_source_ids](mln::core::StyleOperationResult& result) -> mln_status {
-        *out_source_ids = std::exchange(result.id_list, MLN_HANDLE_NULL);
-        return MLN_STATUS_OK;
-      }
+      completion
     );
   });
 }
@@ -638,7 +566,8 @@ auto mln_map_list_style_source_ids_take_result(
 #define MLN_GEOJSON_COMMAND(NAME, CORE)                                       \
   auto NAME(                                                                  \
     mln_map map, mln_buffer_view source_id, mln_buffer_view input,            \
-    const mln_geojson_source_options* options, uint64_t* out_command_id       \
+    const mln_geojson_source_options* options,                                \
+    const mln_completion* completion                                          \
   ) noexcept -> mln_status {                                                  \
     return mln::c_api::status_boundary([&]() -> mln_status {                  \
       if (                                                                    \
@@ -661,7 +590,7 @@ auto mln_map_list_style_source_ids_take_result(
             map, id.view(), input.view(), &options.value                      \
           );                                                                  \
         },                                                                    \
-        out_command_id                                                        \
+        completion                                                            \
       );                                                                      \
     });                                                                       \
   }
@@ -669,7 +598,8 @@ auto mln_map_list_style_source_ids_take_result(
 #define MLN_TILE_URL_COMMAND(NAME, CORE, KIND)                                \
   auto NAME(                                                                  \
     mln_map map, mln_buffer_view source_id, mln_buffer_view url,              \
-    const mln_style_tile_source_options* options, uint64_t* out_command_id    \
+    const mln_style_tile_source_options* options,                             \
+    const mln_completion* completion                                          \
   ) noexcept -> mln_status {                                                  \
     return mln::c_api::status_boundary([&]() -> mln_status {                  \
       if (                                                                    \
@@ -690,7 +620,7 @@ auto mln_map_list_style_source_ids_take_result(
           options.value.attribution = options.attribution.view();             \
           return mln::core::CORE(map, id.view(), url.view(), &options.value); \
         },                                                                    \
-        out_command_id                                                        \
+        completion                                                            \
       );                                                                      \
     });                                                                       \
   }
@@ -699,7 +629,7 @@ auto mln_map_list_style_source_ids_take_result(
   auto NAME(                                                              \
     mln_map map, mln_buffer_view source_id, const mln_buffer_view* tiles, \
     size_t tile_count, const mln_style_tile_source_options* options,      \
-    uint64_t* out_command_id                                              \
+    const mln_completion* completion                                      \
   ) noexcept -> mln_status {                                              \
     return mln::c_api::status_boundary([&]() -> mln_status {              \
       if (                                                                \
@@ -734,7 +664,7 @@ auto mln_map_list_style_source_ids_take_result(
             map, id.view(), views.data(), views.size(), &options.value    \
           );                                                              \
         },                                                                \
-        out_command_id                                                    \
+        completion                                                        \
       );                                                                  \
     });                                                                   \
   }
@@ -757,7 +687,7 @@ auto mln_geojson_source_data_destroy(mln_geojson_source_data data) noexcept
 
 auto mln_map_add_geojson_source_data(
   mln_map map, mln_buffer_view source_id, mln_geojson_source_data data,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (!valid_view(source_id, "source_id is invalid")) {
@@ -779,14 +709,14 @@ auto mln_map_add_geojson_source_data(
          }]() -> mln_status {
         return mln::core::map_add_geojson_source_data(map, id.view(), prepared);
       },
-      out_command_id
+      completion
     );
   });
 }
 
 auto mln_map_set_geojson_source_url(
   mln_map map, mln_buffer_view source_id, mln_buffer_view url,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (
@@ -804,14 +734,14 @@ auto mln_map_set_geojson_source_url(
           map, id.view(), value.view()
         );
       },
-      out_command_id
+      completion
     );
   });
 }
 
 auto mln_map_set_geojson_source_data(
   mln_map map, mln_buffer_view source_id, mln_geojson_source_data data,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (!valid_view(source_id, "source_id is invalid")) {
@@ -833,13 +763,14 @@ auto mln_map_set_geojson_source_data(
          }]() -> mln_status {
         return mln::core::map_set_geojson_source_data(map, id.view(), prepared);
       },
-      out_command_id
+      completion
     );
   });
 }
 
 auto mln_map_set_geojson_source_synchronous_tiling(
-  mln_map map, mln_buffer_view source_id, bool enabled, uint64_t* out_command_id
+  mln_map map, mln_buffer_view source_id, bool enabled,
+  const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (!valid_view(source_id, "source_id is invalid")) {
@@ -853,7 +784,7 @@ auto mln_map_set_geojson_source_synchronous_tiling(
           map, id.view(), enabled
         );
       },
-      out_command_id
+      completion
     );
   });
 }
@@ -879,7 +810,8 @@ MLN_TILE_LIST_COMMAND(
 
 auto mln_map_add_custom_geometry_source(
   mln_map map, mln_buffer_view source_id,
-  const mln_custom_geometry_source_options* options, uint64_t* out_command_id
+  const mln_custom_geometry_source_options* options,
+  const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (
@@ -898,14 +830,32 @@ auto mln_map_add_custom_geometry_source(
           map, id.view(), &owned->value
         );
         if (add_status == MLN_STATUS_OK) {
-          owned->referenced.store(false, std::memory_order_release);
+          auto expected = OwnedCustomGeometryOptions::Ownership::pending;
+          if (!owned->ownership.compare_exchange_strong(
+                expected, OwnedCustomGeometryOptions::Ownership::adopted,
+                std::memory_order_acq_rel
+              )) {
+            owned->ownership.store(
+              OwnedCustomGeometryOptions::Ownership::adopted,
+              std::memory_order_release
+            );
+          }
         }
         return add_status;
       },
-      out_command_id
+      completion
     );
     if (status == MLN_STATUS_OK) {
-      owned->referenced.store(true, std::memory_order_release);
+      auto expected = OwnedCustomGeometryOptions::Ownership::pending;
+      static_cast<void>(owned->ownership.compare_exchange_strong(
+        expected, OwnedCustomGeometryOptions::Ownership::accepted,
+        std::memory_order_acq_rel
+      ));
+    } else {
+      owned->ownership.store(
+        OwnedCustomGeometryOptions::Ownership::rejected,
+        std::memory_order_release
+      );
     }
     return status;
   });
@@ -913,7 +863,7 @@ auto mln_map_add_custom_geometry_source(
 
 auto mln_map_set_custom_geometry_source_tile_data(
   mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
-  mln_buffer_view data, uint64_t* out_command_id
+  mln_buffer_view data, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     auto id = OwnedView{source_id};
@@ -926,14 +876,14 @@ auto mln_map_set_custom_geometry_source_tile_data(
           map, id.view(), tile_id, owned.view()
         );
       },
-      out_command_id
+      completion
     );
   });
 }
 
 auto mln_map_invalidate_custom_geometry_source_tile(
   mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     auto id = OwnedView{source_id};
@@ -944,14 +894,14 @@ auto mln_map_invalidate_custom_geometry_source_tile(
           map, id.view(), tile_id
         );
       },
-      out_command_id
+      completion
     );
   });
 }
 
 auto mln_map_invalidate_custom_geometry_source_region(
   mln_map map, mln_buffer_view source_id, mln_lat_lng_bounds bounds,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     auto id = OwnedView{source_id};
@@ -962,7 +912,7 @@ auto mln_map_invalidate_custom_geometry_source_region(
           map, id.view(), bounds
         );
       },
-      out_command_id
+      completion
     );
   });
 }
@@ -974,7 +924,7 @@ auto mln_map_invalidate_custom_geometry_source_region(
 auto mln_map_set_style_image(
   mln_map map, mln_buffer_view image_id,
   const mln_premultiplied_rgba8_image* image,
-  const mln_style_image_options* options, uint64_t* out_command_id
+  const mln_style_image_options* options, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (
@@ -998,13 +948,13 @@ auto mln_map_set_style_image(
           map, id.view(), &image.value, &options.value
         );
       },
-      out_command_id
+      completion
     );
   });
 }
 
 auto mln_map_remove_style_image(
-  mln_map map, mln_buffer_view image_id, uint64_t* out_command_id
+  mln_map map, mln_buffer_view image_id, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (!valid_view(image_id, "image_id is invalid")) {
@@ -1016,13 +966,13 @@ auto mln_map_remove_style_image(
       [map, id = std::move(id)]() -> mln_status {
         return mln::core::map_remove_style_image(map, id.view());
       },
-      out_command_id
+      completion
     );
   });
 }
 
-auto mln_map_get_style_image_info_start(
-  mln_map map, mln_buffer_view image_id, mln_operation* out_operation
+auto mln_map_get_style_image_info(
+  mln_map map, mln_buffer_view image_id, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     auto id = OwnedView{image_id};
@@ -1031,37 +981,42 @@ auto mln_map_get_style_image_info_start(
       [map, id = std::move(id)](mln::core::StyleOperationResult& result)
         -> mln_status {
         result.image_info = mln::core::style_image_info_default();
-        return mln::core::map_get_style_image_info(
+        auto status = mln::core::map_get_style_image_info(
           map, id.view(), &result.image_info, &result.found
         );
+        if (status != MLN_STATUS_OK || !result.found) return status;
+        size_t x = 0;
+        size_t y = 0;
+        bool found = false;
+        status = mln::core::map_copy_style_image_stretches(
+          map, id.view(), nullptr, 0, &x, nullptr, 0, &y, &found
+        );
+        if (status != MLN_STATUS_OK) return status;
+        result.stretch_x.resize(x);
+        result.stretch_y.resize(y);
+        status = mln::core::map_copy_style_image_stretches(
+          map, id.view(), result.stretch_x.data(), result.stretch_x.size(), &x,
+          result.stretch_y.data(), result.stretch_y.size(), &y, &found
+        );
+        if (status != MLN_STATUS_OK) return status;
+        size_t size = 0;
+        status = mln::core::map_copy_style_image_premultiplied_rgba8(
+          map, id.view(), nullptr, 0, &size, &found
+        );
+        if (status != MLN_STATUS_OK) return status;
+        result.bytes.resize(size);
+        return mln::core::map_copy_style_image_premultiplied_rgba8(
+          map, id.view(), reinterpret_cast<uint8_t*>(result.bytes.data()),
+          result.bytes.size(), &size, &found
+        );
       },
-      out_operation
+      completion
     );
   });
 }
 
-auto mln_map_get_style_image_info_take_result(
-  mln_operation operation_id, mln_style_image_info* out_info, bool* out_found
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    if (
-      out_info == nullptr || out_info->size < sizeof(mln_style_image_info) ||
-      out_found == nullptr
-    )
-      return MLN_STATUS_INVALID_ARGUMENT;
-    return take(
-      operation_id, mln::core::StyleOperationKind::ImageInfo,
-      [=](mln::core::StyleOperationResult& result) -> mln_status {
-        *out_info = result.image_info;
-        *out_found = result.found;
-        return MLN_STATUS_OK;
-      }
-    );
-  });
-}
-
-auto mln_map_copy_style_image_stretches_start(
-  mln_map map, mln_buffer_view image_id, mln_operation* out_operation
+auto mln_map_copy_style_image_stretches(
+  mln_map map, mln_buffer_view image_id, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     auto id = OwnedView{image_id};
@@ -1082,58 +1037,13 @@ auto mln_map_copy_style_image_stretches_start(
           result.stretch_y.data(), result.stretch_y.size(), &y, &result.found
         );
       },
-      out_operation
+      completion
     );
   });
 }
 
-auto mln_map_copy_style_image_stretches_take_result(
-  mln_operation operation_id, mln_image_stretch* out_stretch_x,
-  size_t stretch_x_capacity, size_t* out_stretch_x_count,
-  mln_image_stretch* out_stretch_y, size_t stretch_y_capacity,
-  size_t* out_stretch_y_count, bool* out_found
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    if (
-      out_stretch_x_count == nullptr || out_stretch_y_count == nullptr ||
-      out_found == nullptr ||
-      (out_stretch_x == nullptr && stretch_x_capacity != 0) ||
-      (out_stretch_y == nullptr && stretch_y_capacity != 0)
-    ) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    return take_preserving(
-      operation_id, mln::core::StyleOperationKind::ImageStretches,
-      [=](mln::core::StyleOperationResult& result)
-        -> mln::core::OperationResultTransfer {
-        *out_stretch_x_count = result.stretch_x.size();
-        *out_stretch_y_count = result.stretch_y.size();
-        *out_found = result.found;
-        if (out_stretch_x == nullptr && out_stretch_y == nullptr) {
-          return {MLN_STATUS_OK, false};
-        }
-        if (
-          (out_stretch_x != nullptr &&
-           stretch_x_capacity < result.stretch_x.size()) ||
-          (out_stretch_y != nullptr &&
-           stretch_y_capacity < result.stretch_y.size())
-        ) {
-          return {MLN_STATUS_INVALID_ARGUMENT, false};
-        }
-        if (out_stretch_x != nullptr) {
-          std::ranges::copy(result.stretch_x, out_stretch_x);
-        }
-        if (out_stretch_y != nullptr) {
-          std::ranges::copy(result.stretch_y, out_stretch_y);
-        }
-        return {MLN_STATUS_OK, true};
-      }
-    );
-  });
-}
-
-auto mln_map_copy_style_image_premultiplied_rgba8_start(
-  mln_map map, mln_buffer_view image_id, mln_operation* out_operation
+auto mln_map_copy_style_image_premultiplied_rgba8(
+  mln_map map, mln_buffer_view image_id, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     auto id = OwnedView{image_id};
@@ -1151,38 +1061,17 @@ auto mln_map_copy_style_image_premultiplied_rgba8_start(
           map, id.view(), reinterpret_cast<uint8_t*>(bytes.data()),
           bytes.size(), &size, &result.found
         );
-        return status == MLN_STATUS_OK
-                 ? mln::core::create_buffer(std::move(bytes), &result.buffer)
-                 : status;
+        if (status == MLN_STATUS_OK) result.bytes = std::move(bytes);
+        return status;
       },
-      out_operation
-    );
-  });
-}
-
-auto mln_map_copy_style_image_premultiplied_rgba8_take_result(
-  mln_operation operation_id, mln_buffer* out_pixels, bool* out_found
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    if (
-      out_pixels == nullptr || *out_pixels != MLN_HANDLE_NULL ||
-      out_found == nullptr
-    )
-      return MLN_STATUS_INVALID_ARGUMENT;
-    return take(
-      operation_id, mln::core::StyleOperationKind::ImagePixels,
-      [=](mln::core::StyleOperationResult& result) -> mln_status {
-        *out_pixels = std::exchange(result.buffer, MLN_HANDLE_NULL);
-        *out_found = result.found;
-        return MLN_STATUS_OK;
-      }
+      completion
     );
   });
 }
 
 auto mln_map_add_image_source_url(
   mln_map map, mln_buffer_view source_id, const mln_lat_lng* coordinates,
-  size_t coordinate_count, mln_buffer_view url, uint64_t* out_command_id
+  size_t coordinate_count, mln_buffer_view url, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (
@@ -1206,7 +1095,7 @@ auto mln_map_add_image_source_url(
           map, id.view(), points.data(), points.size(), value.view()
         );
       },
-      out_command_id
+      completion
     );
   });
 }
@@ -1214,7 +1103,7 @@ auto mln_map_add_image_source_url(
 auto mln_map_add_image_source_image(
   mln_map map, mln_buffer_view source_id, const mln_lat_lng* coordinates,
   size_t coordinate_count, const mln_premultiplied_rgba8_image* image,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (
@@ -1240,14 +1129,14 @@ auto mln_map_add_image_source_image(
           map, id.view(), points.data(), points.size(), &owned.value
         );
       },
-      out_command_id
+      completion
     );
   });
 }
 
 auto mln_map_set_image_source_url(
   mln_map map, mln_buffer_view source_id, mln_buffer_view url,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (
@@ -1265,14 +1154,14 @@ auto mln_map_set_image_source_url(
           map, id.view(), value.view()
         );
       },
-      out_command_id
+      completion
     );
   });
 }
 
 auto mln_map_set_image_source_image(
   mln_map map, mln_buffer_view source_id,
-  const mln_premultiplied_rgba8_image* image, uint64_t* out_command_id
+  const mln_premultiplied_rgba8_image* image, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (
@@ -1293,14 +1182,14 @@ auto mln_map_set_image_source_image(
           map, id.view(), &owned.value
         );
       },
-      out_command_id
+      completion
     );
   });
 }
 
 auto mln_map_set_image_source_coordinates(
   mln_map map, mln_buffer_view source_id, const mln_lat_lng* coordinates,
-  size_t coordinate_count, uint64_t* out_command_id
+  size_t coordinate_count, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (
@@ -1321,13 +1210,13 @@ auto mln_map_set_image_source_coordinates(
           map, id.view(), points.data(), points.size()
         );
       },
-      out_command_id
+      completion
     );
   });
 }
 
-auto mln_map_get_image_source_coordinates_start(
-  mln_map map, mln_buffer_view source_id, mln_operation* out_operation
+auto mln_map_get_image_source_coordinates(
+  mln_map map, mln_buffer_view source_id, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     auto id = OwnedView{source_id};
@@ -1346,37 +1235,7 @@ auto mln_map_get_image_source_coordinates_start(
           &count, &result.found
         );
       },
-      out_operation
-    );
-  });
-}
-
-auto mln_map_get_image_source_coordinates_take_result(
-  mln_operation operation_id, mln_lat_lng* out_coordinates,
-  size_t coordinate_capacity, size_t* out_coordinate_count, bool* out_found
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    if (
-      out_coordinate_count == nullptr || out_found == nullptr ||
-      (out_coordinates == nullptr && coordinate_capacity != 0)
-    ) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    return take_preserving(
-      operation_id, mln::core::StyleOperationKind::ImageCoordinates,
-      [=](mln::core::StyleOperationResult& result)
-        -> mln::core::OperationResultTransfer {
-        *out_coordinate_count = result.coordinates.size();
-        *out_found = result.found;
-        if (out_coordinates == nullptr) {
-          return {MLN_STATUS_OK, false};
-        }
-        if (coordinate_capacity < result.coordinates.size()) {
-          return {MLN_STATUS_INVALID_ARGUMENT, false};
-        }
-        std::ranges::copy(result.coordinates, out_coordinates);
-        return {MLN_STATUS_OK, true};
-      }
+      completion
     );
   });
 }
@@ -1384,7 +1243,7 @@ auto mln_map_get_image_source_coordinates_take_result(
 #define MLN_LAYER_THREE_VIEW_COMMAND(NAME, CORE)                      \
   auto NAME(                                                          \
     mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id, \
-    mln_buffer_view before_layer_id, uint64_t* out_command_id         \
+    mln_buffer_view before_layer_id, const mln_completion* completion \
   ) noexcept -> mln_status {                                          \
     return mln::c_api::status_boundary([&]() -> mln_status {          \
       auto layer = OwnedView{layer_id};                               \
@@ -1398,7 +1257,7 @@ auto mln_map_get_image_source_coordinates_take_result(
             map, layer.view(), source.view(), before.view()           \
           );                                                          \
         },                                                            \
-        out_command_id                                                \
+        completion                                                    \
       );                                                              \
     });                                                               \
   }
@@ -1412,7 +1271,7 @@ MLN_LAYER_THREE_VIEW_COMMAND(
 
 auto mln_map_add_location_indicator_layer(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     auto id = OwnedView{layer_id};
@@ -1424,14 +1283,14 @@ auto mln_map_add_location_indicator_layer(
           map, id.view(), before.view()
         );
       },
-      out_command_id
+      completion
     );
   });
 }
 
 auto mln_map_set_location_indicator_location(
   mln_map map, mln_buffer_view layer_id, mln_lat_lng coordinate,
-  double altitude, uint64_t* out_command_id
+  double altitude, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     auto id = OwnedView{layer_id};
@@ -1442,14 +1301,14 @@ auto mln_map_set_location_indicator_location(
           map, id.view(), coordinate, altitude
         );
       },
-      out_command_id
+      completion
     );
   });
 }
 
 auto mln_map_set_location_indicator_bearing(
   mln_map map, mln_buffer_view layer_id, double bearing,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     auto id = OwnedView{layer_id};
@@ -1460,13 +1319,14 @@ auto mln_map_set_location_indicator_bearing(
           map, id.view(), bearing
         );
       },
-      out_command_id
+      completion
     );
   });
 }
 
 auto mln_map_set_location_indicator_accuracy_radius(
-  mln_map map, mln_buffer_view layer_id, double radius, uint64_t* out_command_id
+  mln_map map, mln_buffer_view layer_id, double radius,
+  const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     auto id = OwnedView{layer_id};
@@ -1477,14 +1337,14 @@ auto mln_map_set_location_indicator_accuracy_radius(
           map, id.view(), radius
         );
       },
-      out_command_id
+      completion
     );
   });
 }
 
 auto mln_map_set_location_indicator_image_name(
   mln_map map, mln_buffer_view layer_id, uint32_t image_kind,
-  mln_buffer_view image_id, uint64_t* out_command_id
+  mln_buffer_view image_id, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     auto layer = OwnedView{layer_id};
@@ -1497,13 +1357,13 @@ auto mln_map_set_location_indicator_image_name(
           map, layer.view(), image_kind, image.view()
         );
       },
-      out_command_id
+      completion
     );
   });
 }
 auto mln_map_add_style_layer_json(
   mln_map map, mln_buffer_view layer_json, mln_buffer_view before_layer_id,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (
@@ -1522,13 +1382,13 @@ auto mln_map_add_style_layer_json(
           map, json.view(), before.view()
         );
       },
-      out_command_id
+      completion
     );
   });
 }
 
 auto mln_map_remove_style_layer(
-  mln_map map, mln_buffer_view layer_id, uint64_t* out_command_id
+  mln_map map, mln_buffer_view layer_id, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (!valid_view(layer_id, "layer_id is invalid")) {
@@ -1540,13 +1400,13 @@ auto mln_map_remove_style_layer(
       [map, id = std::move(id)]() -> mln_status {
         return mln::core::map_remove_style_layer(map, id.view());
       },
-      out_command_id
+      completion
     );
   });
 }
 
-auto mln_map_get_style_layer_info_start(
-  mln_map map, mln_buffer_view layer_id, mln_operation* out_operation
+auto mln_map_get_style_layer_info(
+  mln_map map, mln_buffer_view layer_id, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (!valid_view(layer_id, "layer_id is invalid")) {
@@ -1559,70 +1419,51 @@ auto mln_map_get_style_layer_info_start(
         -> mln_status {
         result.layer_info = {};
         result.layer_info.size = sizeof(mln_style_layer_info);
-        return mln::core::map_get_style_layer_info(
+        auto status = mln::core::map_get_style_layer_info(
           map, id.view(), &result.layer_info, &result.found
         );
+        if (status != MLN_STATUS_OK || !result.found) return status;
+        auto copy = [&](auto function, std::string& destination) {
+          size_t size = 0;
+          auto copy_status = function(map, id.view(), nullptr, 0, &size);
+          if (copy_status != MLN_STATUS_OK) return copy_status;
+          destination.resize(size);
+          return function(
+            map, id.view(), destination.data(), destination.size(), &size
+          );
+        };
+        status = copy(mln::core::map_copy_layer_source_id, result.source_id);
+        return status == MLN_STATUS_OK
+                 ? copy(
+                     mln::core::map_copy_layer_source_layer, result.source_layer
+                   )
+                 : status;
       },
-      out_operation
+      completion
     );
   });
 }
 
-auto mln_map_get_style_layer_info_take_result(
-  mln_operation operation_id, mln_style_layer_info* out_info, bool* out_found
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    if (
-      out_info == nullptr || out_info->size < sizeof(mln_style_layer_info) ||
-      out_found == nullptr
-    ) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    return take(
-      operation_id, mln::core::StyleOperationKind::LayerInfo,
-      [=](mln::core::StyleOperationResult& result) -> mln_status {
-        *out_info = result.layer_info;
-        *out_found = result.found;
-        return MLN_STATUS_OK;
-      }
-    );
-  });
-}
-
-auto mln_map_list_style_layer_ids_start(
-  mln_map map, mln_operation* out_operation
+auto mln_map_list_style_layer_ids(
+  mln_map map, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return operation(
       map, mln::core::StyleOperationKind::LayerIds,
       [map](mln::core::StyleOperationResult& result) -> mln_status {
-        return mln::core::map_list_style_layer_ids(map, &result.id_list);
+        auto list = mln_style_id_list{MLN_HANDLE_NULL};
+        const auto status = mln::core::map_list_style_layer_ids(map, &list);
+        return status == MLN_STATUS_OK ? take_id_list(list, result.strings)
+                                       : status;
       },
-      out_operation
-    );
-  });
-}
-
-auto mln_map_list_style_layer_ids_take_result(
-  mln_operation operation_id, mln_style_id_list* out_layer_ids
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    if (out_layer_ids == nullptr || *out_layer_ids != MLN_HANDLE_NULL) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    return take(
-      operation_id, mln::core::StyleOperationKind::LayerIds,
-      [out_layer_ids](mln::core::StyleOperationResult& result) -> mln_status {
-        *out_layer_ids = std::exchange(result.id_list, MLN_HANDLE_NULL);
-        return MLN_STATUS_OK;
-      }
+      completion
     );
   });
 }
 
 auto mln_map_move_style_layer(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view before_layer_id,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (
@@ -1638,13 +1479,13 @@ auto mln_map_move_style_layer(
       [map, id = std::move(id), before = std::move(before)]() -> mln_status {
         return mln::core::map_move_style_layer(map, id.view(), before.view());
       },
-      out_command_id
+      completion
     );
   });
 }
 
-auto mln_map_get_style_layer_json_start(
-  mln_map map, mln_buffer_view layer_id, mln_operation* out_operation
+auto mln_map_get_style_layer_json(
+  mln_map map, mln_buffer_view layer_id, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (!valid_view(layer_id, "layer_id is invalid")) {
@@ -1655,38 +1496,21 @@ auto mln_map_get_style_layer_json_start(
       map, mln::core::StyleOperationKind::LayerJson,
       [map, id = std::move(id)](mln::core::StyleOperationResult& result)
         -> mln_status {
-        return mln::core::map_get_style_layer_json(
-          map, id.view(), &result.buffer, &result.found
+        auto buffer = mln_buffer{MLN_HANDLE_NULL};
+        const auto status = mln::core::map_get_style_layer_json(
+          map, id.view(), &buffer, &result.found
         );
+        return status == MLN_STATUS_OK && result.found
+                 ? take_buffer(buffer, result.bytes)
+                 : status;
       },
-      out_operation
-    );
-  });
-}
-
-auto mln_map_get_style_layer_json_take_result(
-  mln_operation operation_id, mln_buffer* out_layer, bool* out_found
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    if (
-      out_layer == nullptr || *out_layer != MLN_HANDLE_NULL ||
-      out_found == nullptr
-    ) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    return take(
-      operation_id, mln::core::StyleOperationKind::LayerJson,
-      [=](mln::core::StyleOperationResult& result) -> mln_status {
-        *out_layer = std::exchange(result.buffer, MLN_HANDLE_NULL);
-        *out_found = result.found;
-        return MLN_STATUS_OK;
-      }
+      completion
     );
   });
 }
 
 auto mln_map_set_style_light_json(
-  mln_map map, mln_buffer_view light_json, uint64_t* out_command_id
+  mln_map map, mln_buffer_view light_json, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (!valid_view(light_json, "light_json is invalid")) {
@@ -1698,14 +1522,14 @@ auto mln_map_set_style_light_json(
       [map, json = std::move(json)]() -> mln_status {
         return mln::core::map_set_style_light_json(map, json.view());
       },
-      out_command_id
+      completion
     );
   });
 }
 
 auto mln_map_set_style_light_property(
   mln_map map, mln_buffer_view property_name, mln_buffer_view value,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (
@@ -1723,13 +1547,13 @@ auto mln_map_set_style_light_property(
           map, name.view(), json.view()
         );
       },
-      out_command_id
+      completion
     );
   });
 }
 
-auto mln_map_get_style_light_property_start(
-  mln_map map, mln_buffer_view property_name, mln_operation* out_operation
+auto mln_map_get_style_light_property(
+  mln_map map, mln_buffer_view property_name, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (!valid_view(property_name, "property_name is invalid")) {
@@ -1740,35 +1564,21 @@ auto mln_map_get_style_light_property_start(
       map, mln::core::StyleOperationKind::LightProperty,
       [map, name = std::move(name)](mln::core::StyleOperationResult& result)
         -> mln_status {
-        return mln::core::map_get_style_light_property(
-          map, name.view(), &result.buffer
-        );
+        auto buffer = mln_buffer{MLN_HANDLE_NULL};
+        const auto status =
+          mln::core::map_get_style_light_property(map, name.view(), &buffer);
+        if (status != MLN_STATUS_OK || buffer == MLN_HANDLE_NULL) return status;
+        result.found = true;
+        return take_buffer(buffer, result.bytes);
       },
-      out_operation
-    );
-  });
-}
-
-auto mln_map_get_style_light_property_take_result(
-  mln_operation operation_id, mln_buffer* out_value
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    if (out_value == nullptr || *out_value != MLN_HANDLE_NULL) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    return take(
-      operation_id, mln::core::StyleOperationKind::LightProperty,
-      [out_value](mln::core::StyleOperationResult& result) -> mln_status {
-        *out_value = std::exchange(result.buffer, MLN_HANDLE_NULL);
-        return MLN_STATUS_OK;
-      }
+      completion
     );
   });
 }
 
 auto mln_map_set_style_transition_options(
   mln_map map, const mln_style_transition_options* options,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (
@@ -1782,13 +1592,13 @@ auto mln_map_set_style_transition_options(
       [map, owned]() -> mln_status {
         return mln::core::map_set_style_transition_options(map, &owned);
       },
-      out_command_id
+      completion
     );
   });
 }
 
-auto mln_map_get_style_transition_options_start(
-  mln_map map, mln_operation* out_operation
+auto mln_map_get_style_transition_options(
+  mln_map map, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return operation(
@@ -1800,90 +1610,60 @@ auto mln_map_get_style_transition_options_start(
           map, &result.transition_options
         );
       },
-      out_operation
+      completion
     );
   });
 }
 
-auto mln_map_get_style_transition_options_take_result(
-  mln_operation operation_id, mln_style_transition_options* out_options
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    if (
-      out_options == nullptr ||
-      out_options->size < sizeof(mln_style_transition_options)
-    ) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    return take(
-      operation_id, mln::core::StyleOperationKind::TransitionOptions,
-      [out_options](mln::core::StyleOperationResult& result) -> mln_status {
-        *out_options = result.transition_options;
-        return MLN_STATUS_OK;
-      }
-    );
-  });
-}
-
-#define MLN_STYLE_BUFFER_OPERATION(NAME, CORE, KIND)                         \
-  auto NAME##_start(                                                         \
-    mln_map map, mln_buffer_view id, mln_operation* out_operation            \
-  ) noexcept -> mln_status {                                                 \
-    return mln::c_api::status_boundary([&]() -> mln_status {                 \
-      if (!valid_view(id, "style ID is invalid")) {                          \
-        return MLN_STATUS_INVALID_ARGUMENT;                                  \
-      }                                                                      \
-      auto owned = OwnedView{id};                                            \
-      return operation(                                                      \
-        map, mln::core::StyleOperationKind::KIND,                            \
-        [map, owned = std::move(owned)](                                     \
-          mln::core::StyleOperationResult& result                            \
-        ) -> mln_status {                                                    \
-          return mln::core::CORE(map, owned.view(), &result.buffer);         \
-        },                                                                   \
-        out_operation                                                        \
-      );                                                                     \
-    });                                                                      \
-  }                                                                          \
-  auto NAME##_take_result(                                                   \
-    mln_operation operation_id, mln_buffer* out_value                        \
-  ) noexcept -> mln_status {                                                 \
-    return mln::c_api::status_boundary([&]() -> mln_status {                 \
-      if (out_value == nullptr || *out_value != MLN_HANDLE_NULL) {           \
-        return MLN_STATUS_INVALID_ARGUMENT;                                  \
-      }                                                                      \
-      return take(                                                           \
-        operation_id, mln::core::StyleOperationKind::KIND,                   \
-        [out_value](mln::core::StyleOperationResult& result) -> mln_status { \
-          *out_value = std::exchange(result.buffer, MLN_HANDLE_NULL);        \
-          return MLN_STATUS_OK;                                              \
-        }                                                                    \
-      );                                                                     \
-    });                                                                      \
+#define MLN_STYLE_BUFFER_OPERATION(NAME, CORE, KIND)                       \
+  auto NAME(                                                               \
+    mln_map map, mln_buffer_view id, const mln_completion* completion      \
+  ) noexcept -> mln_status {                                               \
+    return mln::c_api::status_boundary([&]() -> mln_status {               \
+      if (!valid_view(id, "style ID is invalid")) {                        \
+        return MLN_STATUS_INVALID_ARGUMENT;                                \
+      }                                                                    \
+      auto owned = OwnedView{id};                                          \
+      return operation(                                                    \
+        map, mln::core::StyleOperationKind::KIND,                          \
+        [map, owned = std::move(owned)](                                   \
+          mln::core::StyleOperationResult& result                          \
+        ) -> mln_status {                                                  \
+          auto buffer = mln_buffer{MLN_HANDLE_NULL};                       \
+          const auto status = mln::core::CORE(map, owned.view(), &buffer); \
+          if (status != MLN_STATUS_OK) return status;                      \
+          if (buffer == MLN_HANDLE_NULL) return MLN_STATUS_OK;             \
+          result.found = true;                                             \
+          return take_buffer(buffer, result.bytes);                        \
+        },                                                                 \
+        completion                                                         \
+      );                                                                   \
+    });                                                                    \
   }
 
-#define MLN_STYLE_SCALAR_COMMAND(NAME, CORE, TYPE)                        \
-  auto NAME(                                                              \
-    mln_map map, mln_buffer_view id, TYPE value, uint64_t* out_command_id \
-  ) noexcept -> mln_status {                                              \
-    return mln::c_api::status_boundary([&]() -> mln_status {              \
-      if (!valid_view(id, "style ID is invalid")) {                       \
-        return MLN_STATUS_INVALID_ARGUMENT;                               \
-      }                                                                   \
-      auto owned = OwnedView{id};                                         \
-      return command(                                                     \
-        map,                                                              \
-        [map, owned = std::move(owned), value]() -> mln_status {          \
-          return mln::core::CORE(map, owned.view(), value);               \
-        },                                                                \
-        out_command_id                                                    \
-      );                                                                  \
-    });                                                                   \
+#define MLN_STYLE_SCALAR_COMMAND(NAME, CORE, TYPE)               \
+  auto NAME(                                                     \
+    mln_map map, mln_buffer_view id, TYPE value,                 \
+    const mln_completion* completion                             \
+  ) noexcept -> mln_status {                                     \
+    return mln::c_api::status_boundary([&]() -> mln_status {     \
+      if (!valid_view(id, "style ID is invalid")) {              \
+        return MLN_STATUS_INVALID_ARGUMENT;                      \
+      }                                                          \
+      auto owned = OwnedView{id};                                \
+      return command(                                            \
+        map,                                                     \
+        [map, owned = std::move(owned), value]() -> mln_status { \
+          return mln::core::CORE(map, owned.view(), value);      \
+        },                                                       \
+        completion                                               \
+      );                                                         \
+    });                                                          \
   }
 
 auto mln_map_set_layer_property(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name,
-  mln_buffer_view value, uint64_t* out_command_id
+  mln_buffer_view value, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (
@@ -1904,14 +1684,14 @@ auto mln_map_set_layer_property(
           map, id.view(), name.view(), json.view()
         );
       },
-      out_command_id
+      completion
     );
   });
 }
 
-auto mln_map_get_layer_property_start(
+auto mln_map_get_layer_property(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (
@@ -1927,35 +1707,22 @@ auto mln_map_get_layer_property_start(
       [map, id = std::move(id), name = std::move(name)](
         mln::core::StyleOperationResult& result
       ) -> mln_status {
-        return mln::core::map_get_layer_property(
-          map, id.view(), name.view(), &result.buffer
+        auto buffer = mln_buffer{MLN_HANDLE_NULL};
+        const auto status = mln::core::map_get_layer_property(
+          map, id.view(), name.view(), &buffer
         );
+        if (status != MLN_STATUS_OK || buffer == MLN_HANDLE_NULL) return status;
+        result.found = true;
+        return take_buffer(buffer, result.bytes);
       },
-      out_operation
-    );
-  });
-}
-
-auto mln_map_get_layer_property_take_result(
-  mln_operation operation_id, mln_buffer* out_value
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    if (out_value == nullptr || *out_value != MLN_HANDLE_NULL) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    return take(
-      operation_id, mln::core::StyleOperationKind::LayerProperty,
-      [out_value](mln::core::StyleOperationResult& result) -> mln_status {
-        *out_value = std::exchange(result.buffer, MLN_HANDLE_NULL);
-        return MLN_STATUS_OK;
-      }
+      completion
     );
   });
 }
 
 auto mln_map_set_layer_filter(
   mln_map map, mln_buffer_view layer_id, const mln_buffer_view* filter,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     if (
@@ -1979,7 +1746,7 @@ auto mln_map_set_layer_filter(
           map, id.view(), view ? &*view : nullptr
         );
       },
-      out_command_id
+      completion
     );
   });
 }
@@ -1990,7 +1757,7 @@ MLN_STYLE_BUFFER_OPERATION(
 
 auto mln_map_set_layer_source_layer(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view source_layer,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     auto id = OwnedView{layer_id};
@@ -2002,14 +1769,14 @@ auto mln_map_set_layer_source_layer(
           map, id.view(), source.view()
         );
       },
-      out_command_id
+      completion
     );
   });
 }
 
 auto mln_map_set_layer_source_id(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id,
-  uint64_t* out_command_id
+  const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     auto id = OwnedView{layer_id};
@@ -2021,7 +1788,7 @@ auto mln_map_set_layer_source_id(
           map, id.view(), source.view()
         );
       },
-      out_command_id
+      completion
     );
   });
 }
@@ -2039,8 +1806,8 @@ MLN_STYLE_SCALAR_COMMAND(
 #undef MLN_STYLE_SCALAR_COMMAND
 #undef MLN_STYLE_BUFFER_OPERATION
 
-auto mln_map_copy_layer_source_layer_start(
-  mln_map map, mln_buffer_view layer_id, mln_operation* out_operation
+auto mln_map_copy_layer_source_layer(
+  mln_map map, mln_buffer_view layer_id, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return start_text_copy(
@@ -2053,24 +1820,13 @@ auto mln_map_copy_layer_source_layer_start(
           value_map, id, text, capacity, size
         );
       },
-      out_operation
+      completion
     );
   });
 }
 
-auto mln_map_copy_layer_source_layer_take_result(
-  mln_operation operation_id, mln_buffer* out_source_layer
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    return take_text_copy(
-      operation_id, mln::core::StyleOperationKind::LayerSourceLayer,
-      out_source_layer
-    );
-  });
-}
-
-auto mln_map_copy_layer_source_id_start(
-  mln_map map, mln_buffer_view layer_id, mln_operation* out_operation
+auto mln_map_copy_layer_source_id(
+  mln_map map, mln_buffer_view layer_id, const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return start_text_copy(
@@ -2083,17 +1839,7 @@ auto mln_map_copy_layer_source_id_start(
           value_map, id, text, capacity, size
         );
       },
-      out_operation
-    );
-  });
-}
-
-auto mln_map_copy_layer_source_id_take_result(
-  mln_operation operation_id, mln_buffer* out_source_id
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    return take_text_copy(
-      operation_id, mln::core::StyleOperationKind::LayerSourceId, out_source_id
+      completion
     );
   });
 }

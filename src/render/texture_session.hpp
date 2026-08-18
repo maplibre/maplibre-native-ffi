@@ -66,69 +66,65 @@ auto webgpu_borrowed_texture_descriptor_default() noexcept
 auto webgpu_owned_texture_attach_start(
   mln_map map, const mln_webgpu_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status;
 auto webgpu_borrowed_texture_attach_start(
   mln_map map, const mln_webgpu_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status;
 auto webgpu_borrowed_texture_set_target_start(
   mln_render_session session,
   const mln_webgpu_borrowed_texture_descriptor* descriptor,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) -> mln_status;
 auto metal_owned_texture_attach_start(
   mln_map map, const mln_metal_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status;
 auto metal_borrowed_texture_attach_start(
   mln_map map, const mln_metal_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status;
 auto vulkan_owned_texture_attach_start(
   mln_map map, const mln_vulkan_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status;
 auto vulkan_borrowed_texture_attach_start(
   mln_map map, const mln_vulkan_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status;
 auto opengl_owned_texture_attach_start(
   mln_map map, const mln_opengl_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status;
 auto opengl_borrowed_texture_attach_start(
   mln_map map, const mln_opengl_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status;
 auto metal_borrowed_texture_set_target_start(
   mln_render_session session,
   const mln_metal_borrowed_texture_descriptor* descriptor,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) -> mln_status;
 auto vulkan_borrowed_texture_set_target_start(
   mln_render_session session,
   const mln_vulkan_borrowed_texture_descriptor* descriptor,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) -> mln_status;
 auto opengl_borrowed_texture_set_target_start(
   mln_render_session session,
   const mln_opengl_borrowed_texture_descriptor* descriptor,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) -> mln_status;
 auto texture_read_premultiplied_rgba8_start(
-  mln_render_session texture, mln_operation* out_operation
-) -> mln_status;
-auto texture_read_premultiplied_rgba8_take_result(
-  mln_operation operation, mln_buffer* out_data,
-  mln_texture_image_info* out_info
+  mln_render_session texture, const mln_completion* completion
 ) -> mln_status;
 auto acquired_frame_get_metal_texture(
   mln_acquired_frame frame, mln_metal_owned_texture_frame* out_frame

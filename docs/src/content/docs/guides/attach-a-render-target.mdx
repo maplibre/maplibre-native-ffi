@@ -31,15 +31,13 @@ Transferable Metal and Vulkan targets, private EGL owned texture targets, and
 `OffscreenCanvas` WebGL targets can use a core worker.
 
 The common attach options select the driver and request an owned-texture ring
-depth from one to three. They also name notification sources for operation
-completion, frame-result readiness, and caller-driver work. A null operation
-source inherits the map runtime's source. Null frame and driver-work sources
-inherit the operation source.
+depth from one to three. They also carry direct wake callbacks for frame-result
+readiness and caller-driver work. A host may omit either wake and poll instead.
 
 Each backend attach function copies its descriptor and options, returns a render
-session in the attaching state, and starts an operation. A caller driver must
-service ready driver work before that operation can complete. Await the operation
-before using the attached session for ordinary work.
+session in the attaching state, and accepts a one-shot completion. A caller
+driver must service ready driver work before attachment can complete. Await the
+completion before using the attached session for ordinary work.
 
 ## Attach to a target
 
@@ -63,7 +61,7 @@ query them.
 
 ## Replace, detach, or abandon
 
-Resize and target replacement are ordered operations. They may start from any
+Resize and target replacement are ordered asynchronous calls. They may start from any
 thread. A caller driver applies them when the host next services ready work on
 the graphics thread. Resize assigns a new extent generation; later frame demands
 capture that generation.
@@ -76,9 +74,10 @@ view allocation. Both paths preserve the session's rendering resources.
 
 <Code code={region(renderTarget, "set-target")} lang="c" title="render-target.c" />
 
-Normal detach is an operation. The selected driver destroys graphics resources
-on its owner and detaches the map. Continue servicing a caller driver until the
-operation completes, then destroy the detached session handle from any thread.
+Normal detach completes asynchronously. The selected driver destroys graphics
+resources on its owner and detaches the map. Continue servicing a caller driver
+until the completion runs, then destroy the detached session handle from any
+thread.
 
 Abandon is the failure path for an owner that can no longer service graphics
 work. It closes control and mailboxes, invalidates graphics accessors, detaches

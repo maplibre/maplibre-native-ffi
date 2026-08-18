@@ -8,40 +8,30 @@
 extern bool host_json_selected(mln_buffer_view json);
 // #endregion member
 
-bool read_selected(
-  mln_render_session session, const mln_feature_state_selector* selector
+static void read_selected(
+  void* user_data, const mln_completion_result* result
+) {
+  bool* selected = user_data;
+  // #region read
+  if (result->status != MLN_STATUS_OK || result->value_count != 1) return;
+  const mln_buffer_view json = *(const mln_buffer_view*)result->value;
+  *selected = host_json_selected(json);
+  // #endregion read
+}
+
+mln_status start_read_selected(
+  mln_render_session session, const mln_feature_state_selector* selector,
+  bool* selected
 ) {
   // #region get
-  mln_operation operation = MLN_HANDLE_NULL;
-  mln_status got = mln_render_session_get_feature_state_start(
+  const mln_completion completion = {
+    .size = sizeof(mln_completion),
+    .callback = read_selected,
+    .user_data = selected,
+  };
+  return mln_render_session_get_feature_state(
     session, selector->source_id, selector->source_layer_id,
-    selector->feature_id, &operation
+    selector->feature_id, &completion
   );
-  bool completed = false;
-  if (got == MLN_STATUS_OK) {
-    got = mln_operation_wait(operation, -1, &completed);
-  }
-  mln_status terminal = MLN_STATUS_INVALID_STATE;
-  if (got == MLN_STATUS_OK && completed) {
-    got = mln_operation_get_status(operation, &terminal);
-  }
-  mln_buffer result = MLN_HANDLE_NULL;
-  if (got == MLN_STATUS_OK) got = terminal;
-  if (got == MLN_STATUS_OK) {
-    got = mln_render_session_get_feature_state_take_result(operation, &result);
-  }
-  mln_operation_release(operation);
-  if (got != MLN_STATUS_OK) return false;
   // #endregion get
-
-  // #region read
-  mln_buffer_view json = {0};
-  bool selected = false;
-  if (mln_buffer_get(result, &json) == MLN_STATUS_OK) {
-    selected = host_json_selected(json);
-  }
-
-  mln_buffer_destroy(result);
-  // #endregion read
-  return selected;
 }

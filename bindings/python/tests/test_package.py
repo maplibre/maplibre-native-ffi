@@ -9,6 +9,7 @@ import threading
 import time
 import typing
 import warnings
+from concurrent.futures import Future
 from pathlib import Path
 
 import maplibre_native_ffi as mln
@@ -105,17 +106,18 @@ def _wait_for_provider_handle(
     raise AssertionError("resource provider did not expose a handled request")
 
 
-def _wait_for_offline_operation(
-    runtime: mln.RuntimeHandle,
-    operation: offline.OperationHandle,
-    *,
-    iterations: int = 5000,
-) -> None:
-    for _ in range(iterations):
-        if operation.poll():
-            return
-        time.sleep(0.001)
-    raise AssertionError("offline operation did not complete")
+def _await(future):
+    return future.result(timeout=5)
+
+
+def _assert_command_failed(
+    future: Future[mln.CommandCompletion], status: mln.MaplibreStatus
+) -> mln.CommandCompletion:
+    completion = _await(future)
+    assert completion.disposition == mln.CommandDisposition.FAILED
+    assert completion.native_status_code == status.native_code
+    assert completion.diagnostic
+    return completion
 
 
 def test_c_version_matches_expected_abi_version() -> None:
@@ -296,7 +298,6 @@ def test_public_type_hints_are_resolvable() -> None:
         mln.RuntimeHandle.create_offline_region,
         mln.RuntimeHandle.set_resource_transform,
         mln.RuntimeHandle.set_resource_provider,
-        offline.OperationHandle.__init__,
         offline.OfflineRegionResponseError.__init__,
     )
 
@@ -313,7 +314,8 @@ def test_public_type_hints_are_resolvable() -> None:
 
     style_hints = typing.get_type_hints(map_module.MapHandle.get_style_layer_json)
     assert style_hints["return"] != typing.Any
-    assert set(typing.get_args(style_hints["return"])) == {bytes, type(None)}
+    assert typing.get_origin(style_hints["return"]) is Future
+    assert typing.get_args(style_hints["return"]) == (bytes | None,)
 
     map_init_hints = typing.get_type_hints(map_module.MapHandle.__init__)
     assert map_init_hints["runtime"] is mln.RuntimeHandle
@@ -326,10 +328,8 @@ def test_public_type_hints_are_resolvable() -> None:
 
     create_map_hints = typing.get_type_hints(mln.RuntimeHandle.create_map)
     assert create_map_hints["options"] == map_module.MapOptions | None
-    assert create_map_hints["return"] is map_module.MapHandle
-
-    offline_handle_hints = typing.get_type_hints(offline.OperationHandle.__init__)
-    assert offline_handle_hints["runtime"] is mln.RuntimeHandle
+    assert typing.get_origin(create_map_hints["return"]) is Future
+    assert typing.get_args(create_map_hints["return"]) == (map_module.MapHandle,)
 
     provider_hints = typing.get_type_hints(mln.RuntimeHandle.set_resource_provider)
     assert provider_hints["callback"] != typing.Any
@@ -343,7 +343,7 @@ def test_public_type_hints_are_resolvable() -> None:
         render.RenderSessionHandle.query_feature_extensions
     )
     assert extension_hints["feature"] is bytes
-    assert typing.get_origin(extension_hints["return"]) is offline.OperationHandle
+    assert typing.get_origin(extension_hints["return"]) is Future
     assert typing.get_args(extension_hints["return"]) == (bytes,)
     assert extension_hints["arguments"] == bytes | None
 
@@ -352,14 +352,14 @@ def test_public_type_hints_are_resolvable() -> None:
     )
     assert rendered_hints["geometry"] is query.RenderedQueryGeometry
     assert rendered_hints["options"] != typing.Any
-    assert typing.get_origin(rendered_hints["return"]) is offline.OperationHandle
+    assert typing.get_origin(rendered_hints["return"]) is Future
     assert typing.get_args(rendered_hints["return"]) == (list[query.QueriedFeature],)
 
     source_hints = typing.get_type_hints(
         render.RenderSessionHandle.query_source_features
     )
     assert source_hints["source_id"] is str
-    assert typing.get_origin(source_hints["return"]) is offline.OperationHandle
+    assert typing.get_origin(source_hints["return"]) is Future
     assert typing.get_args(source_hints["return"]) == (list[query.QueriedFeature],)
 
     response_error_hints = typing.get_type_hints(offline.OfflineRegionResponseError)
@@ -394,12 +394,13 @@ def test_closed_handle_finalizers_are_quiet_at_interpreter_shutdown() -> None:
         from maplibre_native_ffi import style
 
         runtime = mln.RuntimeHandle()
-        map_handle = runtime.create_map()
-        map_handle.set_style_json(b'{"version":8,"sources":{},"layers":[]}')
-        source, _ = map_handle.add_custom_geometry_source(
+        map_handle = runtime.create_map().result(timeout=5)
+        map_handle.set_style_json(b'{"version":8,"sources":{},"layers":[]}').result(timeout=5)
+        source, completion = map_handle.add_custom_geometry_source(
             "custom",
             style.CustomGeometrySourceOptions(max_queued_events=1),
         )
+        completion.result(timeout=5)
         source.close()
         map_handle.close()
         runtime.close()
@@ -423,8 +424,8 @@ def test_multiple_runtimes_are_independent() -> None:
     second = mln.RuntimeHandle()
     try:
         assert first is not second
-        first.barrier()
-        second.barrier()
+        first.barrier().result(timeout=5)
+        second.barrier().result(timeout=5)
     finally:
         second.close()
         first.close()
@@ -432,22 +433,16 @@ def test_multiple_runtimes_are_independent() -> None:
 
 def test_runtime_and_map_are_usable_across_python_threads() -> None:
     runtime = mln.RuntimeHandle()
-    map_handle = runtime.create_map()
+    map_handle = runtime.create_map().result(timeout=5)
     failures: list[BaseException] = []
-    command_ids: list[int] = []
-    command_events: list[mln.RuntimeEvent] = []
+    completions: list[mln.CommandCompletion] = []
 
     def use_handles() -> None:
         try:
             assert map_handle.snapshot().generation > 0
-            command_ids.append(map_handle.request_repaint())
-            runtime.barrier()
-            command_events.extend(
-                event
-                for event in runtime.drain_events().events
-                if event.event_type == mln.RuntimeEventType.COMMAND_FINISHED
-            )
-            assert map_handle.get_camera_ordered().generation > 0
+            completions.append(map_handle.request_repaint().result(timeout=5))
+            runtime.barrier().result(timeout=5)
+            assert _await(map_handle.get_camera_ordered()).generation > 0
             map_handle.close()
         except Exception as error:  # noqa: BLE001 - transport worker failures
             failures.append(error)
@@ -456,48 +451,9 @@ def test_runtime_and_map_are_usable_across_python_threads() -> None:
     thread.start()
     thread.join()
     assert not failures
-    assert command_ids[0] > 0
-    matching = [
-        event
-        for event in command_events
-        if isinstance(event.payload, mln.CommandFinishedPayload)
-        and event.payload.command_id == command_ids[0]
-    ]
-    assert len(matching) == 1
-    assert matching[0].payload.disposition == mln.CommandDisposition.COMMITTED
+    assert completions[0].disposition == mln.CommandDisposition.COMMITTED
+    assert completions[0].generation > 0
     assert map_handle.closed
-    runtime.close()
-
-
-def test_operation_wait_releases_gil_for_another_python_thread(
-    tmp_path: Path,
-) -> None:
-    runtime = mln.RuntimeHandle(mln.RuntimeOptions(cache_path=str(tmp_path)))
-    operation = runtime.run_ambient_cache_operation(offline.AmbientCacheOperation.CLEAR)
-    started = threading.Event()
-    stop = threading.Event()
-    progress = 0
-
-    def advance_python_thread() -> None:
-        nonlocal progress
-        started.set()
-        while not stop.is_set():
-            progress += 1
-
-    thread = threading.Thread(target=advance_python_thread)
-    thread.start()
-    started.wait()
-    before = progress
-    for _ in range(10_000):
-        operation.wait(0)
-        if progress > before:
-            break
-    after = progress
-    stop.set()
-    thread.join()
-
-    assert after > before
-    operation.close()
     runtime.close()
 
 
@@ -525,9 +481,11 @@ def test_map_handle_context_manager_closes_once() -> None:
         with pytest.raises(TypeError, match="RuntimeHandle.create_map"):
             mln.MapHandle(runtime, mln.MapOptions(width=128, height=64))
 
-        with runtime.create_map(mln.MapOptions(width=128, height=64)) as map_handle:
+        with runtime.create_map(mln.MapOptions(width=128, height=64)).result(
+            timeout=5
+        ) as map_handle:
             assert not map_handle.closed
-            map_handle.request_repaint()
+            _await(map_handle.request_repaint())
 
         assert map_handle.closed
         map_handle.close()
@@ -539,7 +497,7 @@ def test_map_options_accept_fast_pfor_decoding() -> None:
         mln.RuntimeHandle() as runtime,
         runtime.create_map(
             mln.MapOptions(width=64, height=64, fast_pfor_enabled=True)
-        ) as map_handle,
+        ).result(timeout=5) as map_handle,
     ):
         assert map_handle.get_size() == (64, 64, 1.0)
 
@@ -547,13 +505,18 @@ def test_map_options_accept_fast_pfor_decoding() -> None:
 def test_unset_map_options_take_the_c_creation_defaults() -> None:
     # Unset fields take the C API defaults rather than values this binding
     # repeats, so mln_map_options_default() stays the single source for them.
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         assert map_handle.get_size() == (256, 256, 1.0)
 
 
 def test_runtime_rejects_close_while_map_is_live() -> None:
     runtime = mln.RuntimeHandle()
-    map_handle = runtime.create_map(mln.MapOptions(width=64, height=64))
+    map_handle = runtime.create_map(mln.MapOptions(width=64, height=64)).result(
+        timeout=5
+    )
     try:
         with pytest.raises(mln.InvalidStateError) as raised:
             runtime.close()
@@ -572,10 +535,12 @@ def test_still_image_request_rejects_continuous_map_mode() -> None:
 
     with (
         mln.RuntimeHandle() as runtime,
-        runtime.create_map(mln.MapOptions(mode=mln.MapMode.CONTINUOUS)) as map_handle,
+        runtime.create_map(mln.MapOptions(mode=mln.MapMode.CONTINUOUS)).result(
+            timeout=5
+        ) as map_handle,
         pytest.raises(mln.InvalidStateError) as raised,
     ):
-        map_handle.request_still_image()
+        _await(map_handle.request_still_image())
 
     assert raised.value.status == mln.MaplibreStatus.INVALID_STATE
 
@@ -586,7 +551,7 @@ def test_map_create_from_closed_runtime_reports_invalid_state() -> None:
     stale = _native_invalid_network_status_error().diagnostic
 
     with pytest.raises(mln.InvalidStateError) as raised:
-        runtime.create_map()
+        runtime.create_map().result(timeout=5)
 
     assert raised.value.native_status_code is None
     assert raised.value.diagnostic == "runtime handle is closed"
@@ -594,18 +559,21 @@ def test_map_create_from_closed_runtime_reports_invalid_state() -> None:
 
 
 def test_map_debug_and_status_options_round_trip_the_snapshot() -> None:
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         debug_options = (
             map_module.MapDebugOptions.TILE_BORDERS
             | map_module.MapDebugOptions.PARSE_STATUS
         )
-        command_id = map_handle.set_debug_options(debug_options)
+        completion = map_handle.set_debug_options(debug_options)
         map_handle.set_rendering_stats_view_enabled(True)
-        runtime.barrier()
+        runtime.barrier().result(timeout=5)
 
         # Snapshot fence: the commit reports the generation that published its
         # effect, and a snapshot at or past that generation observes it.
-        finished = _command_finished_payload(runtime, command_id)
+        finished = _await_command_completion(runtime, completion)
         assert finished.disposition == mln.CommandDisposition.COMMITTED
         snapshot = map_handle.snapshot()
         assert snapshot.generation >= finished.generation
@@ -615,14 +583,17 @@ def test_map_debug_and_status_options_round_trip_the_snapshot() -> None:
 
         map_handle.set_debug_options(map_module.MapDebugOptions.NONE)
         map_handle.set_rendering_stats_view_enabled(False)
-        runtime.barrier()
+        runtime.barrier().result(timeout=5)
         snapshot = map_handle.snapshot()
         assert snapshot.debug_options == map_module.MapDebugOptions.NONE
         assert snapshot.rendering_stats_view_enabled is False
 
 
 def test_style_url_rejects_embedded_nul_before_native_call() -> None:
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         stale = _native_invalid_network_status_error().diagnostic
 
         with pytest.raises(mln.InvalidArgumentError) as raised:
@@ -684,20 +655,26 @@ def test_geojson_source_data_prepares_off_thread_without_a_runtime() -> None:
     assert isinstance(prepared, style.GeoJsonSourceDataHandle)
     with prepared:
         assert prepared.closed is False
-        with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        with (
+            mln.RuntimeHandle() as runtime,
+            runtime.create_map().result(timeout=5) as map_handle,
+        ):
             map_handle.set_style_json(_EMPTY_STYLE_BYTES)
-            command_id = map_handle.add_geojson_source_data("worker-points", prepared)
-            runtime.barrier()
-            finished = _command_finished_payload(runtime, command_id)
+            completion = map_handle.add_geojson_source_data("worker-points", prepared)
+            runtime.barrier().result(timeout=5)
+            finished = _await_command_completion(runtime, completion)
             assert finished.disposition == mln.CommandDisposition.COMMITTED
-            info = map_handle.get_style_source_info("worker-points")
+            info = _await(map_handle.get_style_source_info("worker-points"))
             assert info is not None
             assert info.source_type == style.StyleSourceType.GEOJSON
     assert prepared.closed is True
 
 
 def test_geojson_source_data_installs_on_many_sources_and_outlives_release() -> None:
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         map_handle.set_style_json(_EMPTY_STYLE_BYTES)
         prepared = style.GeoJsonSourceDataHandle(_point_collection("one", "two"))
         # Install calls borrow the handle, so one prepared value serves any
@@ -707,12 +684,12 @@ def test_geojson_source_data_installs_on_many_sources_and_outlives_release() -> 
         map_handle.add_geojson_source_data("points-b", prepared)
         update_id = map_handle.set_geojson_source_data("points-a", prepared)
         prepared.close()
-        runtime.barrier()
-        updated = _command_finished_payload(runtime, update_id)
+        runtime.barrier().result(timeout=5)
+        updated = _await_command_completion(runtime, update_id)
         assert updated.disposition == mln.CommandDisposition.COMMITTED
         # Release never invalidates a source the data was installed on.
         for source_id in ("points-a", "points-b"):
-            info = map_handle.get_style_source_info(source_id)
+            info = _await(map_handle.get_style_source_info(source_id))
             assert info is not None
             assert info.source_type == style.StyleSourceType.GEOJSON
 
@@ -723,7 +700,10 @@ def test_geojson_source_data_close_is_idempotent_and_blocks_installs() -> None:
     assert prepared.closed is True
     prepared.close()
 
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         map_handle.set_style_json(_EMPTY_STYLE_BYTES)
         with pytest.raises(mln.InvalidStateError, match="closed"):
             map_handle.add_geojson_source_data("points", prepared)
@@ -743,7 +723,10 @@ def test_geojson_source_data_create_validates_cluster_input() -> None:
 
 def test_set_geojson_source_data_rejects_mismatched_baked_in_options() -> None:
     document = _point_collection("one", "two")
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         map_handle.set_style_json(_EMPTY_STYLE_BYTES)
         with style.GeoJsonSourceDataHandle(
             document,
@@ -758,11 +741,7 @@ def test_set_geojson_source_data_rejects_mismatched_baked_in_options() -> None:
         # asynchronously with INVALID_ARGUMENT instead of raising at submit.
         with style.GeoJsonSourceDataHandle(document) as plain:
             rejected_id = map_handle.set_geojson_source_data("points", plain)
-        runtime.barrier()
-        rejected = _command_finished_event(runtime, rejected_id)
-        assert isinstance(rejected.payload, mln.CommandFinishedPayload)
-        assert rejected.payload.disposition == mln.CommandDisposition.FAILED
-        assert rejected.code == mln.MaplibreStatus.INVALID_ARGUMENT.native_code
+        _assert_command_failed(rejected_id, mln.MaplibreStatus.INVALID_ARGUMENT)
 
         # Different cluster aggregations would change cluster feature
         # properties under the source's layers, so they are rejected too.
@@ -774,11 +753,7 @@ def test_set_geojson_source_data_rejects_mismatched_baked_in_options() -> None:
             ),
         ) as reclustered:
             reclustered_id = map_handle.set_geojson_source_data("points", reclustered)
-        runtime.barrier()
-        reclustered_event = _command_finished_event(runtime, reclustered_id)
-        assert isinstance(reclustered_event.payload, mln.CommandFinishedPayload)
-        assert reclustered_event.payload.disposition == mln.CommandDisposition.FAILED
-        assert reclustered_event.code == mln.MaplibreStatus.INVALID_ARGUMENT.native_code
+        _assert_command_failed(reclustered_id, mln.MaplibreStatus.INVALID_ARGUMENT)
 
         # Aggregations compare by parsed expression equality, so equivalent
         # cluster_properties JSON matches regardless of formatting.
@@ -790,36 +765,28 @@ def test_set_geojson_source_data_rejects_mismatched_baked_in_options() -> None:
             ),
         ) as matching:
             matching_id = map_handle.set_geojson_source_data("points", matching)
-        runtime.barrier()
-        accepted = _command_finished_payload(runtime, matching_id)
+        runtime.barrier().result(timeout=5)
+        accepted = _await_command_completion(runtime, matching_id)
         assert accepted.disposition == mln.CommandDisposition.COMMITTED
 
 
 def test_set_geojson_source_synchronous_tiling_overrides_at_runtime() -> None:
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         map_handle.set_style_json(_EMPTY_STYLE_BYTES)
         with style.GeoJsonSourceDataHandle(_point_collection("one")) as prepared:
             map_handle.add_geojson_source_data("points", prepared)
         enabled_id = map_handle.set_geojson_source_synchronous_tiling("points", True)
         disabled_id = map_handle.set_geojson_source_synchronous_tiling("points", False)
-        runtime.barrier()
-        finished = {
-            event.payload.command_id: event.payload
-            for event in runtime.drain_events().events
-            if event.event_type == mln.RuntimeEventType.COMMAND_FINISHED
-            and isinstance(event.payload, mln.CommandFinishedPayload)
-        }
-        for command_id in (enabled_id, disabled_id):
-            assert finished[command_id].disposition == mln.CommandDisposition.COMMITTED
+        for completion in (_await(enabled_id), _await(disabled_id)):
+            assert completion.disposition == mln.CommandDisposition.COMMITTED
 
         # A missing source is a map-thread validation, so the command fails
         # asynchronously with INVALID_ARGUMENT instead of raising at submit.
         missing_id = map_handle.set_geojson_source_synchronous_tiling("missing", True)
-        runtime.barrier()
-        missing = _command_finished_event(runtime, missing_id)
-        assert isinstance(missing.payload, mln.CommandFinishedPayload)
-        assert missing.payload.disposition == mln.CommandDisposition.FAILED
-        assert missing.code == mln.MaplibreStatus.INVALID_ARGUMENT.native_code
+        _assert_command_failed(missing_id, mln.MaplibreStatus.INVALID_ARGUMENT)
 
 
 def test_style_source_metadata_enums_preserve_unknown_values() -> None:
@@ -835,27 +802,33 @@ def test_style_source_metadata_enums_preserve_unknown_values() -> None:
 
 def test_loaded_style_document_and_url_read_back_what_was_loaded() -> None:
     style_json = _EMPTY_STYLE_BYTES
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         # Nothing parsed and nothing requested yet.
-        assert map_handle.get_loaded_style_json() == b""
-        assert map_handle.get_style_url() == ""
+        assert _await(map_handle.get_loaded_style_json()) == b""
+        assert _await(map_handle.get_style_url()) == ""
 
         # The document reads back byte-for-byte, so it can be reloaded
         # unchanged.
         map_handle.set_style_json(style_json)
-        assert map_handle.get_loaded_style_json() == style_json
+        assert _await(map_handle.get_loaded_style_json()) == style_json
         # Inline JSON clears the URL.
-        assert map_handle.get_style_url() == ""
+        assert _await(map_handle.get_style_url()) == ""
 
         # The URL is request state, recorded before the load can succeed,
         # while the document still reports the style that last parsed.
         map_handle.set_style_url("https://example.test/style.json")
-        assert map_handle.get_style_url() == "https://example.test/style.json"
-        assert map_handle.get_loaded_style_json() == style_json
+        assert _await(map_handle.get_style_url()) == "https://example.test/style.json"
+        assert _await(map_handle.get_loaded_style_json()) == style_json
 
 
 def test_style_source_url_metadata_and_removal_public_api() -> None:
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         map_handle.set_style_json(_EMPTY_STYLE_BYTES)
         map_handle.add_style_source_json(
             "style-json-points",
@@ -961,12 +934,12 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
         )
 
         def source_type(source_id: str) -> style.StyleSourceType | None:
-            info = map_handle.get_style_source_info(source_id)
+            info = _await(map_handle.get_style_source_info(source_id))
             return info.source_type if info is not None else None
 
         # The info getter's found flag is the existence check.
-        assert map_handle.get_style_source_info("points") is not None
-        assert map_handle.get_style_source_info("missing") is None
+        assert _await(map_handle.get_style_source_info("points")) is not None
+        assert _await(map_handle.get_style_source_info("missing")) is None
         assert source_type("style-json-points") == style.StyleSourceType.GEOJSON
         assert source_type("points") == style.StyleSourceType.GEOJSON
         assert source_type("inline-points") == style.StyleSourceType.GEOJSON
@@ -976,7 +949,7 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
         assert source_type("vector-inline") == style.StyleSourceType.VECTOR
         assert source_type("raster-inline") == style.StyleSourceType.RASTER
         assert source_type("dem-inline") == style.StyleSourceType.RASTER_DEM
-        source_ids = map_handle.list_style_source_ids()
+        source_ids = _await(map_handle.list_style_source_ids())
         assert "style-json-points" in source_ids
         assert "points" in source_ids
         assert "inline-points" in source_ids
@@ -987,20 +960,20 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
         assert "raster-inline" in source_ids
         assert "dem-inline" in source_ids
 
-        info = map_handle.get_style_source_info("points")
+        info = _await(map_handle.get_style_source_info("points"))
         assert info is not None
         assert info.source_type == style.StyleSourceType.GEOJSON
         assert info.attribution is None
         assert info.url == "https://example.test/points.geojson"
         assert info.tile_json is None
-        assert map_handle.get_style_source_info("missing") is None
+        assert _await(map_handle.get_style_source_info("missing")) is None
 
-        remote_info = map_handle.get_style_source_info("vector-tiles")
+        remote_info = _await(map_handle.get_style_source_info("vector-tiles"))
         assert remote_info is not None
         assert remote_info.url == "https://example.test/vector.json"
         assert remote_info.tile_json is None
 
-        copied_inline = map_handle.get_style_source_info("vector-inline")
+        copied_inline = _await(map_handle.get_style_source_info("vector-inline"))
         assert copied_inline is not None
         assert copied_inline.url is None
         assert copied_inline.attribution == "Example attribution"
@@ -1019,18 +992,14 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
         )
 
         removed_id = map_handle.remove_style_source("points")
-        runtime.barrier()
-        removed = _command_finished_payload(runtime, removed_id)
+        runtime.barrier().result(timeout=5)
+        removed = _await_command_completion(runtime, removed_id)
         assert removed.disposition == mln.CommandDisposition.COMMITTED
-        assert map_handle.get_style_source_info("points") is None
+        assert _await(map_handle.get_style_source_info("points")) is None
 
         # Removing the missing source again fails the command with NOT_FOUND.
         missing_id = map_handle.remove_style_source("points")
-        runtime.barrier()
-        missing = _command_finished_event(runtime, missing_id)
-        assert isinstance(missing.payload, mln.CommandFinishedPayload)
-        assert missing.payload.disposition == mln.CommandDisposition.FAILED
-        assert missing.code == mln.MaplibreStatus.NOT_FOUND.native_code
+        _assert_command_failed(missing_id, mln.MaplibreStatus.NOT_FOUND)
 
         for source_id in (
             "style-json-points",
@@ -1043,8 +1012,8 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
             "dem-inline",
         ):
             map_handle.remove_style_source(source_id)
-        runtime.barrier()
-        source_ids = map_handle.list_style_source_ids()
+        runtime.barrier().result(timeout=5)
+        source_ids = _await(map_handle.list_style_source_ids())
         assert "style-json-points" not in source_ids
         assert "points" not in source_ids
         assert "inline-points" not in source_ids
@@ -1076,7 +1045,10 @@ def test_image_source_url_image_and_coordinates_public_api() -> None:
         data=bytes([0, 255, 0, 255]),
     )
 
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         map_handle.set_style_json(_EMPTY_STYLE_BYTES)
         map_handle.add_image_source_url(
             "overlay-url",
@@ -1085,14 +1057,17 @@ def test_image_source_url_image_and_coordinates_public_api() -> None:
         )
         map_handle.add_image_source_image("overlay-inline", coordinates, image)
 
-        url_info = map_handle.get_style_source_info("overlay-url")
-        inline_info = map_handle.get_style_source_info("overlay-inline")
+        url_info = _await(map_handle.get_style_source_info("overlay-url"))
+        inline_info = _await(map_handle.get_style_source_info("overlay-inline"))
         assert url_info is not None
         assert url_info.source_type == style.StyleSourceType.IMAGE
         assert inline_info is not None
         assert inline_info.source_type == style.StyleSourceType.IMAGE
-        assert map_handle.get_image_source_coordinates("overlay-url") == coordinates
-        assert map_handle.get_image_source_coordinates("missing") is None
+        assert (
+            _await(map_handle.get_image_source_coordinates("overlay-url"))
+            == coordinates
+        )
+        assert _await(map_handle.get_image_source_coordinates("missing")) is None
 
         map_handle.set_image_source_url(
             "overlay-url",
@@ -1101,15 +1076,15 @@ def test_image_source_url_image_and_coordinates_public_api() -> None:
         map_handle.set_image_source_image("overlay-url", image)
         map_handle.set_image_source_coordinates("overlay-url", updated_coordinates)
         assert (
-            map_handle.get_image_source_coordinates("overlay-url")
+            _await(map_handle.get_image_source_coordinates("overlay-url"))
             == updated_coordinates
         )
 
         map_handle.remove_style_source("overlay-url")
         map_handle.remove_style_source("overlay-inline")
-        runtime.barrier()
-        assert map_handle.get_style_source_info("overlay-url") is None
-        assert map_handle.get_style_source_info("overlay-inline") is None
+        runtime.barrier().result(timeout=5)
+        assert _await(map_handle.get_style_source_info("overlay-url")) is None
+        assert _await(map_handle.get_style_source_info("overlay-inline")) is None
 
 
 def test_style_json_light_layer_property_and_filter_public_api() -> None:
@@ -1117,7 +1092,10 @@ def test_style_json_light_layer_property_and_filter_public_api() -> None:
     circle = _json_object({"id": "json-circle", "type": "circle", "source": "points"})
     raw_filter = ["==", ["get", "kind"], "park"]
     filter_value = _json_value(raw_filter)
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         map_handle.set_style_json(_EMPTY_STYLE_BYTES)
         map_handle.add_geojson_source_url(
             "points",
@@ -1146,38 +1124,40 @@ def test_style_json_light_layer_property_and_filter_public_api() -> None:
         map_handle.set_style_light_json(_json_object({"anchor": "viewport"}))
         map_handle.set_style_light_property("intensity", _json_value(0.5))
 
-        layer_json = map_handle.get_style_layer_json("json-background")
+        layer_json = _await(map_handle.get_style_layer_json("json-background"))
         assert layer_json is not None
         assert json.loads(layer_json) == {
             "id": "json-background",
             "type": "background",
             "paint": {"background-color": ["rgba", 255, 0, 0, 1]},
         }
-        assert map_handle.get_style_layer_json("missing") is None
-        background_color = map_handle.get_layer_property(
-            "json-background",
-            "background-color",
+        assert _await(map_handle.get_style_layer_json("missing")) is None
+        background_color = _await(
+            map_handle.get_layer_property(
+                "json-background",
+                "background-color",
+            )
         )
         assert json.loads(background_color) == ["rgba", 255, 0, 0, 1]
-        assert json.loads(map_handle.get_layer_filter("json-circle")) == raw_filter
-        assert json.loads(map_handle.get_style_light_property("anchor")) == "viewport"
-        assert json.loads(map_handle.get_style_light_property("intensity")) == 0.5
+        assert (
+            json.loads(_await(map_handle.get_layer_filter("json-circle"))) == raw_filter
+        )
+        assert (
+            json.loads(_await(map_handle.get_style_light_property("anchor")))
+            == "viewport"
+        )
+        assert (
+            json.loads(_await(map_handle.get_style_light_property("intensity"))) == 0.5
+        )
 
-        command_id = map_handle.set_style_light_property("intensity", b"Infinity")
-        runtime.barrier()
-        failures = [
-            event.payload
-            for event in runtime.drain_events().events
-            if event.event_type == mln.RuntimeEventType.COMMAND_FINISHED
-            and isinstance(event.payload, mln.CommandFinishedPayload)
-            and event.payload.command_id == command_id
-        ]
-        assert len(failures) == 1
-        assert failures[0].disposition == mln.CommandDisposition.FAILED
-        assert json.loads(map_handle.get_style_light_property("intensity")) == 0.5
+        completion = map_handle.set_style_light_property("intensity", b"Infinity")
+        _assert_command_failed(completion, mln.MaplibreStatus.INVALID_ARGUMENT)
+        assert (
+            json.loads(_await(map_handle.get_style_light_property("intensity"))) == 0.5
+        )
 
         map_handle.set_layer_filter("json-circle", None)
-        assert map_handle.get_layer_filter("json-circle") is None
+        assert _await(map_handle.get_layer_filter("json-circle")) is None
 
 
 def test_style_image_metadata_copy_and_removal_public_api() -> None:
@@ -1185,7 +1165,10 @@ def test_style_image_metadata_copy_and_removal_public_api() -> None:
         info=render.TextureImageInfo(width=1, height=1, stride=4, byte_length=4),
         data=bytes([255, 0, 0, 255]),
     )
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         map_handle.set_style_json(_EMPTY_STYLE_BYTES)
         map_handle.set_style_image(
             "marker",
@@ -1193,7 +1176,7 @@ def test_style_image_metadata_copy_and_removal_public_api() -> None:
             style.StyleImageOptions(pixel_ratio=2.0, sdf=True),
         )
 
-        info = map_handle.get_style_image_info("marker")
+        info = _await(map_handle.get_style_image_info("marker"))
         assert info is not None
         assert info.width == 1
         assert info.height == 1
@@ -1201,32 +1184,33 @@ def test_style_image_metadata_copy_and_removal_public_api() -> None:
         assert info.byte_length == 4
         assert info.pixel_ratio == pytest.approx(2.0)
         assert info.sdf is True
-        assert map_handle.get_style_image_info("missing") is None
+        assert _await(map_handle.get_style_image_info("missing")) is None
 
-        copied = map_handle.copy_style_image_premultiplied_rgba8("marker")
+        copied = _await(map_handle.copy_style_image_premultiplied_rgba8("marker"))
         assert copied is not None
         assert copied.image == image
         assert copied.pixel_ratio == pytest.approx(2.0)
         assert copied.sdf is True
-        assert map_handle.copy_style_image_premultiplied_rgba8("missing") is None
+        assert (
+            _await(map_handle.copy_style_image_premultiplied_rgba8("missing")) is None
+        )
 
         removed_id = map_handle.remove_style_image("marker")
-        runtime.barrier()
-        removed = _command_finished_payload(runtime, removed_id)
+        runtime.barrier().result(timeout=5)
+        removed = _await_command_completion(runtime, removed_id)
         assert removed.disposition == mln.CommandDisposition.COMMITTED
-        assert map_handle.get_style_image_info("marker") is None
+        assert _await(map_handle.get_style_image_info("marker")) is None
 
         # Removing the missing image again fails the command with NOT_FOUND.
         missing_id = map_handle.remove_style_image("marker")
-        runtime.barrier()
-        missing = _command_finished_event(runtime, missing_id)
-        assert isinstance(missing.payload, mln.CommandFinishedPayload)
-        assert missing.payload.disposition == mln.CommandDisposition.FAILED
-        assert missing.code == mln.MaplibreStatus.NOT_FOUND.native_code
+        _assert_command_failed(missing_id, mln.MaplibreStatus.NOT_FOUND)
 
 
 def test_builtin_style_layers_and_location_indicator_public_api() -> None:
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         map_handle.set_style_json(_EMPTY_STYLE_BYTES)
         map_handle.add_raster_dem_source_url(
             "dem",
@@ -1253,7 +1237,7 @@ def test_builtin_style_layers_and_location_indicator_public_api() -> None:
         )
 
         def layer_type(layer_id: str) -> str | None:
-            info = map_handle.get_style_layer_info(layer_id)
+            info = _await(map_handle.get_style_layer_info(layer_id))
             return info.layer_type if info is not None else None
 
         assert layer_type("hillshade") == "hillshade"
@@ -1262,14 +1246,17 @@ def test_builtin_style_layers_and_location_indicator_public_api() -> None:
         map_handle.remove_style_layer("hillshade")
         map_handle.remove_style_layer("relief")
         map_handle.remove_style_layer("location")
-        runtime.barrier()
-        assert map_handle.get_style_layer_info("hillshade") is None
-        assert map_handle.get_style_layer_info("relief") is None
-        assert map_handle.get_style_layer_info("location") is None
+        runtime.barrier().result(timeout=5)
+        assert _await(map_handle.get_style_layer_info("hillshade")) is None
+        assert _await(map_handle.get_style_layer_info("relief")) is None
+        assert _await(map_handle.get_style_layer_info("location")) is None
 
 
 def test_nine_patch_style_image_round_trips_public_api() -> None:
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         map_handle.set_style_json(_EMPTY_STYLE_BYTES)
         image = render.PremultipliedRgba8Image(
             render.TextureImageInfo(width=2, height=2, stride=8, byte_length=16),
@@ -1283,7 +1270,7 @@ def test_nine_patch_style_image_round_trips_public_api() -> None:
         )
         map_handle.set_style_image("patch", image, options)
 
-        info = map_handle.get_style_image_info("patch")
+        info = _await(map_handle.get_style_image_info("patch"))
         assert info is not None
         assert info.stretch_x_count == 1
         assert info.stretch_y_count == 2
@@ -1292,7 +1279,7 @@ def test_nine_patch_style_image_round_trips_public_api() -> None:
         assert info.text_fit_width is None
         assert info.text_fit_height is style.StyleImageTextFit.PROPORTIONAL
 
-        stretches = map_handle.get_style_image_stretches("patch")
+        stretches = _await(map_handle.get_style_image_stretches("patch"))
         assert stretches is not None
         stretch_x, stretch_y = stretches
         assert stretch_x == (style.ImageStretch(0.0, 1.0),)
@@ -1300,7 +1287,7 @@ def test_nine_patch_style_image_round_trips_public_api() -> None:
             style.ImageStretch(0.0, 1.0),
             style.ImageStretch(1.0, 2.0),
         )
-        assert map_handle.get_style_image_stretches("missing") is None
+        assert _await(map_handle.get_style_image_stretches("missing")) is None
 
         with pytest.raises(mln.InvalidArgumentError, match="positive width"):
             map_handle.set_style_image(
@@ -1315,10 +1302,13 @@ def test_style_transition_options_round_trip_public_api() -> None:
         b'{"version":8,"transition":{"duration":750,"delay":100},'
         b'"sources":{},"layers":[]}'
     )
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         # A map with no style yet reports no duration or delay. The
         # placement flag always reports, because native always holds one.
-        empty = map_handle.get_style_transition_options()
+        empty = _await(map_handle.get_style_transition_options())
         assert empty.duration_ms is None
         assert empty.delay_ms is None
         assert empty.enable_placement_transitions is True
@@ -1326,12 +1316,12 @@ def test_style_transition_options_round_trip_public_api() -> None:
         # The style parser fills in its own 300ms duration for a style that
         # declares no transition.
         map_handle.set_style_json(_EMPTY_STYLE_BYTES)
-        parsed = map_handle.get_style_transition_options()
+        parsed = _await(map_handle.get_style_transition_options())
         assert parsed.duration_ms == 300.0
         assert parsed.delay_ms is None
 
         map_handle.set_style_json(transition_style_json)
-        declared = map_handle.get_style_transition_options()
+        declared = _await(map_handle.get_style_transition_options())
         assert declared.duration_ms == 750.0
         assert declared.delay_ms == 100.0
         assert declared.enable_placement_transitions is True
@@ -1343,39 +1333,35 @@ def test_style_transition_options_round_trip_public_api() -> None:
             enable_placement_transitions=False,
         )
         map_handle.set_style_transition_options(options)
-        assert map_handle.get_style_transition_options() == options
+        assert _await(map_handle.get_style_transition_options()) == options
 
         # Omitting the flag leaves the cross-fade on rather than clearing it.
         map_handle.set_style_transition_options(
             style.StyleTransitionOptions(duration_ms=250.0)
         )
         assert (
-            map_handle.get_style_transition_options().enable_placement_transitions
+            _await(
+                map_handle.get_style_transition_options()
+            ).enable_placement_transitions
             is True
         )
 
         # Loading a style replaces the override with what that style declares.
         map_handle.set_style_json(transition_style_json)
-        assert map_handle.get_style_transition_options() == declared
+        assert _await(map_handle.get_style_transition_options()) == declared
 
-        command_id = map_handle.set_style_transition_options(
+        completion = map_handle.set_style_transition_options(
             style.StyleTransitionOptions(delay_ms=-1.0)
         )
-        runtime.barrier()
-        failures = [
-            event.payload
-            for event in runtime.drain_events().events
-            if event.event_type == mln.RuntimeEventType.COMMAND_FINISHED
-            and isinstance(event.payload, mln.CommandFinishedPayload)
-            and event.payload.command_id == command_id
-        ]
-        assert len(failures) == 1
-        assert failures[0].disposition == mln.CommandDisposition.FAILED
-        assert map_handle.get_style_transition_options() == declared
+        _assert_command_failed(completion, mln.MaplibreStatus.INVALID_ARGUMENT)
+        assert _await(map_handle.get_style_transition_options()) == declared
 
 
 def test_layer_base_accessors_round_trip_public_api() -> None:
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         map_handle.set_style_json(
             b'{"version":8,"sources":{"geo":{"type":"geojson","data":'
             b'{"type":"FeatureCollection","features":[]}}},"layers":['
@@ -1383,20 +1369,18 @@ def test_layer_base_accessors_round_trip_public_api() -> None:
             b'{"id":"fill","type":"fill","source":"geo"}]}'
         )
 
-        assert map_handle.get_layer_source_layer("fill") == ""
+        assert _await(map_handle.get_layer_source_layer("fill")) == ""
         map_handle.set_layer_source_layer("fill", "roads")
-        assert map_handle.get_layer_source_layer("fill") == "roads"
-        assert map_handle.get_layer_source_id("fill") == "geo"
+        assert _await(map_handle.get_layer_source_layer("fill")) == "roads"
+        assert _await(map_handle.get_layer_source_id("fill")) == "geo"
 
         # A layer type that takes no source rejects the accepted command.
-        command_id = map_handle.set_layer_source_layer("bg", "roads")
-        runtime.barrier()
-        failure = _command_finished_payload(runtime, command_id)
-        assert failure.disposition == mln.CommandDisposition.FAILED
-        assert map_handle.get_layer_source_id("bg") == ""
+        completion = map_handle.set_layer_source_layer("bg", "roads")
+        _assert_command_failed(completion, mln.MaplibreStatus.INVALID_ARGUMENT)
+        assert _await(map_handle.get_layer_source_id("bg")) == ""
 
         # An unset zoom range crosses the boundary as infinities.
-        info = map_handle.get_style_layer_info("fill")
+        info = _await(map_handle.get_style_layer_info("fill"))
         assert info is not None
         assert info.layer_type == "fill"
         assert info.min_zoom == -math.inf
@@ -1404,27 +1388,31 @@ def test_layer_base_accessors_round_trip_public_api() -> None:
         assert info.visibility is style.StyleLayerVisibility.VISIBLE
         # The layer-info string sizes gate the source ID and source-layer
         # copies, which agree with the scalar accessors.
-        assert info.source_id == map_handle.get_layer_source_id("fill") == "geo"
-        assert info.source_layer == map_handle.get_layer_source_layer("fill") == "roads"
+        assert info.source_id == _await(map_handle.get_layer_source_id("fill")) == "geo"
+        assert (
+            info.source_layer
+            == _await(map_handle.get_layer_source_layer("fill"))
+            == "roads"
+        )
 
         map_handle.set_layer_min_zoom("fill", 4.0)
         map_handle.set_layer_max_zoom("fill", 12.5)
         map_handle.set_layer_visibility("fill", style.StyleLayerVisibility.NONE)
-        info = map_handle.get_style_layer_info("fill")
+        info = _await(map_handle.get_style_layer_info("fill"))
         assert info is not None
         assert info.min_zoom == 4.0
         assert info.max_zoom == 12.5
         assert info.visibility is style.StyleLayerVisibility.NONE
 
         # A sourceless layer type reports no source strings at all.
-        background = map_handle.get_style_layer_info("bg")
+        background = _await(map_handle.get_style_layer_info("bg"))
         assert background is not None
         assert background.layer_type == "background"
         assert background.source_id is None
         assert background.source_layer is None
 
         # The info getter's found flag reports a missing layer as None.
-        assert map_handle.get_style_layer_info("missing") is None
+        assert _await(map_handle.get_style_layer_info("missing")) is None
 
 
 def test_style_layer_metadata_move_and_removal_public_api() -> None:
@@ -1438,36 +1426,35 @@ def test_style_layer_metadata_move_and_removal_public_api() -> None:
       ]
     }
     """
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         map_handle.set_style_json(style_json)
 
-        layer_ids = map_handle.list_style_layer_ids()
+        layer_ids = _await(map_handle.list_style_layer_ids())
         assert "background-a" in layer_ids
         assert "background-b" in layer_ids
         assert layer_ids.index("background-a") < layer_ids.index("background-b")
-        info = map_handle.get_style_layer_info("background-a")
+        info = _await(map_handle.get_style_layer_info("background-a"))
         assert info is not None
         assert info.layer_type == "background"
-        assert map_handle.get_style_layer_info("missing") is None
+        assert _await(map_handle.get_style_layer_info("missing")) is None
 
         map_handle.move_style_layer("background-b", "background-a")
-        layer_ids = map_handle.list_style_layer_ids()
+        layer_ids = _await(map_handle.list_style_layer_ids())
         assert layer_ids.index("background-b") < layer_ids.index("background-a")
 
         removed_id = map_handle.remove_style_layer("background-b")
-        runtime.barrier()
-        removed = _command_finished_payload(runtime, removed_id)
+        runtime.barrier().result(timeout=5)
+        removed = _await_command_completion(runtime, removed_id)
         assert removed.disposition == mln.CommandDisposition.COMMITTED
-        assert map_handle.get_style_layer_info("background-b") is None
-        assert "background-b" not in map_handle.list_style_layer_ids()
+        assert _await(map_handle.get_style_layer_info("background-b")) is None
+        assert "background-b" not in _await(map_handle.list_style_layer_ids())
 
         # Removing the missing layer again fails the command with NOT_FOUND.
         missing_id = map_handle.remove_style_layer("background-b")
-        runtime.barrier()
-        missing = _command_finished_event(runtime, missing_id)
-        assert isinstance(missing.payload, mln.CommandFinishedPayload)
-        assert missing.payload.disposition == mln.CommandDisposition.FAILED
-        assert missing.code == mln.MaplibreStatus.NOT_FOUND.native_code
+        _assert_command_failed(missing_id, mln.MaplibreStatus.NOT_FOUND)
 
 
 def test_map_viewport_and_tile_options_round_trip_public_values() -> None:
@@ -1486,28 +1473,29 @@ def test_map_viewport_and_tile_options_round_trip_public_values() -> None:
         lod_mode=map_module.TileLodMode.DEFAULT,
     )
 
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         viewport_command = map_handle.set_viewport_options(viewport)
         tile_command = map_handle.set_tile_options(tile)
-        runtime.barrier()
+        runtime.barrier().result(timeout=5)
 
         # The new snapshot fields round-trip both committed set commands.
-        events = runtime.drain_events().events
-        finished = {
-            event.payload.command_id: event.payload
-            for event in events
-            if event.event_type == mln.RuntimeEventType.COMMAND_FINISHED
-            and isinstance(event.payload, mln.CommandFinishedPayload)
-        }
+        viewport_completion = _await(viewport_command)
+        tile_completion = _await(tile_command)
         snapshot = map_handle.snapshot()
         assert snapshot.viewport == viewport
         assert snapshot.tile == tile
-        assert snapshot.generation >= finished[viewport_command].generation
-        assert snapshot.generation >= finished[tile_command].generation
+        assert snapshot.generation >= viewport_completion.generation
+        assert snapshot.generation >= tile_completion.generation
 
 
 def test_camera_snapshot_and_jump_round_trip_public_values() -> None:
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         target = camera.CameraOptions(
             center=geo.LatLng(10.0, 20.0),
             zoom=2.0,
@@ -1517,7 +1505,7 @@ def test_camera_snapshot_and_jump_round_trip_public_values() -> None:
             anchor=camera.ScreenPoint(x=16.0, y=8.0),
         )
         map_handle.jump_to(target)
-        snapshot = map_handle.get_camera_ordered().camera
+        snapshot = _await(map_handle.get_camera_ordered()).camera
 
         assert snapshot.center is not None
         assert snapshot.center.latitude == pytest.approx(10.0)
@@ -1529,13 +1517,16 @@ def test_camera_snapshot_and_jump_round_trip_public_values() -> None:
 
 
 def test_free_camera_and_projection_mode_round_trip_public_values() -> None:
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         free_camera = map_handle.snapshot().free_camera
         assert isinstance(free_camera, camera.FreeCameraOptions)
         map_handle.set_free_camera_options(
             camera.FreeCameraOptions(orientation=camera.Quaternion(0.0, 0.0, 0.0, 1.0))
         )
-        runtime.barrier()
+        runtime.barrier().result(timeout=5)
         updated = map_handle.snapshot().free_camera
         assert updated.position is not None
         assert updated.orientation is not None
@@ -1546,7 +1537,7 @@ def test_free_camera_and_projection_mode_round_trip_public_values() -> None:
             y_skew=0.2,
         )
         map_handle.set_projection_mode(projection)
-        runtime.barrier()
+        runtime.barrier().result(timeout=5)
         snapshot = map_handle.get_projection_mode()
 
         assert snapshot.axonometric is True
@@ -1566,7 +1557,10 @@ def test_camera_fit_bounds_and_constraints_public_api() -> None:
     )
     target = camera.CameraOptions(center=geo.LatLng(0.0, 0.0), zoom=1.0)
 
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         map_handle.set_bounds(
             camera.BoundOptions(
                 bounds=camera.Bounded(bounds),
@@ -1574,29 +1568,35 @@ def test_camera_fit_bounds_and_constraints_public_api() -> None:
                 max_zoom=10.0,
             )
         )
-        runtime.barrier()
+        runtime.barrier().result(timeout=5)
         constraints = map_handle.snapshot().bounds
-        fit_bounds = map_handle.camera_for_lat_lng_bounds(bounds, fit)
-        fit_coordinates = map_handle.camera_for_lat_lngs(
-            (bounds.southwest, bounds.northeast),
-            fit,
+        fit_bounds = _await(map_handle.camera_for_lat_lng_bounds(bounds, fit))
+        fit_coordinates = _await(
+            map_handle.camera_for_lat_lngs(
+                (bounds.southwest, bounds.northeast),
+                fit,
+            )
         )
-        fit_geometry = map_handle.camera_for_geometry(
-            _json_object(
-                {
-                    "type": "LineString",
-                    "coordinates": [
-                        [bounds.southwest.longitude, bounds.southwest.latitude],
-                        [bounds.northeast.longitude, bounds.northeast.latitude],
-                    ],
-                }
-            ),
-            fit,
+        fit_geometry = _await(
+            map_handle.camera_for_geometry(
+                _json_object(
+                    {
+                        "type": "LineString",
+                        "coordinates": [
+                            [bounds.southwest.longitude, bounds.southwest.latitude],
+                            [bounds.northeast.longitude, bounds.northeast.latitude],
+                        ],
+                    }
+                ),
+                fit,
+            )
         )
-        visible_bounds = map_handle.lat_lng_bounds_for_camera(target)
-        unwrapped_bounds = map_handle.lat_lng_bounds_for_camera(
-            target,
-            unwrapped=True,
+        visible_bounds = _await(map_handle.lat_lng_bounds_for_camera(target))
+        unwrapped_bounds = _await(
+            map_handle.lat_lng_bounds_for_camera(
+                target,
+                unwrapped=True,
+            )
         )
 
         assert constraints.bounds == camera.Bounded(bounds)
@@ -1613,7 +1613,7 @@ def _jumped_longitude(map_handle: mln.MapHandle, longitude: float) -> float:
     map_handle.jump_to(
         camera.CameraOptions(center=geo.LatLng(0.0, longitude), zoom=2.0)
     )
-    center = map_handle.get_camera_ordered().camera.center
+    center = _await(map_handle.get_camera_ordered()).camera.center
     assert center is not None
     return center.longitude
 
@@ -1621,7 +1621,7 @@ def _jumped_longitude(map_handle: mln.MapHandle, longitude: float) -> float:
 def _settled_bounds(
     runtime: mln.RuntimeHandle, map_handle: mln.MapHandle
 ) -> camera.BoundsConstraint | None:
-    runtime.barrier()
+    runtime.barrier().result(timeout=5)
     return map_handle.snapshot().bounds.bounds
 
 
@@ -1631,7 +1631,10 @@ def test_camera_bounds_distinguish_unbounded_from_world() -> None:
         northeast=geo.LatLng(90.0, 180.0),
     )
 
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         assert _settled_bounds(runtime, map_handle) == camera.Unbounded()
         # An unbounded map wraps across the antimeridian.
         assert _jumped_longitude(map_handle, 200.0) == pytest.approx(-160.0, abs=1e-6)
@@ -1659,10 +1662,12 @@ def test_camera_transition_commands_accept_public_values() -> None:
         easing=camera.UnitBezier(0.0, 0.0, 1.0, 1.0),
     )
     target = camera.CameraOptions(center=geo.LatLng(0.0, 0.0), zoom=1.0)
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
-        assert map_handle.ease_to(target, animation) > 0
-
-        assert map_handle.fly_to(target, animation) > 0
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
+        assert _await(map_handle.ease_to(target, animation)).generation > 0
+        assert _await(map_handle.fly_to(target, animation)).generation > 0
 
 
 def _drain_runtime_events(runtime: mln.RuntimeHandle) -> list[mln.RuntimeEvent]:
@@ -1679,26 +1684,11 @@ def _finished_transition_ids(events: list[mln.RuntimeEvent]) -> list[int]:
     return ids
 
 
-def _command_finished_event(
-    runtime: mln.RuntimeHandle, command_id: int
-) -> mln.RuntimeEvent:
-    matches = [
-        event
-        for event in runtime.drain_events().events
-        if event.event_type == mln.RuntimeEventType.COMMAND_FINISHED
-        and isinstance(event.payload, mln.CommandFinishedPayload)
-        and event.payload.command_id == command_id
-    ]
-    assert len(matches) == 1
-    return matches[0]
-
-
-def _command_finished_payload(
-    runtime: mln.RuntimeHandle, command_id: int
-) -> mln.CommandFinishedPayload:
-    payload = _command_finished_event(runtime, command_id).payload
-    assert isinstance(payload, mln.CommandFinishedPayload)
-    return payload
+def _await_command_completion(
+    runtime: mln.RuntimeHandle, future
+) -> mln.CommandCompletion:
+    del runtime
+    return _await(future)
 
 
 def _camera_change_modes(
@@ -1714,13 +1704,18 @@ def _camera_change_modes(
 def test_zero_duration_ease_reports_transition_finished_once() -> None:
     target = camera.CameraOptions(center=geo.LatLng(12.0, 34.0), zoom=4.0)
 
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         _drain_runtime_events(runtime)
-        map_handle.ease_to(
-            target,
-            camera.AnimationOptions(duration_ms=0.0, transition_id=101),
+        _await(
+            map_handle.ease_to(
+                target,
+                camera.AnimationOptions(duration_ms=0.0, transition_id=101),
+            )
         )
-        runtime.barrier()
+        runtime.barrier().result(timeout=5)
         events = _drain_runtime_events(runtime)
 
     assert _finished_transition_ids(events) == [101]
@@ -1730,18 +1725,25 @@ def test_zero_duration_ease_reports_transition_finished_once() -> None:
 
 
 def test_superseded_transition_reports_transition_finished_once() -> None:
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         _drain_runtime_events(runtime)
-        map_handle.ease_to(
-            camera.CameraOptions(center=geo.LatLng(20.0, 40.0), zoom=6.0),
-            camera.AnimationOptions(duration_ms=5_000.0, transition_id=201),
+        _await(
+            map_handle.ease_to(
+                camera.CameraOptions(center=geo.LatLng(20.0, 40.0), zoom=6.0),
+                camera.AnimationOptions(duration_ms=5_000.0, transition_id=201),
+            )
         )
-        runtime.barrier()
+        runtime.barrier().result(timeout=5)
         started = _drain_runtime_events(runtime)
-        map_handle.jump_to(
-            camera.CameraOptions(center=geo.LatLng(-20.0, -40.0), zoom=2.0)
+        _await(
+            map_handle.jump_to(
+                camera.CameraOptions(center=geo.LatLng(-20.0, -40.0), zoom=2.0)
+            )
         )
-        runtime.barrier()
+        runtime.barrier().result(timeout=5)
         superseded = _drain_runtime_events(runtime)
 
     assert _finished_transition_ids(started) == []
@@ -1753,26 +1755,31 @@ def test_completed_ease_reports_transition_finished_once() -> None:
     deadline = time.monotonic() + 10.0
     events: list[mln.RuntimeEvent] = []
 
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         _drain_runtime_events(runtime)
-        map_handle.ease_to(
-            target,
-            camera.AnimationOptions(duration_ms=20.0, transition_id=401),
+        _await(
+            map_handle.ease_to(
+                target,
+                camera.AnimationOptions(duration_ms=20.0, transition_id=401),
+            )
         )
-        runtime.barrier()
+        runtime.barrier().result(timeout=5)
         while not _finished_transition_ids(events):
             assert time.monotonic() < deadline, (
                 "ease did not finish under autonomous runtime execution"
             )
-            map_handle.request_repaint()
-            runtime.barrier()
+            _await(map_handle.request_repaint())
+            runtime.barrier().result(timeout=5)
             time.sleep(0.001)
             events.extend(_drain_runtime_events(runtime))
 
         trailing: list[mln.RuntimeEvent] = []
         for _ in range(8):
-            map_handle.request_repaint()
-            runtime.barrier()
+            _await(map_handle.request_repaint())
+            runtime.barrier().result(timeout=5)
             time.sleep(0.001)
             trailing.extend(_drain_runtime_events(runtime))
 
@@ -1786,16 +1793,25 @@ def test_completed_ease_reports_transition_finished_once() -> None:
 def test_camera_change_events_report_immediate_modes_for_jump_and_zero_duration_ease() -> (
     None
 ):
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         _drain_runtime_events(runtime)
-        map_handle.jump_to(camera.CameraOptions(center=geo.LatLng(1.0, 2.0), zoom=3.0))
-        runtime.barrier()
-        jumped = _drain_runtime_events(runtime)
-        map_handle.ease_to(
-            camera.CameraOptions(center=geo.LatLng(-1.0, -2.0), zoom=7.0),
-            camera.AnimationOptions(duration_ms=0.0),
+        _await(
+            map_handle.jump_to(
+                camera.CameraOptions(center=geo.LatLng(1.0, 2.0), zoom=3.0)
+            )
         )
-        runtime.barrier()
+        runtime.barrier().result(timeout=5)
+        jumped = _drain_runtime_events(runtime)
+        _await(
+            map_handle.ease_to(
+                camera.CameraOptions(center=geo.LatLng(-1.0, -2.0), zoom=7.0),
+                camera.AnimationOptions(duration_ms=0.0),
+            )
+        )
+        runtime.barrier().result(timeout=5)
         eased = _drain_runtime_events(runtime)
 
     will_change = mln.RuntimeEventType.MAP_CAMERA_WILL_CHANGE
@@ -1808,13 +1824,18 @@ def test_camera_change_events_report_immediate_modes_for_jump_and_zero_duration_
 
 def test_transition_finished_precedes_camera_did_change_in_one_batch() -> None:
     """BND-090: one drain reports more than one event and preserves queue order."""
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         runtime.drain_events()
-        map_handle.ease_to(
-            camera.CameraOptions(center=geo.LatLng(12.0, 34.0), zoom=4.0),
-            camera.AnimationOptions(duration_ms=0.0, transition_id=707),
+        _await(
+            map_handle.ease_to(
+                camera.CameraOptions(center=geo.LatLng(12.0, 34.0), zoom=4.0),
+                camera.AnimationOptions(duration_ms=0.0, transition_id=707),
+            )
         )
-        runtime.barrier()
+        runtime.barrier().result(timeout=5)
         types = [event.event_type for event in runtime.drain_events().events]
 
     finished = mln.RuntimeEventType.MAP_CAMERA_TRANSITION_FINISHED
@@ -1841,14 +1862,23 @@ def test_option_default_masks_keep_native_bits_this_build_does_not_name(
 
 
 def test_narrowed_map_mask_drops_the_cleared_event_type() -> None:
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
-        map_handle.set_event_mask(
-            mln.RuntimeEventMask.ALL & ~mln.RuntimeEventMask.MAP_CAMERA_DID_CHANGE
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
+        _await(
+            map_handle.set_event_mask(
+                mln.RuntimeEventMask.ALL & ~mln.RuntimeEventMask.MAP_CAMERA_DID_CHANGE
+            )
         )
-        runtime.barrier()
+        runtime.barrier().result(timeout=5)
         runtime.drain_events()
-        map_handle.jump_to(camera.CameraOptions(center=geo.LatLng(1.0, 2.0), zoom=3.0))
-        runtime.barrier()
+        _await(
+            map_handle.jump_to(
+                camera.CameraOptions(center=geo.LatLng(1.0, 2.0), zoom=3.0)
+            )
+        )
+        runtime.barrier().result(timeout=5)
         types = [event.event_type for event in runtime.drain_events().events]
 
     assert mln.RuntimeEventType.MAP_CAMERA_WILL_CHANGE in types
@@ -1859,11 +1889,18 @@ def test_map_created_with_a_narrowed_mask_never_delivers_the_cleared_type() -> N
     narrowed = mln.RuntimeEventMask.ALL & ~mln.RuntimeEventMask.MAP_CAMERA_DID_CHANGE
     options = mln.MapOptions(event_mask=narrowed)
 
-    with mln.RuntimeHandle() as runtime, runtime.create_map(options) as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map(options).result(timeout=5) as map_handle,
+    ):
         assert map_handle.event_mask == narrowed
         runtime.drain_events()
-        map_handle.jump_to(camera.CameraOptions(center=geo.LatLng(1.0, 2.0), zoom=3.0))
-        runtime.barrier()
+        _await(
+            map_handle.jump_to(
+                camera.CameraOptions(center=geo.LatLng(1.0, 2.0), zoom=3.0)
+            )
+        )
+        runtime.barrier().result(timeout=5)
         types = [event.event_type for event in runtime.drain_events().events]
 
     assert mln.RuntimeEventType.MAP_CAMERA_WILL_CHANGE in types
@@ -1878,12 +1915,12 @@ def test_event_masks_round_trip_on_the_map_and_the_runtime() -> None:
     with mln.RuntimeHandle(mln.RuntimeOptions(event_mask=created)) as runtime:
         assert runtime.event_mask == created
         runtime.set_event_mask(mln.RuntimeEventMask.ALL)
-        runtime.barrier()
+        runtime.barrier().result(timeout=5)
         assert runtime.event_mask == mln.RuntimeEventMask.ALL
 
-        with runtime.create_map() as map_handle:
+        with runtime.create_map().result(timeout=5) as map_handle:
             map_handle.set_event_mask(mln.RuntimeEventMask.ALL)
-            runtime.barrier()
+            runtime.barrier().result(timeout=5)
             assert map_handle.event_mask == mln.RuntimeEventMask.ALL
 
             # A read-modify-write of one bit keeps every other bit, including the
@@ -1891,7 +1928,7 @@ def test_event_masks_round_trip_on_the_map_and_the_runtime() -> None:
             map_handle.set_event_mask(
                 map_handle.event_mask & ~mln.RuntimeEventMask.MAP_IDLE
             )
-            runtime.barrier()
+            runtime.barrier().result(timeout=5)
             assert (
                 map_handle.event_mask
                 == mln.RuntimeEventMask.ALL & ~mln.RuntimeEventMask.MAP_IDLE
@@ -1905,7 +1942,7 @@ def test_event_masks_round_trip_on_the_map_and_the_runtime() -> None:
             runtime.set_event_mask(
                 runtime.event_mask & ~mln.RuntimeEventMask.OFFLINE_REGION_STATUS_CHANGED
             )
-            runtime.barrier()
+            runtime.barrier().result(timeout=5)
             assert (
                 runtime.event_mask
                 == mln.RuntimeEventMask.ALL
@@ -1920,11 +1957,11 @@ def test_empty_creation_mask_queues_nothing() -> None:
 
     with mln.RuntimeHandle(options) as runtime:
         assert runtime.event_mask == mln.RuntimeEventMask.NONE
-        with runtime.create_map(map_options) as map_handle:
+        with runtime.create_map(map_options).result(timeout=5) as map_handle:
             assert map_handle.event_mask == mln.RuntimeEventMask.NONE
             assert not runtime.drain_events().events
-            map_handle.set_style_json(_EMPTY_STYLE_BYTES)
-            runtime.barrier()
+            _await(map_handle.set_style_json(_EMPTY_STYLE_BYTES))
+            runtime.barrier().result(timeout=5)
 
             assert not runtime.drain_events().events
 
@@ -1935,43 +1972,42 @@ def test_event_mask_bit_outside_all_is_rejected() -> None:
     with pytest.raises(mln.InvalidArgumentError):
         mln.RuntimeHandle(mln.RuntimeOptions(event_mask=outside))
 
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         with pytest.raises(mln.InvalidArgumentError):
-            runtime.create_map(mln.MapOptions(event_mask=outside))
+            runtime.create_map(mln.MapOptions(event_mask=outside)).result(timeout=5)
         with pytest.raises(mln.InvalidArgumentError):
             runtime.set_event_mask(outside)
         with pytest.raises(mln.InvalidArgumentError):
-            map_handle.set_event_mask(outside)
+            _await(map_handle.set_event_mask(outside))
 
 
-def test_notification_callback_reports_ready_runtime_endpoint() -> None:
+def test_runtime_event_wake_callback_reports_new_events() -> None:
     wake = threading.Event()
-
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         runtime.drain_events()
-        runtime.drain_ready()
-        runtime.set_notification_callback(wake.set)
-        map_handle.set_style_json(_EMPTY_STYLE_BYTES)
-
-        assert wake.wait(5.0)
-        assert any(
-            endpoint.kind == mln.NotificationEndpointKind.RUNTIME_EVENTS
-            for endpoint in runtime.drain_ready()
-        )
-        runtime.clear_notification_callback()
+        runtime.set_event_wake_callback(wake.set)
+        _await(map_handle.request_repaint())
+        assert wake.wait(1)
+        runtime.clear_event_wake_callback()
 
 
 def test_drained_events_stay_equal_after_the_next_drain_and_map_close() -> None:
     with mln.RuntimeHandle() as runtime:
-        map_handle = runtime.create_map()
+        map_handle = runtime.create_map().result(timeout=5)
         map_handle.jump_to(camera.CameraOptions(center=geo.LatLng(1.0, 2.0), zoom=3.0))
-        runtime.barrier()
+        runtime.barrier().result(timeout=5)
         first = runtime.drain_events()
         snapshot = list(first.events)
         assert snapshot
 
         map_handle.jump_to(camera.CameraOptions(center=geo.LatLng(4.0, 5.0), zoom=6.0))
-        runtime.barrier()
+        runtime.barrier().result(timeout=5)
         assert runtime.drain_events().events
 
         assert first == mln.RuntimeEventBatch(events=snapshot)
@@ -1989,19 +2025,13 @@ def test_drain_steps_by_the_reported_event_size() -> None:
 
 
 def test_drain_returns_a_copied_map_loading_failure() -> None:
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
-        command_id = map_handle.set_style_json(b"{")
-        runtime.barrier()
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
+        completion = map_handle.set_style_json(b"{")
+        _assert_command_failed(completion, mln.MaplibreStatus.NATIVE_ERROR)
         events = runtime.drain_events().events
-        command_failures = [
-            event.payload
-            for event in events
-            if event.event_type == mln.RuntimeEventType.COMMAND_FINISHED
-            and isinstance(event.payload, mln.CommandFinishedPayload)
-            and event.payload.command_id == command_id
-        ]
-        assert len(command_failures) == 1
-        assert command_failures[0].disposition == mln.CommandDisposition.FAILED
         failures = [
             event
             for event in events
@@ -2017,7 +2047,10 @@ def test_drain_returns_a_copied_map_loading_failure() -> None:
 
 
 def test_autonomous_runtime_and_drain_return_a_copied_style_loaded_event() -> None:
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         map_handle.set_style_json(_EMPTY_STYLE_BYTES)
         style_loaded = _wait_for_runtime_event(
             runtime, mln.RuntimeEventType.MAP_STYLE_LOADED
@@ -2224,7 +2257,10 @@ def test_queried_feature_materializes_native_wire_values() -> None:
 
 
 def test_invalid_render_target_attach_reports_native_status() -> None:
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         with pytest.raises(
             (mln.InvalidArgumentError, mln.UnsupportedFeatureError)
         ) as raised:
@@ -2237,7 +2273,10 @@ def test_invalid_render_target_attach_reports_native_status() -> None:
 
 
 def test_invalid_opengl_render_target_attach_reports_native_status() -> None:
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         with pytest.raises(
             (mln.InvalidArgumentError, mln.UnsupportedFeatureError)
         ) as raised:
@@ -2252,7 +2291,10 @@ def test_invalid_opengl_render_target_attach_reports_native_status() -> None:
 
 
 def test_invalid_webgpu_render_target_attach_reports_native_status() -> None:
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         with pytest.raises(
             (mln.InvalidArgumentError, mln.UnsupportedFeatureError)
         ) as raised:
@@ -2268,12 +2310,17 @@ def test_invalid_webgpu_render_target_attach_reports_native_status() -> None:
 
 def test_map_coordinate_conversions_round_trip_public_values() -> None:
     coordinate = geo.LatLng(0.0, 0.0)
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         map_handle.jump_to(camera.CameraOptions(center=coordinate, zoom=1.0))
-        point = map_handle.pixel_for_lat_lng(coordinate)
-        projected = map_handle.lat_lng_for_pixel(point)
-        points = map_handle.pixels_for_lat_lngs((coordinate, geo.LatLng(1.0, 1.0)))
-        coordinates = map_handle.lat_lngs_for_pixels(points)
+        point = _await(map_handle.pixel_for_lat_lng(coordinate))
+        projected = _await(map_handle.lat_lng_for_pixel(point))
+        points = _await(
+            map_handle.pixels_for_lat_lngs((coordinate, geo.LatLng(1.0, 1.0)))
+        )
+        coordinates = _await(map_handle.lat_lngs_for_pixels(points))
 
         assert isinstance(point, camera.ScreenPoint)
         assert math.isfinite(projected.latitude)
@@ -2293,11 +2340,14 @@ def test_map_projection_converts_coordinates_and_closes() -> None:
     assert math.isclose(round_tripped.latitude, coordinate.latitude, abs_tol=1e-6)
     assert math.isclose(round_tripped.longitude, coordinate.longitude, abs_tol=1e-6)
 
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         map_handle.jump_to(
             camera.CameraOptions(center=geo.LatLng(10.0, 20.0), zoom=3.0)
         )
-        with map_handle.create_projection() as projection:
+        with _await(map_handle.create_projection()) as projection:
             # A projection created after a camera command observes it.
             created_camera = projection.get_camera()
             assert created_camera.center is not None
@@ -2362,8 +2412,8 @@ def test_map_projection_converts_coordinates_and_closes() -> None:
 
 def test_map_projection_outlives_its_source_handles() -> None:
     runtime = mln.RuntimeHandle()
-    map_handle = runtime.create_map()
-    projection = map_handle.create_projection()
+    map_handle = runtime.create_map().result(timeout=5)
+    projection = _await(map_handle.create_projection())
 
     map_handle.close()
     runtime.close()
@@ -2372,13 +2422,10 @@ def test_map_projection_outlives_its_source_handles() -> None:
     projection.close()
 
 
-def test_offline_region_operation_starts_return_public_handles(tmp_path: Path) -> None:
+def test_offline_futures_complete_with_public_values(tmp_path: Path) -> None:
     definition = offline.OfflineTilePyramidRegionDefinition(
         style_url="https://example.test/style.json",
-        bounds=geo.LatLngBounds(
-            southwest=geo.LatLng(-1.0, -1.0),
-            northeast=geo.LatLng(1.0, 1.0),
-        ),
+        bounds=geo.LatLngBounds(geo.LatLng(-1.0, -2.0), geo.LatLng(1.0, 2.0)),
         min_zoom=0.0,
         max_zoom=1.0,
         pixel_ratio=1.0,
@@ -2386,414 +2433,29 @@ def test_offline_region_operation_starts_return_public_handles(tmp_path: Path) -
     with mln.RuntimeHandle(
         mln.RuntimeOptions(cache_path=str(tmp_path / "cache.db"))
     ) as runtime:
-        operations = [
-            runtime.create_offline_region(definition, b"metadata"),
-            runtime.list_offline_regions(),
-            runtime.get_offline_region(1),
-            runtime.update_offline_region_metadata(1, b"updated"),
-            runtime.get_offline_region_status(1),
-            runtime.set_offline_region_observed(1, False),
-            runtime.set_offline_region_download_state(
-                1,
-                offline.OfflineRegionDownloadState.INACTIVE,
-            ),
-            runtime.invalidate_offline_region(1),
-            runtime.delete_offline_region(1),
-        ]
-
-        for operation in operations:
-            assert isinstance(operation, offline.OperationHandle)
-            assert not operation.closed
-            operation.close()
-            assert operation.closed
-
-
-def test_offline_operation_take_results_convert_public_values() -> None:
-    class FakeNativeRuntime:
-        def __init__(self) -> None:
-            self.discarded = []
-
-        def operation_status(self, operation_id: int) -> tuple[int, str]:
-            return (0, "")
-
-        def operation_release(self, operation_id: int) -> None:
-            self.discarded.append(operation_id)
-
-        def offline_region_create_take_result(
-            self, operation_id: int
-        ) -> dict[str, object]:
-            assert operation_id == 1
-            return region_wire(b"created")
-
-        def offline_region_get_take_result(
-            self, operation_id: int
-        ) -> dict[str, object] | None:
-            assert operation_id == 2
-            return region_wire(b"found")
-
-        def offline_regions_list_take_result(
-            self, operation_id: int
-        ) -> list[dict[str, object]]:
-            assert operation_id == 3
-            return [region_wire(b"listed")]
-
-        def offline_regions_merge_database_take_result(
-            self,
-            operation_id: int,
-        ) -> list[dict[str, object]]:
-            assert operation_id == 4
-            return [region_wire(b"merged")]
-
-        def offline_region_update_metadata_take_result(
-            self,
-            operation_id: int,
-        ) -> dict[str, object]:
-            assert operation_id == 5
-            return region_wire(b"updated")
-
-        def offline_region_get_status_take_result(
-            self, operation_id: int
-        ) -> dict[str, object]:
-            assert operation_id == 6
-            return {
-                "download_state": 1,
-                "completed_resource_count": 2,
-                "completed_resource_size": 3,
-                "completed_tile_count": 4,
-                "required_tile_count": 5,
-                "completed_tile_size": 6,
-                "required_resource_count": 7,
-                "required_resource_count_is_precise": True,
-                "complete": False,
-            }
-
-        def operation_finish(self, operation_id: int) -> None:
-            self.discarded.append(operation_id)
-
-    class FakeRuntime:
-        def __init__(self) -> None:
-            self._native = FakeNativeRuntime()
-            self.operations: set[offline.OperationHandle] = set()
-
-        def _register_operation(self, operation: offline.OperationHandle) -> None:
-            self.operations.add(operation)
-
-        def _unregister_operation(self, operation: offline.OperationHandle) -> None:
-            self.operations.discard(operation)
-
-    def region_wire(metadata: bytes) -> dict[str, object]:
-        return {
-            "id": 42,
-            "definition": {
-                "type": "tile_pyramid",
-                "style_url": "https://example.test/style.json",
-                "bounds": {
-                    "southwest": {"latitude": -1.0, "longitude": -2.0},
-                    "northeast": {"latitude": 1.0, "longitude": 2.0},
-                },
-                "min_zoom": 0.0,
-                "max_zoom": 10.0,
-                "pixel_ratio": 1.0,
-                "include_ideographs": True,
-            },
-            "metadata": metadata,
-        }
-
-    runtime = FakeRuntime()
-
-    with pytest.raises(TypeError, match="created by RuntimeHandle"):
-        offline.OperationHandle(runtime, 99, None, None)
-
-    with offline.OperationHandle._from_native(
-        runtime,
-        1,
-        runtime._native.offline_region_create_take_result,
-        offline._adapt_region_result,
-    ) as operation:
-        region = operation.take()
-    with offline.OperationHandle._from_native(
-        runtime,
-        2,
-        runtime._native.offline_region_get_take_result,
-        offline._adapt_optional_region_result,
-    ) as operation:
-        optional = operation.take()
-    with offline.OperationHandle._from_native(
-        runtime,
-        3,
-        runtime._native.offline_regions_list_take_result,
-        offline._adapt_region_list_result,
-    ) as operation:
-        listed = operation.take()
-    with offline.OperationHandle._from_native(
-        runtime,
-        4,
-        runtime._native.offline_regions_merge_database_take_result,
-        offline._adapt_region_list_result,
-    ) as operation:
-        merged = operation.take()
-    with offline.OperationHandle._from_native(
-        runtime,
-        5,
-        runtime._native.offline_region_update_metadata_take_result,
-        offline._adapt_region_result,
-    ) as operation:
-        updated = operation.take()
-    with offline.OperationHandle._from_native(
-        runtime,
-        6,
-        runtime._native.offline_region_get_status_take_result,
-        offline._adapt_status_result,
-    ) as operation:
-        status = operation.take()
-
-    assert region.id == 42
-    assert isinstance(region.definition, offline.OfflineTilePyramidRegionDefinition)
-    assert region.definition.bounds.southwest == geo.LatLng(-1.0, -2.0)
-    assert optional is not None
-    assert optional.metadata == b"found"
-    assert listed[0].metadata == b"listed"
-    assert merged[0].metadata == b"merged"
-    assert updated.metadata == b"updated"
-    assert status.download_state == offline.OfflineRegionDownloadState.ACTIVE
-    assert status.completed_resource_count == 2
-    assert runtime.operations == set()
-
-
-def test_offline_operation_exposes_common_lifecycle_and_copied_diagnostic() -> None:
-    class FakeNativeRuntime:
-        def __init__(self) -> None:
-            self.cancelled: list[int] = []
-            self.released: list[int] = []
-
-        def operation_poll(self, operation: int) -> bool:
-            return False
-
-        def operation_wait(self, operation: int, timeout_ms: int) -> bool:
-            assert timeout_ms == 25
-            return True
-
-        def operation_cancel(self, operation: int) -> None:
-            self.cancelled.append(operation)
-
-        def operation_status(self, operation: int) -> tuple[int, str]:
-            return (-6, "copied cancellation diagnostic")
-
-        def operation_release(self, operation: int) -> None:
-            self.released.append(operation)
-
-    class FakeRuntime:
-        def __init__(self) -> None:
-            self._native = FakeNativeRuntime()
-            self.operations: set[offline.OperationHandle] = set()
-
-        def _register_operation(self, operation: offline.OperationHandle) -> None:
-            self.operations.add(operation)
-
-        def _unregister_operation(self, operation: offline.OperationHandle) -> None:
-            self.operations.discard(operation)
-
-    runtime = FakeRuntime()
-    operation = offline.OperationHandle._from_native(runtime, 42)
-
-    assert operation.poll() is False
-    assert operation.wait(25) is True
-    operation.cancel()
-    assert operation.status == mln.MaplibreStatus.CANCELLED
-    assert operation.diagnostic == "copied cancellation diagnostic"
-    with pytest.raises(mln.CancelledError) as raised:
-        operation.raise_for_status()
-    assert raised.value.diagnostic == "copied cancellation diagnostic"
-
-    operation.close()
-    assert operation.closed
-    assert runtime._native.cancelled == [42]
-    assert runtime._native.released == [42]
-    assert runtime.operations == set()
-
-
-def test_operation_close_waits_for_active_wait_and_allows_concurrent_cancel() -> None:
-    wait_started = threading.Event()
-    cancelled = threading.Event()
-    released: list[int] = []
-
-    class FakeNativeRuntime:
-        def operation_wait(self, operation: int, timeout_ms: int) -> bool:
-            wait_started.set()
-            assert cancelled.wait(1)
-            return True
-
-        def operation_cancel(self, operation: int) -> None:
-            cancelled.set()
-
-        def operation_release(self, operation: int) -> None:
-            released.append(operation)
-
-    class FakeRuntime:
-        def __init__(self) -> None:
-            self._native = FakeNativeRuntime()
-            self.operations: set[offline.OperationHandle[object]] = set()
-
-        def _register_operation(
-            self, operation: offline.OperationHandle[object]
-        ) -> None:
-            self.operations.add(operation)
-
-        def _unregister_operation(
-            self, operation: offline.OperationHandle[object]
-        ) -> None:
-            self.operations.discard(operation)
-
-    runtime = FakeRuntime()
-    operation = offline.OperationHandle._from_native(runtime, 42)
-    wait_thread = threading.Thread(target=operation.wait)
-    close_thread = threading.Thread(target=operation.close)
-    wait_thread.start()
-    assert wait_started.wait(1)
-    close_thread.start()
-    operation.cancel()
-    wait_thread.join()
-    close_thread.join()
-
-    assert operation.closed
-    assert released == [42]
-
-
-def test_offline_operation_take_rejects_closed_handles() -> None:
-    class FakeNativeRuntime:
-        def __init__(self) -> None:
-            self.discarded: list[int] = []
-            self.status_takes = 0
-
-        def operation_status(self, operation_id: int) -> tuple[int, str]:
-            return (0, "")
-
-        def operation_release(self, operation_id: int) -> None:
-            self.discarded.append(operation_id)
-
-        def operation_finish(self, operation_id: int) -> None:
-            self.discarded.append(operation_id)
-
-        def offline_region_get_status_take_result(
-            self,
-            operation_id: int,
-        ) -> dict[str, object]:
-            assert operation_id == 10
-            self.status_takes += 1
-            return {
-                "download_state": 1,
-                "completed_resource_count": 0,
-                "completed_resource_size": 0,
-                "completed_tile_count": 0,
-                "required_tile_count": 0,
-                "completed_tile_size": 0,
-                "required_resource_count": 0,
-                "required_resource_count_is_precise": True,
-                "complete": True,
-            }
-
-        def offline_region_create_take_result(self, operation_id: int) -> None:
-            raise AssertionError("closed handle called native take")
-
-        def offline_region_get_take_result(self, operation_id: int) -> None:
-            raise AssertionError("closed handle called native take")
-
-        def offline_regions_list_take_result(self, operation_id: int) -> None:
-            raise AssertionError("closed handle called native take")
-
-        def offline_regions_merge_database_take_result(self, operation_id: int) -> None:
-            raise AssertionError("closed handle called native take")
-
-        def offline_region_update_metadata_take_result(self, operation_id: int) -> None:
-            raise AssertionError("closed handle called native take")
-
-    class FakeRuntime:
-        def __init__(self) -> None:
-            self._native = FakeNativeRuntime()
-            self.operations: set[offline.OperationHandle] = set()
-
-        def _register_operation(self, operation: offline.OperationHandle) -> None:
-            self.operations.add(operation)
-
-        def _unregister_operation(self, operation: offline.OperationHandle) -> None:
-            self.operations.discard(operation)
-
-    runtime = FakeRuntime()
-
-    status_handle = offline.OperationHandle._from_native(
-        runtime,
-        10,
-        runtime._native.offline_region_get_status_take_result,
-        offline._adapt_status_result,
-    )
-    assert status_handle.take().complete is True
-    with pytest.raises(mln.InvalidStateError, match="already closed"):
-        status_handle.take()
-    with pytest.raises(mln.InvalidStateError, match="already closed"):
-        _ = status_handle.status
-    assert runtime._native.status_takes == 1
-
-    closed = offline.OperationHandle._from_native(
-        runtime,
-        20,
-        runtime._native.offline_region_create_take_result,
-        offline._adapt_region_result,
-    )
-    closed.close()
-    with pytest.raises(mln.InvalidStateError, match="operation handle"):
-        closed.take()
-
-    assert runtime._native.discarded == [20]
-    assert runtime.operations == set()
-
-
-def test_operation_remains_releasable_after_runtime_close(tmp_path: Path) -> None:
-    runtime = mln.RuntimeHandle(mln.RuntimeOptions(cache_path=str(tmp_path)))
-    operation = runtime.run_ambient_cache_operation(offline.AmbientCacheOperation.CLEAR)
-    try:
-        assert not operation.closed
-        runtime.close()
-        assert runtime.closed
-        assert not operation.closed
-    finally:
-        operation.close()
-
-
-def test_ambient_cache_operation_starts_and_finishes_through_public_api(
-    tmp_path: Path,
-) -> None:
-    with mln.RuntimeHandle(mln.RuntimeOptions(cache_path=str(tmp_path))) as runtime:
-        operation = runtime.run_ambient_cache_operation(
-            offline.AmbientCacheOperation.CLEAR,
+        created = _await(runtime.create_offline_region(definition, b"metadata"))
+        assert created.metadata == b"metadata"
+        assert _await(runtime.get_offline_region(created.id)) == created
+        assert created in _await(runtime.list_offline_regions())
+        assert (
+            _await(runtime.get_offline_region_status(created.id)).download_state
+            == offline.OfflineRegionDownloadState.INACTIVE
         )
-
-        assert isinstance(operation, offline.OperationHandle)
-        assert not operation.closed
-        _wait_for_offline_operation(runtime, operation)
-        _ = operation.status
-        operation.finish()
-        assert operation.closed
+        assert _await(runtime.set_offline_region_observed(created.id, False)) is None
+        assert _await(runtime.delete_offline_region(created.id)) is None
 
 
-def test_set_maximum_ambient_cache_size_starts_and_finishes_through_public_api(
-    tmp_path: Path,
-) -> None:
+def test_ambient_cache_futures_complete_through_public_api(tmp_path: Path) -> None:
     with mln.RuntimeHandle(
-        mln.RuntimeOptions(cache_path=str(tmp_path / "ambient-cache.db"))
+        mln.RuntimeOptions(cache_path=str(tmp_path / "cache.db"))
     ) as runtime:
-        operation = runtime.set_maximum_ambient_cache_size(8 << 20)
-
-        assert isinstance(operation, offline.OperationHandle)
-        assert not operation.closed
-
-        _wait_for_offline_operation(runtime, operation)
-        assert operation.status == mln.MaplibreStatus.OK
-        assert operation.diagnostic == ""
-        operation.finish()
-        assert operation.closed
-
-        # An out-of-range size stays on the binding's documented error family
-        # instead of leaking the extension module's OverflowError.
+        assert (
+            _await(
+                runtime.run_ambient_cache_operation(offline.AmbientCacheOperation.CLEAR)
+            )
+            is None
+        )
+        assert _await(runtime.set_maximum_ambient_cache_size(8 << 20)) is None
         with pytest.raises(mln.InvalidArgumentError):
             runtime.set_maximum_ambient_cache_size(-1)
         with pytest.raises(mln.InvalidArgumentError):
@@ -2898,10 +2560,13 @@ def test_process_global_logging_receiver_copies_native_records() -> None:
     receiver = log.set_log_callback(max_queued_records=8, consume=True)
     try:
         log.set_async_log_severity_mask(log.LogSeverityMask.DEFAULT)
-        with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        with (
+            mln.RuntimeHandle() as runtime,
+            runtime.create_map().result(timeout=5) as map_handle,
+        ):
             map_handle.set_style_json(b"{")
             map_handle.dump_debug_logs()
-            runtime.barrier()
+            runtime.barrier().result(timeout=5)
 
         records = []
         while (record := receiver.poll_record()) is not None:
@@ -2919,10 +2584,13 @@ def test_process_global_logging_receiver_copies_native_records() -> None:
 def test_log_receiver_reports_dropped_records() -> None:
     receiver = log.set_log_callback(max_queued_records=1, consume=True)
     try:
-        with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        with (
+            mln.RuntimeHandle() as runtime,
+            runtime.create_map().result(timeout=5) as map_handle,
+        ):
             map_handle.set_style_json(b"{")
             map_handle.dump_debug_logs()
-            runtime.barrier()
+            runtime.barrier().result(timeout=5)
 
         assert receiver.poll_record() is not None
         assert receiver.dropped_record_count >= 0
@@ -3066,11 +2734,11 @@ def test_resource_provider_adapter_closes_temporary_handle_on_exception() -> Non
 
 def test_offline_download_state_setter_rejects_unknown_before_native_call() -> None:
     class FakeRuntimeNative:
-        def offline_region_set_download_state_start(
+        def set_offline_region_download_state(
             self,
             region_id: int,
             state: int,
-        ) -> int:
+        ) -> None:
             raise AssertionError((region_id, state))
 
     runtime = mln.RuntimeHandle.__new__(mln.RuntimeHandle)
@@ -3190,7 +2858,7 @@ def test_resource_transform_registers_and_clears() -> None:
 
     with mln.RuntimeHandle() as runtime:
         runtime.set_resource_transform(transform, max_pending_callbacks=1)
-        with runtime.create_map():
+        with runtime.create_map().result(timeout=5):
             runtime.set_resource_transform(transform, max_pending_callbacks=1)
             runtime.clear_resource_transform()
 
@@ -3236,7 +2904,7 @@ def test_resource_provider_pass_through_delegates_to_native_http() -> None:
     with _online_network(), _http_style_server() as (style_url, served):
         with mln.RuntimeHandle() as runtime:
             runtime.set_resource_provider(provider, max_pending_callbacks=4)
-            with runtime.create_map() as map_handle:
+            with runtime.create_map().result(timeout=5) as map_handle:
                 map_handle.set_style_url(style_url)
                 _wait_for_runtime_event(runtime, mln.RuntimeEventType.MAP_STYLE_LOADED)
 
@@ -3265,7 +2933,7 @@ def test_resource_transform_rewrites_copied_network_style_request() -> None:
         _online_network(),
         _http_style_server() as (rewritten_style_url, served),
         mln.RuntimeHandle() as runtime,
-        runtime.create_map() as map_handle,
+        runtime.create_map().result(timeout=5) as map_handle,
     ):
         runtime.set_resource_transform(transform, max_pending_callbacks=4)
         map_handle.set_style_url("http://example.invalid/original-style.json")
@@ -3288,7 +2956,7 @@ def test_resource_transform_can_be_cleared_after_map_creation() -> None:
         _online_network(),
         _http_style_server() as (style_url, served),
         mln.RuntimeHandle() as runtime,
-        runtime.create_map() as map_handle,
+        runtime.create_map().result(timeout=5) as map_handle,
     ):
         runtime.set_resource_transform(transform, max_pending_callbacks=1)
         runtime.clear_resource_transform()
@@ -3338,7 +3006,7 @@ def test_resource_provider_replacement_and_clear_retire_previous_callback() -> N
         runtime.set_resource_provider(
             counting_provider(first_urls), max_pending_callbacks=4
         )
-        with runtime.create_map() as map_handle:
+        with runtime.create_map().result(timeout=5) as map_handle:
             load_unservable_style(runtime, map_handle, "jar:file:/packaged/first.json")
             assert "jar:file:/packaged/first.json" in first_urls
 
@@ -3375,8 +3043,8 @@ def test_resource_provider_sees_scheme_alias_and_its_resolved_url() -> None:
         return resource.ResourceProviderDecision.HANDLE
 
     with mln.RuntimeHandle() as runtime:
-        runtime.set_resource_provider(provider, max_pending_callbacks=4)
-        with runtime.create_map() as map_handle:
+        _await(runtime.set_resource_provider(provider, max_pending_callbacks=4))
+        with runtime.create_map().result(timeout=5) as map_handle:
             map_handle.set_style_url("maplibre://maps/style")
             _wait_for_runtime_event(runtime, mln.RuntimeEventType.MAP_STYLE_LOADED)
 
@@ -3399,7 +3067,7 @@ def test_resource_provider_inline_completion_overrides_pass_through_return() -> 
 
     with mln.RuntimeHandle() as runtime:
         runtime.set_resource_provider(provider, max_pending_callbacks=4)
-        with runtime.create_map() as map_handle:
+        with runtime.create_map().result(timeout=5) as map_handle:
             map_handle.set_style_url("custom://inline-style.json")
             _wait_for_runtime_event(runtime, mln.RuntimeEventType.MAP_STYLE_LOADED)
 
@@ -3424,7 +3092,7 @@ def test_resource_provider_deferred_completion_loads_style_with_copied_request()
 
     with mln.RuntimeHandle() as runtime:
         runtime.set_resource_provider(provider, max_pending_callbacks=4)
-        with runtime.create_map() as map_handle:
+        with runtime.create_map().result(timeout=5) as map_handle:
             map_handle.set_style_url("custom://deferred-style.json")
             handle = _wait_for_provider_handle(runtime, handles)
 
@@ -3467,7 +3135,7 @@ def test_resource_provider_can_complete_request_from_another_thread() -> None:
 
     with mln.RuntimeHandle() as runtime:
         runtime.set_resource_provider(provider, max_pending_callbacks=4)
-        with runtime.create_map() as map_handle:
+        with runtime.create_map().result(timeout=5) as map_handle:
             map_handle.set_style_url("custom://cross-thread-style.json")
             handle = _wait_for_provider_handle(runtime, handles)
 
@@ -3507,7 +3175,7 @@ def test_resource_provider_error_response_reports_loading_failure_event() -> Non
 
     with mln.RuntimeHandle() as runtime:
         runtime.set_resource_provider(provider, max_pending_callbacks=4)
-        with runtime.create_map() as map_handle:
+        with runtime.create_map().result(timeout=5) as map_handle:
             map_handle.set_style_url("custom://error-style.json")
             event = _wait_for_runtime_event(
                 runtime,
@@ -3549,38 +3217,28 @@ def test_resource_provider_error_response_reports_offline_response_error_event(
     with mln.RuntimeHandle(
         mln.RuntimeOptions(cache_path=str(tmp_path / "offline-cache.db"))
     ) as runtime:
-        runtime.set_resource_provider(provider, max_pending_callbacks=4)
-        create = runtime.create_offline_region(definition, b"metadata")
-        _wait_for_offline_operation(runtime, create)
-        region = create.take()
-        create.close()
+        _await(runtime.set_resource_provider(provider, max_pending_callbacks=4))
+        region = _await(runtime.create_offline_region(definition, b"metadata"))
 
-        observe = runtime.set_offline_region_observed(region.id, True)
-        _wait_for_offline_operation(runtime, observe)
-        observe.close()
+        _await(runtime.set_offline_region_observed(region.id, True))
 
-        activate = runtime.set_offline_region_download_state(
-            region.id,
-            offline.OfflineRegionDownloadState.ACTIVE,
-        )
-        try:
-            event = _wait_for_runtime_event(
-                runtime,
-                mln.RuntimeEventType.OFFLINE_REGION_RESPONSE_ERROR,
+        _await(
+            runtime.set_offline_region_download_state(
+                region.id,
+                offline.OfflineRegionDownloadState.ACTIVE,
             )
-        finally:
-            activate.close()
-
-        deactivate = runtime.set_offline_region_download_state(
-            region.id,
-            offline.OfflineRegionDownloadState.INACTIVE,
         )
-        _wait_for_offline_operation(runtime, deactivate)
-        deactivate.close()
-
-        unobserve = runtime.set_offline_region_observed(region.id, False)
-        _wait_for_offline_operation(runtime, unobserve)
-        unobserve.close()
+        event = _wait_for_runtime_event(
+            runtime,
+            mln.RuntimeEventType.OFFLINE_REGION_RESPONSE_ERROR,
+        )
+        _await(
+            runtime.set_offline_region_download_state(
+                region.id,
+                offline.OfflineRegionDownloadState.INACTIVE,
+            )
+        )
+        _await(runtime.set_offline_region_observed(region.id, False))
 
     assert isinstance(event.payload, offline.OfflineRegionResponseError)
     assert event.payload.region_id == region.id
@@ -3602,7 +3260,7 @@ def test_resource_request_cancellation_makes_late_completion_terminal() -> None:
 
     with mln.RuntimeHandle() as runtime:
         runtime.set_resource_provider(provider, max_pending_callbacks=4)
-        map_handle = runtime.create_map()
+        map_handle = runtime.create_map().result(timeout=5)
         map_handle.set_style_url("custom://cancelled-style.json")
         handle = _wait_for_provider_handle(runtime, handles)
 
@@ -3639,7 +3297,7 @@ def test_released_resource_request_handle_stays_stale_after_later_request() -> N
 
     with mln.RuntimeHandle() as runtime:
         runtime.set_resource_provider(provider, max_pending_callbacks=4)
-        with runtime.create_map() as map_handle:
+        with runtime.create_map().result(timeout=5) as map_handle:
             map_handle.set_style_url("custom://stale-style-1.json")
             stale_handle = _wait_for_provider_handle(runtime, handles)
             stale_handle.close()
@@ -3673,7 +3331,7 @@ def test_resource_request_release_race_with_cancellation_checks_closes_cleanly()
 
     with mln.RuntimeHandle() as runtime:
         runtime.set_resource_provider(provider, max_pending_callbacks=4)
-        with runtime.create_map() as map_handle:
+        with runtime.create_map().result(timeout=5) as map_handle:
             map_handle.set_style_url("custom://release-race-style.json")
             handle = _wait_for_provider_handle(runtime, handles)
 
@@ -3705,7 +3363,10 @@ def test_resource_request_release_race_with_cancellation_checks_closes_cleanly()
 
 
 def test_custom_geometry_source_scaffolding_queues_copied_events() -> None:
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         map_handle.set_style_json(_EMPTY_STYLE_BYTES)
         source, _ = map_handle.add_custom_geometry_source(
             "custom",
@@ -3714,7 +3375,7 @@ def test_custom_geometry_source_scaffolding_queues_copied_events() -> None:
                 max_queued_events=1,
             ),
         )
-        runtime.barrier()
+        runtime.barrier().result(timeout=5)
 
         source._native.push_fetch_for_test(1, 2, 3)
         source._native.push_cancel_for_test(4, 5, 6)
@@ -3768,13 +3429,13 @@ def test_style_url_load_releases_custom_geometry_state_when_the_style_lands() ->
 
     with mln.RuntimeHandle() as runtime:
         runtime.set_resource_provider(provider, max_pending_callbacks=4)
-        with runtime.create_map() as map_handle:
+        with runtime.create_map().result(timeout=5) as map_handle:
             map_handle.set_style_json(_EMPTY_STYLE_BYTES)
             source, _ = map_handle.add_custom_geometry_source(
                 "custom",
                 style.CustomGeometrySourceOptions(max_queued_events=1),
             )
-            runtime.barrier()
+            runtime.barrier().result(timeout=5)
 
             # The inline load above queued a style-loaded event, so drain it to
             # keep the wait below tied to the URL load.
@@ -3816,7 +3477,10 @@ def test_style_json_load_releases_custom_geometry_state_with_style_loaded_cleare
 ):
     style_loaded = mln.RuntimeEventType.MAP_STYLE_LOADED
 
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         # The same drive reports a style-loaded event while the type is
         # selected, so the cleared phase below asserts a real negative.
         assert style_loaded in _load_style_and_collect_types(
@@ -3826,13 +3490,13 @@ def test_style_json_load_releases_custom_geometry_state_with_style_loaded_cleare
             "custom-masked",
             style.CustomGeometrySourceOptions(max_queued_events=1),
         )
-        runtime.barrier()
+        runtime.barrier().result(timeout=5)
         assert source.closed is False
 
         map_handle.set_event_mask(
             mln.RuntimeEventMask.ALL & ~mln.RuntimeEventMask.MAP_STYLE_LOADED
         )
-        runtime.barrier()
+        runtime.barrier().result(timeout=5)
         types = _load_style_and_collect_types(runtime, map_handle, None)
 
         # The C API releases the dropped source itself, so the release does not
@@ -3842,18 +3506,21 @@ def test_style_json_load_releases_custom_geometry_state_with_style_loaded_cleare
 
 
 def test_remove_style_source_releases_custom_geometry_handle() -> None:
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         map_handle.set_style_json(_EMPTY_STYLE_BYTES)
         source, _ = map_handle.add_custom_geometry_source(
             "custom-remove",
             style.CustomGeometrySourceOptions(max_queued_events=1),
         )
-        runtime.barrier()
+        runtime.barrier().result(timeout=5)
 
-        command_id = map_handle.remove_style_source("custom-remove")
-        runtime.barrier()
+        completion = map_handle.remove_style_source("custom-remove")
+        runtime.barrier().result(timeout=5)
         assert (
-            _command_finished_payload(runtime, command_id).disposition
+            _await_command_completion(runtime, completion).disposition
             == mln.CommandDisposition.COMMITTED
         )
         assert source.closed
@@ -3863,16 +3530,16 @@ def test_remove_style_source_releases_custom_geometry_handle() -> None:
 
 def test_map_close_releases_custom_geometry_handle() -> None:
     with mln.RuntimeHandle() as runtime:
-        map_handle = runtime.create_map()
+        map_handle = runtime.create_map().result(timeout=5)
         map_handle.set_style_json(_EMPTY_STYLE_BYTES)
         source, _ = map_handle.add_custom_geometry_source(
             "custom-close",
             style.CustomGeometrySourceOptions(max_queued_events=1),
         )
-        runtime.barrier()
+        runtime.barrier().result(timeout=5)
 
         map_handle.close()
-        runtime.barrier()
+        runtime.barrier().result(timeout=5)
 
         assert source.closed
         source._native.push_fetch_for_test(1, 2, 3)
@@ -3881,7 +3548,10 @@ def test_map_close_releases_custom_geometry_handle() -> None:
 
 
 def test_custom_geometry_source_rejects_empty_queue_capacity() -> None:
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         map_handle.set_style_json(_EMPTY_STYLE_BYTES)
         with pytest.raises(mln.InvalidArgumentError):
             map_handle.add_custom_geometry_source(
@@ -3898,7 +3568,10 @@ def test_set_bounds_rejects_unsupported_constraint() -> None:
         northeast=geo.LatLng(90.0, 180.0),
     )
 
-    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
         with pytest.raises(mln.InvalidArgumentError):
             map_handle.set_bounds(
                 camera.BoundOptions(bounds=world)  # type: ignore[arg-type]
@@ -3912,7 +3585,7 @@ def test_transition_id_out_of_range_raises_binding_error(transition_id: int) -> 
     # would see a bare OverflowError instead of the binding's error shape.
     with (
         mln.RuntimeHandle() as runtime,
-        runtime.create_map() as map_handle,
+        runtime.create_map().result(timeout=5) as map_handle,
         pytest.raises(mln.InvalidArgumentError),
     ):
         map_handle.ease_to(
@@ -3924,13 +3597,13 @@ def test_transition_id_out_of_range_raises_binding_error(transition_id: int) -> 
 def test_released_map_id_replayed_after_a_new_map_reports_it_stale() -> None:
     """BND-045."""
     with mln.RuntimeHandle() as runtime:
-        first = runtime.create_map()
+        first = runtime.create_map().result(timeout=5)
         released = first._native.id()
         first.close()
 
         # The released slot is the one the next map takes, so the replayed id
         # names a retired generation of a slot that is live again.
-        second = runtime.create_map()
+        second = runtime.create_map().result(timeout=5)
 
         with pytest.raises(mln.InvalidArgumentError) as excinfo:
             _native.map_size_by_id_for_test(released)
@@ -3944,7 +3617,7 @@ def test_released_map_id_replayed_after_a_new_map_reports_it_stale() -> None:
 def test_live_map_snapshot_is_any_thread() -> None:
     """BND-049."""
     with mln.RuntimeHandle() as runtime:
-        map_handle = runtime.create_map()
+        map_handle = runtime.create_map().result(timeout=5)
         live = map_handle._native.id()
         results: list[tuple[int, int, float]] = []
 

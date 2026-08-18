@@ -11,12 +11,12 @@ func TestMapProjectionCameraAndVisibleCoordinates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
-	m, err := runtime.NewMapWithOptions(NewMapOptions(512, 512, 1))
+	m, err := awaitForTest(runtime.NewMapWithOptions(NewMapOptions(512, 512, 1)))
 	if err != nil {
 		_ = runtime.Close()
 		t.Fatalf("NewMapWithOptions(): %v", err)
 	}
-	projection, err := m.NewProjection()
+	projection, err := awaitForTest(m.NewProjection())
 	if err != nil {
 		_ = m.Close()
 		_ = runtime.Close()
@@ -79,7 +79,7 @@ func TestMapProjectionObservesEarlierMapCommands(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
-	m, err := runtime.NewMapWithOptions(NewMapOptions(512, 512, 1))
+	m, err := awaitForTest(runtime.NewMapWithOptions(NewMapOptions(512, 512, 1)))
 	if err != nil {
 		_ = runtime.Close()
 		t.Fatalf("NewMapWithOptions(): %v", err)
@@ -96,7 +96,7 @@ func TestMapProjectionObservesEarlierMapCommands(t *testing.T) {
 	if _, err := m.JumpTo(CameraOptions{}.WithCenter(LatLng{Latitude: 10, Longitude: 20}).WithZoom(3)); err != nil {
 		t.Fatalf("JumpTo(): %v", err)
 	}
-	projection, err := m.NewProjection()
+	projection, err := awaitForTest(m.NewProjection())
 	if err != nil {
 		t.Fatalf("NewProjection(): %v", err)
 	}
@@ -121,12 +121,12 @@ func TestMapProjectionOutlivesMapAndRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
-	m, err := runtime.NewMapWithOptions(NewMapOptions(512, 512, 1))
+	m, err := awaitForTest(runtime.NewMapWithOptions(NewMapOptions(512, 512, 1)))
 	if err != nil {
 		_ = runtime.Close()
 		t.Fatalf("NewMapWithOptions(): %v", err)
 	}
-	projection, err := m.NewProjection()
+	projection, err := awaitForTest(m.NewProjection())
 	if err != nil {
 		_ = m.Close()
 		_ = runtime.Close()
@@ -167,12 +167,12 @@ func TestMapProjectionCanMigrateAcrossGoroutines(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
-	m, err := runtime.NewMapWithOptions(NewMapOptions(512, 512, 1))
+	m, err := awaitForTest(runtime.NewMapWithOptions(NewMapOptions(512, 512, 1)))
 	if err != nil {
 		_ = runtime.Close()
 		t.Fatalf("NewMapWithOptions(): %v", err)
 	}
-	projection, err := m.NewProjection()
+	projection, err := awaitForTest(m.NewProjection())
 	if err != nil {
 		_ = m.Close()
 		_ = runtime.Close()

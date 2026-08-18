@@ -16,13 +16,13 @@ const RenderTarget = render.RenderTarget;
 const uses_egl = build_options.supports_opengl and
     (builtin.os.tag == .linux or builtin.os.tag == .macos);
 
-const NotificationReceiver = struct {
+const EventReceiver = struct {
     scheduled: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
     wake_failed: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
     event_type: u32,
 
     fn schedule(user_data: ?*anyopaque) callconv(.c) void {
-        const self: *NotificationReceiver = @ptrCast(@alignCast(user_data.?));
+        const self: *EventReceiver = @ptrCast(@alignCast(user_data.?));
         if (self.scheduled.swap(true, .acq_rel)) return;
 
         var event = std.mem.zeroes(c.SDL_Event);
@@ -78,10 +78,10 @@ pub fn main(init_args: std.process.Init) !void {
     var current_viewport = viewport.get(window_handle);
     viewport.log("initial viewport", current_viewport);
 
-    const notification_event_type = c.SDL_RegisterEvents(1);
-    if (notification_event_type == 0) return types.AppError.EventDrainFailed;
-    var notification_receiver = NotificationReceiver{
-        .event_type = notification_event_type,
+    const event_wake_type = c.SDL_RegisterEvents(1);
+    if (event_wake_type == 0) return types.AppError.EventDrainFailed;
+    var event_receiver = EventReceiver{
+        .event_type = event_wake_type,
     };
 
     var gpa = std.heap.DebugAllocator(.{}){};
@@ -90,11 +90,11 @@ pub fn main(init_args: std.process.Init) !void {
 
     var state = try map_state.MapState.init(allocator, current_viewport);
     defer state.deinit();
-    try state.runtime.setNotificationCallback(
-        NotificationReceiver.schedule,
-        &notification_receiver,
+    try state.runtime.setEventWakeCallback(
+        EventReceiver.schedule,
+        &event_receiver,
     );
-    defer state.runtime.clearNotificationCallback() catch {};
+    defer state.runtime.clearEventWakeCallback() catch {};
 
     // The graphics context, render session, and presentation resources remain
     // on the window-owning thread.
@@ -109,7 +109,7 @@ pub fn main(init_args: std.process.Init) !void {
         &target,
         &current_viewport,
         &state,
-        &notification_receiver,
+        &event_receiver,
     );
 }
 
@@ -122,7 +122,7 @@ fn renderLoop(
     target: *RenderTarget,
     current_viewport: *types.Viewport,
     state: *map_state.MapState,
-    notification_receiver: *NotificationReceiver,
+    event_receiver: *EventReceiver,
 ) !void {
     printStartupStatus(target_mode);
     input.logControls();
@@ -134,16 +134,16 @@ fn renderLoop(
         const pool = if (build_options.supports_metal) objc.AutoreleasePool.init() else {};
         defer if (build_options.supports_metal) pool.deinit();
 
-        if (notification_receiver.wake_failed.swap(false, .acq_rel)) {
-            notification_receiver.scheduled.store(false, .release);
-            if (try map_state.drainNotifications(state)) render_requested = true;
+        if (event_receiver.wake_failed.swap(false, .acq_rel)) {
+            event_receiver.scheduled.store(false, .release);
+            if (try map_state.drainEvents(state)) render_requested = true;
         }
 
         var event: c.SDL_Event = undefined;
         while (c.SDL_PollEvent(&event)) {
-            if (event.type == notification_receiver.event_type) {
-                notification_receiver.scheduled.store(false, .release);
-                if (try map_state.drainNotifications(state)) render_requested = true;
+            if (event.type == event_receiver.event_type) {
+                event_receiver.scheduled.store(false, .release);
+                if (try map_state.drainEvents(state)) render_requested = true;
                 continue;
             }
             switch (event.type) {
@@ -156,11 +156,12 @@ fn renderLoop(
                     current_viewport.* = viewport.get(window_handle);
                     viewport.log("resized viewport", current_viewport.*);
                     try target.resize(current_viewport.*);
-                    _ = try state.map.resize(
+                    var resize_completion = try state.map.resize(
                         current_viewport.logical_width,
                         current_viewport.logical_height,
                         current_viewport.scale_factor,
                     );
+                    resize_completion.deinit();
                     render_requested = true;
                 },
                 else => {

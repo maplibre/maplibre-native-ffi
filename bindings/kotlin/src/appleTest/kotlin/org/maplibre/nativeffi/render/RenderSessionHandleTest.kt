@@ -9,10 +9,12 @@ import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ObjCObject
 import kotlinx.cinterop.objcPtr
 import kotlinx.cinterop.toLong
+import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.CameraUpdate
 import org.maplibre.nativeffi.camera.CameraUpdateMode
+import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.geo.ScreenBox
 import org.maplibre.nativeffi.geo.ScreenPoint
@@ -23,7 +25,6 @@ import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
-import org.maplibre.nativeffi.runtime.OperationHandle
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
 import platform.Metal.MTLCreateSystemDefaultDevice
@@ -31,23 +32,24 @@ import platform.Metal.MTLCreateSystemDefaultDevice
 @OptIn(BetaInteropApi::class, ExperimentalForeignApi::class)
 class RenderSessionHandleTest {
   @Test
-  fun callerDriverAttachDemandFrameLeaseAndDetachUseOperations(): Unit =
+  fun callerDriverAttachDemandFrameLeaseAndDetachUseFutures(): Unit =
     org.maplibre.nativeffi.runtime.runSuspendTest {
       val device = MTLCreateSystemDefaultDevice() ?: return@runSuspendTest
       val runtime = RuntimeHandle.create(RuntimeOptions())
       try {
         val map =
           MapHandle.create(
-            runtime,
-            MapOptions().apply {
-              width = 32
-              height = 16
-              mapMode = MapMode.CONTINUOUS
-            },
-          )
+              runtime,
+              MapOptions().apply {
+                width = 32
+                height = 16
+                mapMode = MapMode.CONTINUOUS
+              },
+            )
+            .await()
         try {
-          map.setStyleJson(EMPTY_STYLE.encodeToByteArray())
-          runtime.barrier()
+          map.setStyleJson(EMPTY_STYLE.encodeToByteArray()).await()
+          runtime.barrier().await()
           val attachment =
             map.attachMetalOwnedTexture(
               MetalOwnedTextureDescriptor(
@@ -61,7 +63,7 @@ class RenderSessionHandleTest {
             )
           val session = attachment.session
           try {
-            completeOnDriver(session, attachment.operation)
+            completeOnDriver(session, attachment.completed)
             assertEquals(RenderDriver.CALLER_GRAPHICS_THREAD, session.capabilities().driver)
             assertEquals(2, session.capabilities().textureRingDepth)
 
@@ -82,8 +84,8 @@ class RenderSessionHandleTest {
               assertTrue(frame.isReleased)
             }
 
-            completeOnDriver(session, session.startBarrier())
-            completeOnDriver(session, session.startDetach())
+            completeOnDriver(session, session.barrier())
+            completeOnDriver(session, session.detach())
             assertEquals(RenderSessionState.DETACHED, session.snapshot().state)
           } finally {
             if (session.snapshot().state != RenderSessionState.DETACHED) {
@@ -107,16 +109,17 @@ class RenderSessionHandleTest {
       try {
         val map =
           MapHandle.create(
-            runtime,
-            MapOptions().apply {
-              width = 32
-              height = 16
-              mapMode = MapMode.CONTINUOUS
-            },
-          )
+              runtime,
+              MapOptions().apply {
+                width = 32
+                height = 16
+                mapMode = MapMode.CONTINUOUS
+              },
+            )
+            .await()
         try {
-          map.setStyleJson(EMPTY_STYLE.encodeToByteArray())
-          runtime.barrier()
+          map.setStyleJson(EMPTY_STYLE.encodeToByteArray()).await()
+          runtime.barrier().await()
           val attachment =
             map.attachMetalOwnedTexture(
               MetalOwnedTextureDescriptor(
@@ -127,7 +130,7 @@ class RenderSessionHandleTest {
             )
           val session = attachment.session
           try {
-            completeOnDriver(session, attachment.operation)
+            completeOnDriver(session, attachment.completed)
 
             // Render until the map settles: the last frame asks for no repaint.
             var settled: RenderFrameResult? = null
@@ -140,14 +143,16 @@ class RenderSessionHandleTest {
             }
             assertEquals(RenderResult.RENDERED, assertNotNull(settled).disposition)
 
-            map.updateCamera(
-              CameraUpdate(
-                mode = CameraUpdateMode.EASE,
-                camera = CameraOptions().apply { zoom = 4.0 },
-                animation = AnimationOptions().apply { durationMs = 60_000.0 },
+            map
+              .updateCamera(
+                CameraUpdate(
+                  mode = CameraUpdateMode.EASE,
+                  camera = CameraOptions().apply { zoom = 4.0 },
+                  animation = AnimationOptions().apply { durationMs = 60_000.0 },
+                )
               )
-            )
-            runtime.barrier()
+              .await()
+            runtime.barrier().await()
 
             var sawRepaintRequest = false
             for (attempt in 0 until 500) {
@@ -159,7 +164,7 @@ class RenderSessionHandleTest {
             }
             assertTrue(sawRepaintRequest)
 
-            completeOnDriver(session, session.startDetach())
+            completeOnDriver(session, session.detach())
           } finally {
             if (session.snapshot().state != RenderSessionState.DETACHED) {
               runCatching { session.abandon() }
@@ -191,16 +196,17 @@ class RenderSessionHandleTest {
       try {
         val map =
           MapHandle.create(
-            runtime,
-            MapOptions().apply {
-              width = 8
-              height = 8
-              mapMode = MapMode.CONTINUOUS
-            },
-          )
+              runtime,
+              MapOptions().apply {
+                width = 8
+                height = 8
+                mapMode = MapMode.CONTINUOUS
+              },
+            )
+            .await()
         try {
-          map.setStyleJson(EMPTY_STYLE.encodeToByteArray())
-          runtime.barrier()
+          map.setStyleJson(EMPTY_STYLE.encodeToByteArray()).await()
+          runtime.barrier().await()
           val attachment =
             map.attachMetalOwnedTexture(
               MetalOwnedTextureDescriptor(
@@ -210,23 +216,22 @@ class RenderSessionHandleTest {
               RenderSessionAttachOptions(driver = RenderDriver.CALLER_GRAPHICS_THREAD),
             )
           val session = attachment.session
-          completeOnDriver(session, attachment.operation)
+          completeOnDriver(session, attachment.completed)
           try {
 
             session.requestFrame(FrameDemand(ifNeeded = false))
             session.serviceDriverWork()
             assertEquals(RenderResult.RENDERED, session.drainFrameResults().single().disposition)
             val frame = assertNotNull(session.acquireFrame())
-            val pending = session.startReduceMemoryUse()
+            val pending = session.reduceMemoryUse()
             val abandoned = session.abandon()
             assertTrue(
               abandoned.disposition == RenderAbandonDisposition.CLEAN ||
                 abandoned.disposition == RenderAbandonDisposition.QUARANTINED
             )
-            pending.use {
-              assertTrue(it.waitForCompletion(-1))
-              assertEquals(MaplibreStatus.TARGET_LOST, it.terminalStatus())
-            }
+            val failure = runCatching { pending.await() }.exceptionOrNull()
+            assertTrue(failure is MaplibreException)
+            assertEquals(MaplibreStatus.TARGET_LOST, failure.status)
             frame.release()
             assertTrue(frame.isReleased)
             assertEquals(RenderSessionState.ABANDONED, session.snapshot().state)
@@ -252,16 +257,17 @@ class RenderSessionHandleTest {
       try {
         val map =
           MapHandle.create(
-            runtime,
-            MapOptions().apply {
-              width = 32
-              height = 16
-              mapMode = MapMode.CONTINUOUS
-            },
-          )
+              runtime,
+              MapOptions().apply {
+                width = 32
+                height = 16
+                mapMode = MapMode.CONTINUOUS
+              },
+            )
+            .await()
         try {
-          map.setStyleJson(QUERY_STYLE.encodeToByteArray())
-          runtime.barrier()
+          map.setStyleJson(QUERY_STYLE.encodeToByteArray()).await()
+          runtime.barrier().await()
           val attachment =
             map.attachMetalOwnedTexture(
               MetalOwnedTextureDescriptor(
@@ -272,7 +278,7 @@ class RenderSessionHandleTest {
             )
           val session = attachment.session
           try {
-            completeOnDriver(session, attachment.operation)
+            completeOnDriver(session, attachment.completed)
 
             // An over-covering box queries everything visible in the viewport.
             val geometry =
@@ -287,7 +293,7 @@ class RenderSessionHandleTest {
             for (attempt in 0 until 500) {
               renderOneFrame(session)
               rendered =
-                takeFeaturesOnDriver(session, session.startQueryRenderedFeatures(geometry, options))
+                takeFeaturesOnDriver(session, session.queryRenderedFeatures(geometry, options))
                   .firstOrNull()
               if (rendered != null) break
             }
@@ -299,7 +305,7 @@ class RenderSessionHandleTest {
             val source =
               takeFeaturesOnDriver(
                   session,
-                  session.startQuerySourceFeatures(
+                  session.querySourceFeatures(
                     "point",
                     SourceFeatureQueryOptions().apply {
                       filter = """["==",["get","kind"],"capital"]""".encodeToByteArray()
@@ -310,7 +316,7 @@ class RenderSessionHandleTest {
             assertEquals("point", source.sourceId)
             assertTrue(source.feature.decodeToString().contains("\"kind\":\"capital\""))
 
-            completeOnDriver(session, session.startDetach())
+            completeOnDriver(session, session.detach())
           } finally {
             if (session.snapshot().state != RenderSessionState.DETACHED) {
               runCatching { session.abandon() }
@@ -325,20 +331,17 @@ class RenderSessionHandleTest {
       }
     }
 
-  private fun takeFeaturesOnDriver(
+  private suspend fun takeFeaturesOnDriver(
     session: RenderSessionHandle,
-    operation: OperationHandle<List<QueriedFeature>>,
-  ): List<QueriedFeature> = operation.use {
-    while (!it.poll()) session.serviceDriverWork()
-    assertEquals(MaplibreStatus.OK, it.terminalStatus(), it.diagnostic())
-    session.takeQueryFeaturesResult(it)
-  }
+    completion: Deferred<List<QueriedFeature>>,
+  ): List<QueriedFeature> = completeOnDriver(session, completion)
 
-  private fun completeOnDriver(session: RenderSessionHandle, operation: OperationHandle<*>) {
-    operation.use {
-      while (!it.poll()) session.serviceDriverWork()
-      assertEquals(MaplibreStatus.OK, it.terminalStatus(), it.diagnostic())
-    }
+  private suspend fun <T> completeOnDriver(
+    session: RenderSessionHandle,
+    completion: Deferred<T>,
+  ): T {
+    while (!completion.isCompleted) session.serviceDriverWork()
+    return completion.await()
   }
 
   private fun ObjCObject.address(): Long = objcPtr().toLong()

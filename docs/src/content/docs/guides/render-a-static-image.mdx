@@ -17,9 +17,10 @@ the completed texture.
 ## Request one image
 
 Create the map and target with the required logical extent. Start attachment and
-retain both the returned attaching session and operation. This snippet uses
-private OpenGL through EGL, so the native core worker creates and owns its
-context. The host keeps the EGL display initialized until detach completes.
+retain the returned attaching session until its completion callback runs. This
+snippet uses private OpenGL through EGL, so the native core worker creates and
+owns its context. The host keeps the EGL display initialized until detach
+completes.
 
 <Code code={region(stillImage, "create")} lang="c" title="still-image.c" />
 
@@ -28,17 +29,17 @@ context. The host keeps the EGL display initialized until detach completes.
 Submit one frame demand with a token that identifies the job. A core-worker
 target needs no host graphics service.
 
-Drain frame results until the matching token reaches a terminal disposition. A
-rendered disposition supplies the frame generation for readback. Handle target
-not ready according to the target's readiness source. No update and size pending
-wait for a newer map update or matching extent generation.
+The frame wake schedules a host turn. Drain every queued result in that turn and
+continue until the matching token has a rendered disposition and the still-image
+completion has run. No update and size pending require a newer map update or a
+matching extent generation.
 
 <Code code={region(stillImage, "await")} lang="c" title="still-image.c" />
 
 ## Read the pixels
 
-Start readback after the rendered result. Readback is an operation routed
-through the selected driver. Taking the result transfers owned premultiplied
-RGBA8 bytes and their width, height, row stride, and byte length.
+Start readback after the rendered result. Its completion borrows premultiplied
+RGBA8 bytes and their width, height, row stride, and byte length. Copy the bytes
+before the callback returns.
 
 <Code code={region(stillImage, "read")} lang="c" title="still-image.c" />

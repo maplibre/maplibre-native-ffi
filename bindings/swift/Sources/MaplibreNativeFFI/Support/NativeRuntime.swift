@@ -11,15 +11,6 @@ enum NativeRuntime {
     }
   }
 
-  static func barrierStart(_ runtime: NativeRuntimeHandle) throws
-    -> NativeOperationHandle
-  {
-    let raw = try NativeMemory.withTemporary(mln_operation(0)) { operation in
-      try checkStatus(mln_runtime_barrier_start(runtime.raw, operation))
-    }.value
-    return NativeOperationHandle(raw: raw)
-  }
-
   static func release(_ runtime: NativeRuntimeHandle) throws {
     try checkStatus(mln_runtime_release(runtime.raw))
   }

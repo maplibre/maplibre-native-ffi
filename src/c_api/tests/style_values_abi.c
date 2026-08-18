@@ -8,96 +8,61 @@
 #define VIEW(text) ((mln_buffer_view){.data = (text), .size = sizeof(text) - 1})
 
 static bool source_exists(mln_runtime runtime, mln_map map, const char* id) {
-  mln_operation operation = MLN_HANDLE_NULL;
+  (void)runtime;
+  mln_test_completion completion =
+    mln_test_completion_default(sizeof(mln_style_source_info));
   const mln_buffer_view view = {.data = id, .size = strlen(id)};
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_get_style_source_info_start(map, view, &operation)
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
-  mln_style_source_info info = {.size = sizeof(mln_style_source_info)};
-  bool found = false;
-  TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_map_get_style_source_info_take_result(operation, &info, &found)
+    mln_map_get_style_source_info(map, view, &completion.descriptor)
   );
-  mln_operation_release(operation);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
+  const bool found = mln_test_completion_value_count(&completion) == 1;
+  mln_test_completion_destroy(&completion);
   return found;
 }
 
 static bool image_exists(mln_runtime runtime, mln_map map, const char* id) {
-  mln_operation operation = MLN_HANDLE_NULL;
+  (void)runtime;
+  mln_test_completion completion =
+    mln_test_completion_default(sizeof(mln_style_image_info));
   const mln_buffer_view view = {.data = id, .size = strlen(id)};
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_get_style_image_info_start(map, view, &operation)
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
-  mln_style_image_info info = {.size = sizeof(mln_style_image_info)};
-  bool found = false;
-  TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_map_get_style_image_info_take_result(operation, &info, &found)
+    mln_map_get_style_image_info(map, view, &completion.descriptor)
   );
-  mln_operation_release(operation);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
+  const bool found = mln_test_completion_value_count(&completion) == 1;
+  mln_test_completion_destroy(&completion);
   return found;
 }
 
-static const mln_runtime_event* event_at(
-  const mln_runtime_event_batch_view* view, size_t index
-) {
-  return (const mln_runtime_event*)((const char*)view->events +
-                                    (index * view->event_size));
-}
+#define EXPECT_STYLE_COMMAND(terminal_status, expression)            \
+  do {                                                               \
+    mln_test_completion completion = mln_test_completion_default(0); \
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, (expression));              \
+    TEST_ASSERT_EQUAL_INT(                                           \
+      (terminal_status), mln_test_completion_finish(&completion)     \
+    );                                                               \
+    mln_test_completion_destroy(&completion);                        \
+  } while (false)
 
-// Drains the queue until it empties and asserts the COMMAND_FINISHED event for
-// command_id carries the expected disposition, code, generation contract, and,
-// when message_fragment is non-NULL, a diagnostic containing it.
-static void expect_command_finished(
-  mln_runtime runtime, uint64_t command_id, uint32_t disposition,
-  mln_status code, const char* message_fragment
-) {
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
-  bool found = false;
-  for (;;) {
-    mln_test_event_batch batch = mln_test_event_batch_default();
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_test_drain_events(runtime, &batch)
-    );
-    if (batch.event_count == 0) {
-      break;
-    }
-    for (size_t index = 0; index < batch.event_count; index += 1) {
-      const mln_runtime_event* event =
-        (const mln_runtime_event*)((const char*)batch.events +
-                                   (index * batch.event_size));
-      if (
-        event->type != MLN_RUNTIME_EVENT_COMMAND_FINISHED ||
-        event->payload.command_finished.command_id != command_id
-      ) {
-        continue;
-      }
-      found = true;
-      TEST_ASSERT_EQUAL_UINT32(
-        disposition, event->payload.command_finished.disposition
-      );
-      TEST_ASSERT_EQUAL_INT(code, event->code);
-      if (disposition == MLN_COMMAND_DISPOSITION_COMMITTED) {
-        TEST_ASSERT_NOT_EQUAL(0, event->payload.command_finished.generation);
-      } else {
-        TEST_ASSERT_EQUAL_UINT64(0, event->payload.command_finished.generation);
-      }
-      if (message_fragment != NULL) {
-        char message[256] = {0};
-        size_t copied = event->message_size;
-        if (copied > sizeof(message) - 1) {
-          copied = sizeof(message) - 1;
-        }
-        memcpy(message, batch.messages + event->message_offset, copied);
-        TEST_ASSERT_NOT_NULL(strstr(message, message_fragment));
-      }
-    }
-  }
-  TEST_ASSERT_TRUE(found);
-}
+#define EXPECT_STYLE_COMMAND_FAILED(terminal_status, fragment, expression) \
+  do {                                                                     \
+    mln_test_completion completion = mln_test_completion_default(0);       \
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, (expression));                    \
+    TEST_ASSERT_EQUAL_INT(                                                 \
+      (terminal_status), mln_test_completion_finish(&completion)           \
+    );                                                                     \
+    TEST_ASSERT_EQUAL_UINT32(                                              \
+      MLN_COMMAND_DISPOSITION_FAILED,                                      \
+      mln_test_completion_disposition(&completion)                         \
+    );                                                                     \
+    TEST_ASSERT_NOT_NULL(                                                  \
+      strstr(mln_test_completion_diagnostic(&completion), (fragment))      \
+    );                                                                     \
+    mln_test_completion_destroy(&completion);                              \
+  } while (false)
 
 static void style_command_deep_copies_and_ordered_read_observes_it(void) {
   mln_runtime runtime = mln_test_create_runtime();
@@ -106,15 +71,13 @@ static void style_command_deep_copies_and_ordered_read_observes_it(void) {
   char json[] =
     "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\","
     "\"features\":[]}}";
-  uint64_t command = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_add_style_source_json(
-      map, (mln_buffer_view){.data = id, .size = strlen(id)},
-      (mln_buffer_view){.data = json, .size = strlen(json)}, &command
-    )
+  EXPECT_STYLE_COMMAND(
+    MLN_STATUS_OK, mln_map_add_style_source_json(
+                     map, (mln_buffer_view){.data = id, .size = strlen(id)},
+                     (mln_buffer_view){.data = json, .size = strlen(json)},
+                     &completion.descriptor
+                   )
   );
-  TEST_ASSERT_NOT_EQUAL(0, command);
   memset(id, 'x', strlen(id));
   memset(json, ' ', strlen(json));
   TEST_ASSERT_TRUE(source_exists(runtime, map, "owned-source"));
@@ -130,102 +93,27 @@ static void duplicate_id_is_an_async_failed_terminal_event(void) {
     "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\","
     "\"features\":[]}}"
   );
-  uint64_t first = 0;
-  uint64_t duplicate = 0;
+  EXPECT_STYLE_COMMAND(
+    MLN_STATUS_OK,
+    mln_map_add_style_source_json(map, id, json, &completion.descriptor)
+  );
+  mln_test_completion duplicate = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_add_style_source_json(map, id, json, &first)
+    MLN_STATUS_OK,
+    mln_map_add_style_source_json(map, id, json, &duplicate.descriptor)
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_add_style_source_json(map, id, json, &duplicate)
+    MLN_STATUS_INVALID_ARGUMENT, mln_test_completion_finish(&duplicate)
   );
-  TEST_ASSERT_TRUE(duplicate > first);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
-  mln_event_batch batch = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_runtime_drain_events(runtime, &batch)
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_COMMAND_DISPOSITION_FAILED, mln_test_completion_disposition(&duplicate)
   );
-  mln_runtime_event_batch_view view = {
-    .size = sizeof(mln_runtime_event_batch_view)
-  };
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_event_batch_get(batch, &view));
-  bool saw_failure = false;
-  for (size_t index = 0; index < view.event_count; ++index) {
-    const mln_runtime_event* event = event_at(&view, index);
-    if (
-      event->type == MLN_RUNTIME_EVENT_COMMAND_FINISHED &&
-      event->payload.command_finished.command_id == duplicate
-    ) {
-      saw_failure = true;
-      TEST_ASSERT_EQUAL_UINT32(
-        MLN_COMMAND_DISPOSITION_FAILED,
-        event->payload.command_finished.disposition
-      );
-      TEST_ASSERT_EQUAL_INT(MLN_STATUS_INVALID_ARGUMENT, event->code);
-      TEST_ASSERT_EQUAL_UINT64(0, event->payload.command_finished.generation);
-    }
-  }
-  TEST_ASSERT_TRUE(saw_failure);
-  mln_event_batch_release(batch);
+  mln_test_completion_destroy(&duplicate);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
 
-static void typed_take_and_finish_consume_operations(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_operation operation = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_list_style_source_ids_start(map, &operation)
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
-  mln_style_id_list list = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_list_style_source_ids_take_result(operation, &list)
-  );
-  TEST_ASSERT_NOT_EQUAL(MLN_HANDLE_NULL, list);
-  mln_style_id_list_destroy(list);
-
-  operation = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_list_style_source_ids_start(map, &operation)
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_operation_finish(operation));
-  list = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_list_style_source_ids_take_result(operation, &list)
-  );
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, list);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
-static void wrong_typed_take_does_not_consume_result(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_operation operation = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_list_style_source_ids_start(map, &operation)
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
-  mln_style_source_info info = {.size = sizeof(mln_style_source_info)};
-  bool found = false;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_get_style_source_info_take_result(operation, &info, &found)
-  );
-  mln_style_id_list list = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_list_style_source_ids_take_result(operation, &list)
-  );
-  mln_style_id_list_destroy(list);
-  mln_operation_release(operation);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
-static void coordinate_size_probe_preserves_typed_result(void) {
+static void image_source_coordinates_are_borrowed_by_the_completion(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   const mln_lat_lng coordinates[4] = {
@@ -234,73 +122,58 @@ static void coordinate_size_probe_preserves_typed_result(void) {
     {.latitude = 0.0, .longitude = 3.0},
     {.latitude = 0.0, .longitude = 2.0},
   };
-  uint64_t command = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_add_image_source_url(
-                     map, VIEW("probe-image"), coordinates, 4,
-                     VIEW("https://example.invalid/image.png"), &command
-                   )
+  EXPECT_STYLE_COMMAND(
+    MLN_STATUS_OK,
+    mln_map_add_image_source_url(
+      map, VIEW("probe-image"), coordinates, 4,
+      VIEW("https://example.invalid/image.png"), &completion.descriptor
+    )
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
 
-  mln_operation operation = MLN_HANDLE_NULL;
+  mln_test_completion completion =
+    mln_test_completion_default(sizeof(coordinates));
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_get_image_source_coordinates_start(
-                     map, VIEW("probe-image"), &operation
+    MLN_STATUS_OK, mln_map_get_image_source_coordinates(
+                     map, VIEW("probe-image"), &completion.descriptor
                    )
   );
-  bool completed = false;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_operation_wait(operation, -1, &completed)
-  );
-  TEST_ASSERT_TRUE(completed);
-  size_t count = 0;
-  bool found = false;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_get_image_source_coordinates_take_result(
-                     operation, NULL, 0, &count, &found
-                   )
-  );
-  TEST_ASSERT_TRUE(found);
-  TEST_ASSERT_EQUAL_size_t(4, count);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
+  TEST_ASSERT_EQUAL_size_t(4, mln_test_completion_value_count(&completion));
   mln_lat_lng copied[4] = {0};
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_get_image_source_coordinates_take_result(
-                     operation, copied, 4, &count, &found
-                   )
+  TEST_ASSERT_TRUE(
+    mln_test_completion_copy_value(&completion, copied, sizeof(copied))
   );
   TEST_ASSERT_EQUAL_MEMORY(coordinates, copied, sizeof(coordinates));
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_get_image_source_coordinates_take_result(
-      operation, copied, 4, &count, &found
-    )
-  );
-
-  operation = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_get_image_source_coordinates_start(
-                     map, VIEW("probe-image"), &operation
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_get_image_source_coordinates_take_result(
-      operation, NULL, 4, &count, &found
-    )
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_get_image_source_coordinates_take_result(
-                     operation, copied, 4, &count, &found
-                   )
-  );
-  mln_operation_release(operation);
+  mln_test_completion_destroy(&completion);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
 
-static void stretch_size_probe_preserves_typed_result(void) {
+typedef struct stretch_probe {
+  atomic_bool done;
+  mln_status status;
+  mln_image_stretch x;
+  mln_image_stretch y;
+  size_t x_count;
+  size_t y_count;
+} stretch_probe;
+
+static void copy_stretches(
+  void* user_data, const mln_completion_result* result
+) {
+  stretch_probe* probe = user_data;
+  probe->status = result->status;
+  if (result->value_count == 1) {
+    const mln_style_image_stretches_result* stretches = result->value;
+    probe->x_count = stretches->stretch_x_count;
+    probe->y_count = stretches->stretch_y_count;
+    if (probe->x_count != 0) probe->x = stretches->stretch_x[0];
+    if (probe->y_count != 0) probe->y = stretches->stretch_y[0];
+  }
+  atomic_store(&probe->done, true);
+}
+
+static void style_image_stretches_are_borrowed_by_the_completion(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   const uint8_t pixel[4] = {0, 0, 0, 0};
@@ -319,48 +192,32 @@ static void stretch_size_probe_preserves_typed_result(void) {
   options.stretch_x_count = 1;
   options.stretch_y = &stretch_y;
   options.stretch_y_count = 1;
-  uint64_t command = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_style_image(
-                     map, VIEW("probe-stretches"), &image, &options, &command
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
-
-  mln_operation operation = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_copy_style_image_stretches_start(
-                     map, VIEW("probe-stretches"), &operation
-                   )
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
-  size_t x_count = 0;
-  size_t y_count = 0;
-  bool found = false;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_copy_style_image_stretches_take_result(
-                     operation, NULL, 0, &x_count, NULL, 0, &y_count, &found
-                   )
-  );
-  TEST_ASSERT_TRUE(found);
-  TEST_ASSERT_EQUAL_size_t(1, x_count);
-  TEST_ASSERT_EQUAL_size_t(1, y_count);
-  mln_image_stretch copied_x = {0};
-  mln_image_stretch copied_y = {0};
-  TEST_ASSERT_EQUAL_INT(
+  EXPECT_STYLE_COMMAND(
     MLN_STATUS_OK,
-    mln_map_copy_style_image_stretches_take_result(
-      operation, &copied_x, 1, &x_count, &copied_y, 1, &y_count, &found
+    mln_map_set_style_image(
+      map, VIEW("probe-stretches"), &image, &options, &completion.descriptor
     )
   );
-  TEST_ASSERT_EQUAL_MEMORY(&stretch_x, &copied_x, sizeof(stretch_x));
-  TEST_ASSERT_EQUAL_MEMORY(&stretch_y, &copied_y, sizeof(stretch_y));
+
+  stretch_probe probe = {.status = MLN_STATUS_INVALID_STATE};
+  atomic_init(&probe.done, false);
+  const mln_completion completion = {
+    .size = sizeof(mln_completion),
+    .callback = copy_stretches,
+    .user_data = &probe,
+  };
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_copy_style_image_stretches_take_result(
-      operation, &copied_x, 1, &x_count, &copied_y, 1, &y_count, &found
-    )
+    MLN_STATUS_OK, mln_map_copy_style_image_stretches(
+                     map, VIEW("probe-stretches"), &completion
+                   )
   );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
+  TEST_ASSERT_TRUE(atomic_load(&probe.done));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.status);
+  TEST_ASSERT_EQUAL_size_t(1, probe.x_count);
+  TEST_ASSERT_EQUAL_size_t(1, probe.y_count);
+  TEST_ASSERT_EQUAL_MEMORY(&stretch_x, &probe.x, sizeof(stretch_x));
+  TEST_ASSERT_EQUAL_MEMORY(&stretch_y, &probe.y, sizeof(stretch_y));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -372,41 +229,44 @@ static void remove_commands_commit_and_report_missing_ids(void) {
     "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\","
     "\"features\":[]}}"
   );
-  uint64_t command = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_add_style_source_json(map, VIEW("doomed-source"), json, &command)
+  EXPECT_STYLE_COMMAND(
+    MLN_STATUS_OK, mln_map_add_style_source_json(
+                     map, VIEW("doomed-source"), json, &completion.descriptor
+                   )
   );
 
-  command = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_remove_style_source(map, VIEW("doomed-source"), &command)
-  );
-  expect_command_finished(
-    runtime, command, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, NULL
+  EXPECT_STYLE_COMMAND(
+    MLN_STATUS_OK, mln_map_remove_style_source(
+                     map, VIEW("doomed-source"), &completion.descriptor
+                   )
   );
   TEST_ASSERT_FALSE(source_exists(runtime, map, "doomed-source"));
 
-  command = 0;
+  mln_test_completion missing = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_map_remove_style_source(map, VIEW("doomed-source"), &command)
+    mln_map_remove_style_source(map, VIEW("doomed-source"), &missing.descriptor)
   );
-  expect_command_finished(
-    runtime, command, MLN_COMMAND_DISPOSITION_FAILED, MLN_STATUS_NOT_FOUND,
-    "doomed-source"
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_NOT_FOUND, mln_test_completion_finish(&missing)
   );
+  TEST_ASSERT_NOT_NULL(
+    strstr(mln_test_completion_diagnostic(&missing), "doomed-source")
+  );
+  mln_test_completion_destroy(&missing);
 
-  command = 0;
+  missing = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_map_remove_style_layer(map, VIEW("missing-layer"), &command)
+    mln_map_remove_style_layer(map, VIEW("missing-layer"), &missing.descriptor)
   );
-  expect_command_finished(
-    runtime, command, MLN_COMMAND_DISPOSITION_FAILED, MLN_STATUS_NOT_FOUND,
-    "missing-layer"
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_NOT_FOUND, mln_test_completion_finish(&missing)
   );
+  TEST_ASSERT_NOT_NULL(
+    strstr(mln_test_completion_diagnostic(&missing), "missing-layer")
+  );
+  mln_test_completion_destroy(&missing);
 
   const uint8_t pixel[4] = {0, 0, 0, 0};
   mln_premultiplied_rgba8_image image = mln_premultiplied_rgba8_image_default();
@@ -416,56 +276,61 @@ static void remove_commands_commit_and_report_missing_ids(void) {
   image.pixels = pixel;
   image.byte_length = sizeof(pixel);
   mln_style_image_options options = mln_style_image_options_default();
-  command = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_style_image(
-                     map, VIEW("doomed-image"), &image, &options, &command
-                   )
+  EXPECT_STYLE_COMMAND(
+    MLN_STATUS_OK,
+    mln_map_set_style_image(
+      map, VIEW("doomed-image"), &image, &options, &completion.descriptor
+    )
   );
 
-  command = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_remove_style_image(map, VIEW("doomed-image"), &command)
-  );
-  expect_command_finished(
-    runtime, command, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, NULL
+  EXPECT_STYLE_COMMAND(
+    MLN_STATUS_OK, mln_map_remove_style_image(
+                     map, VIEW("doomed-image"), &completion.descriptor
+                   )
   );
   TEST_ASSERT_FALSE(image_exists(runtime, map, "doomed-image"));
 
-  command = 0;
+  missing = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_map_remove_style_image(map, VIEW("doomed-image"), &command)
+    mln_map_remove_style_image(map, VIEW("doomed-image"), &missing.descriptor)
   );
-  expect_command_finished(
-    runtime, command, MLN_COMMAND_DISPOSITION_FAILED, MLN_STATUS_NOT_FOUND,
-    "doomed-image"
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_NOT_FOUND, mln_test_completion_finish(&missing)
   );
+  TEST_ASSERT_NOT_NULL(
+    strstr(mln_test_completion_diagnostic(&missing), "doomed-image")
+  );
+  mln_test_completion_destroy(&missing);
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
 
-// Takes one layer-info result for id after a runtime barrier, asserting the
-// operation itself succeeds, and returns whether the layer was found.
+// Copies one layer-info result from its completion.
 static bool take_layer_info(
   mln_runtime runtime, mln_map map, const char* id, mln_style_layer_info* info
 ) {
-  mln_operation operation = MLN_HANDLE_NULL;
+  (void)runtime;
+  mln_test_completion completion =
+    mln_test_completion_default(sizeof(mln_style_layer_result));
   const mln_buffer_view view = {.data = id, .size = strlen(id)};
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_get_style_layer_info_start(map, view, &operation)
+    MLN_STATUS_OK,
+    mln_map_get_style_layer_info(map, view, &completion.descriptor)
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
   memset(info, 0, sizeof(*info));
   info->size = sizeof(*info);
-  bool found = false;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_get_style_layer_info_take_result(operation, info, &found)
-  );
-  mln_operation_release(operation);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&completion));
+  const bool found = mln_test_completion_value_count(&completion) == 1;
+  if (found) {
+    mln_style_layer_result result = {0};
+    TEST_ASSERT_TRUE(
+      mln_test_completion_copy_value(&completion, &result, sizeof(result))
+    );
+    *info = result.info;
+  }
+  mln_test_completion_destroy(&completion);
   return found;
 }
 
@@ -479,20 +344,19 @@ static void layer_info_reports_scalars_and_sizes_the_source_id_copy(void) {
     "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\","
     "\"features\":[]}}"
   );
-  uint64_t command = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_add_style_source_json(map, VIEW("info-source"), json, &command)
+  EXPECT_STYLE_COMMAND(
+    MLN_STATUS_OK, mln_map_add_style_source_json(
+                     map, VIEW("info-source"), json, &completion.descriptor
+                   )
   );
-  command = 0;
-  TEST_ASSERT_EQUAL_INT(
+  EXPECT_STYLE_COMMAND(
     MLN_STATUS_OK, mln_map_add_style_layer_json(
                      map,
                      VIEW(
                        "{\"id\":\"info-layer\",\"type\":\"circle\",\"source\":"
                        "\"info-source\"}"
                      ),
-                     VIEW(""), &command
+                     VIEW(""), &completion.descriptor
                    )
   );
   TEST_ASSERT_TRUE(take_layer_info(runtime, map, "info-layer", &info));
@@ -505,28 +369,27 @@ static void layer_info_reports_scalars_and_sizes_the_source_id_copy(void) {
   TEST_ASSERT_EQUAL_DOUBLE(-INFINITY, info.min_zoom);
   TEST_ASSERT_EQUAL_DOUBLE(INFINITY, info.max_zoom);
 
-  command = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_set_layer_min_zoom(map, VIEW("info-layer"), 3.0, &command)
-  );
-  command = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_set_layer_max_zoom(map, VIEW("info-layer"), 12.0, &command)
-  );
-  command = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_set_layer_visibility(
-      map, VIEW("info-layer"), MLN_STYLE_LAYER_VISIBILITY_NONE, &command
-    )
-  );
-  command = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_layer_source_layer(
-                     map, VIEW("info-layer"), VIEW("roads"), &command
+  EXPECT_STYLE_COMMAND(
+    MLN_STATUS_OK, mln_map_set_layer_min_zoom(
+                     map, VIEW("info-layer"), 3.0, &completion.descriptor
                    )
+  );
+  EXPECT_STYLE_COMMAND(
+    MLN_STATUS_OK, mln_map_set_layer_max_zoom(
+                     map, VIEW("info-layer"), 12.0, &completion.descriptor
+                   )
+  );
+  EXPECT_STYLE_COMMAND(
+    MLN_STATUS_OK, mln_map_set_layer_visibility(
+                     map, VIEW("info-layer"), MLN_STYLE_LAYER_VISIBILITY_NONE,
+                     &completion.descriptor
+                   )
+  );
+  EXPECT_STYLE_COMMAND(
+    MLN_STATUS_OK,
+    mln_map_set_layer_source_layer(
+      map, VIEW("info-layer"), VIEW("roads"), &completion.descriptor
+    )
   );
   TEST_ASSERT_TRUE(take_layer_info(runtime, map, "info-layer", &info));
   TEST_ASSERT_EQUAL_DOUBLE(3.0, info.min_zoom);
@@ -540,23 +403,22 @@ static void layer_info_reports_scalars_and_sizes_the_source_id_copy(void) {
   TEST_ASSERT_EQUAL_size_t(strlen("roads"), info.source_layer_size);
 
   // The reported source ID length sizes the copy operation's result exactly.
-  mln_operation operation = MLN_HANDLE_NULL;
+  mln_test_completion source_completion = mln_test_completion_buffer_view();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_copy_layer_source_id_start(map, VIEW("info-layer"), &operation)
-  );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
-  mln_buffer source_id = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_copy_layer_source_id_take_result(operation, &source_id)
+    MLN_STATUS_OK, mln_map_copy_layer_source_id(
+                     map, VIEW("info-layer"), &source_completion.descriptor
+                   )
   );
   mln_buffer_view copied = {0};
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_buffer_get(source_id, &copied));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_completion_finish(&source_completion)
+  );
+  TEST_ASSERT_TRUE(
+    mln_test_completion_copy_value(&source_completion, &copied, sizeof(copied))
+  );
   TEST_ASSERT_EQUAL_size_t(info.source_id_size, copied.size);
   TEST_ASSERT_EQUAL_MEMORY("info-source", copied.data, copied.size);
-  mln_buffer_destroy(source_id);
-  mln_operation_release(operation);
+  mln_test_completion_destroy(&source_completion);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -568,44 +430,33 @@ static void an_in_use_source_removal_fails_and_leaves_the_source(void) {
     "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\","
     "\"features\":[]}}"
   );
-  uint64_t command = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_add_style_source_json(map, VIEW("in-use"), json, &command)
+  EXPECT_STYLE_COMMAND(
+    MLN_STATUS_OK, mln_map_add_style_source_json(
+                     map, VIEW("in-use"), json, &completion.descriptor
+                   )
   );
-  command = 0;
-  TEST_ASSERT_EQUAL_INT(
+  EXPECT_STYLE_COMMAND(
     MLN_STATUS_OK,
     mln_map_add_style_layer_json(
       map, VIEW("{\"id\":\"user\",\"type\":\"circle\",\"source\":\"in-use\"}"),
-      VIEW(""), &command
+      VIEW(""), &completion.descriptor
     )
   );
 
-  command = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_remove_style_source(map, VIEW("in-use"), &command)
-  );
-  expect_command_finished(
-    runtime, command, MLN_COMMAND_DISPOSITION_FAILED, MLN_STATUS_INVALID_STATE,
-    "used by a layer"
+  EXPECT_STYLE_COMMAND_FAILED(
+    MLN_STATUS_INVALID_STATE, "used by a layer",
+    mln_map_remove_style_source(map, VIEW("in-use"), &completion.descriptor)
   );
   TEST_ASSERT_TRUE(source_exists(runtime, map, "in-use"));
 
-  command = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_remove_style_layer(map, VIEW("user"), &command)
-  );
-  expect_command_finished(
-    runtime, command, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, NULL
+  EXPECT_STYLE_COMMAND(
+    MLN_STATUS_OK,
+    mln_map_remove_style_layer(map, VIEW("user"), &completion.descriptor)
   );
 
-  command = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_remove_style_source(map, VIEW("in-use"), &command)
-  );
-  expect_command_finished(
-    runtime, command, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, NULL
+  EXPECT_STYLE_COMMAND(
+    MLN_STATUS_OK,
+    mln_map_remove_style_source(map, VIEW("in-use"), &completion.descriptor)
   );
   TEST_ASSERT_FALSE(source_exists(runtime, map, "in-use"));
   mln_test_destroy_map(map);
@@ -793,46 +644,33 @@ static void prepared_geojson_data_installs_and_checks_options(void) {
                    )
   );
 
-  uint64_t command = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_add_geojson_source_data(map, VIEW("plain"), plain_data, &command)
-  );
-  expect_command_finished(
-    runtime, command, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, NULL
-  );
-  command = 0;
-  TEST_ASSERT_EQUAL_INT(
+  EXPECT_STYLE_COMMAND(
     MLN_STATUS_OK, mln_map_add_geojson_source_data(
-                     map, VIEW("clustered"), clustered_data, &command
+                     map, VIEW("plain"), plain_data, &completion.descriptor
                    )
   );
-  expect_command_finished(
-    runtime, command, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, NULL
+  EXPECT_STYLE_COMMAND(
+    MLN_STATUS_OK,
+    mln_map_add_geojson_source_data(
+      map, VIEW("clustered"), clustered_data, &completion.descriptor
+    )
   );
 
   // Data prepared under different options tiles inconsistently with the
   // source, so the mismatch fails the command and names the source.
-  command = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_geojson_source_data(
-                     map, VIEW("clustered"), plain_data, &command
-                   )
-  );
-  expect_command_finished(
-    runtime, command, MLN_COMMAND_DISPOSITION_FAILED,
-    MLN_STATUS_INVALID_ARGUMENT, "do not match"
+  EXPECT_STYLE_COMMAND_FAILED(
+    MLN_STATUS_INVALID_ARGUMENT, "do not match",
+    mln_map_set_geojson_source_data(
+      map, VIEW("clustered"), plain_data, &completion.descriptor
+    )
   );
 
   // One prepared handle installs on any number of matching sources.
-  command = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_geojson_source_data(
-                     map, VIEW("clustered"), clustered_data, &command
-                   )
-  );
-  expect_command_finished(
-    runtime, command, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, NULL
+  EXPECT_STYLE_COMMAND(
+    MLN_STATUS_OK,
+    mln_map_set_geojson_source_data(
+      map, VIEW("clustered"), clustered_data, &completion.descriptor
+    )
   );
 
   // Cluster aggregations are part of the options match: a different
@@ -848,14 +686,11 @@ static void prepared_geojson_data_installs_and_checks_options(void) {
                      MLN_BUFFER_LITERAL(points), &aggregated, &aggregated_data
                    )
   );
-  command = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_add_geojson_source_data(
-                     map, VIEW("aggregated"), aggregated_data, &command
-                   )
-  );
-  expect_command_finished(
-    runtime, command, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, NULL
+  EXPECT_STYLE_COMMAND(
+    MLN_STATUS_OK,
+    mln_map_add_geojson_source_data(
+      map, VIEW("aggregated"), aggregated_data, &completion.descriptor
+    )
   );
   mln_geojson_source_options reaggregated = aggregated;
   reaggregated.cluster_properties =
@@ -867,15 +702,11 @@ static void prepared_geojson_data_installs_and_checks_options(void) {
       MLN_BUFFER_LITERAL(points), &reaggregated, &reaggregated_data
     )
   );
-  command = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_geojson_source_data(
-                     map, VIEW("aggregated"), reaggregated_data, &command
-                   )
-  );
-  expect_command_finished(
-    runtime, command, MLN_COMMAND_DISPOSITION_FAILED,
-    MLN_STATUS_INVALID_ARGUMENT, "do not match"
+  EXPECT_STYLE_COMMAND_FAILED(
+    MLN_STATUS_INVALID_ARGUMENT, "do not match",
+    mln_map_set_geojson_source_data(
+      map, VIEW("aggregated"), reaggregated_data, &completion.descriptor
+    )
   );
   mln_geojson_source_data_destroy(reaggregated_data);
   mln_geojson_source_options reformatted = aggregated;
@@ -887,68 +718,53 @@ static void prepared_geojson_data_installs_and_checks_options(void) {
                      MLN_BUFFER_LITERAL(points), &reformatted, &reformatted_data
                    )
   );
-  command = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_geojson_source_data(
-                     map, VIEW("aggregated"), reformatted_data, &command
-                   )
-  );
-  expect_command_finished(
-    runtime, command, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, NULL
+  EXPECT_STYLE_COMMAND(
+    MLN_STATUS_OK,
+    mln_map_set_geojson_source_data(
+      map, VIEW("aggregated"), reformatted_data, &completion.descriptor
+    )
   );
   mln_geojson_source_data_destroy(reformatted_data);
   mln_geojson_source_data_destroy(aggregated_data);
 
   // The submit-time lease keeps the prepared index alive, so the handle may
   // be destroyed as soon as the install command is submitted.
-  command = 0;
+  mln_test_completion install = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_map_set_geojson_source_data(map, VIEW("plain"), plain_data, &command)
+    MLN_STATUS_OK, mln_map_set_geojson_source_data(
+                     map, VIEW("plain"), plain_data, &install.descriptor
+                   )
   );
   mln_geojson_source_data_destroy(plain_data);
-  expect_command_finished(
-    runtime, command, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, NULL
-  );
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_finish(&install));
+  mln_test_completion_destroy(&install);
 
   // The runtime override takes a live GeoJSON source alone.
-  command = 0;
-  TEST_ASSERT_EQUAL_INT(
+  EXPECT_STYLE_COMMAND(
     MLN_STATUS_OK, mln_map_set_geojson_source_synchronous_tiling(
-                     map, VIEW("plain"), true, &command
+                     map, VIEW("plain"), true, &completion.descriptor
                    )
   );
-  expect_command_finished(
-    runtime, command, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, NULL
-  );
-  command = 0;
-  TEST_ASSERT_EQUAL_INT(
+  EXPECT_STYLE_COMMAND(
     MLN_STATUS_OK, mln_map_set_geojson_source_synchronous_tiling(
-                     map, VIEW("plain"), false, &command
+                     map, VIEW("plain"), false, &completion.descriptor
                    )
   );
-  expect_command_finished(
-    runtime, command, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK, NULL
-  );
-  command = 0;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_set_geojson_source_synchronous_tiling(
-                     map, VIEW("missing"), true, &command
-                   )
-  );
-  expect_command_finished(
-    runtime, command, MLN_COMMAND_DISPOSITION_FAILED,
-    MLN_STATUS_INVALID_ARGUMENT, "source does not exist"
+  EXPECT_STYLE_COMMAND_FAILED(
+    MLN_STATUS_INVALID_ARGUMENT, "source does not exist",
+    mln_map_set_geojson_source_synchronous_tiling(
+      map, VIEW("missing"), true, &completion.descriptor
+    )
   );
 
   // A released handle rejects new installs at submit, a second destroy is a
   // no-op, and installed sources keep their own reference.
   mln_geojson_source_data_destroy(plain_data);
   mln_geojson_source_data_destroy(MLN_HANDLE_NULL);
-  command = 0;
+  mln_completion rejected = mln_test_discard_completion();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_geojson_source_data(map, VIEW("plain"), plain_data, &command)
+    mln_map_set_geojson_source_data(map, VIEW("plain"), plain_data, &rejected)
   );
   TEST_ASSERT_TRUE(source_exists(runtime, map, "plain"));
   mln_geojson_source_data_destroy(clustered_data);
@@ -961,8 +777,6 @@ void run_style_values_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(style_command_deep_copies_and_ordered_read_observes_it);
   RUN_TEST(duplicate_id_is_an_async_failed_terminal_event);
-  RUN_TEST(typed_take_and_finish_consume_operations);
-  RUN_TEST(wrong_typed_take_does_not_consume_result);
   RUN_TEST(remove_commands_commit_and_report_missing_ids);
   RUN_TEST(an_in_use_source_removal_fails_and_leaves_the_source);
   RUN_TEST(geojson_source_data_create_rejects_unsafe_raw_values);
@@ -970,6 +784,6 @@ void run_style_values_abi_tests(void) {
   RUN_TEST(clustered_geojson_data_requires_a_feature_collection);
   RUN_TEST(prepared_geojson_data_installs_and_checks_options);
   RUN_TEST(layer_info_reports_scalars_and_sizes_the_source_id_copy);
-  RUN_TEST(coordinate_size_probe_preserves_typed_result);
-  RUN_TEST(stretch_size_probe_preserves_typed_result);
+  RUN_TEST(image_source_coordinates_are_borrowed_by_the_completion);
+  RUN_TEST(style_image_stretches_are_borrowed_by_the_completion);
 }

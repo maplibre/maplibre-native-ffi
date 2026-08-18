@@ -49,7 +49,7 @@ const QUERY_STYLE_JSON: &str = r##"{"version":8,"sources":{"point":{"type":"geoj
 #[cfg(mln_webgpu_backend)]
 const QUERY_STYLE_BACKGROUND_RGBA: [u8; 4] = [0xd8, 0xf1, 0xff, 0xff];
 const CLUSTER_BASE_STYLE_JSON: &str = r##"{"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#ffffff"}}]}"##;
-fn wait_until_completed<T>(session: &RenderSessionHandle, operation: &OperationHandle<T>) {
+fn wait_until_completed<T>(session: &RenderSessionHandle, operation: &NativeFuture<T>) {
     let deadline = Instant::now() + Duration::from_secs(5);
     while !operation.is_completed().unwrap() {
         let _ = session.service_driver_work(64);
@@ -59,17 +59,17 @@ fn wait_until_completed<T>(session: &RenderSessionHandle, operation: &OperationH
     maplibre_core::check(operation.terminal_status().unwrap()).unwrap();
 }
 
-fn wait_for_operation(session: &RenderSessionHandle, operation: &OperationHandle<()>) {
+fn wait_for_operation(session: &RenderSessionHandle, operation: &NativeFuture<()>) {
     wait_until_completed(session, operation);
     operation.finish().unwrap();
 }
 
 fn finish_attachment(attachment: RenderSessionAttachment) -> Result<RenderSessionHandle> {
-    wait_for_operation(&attachment.session, &attachment.operation);
+    wait_for_operation(&attachment.session, &attachment.completion);
     Ok(attachment.session)
 }
 
-fn finish_unit(session: &RenderSessionHandle, operation: OperationHandle<()>) {
+fn finish_unit(session: &RenderSessionHandle, operation: NativeFuture<()>) {
     wait_for_operation(session, &operation);
 }
 
@@ -298,7 +298,7 @@ impl OwnedTextureTestContext {
         &self,
         session: &RenderSessionHandle,
         extent: &RenderTargetExtent,
-    ) -> Result<OperationHandle<()>> {
+    ) -> Result<NativeFuture<()>> {
         // SAFETY: Test passes an opaque non-null address that the rejected call
         // never dereferences.
         let placeholder = unsafe { NativePointer::from_address(0x1) };
@@ -2364,7 +2364,7 @@ fn pick_vulkan_physical_device(
 }
 
 fn await_runtime_barrier(runtime: &RuntimeHandle) {
-    let operation = runtime.start_barrier().unwrap();
+    let operation = runtime.barrier().unwrap();
     assert!(operation.wait(Duration::from_secs(5)).unwrap());
     maplibre_core::check(operation.terminal_status().unwrap()).unwrap();
     operation.finish().unwrap();
@@ -2412,14 +2412,14 @@ fn close_session(session: RenderSessionHandle) {
     session.destroy().unwrap();
 }
 
-fn take_json(session: &RenderSessionHandle, operation: OperationHandle<Vec<u8>>) -> JsonValue {
+fn take_json(session: &RenderSessionHandle, operation: NativeFuture<Vec<u8>>) -> JsonValue {
     wait_until_completed(session, &operation);
     serde_json::from_slice(&operation.take().unwrap()).unwrap()
 }
 
 fn take_features(
     session: &RenderSessionHandle,
-    operation: OperationHandle<Vec<QueriedFeature>>,
+    operation: NativeFuture<Vec<QueriedFeature>>,
 ) -> Vec<QueriedFeature> {
     wait_until_completed(session, &operation);
     operation.take().unwrap()
@@ -2459,7 +2459,10 @@ fn owned_texture_session_renders_acquires_resizes_and_reads_back() {
     }
 
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::new(32, 16, 1.0)).unwrap();
+    let map = crate::completion::blocking(MapHandle::with_options(
+        &runtime,
+        &MapOptions::new(32, 16, 1.0),
+    ));
     let initial_extent = RenderTargetExtent::new(32, 16, 1.0);
     let (context, session) = create_owned_texture_session(&map, initial_extent.clone()).unwrap();
 
@@ -2495,13 +2498,14 @@ fn owned_texture_session_renders_acquires_resizes_and_reads_back() {
 
     let resized_extent = RenderTargetExtent::new(48, 24, 1.0);
     finish_unit(&session, session.resize(&resized_extent).unwrap());
-    let _ = map
-        .resize(crate::LogicalExtent {
+    drop(
+        map.resize(crate::LogicalExtent {
             width: 48,
             height: 24,
             scale_factor: 1.0,
         })
-        .unwrap();
+        .unwrap(),
+    );
     await_runtime_barrier(&runtime);
     let deadline = Instant::now() + Duration::from_secs(5);
     loop {
@@ -2549,7 +2553,10 @@ fn opengl_owned_texture_exposes_backend_metadata() {
     }
 
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::new(32, 16, 1.0)).unwrap();
+    let map = crate::completion::blocking(MapHandle::with_options(
+        &runtime,
+        &MapOptions::new(32, 16, 1.0),
+    ));
     let (_context, session) =
         create_opengl_owned_texture_session(&map, RenderTargetExtent::new(32, 16, 1.0)).unwrap();
     map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
@@ -2580,7 +2587,10 @@ fn dedicated_opengl_surface_keeps_its_context_on_the_graphics_thread() {
     }
 
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::new(32, 16, 1.0)).unwrap();
+    let map = crate::completion::blocking(MapHandle::with_options(
+        &runtime,
+        &MapOptions::new(32, 16, 1.0),
+    ));
     let surface = DedicatedEglTestSurface::new(32, 16).unwrap();
     assert!(!surface.has_current_context());
     let session = finish_attachment(
@@ -2616,7 +2626,10 @@ fn opengl_surface_session_renders_into_the_platform_surface() {
     }
 
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
+    let map = crate::completion::blocking(MapHandle::with_options(
+        &runtime,
+        &MapOptions::new(64, 64, 1.0),
+    ));
     let (_context, session) =
         create_opengl_surface_session(&map, RenderTargetExtent::new(32, 16, 1.0)).unwrap();
     map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
@@ -2644,7 +2657,10 @@ fn opengl_borrowed_texture_session_replaces_its_target() {
     }
 
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
+    let map = crate::completion::blocking(MapHandle::with_options(
+        &runtime,
+        &MapOptions::new(64, 64, 1.0),
+    ));
     let initial_extent = RenderTargetExtent::new(32, 16, 1.0);
     let (mut texture, session) =
         create_opengl_borrowed_texture_session(&map, initial_extent).unwrap();
@@ -2691,7 +2707,10 @@ fn webgpu_borrowed_texture_session_renders_into_a_host_texture() {
     }
 
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
+    let map = crate::completion::blocking(MapHandle::with_options(
+        &runtime,
+        &MapOptions::new(64, 64, 1.0),
+    ));
     let (context, texture, session) =
         create_webgpu_borrowed_texture_session(&map, RenderTargetExtent::new(64, 64, 1.0)).unwrap();
     map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
@@ -2720,7 +2739,10 @@ fn feature_state_and_rendered_queries_copy_native_results() {
     }
 
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
+    let map = crate::completion::blocking(MapHandle::with_options(
+        &runtime,
+        &MapOptions::new(64, 64, 1.0),
+    ));
     let (_context, session) =
         create_owned_texture_session(&map, RenderTargetExtent::new(64, 64, 1.0)).unwrap();
     map.set_style_json(FEATURE_STATE_STYLE_JSON.as_bytes())
@@ -2839,7 +2861,10 @@ fn cluster_feature_extensions_copy_values_and_feature_collections() {
     }
 
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
+    let map = crate::completion::blocking(MapHandle::with_options(
+        &runtime,
+        &MapOptions::new(64, 64, 1.0),
+    ));
     let (_context, session) =
         create_owned_texture_session(&map, RenderTargetExtent::new(64, 64, 1.0)).unwrap();
     map.set_style_json(CLUSTER_BASE_STYLE_JSON.as_bytes())
@@ -2948,7 +2973,10 @@ fn live_session_blocks_map_close_and_drop_reports_the_leaked_map() {
     }))));
 
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::new(32, 32, 1.0)).unwrap();
+    let map = crate::completion::blocking(MapHandle::with_options(
+        &runtime,
+        &MapOptions::new(32, 32, 1.0),
+    ));
     let (_context, session) =
         create_owned_texture_session(&map, RenderTargetExtent::new(32, 32, 1.0)).unwrap();
 
@@ -2975,7 +3003,10 @@ fn sustained_frame_demands_outlast_the_texture_ring_depth() {
     }
 
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::new(32, 32, 1.0)).unwrap();
+    let map = crate::completion::blocking(MapHandle::with_options(
+        &runtime,
+        &MapOptions::new(32, 32, 1.0),
+    ));
     let (_context, session) =
         create_owned_texture_session(&map, RenderTargetExtent::new(32, 32, 1.0)).unwrap();
     map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
@@ -3003,7 +3034,10 @@ fn cloned_session_controls_can_be_used_from_another_thread() {
     }
 
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::new(32, 32, 1.0)).unwrap();
+    let map = crate::completion::blocking(MapHandle::with_options(
+        &runtime,
+        &MapOptions::new(32, 32, 1.0),
+    ));
     let (_context, session) =
         create_owned_texture_session(&map, RenderTargetExtent::new(32, 32, 1.0)).unwrap();
     let clone = session.clone();
@@ -3024,7 +3058,10 @@ fn texture_readback_before_a_frame_reports_invalid_state() {
     }
 
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::new(16, 16, 1.0)).unwrap();
+    let map = crate::completion::blocking(MapHandle::with_options(
+        &runtime,
+        &MapOptions::new(16, 16, 1.0),
+    ));
     let (_context, session) =
         create_owned_texture_session(&map, RenderTargetExtent::new(16, 16, 1.0)).unwrap();
     if session.capabilities().unwrap().readback {

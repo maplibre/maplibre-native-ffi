@@ -54,50 +54,40 @@ internal static unsafe class RuntimeEventTestHelpers
         throw new TimeoutException($"Timed out waiting for map event {eventType}.");
     }
 
-    internal static RuntimeEvent WaitForCommand(RuntimeHandle runtime, ulong commandId)
-    {
-        for (var attempt = 0; attempt < 5000; attempt++)
-        {
-            foreach (var runtimeEvent in runtime.DrainEvents().Events)
-            {
-                if (
-                    runtimeEvent.Payload is RuntimeEventPayload.CommandFinished command
-                    && command.CommandId == commandId
-                )
-                {
-                    return runtimeEvent;
-                }
-            }
-            Thread.Sleep(1);
-        }
-        throw new TimeoutException($"Timed out waiting for command {commandId}.");
-    }
+    internal static CommandCompletion WaitForCommand(
+        RuntimeHandle runtime,
+        Task<CommandCompletion> command
+    ) => command.GetAwaiter().GetResult();
 
     /// <summary>
     /// Waits for the command to finish, asserts its disposition matches the expected status
     /// (committed for Ok with a nonzero generation, failed with the status code and a message
     /// otherwise), and returns the payload.
     /// </summary>
-    internal static RuntimeEventPayload.CommandFinished AssertCommandFinishes(
+    internal static CommandCompletion AssertCommandFinishes(
         RuntimeHandle runtime,
-        ulong commandId,
+        Task<CommandCompletion> command,
         MaplibreStatus expectedStatus
     )
     {
-        Assert.NotEqual(0ul, commandId);
-        var finished = WaitForCommand(runtime, commandId);
-        var completion = Assert.IsType<RuntimeEventPayload.CommandFinished>(finished.Payload);
         if (expectedStatus == MaplibreStatus.Ok)
         {
-            Assert.Equal(CommandDisposition.Committed, completion.Disposition);
-            Assert.NotEqual(0ul, completion.Generation);
+            return AssertCommitted(command);
         }
-        else
-        {
-            Assert.Equal(CommandDisposition.Failed, completion.Disposition);
-            Assert.Equal((int)expectedStatus, finished.Code);
-            Assert.NotEmpty(finished.Message);
-        }
+
+        var completion = command.GetAwaiter().GetResult();
+        Assert.Equal(CommandDisposition.Failed, completion.Disposition);
+        Assert.Equal((int)expectedStatus, completion.RawStatus);
+        Assert.NotEmpty(completion.Diagnostic);
+        return completion;
+    }
+
+    internal static CommandCompletion AssertCommitted(Task<CommandCompletion> command)
+    {
+        var completion = command.GetAwaiter().GetResult();
+        Assert.Equal(CommandDisposition.Committed, completion.Disposition);
+        Assert.Equal((int)MaplibreStatus.Ok, completion.RawStatus);
+        Assert.NotEqual(0ul, completion.Generation);
         return completion;
     }
 

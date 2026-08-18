@@ -120,9 +120,9 @@ is what rejects a mismatched handle, so document the handle type each parameter
 expects.
 
 Handle values are safe to copy, compare, hash, and move between threads, and
-carry no ownership on their own. Runtime, map, projection, operation,
-notification-source, and event-batch handles are callable from any native
-thread. Render-driver comments name the calls that require a graphics thread.
+carry no ownership on their own. Runtime, map, projection, render-session, and
+event-batch handles are callable from any native thread. Render-driver comments
+name the calls that require a graphics thread.
 
 The bit layout is internal. Hosts pass handles back as issued, and decoding or
 synthesizing an id is unsupported.
@@ -149,8 +149,15 @@ no-op, so a host cleanup hook that runs twice stays safe.
 
 Output handle parameters that create or acquire ownership require `*out_handle`
 to equal `MLN_HANDLE_NULL` on entry and preserve live host-owned handles on
-failure. Document when scoped resource ownership begins, when it ends, and
-whether completion may happen inline or later.
+failure. Document when scoped resource ownership begins and when it ends.
+
+One-shot asynchronous work accepts a completion callback, `user_data`, and a
+release callback. A successful submission transfers that callback state to the C
+API. The completion runs exactly once and may run before the submission returns.
+Its result pointers and diagnostic bytes remain borrowed for the callback. The
+release callback runs after the completion returns and after no native path can
+invoke it again. A rejected submission invokes neither callback and leaves
+callback-state ownership with the caller.
 
 The runtime owns a native scheduler thread and one continuously running MapLibre
 `RunLoop`. Runtime and map entry points resolve a handle, acquire its
@@ -170,12 +177,12 @@ may use a core worker.
 Keep render-session control separate from graphics execution. Demand, snapshots,
 operations, abandonment, and destruction are any-thread calls. The caller-driver
 service call and backend accessors are graphics-thread-affine and serialized.
-Runtime and map updates wake the core worker or make the caller mailbox's
-notification endpoint ready.
+Runtime and map updates wake the core worker or make the caller mailbox's direct
+driver-work wake callback run.
 
-Classify each public function as Immediate, Command, Published snapshot,
-Operation, Event batch, or Render-driver call. A binding maps that category to
-one target-language shape; it does not add another scheduler or asynchronous
+Classify each public function as Immediate, Completion, Published snapshot,
+Event batch, or Render-driver call. A binding maps that category to one
+target-language shape; it does not add another scheduler or asynchronous
 boundary.
 
 The category follows from the declaration, and
@@ -183,65 +190,58 @@ The category follows from the declaration, and
 
 | Declaration                                          | Category           |
 | ---------------------------------------------------- | ------------------ |
-| `_start` suffix with `mln_operation* out_operation`  | Operation          |
-| `_take_result`, `_destroy`, or `_release` suffix     | Immediate          |
+| completion callback parameter                        | Completion         |
+| `_destroy` or `_release` suffix                      | Immediate          |
 | `_drain_` in the name                                | Event batch        |
 | `_service_driver_work` suffix                        | Render-driver call |
 | `snapshot` in the name reading a live map or session | Published snapshot |
-| `uint64_t* out_command_id` parameter                 | Command            |
 | anything else                                        | Immediate          |
 
 Name a new function so that its category derives from this table. A call whose
-effects surface only through a drained event stream and that hands back no
-completion identity is an immediate: `mln_render_session_request_frame` returns
-its final status synchronously and reports the frame through frame results, so
-it needs no command channel. The checker keeps an exception table for forms the
-conventions cannot express; it is empty today, and growth is a design smell.
+effects surface only through a drained event stream and that accepts no
+completion is immediate: `mln_render_session_request_frame` returns its final
+status synchronously and reports the frame through frame results. The checker
+keeps an exception table for forms that the conventions cannot express; it is
+empty today, and growth is a design smell.
 
 Pick the category from what the function reads or writes:
 
 - A read of unkeyed, fixed-size map state that changes only through the caller's
   own commands or through load progress is a published-snapshot field. Every
   committed map command publishes a snapshot and reports the published
-  generation in its terminal event, so a snapshot at or past that generation
+  generation in its completion, so a snapshot at or past that generation
   observes the commit.
 - A keyed or parameterized read, a read with an unbounded payload, a read whose
   value follows committed work that the caller did not author, and work whose
-  completion is the product are operations. Prefer one info aggregate with a
-  found flag over per-field scalar or existence operations, because each
-  operation costs every binding a start, wait, and take wrapper.
-- A mutation whose entire result is a disposition status is a command in the
-  domains that have a command channel: the runtime and the map. A missing id
-  reports a not-found status on the terminal event. A disposition-only mutation
-  in a domain without a command channel, such as the render session and the
-  offline database, stays an operation, because the operation's terminal status
-  is that domain's only asynchronous error channel. Add a command channel to
-  another domain only when its count of disposition-only mutations justifies a
-  new event source.
+  completion is the product use typed completions. Prefer one info aggregate
+  with a found flag over per-field scalar or existence completions.
+- An ordered mutation uses a command completion. A missing ID reports a
+  not-found status through that completion. The completion carries disposition
+  and the generation that a committed map mutation published.
 - A call on state that creation captured into a detached object, which no worker
   touches afterward, is immediate. This choice is per object: reads, setters,
   and close become synchronous together, or their relative order breaks. The map
   projection is the model.
 - Creation of a root executor is immediate when no earlier work exists to order
   against it. The call returns after the worker is ready. Runtime creation is
-  the model; wrapping startup in an operation only adds an observer and a typed
+  the model; wrapping startup in a completion only adds an observer and a typed
   result transfer before the root object exists.
 
-Offer a published snapshot and an ordered operation for the same state only when
-each form does distinct work, as camera does: the snapshot serves
+Offer a published snapshot and an ordered completion for the same state only
+when each form does distinct work, as camera does: the snapshot serves
 latest-published consumers, and the ordered query is the fence. Delete an
 ordered form that strictly duplicates the snapshot.
 
-Commands validate and deep-copy every input before returning acceptance. The
-runtime assigns an order and command ID at commit. Each accepted command reaches
-a terminal disposition, and failures after acceptance carry copied diagnostics
-in command events. Operations retain their work independently from their public
-handle. A completed handle exposes its terminal status and copied diagnostic
-until a typed result take or explicit finish consumes it.
+One-shot functions validate and deep-copy every input before returning
+acceptance. Each accepted completion reaches one terminal result. Native work
+retains its callback state and other dependencies independently from the public
+runtime or map handle. Command completions report committed, superseded, failed,
+or cancelled disposition. A committed map command reports the snapshot
+generation that its commit published.
 
 Published snapshots copy immutable committed state without entering mutable
-MapLibre state. Use an ordered operation instead when a query must observe every
-preceding command.
+MapLibre state. Use an ordered completion instead when a query must observe
+every preceding command.
 
 Graphics contexts that bind to a thread, such as OpenGL, are made current during
 caller-driver service and restored afterward under shared ownership. Dedicated
@@ -262,21 +262,21 @@ next native timer deadline.
 
 Runtime submissions follow these rules:
 
-- One runtime establishes a total commit order across commands, operations,
+- One runtime establishes a total commit order across commands, queries,
   barriers, and close.
 - Committing eligible work invokes the run loop and wakes it when idle.
 - Registry locks protect lookup and state transitions only. Release them before
-  run-loop joins, callback quiescence, operation waits, or host notification.
+  run-loop joins or callback quiescence.
 - A close preflight checks live children and pending child reservations before
   committing an irreversible close.
 - A runtime barrier completes after every preceding submission reaches a
   terminal disposition, not merely after its run-loop callback starts.
-- Queue one event per required host-visible outcome. State consumers may
+- Complete every accepted one-shot submission exactly once. State consumers may
   coalesce only commands whose public contract permits replacement; every
-  replaced command reports `superseded`.
+  replaced command completes as `superseded`.
 - A subscription mask suppresses an event before its payload and message are
-  built. A suppressed event stays out of the queue and does not make its
-  notification source readable.
+  built. A suppressed event stays out of the queue and does not invoke its wake
+  callback.
 
 ## Status And Diagnostics
 
@@ -302,9 +302,9 @@ Every exported `MLN_API` C++ definition must be `noexcept`. Status-returning
 entry points use the C API boundary helper to clear thread-local diagnostics on
 entry and convert exceptions to `MLN_STATUS_NATIVE_ERROR`.
 
-Set thread-local diagnostic strings for synchronous non-OK returns. Store
-operation failures on the operation and report accepted command failures through
-copied terminal events.
+Set thread-local diagnostic strings for synchronous non-OK returns. Pass
+asynchronous failures and their copied diagnostics through the accepted
+completion.
 
 ## Events And Callbacks
 
@@ -312,13 +312,14 @@ The C API preserves MapLibre Native's imperative, observer-driven model. C API
 calls return status for synchronous acceptance or failure; drained events report
 later native work.
 
-Prefer drained events for native-to-host notifications about map state,
-lifecycle, rendering, and errors. A host selects the event types it reads with a
-subscription mask, so document the state that each type carries. Options always
-read the mask, and a bit outside the documented set of types returns
-`MLN_STATUS_INVALID_ARGUMENT`. Use native callbacks for low-level extension
-points where MapLibre needs a synchronous decision, an asynchronous request
-handle, or process-global integration such as logging.
+Prefer drained events for repeated native-to-host observations about map state,
+lifecycle, rendering, and errors. One-shot work uses completion callbacks and
+does not also report completion through an event. A host selects the event types
+it reads with a subscription mask, so document the state that each type carries.
+Options always read the mask, and a bit outside the documented set of types
+returns `MLN_STATUS_INVALID_ARGUMENT`. Use direct callbacks for completion,
+low-level extension points where MapLibre needs a synchronous decision, and
+process-global integration such as logging.
 
 Event payloads use plain data with documented lifetimes. Each event identifies
 its source kind and copied source handle value. Closing a map or disabling an
@@ -328,10 +329,10 @@ undrained event stream during native teardown. A drain transfers the complete
 queue into an owned batch, which stays readable across later drains and runtime
 release until the caller releases it.
 
-Use the six execution categories defined in Ownership And Execution. An
-Immediate return is final. A Command return reports copied acceptance. Published
-snapshots are immutable synchronous copies. Operations carry one terminal result
-and diagnostic. Event batches contain drainable observations. Render-driver
+Use the five execution categories defined in Ownership And Execution. An
+Immediate return is final. A Completion return reports copied acceptance and
+later delivers one terminal result. Published snapshots are immutable
+synchronous copies. Event batches contain drainable observations. Render-driver
 calls execute on the graphics thread named by their target contract.
 
 Logging, resource transform, and resource provider callbacks may run on MapLibre
@@ -370,7 +371,7 @@ CPU-only handle destruction. Abandon closes control and mailboxes without
 graphics calls, returns busy during an in-flight driver call, detaches the map
 in CPU state, invalidates accessors, and quarantines resources that require the
 lost owner. Releasing an acquired frame after abandon remains CPU-only and
-terminates its operation with target lost.
+reports target lost.
 
 ## Callback Adapter
 

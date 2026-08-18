@@ -189,23 +189,30 @@ int _resourceRouteFlags(ResourceProviderRoute route) {
 }
 
 final class _ResourceProviderCallbackState extends RetainedCallbackState {
-  _ResourceProviderCallbackState(
-    ResourceProvider provider,
-    int notificationSource,
-  ) : _callback = provider.callback {
+  _ResourceProviderCallbackState(ResourceProvider provider)
+    : _callback = provider.callback {
     for (final route in provider.routes) {
       _checkNativeCString(route.url);
     }
+    listener = NativeCallable<raw.mln_wake_callbackFunction>.listener((
+      Pointer<Void> _,
+    ) {
+      runUpcall(drain);
+    });
     final outQueue = calloc<Uint64>();
+    final wake = calloc<raw.mln_wake>();
     try {
-      _check(
-        raw.mln_adapter_resource_request_queue_create(
-          notificationSource,
-          outQueue,
-        ),
-      );
+      wake.ref.size = sizeOf<raw.mln_wake>();
+      wake.ref.callback = listener.nativeFunction;
+      wake.ref.user_data = nullptr;
+      wake.ref.release_user_data = nullptr;
+      _check(raw.mln_adapter_resource_request_queue_create(wake, outQueue));
       queue = outQueue.value;
+    } catch (_) {
+      listener.close();
+      rethrow;
     } finally {
+      calloc.free(wake);
       calloc.free(outQueue);
     }
     pointer = calloc<raw.mln_adapter_queued_resource_provider>();
@@ -226,6 +233,7 @@ final class _ResourceProviderCallbackState extends RetainedCallbackState {
   }
 
   final ResourceProviderCallback _callback;
+  late final NativeCallable<raw.mln_wake_callbackFunction> listener;
   late final int queue;
   late final Pointer<raw.mln_adapter_queued_resource_provider> pointer;
 
@@ -267,6 +275,7 @@ final class _ResourceProviderCallbackState extends RetainedCallbackState {
       calloc.free(routes);
     }
     calloc.free(pointer);
+    listener.close();
   }
 }
 

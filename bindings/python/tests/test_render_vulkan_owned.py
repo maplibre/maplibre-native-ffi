@@ -65,7 +65,7 @@ class VulkanOwnedSession:
                     scale_factor=scale_factor,
                     mode=mln.MapMode.CONTINUOUS,
                 )
-            )
+            ).result(timeout=5)
             try:
                 session, attach = map_handle.attach_vulkan_owned_texture(
                     context.owned_texture_descriptor(width, height, scale_factor)
@@ -92,7 +92,7 @@ class VulkanOwnedSession:
 
     def render_once(self) -> None:
         self.map.set_style_json(EMPTY_STYLE_JSON.encode())
-        self.runtime.barrier()
+        self.runtime.barrier().result(timeout=5)
         frame = wait_for_vulkan_frame(self, lambda _: True)
         release_frame(frame)
 
@@ -106,7 +106,7 @@ def vulkan_owned_session() -> VulkanOwnedSession:
         fixture.close()
 
 
-def request_still_image(map_handle: mln.MapHandle) -> mln.OperationHandle[None]:
+def request_still_image(map_handle: mln.MapHandle):
     return map_handle.request_still_image()
 
 
@@ -120,7 +120,7 @@ def wait_for_texture_info(
     image = finish_render_operation(
         fixture.session,
         fixture.session.read_premultiplied_rgba8(),
-        take_result=True,
+        return_result=True,
     )
     return image.info
 
@@ -183,7 +183,7 @@ def test_core_worker_reads_owned_vulkan_texture(
     image = finish_render_operation(
         vulkan_owned_session.session,
         vulkan_owned_session.session.read_premultiplied_rgba8(),
-        take_result=True,
+        return_result=True,
     )
     assert image.info == info
     assert len(image.data) == info.byte_length

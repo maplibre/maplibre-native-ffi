@@ -64,56 +64,41 @@ auto mln_rendered_query_geometry_line_string(
   };
 }
 
-auto mln_render_session_query_rendered_features_start(
+auto mln_render_session_query_rendered_features(
   mln_render_session session, const mln_rendered_query_geometry* geometry,
   const mln_rendered_feature_query_options* options,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::render_session_query_rendered_features_start(
-      session, geometry, options, out_operation
+      session, geometry, options, completion
     );
   });
 }
 
-auto mln_render_session_query_source_features_start(
+auto mln_render_session_query_source_features(
   mln_render_session session, mln_buffer_view source_id,
-  const mln_source_feature_query_options* options, mln_operation* out_operation
+  const mln_source_feature_query_options* options,
+  const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::render_session_query_source_features_start(
-      session, source_id, options, out_operation
+      session, source_id, options, completion
     );
   });
 }
 
-auto mln_render_session_query_feature_extensions_start(
+auto mln_render_session_query_feature_extensions(
   mln_render_session session, mln_buffer_view source_id,
   mln_buffer_view feature, mln_buffer_view extension,
   mln_buffer_view extension_field, const mln_buffer_view* arguments,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::render_session_query_feature_extensions_start(
       session, source_id, feature, extension, extension_field, arguments,
-      out_operation
+      completion
     );
-  });
-}
-
-auto mln_render_query_features_take_result(
-  mln_operation operation, mln_queried_feature_list* out_result
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::render_query_features_take_result(operation, out_result);
-  });
-}
-
-auto mln_render_query_take_result(
-  mln_operation operation, mln_buffer* out_result
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::render_query_take_result(operation, out_result);
   });
 }
 
@@ -186,9 +171,73 @@ auto take_buffer_bytes(mln_buffer buffer, std::any& out) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-// Owns a queried-feature list handle inside an operation result, so a result
-// that is discarded or abandoned instead of taken still destroys the list.
+// Keeps the internal query result alive through its completion callback.
 using OwnedQueriedFeatureList = std::shared_ptr<mln_queried_feature_list>;
+
+auto complete_feature_list(
+  const std::shared_ptr<Completion>& completion, mln_status status,
+  std::string diagnostic, std::any result
+) -> void {
+  auto* list = std::any_cast<OwnedQueriedFeatureList>(&result);
+  if (status != MLN_STATUS_OK || list == nullptr || *list == nullptr) {
+    complete(
+      completion, status == MLN_STATUS_OK ? MLN_STATUS_NATIVE_ERROR : status,
+      status == MLN_STATUS_OK ? "render query produced an invalid result"
+                              : std::move(diagnostic)
+    );
+    return;
+  }
+  size_t count = 0;
+  if (queried_feature_list_count(**list, &count) != MLN_STATUS_OK) {
+    complete(completion, MLN_STATUS_NATIVE_ERROR, thread_last_error_message());
+    return;
+  }
+  auto features = std::vector<mln_queried_feature>(count);
+  for (size_t index = 0; index < count; ++index) {
+    features[index] = mln_queried_feature_default();
+    if (
+      queried_feature_list_get(**list, index, &features[index]) != MLN_STATUS_OK
+    ) {
+      complete(
+        completion, MLN_STATUS_NATIVE_ERROR, thread_last_error_message()
+      );
+      return;
+    }
+  }
+  completion->resolve([list = std::move(*list), features = std::move(features)](
+                        const mln_completion& descriptor
+                      ) {
+    static_cast<void>(list);
+    invoke_completion(
+      descriptor, MLN_STATUS_OK, MLN_COMMAND_DISPOSITION_COMMITTED, 0, {},
+      features.data(), features.size()
+    );
+  });
+}
+
+auto complete_query_buffer(
+  const std::shared_ptr<Completion>& completion, mln_status status,
+  std::string diagnostic, std::any result
+) -> void {
+  auto* bytes = std::any_cast<std::string>(&result);
+  if (status != MLN_STATUS_OK || bytes == nullptr) {
+    complete(
+      completion, status == MLN_STATUS_OK ? MLN_STATUS_NATIVE_ERROR : status,
+      status == MLN_STATUS_OK ? "render query produced an invalid result"
+                              : std::move(diagnostic)
+    );
+    return;
+  }
+  completion->resolve([bytes =
+                         std::move(*bytes)](const mln_completion& descriptor) {
+    const auto view =
+      mln_buffer_view{.data = bytes.data(), .size = bytes.size()};
+    invoke_completion(
+      descriptor, MLN_STATUS_OK, MLN_COMMAND_DISPOSITION_COMMITTED, 0, {},
+      &view, 1
+    );
+  });
+}
 
 auto store_feature_list(mln_queried_feature_list list, std::any& out)
   -> mln_status {
@@ -317,7 +366,7 @@ auto make_views(const std::vector<std::string>& strings, Options& options)
 auto render_session_query_rendered_features_start(
   mln_render_session session, const mln_rendered_query_geometry* geometry,
   const mln_rendered_feature_query_options* options,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) -> mln_status {
   if (geometry == nullptr || geometry->size < sizeof(*geometry)) {
     set_thread_error("rendered query geometry is null or too small");
@@ -367,7 +416,7 @@ auto render_session_query_rendered_features_start(
   if (options_status != MLN_STATUS_OK) return options_status;
 
   return enqueue_driver_result_operation(
-    session, RENDER_OPERATION_QUERY_FEATURES,
+    session,
     [copied_geometry, points = std::move(points),
      copied_options = std::move(copied_options)](
       mln_render_session_object& target, std::any& result
@@ -399,13 +448,14 @@ auto render_session_query_rendered_features_start(
       return status == MLN_STATUS_OK ? store_feature_list(list, result)
                                      : status;
     },
-    out_operation
+    completion, complete_feature_list
   );
 }
 
 auto render_session_query_source_features_start(
   mln_render_session session, mln_buffer_view source_id,
-  const mln_source_feature_query_options* options, mln_operation* out_operation
+  const mln_source_feature_query_options* options,
+  const mln_completion* completion
 ) -> mln_status {
   auto source = std::string{};
   const auto source_status = copy_view(source_id, source);
@@ -414,7 +464,7 @@ auto render_session_query_source_features_start(
   const auto options_status = copy_source_options(options, copied_options);
   if (options_status != MLN_STATUS_OK) return options_status;
   return enqueue_driver_result_operation(
-    session, RENDER_OPERATION_QUERY_FEATURES,
+    session,
     [source = std::move(source), copied_options = std::move(copied_options)](
       mln_render_session_object& target, std::any& result
     ) mutable {
@@ -440,7 +490,7 @@ auto render_session_query_source_features_start(
       return status == MLN_STATUS_OK ? store_feature_list(list, result)
                                      : status;
     },
-    out_operation
+    completion, complete_feature_list
   );
 }
 
@@ -448,7 +498,7 @@ auto render_session_query_feature_extensions_start(
   mln_render_session session, mln_buffer_view source_id,
   mln_buffer_view feature, mln_buffer_view extension,
   mln_buffer_view extension_field, const mln_buffer_view* arguments,
-  mln_operation* out_operation
+  const mln_completion* completion
 ) -> mln_status {
   auto copied = std::vector<std::string>(5);
   const mln_buffer_view inputs[] = {
@@ -461,7 +511,7 @@ auto render_session_query_feature_extensions_start(
   }
   const bool has_arguments = arguments != nullptr;
   return enqueue_driver_result_operation(
-    session, RENDER_OPERATION_QUERY,
+    session,
     [copied = std::move(copied),
      has_arguments](mln_render_session_object& target, std::any& result) {
       const auto view = [&copied](std::size_t i) {
@@ -476,39 +526,7 @@ auto render_session_query_feature_extensions_start(
       return status == MLN_STATUS_OK ? take_buffer_bytes(buffer, result)
                                      : status;
     },
-    out_operation
-  );
-}
-
-auto render_query_features_take_result(
-  mln_operation operation, mln_queried_feature_list* out_result
-) -> mln_status {
-  if (out_result == nullptr || *out_result != MLN_HANDLE_NULL) {
-    set_thread_error(
-      "out_result must point to a null queried-feature list handle"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return take_operation_result<OwnedQueriedFeatureList>(
-    operation, RENDER_OPERATION_QUERY_FEATURES,
-    [out_result](OwnedQueriedFeatureList& result) {
-      *out_result =
-        std::exchange(*result, mln_queried_feature_list{MLN_HANDLE_NULL});
-      return MLN_STATUS_OK;
-    }
-  );
-}
-
-auto render_query_take_result(mln_operation operation, mln_buffer* out_result)
-  -> mln_status {
-  if (out_result == nullptr || *out_result != MLN_HANDLE_NULL) {
-    set_thread_error("out_result must point to a null buffer handle");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return take_operation_result<std::string>(
-    operation, RENDER_OPERATION_QUERY, [out_result](std::string& result) {
-      return create_buffer(std::move(result), out_result);
-    }
+    completion, complete_query_buffer
   );
 }
 

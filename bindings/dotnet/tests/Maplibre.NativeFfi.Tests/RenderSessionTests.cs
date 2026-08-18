@@ -37,9 +37,6 @@ public sealed unsafe class RenderSessionTests
 
         Assert.Equal((uint)RenderDriverKind.CallerGraphicsThread, native.driver);
         Assert.Equal(3u, native.requested_texture_ring_depth);
-        Assert.True(native.operation_source.IsNull);
-        Assert.True(native.frame_source.IsNull);
-        Assert.True(native.driver_work_source.IsNull);
     }
 
     [Fact]
@@ -71,10 +68,10 @@ public sealed unsafe class RenderSessionTests
     }
 
     [Fact]
-    public void RawSurfaceAttachReturnsSessionAndOperation()
+    public void RawSurfaceAttachReturnsSessionAndAcceptsCompletion()
     {
         var method = typeof(NativeMethods).GetMethod(
-            "mln_opengl_surface_attach_start",
+            "mln_opengl_surface_attach",
             BindingFlags.Public | BindingFlags.Static
         );
 
@@ -82,11 +79,11 @@ public sealed unsafe class RenderSessionTests
         var parameters = method!.GetParameters();
         Assert.Equal(5, parameters.Length);
         Assert.Equal(typeof(MlnRenderSession*), parameters[3].ParameterType);
-        Assert.Equal(typeof(MlnOperation*), parameters[4].ParameterType);
+        Assert.Equal(typeof(mln_completion*), parameters[4].ParameterType);
     }
 
     [Fact]
-    public void PublicSessionSurfaceIsOperationBackedAndHasExplicitDriverService()
+    public void PublicSessionSurfaceUsesTasksAndExplicitDriverService()
     {
         var type = typeof(RenderSessionHandle);
 

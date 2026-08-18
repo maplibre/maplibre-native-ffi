@@ -25,9 +25,10 @@ typedef struct mln_test_render_fixture {
   mln_render_session session;
   void* backend_state;
   uint32_t driver;
-  mln_notification_source source;
   bool observed_attaching;
   bool observed_driver_ready;
+  atomic_uint frame_wakes;
+  atomic_uint driver_wakes;
 } mln_test_render_fixture;
 
 // Opaque host thread used by tests that need a second native thread.
@@ -38,49 +39,37 @@ void mln_test_thread_join(mln_test_thread* thread);
 void mln_test_sleep_milliseconds(unsigned int milliseconds);
 // Monotonic milliseconds for bounded concurrency assertions.
 uint64_t mln_test_monotonic_milliseconds(void);
-// Synthetic operation and endpoint controls exercise completion and
-// notification races without depending on one MapLibre file-source schedule.
-typedef struct mln_test_operation_control mln_test_operation_control;
-typedef struct mln_test_endpoint_control mln_test_endpoint_control;
+typedef struct mln_test_completion {
+  mln_completion descriptor;
+  void* state;
+} mln_test_completion;
 
-mln_status mln_test_operation_create(
-  mln_notification_source source, bool cancellable,
-  mln_operation* out_operation, mln_test_operation_control** out_control
+mln_test_completion mln_test_completion_default(size_t value_size);
+mln_test_completion mln_test_completion_buffer_view(void);
+mln_test_completion mln_test_completion_readback(void);
+mln_completion mln_test_discard_completion(void);
+void mln_test_completion_destroy(mln_test_completion* completion);
+void mln_test_completion_reject(mln_test_completion* completion);
+bool mln_test_completion_wait(
+  mln_test_completion* completion, int64_t timeout_ms
 );
-mln_status mln_test_runtime_pending_operation_create(
-  mln_runtime runtime, mln_operation* out_operation,
-  mln_test_operation_control** out_control
+mln_status mln_test_completion_finish(mln_test_completion* completion);
+bool mln_test_completion_poll(mln_test_completion* completion);
+mln_status mln_test_completion_status(mln_test_completion* completion);
+uint32_t mln_test_completion_disposition(mln_test_completion* completion);
+uint64_t mln_test_completion_generation(mln_test_completion* completion);
+const char* mln_test_completion_diagnostic(mln_test_completion* completion);
+size_t mln_test_completion_value_count(mln_test_completion* completion);
+bool mln_test_completion_copy_value(
+  mln_test_completion* completion, void* out_value, size_t value_size
 );
+bool mln_test_completion_contract(void);
+
 mln_status mln_test_runtime_reserve_child(mln_runtime runtime);
 void mln_test_runtime_abandon_child(mln_runtime runtime);
-void mln_test_operation_complete(
-  mln_test_operation_control* control, mln_status status, const char* diagnostic
-);
-unsigned int mln_test_operation_cancel_count(
-  const mln_test_operation_control* control
-);
-void mln_test_operation_block_cancel(
-  mln_test_operation_control* control, atomic_bool* entered,
-  const atomic_bool* release
-);
 mln_status mln_test_render_session_blocking_operation_create(
   mln_render_session session, atomic_bool* entered, const atomic_bool* release,
-  mln_operation* out_operation
-);
-void mln_test_operation_control_destroy(mln_test_operation_control* control);
-
-mln_status mln_test_endpoint_create(
-  mln_notification_source source, uint64_t id, uint32_t kind, bool sticky,
-  mln_test_endpoint_control** out_control
-);
-void mln_test_endpoint_mark_ready(mln_test_endpoint_control* control);
-void mln_test_endpoint_clear_ready(mln_test_endpoint_control* control);
-void mln_test_endpoint_control_destroy(mln_test_endpoint_control* control);
-
-// Holds the source's real ready-drain lease until release is set.
-void mln_test_hold_notification_ready_drain(
-  mln_notification_source source, atomic_bool* entered,
-  const atomic_bool* release
+  const mln_completion* completion
 );
 
 // These helpers track what they create per calling thread so the suite can
@@ -131,7 +120,7 @@ bool mln_test_transferred_webgl_surface_create(
 #endif
 void mln_test_render_fixture_destroy(mln_test_render_fixture* fixture);
 mln_status mln_test_render_fixture_finish_operation(
-  const mln_test_render_fixture* fixture, mln_operation operation
+  const mln_test_render_fixture* fixture, mln_test_completion* completion
 );
 
 // Outcome of building the dedicated EGL surface fixture. Unavailable is a skip;

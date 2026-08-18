@@ -25,7 +25,6 @@ from .errors import (
     WrongThreadError,
 )
 from .map import CameraSnapshot, MapHandle, MapMode, MapOptions, MapSnapshot
-from .offline import OperationHandle
 from .render import (
     FrameDemand,
     FrameDemandFlag,
@@ -49,11 +48,9 @@ from .render import (
 from .runtime import (
     CameraChangeMode,
     CameraTransitionFinishedPayload,
+    CommandCompletion,
     CommandDisposition,
-    CommandFinishedPayload,
     NetworkStatus,
-    NotificationEndpointKind,
-    ReadyEndpoint,
     RenderFramePayload,
     RenderingStats,
     RenderMapPayload,
@@ -80,8 +77,8 @@ __all__ = [
     "CameraSnapshot",
     "CameraTransitionFinishedPayload",
     "CancelledError",
+    "CommandCompletion",
     "CommandDisposition",
-    "CommandFinishedPayload",
     "FrameDemand",
     "FrameDemandFlag",
     "FrameOpenGLTextureName",
@@ -100,10 +97,7 @@ __all__ = [
     "NetworkStatus",
     "NotFoundError",
     "NotReadyError",
-    "NotificationEndpointKind",
     "OpenGLContextProvider",
-    "OperationHandle",
-    "ReadyEndpoint",
     "RenderAbandonDisposition",
     "RenderAbandonResult",
     "RenderBackend",

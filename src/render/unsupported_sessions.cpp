@@ -10,7 +10,7 @@ namespace {
 
 auto validate_unsupported_attach(
   mln_map map, const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
   MapObject* live_map = nullptr;
   const auto map_status = validate_map_live(map, live_map);
@@ -18,7 +18,7 @@ auto validate_unsupported_attach(
     return map_status;
   }
   return validate_render_session_attach_request(
-    options, out_session, out_operation
+    options, out_session, completion
   );
 }
 
@@ -33,7 +33,7 @@ auto unsupported(const char* message) -> mln_status {
 auto metal_surface_attach_start(
   mln_map map, const mln_metal_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
   if (
     const auto status = validate_metal_surface_descriptor(descriptor);
@@ -50,7 +50,7 @@ auto metal_surface_attach_start(
     return status;
   if (
     const auto status =
-      validate_unsupported_attach(map, options, out_session, out_operation);
+      validate_unsupported_attach(map, options, out_session, completion);
     status != MLN_STATUS_OK
   )
     return status;
@@ -59,7 +59,7 @@ auto metal_surface_attach_start(
 auto metal_owned_texture_attach_start(
   mln_map map, const mln_metal_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
   if (
     const auto status = validate_metal_owned_texture_descriptor(descriptor);
@@ -76,7 +76,7 @@ auto metal_owned_texture_attach_start(
     return status;
   if (
     const auto status =
-      validate_unsupported_attach(map, options, out_session, out_operation);
+      validate_unsupported_attach(map, options, out_session, completion);
     status != MLN_STATUS_OK
   )
     return status;
@@ -85,7 +85,7 @@ auto metal_owned_texture_attach_start(
 auto metal_borrowed_texture_attach_start(
   mln_map map, const mln_metal_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
   if (
     const auto status = validate_metal_borrowed_texture_descriptor(descriptor);
@@ -101,7 +101,7 @@ auto metal_borrowed_texture_attach_start(
     return status;
   if (
     const auto status =
-      validate_unsupported_attach(map, options, out_session, out_operation);
+      validate_unsupported_attach(map, options, out_session, completion);
     status != MLN_STATUS_OK
   )
     return status;
@@ -109,7 +109,7 @@ auto metal_borrowed_texture_attach_start(
 }
 auto metal_borrowed_texture_set_target_start(
   mln_render_session, const mln_metal_borrowed_texture_descriptor* descriptor,
-  mln_operation*
+  const mln_completion*
 ) -> mln_status {
   if (
     const auto status = validate_metal_borrowed_texture_descriptor(descriptor);
@@ -120,7 +120,7 @@ auto metal_borrowed_texture_set_target_start(
 }
 auto metal_surface_set_target_start(
   mln_render_session, const mln_metal_surface_descriptor* descriptor,
-  mln_operation*
+  const mln_completion*
 ) -> mln_status {
   if (
     const auto status = validate_metal_surface_descriptor(descriptor);
@@ -135,7 +135,7 @@ auto metal_surface_set_target_start(
 auto vulkan_surface_attach_start(
   mln_map map, const mln_vulkan_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
   if (
     const auto status = validate_vulkan_surface_descriptor(descriptor);
@@ -152,7 +152,7 @@ auto vulkan_surface_attach_start(
     return status;
   if (
     const auto status =
-      validate_unsupported_attach(map, options, out_session, out_operation);
+      validate_unsupported_attach(map, options, out_session, completion);
     status != MLN_STATUS_OK
   )
     return status;
@@ -161,7 +161,7 @@ auto vulkan_surface_attach_start(
 auto vulkan_owned_texture_attach_start(
   mln_map map, const mln_vulkan_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
   if (
     const auto status = validate_vulkan_owned_texture_descriptor(descriptor);
@@ -178,7 +178,7 @@ auto vulkan_owned_texture_attach_start(
     return status;
   if (
     const auto status =
-      validate_unsupported_attach(map, options, out_session, out_operation);
+      validate_unsupported_attach(map, options, out_session, completion);
     status != MLN_STATUS_OK
   )
     return status;
@@ -187,7 +187,7 @@ auto vulkan_owned_texture_attach_start(
 auto vulkan_borrowed_texture_attach_start(
   mln_map map, const mln_vulkan_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
   if (
     const auto status = validate_vulkan_borrowed_texture_descriptor(descriptor);
@@ -203,7 +203,7 @@ auto vulkan_borrowed_texture_attach_start(
     return status;
   if (
     const auto status =
-      validate_unsupported_attach(map, options, out_session, out_operation);
+      validate_unsupported_attach(map, options, out_session, completion);
     status != MLN_STATUS_OK
   )
     return status;
@@ -211,7 +211,7 @@ auto vulkan_borrowed_texture_attach_start(
 }
 auto vulkan_borrowed_texture_set_target_start(
   mln_render_session, const mln_vulkan_borrowed_texture_descriptor* descriptor,
-  mln_operation*
+  const mln_completion*
 ) -> mln_status {
   if (
     const auto status = validate_vulkan_borrowed_texture_descriptor(descriptor);
@@ -222,7 +222,7 @@ auto vulkan_borrowed_texture_set_target_start(
 }
 auto vulkan_surface_set_target_start(
   mln_render_session, const mln_vulkan_surface_descriptor* descriptor,
-  mln_operation*
+  const mln_completion*
 ) -> mln_status {
   if (
     const auto status = validate_vulkan_surface_descriptor(descriptor);
@@ -237,7 +237,7 @@ auto vulkan_surface_set_target_start(
 auto opengl_surface_attach_start(
   mln_map map, const mln_opengl_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
   if (
     const auto status = validate_opengl_surface_descriptor(descriptor, false);
@@ -254,7 +254,7 @@ auto opengl_surface_attach_start(
     return status;
   if (
     const auto status =
-      validate_unsupported_attach(map, options, out_session, out_operation);
+      validate_unsupported_attach(map, options, out_session, completion);
     status != MLN_STATUS_OK
   )
     return status;
@@ -263,7 +263,7 @@ auto opengl_surface_attach_start(
 auto opengl_owned_texture_attach_start(
   mln_map map, const mln_opengl_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
   if (
     const auto status =
@@ -281,7 +281,7 @@ auto opengl_owned_texture_attach_start(
     return status;
   if (
     const auto status =
-      validate_unsupported_attach(map, options, out_session, out_operation);
+      validate_unsupported_attach(map, options, out_session, completion);
     status != MLN_STATUS_OK
   )
     return status;
@@ -290,7 +290,7 @@ auto opengl_owned_texture_attach_start(
 auto opengl_borrowed_texture_attach_start(
   mln_map map, const mln_opengl_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
   if (
     const auto status =
@@ -307,7 +307,7 @@ auto opengl_borrowed_texture_attach_start(
     return status;
   if (
     const auto status =
-      validate_unsupported_attach(map, options, out_session, out_operation);
+      validate_unsupported_attach(map, options, out_session, completion);
     status != MLN_STATUS_OK
   )
     return status;
@@ -315,7 +315,7 @@ auto opengl_borrowed_texture_attach_start(
 }
 auto opengl_surface_set_target_start(
   mln_render_session, const mln_opengl_surface_descriptor* descriptor,
-  mln_operation*
+  const mln_completion*
 ) -> mln_status {
   if (
     const auto status = validate_opengl_surface_descriptor(descriptor, false);
@@ -326,7 +326,7 @@ auto opengl_surface_set_target_start(
 }
 auto opengl_borrowed_texture_set_target_start(
   mln_render_session, const mln_opengl_borrowed_texture_descriptor* descriptor,
-  mln_operation*
+  const mln_completion*
 ) -> mln_status {
   if (
     const auto status =
@@ -342,7 +342,7 @@ auto opengl_borrowed_texture_set_target_start(
 auto webgpu_owned_texture_attach_start(
   mln_map map, const mln_webgpu_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
   if (
     const auto status = validate_webgpu_owned_texture_descriptor(descriptor);
@@ -359,7 +359,7 @@ auto webgpu_owned_texture_attach_start(
     return status;
   if (
     const auto status =
-      validate_unsupported_attach(map, options, out_session, out_operation);
+      validate_unsupported_attach(map, options, out_session, completion);
     status != MLN_STATUS_OK
   )
     return status;
@@ -368,7 +368,7 @@ auto webgpu_owned_texture_attach_start(
 auto webgpu_borrowed_texture_attach_start(
   mln_map map, const mln_webgpu_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
   if (
     const auto status = validate_webgpu_borrowed_texture_descriptor(descriptor);
@@ -384,7 +384,7 @@ auto webgpu_borrowed_texture_attach_start(
     return status;
   if (
     const auto status =
-      validate_unsupported_attach(map, options, out_session, out_operation);
+      validate_unsupported_attach(map, options, out_session, completion);
     status != MLN_STATUS_OK
   )
     return status;
@@ -392,7 +392,7 @@ auto webgpu_borrowed_texture_attach_start(
 }
 auto webgpu_borrowed_texture_set_target_start(
   mln_render_session, const mln_webgpu_borrowed_texture_descriptor* descriptor,
-  mln_operation*
+  const mln_completion*
 ) -> mln_status {
   if (
     const auto status = validate_webgpu_borrowed_texture_descriptor(descriptor);
@@ -404,7 +404,7 @@ auto webgpu_borrowed_texture_set_target_start(
 auto webgpu_surface_attach_start(
   mln_map map, const mln_webgpu_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
-  mln_render_session* out_session, mln_operation* out_operation
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
   if (
     const auto status = validate_webgpu_surface_descriptor(descriptor);
@@ -421,7 +421,7 @@ auto webgpu_surface_attach_start(
     return status;
   if (
     const auto status =
-      validate_unsupported_attach(map, options, out_session, out_operation);
+      validate_unsupported_attach(map, options, out_session, completion);
     status != MLN_STATUS_OK
   )
     return status;
@@ -429,7 +429,7 @@ auto webgpu_surface_attach_start(
 }
 auto webgpu_surface_set_target_start(
   mln_render_session, const mln_webgpu_surface_descriptor* descriptor,
-  mln_operation*
+  const mln_completion*
 ) -> mln_status {
   if (
     const auto status = validate_webgpu_surface_descriptor(descriptor);

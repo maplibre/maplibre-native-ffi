@@ -137,6 +137,13 @@ internal object QueryStructs {
       destroyer(list)
     }
 
+  fun queriedFeatures(values: CPointer<mln_queried_feature>?, count: ULong): List<QueriedFeature> {
+    val size = checkedInt(count, "queried feature count")
+    if (size == 0) return emptyList()
+    requireNotNull(values) { "native completion omitted its queried features" }
+    return List(size) { index -> queriedFeature(values[index]) }
+  }
+
   fun featureStateSelector(
     value: FeatureStateSelector,
     scope: MemScope,

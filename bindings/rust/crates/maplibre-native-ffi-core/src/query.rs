@@ -389,6 +389,36 @@ pub struct QueriedFeature {
     pub state: Option<Vec<u8>>,
 }
 
+/// Copies borrowed native query hits into owned Rust values.
+///
+/// # Safety
+///
+/// Every view in `hits` must remain valid for this call.
+pub unsafe fn copy_queried_features(
+    hits: &[sys::mln_queried_feature],
+) -> crate::Result<Vec<QueriedFeature>> {
+    hits.iter()
+        .map(|hit| {
+            let feature = unsafe { crate::string::copy_string_view_bytes(hit.feature) }?;
+            let source_id = (hit.fields & sys::MLN_QUERIED_FEATURE_SOURCE_ID != 0)
+                .then(|| unsafe { crate::string::copy_string_view(hit.source_id) })
+                .transpose()?;
+            let source_layer_id = (hit.fields & sys::MLN_QUERIED_FEATURE_SOURCE_LAYER_ID != 0)
+                .then(|| unsafe { crate::string::copy_string_view(hit.source_layer_id) })
+                .transpose()?;
+            let state = (hit.fields & sys::MLN_QUERIED_FEATURE_STATE != 0)
+                .then(|| unsafe { crate::string::copy_string_view_bytes(hit.state) })
+                .transpose()?;
+            Ok(QueriedFeature {
+                feature,
+                source_id,
+                source_layer_id,
+                state,
+            })
+        })
+        .collect()
+}
+
 /// Copies an owned native queried-feature list into owned Rust values.
 ///
 /// # Safety
@@ -406,39 +436,16 @@ pub unsafe fn copy_queried_feature_list(
     // SAFETY: list is live and count points to writable storage.
     crate::check(unsafe { sys::mln_queried_feature_list_count(list.handle(), &mut count) })?;
 
-    let mut features = Vec::with_capacity(count);
+    let mut raw_features = Vec::with_capacity(count);
     for index in 0..count {
         // SAFETY: Default constructor takes no arguments and initializes size.
         let mut hit = unsafe { sys::mln_queried_feature_default() };
         // SAFETY: list is live, index is in range, and hit is writable.
         crate::check(unsafe { sys::mln_queried_feature_list_get(list.handle(), index, &mut hit) })?;
-        // SAFETY: The borrowed view remains valid until the list guard drops.
-        let feature = unsafe { crate::string::copy_string_view_bytes(hit.feature) }?;
-        let source_id = if hit.fields & sys::MLN_QUERIED_FEATURE_SOURCE_ID != 0 {
-            // SAFETY: The borrowed view remains valid until the list guard drops.
-            Some(unsafe { crate::string::copy_string_view(hit.source_id) }?)
-        } else {
-            None
-        };
-        let source_layer_id = if hit.fields & sys::MLN_QUERIED_FEATURE_SOURCE_LAYER_ID != 0 {
-            // SAFETY: The borrowed view remains valid until the list guard drops.
-            Some(unsafe { crate::string::copy_string_view(hit.source_layer_id) }?)
-        } else {
-            None
-        };
-        let state = if hit.fields & sys::MLN_QUERIED_FEATURE_STATE != 0 {
-            // SAFETY: The borrowed view remains valid until the list guard drops.
-            Some(unsafe { crate::string::copy_string_view_bytes(hit.state) }?)
-        } else {
-            None
-        };
-        features.push(QueriedFeature {
-            feature,
-            source_id,
-            source_layer_id,
-            state,
-        });
+        raw_features.push(hit);
     }
+    // SAFETY: The list guard keeps every borrowed view alive for this call.
+    let features = unsafe { copy_queried_features(&raw_features) }?;
     Ok(features)
 }
 

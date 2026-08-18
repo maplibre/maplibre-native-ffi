@@ -135,31 +135,24 @@ static size_t query_admin_feature_count(
       );
     }
 
-    mln_operation query = MLN_HANDLE_NULL;
+    mln_test_completion query = mln_test_completion_default(0);
     TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
-      mln_render_session_query_source_features_start(
-        fixture->session, MLN_STRING_LITERAL("mlt-source"), &options, &query
-      )
+      MLN_STATUS_OK, mln_render_session_query_source_features(
+                       fixture->session, MLN_STRING_LITERAL("mlt-source"),
+                       &options, &query.descriptor
+                     )
     );
     const mln_status query_status =
-      mln_test_render_fixture_finish_operation(fixture, query);
+      mln_test_render_fixture_finish_operation(fixture, &query);
     if (query_status == MLN_STATUS_INVALID_STATE) {
       // A terminal NO_UPDATE result can precede creation of the renderer.
       // Retry after the next map update rather than ordering query work behind
       // an in-flight demand.
-      mln_operation_release(query);
+      mln_test_completion_destroy(&query);
     } else {
       TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, query_status);
-      mln_queried_feature_list result = MLN_HANDLE_NULL;
-      TEST_ASSERT_EQUAL_INT(
-        MLN_STATUS_OK, mln_render_query_features_take_result(query, &result)
-      );
-      mln_operation_release(query);
-      TEST_ASSERT_EQUAL_INT(
-        MLN_STATUS_OK, mln_queried_feature_list_count(result, &count)
-      );
-      mln_queried_feature_list_destroy(result);
+      count = mln_test_completion_value_count(&query);
+      mln_test_completion_destroy(&query);
     }
     if (count == 0) {
       mln_test_sleep_millisecond();
@@ -192,11 +185,16 @@ static size_t decode_recorded_tile(
     .callback = serve_recorded_tile,
     .user_data = &provider_state,
   };
-  uint64_t resource_command_id = 0;
+  mln_test_completion provider_completion = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_runtime_set_resource_provider(runtime, &provider, &resource_command_id)
+    MLN_STATUS_OK, mln_runtime_set_resource_provider(
+                     runtime, &provider, &provider_completion.descriptor
+                   )
   );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_completion_finish(&provider_completion)
+  );
+  mln_test_completion_destroy(&provider_completion);
 
   mln_map_options map_options = mln_map_options_default();
   map_options.initial_extent.width = 64;
@@ -217,11 +215,15 @@ static size_t decode_recorded_tile(
 
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
-  resource_command_id = 0;
+  mln_test_completion clear_completion = mln_test_completion_default(0);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_runtime_clear_resource_provider(runtime, &resource_command_id)
+    mln_runtime_clear_resource_provider(runtime, &clear_completion.descriptor)
   );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_test_completion_finish(&clear_completion)
+  );
+  mln_test_completion_destroy(&clear_completion);
   mln_test_destroy_runtime(runtime);
   free(tile_bytes);
 

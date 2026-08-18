@@ -106,12 +106,9 @@ EM_JS(void, mln_test_unregister_offscreen_canvas, (const char* name), {
 typedef struct tracked_session {
   mln_render_session session;
   void* backend_state;
-  mln_notification_source source;
 } tracked_session;
 
 static MLN_FFI_TEST_THREAD_LOCAL mln_runtime tracked_runtime;
-static MLN_FFI_TEST_THREAD_LOCAL mln_notification_source
-  tracked_notification_source;
 static MLN_FFI_TEST_THREAD_LOCAL mln_event_batch compatibility_batch_handle;
 static MLN_FFI_TEST_THREAD_LOCAL mln_map
   tracked_maps[MLN_FFI_TEST_TRACKED_CAPACITY];
@@ -161,7 +158,6 @@ static void track_session(const mln_test_render_fixture* fixture) {
   tracked_sessions[tracked_session_count] = (tracked_session){
     .session = fixture->session,
     .backend_state = fixture->backend_state,
-    .source = fixture->source,
   };
   tracked_session_count += 1;
 }
@@ -188,41 +184,36 @@ mln_status mln_test_runtime_close(mln_runtime runtime) {
 
 mln_runtime mln_test_create_runtime(void) {
   mln_runtime runtime = MLN_HANDLE_NULL;
-  mln_notification_source source = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_notification_source_create(&source));
   mln_runtime_options options = mln_runtime_options_default();
-  options.notification_source = source;
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_create(&options, &runtime));
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, runtime);
   tracked_runtime = runtime;
-  tracked_notification_source = source;
   return runtime;
 }
 
 mln_status mln_test_map_create_status(
   mln_runtime runtime, const mln_map_options* options, mln_map* out_map
 ) {
-  mln_operation operation = MLN_HANDLE_NULL;
-  mln_status status = mln_map_create_start(runtime, options, &operation);
+  mln_test_completion completion =
+    mln_test_completion_default(sizeof(*out_map));
+  mln_status status = mln_map_create(runtime, options, &completion.descriptor);
   if (status != MLN_STATUS_OK) {
+    completion.descriptor.release_user_data(completion.descriptor.user_data);
+    mln_test_completion_destroy(&completion);
     return status;
   }
-  bool completed = false;
-  status = mln_operation_wait(operation, -1, &completed);
-  if (status == MLN_STATUS_OK && !completed) {
+  if (!mln_test_completion_wait(&completion, -1)) {
     status = MLN_STATUS_NATIVE_ERROR;
-  }
-  if (status == MLN_STATUS_OK) {
-    mln_status result = MLN_STATUS_NATIVE_ERROR;
-    status = mln_operation_get_status(operation, &result);
-    if (status == MLN_STATUS_OK) {
-      status = result;
+  } else {
+    status = mln_test_completion_status(&completion);
+    if (
+      status == MLN_STATUS_OK &&
+      !mln_test_completion_copy_value(&completion, out_map, sizeof(*out_map))
+    ) {
+      status = MLN_STATUS_NATIVE_ERROR;
     }
   }
-  if (status == MLN_STATUS_OK) {
-    status = mln_map_create_take_result(operation, out_map);
-  }
-  mln_operation_release(operation);
+  mln_test_completion_destroy(&completion);
   return status;
 }
 
@@ -250,77 +241,92 @@ mln_status mln_test_map_get_camera(
   return mln_map_camera_snapshot_get(map, out_camera, &generation);
 }
 
+static void discard_completion(
+  void* user_data, const mln_completion_result* result
+) {
+  (void)user_data;
+  (void)result;
+}
+
+mln_completion mln_test_discard_completion(void) {
+  const mln_completion completion = {
+    .size = sizeof(mln_completion),
+    .callback = discard_completion,
+  };
+  return completion;
+}
+
 mln_status mln_test_map_request_repaint(mln_map map) {
-  uint64_t command_id = 0;
-  return mln_map_request_repaint(map, &command_id);
+  const mln_completion completion = mln_test_discard_completion();
+  return mln_map_request_repaint(map, &completion);
 }
 
 mln_status mln_test_map_set_event_mask(mln_map map, uint64_t mask) {
-  uint64_t command_id = 0;
-  return mln_map_set_event_mask(map, mask, &command_id);
+  const mln_completion completion = mln_test_discard_completion();
+  return mln_map_set_event_mask(map, mask, &completion);
 }
 
 mln_status mln_test_map_set_style_json(mln_map map, mln_buffer_view json) {
-  uint64_t command_id = 0;
-  return mln_map_set_style_json(map, json, &command_id);
+  const mln_completion completion = mln_test_discard_completion();
+  return mln_map_set_style_json(map, json, &completion);
 }
 
 mln_status mln_test_map_set_style_url(mln_map map, const char* url) {
-  uint64_t command_id = 0;
-  return mln_map_set_style_url(map, url, &command_id);
+  const mln_completion completion = mln_test_discard_completion();
+  return mln_map_set_style_url(map, url, &completion);
 }
 
-static mln_status copy_map_buffer_operation(
-  mln_status (*start)(mln_map, mln_operation*),
-  mln_status (*take)(mln_operation, mln_buffer*), mln_map map, char* out,
+static mln_status copy_map_buffer_completion(
+  mln_status (*submit)(mln_map, const mln_completion*), mln_map map, char* out,
   size_t capacity, size_t* out_size
 ) {
   if (out_size == NULL || (out == NULL && capacity != 0)) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  mln_operation operation = MLN_HANDLE_NULL;
-  mln_status status = start(map, &operation);
+  mln_test_completion completion = mln_test_completion_buffer_view();
+  mln_status status = submit(map, &completion.descriptor);
   if (status != MLN_STATUS_OK) {
+    completion.descriptor.release_user_data(completion.descriptor.user_data);
+    mln_test_completion_destroy(&completion);
     return status;
   }
-  bool completed = false;
-  status = mln_operation_wait(operation, -1, &completed);
-  mln_buffer buffer = MLN_HANDLE_NULL;
-  if (status == MLN_STATUS_OK && completed) {
-    status = take(operation, &buffer);
-  }
-  if (status == MLN_STATUS_OK) {
-    mln_buffer_view view = {0};
-    status = mln_buffer_get(buffer, &view);
-    if (status == MLN_STATUS_OK) {
-      *out_size = view.size;
-      if (capacity < view.size) {
-        status = MLN_STATUS_INVALID_ARGUMENT;
-      } else if (view.size != 0) {
-        memcpy(out, view.data, view.size);
-      }
+  mln_buffer_view view = {0};
+  if (!mln_test_completion_wait(&completion, -1)) {
+    status = MLN_STATUS_NATIVE_ERROR;
+  } else {
+    status = mln_test_completion_status(&completion);
+    if (
+      status == MLN_STATUS_OK &&
+      !mln_test_completion_copy_value(&completion, &view, sizeof(view))
+    ) {
+      status = MLN_STATUS_NATIVE_ERROR;
     }
   }
-  mln_buffer_destroy(buffer);
-  mln_operation_release(operation);
+  if (status == MLN_STATUS_OK) {
+    *out_size = view.size;
+    if (capacity < view.size) {
+      status = MLN_STATUS_INVALID_ARGUMENT;
+    } else if (view.size != 0) {
+      memcpy(out, view.data, view.size);
+    }
+  }
+  mln_test_completion_destroy(&completion);
   return status;
 }
 
 mln_status mln_test_map_copy_loaded_style_json(
   mln_map map, char* out, size_t capacity, size_t* out_size
 ) {
-  return copy_map_buffer_operation(
-    mln_map_loaded_style_json_start, mln_map_loaded_style_json_take_result, map,
-    out, capacity, out_size
+  return copy_map_buffer_completion(
+    mln_map_loaded_style_json, map, out, capacity, out_size
   );
 }
 
 mln_status mln_test_map_copy_style_url(
   mln_map map, char* out, size_t capacity, size_t* out_size
 ) {
-  return copy_map_buffer_operation(
-    mln_map_style_url_start, mln_map_style_url_take_result, map, out, capacity,
-    out_size
+  return copy_map_buffer_completion(
+    mln_map_style_url, map, out, capacity, out_size
   );
 }
 
@@ -328,20 +334,17 @@ mln_map mln_test_create_map_with_options(
   mln_runtime runtime, const mln_map_options* options
 ) {
   mln_map map = MLN_HANDLE_NULL;
-  mln_operation operation = MLN_HANDLE_NULL;
+  mln_test_completion completion = mln_test_completion_default(sizeof(map));
   reserve_map_slot();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_create_start(runtime, options, &operation)
+    MLN_STATUS_OK, mln_map_create(runtime, options, &completion.descriptor)
   );
-  bool completed = false;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_operation_wait(operation, -1, &completed)
+  TEST_ASSERT_TRUE(mln_test_completion_wait(&completion, -1));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_status(&completion));
+  TEST_ASSERT_TRUE(
+    mln_test_completion_copy_value(&completion, &map, sizeof(map))
   );
-  TEST_ASSERT_TRUE(completed);
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK, mln_map_create_take_result(operation, &map)
-  );
-  mln_operation_release(operation);
+  mln_test_completion_destroy(&completion);
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, map);
   track_map(map);
   return map;
@@ -361,31 +364,22 @@ void mln_test_destroy_runtime(mln_runtime runtime) {
   if (tracked_runtime == runtime) {
     tracked_runtime = MLN_HANDLE_NULL;
   }
-  if (tracked_notification_source != MLN_HANDLE_NULL) {
-    mln_notification_source_release(tracked_notification_source);
-    tracked_notification_source = MLN_HANDLE_NULL;
-  }
 }
 
 mln_status mln_test_runtime_barrier(mln_runtime runtime) {
-  mln_operation operation = MLN_HANDLE_NULL;
-  mln_status status = mln_runtime_barrier_start(runtime, &operation);
+  mln_test_completion completion = mln_test_completion_default(0);
+  mln_status status = mln_runtime_barrier(runtime, &completion.descriptor);
   if (status != MLN_STATUS_OK) {
+    completion.descriptor.release_user_data(completion.descriptor.user_data);
+    mln_test_completion_destroy(&completion);
     return status;
   }
-  bool completed = false;
-  status = mln_operation_wait(operation, -1, &completed);
-  if (status == MLN_STATUS_OK && !completed) {
+  if (!mln_test_completion_wait(&completion, -1)) {
     status = MLN_STATUS_NATIVE_ERROR;
+  } else {
+    status = mln_test_completion_status(&completion);
   }
-  if (status == MLN_STATUS_OK) {
-    mln_status result = MLN_STATUS_NATIVE_ERROR;
-    status = mln_operation_get_status(operation, &result);
-    if (status == MLN_STATUS_OK) {
-      status = result;
-    }
-  }
-  mln_operation_release(operation);
+  mln_test_completion_destroy(&completion);
   return status;
 }
 
@@ -531,33 +525,15 @@ void mln_test_thread_join(mln_test_thread* thread) {
   free(thread);
 }
 
-static bool notification_source_contains_kind(
-  mln_notification_source source, uint32_t kind
-) {
-  mln_ready_batch batch = MLN_HANDLE_NULL;
-  if (mln_notification_source_drain_ready(source, &batch) != MLN_STATUS_OK) {
-    return false;
-  }
-  mln_ready_batch_view view = {.size = sizeof(mln_ready_batch_view)};
-  bool found = false;
-  if (mln_ready_batch_get(batch, &view) == MLN_STATUS_OK) {
-    for (size_t index = 0; index < view.endpoint_count; index += 1) {
-      const mln_ready_endpoint* endpoint =
-        (const mln_ready_endpoint*)((const char*)view.endpoints +
-                                    index * view.endpoint_size);
-      found = found || endpoint->kind == kind;
-    }
-  }
-  mln_ready_batch_release(batch);
-  return found;
+static void count_wake(void* user_data) {
+  atomic_fetch_add((atomic_uint*)user_data, 1U);
 }
 
 mln_status mln_test_render_fixture_finish_operation(
-  const mln_test_render_fixture* fixture, mln_operation operation
+  const mln_test_render_fixture* fixture, mln_test_completion* completion
 ) {
   if (
-    fixture == NULL || fixture->session == MLN_HANDLE_NULL ||
-    operation == MLN_HANDLE_NULL
+    fixture == NULL || fixture->session == MLN_HANDLE_NULL || completion == NULL
   ) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -572,10 +548,7 @@ mln_status mln_test_render_fixture_finish_operation(
         return service_status;
       }
     }
-    const mln_status wait_status = mln_operation_wait(operation, 0, &completed);
-    if (wait_status != MLN_STATUS_OK) {
-      return wait_status;
-    }
+    completed = mln_test_completion_poll(completion);
     if (!completed) {
       mln_test_sleep_millisecond();
     }
@@ -583,10 +556,7 @@ mln_status mln_test_render_fixture_finish_operation(
   if (!completed) {
     return MLN_STATUS_NOT_READY;
   }
-  mln_status terminal_status = MLN_STATUS_NATIVE_ERROR;
-  const mln_status status =
-    mln_operation_get_status(operation, &terminal_status);
-  return status == MLN_STATUS_OK ? terminal_status : status;
+  return mln_test_completion_status(completion);
 }
 
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
@@ -837,15 +807,18 @@ mln_test_fixture_result mln_test_dedicated_egl_surface_create(
   mln_render_session_attach_options options =
     mln_render_session_attach_options_default();
   options.driver = fixture->driver;
-  mln_operation attach = MLN_HANDLE_NULL;
-  const mln_status attach_status = mln_opengl_surface_attach_start(
-    map, &descriptor, &options, &fixture->session, &attach
+  mln_test_completion attach = mln_test_completion_default(0);
+  const mln_status attach_status = mln_opengl_surface_attach(
+    map, &descriptor, &options, &fixture->session, &attach.descriptor
   );
   if (
     attach_status != MLN_STATUS_OK ||
-    mln_test_render_fixture_finish_operation(fixture, attach) != MLN_STATUS_OK
+    mln_test_render_fixture_finish_operation(fixture, &attach) != MLN_STATUS_OK
   ) {
-    mln_operation_release(attach);
+    if (attach_status != MLN_STATUS_OK) {
+      attach.descriptor.release_user_data(attach.descriptor.user_data);
+    }
+    mln_test_completion_destroy(&attach);
     if (fixture->session != MLN_HANDLE_NULL) {
       mln_render_abandon_result abandoned = {
         .size = sizeof(mln_render_abandon_result)
@@ -858,7 +831,7 @@ mln_test_fixture_result mln_test_dedicated_egl_surface_create(
     *fixture = (mln_test_render_fixture){0};
     return MLN_TEST_FIXTURE_ATTACH_FAILED;
   }
-  mln_operation_release(attach);
+  mln_test_completion_destroy(&attach);
   return MLN_TEST_FIXTURE_OK;
 }
 
@@ -867,14 +840,16 @@ void mln_test_dedicated_egl_surface_destroy(mln_test_render_fixture* fixture) {
     return;
   }
   if (fixture->session != 0) {
-    mln_operation detach = MLN_HANDLE_NULL;
+    mln_test_completion detach = mln_test_completion_default(0);
     if (
-      mln_render_session_detach_start(fixture->session, &detach) ==
+      mln_render_session_detach(fixture->session, &detach.descriptor) ==
       MLN_STATUS_OK
     ) {
-      (void)mln_test_render_fixture_finish_operation(fixture, detach);
-      mln_operation_release(detach);
+      (void)mln_test_render_fixture_finish_operation(fixture, &detach);
+    } else {
+      detach.descriptor.release_user_data(detach.descriptor.user_data);
     }
+    mln_test_completion_destroy(&detach);
     (void)mln_render_session_destroy(fixture->session);
     fixture->session = 0;
   }
@@ -922,15 +897,18 @@ mln_test_fixture_result mln_test_dedicated_egl_texture_create(
     mln_render_session_attach_options_default();
   options.driver = fixture->driver;
   options.requested_texture_ring_depth = 3;
-  mln_operation attach = MLN_HANDLE_NULL;
-  const mln_status attach_status = mln_opengl_owned_texture_attach_start(
-    map, &descriptor, &options, &fixture->session, &attach
+  mln_test_completion attach = mln_test_completion_default(0);
+  const mln_status attach_status = mln_opengl_owned_texture_attach(
+    map, &descriptor, &options, &fixture->session, &attach.descriptor
   );
   const mln_status finish_status =
     attach_status == MLN_STATUS_OK
-      ? mln_test_render_fixture_finish_operation(fixture, attach)
+      ? mln_test_render_fixture_finish_operation(fixture, &attach)
       : attach_status;
-  mln_operation_release(attach);
+  if (attach_status != MLN_STATUS_OK) {
+    attach.descriptor.release_user_data(attach.descriptor.user_data);
+  }
+  mln_test_completion_destroy(&attach);
   if (finish_status != MLN_STATUS_OK) {
     if (fixture->session != MLN_HANDLE_NULL) {
       mln_render_abandon_result abandoned = {
@@ -951,15 +929,16 @@ void mln_test_dedicated_egl_texture_destroy(mln_test_render_fixture* fixture) {
     return;
   }
   if (fixture->session != MLN_HANDLE_NULL) {
-    mln_operation detach = MLN_HANDLE_NULL;
+    mln_test_completion detach = mln_test_completion_default(0);
     mln_status detach_status =
-      mln_render_session_detach_start(fixture->session, &detach);
+      mln_render_session_detach(fixture->session, &detach.descriptor);
     if (detach_status == MLN_STATUS_OK) {
-      detach_status = mln_test_render_fixture_finish_operation(fixture, detach);
+      detach_status =
+        mln_test_render_fixture_finish_operation(fixture, &detach);
+    } else {
+      detach.descriptor.release_user_data(detach.descriptor.user_data);
     }
-    if (detach != MLN_HANDLE_NULL) {
-      mln_operation_release(detach);
-    }
+    mln_test_completion_destroy(&detach);
     if (detach_status != MLN_STATUS_OK) {
       mln_render_abandon_result abandoned = {
         .size = sizeof(mln_render_abandon_result)
@@ -1650,38 +1629,39 @@ bool mln_test_render_fixture_create(
   mln_webgpu_owned_texture_descriptor descriptor =
     mln_webgpu_owned_texture_descriptor_default();
 #endif
-  if (mln_notification_source_create(&fixture->source) != MLN_STATUS_OK) {
-    destroy_backend_state(fixture->backend_state);
-    *fixture = (mln_test_render_fixture){0};
-    return false;
-  }
   options.driver = fixture->driver;
-  options.operation_source = fixture->source;
+  options.frame_wake = (mln_wake){
+    .size = sizeof(mln_wake),
+    .callback = count_wake,
+    .user_data = &fixture->frame_wakes
+  };
+  options.driver_work_wake = (mln_wake){
+    .size = sizeof(mln_wake),
+    .callback = count_wake,
+    .user_data = &fixture->driver_wakes
+  };
   descriptor.extent.width = 64;
   descriptor.extent.height = 64;
   descriptor.context = context;
-  mln_operation operation = MLN_HANDLE_NULL;
+  mln_test_completion completion = mln_test_completion_default(0);
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
-  const mln_status status = mln_metal_owned_texture_attach_start(
-    map, &descriptor, &options, &fixture->session, &operation
+  const mln_status status = mln_metal_owned_texture_attach(
+    map, &descriptor, &options, &fixture->session, &completion.descriptor
   );
 #elif defined(MLN_FFI_TEST_BACKEND_OPENGL)
-  const mln_status status = mln_opengl_owned_texture_attach_start(
-    map, &descriptor, &options, &fixture->session, &operation
+  const mln_status status = mln_opengl_owned_texture_attach(
+    map, &descriptor, &options, &fixture->session, &completion.descriptor
   );
 #elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
-  const mln_status status = mln_vulkan_owned_texture_attach_start(
-    map, &descriptor, &options, &fixture->session, &operation
+  const mln_status status = mln_vulkan_owned_texture_attach(
+    map, &descriptor, &options, &fixture->session, &completion.descriptor
   );
 #elif defined(MLN_FFI_TEST_BACKEND_WEBGPU)
-  const mln_status status = mln_webgpu_owned_texture_attach_start(
-    map, &descriptor, &options, &fixture->session, &operation
+  const mln_status status = mln_webgpu_owned_texture_attach(
+    map, &descriptor, &options, &fixture->session, &completion.descriptor
   );
 #endif
-  if (
-    status == MLN_STATUS_OK && fixture->session != MLN_HANDLE_NULL &&
-    operation != MLN_HANDLE_NULL
-  ) {
+  if (status == MLN_STATUS_OK && fixture->session != MLN_HANDLE_NULL) {
     mln_render_session_snapshot attaching = {
       .size = sizeof(mln_render_session_snapshot)
     };
@@ -1690,21 +1670,21 @@ bool mln_test_render_fixture_create(
         MLN_STATUS_OK &&
       attaching.state == MLN_RENDER_SESSION_STATE_ATTACHING;
     if (fixture->driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {
-      fixture->observed_driver_ready = notification_source_contains_kind(
-        fixture->source, MLN_NOTIFICATION_ENDPOINT_DRIVER_WORK
-      );
+      fixture->observed_driver_ready = atomic_load(&fixture->driver_wakes) != 0;
     }
   }
   const mln_status finish_status =
-    status == MLN_STATUS_OK && fixture->session != MLN_HANDLE_NULL &&
-        operation != MLN_HANDLE_NULL
-      ? mln_test_render_fixture_finish_operation(fixture, operation)
+    status == MLN_STATUS_OK && fixture->session != MLN_HANDLE_NULL
+      ? mln_test_render_fixture_finish_operation(fixture, &completion)
       : MLN_STATUS_INVALID_STATE;
   if (
     status != MLN_STATUS_OK || fixture->session == MLN_HANDLE_NULL ||
-    operation == MLN_HANDLE_NULL || finish_status != MLN_STATUS_OK
+    finish_status != MLN_STATUS_OK
   ) {
-    mln_operation_release(operation);
+    if (status != MLN_STATUS_OK) {
+      completion.descriptor.release_user_data(completion.descriptor.user_data);
+    }
+    mln_test_completion_destroy(&completion);
     if (fixture->session != MLN_HANDLE_NULL) {
       mln_render_abandon_result abandoned = {
         .size = sizeof(mln_render_abandon_result)
@@ -1713,11 +1693,10 @@ bool mln_test_render_fixture_create(
       (void)mln_render_session_destroy(fixture->session);
     }
     destroy_backend_state(fixture->backend_state);
-    mln_notification_source_release(fixture->source);
     *fixture = (mln_test_render_fixture){0};
     return false;
   }
-  mln_operation_release(operation);
+  mln_test_completion_destroy(&completion);
   track_session(fixture);
   return true;
 }
@@ -1755,44 +1734,40 @@ bool mln_test_transferred_webgl_surface_create(
     .kind = MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS,
     .canvas_selector = mln_test_buffer_view(target, strlen(target)),
   };
-  if (mln_notification_source_create(&fixture->source) != MLN_STATUS_OK) {
-    destroy_backend_state(fixture->backend_state);
-    *fixture = (mln_test_render_fixture){0};
-    return false;
-  }
   mln_render_session_attach_options options =
     mln_render_session_attach_options_default();
   options.driver = fixture->driver;
-  options.operation_source = fixture->source;
-  mln_operation operation = MLN_HANDLE_NULL;
-  const mln_status status = mln_opengl_surface_attach_start(
-    map, &descriptor, &options, &fixture->session, &operation
+  options.frame_wake = (mln_wake){
+    .size = sizeof(mln_wake),
+    .callback = count_wake,
+    .user_data = &fixture->frame_wakes
+  };
+  options.driver_work_wake = (mln_wake){
+    .size = sizeof(mln_wake),
+    .callback = count_wake,
+    .user_data = &fixture->driver_wakes
+  };
+  mln_test_completion completion = mln_test_completion_default(0);
+  const mln_status status = mln_opengl_surface_attach(
+    map, &descriptor, &options, &fixture->session, &completion.descriptor
   );
   const mln_status finish_status =
-    status == MLN_STATUS_OK && fixture->session != MLN_HANDLE_NULL &&
-        operation != MLN_HANDLE_NULL
-      ? mln_test_render_fixture_finish_operation(fixture, operation)
+    status == MLN_STATUS_OK && fixture->session != MLN_HANDLE_NULL
+      ? mln_test_render_fixture_finish_operation(fixture, &completion)
       : MLN_STATUS_INVALID_STATE;
   if (
     status != MLN_STATUS_OK || finish_status != MLN_STATUS_OK ||
     fixture->session == MLN_HANDLE_NULL
   ) {
-    char diagnostic[256] = {0};
-    size_t diagnostic_size = 0;
-    if (operation != MLN_HANDLE_NULL) {
-      (void)mln_operation_copy_diagnostic(
-        operation, diagnostic, sizeof(diagnostic) - 1, &diagnostic_size
-      );
+    if (status != MLN_STATUS_OK) {
+      completion.descriptor.release_user_data(completion.descriptor.user_data);
     }
     fprintf(
       stderr,
-      "transferred WebGL attach failed: start=%d finish=%d diagnostic=%.*s\n",
-      status, finish_status,
-      (int)(diagnostic_size < sizeof(diagnostic) ? diagnostic_size
-                                                 : sizeof(diagnostic) - 1),
-      diagnostic
+      "transferred WebGL attach failed: submit=%d finish=%d diagnostic=%s\n",
+      status, finish_status, mln_test_completion_diagnostic(&completion)
     );
-    mln_operation_release(operation);
+    mln_test_completion_destroy(&completion);
     if (fixture->session != MLN_HANDLE_NULL) {
       mln_render_abandon_result abandoned = {
         .size = sizeof(mln_render_abandon_result)
@@ -1801,11 +1776,10 @@ bool mln_test_transferred_webgl_surface_create(
       (void)mln_render_session_destroy(fixture->session);
     }
     destroy_backend_state(fixture->backend_state);
-    mln_notification_source_release(fixture->source);
     *fixture = (mln_test_render_fixture){0};
     return false;
   }
-  mln_operation_release(operation);
+  mln_test_completion_destroy(&completion);
   track_session(fixture);
   return true;
 }
@@ -1940,24 +1914,25 @@ void mln_test_render_fixture_destroy(mln_test_render_fixture* fixture) {
     return;
   }
   if (fixture->session != MLN_HANDLE_NULL) {
-    mln_operation detach = MLN_HANDLE_NULL;
+    mln_test_completion detach = mln_test_completion_default(0);
     const mln_status detach_status =
-      mln_render_session_detach_start(fixture->session, &detach);
+      mln_render_session_detach(fixture->session, &detach.descriptor);
     if (detach_status == MLN_STATUS_OK) {
       TEST_ASSERT_EQUAL_INT(
-        MLN_STATUS_OK, mln_test_render_fixture_finish_operation(fixture, detach)
+        MLN_STATUS_OK,
+        mln_test_render_fixture_finish_operation(fixture, &detach)
       );
-      mln_operation_release(detach);
     } else {
+      detach.descriptor.release_user_data(detach.descriptor.user_data);
       TEST_ASSERT_EQUAL_INT(MLN_STATUS_INVALID_STATE, detach_status);
     }
+    mln_test_completion_destroy(&detach);
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK, mln_render_session_destroy(fixture->session)
     );
   }
   untrack_session(fixture->session);
   destroy_backend_state(fixture->backend_state);
-  mln_notification_source_release(fixture->source);
   *fixture = (mln_test_render_fixture){0};
 }
 
@@ -1978,7 +1953,6 @@ bool mln_test_reclaim_thread_resources(void) {
       (void)mln_render_session_destroy(entry.session);
     }
     destroy_backend_state(entry.backend_state);
-    mln_notification_source_release(entry.source);
     reclaimed = true;
   }
   while (tracked_map_count > 0) {
@@ -1989,11 +1963,6 @@ bool mln_test_reclaim_thread_resources(void) {
   if (tracked_runtime != MLN_HANDLE_NULL) {
     (void)mln_runtime_release(tracked_runtime);
     tracked_runtime = MLN_HANDLE_NULL;
-    reclaimed = true;
-  }
-  if (tracked_notification_source != MLN_HANDLE_NULL) {
-    mln_notification_source_release(tracked_notification_source);
-    tracked_notification_source = MLN_HANDLE_NULL;
     reclaimed = true;
   }
   return reclaimed;
