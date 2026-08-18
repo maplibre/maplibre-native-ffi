@@ -419,6 +419,37 @@ class MapHandleTest {
   }
 
   @Test
+  fun sixLiveCustomGeometrySourcesStayRegistered() {
+    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+      MapHandle.create(
+          runtime,
+          MapOptions().apply {
+            width = 64
+            height = 64
+            mapMode = MapMode.STATIC
+          },
+        )
+        .use { map ->
+          map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
+          val options =
+            CustomGeometrySourceOptions(
+              object : CustomGeometrySourceCallback {
+                override fun fetchTile(tileId: CanonicalTileId) {}
+              }
+            )
+          val ids = (1..6).map { "custom-$it" }
+          ids.forEach { map.addCustomGeometrySource(it, options) }
+          ids.forEach { id -> assertTrue(map.styleSourceExists(id), id) }
+
+          assertTrue(map.removeStyleSource("custom-1"))
+          map.addCustomGeometrySource("custom-7", options)
+          assertTrue(map.styleSourceExists("custom-7"))
+          assertFalse(map.styleSourceExists("custom-1"))
+        }
+    }
+  }
+
+  @Test
   fun tileSourcesCanBeAddedAndInspected() {
     val runtime = RuntimeHandle.create(RuntimeOptions())
     val map =

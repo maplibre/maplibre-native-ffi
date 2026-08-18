@@ -10,6 +10,7 @@ import kotlin.test.assertTrue
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.internal.javacpp.JavaCppSupport
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
+import org.maplibre.nativeffi.resource.HttpHeaderTransformCallback
 import org.maplibre.nativeffi.resource.ResourceKind
 import org.maplibre.nativeffi.resource.ResourceProviderCallback
 import org.maplibre.nativeffi.resource.ResourceProviderDecision
@@ -98,6 +99,97 @@ class ResourceCallbackStateTest {
         assertTrue(state.isClosedForTesting())
         assertEquals(MaplibreStatus.INVALID_ARGUMENT.nativeCode, state.invoke(991, url, response))
       }
+    }
+  }
+
+  @Test
+  fun elevenLiveCallbackStatesKeepNonNullThunksAndDispatchByUserData() {
+    val providerHits = IntArray(11)
+    val transformHits = IntArray(11)
+    val headerHits = IntArray(11)
+    val providers =
+      List(11) { index ->
+        ResourceProviderState(
+          ResourceProviderCallback { _, _ ->
+            providerHits[index] += 1
+            ResourceProviderDecision.PASS_THROUGH
+          }
+        )
+      }
+    val transforms =
+      List(11) { index ->
+        ResourceTransformState(
+          ResourceTransformCallback { _ ->
+            transformHits[index] += 1
+            null
+          }
+        )
+      }
+    val headers =
+      List(11) { index ->
+        HttpHeaderTransformState(
+          HttpHeaderTransformCallback { _ ->
+            headerHits[index] += 1
+            emptyList()
+          }
+        )
+      }
+    try {
+      providers.forEach { assertFalse(it.descriptor().callback().isNull) }
+      transforms.forEach { assertFalse(it.descriptor().callback().isNull) }
+      headers.forEach { assertFalse(it.descriptor().callback().isNull) }
+
+      withRequest { request ->
+        val first = providers.first()
+        val last = providers.last()
+        assertEquals(
+          ResourceProviderDecision.PASS_THROUGH.nativeValue,
+          first.descriptor().callback().call(first.descriptor().user_data(), request, 1),
+        )
+        assertEquals(
+          ResourceProviderDecision.PASS_THROUGH.nativeValue,
+          last.descriptor().callback().call(last.descriptor().user_data(), request, 2),
+        )
+      }
+      JavaCppSupport.cString("https://example.com/style.json").use { url ->
+        MaplibreNativeC.mln_resource_transform_response().use { response ->
+          val first = transforms.first()
+          val last = transforms.last()
+          assertEquals(
+            MaplibreStatus.OK.nativeCode,
+            first.descriptor().callback().call(first.descriptor().user_data(), 1, url, response),
+          )
+          assertEquals(
+            MaplibreStatus.OK.nativeCode,
+            last.descriptor().callback().call(last.descriptor().user_data(), 1, url, response),
+          )
+        }
+        MaplibreNativeC.mln_http_header_transform_response().use { response ->
+          val first = headers.first()
+          val last = headers.last()
+          assertEquals(
+            MaplibreStatus.OK.nativeCode,
+            first.descriptor().callback().call(first.descriptor().user_data(), 1, url, response),
+          )
+          assertEquals(
+            MaplibreStatus.OK.nativeCode,
+            last.descriptor().callback().call(last.descriptor().user_data(), 1, url, response),
+          )
+        }
+      }
+      assertEquals(1, providerHits.first())
+      assertEquals(1, providerHits.last())
+      assertEquals(0, providerHits.slice(1..9).sum())
+      assertEquals(1, transformHits.first())
+      assertEquals(1, transformHits.last())
+      assertEquals(0, transformHits.slice(1..9).sum())
+      assertEquals(1, headerHits.first())
+      assertEquals(1, headerHits.last())
+      assertEquals(0, headerHits.slice(1..9).sum())
+    } finally {
+      providers.forEach { it.close() }
+      transforms.forEach { it.close() }
+      headers.forEach { it.close() }
     }
   }
 
