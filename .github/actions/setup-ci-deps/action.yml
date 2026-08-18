@@ -115,8 +115,8 @@ runs:
     # GitHub-hosted x64 runners prefer azure.archive.ubuntu.com. When that
     # mirror crawls, apt keeps the connection instead of failing over, and
     # `mise bootstrap`'s libclang-dev download sits in this action for tens
-    # of minutes. Bound idle fetches and wrap apt-get so a crawl demotes the
-    # Azure mirror and retries. ARM runners use ports.ubuntu.com instead.
+    # of minutes. Demote Azure and bound idle fetches before any apt-get.
+    # ARM runners use ports.ubuntu.com instead.
     - name: Bound apt downloads on Linux
       if: ${{ runner.os == 'Linux' }}
       shell: bash
