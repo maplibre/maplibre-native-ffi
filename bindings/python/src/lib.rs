@@ -191,6 +191,11 @@ struct CustomGeometrySourceHandle {
     shared: Arc<PyCustomGeometrySourceShared>,
 }
 
+#[pyclass(name = "_CustomMvtVectorSourceHandle")]
+struct CustomMvtVectorSourceHandle {
+    shared: Arc<PyCustomGeometrySourceShared>,
+}
+
 struct RenderSessionState {
     handle: maplibre_core::handle::NativeHandleState<sys::mln_render_session>,
     detached: bool,
@@ -737,6 +742,50 @@ impl Drop for PyCustomGeometrySourceState {
     }
 }
 
+struct PyCustomMvtVectorSourceState {
+    shared: Arc<PyCustomGeometrySourceShared>,
+    min_zoom: Option<f64>,
+    max_zoom: Option<f64>,
+    has_cancel_tile: bool,
+}
+
+impl PyCustomMvtVectorSourceState {
+    fn new(
+        max_queued_events: usize,
+        min_zoom: Option<f64>,
+        max_zoom: Option<f64>,
+        has_cancel_tile: bool,
+    ) -> Box<Self> {
+        Box::new(Self {
+            shared: PyCustomGeometrySourceShared::new(max_queued_events),
+            min_zoom,
+            max_zoom,
+            has_cancel_tile,
+        })
+    }
+
+    fn descriptor(&self) -> sys::mln_custom_mvt_vector_source_options {
+        maplibre_core::style::custom_mvt_vector_source_options_to_native(
+            maplibre_core::style::CustomMvtVectorSourceDescriptorFields {
+                fetch_tile: Some(custom_mvt_vector_fetch_tile_trampoline),
+                cancel_tile: self
+                    .has_cancel_tile
+                    .then_some(custom_mvt_vector_cancel_tile_trampoline as _),
+                release_user_data: Some(custom_mvt_vector_release_trampoline),
+                user_data: ptr::from_ref(self).cast_mut().cast::<c_void>(),
+                min_zoom: self.min_zoom,
+                max_zoom: self.max_zoom,
+            },
+        )
+    }
+}
+
+impl Drop for PyCustomMvtVectorSourceState {
+    fn drop(&mut self) {
+        self.shared.close();
+    }
+}
+
 /// Takes back the callback state the C API stopped referencing.
 ///
 /// The C API calls this once on the map owner thread, whether the source was
@@ -780,6 +829,56 @@ unsafe extern "C" fn custom_geometry_cancel_tile_trampoline(
             return;
         };
         // SAFETY: user_data points to PyCustomGeometrySourceState retained by the
+        // map until source/style/map teardown waits for in-flight callbacks.
+        let state = unsafe { state.as_ref() };
+        let Some(_guard) = state.shared.enter_callback() else {
+            return;
+        };
+        state.shared.enqueue(1, tile_id);
+    }));
+}
+
+unsafe extern "C" fn custom_mvt_vector_release_trampoline(user_data: *mut c_void) {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        let Some(state) = ptr::NonNull::new(user_data.cast::<PyCustomMvtVectorSourceState>())
+        else {
+            return;
+        };
+        // SAFETY: user_data is the Box this binding leaked into a successful
+        // mln_map_add_custom_mvt_vector_source, and the C API releases it once.
+        drop(unsafe { Box::from_raw(state.as_ptr()) });
+    }));
+}
+
+unsafe extern "C" fn custom_mvt_vector_fetch_tile_trampoline(
+    user_data: *mut c_void,
+    tile_id: sys::mln_canonical_tile_id,
+) {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        let Some(state) = ptr::NonNull::new(user_data.cast::<PyCustomMvtVectorSourceState>())
+        else {
+            return;
+        };
+        // SAFETY: user_data points to PyCustomMvtVectorSourceState retained by the
+        // map until source/style/map teardown waits for in-flight callbacks.
+        let state = unsafe { state.as_ref() };
+        let Some(_guard) = state.shared.enter_callback() else {
+            return;
+        };
+        state.shared.enqueue(0, tile_id);
+    }));
+}
+
+unsafe extern "C" fn custom_mvt_vector_cancel_tile_trampoline(
+    user_data: *mut c_void,
+    tile_id: sys::mln_canonical_tile_id,
+) {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        let Some(state) = ptr::NonNull::new(user_data.cast::<PyCustomMvtVectorSourceState>())
+        else {
+            return;
+        };
+        // SAFETY: user_data points to PyCustomMvtVectorSourceState retained by the
         // map until source/style/map teardown waits for in-flight callbacks.
         let state = unsafe { state.as_ref() };
         let Some(_guard) = state.shared.enter_callback() else {
@@ -3622,6 +3721,115 @@ impl MapHandle {
         .map_err(map_error)
     }
 
+    fn add_custom_mvt_vector_source(
+        &self,
+        source_id: String,
+        max_queued_events: usize,
+        min_zoom: Option<f64>,
+        max_zoom: Option<f64>,
+        has_cancel_tile: bool,
+    ) -> PyResult<CustomMvtVectorSourceHandle> {
+        if max_queued_events == 0 {
+            return Err(invalid_argument_error(
+                "max_queued_events must be greater than zero",
+            ));
+        }
+        let state = PyCustomMvtVectorSourceState::new(
+            max_queued_events,
+            min_zoom,
+            max_zoom,
+            has_cancel_tile,
+        );
+        let descriptor = state.descriptor();
+        let handle = CustomMvtVectorSourceHandle {
+            shared: Arc::clone(&state.shared),
+        };
+        let source_id_view = maplibre_core::string::string_view(&source_id);
+        let map_state = self.state();
+        // SAFETY: map_state owns or has released the map pointer. The C API
+        // validates that it is live. source_id_view and descriptor are valid for
+        // this call, and descriptor's release callback takes the leaked state
+        // back once the C API stops referencing it.
+        maplibre_core::check(unsafe {
+            sys::mln_map_add_custom_mvt_vector_source(
+                map_state.handle(),
+                source_id_view.raw(),
+                &descriptor,
+            )
+        })
+        .map_err(map_error)?;
+        Box::leak(state);
+        Ok(handle)
+    }
+
+    fn set_custom_mvt_vector_source_tile_data(
+        &self,
+        source_id: String,
+        z: u32,
+        x: u32,
+        y: u32,
+        data: &Bound<'_, PyBytes>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let source_id = maplibre_core::string::string_view(&source_id);
+        let data = maplibre_core::string::buffer_view(data.as_bytes());
+        // SAFETY: The C API validates the map pointer, source ID, tile ID, and
+        // MVT buffer view.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_custom_mvt_vector_source_tile_data(
+                state.handle(),
+                source_id.raw(),
+                sys::mln_canonical_tile_id { z, x, y },
+                data,
+            )
+        })
+        .map_err(map_error)
+    }
+
+    fn set_custom_mvt_vector_source_tile_error(
+        &self,
+        source_id: String,
+        z: u32,
+        x: u32,
+        y: u32,
+        message: String,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let source_id = maplibre_core::string::string_view(&source_id);
+        let message = maplibre_core::string::string_view(&message);
+        // SAFETY: The C API validates the map pointer, source ID, tile ID, and
+        // diagnostic message view.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_custom_mvt_vector_source_tile_error(
+                state.handle(),
+                source_id.raw(),
+                sys::mln_canonical_tile_id { z, x, y },
+                message.raw(),
+            )
+        })
+        .map_err(map_error)
+    }
+
+    fn invalidate_custom_mvt_vector_source_tile(
+        &self,
+        source_id: String,
+        z: u32,
+        x: u32,
+        y: u32,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let source_id = maplibre_core::string::string_view(&source_id);
+        // SAFETY: The C API validates the map pointer, source ID, and tile ID.
+        maplibre_core::check(unsafe {
+            sys::mln_map_invalidate_custom_mvt_vector_source_tile(
+                state.handle(),
+                source_id.raw(),
+                sys::mln_canonical_tile_id { z, x, y },
+            )
+        })
+        .map_err(map_error)
+    }
+
     #[getter]
     fn closed(&self) -> bool {
         self.state().is_closed()
@@ -4551,6 +4759,54 @@ impl LogReceiver {
 
 #[pymethods]
 impl CustomGeometrySourceHandle {
+    fn close(&self) {
+        self.shared.close();
+    }
+
+    fn poll_event(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
+        let mut queue = self
+            .shared
+            .queue
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let Some(event) = queue.events.pop_front() else {
+            return Ok(None);
+        };
+        drop(queue);
+        custom_geometry_event_to_py(py, event).map(Some)
+    }
+
+    fn push_fetch_for_test(&self, z: u32, x: u32, y: u32) {
+        self.shared
+            .enqueue(0, sys::mln_canonical_tile_id { z, x, y });
+    }
+
+    fn push_cancel_for_test(&self, z: u32, x: u32, y: u32) {
+        self.shared
+            .enqueue(1, sys::mln_canonical_tile_id { z, x, y });
+    }
+
+    #[getter]
+    fn dropped_event_count(&self) -> u64 {
+        self.shared
+            .queue
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .dropped_events
+    }
+
+    #[getter]
+    fn closed(&self) -> bool {
+        self.shared
+            .queue
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .closed
+    }
+}
+
+#[pymethods]
+impl CustomMvtVectorSourceHandle {
     fn close(&self) {
         self.shared.close();
     }
@@ -8022,6 +8278,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<WakeSource>()?;
     module.add_class::<LogReceiver>()?;
     module.add_class::<CustomGeometrySourceHandle>()?;
+    module.add_class::<CustomMvtVectorSourceHandle>()?;
     module.add_class::<RenderSessionHandle>()?;
     module.add_class::<DetachedRenderSessionHandle>()?;
     module.add_class::<MetalOwnedTextureFrameHandle>()?;

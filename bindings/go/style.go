@@ -440,6 +440,47 @@ type CustomGeometrySourceOptions struct {
 	Wrap       *bool
 }
 
+// CustomMVTVectorTileCallback receives custom MVT vector tile requests. Native
+// code may invoke it on worker threads, racing owner-thread map calls, so it
+// must be thread-safe, must not call MapLibre map APIs, and should queue
+// SetCustomMVTVectorSourceTileData, SetCustomMVTVectorSourceTileError, or
+// invalidation work back to the map owner thread. Panics are recovered and
+// ignored.
+type CustomMVTVectorTileCallback func(CanonicalTileID)
+
+// CustomMVTVectorSourceOptions configures a custom MVT vector source. CancelTile
+// is best-effort and may be repeated or race with FetchTile.
+type CustomMVTVectorSourceOptions struct {
+	FetchTile  CustomMVTVectorTileCallback
+	CancelTile CustomMVTVectorTileCallback
+	MinZoom    *float64
+	MaxZoom    *float64
+}
+
+func (options CustomMVTVectorSourceOptions) toCallback() callback.CustomMVTVectorSourceOptions {
+	raw := callback.CustomMVTVectorSourceOptions{
+		FetchTile: func(tileID callback.CanonicalTileID) {
+			if options.FetchTile != nil {
+				options.FetchTile(CanonicalTileID{Z: tileID.Z, X: tileID.X, Y: tileID.Y})
+			}
+		},
+	}
+	if options.CancelTile != nil {
+		raw.CancelTile = func(tileID callback.CanonicalTileID) {
+			options.CancelTile(CanonicalTileID{Z: tileID.Z, X: tileID.X, Y: tileID.Y})
+		}
+	}
+	if options.MinZoom != nil {
+		raw.Fields |= C.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM
+		raw.MinZoom = *options.MinZoom
+	}
+	if options.MaxZoom != nil {
+		raw.Fields |= C.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM
+		raw.MaxZoom = *options.MaxZoom
+	}
+	return raw
+}
+
 func (options CustomGeometrySourceOptions) toCallback() callback.CustomGeometrySourceOptions {
 	raw := callback.CustomGeometrySourceOptions{
 		FetchTile: func(tileID callback.CanonicalTileID) {
@@ -1066,6 +1107,85 @@ func (m *MapHandle) InvalidateCustomGeometrySourceRegion(sourceID string, bounds
 	defer sourceView.free()
 	return checkNative(func() int32 {
 		return int32(C.mln_map_invalidate_custom_geometry_source_region(C.mln_map(ptr), sourceView.raw(), cLatLngBounds(bounds)))
+	})
+}
+
+// AddCustomMVTVectorSource adds a custom MVT vector source to the current style.
+// Callback state remains valid until source removal, style replacement, or map
+// close, each of which frees it on the map owner thread. A failed add frees it
+// before returning.
+func (m *MapHandle) AddCustomMVTVectorSource(sourceID string, options CustomMVTVectorSourceOptions) error {
+	if options.FetchTile == nil {
+		return newBindingError(ErrInvalidArgument, "CustomMVTVectorSourceOptions.FetchTile is nil")
+	}
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+
+	return checkNative(func() int32 {
+		return callback.AddCustomMVTVectorSource(uint64(ptr), sourceID, options.toCallback())
+	})
+}
+
+// SetCustomMVTVectorSourceTileData sets custom MVT vector data for one tile.
+func (m *MapHandle) SetCustomMVTVectorSourceTileData(sourceID string, tileID CanonicalTileID, data []byte) error {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	sourceView := newCStringView(sourceID)
+	defer sourceView.free()
+	rawData := newCBufferView(data)
+	defer rawData.free()
+	return checkNative(func() int32 {
+		return int32(C.mln_map_set_custom_mvt_vector_source_tile_data(
+			C.mln_map(ptr),
+			sourceView.raw(),
+			cCanonicalTileID(tileID),
+			rawData.raw(),
+		))
+	})
+}
+
+// SetCustomMVTVectorSourceTileError reports a custom MVT vector source error for one tile.
+func (m *MapHandle) SetCustomMVTVectorSourceTileError(sourceID string, tileID CanonicalTileID, message string) error {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	sourceView := newCStringView(sourceID)
+	defer sourceView.free()
+	messageView := newCStringView(message)
+	defer messageView.free()
+	return checkNative(func() int32 {
+		return int32(C.mln_map_set_custom_mvt_vector_source_tile_error(
+			C.mln_map(ptr),
+			sourceView.raw(),
+			cCanonicalTileID(tileID),
+			messageView.raw(),
+		))
+	})
+}
+
+// InvalidateCustomMVTVectorSourceTile invalidates custom MVT vector data for one tile.
+func (m *MapHandle) InvalidateCustomMVTVectorSourceTile(sourceID string, tileID CanonicalTileID) error {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	sourceView := newCStringView(sourceID)
+	defer sourceView.free()
+	return checkNative(func() int32 {
+		return int32(C.mln_map_invalidate_custom_mvt_vector_source_tile(C.mln_map(ptr), sourceView.raw(), cCanonicalTileID(tileID)))
 	})
 }
 

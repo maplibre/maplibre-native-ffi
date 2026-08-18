@@ -134,6 +134,9 @@ pub const CanonicalTileId = map.CanonicalTileId;
 pub const CustomGeometrySourceTileCallback = map.CustomGeometrySourceTileCallback;
 pub const CustomGeometrySourceReleaseCallback = map.CustomGeometrySourceReleaseCallback;
 pub const CustomGeometrySourceOptions = map.CustomGeometrySourceOptions;
+pub const CustomMvtVectorSourceTileCallback = map.CustomMvtVectorSourceTileCallback;
+pub const CustomMvtVectorSourceReleaseCallback = map.CustomMvtVectorSourceReleaseCallback;
+pub const CustomMvtVectorSourceOptions = map.CustomMvtVectorSourceOptions;
 pub const MapProjectionHandle = projection.MapProjectionHandle;
 
 pub const LatLng = values.LatLng;

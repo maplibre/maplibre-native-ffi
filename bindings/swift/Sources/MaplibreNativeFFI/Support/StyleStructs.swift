@@ -566,6 +566,159 @@ struct NativeCustomGeometrySourceOptions {
   }
 }
 
+private final class NativeCustomMvtVectorSourceCallbackBox: @unchecked Sendable {
+  typealias TileCallback = @Sendable (NativeCanonicalTileID) -> Void
+
+  private let fetchTile: TileCallback
+  private let cancelTile: TileCallback?
+  private let condition = NSCondition()
+  private var activeUpcalls = 0
+  private var retired = false
+
+  init(fetchTile: @escaping TileCallback, cancelTile: TileCallback? = nil) {
+    self.fetchTile = fetchTile
+    self.cancelTile = cancelTile
+  }
+
+  func fetched(_ tileId: mln_canonical_tile_id) {
+    guard beginUpcall() else { return }
+    defer { endUpcall() }
+    fetchTile(NativeCanonicalTileID(tileId))
+  }
+
+  func cancelled(_ tileId: mln_canonical_tile_id) {
+    guard beginUpcall() else { return }
+    defer { endUpcall() }
+    cancelTile?(NativeCanonicalTileID(tileId))
+  }
+
+  func retireAndWait() {
+    condition.lock()
+    retired = true
+    while activeUpcalls > 0 {
+      condition.wait()
+    }
+    condition.unlock()
+  }
+
+  private func beginUpcall() -> Bool {
+    condition.lock()
+    defer { condition.unlock() }
+    guard !retired else { return false }
+    activeUpcalls += 1
+    return true
+  }
+
+  private func endUpcall() {
+    condition.lock()
+    activeUpcalls -= 1
+    if activeUpcalls == 0 {
+      condition.broadcast()
+    }
+    condition.unlock()
+  }
+}
+
+/// A retain on one custom MVT vector source's tile callbacks, handed to the C
+/// API as `user_data`.
+///
+/// The C API owns the retain once it accepts the source, and gives it back by
+/// invoking the release callback exactly once, on the map owner thread, when it
+/// stops referencing the pointer. A rejected add is the one case that never
+/// releases, so the caller releases it with ``release()`` there.
+struct NativeCustomMvtVectorSourceCallbacks: @unchecked Sendable {
+  typealias TileCallback = @Sendable (NativeCanonicalTileID) -> Void
+
+  let unmanagedPointer: UnsafeMutableRawPointer
+
+  init(fetchTile: @escaping TileCallback, cancelTile: TileCallback? = nil) {
+    unmanagedPointer = Unmanaged.passRetained(
+      NativeCustomMvtVectorSourceCallbackBox(
+        fetchTile: fetchTile,
+        cancelTile: cancelTile
+      )
+    ).toOpaque()
+  }
+
+  func release() {
+    releaseCustomMvtVectorCallbacks(unmanagedPointer)
+  }
+}
+
+/// Retires the callbacks behind `userData` and drops the retain the C API held.
+///
+/// Retiring waits for the tile callbacks still running on native worker
+/// threads, so the host's closures are never entered after this returns.
+private func releaseCustomMvtVectorCallbacks(
+  _ userData: UnsafeMutableRawPointer
+) {
+  let box = Unmanaged<NativeCustomMvtVectorSourceCallbackBox>
+    .fromOpaque(userData)
+  box.takeUnretainedValue().retireAndWait()
+  box.release()
+}
+
+private func customMvtVectorReleaseUserDataCallback(
+  _ userData: UnsafeMutableRawPointer?
+) {
+  guard let userData else { return }
+  releaseCustomMvtVectorCallbacks(userData)
+}
+
+private func customMvtVectorFetchTileCallback(
+  _ userData: UnsafeMutableRawPointer?,
+  _ tileId: mln_canonical_tile_id
+) {
+  guard let userData else { return }
+  Unmanaged<NativeCustomMvtVectorSourceCallbackBox>.fromOpaque(userData)
+    .takeUnretainedValue().fetched(tileId)
+}
+
+private func customMvtVectorCancelTileCallback(
+  _ userData: UnsafeMutableRawPointer?,
+  _ tileId: mln_canonical_tile_id
+) {
+  guard let userData else { return }
+  Unmanaged<NativeCustomMvtVectorSourceCallbackBox>.fromOpaque(userData)
+    .takeUnretainedValue().cancelled(tileId)
+}
+
+struct NativeCustomMvtVectorSourceOptions {
+  let callbacks: NativeCustomMvtVectorSourceCallbacks
+  var minZoom: Double?
+  var maxZoom: Double?
+
+  init(
+    callbacks: NativeCustomMvtVectorSourceCallbacks,
+    minZoom: Double? = nil,
+    maxZoom: Double? = nil
+  ) {
+    self.callbacks = callbacks
+    self.minZoom = minZoom
+    self.maxZoom = maxZoom
+  }
+
+  func withNativeOptions<Result>(
+    _ body: (UnsafePointer<mln_custom_mvt_vector_source_options>) throws
+      -> Result
+  ) throws -> Result {
+    var options = mln_custom_mvt_vector_source_options_default()
+    options.fetch_tile = customMvtVectorFetchTileCallback
+    options.cancel_tile = customMvtVectorCancelTileCallback
+    options.user_data = callbacks.unmanagedPointer
+    options.release_user_data = customMvtVectorReleaseUserDataCallback
+    if let minZoom {
+      options.fields |= MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM.rawValue
+      options.min_zoom = minZoom
+    }
+    if let maxZoom {
+      options.fields |= MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM.rawValue
+      options.max_zoom = maxZoom
+    }
+    return try withUnsafePointer(to: &options, body)
+  }
+}
+
 struct NativeStyleImageInfo: Equatable {
   let width: UInt32
   let height: UInt32

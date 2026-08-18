@@ -32,6 +32,8 @@ import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
 import org.maplibre.nativeffi.style.CustomGeometrySourceCallback
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.CustomMvtVectorSourceCallback
+import org.maplibre.nativeffi.style.CustomMvtVectorSourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceDataHandle
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.RasterDemEncoding
@@ -421,6 +423,61 @@ class MapHandleTest {
 
       assertTrue(map.removeStyleSource("custom-places"))
       assertFalse(map.styleSourceExists("custom-places"))
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
+  @Test
+  fun customMvtVectorSourcesCanBeManaged() {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 64
+          height = 64
+          mapMode = MapMode.STATIC
+        },
+      )
+
+    try {
+      map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray())
+      map.addCustomMvtVectorSource(
+        "custom-mvt",
+        CustomMvtVectorSourceOptions(
+            object : CustomMvtVectorSourceCallback {
+              override fun fetchTile(tileId: CanonicalTileId) {}
+            }
+          )
+          .apply {
+            minZoom = 0.0
+            maxZoom = 14.0
+          },
+      )
+
+      assertTrue(map.styleSourceExists("custom-mvt"))
+      assertEquals(SourceType.CUSTOM_MVT_VECTOR, map.styleSourceType("custom-mvt"))
+
+      val tileId = CanonicalTileId(0, 0, 0)
+      map.setCustomMvtVectorSourceTileData("custom-mvt", tileId, ByteArray(0))
+      map.setCustomMvtVectorSourceTileError("custom-mvt", tileId, "tile missing")
+      map.invalidateCustomMvtVectorSourceTile("custom-mvt", tileId)
+
+      assertFailsWith<InvalidArgumentException> {
+        map.addCustomMvtVectorSource(
+          "custom-mvt",
+          CustomMvtVectorSourceOptions(
+            object : CustomMvtVectorSourceCallback {
+              override fun fetchTile(tileId: CanonicalTileId) {}
+            }
+          ),
+        )
+      }
+
+      assertTrue(map.removeStyleSource("custom-mvt"))
+      assertFalse(map.styleSourceExists("custom-mvt"))
     } finally {
       map.close()
       runtime.close()

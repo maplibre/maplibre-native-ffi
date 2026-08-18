@@ -17,9 +17,13 @@ use maplibre_native_ffi_core::values::lat_lngs_to_native;
 use maplibre_native_ffi_sys as sys;
 
 use crate::custom_geometry::{CanonicalTileId, CustomGeometrySourceState};
+use crate::custom_mvt_vector::CustomMvtVectorSourceState;
 use crate::render::PremultipliedRgba8Image;
 use crate::values::NativeValue;
-use crate::{CustomGeometrySourceOptions, Error, ErrorKind, LatLng, LatLngBounds, Result};
+use crate::{
+    CustomGeometrySourceOptions, CustomMvtVectorSourceOptions, Error, ErrorKind, LatLng,
+    LatLngBounds, Result,
+};
 
 impl super::MapHandle {
     /// Loads a style URL through MapLibre Native style APIs.
@@ -170,6 +174,105 @@ impl super::MapHandle {
                 map,
                 source_id.raw(),
                 bounds.to_native(),
+            )
+        })
+    }
+
+    /// Adds a custom MVT vector source to the current style.
+    ///
+    /// The callback state is scoped to this map's current style. The C API
+    /// frees it once it stops referencing it, whether the source is removed,
+    /// dropped by a style load, or retired with the map. Native may invoke
+    /// callbacks from worker threads, so queue owner-thread work before calling
+    /// map APIs.
+    pub fn add_custom_mvt_vector_source(
+        &self,
+        source_id: &str,
+        options: CustomMvtVectorSourceOptions,
+    ) -> Result<()> {
+        let map = self.inner.native()?;
+        let source_id_view = maplibre_core::string::string_view(source_id);
+        let state = CustomMvtVectorSourceState::new(options);
+        let descriptor = state.descriptor();
+        // The descriptor's release callback frees this box, so the C API owns
+        // the callback state from a successful add onwards.
+        let state = Box::into_raw(state);
+        // SAFETY: map is live, source_id_view is valid for this call, and
+        // descriptor names callback state that lives until the release callback.
+        let status = unsafe {
+            sys::mln_map_add_custom_mvt_vector_source(map, source_id_view.raw(), &descriptor)
+        };
+        if let Err(error) = maplibre_core::check(status) {
+            // SAFETY: A rejected add releases nothing, so this box is still
+            // this call's to free.
+            drop(unsafe { Box::from_raw(state) });
+            return Err(error);
+        }
+        Ok(())
+    }
+
+    /// Sets custom MVT vector source data for one canonical tile.
+    ///
+    /// Pass an empty slice for an empty tile. Native ignores the bytes when
+    /// that tile is not awaiting a response after fetch.
+    pub fn set_custom_mvt_vector_source_tile_data(
+        &self,
+        source_id: &str,
+        tile_id: CanonicalTileId,
+        data: &[u8],
+    ) -> Result<()> {
+        let map = self.inner.native()?;
+        let source_id = maplibre_core::string::string_view(source_id);
+        let data = maplibre_core::string::buffer_view(data);
+        // SAFETY: map is live, source_id is valid for this call, tile_id is
+        // passed by value, and data remains valid for this call.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_custom_mvt_vector_source_tile_data(
+                map,
+                source_id.raw(),
+                tile_id.to_native(),
+                data,
+            )
+        })
+    }
+
+    /// Reports a custom MVT vector source error for one canonical tile.
+    pub fn set_custom_mvt_vector_source_tile_error(
+        &self,
+        source_id: &str,
+        tile_id: CanonicalTileId,
+        message: &str,
+    ) -> Result<()> {
+        let map = self.inner.native()?;
+        let source_id = maplibre_core::string::string_view(source_id);
+        let message = maplibre_core::string::string_view(message);
+        // SAFETY: map is live, source_id and message are valid for this call,
+        // and tile_id is passed by value.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_custom_mvt_vector_source_tile_error(
+                map,
+                source_id.raw(),
+                tile_id.to_native(),
+                message.raw(),
+            )
+        })
+    }
+
+    /// Invalidates custom MVT vector source data for one canonical tile.
+    pub fn invalidate_custom_mvt_vector_source_tile(
+        &self,
+        source_id: &str,
+        tile_id: CanonicalTileId,
+    ) -> Result<()> {
+        let map = self.inner.native()?;
+        let source_id = maplibre_core::string::string_view(source_id);
+        // SAFETY: map is live, source_id is valid for this call, and tile_id is
+        // passed by value.
+        maplibre_core::check(unsafe {
+            sys::mln_map_invalidate_custom_mvt_vector_source_tile(
+                map,
+                source_id.raw(),
+                tile_id.to_native(),
             )
         })
     }

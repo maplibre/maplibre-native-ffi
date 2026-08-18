@@ -81,3 +81,7 @@ A hillshade layer requires a raster-DEM source. The dedicated hillshade-layer
 call adds it without a JSON layer object.
 
 <Code code={region(rasterDemSnippet, "layer")} lang="c" title="tile-source-raster-dem.c" />
+
+When the host already holds encoded vector tiles,
+[Supply vector tiles from the host](/maplibre-native-ffi/guides/supply-vector-tiles-from-the-host/)
+serves them through a fetch callback.

@@ -6,9 +6,9 @@ use std::time::Duration;
 
 use crate::events::{RuntimeEventPayload, RuntimeEventSource, RuntimeEventType};
 use crate::{
-    BoundsConstraint, CameraChangeMode, CustomGeometrySourceOptions, EdgeInsets, ErrorKind,
-    MapMode, ResourceKind, ResourceProviderDecision, ResourceResponse, RuntimeEventMask,
-    TextureImageInfo,
+    BoundsConstraint, CameraChangeMode, CustomGeometrySourceOptions, CustomMvtVectorSourceOptions,
+    EdgeInsets, ErrorKind, MapMode, ResourceKind, ResourceProviderDecision, ResourceResponse,
+    RuntimeEventMask, TextureImageInfo,
 };
 
 const VALID_STYLE_JSON: &str = r#"{"version":8,"sources":{},"layers":[]}"#;
@@ -858,6 +858,77 @@ fn custom_geometry_source_state_releases_after_url_style_replacement() {
     );
 
     map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+fn mvt_options_counting_releases(releases: &Arc<AtomicUsize>) -> CustomMvtVectorSourceOptions {
+    let probe = ReleaseProbe {
+        releases: Arc::clone(releases),
+    };
+    CustomMvtVectorSourceOptions::new(move |_| {
+        let _ = &probe;
+    })
+}
+
+#[test]
+// Spec coverage: BND-105 and BND-124.
+fn custom_mvt_vector_source_apis_call_real_c_api_and_style_replacement_releases_state() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
+    let releases = Arc::new(AtomicUsize::new(0));
+
+    let mut custom_options = mvt_options_counting_releases(&releases).with_cancel_tile(|_| {});
+    custom_options.min_zoom = Some(0.0);
+    custom_options.max_zoom = Some(2.0);
+    map.add_custom_mvt_vector_source("custom", custom_options)
+        .unwrap();
+    assert_eq!(
+        map.style_source_type("custom").unwrap(),
+        Some(SourceType::CustomMvtVector)
+    );
+
+    let tile_id = CanonicalTileId::new(0, 0, 0);
+    map.set_custom_mvt_vector_source_tile_data("custom", tile_id, &[])
+        .unwrap();
+    map.set_custom_mvt_vector_source_tile_error("custom", tile_id, "missing")
+        .unwrap();
+    map.invalidate_custom_mvt_vector_source_tile("custom", tile_id)
+        .unwrap();
+    assert_eq!(releases.load(Ordering::SeqCst), 0);
+
+    assert!(map.remove_style_source("custom").unwrap());
+    assert_eq!(releases.load(Ordering::SeqCst), 1);
+    assert!(!map.style_source_exists("custom").unwrap());
+
+    map.add_custom_mvt_vector_source("custom", mvt_options_counting_releases(&releases))
+        .unwrap();
+    let error = map
+        .add_custom_mvt_vector_source("custom", mvt_options_counting_releases(&releases))
+        .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+    assert_eq!(releases.load(Ordering::SeqCst), 2);
+
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
+    assert_eq!(releases.load(Ordering::SeqCst), 3);
+
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+// Spec coverage: BND-124.
+fn custom_mvt_vector_source_state_is_released_on_map_close() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
+    let releases = Arc::new(AtomicUsize::new(0));
+    map.add_custom_mvt_vector_source("custom", mvt_options_counting_releases(&releases))
+        .unwrap();
+
+    map.close().unwrap();
+
+    assert_eq!(releases.load(Ordering::SeqCst), 1);
     runtime.close().unwrap();
 }
 

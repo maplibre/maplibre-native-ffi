@@ -16,6 +16,14 @@ const CustomGeometrySourceState = struct {
     active_upcalls: std.atomic.Value(usize),
 };
 
+const CustomMvtVectorSourceState = struct {
+    fetch_tile: CustomMvtVectorSourceTileCallback,
+    cancel_tile: ?CustomMvtVectorSourceTileCallback,
+    release_context: ?CustomMvtVectorSourceReleaseCallback,
+    context: ?*anyopaque,
+    active_upcalls: std.atomic.Value(usize),
+};
+
 const MapState = struct {
     runtime_registry: *runtime_module.RuntimeRegistry,
     id_value: values.MapId,
@@ -31,6 +39,8 @@ pub const RenderSessionRegistration = struct {
 
 var custom_geometry_state_registry_lock = std.Io.Mutex.init;
 var custom_geometry_state_registry: std.ArrayList(*CustomGeometrySourceState) = .empty;
+var custom_mvt_vector_state_registry_lock = std.Io.Mutex.init;
+var custom_mvt_vector_state_registry: std.ArrayList(*CustomMvtVectorSourceState) = .empty;
 
 // Keyed by map handle; the C API never reuses a handle value, so a released
 // handle never collides with a live key.
@@ -109,6 +119,28 @@ pub const CustomGeometrySourceOptions = struct {
     buffer: ?u32 = null,
     clip: ?bool = null,
     wrap: ?bool = null,
+};
+
+pub const CustomMvtVectorSourceTileCallback = *const fn (
+    context: ?*anyopaque,
+    tile_id: CanonicalTileId,
+) void;
+
+pub const CustomMvtVectorSourceReleaseCallback = *const fn (context: ?*anyopaque) void;
+
+/// Options for `MapHandle.addCustomMvtVectorSource`.
+pub const CustomMvtVectorSourceOptions = struct {
+    fetch_tile: CustomMvtVectorSourceTileCallback,
+    cancel_tile: ?CustomMvtVectorSourceTileCallback = null,
+    /// Invoked once with `context` after the map stops referencing this source:
+    /// on an explicit removal, on a style load that leaves a style without the
+    /// source, and on the map's own destruction. It runs on the map owner thread,
+    /// after the last tile callback returns, and never runs for an add that
+    /// failed. A host frees `context` here instead of tracking style loads.
+    release_context: ?CustomMvtVectorSourceReleaseCallback = null,
+    context: ?*anyopaque = null,
+    min_zoom: ?f64 = null,
+    max_zoom: ?f64 = null,
 };
 
 /// Prepared GeoJSON source data: one parsed and tiled GeoJSON document with
@@ -1601,6 +1633,91 @@ pub const MapHandle = enum(c.mln_map) {
         );
     }
 
+    pub fn addCustomMvtVectorSource(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        source_id: []const u8,
+        options: CustomMvtVectorSourceOptions,
+    ) status.Error!void {
+        _ = try native(self);
+        const map_state = try mapStateForHandle(self);
+
+        const source_state = try std.heap.smp_allocator.create(CustomMvtVectorSourceState);
+        source_state.* = .{
+            .fetch_tile = options.fetch_tile,
+            .cancel_tile = options.cancel_tile,
+            .release_context = options.release_context,
+            .context = options.context,
+            .active_upcalls = std.atomic.Value(usize).init(0),
+        };
+        errdefer std.heap.smp_allocator.destroy(source_state);
+
+        try registerLiveCustomMvtVectorSourceState(source_state);
+        errdefer unregisterLiveCustomMvtVectorSourceState(source_state);
+
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        var native_options = customMvtVectorSourceOptionsToNative(options, source_state);
+        try status.checkStatus(
+            c.mln_map_add_custom_mvt_vector_source(try native(self), try temp.stringView(source_id), &native_options),
+            map_state.diagnostic_store,
+        );
+    }
+
+    pub fn setCustomMvtVectorSourceTileData(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        source_id: []const u8,
+        tile_id: CanonicalTileId,
+        data: []const u8,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        try status.checkStatus(
+            c.mln_map_set_custom_mvt_vector_source_tile_data(
+                try native(self),
+                try temp.stringView(source_id),
+                canonicalTileIdToNative(tile_id),
+                try temp.stringView(data),
+            ),
+            diagnosticStore(self),
+        );
+    }
+
+    pub fn setCustomMvtVectorSourceTileError(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        source_id: []const u8,
+        tile_id: CanonicalTileId,
+        message: []const u8,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        try status.checkStatus(
+            c.mln_map_set_custom_mvt_vector_source_tile_error(
+                try native(self),
+                try temp.stringView(source_id),
+                canonicalTileIdToNative(tile_id),
+                try temp.stringView(message),
+            ),
+            diagnosticStore(self),
+        );
+    }
+
+    pub fn invalidateCustomMvtVectorSourceTile(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        source_id: []const u8,
+        tile_id: CanonicalTileId,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        try status.checkStatus(
+            c.mln_map_invalidate_custom_mvt_vector_source_tile(try native(self), try temp.stringView(source_id), canonicalTileIdToNative(tile_id)),
+            diagnosticStore(self),
+        );
+    }
+
     pub fn requestRepaint(self: *MapHandle) status.Error!void {
         try status.checkStatus(c.mln_map_request_repaint(try native(self)), diagnosticStore(self));
     }
@@ -2122,6 +2239,26 @@ fn customGeometrySourceOptionsToNative(
     return raw;
 }
 
+fn customMvtVectorSourceOptionsToNative(
+    options: CustomMvtVectorSourceOptions,
+    source_state: *CustomMvtVectorSourceState,
+) c.mln_custom_mvt_vector_source_options {
+    var raw = c.mln_custom_mvt_vector_source_options_default();
+    raw.fetch_tile = customMvtVectorFetchTileTrampoline;
+    raw.cancel_tile = if (options.cancel_tile != null) customMvtVectorCancelTileTrampoline else null;
+    raw.release_user_data = customMvtVectorReleaseTrampoline;
+    raw.user_data = source_state;
+    if (options.min_zoom) |min_zoom| {
+        raw.fields |= c.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM;
+        raw.min_zoom = min_zoom;
+    }
+    if (options.max_zoom) |max_zoom| {
+        raw.fields |= c.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM;
+        raw.max_zoom = max_zoom;
+    }
+    return raw;
+}
+
 fn customGeometryFetchTileTrampoline(user_data: ?*anyopaque, raw_tile_id: c.mln_canonical_tile_id) callconv(.c) void {
     const source_state: *CustomGeometrySourceState = @ptrCast(@alignCast(user_data orelse return));
     if (!beginCustomGeometryUpcall(source_state)) return;
@@ -2207,6 +2344,85 @@ fn removeLiveCustomGeometrySourceStateLocked(source_state: *CustomGeometrySource
 }
 
 fn waitForCustomGeometryUpcalls(source_state: *CustomGeometrySourceState) void {
+    while (source_state.active_upcalls.load(.seq_cst) != 0) {
+        std.Thread.yield() catch {};
+    }
+}
+
+fn customMvtVectorFetchTileTrampoline(user_data: ?*anyopaque, raw_tile_id: c.mln_canonical_tile_id) callconv(.c) void {
+    const source_state: *CustomMvtVectorSourceState = @ptrCast(@alignCast(user_data orelse return));
+    if (!beginCustomMvtVectorUpcall(source_state)) return;
+    defer endCustomMvtVectorUpcall(source_state);
+
+    source_state.fetch_tile(source_state.context, canonicalTileIdFromNative(raw_tile_id));
+}
+
+fn customMvtVectorCancelTileTrampoline(user_data: ?*anyopaque, raw_tile_id: c.mln_canonical_tile_id) callconv(.c) void {
+    const source_state: *CustomMvtVectorSourceState = @ptrCast(@alignCast(user_data orelse return));
+    if (!beginCustomMvtVectorUpcall(source_state)) return;
+    defer endCustomMvtVectorUpcall(source_state);
+
+    const cancel_tile = source_state.cancel_tile orelse return;
+    cancel_tile(source_state.context, canonicalTileIdFromNative(raw_tile_id));
+}
+
+fn beginCustomMvtVectorUpcall(source_state: *CustomMvtVectorSourceState) bool {
+    std.Io.Threaded.mutexLock(&custom_mvt_vector_state_registry_lock);
+    defer std.Io.Threaded.mutexUnlock(&custom_mvt_vector_state_registry_lock);
+
+    for (custom_mvt_vector_state_registry.items) |live_state| {
+        if (live_state == source_state) {
+            _ = source_state.active_upcalls.fetchAdd(1, .seq_cst);
+            return true;
+        }
+    }
+    return false;
+}
+
+fn endCustomMvtVectorUpcall(source_state: *CustomMvtVectorSourceState) void {
+    _ = source_state.active_upcalls.fetchSub(1, .seq_cst);
+}
+
+fn customMvtVectorReleaseTrampoline(user_data: ?*anyopaque) callconv(.c) void {
+    const source_state: *CustomMvtVectorSourceState = @ptrCast(@alignCast(user_data orelse return));
+    freeCustomMvtVectorSourceState(source_state);
+}
+
+fn freeCustomMvtVectorSourceState(source_state: *CustomMvtVectorSourceState) void {
+    retireLiveCustomMvtVectorSourceState(source_state);
+    waitForCustomMvtVectorUpcalls(source_state);
+    if (source_state.release_context) |release| release(source_state.context);
+    std.heap.smp_allocator.destroy(source_state);
+}
+
+fn registerLiveCustomMvtVectorSourceState(source_state: *CustomMvtVectorSourceState) std.mem.Allocator.Error!void {
+    std.Io.Threaded.mutexLock(&custom_mvt_vector_state_registry_lock);
+    defer std.Io.Threaded.mutexUnlock(&custom_mvt_vector_state_registry_lock);
+    try custom_mvt_vector_state_registry.append(std.heap.smp_allocator, source_state);
+}
+
+fn unregisterLiveCustomMvtVectorSourceState(source_state: *CustomMvtVectorSourceState) void {
+    std.Io.Threaded.mutexLock(&custom_mvt_vector_state_registry_lock);
+    defer std.Io.Threaded.mutexUnlock(&custom_mvt_vector_state_registry_lock);
+    removeLiveCustomMvtVectorSourceStateLocked(source_state);
+}
+
+fn retireLiveCustomMvtVectorSourceState(source_state: *CustomMvtVectorSourceState) void {
+    std.Io.Threaded.mutexLock(&custom_mvt_vector_state_registry_lock);
+    defer std.Io.Threaded.mutexUnlock(&custom_mvt_vector_state_registry_lock);
+    removeLiveCustomMvtVectorSourceStateLocked(source_state);
+}
+
+fn removeLiveCustomMvtVectorSourceStateLocked(source_state: *CustomMvtVectorSourceState) void {
+    for (custom_mvt_vector_state_registry.items, 0..) |live_state, index| {
+        if (live_state == source_state) {
+            _ = custom_mvt_vector_state_registry.orderedRemove(index);
+            return;
+        }
+    }
+}
+
+fn waitForCustomMvtVectorUpcalls(source_state: *CustomMvtVectorSourceState) void {
     while (source_state.active_upcalls.load(.seq_cst) != 0) {
         std.Thread.yield() catch {};
     }
@@ -2325,6 +2541,12 @@ fn liveCustomGeometrySourceCountForTesting() usize {
     std.Io.Threaded.mutexLock(&custom_geometry_state_registry_lock);
     defer std.Io.Threaded.mutexUnlock(&custom_geometry_state_registry_lock);
     return custom_geometry_state_registry.items.len;
+}
+
+fn liveCustomMvtVectorSourceCountForTesting() usize {
+    std.Io.Threaded.mutexLock(&custom_mvt_vector_state_registry_lock);
+    defer std.Io.Threaded.mutexUnlock(&custom_mvt_vector_state_registry_lock);
+    return custom_mvt_vector_state_registry.items.len;
 }
 
 fn copyStyleIdList(
@@ -2542,6 +2764,24 @@ test "an explicit source removal releases the callback state" {
 
     try std.testing.expect(try map.removeStyleSource(std.testing.allocator, "custom"));
     try std.testing.expectEqual(baseline, liveCustomGeometrySourceCountForTesting());
+}
+
+test "an explicit custom MVT vector source removal releases the callback state" {
+    var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try createLoadedMapForTesting(&runtime);
+    defer map.close() catch @panic("map close failed");
+
+    const baseline = liveCustomMvtVectorSourceCountForTesting();
+    var state = TestCustomGeometryCallbackState{};
+    try map.addCustomMvtVectorSource(std.testing.allocator, "custom-mvt", .{
+        .fetch_tile = testFetchCustomGeometryTile,
+        .context = &state,
+    });
+    try std.testing.expectEqual(baseline + 1, liveCustomMvtVectorSourceCountForTesting());
+
+    try std.testing.expect(try map.removeStyleSource(std.testing.allocator, "custom-mvt"));
+    try std.testing.expectEqual(baseline, liveCustomMvtVectorSourceCountForTesting());
 }
 
 // A map whose mask clears style-loaded still releases the state, because the

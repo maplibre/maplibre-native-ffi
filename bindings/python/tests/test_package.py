@@ -4180,6 +4180,83 @@ def test_custom_geometry_source_rejects_empty_queue_capacity() -> None:
             )
 
 
+def test_custom_mvt_vector_source_scaffolding_queues_copied_events() -> None:
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        map_handle.set_style_json(_EMPTY_STYLE_BYTES)
+        source = map_handle.add_custom_mvt_vector_source(
+            "custom-mvt",
+            style.CustomMvtVectorSourceOptions(
+                has_cancel_tile=True,
+                max_queued_events=1,
+            ),
+        )
+
+        source._native.push_fetch_for_test(1, 2, 3)
+        source._native.push_cancel_for_test(4, 5, 6)
+
+        event = source.poll_event()
+        assert event == style.CustomMvtVectorSourceEvent(
+            style.CustomMvtVectorSourceEventType.FETCH_TILE,
+            style.CanonicalTileId(1, 2, 3),
+        )
+        assert source.poll_event() is None
+        assert source.dropped_event_count == 1
+
+        tile = style.CanonicalTileId(0, 0, 0)
+        map_handle.set_custom_mvt_vector_source_tile_data("custom-mvt", tile, b"")
+        map_handle.set_custom_mvt_vector_source_tile_error(
+            "custom-mvt", tile, "tile missing"
+        )
+        map_handle.invalidate_custom_mvt_vector_source_tile("custom-mvt", tile)
+        assert (
+            map_handle.get_style_source_type("custom-mvt")
+            == style.StyleSourceType.CUSTOM_MVT_VECTOR
+        )
+        source.close()
+        assert source.closed
+
+
+def test_remove_style_source_releases_custom_mvt_vector_handle() -> None:
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        map_handle.set_style_json(_EMPTY_STYLE_BYTES)
+        source = map_handle.add_custom_mvt_vector_source(
+            "custom-mvt-remove",
+            style.CustomMvtVectorSourceOptions(max_queued_events=1),
+        )
+
+        assert map_handle.remove_style_source("custom-mvt-remove") is True
+        assert source.closed
+        source._native.push_fetch_for_test(1, 2, 3)
+        assert source.poll_event() is None
+
+
+def test_map_close_releases_custom_mvt_vector_handle() -> None:
+    with mln.RuntimeHandle() as runtime:
+        map_handle = runtime.create_map()
+        map_handle.set_style_json(_EMPTY_STYLE_BYTES)
+        source = map_handle.add_custom_mvt_vector_source(
+            "custom-mvt-close",
+            style.CustomMvtVectorSourceOptions(max_queued_events=1),
+        )
+
+        map_handle.close()
+
+        assert source.closed
+        source._native.push_fetch_for_test(1, 2, 3)
+        assert source.poll_event() is None
+        map_handle.close()
+
+
+def test_custom_mvt_vector_source_rejects_empty_queue_capacity() -> None:
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        map_handle.set_style_json(_EMPTY_STYLE_BYTES)
+        with pytest.raises(mln.InvalidArgumentError):
+            map_handle.add_custom_mvt_vector_source(
+                "custom-mvt",
+                style.CustomMvtVectorSourceOptions(max_queued_events=0),
+            )
+
+
 def test_set_bounds_rejects_unsupported_constraint() -> None:
     # Annotations do not bind at runtime, so a stale LatLngBounds would
     # otherwise be treated as absent and silently leave the constraint alone.

@@ -25,6 +25,7 @@ int main(void) {
   run_callback_adapter_abi_tests();
   run_core_abi_tests();
   run_custom_geometry_source_abi_tests();
+  run_custom_mvt_vector_source_abi_tests();
   run_handles_abi_tests();
   run_map_options_abi_tests();
   run_render_backend_abi_tests();

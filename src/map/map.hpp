@@ -31,6 +31,8 @@ auto style_tile_source_options_default() noexcept
 auto geojson_source_options_default() noexcept -> mln_geojson_source_options;
 auto custom_geometry_source_options_default() noexcept
   -> mln_custom_geometry_source_options;
+auto custom_mvt_vector_source_options_default() noexcept
+  -> mln_custom_mvt_vector_source_options;
 auto premultiplied_rgba8_image_default() noexcept
   -> mln_premultiplied_rgba8_image;
 auto style_image_options_default() noexcept -> mln_style_image_options;
@@ -149,6 +151,21 @@ auto map_invalidate_custom_geometry_source_tile(
 ) -> mln_status;
 auto map_invalidate_custom_geometry_source_region(
   mln_map map, mln_buffer_view source_id, mln_lat_lng_bounds bounds
+) -> mln_status;
+auto map_add_custom_mvt_vector_source(
+  mln_map map, mln_buffer_view source_id,
+  const mln_custom_mvt_vector_source_options* options
+) -> mln_status;
+auto map_set_custom_mvt_vector_source_tile_data(
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
+  mln_buffer_view data
+) -> mln_status;
+auto map_set_custom_mvt_vector_source_tile_error(
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
+  mln_buffer_view message
+) -> mln_status;
+auto map_invalidate_custom_mvt_vector_source_tile(
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id
 ) -> mln_status;
 auto map_set_style_image(
   mln_map map, mln_buffer_view image_id,

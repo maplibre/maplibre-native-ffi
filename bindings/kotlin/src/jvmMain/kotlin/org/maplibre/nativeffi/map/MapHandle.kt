@@ -27,6 +27,7 @@ import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 import org.maplibre.nativeffi.runtime.RuntimeEventMask
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.CustomMvtVectorSourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceDataHandle
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.ImageStretch
@@ -53,6 +54,8 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
 
   private val customGeometrySources =
     CustomGeometrySourceRegistry<CustomGeometrySourceState>(::releaseCallbackRoot)
+  private val customMvtVectorSources =
+    CustomGeometrySourceRegistry<CustomMvtVectorSourceState>(::releaseCallbackRoot)
 
   public actual val isClosed: Boolean
     get() = core.isReleased()
@@ -184,6 +187,42 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   public actual fun invalidateCustomGeometrySourceRegion(sourceId: String, bounds: LatLngBounds) {
     NativeAccess.ensureLoaded()
     NativeAccess.invalidateCustomGeometrySourceRegion(requireLiveHandle(), sourceId, bounds)
+  }
+
+  public actual fun addCustomMvtVectorSource(
+    sourceId: String,
+    options: CustomMvtVectorSourceOptions,
+  ) {
+    NativeAccess.ensureLoaded()
+    val registry = customMvtVectorSources
+    val sourceState = CustomMvtVectorSourceState(options) { registry.remove(sourceId) }
+    registry.install(sourceId, sourceState) {
+      NativeAccess.addCustomMvtVectorSource(requireLiveHandle(), sourceId, sourceState.descriptor())
+      HandleLeakCleaner.retainNativeCallbackRoot(sourceState)
+    }
+  }
+
+  public actual fun setCustomMvtVectorSourceTileData(
+    sourceId: String,
+    tileId: CanonicalTileId,
+    data: ByteArray,
+  ) {
+    NativeAccess.ensureLoaded()
+    NativeAccess.setCustomMvtVectorSourceTileData(requireLiveHandle(), sourceId, tileId, data)
+  }
+
+  public actual fun setCustomMvtVectorSourceTileError(
+    sourceId: String,
+    tileId: CanonicalTileId,
+    message: String,
+  ) {
+    NativeAccess.ensureLoaded()
+    NativeAccess.setCustomMvtVectorSourceTileError(requireLiveHandle(), sourceId, tileId, message)
+  }
+
+  public actual fun invalidateCustomMvtVectorSourceTile(sourceId: String, tileId: CanonicalTileId) {
+    NativeAccess.ensureLoaded()
+    NativeAccess.invalidateCustomMvtVectorSourceTile(requireLiveHandle(), sourceId, tileId)
   }
 
   public actual fun addVectorSourceUrl(sourceId: String, url: String, options: TileSourceOptions?) {
