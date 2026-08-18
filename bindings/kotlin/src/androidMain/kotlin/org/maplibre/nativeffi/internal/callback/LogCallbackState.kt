@@ -65,8 +65,16 @@ internal class LogCallbackState private constructor(private val callback: LogCal
       try {
         withUpdateLock {
           current.load()?.checkCanClose()
-          register(replacement)
+          // Publish before native install. The shared thunk dispatches through `current`, so
+          // installing first would deliver logs to the previous callback until exchange.
           previous = current.exchange(replacement)
+          try {
+            register(replacement)
+          } catch (error: Throwable) {
+            current.store(previous)
+            previous = null
+            throw error
+          }
         }
       } catch (error: Throwable) {
         closeAndSuppress(error, replacement)
