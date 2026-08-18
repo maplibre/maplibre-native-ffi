@@ -161,7 +161,6 @@ dependencies {
   "jvmTestImplementation"(libs.lwjgl)
   "jvmTestImplementation"(libs.lwjgl.egl)
   "jvmTestRuntimeOnly"(variantOf(libs.lwjgl) { classifier(lwjglNative) })
-  "jvmTestRuntimeOnly"(variantOf(libs.lwjgl.egl) { classifier(lwjglNative) })
 }
 
 apply(from = "gradle/jextract-jvm.gradle.kts")
