@@ -101,6 +101,21 @@ kotlin {
         }
       }
     }
+
+    if (name == "linuxX64" || name == "linuxArm64") {
+      val eglLibDir =
+        if (name == "linuxX64") "/usr/lib/x86_64-linux-gnu" else "/usr/lib/aarch64-linux-gnu"
+      binaries.all { linkerOpts("-L$eglLibDir") }
+      compilations.getByName("test") {
+        cinterops {
+          create("egl") {
+            defFile(project.file("src/linuxTest/cinterop/egl.def"))
+            includeDirs(project.file("src/linuxTest/cinterop"))
+            compilerOpts("-I${project.file("src/linuxTest/cinterop")}")
+          }
+        }
+      }
+    }
   }
 
   sourceSets {
@@ -153,7 +168,15 @@ configurations.register("javaCppTool") {
   isCanBeResolved = true
 }
 
-dependencies.add("javaCppTool", libs.javacpp)
+val lwjglNative = hostPlatform.lwjglNativeClassifier
+
+dependencies {
+  add("javaCppTool", libs.javacpp)
+  "jvmTestImplementation"(platform(libs.lwjgl.bom))
+  "jvmTestImplementation"(libs.lwjgl)
+  "jvmTestImplementation"(libs.lwjgl.egl)
+  "jvmTestRuntimeOnly"(variantOf(libs.lwjgl) { classifier(lwjglNative) })
+}
 
 apply(from = "gradle/jextract-jvm.gradle.kts")
 

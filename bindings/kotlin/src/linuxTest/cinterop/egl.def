@@ -1,0 +1,5 @@
+headers = egl_test.h
+headerFilter = egl_test.h
+package = org.maplibre.nativeffi.internal.egl
+linkerOpts = -lEGL
+language = C
