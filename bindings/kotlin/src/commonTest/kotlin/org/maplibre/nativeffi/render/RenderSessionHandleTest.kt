@@ -23,6 +23,7 @@ import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.query.FeatureStateSelector
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.runtime.RuntimeEventType
+import org.maplibre.nativeffi.sleepMillis
 
 class RenderSessionHandleTest {
   // BND-160, BND-161, BND-163, BND-164, BND-165, BND-166, BND-167, BND-168,
@@ -45,15 +46,19 @@ class RenderSessionHandleTest {
     try {
       withOwnedTextureSession { runtime, map, owned ->
         val session = owned.session
-        map.setStyleJson(QUERY_STYLE_JSON.encodeToByteArray())
-        assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE))
+        map.setStyleJson(BACKGROUND_STYLE_JSON.encodeToByteArray())
 
-        // Render until the map settles: the last frame asks for no repaint.
+        // The session owns this thread, which is also the map's, so the map
+        // only reaches the style when this loop pumps the runtime. Render until
+        // the map settles: the last frame asks for no repaint.
         var update = session.renderUpdate()
         for (attempt in 0 until 500) {
           if (update.result == RenderResult.RENDERED && !update.needsRepaint) break
-          runtime.pump(1)
+          runtime.pump(0)
           update = session.renderUpdate()
+          if (update.result != RenderResult.RENDERED || update.needsRepaint) {
+            sleepMillis(1)
+          }
         }
         assertEquals(RenderResult.RENDERED, update.result)
         assertFalse(update.needsRepaint)
@@ -65,12 +70,13 @@ class RenderSessionHandleTest {
 
         var sawRepaintRequest = false
         for (attempt in 0 until 500) {
-          runtime.pump(1)
+          runtime.pump(0)
           update = session.renderUpdate()
           if (update.result == RenderResult.RENDERED && update.needsRepaint) {
             sawRepaintRequest = true
             break
           }
+          sleepMillis(1)
         }
         assertTrue(sawRepaintRequest)
       }
@@ -260,6 +266,11 @@ class RenderSessionHandleTest {
     FeatureStateSelector("point").apply { featureId = "feature-1" }
 
   private fun featureState(): ByteArray = jsonBytes("""{"hover":true,"radius":20}""")
+
+  private companion object {
+    private const val BACKGROUND_STYLE_JSON =
+      """{"version":8,"sources":{},"layers":[{"id":"bg","type":"background","paint":{"background-color":"#ff0000"}}]}"""
+  }
 }
 
 private fun dummyPointer(): NativePointer = NativePointer.ofAddress(1)

@@ -5,3 +5,7 @@ internal actual fun runOnBackgroundThread(block: () -> Unit) {
   thread.start()
   thread.join()
 }
+
+internal actual fun sleepMillis(millis: Int) {
+  Thread.sleep(millis.toLong())
+}

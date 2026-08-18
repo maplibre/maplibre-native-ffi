@@ -13,6 +13,7 @@ import kotlinx.cinterop.staticCFunction
 import platform.posix.pthread_create
 import platform.posix.pthread_join
 import platform.posix.pthread_tVar
+import platform.posix.usleep
 
 internal actual fun runOnBackgroundThread(block: () -> Unit) {
   memScoped {
@@ -31,6 +32,10 @@ internal actual fun runOnBackgroundThread(block: () -> Unit) {
     }
     pthread_join(thread.ptr[0], null)
   }
+}
+
+internal actual fun sleepMillis(millis: Int) {
+  usleep((millis * 1_000).toUInt())
 }
 
 private fun invokeBackgroundThreadBlock(raw: COpaquePointer?): COpaquePointer? {
