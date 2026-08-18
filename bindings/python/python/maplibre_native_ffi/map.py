@@ -396,7 +396,7 @@ def lat_lng_for_projected_meters(meters: ProjectedMeters) -> LatLng:
 
 
 class MapProjectionHandle(NativeHandleMixin):
-    """Standalone projection helper snapshotted from a map transform."""
+    """Any-thread projection helper snapshotted from a map transform."""
 
     _handle_name = "MapProjectionHandle"
 

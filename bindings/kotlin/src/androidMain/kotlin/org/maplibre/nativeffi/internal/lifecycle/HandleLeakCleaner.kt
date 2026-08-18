@@ -7,9 +7,8 @@ import org.maplibre.nativeffi.runtime.OfflineOperationLeakReport
 /**
  * Reports owner-thread-affine native handles that become unreachable before explicit release.
  *
- * Runtime, map, projection, and render-session handles are bound to their owner thread, so this
- * hook MUST NOT destroy them; explicit release on the owner thread stays the only path that frees
- * native state.
+ * Runtime, map, and render-session handles are bound to their owner thread, so this hook MUST NOT
+ * destroy them; explicit release on the owner thread stays the only path that frees native state.
  *
  * Registered actions must capture leak-report state only. Capturing the wrapper would keep it
  * reachable and suppress every report.

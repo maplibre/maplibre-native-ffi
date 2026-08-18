@@ -145,7 +145,7 @@ internal class HandleStateCore(
       if (released.load() == 0) {
         writeLine(
           "Leaked $typeName native handle 0x${handleId.toString(16)}; " +
-            "close handles explicitly on their owner thread."
+            "close handles explicitly."
         )
       }
     }

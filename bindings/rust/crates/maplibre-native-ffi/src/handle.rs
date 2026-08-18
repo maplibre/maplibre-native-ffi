@@ -1,5 +1,6 @@
 use std::marker::PhantomData;
 use std::rc::Rc;
+use std::sync::Mutex;
 
 use maplibre_native_ffi_core::{
     self as maplibre_core,
@@ -14,6 +15,73 @@ pub(crate) struct ThreadAffineNativeHandle<T: NativeHandle> {
     state: NativeHandleState<T>,
     destroy: unsafe extern "C" fn(T) -> sys::mln_status,
     _thread_affine: PhantomData<Rc<()>>,
+}
+
+#[derive(Debug)]
+pub(crate) struct ConcurrentNativeHandle<T: NativeHandle> {
+    state: Mutex<NativeHandleState<T>>,
+    destroy: unsafe extern "C" fn(T) -> sys::mln_status,
+}
+
+impl<T: NativeHandle> ConcurrentNativeHandle<T> {
+    /// Takes ownership of a native handle that the C API accepts from any thread.
+    ///
+    /// # Safety
+    ///
+    /// `handle` must be a live handle of the matching native type owned by the
+    /// caller. `destroy` must release exactly that handle type.
+    pub(crate) unsafe fn from_handle(
+        handle: T,
+        destroy: unsafe extern "C" fn(T) -> sys::mln_status,
+        type_name: &'static str,
+    ) -> Result<Self> {
+        Ok(Self {
+            // SAFETY: The caller promises handle is an owned live handle of the
+            // matching native type.
+            state: Mutex::new(unsafe { NativeHandleState::from_handle(handle, type_name) }?),
+            destroy,
+        })
+    }
+
+    pub(crate) fn live_handle(&self) -> Option<T> {
+        self.state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .live_handle()
+    }
+
+    pub(crate) fn is_closed(&self) -> bool {
+        self.state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .is_closed()
+    }
+
+    pub(crate) fn close(&self) -> Result<()> {
+        let state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        // SAFETY: from_handle binds this state to its matching destroy function.
+        unsafe { state.close_status(self.destroy) }
+    }
+}
+
+impl<T: NativeHandle> Drop for ConcurrentNativeHandle<T> {
+    fn drop(&mut self) {
+        let state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let id = state.id().unwrap_or_default();
+        // SAFETY: from_handle binds this state to its matching destroy function.
+        if unsafe { state.close_status(self.destroy) }.is_err() {
+            maplibre_core::handle::report_leak(maplibre_core::handle::NativeHandleLeak {
+                type_name: state.type_name(),
+                id,
+            });
+        }
+    }
 }
 
 impl<T: NativeHandle> ThreadAffineNativeHandle<T> {

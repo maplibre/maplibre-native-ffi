@@ -28,6 +28,7 @@ const ProjectionLease = struct {
 var projection_registry_lock = std.atomic.Value(bool).init(false);
 var projection_registry: std.AutoHashMapUnmanaged(c.mln_map_projection, *ProjectionState) = .empty;
 
+/// Any-thread standalone projection snapshot with serialized native calls.
 pub const MapProjectionHandle = enum(c.mln_map_projection) {
     _,
 

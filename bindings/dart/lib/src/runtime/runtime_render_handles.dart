@@ -10,10 +10,14 @@ final class _TextureFrameLease {
   final void Function() release;
 }
 
-/// Standalone projection helper snapshot from a map transform.
+/// Any-thread standalone projection helper snapshot from a map transform.
 final class MapProjectionHandle {
   MapProjectionHandle._(NativeMapProjection handle)
-    : _state = NativeHandleState(handle, 'MapProjectionHandle');
+    : _state = NativeHandleState(
+        handle,
+        'MapProjectionHandle',
+        threadAffine: false,
+      );
 
   final NativeHandleState<NativeMapProjection> _state;
 

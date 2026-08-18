@@ -5,7 +5,7 @@ import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ScreenPoint
 
-/** Owned standalone projection snapshot created from a map. */
+/** Any-thread standalone projection snapshot created from a map. */
 public expect class MapProjectionHandle : AutoCloseable {
   public val camera: CameraOptions
 

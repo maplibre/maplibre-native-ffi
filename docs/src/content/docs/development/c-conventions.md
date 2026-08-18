@@ -152,8 +152,9 @@ failure. Document when scoped resource ownership begins, when it ends, and
 whether completion may happen inline or later.
 
 The runtime and map use a host-pumped, owner-thread model. Runtime creation
-records the owner thread. Runtime, map, map-projection, and render session calls
-that touch thread-affine state validate the owner thread.
+records the owner thread. Runtime, map, and render session calls that touch
+thread-affine state validate the owner thread. A standalone map projection owns
+copied transform state and serializes calls from any thread.
 
 A map shares its runtime's owner thread. A render session records its own: the
 thread that attached it, fixed for the session's lifetime. Attach validates that

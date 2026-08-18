@@ -266,12 +266,21 @@ public sealed class MapCameraOptionsTests
 
         map.Close();
 
-        var camera = projection.GetCamera();
-        Assert.NotNull(camera);
-        var point = projection.PixelForLatLng(coordinate);
-        AssertClose(coordinate, projection.LatLngForPixel(point));
-
-        projection.Close();
+        Exception? failure = null;
+        var worker = new Thread(() =>
+        {
+            failure = Record.Exception(() =>
+            {
+                var camera = projection.GetCamera();
+                Assert.NotNull(camera);
+                var point = projection.PixelForLatLng(coordinate);
+                AssertClose(coordinate, projection.LatLngForPixel(point));
+                projection.Close();
+            });
+        });
+        worker.Start();
+        worker.Join();
+        Assert.Null(failure);
         runtime.Close();
     }
 

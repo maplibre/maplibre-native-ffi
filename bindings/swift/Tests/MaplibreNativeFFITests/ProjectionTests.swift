@@ -10,7 +10,7 @@ import Testing
   #expect(abs(roundTripped.longitude - coordinate.longitude) < 0.000001)
 }
 
-@Test func mapProjectionCameraAndCoordinateConversion() throws {
+@Test func mapProjectionCameraAndCoordinateConversion() async throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.close() }
@@ -38,7 +38,12 @@ import Testing
   #expect(abs(coordinate.latitude - 1) < 0.000001)
   #expect(abs(coordinate.longitude - 2) < 0.000001)
 
-  try projection.close()
+  try map.close()
+  try runtime.close()
+  try await Task.detached {
+    _ = try projection.camera()
+    try projection.close()
+  }.value
   #expect(projection.isClosed)
 }
 

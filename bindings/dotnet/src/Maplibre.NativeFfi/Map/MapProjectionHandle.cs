@@ -7,7 +7,7 @@ using Maplibre.NativeFfi.Internal.Struct;
 
 namespace Maplibre.NativeFfi.Map;
 
-/// <summary>Owner-thread projection snapshot handle.</summary>
+/// <summary>Any-thread projection snapshot handle with serialized native calls.</summary>
 public sealed unsafe class MapProjectionHandle : IDisposable
 {
     private readonly NativeHandleState<MlnMapProjection> state;
@@ -29,24 +29,28 @@ public sealed unsafe class MapProjectionHandle : IDisposable
         return new MapProjectionHandle(projection);
     }
 
-    internal MlnMapProjection Handle => state.Handle;
-
     /// <summary>Whether this wrapper has successfully closed its native handle.</summary>
     public bool IsClosed => state.IsClosed;
 
     /// <summary>Gets the projection camera descriptor.</summary>
     public CameraOptions GetCamera()
     {
-        var camera = NativeMethods.mln_camera_options_default();
-        NativeStatus.Check(NativeMethods.mln_map_projection_get_camera(Handle, &camera));
-        return MapStructs.CameraOptionsFromNative(camera);
+        return state.WithLive(handle =>
+        {
+            var camera = NativeMethods.mln_camera_options_default();
+            NativeStatus.Check(NativeMethods.mln_map_projection_get_camera(handle, &camera));
+            return MapStructs.CameraOptionsFromNative(camera);
+        });
     }
 
     /// <summary>Sets the projection camera descriptor, applying only non-null fields.</summary>
     public void SetCamera(CameraOptions camera)
     {
-        var nativeCamera = MapStructs.ToNative(camera);
-        NativeStatus.Check(NativeMethods.mln_map_projection_set_camera(Handle, &nativeCamera));
+        state.WithLive(handle =>
+        {
+            var nativeCamera = MapStructs.ToNative(camera);
+            NativeStatus.Check(NativeMethods.mln_map_projection_set_camera(handle, &nativeCamera));
+        });
     }
 
     /// <summary>Sets a camera that makes the supplied coordinates visible with padding.</summary>
@@ -59,58 +63,70 @@ public sealed unsafe class MapProjectionHandle : IDisposable
             nativeCoordinates[index] = CoreStructs.ToNative(coordinates[index]);
         }
 
-        var nativePadding = MapStructs.ToNative(padding);
-        fixed (mln_lat_lng* coordinatesPointer = nativeCoordinates)
+        state.WithLive(handle =>
         {
-            NativeStatus.Check(
-                NativeMethods.mln_map_projection_set_visible_coordinates(
-                    Handle,
-                    nativeCoordinates.Length == 0 ? null : coordinatesPointer,
-                    (nuint)nativeCoordinates.Length,
-                    nativePadding
-                )
-            );
-        }
+            var nativePadding = MapStructs.ToNative(padding);
+            fixed (mln_lat_lng* coordinatesPointer = nativeCoordinates)
+            {
+                NativeStatus.Check(
+                    NativeMethods.mln_map_projection_set_visible_coordinates(
+                        handle,
+                        nativeCoordinates.Length == 0 ? null : coordinatesPointer,
+                        (nuint)nativeCoordinates.Length,
+                        nativePadding
+                    )
+                );
+            }
+        });
     }
 
     /// <summary>Sets a camera that makes the supplied geometry visible with padding.</summary>
     public void SetVisibleGeometry(byte[] geometry, EdgeInsets padding)
     {
         ArgumentNullException.ThrowIfNull(geometry);
-        using var nativeGeometry = NativeStringView.From(geometry, nameof(geometry));
-        var nativePadding = MapStructs.ToNative(padding);
-        NativeStatus.Check(
-            NativeMethods.mln_map_projection_set_visible_geometry(
-                Handle,
-                nativeGeometry.Value,
-                nativePadding
-            )
-        );
+        state.WithLive(handle =>
+        {
+            using var nativeGeometry = NativeStringView.From(geometry, nameof(geometry));
+            var nativePadding = MapStructs.ToNative(padding);
+            NativeStatus.Check(
+                NativeMethods.mln_map_projection_set_visible_geometry(
+                    handle,
+                    nativeGeometry.Value,
+                    nativePadding
+                )
+            );
+        });
     }
 
     /// <summary>Converts a geographic coordinate to a screen pixel using this projection snapshot.</summary>
     public ScreenPoint PixelForLatLng(LatLng coordinate)
     {
-        var nativeCoordinate = CoreStructs.ToNative(coordinate);
-        mln_screen_point point = default;
-        NativeStatus.Check(
-            NativeMethods.mln_map_projection_pixel_for_lat_lng(Handle, nativeCoordinate, &point)
-        );
-        return MapStructs.FromNative(point);
+        return state.WithLive(handle =>
+        {
+            var nativeCoordinate = CoreStructs.ToNative(coordinate);
+            mln_screen_point point = default;
+            NativeStatus.Check(
+                NativeMethods.mln_map_projection_pixel_for_lat_lng(handle, nativeCoordinate, &point)
+            );
+            return MapStructs.FromNative(point);
+        });
     }
 
     /// <summary>Converts a screen pixel to a geographic coordinate using this projection snapshot.</summary>
     public LatLng LatLngForPixel(ScreenPoint point)
     {
-        var nativePoint = MapStructs.ToNative(point);
-        mln_lat_lng coordinate = default;
-        NativeStatus.Check(
-            NativeMethods.mln_map_projection_lat_lng_for_pixel(Handle, nativePoint, &coordinate)
-        );
-        return CoreStructs.FromNative(coordinate);
+        return state.WithLive(handle =>
+        {
+            var nativePoint = MapStructs.ToNative(point);
+            mln_lat_lng coordinate = default;
+            NativeStatus.Check(
+                NativeMethods.mln_map_projection_lat_lng_for_pixel(handle, nativePoint, &coordinate)
+            );
+            return CoreStructs.FromNative(coordinate);
+        });
     }
 
-    /// <summary>Destroys the projection on its owner thread.</summary>
+    /// <summary>Destroys the projection after active calls complete.</summary>
     public void Close()
     {
         state.Close();
