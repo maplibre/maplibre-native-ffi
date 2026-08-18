@@ -1,10 +1,10 @@
 package org.maplibre.nativeffi.render
 
+import org.lwjgl.PointerBuffer
 import org.lwjgl.egl.EGL
 import org.lwjgl.egl.EGL14
 import org.lwjgl.egl.EGL15
 import org.lwjgl.system.MemoryStack
-import org.lwjgl.system.PointerBuffer
 import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.map.MapHandle
 

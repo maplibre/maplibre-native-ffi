@@ -115,15 +115,6 @@ kotlin {
     }
 
     commonTest.dependencies { implementation(kotlin("test")) }
-
-    jvmTest.dependencies {
-      val lwjglNative = hostPlatform.lwjglNativeClassifier
-      implementation(platform(libs.lwjgl.bom))
-      implementation(libs.lwjgl)
-      implementation(libs.lwjgl.egl)
-      runtimeOnly(variantOf(libs.lwjgl) { classifier(lwjglNative) })
-      runtimeOnly(variantOf(libs.lwjgl.egl) { classifier(lwjglNative) })
-    }
   }
 }
 
@@ -162,7 +153,16 @@ configurations.register("javaCppTool") {
   isCanBeResolved = true
 }
 
-dependencies.add("javaCppTool", libs.javacpp)
+val lwjglNative = hostPlatform.lwjglNativeClassifier
+
+dependencies {
+  add("javaCppTool", libs.javacpp)
+  "jvmTestImplementation"(platform(libs.lwjgl.bom))
+  "jvmTestImplementation"(libs.lwjgl)
+  "jvmTestImplementation"(libs.lwjgl.egl)
+  "jvmTestRuntimeOnly"(variantOf(libs.lwjgl) { classifier(lwjglNative) })
+  "jvmTestRuntimeOnly"(variantOf(libs.lwjgl.egl) { classifier(lwjglNative) })
+}
 
 apply(from = "gradle/jextract-jvm.gradle.kts")
 
