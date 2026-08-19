@@ -33,6 +33,17 @@ style has parsed and its sources exist. A loading-failed event carries the
 failure text.
 [Handle events](/maplibre-native-ffi/guides/handle-events/) covers reading both.
 
+## Load a bundled style on Android
+
+After
+[Android platform initialization](/maplibre-native-ffi/install/#android), a
+style URL can name a file in the APK `assets/` directory.
+`asset://style.json` and `file:///android_asset/style.json` both read that file.
+Prefix the same URL with `pmtiles://` for a PMTiles archive in that directory.
+Add `pmtiles` to the app's `androidResources.noCompress` list so MapLibre can
+read byte ranges from that archive. Other `file://` URLs still read the
+filesystem, including files the host downloaded into app storage.
+
 ## Replay additions after a style load
 
 Sources, layers, images, and layer properties that your host adds belong to the

@@ -51,7 +51,6 @@ function(mln_ffi_configure_platform_support target)
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/monotonic_timer.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/gfx/headless_backend.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/layermanager/layer_manager.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/storage/asset_file_source.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/storage/database_file_source.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/storage/file_source_request.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/storage/local_file_request.cpp
@@ -81,6 +80,11 @@ function(mln_ffi_configure_platform_support target)
   if(MLN_FFI_DEFAULT_THREAD_LOCAL)
     list(APPEND MLN_FFI_VENDOR_PLATFORM_SOURCES
          ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/util/thread_local.cpp)
+  endif()
+
+  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Android")
+    list(APPEND MLN_FFI_VENDOR_PLATFORM_SOURCES
+         ${MLN_FFI_SOURCE_DIR}/platform/default/src/mbgl/storage/asset_file_source.cpp)
   endif()
 
   if(MLN_WITH_PMTILES)

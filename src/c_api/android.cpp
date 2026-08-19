@@ -5,6 +5,8 @@
 #include "maplibre_native_c.h"
 
 #ifdef __ANDROID__
+#include "platform/android/asset_manager.hpp"
+
 extern "C" auto mlnffi_rust_android_init_tls_verifier(
   void* jni_env, void* context
 ) -> char*;
@@ -27,13 +29,19 @@ auto mln_android_init(void* jni_env, void* jni_class, void* context) noexcept
     return MLN_STATUS_UNSUPPORTED;
 #else
     auto* error = mlnffi_rust_android_init_tls_verifier(jni_env, context);
-    if (error == nullptr) {
-      return MLN_STATUS_OK;
+    if (error != nullptr) {
+      mln::core::set_thread_error(error);
+      mlnffi_rust_android_error_free(error);
+      return MLN_STATUS_NATIVE_ERROR;
     }
 
-    mln::core::set_thread_error(error);
-    mlnffi_rust_android_error_free(error);
-    return MLN_STATUS_NATIVE_ERROR;
+    auto* asset_error =
+      mln::platform::android_retain_asset_manager(jni_env, context);
+    if (asset_error != nullptr) {
+      mln::core::set_thread_error(asset_error);
+      return MLN_STATUS_NATIVE_ERROR;
+    }
+    return MLN_STATUS_OK;
 #endif
   });
 }
