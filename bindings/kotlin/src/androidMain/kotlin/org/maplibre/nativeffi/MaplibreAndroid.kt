@@ -10,11 +10,11 @@ public object MaplibreAndroid {
    * Initializes Android platform services that require an app [Context].
    *
    * This forwards to `mln_android_init`. Call it before creating a runtime that may issue Android
-   * HTTP requests.
+   * HTTP requests or load `asset://` and `file:///android_asset/` URLs from the APK. Pass an
+   * Activity or Application; `asset://` URLs read that [Context]'s AssetManager.
    */
   public fun initialize(context: Context) {
     NativeAccess.ensureLoaded()
-    val appContext = context.applicationContext ?: context
-    Status.check(AndroidNativeBridge.initialize(appContext))
+    Status.check(AndroidNativeBridge.initialize(context))
   }
 }
