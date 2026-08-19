@@ -42,8 +42,8 @@ private constructor(private val addressValue: Long, private val scope: FrameScop
     /**
      * Null native pointer value.
      *
-     * Kotlin/Native writes companion properties into a generated Objective-C header. `NULL` is a C
-     * macro, so this value is named `NULL_POINTER`.
+     * Named `NULL_POINTER` because Kotlin/Native exports this into an Objective-C header, where
+     * `NULL` is a C macro.
      */
     public val NULL_POINTER: NativePointer = NativePointer(0L, null)
 

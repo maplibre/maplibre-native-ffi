@@ -3,6 +3,7 @@ import org.gradle.api.tasks.testing.Test
 import org.gradle.api.tasks.testing.logging.TestLogEvent
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+import org.jetbrains.kotlin.gradle.plugin.mpp.NativeBuildType
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
@@ -98,6 +99,29 @@ kotlin {
       }
     }
 
+    // Kotlin tests compile against a klib. macOS CI compiles the generated
+    // Objective-C header so a public name that collides with a C macro fails
+    // the same way an Xcode framework consumer would.
+    if (hostPlatform.isMac && name == "macosArm64") {
+      binaries.framework("objcExportCheck", listOf(NativeBuildType.DEBUG)) {
+        baseName = "MaplibreNativeFfi"
+        isStatic = true
+      }
+      val framework = binaries.getFramework("objcExportCheck", NativeBuildType.DEBUG)
+      val headerCheckScript = file("scripts/check-objc-export-header.sh")
+      val generatedHeader = framework.outputFile.resolve("Headers/${framework.baseName}.h")
+      val check =
+        tasks.register<Exec>("checkObjcExportHeader") {
+          group = "verification"
+          description = "Compiles the generated Objective-C header with clang."
+          dependsOn(framework.linkTaskProvider)
+          inputs.file(headerCheckScript)
+          inputs.file(generatedHeader)
+          commandLine("bash", headerCheckScript, "macosx", generatedHeader)
+        }
+      tasks.matching { it.name == "macosArm64Test" }.configureEach { dependsOn(check) }
+    }
+
     compilations.getByName("main") {
       cinterops {
         create("maplibreNativeC") {
@@ -185,8 +209,6 @@ dependencies {
 }
 
 apply(from = "gradle/jextract-jvm.gradle.kts")
-
-apply(from = "gradle/objc-export-header.gradle.kts")
 
 extensions.extraProperties["maplibreAndroidSdkDirectory"] =
   androidComponents.sdkComponents.sdkDirectory

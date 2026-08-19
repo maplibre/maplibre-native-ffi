@@ -126,8 +126,8 @@ class MetalRenderTargetTest {
     }
   }
 
-  // A null Metal device at attach selects the system default, and the session
-  // writes drawableSize from the extent's physical size.
+  // A null device at attach uses MTLCreateSystemDefaultDevice(), and the
+  // session writes drawableSize from the extent's physical size.
 
   @Test
   fun metalSurfaceAttachAcceptsNullDeviceAndWritesDrawableSize() {

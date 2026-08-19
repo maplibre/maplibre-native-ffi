@@ -474,11 +474,7 @@ public expect class MapHandle : AutoCloseable {
   /**
    * Attaches a Metal `CAMetalLayer` as this map's one live render session.
    *
-   * A null `context.device` is accepted. The session then renders with the device
-   * `MTLCreateSystemDefaultDevice()` returns.
-   *
-   * The calling thread becomes the session's owner thread for the session's lifetime, and it need
-   * not be this map's owner thread. Close the session before closing the map.
+   * A null `context.device` is accepted. The session then uses `MTLCreateSystemDefaultDevice()`.
    */
   public fun attachMetalSurface(descriptor: MetalSurfaceDescriptor): RenderSessionHandle
 
