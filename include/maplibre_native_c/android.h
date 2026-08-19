@@ -16,16 +16,19 @@ extern "C" {
  * Initializes Android platform services that require access to the host app.
  *
  * This function is required before Android HTTP requests can validate TLS using
- * the app's platform trust policy. The host must package the
- * rustls-platform-verifier Android component in the APK or AAB.
+ * the app's platform trust policy, and before `asset://` or
+ * `file:///android_asset/` URLs can read files from the APK `assets/`
+ * directory. The host must package the rustls-platform-verifier Android
+ * component in the APK or AAB.
  *
  * `jni_env` must be a `JNIEnv*` valid for the calling thread. `jni_class` is
  * accepted for static JNI binding adapters and ignored by the implementation;
  * direct C callers may pass null. `context` must be an Android
- * `android.content.Context` object. Any Context subtype may be passed; the
- * implementation resolves and stores the process application context when
- * initialization succeeds. All pointers are borrowed for the duration of the
- * call.
+ * `android.content.Context` object. Any Context subtype may be passed. The
+ * implementation retains that Context's AssetManager when initialization
+ * succeeds, so pass an Activity or the application Context to read the app
+ * APK. TLS verification still resolves the process application context. All
+ * pointers are borrowed for the duration of the call.
  *
  * May be called from any thread that is attached to the JVM.
  *
@@ -33,7 +36,8 @@ extern "C" {
  * - MLN_STATUS_OK when initialization succeeds or was already completed;
  * - MLN_STATUS_INVALID_ARGUMENT when `jni_env` or `context` is null;
  * - MLN_STATUS_UNSUPPORTED when this library was not built for Android;
- * - MLN_STATUS_NATIVE_ERROR when Android verifier initialization fails.
+ * - MLN_STATUS_NATIVE_ERROR when Android verifier or AssetManager
+ *   initialization fails.
  */
 MLN_API mln_status
 mln_android_init(void* jni_env, void* jni_class, void* context) MLN_NOEXCEPT;

@@ -294,10 +294,7 @@ android {
 
 Initialize the platform once before you create a runtime, passing an
 `android.content.Context`. Every binding exposes this call under its own name.
-Android HTTPS requests validate against the app's trust policy from that point
-on. Kotlin/JVM hosts call `MaplibreAndroid.initialize(context)`. Kotlin/Native
-hosts create `AndroidJniEnvironment` and `AndroidContextReference` values from
-host JNI addresses, then pass them to `MaplibreAndroid.initialize`.
+The call is required for HTTPS and for reading APK assets.
 
 ### iOS
 

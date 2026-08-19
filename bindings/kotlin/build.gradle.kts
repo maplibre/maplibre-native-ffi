@@ -62,6 +62,12 @@ kotlin {
     minSdk = libs.versions.android.minSdk.get().toInt()
 
     withJava()
+    // Device-test APK assets are collected only when Android resource processing
+    // is enabled. The published AAR has no res/ or assets/ of its own.
+    androidResources {
+      enable = true
+      noCompress += "pmtiles"
+    }
     withDeviceTestBuilder { sourceSetTreeName = "test" }
       .configure {
         instrumentationRunner = "org.maplibre.nativeffi.MaplibreTestRunner"

@@ -4,7 +4,9 @@ import androidx.test.runner.AndroidJUnitRunner
 
 class MaplibreTestRunner : AndroidJUnitRunner() {
   override fun onStart() {
-    MaplibreAndroid.initialize(targetContext)
+    // Instrumentation context serves androidDeviceTest/assets. The target
+    // application context does not.
+    MaplibreAndroid.initialize(context)
     super.onStart()
   }
 }
