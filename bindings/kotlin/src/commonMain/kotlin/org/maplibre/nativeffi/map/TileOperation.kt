@@ -20,7 +20,12 @@ public value class TileOperation(public val nativeValue: Int) {
     public val ERROR: TileOperation = TileOperation(6)
     public val CANCELLED: TileOperation = TileOperation(7)
 
-    /** No tile operation took place. */
+    /**
+     * No tile operation took place.
+     *
+     * Kotlin/Native writes companion properties into a generated Objective-C header. `NULL` is a C
+     * macro, so this value is named `NULL_OP`.
+     */
     public val NULL_OP: TileOperation = TileOperation(8)
 
     internal fun fromNative(nativeValue: UInt): TileOperation = fromNative(nativeValue.toInt())

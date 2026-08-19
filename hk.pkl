@@ -60,17 +60,6 @@ local lintSteps = new Mapping<String, Step> {
     glob = List("docs/snippets/c/**/*.c", "include/**/*.h")
     check = "mise run //docs:check-snippets"
   }
-  // Kotlin tests compile against a klib and never generate the Objective-C
-  // header a Swift/Xcode framework consumer compiles, so names such as NULL
-  // that collide with C macros have to be rejected from source.
-  ["kotlin-objc-export-names"] {
-    glob = List(
-      "bindings/kotlin/src/**/*.kt",
-      ".mise/tasks/kotlin/check-objc-export-names",
-    )
-    exclude = List("bindings/kotlin/src/**Test/**", "bindings/kotlin/src/**DeviceTest/**")
-    check = "mise run kotlin:check-objc-export-names"
-  }
   ["ruff"] {
     glob = List("**/*.py")
     exclude = List("third_party/**")

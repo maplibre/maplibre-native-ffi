@@ -186,6 +186,8 @@ dependencies {
 
 apply(from = "gradle/jextract-jvm.gradle.kts")
 
+apply(from = "gradle/objc-export-header.gradle.kts")
+
 extensions.extraProperties["maplibreAndroidSdkDirectory"] =
   androidComponents.sdkComponents.sdkDirectory
 
