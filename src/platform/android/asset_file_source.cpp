@@ -111,6 +111,15 @@ auto read_asset(
     length = last - offset + 1;
   }
 
+  if (offset > total) {
+    response.data = std::make_shared<std::string>();
+    return response;
+  }
+  const auto remaining = total - offset;
+  if (length > remaining) {
+    length = remaining;
+  }
+
   if (offset != 0 && AAsset_seek64(asset.get(), offset, SEEK_SET) < 0) {
     response.error = std::make_unique<mbgl::Response::Error>(
       mbgl::Response::Error::Reason::Other, "Cannot seek asset " + path
@@ -119,14 +128,27 @@ auto read_asset(
   }
 
   auto data = std::string(static_cast<std::size_t>(length), '\0');
-  const auto read = AAsset_read(asset.get(), data.data(), data.size());
-  if (read < 0) {
+  auto filled = std::size_t{0};
+  while (filled < data.size()) {
+    const auto got =
+      AAsset_read(asset.get(), data.data() + filled, data.size() - filled);
+    if (got < 0) {
+      response.error = std::make_unique<mbgl::Response::Error>(
+        mbgl::Response::Error::Reason::Other, "Cannot read asset " + path
+      );
+      return response;
+    }
+    if (got == 0) {
+      break;
+    }
+    filled += static_cast<std::size_t>(got);
+  }
+  if (filled != data.size()) {
     response.error = std::make_unique<mbgl::Response::Error>(
       mbgl::Response::Error::Reason::Other, "Cannot read asset " + path
     );
     return response;
   }
-  data.resize(static_cast<std::size_t>(read));
   response.data = std::make_shared<std::string>(std::move(data));
   return response;
 }
