@@ -31,7 +31,7 @@ constexpr auto android_asset_file_prefix =
   std::string_view{"file:///android_asset"};
 
 auto accepts_url(std::string_view url) -> bool {
-  if (url.starts_with(mbgl::util::ASSET_PROTOCOL)) {
+  if (url.starts_with(mln::util::ASSET_PROTOCOL)) {
     return true;
   }
   if (!url.starts_with(android_asset_file_prefix)) {
@@ -44,9 +44,9 @@ auto accepts_url(std::string_view url) -> bool {
 
 auto asset_path_from_url(std::string_view url) -> std::string {
   auto rest = std::string_view{};
-  if (url.starts_with(mbgl::util::ASSET_PROTOCOL)) {
+  if (url.starts_with(mln::util::ASSET_PROTOCOL)) {
     rest =
-      url.substr(std::char_traits<char>::length(mbgl::util::ASSET_PROTOCOL));
+      url.substr(std::char_traits<char>::length(mln::util::ASSET_PROTOCOL));
   } else {
     rest = url.substr(android_asset_file_prefix.size());
     if (!rest.empty() && rest.front() == '/') {
@@ -59,7 +59,7 @@ auto asset_path_from_url(std::string_view url) -> std::string {
     rest = rest.substr(0, suffix);
   }
 
-  auto path = mbgl::util::percentDecode(std::string{rest});
+  auto path = mln::util::percentDecode(std::string{rest});
   while (path.starts_with('/')) {
     path.erase(0, 1);
   }
@@ -77,11 +77,11 @@ struct AssetCloser {
 auto read_asset(
   AAssetManager* manager, const std::string& path,
   const std::optional<std::pair<std::uint64_t, std::uint64_t>>& data_range
-) -> mbgl::Response {
-  auto response = mbgl::Response{};
+) -> mln::Response {
+  auto response = mln::Response{};
   if (manager == nullptr) {
-    response.error = std::make_unique<mbgl::Response::Error>(
-      mbgl::Response::Error::Reason::Other,
+    response.error = std::make_unique<mln::Response::Error>(
+      mln::Response::Error::Reason::Other,
       "Android AssetManager is not initialized; call mln_android_init before "
       "asset requests"
     );
@@ -92,8 +92,8 @@ auto read_asset(
     AAssetManager_open(manager, path.c_str(), AASSET_MODE_RANDOM)
   };
   if (!asset) {
-    response.error = std::make_unique<mbgl::Response::Error>(
-      mbgl::Response::Error::Reason::NotFound, "Could not read asset"
+    response.error = std::make_unique<mln::Response::Error>(
+      mln::Response::Error::Reason::NotFound, "Could not read asset"
     );
     return response;
   }
@@ -121,8 +121,8 @@ auto read_asset(
   }
 
   if (offset != 0 && AAsset_seek64(asset.get(), offset, SEEK_SET) < 0) {
-    response.error = std::make_unique<mbgl::Response::Error>(
-      mbgl::Response::Error::Reason::Other, "Cannot seek asset " + path
+    response.error = std::make_unique<mln::Response::Error>(
+      mln::Response::Error::Reason::Other, "Cannot seek asset " + path
     );
     return response;
   }
@@ -133,8 +133,8 @@ auto read_asset(
     const auto got =
       AAsset_read(asset.get(), data.data() + filled, data.size() - filled);
     if (got < 0) {
-      response.error = std::make_unique<mbgl::Response::Error>(
-        mbgl::Response::Error::Reason::Other, "Cannot read asset " + path
+      response.error = std::make_unique<mln::Response::Error>(
+        mln::Response::Error::Reason::Other, "Cannot read asset " + path
       );
       return response;
     }
@@ -144,8 +144,8 @@ auto read_asset(
     filled += static_cast<std::size_t>(got);
   }
   if (filled != data.size()) {
-    response.error = std::make_unique<mbgl::Response::Error>(
-      mbgl::Response::Error::Reason::Other, "Cannot read asset " + path
+    response.error = std::make_unique<mln::Response::Error>(
+      mln::Response::Error::Reason::Other, "Cannot read asset " + path
     );
     return response;
   }
@@ -155,7 +155,7 @@ auto read_asset(
 
 }  // namespace
 
-namespace mbgl {
+namespace mln {
 
 class AssetFileSource::Impl {
  public:
@@ -259,4 +259,4 @@ auto AssetFileSource::getClientOptions() -> ClientOptions {
   return impl->actor().ask(&Impl::getClientOptions).get();
 }
 
-}  // namespace mbgl
+}  // namespace mln
