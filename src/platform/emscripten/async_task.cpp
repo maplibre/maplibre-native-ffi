@@ -7,7 +7,7 @@
 
 #include "run_loop_wake.hpp"
 
-namespace mbgl {
+namespace mln {
 namespace util {
 
 class AsyncTaskState : public platform::emscripten::RunLoopWake::Runnable,
@@ -32,9 +32,7 @@ class AsyncTaskState : public platform::emscripten::RunLoopWake::Runnable,
     }
   }
 
-  auto dueTime() const -> mbgl::TimePoint override {
-    return mbgl::Clock::now();
-  }
+  auto dueTime() const -> mln::TimePoint override { return mln::Clock::now(); }
 
   auto countsForWaitForEmpty() const -> bool override { return true; }
 
@@ -78,4 +76,4 @@ AsyncTask::~AsyncTask() = default;
 void AsyncTask::send() { impl->maySend(); }
 
 }  // namespace util
-}  // namespace mbgl
+}  // namespace mln

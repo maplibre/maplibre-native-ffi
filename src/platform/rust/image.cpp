@@ -42,7 +42,7 @@ class RustDecodedImage {
 
 }  // namespace
 
-namespace mbgl {
+namespace mln {
 
 auto decodeImage(const std::string& encoded) -> PremultipliedImage {
   // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
@@ -71,4 +71,4 @@ auto decodeImage(const std::string& encoded) -> PremultipliedImage {
   return image;
 }
 
-}  // namespace mbgl
+}  // namespace mln

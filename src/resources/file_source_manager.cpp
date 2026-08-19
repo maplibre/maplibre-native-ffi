@@ -12,7 +12,7 @@
 
 #include "resources/resource_loader.hpp"
 
-namespace mbgl {
+namespace mln {
 
 auto FileSourceManager::get() noexcept -> FileSourceManager* {
   static auto manager = FileSourceManager{};
@@ -106,4 +106,4 @@ auto FileSourceManager::get() noexcept -> FileSourceManager* {
   return &manager;
 }
 
-}  // namespace mbgl
+}  // namespace mln

@@ -1,7 +1,7 @@
 #pragma once
 
 // Looks up a GL entry point in the client library, for the generated table in
-// mbgl::platform. Resolution needs no current context, so an entry point can
+// mln::platform. Resolution needs no current context, so an entry point can
 // resolve before a display exists.
 
 #include <type_traits>

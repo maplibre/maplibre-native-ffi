@@ -13,9 +13,9 @@ namespace mln::core::opengl {
 // context current, so MapLibre keeps its cached state across frames and clears
 // each frame to the style's background color.
 #if defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
-constexpr auto session_context_mode = mbgl::gfx::ContextMode::Shared;
+constexpr auto session_context_mode = mln::gfx::ContextMode::Shared;
 #else
-constexpr auto session_context_mode = mbgl::gfx::ContextMode::Unique;
+constexpr auto session_context_mode = mln::gfx::ContextMode::Unique;
 #endif
 
 }  // namespace mln::core::opengl

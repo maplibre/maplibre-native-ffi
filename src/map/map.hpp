@@ -7,11 +7,11 @@
 
 #include "maplibre_native_c.h"
 
-namespace mbgl {
+namespace mln {
 class Map;
 class RendererObserver;
 class UpdateParameters;
-}  // namespace mbgl
+}  // namespace mln
 
 namespace mln::core {
 
@@ -461,7 +461,7 @@ auto validate_map(mln_map map, MapObject*& out_map) -> mln_status;
 auto map_scale_factor(mln_map map) -> double;
 // Map-thread only. Code reachable from a render session's owner thread uses the
 // posting helpers below instead.
-auto map_native(MapObject* map) -> mbgl::Map*;
+auto map_native(MapObject* map) -> mln::Map*;
 
 // Queue a map mutation for the map's owner thread. Callable from any thread;
 // the effect lands on the map's next mln_runtime_pump(). Returns
@@ -469,8 +469,8 @@ auto map_native(MapObject* map) -> mbgl::Map*;
 auto map_post_set_size(mln_map map, uint32_t width, uint32_t height)
   -> mln_status;
 auto map_post_trigger_repaint(mln_map map) -> mln_status;
-auto map_latest_update(mln_map map) -> std::shared_ptr<mbgl::UpdateParameters>;
-auto map_renderer_observer(mln_map map) -> mbgl::RendererObserver*;
+auto map_latest_update(mln_map map) -> std::shared_ptr<mln::UpdateParameters>;
+auto map_renderer_observer(mln_map map) -> mln::RendererObserver*;
 auto map_run_render_jobs(mln_map map) -> void;
 auto map_attach_render_target_session(mln_map map, void* session) -> mln_status;
 auto map_detach_render_target_session(mln_map map, void* session) -> mln_status;

@@ -46,7 +46,7 @@ auto owned_descriptor_from_borrowed(
 namespace mln::core {
 
 class VulkanTextureBackend::VulkanTextureRenderableResource final
-    : public mbgl::vulkan::SurfaceRenderableResource {
+    : public mln::vulkan::SurfaceRenderableResource {
  public:
   explicit VulkanTextureRenderableResource(VulkanTextureBackend& backend_)
       : SurfaceRenderableResource(backend_) {}
@@ -132,7 +132,7 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
     // This resource is only used by VulkanTextureBackend, so the downcast is
     // invariant within this file.
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
-    static_cast<mbgl::vulkan::Context&>(backend.getContext()).waitFrame();
+    static_cast<mln::vulkan::Context&>(backend.getContext()).waitFrame();
   }
 
   [[nodiscard]] auto image() const -> VkImage {
@@ -184,7 +184,7 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
 
     for (auto index = uint32_t{}; index < image_count; ++index) {
       auto allocation =
-        std::make_unique<mbgl::vulkan::ImageAllocation>(backend.getAllocator());
+        std::make_unique<mln::vulkan::ImageAllocation>(backend.getAllocator());
       if (!allocation->create(allocation_create_info, image_create_info)) {
         throw std::runtime_error(
           "Vulkan sampled color texture allocation failed"
@@ -346,19 +346,19 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
 };
 
 VulkanTextureBackend::VulkanTextureBackend(
-  const mln_vulkan_owned_texture_descriptor& descriptor, mbgl::Size size
+  const mln_vulkan_owned_texture_descriptor& descriptor, mln::Size size
 )
-    : mbgl::vulkan::RendererBackend(mbgl::gfx::ContextMode::Unique),
-      mbgl::gfx::HeadlessBackend(size),
+    : mln::vulkan::RendererBackend(mln::gfx::ContextMode::Unique),
+      mln::gfx::HeadlessBackend(size),
       descriptor_(descriptor) {
   initSharedDevice();
 }
 
 VulkanTextureBackend::VulkanTextureBackend(
-  const mln_vulkan_borrowed_texture_descriptor& descriptor, mbgl::Size size
+  const mln_vulkan_borrowed_texture_descriptor& descriptor, mln::Size size
 )
-    : mbgl::vulkan::RendererBackend(mbgl::gfx::ContextMode::Unique),
-      mbgl::gfx::HeadlessBackend(size),
+    : mln::vulkan::RendererBackend(mln::gfx::ContextMode::Unique),
+      mln::gfx::HeadlessBackend(size),
       descriptor_(owned_descriptor_from_borrowed(descriptor)),
       borrowed_descriptor_(descriptor),
       uses_borrowed_texture_(true) {
@@ -366,7 +366,7 @@ VulkanTextureBackend::VulkanTextureBackend(
 }
 
 VulkanTextureBackend::~VulkanTextureBackend() {
-  auto guard = mbgl::gfx::BackendScope{*this};
+  auto guard = mln::gfx::BackendScope{*this};
   resource.reset();
   getThreadPool().runRenderJobs(true);
 }
@@ -384,7 +384,7 @@ void VulkanTextureBackend::initSharedDevice() {
   physicalDeviceProperties = physicalDevice.getProperties(dispatcher);
 }
 
-auto VulkanTextureBackend::getDefaultRenderable() -> mbgl::gfx::Renderable& {
+auto VulkanTextureBackend::getDefaultRenderable() -> mln::gfx::Renderable& {
   if (!resource) {
     resource = std::make_unique<VulkanTextureRenderableResource>(*this);
   }
@@ -407,7 +407,7 @@ void VulkanTextureBackend::set_borrowed_target(
   const mln_vulkan_borrowed_texture_descriptor& descriptor
 ) {
   const auto new_size =
-    mbgl::Size{descriptor.physical_width, descriptor.physical_height};
+    mln::Size{descriptor.physical_width, descriptor.physical_height};
   // Nothing is built yet, so the lazy path already takes the new image.
   if (!resource) {
     borrowed_descriptor_ = descriptor;
@@ -424,7 +424,7 @@ void VulkanTextureBackend::set_borrowed_target(
   size = new_size;
 }
 
-void VulkanTextureBackend::resize(mbgl::Size new_size) {
+void VulkanTextureBackend::resize(mln::Size new_size) {
   // Nothing is built yet, so the lazy path already produces the new size. A
   // borrowed texture is sized by its owner and never reaches here; the session
   // rejects resizing one.
@@ -438,10 +438,10 @@ void VulkanTextureBackend::resize(mbgl::Size new_size) {
   );
 }
 
-auto VulkanTextureBackend::readStillImage() -> mbgl::PremultipliedImage {
+auto VulkanTextureBackend::readStillImage() -> mln::PremultipliedImage {
   prepareRenderResources();
 
-  auto image = mbgl::PremultipliedImage(size);
+  auto image = mln::PremultipliedImage(size);
   const auto image_size = image.bytes();
   const auto& allocator = getAllocator();
   const auto buffer_info = vk::BufferCreateInfo()
@@ -457,14 +457,14 @@ auto VulkanTextureBackend::readStillImage() -> mbgl::PremultipliedImage {
     VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
     VMA_ALLOCATION_CREATE_MAPPED_BIT;
 
-  auto buffer_allocation = mbgl::vulkan::BufferAllocation{allocator};
+  auto buffer_allocation = mln::vulkan::BufferAllocation{allocator};
   if (!buffer_allocation.create(allocation_info, buffer_info)) {
     throw std::runtime_error("Vulkan readback buffer allocation failed");
   }
 
   // VulkanTextureBackend always constructs a Vulkan renderer context.
   // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
-  auto& context_impl = static_cast<mbgl::vulkan::Context&>(getContext());
+  auto& context_impl = static_cast<mln::vulkan::Context&>(getContext());
   auto& resource_impl = getResource<VulkanTextureRenderableResource>();
   auto* const source_image = resource_impl.image();
   context_impl.waitFrame();
@@ -536,7 +536,7 @@ auto VulkanTextureBackend::readStillImage() -> mbgl::PremultipliedImage {
   return image;
 }
 
-auto VulkanTextureBackend::getRendererBackend() -> mbgl::gfx::RendererBackend* {
+auto VulkanTextureBackend::getRendererBackend() -> mln::gfx::RendererBackend* {
   return this;
 }
 
@@ -570,7 +570,7 @@ void VulkanTextureBackend::initInstance() {
   usingSharedContext = true;
   instance = vk::UniqueInstance(
     static_cast<VkInstance>(descriptor_.context.instance),
-    mbgl::vulkan::ObjectDestroy<vk::detail::NoParent>(nullptr, dispatcher)
+    mln::vulkan::ObjectDestroy<vk::detail::NoParent>(nullptr, dispatcher)
   );
 }
 
@@ -597,7 +597,7 @@ void VulkanTextureBackend::initDevice() {
   }
   device = vk::UniqueDevice(
     static_cast<VkDevice>(descriptor_.context.device),
-    mbgl::vulkan::ObjectDestroy<vk::detail::NoParent>(nullptr, dispatcher)
+    mln::vulkan::ObjectDestroy<vk::detail::NoParent>(nullptr, dispatcher)
   );
   vulkan_init_device_dispatch(dispatcher, device.get(), descriptor_.context);
   graphicsQueueIndex =

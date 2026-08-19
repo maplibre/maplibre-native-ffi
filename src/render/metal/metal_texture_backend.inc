@@ -8,23 +8,23 @@
 
 namespace mln::core {
 
-class MetalTextureBackend final : public mbgl::mtl::RendererBackend,
-                                  public mbgl::gfx::HeadlessBackend {
+class MetalTextureBackend final : public mln::mtl::RendererBackend,
+                                  public mln::gfx::HeadlessBackend {
  private:
   class MetalTextureRenderableResource;
 
  public:
-  MetalTextureBackend(MTL::Device* host_device, mbgl::Size size);
-  MetalTextureBackend(MTL::Texture* borrowed_texture, mbgl::Size size);
+  MetalTextureBackend(MTL::Device* host_device, mln::Size size);
+  MetalTextureBackend(MTL::Texture* borrowed_texture, mln::Size size);
   MetalTextureBackend(const MetalTextureBackend&) = delete;
   auto operator=(const MetalTextureBackend&) -> MetalTextureBackend& = delete;
   MetalTextureBackend(MetalTextureBackend&&) = delete;
   auto operator=(MetalTextureBackend&&) -> MetalTextureBackend& = delete;
   ~MetalTextureBackend() override;
 
-  auto getDefaultRenderable() -> mbgl::gfx::Renderable& override;
-  auto readStillImage() -> mbgl::PremultipliedImage override;
-  auto getRendererBackend() -> mbgl::gfx::RendererBackend* override;
+  auto getDefaultRenderable() -> mln::gfx::Renderable& override;
+  auto readStillImage() -> mln::PremultipliedImage override;
+  auto getRendererBackend() -> mln::gfx::RendererBackend* override;
   void activate() override;
   void deactivate() override;
   void updateAssumedState() override;
@@ -38,7 +38,7 @@ class MetalTextureBackend final : public mbgl::mtl::RendererBackend,
     -> bool;
   // Renders into a different caller-owned texture from here on. The caller has
   // already established that the format matches.
-  void set_borrowed_texture(MTL::Texture* texture, mbgl::Size new_size);
+  void set_borrowed_texture(MTL::Texture* texture, mln::Size new_size);
 
  private:
   MTL::Texture* borrowed_texture_ = nullptr;

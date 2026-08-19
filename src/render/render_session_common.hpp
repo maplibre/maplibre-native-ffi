@@ -58,7 +58,7 @@ class SurfaceSessionBackend {
   auto operator=(SurfaceSessionBackend&&) -> SurfaceSessionBackend& = delete;
   virtual ~SurfaceSessionBackend() = default;
 
-  virtual auto renderer_backend() -> mbgl::gfx::RendererBackend& = 0;
+  virtual auto renderer_backend() -> mln::gfx::RendererBackend& = 0;
   virtual void resize(uint32_t physical_width, uint32_t physical_height) = 0;
 
   // Whether the surface can take a frame right now. Not ready skips the frame
@@ -115,14 +115,14 @@ class TextureSessionBackend {
   auto operator=(TextureSessionBackend&&) -> TextureSessionBackend& = delete;
   virtual ~TextureSessionBackend() = default;
 
-  virtual auto headless_backend() -> mbgl::gfx::HeadlessBackend& = 0;
-  virtual auto renderer_backend() -> mbgl::gfx::RendererBackend* {
+  virtual auto headless_backend() -> mln::gfx::HeadlessBackend& = 0;
+  virtual auto renderer_backend() -> mln::gfx::RendererBackend* {
     return headless_backend().getRendererBackend();
   }
   // Follows a new physical size. The default drops the renderable resource and
   // rebuilds it lazily; a backend whose renderer keys cached GPU state on that
   // resource overrides this to rebuild only what the size changed.
-  virtual void resize(mbgl::Size size) { headless_backend().setSize(size); }
+  virtual void resize(mln::Size size) { headless_backend().setSize(size); }
 
   // Renders into a new caller-owned texture, keeping the graphics context and
   // every resource the renderer holds against it. The descriptor must name the
@@ -206,7 +206,7 @@ class TextureSessionBackend {
 //
 // Lifetime is the session's. Mailboxes created during a render hold a WeakPtr
 // to it, so it outlives every message in flight.
-class RenderSessionScheduler final : public mbgl::Scheduler {
+class RenderSessionScheduler final : public mln::Scheduler {
  public:
   RenderSessionScheduler() = default;
   RenderSessionScheduler(const RenderSessionScheduler&) = delete;
@@ -218,17 +218,17 @@ class RenderSessionScheduler final : public mbgl::Scheduler {
 
   void schedule(std::function<void()>&& task) override;
   void schedule(
-    const mbgl::util::SimpleIdentity, std::function<void()>&& task
+    const mln::util::SimpleIdentity, std::function<void()>&& task
   ) override;
-  auto makeWeakPtr() -> mapbox::base::WeakPtr<mbgl::Scheduler> override {
+  auto makeWeakPtr() -> mapbox::base::WeakPtr<mln::Scheduler> override {
     return weak_factory_.makeWeakPtr();
   }
   // Only the owner thread may run this queue, so a caller on any other thread
   // gets a no-op rather than tasks running off the owner thread.
   void waitForEmpty(
-    const mbgl::util::SimpleIdentity = mbgl::util::SimpleIdentity::Empty
+    const mln::util::SimpleIdentity = mln::util::SimpleIdentity::Empty
   ) override {
-    if (mbgl::Scheduler::GetCurrent(/*init=*/false) == this) {
+    if (mln::Scheduler::GetCurrent(/*init=*/false) == this) {
       drain();
     }
   }
@@ -265,7 +265,7 @@ class RenderSessionScheduler final : public mbgl::Scheduler {
   std::vector<std::function<void()>> queue_;
   std::function<void()> repaint_request_;
   bool draining_ = false;
-  mapbox::base::WeakPtrFactory<mbgl::Scheduler> weak_factory_{this};
+  mapbox::base::WeakPtrFactory<mln::Scheduler> weak_factory_{this};
   // Do not add members here, see `WeakPtrFactory`
 };
 
@@ -279,10 +279,10 @@ class RenderSessionScheduler final : public mbgl::Scheduler {
 // from mln_runtime_create().
 class ScopedCurrentScheduler {
  public:
-  explicit ScopedCurrentScheduler(mbgl::Scheduler& scheduler)
-      : previous_(mbgl::Scheduler::GetCurrent(/*init=*/false)) {
+  explicit ScopedCurrentScheduler(mln::Scheduler& scheduler)
+      : previous_(mln::Scheduler::GetCurrent(/*init=*/false)) {
     if (previous_ == nullptr) {
-      mbgl::Scheduler::SetCurrent(&scheduler);
+      mln::Scheduler::SetCurrent(&scheduler);
     }
   }
   ScopedCurrentScheduler(const ScopedCurrentScheduler&) = delete;
@@ -290,23 +290,23 @@ class ScopedCurrentScheduler {
     -> ScopedCurrentScheduler& = delete;
   ScopedCurrentScheduler(ScopedCurrentScheduler&&) = delete;
   auto operator=(ScopedCurrentScheduler&&) -> ScopedCurrentScheduler& = delete;
-  ~ScopedCurrentScheduler() { mbgl::Scheduler::SetCurrent(previous_); }
+  ~ScopedCurrentScheduler() { mln::Scheduler::SetCurrent(previous_); }
 
  private:
-  mbgl::Scheduler* previous_;
+  mln::Scheduler* previous_;
 };
 
 struct RenderSurfaceState {
   std::unique_ptr<SurfaceSessionBackend> backend = nullptr;
 };
 
-// Records the frame status that mbgl::Renderer reports synchronously out of
+// Records the frame status that mln::Renderer reports synchronously out of
 // render(), so render_session_render_update() can return its repaint flag,
 // and forwards every callback to the map's observer so runtime event delivery
 // is unchanged. Runs entirely on the session owner thread.
-class SessionFrameObserver final : public mbgl::RendererObserver {
+class SessionFrameObserver final : public mln::RendererObserver {
  public:
-  auto set_delegate(mbgl::RendererObserver* delegate) -> void {
+  auto set_delegate(mln::RendererObserver* delegate) -> void {
     delegate_ = delegate;
   }
 
@@ -338,7 +338,7 @@ class SessionFrameObserver final : public mbgl::RendererObserver {
 
   void onDidFinishRenderingFrame(
     RenderMode mode, bool repaint, bool placement_changed,
-    const mbgl::gfx::RenderingStats& stats
+    const mln::gfx::RenderingStats& stats
   ) override {
     needs_repaint_ = repaint;
     if (delegate_ != nullptr) {
@@ -369,7 +369,7 @@ class SessionFrameObserver final : public mbgl::RendererObserver {
   }
 
   void onPreCompileShader(
-    mbgl::shaders::BuiltIn id, mbgl::gfx::Backend::Type type,
+    mln::shaders::BuiltIn id, mln::gfx::Backend::Type type,
     const std::string& defines
   ) override {
     if (delegate_ != nullptr) {
@@ -378,7 +378,7 @@ class SessionFrameObserver final : public mbgl::RendererObserver {
   }
 
   void onPostCompileShader(
-    mbgl::shaders::BuiltIn id, mbgl::gfx::Backend::Type type,
+    mln::shaders::BuiltIn id, mln::gfx::Backend::Type type,
     const std::string& defines
   ) override {
     if (delegate_ != nullptr) {
@@ -387,7 +387,7 @@ class SessionFrameObserver final : public mbgl::RendererObserver {
   }
 
   void onShaderCompileFailed(
-    mbgl::shaders::BuiltIn id, mbgl::gfx::Backend::Type type,
+    mln::shaders::BuiltIn id, mln::gfx::Backend::Type type,
     const std::string& defines
   ) override {
     if (delegate_ != nullptr) {
@@ -396,7 +396,7 @@ class SessionFrameObserver final : public mbgl::RendererObserver {
   }
 
   void onGlyphsLoaded(
-    const mbgl::FontStack& stack, const mbgl::GlyphRange& range
+    const mln::FontStack& stack, const mln::GlyphRange& range
   ) override {
     if (delegate_ != nullptr) {
       delegate_->onGlyphsLoaded(stack, range);
@@ -404,7 +404,7 @@ class SessionFrameObserver final : public mbgl::RendererObserver {
   }
 
   void onGlyphsError(
-    const mbgl::FontStack& stack, const mbgl::GlyphRange& range,
+    const mln::FontStack& stack, const mln::GlyphRange& range,
     std::exception_ptr error
   ) override {
     if (delegate_ != nullptr) {
@@ -413,7 +413,7 @@ class SessionFrameObserver final : public mbgl::RendererObserver {
   }
 
   void onGlyphsRequested(
-    const mbgl::FontStack& stack, const mbgl::GlyphRange& range
+    const mln::FontStack& stack, const mln::GlyphRange& range
   ) override {
     if (delegate_ != nullptr) {
       delegate_->onGlyphsRequested(stack, range);
@@ -421,7 +421,7 @@ class SessionFrameObserver final : public mbgl::RendererObserver {
   }
 
   void onTileAction(
-    mbgl::TileOperation operation, const mbgl::OverscaledTileID& id,
+    mln::TileOperation operation, const mln::OverscaledTileID& id,
     const std::string& source_id
   ) override {
     if (delegate_ != nullptr) {
@@ -436,7 +436,7 @@ class SessionFrameObserver final : public mbgl::RendererObserver {
   }
 
  private:
-  mbgl::RendererObserver* delegate_ = nullptr;
+  mln::RendererObserver* delegate_ = nullptr;
   bool needs_repaint_ = false;
 };
 
@@ -474,7 +474,7 @@ struct mln_render_session_object {
   mln::core::RenderSessionScheduler scheduler;
   // Declared before `renderer`, which holds a raw pointer to it.
   mln::core::SessionFrameObserver frame_observer;
-  std::unique_ptr<mbgl::Renderer> renderer = nullptr;
+  std::unique_ptr<mln::Renderer> renderer = nullptr;
   mln::core::RenderSurfaceState surface;
   mln::core::RenderTextureState texture;
 };

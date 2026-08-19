@@ -158,11 +158,11 @@ auto validate_vulkan_handles(const mln_vulkan_surface_descriptor& descriptor)
   return MLN_STATUS_OK;
 }
 
-class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
-                                   public mbgl::vulkan::Renderable {
+class VulkanSurfaceBackend final : public mln::vulkan::RendererBackend,
+                                   public mln::vulkan::Renderable {
  private:
   class VulkanSurfaceRenderableResource final
-      : public mbgl::vulkan::SurfaceRenderableResource {
+      : public mln::vulkan::SurfaceRenderableResource {
    public:
     VulkanSurfaceRenderableResource(
       VulkanSurfaceBackend& backend_, VkSurfaceKHR surface_
@@ -189,7 +189,7 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
       }
       surface = vk::UniqueSurfaceKHR(
         borrowed_surface,
-        mbgl::vulkan::ObjectDestroy<vk::Instance>(
+        mln::vulkan::ObjectDestroy<vk::Instance>(
           backend.getInstance().get(), nullptr, backend.getDispatcher()
         )
       );
@@ -208,7 +208,7 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
     // layouts do not change across a resize; if the surface did report a new
     // format, setColorFormat() drops the pass and initRenderPass() rebuilds it
     // before the framebuffers are created.
-    void resize(mbgl::Size size) {
+    void resize(mln::Size size) {
       if (!renderPass) {
         return;
       }
@@ -257,7 +257,7 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
 
     // Presents through a different host surface from here on. The caller has
     // already established that it matches, so the render pass survives.
-    void set_surface(VkSurfaceKHR surface_, mbgl::Size size) {
+    void set_surface(VkSurfaceKHR surface_, mln::Size size) {
       backend.getDevice()->waitIdle(backend.getDispatcher());
       swapchainFramebuffers.clear();
       swapchainImageViews.clear();
@@ -285,10 +285,10 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
 
  public:
   VulkanSurfaceBackend(
-    const mln_vulkan_surface_descriptor& descriptor, mbgl::Size size
+    const mln_vulkan_surface_descriptor& descriptor, mln::Size size
   )
-      : mbgl::vulkan::RendererBackend(mbgl::gfx::ContextMode::Unique),
-        mbgl::vulkan::Renderable(size, nullptr),
+      : mln::vulkan::RendererBackend(mln::gfx::ContextMode::Unique),
+        mln::vulkan::Renderable(size, nullptr),
         descriptor_(descriptor) {
     initSharedDevice();
     initAllocator();
@@ -302,12 +302,12 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
   auto operator=(VulkanSurfaceBackend&&) -> VulkanSurfaceBackend& = delete;
 
   ~VulkanSurfaceBackend() override {
-    auto guard = mbgl::gfx::BackendScope{*this};
+    auto guard = mln::gfx::BackendScope{*this};
     resource.reset();
     getThreadPool().runRenderJobs(true);
   }
 
-  auto getDefaultRenderable() -> mbgl::gfx::Renderable& override {
+  auto getDefaultRenderable() -> mln::gfx::Renderable& override {
     if (!resource) {
       resource = std::make_unique<VulkanSurfaceRenderableResource>(
         *this, static_cast<VkSurfaceKHR>(descriptor_.surface)
@@ -316,8 +316,8 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
     return *this;
   }
 
-  void resize(mbgl::Size size) {
-    mbgl::vulkan::Renderable::setSize(size);
+  void resize(mln::Size size) {
+    mln::vulkan::Renderable::setSize(size);
     if (resource) {
       getResource<VulkanSurfaceRenderableResource>().resize(size);
       adopt_swapchain_extent();
@@ -338,7 +338,7 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
   }
 
   void set_surface(const mln_vulkan_surface_descriptor& descriptor) {
-    const auto new_size = mbgl::Size{
+    const auto new_size = mln::Size{
       mln::core::physical_dimension(
         descriptor.extent.width, descriptor.extent.scale_factor
       ),
@@ -350,7 +350,7 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
     // surface: the wrapper is created against descriptor_ on first use.
     if (!resource) {
       descriptor_.surface = descriptor.surface;
-      mbgl::vulkan::Renderable::setSize(new_size);
+      mln::vulkan::Renderable::setSize(new_size);
       return;
     }
     // The resource first, then this backend's own view of the target. Building
@@ -360,7 +360,7 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
       static_cast<VkSurfaceKHR>(descriptor.surface), new_size
     );
     descriptor_.surface = descriptor.surface;
-    mbgl::vulkan::Renderable::setSize(new_size);
+    mln::vulkan::Renderable::setSize(new_size);
     adopt_swapchain_extent();
   }
 
@@ -375,13 +375,13 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
  private:
   // Takes the extent the swapchain actually got. A surface may report a fixed
   // currentExtent, clamp what was asked for, or swap width and height for a
-  // pre-rotated display, and mbgl::Renderer reads its viewport and scissor from
+  // pre-rotated display, and mln::Renderer reads its viewport and scissor from
   // the renderable's size.
   void adopt_swapchain_extent() {
     const auto& renderable_resource =
       getResource<VulkanSurfaceRenderableResource>();
     const auto& extent = renderable_resource.getExtent();
-    mbgl::vulkan::Renderable::setSize({extent.width, extent.height});
+    mln::vulkan::Renderable::setSize({extent.width, extent.height});
   }
 
  public:
@@ -390,7 +390,7 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
     usingSharedContext = true;
     instance = vk::UniqueInstance(
       static_cast<VkInstance>(descriptor_.context.instance),
-      mbgl::vulkan::ObjectDestroy<vk::detail::NoParent>(nullptr, dispatcher)
+      mln::vulkan::ObjectDestroy<vk::detail::NoParent>(nullptr, dispatcher)
     );
   }
 
@@ -425,7 +425,7 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
 
     device = vk::UniqueDevice(
       static_cast<VkDevice>(descriptor_.context.device),
-      mbgl::vulkan::ObjectDestroy<vk::detail::NoParent>(nullptr, dispatcher)
+      mln::vulkan::ObjectDestroy<vk::detail::NoParent>(nullptr, dispatcher)
     );
     mln::core::vulkan_init_device_dispatch(
       dispatcher, device.get(), descriptor_.context
@@ -459,16 +459,16 @@ class VulkanSurfaceSessionBackend final
     : public mln::core::SurfaceSessionBackend {
  public:
   VulkanSurfaceSessionBackend(
-    const mln_vulkan_surface_descriptor& descriptor, mbgl::Size size
+    const mln_vulkan_surface_descriptor& descriptor, mln::Size size
   )
       : backend_(descriptor, size) {}
 
-  auto renderer_backend() -> mbgl::gfx::RendererBackend& override {
+  auto renderer_backend() -> mln::gfx::RendererBackend& override {
     return backend_;
   }
 
   void resize(uint32_t physical_width, uint32_t physical_height) override {
-    backend_.resize(mbgl::Size{physical_width, physical_height});
+    backend_.resize(mln::Size{physical_width, physical_height});
   }
 
   auto set_vulkan_target(const mln_vulkan_surface_descriptor& descriptor)
@@ -551,7 +551,7 @@ auto vulkan_surface_attach(
   session->map = map;
   set_session_extent(*session, descriptor->extent);
   session->surface.backend = std::make_unique<VulkanSurfaceSessionBackend>(
-    *descriptor, mbgl::Size{session->physical_width, session->physical_height}
+    *descriptor, mln::Size{session->physical_width, session->physical_height}
   );
   return attach_render_session(
     std::move(session), out_session, RenderSessionKind::Surface,

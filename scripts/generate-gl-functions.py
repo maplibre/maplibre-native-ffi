@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Rewrites MapLibre Native's GL entry-point table to resolve at run time.
 
-Upstream defines `mbgl::platform::glFoo` as a function pointer initialized from
+Upstream defines `mln::platform::glFoo` as a function pointer initialized from
 the linked `::glFoo`, which is what makes the library depend on a GL loader at
 link time. Every initializer here becomes a stub that looks the entry point up
 through the client library on its first call, so the table costs nothing at link
@@ -35,7 +35,7 @@ namespace {
 %s}  // namespace
 """
 
-# The prefix keeps these clear of the `mbgl::platform` names they stand for.
+# The prefix keeps these clear of the `mln::platform` names they stand for.
 NAME_PREFIX = "mln_gl_name_"
 
 

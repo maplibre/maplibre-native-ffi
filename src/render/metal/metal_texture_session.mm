@@ -57,13 +57,13 @@ auto validate_borrowed_texture(
 class MetalTextureSessionBackend final
     : public mln::core::TextureSessionBackend {
  public:
-  MetalTextureSessionBackend(MTL::Device* host_device, mbgl::Size size)
+  MetalTextureSessionBackend(MTL::Device* host_device, mln::Size size)
       : backend_(host_device, size) {}
 
-  MetalTextureSessionBackend(MTL::Texture* borrowed_texture, mbgl::Size size)
+  MetalTextureSessionBackend(MTL::Texture* borrowed_texture, mln::Size size)
       : backend_(borrowed_texture, size) {}
 
-  auto headless_backend() -> mbgl::gfx::HeadlessBackend& override {
+  auto headless_backend() -> mln::gfx::HeadlessBackend& override {
     return backend_;
   }
 
@@ -86,7 +86,7 @@ class MetalTextureSessionBackend final
       );
     }
     backend_.set_borrowed_texture(
-      texture, mbgl::Size{descriptor.physical_width, descriptor.physical_height}
+      texture, mln::Size{descriptor.physical_width, descriptor.physical_height}
     );
     return MLN_STATUS_OK;
   }
@@ -176,7 +176,7 @@ auto metal_owned_texture_attach(
   session->texture.mode = TextureSessionMode::Owned;
   session->texture.backend = std::make_unique<MetalTextureSessionBackend>(
     static_cast<MTL::Device*>(descriptor->context.device),
-    mbgl::Size{session->physical_width, session->physical_height}
+    mln::Size{session->physical_width, session->physical_height}
   );
   return attach_render_session(
     std::move(session), out_session, RenderSessionKind::Texture,
@@ -219,7 +219,7 @@ auto metal_borrowed_texture_attach(
   session->texture.mode = TextureSessionMode::Borrowed;
   session->texture.backend = std::make_unique<MetalTextureSessionBackend>(
     static_cast<MTL::Texture*>(descriptor->texture),
-    mbgl::Size{session->physical_width, session->physical_height}
+    mln::Size{session->physical_width, session->physical_height}
   );
   return attach_render_session(
     std::move(session), out_session, RenderSessionKind::Texture,

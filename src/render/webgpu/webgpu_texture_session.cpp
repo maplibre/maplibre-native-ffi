@@ -45,7 +45,7 @@ constexpr uint32_t readback_yield_attempts = 5000;
 
 auto validate_webgpu_texture(
   const mln_webgpu_borrowed_texture_descriptor& descriptor,
-  mbgl::Size physical_size
+  mln::Size physical_size
 ) -> mln_status {
   auto* const texture = static_cast<WGPUTexture>(descriptor.texture);
   const auto format = static_cast<WGPUTextureFormat>(descriptor.format);
@@ -83,10 +83,10 @@ auto validate_webgpu_texture(
   return MLN_STATUS_OK;
 }
 
-class WebGPUTextureBackend final : public mbgl::webgpu::RendererBackend,
-                                   public mbgl::gfx::HeadlessBackend {
+class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
+                                   public mln::gfx::HeadlessBackend {
  public:
-  class RenderableResource final : public mbgl::webgpu::RenderableResource {
+  class RenderableResource final : public mln::webgpu::RenderableResource {
    public:
     explicit RenderableResource(WebGPUTextureBackend& backend_)
         : backend(backend_) {}
@@ -95,7 +95,7 @@ class WebGPUTextureBackend final : public mbgl::webgpu::RendererBackend,
 
     void swap() override {}
 
-    const mbgl::webgpu::RendererBackend& getBackend() const override {
+    const mln::webgpu::RendererBackend& getBackend() const override {
       return backend;
     }
 
@@ -130,10 +130,10 @@ class WebGPUTextureBackend final : public mbgl::webgpu::RendererBackend,
   };
 
   WebGPUTextureBackend(
-    const mln_webgpu_owned_texture_descriptor& descriptor, mbgl::Size size
+    const mln_webgpu_owned_texture_descriptor& descriptor, mln::Size size
   )
-      : mbgl::webgpu::RendererBackend(mbgl::gfx::ContextMode::Unique),
-        mbgl::gfx::HeadlessBackend(size),
+      : mln::webgpu::RendererBackend(mln::gfx::ContextMode::Unique),
+        mln::gfx::HeadlessBackend(size),
         owns_color_texture_(true),
         color_format_(webgpu_owned_color_format) {
     try {
@@ -148,10 +148,10 @@ class WebGPUTextureBackend final : public mbgl::webgpu::RendererBackend,
   }
 
   WebGPUTextureBackend(
-    const mln_webgpu_borrowed_texture_descriptor& descriptor, mbgl::Size size
+    const mln_webgpu_borrowed_texture_descriptor& descriptor, mln::Size size
   )
-      : mbgl::webgpu::RendererBackend(mbgl::gfx::ContextMode::Unique),
-        mbgl::gfx::HeadlessBackend(size),
+      : mln::webgpu::RendererBackend(mln::gfx::ContextMode::Unique),
+        mln::gfx::HeadlessBackend(size),
         owns_color_texture_(false),
         texture_(static_cast<WGPUTexture>(descriptor.texture)),
         color_view_(static_cast<WGPUTextureView>(descriptor.texture_view)),
@@ -170,7 +170,7 @@ class WebGPUTextureBackend final : public mbgl::webgpu::RendererBackend,
 
   ~WebGPUTextureBackend() override { shutdown(); }
 
-  mbgl::gfx::Renderable& getDefaultRenderable() override {
+  mln::gfx::Renderable& getDefaultRenderable() override {
     if (!hasResource()) {
       setResource(std::make_unique<RenderableResource>(*this));
     }
@@ -185,7 +185,7 @@ class WebGPUTextureBackend final : public mbgl::webgpu::RendererBackend,
   // instance created with timedWaitAnyEnable, and the host's instance is
   // optional. A spontaneous callback needs no instance, and yielding to the
   // browser's job queue is what lets it arrive.
-  mbgl::PremultipliedImage readStillImage() override {
+  mln::PremultipliedImage readStillImage() override {
     const auto size = getSize();
     if (
       device_ == nullptr || queue_ == nullptr || texture_ == nullptr ||
@@ -221,7 +221,7 @@ class WebGPUTextureBackend final : public mbgl::webgpu::RendererBackend,
     return image;
   }
 
-  mbgl::gfx::RendererBackend* getRendererBackend() override { return this; }
+  mln::gfx::RendererBackend* getRendererBackend() override { return this; }
 
   void* getCurrentTextureView() override {
     ensureColorTexture();
@@ -233,7 +233,7 @@ class WebGPUTextureBackend final : public mbgl::webgpu::RendererBackend,
     return depth_stencil_view_;
   }
 
-  mbgl::Size getFramebufferSize() const override { return getSize(); }
+  mln::Size getFramebufferSize() const override { return getSize(); }
 
   auto rendered_texture() const -> void* { return texture_; }
   auto rendered_texture_view() const -> void* { return color_view_; }
@@ -284,7 +284,7 @@ class WebGPUTextureBackend final : public mbgl::webgpu::RendererBackend,
     releaseColorTexture();
     texture_ = texture;
     color_view_ = view;
-    setSize(mbgl::Size{descriptor.physical_width, descriptor.physical_height});
+    setSize(mln::Size{descriptor.physical_width, descriptor.physical_height});
   }
 
  protected:
@@ -299,7 +299,7 @@ class WebGPUTextureBackend final : public mbgl::webgpu::RendererBackend,
   // Submits the texture-to-buffer copy on the session's queue, ordered behind
   // the render commands already there, so it needs no fence of its own.
   auto copy_texture_into(
-    WGPUBuffer destination, uint32_t aligned_row_stride, mbgl::Size size
+    WGPUBuffer destination, uint32_t aligned_row_stride, mln::Size size
   ) -> bool {
     auto* const encoder = wgpuDeviceCreateCommandEncoder(device_, nullptr);
     if (encoder == nullptr) {
@@ -345,9 +345,9 @@ class WebGPUTextureBackend final : public mbgl::webgpu::RendererBackend,
   // spins: emscripten_sleep suspends through JSPI and lets that queue run. The
   // wait is bounded so a device that never answers fails the read.
   auto map_buffer_into_image(
-    WGPUBuffer staging, uint64_t mapped_size, mbgl::Size size,
+    WGPUBuffer staging, uint64_t mapped_size, mln::Size size,
     uint32_t row_stride, uint32_t aligned_row_stride
-  ) -> mbgl::PremultipliedImage {
+  ) -> mln::PremultipliedImage {
     auto const state = std::make_shared<MapState>();
     WGPUBufferMapCallbackInfo callback_info{};
     callback_info.mode = WGPUCallbackMode_AllowSpontaneous;
@@ -570,19 +570,19 @@ class WebGPUTextureBackend final : public mbgl::webgpu::RendererBackend,
   WGPUInstance instance_ = nullptr;
   WGPUDevice device_ = nullptr;
   WGPUQueue queue_ = nullptr;
-  mbgl::Size color_texture_size_{0, 0};
+  mln::Size color_texture_size_{0, 0};
   WGPUTexture depth_stencil_texture_ = nullptr;
   WGPUTextureView depth_stencil_view_ = nullptr;
-  mbgl::Size depth_stencil_size_{0, 0};
+  mln::Size depth_stencil_size_{0, 0};
 };
 
 // Renders into a surface the host presents, which in a browser is a canvas. A
 // surface hands out one texture per frame and takes it back at present, so this
 // acquires at frame start and releases at swap rather than holding one.
-class WebGPUSurfaceBackend final : public mbgl::webgpu::RendererBackend,
-                                   public mbgl::gfx::Renderable {
+class WebGPUSurfaceBackend final : public mln::webgpu::RendererBackend,
+                                   public mln::gfx::Renderable {
  public:
-  class RenderableResource final : public mbgl::webgpu::RenderableResource {
+  class RenderableResource final : public mln::webgpu::RenderableResource {
    public:
     explicit RenderableResource(WebGPUSurfaceBackend& backend_)
         : backend(backend_) {}
@@ -591,7 +591,7 @@ class WebGPUSurfaceBackend final : public mbgl::webgpu::RendererBackend,
 
     void swap() override { backend.present(); }
 
-    const mbgl::webgpu::RendererBackend& getBackend() const override {
+    const mln::webgpu::RendererBackend& getBackend() const override {
       return backend;
     }
 
@@ -626,12 +626,10 @@ class WebGPUSurfaceBackend final : public mbgl::webgpu::RendererBackend,
   };
 
   WebGPUSurfaceBackend(
-    const mln_webgpu_surface_descriptor& descriptor, mbgl::Size size
+    const mln_webgpu_surface_descriptor& descriptor, mln::Size size
   )
-      : mbgl::webgpu::RendererBackend(mbgl::gfx::ContextMode::Unique),
-        mbgl::gfx::Renderable(
-          size, std::make_unique<RenderableResource>(*this)
-        ),
+      : mln::webgpu::RendererBackend(mln::gfx::ContextMode::Unique),
+        mln::gfx::Renderable(size, std::make_unique<RenderableResource>(*this)),
         surface_(static_cast<WGPUSurface>(descriptor.surface)),
         color_format_(static_cast<WGPUTextureFormat>(descriptor.format)) {
     wgpuSurfaceAddRef(surface_);
@@ -653,7 +651,7 @@ class WebGPUSurfaceBackend final : public mbgl::webgpu::RendererBackend,
 
   ~WebGPUSurfaceBackend() override { shutdown(); }
 
-  mbgl::gfx::Renderable& getDefaultRenderable() override { return *this; }
+  mln::gfx::Renderable& getDefaultRenderable() override { return *this; }
 
   void* getCurrentTextureView() override { return color_view(); }
 
@@ -662,7 +660,7 @@ class WebGPUSurfaceBackend final : public mbgl::webgpu::RendererBackend,
     return depth_stencil_view_;
   }
 
-  mbgl::Size getFramebufferSize() const override { return getSize(); }
+  mln::Size getFramebufferSize() const override { return getSize(); }
 
   auto color_format() const -> wgpu::TextureFormat {
     return static_cast<wgpu::TextureFormat>(color_format_);
@@ -736,7 +734,7 @@ class WebGPUSurfaceBackend final : public mbgl::webgpu::RendererBackend,
     releaseFrame();
   }
 
-  void resize(mbgl::Size size_) {
+  void resize(mln::Size size_) {
     if (size_ == getSize()) {
       return;
     }
@@ -769,7 +767,7 @@ class WebGPUSurfaceBackend final : public mbgl::webgpu::RendererBackend,
       wgpuSurfaceRelease(surface_);
     }
     surface_ = replacement;
-    size = mbgl::Size{
+    size = mln::Size{
       mln::core::physical_dimension(
         descriptor.extent.width, descriptor.extent.scale_factor
       ),
@@ -925,23 +923,23 @@ class WebGPUSurfaceBackend final : public mbgl::webgpu::RendererBackend,
   WGPUQueue queue_ = nullptr;
   WGPUTexture depth_stencil_texture_ = nullptr;
   WGPUTextureView depth_stencil_view_ = nullptr;
-  mbgl::Size depth_stencil_size_{0, 0};
+  mln::Size depth_stencil_size_{0, 0};
 };
 
 class WebGPUSurfaceSessionBackend final
     : public mln::core::SurfaceSessionBackend {
  public:
   WebGPUSurfaceSessionBackend(
-    const mln_webgpu_surface_descriptor& descriptor, mbgl::Size size
+    const mln_webgpu_surface_descriptor& descriptor, mln::Size size
   )
       : backend_(descriptor, size) {}
 
-  auto renderer_backend() -> mbgl::gfx::RendererBackend& override {
+  auto renderer_backend() -> mln::gfx::RendererBackend& override {
     return backend_;
   }
 
   void resize(uint32_t physical_width, uint32_t physical_height) override {
-    backend_.resize(mbgl::Size{physical_width, physical_height});
+    backend_.resize(mln::Size{physical_width, physical_height});
   }
 
   auto prepare_frame(bool& out_ready) -> mln_status override {
@@ -979,16 +977,16 @@ class WebGPUTextureSessionBackend final
     : public mln::core::TextureSessionBackend {
  public:
   WebGPUTextureSessionBackend(
-    const mln_webgpu_owned_texture_descriptor& descriptor, mbgl::Size size
+    const mln_webgpu_owned_texture_descriptor& descriptor, mln::Size size
   )
       : backend_(descriptor, size) {}
 
   WebGPUTextureSessionBackend(
-    const mln_webgpu_borrowed_texture_descriptor& descriptor, mbgl::Size size
+    const mln_webgpu_borrowed_texture_descriptor& descriptor, mln::Size size
   )
       : backend_(descriptor, size) {}
 
-  auto headless_backend() -> mbgl::gfx::HeadlessBackend& override {
+  auto headless_backend() -> mln::gfx::HeadlessBackend& override {
     return backend_;
   }
 
@@ -1095,7 +1093,7 @@ auto webgpu_owned_texture_attach(
     session->texture.api_kind = TextureSessionApi::WebGPU;
     session->texture.mode = TextureSessionMode::Owned;
     session->texture.backend = std::make_unique<WebGPUTextureSessionBackend>(
-      *descriptor, mbgl::Size{session->physical_width, session->physical_height}
+      *descriptor, mln::Size{session->physical_width, session->physical_height}
     );
     return attach_render_session(
       std::move(session), out_session, RenderSessionKind::Texture,
@@ -1147,7 +1145,7 @@ auto webgpu_borrowed_texture_attach(
   }
 
   const auto physical_size =
-    mbgl::Size{descriptor->physical_width, descriptor->physical_height};
+    mln::Size{descriptor->physical_width, descriptor->physical_height};
   const auto texture_status =
     validate_webgpu_texture(*descriptor, physical_size);
   if (texture_status != MLN_STATUS_OK) {
@@ -1207,7 +1205,7 @@ auto webgpu_borrowed_texture_set_target(
   // already released.
   const auto texture_status = validate_webgpu_texture(
     *descriptor,
-    mbgl::Size{descriptor->physical_width, descriptor->physical_height}
+    mln::Size{descriptor->physical_width, descriptor->physical_height}
   );
   if (texture_status != MLN_STATUS_OK) {
     return texture_status;
@@ -1260,7 +1258,7 @@ auto webgpu_surface_attach(
     session->map = map;
     set_session_extent(*session, descriptor->extent);
     session->surface.backend = std::make_unique<WebGPUSurfaceSessionBackend>(
-      *descriptor, mbgl::Size{session->physical_width, session->physical_height}
+      *descriptor, mln::Size{session->physical_width, session->physical_height}
     );
     return attach_render_session(
       std::move(session), out_session, RenderSessionKind::Surface,

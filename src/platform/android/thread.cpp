@@ -10,7 +10,7 @@
 #include <sys/prctl.h>
 #include <sys/resource.h>
 
-namespace mbgl::platform {
+namespace mln::platform {
 
 auto getCurrentThreadName() -> std::string {
   auto name = std::array<char, 32>{"unknown"};
@@ -54,4 +54,4 @@ void attachThread() {}
 
 void detachThread() {}
 
-}  // namespace mbgl::platform
+}  // namespace mln::platform
