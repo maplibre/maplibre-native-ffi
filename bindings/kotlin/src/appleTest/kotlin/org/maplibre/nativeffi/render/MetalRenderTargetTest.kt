@@ -134,7 +134,14 @@ class MetalRenderTargetTest {
     if (!metalSupportedOrInapplicable()) return
     val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
     try {
-      val map = createStaticMap(runtime)
+      val map =
+        MapHandle.create(
+          runtime,
+          MapOptions().apply {
+            width = 64
+            height = 64
+          },
+        )
       try {
         val layer = CAMetalLayer()
         layer.drawableSize = CGSizeMake(1.0, 1.0)
