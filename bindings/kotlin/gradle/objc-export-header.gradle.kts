@@ -20,7 +20,8 @@ import org.maplibre.nativeffi.gradle.HostPlatform
 // Objective-C header with clang so a public name that collides with a C
 // macro fails the same way an Xcode framework consumer would.
 
-val hostIsMac = HostPlatform.current().isMac
+val hostPlatform = HostPlatform.current()
+val hostIsMac = hostPlatform.isMac
 
 val objcExportFrameworkBaseName = "MaplibreNativeFfiObjCCheck"
 val objcExportBinaryName = "objcExportCheck"
@@ -93,4 +94,18 @@ extensions.configure<KotlinMultiplatformExtension> {
       }
     tasks.matching { it.name == "${name}Test" }.configureEach { dependsOn(check) }
   }
+}
+
+val objcNullCollisionScript = layout.projectDirectory.file("scripts/assert-objc-null-collision.sh")
+
+if (hostPlatform.isLinux || hostPlatform.isMac) {
+  val assertObjcNullCollision =
+    tasks.register<Exec>("assertObjcExportNullCollision") {
+      group = "verification"
+      description =
+        "Asserts clang rejects a Kotlin-shaped Objective-C property named NULL and accepts NULL_POINTER."
+      inputs.file(objcNullCollisionScript)
+      commandLine("bash", objcNullCollisionScript.asFile)
+    }
+  tasks.named("jvmTest") { dependsOn(assertObjcNullCollision) }
 }
