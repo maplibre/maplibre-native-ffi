@@ -72,7 +72,7 @@ auto optionalCString(char* value) -> std::optional<std::string> {
 }
 
 auto isHTTPURL(const std::string& url) -> bool {
-  const auto parsed = mbgl::util::URL{url};
+  const auto parsed = mln::util::URL{url};
   const auto scheme =
     std::string_view{url}.substr(parsed.scheme.first, parsed.scheme.second);
   auto equalsIgnoringASCIICase = [scheme](std::string_view expected) {
@@ -89,23 +89,23 @@ auto isHTTPURL(const std::string& url) -> bool {
   return equalsIgnoringASCIICase("http") || equalsIgnoringASCIICase("https");
 }
 
-auto resourceKindToAbi(mbgl::Resource::Kind kind) -> std::uint32_t {
+auto resourceKindToAbi(mln::Resource::Kind kind) -> std::uint32_t {
   switch (kind) {
-    case mbgl::Resource::Kind::Style:
+    case mln::Resource::Kind::Style:
       return MLN_RESOURCE_KIND_STYLE;
-    case mbgl::Resource::Kind::Source:
+    case mln::Resource::Kind::Source:
       return MLN_RESOURCE_KIND_SOURCE;
-    case mbgl::Resource::Kind::Tile:
+    case mln::Resource::Kind::Tile:
       return MLN_RESOURCE_KIND_TILE;
-    case mbgl::Resource::Kind::Glyphs:
+    case mln::Resource::Kind::Glyphs:
       return MLN_RESOURCE_KIND_GLYPHS;
-    case mbgl::Resource::Kind::SpriteImage:
+    case mln::Resource::Kind::SpriteImage:
       return MLN_RESOURCE_KIND_SPRITE_IMAGE;
-    case mbgl::Resource::Kind::SpriteJSON:
+    case mln::Resource::Kind::SpriteJSON:
       return MLN_RESOURCE_KIND_SPRITE_JSON;
-    case mbgl::Resource::Kind::Image:
+    case mln::Resource::Kind::Image:
       return MLN_RESOURCE_KIND_IMAGE;
-    case mbgl::Resource::Kind::Unknown:
+    case mln::Resource::Kind::Unknown:
     default:
       return MLN_RESOURCE_KIND_UNKNOWN;
   }
@@ -152,7 +152,7 @@ class RustHttpRequestHandle {
 
 }  // namespace
 
-namespace mbgl {
+namespace mln {
 
 class HTTPFileSource::Impl {
  public:
@@ -455,4 +455,4 @@ auto HTTPFileSource::getClientOptions() -> ClientOptions {
   return impl->getClientOptions();
 }
 
-}  // namespace mbgl
+}  // namespace mln

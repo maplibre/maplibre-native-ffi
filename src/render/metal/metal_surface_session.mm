@@ -25,14 +25,14 @@
 
 namespace {
 
-class MetalSurfaceBackend final : public mbgl::mtl::RendererBackend,
-                                  public mbgl::gfx::Renderable {
+class MetalSurfaceBackend final : public mln::mtl::RendererBackend,
+                                  public mln::gfx::Renderable {
  private:
   class MetalSurfaceRenderableResource final
-      : public mbgl::mtl::RenderableResource {
+      : public mln::mtl::RenderableResource {
    public:
     MetalSurfaceRenderableResource(
-      MetalSurfaceBackend& backend_, CA::MetalLayer* layer_, mbgl::Size size_
+      MetalSurfaceBackend& backend_, CA::MetalLayer* layer_, mln::Size size_
     )
         : backend(backend_), layer(NS::RetainPtr(layer_)) {
       layer->setDevice(backend.getDevice().get());
@@ -49,7 +49,7 @@ class MetalSurfaceBackend final : public mbgl::mtl::RendererBackend,
       -> MetalSurfaceRenderableResource& = delete;
     ~MetalSurfaceRenderableResource() override = default;
 
-    void setSize(mbgl::Size size_) {
+    void setSize(mln::Size size_) {
       size = size_;
       layer->setDrawableSize(CGSizeMake(
         static_cast<CGFloat>(size.width), static_cast<CGFloat>(size.height)
@@ -60,7 +60,7 @@ class MetalSurfaceBackend final : public mbgl::mtl::RendererBackend,
     // Presents through a different layer from here on. Every layer this session
     // takes is configured for the same device and pixel format, so the render
     // pipeline states mbgl caches against that format stay usable.
-    void set_layer(CA::MetalLayer* layer_, mbgl::Size size_) {
+    void set_layer(CA::MetalLayer* layer_, mln::Size size_) {
       // Release what is still bound to the outgoing layer: a drawable must not
       // outlive its layer.
       commandBuffer.reset();
@@ -100,21 +100,21 @@ class MetalSurfaceBackend final : public mbgl::mtl::RendererBackend,
         depthStencilDirty = false;
         // Metal renderables are always attached to a Metal backend/context.
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
-        auto& context = static_cast<mbgl::mtl::Context&>(backend.getContext());
+        auto& context = static_cast<mln::mtl::Context&>(backend.getContext());
         depthTexture = context.createTexture2D();
         depthTexture->setSize(size);
         depthTexture->setFormat(
-          mbgl::gfx::TexturePixelType::Depth,
-          mbgl::gfx::TextureChannelDataType::Float
+          mln::gfx::TexturePixelType::Depth,
+          mln::gfx::TextureChannelDataType::Float
         );
         depthTexture->setSamplerConfiguration(
-          {.filter = mbgl::gfx::TextureFilterType::Linear,
-           .wrapU = mbgl::gfx::TextureWrapType::Clamp,
-           .wrapV = mbgl::gfx::TextureWrapType::Clamp}
+          {.filter = mln::gfx::TextureFilterType::Linear,
+           .wrapU = mln::gfx::TextureWrapType::Clamp,
+           .wrapV = mln::gfx::TextureWrapType::Clamp}
         );
-        // The texture was created by mbgl::mtl::Context above.
+        // The texture was created by mln::mtl::Context above.
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
-        static_cast<mbgl::mtl::Texture2D*>(depthTexture.get())
+        static_cast<mln::mtl::Texture2D*>(depthTexture.get())
           ->setUsage(
             MTL::TextureUsageShaderRead | MTL::TextureUsageShaderWrite |
             MTL::TextureUsageRenderTarget
@@ -123,17 +123,17 @@ class MetalSurfaceBackend final : public mbgl::mtl::RendererBackend,
         stencilTexture = context.createTexture2D();
         stencilTexture->setSize(size);
         stencilTexture->setFormat(
-          mbgl::gfx::TexturePixelType::Stencil,
-          mbgl::gfx::TextureChannelDataType::UnsignedByte
+          mln::gfx::TexturePixelType::Stencil,
+          mln::gfx::TextureChannelDataType::UnsignedByte
         );
         stencilTexture->setSamplerConfiguration(
-          {.filter = mbgl::gfx::TextureFilterType::Linear,
-           .wrapU = mbgl::gfx::TextureWrapType::Clamp,
-           .wrapV = mbgl::gfx::TextureWrapType::Clamp}
+          {.filter = mln::gfx::TextureFilterType::Linear,
+           .wrapU = mln::gfx::TextureWrapType::Clamp,
+           .wrapV = mln::gfx::TextureWrapType::Clamp}
         );
-        // The texture was created by mbgl::mtl::Context above.
+        // The texture was created by mln::mtl::Context above.
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
-        static_cast<mbgl::mtl::Texture2D*>(stencilTexture.get())
+        static_cast<mln::mtl::Texture2D*>(stencilTexture.get())
           ->setUsage(
             MTL::TextureUsageShaderRead | MTL::TextureUsageShaderWrite |
             MTL::TextureUsageRenderTarget
@@ -143,18 +143,18 @@ class MetalSurfaceBackend final : public mbgl::mtl::RendererBackend,
       depthTexture->create();
       if (auto* depthTarget = renderPassDescriptor->depthAttachment()) {
         depthTarget->setTexture(
-          // The texture was created by mbgl::mtl::Context above.
+          // The texture was created by mln::mtl::Context above.
           // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
-          static_cast<mbgl::mtl::Texture2D*>(depthTexture.get())
+          static_cast<mln::mtl::Texture2D*>(depthTexture.get())
             ->getMetalTexture()
         );
       }
       stencilTexture->create();
       if (auto* stencilTarget = renderPassDescriptor->stencilAttachment()) {
         stencilTarget->setTexture(
-          // The texture was created by mbgl::mtl::Context above.
+          // The texture was created by mln::mtl::Context above.
           // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
-          static_cast<mbgl::mtl::Texture2D*>(stencilTexture.get())
+          static_cast<mln::mtl::Texture2D*>(stencilTexture.get())
             ->getMetalTexture()
         );
       }
@@ -176,43 +176,43 @@ class MetalSurfaceBackend final : public mbgl::mtl::RendererBackend,
     }
 
     [[nodiscard]] auto getBackend() const
-      -> const mbgl::mtl::RendererBackend& override {
+      -> const mln::mtl::RendererBackend& override {
       return backend;
     }
 
     [[nodiscard]] auto getCommandBuffer() const
-      -> const mbgl::mtl::MTLCommandBufferPtr& override {
+      -> const mln::mtl::MTLCommandBufferPtr& override {
       return commandBuffer;
     }
 
     [[nodiscard]] auto getUploadPassDescriptor() const
-      -> mbgl::mtl::MTLBlitPassDescriptorPtr override {
+      -> mln::mtl::MTLBlitPassDescriptorPtr override {
       return NS::TransferPtr(MTL::BlitPassDescriptor::alloc()->init());
     }
 
     [[nodiscard]] auto getRenderPassDescriptor() const
-      -> const mbgl::mtl::MTLRenderPassDescriptorPtr& override {
+      -> const mln::mtl::MTLRenderPassDescriptorPtr& override {
       return renderPassDescriptor;
     }
 
    private:
     MetalSurfaceBackend& backend;
     NS::SharedPtr<CA::MetalLayer> layer;
-    mbgl::Size size{0, 0};
-    mbgl::mtl::MTLCommandBufferPtr commandBuffer;
-    mbgl::mtl::MTLRenderPassDescriptorPtr renderPassDescriptor;
-    mbgl::mtl::CAMetalDrawablePtr drawable;
-    mbgl::gfx::Texture2DPtr depthTexture;
-    mbgl::gfx::Texture2DPtr stencilTexture;
+    mln::Size size{0, 0};
+    mln::mtl::MTLCommandBufferPtr commandBuffer;
+    mln::mtl::MTLRenderPassDescriptorPtr renderPassDescriptor;
+    mln::mtl::CAMetalDrawablePtr drawable;
+    mln::gfx::Texture2DPtr depthTexture;
+    mln::gfx::Texture2DPtr stencilTexture;
     bool depthStencilDirty = true;
   };
 
  public:
   MetalSurfaceBackend(
-    CA::MetalLayer* layer, MTL::Device* host_device, mbgl::Size size_
+    CA::MetalLayer* layer, MTL::Device* host_device, mln::Size size_
   )
-      : mbgl::mtl::RendererBackend(mbgl::gfx::ContextMode::Unique),
-        mbgl::gfx::Renderable(size_, nullptr) {
+      : mln::mtl::RendererBackend(mln::gfx::ContextMode::Unique),
+        mln::gfx::Renderable(size_, nullptr) {
     if (host_device != nullptr) {
       device = NS::RetainPtr(host_device);
       commandQueue = NS::TransferPtr(device->newCommandQueue());
@@ -227,21 +227,21 @@ class MetalSurfaceBackend final : public mbgl::mtl::RendererBackend,
   auto operator=(MetalSurfaceBackend&&) -> MetalSurfaceBackend& = delete;
 
   ~MetalSurfaceBackend() override {
-    auto guard = mbgl::gfx::BackendScope{*this};
+    auto guard = mln::gfx::BackendScope{*this};
     resource.reset();
     context.reset();
   }
 
-  auto getDefaultRenderable() -> mbgl::gfx::Renderable& override {
+  auto getDefaultRenderable() -> mln::gfx::Renderable& override {
     return *this;
   }
 
-  void setSize(mbgl::Size size_) {
+  void setSize(mln::Size size_) {
     size = size_;
     getResource<MetalSurfaceRenderableResource>().setSize(size_);
   }
 
-  void set_layer(CA::MetalLayer* layer_, mbgl::Size size_) {
+  void set_layer(CA::MetalLayer* layer_, mln::Size size_) {
     size = size_;
     getResource<MetalSurfaceRenderableResource>().set_layer(layer_, size_);
   }
@@ -265,16 +265,16 @@ class MetalSurfaceSessionBackend final
     : public mln::core::SurfaceSessionBackend {
  public:
   MetalSurfaceSessionBackend(
-    CA::MetalLayer* layer, MTL::Device* host_device, mbgl::Size size
+    CA::MetalLayer* layer, MTL::Device* host_device, mln::Size size
   )
       : backend_(layer, host_device, size) {}
 
-  auto renderer_backend() -> mbgl::gfx::RendererBackend& override {
+  auto renderer_backend() -> mln::gfx::RendererBackend& override {
     return backend_;
   }
 
   void resize(uint32_t physical_width, uint32_t physical_height) override {
-    backend_.setSize(mbgl::Size{physical_width, physical_height});
+    backend_.setSize(mln::Size{physical_width, physical_height});
   }
 
   auto prepare_frame(bool& out_ready) -> mln_status override {
@@ -294,7 +294,7 @@ class MetalSurfaceSessionBackend final
     }
     backend_.set_layer(
       static_cast<CA::MetalLayer*>(descriptor.layer),
-      mbgl::Size{
+      mln::Size{
         mln::core::physical_dimension(
           descriptor.extent.width, descriptor.extent.scale_factor
         ),
@@ -348,7 +348,7 @@ auto metal_surface_attach(
   session->surface.backend = std::make_unique<MetalSurfaceSessionBackend>(
     static_cast<CA::MetalLayer*>(descriptor->layer),
     static_cast<MTL::Device*>(descriptor->context.device),
-    mbgl::Size{session->physical_width, session->physical_height}
+    mln::Size{session->physical_width, session->physical_height}
   );
   return attach_render_session(
     std::move(session), out_session, RenderSessionKind::Surface,

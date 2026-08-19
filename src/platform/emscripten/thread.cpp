@@ -3,7 +3,7 @@
 #include <mbgl/platform/thread.hpp>
 #include <mbgl/util/platform.hpp>
 
-namespace mbgl {
+namespace mln {
 namespace platform {
 
 // No-ops in browser builds: Emscripten exposes no scheduling priority APIs and
@@ -22,4 +22,4 @@ void attachThread() {}
 void detachThread() {}
 
 }  // namespace platform
-}  // namespace mbgl
+}  // namespace mln

@@ -10,14 +10,14 @@
 
 #include <mbgl/util/chrono.hpp>
 
-namespace mbgl::platform::emscripten {
+namespace mln::platform::emscripten {
 
 struct RunLoopWake {
   class Runnable {
    public:
     virtual ~Runnable() = default;
 
-    virtual auto dueTime() const -> mbgl::TimePoint = 0;
+    virtual auto dueTime() const -> mln::TimePoint = 0;
     virtual void runTask() = 0;
     virtual auto countsForWaitForEmpty() const -> bool { return false; }
   };
@@ -61,7 +61,7 @@ struct RunLoopWake {
     runnables.remove(runnable);
   }
 
-  auto processRunnables() -> mbgl::Milliseconds {
+  auto processRunnables() -> mln::Milliseconds {
     auto ready = readyRunnables();
     for (auto& runnable : ready) {
       runnable->runTask();
@@ -82,7 +82,7 @@ struct RunLoopWake {
  private:
   auto readyRunnables() -> std::vector<std::shared_ptr<Runnable>> {
     auto ready = std::vector<std::shared_ptr<Runnable>>{};
-    auto const now = mbgl::Clock::now();
+    auto const now = mln::Clock::now();
     std::lock_guard lock(runnables_mutex);
     for (auto& runnable : runnables) {
       if (runnable->dueTime() <= now) {
@@ -92,13 +92,13 @@ struct RunLoopWake {
     return ready;
   }
 
-  auto nextDelay() -> mbgl::Milliseconds {
+  auto nextDelay() -> mln::Milliseconds {
     std::lock_guard lock(runnables_mutex);
     if (runnables.empty()) {
-      return mbgl::Milliseconds(-1);
+      return mln::Milliseconds(-1);
     }
 
-    auto next_due = mbgl::TimePoint::max();
+    auto next_due = mln::TimePoint::max();
     for (auto& runnable : runnables) {
       auto const due_time = runnable->dueTime();
       if (due_time < next_due) {
@@ -106,17 +106,17 @@ struct RunLoopWake {
       }
     }
 
-    if (next_due == mbgl::TimePoint::max()) {
-      return mbgl::Milliseconds(-1);
+    if (next_due == mln::TimePoint::max()) {
+      return mln::Milliseconds(-1);
     }
 
     // Rounding up keeps a sub-millisecond remainder a positive delay, so zero
     // means due rather than nearly due.
     auto const delay =
-      std::chrono::ceil<mbgl::Milliseconds>(next_due - mbgl::Clock::now());
-    return delay < mbgl::Milliseconds::zero() ? mbgl::Milliseconds::zero()
-                                              : delay;
+      std::chrono::ceil<mln::Milliseconds>(next_due - mln::Clock::now());
+    return delay < mln::Milliseconds::zero() ? mln::Milliseconds::zero()
+                                             : delay;
   }
 };
 
-}  // namespace mbgl::platform::emscripten
+}  // namespace mln::platform::emscripten

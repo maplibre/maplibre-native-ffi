@@ -16,19 +16,19 @@ namespace mln::core {
 
 auto validate_bytes(mln_buffer_view bytes, const char* name) -> bool;
 auto parse_json_document(
-  mln_buffer_view bytes, const char* name, mbgl::JSDocument& out_document
+  mln_buffer_view bytes, const char* name, mln::JSDocument& out_document
 ) -> bool;
 auto to_native_geometry(mln_buffer_view geometry)
-  -> std::optional<mbgl::Geometry<double>>;
-auto to_native_json_value(mln_buffer_view value) -> std::optional<mbgl::Value>;
+  -> std::optional<mln::Geometry<double>>;
+auto to_native_json_value(mln_buffer_view value) -> std::optional<mln::Value>;
 auto to_native_feature(mln_buffer_view feature)
-  -> std::optional<mbgl::GeoJSONFeature>;
-auto to_native_geojson(mln_buffer_view geojson) -> std::optional<mbgl::GeoJSON>;
-auto serialize_json_value(const mbgl::Value& value) -> std::string;
-auto serialize_geojson(const mbgl::GeoJSON& geojson) -> std::string;
-auto serialize_feature_collection(const mbgl::FeatureCollection& features)
+  -> std::optional<mln::GeoJSONFeature>;
+auto to_native_geojson(mln_buffer_view geojson) -> std::optional<mln::GeoJSON>;
+auto serialize_json_value(const mln::Value& value) -> std::string;
+auto serialize_geojson(const mln::GeoJSON& geojson) -> std::string;
+auto serialize_feature_collection(const mln::FeatureCollection& features)
   -> std::string;
-auto geometry_lat_lngs(const mbgl::Geometry<double>& geometry)
-  -> std::vector<mbgl::LatLng>;
+auto geometry_lat_lngs(const mln::Geometry<double>& geometry)
+  -> std::vector<mln::LatLng>;
 
 }  // namespace mln::core

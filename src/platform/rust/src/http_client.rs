@@ -9,7 +9,7 @@ use std::sync::{
 };
 use std::time::Duration;
 
-// Matches `mbgl::util::DEFAULT_MAXIMUM_CONCURRENT_REQUESTS` enforced by
+// Matches `mln::util::DEFAULT_MAXIMUM_CONCURRENT_REQUESTS` enforced by
 // `OnlineFileSource` in maplibre-native's default platform layer.
 const HTTP_WORKER_THREADS: usize = 20;
 // Bounds connection establishment only, so a hung TCP/TLS handshake cannot

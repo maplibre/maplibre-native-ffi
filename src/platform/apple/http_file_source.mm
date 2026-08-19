@@ -119,7 +119,7 @@ static char MLNTransformedHeaderNamesKey;
 }
 @end
 
-namespace mbgl {
+namespace mln {
 
 // Data that is shared between the requesting thread and the thread running the
 // completion handler.
@@ -268,7 +268,7 @@ NSString* HTTPFileSource::Impl::getUserAgent() const {
   // the system language is set to a right-to-left language.
   [userAgentComponents
     addObject:[NSString stringWithFormat:@"MapLibreNative/0.0.0 (%@)",
-                                         @(mbgl::version::revision)]];
+                                         @(mln::version::revision)]];
 
   NSString* systemName = @"Darwin";
 #if TARGET_OS_TV
@@ -444,7 +444,7 @@ std::unique_ptr<AsyncRequest> HTTPFileSource::request(
       [transformedHeaderNames addObject:field];
     }
 
-    const bool isTile = resource.kind == mbgl::Resource::Kind::Tile;
+    const bool isTile = resource.kind == mln::Resource::Kind::Tile;
 
     if (isTile) {
       [MLNNativeNetworkManager.sharedManager startDownloadEvent:url.relativePath
@@ -682,4 +682,4 @@ ClientOptions HTTPFileSource::getClientOptions() {
   return impl->getClientOptions();
 }
 
-}  // namespace mbgl
+}  // namespace mln

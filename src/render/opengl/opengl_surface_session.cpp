@@ -34,11 +34,11 @@
 
 namespace {
 
-class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
-                                   public mbgl::gfx::Renderable {
+class OpenGLSurfaceBackend final : public mln::gl::RendererBackend,
+                                   public mln::gfx::Renderable {
  private:
   class OpenGLSurfaceRenderableResource final
-      : public mbgl::gl::RenderableResource {
+      : public mln::gl::RenderableResource {
    public:
     explicit OpenGLSurfaceRenderableResource(OpenGLSurfaceBackend& backend_)
         : backend(backend_) {}
@@ -57,10 +57,10 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
 
  public:
   OpenGLSurfaceBackend(
-    const mln_opengl_surface_descriptor& descriptor, mbgl::Size size
+    const mln_opengl_surface_descriptor& descriptor, mln::Size size
   )
-      : mbgl::gl::RendererBackend(mln::core::opengl::session_context_mode),
-        mbgl::gfx::Renderable(
+      : mln::gl::RendererBackend(mln::core::opengl::session_context_mode),
+        mln::gfx::Renderable(
           size, std::make_unique<OpenGLSurfaceRenderableResource>(*this)
         ),
         descriptor_(descriptor) {}
@@ -111,7 +111,7 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
   // stay allocated until something in the group deletes them.
   void cleanup_while_current() {
     try {
-      auto guard = mbgl::gfx::BackendScope{*this};
+      auto guard = mln::gfx::BackendScope{*this};
       cleanup();
       return;
     } catch (...) {  // NOLINT(bugprone-empty-catch)
@@ -119,7 +119,7 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
     }
     fallback_drawable_ = true;
     try {
-      auto guard = mbgl::gfx::BackendScope{*this};
+      auto guard = mln::gfx::BackendScope{*this};
       cleanup();
     } catch (...) {
       // Nothing can be made current, so no GL call is safe. Leak the renderable
@@ -131,11 +131,11 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
     }
   }
 
-  auto getDefaultRenderable() -> mbgl::gfx::Renderable& override {
+  auto getDefaultRenderable() -> mln::gfx::Renderable& override {
     return *this;
   }
 
-  void resize(mbgl::Size size_) { size = size_; }
+  void resize(mln::Size size_) { size = size_; }
 
   // Presents through a different host surface from here on. The outgoing
   // surface is never touched, which a host may already have destroyed;
@@ -145,7 +145,7 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
     // session's GL context was created from it, and WGL context creation still
     // reads its device_context.
     descriptor_.surface = descriptor.surface;
-    size = mbgl::Size{
+    size = mln::Size{
       mln::core::physical_dimension(
         descriptor.extent.width, descriptor.extent.scale_factor
       ),
@@ -205,7 +205,7 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
   }
 
   auto getExtensionFunctionPointer(const char* name)
-    -> mbgl::gl::ProcAddress override {
+    -> mln::gl::ProcAddress override {
 #if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
     using GetProcAddressFunction = PROC(WINAPI*)(LPCSTR);
     auto* loader = reinterpret_cast<GetProcAddressFunction>(
@@ -214,18 +214,18 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
     if (loader != nullptr) {
       auto* proc = loader(name);
       if (mln::core::opengl::is_valid_wgl_proc_address(proc)) {
-        return reinterpret_cast<mbgl::gl::ProcAddress>(proc);
+        return reinterpret_cast<mln::gl::ProcAddress>(proc);
       }
     }
     auto* proc = wglGetProcAddress(name);
     if (mln::core::opengl::is_valid_wgl_proc_address(proc)) {
-      return reinterpret_cast<mbgl::gl::ProcAddress>(proc);
+      return reinterpret_cast<mln::gl::ProcAddress>(proc);
     }
-    return reinterpret_cast<mbgl::gl::ProcAddress>(
+    return reinterpret_cast<mln::gl::ProcAddress>(
       mln::core::opengl::get_opengl32_proc_address(name)
     );
 #elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
-    return reinterpret_cast<mbgl::gl::ProcAddress>(
+    return reinterpret_cast<mln::gl::ProcAddress>(
       mln::core::opengl::get_egl_proc_address(
         descriptor_.context.data.egl, name,
         egl_context_ ? egl_context_->active_api() : EGL_NONE
@@ -437,16 +437,16 @@ class OpenGLSurfaceSessionBackend final
     : public mln::core::SurfaceSessionBackend {
  public:
   OpenGLSurfaceSessionBackend(
-    const mln_opengl_surface_descriptor& descriptor, mbgl::Size size
+    const mln_opengl_surface_descriptor& descriptor, mln::Size size
   )
       : backend_(descriptor, size) {}
 
-  auto renderer_backend() -> mbgl::gfx::RendererBackend& override {
+  auto renderer_backend() -> mln::gfx::RendererBackend& override {
     return backend_;
   }
 
   void resize(uint32_t physical_width, uint32_t physical_height) override {
-    backend_.resize(mbgl::Size{physical_width, physical_height});
+    backend_.resize(mln::Size{physical_width, physical_height});
   }
 
   auto set_opengl_target(const mln_opengl_surface_descriptor& descriptor)
@@ -505,7 +505,7 @@ auto opengl_surface_attach(
   session->map = map;
   set_session_extent(*session, descriptor->extent);
   session->surface.backend = std::make_unique<OpenGLSurfaceSessionBackend>(
-    *descriptor, mbgl::Size{session->physical_width, session->physical_height}
+    *descriptor, mln::Size{session->physical_width, session->physical_height}
   );
   return attach_render_session(
     std::move(session), out_session, RenderSessionKind::Surface,

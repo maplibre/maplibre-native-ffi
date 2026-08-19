@@ -23,9 +23,9 @@
 #include "handles/handle_table.hpp"
 #include "maplibre_native_c.h"
 
-namespace mbgl {
+namespace mln {
 class DatabaseFileSource;
-}  // namespace mbgl
+}  // namespace mln
 
 namespace mln::core {
 
@@ -180,10 +180,10 @@ struct RuntimeObject {
   // The token this runtime hands to mbgl as its opaque platform context.
   void* platform_context = nullptr;
   std::thread::id owner_thread;
-  std::unique_ptr<mbgl::util::RunLoop> run_loop;
+  std::unique_ptr<mln::util::RunLoop> run_loop;
   std::string asset_path;
   std::string cache_path;
-  std::shared_ptr<mbgl::DatabaseFileSource> database_source;
+  std::shared_ptr<mln::DatabaseFileSource> database_source;
   std::shared_ptr<mln::core::ResourceProviderState> resource_provider_state;
   std::shared_ptr<mln::core::OfflineRegionEventState> offline_event_state;
   std::shared_ptr<mln::core::OfflineOperationEventState>
@@ -368,13 +368,13 @@ auto validate_runtime(mln_runtime runtime, RuntimeObject*& out_runtime)
   -> mln_status;
 
 // The run loop this runtime pumps from mln_runtime_pump(). Use it as the
-// mbgl::Scheduler backing a Mailbox, so work posted from a foreign thread is
+// mln::Scheduler backing a Mailbox, so work posted from a foreign thread is
 // delivered on the runtime owner thread. Prefer this over
-// mbgl::util::RunLoop::Get(), which reads the calling thread's ambient
+// mln::util::RunLoop::Get(), which reads the calling thread's ambient
 // scheduler.
-auto runtime_run_loop(RuntimeObject* runtime) -> mbgl::util::RunLoop&;
+auto runtime_run_loop(RuntimeObject* runtime) -> mln::util::RunLoop&;
 
-auto resource_options_for_runtime(mln_runtime runtime) -> mbgl::ResourceOptions;
+auto resource_options_for_runtime(mln_runtime runtime) -> mln::ResourceOptions;
 // Leases the resource provider registered on the runtime named by a MapLibre
 // platform context. Hold the returned lease across the provider callback, so
 // replacement and teardown cannot retire its callback or `user_data`. Returns

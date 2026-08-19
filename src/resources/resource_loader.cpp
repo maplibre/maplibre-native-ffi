@@ -33,8 +33,8 @@
 namespace mln::core {
 namespace {
 
-auto can_request_network(const mbgl::Resource& resource) -> bool {
-  return resource.hasLoadingMethod(mbgl::Resource::LoadingMethod::Network);
+auto can_request_network(const mln::Resource& resource) -> bool {
+  return resource.hasLoadingMethod(mln::Resource::LoadingMethod::Network);
 }
 
 auto equals_ignoring_case(std::string_view left, std::string_view right)
@@ -94,12 +94,12 @@ auto diagnostic_url(std::string_view url) -> std::string {
 
 auto unsupported_scheme_response(
   std::string_view scheme, const std::string& url, bool provider_declined
-) -> mbgl::Response {
-  auto response = mbgl::Response{};
+) -> mln::Response {
+  auto response = mln::Response{};
   // Reason::Other makes this terminal; the transport and server reasons are
   // retried or absorbed by the tile and source paths.
-  response.error = std::make_unique<mbgl::Response::Error>(
-    mbgl::Response::Error::Reason::Other,
+  response.error = std::make_unique<mln::Response::Error>(
+    mln::Response::Error::Reason::Other,
     "unsupported URL scheme \"" + std::string{scheme} +
       "\" for network request \"" + diagnostic_url(url) +
       (provider_declined
@@ -112,69 +112,69 @@ auto unsupported_scheme_response(
 }
 
 auto respond_immediately(
-  const mbgl::Response& response, mbgl::FileSource::Callback callback
-) -> std::unique_ptr<mbgl::AsyncRequest> {
-  auto request = std::make_unique<mbgl::FileSourceRequest>(std::move(callback));
-  request->actor().invoke(&mbgl::FileSourceRequest::setResponse, response);
+  const mln::Response& response, mln::FileSource::Callback callback
+) -> std::unique_ptr<mln::AsyncRequest> {
+  auto request = std::make_unique<mln::FileSourceRequest>(std::move(callback));
+  request->actor().invoke(&mln::FileSourceRequest::setResponse, response);
   return request;
 }
 
-auto resource_kind_to_abi(mbgl::Resource::Kind kind) -> uint32_t {
+auto resource_kind_to_abi(mln::Resource::Kind kind) -> uint32_t {
   switch (kind) {
-    case mbgl::Resource::Kind::Style:
+    case mln::Resource::Kind::Style:
       return MLN_RESOURCE_KIND_STYLE;
-    case mbgl::Resource::Kind::Source:
+    case mln::Resource::Kind::Source:
       return MLN_RESOURCE_KIND_SOURCE;
-    case mbgl::Resource::Kind::Tile:
+    case mln::Resource::Kind::Tile:
       return MLN_RESOURCE_KIND_TILE;
-    case mbgl::Resource::Kind::Glyphs:
+    case mln::Resource::Kind::Glyphs:
       return MLN_RESOURCE_KIND_GLYPHS;
-    case mbgl::Resource::Kind::SpriteImage:
+    case mln::Resource::Kind::SpriteImage:
       return MLN_RESOURCE_KIND_SPRITE_IMAGE;
-    case mbgl::Resource::Kind::SpriteJSON:
+    case mln::Resource::Kind::SpriteJSON:
       return MLN_RESOURCE_KIND_SPRITE_JSON;
-    case mbgl::Resource::Kind::Image:
+    case mln::Resource::Kind::Image:
       return MLN_RESOURCE_KIND_IMAGE;
-    case mbgl::Resource::Kind::Unknown:
+    case mln::Resource::Kind::Unknown:
     default:
       return MLN_RESOURCE_KIND_UNKNOWN;
   }
 }
 
-// Applies the per-kind normalization mbgl::OnlineFileSource would apply, so a
+// Applies the per-kind normalization mln::OnlineFileSource would apply, so a
 // provider sees the URL the built-in path would have requested. Kinds with no
 // canonical form, and URLs normalization rejects, fall back to the request URL
 // so a provider stays reachable for requests the native path refuses.
 auto resolve_resource_url(
-  const mbgl::ResourceOptions& resource_options, const mbgl::Resource& resource
+  const mln::ResourceOptions& resource_options, const mln::Resource& resource
 ) -> std::string {
   const auto& options = resource_options.tileServerOptions();
   const auto& api_key = resource_options.apiKey();
   try {
     switch (resource.kind) {
-      case mbgl::Resource::Kind::Style:
-        return mbgl::util::mapbox::normalizeStyleURL(
+      case mln::Resource::Kind::Style:
+        return mln::util::mapbox::normalizeStyleURL(
           options, resource.url, api_key
         );
-      case mbgl::Resource::Kind::Source:
-        return mbgl::util::mapbox::normalizeSourceURL(
+      case mln::Resource::Kind::Source:
+        return mln::util::mapbox::normalizeSourceURL(
           options, resource.url, api_key
         );
-      case mbgl::Resource::Kind::Glyphs:
-        return mbgl::util::mapbox::normalizeGlyphsURL(
+      case mln::Resource::Kind::Glyphs:
+        return mln::util::mapbox::normalizeGlyphsURL(
           options, resource.url, api_key
         );
-      case mbgl::Resource::Kind::SpriteImage:
-      case mbgl::Resource::Kind::SpriteJSON:
-        return mbgl::util::mapbox::normalizeSpriteURL(
+      case mln::Resource::Kind::SpriteImage:
+      case mln::Resource::Kind::SpriteJSON:
+        return mln::util::mapbox::normalizeSpriteURL(
           options, resource.url, api_key
         );
-      case mbgl::Resource::Kind::Tile:
-        return mbgl::util::mapbox::normalizeTileURL(
+      case mln::Resource::Kind::Tile:
+        return mln::util::mapbox::normalizeTileURL(
           options, resource.url, api_key
         );
-      case mbgl::Resource::Kind::Unknown:
-      case mbgl::Resource::Kind::Image:
+      case mln::Resource::Kind::Unknown:
+      case mln::Resource::Kind::Image:
       default:
         return resource.url;
     }
@@ -183,16 +183,15 @@ auto resolve_resource_url(
   }
 }
 
-auto make_resource_transform(void* platform_context)
-  -> mbgl::ResourceTransform {
+auto make_resource_transform(void* platform_context) -> mln::ResourceTransform {
   if (platform_context == nullptr) {
-    return mbgl::ResourceTransform{};
+    return mln::ResourceTransform{};
   }
 
-  return mbgl::ResourceTransform{
+  return mln::ResourceTransform{
     [platform_context](
-      mbgl::Resource::Kind kind, const std::string& url,
-      mbgl::ResourceTransform::FinishedCallback finished
+      mln::Resource::Kind kind, const std::string& url,
+      mln::ResourceTransform::FinishedCallback finished
     ) -> void {
       std::string replacement_url;
       const auto status = invoke_resource_transform(
@@ -208,24 +207,24 @@ auto make_resource_transform(void* platform_context)
   };
 }
 
-class AbiNetworkFileSource final : public mbgl::FileSource {
+class AbiNetworkFileSource final : public mln::FileSource {
  public:
   AbiNetworkFileSource(
-    const mbgl::ResourceOptions& resource_options,
-    const mbgl::ClientOptions& client_options
+    const mln::ResourceOptions& resource_options,
+    const mln::ClientOptions& client_options
   )
       : resource_options_(resource_options.clone()),
         client_options_(client_options.clone()),
         native_(
-          std::make_unique<mbgl::OnlineFileSource>(
+          std::make_unique<mln::OnlineFileSource>(
             resource_options, client_options
           )
         ) {
     apply_resource_transform(resource_options_.platformContext());
   }
 
-  auto request(const mbgl::Resource& resource, Callback callback)
-    -> std::unique_ptr<mbgl::AsyncRequest> override {
+  auto request(const mln::Resource& resource, Callback callback)
+    -> std::unique_ptr<mln::AsyncRequest> override {
     const auto options = resource_options_snapshot();
     auto provider_declined = false;
     if (can_request_network(resource)) {
@@ -260,7 +259,7 @@ class AbiNetworkFileSource final : public mbgl::FileSource {
     return native_->request(resource, std::move(callback));
   }
 
-  [[nodiscard]] auto canRequest(const mbgl::Resource& resource) const
+  [[nodiscard]] auto canRequest(const mln::Resource& resource) const
     -> bool override {
     const auto provider = acquire_resource_provider_for_platform_context(
       resource_options_snapshot().platformContext()
@@ -270,7 +269,7 @@ class AbiNetworkFileSource final : public mbgl::FileSource {
   }
 
   void forward(
-    const mbgl::Resource& resource, const mbgl::Response& response,
+    const mln::Resource& resource, const mln::Response& response,
     std::function<void()> callback
   ) override {
     native_->forward(resource, response, std::move(callback));
@@ -284,11 +283,11 @@ class AbiNetworkFileSource final : public mbgl::FileSource {
 
   void resume() override { native_->resume(); }
 
-  void setResourceTransform(mbgl::ResourceTransform transform) override {
+  void setResourceTransform(mln::ResourceTransform transform) override {
     native_->setResourceTransform(std::move(transform));
   }
 
-  void setResourceOptions(mbgl::ResourceOptions options) override {
+  void setResourceOptions(mln::ResourceOptions options) override {
     auto platform_context = options.platformContext();
     {
       const std::scoped_lock lock(resource_options_mutex_);
@@ -298,24 +297,23 @@ class AbiNetworkFileSource final : public mbgl::FileSource {
     apply_resource_transform(platform_context);
   }
 
-  auto getResourceOptions() -> mbgl::ResourceOptions override {
+  auto getResourceOptions() -> mln::ResourceOptions override {
     return resource_options_snapshot();
   }
 
-  void setClientOptions(mbgl::ClientOptions options) override {
+  void setClientOptions(mln::ClientOptions options) override {
     client_options_ = options.clone();
     native_->setClientOptions(std::move(options));
   }
 
-  auto getClientOptions() -> mbgl::ClientOptions override {
+  auto getClientOptions() -> mln::ClientOptions override {
     return client_options_.clone();
   }
 
  private:
   // Snapshots the options so reads never race a replacement. The mutex guards
   // only this member and is released before any other lock is taken.
-  [[nodiscard]] auto resource_options_snapshot() const
-    -> mbgl::ResourceOptions {
+  [[nodiscard]] auto resource_options_snapshot() const -> mln::ResourceOptions {
     const std::scoped_lock lock(resource_options_mutex_);
     return resource_options_.clone();
   }
@@ -324,7 +322,7 @@ class AbiNetworkFileSource final : public mbgl::FileSource {
   // registered resource transform rewrites URLs inside the online source, so it
   // keeps every scheme available.
   [[nodiscard]] static auto unsupported_network_scheme(
-    const mbgl::ResourceOptions& options, const std::string& url
+    const mln::ResourceOptions& options, const std::string& url
   ) -> std::optional<std::string_view> {
     if (
       has_resource_transform_for_platform_context(options.platformContext())
@@ -355,17 +353,17 @@ class AbiNetworkFileSource final : public mbgl::FileSource {
   }
 
   mutable std::mutex resource_options_mutex_;
-  mbgl::ResourceOptions resource_options_;
-  mbgl::ClientOptions client_options_;
-  std::unique_ptr<mbgl::FileSource> native_;
+  mln::ResourceOptions resource_options_;
+  mln::ClientOptions client_options_;
+  std::unique_ptr<mln::FileSource> native_;
 };
 
 }  // namespace
 
 auto make_network_file_source(
-  const mbgl::ResourceOptions& resource_options,
-  const mbgl::ClientOptions& client_options
-) noexcept -> std::unique_ptr<mbgl::FileSource> {
+  const mln::ResourceOptions& resource_options,
+  const mln::ClientOptions& client_options
+) noexcept -> std::unique_ptr<mln::FileSource> {
   try {
     return std::make_unique<AbiNetworkFileSource>(
       resource_options, client_options
@@ -380,11 +378,11 @@ auto make_network_file_source(
 }
 
 auto make_database_file_source(
-  const mbgl::ResourceOptions& resource_options,
-  const mbgl::ClientOptions& client_options
-) noexcept -> std::unique_ptr<mbgl::FileSource> {
+  const mln::ResourceOptions& resource_options,
+  const mln::ClientOptions& client_options
+) noexcept -> std::unique_ptr<mln::FileSource> {
   try {
-    auto source = std::make_unique<mbgl::DatabaseFileSource>(
+    auto source = std::make_unique<mln::DatabaseFileSource>(
       resource_options, client_options
     );
     return source;
@@ -398,11 +396,11 @@ auto make_database_file_source(
 }
 
 auto make_main_resource_loader(
-  const mbgl::ResourceOptions& resource_options,
-  const mbgl::ClientOptions& client_options
-) noexcept -> std::unique_ptr<mbgl::FileSource> {
+  const mln::ResourceOptions& resource_options,
+  const mln::ClientOptions& client_options
+) noexcept -> std::unique_ptr<mln::FileSource> {
   try {
-    return std::make_unique<mbgl::MainResourceLoader>(
+    return std::make_unique<mln::MainResourceLoader>(
       resource_options, client_options
     );
   } catch (const std::exception& exception) {

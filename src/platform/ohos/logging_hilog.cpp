@@ -5,7 +5,7 @@
 
 #include <hilog/log.h>
 
-namespace mbgl {
+namespace mln {
 namespace {
 
 constexpr unsigned int kMapLibreHilogDomain = 0x4d4c;
@@ -51,4 +51,4 @@ void Log::platformRecord(EventSeverity severity, const std::string& msg) {
   );
 }
 
-}  // namespace mbgl
+}  // namespace mln

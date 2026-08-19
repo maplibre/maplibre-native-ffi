@@ -9,18 +9,18 @@
 namespace mln::core {
 
 auto make_network_file_source(
-  const mbgl::ResourceOptions& resource_options,
-  const mbgl::ClientOptions& client_options
-) noexcept -> std::unique_ptr<mbgl::FileSource>;
+  const mln::ResourceOptions& resource_options,
+  const mln::ClientOptions& client_options
+) noexcept -> std::unique_ptr<mln::FileSource>;
 
 auto make_database_file_source(
-  const mbgl::ResourceOptions& resource_options,
-  const mbgl::ClientOptions& client_options
-) noexcept -> std::unique_ptr<mbgl::FileSource>;
+  const mln::ResourceOptions& resource_options,
+  const mln::ClientOptions& client_options
+) noexcept -> std::unique_ptr<mln::FileSource>;
 
 auto make_main_resource_loader(
-  const mbgl::ResourceOptions& resource_options,
-  const mbgl::ClientOptions& client_options
-) noexcept -> std::unique_ptr<mbgl::FileSource>;
+  const mln::ResourceOptions& resource_options,
+  const mln::ClientOptions& client_options
+) noexcept -> std::unique_ptr<mln::FileSource>;
 
 }  // namespace mln::core

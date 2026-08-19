@@ -15,20 +15,19 @@ auto network_status_get(std::uint32_t* out_status) -> mln_status {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  *out_status =
-    mbgl::NetworkStatus::Get() == mbgl::NetworkStatus::Status::Online
-      ? MLN_NETWORK_STATUS_ONLINE
-      : MLN_NETWORK_STATUS_OFFLINE;
+  *out_status = mln::NetworkStatus::Get() == mln::NetworkStatus::Status::Online
+                  ? MLN_NETWORK_STATUS_ONLINE
+                  : MLN_NETWORK_STATUS_OFFLINE;
   return MLN_STATUS_OK;
 }
 
 auto network_status_set(std::uint32_t status) -> mln_status {
   switch (status) {
     case MLN_NETWORK_STATUS_ONLINE:
-      mbgl::NetworkStatus::Set(mbgl::NetworkStatus::Status::Online);
+      mln::NetworkStatus::Set(mln::NetworkStatus::Status::Online);
       return MLN_STATUS_OK;
     case MLN_NETWORK_STATUS_OFFLINE:
-      mbgl::NetworkStatus::Set(mbgl::NetworkStatus::Status::Offline);
+      mln::NetworkStatus::Set(mln::NetworkStatus::Status::Offline);
       return MLN_STATUS_OK;
     default:
       set_thread_error("network status is invalid");

@@ -52,7 +52,7 @@ inline auto vulkan_get_device_proc_addr(
 
 inline auto vulkan_dispatch_loader(
   const mln_vulkan_context_descriptor& context
-) noexcept -> mbgl::vulkan::DispatchLoaderDynamic {
+) noexcept -> mln::vulkan::DispatchLoaderDynamic {
   const auto get_instance_proc_addr = vulkan_get_instance_proc_addr(context);
   if (get_instance_proc_addr == nullptr) {
     // Every dispatch entry stays null so callers report an unresolved loader
@@ -63,7 +63,7 @@ inline auto vulkan_dispatch_loader(
 }
 
 inline auto vulkan_init_instance_dispatch(
-  mbgl::vulkan::DispatchLoaderDynamic& dispatcher,
+  mln::vulkan::DispatchLoaderDynamic& dispatcher,
   const mln_vulkan_context_descriptor& context
 ) noexcept -> void {
   if (dispatcher.vkGetInstanceProcAddr == nullptr) {
@@ -73,7 +73,7 @@ inline auto vulkan_init_instance_dispatch(
 }
 
 inline auto vulkan_init_device_dispatch(
-  mbgl::vulkan::DispatchLoaderDynamic& dispatcher, VkDevice device,
+  mln::vulkan::DispatchLoaderDynamic& dispatcher, VkDevice device,
   const mln_vulkan_context_descriptor& context
 ) noexcept -> void {
   if (const auto get_device_proc_addr = vulkan_get_device_proc_addr(context)) {

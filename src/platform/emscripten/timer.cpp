@@ -9,7 +9,7 @@
 
 #include "run_loop_wake.hpp"
 
-namespace mbgl {
+namespace mln {
 namespace util {
 
 class TimerState : public platform::emscripten::RunLoopWake::Runnable,
@@ -97,4 +97,4 @@ void Timer::start(
 void Timer::stop() { impl->stop(); }
 
 }  // namespace util
-}  // namespace mbgl
+}  // namespace mln

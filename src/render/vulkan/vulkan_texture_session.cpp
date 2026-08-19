@@ -111,20 +111,20 @@ class VulkanTextureSessionBackend final
     : public mln::core::TextureSessionBackend {
  public:
   VulkanTextureSessionBackend(
-    const mln_vulkan_owned_texture_descriptor& descriptor, mbgl::Size size
+    const mln_vulkan_owned_texture_descriptor& descriptor, mln::Size size
   )
       : backend_(descriptor, size) {}
 
   VulkanTextureSessionBackend(
-    const mln_vulkan_borrowed_texture_descriptor& descriptor, mbgl::Size size
+    const mln_vulkan_borrowed_texture_descriptor& descriptor, mln::Size size
   )
       : backend_(descriptor, size) {}
 
-  auto headless_backend() -> mbgl::gfx::HeadlessBackend& override {
+  auto headless_backend() -> mln::gfx::HeadlessBackend& override {
     return backend_;
   }
 
-  void resize(mbgl::Size size) override { backend_.resize(size); }
+  void resize(mln::Size size) override { backend_.resize(size); }
 
   auto set_vulkan_borrowed_target(
     const mln_vulkan_borrowed_texture_descriptor& descriptor
@@ -227,7 +227,7 @@ auto vulkan_owned_texture_attach(
   session->texture.api_kind = TextureSessionApi::Vulkan;
   session->texture.mode = TextureSessionMode::Owned;
   session->texture.backend = std::make_unique<VulkanTextureSessionBackend>(
-    *descriptor, mbgl::Size{session->physical_width, session->physical_height}
+    *descriptor, mln::Size{session->physical_width, session->physical_height}
   );
   return attach_render_session(
     std::move(session), out_session, RenderSessionKind::Texture,
@@ -285,7 +285,7 @@ auto vulkan_borrowed_texture_attach(
   session->texture.api_kind = TextureSessionApi::Vulkan;
   session->texture.mode = TextureSessionMode::Borrowed;
   session->texture.backend = std::make_unique<VulkanTextureSessionBackend>(
-    *descriptor, mbgl::Size{session->physical_width, session->physical_height}
+    *descriptor, mln::Size{session->physical_width, session->physical_height}
   );
   return attach_render_session(
     std::move(session), out_session, RenderSessionKind::Texture,

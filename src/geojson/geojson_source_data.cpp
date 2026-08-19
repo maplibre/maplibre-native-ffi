@@ -32,22 +32,22 @@ auto has_geojson_source_option(
   return (options.fields & field) != 0U;
 }
 
-auto geojson_geometry_type_name(const mbgl::Geometry<double>& geometry)
+auto geojson_geometry_type_name(const mln::Geometry<double>& geometry)
   -> std::string_view {
   return geometry.match(
-    [](const mbgl::EmptyGeometry&) -> std::string_view { return "empty"; },
-    [](const mbgl::Point<double>&) -> std::string_view { return "point"; },
-    [](const mbgl::LineString<double>&) -> std::string_view {
+    [](const mln::EmptyGeometry&) -> std::string_view { return "empty"; },
+    [](const mln::Point<double>&) -> std::string_view { return "point"; },
+    [](const mln::LineString<double>&) -> std::string_view {
       return "line string";
     },
-    [](const mbgl::Polygon<double>&) -> std::string_view { return "polygon"; },
-    [](const mbgl::MultiPoint<double>&) -> std::string_view {
+    [](const mln::Polygon<double>&) -> std::string_view { return "polygon"; },
+    [](const mln::MultiPoint<double>&) -> std::string_view {
       return "multi-point";
     },
-    [](const mbgl::MultiLineString<double>&) -> std::string_view {
+    [](const mln::MultiLineString<double>&) -> std::string_view {
       return "multi-line string";
     },
-    [](const mbgl::MultiPolygon<double>&) -> std::string_view {
+    [](const mln::MultiPolygon<double>&) -> std::string_view {
       return "multi-polygon";
     },
     [](const mapbox::geometry::geometry_collection<double>&)
@@ -55,16 +55,15 @@ auto geojson_geometry_type_name(const mbgl::Geometry<double>& geometry)
   );
 }
 
-auto geojson_alternative_name(const mbgl::GeoJSON& geojson)
-  -> std::string_view {
+auto geojson_alternative_name(const mln::GeoJSON& geojson) -> std::string_view {
   return geojson.match(
-    [](const mbgl::Geometry<double>&) -> std::string_view {
+    [](const mln::Geometry<double>&) -> std::string_view {
       return "a bare geometry";
     },
-    [](const mbgl::GeoJSONFeature&) -> std::string_view {
+    [](const mln::GeoJSONFeature&) -> std::string_view {
       return "a single feature";
     },
-    [](const mbgl::FeatureCollection&) -> std::string_view {
+    [](const mln::FeatureCollection&) -> std::string_view {
       return "a feature collection";
     }
   );
@@ -73,8 +72,8 @@ auto geojson_alternative_name(const mbgl::GeoJSON& geojson)
 // Clustering requires a feature collection whose every feature has point
 // geometry; anything else raises a variant access error inside supercluster
 // while the index is built. An empty collection is accepted.
-auto validate_clustered_geojson(const mbgl::GeoJSON& geojson) -> bool {
-  if (!geojson.is<mbgl::FeatureCollection>()) {
+auto validate_clustered_geojson(const mln::GeoJSON& geojson) -> bool {
+  if (!geojson.is<mln::FeatureCollection>()) {
     const auto message =
       std::string{
         "clustered GeoJSON data requires a feature collection; "
@@ -85,10 +84,10 @@ auto validate_clustered_geojson(const mbgl::GeoJSON& geojson) -> bool {
     return false;
   }
 
-  const auto& features = geojson.get<mbgl::FeatureCollection>();
+  const auto& features = geojson.get<mln::FeatureCollection>();
   for (std::size_t index = 0; index < features.size(); ++index) {
     const auto& geometry = features.at(index).geometry;
-    if (geometry.is<mbgl::Point<double>>()) {
+    if (geometry.is<mln::Point<double>>()) {
       continue;
     }
     const auto message =
@@ -108,19 +107,19 @@ auto validate_clustered_geojson(const mbgl::GeoJSON& geojson) -> bool {
 // scheduler. A prepared handle installed on several sources, or a synchronous
 // tiling toggle with async slices in flight, mixes those modes on one index,
 // so every slice takes this wrapper's lock instead.
-class SerializedGeoJsonData final : public mbgl::style::GeoJSONData {
+class SerializedGeoJsonData final : public mln::style::GeoJSONData {
  public:
   SerializedGeoJsonData(
-    std::shared_ptr<mbgl::style::GeoJSONData> inner,
-    std::shared_ptr<mbgl::Scheduler> scheduler
+    std::shared_ptr<mln::style::GeoJSONData> inner,
+    std::shared_ptr<mln::Scheduler> scheduler
   )
       : inner_(std::move(inner)),
         scheduler_(std::move(scheduler)),
         mutex_(std::make_shared<std::mutex>()) {}
 
   void getTile(
-    const mbgl::CanonicalTileID& id,
-    const std::function<void(TileFeatures)>& fn, bool run_synchronously
+    const mln::CanonicalTileID& id, const std::function<void(TileFeatures)>& fn,
+    bool run_synchronously
   ) final {
     if (run_synchronously) {
       const std::scoped_lock lock(*mutex_);
@@ -128,7 +127,7 @@ class SerializedGeoJsonData final : public mbgl::style::GeoJSONData {
       return;
     }
     scheduler_->scheduleAndReplyValue(
-      mbgl::util::SimpleIdentity::Empty,
+      mln::util::SimpleIdentity::Empty,
       [inner = inner_, mutex = mutex_, id]() -> TileFeatures {
         auto features = TileFeatures{};
         const std::scoped_lock lock(*mutex);
@@ -161,8 +160,8 @@ class SerializedGeoJsonData final : public mbgl::style::GeoJSONData {
   }
 
  private:
-  std::shared_ptr<mbgl::style::GeoJSONData> inner_;
-  std::shared_ptr<mbgl::Scheduler> scheduler_;
+  std::shared_ptr<mln::style::GeoJSONData> inner_;
+  std::shared_ptr<mln::Scheduler> scheduler_;
   std::shared_ptr<std::mutex> mutex_;
 };
 
@@ -323,8 +322,8 @@ auto validate_geojson_source_options(const mln_geojson_source_options* options)
 // Cluster properties reach Converter<GeoJSONOptions> as a one-member object,
 // which is what parses the aggregation expressions.
 auto to_native_geojson_source_options(const mln_geojson_source_options& options)
-  -> std::optional<mbgl::Immutable<mbgl::style::GeoJSONOptions>> {
-  auto native = mbgl::style::GeoJSONOptions{};
+  -> std::optional<mln::Immutable<mln::style::GeoJSONOptions>> {
+  auto native = mln::style::GeoJSONOptions{};
   native.minzoom = static_cast<uint8_t>(options.min_zoom);
   native.maxzoom = static_cast<uint8_t>(options.max_zoom);
   native.tileSize = static_cast<uint16_t>(options.tile_size);
@@ -338,7 +337,7 @@ auto to_native_geojson_source_options(const mln_geojson_source_options& options)
   native.synchronousUpdate = options.synchronous_tiling;
 
   if (options.cluster_properties.size != 0) {
-    auto document = mbgl::JSDocument{};
+    auto document = mln::JSDocument{};
     if (!parse_json_document(
           options.cluster_properties, "cluster_properties", document
         )) {
@@ -354,9 +353,9 @@ auto to_native_geojson_source_options(const mln_geojson_source_options& options)
       options.cluster_properties.size
     );
     wrapper.push_back('}');
-    auto error = mbgl::style::conversion::Error{};
+    auto error = mln::style::conversion::Error{};
     auto converted =
-      mbgl::style::conversion::convertJSON<mbgl::style::GeoJSONOptions>(
+      mln::style::conversion::convertJSON<mln::style::GeoJSONOptions>(
         wrapper, error
       );
     if (!converted) {
@@ -366,7 +365,7 @@ auto to_native_geojson_source_options(const mln_geojson_source_options& options)
     native.clusterProperties = std::move(converted->clusterProperties);
   }
 
-  return mbgl::makeMutable<mbgl::style::GeoJSONOptions>(std::move(native));
+  return mln::makeMutable<mln::style::GeoJSONOptions>(std::move(native));
 }
 
 namespace {
@@ -374,8 +373,8 @@ namespace {
 // Cluster aggregations parse into expression pairs, which carry deep equality,
 // so options prepared from equivalent cluster_properties JSON compare equal.
 auto cluster_properties_equal(
-  const mbgl::style::GeoJSONOptions::ClusterProperties& left,
-  const mbgl::style::GeoJSONOptions::ClusterProperties& right
+  const mln::style::GeoJSONOptions::ClusterProperties& left,
+  const mln::style::GeoJSONOptions::ClusterProperties& right
 ) -> bool {
   if (left.size() != right.size()) {
     return false;
@@ -405,8 +404,8 @@ auto cluster_properties_equal(
 }  // namespace
 
 auto geojson_source_options_equal(
-  const mbgl::style::GeoJSONOptions& left,
-  const mbgl::style::GeoJSONOptions& right
+  const mln::style::GeoJSONOptions& left,
+  const mln::style::GeoJSONOptions& right
 ) -> bool {
   return left.minzoom == right.minzoom && left.maxzoom == right.maxzoom &&
          left.tileSize == right.tileSize && left.buffer == right.buffer &&
@@ -454,15 +453,15 @@ auto geojson_source_data_create(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto scheduler = mbgl::Scheduler::GetSequenced();
+  auto scheduler = mln::Scheduler::GetSequenced();
   auto index =
-    mbgl::style::GeoJSONData::create(*geojson, scheduler, *native_options);
+    mln::style::GeoJSONData::create(*geojson, scheduler, *native_options);
   // Supercluster indexes are immutable after construction and always slice
   // inline, so only the geojson-vt path needs the serializing wrapper. This
   // mirrors the dispatch inside GeoJSONData::create.
   const auto clustered = (*native_options)->cluster &&
-                         geojson->is<mbgl::FeatureCollection>() &&
-                         !geojson->get<mbgl::FeatureCollection>().empty();
+                         geojson->is<mln::FeatureCollection>() &&
+                         !geojson->get<mln::FeatureCollection>().empty();
   if (!clustered) {
     index = std::make_shared<SerializedGeoJsonData>(
       std::move(index), std::move(scheduler)
