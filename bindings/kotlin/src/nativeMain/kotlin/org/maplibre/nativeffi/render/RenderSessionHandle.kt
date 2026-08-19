@@ -533,7 +533,8 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
     pointer: kotlinx.cinterop.COpaquePointer?,
     scope: FrameScope,
   ): NativePointer =
-    pointer?.rawValue?.toLong()?.let { NativePointer.scoped(it, scope) } ?: NativePointer.NULL
+    pointer?.rawValue?.toLong()?.let { NativePointer.scoped(it, scope) }
+      ?: NativePointer.NULL_POINTER
 
   internal companion object {
     internal fun attachMetalOwnedTexture(

@@ -243,3 +243,8 @@ run = "./gradlew :bindings:kotlin:compileAndroidMain"
 description = "Verify the Android binding stays on the android-minSdk floor."
 dir = "../.."
 run = "./gradlew :bindings:kotlin:checkAndroidApiFloor"
+
+[tasks.check-objc-export-names]
+description = "Reject public Kotlin/Native names that collide with C macros in Objective-C headers."
+dir = "../.."
+run = "./.mise/tasks/kotlin/check-objc-export-names"

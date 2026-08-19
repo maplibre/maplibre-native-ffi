@@ -1,0 +1,190 @@
+#!/usr/bin/env python3
+# [MISE] description="Reject Kotlin/Native public names that collide with C macros in generated Objective-C headers."
+# [MISE] shell="python"
+
+"""Reject public Kotlin identifiers that break Kotlin/Native Objective-C headers.
+
+Kotlin/Native writes public companion properties and types into a generated
+Objective-C header when a consumer builds a framework. C and Objective-C
+headers define macros such as ``NULL``, so a property named ``NULL`` expands
+during that compile and Swift/Xcode consumers fail. Kotlin compilations against
+a klib do not compile that header, so the Kotlin test suite cannot see the
+collision.
+
+This check reads Apple-exported Kotlin source sets and reports public
+declarations whose names match those macros.
+"""
+
+from __future__ import annotations
+
+import os
+import pathlib
+import re
+import sys
+
+RESERVED_NAMES = frozenset(
+    {
+        "NULL",
+        "YES",
+        "NO",
+        "TRUE",
+        "FALSE",
+        "nil",
+        "Nil",
+        "MIN",
+        "MAX",
+    }
+)
+
+# Source sets Kotlin/Native compiles into Apple klibs that can emit an ObjC header.
+APPLE_EXPORTED_SOURCE_SETS = frozenset(
+    {
+        "commonMain",
+        "nativeMain",
+        "appleMain",
+        "iosMain",
+        "iosArm64Main",
+        "iosSimulatorArm64Main",
+        "macosMain",
+        "macosArm64Main",
+        "tvosMain",
+        "tvosArm64Main",
+        "tvosSimulatorArm64Main",
+    }
+)
+
+DECL = re.compile(
+    r"^\s*(?P<mods>(?:(?:public|internal|private|protected|open|override|expect|"
+    r"actual|const|suspend|inline|value|data|inner|annotation|sealed|abstract|"
+    r"tailrec)\s+)*)(?:val|var|fun|class|object|interface|typealias)\s+"
+    r"(?P<name>[A-Za-z_][A-Za-z0-9_]*)\b"
+)
+
+HIDDEN_FROM_OBJC = re.compile(r"@(?:HiddenFromObjC|ObjCName)\b")
+PRIVATE_MOD = re.compile(r"\b(?:private|internal)\b")
+
+
+def fail(message: str) -> None:
+    print(f"error: {message}", file=sys.stderr)
+    raise SystemExit(1)
+
+
+def repository_root() -> pathlib.Path:
+    root = os.environ.get("MISE_MONOREPO_ROOT")
+    if root:
+        return pathlib.Path(root)
+    return pathlib.Path(__file__).resolve().parents[3]
+
+
+def kotlin_root(root: pathlib.Path) -> pathlib.Path:
+    return root / "bindings" / "kotlin" / "src"
+
+
+def exported_kotlin_files(root: pathlib.Path) -> list[pathlib.Path]:
+    src = kotlin_root(root)
+    if not src.is_dir():
+        fail(f"Kotlin source root missing: {src}")
+    files = []
+    for source_set in sorted(APPLE_EXPORTED_SOURCE_SETS):
+        kotlin_dir = src / source_set / "kotlin"
+        if kotlin_dir.is_dir():
+            files.extend(sorted(kotlin_dir.rglob("*.kt")))
+    return files
+
+
+def code_lines(text: str) -> list[tuple[int, str]]:
+    """Yield (lineno, line) with block and line comments stripped."""
+    lines = []
+    in_block = False
+    for lineno, raw in enumerate(text.splitlines(), 1):
+        chars: list[str] = []
+        i = 0
+        while i < len(raw):
+            if in_block:
+                end = raw.find("*/", i)
+                if end == -1:
+                    i = len(raw)
+                    break
+                in_block = False
+                i = end + 2
+                continue
+            if raw.startswith("//", i):
+                break
+            if raw.startswith("/*", i):
+                in_block = True
+                i += 2
+                continue
+            chars.append(raw[i])
+            i += 1
+        lines.append((lineno, "".join(chars)))
+    return lines
+
+
+def preceding_hides_from_objc(lines: list[tuple[int, str]], index: int) -> bool:
+    """True when a nearby annotation keeps the declaration out of the ObjC header."""
+    for lookback in range(index, max(-1, index - 8), -1):
+        text = lines[lookback][1].strip()
+        if not text:
+            continue
+        if HIDDEN_FROM_OBJC.search(text):
+            return True
+        if lookback < index:
+            break
+    return False
+
+
+def scan_file(path: pathlib.Path, root: pathlib.Path) -> list[str]:
+    lines = code_lines(path.read_text(encoding="utf-8"))
+    violations = []
+    relative = path.relative_to(root)
+    for index, (lineno, text) in enumerate(lines):
+        match = DECL.match(text)
+        if match is None:
+            continue
+        name = match.group("name")
+        if name not in RESERVED_NAMES:
+            continue
+        if PRIVATE_MOD.search(match.group("mods")):
+            continue
+        if preceding_hides_from_objc(lines, index):
+            continue
+        violations.append(
+            f"{relative}:{lineno}: public Kotlin/Native name {name!r} collides with a "
+            "C/Objective-C macro in generated framework headers"
+        )
+    return violations
+
+
+def main() -> int:
+    root = repository_root()
+    files = exported_kotlin_files(root)
+    if not files:
+        fail(f"no Kotlin sources under {kotlin_root(root)} Apple-exported source sets")
+    violations: list[str] = []
+    for path in files:
+        violations.extend(scan_file(path, root))
+    if violations:
+        print(
+            "error: public Kotlin/Native names collide with C macros that break "
+            "generated Objective-C headers:",
+            file=sys.stderr,
+        )
+        for violation in violations:
+            print(f"  {violation}", file=sys.stderr)
+        print(
+            "\nRename the declaration (for example NULL_POINTER) or mark it "
+            "@HiddenFromObjC / @ObjCName. Kotlin tests compile against a klib and "
+            "do not compile the generated header, so this check is what catches "
+            "the collision.",
+            file=sys.stderr,
+        )
+        return 1
+    print(
+        f"Kotlin/Native public names avoid Objective-C header macro collisions "
+        f"({len(files)} files scanned)"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

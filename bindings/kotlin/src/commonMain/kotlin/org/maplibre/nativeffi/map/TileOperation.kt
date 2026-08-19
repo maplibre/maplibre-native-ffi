@@ -19,7 +19,9 @@ public value class TileOperation(public val nativeValue: Int) {
     public val END_PARSE: TileOperation = TileOperation(5)
     public val ERROR: TileOperation = TileOperation(6)
     public val CANCELLED: TileOperation = TileOperation(7)
-    public val NULL: TileOperation = TileOperation(8)
+
+    /** No tile operation took place. */
+    public val NULL_OP: TileOperation = TileOperation(8)
 
     internal fun fromNative(nativeValue: UInt): TileOperation = fromNative(nativeValue.toInt())
 

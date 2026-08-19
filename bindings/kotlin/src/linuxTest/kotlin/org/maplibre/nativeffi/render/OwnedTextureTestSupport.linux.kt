@@ -66,7 +66,7 @@ private class LinuxEglOwnedTextureSession(
         NativePointer.ofAddress(display.toLong()),
         NativePointer.ofAddress(config.toLong()),
         NativePointer.ofAddress(context.toLong()),
-        NativePointer.NULL,
+        NativePointer.NULL_POINTER,
       )
     return session
       .map()
@@ -127,7 +127,7 @@ private fun createEglSession(map: MapHandle, width: Int, height: Int): OwnedText
         NativePointer.ofAddress(display.toLong()),
         NativePointer.ofAddress(config.toLong()),
         NativePointer.ofAddress(liveContext.toLong()),
-        NativePointer.NULL,
+        NativePointer.NULL_POINTER,
       )
     val session =
       map.attachOpenGLOwnedTexture(
