@@ -471,6 +471,11 @@ public expect class MapHandle : AutoCloseable {
     descriptor: OpenGLBorrowedTextureDescriptor
   ): RenderSessionHandle
 
+  /**
+   * Attaches a Metal `CAMetalLayer` as this map's one live render session.
+   *
+   * A null `context.device` is accepted. The session then uses `MTLCreateSystemDefaultDevice()`.
+   */
   public fun attachMetalSurface(descriptor: MetalSurfaceDescriptor): RenderSessionHandle
 
   public fun attachVulkanSurface(descriptor: VulkanSurfaceDescriptor): RenderSessionHandle

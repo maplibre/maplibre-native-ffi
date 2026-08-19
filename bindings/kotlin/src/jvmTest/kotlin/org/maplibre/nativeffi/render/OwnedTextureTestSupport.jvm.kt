@@ -32,7 +32,7 @@ private class JvmEglOwnedTextureSession(
         NativePointer.ofAddress(display),
         NativePointer.ofAddress(config),
         NativePointer.ofAddress(context),
-        NativePointer.NULL,
+        NativePointer.NULL_POINTER,
       )
     return session
       .map()
@@ -130,7 +130,7 @@ private fun createEglSession(
         NativePointer.ofAddress(display),
         NativePointer.ofAddress(config),
         NativePointer.ofAddress(context),
-        NativePointer.NULL,
+        NativePointer.NULL_POINTER,
       )
     val session =
       map.attachOpenGLOwnedTexture(

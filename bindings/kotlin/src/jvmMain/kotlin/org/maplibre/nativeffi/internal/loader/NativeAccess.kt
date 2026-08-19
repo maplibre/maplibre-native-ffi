@@ -3115,7 +3115,7 @@ internal object NativeAccess {
     if (pointer.isNull) MemorySegment.NULL else MemorySegment.ofAddress(pointer.address)
 
   private fun scopedPointer(pointer: MemorySegment, scope: FrameScope): NativePointer =
-    if (pointer == MemorySegment.NULL) NativePointer.NULL
+    if (pointer == MemorySegment.NULL) NativePointer.NULL_POINTER
     else NativePointer.scoped(pointer.address(), scope)
 
   internal fun takeOfflineRegionStatusResult(

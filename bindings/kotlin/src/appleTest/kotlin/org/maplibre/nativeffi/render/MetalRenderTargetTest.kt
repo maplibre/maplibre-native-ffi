@@ -11,6 +11,7 @@ import kotlinx.cinterop.ObjCObject
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.objcPtr
 import kotlinx.cinterop.toLong
+import kotlinx.cinterop.useContents
 import kotlinx.cinterop.usePinned
 import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.error.UnsupportedFeatureException
@@ -122,6 +123,54 @@ class MetalRenderTargetTest {
     } finally {
       Maplibre.clearLogCallback()
       Maplibre.restoreDefaultAsyncLogSeverities()
+    }
+  }
+
+  // A null device at attach uses MTLCreateSystemDefaultDevice(), and the
+  // session writes drawableSize from the extent's physical size.
+
+  @Test
+  fun metalSurfaceAttachAcceptsNullDeviceAndWritesDrawableSize() {
+    if (!metalSupportedOrInapplicable()) return
+    val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
+    try {
+      val map =
+        MapHandle.create(
+          runtime,
+          MapOptions().apply {
+            width = 64
+            height = 64
+          },
+        )
+      try {
+        val layer = CAMetalLayer()
+        layer.drawableSize = CGSizeMake(1.0, 1.0)
+        val extent = RenderTargetExtent(32, 16, 2.0)
+        val physical = extent.physicalSize()
+        val session =
+          map.attachMetalSurface(
+            MetalSurfaceDescriptor(
+              extent = extent,
+              context = MetalContextDescriptor(NativePointer.NULL_POINTER),
+              layer = NativePointer.ofAddress(layer.address()),
+            )
+          )
+        try {
+          layer.drawableSize.useContents {
+            assertEquals(physical.width.toDouble(), width)
+            assertEquals(physical.height.toDouble(), height)
+          }
+          map.setStyleJson(QUERY_STYLE_JSON.encodeToByteArray())
+          assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE))
+          assertEquals(RenderResult.RENDERED, session.renderUpdate().result)
+        } finally {
+          session.close()
+        }
+      } finally {
+        map.close()
+      }
+    } finally {
+      runtime.close()
     }
   }
 

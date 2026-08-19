@@ -312,7 +312,7 @@ private fun dummyVulkanSurface(): VulkanSurfaceDescriptor =
   VulkanSurfaceDescriptor(RenderTargetExtent(16, 8, 1.0), dummyVulkanContext(), dummyPointer())
 
 private fun dummyEglContext(): EglContextDescriptor =
-  EglContextDescriptor(dummyPointer(), dummyPointer(), dummyPointer(), NativePointer.NULL)
+  EglContextDescriptor(dummyPointer(), dummyPointer(), dummyPointer(), NativePointer.NULL_POINTER)
 
 private fun dummyOpenGLBorrowedTexture(): OpenGLBorrowedTextureDescriptor =
   OpenGLBorrowedTextureDescriptor(

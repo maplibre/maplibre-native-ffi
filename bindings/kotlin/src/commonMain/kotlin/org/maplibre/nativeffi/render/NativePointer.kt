@@ -39,8 +39,13 @@ private constructor(private val addressValue: Long, private val scope: FrameScop
   }
 
   public companion object {
-    /** Null native pointer value. */
-    public val NULL: NativePointer = NativePointer(0L, null)
+    /**
+     * Null native pointer value.
+     *
+     * Named `NULL_POINTER` because Kotlin/Native exports this into an Objective-C header, where
+     * `NULL` is a C macro.
+     */
+    public val NULL_POINTER: NativePointer = NativePointer(0L, null)
 
     /**
      * Creates an opaque borrowed backend interop pointer from an address bit pattern.
@@ -50,9 +55,9 @@ private constructor(private val addressValue: Long, private val scope: FrameScop
      * value. This value grants no general memory access.
      */
     public fun ofAddress(address: Long): NativePointer =
-      if (address == 0L) NULL else NativePointer(address, null)
+      if (address == 0L) NULL_POINTER else NativePointer(address, null)
 
     internal fun scoped(address: Long, scope: FrameScope): NativePointer =
-      if (address == 0L) NULL else NativePointer(address, scope)
+      if (address == 0L) NULL_POINTER else NativePointer(address, scope)
   }
 }
