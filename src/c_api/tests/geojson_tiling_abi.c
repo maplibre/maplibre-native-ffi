@@ -234,7 +234,7 @@ static void replacing_data_during_async_tiling_survives(void) {
   atomic_init(&probe.stop, false);
   atomic_init(&probe.finished, false);
   mln_test_thread* render_thread =
-    mln_test_thread_start(render_until_stopped, &probe);
+    mln_test_thread_try_start(render_until_stopped, &probe);
 
   tiling_data_supply supply = {
     .json = mln_test_buffer_view(json, strlen(json)), .options = &options
@@ -247,11 +247,22 @@ static void replacing_data_during_async_tiling_survives(void) {
   for (unsigned int slot = 0; slot < PIPELINE_CAPACITY; slot += 1) {
     atomic_init(&supply.ready[slot], 0);
   }
-  mln_test_thread* producer_threads[PRODUCER_COUNT];
-  for (unsigned int index = 0; index < PRODUCER_COUNT; index += 1) {
-    producer_threads[index] =
-      mln_test_thread_start(produce_prepared_data, &supply);
+  // Starting a thread asserts on failure inside mln_test_thread_start, so
+  // these starts report null instead; the cleanup below stops and joins
+  // whatever started before any assertion runs.
+  mln_test_thread* producer_threads[PRODUCER_COUNT] = {0};
+  unsigned int producers_started = 0;
+  if (render_thread != NULL) {
+    for (; producers_started < PRODUCER_COUNT; producers_started += 1) {
+      producer_threads[producers_started] =
+        mln_test_thread_try_start(produce_prepared_data, &supply);
+      if (producer_threads[producers_started] == NULL) {
+        break;
+      }
+    }
   }
+  const bool threads_started =
+    render_thread != NULL && producers_started == PRODUCER_COUNT;
 
   // Each pump queues the current dataset's slice tasklets; replacing and
   // releasing that dataset right after the pump lands while they run.
@@ -260,7 +271,7 @@ static void replacing_data_during_async_tiling_survives(void) {
   // Unity here, so the loop records the first failure and reports it after
   // the joins.
   mln_status loop_status = MLN_STATUS_OK;
-  while (loop_status == MLN_STATUS_OK &&
+  while (loop_status == MLN_STATUS_OK && threads_started &&
          atomic_load(&supply.tail) < TILING_REPLACEMENTS &&
          !atomic_load(&probe.finished) && !atomic_load(&supply.failed)) {
     const unsigned int position = atomic_load(&supply.tail);
@@ -294,17 +305,34 @@ static void replacing_data_during_async_tiling_survives(void) {
     }
   }
 
+  // Stop both sides before joining anything: the render thread winds down
+  // while the producers drain, and a producer blocked on a full pipeline sees
+  // the stop and exits.
   atomic_store(&supply.stop, true);
-  for (unsigned int index = 0; index < PRODUCER_COUNT; index += 1) {
+  atomic_store(&probe.stop, true);
+  for (unsigned int index = 0; index < producers_started; index += 1) {
     mln_test_thread_join(producer_threads[index]);
   }
   free(json);
 
-  atomic_store(&probe.stop, true);
-  const bool render_finished = mln_test_pump_until(runtime, &probe.finished);
-  mln_test_thread_join(render_thread);
+  // One pump_until budget is enough on a hardware backend, but a
+  // software-rendered CI runner can take far longer to wind the render
+  // thread down, so wait on a deadline instead.
+  bool render_finished = false;
+  if (render_thread != NULL) {
+    const uint64_t deadline = mln_test_monotonic_milliseconds() + 30000;
+    while (!(render_finished = mln_test_pump_until(runtime, &probe.finished)) &&
+           mln_test_monotonic_milliseconds() < deadline) {
+    }
+    // Join only a finished thread; a wedged one fails the assertion below
+    // rather than hanging the suite.
+    if (render_finished) {
+      mln_test_thread_join(render_thread);
+    }
+  }
 
   // The threads are joined, so assertions are safe from here on.
+  TEST_ASSERT_TRUE(threads_started);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, loop_status);
   TEST_ASSERT_FALSE(atomic_load(&supply.failed));
   TEST_ASSERT_TRUE(render_finished);

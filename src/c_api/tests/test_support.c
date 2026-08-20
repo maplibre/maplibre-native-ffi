@@ -302,19 +302,33 @@ static void* thread_trampoline(void* argument) {
 }
 #endif
 
-mln_test_thread* mln_test_thread_start(void (*entry)(void*), void* argument) {
+mln_test_thread* mln_test_thread_try_start(
+  void (*entry)(void*), void* argument
+) {
   mln_test_thread* thread = calloc(1, sizeof(*thread));
-  TEST_ASSERT_NOT_NULL(thread);
+  if (thread == NULL) {
+    return NULL;
+  }
   thread->entry = entry;
   thread->argument = argument;
 #if defined(_WIN32)
   thread->handle = CreateThread(NULL, 0, thread_trampoline, thread, 0, NULL);
-  TEST_ASSERT_NOT_NULL(thread->handle);
+  if (thread->handle == NULL) {
+    free(thread);
+    return NULL;
+  }
 #else
-  TEST_ASSERT_EQUAL_INT(
-    0, pthread_create(&thread->handle, NULL, thread_trampoline, thread)
-  );
+  if (pthread_create(&thread->handle, NULL, thread_trampoline, thread) != 0) {
+    free(thread);
+    return NULL;
+  }
 #endif
+  return thread;
+}
+
+mln_test_thread* mln_test_thread_start(void (*entry)(void*), void* argument) {
+  mln_test_thread* thread = mln_test_thread_try_start(entry, argument);
+  TEST_ASSERT_NOT_NULL(thread);
   return thread;
 }
 
