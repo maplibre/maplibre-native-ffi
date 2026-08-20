@@ -11,21 +11,19 @@
 #include "test_support.h"
 #include "unity.h"
 
+// Ten datasets per batch: the sequenced-scheduler round-robin has ten slots,
+// and a batch is created before its replacement loop runs, so every dataset
+// in a batch gets its own worker. Each batch then dies worker by worker in
+// the loop, and every death is a chance for the replaced dataset's slices to
+// still be in flight.
+#define TILING_BATCH_SIZE 10
+#define TILING_BATCHES 5
+
 // A few thousand points match the field repro's dataset shape; the exact
 // size matters less than replacing faster than the slicing worker drains.
 #define TILING_POINT_COUNT 8000
-#define TILING_REPLACEMENTS 400
 
-// One source, as in the field repro. Every GeoJSON source pins a slot of the
-// sequenced-scheduler round-robin for its lifetime, and a dataset on a pinned
-// slot never leaves its scheduler to its worker.
-#define TILING_SOURCE_COUNT 1
-
-// Prepared datasets the producer threads have ready for the map owner
-// thread.
-#define PIPELINE_CAPACITY 8
-
-// The style renders without the network; the layers make the sources' tiles
+// The style renders without the network; the layer makes the source's tiles
 // visible so every replacement re-requests them.
 static const char tiling_style_json[] =
   "{\"version\":8,\"sources\":{},\"layers\":"
@@ -33,7 +31,7 @@ static const char tiling_style_json[] =
   "\"paint\":{\"background-color\":\"#000000\"}}]}";
 
 static const char tiling_layer_json[] =
-  "{\"id\":\"fill-%u\",\"type\":\"fill\",\"source\":\"points-%u\","
+  "{\"id\":\"fill\",\"type\":\"fill\",\"source\":\"points\","
   "\"paint\":{\"fill-color\":\"#ff0000\"}}";
 
 // Zero tolerance keeps every pyramid level slicing the full dataset instead
@@ -86,27 +84,31 @@ typedef struct tiling_render_probe {
   mln_status render_status;
 } tiling_render_probe;
 
+// Static so a render thread that misses the shutdown deadline still reads
+// valid state; the test fails its assertion instead of dangling.
+static tiling_render_probe probe;
+
 static void render_until_stopped(void* argument) {
-  tiling_render_probe* probe = (tiling_render_probe*)argument;
+  (void)argument;
   mln_test_render_fixture fixture = {0};
-  probe->attached = mln_test_render_fixture_create(probe->map, &fixture);
-  if (!probe->attached) {
-    atomic_store(&probe->finished, true);
+  probe.attached = mln_test_render_fixture_create(probe.map, &fixture);
+  if (!probe.attached) {
+    atomic_store(&probe.finished, true);
     return;
   }
 
   // The target stays small so each render applies the replacement quickly,
   // dropping the previous dataset's references while its slices are in
   // flight.
-  probe->render_status = MLN_STATUS_OK;
-  while (!atomic_load(&probe->stop)) {
+  probe.render_status = MLN_STATUS_OK;
+  while (!atomic_load(&probe.stop)) {
     mln_render_result result = MLN_RENDER_RESULT_NO_UPDATE;
     bool needs_repaint = false;
     const mln_status status = mln_render_session_render_update(
       fixture.session, &result, &needs_repaint
     );
     if (status != MLN_STATUS_OK) {
-      probe->render_status = status;
+      probe.render_status = status;
       break;
     }
     if (result != MLN_RENDER_RESULT_RENDERED) {
@@ -115,58 +117,7 @@ static void render_until_stopped(void* argument) {
   }
 
   mln_test_render_fixture_destroy(&fixture);
-  atomic_store(&probe->finished, true);
-}
-
-// Producer threads prepare datasets from one shared document, so the map
-// owner thread replaces data faster than the slicing worker slices it — the
-// shape of the field repro.
-#define PRODUCER_COUNT 4
-
-typedef struct tiling_data_supply {
-  mln_buffer_view json;
-  const mln_geojson_source_options* options;
-  atomic_bool stop;
-  atomic_bool failed;
-  atomic_uint ticket;
-  atomic_uint claimed;
-  atomic_uint tail;
-  mln_geojson_source_data slots[PIPELINE_CAPACITY];
-  atomic_uint ready[PIPELINE_CAPACITY];
-} tiling_data_supply;
-
-static void produce_prepared_data(void* argument) {
-  tiling_data_supply* supply = (tiling_data_supply*)argument;
-  while (!atomic_load(&supply->stop) && !atomic_load(&supply->failed)) {
-    const unsigned int ticket = atomic_fetch_add(&supply->ticket, 1);
-    if (ticket >= TILING_REPLACEMENTS) {
-      return;
-    }
-
-    mln_geojson_source_data next = MLN_HANDLE_NULL;
-    if (
-      mln_geojson_source_data_create(supply->json, supply->options, &next) !=
-      MLN_STATUS_OK
-    ) {
-      atomic_store(&supply->failed, true);
-      return;
-    }
-
-    const unsigned int position = atomic_fetch_add(&supply->claimed, 1);
-    while (atomic_load(&supply->tail) + PIPELINE_CAPACITY <= position &&
-           !atomic_load(&supply->stop)) {
-      mln_test_sleep_millisecond();
-    }
-    if (atomic_load(&supply->stop)) {
-      mln_geojson_source_data_destroy(next);
-      return;
-    }
-    supply->slots[position % PIPELINE_CAPACITY] = next;
-    atomic_store_explicit(
-      &supply->ready[position % PIPELINE_CAPACITY], position + 1,
-      memory_order_release
-    );
-  }
+  atomic_store(&probe.finished, true);
 }
 
 // Default options tile asynchronously, so every replacement schedules slice
@@ -191,165 +142,89 @@ static void replacing_data_during_async_tiling_survives(void) {
 
   char* json = build_feature_collection();
   TEST_ASSERT_NOT_NULL(json);
+  const mln_buffer_view document = mln_test_buffer_view(json, strlen(json));
+
   mln_geojson_source_data current = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_geojson_source_data_create(document, &options, &current)
+  );
+
+  const mln_buffer_view source_id = MLN_BUFFER_LITERAL("points");
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_add_geojson_source_data(map, source_id, current)
+  );
+  TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
-    mln_geojson_source_data_create(
-      mln_test_buffer_view(json, strlen(json)), &options, &current
+    mln_map_add_style_layer_json(
+      map, MLN_BUFFER_LITERAL(tiling_layer_json), MLN_BUFFER_LITERAL("")
     )
   );
 
-  char source_ids[TILING_SOURCE_COUNT][32];
-  char layer_json[160];
-  mln_buffer_view source_views[TILING_SOURCE_COUNT];
-  for (unsigned int source = 0; source < TILING_SOURCE_COUNT; source += 1) {
-    const int id_length = snprintf(
-      source_ids[source], sizeof(source_ids[source]), "points-%u", source
-    );
-    TEST_ASSERT_TRUE(
-      id_length > 0 && (size_t)id_length < sizeof(source_ids[source])
-    );
-    source_views[source] =
-      mln_test_buffer_view(source_ids[source], (size_t)id_length);
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
-      mln_map_add_geojson_source_data(map, source_views[source], current)
-    );
-    const int layer_length = snprintf(
-      layer_json, sizeof(layer_json), tiling_layer_json, source, source
-    );
-    TEST_ASSERT_TRUE(
-      layer_length > 0 && (size_t)layer_length < sizeof(layer_json)
-    );
-    TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
-      mln_map_add_style_layer_json(
-        map, mln_test_buffer_view(layer_json, (size_t)layer_length),
-        MLN_BUFFER_LITERAL("")
-      )
-    );
-  }
-
-  tiling_render_probe probe = {.map = map};
+  // No assertion may run while the render thread is live: Unity failures
+  // longjmp past the thread cleanup. From here on the test records statuses
+  // and reports them after the join.
+  probe = (tiling_render_probe){.map = map};
   atomic_init(&probe.stop, false);
   atomic_init(&probe.finished, false);
   mln_test_thread* render_thread =
-    mln_test_thread_try_start(render_until_stopped, &probe);
+    mln_test_thread_start(render_until_stopped, &probe);
 
-  tiling_data_supply supply = {
-    .json = mln_test_buffer_view(json, strlen(json)), .options = &options
-  };
-  atomic_init(&supply.stop, false);
-  atomic_init(&supply.failed, false);
-  atomic_init(&supply.ticket, 0);
-  atomic_init(&supply.claimed, 0);
-  atomic_init(&supply.tail, 0);
-  for (unsigned int slot = 0; slot < PIPELINE_CAPACITY; slot += 1) {
-    atomic_init(&supply.ready[slot], 0);
-  }
-  // Starting a thread asserts on failure inside mln_test_thread_start, so
-  // these starts report null instead; the cleanup below stops and joins
-  // whatever started before any assertion runs.
-  mln_test_thread* producer_threads[PRODUCER_COUNT] = {0};
-  unsigned int producers_started = 0;
-  if (render_thread != NULL) {
-    for (; producers_started < PRODUCER_COUNT; producers_started += 1) {
-      producer_threads[producers_started] =
-        mln_test_thread_try_start(produce_prepared_data, &supply);
-      if (producer_threads[producers_started] == NULL) {
+  mln_status loop_status = MLN_STATUS_OK;
+  for (unsigned int batch = 0;
+       loop_status == MLN_STATUS_OK && batch < TILING_BATCHES &&
+       !atomic_load(&probe.finished);
+       batch += 1) {
+    mln_geojson_source_data prepared[TILING_BATCH_SIZE] = {0};
+    unsigned int count = 0;
+    for (; count < TILING_BATCH_SIZE; count += 1) {
+      loop_status =
+        mln_geojson_source_data_create(document, &options, &prepared[count]);
+      if (loop_status != MLN_STATUS_OK) {
         break;
       }
     }
-  }
-  const bool threads_started =
-    render_thread != NULL && producers_started == PRODUCER_COUNT;
-
-  // Each pump queues the current dataset's slice tasklets; replacing and
-  // releasing that dataset right after the pump lands while they run.
-  //
-  // A failed call longjmps past the thread cleanup below if it goes through
-  // Unity here, so the loop records the first failure and reports it after
-  // the joins.
-  mln_status loop_status = MLN_STATUS_OK;
-  while (loop_status == MLN_STATUS_OK && threads_started &&
-         atomic_load(&supply.tail) < TILING_REPLACEMENTS &&
-         !atomic_load(&probe.finished) && !atomic_load(&supply.failed)) {
-    const unsigned int position = atomic_load(&supply.tail);
-    if (
-      atomic_load_explicit(
-        &supply.ready[position % PIPELINE_CAPACITY], memory_order_acquire
-      ) != position + 1
-    ) {
-      loop_status = mln_runtime_pump(runtime, 2, -1);
-      mln_test_drain_all(runtime);
-      continue;
-    }
-    mln_geojson_source_data next = supply.slots[position % PIPELINE_CAPACITY];
-    atomic_store(&supply.tail, position + 1);
 
     // A non-blocking pump keeps the replacement period shorter than one
-    // slice, so the replacement lands while the slice is still in flight.
-    loop_status = mln_runtime_pump(runtime, 0, -1);
-    mln_test_drain_all(runtime);
-    for (unsigned int source = 0;
-         loop_status == MLN_STATUS_OK && source < TILING_SOURCE_COUNT;
-         source += 1) {
+    // slice, so each replacement lands while the slice is still in flight.
+    for (unsigned int index = 0; loop_status == MLN_STATUS_OK &&
+                                 index < count && !atomic_load(&probe.finished);
+         index += 1) {
+      loop_status = mln_runtime_pump(runtime, 0, -1);
+      mln_test_drain_all(runtime);
       loop_status =
-        mln_map_set_geojson_source_data(map, source_views[source], next);
+        mln_map_set_geojson_source_data(map, source_id, prepared[index]);
+      if (loop_status == MLN_STATUS_OK) {
+        mln_geojson_source_data_destroy(current);
+        current = prepared[index];
+        prepared[index] = MLN_HANDLE_NULL;
+      }
     }
-    if (loop_status == MLN_STATUS_OK) {
-      mln_geojson_source_data_destroy(current);
-      current = next;
-    } else {
-      mln_geojson_source_data_destroy(next);
+    for (unsigned int index = 0; index < TILING_BATCH_SIZE; index += 1) {
+      mln_geojson_source_data_destroy(prepared[index]);
     }
-  }
-
-  // Stop both sides before joining anything: the render thread winds down
-  // while the producers drain, and a producer blocked on a full pipeline sees
-  // the stop and exits.
-  atomic_store(&supply.stop, true);
-  atomic_store(&probe.stop, true);
-  for (unsigned int index = 0; index < producers_started; index += 1) {
-    mln_test_thread_join(producer_threads[index]);
   }
   free(json);
 
+  atomic_store(&probe.stop, true);
   // One pump_until budget is enough on a hardware backend, but a
   // software-rendered CI runner can take far longer to wind the render
   // thread down, so wait on a deadline instead.
-  bool render_finished = false;
-  if (render_thread != NULL) {
-    const uint64_t deadline = mln_test_monotonic_milliseconds() + 30000;
-    while (!(render_finished = mln_test_pump_until(runtime, &probe.finished)) &&
-           mln_test_monotonic_milliseconds() < deadline) {
-    }
-    // Join only a finished thread; a wedged one fails the assertion below
-    // rather than hanging the suite.
-    if (render_finished) {
-      mln_test_thread_join(render_thread);
-    }
+  const uint64_t deadline = mln_test_monotonic_milliseconds() + 30000;
+  bool finished = false;
+  while (!(finished = mln_test_pump_until(runtime, &probe.finished)) &&
+         mln_test_monotonic_milliseconds() < deadline) {
+  }
+  // Join only a finished thread; a wedged one fails an assertion below
+  // rather than hanging the suite, and the static probe stays valid for it.
+  if (finished) {
+    mln_test_thread_join(render_thread);
   }
 
-  // The threads are joined, so assertions are safe from here on.
-  TEST_ASSERT_TRUE(threads_started);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, loop_status);
-  TEST_ASSERT_FALSE(atomic_load(&supply.failed));
-  TEST_ASSERT_TRUE(render_finished);
+  TEST_ASSERT_TRUE(finished);
   TEST_ASSERT_TRUE(probe.attached);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.render_status);
 
-  // A handle the consumer never took is still the test's to release.
-  for (unsigned int position = atomic_load(&supply.tail);
-       position < atomic_load(&supply.claimed); position += 1) {
-    if (
-      atomic_load(&supply.ready[position % PIPELINE_CAPACITY]) == position + 1
-    ) {
-      mln_geojson_source_data_destroy(
-        supply.slots[position % PIPELINE_CAPACITY]
-      );
-    }
-  }
   mln_geojson_source_data_destroy(current);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);

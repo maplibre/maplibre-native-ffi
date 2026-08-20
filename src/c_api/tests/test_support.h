@@ -27,11 +27,6 @@ typedef struct mln_test_render_fixture {
 typedef struct mln_test_thread mln_test_thread;
 
 mln_test_thread* mln_test_thread_start(void (*entry)(void*), void* argument);
-// Reports allocation or creation failure as null instead of asserting, for
-// tests that must stop and join already-started threads before failing.
-mln_test_thread* mln_test_thread_try_start(
-  void (*entry)(void*), void* argument
-);
 void mln_test_thread_join(mln_test_thread* thread);
 void mln_test_sleep_milliseconds(unsigned int milliseconds);
 // Monotonic milliseconds, for tests that assert a pump returned promptly rather
