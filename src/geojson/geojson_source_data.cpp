@@ -175,19 +175,21 @@ class SerializedGeoJsonData final : public mln::style::GeoJSONData {
   std::shared_ptr<std::mutex> mutex_;
 };
 
-// Keeps sequenced schedulers alive for the process lifetime. Upstream holds
-// them weakly, so a dataset's scheduler is destroyed with the dataset; a
-// slice tasklet in flight can be that scheduler's last owner, and destroying
-// a ThreadedScheduler on its own worker thread aborts the process on
-// thread::join of the current thread (issue #644). GetSequenced()
-// round-robins ten slots, so this pins at most ten threads.
+// Keeps sequenced schedulers alive for the process lifetime. GetSequenced()
+// round-robins ten slots and this registry dedupes them, so it pins at most
+// ten threads however many datasets are created. Upstream holds the slots
+// weakly, so a dataset's scheduler is destroyed with the dataset; a slice
+// tasklet in flight can be that scheduler's last owner, and destroying a
+// ThreadedScheduler on its own worker thread aborts the process on
+// thread::join of the current thread (issue #644).
 auto pin_sequenced_scheduler(const std::shared_ptr<mln::Scheduler>& scheduler)
   -> void {
   struct PinnedSchedulers {
     std::mutex mutex;
     std::vector<std::shared_ptr<mln::Scheduler>> schedulers;
   };
-  // Deliberately leaked: worker threads outlive static destruction.
+  // Leaked so process exit, not a static destructor joining worker threads
+  // mid-teardown, reclaims the pinned threads.
   static auto* pinned = new PinnedSchedulers();
   const std::scoped_lock lock(pinned->mutex);
   auto& schedulers = pinned->schedulers;
