@@ -199,17 +199,21 @@ static void replacing_data_during_async_tiling_survives(void) {
     )
   );
 
-  char source_id[32];
+  char source_ids[TILING_SOURCE_COUNT][32];
   char layer_json[160];
+  mln_buffer_view source_views[TILING_SOURCE_COUNT];
   for (unsigned int source = 0; source < TILING_SOURCE_COUNT; source += 1) {
-    const int id_length =
-      snprintf(source_id, sizeof(source_id), "points-%u", source);
-    TEST_ASSERT_TRUE(id_length > 0 && (size_t)id_length < sizeof(source_id));
+    const int id_length = snprintf(
+      source_ids[source], sizeof(source_ids[source]), "points-%u", source
+    );
+    TEST_ASSERT_TRUE(
+      id_length > 0 && (size_t)id_length < sizeof(source_ids[source])
+    );
+    source_views[source] =
+      mln_test_buffer_view(source_ids[source], (size_t)id_length);
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK,
-      mln_map_add_geojson_source_data(
-        map, mln_test_buffer_view(source_id, (size_t)id_length), current
-      )
+      mln_map_add_geojson_source_data(map, source_views[source], current)
     );
     const int layer_length = snprintf(
       layer_json, sizeof(layer_json), tiling_layer_json, source, source
@@ -251,7 +255,13 @@ static void replacing_data_during_async_tiling_survives(void) {
 
   // Each pump queues the current dataset's slice tasklets; replacing and
   // releasing that dataset right after the pump lands while they run.
-  while (atomic_load(&supply.tail) < TILING_REPLACEMENTS &&
+  //
+  // A failed call longjmps past the thread cleanup below if it goes through
+  // Unity here, so the loop records the first failure and reports it after
+  // the joins.
+  mln_status loop_status = MLN_STATUS_OK;
+  while (loop_status == MLN_STATUS_OK &&
+         atomic_load(&supply.tail) < TILING_REPLACEMENTS &&
          !atomic_load(&probe.finished) && !atomic_load(&supply.failed)) {
     const unsigned int position = atomic_load(&supply.tail);
     if (
@@ -259,7 +269,7 @@ static void replacing_data_during_async_tiling_survives(void) {
         &supply.ready[position % PIPELINE_CAPACITY], memory_order_acquire
       ) != position + 1
     ) {
-      TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 2, -1));
+      loop_status = mln_runtime_pump(runtime, 2, -1);
       mln_test_drain_all(runtime);
       continue;
     }
@@ -268,33 +278,36 @@ static void replacing_data_during_async_tiling_survives(void) {
 
     // A non-blocking pump keeps the replacement period shorter than one
     // slice, so the replacement lands while the slice is still in flight.
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0, -1));
+    loop_status = mln_runtime_pump(runtime, 0, -1);
     mln_test_drain_all(runtime);
-    for (unsigned int source = 0; source < TILING_SOURCE_COUNT; source += 1) {
-      const int id_length =
-        snprintf(source_id, sizeof(source_id), "points-%u", source);
-      TEST_ASSERT_TRUE(id_length > 0 && (size_t)id_length < sizeof(source_id));
-      TEST_ASSERT_EQUAL_INT(
-        MLN_STATUS_OK,
-        mln_map_set_geojson_source_data(
-          map, mln_test_buffer_view(source_id, (size_t)id_length), next
-        )
-      );
+    for (unsigned int source = 0;
+         loop_status == MLN_STATUS_OK && source < TILING_SOURCE_COUNT;
+         source += 1) {
+      loop_status =
+        mln_map_set_geojson_source_data(map, source_views[source], next);
     }
-    mln_geojson_source_data_destroy(current);
-    current = next;
+    if (loop_status == MLN_STATUS_OK) {
+      mln_geojson_source_data_destroy(current);
+      current = next;
+    } else {
+      mln_geojson_source_data_destroy(next);
+    }
   }
 
   atomic_store(&supply.stop, true);
   for (unsigned int index = 0; index < PRODUCER_COUNT; index += 1) {
     mln_test_thread_join(producer_threads[index]);
   }
-  TEST_ASSERT_FALSE(atomic_load(&supply.failed));
   free(json);
 
   atomic_store(&probe.stop, true);
-  TEST_ASSERT_TRUE(mln_test_pump_until(runtime, &probe.finished));
+  const bool render_finished = mln_test_pump_until(runtime, &probe.finished);
   mln_test_thread_join(render_thread);
+
+  // The threads are joined, so assertions are safe from here on.
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, loop_status);
+  TEST_ASSERT_FALSE(atomic_load(&supply.failed));
+  TEST_ASSERT_TRUE(render_finished);
   TEST_ASSERT_TRUE(probe.attached);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, probe.render_status);
 
