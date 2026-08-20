@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <functional>
@@ -7,6 +8,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include <mbgl/actor/scheduler.hpp>
 #include <mbgl/style/conversion/geojson_options.hpp>  // IWYU pragma: keep
@@ -126,12 +128,20 @@ class SerializedGeoJsonData final : public mln::style::GeoJSONData {
       inner_->getTile(id, fn, true);
       return;
     }
+    // A weak capture keeps a queued task from holding replaced data alive for
+    // slices no tile will show. An expired data has no live tiles, so an
+    // empty reply is correct.
     scheduler_->scheduleAndReplyValue(
       mln::util::SimpleIdentity::Empty,
-      [inner = inner_, mutex = mutex_, id]() -> TileFeatures {
+      [inner = std::weak_ptr<mln::style::GeoJSONData>(inner_), mutex = mutex_,
+       id]() -> TileFeatures {
         auto features = TileFeatures{};
+        const auto locked = inner.lock();
+        if (!locked) {
+          return features;
+        }
         const std::scoped_lock lock(*mutex);
-        inner->getTile(
+        locked->getTile(
           id,
           [&features](TileFeatures result) { features = std::move(result); },
           true
@@ -164,6 +174,32 @@ class SerializedGeoJsonData final : public mln::style::GeoJSONData {
   std::shared_ptr<mln::Scheduler> scheduler_;
   std::shared_ptr<std::mutex> mutex_;
 };
+
+// Keeps sequenced schedulers alive for the process lifetime. GetSequenced()
+// round-robins ten slots and this registry dedupes them, so it pins at most
+// ten threads however many datasets are created. Upstream holds the slots
+// weakly, so a dataset's scheduler is destroyed with the dataset; a slice
+// tasklet in flight can be that scheduler's last owner, and destroying a
+// ThreadedScheduler on its own worker thread aborts the process on
+// thread::join of the current thread (issue #644).
+auto pin_sequenced_scheduler(const std::shared_ptr<mln::Scheduler>& scheduler)
+  -> void {
+  struct PinnedSchedulers {
+    std::mutex mutex;
+    std::vector<std::shared_ptr<mln::Scheduler>> schedulers;
+  };
+  // Leaked so process exit, not a static destructor joining worker threads
+  // mid-teardown, reclaims the pinned threads.
+  static auto* pinned = new PinnedSchedulers();
+  const std::scoped_lock lock(pinned->mutex);
+  auto& schedulers = pinned->schedulers;
+  if (
+    std::find(schedulers.begin(), schedulers.end(), scheduler) ==
+    schedulers.end()
+  ) {
+    schedulers.push_back(scheduler);
+  }
+}
 
 }  // namespace
 
@@ -454,6 +490,7 @@ auto geojson_source_data_create(
   }
 
   auto scheduler = mln::Scheduler::GetSequenced();
+  pin_sequenced_scheduler(scheduler);
   auto index =
     mln::style::GeoJSONData::create(*geojson, scheduler, *native_options);
   // Supercluster indexes are immutable after construction and always slice
