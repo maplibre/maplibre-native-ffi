@@ -1632,6 +1632,7 @@ auto render_session_set_feature_state(
         .source_id = string_from_view(selector->source_id),
         .source_layer_id = feature_state_source_layer(*selector),
         .feature_id = string_from_view(selector->feature_id),
+        .state_key = std::nullopt,
         .state = *state_object,
       }
     );
@@ -1727,6 +1728,7 @@ auto render_session_remove_feature_state(
         .state_key = optional_selector_string(
           *selector, MLN_FEATURE_STATE_SELECTOR_STATE_KEY, selector->state_key
         ),
+        .state = {},
       }
     );
     static_cast<void>(map_post_trigger_repaint(live->map));
