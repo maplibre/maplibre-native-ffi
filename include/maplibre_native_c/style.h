@@ -1644,7 +1644,7 @@ MLN_API mln_status mln_map_set_location_indicator_bearing(
 ) MLN_NOEXCEPT;
 
 /**
- * Sets a location indicator layer accuracy radius in logical pixels.
+ * Sets a location indicator layer accuracy radius in meters.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

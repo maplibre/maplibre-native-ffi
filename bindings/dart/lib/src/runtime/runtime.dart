@@ -3357,7 +3357,7 @@ final class MapHandle {
     });
   }
 
-  /// Sets a location indicator layer accuracy radius in logical pixels.
+  /// Sets a location indicator layer accuracy radius in meters.
   void setLocationIndicatorAccuracyRadius(String layerId, double radius) {
     withNativeArena((arena) {
       final nativeLayerId = nativeStringView(layerId, arena);

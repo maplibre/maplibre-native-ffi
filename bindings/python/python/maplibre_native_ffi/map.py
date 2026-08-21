@@ -871,7 +871,7 @@ class MapHandle(NativeHandleMixin):
         layer_id: str,
         radius: float,
     ) -> None:
-        """Set a location indicator layer accuracy radius in logical pixels."""
+        """Set a location indicator layer accuracy radius in meters."""
         self._native.set_location_indicator_accuracy_radius(layer_id, radius)
 
     def set_location_indicator_image_name(

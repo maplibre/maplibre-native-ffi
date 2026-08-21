@@ -1655,7 +1655,7 @@ public sealed unsafe class MapHandle : IDisposable
         );
     }
 
-    /// <summary>Sets a location indicator layer accuracy radius in logical pixels.</summary>
+    /// <summary>Sets a location indicator layer accuracy radius in meters.</summary>
     public void SetLocationIndicatorAccuracyRadius(string layerId, double radius)
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));

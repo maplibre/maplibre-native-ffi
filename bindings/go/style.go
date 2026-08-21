@@ -1898,7 +1898,7 @@ func (m *MapHandle) SetLocationIndicatorBearing(layerID string, bearing float64)
 	})
 }
 
-// SetLocationIndicatorAccuracyRadius sets a location indicator layer accuracy radius.
+// SetLocationIndicatorAccuracyRadius sets a location indicator layer accuracy radius in meters.
 func (m *MapHandle) SetLocationIndicatorAccuracyRadius(layerID string, radius float64) error {
 	ptr, release, err := m.ptr()
 	if err != nil {
