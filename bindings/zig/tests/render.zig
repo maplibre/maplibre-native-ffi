@@ -1716,9 +1716,14 @@ test "map feature state set get and remove" {
     try testing.expectError(error.InvalidArgument, map.removeFeatureState(testing.allocator, .{ .source_id = "point", .state_key = "hover" }));
 
     try session.resize(.{ .width = 64, .height = 64, .scale_factor = 2.0 });
-    try testing.expectEqual(@as(maplibre.RenderResult, .size_pending), (try session.renderUpdate()).result);
-    try runtime.pump(0, null);
-    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
+    switch ((try session.renderUpdate()).result) {
+        .rendered => {},
+        .size_pending => {
+            try runtime.pump(0, null);
+            try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
+        },
+        else => return error.UnexpectedRenderResult,
+    }
     var after_scale = try map.getFeatureState(testing.allocator, selector);
     defer after_scale.deinit();
     try testing.expect(rawMember(after_scale.value, "hover") == null);

@@ -1448,6 +1448,12 @@ fn copyQueriedFeatureList(
 }
 
 fn stringViewArray(temp: *native_temp.TempStorage, values_list: []const []const u8) status.Error![]c.mln_buffer_view {
+    const raw = try temp.arena.allocator().alloc(c.mln_buffer_view, values_list.len);
+    for (values_list, raw) |value, *out| out.* = try temp.stringView(value);
+    return raw;
+}
+
+fn metalSurfaceDescriptorToNative(descriptor: MetalSurfaceDescriptor) c.mln_metal_surface_descriptor {
     var raw = c.mln_metal_surface_descriptor_default();
     raw.extent = renderTargetExtentToNative(descriptor.extent);
     raw.context = metalContextToNative(descriptor.context);

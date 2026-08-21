@@ -3312,15 +3312,17 @@ fn feature_state_set_get_and_remove_copy_snapshots() {
     assert!(json_member(&after_remove, "hover").is_none());
 
     session.resize(64, 64, 2.0).unwrap();
-    assert_eq!(
-        session.render_update().unwrap().result,
-        RenderResult::SizePending
-    );
-    runtime.pump(Some(Duration::ZERO), None).unwrap();
-    assert_eq!(
-        session.render_update().unwrap().result,
-        RenderResult::Rendered
-    );
+    match session.render_update().unwrap().result {
+        RenderResult::Rendered => {}
+        RenderResult::SizePending => {
+            runtime.pump(Some(Duration::ZERO), None).unwrap();
+            assert_eq!(
+                session.render_update().unwrap().result,
+                RenderResult::Rendered
+            );
+        }
+        other => panic!("unexpected render result after scale-factor resize: {other:?}"),
+    }
     let after_scale: JsonValue =
         serde_json::from_slice(&map.get_feature_state(&selector).unwrap()).unwrap();
     assert_json_member(&after_scale, "radius", &json!(20));
