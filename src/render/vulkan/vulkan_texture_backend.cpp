@@ -129,14 +129,16 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
   }
 
   void swap() override {
+    // Submit the recorded frame. A discarded borrowed render then restores the
+    // host initial layout so the next render in this update matches the layout
+    // contract.
+    SurfaceRenderableResource::swap();
     if (
       mln::core::discard_renderable_present && usesBorrowedImage &&
       initial_layout_ != final_layout_ &&
       initial_layout_ != vk::ImageLayout::eUndefined
     ) {
       restore_borrowed_initial_layout();
-    } else {
-      SurfaceRenderableResource::swap();
     }
     // This resource is only used by VulkanTextureBackend, so the downcast is
     // invariant within this file.
