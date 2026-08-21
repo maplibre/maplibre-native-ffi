@@ -115,36 +115,6 @@ auto mln_render_session_dump_debug_logs(mln_render_session session) noexcept
   });
 }
 
-auto mln_render_session_set_feature_state(
-  mln_render_session session, const mln_feature_state_selector* selector,
-  mln_buffer_view state
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::render_session_set_feature_state(
-      session, selector, state
-    );
-  });
-}
-
-auto mln_render_session_get_feature_state(
-  mln_render_session session, const mln_feature_state_selector* selector,
-  mln_buffer* out_state
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::render_session_get_feature_state(
-      session, selector, out_state
-    );
-  });
-}
-
-auto mln_render_session_remove_feature_state(
-  mln_render_session session, const mln_feature_state_selector* selector
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::render_session_remove_feature_state(session, selector);
-  });
-}
-
 auto mln_queried_feature_default() noexcept -> mln_queried_feature {
   return mln_queried_feature{
     .size = sizeof(mln_queried_feature),

@@ -27,6 +27,7 @@
 #include "render/vulkan/vulkan_texture_backend.hpp"
 
 #include "maplibre_native_c/texture.h"
+#include "render/render_session_common.hpp"
 #include "render/vulkan/vulkan_dispatch.hpp"
 
 namespace {
@@ -128,7 +129,15 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
   }
 
   void swap() override {
-    SurfaceRenderableResource::swap();
+    if (
+      mln::core::discard_renderable_present && usesBorrowedImage &&
+      initial_layout_ != final_layout_ &&
+      initial_layout_ != vk::ImageLayout::eUndefined
+    ) {
+      restore_borrowed_initial_layout();
+    } else {
+      SurfaceRenderableResource::swap();
+    }
     // This resource is only used by VulkanTextureBackend, so the downcast is
     // invariant within this file.
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
@@ -335,6 +344,32 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
       return borrowedImageView;
     }
     return swapchainImageViews.at(index).get();
+  }
+
+  void restore_borrowed_initial_layout() {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
+    auto& context_impl =
+      static_cast<mln::vulkan::Context&>(backend.getContext());
+    context_impl.waitFrame();
+    context_impl.submitOneTimeCommand(
+      [&](const vk::UniqueCommandBuffer& command_buffer) -> void {
+        const auto barrier =
+          vk::ImageMemoryBarrier()
+            .setImage(borrowedImage)
+            .setOldLayout(final_layout_)
+            .setNewLayout(initial_layout_)
+            .setSrcAccessMask(vk::AccessFlagBits::eColorAttachmentWrite)
+            .setDstAccessMask(vk::AccessFlagBits::eColorAttachmentRead)
+            .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+            .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+            .setSubresourceRange({vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1});
+        command_buffer->pipelineBarrier(
+          vk::PipelineStageFlagBits::eColorAttachmentOutput,
+          vk::PipelineStageFlagBits::eColorAttachmentOutput, {}, nullptr,
+          nullptr, barrier, backend.getDispatcher()
+        );
+      }
+    );
   }
 
   bool usesBorrowedImage = false;

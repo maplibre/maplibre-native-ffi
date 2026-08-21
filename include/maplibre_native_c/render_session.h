@@ -29,12 +29,13 @@ extern "C" {
  * mln_*_borrowed_texture_set_target() function for the backend. See texture.h.
  *
  * The session renderer survives a resize, carrying the tile pyramid, glyph and
- * image atlases, symbol placement, and feature state set through
- * mln_render_session_set_feature_state() across to the new size. A scale_factor
+ * image atlases, and symbol placement across to the new size. A scale_factor
  * that differs from the session's current value retires the renderer instead,
  * because its shaders are compiled for a fixed pixel ratio, and renderer-held
- * state starts empty on the next mln_render_session_render_update(). Map state
- * such as camera, style, and sources survives either way.
+ * tile and atlas state starts empty on the next
+ * mln_render_session_render_update(). Map state such as camera, style, sources,
+ * and feature state survives either way. The session pushes map feature state
+ * into a replacement renderer on the next render update.
  *
  * Passing a scale_factor that differs from the map's mln_map_options
  * scale_factor logs a warning; see mln_map_options.
@@ -206,85 +207,6 @@ mln_render_session_clear_data(mln_render_session session) MLN_NOEXCEPT;
  */
 MLN_API mln_status
 mln_render_session_dump_debug_logs(mln_render_session session) MLN_NOEXCEPT;
-
-/**
- * Sets per-feature state on a render source for this render session.
- *
- * selector->source_id and selector->feature_id are borrowed for the duration of
- * the call. state must contain one UTF-8 JSON object and is parsed before
- * return. The accepted command requests a map repaint.
- *
- * A call before that source exists on a render update is stored and applied
- * before the first presented frame that includes the source.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, selector is
- *   null or invalid, selector lacks MLN_FEATURE_STATE_SELECTOR_FEATURE_ID,
- *   state is empty, invalid JSON, or not an object.
- * - MLN_STATUS_INVALID_STATE when the session is detached.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when the render backend reports no renderer
- *   backend, or when an internal exception is converted to status.
- */
-MLN_API mln_status mln_render_session_set_feature_state(
-  mln_render_session session, const mln_feature_state_selector* selector,
-  mln_buffer_view state
-) MLN_NOEXCEPT;
-
-/**
- * Copies per-feature state from a render source in this render session.
- *
- * selector->source_id and selector->feature_id are borrowed for the duration of
- * the call. On success, *out_state receives an owned buffer containing a UTF-8
- * JSON object. Destroy it with mln_buffer_destroy(). Missing native source or
- * feature state is reported as an empty object. A call before that source
- * exists on a render update copies any state stored for that feature, or an
- * empty object when none has been set.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, selector is
- *   null or invalid, selector lacks MLN_FEATURE_STATE_SELECTOR_FEATURE_ID,
- *   out_state is null, or *out_state is not null.
- * - MLN_STATUS_INVALID_STATE when the session is detached.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when the render backend reports no renderer
- *   backend, or when an internal exception is converted to status.
- */
-MLN_API mln_status mln_render_session_get_feature_state(
-  mln_render_session session, const mln_feature_state_selector* selector,
-  mln_buffer* out_state
-) MLN_NOEXCEPT;
-
-/**
- * Removes per-feature state from a render source in this render session.
- *
- * selector->source_id is required. selector->feature_id and selector->state_key
- * are optional. Passing both removes one state key from one feature. Passing
- * only feature_id removes all state for that feature. Passing neither removes
- * all feature state for the source/source-layer. The accepted command requests
- * a map repaint.
- *
- * A call before that source exists on a render update is stored and applied
- * before the first presented frame that includes the source.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, selector is
- *   null or invalid, or selector has MLN_FEATURE_STATE_SELECTOR_STATE_KEY
- *   without MLN_FEATURE_STATE_SELECTOR_FEATURE_ID.
- * - MLN_STATUS_INVALID_STATE when the session is detached.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when the render backend reports no renderer
- *   backend, or when an internal exception is converted to status.
- */
-MLN_API mln_status mln_render_session_remove_feature_state(
-  mln_render_session session, const mln_feature_state_selector* selector
-) MLN_NOEXCEPT;
 
 #ifdef __cplusplus
 }

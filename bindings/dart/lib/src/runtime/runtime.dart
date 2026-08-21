@@ -1849,6 +1849,38 @@ final class MapHandle {
     });
   }
 
+  /// Sets per-feature state on this map.
+  void setFeatureState(FeatureStateSelector selector, Uint8List state) {
+    withNativeArena((arena) {
+      final nativeSelector = _featureStateSelectorToNative(selector, arena);
+      final nativeState = nativeBufferView(state, arena);
+      _check(
+        raw.mln_map_set_feature_state(_handle.raw, nativeSelector, nativeState),
+      );
+    });
+  }
+
+  /// Copies per-feature state from this map.
+  Uint8List getFeatureState(FeatureStateSelector selector) {
+    return withNativeArena((arena) {
+      final nativeSelector = _featureStateSelectorToNative(selector, arena);
+      final outState = arena<Uint64>();
+      outState.value = 0;
+      _check(
+        raw.mln_map_get_feature_state(_handle.raw, nativeSelector, outState),
+      );
+      return copyOwnedBuffer(NativeOwnedBufferHandle(outState.value));
+    });
+  }
+
+  /// Removes per-feature state from this map.
+  void removeFeatureState(FeatureStateSelector selector) {
+    withNativeArena((arena) {
+      final nativeSelector = _featureStateSelectorToNative(selector, arena);
+      _check(raw.mln_map_remove_feature_state(_handle.raw, nativeSelector));
+    });
+  }
+
   /// Returns the style document this map's style was last parsed from.
   ///
   /// This is the loaded document, not a serialization of the live style:

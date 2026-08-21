@@ -79,7 +79,7 @@ class RenderQueryTest {
             assertEquals("point", source.sourceId)
             assertEquals("capital", featureStringProperty(source.feature, "kind"))
 
-            session.setFeatureState(featureStateSelector(), featureState())
+            map.setFeatureState(featureStateSelector(), featureState())
             renderIfAvailable(runtime, map, session)
             val renderedWithState =
               waitForQueriedFeature(runtime, map, session) {

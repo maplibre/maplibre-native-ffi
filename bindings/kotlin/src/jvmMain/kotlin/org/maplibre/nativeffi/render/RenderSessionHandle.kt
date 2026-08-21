@@ -7,7 +7,6 @@ import org.maplibre.nativeffi.internal.lifecycle.NativeRenderSession
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.map.MapHandle
-import org.maplibre.nativeffi.query.FeatureStateSelector
 import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
@@ -104,24 +103,6 @@ internal constructor(private val map: MapHandle, private val handle: NativeRende
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("dump debug logs")
     NativeAccess.dumpRenderSessionDebugLogs(requireLiveHandle())
-  }
-
-  public actual fun setFeatureState(selector: FeatureStateSelector, value: ByteArray) {
-    NativeAccess.ensureLoaded()
-    activeFrame.ensureInactive("set feature state")
-    NativeAccess.setFeatureState(requireLiveHandle(), selector, value)
-  }
-
-  public actual fun getFeatureState(selector: FeatureStateSelector): ByteArray {
-    NativeAccess.ensureLoaded()
-    activeFrame.ensureInactive("get feature state")
-    return NativeAccess.getFeatureState(requireLiveHandle(), selector)
-  }
-
-  public actual fun removeFeatureState(selector: FeatureStateSelector) {
-    NativeAccess.ensureLoaded()
-    activeFrame.ensureInactive("remove feature state")
-    NativeAccess.removeFeatureState(requireLiveHandle(), selector)
   }
 
   public actual fun queryRenderedFeatures(

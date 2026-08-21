@@ -562,6 +562,15 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_status mln_map_request_repaint([NativeTypeName("mln_map")] MlnMap map);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_set_feature_state([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_feature_state_selector *")] mln_feature_state_selector* selector, mln_buffer_view state);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_get_feature_state([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_feature_state_selector *")] mln_feature_state_selector* selector, [NativeTypeName("mln_buffer *")] MlnBuffer* out_state);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_remove_feature_state([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_feature_state_selector *")] mln_feature_state_selector* selector);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_request_still_image([NativeTypeName("mln_map")] MlnMap map);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]

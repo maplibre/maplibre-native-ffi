@@ -155,37 +155,4 @@ public extension RenderSessionHandle {
       return try withUnsafePointer(to: &argumentsView, call)
     }
   }
-
-  func setFeatureState(selector: FeatureStateSelector, state: Data) throws {
-    try mapNativeFailure {
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      try selector.nativeSelector.withNativeSelector { selector in
-        try checkStatus(mln_render_session_set_feature_state(
-          requireLiveHandle().raw,
-          selector,
-          arena.view(state)
-        ))
-      }
-    }
-  }
-
-  func featureState(selector: FeatureStateSelector) throws -> Data {
-    try mapNativeFailure {
-      try selector.nativeSelector.withNativeSelector { selector in
-        try NativeQuery.featureState(requireLiveHandle(), selector: selector)
-      }
-    }
-  }
-
-  func removeFeatureState(selector: FeatureStateSelector) throws {
-    try mapNativeFailure {
-      try selector.nativeSelector.withNativeSelector { selector in
-        try checkStatus(mln_render_session_remove_feature_state(
-          requireLiveHandle().raw,
-          selector
-        ))
-      }
-    }
-  }
 }

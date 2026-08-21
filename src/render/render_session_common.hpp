@@ -10,6 +10,7 @@
 #include <optional>
 #include <string>
 #include <thread>
+#include <unordered_set>
 #include <vector>
 
 #include <mbgl/actor/scheduler.hpp>
@@ -21,6 +22,7 @@
 #include <mbgl/util/size.hpp>
 
 #include "diagnostics/diagnostics.hpp"
+#include "map/feature_state.hpp"
 #include "maplibre_native_c.h"
 
 struct mln_render_session_object;
@@ -339,9 +341,10 @@ class SessionFrameObserver final : public mln::RendererObserver {
   }
 
   void onWillStartRenderingMap() override {
-    if (delegate_ != nullptr) {
-      delegate_->onWillStartRenderingMap();
+    if (suppress_frame_callbacks_ || delegate_ == nullptr) {
+      return;
     }
+    delegate_->onWillStartRenderingMap();
   }
 
   void onWillStartRenderingFrame() override {
@@ -367,9 +370,10 @@ class SessionFrameObserver final : public mln::RendererObserver {
   }
 
   void onDidFinishRenderingMap() override {
-    if (delegate_ != nullptr) {
-      delegate_->onDidFinishRenderingMap();
+    if (suppress_frame_callbacks_ || delegate_ == nullptr) {
+      return;
     }
+    delegate_->onDidFinishRenderingMap();
   }
 
   void onStyleImageMissing(
@@ -459,51 +463,6 @@ class SessionFrameObserver final : public mln::RendererObserver {
   bool suppress_frame_callbacks_ = false;
 };
 
-// Native setFeatureState is a no-op until the source exists inside render().
-class PendingFeatureState {
- public:
-  [[nodiscard]] auto empty() const -> bool { return mutations_.empty(); }
-
-  // Once anything is queued, later mutations stay in the log so get and apply
-  // see one ordered history.
-  [[nodiscard]] auto needs_queue(const mln::Renderer* renderer) const -> bool {
-    return renderer == nullptr || !empty();
-  }
-
-  void set(
-    std::string source_id, std::optional<std::string> source_layer_id,
-    std::string feature_id, mln::FeatureState state
-  );
-  void remove(
-    std::string source_id, std::optional<std::string> source_layer_id,
-    std::optional<std::string> feature_id, std::optional<std::string> state_key
-  );
-
-  [[nodiscard]] auto get(
-    const std::string& source_id,
-    const std::optional<std::string>& source_layer_id,
-    const std::string& feature_id, mln::FeatureState base = {}
-  ) const -> mln::FeatureState;
-
-  [[nodiscard]] auto has_source_in(const mln::UpdateParameters& update) const
-    -> bool;
-
-  void apply(mln::Renderer& renderer, const mln::UpdateParameters& update);
-
- private:
-  struct Mutation {
-    enum class Kind : uint8_t { Set, Remove };
-    Kind kind = Kind::Set;
-    std::string source_id;
-    std::optional<std::string> source_layer_id;
-    std::optional<std::string> feature_id;
-    std::optional<std::string> state_key;
-    mln::FeatureState state;
-  };
-
-  std::vector<Mutation> mutations_;
-};
-
 struct RenderTextureState {
   std::unique_ptr<TextureSessionBackend> backend = nullptr;
   uint64_t next_frame_id = 1;
@@ -539,7 +498,9 @@ struct mln_render_session_object {
   // Declared before `renderer`, which holds a raw pointer to it.
   mln::core::SessionFrameObserver frame_observer;
   std::unique_ptr<mln::Renderer> renderer = nullptr;
-  mln::core::PendingFeatureState pending_feature_state;
+  std::unordered_set<std::string> rendered_source_ids;
+  mln::core::FeatureStateSnapshot applied_feature_state;
+  std::shared_ptr<const mln::core::FeatureStateSnapshot> pushed_feature_state;
   mln::core::RenderSurfaceState surface;
   mln::core::RenderTextureState texture;
 };
@@ -772,17 +733,6 @@ auto render_session_destroy(mln_render_session session) -> mln_status;
 auto render_session_reduce_memory_use(mln_render_session session) -> mln_status;
 auto render_session_clear_data(mln_render_session session) -> mln_status;
 auto render_session_dump_debug_logs(mln_render_session session) -> mln_status;
-auto render_session_set_feature_state(
-  mln_render_session session, const mln_feature_state_selector* selector,
-  mln_buffer_view state
-) -> mln_status;
-auto render_session_get_feature_state(
-  mln_render_session session, const mln_feature_state_selector* selector,
-  mln_buffer* out_state
-) -> mln_status;
-auto render_session_remove_feature_state(
-  mln_render_session session, const mln_feature_state_selector* selector
-) -> mln_status;
 auto queried_feature_list_count(
   mln_queried_feature_list list, size_t* out_count
 ) -> mln_status;

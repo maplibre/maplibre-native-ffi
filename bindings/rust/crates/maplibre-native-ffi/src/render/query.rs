@@ -10,49 +10,12 @@ pub use maplibre_core::query::{
     SourceFeatureQueryOptions,
 };
 pub(crate) use maplibre_core::query::{
-    FeatureStateSelectorNativeExt, NativeRenderedFeatureQueryOptions,
-    NativeSourceFeatureQueryOptions, RenderedFeatureQueryOptionsNativeExt,
-    RenderedQueryGeometryNativeExt, SourceFeatureQueryOptionsNativeExt,
+    NativeRenderedFeatureQueryOptions, NativeSourceFeatureQueryOptions,
+    RenderedFeatureQueryOptionsNativeExt, RenderedQueryGeometryNativeExt,
+    SourceFeatureQueryOptionsNativeExt,
 };
 
 impl super::RenderSessionHandle {
-    /// Sets per-feature state on a render source for this session.
-    pub fn set_feature_state(&self, selector: &FeatureStateSelector, state: &[u8]) -> Result<()> {
-        self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.native()?;
-        let selector = selector.to_native();
-        let state = maplibre_core::string::buffer_view(state);
-        // SAFETY: session is live and all borrowed storage remains valid for the call.
-        maplibre_core::check(unsafe {
-            sys::mln_render_session_set_feature_state(session, selector.as_ptr(), state)
-        })
-    }
-
-    /// Copies per-feature state from a render source in this session.
-    pub fn get_feature_state(&self, selector: &FeatureStateSelector) -> Result<Vec<u8>> {
-        self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.native()?;
-        let selector = selector.to_native();
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
-        // SAFETY: session is live, selector storage remains valid, and out is writable.
-        maplibre_core::check(unsafe {
-            sys::mln_render_session_get_feature_state(session, selector.as_ptr(), out.as_mut_ptr())
-        })?;
-        // SAFETY: Success transfers the owned buffer to this call.
-        unsafe { maplibre_core::string::copy_owned_buffer(out.get()) }
-    }
-
-    /// Removes per-feature state selected for this session.
-    pub fn remove_feature_state(&self, selector: &FeatureStateSelector) -> Result<()> {
-        self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.native()?;
-        let selector = selector.to_native();
-        // SAFETY: session is live and selector storage remains valid for the call.
-        maplibre_core::check(unsafe {
-            sys::mln_render_session_remove_feature_state(session, selector.as_ptr())
-        })
-    }
-
     /// Copies rendered features from the latest render session state.
     pub fn query_rendered_features(
         &self,

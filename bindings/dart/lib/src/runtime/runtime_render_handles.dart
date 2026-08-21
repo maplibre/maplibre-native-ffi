@@ -210,11 +210,12 @@ final class RenderSessionHandle {
   /// texture is rejected here: allocate one at the new size and hand it over
   /// with [setMetalBorrowedTextureTarget] or its Vulkan or OpenGL counterpart.
   ///
-  /// The session keeps its renderer across a resize, so renderer-held state
-  /// such as feature state carries over. A scale factor that differs from the
-  /// session's current one starts a new renderer with that state empty, because
-  /// a renderer compiles its shaders for one pixel ratio; the same applies to
-  /// every `setTarget` method.
+  /// The session keeps its renderer across a resize, along with the tile
+  /// pyramid, glyph and image atlases, and symbol placement. A scale factor
+  /// that differs from the session's current one retires the renderer instead,
+  /// because a renderer compiles its shaders for one pixel ratio; the same
+  /// applies to every `setTarget` method. Map-owned feature state survives
+  /// either way.
   void resize(int width, int height, {double scaleFactor = 1}) {
     _checkNoActiveTextureFrame('resize render session');
     _check(
@@ -224,8 +225,9 @@ final class RenderSessionHandle {
 
   /// Presents this attached surface session through a new Metal surface.
   ///
-  /// Replacing the surface in place keeps this session's renderer and the state
-  /// it holds, such as the tile pyramid, atlases, and feature state.
+  /// Replacing the surface in place keeps this session's renderer along with
+  /// the tile pyramid, atlases, and symbol placement. Map-owned feature state
+  /// is unchanged.
   ///
   /// [descriptor] names the same graphics context this session attached with,
   /// and its extent applies as [resize] applies one. A descriptor whose context
@@ -413,51 +415,6 @@ final class RenderSessionHandle {
   /// Dumps renderer debug logs through MapLibre Native logging.
   void dumpDebugLogs() {
     _check(raw.mln_render_session_dump_debug_logs(_handle.raw));
-  }
-
-  /// Sets per-feature state on a render source.
-  void setFeatureState(FeatureStateSelector selector, Uint8List state) {
-    withNativeArena((arena) {
-      final nativeSelector = _featureStateSelectorToNative(selector, arena);
-      final nativeState = nativeBufferView(state, arena);
-      _check(
-        raw.mln_render_session_set_feature_state(
-          _handle.raw,
-          nativeSelector,
-          nativeState,
-        ),
-      );
-    });
-  }
-
-  /// Copies per-feature state from a render source.
-  Uint8List getFeatureState(FeatureStateSelector selector) {
-    return withNativeArena((arena) {
-      final nativeSelector = _featureStateSelectorToNative(selector, arena);
-      final outState = arena<Uint64>();
-      outState.value = 0;
-      _check(
-        raw.mln_render_session_get_feature_state(
-          _handle.raw,
-          nativeSelector,
-          outState,
-        ),
-      );
-      return copyOwnedBuffer(NativeOwnedBufferHandle(outState.value));
-    });
-  }
-
-  /// Removes per-feature state from a render source.
-  void removeFeatureState(FeatureStateSelector selector) {
-    withNativeArena((arena) {
-      final nativeSelector = _featureStateSelectorToNative(selector, arena);
-      _check(
-        raw.mln_render_session_remove_feature_state(
-          _handle.raw,
-          nativeSelector,
-        ),
-      );
-    });
   }
 
   /// Queries rendered features from the latest render session state.

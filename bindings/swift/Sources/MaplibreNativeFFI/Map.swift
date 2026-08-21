@@ -164,6 +164,42 @@ public final class MapHandle {
     }
   }
 
+  public func setFeatureState(
+    selector: FeatureStateSelector,
+    state: Data
+  ) throws {
+    try mapNativeFailure {
+      let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
+      try selector.nativeSelector.withNativeSelector { selector in
+        try checkStatus(mln_map_set_feature_state(
+          handle.requireLive().raw,
+          selector,
+          arena.view(state)
+        ))
+      }
+    }
+  }
+
+  public func featureState(selector: FeatureStateSelector) throws -> Data {
+    try mapNativeFailure {
+      try selector.nativeSelector.withNativeSelector { selector in
+        try NativeQuery.featureState(handle.requireLive(), selector: selector)
+      }
+    }
+  }
+
+  public func removeFeatureState(selector: FeatureStateSelector) throws {
+    try mapNativeFailure {
+      try selector.nativeSelector.withNativeSelector { selector in
+        try checkStatus(mln_map_remove_feature_state(
+          handle.requireLive().raw,
+          selector
+        ))
+      }
+    }
+  }
+
   /// Copies the style document this map's style was last parsed from, byte for
   /// byte, rather than a serialization of the live style. Runtime mutations do
   /// not change it, and a failed parse leaves the previous document in place.

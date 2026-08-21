@@ -85,6 +85,7 @@
 #include "geojson/geojson.hpp"
 #include "geojson/geojson_source_data.hpp"
 #include "handles/handle_table.hpp"
+#include "map/feature_state.hpp"
 #include "maplibre_native_c.h"
 #include "runtime/runtime.hpp"
 #include "style/style_value.hpp"
@@ -3263,6 +3264,7 @@ struct MapObject {
   // Guarded by the map handle table's mutex; a render session on another thread
   // clears it from map_detach_render_target_session().
   void* render_target_session = nullptr;
+  FeatureStateStore feature_state;
 };
 
 template <>
@@ -3805,6 +3807,88 @@ auto map_request_repaint(mln_map map) -> mln_status {
   return MLN_STATUS_OK;
 }
 
+auto map_set_feature_state(
+  mln_map map, const mln_feature_state_selector* selector, mln_buffer_view state
+) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  const auto selector_status = validate_feature_state_selector(selector, true);
+  if (selector_status != MLN_STATUS_OK) {
+    return selector_status;
+  }
+
+  auto native_state = to_native_json_value(state);
+  if (!native_state) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto* state_object = native_state->getObject();
+  if (state_object == nullptr) {
+    set_thread_error("feature state value must be a JSON object");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  live->feature_state.set(
+    string_from_view(selector->source_id),
+    feature_state_source_layer(*selector),
+    string_from_view(selector->feature_id), *state_object
+  );
+  live->map->triggerRepaint();
+  return MLN_STATUS_OK;
+}
+
+auto map_get_feature_state(
+  mln_map map, const mln_feature_state_selector* selector, mln_buffer* out_state
+) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  const auto selector_status = validate_feature_state_selector(selector, true);
+  if (selector_status != MLN_STATUS_OK) {
+    return selector_status;
+  }
+
+  auto state = live->feature_state.get(
+    string_from_view(selector->source_id),
+    feature_state_source_layer(*selector),
+    string_from_view(selector->feature_id)
+  );
+  return create_buffer(
+    serialize_json_value(mln::Value{std::move(state)}), out_state
+  );
+}
+
+auto map_remove_feature_state(
+  mln_map map, const mln_feature_state_selector* selector
+) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  const auto selector_status = validate_feature_state_selector(selector, false);
+  if (selector_status != MLN_STATUS_OK) {
+    return selector_status;
+  }
+
+  live->feature_state.remove(
+    string_from_view(selector->source_id),
+    feature_state_source_layer(*selector),
+    optional_selector_string(
+      *selector, MLN_FEATURE_STATE_SELECTOR_FEATURE_ID, selector->feature_id
+    ),
+    optional_selector_string(
+      *selector, MLN_FEATURE_STATE_SELECTOR_STATE_KEY, selector->state_key
+    )
+  );
+  live->map->triggerRepaint();
+  return MLN_STATUS_OK;
+}
+
 auto map_request_still_image(mln_map map) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -3871,6 +3955,13 @@ auto map_post_trigger_repaint(mln_map map) -> mln_status {
 auto map_latest_update(mln_map map) -> std::shared_ptr<mln::UpdateParameters> {
   auto* live = handle_table<MapObject>().try_resolve(map);
   return live == nullptr ? nullptr : live->frontend->latest_update();
+}
+
+auto map_feature_state_snapshot(mln_map map)
+  -> std::shared_ptr<const FeatureStateSnapshot> {
+  auto* live = handle_table<MapObject>().try_resolve(map);
+  return live == nullptr ? std::make_shared<FeatureStateSnapshot>()
+                         : live->feature_state.snapshot();
 }
 
 auto map_renderer_observer(mln_map map) -> mln::RendererObserver* {

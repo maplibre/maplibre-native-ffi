@@ -1661,7 +1661,7 @@ test "owned texture attachment rejects another active session" {
     try testing.expectError(error.InvalidState, attachTestOwnedTexture(&map, .{}));
 }
 
-test "render session feature state set get and remove" {
+test "map feature state set get and remove" {
     if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
@@ -1675,16 +1675,16 @@ test "render session feature state set get and remove" {
 
     const selector = maplibre.FeatureStateSelector{ .source_id = "point", .feature_id = "feature-1" };
     const feature_state = "{\"hover\":true,\"radius\":18446744073709551615}";
-    try session.setFeatureState(testing.allocator, selector, feature_state);
-    try session.removeFeatureState(testing.allocator, .{ .source_id = "point", .feature_id = "feature-1", .state_key = "hover" });
-    var queued = try session.getFeatureState(testing.allocator, selector);
+    try map.setFeatureState(testing.allocator, selector, feature_state);
+    try map.removeFeatureState(testing.allocator, .{ .source_id = "point", .feature_id = "feature-1", .state_key = "hover" });
+    var queued = try map.getFeatureState(testing.allocator, selector);
     defer queued.deinit();
     try testing.expect(rawMember(queued.value, "hover") == null);
     try testing.expectEqualStrings("18446744073709551615", rawMember(queued.value, "radius").?);
 
     try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
     _ = try session.renderUpdate();
-    var before_style = try session.getFeatureState(testing.allocator, selector);
+    var before_style = try map.getFeatureState(testing.allocator, selector);
     defer before_style.deinit();
     try testing.expect(rawMember(before_style.value, "hover") == null);
     try testing.expectEqualStrings("18446744073709551615", rawMember(before_style.value, "radius").?);
@@ -1693,27 +1693,36 @@ test "render session feature state set get and remove" {
     try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
     try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
 
-    var snapshot = try session.getFeatureState(testing.allocator, selector);
+    var snapshot = try map.getFeatureState(testing.allocator, selector);
     defer snapshot.deinit();
     try testing.expect(rawMember(snapshot.value, "hover") == null);
     try testing.expectEqualStrings("18446744073709551615", rawMember(snapshot.value, "radius").?);
 
-    try session.setFeatureState(testing.allocator, selector, feature_state);
-    var restored = try session.getFeatureState(testing.allocator, selector);
+    try map.setFeatureState(testing.allocator, selector, feature_state);
+    var restored = try map.getFeatureState(testing.allocator, selector);
     defer restored.deinit();
     try testing.expectEqualStrings("true", rawMember(restored.value, "hover").?);
     try testing.expectEqualStrings("18446744073709551615", rawMember(restored.value, "radius").?);
 
-    try session.removeFeatureState(testing.allocator, .{ .source_id = "point", .feature_id = "feature-1", .state_key = "hover" });
+    try map.removeFeatureState(testing.allocator, .{ .source_id = "point", .feature_id = "feature-1", .state_key = "hover" });
     try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
     try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
 
-    var after_remove = try session.getFeatureState(testing.allocator, selector);
+    var after_remove = try map.getFeatureState(testing.allocator, selector);
     defer after_remove.deinit();
     try testing.expect(rawMember(after_remove.value, "hover") == null);
     try testing.expectEqualStrings("18446744073709551615", rawMember(after_remove.value, "radius").?);
 
-    try testing.expectError(error.InvalidArgument, session.removeFeatureState(testing.allocator, .{ .source_id = "point", .state_key = "hover" }));
+    try testing.expectError(error.InvalidArgument, map.removeFeatureState(testing.allocator, .{ .source_id = "point", .state_key = "hover" }));
+
+    try session.resize(.{ .width = 64, .height = 64, .scale_factor = 2.0 });
+    try testing.expectEqual(@as(maplibre.RenderResult, .size_pending), (try session.renderUpdate()).result);
+    try runtime.pump(0, null);
+    try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
+    var after_scale = try map.getFeatureState(testing.allocator, selector);
+    defer after_scale.deinit();
+    try testing.expect(rawMember(after_scale.value, "hover") == null);
+    try testing.expectEqualStrings("18446744073709551615", rawMember(after_scale.value, "radius").?);
 }
 
 test "render session queries rendered and source features" {

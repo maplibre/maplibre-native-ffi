@@ -30,6 +30,8 @@ import org.maplibre.nativeffi.internal.javacpp.ownedBuffer
 import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
+import org.maplibre.nativeffi.query.FeatureStateSelector
+import org.maplibre.nativeffi.render.FeatureStateSelectorScope
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalSurfaceDescriptor
@@ -108,6 +110,47 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
     NativeAccess.ensureLoaded()
     ByteArrayViewScope(json).use { nativeJson ->
       Status.check(MaplibreNativeC.mln_map_set_style_json(requireLiveHandle(), nativeJson.view))
+    }
+  }
+
+  public actual fun setFeatureState(selector: FeatureStateSelector, value: ByteArray) {
+    NativeAccess.ensureLoaded()
+    FeatureStateSelectorScope(selector).use { nativeSelector ->
+      ByteArrayViewScope(value).use { nativeValue ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_feature_state(
+            requireLiveHandle(),
+            nativeSelector.selector,
+            nativeValue.view,
+          )
+        )
+      }
+    }
+  }
+
+  public actual fun getFeatureState(selector: FeatureStateSelector): ByteArray {
+    NativeAccess.ensureLoaded()
+    FeatureStateSelectorScope(selector).use { nativeSelector ->
+      LongPointer(1).use { outState ->
+        outState.put(0, 0L)
+        Status.check(
+          MaplibreNativeC.mln_map_get_feature_state(
+            requireLiveHandle(),
+            nativeSelector.selector,
+            outState,
+          )
+        )
+        return ownedBuffer(outState.get())
+      }
+    }
+  }
+
+  public actual fun removeFeatureState(selector: FeatureStateSelector) {
+    NativeAccess.ensureLoaded()
+    FeatureStateSelectorScope(selector).use { nativeSelector ->
+      Status.check(
+        MaplibreNativeC.mln_map_remove_feature_state(requireLiveHandle(), nativeSelector.selector)
+      )
     }
   }
 

@@ -552,8 +552,8 @@ MLN_API mln_status mln_opengl_borrowed_texture_attach(
  * reports MLN_STATUS_UNSUPPORTED for these targets and a host that follows a
  * resize hands over a replacement here instead. The texture is replaced in
  * place, so the session keeps its renderer along with the tile pyramid, glyph
- * and image atlases, symbol placement, and feature state set through
- * mln_render_session_set_feature_state().
+ * and image atlases, and symbol placement. Map-owned feature state is
+ * unchanged.
  *
  * descriptor->texture must belong to the device the session attached with. A
  * texture on a different device requires destroying this session with

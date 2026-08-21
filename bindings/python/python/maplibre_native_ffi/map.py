@@ -24,6 +24,7 @@ from .camera import (
 )
 from .errors import InvalidArgumentError
 from .geo import LatLng, LatLngBounds
+from .query import FeatureStateSelector
 from .render import (
     MetalBorrowedTextureDescriptor,
     MetalOwnedTextureDescriptor,
@@ -640,6 +641,38 @@ class MapHandle(NativeHandleMixin):
         error and without an event.
         """
         self._native.set_style_json(json)
+
+    def set_feature_state(
+        self,
+        selector: FeatureStateSelector,
+        state: bytes,
+    ) -> None:
+        """Set per-feature state on this map."""
+        self._native.set_feature_state(
+            selector.source_id,
+            selector.source_layer_id,
+            selector.feature_id,
+            selector.state_key,
+            state,
+        )
+
+    def get_feature_state(self, selector: FeatureStateSelector) -> bytes:
+        """Return copied per-feature state JSON from this map."""
+        return self._native.get_feature_state(
+            selector.source_id,
+            selector.source_layer_id,
+            selector.feature_id,
+            selector.state_key,
+        )
+
+    def remove_feature_state(self, selector: FeatureStateSelector) -> None:
+        """Remove per-feature state from this map."""
+        self._native.remove_feature_state(
+            selector.source_id,
+            selector.source_layer_id,
+            selector.feature_id,
+            selector.state_key,
+        )
 
     def get_loaded_style_json(self) -> bytes:
         """Return the style document this map's style was last parsed from.

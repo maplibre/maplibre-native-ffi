@@ -33,14 +33,5 @@ namespace Maplibre.NativeFfi.Internal.C
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_render_session_dump_debug_logs([NativeTypeName("mln_render_session")] MlnRenderSession session);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_set_feature_state([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_feature_state_selector *")] mln_feature_state_selector* selector, mln_buffer_view state);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_get_feature_state([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_feature_state_selector *")] mln_feature_state_selector* selector, [NativeTypeName("mln_buffer *")] MlnBuffer* out_state);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_remove_feature_state([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_feature_state_selector *")] mln_feature_state_selector* selector);
     }
 }

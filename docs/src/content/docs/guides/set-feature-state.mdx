@@ -16,11 +16,10 @@ style expressions read while the map draws. One styling rule then covers
 selection, hover, a live value, or a computed status, because each feature
 supplies its own input to that rule.
 
-Feature state belongs to the [render session](/maplibre-native-ffi/concepts/)
-and applies to its loaded tiles. Set or remove state on the session's owner
-thread after the session is attached. A call before that source exists on a
-render update is kept and applied before the first presented frame that includes
-the source.
+Feature state belongs to the [map](/maplibre-native-ffi/concepts/). Set or
+remove it on the map's owner thread. A render session pushes it into the
+renderer on the next render update, including the first presented frame that
+contains the source.
 
 ## Set state on a feature
 
@@ -53,9 +52,9 @@ with neither one removes the state of every feature in the source layer.
 
 ## Read state back
 
-Reading state copies the session's value into a snapshot handle that the host
-owns. The snapshot contains an empty object when the source or feature has no
-state.
+Reading state copies the map's store into a snapshot handle that the host owns.
+The snapshot contains an empty object when the source or feature has no state.
+The copy does not require a render session or a loaded source.
 
 <Code code={region(featureStateRead, "get")} lang="c" title="feature-state-read.c" />
 
@@ -72,10 +71,7 @@ that you keep, because destroying the snapshot invalidates those pointers.
 
 ## How long state lives
 
-Feature state lives with a render session's rendering resources. A resize or an
-in-place target replacement preserves those resources, as
-[Attach a render target](/maplibre-native-ffi/guides/attach-a-render-target/)
-describes. Changing the scale factor recreates them. Destroying the session and
-attaching another does the same. Feature state starts empty after either change.
-To preserve it, keep a host copy and set it again on the new session before the
-next render update.
+Feature state lives with the map. Destroying the map discards it. A resize, an
+in-place target replacement, a scale-factor change, and a new render session
+leave it in place. The next render update pushes the map's store into the
+renderer.

@@ -111,6 +111,28 @@ class _MapHandle:
     def create_projection(self) -> "_MapProjectionHandle": ...
     def set_style_url(self, url: str) -> None: ...
     def set_style_json(self, json: bytes) -> None: ...
+    def set_feature_state(
+        self,
+        source_id: str,
+        source_layer_id: str | None,
+        feature_id: str | None,
+        state_key: str | None,
+        state_value: bytes,
+    ) -> None: ...
+    def get_feature_state(
+        self,
+        source_id: str,
+        source_layer_id: str | None,
+        feature_id: str | None,
+        state_key: str | None,
+    ) -> bytes: ...
+    def remove_feature_state(
+        self,
+        source_id: str,
+        source_layer_id: str | None,
+        feature_id: str | None,
+        state_key: str | None,
+    ) -> None: ...
     def copy_loaded_style_json(self) -> bytes: ...
     def copy_style_url(self) -> str: ...
     def get_camera(self) -> _WireDict: ...
@@ -617,28 +639,6 @@ class _RenderSessionHandle:
         extension_field: str,
         arguments: bytes | None,
     ) -> bytes: ...
-    def set_feature_state(
-        self,
-        source_id: str,
-        source_layer_id: str | None,
-        feature_id: str | None,
-        state_key: str | None,
-        state_value: bytes,
-    ) -> None: ...
-    def get_feature_state(
-        self,
-        source_id: str,
-        source_layer_id: str | None,
-        feature_id: str | None,
-        state_key: str | None,
-    ) -> bytes: ...
-    def remove_feature_state(
-        self,
-        source_id: str,
-        source_layer_id: str | None,
-        feature_id: str | None,
-        state_key: str | None,
-    ) -> None: ...
     def texture_image_info(self) -> _WireDict: ...
     def read_premultiplied_rgba8(self) -> _WireDict: ...
     def read_premultiplied_rgba8_into(self, buffer: object) -> _WireDict: ...

@@ -11,7 +11,6 @@ from . import _native
 from ._enum import UnknownIntEnum
 from ._lifecycle import NativeHandleMixin
 from .query import (
-    FeatureStateSelector,
     QueriedFeature,
     RenderedFeatureQueryOptions,
     RenderedQueryGeometry,
@@ -513,10 +512,11 @@ class RenderSessionHandle(NativeHandleMixin):
         :class:`UnsupportedFeatureError`; hand over a new texture with the
         backend's ``set_*_borrowed_texture_target`` method instead.
 
-        The session keeps its renderer, and renderer-held state such as feature
-        state carries over. A new scale factor is the exception: it starts a
-        fresh renderer with that state empty. The same exception applies to
-        every ``set_*_target`` method.
+        The session keeps its renderer, along with the tile pyramid, glyph and
+        image atlases, and symbol placement. A new scale factor retires the
+        renderer instead, because shaders are compiled for one pixel ratio.
+        Map-owned feature state survives either way. The same scale-factor
+        rule applies to every ``set_*_target`` method.
         """
         self._native.resize(width, height, scale_factor)
 
@@ -532,9 +532,10 @@ class RenderSessionHandle(NativeHandleMixin):
     def set_metal_surface_target(self, descriptor: MetalSurfaceDescriptor) -> None:
         """Present this attached surface session through a new surface.
 
-        The session keeps its renderer, and with it the tile pyramid, atlases,
-        symbol placement, and feature state. The descriptor's extent applies as
-        a resize does. A ``context.device`` that is neither null nor this
+        The session keeps its renderer, along with the tile pyramid, atlases,
+        and symbol placement. Map-owned feature state is unchanged. The
+        descriptor's extent applies as a resize does. A ``context.device`` that
+        is neither null nor this
         session's device raises :class:`InvalidArgumentError` and leaves this
         session rendering into the surface it has. The session assigns the layer
         its own device and pixel format.
@@ -799,38 +800,6 @@ class RenderSessionHandle(NativeHandleMixin):
             extension,
             extension_field,
             arguments,
-        )
-
-    def set_feature_state(
-        self,
-        selector: FeatureStateSelector,
-        state: bytes,
-    ) -> None:
-        """Set per-feature state on a render source for this render session."""
-        self._native.set_feature_state(
-            selector.source_id,
-            selector.source_layer_id,
-            selector.feature_id,
-            selector.state_key,
-            state,
-        )
-
-    def get_feature_state(self, selector: FeatureStateSelector) -> bytes:
-        """Return copied per-feature state JSON from a render source."""
-        return self._native.get_feature_state(
-            selector.source_id,
-            selector.source_layer_id,
-            selector.feature_id,
-            selector.state_key,
-        )
-
-    def remove_feature_state(self, selector: FeatureStateSelector) -> None:
-        """Remove per-feature state from a render source."""
-        self._native.remove_feature_state(
-            selector.source_id,
-            selector.source_layer_id,
-            selector.feature_id,
-            selector.state_key,
         )
 
 

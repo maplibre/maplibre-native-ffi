@@ -106,6 +106,7 @@ function(mln_ffi_configure_c_api_implementation target)
       ${PROJECT_SOURCE_DIR}/src/geojson/geojson_source_data.cpp
       ${PROJECT_SOURCE_DIR}/src/handles/handle_table.cpp
       ${PROJECT_SOURCE_DIR}/src/logging/logging.cpp
+      ${PROJECT_SOURCE_DIR}/src/map/feature_state.cpp
       ${PROJECT_SOURCE_DIR}/src/map/map.cpp
       ${PROJECT_SOURCE_DIR}/src/render/render_session_common.cpp
       ${PROJECT_SOURCE_DIR}/src/render/surface_session.cpp

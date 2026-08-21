@@ -738,6 +738,19 @@ external int mln_map_get_debug_options(
 @ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<ffi.Uint64>)>()
 external int mln_map_get_event_mask(int map, ffi.Pointer<ffi.Uint64> out_mask);
 
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Pointer<mln_feature_state_selector>,
+    ffi.Pointer<mln_buffer>,
+  )
+>()
+external int mln_map_get_feature_state(
+  int map,
+  ffi.Pointer<mln_feature_state_selector> selector,
+  ffi.Pointer<mln_buffer> out_state,
+);
+
 @ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_free_camera_options>)>()
 external int mln_map_get_free_camera_options(
   int map,
@@ -1201,6 +1214,14 @@ external int mln_map_projection_set_visible_geometry(
 );
 
 @ffi.Native<
+  ffi.Int32 Function(mln_map, ffi.Pointer<mln_feature_state_selector>)
+>()
+external int mln_map_remove_feature_state(
+  int map,
+  ffi.Pointer<mln_feature_state_selector> selector,
+);
+
+@ffi.Native<
   ffi.Int32 Function(mln_map, mln_buffer_view, ffi.Pointer<ffi.Bool>)
 >()
 external int mln_map_remove_style_image(
@@ -1335,6 +1356,19 @@ external int mln_map_set_debug_options(int map, int options);
 
 @ffi.Native<ffi.Int32 Function(mln_map, ffi.Uint64)>()
 external int mln_map_set_event_mask(int map, int mask);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    mln_map,
+    ffi.Pointer<mln_feature_state_selector>,
+    mln_buffer_view,
+  )
+>()
+external int mln_map_set_feature_state(
+  int map,
+  ffi.Pointer<mln_feature_state_selector> selector,
+  mln_buffer_view state,
+);
 
 @ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_free_camera_options>)>()
 external int mln_map_set_free_camera_options(
@@ -1877,19 +1911,6 @@ external int mln_render_session_dump_debug_logs(int session);
 @ffi.Native<
   ffi.Int32 Function(
     mln_render_session,
-    ffi.Pointer<mln_feature_state_selector>,
-    ffi.Pointer<mln_buffer>,
-  )
->()
-external int mln_render_session_get_feature_state(
-  int session,
-  ffi.Pointer<mln_feature_state_selector> selector,
-  ffi.Pointer<mln_buffer> out_state,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_render_session,
     mln_buffer_view,
     mln_buffer_view,
     mln_buffer_view,
@@ -1944,17 +1965,6 @@ external int mln_render_session_reduce_memory_use(int session);
 @ffi.Native<
   ffi.Int32 Function(
     mln_render_session,
-    ffi.Pointer<mln_feature_state_selector>,
-  )
->()
-external int mln_render_session_remove_feature_state(
-  int session,
-  ffi.Pointer<mln_feature_state_selector> selector,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_render_session,
     ffi.Pointer<ffi.Uint32>,
     ffi.Pointer<ffi.Bool>,
   )
@@ -1973,19 +1983,6 @@ external int mln_render_session_resize(
   int width,
   int height,
   double scale_factor,
-);
-
-@ffi.Native<
-  ffi.Int32 Function(
-    mln_render_session,
-    ffi.Pointer<mln_feature_state_selector>,
-    mln_buffer_view,
-  )
->()
-external int mln_render_session_set_feature_state(
-  int session,
-  ffi.Pointer<mln_feature_state_selector> selector,
-  mln_buffer_view state,
 );
 
 @ffi.Native<

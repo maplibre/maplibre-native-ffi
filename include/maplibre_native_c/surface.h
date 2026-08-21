@@ -229,9 +229,8 @@ MLN_API mln_status mln_webgpu_surface_attach(
  *
  * Use this when a host destroys and recreates its surface while the map lives
  * on. The presentation surface is replaced in place, so the session keeps its
- * renderer along with the tile pyramid, glyph and image atlases, symbol
- * placement, and feature state set through
- * mln_render_session_set_feature_state().
+ * renderer along with the tile pyramid, glyph and image atlases, and symbol
+ * placement. Map-owned feature state is unchanged.
  *
  * descriptor->context must name the graphics context or device the session
  * attached with; a null Metal device names none and is accepted. A target on a

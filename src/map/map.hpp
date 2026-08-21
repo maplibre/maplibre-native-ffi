@@ -16,6 +16,7 @@ class UpdateParameters;
 namespace mln::core {
 
 struct MapObject;
+struct FeatureStateSnapshot;
 
 auto map_options_default() noexcept -> mln_map_options;
 auto camera_options_default() noexcept -> mln_camera_options;
@@ -44,6 +45,15 @@ auto create_map(
 ) -> mln_status;
 auto destroy_map(mln_map map) -> mln_status;
 auto map_request_repaint(mln_map map) -> mln_status;
+auto map_set_feature_state(
+  mln_map map, const mln_feature_state_selector* selector, mln_buffer_view state
+) -> mln_status;
+auto map_get_feature_state(
+  mln_map map, const mln_feature_state_selector* selector, mln_buffer* out_state
+) -> mln_status;
+auto map_remove_feature_state(
+  mln_map map, const mln_feature_state_selector* selector
+) -> mln_status;
 auto map_request_still_image(mln_map map) -> mln_status;
 auto map_set_style_url(mln_map map, const char* url) -> mln_status;
 auto map_set_style_json(mln_map map, mln_buffer_view json) -> mln_status;
@@ -470,6 +480,10 @@ auto map_post_set_size(mln_map map, uint32_t width, uint32_t height)
   -> mln_status;
 auto map_post_trigger_repaint(mln_map map) -> mln_status;
 auto map_latest_update(mln_map map) -> std::shared_ptr<mln::UpdateParameters>;
+// Copies the map's coalesced feature-state snapshot. Callable from a render
+// session's owner thread while the map is attached to that session.
+auto map_feature_state_snapshot(mln_map map)
+  -> std::shared_ptr<const FeatureStateSnapshot>;
 auto map_renderer_observer(mln_map map) -> mln::RendererObserver*;
 auto map_run_render_jobs(mln_map map) -> void;
 auto map_attach_render_target_session(mln_map map, void* session) -> mln_status;

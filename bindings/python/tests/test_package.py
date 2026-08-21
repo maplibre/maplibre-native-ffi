@@ -341,7 +341,7 @@ def test_public_type_hints_are_resolvable() -> None:
         render.RenderSessionHandle.query_feature_extensions,
         render.RenderSessionHandle.query_rendered_features,
         render.RenderSessionHandle.query_source_features,
-        render.RenderSessionHandle.set_feature_state,
+        map_module.MapHandle.set_feature_state,
         mln.RuntimeHandle.create_map,
         mln.RuntimeHandle.create_offline_region,
         mln.RuntimeHandle.set_resource_transform,
@@ -672,9 +672,6 @@ def test_render_session_methods_propagate_wrong_thread_errors() -> None:
         "query_rendered_features": "wrong thread while querying rendered features",
         "query_source_features": "wrong thread while querying source features",
         "query_feature_extensions": "wrong thread while querying feature extensions",
-        "set_feature_state": "wrong thread while setting feature state",
-        "get_feature_state": "wrong thread while getting feature state",
-        "remove_feature_state": "wrong thread while removing feature state",
     }
 
     class FakeNativeRenderSession:
@@ -749,34 +746,6 @@ def test_render_session_methods_propagate_wrong_thread_errors() -> None:
         ) -> None:
             self._wrong_thread("query_feature_extensions")
 
-        def set_feature_state(
-            self,
-            source_id: str,
-            source_layer_id: str | None,
-            feature_id: str | None,
-            state_key: str | None,
-            state: object,
-        ) -> None:
-            self._wrong_thread("set_feature_state")
-
-        def get_feature_state(
-            self,
-            source_id: str,
-            source_layer_id: str | None,
-            feature_id: str | None,
-            state_key: str | None,
-        ) -> None:
-            self._wrong_thread("get_feature_state")
-
-        def remove_feature_state(
-            self,
-            source_id: str,
-            source_layer_id: str | None,
-            feature_id: str | None,
-            state_key: str | None,
-        ) -> None:
-            self._wrong_thread("remove_feature_state")
-
     session = render.RenderSessionHandle._from_native(
         FakeNativeRenderSession(), object()
     )
@@ -790,7 +759,6 @@ def test_render_session_methods_propagate_wrong_thread_errors() -> None:
             "properties": {},
         }
     )
-    selector = query.FeatureStateSelector(source_id="points", feature_id="feature-1")
     calls = {
         "close": session.close,
         "resize": lambda: session.resize(128, 64, 1.0),
@@ -821,14 +789,6 @@ def test_render_session_methods_propagate_wrong_thread_errors() -> None:
                 _json_object({"limit": 10}),
             )
         ),
-        "set_feature_state": (
-            lambda: session.set_feature_state(
-                selector,
-                _json_object({"hover": True}),
-            )
-        ),
-        "get_feature_state": lambda: session.get_feature_state(selector),
-        "remove_feature_state": lambda: session.remove_feature_state(selector),
     }
     raised_errors: dict[str, BaseException] = {}
 
@@ -2589,57 +2549,7 @@ def test_opengl_owned_texture_frame_public_api_uses_native_values() -> None:
     assert frame.closed
 
 
-def test_render_session_feature_state_public_api_uses_json_buffers() -> None:
-    class FakeNativeRenderSession:
-        closed = False
-        detached = False
-
-        def __init__(self) -> None:
-            self.set_call = None
-            self.remove_call = None
-
-        def set_feature_state(
-            self,
-            source_id: str,
-            source_layer_id: str | None,
-            feature_id: str | None,
-            state_key: str | None,
-            state: object,
-        ) -> None:
-            self.set_call = (
-                source_id,
-                source_layer_id,
-                feature_id,
-                state_key,
-                state,
-            )
-
-        def get_feature_state(
-            self,
-            source_id: str,
-            source_layer_id: str | None,
-            feature_id: str | None,
-            state_key: str | None,
-        ) -> bytes:
-            assert (source_id, source_layer_id, feature_id, state_key) == (
-                "points",
-                "symbols",
-                "feature-1",
-                "hover",
-            )
-            return _json_object({"hover": True})
-
-        def remove_feature_state(
-            self,
-            source_id: str,
-            source_layer_id: str | None,
-            feature_id: str | None,
-            state_key: str | None,
-        ) -> None:
-            self.remove_call = (source_id, source_layer_id, feature_id, state_key)
-
-    fake_native = FakeNativeRenderSession()
-    session = render.RenderSessionHandle._from_native(fake_native, object())
+def test_map_feature_state_set_get_and_remove() -> None:
     selector = query.FeatureStateSelector(
         source_id="points",
         source_layer_id="symbols",
@@ -2647,48 +2557,20 @@ def test_render_session_feature_state_public_api_uses_json_buffers() -> None:
         state_key="hover",
     )
     state = _json_object({"hover": True})
-
-    session.set_feature_state(selector, state)
-    returned = session.get_feature_state(selector)
-    session.remove_feature_state(selector)
-
-    assert fake_native.set_call == (
-        "points",
-        "symbols",
-        "feature-1",
-        "hover",
-        state,
-    )
-    assert json.loads(returned) == {"hover": True}
-    assert fake_native.remove_call == ("points", "symbols", "feature-1", "hover")
-
-
-def test_render_session_feature_state_empty_result_is_empty_object() -> None:
-    class FakeNativeRenderSession:
-        closed = False
-        detached = False
-
-        def get_feature_state(
-            self,
-            source_id: str,
-            source_layer_id: str | None,
-            feature_id: str | None,
-            state_key: str | None,
-        ) -> bytes:
-            assert (source_id, source_layer_id, feature_id, state_key) == (
-                "points",
-                None,
-                "feature-1",
-                None,
+    with mln.RuntimeHandle() as runtime, runtime.create_map() as map_handle:
+        map_handle.set_feature_state(selector, state)
+        returned = map_handle.get_feature_state(selector)
+        map_handle.remove_feature_state(selector)
+        empty = map_handle.get_feature_state(
+            query.FeatureStateSelector(
+                source_id="points",
+                source_layer_id="symbols",
+                feature_id="feature-1",
             )
-            return b"{}"
+        )
 
-    session = render.RenderSessionHandle._from_native(
-        FakeNativeRenderSession(), object()
-    )
-    selector = query.FeatureStateSelector(source_id="points", feature_id="feature-1")
-
-    assert json.loads(session.get_feature_state(selector)) == {}
+    assert json.loads(returned) == {"hover": True}
+    assert json.loads(empty) == {}
 
 
 def test_invalid_render_target_attach_reports_native_status() -> None:
