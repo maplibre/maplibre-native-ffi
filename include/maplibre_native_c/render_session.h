@@ -215,8 +215,7 @@ mln_render_session_dump_debug_logs(mln_render_session session) MLN_NOEXCEPT;
  * return. The accepted command requests a map repaint.
  *
  * A call before that source exists on a render update is stored and applied
- * after the renderer is constructed, before the first presented frame that
- * includes the source.
+ * before the first presented frame that includes the source.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -270,8 +269,7 @@ MLN_API mln_status mln_render_session_get_feature_state(
  * a map repaint.
  *
  * A call before that source exists on a render update is stored and applied
- * after the renderer is constructed, before the first presented frame that
- * includes the source.
+ * before the first presented frame that includes the source.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

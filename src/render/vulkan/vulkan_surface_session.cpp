@@ -208,10 +208,7 @@ class VulkanSurfaceBackend final : public mln::vulkan::RendererBackend,
         return;
       }
 
-      // Native swap() submits the recorded commands and presents. Presenting
-      // would show the feature-state-free warmup. End and submit that work so
-      // the acquire semaphore is waited, then rebuild the swapchain so the
-      // next frame can acquire from a full image pool.
+      // Submit without presenting, then rebuild so the next frame can acquire.
       auto& context = backend.getContext<mln::vulkan::Context>();
       const auto& dispatcher = backend.getDispatcher();
       auto& command_buffer = context.getCommandBuffer();

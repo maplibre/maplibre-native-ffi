@@ -591,10 +591,7 @@ class WebGPUSurfaceBackend final : public mln::webgpu::RendererBackend,
 
     void swap() override {
       if (mln::core::discard_renderable_present) {
-        // Keep the current canvas texture so the presented render can draw
-        // over the warmup in this animation frame. present() only releases
-        // that texture; the browser composites it, and a second acquire in
-        // this frame can report not-ready.
+        // present() would release the canvas texture.
         return;
       }
       backend.present();

@@ -630,89 +630,41 @@ auto feature_state_source_layer(const mln_feature_state_selector& selector)
 auto update_has_source(
   const mln::UpdateParameters& update, const std::string& source_id
 ) -> bool {
-  for (const auto& source : *update.sources) {
-    if (source->id == source_id) {
-      return true;
-    }
-  }
-  return false;
+  return std::ranges::any_of(*update.sources, [&](const auto& source) {
+    return source->id == source_id;
+  });
 }
 
-auto pending_feature_state_has_ready_source(
-  const std::vector<mln::core::PendingFeatureStateMutation>& pending,
-  const mln::UpdateParameters& update
-) -> bool {
-  for (const auto& mutation : pending) {
-    if (update_has_source(update, mutation.source_id)) {
-      return true;
-    }
+class UnpresentedRender {
+ public:
+  explicit UnpresentedRender(mln::core::SessionFrameObserver& observer)
+      : observer_(observer) {
+    observer_.suppress_frame_callbacks(true);
+    mln::core::discard_renderable_present = true;
   }
-  return false;
-}
+  UnpresentedRender(const UnpresentedRender&) = delete;
+  auto operator=(const UnpresentedRender&) -> UnpresentedRender& = delete;
+  ~UnpresentedRender() {
+    mln::core::discard_renderable_present = false;
+    observer_.suppress_frame_callbacks(false);
+  }
 
-auto replay_pending_feature_state(
-  const std::vector<mln::core::PendingFeatureStateMutation>& pending,
-  const std::string& source_id,
-  const std::optional<std::string>& source_layer_id,
-  const std::string& feature_id, mln::FeatureState result = {}
-) -> mln::FeatureState {
-  for (const auto& mutation : pending) {
-    if (
-      mutation.source_id != source_id ||
-      mutation.source_layer_id != source_layer_id
-    ) {
-      continue;
-    }
-    if (mutation.kind == mln::core::PendingFeatureStateMutation::Kind::Set) {
-      if (mutation.feature_id && *mutation.feature_id == feature_id) {
-        for (const auto& entry : mutation.state) {
-          result[entry.first] = entry.second;
-        }
-      }
-      continue;
-    }
-    if (!mutation.feature_id) {
-      result.clear();
-      continue;
-    }
-    if (*mutation.feature_id != feature_id) {
-      continue;
-    }
-    if (!mutation.state_key) {
-      result.clear();
-      continue;
-    }
-    result.erase(*mutation.state_key);
-  }
-  return result;
-}
+ private:
+  mln::core::SessionFrameObserver& observer_;
+};
 
-auto apply_pending_feature_state(
-  mln_render_session_object& session, const mln::UpdateParameters& update
-) -> void {
-  if (session.renderer == nullptr) {
-    return;
+auto prepare_surface_frame(mln_render_session_object& session, bool& out_ready)
+  -> mln_status {
+  out_ready = true;
+  if (session.kind != mln::core::RenderSessionKind::Surface) {
+    return MLN_STATUS_OK;
   }
-  auto remaining = std::vector<mln::core::PendingFeatureStateMutation>{};
-  remaining.reserve(session.pending_feature_state.size());
-  for (auto& mutation : session.pending_feature_state) {
-    if (!update_has_source(update, mutation.source_id)) {
-      remaining.push_back(std::move(mutation));
-      continue;
-    }
-    if (mutation.kind == mln::core::PendingFeatureStateMutation::Kind::Set) {
-      session.renderer->setFeatureState(
-        mutation.source_id, mutation.source_layer_id,
-        mutation.feature_id.value_or(std::string{}), mutation.state
-      );
-      continue;
-    }
-    session.renderer->removeFeatureState(
-      mutation.source_id, mutation.source_layer_id, mutation.feature_id,
-      mutation.state_key
-    );
+  try {
+    return session.surface.backend->prepare_frame(out_ready);
+  } catch (const std::exception& exception) {
+    set_native_stage_error("preparing surface frame", exception);
+    return MLN_STATUS_NATIVE_ERROR;
   }
-  session.pending_feature_state = std::move(remaining);
 }
 
 auto to_rendered_query_options(
@@ -975,6 +927,104 @@ auto warn_on_scale_factor_mismatch(mln_map map, double scale_factor) -> void {
 }  // namespace
 
 namespace mln::core {
+
+void PendingFeatureState::set(
+  std::string source_id, std::optional<std::string> source_layer_id,
+  std::string feature_id, mln::FeatureState state
+) {
+  mutations_.push_back(
+    Mutation{
+      .kind = Mutation::Kind::Set,
+      .source_id = std::move(source_id),
+      .source_layer_id = std::move(source_layer_id),
+      .feature_id = std::move(feature_id),
+      .state_key = std::nullopt,
+      .state = std::move(state),
+    }
+  );
+}
+
+void PendingFeatureState::remove(
+  std::string source_id, std::optional<std::string> source_layer_id,
+  std::optional<std::string> feature_id, std::optional<std::string> state_key
+) {
+  mutations_.push_back(
+    Mutation{
+      .kind = Mutation::Kind::Remove,
+      .source_id = std::move(source_id),
+      .source_layer_id = std::move(source_layer_id),
+      .feature_id = std::move(feature_id),
+      .state_key = std::move(state_key),
+      .state = {},
+    }
+  );
+}
+
+auto PendingFeatureState::get(
+  const std::string& source_id,
+  const std::optional<std::string>& source_layer_id,
+  const std::string& feature_id, mln::FeatureState result
+) const -> mln::FeatureState {
+  for (const auto& mutation : mutations_) {
+    if (
+      mutation.source_id != source_id ||
+      mutation.source_layer_id != source_layer_id
+    ) {
+      continue;
+    }
+    if (mutation.kind == Mutation::Kind::Set) {
+      if (mutation.feature_id == feature_id) {
+        for (const auto& [key, value] : mutation.state) {
+          result[key] = value;
+        }
+      }
+      continue;
+    }
+    if (!mutation.feature_id.has_value()) {
+      result.clear();
+    } else if (mutation.feature_id == feature_id) {
+      if (!mutation.state_key.has_value()) {
+        result.clear();
+      } else {
+        result.erase(*mutation.state_key);
+      }
+    }
+  }
+  return result;
+}
+
+auto PendingFeatureState::has_source_in(
+  const mln::UpdateParameters& update
+) const -> bool {
+  return std::ranges::any_of(mutations_, [&](const Mutation& mutation) {
+    return update_has_source(update, mutation.source_id);
+  });
+}
+
+void PendingFeatureState::apply(
+  mln::Renderer& renderer, const mln::UpdateParameters& update
+) {
+  auto remaining = std::vector<Mutation>{};
+  remaining.reserve(mutations_.size());
+  for (auto& mutation : mutations_) {
+    if (!update_has_source(update, mutation.source_id)) {
+      remaining.push_back(std::move(mutation));
+      continue;
+    }
+    if (mutation.kind == Mutation::Kind::Set) {
+      renderer.setFeatureState(
+        mutation.source_id, mutation.source_layer_id,
+        mutation.feature_id.value_or(std::string{}), mutation.state
+      );
+    } else {
+      renderer.removeFeatureState(
+        mutation.source_id, mutation.source_layer_id, mutation.feature_id,
+        mutation.state_key
+      );
+    }
+  }
+  mutations_ = std::move(remaining);
+}
 
 auto register_render_session(std::shared_ptr<mln_render_session_object> session)
   -> mln_render_session {
@@ -1410,22 +1460,23 @@ auto render_session_render_update(
 
   if (live->kind == RenderSessionKind::Texture) {
     live->texture.backend->prepare_render_resources();
-  } else {
-    bool surface_ready = true;
-    try {
-      const auto prepare_status =
-        live->surface.backend->prepare_frame(surface_ready);
-      if (prepare_status != MLN_STATUS_OK) {
-        return prepare_status;
-      }
-    } catch (const std::exception& exception) {
-      set_native_stage_error("preparing surface frame", exception);
-      return MLN_STATUS_NATIVE_ERROR;
+  }
+  const auto wait_surface = [&]() -> std::optional<mln_status> {
+    bool ready = true;
+    if (
+      const auto status = prepare_surface_frame(*live, ready);
+      status != MLN_STATUS_OK
+    ) {
+      return status;
     }
-    if (!surface_ready) {
+    if (!ready) {
       *out_result = MLN_RENDER_RESULT_TARGET_NOT_READY;
       return MLN_STATUS_OK;
     }
+    return std::nullopt;
+  };
+  if (const auto early = wait_surface()) {
+    return *early;
   }
   if (live->renderer == nullptr) {
     try {
@@ -1450,41 +1501,18 @@ auto render_session_render_update(
     return MLN_STATUS_OK;
   };
 
-  // Native feature-state calls no-op until createRenderTree has built the
-  // source. Draw once without presenting when a queued source is in this
-  // update, apply those mutations, then draw the frame the host sees. Mutations
-  // whose source is still missing stay queued.
-  if (
-    pending_feature_state_has_ready_source(live->pending_feature_state, *update)
-  ) {
-    live->frame_observer.suppress_frame_callbacks(true);
-    mln_status warmup_status = MLN_STATUS_OK;
+  if (live->pending_feature_state.has_source_in(*update)) {
     {
-      const DiscardRenderablePresent discard_present{};
-      static_cast<void>(discard_present);
-      warmup_status = render_once();
-    }
-    live->frame_observer.suppress_frame_callbacks(false);
-    if (warmup_status != MLN_STATUS_OK) {
-      return warmup_status;
-    }
-    apply_pending_feature_state(*live, *update);
-    if (live->kind == RenderSessionKind::Surface) {
-      bool surface_ready = true;
-      try {
-        const auto prepare_status =
-          live->surface.backend->prepare_frame(surface_ready);
-        if (prepare_status != MLN_STATUS_OK) {
-          return prepare_status;
-        }
-      } catch (const std::exception& exception) {
-        set_native_stage_error("preparing surface frame", exception);
-        return MLN_STATUS_NATIVE_ERROR;
+      const UnpresentedRender unpresented{live->frame_observer};
+      if (
+        const auto warmup_status = render_once(); warmup_status != MLN_STATUS_OK
+      ) {
+        return warmup_status;
       }
-      if (!surface_ready) {
-        *out_result = MLN_RENDER_RESULT_TARGET_NOT_READY;
-        return MLN_STATUS_OK;
-      }
+    }
+    live->pending_feature_state.apply(*live->renderer, *update);
+    if (const auto early = wait_surface()) {
+      return *early;
     }
   }
 
@@ -1659,16 +1687,11 @@ auto render_session_set_feature_state(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  if (live->renderer == nullptr || !live->pending_feature_state.empty()) {
-    live->pending_feature_state.push_back(
-      PendingFeatureStateMutation{
-        .kind = PendingFeatureStateMutation::Kind::Set,
-        .source_id = string_from_view(selector->source_id),
-        .source_layer_id = feature_state_source_layer(*selector),
-        .feature_id = string_from_view(selector->feature_id),
-        .state_key = std::nullopt,
-        .state = *state_object,
-      }
+  if (live->pending_feature_state.needs_queue(live->renderer.get())) {
+    live->pending_feature_state.set(
+      string_from_view(selector->source_id),
+      feature_state_source_layer(*selector),
+      string_from_view(selector->feature_id), *state_object
     );
     static_cast<void>(map_post_trigger_repaint(live->map));
     return MLN_STATUS_OK;
@@ -1723,13 +1746,11 @@ auto render_session_get_feature_state(
       string_from_view(selector->feature_id)
     );
   }
-  if (!live->pending_feature_state.empty()) {
-    state = replay_pending_feature_state(
-      live->pending_feature_state, string_from_view(selector->source_id),
-      feature_state_source_layer(*selector),
-      string_from_view(selector->feature_id), std::move(state)
-    );
-  }
+  state = live->pending_feature_state.get(
+    string_from_view(selector->source_id),
+    feature_state_source_layer(*selector),
+    string_from_view(selector->feature_id), std::move(state)
+  );
   return create_buffer(
     serialize_json_value(mln::Value{std::move(state)}), out_state
   );
@@ -1748,20 +1769,16 @@ auto render_session_remove_feature_state(
     return selector_status;
   }
 
-  if (live->renderer == nullptr || !live->pending_feature_state.empty()) {
-    live->pending_feature_state.push_back(
-      PendingFeatureStateMutation{
-        .kind = PendingFeatureStateMutation::Kind::Remove,
-        .source_id = string_from_view(selector->source_id),
-        .source_layer_id = feature_state_source_layer(*selector),
-        .feature_id = optional_selector_string(
-          *selector, MLN_FEATURE_STATE_SELECTOR_FEATURE_ID, selector->feature_id
-        ),
-        .state_key = optional_selector_string(
-          *selector, MLN_FEATURE_STATE_SELECTOR_STATE_KEY, selector->state_key
-        ),
-        .state = {},
-      }
+  if (live->pending_feature_state.needs_queue(live->renderer.get())) {
+    live->pending_feature_state.remove(
+      string_from_view(selector->source_id),
+      feature_state_source_layer(*selector),
+      optional_selector_string(
+        *selector, MLN_FEATURE_STATE_SELECTOR_FEATURE_ID, selector->feature_id
+      ),
+      optional_selector_string(
+        *selector, MLN_FEATURE_STATE_SELECTOR_STATE_KEY, selector->state_key
+      )
     );
     static_cast<void>(map_post_trigger_repaint(live->map));
     return MLN_STATUS_OK;
