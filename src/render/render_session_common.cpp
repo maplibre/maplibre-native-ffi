@@ -626,6 +626,64 @@ auto feature_state_source_layer(const mln_feature_state_selector& selector)
   );
 }
 
+auto replay_pending_feature_state(
+  const std::vector<mln::core::PendingFeatureStateMutation>& pending,
+  const std::string& source_id,
+  const std::optional<std::string>& source_layer_id,
+  const std::string& feature_id
+) -> mln::FeatureState {
+  auto result = mln::FeatureState{};
+  for (const auto& mutation : pending) {
+    if (
+      mutation.source_id != source_id ||
+      mutation.source_layer_id != source_layer_id
+    ) {
+      continue;
+    }
+    if (mutation.kind == mln::core::PendingFeatureStateMutation::Kind::Set) {
+      if (mutation.feature_id && *mutation.feature_id == feature_id) {
+        for (const auto& entry : mutation.state) {
+          result[entry.first] = entry.second;
+        }
+      }
+      continue;
+    }
+    if (!mutation.feature_id) {
+      result.clear();
+      continue;
+    }
+    if (*mutation.feature_id != feature_id) {
+      continue;
+    }
+    if (!mutation.state_key) {
+      result.clear();
+      continue;
+    }
+    result.erase(*mutation.state_key);
+  }
+  return result;
+}
+
+auto apply_pending_feature_state(mln_render_session_object& session) -> void {
+  if (session.renderer == nullptr) {
+    return;
+  }
+  for (const auto& mutation : session.pending_feature_state) {
+    if (mutation.kind == mln::core::PendingFeatureStateMutation::Kind::Set) {
+      session.renderer->setFeatureState(
+        mutation.source_id, mutation.source_layer_id,
+        mutation.feature_id.value_or(std::string{}), mutation.state
+      );
+      continue;
+    }
+    session.renderer->removeFeatureState(
+      mutation.source_id, mutation.source_layer_id, mutation.feature_id,
+      mutation.state_key
+    );
+  }
+  session.pending_feature_state.clear();
+}
+
 auto to_rendered_query_options(
   const mln_rendered_feature_query_options* options
 ) -> std::optional<mln::RenderedQueryOptions> {
@@ -1351,11 +1409,55 @@ auto render_session_render_update(
     }
   }
 
-  try {
-    live->renderer->render(update);
-  } catch (const std::exception& exception) {
-    set_native_stage_error("rendering update", exception);
-    return MLN_STATUS_NATIVE_ERROR;
+  const auto render_once = [&]() -> mln_status {
+    try {
+      live->renderer->render(update);
+    } catch (const std::exception& exception) {
+      set_native_stage_error("rendering update", exception);
+      return MLN_STATUS_NATIVE_ERROR;
+    }
+    return MLN_STATUS_OK;
+  };
+
+  // Native feature-state calls no-op until the first render builds sources.
+  // Draw once without presenting, apply queued mutations, then draw the frame
+  // the host sees.
+  if (!live->pending_feature_state.empty()) {
+    live->frame_observer.suppress_frame_callbacks(true);
+    mln_status warmup_status = MLN_STATUS_OK;
+    {
+      const DiscardRenderablePresent discard_present{};
+      static_cast<void>(discard_present);
+      warmup_status = render_once();
+    }
+    live->frame_observer.suppress_frame_callbacks(false);
+    if (warmup_status != MLN_STATUS_OK) {
+      return warmup_status;
+    }
+    apply_pending_feature_state(*live);
+    if (live->kind == RenderSessionKind::Surface) {
+      bool surface_ready = true;
+      try {
+        const auto prepare_status =
+          live->surface.backend->prepare_frame(surface_ready);
+        if (prepare_status != MLN_STATUS_OK) {
+          return prepare_status;
+        }
+      } catch (const std::exception& exception) {
+        set_native_stage_error("preparing surface frame", exception);
+        return MLN_STATUS_NATIVE_ERROR;
+      }
+      if (!surface_ready) {
+        *out_result = MLN_RENDER_RESULT_TARGET_NOT_READY;
+        return MLN_STATUS_OK;
+      }
+    }
+  }
+
+  if (
+    const auto render_status = render_once(); render_status != MLN_STATUS_OK
+  ) {
+    return render_status;
   }
   // Absorb results that landed from worker threads during the render.
   live->scheduler.drain();
@@ -1512,13 +1614,6 @@ auto render_session_set_feature_state(
   if (selector_status != MLN_STATUS_OK) {
     return selector_status;
   }
-  mln::gfx::RendererBackend* backend = nullptr;
-  if (
-    const auto backend_status = validate_renderer_backend(live, backend);
-    backend_status != MLN_STATUS_OK
-  ) {
-    return backend_status;
-  }
 
   auto native_state = to_native_json_value(state);
   if (!native_state) {
@@ -1530,6 +1625,27 @@ auto render_session_set_feature_state(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
+  if (live->renderer == nullptr) {
+    live->pending_feature_state.push_back(
+      PendingFeatureStateMutation{
+        .kind = PendingFeatureStateMutation::Kind::Set,
+        .source_id = string_from_view(selector->source_id),
+        .source_layer_id = feature_state_source_layer(*selector),
+        .feature_id = string_from_view(selector->feature_id),
+        .state = *state_object,
+      }
+    );
+    static_cast<void>(map_post_trigger_repaint(live->map));
+    return MLN_STATUS_OK;
+  }
+
+  mln::gfx::RendererBackend* backend = nullptr;
+  if (
+    const auto backend_status = validate_renderer_backend(live, backend);
+    backend_status != MLN_STATUS_OK
+  ) {
+    return backend_status;
+  }
   auto current = ScopedCurrentScheduler{live->scheduler};
   auto guard = mln::gfx::BackendScope{*backend};
   live->renderer->setFeatureState(
@@ -1554,6 +1670,18 @@ auto render_session_get_feature_state(
   if (selector_status != MLN_STATUS_OK) {
     return selector_status;
   }
+
+  if (live->renderer == nullptr) {
+    auto state = replay_pending_feature_state(
+      live->pending_feature_state, string_from_view(selector->source_id),
+      feature_state_source_layer(*selector),
+      string_from_view(selector->feature_id)
+    );
+    return create_buffer(
+      serialize_json_value(mln::Value{std::move(state)}), out_state
+    );
+  }
+
   mln::gfx::RendererBackend* backend = nullptr;
   if (
     const auto backend_status = validate_renderer_backend(live, backend);
@@ -1561,7 +1689,6 @@ auto render_session_get_feature_state(
   ) {
     return backend_status;
   }
-
   auto state = mln::FeatureState{};
   auto current = ScopedCurrentScheduler{live->scheduler};
   auto guard = mln::gfx::BackendScope{*backend};
@@ -1587,6 +1714,25 @@ auto render_session_remove_feature_state(
   if (selector_status != MLN_STATUS_OK) {
     return selector_status;
   }
+
+  if (live->renderer == nullptr) {
+    live->pending_feature_state.push_back(
+      PendingFeatureStateMutation{
+        .kind = PendingFeatureStateMutation::Kind::Remove,
+        .source_id = string_from_view(selector->source_id),
+        .source_layer_id = feature_state_source_layer(*selector),
+        .feature_id = optional_selector_string(
+          *selector, MLN_FEATURE_STATE_SELECTOR_FEATURE_ID, selector->feature_id
+        ),
+        .state_key = optional_selector_string(
+          *selector, MLN_FEATURE_STATE_SELECTOR_STATE_KEY, selector->state_key
+        ),
+      }
+    );
+    static_cast<void>(map_post_trigger_repaint(live->map));
+    return MLN_STATUS_OK;
+  }
+
   mln::gfx::RendererBackend* backend = nullptr;
   if (
     const auto backend_status = validate_renderer_backend(live, backend);
@@ -1594,7 +1740,6 @@ auto render_session_remove_feature_state(
   ) {
     return backend_status;
   }
-
   auto current = ScopedCurrentScheduler{live->scheduler};
   auto guard = mln::gfx::BackendScope{*backend};
   live->renderer->removeFeatureState(

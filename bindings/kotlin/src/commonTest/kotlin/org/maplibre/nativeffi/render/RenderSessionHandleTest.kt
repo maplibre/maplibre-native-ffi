@@ -97,9 +97,10 @@ class RenderSessionHandleTest {
         map.jumpTo(CameraOptions().apply { center = featureCoordinate })
         assertSame(map, session.map())
         assertFailsWith<InvalidStateException> { session.textureImageInfo() }
-        assertFailsWith<InvalidStateException> {
-          session.setFeatureState(featureStateSelector(), featureState())
-        }
+        session.setFeatureState(featureStateSelector(), featureState())
+        val queuedState = session.getFeatureState(featureStateSelector())
+        assertEquals("true", rawMember(queuedState, "hover")?.decodeToString())
+        assertEquals(20.0, numberMember(queuedState, "radius"))
         assertFailsWith<InvalidStateException> { map.close() }
         assertFailsWith<InvalidStateException> { owned.attachAnotherOwnedTexture(16, 8).close() }
 

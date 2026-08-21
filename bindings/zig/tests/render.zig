@@ -1675,17 +1675,27 @@ test "render session feature state set get and remove" {
 
     const selector = maplibre.FeatureStateSelector{ .source_id = "point", .feature_id = "feature-1" };
     const feature_state = "{\"hover\":true,\"radius\":18446744073709551615}";
-    try testing.expectError(error.InvalidState, session.setFeatureState(testing.allocator, selector, feature_state));
+    try session.setFeatureState(testing.allocator, selector, feature_state);
+    try session.removeFeatureState(testing.allocator, .{ .source_id = "point", .feature_id = "feature-1", .state_key = "hover" });
+    var queued = try session.getFeatureState(testing.allocator, selector);
+    defer queued.deinit();
+    try testing.expect(rawMember(queued.value, "hover") == null);
+    try testing.expectEqualStrings("18446744073709551615", rawMember(queued.value, "radius").?);
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
     try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
 
-    try session.setFeatureState(testing.allocator, selector, feature_state);
     var snapshot = try session.getFeatureState(testing.allocator, selector);
     defer snapshot.deinit();
-    try testing.expectEqualStrings("true", rawMember(snapshot.value, "hover").?);
+    try testing.expect(rawMember(snapshot.value, "hover") == null);
     try testing.expectEqualStrings("18446744073709551615", rawMember(snapshot.value, "radius").?);
+
+    try session.setFeatureState(testing.allocator, selector, feature_state);
+    var restored = try session.getFeatureState(testing.allocator, selector);
+    defer restored.deinit();
+    try testing.expectEqualStrings("true", rawMember(restored.value, "hover").?);
+    try testing.expectEqualStrings("18446744073709551615", rawMember(restored.value, "radius").?);
 
     try session.removeFeatureState(testing.allocator, .{ .source_id = "point", .feature_id = "feature-1", .state_key = "hover" });
     try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));

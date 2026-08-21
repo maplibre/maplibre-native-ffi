@@ -589,7 +589,13 @@ class WebGPUSurfaceBackend final : public mln::webgpu::RendererBackend,
 
     void bind() override { backend.ensureDepthStencilTexture(); }
 
-    void swap() override { backend.present(); }
+    void swap() override {
+      if (mln::core::discard_renderable_present) {
+        backend.releaseFrame();
+        return;
+      }
+      backend.present();
+    }
 
     const mln::webgpu::RendererBackend& getBackend() const override {
       return backend;

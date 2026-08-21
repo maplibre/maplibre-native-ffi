@@ -201,6 +201,13 @@ class VulkanSurfaceBackend final : public mln::vulkan::RendererBackend,
 
     void bind() override {}
 
+    void swap() override {
+      if (mln::core::discard_renderable_present) {
+        return;
+      }
+      SurfaceRenderableResource::swap();
+    }
+
     // Rebuilds the swapchain and everything sized with it, keeping the render
     // pass. mbgl keys its pipeline cache on the render pass handle, so
     // destroying the pass strands every cached pipeline and lets a recycled

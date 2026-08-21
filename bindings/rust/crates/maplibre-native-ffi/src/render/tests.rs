@@ -2341,23 +2341,6 @@ fn static_map_options(width: u32, height: u32, scale_factor: f64) -> MapOptions 
     options
 }
 
-fn load_feature_state_style(
-    runtime: &mut RuntimeHandle,
-    map: &MapHandle,
-    session: &RenderSessionHandle,
-) {
-    map.set_style_json(FEATURE_STATE_STYLE_JSON.as_bytes())
-        .unwrap();
-    assert!(wait_for_runtime_event(
-        runtime,
-        RuntimeEventType::MapRenderUpdateAvailable
-    ));
-    assert_eq!(
-        session.render_update().unwrap().result,
-        RenderResult::Rendered
-    );
-}
-
 fn load_query_style(runtime: &mut RuntimeHandle, map: &MapHandle, session: &RenderSessionHandle) {
     let mut camera = CameraOptions::default();
     camera.center = Some(LatLng::new(37.7749, -122.4194));
@@ -3283,12 +3266,23 @@ fn feature_state_set_get_and_remove_copy_snapshots() {
     let selector = FeatureStateSelector::new("point").with_feature_id("feature-1");
     let state = br#"{"hover":true,"radius":20}"#;
 
-    let error = session.set_feature_state(&selector, state).unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidState);
-
-    load_feature_state_style(&mut runtime, &map, &session);
-
     session.set_feature_state(&selector, state).unwrap();
+    let queued: JsonValue =
+        serde_json::from_slice(&session.get_feature_state(&selector).unwrap()).unwrap();
+    assert_json_member(&queued, "hover", &json!(true));
+    assert_json_member(&queued, "radius", &json!(20));
+
+    map.set_style_json(FEATURE_STATE_STYLE_JSON.as_bytes())
+        .unwrap();
+    assert!(wait_for_runtime_event(
+        &mut runtime,
+        RuntimeEventType::MapRenderUpdateAvailable
+    ));
+    assert_eq!(
+        session.render_update().unwrap().result,
+        RenderResult::Rendered
+    );
+
     let copied: JsonValue =
         serde_json::from_slice(&session.get_feature_state(&selector).unwrap()).unwrap();
     assert_json_member(&copied, "hover", &json!(true));

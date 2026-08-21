@@ -168,6 +168,13 @@ class MetalSurfaceBackend final : public mln::mtl::RendererBackend,
     }
 
     void swap() override {
+      if (mln::core::discard_renderable_present) {
+        commandBuffer->commit();
+        commandBuffer.reset();
+        drawable.reset();
+        renderPassDescriptor.reset();
+        return;
+      }
       commandBuffer->presentDrawable(drawable.get());
       commandBuffer->commit();
       commandBuffer.reset();

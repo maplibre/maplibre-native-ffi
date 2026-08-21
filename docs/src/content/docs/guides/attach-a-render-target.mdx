@@ -81,7 +81,8 @@ allocating a replacement borrowed texture.
 <Code code={region(renderTarget, "set-target")} lang="c" title="render-target.c" />
 
 Changing the scale factor recreates the session's rendering resources because
-its shaders use a fixed pixel ratio. Feature state then starts empty.
+its shaders use a fixed pixel ratio. Feature state then starts empty. Set the
+restored state before the next render update so the first frame includes it.
 
 Release the session before the map. Destroying a map while a session is attached
 reports an invalid-state status.

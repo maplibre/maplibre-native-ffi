@@ -7,6 +7,8 @@
 #include <limits>
 #include <memory>
 #include <mutex>
+#include <optional>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -15,6 +17,7 @@
 #include <mbgl/gfx/renderer_backend.hpp>
 #include <mbgl/renderer/renderer.hpp>
 #include <mbgl/renderer/renderer_observer.hpp>
+#include <mbgl/util/feature.hpp>
 #include <mbgl/util/size.hpp>
 
 #include "diagnostics/diagnostics.hpp"
@@ -23,6 +26,19 @@
 struct mln_render_session_object;
 
 namespace mln::core {
+
+inline thread_local bool discard_renderable_present = false;
+
+// Drops host presentation for an internal source-creating render that is
+// overwritten before the session returns a frame.
+class DiscardRenderablePresent {
+ public:
+  DiscardRenderablePresent() { discard_renderable_present = true; }
+  DiscardRenderablePresent(const DiscardRenderablePresent&) = delete;
+  auto operator=(const DiscardRenderablePresent&)
+    -> DiscardRenderablePresent& = delete;
+  ~DiscardRenderablePresent() { discard_renderable_present = false; }
+};
 
 enum class RenderSessionKind : uint8_t { Surface, Texture };
 enum class TextureSessionApi : uint8_t {
@@ -312,6 +328,14 @@ class SessionFrameObserver final : public mln::RendererObserver {
 
   [[nodiscard]] auto needs_repaint() const -> bool { return needs_repaint_; }
 
+  // Drops frame start/finish callbacks for an internal source-creating render
+  // that is overwritten before present, so the host sees one frame per
+  // mln_render_session_render_update(). Map start/finish and resource
+  // callbacks still go through.
+  auto suppress_frame_callbacks(bool suppress) -> void {
+    suppress_frame_callbacks_ = suppress;
+  }
+
   void onInvalidate() override {
     if (delegate_ != nullptr) {
       delegate_->onInvalidate();
@@ -331,15 +355,19 @@ class SessionFrameObserver final : public mln::RendererObserver {
   }
 
   void onWillStartRenderingFrame() override {
-    if (delegate_ != nullptr) {
-      delegate_->onWillStartRenderingFrame();
+    if (suppress_frame_callbacks_ || delegate_ == nullptr) {
+      return;
     }
+    delegate_->onWillStartRenderingFrame();
   }
 
   void onDidFinishRenderingFrame(
     RenderMode mode, bool repaint, bool placement_changed,
     const mln::gfx::RenderingStats& stats
   ) override {
+    if (suppress_frame_callbacks_) {
+      return;
+    }
     needs_repaint_ = repaint;
     if (delegate_ != nullptr) {
       delegate_->onDidFinishRenderingFrame(
@@ -438,6 +466,20 @@ class SessionFrameObserver final : public mln::RendererObserver {
  private:
   mln::RendererObserver* delegate_ = nullptr;
   bool needs_repaint_ = false;
+  bool suppress_frame_callbacks_ = false;
+};
+
+// Feature-state mutation accepted while the session renderer does not exist
+// yet. Applied after the renderer is constructed and has sources, before the
+// first presented frame.
+struct PendingFeatureStateMutation {
+  enum class Kind : uint8_t { Set, Remove };
+  Kind kind = Kind::Set;
+  std::string source_id;
+  std::optional<std::string> source_layer_id;
+  std::optional<std::string> feature_id;
+  std::optional<std::string> state_key;
+  mln::FeatureState state;
 };
 
 struct RenderTextureState {
@@ -475,6 +517,7 @@ struct mln_render_session_object {
   // Declared before `renderer`, which holds a raw pointer to it.
   mln::core::SessionFrameObserver frame_observer;
   std::unique_ptr<mln::Renderer> renderer = nullptr;
+  std::vector<mln::core::PendingFeatureStateMutation> pending_feature_state;
   mln::core::RenderSurfaceState surface;
   mln::core::RenderTextureState texture;
 };
