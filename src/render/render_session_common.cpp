@@ -21,6 +21,7 @@
 #include <mbgl/renderer/renderer.hpp>
 #include <mbgl/renderer/update_parameters.hpp>
 #include <mbgl/style/filter.hpp>
+#include <mbgl/style/source_impl.hpp>
 #include <mbgl/util/feature.hpp>
 #include <mbgl/util/geo.hpp>
 #include <mbgl/util/geojson.hpp>
@@ -626,13 +627,35 @@ auto feature_state_source_layer(const mln_feature_state_selector& selector)
   );
 }
 
+auto update_has_source(
+  const mln::UpdateParameters& update, const std::string& source_id
+) -> bool {
+  for (const auto& source : *update.sources) {
+    if (source->id == source_id) {
+      return true;
+    }
+  }
+  return false;
+}
+
+auto pending_feature_state_has_ready_source(
+  const std::vector<mln::core::PendingFeatureStateMutation>& pending,
+  const mln::UpdateParameters& update
+) -> bool {
+  for (const auto& mutation : pending) {
+    if (update_has_source(update, mutation.source_id)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 auto replay_pending_feature_state(
   const std::vector<mln::core::PendingFeatureStateMutation>& pending,
   const std::string& source_id,
   const std::optional<std::string>& source_layer_id,
-  const std::string& feature_id
+  const std::string& feature_id, mln::FeatureState result = {}
 ) -> mln::FeatureState {
-  auto result = mln::FeatureState{};
   for (const auto& mutation : pending) {
     if (
       mutation.source_id != source_id ||
@@ -664,11 +687,19 @@ auto replay_pending_feature_state(
   return result;
 }
 
-auto apply_pending_feature_state(mln_render_session_object& session) -> void {
+auto apply_pending_feature_state(
+  mln_render_session_object& session, const mln::UpdateParameters& update
+) -> void {
   if (session.renderer == nullptr) {
     return;
   }
-  for (const auto& mutation : session.pending_feature_state) {
+  auto remaining = std::vector<mln::core::PendingFeatureStateMutation>{};
+  remaining.reserve(session.pending_feature_state.size());
+  for (auto& mutation : session.pending_feature_state) {
+    if (!update_has_source(update, mutation.source_id)) {
+      remaining.push_back(std::move(mutation));
+      continue;
+    }
     if (mutation.kind == mln::core::PendingFeatureStateMutation::Kind::Set) {
       session.renderer->setFeatureState(
         mutation.source_id, mutation.source_layer_id,
@@ -681,7 +712,7 @@ auto apply_pending_feature_state(mln_render_session_object& session) -> void {
       mutation.state_key
     );
   }
-  session.pending_feature_state.clear();
+  session.pending_feature_state = std::move(remaining);
 }
 
 auto to_rendered_query_options(
@@ -1419,10 +1450,13 @@ auto render_session_render_update(
     return MLN_STATUS_OK;
   };
 
-  // Native feature-state calls no-op until the first render builds sources.
-  // Draw once without presenting, apply queued mutations, then draw the frame
-  // the host sees.
-  if (!live->pending_feature_state.empty()) {
+  // Native feature-state calls no-op until createRenderTree has built the
+  // source. Draw once without presenting when a queued source is in this
+  // update, apply those mutations, then draw the frame the host sees. Mutations
+  // whose source is still missing stay queued.
+  if (
+    pending_feature_state_has_ready_source(live->pending_feature_state, *update)
+  ) {
     live->frame_observer.suppress_frame_callbacks(true);
     mln_status warmup_status = MLN_STATUS_OK;
     {
@@ -1434,7 +1468,7 @@ auto render_session_render_update(
     if (warmup_status != MLN_STATUS_OK) {
       return warmup_status;
     }
-    apply_pending_feature_state(*live);
+    apply_pending_feature_state(*live, *update);
     if (live->kind == RenderSessionKind::Surface) {
       bool surface_ready = true;
       try {
@@ -1625,7 +1659,7 @@ auto render_session_set_feature_state(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  if (live->renderer == nullptr) {
+  if (live->renderer == nullptr || !live->pending_feature_state.empty()) {
     live->pending_feature_state.push_back(
       PendingFeatureStateMutation{
         .kind = PendingFeatureStateMutation::Kind::Set,
@@ -1672,32 +1706,30 @@ auto render_session_get_feature_state(
     return selector_status;
   }
 
-  if (live->renderer == nullptr) {
-    auto state = replay_pending_feature_state(
-      live->pending_feature_state, string_from_view(selector->source_id),
+  auto state = mln::FeatureState{};
+  if (live->renderer != nullptr) {
+    mln::gfx::RendererBackend* backend = nullptr;
+    if (
+      const auto backend_status = validate_renderer_backend(live, backend);
+      backend_status != MLN_STATUS_OK
+    ) {
+      return backend_status;
+    }
+    auto current = ScopedCurrentScheduler{live->scheduler};
+    auto guard = mln::gfx::BackendScope{*backend};
+    live->renderer->getFeatureState(
+      state, string_from_view(selector->source_id),
       feature_state_source_layer(*selector),
       string_from_view(selector->feature_id)
     );
-    return create_buffer(
-      serialize_json_value(mln::Value{std::move(state)}), out_state
+  }
+  if (!live->pending_feature_state.empty()) {
+    state = replay_pending_feature_state(
+      live->pending_feature_state, string_from_view(selector->source_id),
+      feature_state_source_layer(*selector),
+      string_from_view(selector->feature_id), std::move(state)
     );
   }
-
-  mln::gfx::RendererBackend* backend = nullptr;
-  if (
-    const auto backend_status = validate_renderer_backend(live, backend);
-    backend_status != MLN_STATUS_OK
-  ) {
-    return backend_status;
-  }
-  auto state = mln::FeatureState{};
-  auto current = ScopedCurrentScheduler{live->scheduler};
-  auto guard = mln::gfx::BackendScope{*backend};
-  live->renderer->getFeatureState(
-    state, string_from_view(selector->source_id),
-    feature_state_source_layer(*selector),
-    string_from_view(selector->feature_id)
-  );
   return create_buffer(
     serialize_json_value(mln::Value{std::move(state)}), out_state
   );
@@ -1716,7 +1748,7 @@ auto render_session_remove_feature_state(
     return selector_status;
   }
 
-  if (live->renderer == nullptr) {
+  if (live->renderer == nullptr || !live->pending_feature_state.empty()) {
     live->pending_feature_state.push_back(
       PendingFeatureStateMutation{
         .kind = PendingFeatureStateMutation::Kind::Remove,

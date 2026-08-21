@@ -214,8 +214,9 @@ mln_render_session_dump_debug_logs(mln_render_session session) MLN_NOEXCEPT;
  * the call. state must contain one UTF-8 JSON object and is parsed before
  * return. The accepted command requests a map repaint.
  *
- * A call before the session renderer exists is stored and applied after that
- * renderer is constructed, before the first presented frame.
+ * A call before that source exists on a render update is stored and applied
+ * after the renderer is constructed, before the first presented frame that
+ * includes the source.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -239,9 +240,9 @@ MLN_API mln_status mln_render_session_set_feature_state(
  * selector->source_id and selector->feature_id are borrowed for the duration of
  * the call. On success, *out_state receives an owned buffer containing a UTF-8
  * JSON object. Destroy it with mln_buffer_destroy(). Missing native source or
- * feature state is reported as an empty object. A call before the session
- * renderer exists copies any state stored for that feature, or an empty object
- * when none has been set.
+ * feature state is reported as an empty object. A call before that source
+ * exists on a render update copies any state stored for that feature, or an
+ * empty object when none has been set.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -268,8 +269,9 @@ MLN_API mln_status mln_render_session_get_feature_state(
  * all feature state for the source/source-layer. The accepted command requests
  * a map repaint.
  *
- * A call before the session renderer exists is stored and applied after that
- * renderer is constructed, before the first presented frame.
+ * A call before that source exists on a render update is stored and applied
+ * after the renderer is constructed, before the first presented frame that
+ * includes the source.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

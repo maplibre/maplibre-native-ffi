@@ -104,6 +104,12 @@ class RenderSessionHandleTest {
         assertFailsWith<InvalidStateException> { map.close() }
         assertFailsWith<InvalidStateException> { owned.attachAnotherOwnedTexture(16, 8).close() }
 
+        assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE))
+        session.renderUpdate()
+        val beforeStyle = session.getFeatureState(featureStateSelector())
+        assertEquals("true", rawMember(beforeStyle, "hover")?.decodeToString())
+        assertEquals(20.0, numberMember(beforeStyle, "radius"))
+
         map.setStyleJson(QUERY_STYLE_JSON.encodeToByteArray())
         assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE))
         assertEquals(RenderResult.RENDERED, session.renderUpdate().result)

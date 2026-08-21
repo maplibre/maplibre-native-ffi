@@ -3272,6 +3272,16 @@ fn feature_state_set_get_and_remove_copy_snapshots() {
     assert_json_member(&queued, "hover", &json!(true));
     assert_json_member(&queued, "radius", &json!(20));
 
+    assert!(wait_for_runtime_event(
+        &mut runtime,
+        RuntimeEventType::MapRenderUpdateAvailable
+    ));
+    let _ = session.render_update();
+    let before_style: JsonValue =
+        serde_json::from_slice(&session.get_feature_state(&selector).unwrap()).unwrap();
+    assert_json_member(&before_style, "hover", &json!(true));
+    assert_json_member(&before_style, "radius", &json!(20));
+
     map.set_style_json(FEATURE_STATE_STYLE_JSON.as_bytes())
         .unwrap();
     assert!(wait_for_runtime_event(

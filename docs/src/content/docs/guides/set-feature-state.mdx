@@ -18,8 +18,9 @@ supplies its own input to that rule.
 
 Feature state belongs to the [render session](/maplibre-native-ffi/concepts/)
 and applies to its loaded tiles. Set or remove state on the session's owner
-thread after the session is attached. A call before the first render update is
-kept and applied to the first presented frame.
+thread after the session is attached. A call before that source exists on a
+render update is kept and applied before the first presented frame that includes
+the source.
 
 ## Set state on a feature
 

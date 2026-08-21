@@ -1682,6 +1682,13 @@ test "render session feature state set get and remove" {
     try testing.expect(rawMember(queued.value, "hover") == null);
     try testing.expectEqualStrings("18446744073709551615", rawMember(queued.value, "radius").?);
 
+    try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
+    _ = try session.renderUpdate();
+    var before_style = try session.getFeatureState(testing.allocator, selector);
+    defer before_style.deinit();
+    try testing.expect(rawMember(before_style.value, "hover") == null);
+    try testing.expectEqualStrings("18446744073709551615", rawMember(before_style.value, "radius").?);
+
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try support.waitForEvent(&runtime, .map_render_update_available));
     try testing.expectEqual(@as(maplibre.RenderResult, .rendered), (try session.renderUpdate()).result);
