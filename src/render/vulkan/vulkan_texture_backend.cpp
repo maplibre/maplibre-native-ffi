@@ -27,7 +27,7 @@
 #include "render/vulkan/vulkan_texture_backend.hpp"
 
 #include "maplibre_native_c/texture.h"
-#include "render/render_session_common.hpp"
+#include "render/discard_present.hpp"
 #include "render/vulkan/vulkan_dispatch.hpp"
 
 namespace {

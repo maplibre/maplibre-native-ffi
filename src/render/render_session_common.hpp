@@ -24,6 +24,7 @@
 #include "diagnostics/diagnostics.hpp"
 #include "map/feature_state.hpp"
 #include "maplibre_native_c.h"
+#include "render/discard_present.hpp"
 
 struct mln_render_session_object;
 
@@ -32,9 +33,6 @@ class UpdateParameters;
 }
 
 namespace mln::core {
-
-// Backend swap() skips host present while an internal render is in progress.
-inline thread_local bool discard_renderable_present = false;
 
 enum class RenderSessionKind : uint8_t { Surface, Texture };
 enum class TextureSessionApi : uint8_t {
