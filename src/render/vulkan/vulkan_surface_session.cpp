@@ -9,6 +9,7 @@
 #include <mbgl/gfx/renderable.hpp>
 #include <mbgl/gfx/renderer_backend.hpp>
 #include <mbgl/util/size.hpp>
+#include <mbgl/vulkan/context.hpp>
 #include <mbgl/vulkan/renderable_resource.hpp>
 #include <mbgl/vulkan/renderer_backend.hpp>
 
@@ -200,6 +201,30 @@ class VulkanSurfaceBackend final : public mln::vulkan::RendererBackend,
     }
 
     void bind() override {}
+
+    void swap() override {
+      if (!mln::core::discard_renderable_present) {
+        SurfaceRenderableResource::swap();
+        return;
+      }
+
+      // Submit without presenting, then rebuild so the next frame can acquire.
+      auto& context = backend.getContext<mln::vulkan::Context>();
+      const auto& dispatcher = backend.getDispatcher();
+      auto& command_buffer = context.getCommandBuffer();
+      command_buffer->end(dispatcher);
+
+      const vk::PipelineStageFlags wait_stage[] = {
+        vk::PipelineStageFlagBits::eColorAttachmentOutput
+      };
+      const auto submit_info = vk::SubmitInfo()
+                                 .setCommandBuffers(command_buffer.get())
+                                 .setWaitSemaphores(getAcquireSemaphore())
+                                 .setWaitDstStageMask(wait_stage);
+      backend.getGraphicsQueue().submit(submit_info, nullptr, dispatcher);
+      backend.endFrameCapture();
+      recreateSwapchain();
+    }
 
     // Rebuilds the swapchain and everything sized with it, keeping the render
     // pass. mbgl keys its pipeline cache on the render pass handle, so

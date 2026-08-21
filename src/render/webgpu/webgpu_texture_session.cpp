@@ -589,7 +589,15 @@ class WebGPUSurfaceBackend final : public mln::webgpu::RendererBackend,
 
     void bind() override { backend.ensureDepthStencilTexture(); }
 
-    void swap() override { backend.present(); }
+    void swap() override {
+      if (mln::core::discard_renderable_present) {
+        // Keep this canvas texture so the presented render in the same update
+        // overwrites it. Releasing here would either composite the warmup or
+        // make the next acquire fail in this browser frame.
+        return;
+      }
+      backend.present();
+    }
 
     const mln::webgpu::RendererBackend& getBackend() const override {
       return backend;

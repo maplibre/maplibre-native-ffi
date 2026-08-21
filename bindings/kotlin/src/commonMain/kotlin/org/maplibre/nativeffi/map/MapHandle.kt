@@ -9,6 +9,7 @@ import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.ScreenPoint
+import org.maplibre.nativeffi.query.FeatureStateSelector
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalSurfaceDescriptor
@@ -70,6 +71,12 @@ public expect class MapHandle : AutoCloseable {
    * @see org.maplibre.nativeffi.runtime.RuntimeHandle.drainEvents
    */
   public fun setStyleJson(json: ByteArray)
+
+  public fun setFeatureState(selector: FeatureStateSelector, value: ByteArray)
+
+  public fun getFeatureState(selector: FeatureStateSelector): ByteArray
+
+  public fun removeFeatureState(selector: FeatureStateSelector)
 
   /**
    * Returns the style document this map's style was last parsed from, byte-for-byte, or an empty

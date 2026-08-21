@@ -1,7 +1,6 @@
 package org.maplibre.nativeffi.render
 
 import org.maplibre.nativeffi.map.MapHandle
-import org.maplibre.nativeffi.query.FeatureStateSelector
 import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
@@ -20,10 +19,9 @@ public expect class RenderSessionHandle : AutoCloseable {
    * owner and throw `UnsupportedFeatureException`; hand over a new texture with the backend's
    * set-target method, such as [setMetalBorrowedTextureTarget].
    *
-   * The session keeps its renderer across a resize, so renderer-held state such as feature state
-   * carries over. A scale factor change starts a new renderer with that state empty, since shaders
-   * are compiled for one pixel ratio. Map state such as camera, style, and sources survives either
-   * way.
+   * The session keeps its renderer across a resize, along with the tile pyramid, glyph and image
+   * atlases, and symbol placement. A scale factor change retires the renderer instead, because
+   * shaders are compiled for one pixel ratio. Map-owned feature state survives either way.
    */
   public fun resize(width: Int, height: Int, scaleFactor: Double)
 
@@ -110,12 +108,6 @@ public expect class RenderSessionHandle : AutoCloseable {
   public fun clearData()
 
   public fun dumpDebugLogs()
-
-  public fun setFeatureState(selector: FeatureStateSelector, value: ByteArray)
-
-  public fun getFeatureState(selector: FeatureStateSelector): ByteArray
-
-  public fun removeFeatureState(selector: FeatureStateSelector)
 
   public fun queryRenderedFeatures(
     geometry: RenderedQueryGeometry,

@@ -2341,23 +2341,6 @@ fn static_map_options(width: u32, height: u32, scale_factor: f64) -> MapOptions 
     options
 }
 
-fn load_feature_state_style(
-    runtime: &mut RuntimeHandle,
-    map: &MapHandle,
-    session: &RenderSessionHandle,
-) {
-    map.set_style_json(FEATURE_STATE_STYLE_JSON.as_bytes())
-        .unwrap();
-    assert!(wait_for_runtime_event(
-        runtime,
-        RuntimeEventType::MapRenderUpdateAvailable
-    ));
-    assert_eq!(
-        session.render_update().unwrap().result,
-        RenderResult::Rendered
-    );
-}
-
 fn load_query_style(runtime: &mut RuntimeHandle, map: &MapHandle, session: &RenderSessionHandle) {
     let mut camera = CameraOptions::default();
     camera.center = Some(LatLng::new(37.7749, -122.4194));
@@ -3283,14 +3266,35 @@ fn feature_state_set_get_and_remove_copy_snapshots() {
     let selector = FeatureStateSelector::new("point").with_feature_id("feature-1");
     let state = br#"{"hover":true,"radius":20}"#;
 
-    let error = session.set_feature_state(&selector, state).unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidState);
+    map.set_feature_state(&selector, state).unwrap();
+    let queued: JsonValue =
+        serde_json::from_slice(&map.get_feature_state(&selector).unwrap()).unwrap();
+    assert_json_member(&queued, "hover", &json!(true));
+    assert_json_member(&queued, "radius", &json!(20));
 
-    load_feature_state_style(&mut runtime, &map, &session);
+    assert!(wait_for_runtime_event(
+        &mut runtime,
+        RuntimeEventType::MapRenderUpdateAvailable
+    ));
+    let _ = session.render_update();
+    let before_style: JsonValue =
+        serde_json::from_slice(&map.get_feature_state(&selector).unwrap()).unwrap();
+    assert_json_member(&before_style, "hover", &json!(true));
+    assert_json_member(&before_style, "radius", &json!(20));
 
-    session.set_feature_state(&selector, state).unwrap();
+    map.set_style_json(FEATURE_STATE_STYLE_JSON.as_bytes())
+        .unwrap();
+    assert!(wait_for_runtime_event(
+        &mut runtime,
+        RuntimeEventType::MapRenderUpdateAvailable
+    ));
+    assert_eq!(
+        session.render_update().unwrap().result,
+        RenderResult::Rendered
+    );
+
     let copied: JsonValue =
-        serde_json::from_slice(&session.get_feature_state(&selector).unwrap()).unwrap();
+        serde_json::from_slice(&map.get_feature_state(&selector).unwrap()).unwrap();
     assert_json_member(&copied, "hover", &json!(true));
     assert_json_member(&copied, "radius", &json!(20));
 
@@ -3298,14 +3302,31 @@ fn feature_state_set_get_and_remove_copy_snapshots() {
         .with_feature_id("feature-1")
         .with_state_key("hover")
         .unwrap();
-    session.remove_feature_state(&hover_selector).unwrap();
+    map.remove_feature_state(&hover_selector).unwrap();
     let _ = wait_for_runtime_event(&mut runtime, RuntimeEventType::MapRenderUpdateAvailable);
     let _ = session.render_update();
 
     let after_remove: JsonValue =
-        serde_json::from_slice(&session.get_feature_state(&selector).unwrap()).unwrap();
+        serde_json::from_slice(&map.get_feature_state(&selector).unwrap()).unwrap();
     assert_json_member(&after_remove, "radius", &json!(20));
     assert!(json_member(&after_remove, "hover").is_none());
+
+    session.resize(64, 64, 2.0).unwrap();
+    match session.render_update().unwrap().result {
+        RenderResult::Rendered => {}
+        RenderResult::SizePending => {
+            runtime.pump(Some(Duration::ZERO), None).unwrap();
+            assert_eq!(
+                session.render_update().unwrap().result,
+                RenderResult::Rendered
+            );
+        }
+        other => panic!("unexpected render result after scale-factor resize: {other:?}"),
+    }
+    let after_scale: JsonValue =
+        serde_json::from_slice(&map.get_feature_state(&selector).unwrap()).unwrap();
+    assert_json_member(&after_scale, "radius", &json!(20));
+    assert!(json_member(&after_scale, "hover").is_none());
 
     session.close().unwrap();
     map.close().unwrap();
@@ -3337,9 +3358,7 @@ fn rendered_and_source_queries_copy_results() {
     load_query_style(&mut runtime, &map, &session);
     let state_selector = FeatureStateSelector::new("point").with_feature_id("feature-1");
     let query_state = br#"{"selected":true}"#;
-    session
-        .set_feature_state(&state_selector, query_state)
-        .unwrap();
+    map.set_feature_state(&state_selector, query_state).unwrap();
     let _ = wait_for_runtime_event(&mut runtime, RuntimeEventType::MapRenderUpdateAvailable);
     let _ = session.render_update();
 
@@ -3998,7 +4017,6 @@ fn acquired_frame_state_rejects_reentrant_session_operations_before_native_calls
 
     session.inner.frame_acquired.set(true);
 
-    let selector = FeatureStateSelector::new("point").with_feature_id("feature-1");
     let detach_error = session.detach().unwrap_err();
     assert_eq!(detach_error.kind(), ErrorKind::InvalidState);
     assert!(detach_error.diagnostic().contains("acquired texture frame"));
@@ -4007,9 +4025,6 @@ fn acquired_frame_state_rejects_reentrant_session_operations_before_native_calls
     for error in [
         session.resize(32, 16, 1.0).unwrap_err(),
         session.render_update().unwrap_err(),
-        session.set_feature_state(&selector, b"{}").unwrap_err(),
-        session.get_feature_state(&selector).unwrap_err(),
-        session.remove_feature_state(&selector).unwrap_err(),
         session
             .query_rendered_features(
                 &RenderedQueryGeometry::point(ScreenPoint::new(0.0, 0.0)),

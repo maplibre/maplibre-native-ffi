@@ -239,6 +239,58 @@ func (m *MapHandle) SetStyleJSON(json []byte) error {
 	return checkNative(func() int32 { return int32(C.mln_map_set_style_json(C.mln_map(ptr), jsonView.raw())) })
 }
 
+// SetFeatureState sets per-feature state on this map. The state value is
+// copied before the call returns.
+func (m *MapHandle) SetFeatureState(selector FeatureStateSelector, state []byte) error {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	rawSelector := newCFeatureStateSelector(selector)
+	defer rawSelector.free()
+	rawState := newCBufferView(state)
+	defer rawState.free()
+	return checkNative(func() int32 {
+		return int32(C.mln_map_set_feature_state(C.mln_map(ptr), &rawSelector.raw, rawState.raw()))
+	})
+}
+
+// FeatureState returns copied per-feature state from this map.
+func (m *MapHandle) FeatureState(selector FeatureStateSelector) ([]byte, error) {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	rawSelector := newCFeatureStateSelector(selector)
+	defer rawSelector.free()
+	var buffer C.mln_buffer
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_get_feature_state(C.mln_map(ptr), &rawSelector.raw, &buffer))
+	}); err != nil {
+		return nil, err
+	}
+	return goOwnedBuffer(buffer)
+}
+
+// RemoveFeatureState removes per-feature state from this map.
+func (m *MapHandle) RemoveFeatureState(selector FeatureStateSelector) error {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	rawSelector := newCFeatureStateSelector(selector)
+	defer rawSelector.free()
+	return checkNative(func() int32 {
+		return int32(C.mln_map_remove_feature_state(C.mln_map(ptr), &rawSelector.raw))
+	})
+}
+
 // LoadedStyleJSON returns the style document this map's style was last parsed
 // from, byte for byte, rather than a serialization of the live style. Runtime
 // mutations such as adding a layer do not change it, and a failed parse leaves

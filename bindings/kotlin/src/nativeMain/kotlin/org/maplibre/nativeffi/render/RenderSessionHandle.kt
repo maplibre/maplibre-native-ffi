@@ -36,15 +36,12 @@ import org.maplibre.nativeffi.internal.c.mln_render_session_clear_data
 import org.maplibre.nativeffi.internal.c.mln_render_session_destroy
 import org.maplibre.nativeffi.internal.c.mln_render_session_detach
 import org.maplibre.nativeffi.internal.c.mln_render_session_dump_debug_logs
-import org.maplibre.nativeffi.internal.c.mln_render_session_get_feature_state
 import org.maplibre.nativeffi.internal.c.mln_render_session_query_feature_extensions
 import org.maplibre.nativeffi.internal.c.mln_render_session_query_rendered_features
 import org.maplibre.nativeffi.internal.c.mln_render_session_query_source_features
 import org.maplibre.nativeffi.internal.c.mln_render_session_reduce_memory_use
-import org.maplibre.nativeffi.internal.c.mln_render_session_remove_feature_state
 import org.maplibre.nativeffi.internal.c.mln_render_session_render_update
 import org.maplibre.nativeffi.internal.c.mln_render_session_resize
-import org.maplibre.nativeffi.internal.c.mln_render_session_set_feature_state
 import org.maplibre.nativeffi.internal.c.mln_texture_image_info_default
 import org.maplibre.nativeffi.internal.c.mln_texture_read_premultiplied_rgba8
 import org.maplibre.nativeffi.internal.c.mln_vulkan_borrowed_texture_attach
@@ -68,7 +65,6 @@ import org.maplibre.nativeffi.internal.struct.CoreStructs
 import org.maplibre.nativeffi.internal.struct.QueryStructs
 import org.maplibre.nativeffi.internal.struct.RenderStructs
 import org.maplibre.nativeffi.map.MapHandle
-import org.maplibre.nativeffi.query.FeatureStateSelector
 import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
@@ -203,45 +199,6 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
   public actual fun dumpDebugLogs() {
     activeFrame.ensureInactive("dump debug logs")
     Status.check(mln_render_session_dump_debug_logs(state.requireLive().rawHandleValue))
-  }
-
-  public actual fun setFeatureState(selector: FeatureStateSelector, value: ByteArray) {
-    activeFrame.ensureInactive("set feature state")
-    memScoped {
-      Status.check(
-        mln_render_session_set_feature_state(
-          state.requireLive().rawHandleValue,
-          QueryStructs.featureStateSelector(selector, this),
-          ByteStructs.bufferView(value, this),
-        )
-      )
-    }
-  }
-
-  public actual fun getFeatureState(selector: FeatureStateSelector): ByteArray = memScoped {
-    activeFrame.ensureInactive("get feature state")
-    val outState = alloc<ULongVar>()
-    outState.value = 0uL
-    Status.check(
-      mln_render_session_get_feature_state(
-        state.requireLive().rawHandleValue,
-        QueryStructs.featureStateSelector(selector, this),
-        outState.ptr,
-      )
-    )
-    ByteStructs.ownedBuffer(outState.value.asHandle("mln_buffer", ::ownedBufferHandle))
-  }
-
-  public actual fun removeFeatureState(selector: FeatureStateSelector) {
-    activeFrame.ensureInactive("remove feature state")
-    memScoped {
-      Status.check(
-        mln_render_session_remove_feature_state(
-          state.requireLive().rawHandleValue,
-          QueryStructs.featureStateSelector(selector, this),
-        )
-      )
-    }
   }
 
   public actual fun queryRenderedFeatures(

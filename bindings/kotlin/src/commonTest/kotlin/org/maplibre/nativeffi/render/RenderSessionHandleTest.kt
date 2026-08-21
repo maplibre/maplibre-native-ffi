@@ -97,11 +97,18 @@ class RenderSessionHandleTest {
         map.jumpTo(CameraOptions().apply { center = featureCoordinate })
         assertSame(map, session.map())
         assertFailsWith<InvalidStateException> { session.textureImageInfo() }
-        assertFailsWith<InvalidStateException> {
-          session.setFeatureState(featureStateSelector(), featureState())
-        }
+        map.setFeatureState(featureStateSelector(), featureState())
+        val queuedState = map.getFeatureState(featureStateSelector())
+        assertEquals("true", rawMember(queuedState, "hover")?.decodeToString())
+        assertEquals(20.0, numberMember(queuedState, "radius"))
         assertFailsWith<InvalidStateException> { map.close() }
         assertFailsWith<InvalidStateException> { owned.attachAnotherOwnedTexture(16, 8).close() }
+
+        assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE))
+        session.renderUpdate()
+        val beforeStyle = map.getFeatureState(featureStateSelector())
+        assertEquals("true", rawMember(beforeStyle, "hover")?.decodeToString())
+        assertEquals(20.0, numberMember(beforeStyle, "radius"))
 
         map.setStyleJson(QUERY_STYLE_JSON.encodeToByteArray())
         assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE))
@@ -136,22 +143,22 @@ class RenderSessionHandleTest {
         }
 
         assertFailsWith<InvalidArgumentException> {
-          session.setFeatureState(featureStateSelector(), jsonBytes("[]"))
+          map.setFeatureState(featureStateSelector(), jsonBytes("[]"))
         }
-        session.setFeatureState(featureStateSelector(), featureState())
-        val copiedState = session.getFeatureState(featureStateSelector())
+        map.setFeatureState(featureStateSelector(), featureState())
+        val copiedState = map.getFeatureState(featureStateSelector())
         assertEquals("true", rawMember(copiedState, "hover")?.decodeToString())
         assertEquals(20.0, numberMember(copiedState, "radius"))
 
         renderIfAvailable(runtime, map, session)
-        session.removeFeatureState(
+        map.removeFeatureState(
           FeatureStateSelector("point").apply {
             featureId = "feature-1"
             stateKey = "hover"
           }
         )
         renderIfAvailable(runtime, map, session)
-        val afterRemove = session.getFeatureState(featureStateSelector())
+        val afterRemove = map.getFeatureState(featureStateSelector())
         assertEquals(null, rawMember(afterRemove, "hover"))
         assertEquals(20.0, numberMember(afterRemove, "radius"))
 
@@ -177,13 +184,6 @@ class RenderSessionHandleTest {
           assertFailsWith<InvalidStateException> { session.reduceMemoryUse() }
           assertFailsWith<InvalidStateException> { session.clearData() }
           assertFailsWith<InvalidStateException> { session.dumpDebugLogs() }
-          assertFailsWith<InvalidStateException> {
-            session.setFeatureState(featureStateSelector(), jsonBytes("true"))
-          }
-          assertFailsWith<InvalidStateException> { session.getFeatureState(featureStateSelector()) }
-          assertFailsWith<InvalidStateException> {
-            session.removeFeatureState(featureStateSelector())
-          }
           assertFailsWith<InvalidStateException> {
             session.queryRenderedFeatures(queryGeometry, null)
           }

@@ -1,4 +1,4 @@
-// Reading back the feature state that a render session holds for one feature.
+// Reading back the feature state that a map holds for one feature.
 
 #include <maplibre_native_c.h>
 
@@ -8,13 +8,10 @@
 extern bool host_json_selected(mln_buffer_view json);
 // #endregion member
 
-bool read_selected(
-  mln_render_session session, const mln_feature_state_selector* selector
-) {
+bool read_selected(mln_map map, const mln_feature_state_selector* selector) {
   // #region get
   mln_buffer result = MLN_HANDLE_NULL;
-  const mln_status got =
-    mln_render_session_get_feature_state(session, selector, &result);
+  const mln_status got = mln_map_get_feature_state(map, selector, &result);
   if (got != MLN_STATUS_OK) return false;
   // #endregion get
 

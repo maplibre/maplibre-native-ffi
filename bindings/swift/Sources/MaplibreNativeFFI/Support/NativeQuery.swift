@@ -47,12 +47,12 @@ enum NativeQuery {
   }
 
   static func featureState(
-    _ session: NativeRenderSessionHandle,
+    _ map: NativeMapHandle,
     selector: UnsafePointer<mln_feature_state_selector>
   ) throws -> Data {
     try copyResult { output in
-      try checkStatus(mln_render_session_get_feature_state(
-        session.raw, selector, output
+      try checkStatus(mln_map_get_feature_state(
+        map.raw, selector, output
       ))
     }
   }

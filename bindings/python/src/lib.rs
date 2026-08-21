@@ -1753,6 +1753,65 @@ impl MapHandle {
         Ok(())
     }
 
+    fn set_feature_state(
+        &self,
+        source_id: String,
+        source_layer_id: Option<String>,
+        feature_id: Option<String>,
+        state_key: Option<String>,
+        state_value: &Bound<'_, PyBytes>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let selector =
+            feature_state_selector_from_parts(source_id, source_layer_id, feature_id, state_key)?;
+        let selector = maplibre_core::query::feature_state_selector_to_native(&selector);
+        let state_value = maplibre_core::string::buffer_view(state_value.as_bytes());
+        // SAFETY: The C API validates the map pointer, selector, and JSON state.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_feature_state(state.handle(), selector.as_ptr(), state_value)
+        })
+        .map_err(map_error)
+    }
+
+    fn get_feature_state(
+        &self,
+        py: Python<'_>,
+        source_id: String,
+        source_layer_id: Option<String>,
+        feature_id: Option<String>,
+        state_key: Option<String>,
+    ) -> PyResult<Py<PyBytes>> {
+        let state = self.state();
+        let selector =
+            feature_state_selector_from_parts(source_id, source_layer_id, feature_id, state_key)?;
+        let selector = maplibre_core::query::feature_state_selector_to_native(&selector);
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
+        // SAFETY: The C API validates the map pointer, selector, and output pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_feature_state(state.handle(), selector.as_ptr(), out.as_mut_ptr())
+        })
+        .map_err(map_error)?;
+        owned_buffer_to_py(py, out.get())
+    }
+
+    fn remove_feature_state(
+        &self,
+        source_id: String,
+        source_layer_id: Option<String>,
+        feature_id: Option<String>,
+        state_key: Option<String>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let selector =
+            feature_state_selector_from_parts(source_id, source_layer_id, feature_id, state_key)?;
+        let selector = maplibre_core::query::feature_state_selector_to_native(&selector);
+        // SAFETY: The C API validates the map pointer and selector.
+        maplibre_core::check(unsafe {
+            sys::mln_map_remove_feature_state(state.handle(), selector.as_ptr())
+        })
+        .map_err(map_error)
+    }
+
     fn copy_loaded_style_json(&self, py: Python<'_>) -> PyResult<Py<PyBytes>> {
         let state = self.state();
         // SAFETY: The C API validates the map pointer and each buffer and out
@@ -4454,85 +4513,6 @@ impl RenderSessionHandle {
         })
         .map_err(map_error)?;
         owned_buffer_to_py(py, out.get())
-    }
-
-    fn set_feature_state(
-        &self,
-        source_id: String,
-        source_layer_id: Option<String>,
-        feature_id: Option<String>,
-        state_key: Option<String>,
-        state_value: &Bound<'_, PyBytes>,
-    ) -> PyResult<()> {
-        let state = self
-            .state
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        state.ensure_no_frame_acquired()?;
-        let selector =
-            feature_state_selector_from_parts(source_id, source_layer_id, feature_id, state_key)?;
-        let selector = maplibre_core::query::feature_state_selector_to_native(&selector);
-        let state_value = maplibre_core::string::buffer_view(state_value.as_bytes());
-        // SAFETY: The C API validates the render-session pointer, selector, and JSON state.
-        maplibre_core::check(unsafe {
-            sys::mln_render_session_set_feature_state(
-                state.native(),
-                selector.as_ptr(),
-                state_value,
-            )
-        })
-        .map_err(map_error)
-    }
-
-    fn get_feature_state(
-        &self,
-        py: Python<'_>,
-        source_id: String,
-        source_layer_id: Option<String>,
-        feature_id: Option<String>,
-        state_key: Option<String>,
-    ) -> PyResult<Py<PyBytes>> {
-        let state = self
-            .state
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        state.ensure_no_frame_acquired()?;
-        let selector =
-            feature_state_selector_from_parts(source_id, source_layer_id, feature_id, state_key)?;
-        let selector = maplibre_core::query::feature_state_selector_to_native(&selector);
-        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
-        // SAFETY: The C API validates the render-session pointer, selector, and output pointer.
-        maplibre_core::check(unsafe {
-            sys::mln_render_session_get_feature_state(
-                state.native(),
-                selector.as_ptr(),
-                out.as_mut_ptr(),
-            )
-        })
-        .map_err(map_error)?;
-        owned_buffer_to_py(py, out.get())
-    }
-
-    fn remove_feature_state(
-        &self,
-        source_id: String,
-        source_layer_id: Option<String>,
-        feature_id: Option<String>,
-        state_key: Option<String>,
-    ) -> PyResult<()> {
-        let state = self
-            .state
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        state.ensure_no_frame_acquired()?;
-        let selector =
-            feature_state_selector_from_parts(source_id, source_layer_id, feature_id, state_key)?;
-        let selector = maplibre_core::query::feature_state_selector_to_native(&selector);
-        // SAFETY: The C API validates the render-session pointer and selector.
-        maplibre_core::check(unsafe {
-            sys::mln_render_session_remove_feature_state(state.native(), selector.as_ptr())
-        })
-        .map_err(map_error)
     }
 
     fn texture_image_info(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {

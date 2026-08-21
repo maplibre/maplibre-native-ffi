@@ -76,6 +76,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_get_bounds
 import org.maplibre.nativeffi.internal.c.mln_map_get_camera
 import org.maplibre.nativeffi.internal.c.mln_map_get_debug_options
 import org.maplibre.nativeffi.internal.c.mln_map_get_event_mask
+import org.maplibre.nativeffi.internal.c.mln_map_get_feature_state
 import org.maplibre.nativeffi.internal.c.mln_map_get_free_camera_options
 import org.maplibre.nativeffi.internal.c.mln_map_get_image_source_coordinates
 import org.maplibre.nativeffi.internal.c.mln_map_get_layer_filter
@@ -118,6 +119,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_pitch_by_animated
 import org.maplibre.nativeffi.internal.c.mln_map_pixel_for_lat_lng
 import org.maplibre.nativeffi.internal.c.mln_map_pixels_for_lat_lngs
 import org.maplibre.nativeffi.internal.c.mln_map_projection_create
+import org.maplibre.nativeffi.internal.c.mln_map_remove_feature_state
 import org.maplibre.nativeffi.internal.c.mln_map_remove_style_image
 import org.maplibre.nativeffi.internal.c.mln_map_remove_style_layer
 import org.maplibre.nativeffi.internal.c.mln_map_remove_style_source
@@ -133,6 +135,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_set_custom_mvt_vector_source_ti
 import org.maplibre.nativeffi.internal.c.mln_map_set_custom_mvt_vector_source_tile_error
 import org.maplibre.nativeffi.internal.c.mln_map_set_debug_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_event_mask
+import org.maplibre.nativeffi.internal.c.mln_map_set_feature_state
 import org.maplibre.nativeffi.internal.c.mln_map_set_free_camera_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_geojson_source_data
 import org.maplibre.nativeffi.internal.c.mln_map_set_geojson_source_synchronous_tiling
@@ -187,7 +190,9 @@ import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.struct.ByteStructs
 import org.maplibre.nativeffi.internal.struct.CoreStructs
 import org.maplibre.nativeffi.internal.struct.MapStructs
+import org.maplibre.nativeffi.internal.struct.QueryStructs
 import org.maplibre.nativeffi.internal.struct.StyleStructs
+import org.maplibre.nativeffi.query.FeatureStateSelector
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalSurfaceDescriptor
@@ -250,6 +255,42 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         mln_map_set_style_json(
           state.requireLive().rawHandleValue,
           ByteStructs.bufferView(json, this),
+        )
+      )
+    }
+  }
+
+  public actual fun setFeatureState(selector: FeatureStateSelector, value: ByteArray) {
+    memScoped {
+      Status.check(
+        mln_map_set_feature_state(
+          state.requireLive().rawHandleValue,
+          QueryStructs.featureStateSelector(selector, this),
+          ByteStructs.bufferView(value, this),
+        )
+      )
+    }
+  }
+
+  public actual fun getFeatureState(selector: FeatureStateSelector): ByteArray = memScoped {
+    val outState = alloc<ULongVar>()
+    outState.value = 0uL
+    Status.check(
+      mln_map_get_feature_state(
+        state.requireLive().rawHandleValue,
+        QueryStructs.featureStateSelector(selector, this),
+        outState.ptr,
+      )
+    )
+    ByteStructs.ownedBuffer(outState.value.asHandle("mln_buffer", ::ownedBufferHandle))
+  }
+
+  public actual fun removeFeatureState(selector: FeatureStateSelector) {
+    memScoped {
+      Status.check(
+        mln_map_remove_feature_state(
+          state.requireLive().rawHandleValue,
+          QueryStructs.featureStateSelector(selector, this),
         )
       )
     }

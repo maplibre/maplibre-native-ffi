@@ -357,8 +357,9 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     /// Resizes this attached render session. Surface and owned-texture sessions resize in place;
     /// a borrowed texture target throws an unsupported-feature error, since its owner sizes it —
     /// hand over a new texture with the backend's set-target method instead. A resize keeps the
-    /// session's renderer and renderer-held state such as feature state, unless the scale factor
-    /// changes, which starts a new renderer with that state empty.
+    /// session's renderer along with the tile pyramid, glyph and image atlases, and symbol
+    /// placement. A scale factor change retires the renderer instead, because shaders are compiled
+    /// for one pixel ratio. Map-owned feature state survives either way.
     /// </summary>
     public void Resize(uint width, uint height, double scaleFactor)
     {
@@ -486,40 +487,6 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     public void DumpDebugLogs()
     {
         NativeStatus.Check(NativeMethods.mln_render_session_dump_debug_logs(Handle));
-    }
-
-    public void SetFeatureState(FeatureStateSelector selector, byte[] value)
-    {
-        using var nativeSelector = NativeFeatureStateSelector.From(selector);
-        using var nativeValue = NativeStringView.From(value, nameof(value));
-        var selectorValue = nativeSelector.Value;
-        NativeStatus.Check(
-            NativeMethods.mln_render_session_set_feature_state(
-                Handle,
-                &selectorValue,
-                nativeValue.Value
-            )
-        );
-    }
-
-    public byte[] GetFeatureState(FeatureStateSelector selector)
-    {
-        using var nativeSelector = NativeFeatureStateSelector.From(selector);
-        var selectorValue = nativeSelector.Value;
-        MlnBuffer buffer = default;
-        NativeStatus.Check(
-            NativeMethods.mln_render_session_get_feature_state(Handle, &selectorValue, &buffer)
-        );
-        return ValueStructs.ReadBuffer(buffer);
-    }
-
-    public void RemoveFeatureState(FeatureStateSelector selector)
-    {
-        using var nativeSelector = NativeFeatureStateSelector.From(selector);
-        var selectorValue = nativeSelector.Value;
-        NativeStatus.Check(
-            NativeMethods.mln_render_session_remove_feature_state(Handle, &selectorValue)
-        );
     }
 
     public QueriedFeature[] QueryRenderedFeatures(

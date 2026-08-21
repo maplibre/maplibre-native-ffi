@@ -49,7 +49,12 @@ class OpenGLSurfaceBackend final : public mln::gl::RendererBackend,
       backend.setScissorTest(0, 0, 0, 0);
     }
 
-    void swap() override { backend.swap_surface(); }
+    void swap() override {
+      if (mln::core::discard_renderable_present) {
+        return;
+      }
+      backend.swap_surface();
+    }
 
    private:
     OpenGLSurfaceBackend& backend;

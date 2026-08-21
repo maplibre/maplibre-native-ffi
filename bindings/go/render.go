@@ -794,10 +794,10 @@ func (session *RenderSessionHandle) markFrameReleased() {
 // texture at the new size with SetMetalBorrowedTextureTarget,
 // SetVulkanBorrowedTextureTarget, or SetOpenGLBorrowedTextureTarget instead.
 //
-// The session keeps its renderer across a resize, so renderer-held state such
-// as feature state carries over. A scale factor change starts a new renderer
-// with that state empty, because a renderer compiles its shaders for one pixel
-// ratio. Map state such as camera, style, and sources survives either way.
+// The session keeps its renderer across a resize, along with the tile pyramid,
+// glyph and image atlases, and symbol placement. A scale factor change retires
+// the renderer instead, because shaders are compiled for one pixel ratio.
+// Map-owned feature state survives either way.
 func (session *RenderSessionHandle) Resize(extent RenderTargetExtent) error {
 	if err := extent.validate(); err != nil {
 		return err

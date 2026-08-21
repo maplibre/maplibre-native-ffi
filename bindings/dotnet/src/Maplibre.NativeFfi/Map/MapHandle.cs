@@ -6,6 +6,7 @@ using Maplibre.NativeFfi.Internal.Memory;
 using Maplibre.NativeFfi.Internal.Pointer;
 using Maplibre.NativeFfi.Internal.Status;
 using Maplibre.NativeFfi.Internal.Struct;
+using Maplibre.NativeFfi.Query;
 using Maplibre.NativeFfi.Render;
 using Maplibre.NativeFfi.Runtime;
 using Maplibre.NativeFfi.Style;
@@ -640,6 +641,37 @@ public sealed unsafe class MapHandle : IDisposable
         ArgumentNullException.ThrowIfNull(json);
         using var nativeJson = NativeStringView.From(json, nameof(json));
         NativeStatus.Check(NativeMethods.mln_map_set_style_json(Handle, nativeJson.Value));
+    }
+
+    /// <summary>Sets per-feature state on this map.</summary>
+    public void SetFeatureState(FeatureStateSelector selector, byte[] value)
+    {
+        using var nativeSelector = NativeFeatureStateSelector.From(selector);
+        using var nativeValue = NativeStringView.From(value, nameof(value));
+        var selectorValue = nativeSelector.Value;
+        NativeStatus.Check(
+            NativeMethods.mln_map_set_feature_state(Handle, &selectorValue, nativeValue.Value)
+        );
+    }
+
+    /// <summary>Copies per-feature state from this map.</summary>
+    public byte[] GetFeatureState(FeatureStateSelector selector)
+    {
+        using var nativeSelector = NativeFeatureStateSelector.From(selector);
+        var selectorValue = nativeSelector.Value;
+        MlnBuffer buffer = default;
+        NativeStatus.Check(
+            NativeMethods.mln_map_get_feature_state(Handle, &selectorValue, &buffer)
+        );
+        return ValueStructs.ReadBuffer(buffer);
+    }
+
+    /// <summary>Removes per-feature state from this map.</summary>
+    public void RemoveFeatureState(FeatureStateSelector selector)
+    {
+        using var nativeSelector = NativeFeatureStateSelector.From(selector);
+        var selectorValue = nativeSelector.Value;
+        NativeStatus.Check(NativeMethods.mln_map_remove_feature_state(Handle, &selectorValue));
     }
 
     /// <summary>Gets the style document this map's style was last parsed from.</summary>

@@ -75,13 +75,14 @@ unsupported status. Allocate a texture at the new size and replace the target.
 A host can recreate a surface while the map remains live. Android rotation,
 Flutter surface lifecycle changes, and reallocating resizes use this path.
 Replacing the target in place preserves the session's rendering resources,
-including loaded tiles and feature state. Use the same operation after
-allocating a replacement borrowed texture.
+including loaded tiles. Map-owned feature state is unchanged. Use the same
+operation after allocating a replacement borrowed texture.
 
 <Code code={region(renderTarget, "set-target")} lang="c" title="render-target.c" />
 
 Changing the scale factor recreates the session's rendering resources because
-its shaders use a fixed pixel ratio. Feature state then starts empty.
+its shaders use a fixed pixel ratio. Map-owned feature state survives, and the
+next render update pushes it into the new renderer.
 
 Release the session before the map. Destroying a map while a session is attached
 reports an invalid-state status.

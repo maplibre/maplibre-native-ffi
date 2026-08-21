@@ -13,6 +13,7 @@ import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.lifecycle.NativeMap
 import org.maplibre.nativeffi.internal.loader.NativeAccess
+import org.maplibre.nativeffi.query.FeatureStateSelector
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalSurfaceDescriptor
@@ -80,6 +81,21 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   public actual fun setStyleJson(json: ByteArray) {
     NativeAccess.ensureLoaded()
     NativeAccess.setMapStyleJson(requireLiveHandle(), json)
+  }
+
+  public actual fun setFeatureState(selector: FeatureStateSelector, value: ByteArray) {
+    NativeAccess.ensureLoaded()
+    NativeAccess.setMapFeatureState(requireLiveHandle(), selector, value)
+  }
+
+  public actual fun getFeatureState(selector: FeatureStateSelector): ByteArray {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.getMapFeatureState(requireLiveHandle(), selector)
+  }
+
+  public actual fun removeFeatureState(selector: FeatureStateSelector) {
+    NativeAccess.ensureLoaded()
+    NativeAccess.removeMapFeatureState(requireLiveHandle(), selector)
   }
 
   public actual fun loadedStyleJson(): ByteArray {

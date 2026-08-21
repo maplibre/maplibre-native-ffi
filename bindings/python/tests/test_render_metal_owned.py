@@ -368,7 +368,6 @@ def test_active_metal_frame_rejects_nested_acquire_and_session_operations(
     metal_owned_session.render_once()
 
     frame = metal_owned_session.session.acquire_metal_owned_texture_frame()
-    selector = query.FeatureStateSelector(source_id="point", feature_id="feature-1")
     point_query = query.RenderedQueryGeometry.point_geometry(
         camera.ScreenPoint(0.0, 0.0)
     )
@@ -394,12 +393,6 @@ def test_active_metal_frame_rejects_nested_acquire_and_session_operations(
             "x",
             "y",
         ),
-        lambda: metal_owned_session.session.set_feature_state(
-            selector,
-            b'{"hover":true}',
-        ),
-        lambda: metal_owned_session.session.get_feature_state(selector),
-        lambda: metal_owned_session.session.remove_feature_state(selector),
         metal_owned_session.session.close,
         *set_target_calls(metal_owned_session.session),
     )

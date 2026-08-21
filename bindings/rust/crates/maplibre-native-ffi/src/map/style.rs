@@ -13,6 +13,7 @@ pub use maplibre_core::{
 };
 use maplibre_native_ffi_core as maplibre_core;
 use maplibre_native_ffi_core::ptr::const_ptr_or_null;
+use maplibre_native_ffi_core::query::FeatureStateSelectorNativeExt;
 use maplibre_native_ffi_core::values::lat_lngs_to_native;
 use maplibre_native_ffi_sys as sys;
 
@@ -21,8 +22,8 @@ use crate::custom_mvt_vector::CustomMvtVectorSourceState;
 use crate::render::PremultipliedRgba8Image;
 use crate::values::NativeValue;
 use crate::{
-    CustomGeometrySourceOptions, CustomMvtVectorSourceOptions, Error, ErrorKind, LatLng,
-    LatLngBounds, Result,
+    CustomGeometrySourceOptions, CustomMvtVectorSourceOptions, Error, ErrorKind,
+    FeatureStateSelector, LatLng, LatLngBounds, Result,
 };
 
 impl super::MapHandle {
@@ -51,6 +52,38 @@ impl super::MapHandle {
         // completes before a successful return, so the C API has already
         // released the callback state of the sources this load dropped.
         maplibre_core::check(unsafe { sys::mln_map_set_style_json(map, json) })
+    }
+
+    /// Sets per-feature state on this map.
+    pub fn set_feature_state(&self, selector: &FeatureStateSelector, state: &[u8]) -> Result<()> {
+        let map = self.inner.native()?;
+        let selector = selector.to_native();
+        let state = maplibre_core::string::buffer_view(state);
+        // SAFETY: map is live and all borrowed storage remains valid for the call.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_feature_state(map, selector.as_ptr(), state)
+        })
+    }
+
+    /// Copies per-feature state from this map.
+    pub fn get_feature_state(&self, selector: &FeatureStateSelector) -> Result<Vec<u8>> {
+        let map = self.inner.native()?;
+        let selector = selector.to_native();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_buffer>::new();
+        // SAFETY: map is live, selector storage remains valid, and out is writable.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_feature_state(map, selector.as_ptr(), out.as_mut_ptr())
+        })?;
+        // SAFETY: Success transfers the owned buffer to this call.
+        unsafe { maplibre_core::string::copy_owned_buffer(out.get()) }
+    }
+
+    /// Removes per-feature state selected on this map.
+    pub fn remove_feature_state(&self, selector: &FeatureStateSelector) -> Result<()> {
+        let map = self.inner.native()?;
+        let selector = selector.to_native();
+        // SAFETY: map is live and selector storage remains valid for the call.
+        maplibre_core::check(unsafe { sys::mln_map_remove_feature_state(map, selector.as_ptr()) })
     }
 
     /// Copies the style document this map's style was last parsed from: the

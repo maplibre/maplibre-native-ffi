@@ -1614,8 +1614,10 @@ impl RenderSessionHandle {
     /// Resizes this attached render session.
     ///
     /// Surface and owned-texture sessions resize in place, keeping the
-    /// renderer and its state. A scale factor change starts a new renderer with
-    /// renderer-held state empty. Borrowed texture targets report an
+    /// renderer along with the tile pyramid, glyph and image atlases, and
+    /// symbol placement. A scale factor change retires the renderer instead,
+    /// because shaders are compiled for one pixel ratio. Map-owned feature
+    /// state survives either way. Borrowed texture targets report an
     /// unsupported-feature error; hand over a new texture with the backend's
     /// `set_*_borrowed_texture_target` method instead.
     pub fn resize(&self, width: u32, height: u32, scale_factor: f64) -> Result<()> {

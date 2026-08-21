@@ -564,6 +564,40 @@ internal object NativeAccess {
     }
   }
 
+  internal fun setMapFeatureState(
+    map: NativeMap,
+    selector: FeatureStateSelector,
+    value: ByteArray,
+  ) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapTwoAddressStatusFunction("mln_map_set_feature_state")
+          .invokeNative(map, featureStateSelector(arena, selector), byteArrayView(arena, value))
+          as Int
+      )
+    }
+  }
+
+  internal fun getMapFeatureState(map: NativeMap, selector: FeatureStateSelector): ByteArray =
+    Arena.ofConfined().use { arena ->
+      val outSnapshot = arena.allocate(ValueLayout.JAVA_LONG)
+      outSnapshot.set(ValueLayout.JAVA_LONG, 0, 0L)
+      Status.check(
+        mapTwoAddressStatusFunction("mln_map_get_feature_state")
+          .invokeNative(map, featureStateSelector(arena, selector), outSnapshot) as Int
+      )
+      ownedBuffer(NativeOwnedBuffer(outSnapshot.get(ValueLayout.JAVA_LONG, 0)))!!
+    }
+
+  internal fun removeMapFeatureState(map: NativeMap, selector: FeatureStateSelector) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapAddressStatusFunction("mln_map_remove_feature_state")
+          .invokeNative(map, featureStateSelector(arena, selector)) as Int
+      )
+    }
+  }
+
   internal fun addStyleSourceJson(map: NativeMap, sourceId: String, sourceJson: ByteArray) {
     Arena.ofConfined().use { arena ->
       Status.check(
@@ -2269,43 +2303,6 @@ internal object NativeAccess {
     Status.check(
       renderSessionStatusFunction("mln_render_session_dump_debug_logs").invokeNative(session) as Int
     )
-  }
-
-  internal fun setFeatureState(
-    session: NativeRenderSession,
-    selector: FeatureStateSelector,
-    value: ByteArray,
-  ) {
-    Arena.ofConfined().use { arena ->
-      Status.check(
-        renderSessionTwoAddressStatusFunction("mln_render_session_set_feature_state")
-          .invokeNative(session, featureStateSelector(arena, selector), byteArrayView(arena, value))
-          as Int
-      )
-    }
-  }
-
-  internal fun getFeatureState(
-    session: NativeRenderSession,
-    selector: FeatureStateSelector,
-  ): ByteArray =
-    Arena.ofConfined().use { arena ->
-      val outSnapshot = arena.allocate(ValueLayout.JAVA_LONG)
-      outSnapshot.set(ValueLayout.JAVA_LONG, 0, 0L)
-      Status.check(
-        renderSessionTwoAddressStatusFunction("mln_render_session_get_feature_state")
-          .invokeNative(session, featureStateSelector(arena, selector), outSnapshot) as Int
-      )
-      ownedBuffer(NativeOwnedBuffer(outSnapshot.get(ValueLayout.JAVA_LONG, 0)))!!
-    }
-
-  internal fun removeFeatureState(session: NativeRenderSession, selector: FeatureStateSelector) {
-    Arena.ofConfined().use { arena ->
-      Status.check(
-        renderSessionAddressStatusFunction("mln_render_session_remove_feature_state")
-          .invokeNative(session, featureStateSelector(arena, selector)) as Int
-      )
-    }
   }
 
   internal fun queryRenderedFeatures(

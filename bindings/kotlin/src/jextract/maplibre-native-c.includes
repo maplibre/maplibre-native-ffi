@@ -213,6 +213,9 @@
 --include-function mln_map_request_repaint
 --include-function mln_map_request_still_image
 --include-function mln_map_set_event_mask
+--include-function mln_map_set_feature_state
+--include-function mln_map_get_feature_state
+--include-function mln_map_remove_feature_state
 --include-function mln_map_set_style_json
 --include-function mln_map_set_style_url
 --include-function mln_offline_region_list_count
@@ -317,12 +320,9 @@
 --include-function mln_render_session_destroy
 --include-function mln_render_session_detach
 --include-function mln_render_session_dump_debug_logs
---include-function mln_render_session_get_feature_state
 --include-function mln_render_session_reduce_memory_use
---include-function mln_render_session_remove_feature_state
 --include-function mln_render_session_render_update
 --include-function mln_render_session_resize
---include-function mln_render_session_set_feature_state
 
 # include/maplibre_native_c/render_target.h
 --include-constant MLN_OPENGL_CONTEXT_PLATFORM_EGL

@@ -190,6 +190,14 @@ pub const GeoJsonSourceDataHandle = enum(c.mln_geojson_source_data) {
     }
 };
 
+/// Feature-state source, feature, and key selector.
+pub const FeatureStateSelector = struct {
+    source_id: []const u8,
+    source_layer_id: ?[]const u8 = null,
+    feature_id: ?[]const u8 = null,
+    state_key: ?[]const u8 = null,
+};
+
 pub const MapHandle = enum(c.mln_map) {
     _,
 
@@ -248,6 +256,52 @@ pub const MapHandle = enum(c.mln_map) {
         const native_map = try native(self);
         _ = allocator;
         try status.checkStatus(c.mln_map_set_style_json(native_map, stringView(json)), diagnosticStore(self));
+    }
+
+    pub fn setFeatureState(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        selector: FeatureStateSelector,
+        feature_state: []const u8,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        var raw_selector = try featureStateSelectorToNative(&temp, selector);
+        const raw_state = try temp.stringView(feature_state);
+        try status.checkStatus(
+            c.mln_map_set_feature_state(try native(self), &raw_selector, raw_state),
+            diagnosticStore(self),
+        );
+    }
+
+    pub fn getFeatureState(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        selector: FeatureStateSelector,
+    ) status.Error!values.OwnedString {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        var raw_selector = try featureStateSelectorToNative(&temp, selector);
+        var buffer: c.mln_buffer = 0;
+        try status.checkStatus(
+            c.mln_map_get_feature_state(try native(self), &raw_selector, &buffer),
+            diagnosticStore(self),
+        );
+        return (try native_temp.copyOwnedBuffer(allocator, buffer, diagnosticStore(self))) orelse error.NativeError;
+    }
+
+    pub fn removeFeatureState(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        selector: FeatureStateSelector,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        var raw_selector = try featureStateSelectorToNative(&temp, selector);
+        try status.checkStatus(
+            c.mln_map_remove_feature_state(try native(self), &raw_selector),
+            diagnosticStore(self),
+        );
     }
 
     /// Loads a style URL.
@@ -2504,6 +2558,33 @@ fn lockMapRegistry() void {
 
 fn unlockMapRegistry() void {
     map_registry_lock.store(false, .seq_cst);
+}
+
+fn featureStateSelectorToNative(
+    temp: *native_temp.TempStorage,
+    selector: FeatureStateSelector,
+) status.Error!c.mln_feature_state_selector {
+    var raw = c.mln_feature_state_selector{
+        .size = @sizeOf(c.mln_feature_state_selector),
+        .fields = 0,
+        .source_id = try temp.stringView(selector.source_id),
+        .source_layer_id = .{ .data = null, .size = 0 },
+        .feature_id = .{ .data = null, .size = 0 },
+        .state_key = .{ .data = null, .size = 0 },
+    };
+    if (selector.source_layer_id) |source_layer_id| {
+        raw.fields |= c.MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID;
+        raw.source_layer_id = try temp.stringView(source_layer_id);
+    }
+    if (selector.feature_id) |feature_id| {
+        raw.fields |= c.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID;
+        raw.feature_id = try temp.stringView(feature_id);
+    }
+    if (selector.state_key) |state_key| {
+        raw.fields |= c.MLN_FEATURE_STATE_SELECTOR_STATE_KEY;
+        raw.state_key = try temp.stringView(state_key);
+    }
+    return raw;
 }
 
 pub fn native(handle: *MapHandle) status.BindingError!c.mln_map {

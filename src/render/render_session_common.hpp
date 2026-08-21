@@ -7,7 +7,10 @@
 #include <limits>
 #include <memory>
 #include <mutex>
+#include <optional>
+#include <string>
 #include <thread>
+#include <unordered_set>
 #include <vector>
 
 #include <mbgl/actor/scheduler.hpp>
@@ -15,12 +18,19 @@
 #include <mbgl/gfx/renderer_backend.hpp>
 #include <mbgl/renderer/renderer.hpp>
 #include <mbgl/renderer/renderer_observer.hpp>
+#include <mbgl/util/feature.hpp>
 #include <mbgl/util/size.hpp>
 
 #include "diagnostics/diagnostics.hpp"
+#include "map/feature_state.hpp"
 #include "maplibre_native_c.h"
+#include "render/discard_present.hpp"
 
 struct mln_render_session_object;
+
+namespace mln {
+class UpdateParameters;
+}
 
 namespace mln::core {
 
@@ -312,6 +322,10 @@ class SessionFrameObserver final : public mln::RendererObserver {
 
   [[nodiscard]] auto needs_repaint() const -> bool { return needs_repaint_; }
 
+  auto suppress_frame_callbacks(bool suppress) -> void {
+    suppress_frame_callbacks_ = suppress;
+  }
+
   void onInvalidate() override {
     if (delegate_ != nullptr) {
       delegate_->onInvalidate();
@@ -325,21 +339,26 @@ class SessionFrameObserver final : public mln::RendererObserver {
   }
 
   void onWillStartRenderingMap() override {
-    if (delegate_ != nullptr) {
-      delegate_->onWillStartRenderingMap();
+    if (suppress_frame_callbacks_ || delegate_ == nullptr) {
+      return;
     }
+    delegate_->onWillStartRenderingMap();
   }
 
   void onWillStartRenderingFrame() override {
-    if (delegate_ != nullptr) {
-      delegate_->onWillStartRenderingFrame();
+    if (suppress_frame_callbacks_ || delegate_ == nullptr) {
+      return;
     }
+    delegate_->onWillStartRenderingFrame();
   }
 
   void onDidFinishRenderingFrame(
     RenderMode mode, bool repaint, bool placement_changed,
     const mln::gfx::RenderingStats& stats
   ) override {
+    if (suppress_frame_callbacks_) {
+      return;
+    }
     needs_repaint_ = repaint;
     if (delegate_ != nullptr) {
       delegate_->onDidFinishRenderingFrame(
@@ -349,9 +368,10 @@ class SessionFrameObserver final : public mln::RendererObserver {
   }
 
   void onDidFinishRenderingMap() override {
-    if (delegate_ != nullptr) {
-      delegate_->onDidFinishRenderingMap();
+    if (suppress_frame_callbacks_ || delegate_ == nullptr) {
+      return;
     }
+    delegate_->onDidFinishRenderingMap();
   }
 
   void onStyleImageMissing(
@@ -438,6 +458,7 @@ class SessionFrameObserver final : public mln::RendererObserver {
  private:
   mln::RendererObserver* delegate_ = nullptr;
   bool needs_repaint_ = false;
+  bool suppress_frame_callbacks_ = false;
 };
 
 struct RenderTextureState {
@@ -475,6 +496,9 @@ struct mln_render_session_object {
   // Declared before `renderer`, which holds a raw pointer to it.
   mln::core::SessionFrameObserver frame_observer;
   std::unique_ptr<mln::Renderer> renderer = nullptr;
+  std::unordered_set<std::string> rendered_source_ids;
+  mln::core::FeatureStateSnapshot applied_feature_state;
+  std::shared_ptr<const mln::core::FeatureStateSnapshot> pushed_feature_state;
   mln::core::RenderSurfaceState surface;
   mln::core::RenderTextureState texture;
 };
@@ -707,17 +731,6 @@ auto render_session_destroy(mln_render_session session) -> mln_status;
 auto render_session_reduce_memory_use(mln_render_session session) -> mln_status;
 auto render_session_clear_data(mln_render_session session) -> mln_status;
 auto render_session_dump_debug_logs(mln_render_session session) -> mln_status;
-auto render_session_set_feature_state(
-  mln_render_session session, const mln_feature_state_selector* selector,
-  mln_buffer_view state
-) -> mln_status;
-auto render_session_get_feature_state(
-  mln_render_session session, const mln_feature_state_selector* selector,
-  mln_buffer* out_state
-) -> mln_status;
-auto render_session_remove_feature_state(
-  mln_render_session session, const mln_feature_state_selector* selector
-) -> mln_status;
 auto queried_feature_list_count(
   mln_queried_feature_list list, size_t* out_count
 ) -> mln_status;

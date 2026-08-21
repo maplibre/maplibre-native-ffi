@@ -282,64 +282,6 @@ func (options *cSourceFeatureQueryOptions) free() {
 	}
 }
 
-// SetFeatureState sets per-feature state on a render source. The state value is
-// copied before the call returns.
-func (session *RenderSessionHandle) SetFeatureState(selector FeatureStateSelector, state []byte) error {
-	ptr, release, err := session.ptr()
-	if err != nil {
-		return err
-	}
-	defer release()
-	defer session.state.KeepAlive()
-	rawSelector := newCFeatureStateSelector(selector)
-	defer rawSelector.free()
-	rawState := newCBufferView(state)
-	defer rawState.free()
-	return session.withNoAcquiredFrame(func() error {
-		return checkNative(func() int32 {
-			return int32(C.mln_render_session_set_feature_state(C.mln_render_session(ptr), &rawSelector.raw, rawState.raw()))
-		})
-	})
-}
-
-// FeatureState returns copied per-feature state from a render source.
-func (session *RenderSessionHandle) FeatureState(selector FeatureStateSelector) ([]byte, error) {
-	ptr, release, err := session.ptr()
-	if err != nil {
-		return nil, err
-	}
-	defer release()
-	defer session.state.KeepAlive()
-	rawSelector := newCFeatureStateSelector(selector)
-	defer rawSelector.free()
-	var buffer C.mln_buffer
-	if err := session.withNoAcquiredFrame(func() error {
-		return checkNative(func() int32 {
-			return int32(C.mln_render_session_get_feature_state(C.mln_render_session(ptr), &rawSelector.raw, &buffer))
-		})
-	}); err != nil {
-		return nil, err
-	}
-	return goOwnedBuffer(buffer)
-}
-
-// RemoveFeatureState removes per-feature state from a render source.
-func (session *RenderSessionHandle) RemoveFeatureState(selector FeatureStateSelector) error {
-	ptr, release, err := session.ptr()
-	if err != nil {
-		return err
-	}
-	defer release()
-	defer session.state.KeepAlive()
-	rawSelector := newCFeatureStateSelector(selector)
-	defer rawSelector.free()
-	return session.withNoAcquiredFrame(func() error {
-		return checkNative(func() int32 {
-			return int32(C.mln_render_session_remove_feature_state(C.mln_render_session(ptr), &rawSelector.raw))
-		})
-	})
-}
-
 // QueryRenderedFeatures queries rendered features from the latest render session
 // state and returns copied hits.
 func (session *RenderSessionHandle) QueryRenderedFeatures(geometry RenderedQueryGeometry, options *RenderedFeatureQueryOptions) ([]QueriedFeature, error) {

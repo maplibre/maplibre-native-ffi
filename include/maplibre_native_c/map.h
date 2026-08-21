@@ -971,6 +971,75 @@ MLN_API mln_status mln_map_get_size(
 MLN_API mln_status mln_map_request_repaint(mln_map map) MLN_NOEXCEPT;
 
 /**
+ * Sets per-feature state on this map.
+ *
+ * selector->source_id and selector->feature_id are borrowed for the duration of
+ * the call. state must contain one UTF-8 JSON object and is parsed before
+ * return. The accepted command requests a map repaint.
+ *
+ * Feature state belongs to the map. A render session pushes it into the
+ * renderer on the next render update, including the first presented frame that
+ * contains the source. mln_map_get_feature_state copies this map store, not
+ * the last rendered frame.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, selector is
+ *   null or invalid, selector lacks MLN_FEATURE_STATE_SELECTOR_FEATURE_ID,
+ *   state is empty, invalid JSON, or not an object.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_set_feature_state(
+  mln_map map, const mln_feature_state_selector* selector, mln_buffer_view state
+) MLN_NOEXCEPT;
+
+/**
+ * Copies per-feature state from this map.
+ *
+ * selector->source_id and selector->feature_id are borrowed for the duration of
+ * the call. On success, *out_state receives an owned buffer containing a UTF-8
+ * JSON object. Destroy it with mln_buffer_destroy(). Missing feature state is
+ * reported as an empty object. The copy does not require a render session or a
+ * loaded source.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, selector is
+ *   null or invalid, selector lacks MLN_FEATURE_STATE_SELECTOR_FEATURE_ID,
+ *   out_state is null, or *out_state is not null.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_get_feature_state(
+  mln_map map, const mln_feature_state_selector* selector, mln_buffer* out_state
+) MLN_NOEXCEPT;
+
+/**
+ * Removes per-feature state from this map.
+ *
+ * selector->source_id is required. selector->feature_id and selector->state_key
+ * are optional. Passing both removes one state key from one feature. Passing
+ * only feature_id removes all state for that feature. Passing neither removes
+ * all feature state for the source/source-layer. The accepted command requests
+ * a map repaint.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, selector is
+ *   null or invalid, or selector has MLN_FEATURE_STATE_SELECTOR_STATE_KEY
+ *   without MLN_FEATURE_STATE_SELECTOR_FEATURE_ID.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_remove_feature_state(
+  mln_map map, const mln_feature_state_selector* selector
+) MLN_NOEXCEPT;
+
+/**
  * Requests one still image for a static or tile map.
  *
  * Pump the runtime and drain runtime events for this map until

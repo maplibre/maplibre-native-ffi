@@ -157,53 +157,6 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
     Status.check(MaplibreNativeC.mln_render_session_dump_debug_logs(requireLiveHandle()))
   }
 
-  public actual fun setFeatureState(selector: FeatureStateSelector, value: ByteArray) {
-    NativeAccess.ensureLoaded()
-    activeFrame.ensureInactive("set feature state")
-    FeatureStateSelectorScope(selector).use { nativeSelector ->
-      ByteArrayViewScope(value).use { nativeValue ->
-        Status.check(
-          MaplibreNativeC.mln_render_session_set_feature_state(
-            requireLiveHandle(),
-            nativeSelector.selector,
-            nativeValue.view,
-          )
-        )
-      }
-    }
-  }
-
-  public actual fun getFeatureState(selector: FeatureStateSelector): ByteArray {
-    NativeAccess.ensureLoaded()
-    activeFrame.ensureInactive("get feature state")
-    FeatureStateSelectorScope(selector).use { nativeSelector ->
-      LongPointer(1).use { outState ->
-        outState.put(0, 0L)
-        Status.check(
-          MaplibreNativeC.mln_render_session_get_feature_state(
-            requireLiveHandle(),
-            nativeSelector.selector,
-            outState,
-          )
-        )
-        return ownedBuffer(outState.get())
-      }
-    }
-  }
-
-  public actual fun removeFeatureState(selector: FeatureStateSelector) {
-    NativeAccess.ensureLoaded()
-    activeFrame.ensureInactive("remove feature state")
-    FeatureStateSelectorScope(selector).use { nativeSelector ->
-      Status.check(
-        MaplibreNativeC.mln_render_session_remove_feature_state(
-          requireLiveHandle(),
-          nativeSelector.selector,
-        )
-      )
-    }
-  }
-
   public actual fun queryRenderedFeatures(
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions?,
@@ -929,7 +882,7 @@ private class SourceFeatureQueryOptionsScope(value: SourceFeatureQueryOptions?) 
   }
 }
 
-private class FeatureStateSelectorScope(value: FeatureStateSelector) : AutoCloseable {
+internal class FeatureStateSelectorScope(value: FeatureStateSelector) : AutoCloseable {
   private val sourceId = StringViewScope(value.sourceId)
   private val sourceLayerId = value.sourceLayerId?.let(::StringViewScope)
   private val featureId = value.featureId?.let(::StringViewScope)

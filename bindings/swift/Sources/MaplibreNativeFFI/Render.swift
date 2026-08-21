@@ -602,9 +602,10 @@ public final class RenderSessionHandle {
   /// targets throw an unsupported-feature error; hand over a new texture with
   /// the backend's borrowed-texture target setter instead.
   ///
-  /// The session keeps its renderer, and renderer-held state such as feature
-  /// state, across a resize. A scale factor change starts a new renderer with
-  /// that state empty.
+  /// The session keeps its renderer, along with the tile pyramid, glyph and
+  /// image atlases, and symbol placement. A scale factor change retires the
+  /// renderer instead, because shaders are compiled for one pixel ratio.
+  /// Map-owned feature state survives either way.
   public func resize(width: UInt32, height: UInt32,
                      scaleFactor: Double) throws
   {
