@@ -1123,7 +1123,7 @@ impl super::MapHandle {
         })
     }
 
-    /// Sets a location indicator layer accuracy radius in logical pixels.
+    /// Sets a location indicator layer accuracy radius in meters.
     pub fn set_location_indicator_accuracy_radius(
         &self,
         layer_id: &str,
