@@ -81,28 +81,45 @@ apply_mln_patches() {
   done
 }
 
-# `submodule update --checkout` refuses to move a worktree carrying local
-# changes, and leaves one alone entirely when the submodule already sits at the
-# pinned commit, so the files a patch touches are restored before the checkout
-# and the patch goes on again after.
+# A synced worktree is modified in exactly the paths that the listed patches
+# touch, so a tracked change anywhere else is an edit made by hand or a
+# leftover from a patch that has since left the list. A nested submodule
+# carrying tracked edits reports as modified too; untracked content inside
+# one is build noise, and stays ignored.
+mln_unexplained_paths() {
+  local patch patched path
+  patched="$(
+    for patch in "${mln_patches[@]}"; do
+      # --numstat reads the patch alone; its columns are added, removed, path.
+      git -C "$mln_path" apply --numstat "$patch" | cut -f3
+    done
+  )"
+  git -C "$mln_path" status --porcelain --untracked-files=no \
+    --ignore-submodules=untracked | cut -c4- |
+    while read -r path; do
+      grep -qxF "$path" <<<"$patched" || printf '%s\n' "$path"
+    done
+}
+
+# The submodule worktrees below are managed rather than edited, so the update
+# runs with --force: it throws away local changes and checks out even when a
+# submodule already sits at its pinned commit. That is what puts a worktree
+# carrying an applied patch back on the pinned files before the patch goes on
+# again, whether the patch was since edited or dropped from the list entirely.
 #
-# Restoring those paths rather than reversing the patch is what handles an
-# edited patch: an earlier version of it is still applied, no longer reverses,
-# and would leave a stale hunk for the new version to fail against. Files that
-# no patch names are left where they are, so an unrelated local edit still fails
-# the checkout as it would have anyway.
-restore_mln_patch_paths() {
-  local patch path
+# Report the paths that no listed patch accounts for, because an edit made by
+# hand goes with them. Paths that a patch does account for are routine: the
+# checkout resets them and the patch goes back on.
+report_discarded_mln_changes() {
+  local changes
   if [[ ! -e "$mln_path/.git" ]]; then
     return 0
   fi
-  for patch in "${mln_patches[@]}"; do
-    # --numstat reads the patch alone, so it names the paths whatever state the
-    # worktree is in. Its columns are added, removed, path.
-    while IFS=$'\t' read -r _ _ path; do
-      git -C "$mln_path" checkout -- "$path"
-    done < <(git -C "$mln_path" apply --numstat "$patch")
-  done
+  changes="$(mln_unexplained_paths)"
+  if [[ -n "$changes" ]]; then
+    printf 'sync-submodules: discarding local changes in %s\n%s\n' \
+      "$mln_path" "$changes" >&2
+  fi
 }
 
 # Skipped by design (full MapLibre tree only): googletest, benchmark, cpp-httplib, args,
@@ -119,24 +136,25 @@ if [[ "$top_status" == " "* ]]; then
     mlt_count="$(printf '%s\n' "$mlt_status" | sed '/^$/d' | wc -l | tr -d ' ')"
     if [[ "$mlt_count" == "${#mlt_vendor_paths[@]}" ]] &&
       ! grep -qE '^[+-U]' <<<"$mlt_status" &&
-      mln_patches_applied; then
+      mln_patches_applied &&
+      [[ -z "$(mln_unexplained_paths)" ]]; then
       exit 0
     fi
   fi
 fi
 
-restore_mln_patch_paths
+report_discarded_mln_changes
 
 git -c submodule.recurse=false submodule sync "$mln_path"
 # .gitmodules marks this submodule `update = none` so that Cargo and SwiftPM
 # skip it when resolving a git dependency on this repository. --checkout is the
 # opt back in for the builds that do need the source.
-git -c submodule.recurse=false submodule update --init --checkout --depth 1 "$mln_path"
+git -c submodule.recurse=false submodule update --init --checkout --force --depth 1 "$mln_path"
 
 apply_mln_patches
 
 git -C "$mln_path" -c submodule.recurse=false submodule sync "${vendor_paths[@]}"
-git -C "$mln_path" -c submodule.recurse=false submodule update --init --depth 1 "${vendor_paths[@]}"
+git -C "$mln_path" -c submodule.recurse=false submodule update --init --force --depth 1 "${vendor_paths[@]}"
 
 git -C "$mlt_path" -c submodule.recurse=false submodule sync "${mlt_vendor_paths[@]}"
-git -C "$mlt_path" -c submodule.recurse=false submodule update --init --depth 1 "${mlt_vendor_paths[@]}"
+git -C "$mlt_path" -c submodule.recurse=false submodule update --init --force --depth 1 "${mlt_vendor_paths[@]}"
