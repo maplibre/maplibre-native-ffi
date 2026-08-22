@@ -15,9 +15,11 @@ resources whose paths contain spaces or non-ASCII characters.
 uses it to bound one pump's drain; the budget logic stays on the C API side, and
 an unset gate keeps upstream behavior.
 
-Drop a patch once the pin moves to a commit that carries it. Applying is
-idempotent, and the sync restores the files a patch touches before moving the
-submodule, so a pin bump and an edit to a patch both take effect on a worktree
-that already carries the old version. A patch that no longer applies fails the
-sync rather than being skipped. Each patch changes files that the pinned commit
-already has, because restoring a path is how the sync clears what it applied.
+Drop a patch once the pin moves to a commit that carries it. The sync checks out
+the pinned commit with `--force`, so it discards whatever the last sync applied
+before applying the list again. A pin bump, an edit to a patch, and a dropped
+patch all take effect on a worktree that still carries the old version. A patch
+that no longer applies fails the sync rather than being skipped.
+
+Local edits to the submodule worktree are discarded by the same checkout. The
+sync prints them first.
