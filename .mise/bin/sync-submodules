@@ -81,19 +81,41 @@ apply_mln_patches() {
   done
 }
 
+# A synced worktree is modified in exactly the paths that the listed patches
+# touch, so a tracked change anywhere else is an edit made by hand or a
+# leftover from a patch that has since left the list. A nested submodule
+# carrying tracked edits reports as modified too; untracked content inside
+# one is build noise, and stays ignored.
+mln_unexplained_paths() {
+  local patch patched path
+  patched="$(
+    for patch in "${mln_patches[@]}"; do
+      # --numstat reads the patch alone; its columns are added, removed, path.
+      git -C "$mln_path" apply --numstat "$patch" | cut -f3
+    done
+  )"
+  git -C "$mln_path" status --porcelain --untracked-files=no \
+    --ignore-submodules=untracked | cut -c4- |
+    while read -r path; do
+      grep -qxF "$path" <<<"$patched" || printf '%s\n' "$path"
+    done
+}
+
 # The submodule worktrees below are managed rather than edited, so the update
 # runs with --force: it throws away local changes and checks out even when a
 # submodule already sits at its pinned commit. That is what puts a worktree
 # carrying an applied patch back on the pinned files before the patch goes on
 # again, whether the patch was since edited or dropped from the list entirely.
 #
-# Report what that discards, because a local edit made by hand goes with it.
+# Report the paths that no listed patch accounts for, because an edit made by
+# hand goes with them. Paths that a patch does account for are routine: the
+# checkout resets them and the patch goes back on.
 report_discarded_mln_changes() {
   local changes
   if [[ ! -e "$mln_path/.git" ]]; then
     return 0
   fi
-  changes="$(git -C "$mln_path" status --porcelain --untracked-files=no || true)"
+  changes="$(mln_unexplained_paths)"
   if [[ -n "$changes" ]]; then
     printf 'sync-submodules: discarding local changes in %s\n%s\n' \
       "$mln_path" "$changes" >&2
@@ -114,7 +136,8 @@ if [[ "$top_status" == " "* ]]; then
     mlt_count="$(printf '%s\n' "$mlt_status" | sed '/^$/d' | wc -l | tr -d ' ')"
     if [[ "$mlt_count" == "${#mlt_vendor_paths[@]}" ]] &&
       ! grep -qE '^[+-U]' <<<"$mlt_status" &&
-      mln_patches_applied; then
+      mln_patches_applied &&
+      [[ -z "$(mln_unexplained_paths)" ]]; then
       exit 0
     fi
   fi

@@ -21,5 +21,8 @@ before applying the list again. A pin bump, an edit to a patch, and a dropped
 patch all take effect on a worktree that still carries the old version. A patch
 that no longer applies fails the sync rather than being skipped.
 
-Local edits to the submodule worktree are discarded by the same checkout. The
-sync prints them first.
+Local edits to the submodule worktree, including edits inside a nested vendor
+submodule, are discarded by the same checkout, and a sync runs it whenever the
+worktree carries a tracked change that no listed patch accounts for. The sync
+prints those paths first. A forced checkout also removes an untracked file that
+sits where a new pin adds a tracked one.
