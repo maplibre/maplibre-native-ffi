@@ -457,6 +457,14 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             .WaitAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Resizes this attached render session. Surface and owned-texture sessions resize in place;
+    /// a borrowed texture target reports an unsupported-feature error, since its owner sizes it —
+    /// hand over a new texture with the backend's set-target method instead. A resize keeps the
+    /// session's renderer along with the tile pyramid, glyph and image atlases, and symbol
+    /// placement. A scale factor change retires the renderer instead, because shaders are compiled
+    /// for one pixel ratio. Map-owned feature state survives either way.
+    /// </summary>
     public Task ResizeAsync(
         RenderTargetExtent extent,
         CancellationToken cancellationToken = default
@@ -617,100 +625,6 @@ public sealed unsafe class RenderSessionHandle : IDisposable
                 CopyBuffer
             )
             .WaitAsync(cancellationToken);
-    }
-
-    public Task SetFeatureStateAsync(
-        FeatureStateSelector selector,
-        byte[] stateJson,
-        CancellationToken cancellationToken = default
-    )
-    {
-        ArgumentNullException.ThrowIfNull(selector);
-        using var source = NativeStringView.From(selector.SourceId, nameof(selector.SourceId));
-        using var layer = NativeStringView.From(
-            selector.SourceLayerId ?? string.Empty,
-            nameof(selector.SourceLayerId)
-        );
-        using var feature = NativeStringView.From(
-            selector.FeatureId ?? string.Empty,
-            nameof(selector.FeatureId)
-        );
-        using var state = NativeStringView.From(stateJson, nameof(stateJson));
-        return StartOperationAsync(
-            operation =>
-                NativeMethods.mln_render_session_set_feature_state(
-                    Handle,
-                    source.Value,
-                    layer.Value,
-                    feature.Value,
-                    state.Value,
-                    operation
-                ),
-            cancellationToken
-        );
-    }
-
-    public Task<byte[]> GetFeatureStateAsync(
-        FeatureStateSelector selector,
-        CancellationToken cancellationToken = default
-    )
-    {
-        ArgumentNullException.ThrowIfNull(selector);
-        using var source = NativeStringView.From(selector.SourceId, nameof(selector.SourceId));
-        using var layer = NativeStringView.From(
-            selector.SourceLayerId ?? string.Empty,
-            nameof(selector.SourceLayerId)
-        );
-        using var feature = NativeStringView.From(
-            selector.FeatureId ?? string.Empty,
-            nameof(selector.FeatureId)
-        );
-        return NativeCompletion
-            .Submit(
-                completion =>
-                    NativeMethods.mln_render_session_get_feature_state(
-                        Handle,
-                        source.Value,
-                        layer.Value,
-                        feature.Value,
-                        completion
-                    ),
-                CopyBuffer
-            )
-            .WaitAsync(cancellationToken);
-    }
-
-    public Task RemoveFeatureStateAsync(
-        FeatureStateSelector selector,
-        CancellationToken cancellationToken = default
-    )
-    {
-        ArgumentNullException.ThrowIfNull(selector);
-        using var source = NativeStringView.From(selector.SourceId, nameof(selector.SourceId));
-        using var layer = NativeStringView.From(
-            selector.SourceLayerId ?? string.Empty,
-            nameof(selector.SourceLayerId)
-        );
-        using var feature = NativeStringView.From(
-            selector.FeatureId ?? string.Empty,
-            nameof(selector.FeatureId)
-        );
-        using var key = NativeStringView.From(
-            selector.StateKey ?? string.Empty,
-            nameof(selector.StateKey)
-        );
-        return StartOperationAsync(
-            operation =>
-                NativeMethods.mln_render_session_remove_feature_state(
-                    Handle,
-                    source.Value,
-                    layer.Value,
-                    feature.Value,
-                    key.Value,
-                    operation
-                ),
-            cancellationToken
-        );
     }
 
     public Task DetachAsync(CancellationToken cancellationToken = default) =>

@@ -3,6 +3,7 @@ import org.gradle.api.tasks.testing.Test
 import org.gradle.api.tasks.testing.logging.TestLogEvent
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+import org.jetbrains.kotlin.gradle.plugin.mpp.NativeBuildType
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
@@ -62,6 +63,12 @@ kotlin {
     minSdk = libs.versions.android.minSdk.get().toInt()
 
     withJava()
+    // Device-test APK assets are collected only when Android resource processing
+    // is enabled. The published AAR has no res/ or assets/ of its own.
+    androidResources {
+      enable = true
+      noCompress += "pmtiles"
+    }
     withDeviceTestBuilder { sourceSetTreeName = "test" }
       .configure {
         instrumentationRunner = "org.maplibre.nativeffi.MaplibreTestRunner"
@@ -92,12 +99,50 @@ kotlin {
       }
     }
 
+    // Kotlin tests compile against a klib. macOS CI compiles the generated
+    // Objective-C header so a public name that collides with a C macro fails
+    // the same way an Xcode framework consumer would.
+    if (hostPlatform.isMac && name == "macosArm64") {
+      binaries.framework("objcExportCheck", listOf(NativeBuildType.DEBUG)) {
+        baseName = "MaplibreNativeFfi"
+        isStatic = true
+      }
+      val framework = binaries.getFramework("objcExportCheck", NativeBuildType.DEBUG)
+      val headerCheckScript = file("scripts/check-objc-export-header.sh")
+      val generatedHeader = framework.outputFile.resolve("Headers/${framework.baseName}.h")
+      val check =
+        tasks.register<Exec>("checkObjcExportHeader") {
+          group = "verification"
+          description = "Compiles the generated Objective-C header with clang."
+          dependsOn(framework.linkTaskProvider)
+          inputs.file(headerCheckScript)
+          inputs.file(generatedHeader)
+          commandLine("bash", headerCheckScript, "macosx", generatedHeader)
+        }
+      tasks.matching { it.name == "macosArm64Test" }.configureEach { dependsOn(check) }
+    }
+
     compilations.getByName("main") {
       cinterops {
         create("maplibreNativeC") {
           defFile(project.file("src/nativeInterop/cinterop/maplibreNativeC.def"))
           includeDirs.headerFilterOnly(checkedInCHeaders.asFile)
           compilerOpts("-I${checkedInCHeaders.asFile}")
+        }
+      }
+    }
+
+    if (name == "linuxX64" || name == "linuxArm64") {
+      val eglLibDir =
+        if (name == "linuxX64") "/usr/lib/x86_64-linux-gnu" else "/usr/lib/aarch64-linux-gnu"
+      binaries.all { linkerOpts("-L$eglLibDir") }
+      compilations.getByName("test") {
+        cinterops {
+          create("egl") {
+            defFile(project.file("src/linuxTest/cinterop/egl.def"))
+            includeDirs(project.file("src/linuxTest/cinterop"))
+            compilerOpts("-I${project.file("src/linuxTest/cinterop")}")
+          }
         }
       }
     }
@@ -156,7 +201,15 @@ configurations.register("javaCppTool") {
   isCanBeResolved = true
 }
 
-dependencies.add("javaCppTool", libs.javacpp)
+val lwjglNative = hostPlatform.lwjglNativeClassifier
+
+dependencies {
+  add("javaCppTool", libs.javacpp)
+  "jvmTestImplementation"(platform(libs.lwjgl.bom))
+  "jvmTestImplementation"(libs.lwjgl)
+  "jvmTestImplementation"(libs.lwjgl.egl)
+  "jvmTestRuntimeOnly"(variantOf(libs.lwjgl) { classifier(lwjglNative) })
+}
 
 apply(from = "gradle/jextract-jvm.gradle.kts")
 

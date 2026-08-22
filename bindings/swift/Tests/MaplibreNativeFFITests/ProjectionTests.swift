@@ -57,7 +57,11 @@ import Testing
   #expect(abs(detached.latitude - 10) < 0.000001)
   #expect(abs(detached.longitude - 20) < 0.000001)
 
-  try projection.close()
+  // Close is synchronous and works from any thread.
+  try await Task.detached {
+    _ = try projection.camera()
+    try projection.close()
+  }.value
   #expect(projection.isClosed)
 }
 

@@ -114,7 +114,8 @@ struct OwnedImageOptions {
     value.stretch_y = stretch_y.data();
   }
 };
-struct OwnedCustomGeometryOptions {
+template <typename Options>
+struct OwnedCallbackSourceOptions {
   enum class Ownership : std::uint8_t {
     pending,
     accepted,
@@ -122,15 +123,13 @@ struct OwnedCustomGeometryOptions {
     rejected,
   };
 
-  mln_custom_geometry_source_options value{};
+  Options value{};
   std::atomic<Ownership> ownership = Ownership::pending;
 
-  explicit OwnedCustomGeometryOptions(
-    const mln_custom_geometry_source_options& options
-  )
+  explicit OwnedCallbackSourceOptions(const Options& options)
       : value(options) {}
 
-  ~OwnedCustomGeometryOptions() {
+  ~OwnedCallbackSourceOptions() {
     if (
       ownership.load(std::memory_order_acquire) == Ownership::accepted &&
       value.release_user_data != nullptr
@@ -142,6 +141,11 @@ struct OwnedCustomGeometryOptions {
     }
   }
 };
+
+using OwnedCustomGeometryOptions =
+  OwnedCallbackSourceOptions<mln_custom_geometry_source_options>;
+using OwnedCustomMvtVectorOptions =
+  OwnedCallbackSourceOptions<mln_custom_mvt_vector_source_options>;
 auto valid_view(mln_buffer_view view, const char* name) -> bool {
   if (view.data == nullptr && view.size != 0) {
     mln::core::set_thread_error(name);
@@ -258,6 +262,11 @@ auto mln_geojson_source_options_default(void) noexcept
 auto mln_custom_geometry_source_options_default(void) noexcept
   -> mln_custom_geometry_source_options {
   return mln::core::custom_geometry_source_options_default();
+}
+
+auto mln_custom_mvt_vector_source_options_default(void) noexcept
+  -> mln_custom_mvt_vector_source_options {
+  return mln::core::custom_mvt_vector_source_options_default();
 }
 
 auto mln_premultiplied_rgba8_image_default(void) noexcept
@@ -910,6 +919,116 @@ auto mln_map_invalidate_custom_geometry_source_region(
       [map, id = std::move(id), bounds]() -> mln_status {
         return mln::core::map_invalidate_custom_geometry_source_region(
           map, id.view(), bounds
+        );
+      },
+      completion
+    );
+  });
+}
+
+auto mln_map_add_custom_mvt_vector_source(
+  mln_map map, mln_buffer_view source_id,
+  const mln_custom_mvt_vector_source_options* options,
+  const mln_completion* completion
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    if (
+      !valid_view(source_id, "source_id is invalid") ||
+      mln::core::validate_custom_mvt_command_options(options) != MLN_STATUS_OK
+    ) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    auto id = OwnedView{source_id};
+    auto owned = std::make_shared<OwnedCustomMvtVectorOptions>(*options);
+    const auto status = command(
+      map,
+      [map, id = std::move(id), owned]() -> mln_status {
+        const auto add_status = mln::core::map_add_custom_mvt_vector_source(
+          map, id.view(), &owned->value
+        );
+        if (add_status == MLN_STATUS_OK) {
+          auto expected = OwnedCustomMvtVectorOptions::Ownership::pending;
+          if (!owned->ownership.compare_exchange_strong(
+                expected, OwnedCustomMvtVectorOptions::Ownership::adopted,
+                std::memory_order_acq_rel
+              )) {
+            owned->ownership.store(
+              OwnedCustomMvtVectorOptions::Ownership::adopted,
+              std::memory_order_release
+            );
+          }
+        }
+        return add_status;
+      },
+      completion
+    );
+    if (status == MLN_STATUS_OK) {
+      auto expected = OwnedCustomMvtVectorOptions::Ownership::pending;
+      static_cast<void>(owned->ownership.compare_exchange_strong(
+        expected, OwnedCustomMvtVectorOptions::Ownership::accepted,
+        std::memory_order_acq_rel
+      ));
+    } else {
+      owned->ownership.store(
+        OwnedCustomMvtVectorOptions::Ownership::rejected,
+        std::memory_order_release
+      );
+    }
+    return status;
+  });
+}
+
+auto mln_map_set_custom_mvt_vector_source_tile_data(
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
+  mln_buffer_view data, const mln_completion* completion
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    auto id = OwnedView{source_id};
+    auto owned = OwnedView{data};
+    return command(
+      map,
+      [map, id = std::move(id), owned = std::move(owned),
+       tile_id]() -> mln_status {
+        return mln::core::map_set_custom_mvt_vector_source_tile_data(
+          map, id.view(), tile_id, owned.view()
+        );
+      },
+      completion
+    );
+  });
+}
+
+auto mln_map_set_custom_mvt_vector_source_tile_error(
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
+  mln_buffer_view message, const mln_completion* completion
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    auto id = OwnedView{source_id};
+    auto owned = OwnedView{message};
+    return command(
+      map,
+      [map, id = std::move(id), owned = std::move(owned),
+       tile_id]() -> mln_status {
+        return mln::core::map_set_custom_mvt_vector_source_tile_error(
+          map, id.view(), tile_id, owned.view()
+        );
+      },
+      completion
+    );
+  });
+}
+
+auto mln_map_invalidate_custom_mvt_vector_source_tile(
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
+  const mln_completion* completion
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    auto id = OwnedView{source_id};
+    return command(
+      map,
+      [map, id = std::move(id), tile_id]() -> mln_status {
+        return mln::core::map_invalidate_custom_mvt_vector_source_tile(
+          map, id.view(), tile_id
         );
       },
       completion

@@ -47,7 +47,9 @@ func (projection *MapProjectionHandle) ptr() (nativeProjection, error) {
 	return value, nil
 }
 
-// Close destroys this projection helper synchronously.
+// Close destroys this projection helper synchronously. A successful close
+// makes later calls fail. A failed close leaves the native handle live so
+// callers can retry.
 func (projection *MapProjectionHandle) Close() error {
 	if projection == nil || projection.state == nil {
 		return newBindingError(ErrInvalidArgument, "MapProjectionHandle is nil")

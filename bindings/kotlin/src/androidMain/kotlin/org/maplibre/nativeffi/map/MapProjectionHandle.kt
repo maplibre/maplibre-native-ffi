@@ -28,17 +28,19 @@ public actual class MapProjectionHandle internal constructor(private val handleI
   public actual fun camera(): CameraOptions {
     NativeAccess.ensureLoaded()
     MaplibreNativeC.mln_camera_options_default().use { outCamera ->
-      Status.check(MaplibreNativeC.mln_map_projection_get_camera(requireLiveHandle(), outCamera))
-      return projectionCameraOptions(outCamera)
+      return withLiveHandle { handle ->
+        Status.check(MaplibreNativeC.mln_map_projection_get_camera(handle, outCamera))
+        projectionCameraOptions(outCamera)
+      }
     }
   }
 
   public actual fun setCamera(camera: CameraOptions) {
     NativeAccess.ensureLoaded()
     ProjectionCameraOptionsScope(camera).use { nativeCamera ->
-      Status.check(
-        MaplibreNativeC.mln_map_projection_set_camera(requireLiveHandle(), nativeCamera.options)
-      )
+      withLiveHandle { handle ->
+        Status.check(MaplibreNativeC.mln_map_projection_set_camera(handle, nativeCamera.options))
+      }
     }
   }
 
@@ -51,14 +53,16 @@ public actual class MapProjectionHandle internal constructor(private val handleI
         .bottom(padding.bottom)
         .right(padding.right)
         .use { nativePadding ->
-          Status.check(
-            MaplibreNativeC.mln_map_projection_set_visible_coordinates(
-              requireLiveHandle(),
-              nativeCoordinates.coordinates,
-              nativeCoordinates.count,
-              nativePadding,
+          withLiveHandle { handle ->
+            Status.check(
+              MaplibreNativeC.mln_map_projection_set_visible_coordinates(
+                handle,
+                nativeCoordinates.coordinates,
+                nativeCoordinates.count,
+                nativePadding,
+              )
             )
-          )
+          }
         }
     }
   }
@@ -72,13 +76,15 @@ public actual class MapProjectionHandle internal constructor(private val handleI
         .bottom(padding.bottom)
         .right(padding.right)
         .use { nativePadding ->
-          Status.check(
-            MaplibreNativeC.mln_map_projection_set_visible_geometry(
-              requireLiveHandle(),
-              nativeGeometry.view,
-              nativePadding,
+          withLiveHandle { handle ->
+            Status.check(
+              MaplibreNativeC.mln_map_projection_set_visible_geometry(
+                handle,
+                nativeGeometry.view,
+                nativePadding,
+              )
             )
-          )
+          }
         }
     }
   }
@@ -86,15 +92,17 @@ public actual class MapProjectionHandle internal constructor(private val handleI
   public actual fun pixelForLatLng(coordinate: LatLng): ScreenPoint {
     NativeAccess.ensureLoaded()
     MaplibreNativeC.mln_screen_point().use { outPoint ->
-      Status.check(
-        MaplibreNativeC.mln_map_projection_pixel_for_lat_lng(
-          requireLiveHandle(),
-          MaplibreNativeC.mln_lat_lng()
-            .latitude(coordinate.latitude)
-            .longitude(coordinate.longitude),
-          outPoint,
+      withLiveHandle { handle ->
+        Status.check(
+          MaplibreNativeC.mln_map_projection_pixel_for_lat_lng(
+            handle,
+            MaplibreNativeC.mln_lat_lng()
+              .latitude(coordinate.latitude)
+              .longitude(coordinate.longitude),
+            outPoint,
+          )
         )
-      )
+      }
       return ScreenPoint(outPoint.x(), outPoint.y())
     }
   }
@@ -102,13 +110,15 @@ public actual class MapProjectionHandle internal constructor(private val handleI
   public actual fun latLngForPixel(point: ScreenPoint): LatLng {
     NativeAccess.ensureLoaded()
     MaplibreNativeC.mln_lat_lng().use { outCoordinate ->
-      Status.check(
-        MaplibreNativeC.mln_map_projection_lat_lng_for_pixel(
-          requireLiveHandle(),
-          MaplibreNativeC.mln_screen_point().x(point.x).y(point.y),
-          outCoordinate,
+      withLiveHandle { handle ->
+        Status.check(
+          MaplibreNativeC.mln_map_projection_lat_lng_for_pixel(
+            handle,
+            MaplibreNativeC.mln_screen_point().x(point.x).y(point.y),
+            outCoordinate,
+          )
         )
-      )
+      }
       return LatLng(outCoordinate.latitude(), outCoordinate.longitude())
     }
   }
@@ -127,10 +137,7 @@ public actual class MapProjectionHandle internal constructor(private val handleI
     core.completeClose()
   }
 
-  private fun requireLiveHandle(): Long {
-    core.requireLive()
-    return handleId
-  }
+  private fun <T> withLiveHandle(block: (Long) -> T): T = core.withLive { block(handleId) }
 }
 
 private fun projectionCameraOptions(value: MaplibreNativeC.mln_camera_options): CameraOptions {

@@ -10,6 +10,7 @@
 mod camera;
 mod completion;
 mod custom_geometry;
+mod custom_mvt_vector;
 mod events;
 mod geojson;
 mod handle;
@@ -33,6 +34,7 @@ pub use camera::{
 };
 pub use completion::{CommandCompletion, NativeFuture};
 pub use custom_geometry::{CanonicalTileId, CustomGeometrySourceOptions};
+pub use custom_mvt_vector::CustomMvtVectorSourceOptions;
 pub use events::{
     CameraTransitionFinishedEvent, CommandDisposition, MapId, OfflineRegionResponseErrorEvent,
     OfflineRegionStatus, OfflineRegionStatusEvent, OfflineRegionTileCountLimitEvent,

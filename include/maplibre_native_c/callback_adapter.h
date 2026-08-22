@@ -522,6 +522,17 @@ MLN_API void mln_adapter_custom_geometry_callbacks_retire(
   mln_custom_geometry_source_tile_callback cancel_tile, void* user_data
 ) MLN_NOEXCEPT;
 
+/**
+ * Invokes custom MVT vector tile callbacks once with a retirement tile id.
+ *
+ * The retirement tile id uses z = UINT8_MAX, which no real tile uses, so a host
+ * listener recognizes it and releases the state behind the callbacks.
+ */
+MLN_API void mln_adapter_custom_mvt_vector_callbacks_retire(
+  mln_custom_mvt_vector_source_tile_callback fetch_tile,
+  mln_custom_mvt_vector_source_tile_callback cancel_tile, void* user_data
+) MLN_NOEXCEPT;
+
 // NOLINTEND(modernize-use-using,modernize-use-trailing-return-type)
 
 #ifdef __cplusplus

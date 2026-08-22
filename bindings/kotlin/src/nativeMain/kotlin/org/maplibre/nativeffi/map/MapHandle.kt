@@ -43,6 +43,7 @@ import org.maplibre.nativeffi.internal.c.mln_lat_lng
 import org.maplibre.nativeffi.internal.c.mln_logical_extent
 import org.maplibre.nativeffi.internal.c.mln_map_add_color_relief_layer
 import org.maplibre.nativeffi.internal.c.mln_map_add_custom_geometry_source
+import org.maplibre.nativeffi.internal.c.mln_map_add_custom_mvt_vector_source
 import org.maplibre.nativeffi.internal.c.mln_map_add_geojson_source_data
 import org.maplibre.nativeffi.internal.c.mln_map_add_geojson_source_url
 import org.maplibre.nativeffi.internal.c.mln_map_add_hillshade_layer
@@ -64,6 +65,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_copy_layer_source_id
 import org.maplibre.nativeffi.internal.c.mln_map_copy_layer_source_layer
 import org.maplibre.nativeffi.internal.c.mln_map_copy_style_image_stretches
 import org.maplibre.nativeffi.internal.c.mln_map_create
+import org.maplibre.nativeffi.internal.c.mln_map_get_feature_state
 import org.maplibre.nativeffi.internal.c.mln_map_get_image_source_coordinates
 import org.maplibre.nativeffi.internal.c.mln_map_get_layer_filter
 import org.maplibre.nativeffi.internal.c.mln_map_get_layer_property
@@ -75,6 +77,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_info
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_transition_options
 import org.maplibre.nativeffi.internal.c.mln_map_invalidate_custom_geometry_source_region
 import org.maplibre.nativeffi.internal.c.mln_map_invalidate_custom_geometry_source_tile
+import org.maplibre.nativeffi.internal.c.mln_map_invalidate_custom_mvt_vector_source_tile
 import org.maplibre.nativeffi.internal.c.mln_map_list_style_layer_ids
 import org.maplibre.nativeffi.internal.c.mln_map_list_style_source_ids
 import org.maplibre.nativeffi.internal.c.mln_map_loaded_style_json
@@ -83,6 +86,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_options
 import org.maplibre.nativeffi.internal.c.mln_map_options_default
 import org.maplibre.nativeffi.internal.c.mln_map_projection_create
 import org.maplibre.nativeffi.internal.c.mln_map_release
+import org.maplibre.nativeffi.internal.c.mln_map_remove_feature_state
 import org.maplibre.nativeffi.internal.c.mln_map_remove_style_image
 import org.maplibre.nativeffi.internal.c.mln_map_remove_style_layer
 import org.maplibre.nativeffi.internal.c.mln_map_remove_style_source
@@ -91,8 +95,11 @@ import org.maplibre.nativeffi.internal.c.mln_map_request_still_image
 import org.maplibre.nativeffi.internal.c.mln_map_resize
 import org.maplibre.nativeffi.internal.c.mln_map_set_bounds
 import org.maplibre.nativeffi.internal.c.mln_map_set_custom_geometry_source_tile_data
+import org.maplibre.nativeffi.internal.c.mln_map_set_custom_mvt_vector_source_tile_data
+import org.maplibre.nativeffi.internal.c.mln_map_set_custom_mvt_vector_source_tile_error
 import org.maplibre.nativeffi.internal.c.mln_map_set_debug_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_event_mask
+import org.maplibre.nativeffi.internal.c.mln_map_set_feature_state
 import org.maplibre.nativeffi.internal.c.mln_map_set_free_camera_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_geojson_source_data
 import org.maplibre.nativeffi.internal.c.mln_map_set_geojson_source_synchronous_tiling
@@ -139,7 +146,9 @@ import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.struct.ByteStructs
 import org.maplibre.nativeffi.internal.struct.CoreStructs
 import org.maplibre.nativeffi.internal.struct.MapStructs
+import org.maplibre.nativeffi.internal.struct.QueryStructs
 import org.maplibre.nativeffi.internal.struct.StyleStructs
+import org.maplibre.nativeffi.query.FeatureStateSelector
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalSurfaceDescriptor
@@ -157,6 +166,7 @@ import org.maplibre.nativeffi.runtime.CommandCompletion
 import org.maplibre.nativeffi.runtime.RuntimeEventMask
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.CustomMvtVectorSourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceDataHandle
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.ImageStretch
@@ -183,6 +193,8 @@ private constructor(
     RuntimeEventMask(cachedEventMask.nativeValue and RuntimeEventMask.ALL_MAP_EVENTS.nativeValue)
   private val customGeometrySources =
     CustomGeometrySourceRegistry<CustomGeometrySourceState> { it.close() }
+  private val customMvtVectorSources =
+    CustomGeometrySourceRegistry<CustomMvtVectorSourceState> { it.close() }
 
   public actual val eventMask: RuntimeEventMask
     get() = cachedEventMask
@@ -220,6 +232,50 @@ private constructor(
         )
       }
     }
+
+  public actual fun setFeatureState(
+    selector: FeatureStateSelector,
+    value: ByteArray,
+  ): Deferred<CommandCompletion> = command { completion ->
+    memScoped {
+      Status.check(
+        mln_map_set_feature_state(
+          state.requireLive().rawHandleValue,
+          QueryStructs.featureStateSelector(selector, this),
+          ByteStructs.bufferView(value, this),
+          completion,
+        )
+      )
+    }
+  }
+
+  public actual fun getFeatureState(selector: FeatureStateSelector): Deferred<ByteArray> =
+    memScoped {
+      CompletionBridge.submit(
+        { result -> checkNotNull(bufferCompletion(result)) },
+        { completion ->
+          mln_map_get_feature_state(
+            state.requireLive().rawHandleValue,
+            QueryStructs.featureStateSelector(selector, this),
+            completion,
+          )
+        },
+      )
+    }
+
+  public actual fun removeFeatureState(
+    selector: FeatureStateSelector
+  ): Deferred<CommandCompletion> = command { completion ->
+    memScoped {
+      Status.check(
+        mln_map_remove_feature_state(
+          state.requireLive().rawHandleValue,
+          QueryStructs.featureStateSelector(selector, this),
+          completion,
+        )
+      )
+    }
+  }
 
   public actual fun loadedStyleJson(): Deferred<ByteArray> =
     CompletionBridge.submit(
@@ -451,6 +507,78 @@ private constructor(
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           CoreStructs.latLngBounds(bounds),
+          completion,
+        )
+      )
+    }
+  }
+
+  public actual fun addCustomMvtVectorSource(
+    sourceId: String,
+    options: CustomMvtVectorSourceOptions,
+  ): Deferred<CommandCompletion> = command { completion ->
+    val registry = customMvtVectorSources
+    val sourceState = CustomMvtVectorSourceState(options) { registry.remove(sourceId) }
+    registry.install(sourceId, sourceState) {
+      memScoped {
+        Status.check(
+          mln_map_add_custom_mvt_vector_source(
+            state.requireLive().rawHandleValue,
+            CoreStructs.stringView(sourceId, this),
+            sourceState.descriptor(),
+            completion,
+          )
+        )
+      }
+    }
+  }
+
+  public actual fun setCustomMvtVectorSourceTileData(
+    sourceId: String,
+    tileId: CanonicalTileId,
+    data: ByteArray,
+  ): Deferred<CommandCompletion> = command { completion ->
+    memScoped {
+      Status.check(
+        mln_map_set_custom_mvt_vector_source_tile_data(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(sourceId, this),
+          StyleStructs.canonicalTileId(tileId),
+          ByteStructs.bufferView(data, this),
+          completion,
+        )
+      )
+    }
+  }
+
+  public actual fun setCustomMvtVectorSourceTileError(
+    sourceId: String,
+    tileId: CanonicalTileId,
+    message: String,
+  ): Deferred<CommandCompletion> = command { completion ->
+    memScoped {
+      Status.check(
+        mln_map_set_custom_mvt_vector_source_tile_error(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(sourceId, this),
+          StyleStructs.canonicalTileId(tileId),
+          CoreStructs.stringView(message, this),
+          completion,
+        )
+      )
+    }
+  }
+
+  public actual fun invalidateCustomMvtVectorSourceTile(
+    sourceId: String,
+    tileId: CanonicalTileId,
+  ): Deferred<CommandCompletion> = command { completion ->
+    memScoped {
+      Status.check(
+        mln_map_invalidate_custom_mvt_vector_source_tile(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(sourceId, this),
+          StyleStructs.canonicalTileId(tileId),
           completion,
         )
       )

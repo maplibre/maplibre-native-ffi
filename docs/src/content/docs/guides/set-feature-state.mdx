@@ -16,11 +16,11 @@ style expressions read while the map draws. One styling rule then covers
 selection, hover, a live value, or a computed status, because each feature
 supplies its own input to that rule.
 
-Feature state belongs to the [render session](/maplibre-native-ffi/concepts/)
-and applies to its loaded tiles. Its set, get, and remove operations are callable
-from any thread and execute in order through the selected driver. A caller
-driver needs graphics-thread service while an operation is pending. Set state
-after the first rendered frame that follows a style load.
+Feature state belongs to the [map](/maplibre-native-ffi/concepts/). Its set,
+get, and remove calls are callable from any thread, execute in order, and
+report through a completion. A render session pushes the map's store into the
+renderer on the next render update, including the first presented frame that
+contains the source.
 
 ## Set state on a feature
 
@@ -53,28 +53,25 @@ with neither one removes the state of every feature in the source layer.
 
 ## Read state back
 
-Reading state copies the session's value into a snapshot handle that the host
-owns. The snapshot contains an empty object when the source or feature has no
-state.
+Reading state copies the map's store and reports the copy through the
+completion. The read does not require a render session or a loaded source.
 
 <Code code={region(featureStateRead, "get")} lang="c" title="feature-state-read.c" />
 
-The snapshot's root is a JSON object with one member per state key. Reading one
-value iterates over those members and compares each key against the one that you
-want.
+The result is UTF-8 bytes holding one JSON object with one member per state
+key, or an empty object when the source or feature has no state. Parse it with
+the host's JSON library to read the value that you want.
 
 <Code code={region(featureStateRead, "member")} lang="c" title="feature-state-read.c" />
 
-The root value and everything under it point into the snapshot. Copy any value
-that you keep, because destroying the snapshot invalidates those pointers.
+Copy any value that you keep, because the result bytes stay valid only for the
+completion callback.
 
 <Code code={region(featureStateRead, "read")} lang="c" title="feature-state-read.c" />
 
 ## How long state lives
 
-Feature state lives with a render session's rendering resources. A resize or an
-in-place target replacement preserves those resources, as
-[Attach a render target](/maplibre-native-ffi/guides/attach-a-render-target/)
-describes. Changing the scale factor recreates them. Destroying the session and
-attaching another does the same. Feature state starts empty after either change.
-To preserve it, keep a host copy and set it again after the next render update.
+Feature state lives with the map. Destroying the map discards it. A resize, an
+in-place target replacement, a scale-factor change, and a new render session
+leave it in place. The next render update pushes the map's store into the
+renderer.

@@ -237,6 +237,14 @@ public sealed class CustomGeometrySourceOptions
     public bool? Wrap { get; set; }
 }
 
+public sealed class CustomMvtVectorSourceOptions
+{
+    public CustomMvtVectorSourceCallback? FetchTile { get; set; }
+    public CustomMvtVectorSourceCallback? CancelTile { get; set; }
+    public double? MinimumZoom { get; set; }
+    public double? MaximumZoom { get; set; }
+}
+
 public sealed record StyleImage(PremultipliedRgba8Image Image, StyleImageOptions Options);
 
 public sealed record StyleImageInfo(
@@ -391,3 +399,5 @@ public sealed record StyleTransitionOptions
 }
 
 public delegate void CustomGeometrySourceCallback(CanonicalTileId tileId);
+
+public delegate void CustomMvtVectorSourceCallback(CanonicalTileId tileId);

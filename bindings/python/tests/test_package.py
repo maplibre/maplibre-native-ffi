@@ -293,7 +293,7 @@ def test_public_type_hints_are_resolvable() -> None:
         render.RenderSessionHandle.query_feature_extensions,
         render.RenderSessionHandle.query_rendered_features,
         render.RenderSessionHandle.query_source_features,
-        render.RenderSessionHandle.set_feature_state,
+        map_module.MapHandle.set_feature_state,
         mln.RuntimeHandle.create_map,
         mln.RuntimeHandle.create_offline_region,
         mln.RuntimeHandle.set_resource_transform,
@@ -2256,6 +2256,35 @@ def test_queried_feature_materializes_native_wire_values() -> None:
     ]
 
 
+def test_map_feature_state_set_get_and_remove() -> None:
+    selector = query.FeatureStateSelector(
+        source_id="points",
+        source_layer_id="symbols",
+        feature_id="feature-1",
+        state_key="hover",
+    )
+    state = _json_object({"hover": True})
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
+        _await(map_handle.set_feature_state(selector, state))
+        returned = _await(map_handle.get_feature_state(selector))
+        _await(map_handle.remove_feature_state(selector))
+        empty = _await(
+            map_handle.get_feature_state(
+                query.FeatureStateSelector(
+                    source_id="points",
+                    source_layer_id="symbols",
+                    feature_id="feature-1",
+                )
+            )
+        )
+
+    assert json.loads(returned) == {"hover": True}
+    assert json.loads(empty) == {}
+
+
 def test_invalid_render_target_attach_reports_native_status() -> None:
     with (
         mln.RuntimeHandle() as runtime,
@@ -2420,6 +2449,30 @@ def test_map_projection_outlives_its_source_handles() -> None:
 
     assert isinstance(projection.get_camera(), camera.CameraOptions)
     projection.close()
+
+
+def test_map_projection_remains_usable_on_another_thread_after_map_close() -> None:
+    runtime = mln.RuntimeHandle()
+    map_handle = runtime.create_map().result(timeout=5)
+    projection = _await(map_handle.create_projection())
+    map_handle.close()
+    runtime.close()
+
+    failures: list[BaseException] = []
+
+    def use_and_close_projection() -> None:
+        try:
+            assert isinstance(projection.get_camera(), camera.CameraOptions)
+            projection.close()
+        except BaseException as error:  # noqa: BLE001 - reported by the test thread
+            failures.append(error)
+
+    thread = threading.Thread(target=use_and_close_projection)
+    thread.start()
+    thread.join()
+
+    assert not failures
+    assert projection.closed
 
 
 def test_offline_futures_complete_with_public_values(tmp_path: Path) -> None:
@@ -3557,6 +3610,100 @@ def test_custom_geometry_source_rejects_empty_queue_capacity() -> None:
             map_handle.add_custom_geometry_source(
                 "custom",
                 style.CustomGeometrySourceOptions(max_queued_events=0),
+            )
+
+
+def test_custom_mvt_vector_source_scaffolding_queues_copied_events() -> None:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
+        map_handle.set_style_json(_EMPTY_STYLE_BYTES)
+        source, _ = map_handle.add_custom_mvt_vector_source(
+            "custom-mvt",
+            style.CustomMvtVectorSourceOptions(
+                has_cancel_tile=True,
+                max_queued_events=1,
+            ),
+        )
+        runtime.barrier().result(timeout=5)
+
+        source._native.push_fetch_for_test(1, 2, 3)
+        source._native.push_cancel_for_test(4, 5, 6)
+
+        event = source.poll_event()
+        assert event == style.CustomMvtVectorSourceEvent(
+            style.CustomMvtVectorSourceEventType.FETCH_TILE,
+            style.CanonicalTileId(1, 2, 3),
+        )
+        assert source.poll_event() is None
+        assert source.dropped_event_count == 1
+
+        tile = style.CanonicalTileId(0, 0, 0)
+        map_handle.set_custom_mvt_vector_source_tile_data("custom-mvt", tile, b"")
+        map_handle.set_custom_mvt_vector_source_tile_error(
+            "custom-mvt", tile, "tile missing"
+        )
+        map_handle.invalidate_custom_mvt_vector_source_tile("custom-mvt", tile)
+        info = map_handle.get_style_source_info("custom-mvt").result(timeout=5)
+        assert info is not None
+        assert info.source_type == style.StyleSourceType.CUSTOM_MVT_VECTOR
+        source.close()
+        assert source.closed
+
+
+def test_remove_style_source_releases_custom_mvt_vector_handle() -> None:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
+        map_handle.set_style_json(_EMPTY_STYLE_BYTES)
+        source, _ = map_handle.add_custom_mvt_vector_source(
+            "custom-mvt-remove",
+            style.CustomMvtVectorSourceOptions(max_queued_events=1),
+        )
+        runtime.barrier().result(timeout=5)
+
+        completion = map_handle.remove_style_source("custom-mvt-remove")
+        runtime.barrier().result(timeout=5)
+        assert (
+            _await_command_completion(runtime, completion).disposition
+            == mln.CommandDisposition.COMMITTED
+        )
+        assert source.closed
+        source._native.push_fetch_for_test(1, 2, 3)
+        assert source.poll_event() is None
+
+
+def test_map_close_releases_custom_mvt_vector_handle() -> None:
+    with mln.RuntimeHandle() as runtime:
+        map_handle = runtime.create_map().result(timeout=5)
+        map_handle.set_style_json(_EMPTY_STYLE_BYTES)
+        source, _ = map_handle.add_custom_mvt_vector_source(
+            "custom-mvt-close",
+            style.CustomMvtVectorSourceOptions(max_queued_events=1),
+        )
+        runtime.barrier().result(timeout=5)
+
+        map_handle.close()
+        runtime.barrier().result(timeout=5)
+
+        assert source.closed
+        source._native.push_fetch_for_test(1, 2, 3)
+        assert source.poll_event() is None
+        map_handle.close()
+
+
+def test_custom_mvt_vector_source_rejects_empty_queue_capacity() -> None:
+    with (
+        mln.RuntimeHandle() as runtime,
+        runtime.create_map().result(timeout=5) as map_handle,
+    ):
+        map_handle.set_style_json(_EMPTY_STYLE_BYTES)
+        with pytest.raises(mln.InvalidArgumentError):
+            map_handle.add_custom_mvt_vector_source(
+                "custom-mvt",
+                style.CustomMvtVectorSourceOptions(max_queued_events=0),
             )
 
 

@@ -313,7 +313,25 @@ public sealed class MapCameraOptionsTests
 
         map.Close();
         runtime.Close();
-        AssertClose(coordinate, projection.LatLngForPixel(projection.PixelForLatLng(coordinate)));
+
+        // The projection stays usable after its map and runtime close, including from a
+        // thread that first touches it after those closes.
+        Exception? failure = null;
+        var worker = new Thread(() =>
+        {
+            failure = Record.Exception(() =>
+            {
+                var closedCamera = projection.GetCamera();
+                Assert.NotNull(closedCamera);
+                AssertClose(
+                    coordinate,
+                    projection.LatLngForPixel(projection.PixelForLatLng(coordinate))
+                );
+            });
+        });
+        worker.Start();
+        worker.Join();
+        Assert.Null(failure);
 
         // Close is synchronous and idempotent through Dispose.
         projection.Close();

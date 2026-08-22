@@ -8,7 +8,6 @@ import org.maplibre.nativeffi.internal.lifecycle.NativeRenderSession
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.map.MapHandle
-import org.maplibre.nativeffi.query.FeatureStateSelector
 import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
@@ -102,17 +101,6 @@ internal constructor(private val ownerMap: MapHandle, private val handle: Native
 
   public actual fun detach(): Deferred<Unit> =
     NativeAccess.renderControl(requireLiveHandle(), "mln_render_session_detach")
-
-  public actual fun setFeatureState(
-    selector: FeatureStateSelector,
-    value: ByteArray,
-  ): Deferred<Unit> = NativeAccess.setFeatureState(requireLiveHandle(), selector, value)
-
-  public actual fun getFeatureState(selector: FeatureStateSelector): Deferred<ByteArray> =
-    NativeAccess.getFeatureState(requireLiveHandle(), selector)
-
-  public actual fun removeFeatureState(selector: FeatureStateSelector): Deferred<Unit> =
-    NativeAccess.removeFeatureState(requireLiveHandle(), selector)
 
   public actual fun queryRenderedFeatures(
     geometry: RenderedQueryGeometry,

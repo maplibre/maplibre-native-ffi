@@ -593,10 +593,10 @@ const TestOwnedTextureSession = struct {
 fn resolveFuture(comptime T: type, session: maplibre.RenderSessionHandle, future_value: maplibre.Future(T)) !T {
     var future = future_value;
     defer future.deinit();
-    for (0..100_000) |_| {
+    for (0..wait_turns) |turn| {
         if (try future.poll()) return future.wait(null);
         _ = session.serviceDriverWork(64) catch 0;
-        try std.Thread.yield();
+        try waitOneTurn(turn);
     }
     return error.OperationTimedOut;
 }
@@ -1002,6 +1002,20 @@ fn findVulkanMemoryType(dispatch: *const VulkanDispatch, physical_device: if (bu
 
 var next_frame_token: u64 = 1;
 
+// Turns a driver poll waits before giving up. The first `spin_turns` yield, so
+// work that lands immediately costs nothing; the rest sleep a millisecond
+// each, which puts a wall-clock bound on the wait. Yields alone cannot: they
+// measure scheduler turns, and on an idle host a hundred thousand of them
+// elapse in tens of milliseconds -- less than a real frame takes, so the wait
+// expired while the frame was still on its way.
+const spin_turns = 1_000;
+const wait_turns = spin_turns + 30_000;
+
+fn waitOneTurn(turn: usize) !void {
+    if (turn < spin_turns) return std.Thread.yield();
+    try testing.io.sleep(.fromMilliseconds(1), .awake);
+}
+
 fn awaitRuntimeBarrier(runtime: *maplibre.RuntimeHandle) !void {
     var future = try runtime.barrier();
     defer future.deinit();
@@ -1018,11 +1032,11 @@ fn renderFrame(session: maplibre.RenderSessionHandle, if_needed: bool) !maplibre
         .token = token,
     });
 
-    for (0..100_000) |_| {
+    for (0..wait_turns) |turn| {
         _ = session.serviceDriverWork(64) catch 0;
         var batch = session.drainFrameResults() catch |err| switch (err) {
             error.NotReady => {
-                try std.Thread.yield();
+                try waitOneTurn(turn);
                 continue;
             },
             else => return err,
@@ -1032,7 +1046,7 @@ fn renderFrame(session: maplibre.RenderSessionHandle, if_needed: bool) !maplibre
             const result = try batch.get(index);
             if (result.token == token) return result;
         }
-        try std.Thread.yield();
+        try waitOneTurn(turn);
     }
     return error.FrameTimedOut;
 }
@@ -1286,11 +1300,13 @@ test "feature state and rendered queries copy operation results" {
     _ = try renderFrame(owned.session, false);
 
     const selector = maplibre.FeatureStateSelector{ .source_id = "point", .feature_id = "feature-1" };
-    try finishOperation(
-        owned.session,
-        try owned.session.setFeatureState(testing.allocator, selector, "{\"hover\":true,\"count\":3}"),
-    );
-    var state = try resolveFuture(maplibre.OwnedString, owned.session, try owned.session.getFeatureState(testing.allocator, selector));
+    try testing.expect(std.meta.eql(
+        try support.waitForCommandDisposition(&runtime, try map.setFeatureState(testing.allocator, selector, "{\"hover\":true,\"count\":3}")),
+        maplibre.CommandDisposition.committed,
+    ));
+    var state_future = try map.getFeatureState(testing.allocator, selector);
+    defer state_future.deinit();
+    var state = try state_future.wait(null);
     defer state.deinit();
     try testing.expect(std.mem.indexOf(u8, state.value, "\"hover\":true") != null);
 
@@ -1325,10 +1341,74 @@ test "feature state and rendered queries copy operation results" {
     try testing.expectEqualStrings("point", source.items[0].source_id.?);
     try testing.expect(std.mem.indexOf(u8, source.items[0].feature, "\"type\":\"Point\"") != null);
 
-    try finishOperation(
-        owned.session,
-        try owned.session.removeFeatureState(testing.allocator, selector),
-    );
+    try testing.expect(std.meta.eql(
+        try support.waitForCommandDisposition(&runtime, try map.removeFeatureState(testing.allocator, selector)),
+        maplibre.CommandDisposition.committed,
+    ));
+}
+
+fn featureStateForTesting(map: *maplibre.MapHandle, selector: maplibre.FeatureStateSelector) !maplibre.OwnedString {
+    var future = try map.getFeatureState(testing.allocator, selector);
+    defer future.deinit();
+    return future.wait(null);
+}
+
+fn commitMapCommand(runtime: *maplibre.RuntimeHandle, future: maplibre.Future(maplibre.CommandCompletion)) !void {
+    try testing.expect(std.meta.eql(
+        try support.waitForCommandDisposition(runtime, future),
+        maplibre.CommandDisposition.committed,
+    ));
+}
+
+// Feature state belongs to the map, so it needs no loaded style, ordered reads
+// observe every earlier command, and it survives style loads and a renderer
+// retirement driven by a scale-factor change.
+test "map feature state set get and remove" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map_future = try maplibre.MapHandle.create(&runtime, .{ .width = 64, .height = 64 });
+    defer map_future.deinit();
+    var map = try map_future.wait(null);
+    defer map.close() catch @panic("map close failed");
+    var owned = try attachTestOwnedTexture(&map, .{ .extent = .{ .width = 64, .height = 64 } });
+    defer owned.close() catch @panic("render session close failed");
+
+    const selector = maplibre.FeatureStateSelector{ .source_id = "point", .feature_id = "feature-1" };
+    const feature_state = "{\"hover\":true,\"radius\":18446744073709551615}";
+    try commitMapCommand(&runtime, try map.setFeatureState(testing.allocator, selector, feature_state));
+    try commitMapCommand(&runtime, try map.removeFeatureState(testing.allocator, .{ .source_id = "point", .feature_id = "feature-1", .state_key = "hover" }));
+    var queued = try featureStateForTesting(&map, selector);
+    defer queued.deinit();
+    try testing.expect(rawJsonMember(queued.value, "hover") == null);
+    try testing.expectEqualStrings("18446744073709551615", rawJsonMember(queued.value, "radius").?);
+
+    // A style load drops style-owned objects, not map-owned feature state.
+    _ = try map.setStyleJson(testing.allocator, feature_state_style_json);
+    try awaitRuntimeBarrier(&runtime);
+    _ = try renderFrame(owned.session, false);
+    var after_style = try featureStateForTesting(&map, selector);
+    defer after_style.deinit();
+    try testing.expect(rawJsonMember(after_style.value, "hover") == null);
+    try testing.expectEqualStrings("18446744073709551615", rawJsonMember(after_style.value, "radius").?);
+
+    try commitMapCommand(&runtime, try map.setFeatureState(testing.allocator, selector, feature_state));
+    var restored = try featureStateForTesting(&map, selector);
+    defer restored.deinit();
+    try testing.expectEqualStrings("true", rawJsonMember(restored.value, "hover").?);
+    try testing.expectEqualStrings("18446744073709551615", rawJsonMember(restored.value, "radius").?);
+
+    try testing.expectError(error.InvalidArgument, map.removeFeatureState(testing.allocator, .{ .source_id = "point", .state_key = "hover" }));
+
+    // A scale-factor change retires the renderer; map-owned state survives.
+    try finishOperation(owned.session, try owned.session.resize(.{ .width = 64, .height = 64, .scale_factor = 2.0 }));
+    for (0..100) |_| {
+        if (std.meta.activeTag((try renderFrame(owned.session, false)).disposition) == .rendered) break;
+    } else return error.RenderDidNotComplete;
+    var after_scale = try featureStateForTesting(&map, selector);
+    defer after_scale.deinit();
+    try testing.expectEqualStrings("true", rawJsonMember(after_scale.value, "hover").?);
+    try testing.expectEqualStrings("18446744073709551615", rawJsonMember(after_scale.value, "radius").?);
 }
 
 test "cluster feature extensions copy values and feature collections" {

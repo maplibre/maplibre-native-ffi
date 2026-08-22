@@ -157,6 +157,9 @@ func TestMapProjectionOutlivesMapAndRuntime(t *testing.T) {
 	if err := projection.Close(); err != nil {
 		t.Fatalf("Projection Close(): %v", err)
 	}
+	if err := projection.Close(); err != nil {
+		t.Fatalf("second Projection Close(): %v", err)
+	}
 	if _, err := projection.PixelForLatLng(coordinate); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("PixelForLatLng() after close error = %v, want ErrInvalidArgument", err)
 	}
@@ -201,5 +204,17 @@ func TestMapProjectionCanMigrateAcrossGoroutines(t *testing.T) {
 	}
 	if math.Abs(got.point.X-256) > 1e-6 || math.Abs(got.point.Y-256) > 1e-6 {
 		t.Fatalf("PixelForLatLng(center) from another goroutine = %#v, want the viewport center", got.point)
+	}
+
+	// A close on another goroutine retires the handle for every goroutine.
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- projection.Close()
+	}()
+	if err := <-errCh; err != nil {
+		t.Fatalf("Projection Close() from another goroutine: %v", err)
+	}
+	if _, err := projection.Camera(); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("Projection Camera() after cross-goroutine close error = %v, want ErrInvalidArgument", err)
 	}
 }

@@ -297,35 +297,6 @@ func startRenderCompletion[T any](
 	}, convert)
 }
 
-// SetFeatureState starts an ordered feature-state update.
-func (session *RenderSessionHandle) SetFeatureState(selector FeatureStateSelector, state []byte) (*Future[struct{}], error) {
-	raw := newCFeatureStateSelector(selector)
-	defer raw.free()
-	rawState := newCBufferView(state)
-	defer rawState.free()
-	return startRenderCompletion(session, func(s C.mln_render_session, completion *C.mln_completion) int32 {
-		return int32(C.mln_render_session_set_feature_state(s, raw.sourceID.raw(), raw.sourceLayerID.raw(), raw.featureID.raw(), rawState.raw(), completion))
-	}, completionUnit)
-}
-
-// FeatureState starts a renderer-affine feature-state query.
-func (session *RenderSessionHandle) FeatureState(selector FeatureStateSelector) (*Future[[]byte], error) {
-	raw := newCFeatureStateSelector(selector)
-	defer raw.free()
-	return startRenderCompletion(session, func(s C.mln_render_session, completion *C.mln_completion) int32 {
-		return int32(C.mln_render_session_get_feature_state(s, raw.sourceID.raw(), raw.sourceLayerID.raw(), raw.featureID.raw(), completion))
-	}, completionBuffer)
-}
-
-// RemoveFeatureState starts an ordered feature-state removal.
-func (session *RenderSessionHandle) RemoveFeatureState(selector FeatureStateSelector) (*Future[struct{}], error) {
-	raw := newCFeatureStateSelector(selector)
-	defer raw.free()
-	return startRenderCompletion(session, func(s C.mln_render_session, completion *C.mln_completion) int32 {
-		return int32(C.mln_render_session_remove_feature_state(s, raw.sourceID.raw(), raw.sourceLayerID.raw(), raw.featureID.raw(), raw.stateKey.raw(), completion))
-	}, completionUnit)
-}
-
 // QueryRenderedFeatures starts a query against the latest driver state.
 // The completed operation yields copied hits.
 func (session *RenderSessionHandle) QueryRenderedFeatures(geometry RenderedQueryGeometry, options *RenderedFeatureQueryOptions) (*Future[[]QueriedFeature], error) {

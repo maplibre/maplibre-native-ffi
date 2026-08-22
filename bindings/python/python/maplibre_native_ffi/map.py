@@ -27,6 +27,7 @@ from .camera import (
 )
 from .errors import InvalidArgumentError
 from .geo import LatLng, LatLngBounds
+from .query import FeatureStateSelector
 from .render import (
     MetalBorrowedTextureDescriptor,
     MetalOwnedTextureDescriptor,
@@ -50,6 +51,8 @@ from .style import (
     CanonicalTileId,
     CustomGeometrySourceHandle,
     CustomGeometrySourceOptions,
+    CustomMvtVectorSourceHandle,
+    CustomMvtVectorSourceOptions,
     GeoJsonSourceDataHandle,
     GeoJsonSourceOptions,
     ImageStretch,
@@ -745,6 +748,50 @@ class MapHandle(NativeHandleMixin):
         """
         return self._native.set_style_json(json)
 
+    def set_feature_state(
+        self,
+        selector: FeatureStateSelector,
+        state: bytes,
+    ) -> Future[CommandCompletion]:
+        """Submit per-feature state and return its completion future.
+
+        Feature state belongs to the map. A render session pushes it into the
+        renderer on the next render update, including the first presented
+        frame that contains the source.
+        """
+        return self._native.set_feature_state(
+            selector.source_id,
+            selector.source_layer_id,
+            selector.feature_id,
+            selector.state_key,
+            state,
+        )
+
+    def get_feature_state(self, selector: FeatureStateSelector) -> Future[bytes]:
+        """Start an ordered read of copied per-feature state JSON.
+
+        The read observes every map command accepted before it and copies the
+        map store, not the last rendered frame. Missing feature state resolves
+        to an empty JSON object.
+        """
+        return self._native.get_feature_state(
+            selector.source_id,
+            selector.source_layer_id,
+            selector.feature_id,
+            selector.state_key,
+        )
+
+    def remove_feature_state(
+        self, selector: FeatureStateSelector
+    ) -> Future[CommandCompletion]:
+        """Submit per-feature state removal and return its completion future."""
+        return self._native.remove_feature_state(
+            selector.source_id,
+            selector.source_layer_id,
+            selector.feature_id,
+            selector.state_key,
+        )
+
     def get_loaded_style_json(self) -> Future[bytes]:
         """Return the style document this map's style was last parsed from.
 
@@ -983,7 +1030,7 @@ class MapHandle(NativeHandleMixin):
         layer_id: str,
         radius: float,
     ) -> Future[CommandCompletion]:
-        """Set a location indicator layer accuracy radius in logical pixels."""
+        """Set a location indicator layer accuracy radius in meters."""
         return self._native.set_location_indicator_accuracy_radius(layer_id, radius)
 
     def set_location_indicator_image_name(
@@ -1620,6 +1667,71 @@ class MapHandle(NativeHandleMixin):
             source_id,
             (bounds.southwest.latitude, bounds.southwest.longitude),
             (bounds.northeast.latitude, bounds.northeast.longitude),
+        )
+
+    def add_custom_mvt_vector_source(
+        self,
+        source_id: str,
+        options: CustomMvtVectorSourceOptions | None = None,
+    ) -> tuple[CustomMvtVectorSourceHandle, Future[CommandCompletion]]:
+        """Add a custom MVT vector source and return its queued-event handle.
+
+        The handle closes when the source goes away: an explicit removal, a
+        style load that leaves a style without the source, or closing this map.
+        """
+        from .style import CustomMvtVectorSourceHandle, CustomMvtVectorSourceOptions
+
+        options = options or CustomMvtVectorSourceOptions()
+        native, completion = self._native.add_custom_mvt_vector_source(
+            source_id,
+            options.max_queued_events,
+            options.min_zoom,
+            options.max_zoom,
+            options.has_cancel_tile,
+        )
+        return CustomMvtVectorSourceHandle._from_native(native), completion
+
+    def set_custom_mvt_vector_source_tile_data(
+        self,
+        source_id: str,
+        tile_id: CanonicalTileId,
+        data: bytes,
+    ) -> Future[CommandCompletion]:
+        """Set custom MVT vector source data for one canonical tile."""
+        return self._native.set_custom_mvt_vector_source_tile_data(
+            source_id,
+            tile_id.z,
+            tile_id.x,
+            tile_id.y,
+            data,
+        )
+
+    def set_custom_mvt_vector_source_tile_error(
+        self,
+        source_id: str,
+        tile_id: CanonicalTileId,
+        message: str,
+    ) -> Future[CommandCompletion]:
+        """Report a custom MVT vector source error for one canonical tile."""
+        return self._native.set_custom_mvt_vector_source_tile_error(
+            source_id,
+            tile_id.z,
+            tile_id.x,
+            tile_id.y,
+            message,
+        )
+
+    def invalidate_custom_mvt_vector_source_tile(
+        self,
+        source_id: str,
+        tile_id: CanonicalTileId,
+    ) -> Future[CommandCompletion]:
+        """Invalidate custom MVT vector source data for one canonical tile."""
+        return self._native.invalidate_custom_mvt_vector_source_tile(
+            source_id,
+            tile_id.z,
+            tile_id.x,
+            tile_id.y,
         )
 
     def _attach_render_session(

@@ -2,7 +2,6 @@ package org.maplibre.nativeffi.render
 
 import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.map.MapHandle
-import org.maplibre.nativeffi.query.FeatureStateSelector
 import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
@@ -56,12 +55,6 @@ public expect class RenderSessionHandle : AutoCloseable {
   public fun barrier(): Deferred<Unit>
 
   public fun detach(): Deferred<Unit>
-
-  public fun setFeatureState(selector: FeatureStateSelector, value: ByteArray): Deferred<Unit>
-
-  public fun getFeatureState(selector: FeatureStateSelector): Deferred<ByteArray>
-
-  public fun removeFeatureState(selector: FeatureStateSelector): Deferred<Unit>
 
   public fun queryRenderedFeatures(
     geometry: RenderedQueryGeometry,

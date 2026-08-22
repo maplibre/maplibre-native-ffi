@@ -12,7 +12,7 @@
 namespace mln::platform {
 
 inline auto is_mapbox_endpoint(const std::string& url) -> bool {
-  const auto parsed = mbgl::util::URL{url};
+  const auto parsed = mln::util::URL{url};
   const auto host = url.substr(parsed.domain.first, parsed.domain.second);
   return host == "mapbox.com" || host == "mapbox.cn" ||
          host.ends_with(".mapbox.com") || host.ends_with(".mapbox.cn");
@@ -20,10 +20,10 @@ inline auto is_mapbox_endpoint(const std::string& url) -> bool {
 
 // Returns the URL to request, which is the resource's own unless it is an
 // offline download from a Mapbox endpoint.
-inline auto offline_url(const mbgl::Resource& resource) -> std::string {
+inline auto offline_url(const mln::Resource& resource) -> std::string {
   auto url = resource.url;
   if (
-    resource.usage != mbgl::Resource::Usage::Offline || !is_mapbox_endpoint(url)
+    resource.usage != mln::Resource::Usage::Offline || !is_mapbox_endpoint(url)
   ) {
     return url;
   }

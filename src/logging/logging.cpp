@@ -12,7 +12,7 @@
 
 namespace {
 
-class CallbackLogObserver final : public mbgl::Log::Observer {
+class CallbackLogObserver final : public mln::Log::Observer {
  public:
   CallbackLogObserver(
     mln_log_callback callback, void* user_data,
@@ -29,7 +29,7 @@ class CallbackLogObserver final : public mbgl::Log::Observer {
   }
 
   auto onRecord(
-    mbgl::EventSeverity severity, mbgl::Event event, std::int64_t code,
+    mln::EventSeverity severity, mln::Event event, std::int64_t code,
     const std::string& message
   ) -> bool override {
     if (callback_ == nullptr) {
@@ -49,9 +49,9 @@ class CallbackLogObserver final : public mbgl::Log::Observer {
 };
 
 auto set_severity_async(
-  std::uint32_t mask, mln_log_severity_mask bit, mbgl::EventSeverity severity
+  std::uint32_t mask, mln_log_severity_mask bit, mln::EventSeverity severity
 ) -> void {
-  mbgl::Log::useLogThread((mask & bit) != 0U, severity);
+  mln::Log::useLogThread((mask & bit) != 0U, severity);
 }
 
 }  // namespace
@@ -63,14 +63,14 @@ auto set_log_callback(
   mln_log_callback_release release_user_data
 ) -> mln_status {
   if (callback == nullptr) {
-    mbgl::Log::removeObserver();
+    mln::Log::removeObserver();
     if (release_user_data != nullptr) {
       release_user_data(user_data);
     }
     return MLN_STATUS_OK;
   }
 
-  mbgl::Log::setObserver(
+  mln::Log::setObserver(
     std::make_unique<CallbackLogObserver>(
       callback, user_data, release_user_data
     )
@@ -79,7 +79,7 @@ auto set_log_callback(
 }
 
 auto clear_log_callback() -> mln_status {
-  mbgl::Log::removeObserver();
+  mln::Log::removeObserver();
   return MLN_STATUS_OK;
 }
 
@@ -90,13 +90,13 @@ auto set_log_async_severity_mask(std::uint32_t mask) -> mln_status {
   }
 
   set_severity_async(
-    mask, MLN_LOG_SEVERITY_MASK_INFO, mbgl::EventSeverity::Info
+    mask, MLN_LOG_SEVERITY_MASK_INFO, mln::EventSeverity::Info
   );
   set_severity_async(
-    mask, MLN_LOG_SEVERITY_MASK_WARNING, mbgl::EventSeverity::Warning
+    mask, MLN_LOG_SEVERITY_MASK_WARNING, mln::EventSeverity::Warning
   );
   set_severity_async(
-    mask, MLN_LOG_SEVERITY_MASK_ERROR, mbgl::EventSeverity::Error
+    mask, MLN_LOG_SEVERITY_MASK_ERROR, mln::EventSeverity::Error
   );
   return MLN_STATUS_OK;
 }

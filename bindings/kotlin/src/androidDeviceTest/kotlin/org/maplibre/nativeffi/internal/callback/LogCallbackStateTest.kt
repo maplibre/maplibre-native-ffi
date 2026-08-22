@@ -5,6 +5,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.log.LogCallback
+import org.maplibre.nativeffi.log.LogRecord
 
 class LogCallbackStateTest {
   @Test
@@ -26,5 +27,34 @@ class LogCallbackStateTest {
     Maplibre.setLogCallback(LogCallback { false })
     Maplibre.clearLogCallback()
     Maplibre.clearLogCallback()
+  }
+
+  @Test
+  fun callbackKeepsRawSeverityAndEventValues() {
+    var copied: LogRecord? = null
+    val state =
+      LogCallbackState.createForTesting(
+        LogCallback {
+          copied = it
+          true
+        }
+      )
+    try {
+      assertEquals(1, state.invoke(991, 992, 7, null))
+    } finally {
+      state.close()
+    }
+    assertEquals(991, copied?.severity?.nativeValue)
+    assertEquals(992, copied?.event?.nativeValue)
+    assertEquals(7, copied?.code)
+  }
+
+  @Test
+  fun elevenRegistrationsKeepTheSharedThunkCallable() {
+    try {
+      repeat(11) { index -> Maplibre.setLogCallback(LogCallback { it.code == index.toLong() }) }
+    } finally {
+      Maplibre.clearLogCallback()
+    }
   }
 }

@@ -5,7 +5,7 @@
 #include <mbgl/util/client_options.hpp>
 #include <mbgl/util/version.hpp>
 
-namespace mbgl {
+namespace mln {
 namespace ohos {
 
 inline std::string buildUserAgent(const ClientOptions& clientOptions) {
@@ -26,4 +26,4 @@ inline std::string buildUserAgent(const ClientOptions& clientOptions) {
 }
 
 }  // namespace ohos
-}  // namespace mbgl
+}  // namespace mln

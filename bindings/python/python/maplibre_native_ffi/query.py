@@ -114,7 +114,7 @@ class QueriedFeature:
 
 @dataclass(frozen=True, slots=True)
 class FeatureStateSelector:
-    """Source, feature, and state-key selector for render-session feature state."""
+    """Source, feature, and state-key selector for map feature state."""
 
     source_id: str
     source_layer_id: str | None = None

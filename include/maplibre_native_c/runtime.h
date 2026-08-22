@@ -359,7 +359,12 @@ typedef struct mln_runtime_options {
   uint32_t size;
   /** No flags are currently defined. Must be zero. */
   uint32_t flags;
-  /** Filesystem root for asset:// URLs. Copied during runtime creation. */
+  /**
+   * Filesystem root for asset:// URLs. Copied during runtime creation.
+   *
+   * On Android, asset:// URLs read the APK `assets/` directory after
+   * mln_android_init. This field is unused there.
+   */
   const char* asset_path;
   /** Cache database path. Copied during runtime creation. */
   const char* cache_path;

@@ -17,6 +17,14 @@ const CustomGeometrySourceState = struct {
     active_upcalls: std.atomic.Value(usize),
 };
 
+const CustomMvtVectorSourceState = struct {
+    fetch_tile: CustomMvtVectorSourceTileCallback,
+    cancel_tile: ?CustomMvtVectorSourceTileCallback,
+    release_context: ?CustomMvtVectorSourceReleaseCallback,
+    context: ?*anyopaque,
+    active_upcalls: std.atomic.Value(usize),
+};
+
 const MapState = struct {
     runtime_registry: *runtime_module.RuntimeRegistry,
     id_value: values.MapId,
@@ -34,6 +42,8 @@ pub const RenderSessionRegistration = struct {
 
 var custom_geometry_state_registry_lock = std.Io.Mutex.init;
 var custom_geometry_state_registry: std.ArrayList(*CustomGeometrySourceState) = .empty;
+var custom_mvt_vector_state_registry_lock = std.Io.Mutex.init;
+var custom_mvt_vector_state_registry: std.ArrayList(*CustomMvtVectorSourceState) = .empty;
 
 // Keyed by map handle; the C API never reuses a handle value, so a released
 // handle never collides with a live key.
@@ -244,6 +254,28 @@ pub const CustomGeometrySourceOptions = struct {
     wrap: ?bool = null,
 };
 
+pub const CustomMvtVectorSourceTileCallback = *const fn (
+    context: ?*anyopaque,
+    tile_id: CanonicalTileId,
+) void;
+
+pub const CustomMvtVectorSourceReleaseCallback = *const fn (context: ?*anyopaque) void;
+
+/// Options for `MapHandle.addCustomMvtVectorSource`.
+pub const CustomMvtVectorSourceOptions = struct {
+    fetch_tile: CustomMvtVectorSourceTileCallback,
+    cancel_tile: ?CustomMvtVectorSourceTileCallback = null,
+    /// Invoked once with `context` after the map stops referencing this source:
+    /// on an explicit removal, on a style load that leaves a style without the
+    /// source, and on the map's own destruction. It runs on the map owner thread,
+    /// after the last tile callback returns, and never runs for an add that
+    /// failed. A host frees `context` here instead of tracking style loads.
+    release_context: ?CustomMvtVectorSourceReleaseCallback = null,
+    context: ?*anyopaque = null,
+    min_zoom: ?f64 = null,
+    max_zoom: ?f64 = null,
+};
+
 /// Prepared GeoJSON source data: one parsed and tiled GeoJSON document with
 /// its source options baked in, ready to install on GeoJSON sources.
 pub const GeoJsonSourceDataHandle = enum(c.mln_geojson_source_data) {
@@ -289,6 +321,14 @@ pub const GeoJsonSourceDataHandle = enum(c.mln_geojson_source_data) {
     pub fn release(self: GeoJsonSourceDataHandle) void {
         c.mln_geojson_source_data_destroy(@intFromEnum(self));
     }
+};
+
+/// Feature-state source, feature, and key selector.
+pub const FeatureStateSelector = struct {
+    source_id: []const u8,
+    source_layer_id: ?[]const u8 = null,
+    feature_id: ?[]const u8 = null,
+    state_key: ?[]const u8 = null,
 };
 
 pub const MapHandle = enum(c.mln_map) {
@@ -356,6 +396,57 @@ pub const MapHandle = enum(c.mln_map) {
     ) status.Error!completion.Future(completion.CommandCompletion) {
         _ = allocator;
         return submitCommand(self, c.mln_map_set_style_json, .{ try native(self), stringView(json) });
+    }
+
+    /// Accepts an ordered per-feature-state command. The committed command
+    /// requests a map repaint.
+    pub fn setFeatureState(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        selector: FeatureStateSelector,
+        feature_state: []const u8,
+    ) status.Error!completion.Future(completion.CommandCompletion) {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        var raw_selector = try featureStateSelectorToNative(&temp, selector);
+        return submitCommand(self, c.mln_map_set_feature_state, .{
+            try native(self),
+            &raw_selector,
+            try temp.stringView(feature_state),
+        });
+    }
+
+    /// Starts an ordered read of per-feature state. The read copies the map
+    /// store, not the last rendered frame; missing feature state resolves to an
+    /// empty JSON object.
+    pub fn getFeatureState(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        selector: FeatureStateSelector,
+    ) status.Error!completion.Future(values.OwnedString) {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        var raw_selector = try featureStateSelectorToNative(&temp, selector);
+        return submitAllocatedQuery(values.OwnedString, self, allocator, copyOwnedStringResult, c.mln_map_get_feature_state, .{
+            try native(self),
+            &raw_selector,
+        });
+    }
+
+    /// Accepts an ordered feature-state removal command. The committed command
+    /// requests a map repaint.
+    pub fn removeFeatureState(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        selector: FeatureStateSelector,
+    ) status.Error!completion.Future(completion.CommandCompletion) {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        var raw_selector = try featureStateSelectorToNative(&temp, selector);
+        return submitCommand(self, c.mln_map_remove_feature_state, .{
+            try native(self),
+            &raw_selector,
+        });
     }
 
     /// Accepts an ordered style-URL command.
@@ -1148,6 +1239,77 @@ pub const MapHandle = enum(c.mln_map) {
         return submitCommand(self, c.mln_map_invalidate_custom_geometry_source_region, .{ try native(self), try temp.stringView(source_id), values.latLngBoundsToNative(bounds) });
     }
 
+    pub fn addCustomMvtVectorSource(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        source_id: []const u8,
+        options: CustomMvtVectorSourceOptions,
+    ) status.Error!completion.Future(completion.CommandCompletion) {
+        const source_state = try std.heap.smp_allocator.create(CustomMvtVectorSourceState);
+        source_state.* = .{
+            .fetch_tile = options.fetch_tile,
+            .cancel_tile = options.cancel_tile,
+            .release_context = options.release_context,
+            .context = options.context,
+            .active_upcalls = std.atomic.Value(usize).init(0),
+        };
+        errdefer std.heap.smp_allocator.destroy(source_state);
+
+        try registerLiveCustomMvtVectorSourceState(source_state);
+        // A failed add releases nothing, so this call owns the state it built.
+        errdefer unregisterLiveCustomMvtVectorSourceState(source_state);
+
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        var native_options = customMvtVectorSourceOptionsToNative(options, source_state);
+        return submitCommand(self, c.mln_map_add_custom_mvt_vector_source, .{ try native(self), try temp.stringView(source_id), &native_options });
+    }
+
+    pub fn setCustomMvtVectorSourceTileData(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        source_id: []const u8,
+        tile_id: CanonicalTileId,
+        data: []const u8,
+    ) status.Error!completion.Future(completion.CommandCompletion) {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        return submitCommand(self, c.mln_map_set_custom_mvt_vector_source_tile_data, .{
+            try native(self),
+            try temp.stringView(source_id),
+            canonicalTileIdToNative(tile_id),
+            try temp.stringView(data),
+        });
+    }
+
+    pub fn setCustomMvtVectorSourceTileError(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        source_id: []const u8,
+        tile_id: CanonicalTileId,
+        message: []const u8,
+    ) status.Error!completion.Future(completion.CommandCompletion) {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        return submitCommand(self, c.mln_map_set_custom_mvt_vector_source_tile_error, .{
+            try native(self),
+            try temp.stringView(source_id),
+            canonicalTileIdToNative(tile_id),
+            try temp.stringView(message),
+        });
+    }
+
+    pub fn invalidateCustomMvtVectorSourceTile(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        source_id: []const u8,
+        tile_id: CanonicalTileId,
+    ) status.Error!completion.Future(completion.CommandCompletion) {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        return submitCommand(self, c.mln_map_invalidate_custom_mvt_vector_source_tile, .{ try native(self), try temp.stringView(source_id), canonicalTileIdToNative(tile_id) });
+    }
+
     pub fn requestRepaint(self: *MapHandle) status.Error!completion.Future(completion.CommandCompletion) {
         return submitCommand(self, c.mln_map_request_repaint, .{try native(self)});
     }
@@ -1574,6 +1736,26 @@ fn customGeometrySourceOptionsToNative(
     return raw;
 }
 
+fn customMvtVectorSourceOptionsToNative(
+    options: CustomMvtVectorSourceOptions,
+    source_state: *CustomMvtVectorSourceState,
+) c.mln_custom_mvt_vector_source_options {
+    var raw = c.mln_custom_mvt_vector_source_options_default();
+    raw.fetch_tile = customMvtVectorFetchTileTrampoline;
+    raw.cancel_tile = if (options.cancel_tile != null) customMvtVectorCancelTileTrampoline else null;
+    raw.release_user_data = customMvtVectorReleaseTrampoline;
+    raw.user_data = source_state;
+    if (options.min_zoom) |min_zoom| {
+        raw.fields |= c.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM;
+        raw.min_zoom = min_zoom;
+    }
+    if (options.max_zoom) |max_zoom| {
+        raw.fields |= c.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM;
+        raw.max_zoom = max_zoom;
+    }
+    return raw;
+}
+
 fn customGeometryFetchTileTrampoline(user_data: ?*anyopaque, raw_tile_id: c.mln_canonical_tile_id) callconv(.c) void {
     const source_state: *CustomGeometrySourceState = @ptrCast(@alignCast(user_data orelse return));
     if (!beginCustomGeometryUpcall(source_state)) return;
@@ -1659,6 +1841,85 @@ fn removeLiveCustomGeometrySourceStateLocked(source_state: *CustomGeometrySource
 }
 
 fn waitForCustomGeometryUpcalls(source_state: *CustomGeometrySourceState) void {
+    while (source_state.active_upcalls.load(.seq_cst) != 0) {
+        std.Thread.yield() catch {};
+    }
+}
+
+fn customMvtVectorFetchTileTrampoline(user_data: ?*anyopaque, raw_tile_id: c.mln_canonical_tile_id) callconv(.c) void {
+    const source_state: *CustomMvtVectorSourceState = @ptrCast(@alignCast(user_data orelse return));
+    if (!beginCustomMvtVectorUpcall(source_state)) return;
+    defer endCustomMvtVectorUpcall(source_state);
+
+    source_state.fetch_tile(source_state.context, canonicalTileIdFromNative(raw_tile_id));
+}
+
+fn customMvtVectorCancelTileTrampoline(user_data: ?*anyopaque, raw_tile_id: c.mln_canonical_tile_id) callconv(.c) void {
+    const source_state: *CustomMvtVectorSourceState = @ptrCast(@alignCast(user_data orelse return));
+    if (!beginCustomMvtVectorUpcall(source_state)) return;
+    defer endCustomMvtVectorUpcall(source_state);
+
+    const cancel_tile = source_state.cancel_tile orelse return;
+    cancel_tile(source_state.context, canonicalTileIdFromNative(raw_tile_id));
+}
+
+fn beginCustomMvtVectorUpcall(source_state: *CustomMvtVectorSourceState) bool {
+    std.Io.Threaded.mutexLock(&custom_mvt_vector_state_registry_lock);
+    defer std.Io.Threaded.mutexUnlock(&custom_mvt_vector_state_registry_lock);
+
+    for (custom_mvt_vector_state_registry.items) |live_state| {
+        if (live_state == source_state) {
+            _ = source_state.active_upcalls.fetchAdd(1, .seq_cst);
+            return true;
+        }
+    }
+    return false;
+}
+
+fn endCustomMvtVectorUpcall(source_state: *CustomMvtVectorSourceState) void {
+    _ = source_state.active_upcalls.fetchSub(1, .seq_cst);
+}
+
+fn customMvtVectorReleaseTrampoline(user_data: ?*anyopaque) callconv(.c) void {
+    const source_state: *CustomMvtVectorSourceState = @ptrCast(@alignCast(user_data orelse return));
+    freeCustomMvtVectorSourceState(source_state);
+}
+
+fn freeCustomMvtVectorSourceState(source_state: *CustomMvtVectorSourceState) void {
+    retireLiveCustomMvtVectorSourceState(source_state);
+    waitForCustomMvtVectorUpcalls(source_state);
+    if (source_state.release_context) |release| release(source_state.context);
+    std.heap.smp_allocator.destroy(source_state);
+}
+
+fn registerLiveCustomMvtVectorSourceState(source_state: *CustomMvtVectorSourceState) std.mem.Allocator.Error!void {
+    std.Io.Threaded.mutexLock(&custom_mvt_vector_state_registry_lock);
+    defer std.Io.Threaded.mutexUnlock(&custom_mvt_vector_state_registry_lock);
+    try custom_mvt_vector_state_registry.append(std.heap.smp_allocator, source_state);
+}
+
+fn unregisterLiveCustomMvtVectorSourceState(source_state: *CustomMvtVectorSourceState) void {
+    std.Io.Threaded.mutexLock(&custom_mvt_vector_state_registry_lock);
+    defer std.Io.Threaded.mutexUnlock(&custom_mvt_vector_state_registry_lock);
+    removeLiveCustomMvtVectorSourceStateLocked(source_state);
+}
+
+fn retireLiveCustomMvtVectorSourceState(source_state: *CustomMvtVectorSourceState) void {
+    std.Io.Threaded.mutexLock(&custom_mvt_vector_state_registry_lock);
+    defer std.Io.Threaded.mutexUnlock(&custom_mvt_vector_state_registry_lock);
+    removeLiveCustomMvtVectorSourceStateLocked(source_state);
+}
+
+fn removeLiveCustomMvtVectorSourceStateLocked(source_state: *CustomMvtVectorSourceState) void {
+    for (custom_mvt_vector_state_registry.items, 0..) |live_state, index| {
+        if (live_state == source_state) {
+            _ = custom_mvt_vector_state_registry.orderedRemove(index);
+            return;
+        }
+    }
+}
+
+fn waitForCustomMvtVectorUpcalls(source_state: *CustomMvtVectorSourceState) void {
     while (source_state.active_upcalls.load(.seq_cst) != 0) {
         std.Thread.yield() catch {};
     }
@@ -1827,6 +2088,33 @@ fn copyLatLngBoundsResult(result: *const c.mln_completion_result) status.Error!v
     return values.latLngBoundsFromNative(try completion.value(c.mln_lat_lng_bounds)(result));
 }
 
+fn featureStateSelectorToNative(
+    temp: *native_temp.TempStorage,
+    selector: FeatureStateSelector,
+) status.Error!c.mln_feature_state_selector {
+    var raw = c.mln_feature_state_selector{
+        .size = @sizeOf(c.mln_feature_state_selector),
+        .fields = 0,
+        .source_id = try temp.stringView(selector.source_id),
+        .source_layer_id = .{ .data = null, .size = 0 },
+        .feature_id = .{ .data = null, .size = 0 },
+        .state_key = .{ .data = null, .size = 0 },
+    };
+    if (selector.source_layer_id) |source_layer_id| {
+        raw.fields |= c.MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID;
+        raw.source_layer_id = try temp.stringView(source_layer_id);
+    }
+    if (selector.feature_id) |feature_id| {
+        raw.fields |= c.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID;
+        raw.feature_id = try temp.stringView(feature_id);
+    }
+    if (selector.state_key) |state_key| {
+        raw.fields |= c.MLN_FEATURE_STATE_SELECTOR_STATE_KEY;
+        raw.state_key = try temp.stringView(state_key);
+    }
+    return raw;
+}
+
 pub fn native(handle: *MapHandle) status.BindingError!c.mln_map {
     const map_state = mapState(handle.*) orelse return error.ClosedHandle;
     if (map_state.closing) return error.ActiveBorrow;
@@ -1863,6 +2151,12 @@ fn liveCustomGeometrySourceCountForTesting() usize {
     std.Io.Threaded.mutexLock(&custom_geometry_state_registry_lock);
     defer std.Io.Threaded.mutexUnlock(&custom_geometry_state_registry_lock);
     return custom_geometry_state_registry.items.len;
+}
+
+fn liveCustomMvtVectorSourceCountForTesting() usize {
+    std.Io.Threaded.mutexLock(&custom_mvt_vector_state_registry_lock);
+    defer std.Io.Threaded.mutexUnlock(&custom_mvt_vector_state_registry_lock);
+    return custom_mvt_vector_state_registry.items.len;
 }
 
 fn copyStyleIdList(
@@ -2069,6 +2363,26 @@ test "an explicit source removal releases the callback state" {
     const disposition = try waitForCommandDispositionForTesting(&runtime, remove_id);
     try std.testing.expect(std.meta.eql(disposition, completion.CommandDisposition.committed));
     try std.testing.expectEqual(baseline, liveCustomGeometrySourceCountForTesting());
+}
+
+test "an explicit custom MVT vector source removal releases the callback state" {
+    var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try createLoadedMapForTesting(&runtime);
+    defer map.close() catch @panic("map close failed");
+
+    const baseline = liveCustomMvtVectorSourceCountForTesting();
+    var state = TestCustomGeometryCallbackState{};
+    _ = try map.addCustomMvtVectorSource(std.testing.allocator, "custom-mvt", .{
+        .fetch_tile = testFetchCustomGeometryTile,
+        .context = &state,
+    });
+    try std.testing.expectEqual(baseline + 1, liveCustomMvtVectorSourceCountForTesting());
+
+    const remove_id = try map.removeStyleSource(std.testing.allocator, "custom-mvt");
+    const disposition = try waitForCommandDispositionForTesting(&runtime, remove_id);
+    try std.testing.expect(std.meta.eql(disposition, completion.CommandDisposition.committed));
+    try std.testing.expectEqual(baseline, liveCustomMvtVectorSourceCountForTesting());
 }
 
 // A map whose mask clears style-loaded still releases the state, because the

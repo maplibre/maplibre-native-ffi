@@ -241,57 +241,6 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
     MaplibreNativeC.mln_render_session_detach(requireLiveHandle(), it)
   }
 
-  public actual fun setFeatureState(
-    selector: FeatureStateSelector,
-    value: ByteArray,
-  ): Deferred<Unit> =
-    withSelectorViews(selector) { sourceId, sourceLayerId, featureId ->
-      ByteArrayViewScope(value).use { nativeValue ->
-        unit { completion ->
-          MaplibreNativeC.mln_render_session_set_feature_state(
-            requireLiveHandle(),
-            sourceId,
-            sourceLayerId,
-            featureId,
-            nativeValue.view,
-            completion,
-          )
-        }
-      }
-    }
-
-  public actual fun getFeatureState(selector: FeatureStateSelector): Deferred<ByteArray> =
-    withSelectorViews(selector) { sourceId, sourceLayerId, featureId ->
-      CompletionBridge.submit(
-        ::requiredBuffer,
-        { completion ->
-          MaplibreNativeC.mln_render_session_get_feature_state(
-            requireLiveHandle(),
-            sourceId,
-            sourceLayerId,
-            featureId,
-            completion,
-          )
-        },
-      )
-    }
-
-  public actual fun removeFeatureState(selector: FeatureStateSelector): Deferred<Unit> =
-    withSelectorViews(selector) { sourceId, sourceLayerId, featureId ->
-      StringViewScope(selector.stateKey ?: "").use { stateKey ->
-        unit { completion ->
-          MaplibreNativeC.mln_render_session_remove_feature_state(
-            requireLiveHandle(),
-            sourceId,
-            sourceLayerId,
-            featureId,
-            stateKey.view,
-            completion,
-          )
-        }
-      }
-    }
-
   public actual fun queryRenderedFeatures(
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions?,
@@ -420,23 +369,6 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
     val values = MaplibreNativeC.mln_queried_feature(result.value())
     return List(count) { index -> queriedFeature(values.position(index.toLong())) }
   }
-
-  private inline fun <T> withSelectorViews(
-    selector: FeatureStateSelector,
-    block:
-      (
-        MaplibreNativeC.mln_buffer_view,
-        MaplibreNativeC.mln_buffer_view,
-        MaplibreNativeC.mln_buffer_view,
-      ) -> T,
-  ): T =
-    StringViewScope(selector.sourceId).use { sourceId ->
-      StringViewScope(selector.sourceLayerId ?: "").use { sourceLayerId ->
-        StringViewScope(selector.featureId ?: "").use { featureId ->
-          block(sourceId.view, sourceLayerId.view, featureId.view)
-        }
-      }
-    }
 
   internal companion object {
     private fun attach(
@@ -1075,6 +1007,42 @@ private class SourceFeatureQueryOptionsScope(value: SourceFeatureQueryOptions?) 
     }
     out.position(0)
     return out
+  }
+}
+
+internal class FeatureStateSelectorScope(value: FeatureStateSelector) : AutoCloseable {
+  private val sourceId = StringViewScope(value.sourceId)
+  private val sourceLayerId = value.sourceLayerId?.let(::StringViewScope)
+  private val featureId = value.featureId?.let(::StringViewScope)
+  private val stateKey = value.stateKey?.let(::StringViewScope)
+  val selector: MaplibreNativeC.mln_feature_state_selector =
+    MaplibreNativeC.mln_feature_state_selector()
+
+  init {
+    selector.size(selector.sizeof())
+    selector.source_id(sourceId.view)
+    var fields = 0
+    sourceLayerId?.let {
+      fields = fields or MaplibreNativeC.MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID
+      selector.source_layer_id(it.view)
+    }
+    featureId?.let {
+      fields = fields or MaplibreNativeC.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID
+      selector.feature_id(it.view)
+    }
+    stateKey?.let {
+      fields = fields or MaplibreNativeC.MLN_FEATURE_STATE_SELECTOR_STATE_KEY
+      selector.state_key(it.view)
+    }
+    selector.fields(fields)
+  }
+
+  override fun close() {
+    selector.close()
+    stateKey?.close()
+    featureId?.close()
+    sourceLayerId?.close()
+    sourceId.close()
   }
 }
 

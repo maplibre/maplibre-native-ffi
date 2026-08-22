@@ -10,16 +10,17 @@
 
 #include "maplibre_native_c.h"
 
-namespace mbgl {
+namespace mln {
 class Map;
 class RendererObserver;
 class UpdateParameters;
-}  // namespace mbgl
+}  // namespace mln
 
 namespace mln::core {
 
 struct GeoJsonSourceDataObject;
 struct MapObject;
+struct FeatureStateSnapshot;
 
 auto map_options_default() noexcept -> mln_map_options;
 auto camera_options_default() noexcept -> mln_camera_options;
@@ -37,6 +38,8 @@ auto style_tile_source_options_default() noexcept
 auto geojson_source_options_default() noexcept -> mln_geojson_source_options;
 auto custom_geometry_source_options_default() noexcept
   -> mln_custom_geometry_source_options;
+auto custom_mvt_vector_source_options_default() noexcept
+  -> mln_custom_mvt_vector_source_options;
 auto premultiplied_rgba8_image_default() noexcept
   -> mln_premultiplied_rgba8_image;
 auto style_image_options_default() noexcept -> mln_style_image_options;
@@ -102,6 +105,9 @@ auto validate_tile_command_options(
 auto validate_custom_geometry_command_options(
   const mln_custom_geometry_source_options* options
 ) -> mln_status;
+auto validate_custom_mvt_command_options(
+  const mln_custom_mvt_vector_source_options* options
+) -> mln_status;
 auto validate_style_image_command_input(
   const mln_premultiplied_rgba8_image* image,
   const mln_style_image_options* options
@@ -151,6 +157,16 @@ auto map_request_repaint(mln_map map, const mln_completion* completion)
   -> mln_status;
 auto map_request_still_image_start(
   mln_map map, const mln_completion* completion
+) -> mln_status;
+auto map_set_feature_state(
+  mln_map map, const mln_feature_state_selector* selector, mln_buffer_view state
+) -> mln_status;
+auto map_get_feature_state_start(
+  mln_map map, const mln_feature_state_selector* selector,
+  const mln_completion* completion
+) -> mln_status;
+auto map_remove_feature_state(
+  mln_map map, const mln_feature_state_selector* selector
 ) -> mln_status;
 auto map_set_style_url(mln_map map, const char* url) -> mln_status;
 auto map_set_style_json(mln_map map, mln_buffer_view json) -> mln_status;
@@ -251,6 +267,21 @@ auto map_invalidate_custom_geometry_source_tile(
 ) -> mln_status;
 auto map_invalidate_custom_geometry_source_region(
   mln_map map, mln_buffer_view source_id, mln_lat_lng_bounds bounds
+) -> mln_status;
+auto map_add_custom_mvt_vector_source(
+  mln_map map, mln_buffer_view source_id,
+  const mln_custom_mvt_vector_source_options* options
+) -> mln_status;
+auto map_set_custom_mvt_vector_source_tile_data(
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
+  mln_buffer_view data
+) -> mln_status;
+auto map_set_custom_mvt_vector_source_tile_error(
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
+  mln_buffer_view message
+) -> mln_status;
+auto map_invalidate_custom_mvt_vector_source_tile(
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id
 ) -> mln_status;
 auto map_set_style_image(
   mln_map map, mln_buffer_view image_id,
@@ -515,18 +546,22 @@ auto validate_map(mln_map map, MapObject*& out_map) -> mln_status;
 auto map_scale_factor(mln_map map) -> double;
 // Returns worker-owned native state. Callers must already run on the runtime
 // worker or use the posting helpers below.
-auto map_native(MapObject* map) -> mbgl::Map*;
+auto map_native(MapObject* map) -> mln::Map*;
 
 auto map_post_resize(mln_map map, mln_logical_extent extent) -> mln_status;
 auto map_post_trigger_repaint(mln_map map) -> mln_status;
-auto map_latest_update(mln_map map) -> std::shared_ptr<mbgl::UpdateParameters>;
+auto map_latest_update(mln_map map) -> std::shared_ptr<mln::UpdateParameters>;
 auto map_latest_update_generation(mln_map map) noexcept -> uint64_t;
 auto map_latest_update_snapshot(mln_map map, uint64_t& out_generation)
-  -> std::shared_ptr<mbgl::UpdateParameters>;
+  -> std::shared_ptr<mln::UpdateParameters>;
 auto map_set_render_session_publish_callback(
   mln_map map, std::function<void()> callback
 ) -> mln_status;
-auto map_renderer_observer(mln_map map) -> mbgl::RendererObserver*;
+// Copies the map's coalesced feature-state snapshot. Callable from a render
+// session's owner thread while the map is attached to that session.
+auto map_feature_state_snapshot(mln_map map)
+  -> std::shared_ptr<const FeatureStateSnapshot>;
+auto map_renderer_observer(mln_map map) -> mln::RendererObserver*;
 auto map_run_render_jobs(mln_map map) -> void;
 auto map_attach_render_target_session(mln_map map, void* session) -> mln_status;
 auto map_detach_render_target_session(mln_map map, void* session) -> mln_status;

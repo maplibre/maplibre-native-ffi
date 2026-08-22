@@ -35,7 +35,7 @@ class DescriptorValidationTest {
       }
       assertFailsWith<InvalidArgumentException> { TileOptions().prefetchZoomDelta = -1 }
       assertFailsWith<InvalidArgumentException> { NativeBuffer.allocate(-1) }
-      val nullPointer = NativePointer.NULL
+      val nullPointer = NativePointer.NULL_POINTER
       assertFailsWith<InvalidArgumentException> { RenderTargetExtent(-1, 1, 1.0) }
       assertFailsWith<InvalidArgumentException> { RenderTargetExtent(1, 1, 1.0).width = -1 }
       assertFailsWith<InvalidArgumentException> {

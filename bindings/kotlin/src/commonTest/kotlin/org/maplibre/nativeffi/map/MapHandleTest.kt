@@ -19,6 +19,7 @@ import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.Quaternion
 import org.maplibre.nativeffi.geo.Vec3
+import org.maplibre.nativeffi.query.FeatureStateSelector
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
 import org.maplibre.nativeffi.runtime.CommandCompletion
 import org.maplibre.nativeffi.runtime.CommandDisposition
@@ -27,6 +28,8 @@ import org.maplibre.nativeffi.runtime.RuntimeOptions
 import org.maplibre.nativeffi.runtime.use
 import org.maplibre.nativeffi.style.CustomGeometrySourceCallback
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.CustomMvtVectorSourceCallback
+import org.maplibre.nativeffi.style.CustomMvtVectorSourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceDataHandle
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.RasterDemEncoding
@@ -515,6 +518,180 @@ class MapHandleTest {
 
         assertCommandCommitted(runtime, map.removeStyleSource("custom-places").await())
         assertNull(map.styleSourceInfo("custom-places").await())
+      } finally {
+        map.close()
+        runtime.close()
+      }
+    }
+
+  @Test
+  fun customMvtVectorSourcesCanBeManaged(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val runtime = RuntimeHandle.create(RuntimeOptions())
+      val map =
+        MapHandle.create(
+            runtime,
+            MapOptions().apply {
+              width = 64
+              height = 64
+              mapMode = MapMode.STATIC
+            },
+          )
+          .await()
+
+      try {
+        map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray()).await()
+        map
+          .addCustomMvtVectorSource(
+            "custom-mvt",
+            CustomMvtVectorSourceOptions(
+                object : CustomMvtVectorSourceCallback {
+                  override fun fetchTile(tileId: CanonicalTileId) {}
+                }
+              )
+              .apply {
+                minZoom = 0.0
+                maxZoom = 14.0
+              },
+          )
+          .await()
+
+        assertEquals(SourceType.CUSTOM_MVT_VECTOR, map.styleSourceInfo("custom-mvt").await()?.type)
+
+        val tileId = CanonicalTileId(0, 0, 0)
+        map.setCustomMvtVectorSourceTileData("custom-mvt", tileId, ByteArray(0)).await()
+        map.setCustomMvtVectorSourceTileError("custom-mvt", tileId, "tile missing").await()
+        map.invalidateCustomMvtVectorSourceTile("custom-mvt", tileId).await()
+
+        // A second source under the same ID is rejected, and the first one stays installed.
+        assertCommandFailed(
+          map
+            .addCustomMvtVectorSource(
+              "custom-mvt",
+              CustomMvtVectorSourceOptions(
+                object : CustomMvtVectorSourceCallback {
+                  override fun fetchTile(tileId: CanonicalTileId) {}
+                }
+              ),
+            )
+            .await(),
+          MaplibreStatus.INVALID_ARGUMENT,
+        )
+
+        assertCommandCommitted(runtime, map.removeStyleSource("custom-mvt").await())
+        assertNull(map.styleSourceInfo("custom-mvt").await())
+      } finally {
+        map.close()
+        runtime.close()
+      }
+    }
+
+  // Every live custom source keeps its own callback state, past the ten-slot JavaCPP
+  // function-pointer pool that per-source thunks would exhaust on Android.
+
+  @Test
+  fun elevenLiveCustomSourcesStayRegistered(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val runtime = RuntimeHandle.create(RuntimeOptions())
+      val map =
+        MapHandle.create(
+            runtime,
+            MapOptions().apply {
+              width = 64
+              height = 64
+              mapMode = MapMode.STATIC
+            },
+          )
+          .await()
+
+      try {
+        map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""".encodeToByteArray()).await()
+        val geometryOptions =
+          CustomGeometrySourceOptions(
+            object : CustomGeometrySourceCallback {
+              override fun fetchTile(tileId: CanonicalTileId) {}
+            }
+          )
+        val mvtOptions =
+          CustomMvtVectorSourceOptions(
+            object : CustomMvtVectorSourceCallback {
+              override fun fetchTile(tileId: CanonicalTileId) {}
+            }
+          )
+        val geometryIds = (1..11).map { "custom-$it" }
+        val mvtIds = (1..11).map { "custom-mvt-$it" }
+        geometryIds.forEach { map.addCustomGeometrySource(it, geometryOptions).await() }
+        mvtIds.forEach { map.addCustomMvtVectorSource(it, mvtOptions).await() }
+        (geometryIds + mvtIds).forEach { id -> assertNotNull(map.styleSourceInfo(id).await(), id) }
+
+        assertCommandCommitted(runtime, map.removeStyleSource("custom-1").await())
+        assertCommandCommitted(runtime, map.removeStyleSource("custom-mvt-1").await())
+        map.addCustomGeometrySource("custom-12", geometryOptions).await()
+        map.addCustomMvtVectorSource("custom-mvt-12", mvtOptions).await()
+        assertNotNull(map.styleSourceInfo("custom-12").await())
+        assertNotNull(map.styleSourceInfo("custom-mvt-12").await())
+        assertNull(map.styleSourceInfo("custom-1").await())
+        assertNull(map.styleSourceInfo("custom-mvt-1").await())
+      } finally {
+        map.close()
+        runtime.close()
+      }
+    }
+
+  @Test
+  fun featureStateRoundTripsThroughTheMapStore(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val runtime = RuntimeHandle.create(RuntimeOptions())
+      val map =
+        MapHandle.create(
+            runtime,
+            MapOptions().apply {
+              width = 64
+              height = 64
+              mapMode = MapMode.STATIC
+            },
+          )
+          .await()
+
+      try {
+        val selector = FeatureStateSelector("point").apply { featureId = "feature-1" }
+
+        // The store answers before any source loads, and missing state reads as an empty object.
+        assertEquals("{}", map.getFeatureState(selector).await().decodeToString())
+
+        assertCommandCommitted(
+          runtime,
+          map
+            .setFeatureState(selector, """{"hover":true,"radius":20}""".encodeToByteArray())
+            .await(),
+        )
+        val stored = map.getFeatureState(selector).await().decodeToString()
+        assertTrue(stored.contains("\"hover\":true"), stored)
+        assertTrue(stored.contains("\"radius\":20"), stored)
+
+        // State must be one JSON object.
+        assertFailsWith<InvalidArgumentException> {
+          map.setFeatureState(selector, "[]".encodeToByteArray()).await()
+        }
+
+        // A state key narrows the removal to that one member.
+        assertCommandCommitted(
+          runtime,
+          map
+            .removeFeatureState(
+              FeatureStateSelector("point").apply {
+                featureId = "feature-1"
+                stateKey = "hover"
+              }
+            )
+            .await(),
+        )
+        val afterRemove = map.getFeatureState(selector).await().decodeToString()
+        assertFalse(afterRemove.contains("hover"), afterRemove)
+        assertTrue(afterRemove.contains("\"radius\":20"), afterRemove)
+
+        assertCommandCommitted(runtime, map.removeFeatureState(selector).await())
+        assertEquals("{}", map.getFeatureState(selector).await().decodeToString())
       } finally {
         map.close()
         runtime.close()

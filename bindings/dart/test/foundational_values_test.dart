@@ -313,6 +313,7 @@ void main() {
     expect(ResourceResponseStatus.error.rawValue, 1);
     expect(ResourceErrorReason.rateLimit.rawValue, 4);
     expect(SourceType.customVector.rawValue, 8);
+    expect(SourceType.customMvtVector.rawValue, 9);
     expect(TileScheme.tms.rawValue, 1);
   });
 

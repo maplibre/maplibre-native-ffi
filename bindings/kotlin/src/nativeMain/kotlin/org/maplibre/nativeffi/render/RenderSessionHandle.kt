@@ -204,48 +204,6 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
 
   public actual fun detach(): Deferred<Unit> = unit { mln_render_session_detach(id(), it) }
 
-  public actual fun setFeatureState(
-    selector: FeatureStateSelector,
-    value: ByteArray,
-  ): Deferred<Unit> = memScoped {
-    val views = selectorViews(selector, this)
-    unit {
-      mln_render_session_set_feature_state(
-        id(),
-        views[0],
-        views[1],
-        views[2],
-        ByteStructs.bufferView(value, this),
-        it,
-      )
-    }
-  }
-
-  public actual fun getFeatureState(selector: FeatureStateSelector): Deferred<ByteArray> =
-    memScoped {
-      val views = selectorViews(selector, this)
-      CompletionBridge.submit(
-        { result -> requiredBuffer(result) },
-        { completion ->
-          mln_render_session_get_feature_state(id(), views[0], views[1], views[2], completion)
-        },
-      )
-    }
-
-  public actual fun removeFeatureState(selector: FeatureStateSelector): Deferred<Unit> = memScoped {
-    val views = selectorViews(selector, this)
-    unit {
-      mln_render_session_remove_feature_state(
-        id(),
-        views[0],
-        views[1],
-        views[2],
-        ByteStructs.bufferView(selector.stateKey?.encodeToByteArray() ?: byteArrayOf(), this),
-        it,
-      )
-    }
-  }
-
   public actual fun queryRenderedFeatures(
     geometry: RenderedQueryGeometry,
     options: RenderedFeatureQueryOptions?,
@@ -654,7 +612,8 @@ internal constructor(
   }
 
   private fun scoped(pointer: COpaquePointer?): NativePointer =
-    pointer?.rawValue?.toLong()?.let { NativePointer.scoped(it, scope) } ?: NativePointer.NULL
+    pointer?.rawValue?.toLong()?.let { NativePointer.scoped(it, scope) }
+      ?: NativePointer.NULL_POINTER
 }
 
 @OptIn(ExperimentalForeignApi::class)
@@ -668,14 +627,6 @@ private fun extent(value: RenderTargetExtent, scope: MemScope): CPointer<mln_ren
       scale_factor = value.scaleFactor
     }
     .ptr
-
-@OptIn(ExperimentalForeignApi::class)
-private fun selectorViews(value: FeatureStateSelector, scope: MemScope) =
-  listOf(
-    ByteStructs.bufferView(value.sourceId.encodeToByteArray(), scope),
-    ByteStructs.bufferView(value.sourceLayerId?.encodeToByteArray() ?: byteArrayOf(), scope),
-    ByteStructs.bufferView(value.featureId?.encodeToByteArray() ?: byteArrayOf(), scope),
-  )
 
 @OptIn(ExperimentalForeignApi::class)
 private fun frameResult(value: mln_render_frame_result) =

@@ -57,6 +57,7 @@
 #include <mbgl/style/rapidjson_conversion.hpp>
 #include <mbgl/style/source.hpp>
 #include <mbgl/style/sources/custom_geometry_source.hpp>
+#include <mbgl/style/sources/custom_vector_source.hpp>
 #include <mbgl/style/sources/geojson_source.hpp>
 #include <mbgl/style/sources/image_source.hpp>
 #include <mbgl/style/sources/raster_dem_source.hpp>
@@ -118,10 +119,10 @@ auto validate_lat_lng_bounds(mln_lat_lng_bounds bounds) -> mln_status;
 auto validate_lat_lng_array(
   const mln_lat_lng* coordinates, size_t coordinate_count, bool allow_empty
 ) -> mln_status;
-auto to_native_lat_lng(mln_lat_lng coordinate) -> mbgl::LatLng;
-auto from_native_lat_lng(const mbgl::LatLng& coordinate) -> mln_lat_lng;
-auto to_native_lat_lng_bounds(mln_lat_lng_bounds bounds) -> mbgl::LatLngBounds;
-auto from_native_lat_lng_bounds(const mbgl::LatLngBounds& bounds)
+auto to_native_lat_lng(mln_lat_lng coordinate) -> mln::LatLng;
+auto from_native_lat_lng(const mln::LatLng& coordinate) -> mln_lat_lng;
+auto to_native_lat_lng_bounds(mln_lat_lng_bounds bounds) -> mln::LatLngBounds;
+auto from_native_lat_lng_bounds(const mln::LatLngBounds& bounds)
   -> mln_lat_lng_bounds;
 
 }  // namespace mln::core
@@ -161,95 +162,94 @@ auto string_view_from_literal(const char* string) -> mln_buffer_view {
   return mln_buffer_view{.data = string, .size = std::strlen(string)};
 }
 
-auto to_c_source_type(mbgl::style::SourceType type) -> uint32_t {
+auto to_c_source_type(mln::style::SourceType type) -> uint32_t {
   switch (type) {
-    case mbgl::style::SourceType::Vector:
+    case mln::style::SourceType::Vector:
       return MLN_STYLE_SOURCE_TYPE_VECTOR;
-    case mbgl::style::SourceType::Raster:
+    case mln::style::SourceType::Raster:
       return MLN_STYLE_SOURCE_TYPE_RASTER;
-    case mbgl::style::SourceType::RasterDEM:
+    case mln::style::SourceType::RasterDEM:
       return MLN_STYLE_SOURCE_TYPE_RASTER_DEM;
-    case mbgl::style::SourceType::GeoJSON:
+    case mln::style::SourceType::GeoJSON:
       return MLN_STYLE_SOURCE_TYPE_GEOJSON;
-    case mbgl::style::SourceType::Video:
+    case mln::style::SourceType::Video:
       return MLN_STYLE_SOURCE_TYPE_VIDEO;
-    case mbgl::style::SourceType::Annotations:
+    case mln::style::SourceType::Annotations:
       return MLN_STYLE_SOURCE_TYPE_ANNOTATIONS;
-    case mbgl::style::SourceType::Image:
+    case mln::style::SourceType::Image:
       return MLN_STYLE_SOURCE_TYPE_IMAGE;
-    case mbgl::style::SourceType::CustomVector:
+    case mln::style::SourceType::CustomVector:
       return MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR;
-    case mbgl::style::SourceType::CustomMVTVector:
+    case mln::style::SourceType::CustomMVTVector:
       return MLN_STYLE_SOURCE_TYPE_CUSTOM_MVT_VECTOR;
   }
   assert(false);
   return MLN_STYLE_SOURCE_TYPE_UNKNOWN;
 }
 
-auto to_c_tile_scheme(mbgl::Tileset::Scheme scheme) -> uint32_t {
+auto to_c_tile_scheme(mln::Tileset::Scheme scheme) -> uint32_t {
   switch (scheme) {
-    case mbgl::Tileset::Scheme::XYZ:
+    case mln::Tileset::Scheme::XYZ:
       return MLN_STYLE_TILE_SCHEME_XYZ;
-    case mbgl::Tileset::Scheme::TMS:
+    case mln::Tileset::Scheme::TMS:
       return MLN_STYLE_TILE_SCHEME_TMS;
   }
   assert(false);
   return MLN_STYLE_TILE_SCHEME_XYZ;
 }
 
-auto to_c_vector_encoding(mbgl::Tileset::VectorEncoding encoding) -> uint32_t {
+auto to_c_vector_encoding(mln::Tileset::VectorEncoding encoding) -> uint32_t {
   switch (encoding) {
-    case mbgl::Tileset::VectorEncoding::Mapbox:
+    case mln::Tileset::VectorEncoding::Mapbox:
       return MLN_STYLE_VECTOR_TILE_ENCODING_MVT;
-    case mbgl::Tileset::VectorEncoding::MLT:
+    case mln::Tileset::VectorEncoding::MLT:
       return MLN_STYLE_VECTOR_TILE_ENCODING_MLT;
   }
   assert(false);
   return MLN_STYLE_VECTOR_TILE_ENCODING_MVT;
 }
 
-auto to_c_raster_encoding(mbgl::Tileset::RasterEncoding encoding) -> uint32_t {
+auto to_c_raster_encoding(mln::Tileset::RasterEncoding encoding) -> uint32_t {
   switch (encoding) {
-    case mbgl::Tileset::RasterEncoding::Mapbox:
+    case mln::Tileset::RasterEncoding::Mapbox:
       return MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX;
-    case mbgl::Tileset::RasterEncoding::Terrarium:
+    case mln::Tileset::RasterEncoding::Terrarium:
       return MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM;
   }
   assert(false);
   return MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX;
 }
 
-auto tile_source_from_source(const mbgl::style::Source& source)
-  -> const mbgl::style::TileSource* {
+auto tile_source_from_source(const mln::style::Source& source)
+  -> const mln::style::TileSource* {
   switch (source.getType()) {
-    case mbgl::style::SourceType::Vector:
-      return source.as<mbgl::style::VectorSource>();
-    case mbgl::style::SourceType::Raster:
-      return source.as<mbgl::style::RasterSource>();
-    case mbgl::style::SourceType::RasterDEM:
-      return source.as<mbgl::style::RasterDEMSource>();
+    case mln::style::SourceType::Vector:
+      return source.as<mln::style::VectorSource>();
+    case mln::style::SourceType::Raster:
+      return source.as<mln::style::RasterSource>();
+    case mln::style::SourceType::RasterDEM:
+      return source.as<mln::style::RasterDEMSource>();
     default:
       return nullptr;
   }
 }
 
-auto inline_tileset(const mbgl::style::TileSource& source)
-  -> const mbgl::Tileset* {
+auto inline_tileset(const mln::style::TileSource& source)
+  -> const mln::Tileset* {
   const auto& url_or_tileset = source.getURLOrTileset();
-  return url_or_tileset.is<mbgl::Tileset>()
-           ? &url_or_tileset.get<mbgl::Tileset>()
-           : nullptr;
+  return url_or_tileset.is<mln::Tileset>() ? &url_or_tileset.get<mln::Tileset>()
+                                           : nullptr;
 }
 
-auto source_url(const mbgl::style::Source& source)
+auto source_url(const mln::style::Source& source)
   -> std::optional<std::string> {
   if (const auto* tile_source = tile_source_from_source(source)) {
     return tile_source->getURL();
   }
-  if (const auto* geojson = source.as<mbgl::style::GeoJSONSource>()) {
+  if (const auto* geojson = source.as<mln::style::GeoJSONSource>()) {
     return geojson->getURL();
   }
-  if (const auto* image = source.as<mbgl::style::ImageSource>()) {
+  if (const auto* image = source.as<mln::style::ImageSource>()) {
     return image->getURL();
   }
   return std::nullopt;
@@ -513,23 +513,23 @@ auto effective_tile_source_options(const mln_style_tile_source_options* options)
   return result;
 }
 
-auto to_native_tile_scheme(uint32_t scheme) -> mbgl::Tileset::Scheme {
-  return scheme == MLN_STYLE_TILE_SCHEME_TMS ? mbgl::Tileset::Scheme::TMS
-                                             : mbgl::Tileset::Scheme::XYZ;
+auto to_native_tile_scheme(uint32_t scheme) -> mln::Tileset::Scheme {
+  return scheme == MLN_STYLE_TILE_SCHEME_TMS ? mln::Tileset::Scheme::TMS
+                                             : mln::Tileset::Scheme::XYZ;
 }
 
 auto to_native_vector_encoding(uint32_t encoding)
-  -> mbgl::Tileset::VectorEncoding {
+  -> mln::Tileset::VectorEncoding {
   return encoding == MLN_STYLE_VECTOR_TILE_ENCODING_MLT
-           ? mbgl::Tileset::VectorEncoding::MLT
-           : mbgl::Tileset::VectorEncoding::Mapbox;
+           ? mln::Tileset::VectorEncoding::MLT
+           : mln::Tileset::VectorEncoding::Mapbox;
 }
 
 auto to_native_raster_encoding(uint32_t encoding)
-  -> mbgl::Tileset::RasterEncoding {
+  -> mln::Tileset::RasterEncoding {
   return encoding == MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM
-           ? mbgl::Tileset::RasterEncoding::Terrarium
-           : mbgl::Tileset::RasterEncoding::Mapbox;
+           ? mln::Tileset::RasterEncoding::Terrarium
+           : mln::Tileset::RasterEncoding::Mapbox;
 }
 
 auto validate_tile_urls(const mln_buffer_view* tiles, size_t tile_count)
@@ -567,7 +567,7 @@ auto to_native_tile_urls(const mln_buffer_view* tiles, size_t tile_count)
 auto to_native_tileset(
   const mln_buffer_view* tiles, size_t tile_count,
   const mln_style_tile_source_options& options, bool vector_source
-) -> std::optional<mbgl::Tileset> {
+) -> std::optional<mln::Tileset> {
   if (options.min_zoom > options.max_zoom) {
     mln::core::set_thread_error(
       "effective min_zoom must be less than or equal to max_zoom"
@@ -575,9 +575,9 @@ auto to_native_tileset(
     return std::nullopt;
   }
 
-  auto tileset = mbgl::Tileset{
+  auto tileset = mln::Tileset{
     to_native_tile_urls(tiles, tile_count),
-    mbgl::Range<uint8_t>{
+    mln::Range<uint8_t>{
       static_cast<uint8_t>(options.min_zoom),
       static_cast<uint8_t>(options.max_zoom)
     },
@@ -585,7 +585,7 @@ auto to_native_tileset(
     to_native_tile_scheme(options.scheme),
     std::nullopt,
     vector_source
-      ? std::optional<mbgl::Tileset::VectorEncoding>{to_native_vector_encoding(
+      ? std::optional<mln::Tileset::VectorEncoding>{to_native_vector_encoding(
           options.vector_encoding
         )}
       : std::nullopt
@@ -755,18 +755,18 @@ auto effective_custom_geometry_source_options(
   return result;
 }
 
-auto to_c_canonical_tile_id(const mbgl::CanonicalTileID& tile_id)
+auto to_c_canonical_tile_id(const mln::CanonicalTileID& tile_id)
   -> mln_canonical_tile_id {
   return mln_canonical_tile_id{.z = tile_id.z, .x = tile_id.x, .y = tile_id.y};
 }
 
 auto to_native_tile_function(
   mln_custom_geometry_source_tile_callback callback, void* user_data
-) -> mbgl::style::TileFunction {
+) -> mln::style::TileFunction {
   if (callback == nullptr) {
     return nullptr;
   }
-  return [callback, user_data](const mbgl::CanonicalTileID& tile_id) -> void {
+  return [callback, user_data](const mln::CanonicalTileID& tile_id) -> void {
     try {
       callback(user_data, to_c_canonical_tile_id(tile_id));
     } catch (const std::exception& exception) {
@@ -779,22 +779,131 @@ auto to_native_tile_function(
 
 auto to_native_custom_geometry_source_options(
   const mln_custom_geometry_source_options& options
-) -> mbgl::style::CustomGeometrySource::Options {
-  auto result = mbgl::style::CustomGeometrySource::Options{};
+) -> mln::style::CustomGeometrySource::Options {
+  auto result = mln::style::CustomGeometrySource::Options{};
   result.fetchTileFunction =
     to_native_tile_function(options.fetch_tile, options.user_data);
   result.cancelTileFunction =
     to_native_tile_function(options.cancel_tile, options.user_data);
-  result.zoomRange = mbgl::Range<uint8_t>{
+  result.zoomRange = mln::Range<uint8_t>{
     static_cast<uint8_t>(options.min_zoom),
     static_cast<uint8_t>(options.max_zoom)
   };
-  result.tileOptions = mbgl::style::CustomGeometrySource::TileOptions{
+  result.tileOptions = mln::style::CustomGeometrySource::TileOptions{
     .tolerance = options.tolerance,
     .tileSize = static_cast<uint16_t>(options.tile_size),
     .buffer = static_cast<uint16_t>(options.buffer),
     .clip = options.clip,
     .wrap = options.wrap
+  };
+  return result;
+}
+
+auto has_custom_mvt_vector_source_option(
+  const mln_custom_mvt_vector_source_options& options, uint32_t field
+) -> bool {
+  return (options.fields & field) != 0U;
+}
+
+auto effective_custom_mvt_vector_source_options(
+  const mln_custom_mvt_vector_source_options& options
+) -> mln_custom_mvt_vector_source_options;
+
+auto validate_custom_mvt_vector_source_options(
+  const mln_custom_mvt_vector_source_options* options
+) -> mln_status {
+  if (options == nullptr) {
+    mln::core::set_thread_error("options must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (options->size < sizeof(mln_custom_mvt_vector_source_options)) {
+    mln::core::set_thread_error(
+      "mln_custom_mvt_vector_source_options.size is too small"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  constexpr auto known_fields =
+    static_cast<uint32_t>(MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM) |
+    MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM;
+  if ((options->fields & ~known_fields) != 0U) {
+    mln::core::set_thread_error(
+      "mln_custom_mvt_vector_source_options.fields contains unknown bits"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (options->fetch_tile == nullptr) {
+    mln::core::set_thread_error("fetch_tile must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (
+    has_custom_mvt_vector_source_option(
+      *options, MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM
+    )
+  ) {
+    const auto status =
+      validate_custom_geometry_zoom(options->min_zoom, "min_zoom");
+    if (status != MLN_STATUS_OK) {
+      return status;
+    }
+  }
+  if (
+    has_custom_mvt_vector_source_option(
+      *options, MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM
+    )
+  ) {
+    const auto status =
+      validate_custom_geometry_zoom(options->max_zoom, "max_zoom");
+    if (status != MLN_STATUS_OK) {
+      return status;
+    }
+  }
+  const auto effective = effective_custom_mvt_vector_source_options(*options);
+  if (effective.min_zoom > effective.max_zoom) {
+    mln::core::set_thread_error(
+      "min_zoom must be less than or equal to max_zoom"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
+auto effective_custom_mvt_vector_source_options(
+  const mln_custom_mvt_vector_source_options& options
+) -> mln_custom_mvt_vector_source_options {
+  auto result = mln::core::custom_mvt_vector_source_options_default();
+  result.fields = options.fields;
+  result.fetch_tile = options.fetch_tile;
+  result.cancel_tile = options.cancel_tile;
+  result.user_data = options.user_data;
+  result.release_user_data = options.release_user_data;
+  if (
+    has_custom_mvt_vector_source_option(
+      options, MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM
+    )
+  ) {
+    result.min_zoom = options.min_zoom;
+  }
+  if (
+    has_custom_mvt_vector_source_option(
+      options, MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM
+    )
+  ) {
+    result.max_zoom = options.max_zoom;
+  }
+  return result;
+}
+
+auto to_native_custom_mvt_vector_source_options(
+  const mln_custom_mvt_vector_source_options& options
+) -> mln::style::CustomVectorSource::Options {
+  auto result = mln::style::CustomVectorSource::Options{};
+  result.fetchTileFunction =
+    to_native_tile_function(options.fetch_tile, options.user_data);
+  result.cancelTileFunction =
+    to_native_tile_function(options.cancel_tile, options.user_data);
+  result.zoomRange = mln::Range<uint8_t>{
+    static_cast<uint8_t>(options.min_zoom),
+    static_cast<uint8_t>(options.max_zoom)
   };
   return result;
 }
@@ -817,8 +926,8 @@ auto validate_canonical_tile_id(mln_canonical_tile_id tile_id) -> mln_status {
 }
 
 auto to_native_canonical_tile_id(mln_canonical_tile_id tile_id)
-  -> mbgl::CanonicalTileID {
-  return mbgl::CanonicalTileID{
+  -> mln::CanonicalTileID {
+  return mln::CanonicalTileID{
     static_cast<uint8_t>(tile_id.z), tile_id.x, tile_id.y
   };
 }
@@ -835,7 +944,7 @@ auto validate_source_id(mln_buffer_view source_id) -> mln_status {
 }
 
 auto validate_source_can_be_added(
-  mbgl::style::Style& style, const std::string& source_id
+  mln::style::Style& style, const std::string& source_id
 ) -> mln_status {
   if (style.getSource(source_id) != nullptr) {
     mln::core::set_thread_error("source already exists");
@@ -998,8 +1107,8 @@ auto effective_style_image_options(const mln_style_image_options* options)
 }
 
 auto to_native_image_stretches(const mln_image_stretch* stretches, size_t count)
-  -> mbgl::style::ImageStretches {
-  auto native = mbgl::style::ImageStretches{};
+  -> mln::style::ImageStretches {
+  auto native = mln::style::ImageStretches{};
   native.reserve(count);
   for (size_t index = 0; index < count; index += 1) {
     native.emplace_back(stretches[index].from, stretches[index].to);
@@ -1007,22 +1116,22 @@ auto to_native_image_stretches(const mln_image_stretch* stretches, size_t count)
   return native;
 }
 
-auto to_native_text_fit(uint32_t value) -> mbgl::style::TextFit {
+auto to_native_text_fit(uint32_t value) -> mln::style::TextFit {
   switch (value) {
     case MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY:
-      return mbgl::style::TextFit::stretchOnly;
+      return mln::style::TextFit::stretchOnly;
     case MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL:
-      return mbgl::style::TextFit::proportional;
+      return mln::style::TextFit::proportional;
     default:
-      return mbgl::style::TextFit::stretchOrShrink;
+      return mln::style::TextFit::stretchOrShrink;
   }
 }
 
-auto from_native_text_fit(mbgl::style::TextFit value) -> uint32_t {
+auto from_native_text_fit(mln::style::TextFit value) -> uint32_t {
   switch (value) {
-    case mbgl::style::TextFit::stretchOnly:
+    case mln::style::TextFit::stretchOnly:
       return MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY;
-    case mbgl::style::TextFit::proportional:
+    case mln::style::TextFit::proportional:
       return MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL;
     default:
       return MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK;
@@ -1094,8 +1203,8 @@ auto validate_premultiplied_rgba8_image(
 
 auto to_native_premultiplied_rgba8_image(
   const mln_premultiplied_rgba8_image& image
-) -> mbgl::PremultipliedImage {
-  auto result = mbgl::PremultipliedImage{mbgl::Size{image.width, image.height}};
+) -> mln::PremultipliedImage {
+  auto result = mln::PremultipliedImage{mln::Size{image.width, image.height}};
   const auto output_stride = result.stride();
   const auto row_bytes = static_cast<size_t>(image.width) * 4U;
   const auto input = std::span<const uint8_t>{image.pixels, image.byte_length};
@@ -1122,7 +1231,7 @@ auto validate_image_id(mln_buffer_view image_id) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-auto style_image_info_from_native(const mbgl::style::Image& image)
+auto style_image_info_from_native(const mln::style::Image& image)
   -> mln_style_image_info {
   const auto& pixels = image.getImage();
   return mln_style_image_info{
@@ -1186,8 +1295,8 @@ auto validate_image_source_coordinates(
 }
 
 auto to_native_image_source_coordinates(const mln_lat_lng* coordinates)
-  -> std::array<mbgl::LatLng, 4> {
-  auto result = std::array<mbgl::LatLng, 4>{};
+  -> std::array<mln::LatLng, 4> {
+  auto result = std::array<mln::LatLng, 4>{};
   const auto coordinate_span = std::span<const mln_lat_lng>{coordinates, 4};
   auto index = size_t{0};
   for (const auto coordinate : coordinate_span) {
@@ -1198,7 +1307,7 @@ auto to_native_image_source_coordinates(const mln_lat_lng* coordinates)
 }
 
 auto from_native_image_source_coordinates(
-  const std::array<mbgl::LatLng, 4>& coordinates
+  const std::array<mln::LatLng, 4>& coordinates
 ) -> std::array<mln_lat_lng, 4> {
   auto result = std::array<mln_lat_lng, 4>{};
   for (auto index = size_t{0}; index < result.size(); ++index) {
@@ -1306,23 +1415,23 @@ auto validate_lat_lng_array(
   return MLN_STATUS_OK;
 }
 
-auto to_native_lat_lng(mln_lat_lng coordinate) -> mbgl::LatLng {
-  return mbgl::LatLng{coordinate.latitude, coordinate.longitude};
+auto to_native_lat_lng(mln_lat_lng coordinate) -> mln::LatLng {
+  return mln::LatLng{coordinate.latitude, coordinate.longitude};
 }
 
-auto from_native_lat_lng(const mbgl::LatLng& coordinate) -> mln_lat_lng {
+auto from_native_lat_lng(const mln::LatLng& coordinate) -> mln_lat_lng {
   return mln_lat_lng{
     .latitude = coordinate.latitude(), .longitude = coordinate.longitude()
   };
 }
 
-auto to_native_lat_lng_bounds(mln_lat_lng_bounds bounds) -> mbgl::LatLngBounds {
-  return mbgl::LatLngBounds::hull(
+auto to_native_lat_lng_bounds(mln_lat_lng_bounds bounds) -> mln::LatLngBounds {
+  return mln::LatLngBounds::hull(
     to_native_lat_lng(bounds.southwest), to_native_lat_lng(bounds.northeast)
   );
 }
 
-auto from_native_lat_lng_bounds(const mbgl::LatLngBounds& bounds)
+auto from_native_lat_lng_bounds(const mln::LatLngBounds& bounds)
   -> mln_lat_lng_bounds {
   return mln_lat_lng_bounds{
     .southwest =
@@ -1367,27 +1476,27 @@ auto copy_text(
 using DoubleMilliseconds = std::chrono::duration<double, std::milli>;
 
 auto max_native_duration_ms() -> double {
-  return std::chrono::duration_cast<DoubleMilliseconds>(mbgl::Duration::max())
+  return std::chrono::duration_cast<DoubleMilliseconds>(mln::Duration::max())
     .count();
 }
 
-auto duration_from_milliseconds(double milliseconds) -> mbgl::Duration {
-  return std::chrono::duration_cast<mbgl::Duration>(
+auto duration_from_milliseconds(double milliseconds) -> mln::Duration {
+  return std::chrono::duration_cast<mln::Duration>(
     DoubleMilliseconds{milliseconds}
   );
 }
 
-auto milliseconds_from_duration(mbgl::Duration duration) -> double {
+auto milliseconds_from_duration(mln::Duration duration) -> double {
   return std::chrono::duration_cast<DoubleMilliseconds>(duration).count();
 }
 
-// The accepted bound is exclusive because mbgl::Duration::max() has no exact
+// The accepted bound is exclusive because mln::Duration::max() has no exact
 // double representation: the nearest double converts back to 2^63 ticks, one
 // past the largest representable count. The margin holds for a nanosecond
 // duration only, so pin the representation.
 static_assert(
-  std::is_same_v<mbgl::Duration, std::chrono::nanoseconds>,
-  "the accepted duration bound is derived from a nanosecond mbgl::Duration"
+  std::is_same_v<mln::Duration, std::chrono::nanoseconds>,
+  "the accepted duration bound is derived from a nanosecond mln::Duration"
 );
 
 auto is_native_duration_ms(double milliseconds) -> bool {
@@ -1405,20 +1514,20 @@ auto style_tile_source_options_default() noexcept
     .size = sizeof(mln_style_tile_source_options),
     .fields = 0,
     .min_zoom = 0,
-    .max_zoom = mbgl::util::DEFAULT_MAX_ZOOM,
+    .max_zoom = mln::util::DEFAULT_MAX_ZOOM,
     .attribution = {.data = nullptr, .size = 0},
     .scheme = MLN_STYLE_TILE_SCHEME_XYZ,
     .bounds =
       {.southwest = {.latitude = 0, .longitude = 0},
        .northeast = {.latitude = 0, .longitude = 0}},
-    .tile_size = mbgl::util::tileSize_I,
+    .tile_size = mln::util::tileSize_I,
     .vector_encoding = MLN_STYLE_VECTOR_TILE_ENCODING_MVT,
     .raster_encoding = MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX
   };
 }
 
 auto geojson_source_options_default() noexcept -> mln_geojson_source_options {
-  const auto defaults = mbgl::style::GeoJSONOptions{};
+  const auto defaults = mln::style::GeoJSONOptions{};
   return mln_geojson_source_options{
     .size = sizeof(mln_geojson_source_options),
     .fields = 0,
@@ -1448,10 +1557,24 @@ auto custom_geometry_source_options_default() noexcept
     .min_zoom = 0,
     .max_zoom = 18,
     .tolerance = 0.375,
-    .tile_size = mbgl::util::tileSize_I,
+    .tile_size = mln::util::tileSize_I,
     .buffer = 128,
     .clip = false,
     .wrap = false,
+    .release_user_data = nullptr
+  };
+}
+
+auto custom_mvt_vector_source_options_default() noexcept
+  -> mln_custom_mvt_vector_source_options {
+  return mln_custom_mvt_vector_source_options{
+    .size = sizeof(mln_custom_mvt_vector_source_options),
+    .fields = 0,
+    .fetch_tile = nullptr,
+    .cancel_tile = nullptr,
+    .user_data = nullptr,
+    .min_zoom = 0,
+    .max_zoom = 18,
     .release_user_data = nullptr
   };
 }
@@ -1546,6 +1669,12 @@ auto validate_custom_geometry_command_options(
   const mln_custom_geometry_source_options* options
 ) -> mln_status {
   return validate_custom_geometry_source_options(options);
+}
+
+auto validate_custom_mvt_command_options(
+  const mln_custom_mvt_vector_source_options* options
+) -> mln_status {
+  return validate_custom_mvt_vector_source_options(options);
 }
 
 auto validate_style_image_command_input(
@@ -1677,9 +1806,9 @@ auto map_add_style_source_json(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto error = mbgl::style::conversion::Error{};
+  auto error = mln::style::conversion::Error{};
   auto source =
-    mbgl::style::conversion::convertJSON<std::unique_ptr<mbgl::style::Source>>(
+    mln::style::conversion::convertJSON<std::unique_ptr<mln::style::Source>>(
       string_from_view(source_json), error, id
     );
   if (!source) {
@@ -1721,7 +1850,7 @@ auto map_remove_style_source(mln_map map, mln_buffer_view source_id)
   // The detached source is dropped before the release runs, so the style no
   // longer holds the callbacks that read the host's state.
   removed.reset();
-  release_custom_geometry_source(*live, id);
+  release_callback_source(*live, id);
   return MLN_STATUS_OK;
 }
 
@@ -1780,7 +1909,7 @@ auto map_get_style_source_info(
 
   out_info->fields |= MLN_STYLE_SOURCE_INFO_TILE_SIZE;
   out_info->tile_size = tile_source->getTileSize();
-  if (const auto* vector_source = source->as<mbgl::style::VectorSource>()) {
+  if (const auto* vector_source = source->as<mln::style::VectorSource>()) {
     out_info->fields |= MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING;
     out_info->vector_encoding =
       to_c_vector_encoding(vector_source->getEncoding());
@@ -2000,9 +2129,8 @@ auto map_add_geojson_source_url(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto source = std::make_unique<mbgl::style::GeoJSONSource>(
-    id, std::move(*native_options)
-  );
+  auto source =
+    std::make_unique<mln::style::GeoJSONSource>(id, std::move(*native_options));
   source->setURL(string_from_view(url));
   style.addSource(std::move(source));
   return MLN_STATUS_OK;
@@ -2034,7 +2162,7 @@ auto map_add_geojson_source_data(
     return add_status;
   }
 
-  auto source = std::make_unique<mbgl::style::GeoJSONSource>(id, data->options);
+  auto source = std::make_unique<mln::style::GeoJSONSource>(id, data->options);
   source->setGeoJSONData(data->data);
   style.addSource(std::move(source));
   return MLN_STATUS_OK;
@@ -2066,7 +2194,7 @@ auto map_set_geojson_source_url(
     set_thread_error("source does not exist");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto* geojson_source = source->as<mbgl::style::GeoJSONSource>();
+  auto* geojson_source = source->as<mln::style::GeoJSONSource>();
   if (geojson_source == nullptr) {
     set_thread_error("source is not a GeoJSON source");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -2101,7 +2229,7 @@ auto map_set_geojson_source_data(
     set_thread_error("source does not exist");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto* geojson_source = source->as<mbgl::style::GeoJSONSource>();
+  auto* geojson_source = source->as<mln::style::GeoJSONSource>();
   if (geojson_source == nullptr) {
     set_thread_error("source is not a GeoJSON source");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -2140,7 +2268,7 @@ auto map_set_geojson_source_synchronous_tiling(
     set_thread_error("source does not exist");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto* geojson_source = source->as<mbgl::style::GeoJSONSource>();
+  auto* geojson_source = source->as<mln::style::GeoJSONSource>();
   if (geojson_source == nullptr) {
     set_thread_error("source is not a GeoJSON source");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -2203,14 +2331,14 @@ auto map_add_vector_source_url(
     )
   ) {
     style.addSource(
-      std::make_unique<mbgl::style::VectorSource>(
+      std::make_unique<mln::style::VectorSource>(
         id, string_from_view(url), max_zoom, min_zoom,
         to_native_vector_encoding(effective.vector_encoding)
       )
     );
   } else {
     style.addSource(
-      std::make_unique<mbgl::style::VectorSource>(
+      std::make_unique<mln::style::VectorSource>(
         id, string_from_view(url), max_zoom, min_zoom
       )
     );
@@ -2254,7 +2382,7 @@ auto map_add_vector_source_tiles(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   style.addSource(
-    std::make_unique<mbgl::style::VectorSource>(
+    std::make_unique<mln::style::VectorSource>(
       id, *tileset, std::nullopt, std::nullopt,
       to_native_vector_encoding(effective.vector_encoding)
     )
@@ -2297,7 +2425,7 @@ auto map_add_raster_source_url(
 
   const auto effective = effective_tile_source_options(options);
   style.addSource(
-    std::make_unique<mbgl::style::RasterSource>(
+    std::make_unique<mln::style::RasterSource>(
       id, string_from_view(url), static_cast<uint16_t>(effective.tile_size)
     )
   );
@@ -2340,7 +2468,7 @@ auto map_add_raster_source_tiles(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   style.addSource(
-    std::make_unique<mbgl::style::RasterSource>(
+    std::make_unique<mln::style::RasterSource>(
       id, *tileset, static_cast<uint16_t>(effective.tile_size)
     )
   );
@@ -2381,18 +2509,18 @@ auto map_add_raster_dem_source_url(
   }
 
   const auto effective = effective_tile_source_options(options);
-  auto source_options = std::optional<mbgl::style::SourceOptions>{};
+  auto source_options = std::optional<mln::style::SourceOptions>{};
   if (
     has_tile_source_option(
       effective, MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING
     )
   ) {
-    source_options = mbgl::style::SourceOptions{
+    source_options = mln::style::SourceOptions{
       .rasterEncoding = to_native_raster_encoding(effective.raster_encoding)
     };
   }
   style.addSource(
-    std::make_unique<mbgl::style::RasterDEMSource>(
+    std::make_unique<mln::style::RasterDEMSource>(
       id, string_from_view(url), static_cast<uint16_t>(effective.tile_size),
       source_options
     )
@@ -2444,7 +2572,7 @@ auto map_add_raster_dem_source_tiles(
       to_native_raster_encoding(effective.raster_encoding);
   }
   style.addSource(
-    std::make_unique<mbgl::style::RasterDEMSource>(
+    std::make_unique<mln::style::RasterDEMSource>(
       id, *tileset, static_cast<uint16_t>(effective.tile_size)
     )
   );
@@ -2482,12 +2610,13 @@ auto map_add_custom_geometry_source(
   // rejects the source untracks it again; either way the add failed and the
   // caller still owns user_data. Tracking afterwards would leave a live source
   // whose release never runs.
-  track_custom_geometry_source(
-    *live, id, effective.release_user_data, effective.user_data
+  track_callback_source(
+    *live, id, CallbackSourceKind::CustomGeometry, effective.release_user_data,
+    effective.user_data
   );
   try {
     style.addSource(
-      std::make_unique<mbgl::style::CustomGeometrySource>(
+      std::make_unique<mln::style::CustomGeometrySource>(
         id, to_native_custom_geometry_source_options(effective)
       )
     );
@@ -2496,7 +2625,7 @@ auto map_add_custom_geometry_source(
     // never tracked, so there is nothing to untrack and no entry of another
     // source's to erase.
     if (effective.release_user_data != nullptr) {
-      untrack_custom_geometry_source(*live, id);
+      untrack_callback_source(*live, id);
     }
     throw;
   }
@@ -2531,7 +2660,7 @@ auto map_set_custom_geometry_source_tile_data(
     set_thread_error("source does not exist");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto* custom_source = source->as<mbgl::style::CustomGeometrySource>();
+  auto* custom_source = source->as<mln::style::CustomGeometrySource>();
   if (custom_source == nullptr) {
     set_thread_error("source is not a custom geometry source");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -2563,7 +2692,7 @@ auto map_invalidate_custom_geometry_source_tile(
     set_thread_error("source does not exist");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto* custom_source = source->as<mbgl::style::CustomGeometrySource>();
+  auto* custom_source = source->as<mln::style::CustomGeometrySource>();
   if (custom_source == nullptr) {
     set_thread_error("source is not a custom geometry source");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -2595,12 +2724,187 @@ auto map_invalidate_custom_geometry_source_region(
     set_thread_error("source does not exist");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto* custom_source = source->as<mbgl::style::CustomGeometrySource>();
+  auto* custom_source = source->as<mln::style::CustomGeometrySource>();
   if (custom_source == nullptr) {
     set_thread_error("source is not a custom geometry source");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   custom_source->invalidateRegion(to_native_lat_lng_bounds(bounds));
+  return MLN_STATUS_OK;
+}
+
+auto lookup_custom_mvt_vector_source(
+  MapObject* live, mln_buffer_view source_id,
+  mln::style::CustomVectorSource*& out_source
+) -> mln_status {
+  auto* source =
+    map_native(live)->getStyle().getSource(string_from_view(source_id));
+  if (source == nullptr) {
+    set_thread_error("source does not exist");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  out_source = source->as<mln::style::CustomVectorSource>();
+  if (out_source == nullptr) {
+    set_thread_error("source is not a custom MVT vector source");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
+auto map_add_custom_mvt_vector_source(
+  mln_map map, mln_buffer_view source_id,
+  const mln_custom_mvt_vector_source_options* options
+) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  const auto source_id_status = validate_source_id(source_id);
+  if (source_id_status != MLN_STATUS_OK) {
+    return source_id_status;
+  }
+  const auto options_status =
+    validate_custom_mvt_vector_source_options(options);
+  if (options_status != MLN_STATUS_OK) {
+    return options_status;
+  }
+
+  auto& style = map_native(live)->getStyle();
+  const auto id = string_from_view(source_id);
+  const auto add_status = validate_source_can_be_added(style, id);
+  if (add_status != MLN_STATUS_OK) {
+    return add_status;
+  }
+
+  const auto effective = effective_custom_mvt_vector_source_options(*options);
+  // Tracked before the style takes the source, so the two cannot disagree. A
+  // throw while tracking leaves no source in the style, and a style that
+  // rejects the source untracks it again; either way the add failed and the
+  // caller still owns user_data. Tracking afterwards would leave a live source
+  // whose release never runs.
+  track_callback_source(
+    *live, id, CallbackSourceKind::CustomMvtVector, effective.release_user_data,
+    effective.user_data
+  );
+  try {
+    style.addSource(
+      std::make_unique<mln::style::CustomVectorSource>(
+        id, to_native_custom_mvt_vector_source_options(effective)
+      )
+    );
+  } catch (...) {
+    // Mirrors add()'s own early return: a source with no release callback was
+    // never tracked, so there is nothing to untrack and no entry of another
+    // source's to erase.
+    if (effective.release_user_data != nullptr) {
+      untrack_callback_source(*live, id);
+    }
+    throw;
+  }
+  return MLN_STATUS_OK;
+}
+
+auto map_set_custom_mvt_vector_source_tile_data(
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
+  mln_buffer_view data
+) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  const auto source_id_status = validate_source_id(source_id);
+  if (source_id_status != MLN_STATUS_OK) {
+    return source_id_status;
+  }
+  const auto tile_status = validate_canonical_tile_id(tile_id);
+  if (tile_status != MLN_STATUS_OK) {
+    return tile_status;
+  }
+  if (!validate_string_view(data, "data")) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  mln::style::CustomVectorSource* custom_source = nullptr;
+  const auto source_status =
+    lookup_custom_mvt_vector_source(live, source_id, custom_source);
+  if (source_status != MLN_STATUS_OK) {
+    return source_status;
+  }
+
+  auto native_data = std::shared_ptr<const std::string>{};
+  if (data.size != 0) {
+    native_data = std::make_shared<const std::string>(
+      static_cast<const char*>(data.data), data.size
+    );
+  }
+  custom_source->setTileData(
+    to_native_canonical_tile_id(tile_id), native_data,
+    mln::style::TileDataFormat::MVT
+  );
+  return MLN_STATUS_OK;
+}
+
+auto map_set_custom_mvt_vector_source_tile_error(
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
+  mln_buffer_view message
+) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  const auto source_id_status = validate_source_id(source_id);
+  if (source_id_status != MLN_STATUS_OK) {
+    return source_id_status;
+  }
+  const auto tile_status = validate_canonical_tile_id(tile_id);
+  if (tile_status != MLN_STATUS_OK) {
+    return tile_status;
+  }
+  if (!validate_string_view(message, "message")) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  mln::style::CustomVectorSource* custom_source = nullptr;
+  const auto source_status =
+    lookup_custom_mvt_vector_source(live, source_id, custom_source);
+  if (source_status != MLN_STATUS_OK) {
+    return source_status;
+  }
+
+  custom_source->setTileError(
+    to_native_canonical_tile_id(tile_id),
+    std::make_exception_ptr(std::runtime_error(string_from_view(message)))
+  );
+  return MLN_STATUS_OK;
+}
+
+auto map_invalidate_custom_mvt_vector_source_tile(
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id
+) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  const auto source_id_status = validate_source_id(source_id);
+  if (source_id_status != MLN_STATUS_OK) {
+    return source_id_status;
+  }
+  const auto tile_status = validate_canonical_tile_id(tile_id);
+  if (tile_status != MLN_STATUS_OK) {
+    return tile_status;
+  }
+
+  mln::style::CustomVectorSource* custom_source = nullptr;
+  const auto source_status =
+    lookup_custom_mvt_vector_source(live, source_id, custom_source);
+  if (source_status != MLN_STATUS_OK) {
+    return source_status;
+  }
+  custom_source->invalidateTile(to_native_canonical_tile_id(tile_id));
   return MLN_STATUS_OK;
 }
 
@@ -2628,26 +2932,26 @@ auto map_set_style_image(
   }
 
   const auto effective = effective_style_image_options(options);
-  auto content = std::optional<mbgl::style::ImageContent>{};
+  auto content = std::optional<mln::style::ImageContent>{};
   if (
     options != nullptr &&
     has_style_image_option(*options, MLN_STYLE_IMAGE_OPTION_CONTENT)
   ) {
-    content = mbgl::style::ImageContent{
+    content = mln::style::ImageContent{
       .left = effective.content.left,
       .top = effective.content.top,
       .right = effective.content.right,
       .bottom = effective.content.bottom
     };
   }
-  auto text_fit_width = std::optional<mbgl::style::TextFit>{};
+  auto text_fit_width = std::optional<mln::style::TextFit>{};
   if (
     options != nullptr &&
     has_style_image_option(*options, MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH)
   ) {
     text_fit_width = to_native_text_fit(effective.text_fit_width);
   }
-  auto text_fit_height = std::optional<mbgl::style::TextFit>{};
+  auto text_fit_height = std::optional<mln::style::TextFit>{};
   if (
     options != nullptr &&
     has_style_image_option(*options, MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT)
@@ -2655,7 +2959,7 @@ auto map_set_style_image(
     text_fit_height = to_native_text_fit(effective.text_fit_height);
   }
 
-  auto style_image = std::make_unique<mbgl::style::Image>(
+  auto style_image = std::make_unique<mln::style::Image>(
     string_from_view(image_id), to_native_premultiplied_rgba8_image(*image),
     effective.pixel_ratio, effective.sdf,
     to_native_image_stretches(effective.stretch_x, effective.stretch_x_count),
@@ -2879,7 +3183,7 @@ auto map_add_image_source_url(
     return add_status;
   }
 
-  auto source = std::make_unique<mbgl::style::ImageSource>(
+  auto source = std::make_unique<mln::style::ImageSource>(
     id, to_native_image_source_coordinates(coordinates)
   );
   source->setURL(string_from_view(url));
@@ -2919,14 +3223,14 @@ auto map_add_image_source_image(
 
   auto native_image = to_native_premultiplied_rgba8_image(*image);
   style.addSource(
-    std::make_unique<mbgl::style::ImageSource>(
+    std::make_unique<mln::style::ImageSource>(
       id, to_native_image_source_coordinates(coordinates)
     )
   );
   auto* added_source = style.getSource(id);
   auto* image_source = added_source == nullptr
                          ? nullptr
-                         : added_source->as<mbgl::style::ImageSource>();
+                         : added_source->as<mln::style::ImageSource>();
   if (image_source == nullptr) {
     set_thread_error("added source is not an image source");
     return MLN_STATUS_NATIVE_ERROR;
@@ -2961,7 +3265,7 @@ auto map_set_image_source_url(
     set_thread_error("source does not exist");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto* image_source = source->as<mbgl::style::ImageSource>();
+  auto* image_source = source->as<mln::style::ImageSource>();
   if (image_source == nullptr) {
     set_thread_error("source is not an image source");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -2994,7 +3298,7 @@ auto map_set_image_source_image(
     set_thread_error("source does not exist");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto* image_source = source->as<mbgl::style::ImageSource>();
+  auto* image_source = source->as<mln::style::ImageSource>();
   if (image_source == nullptr) {
     set_thread_error("source is not an image source");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -3028,7 +3332,7 @@ auto map_set_image_source_coordinates(
     set_thread_error("source does not exist");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto* image_source = source->as<mbgl::style::ImageSource>();
+  auto* image_source = source->as<mln::style::ImageSource>();
   if (image_source == nullptr) {
     set_thread_error("source is not an image source");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -3068,7 +3372,7 @@ auto map_get_image_source_coordinates(
   if (source == nullptr) {
     return MLN_STATUS_OK;
   }
-  auto* image_source = source->as<mbgl::style::ImageSource>();
+  auto* image_source = source->as<mln::style::ImageSource>();
   if (image_source == nullptr) {
     set_thread_error("source is not an image source");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -3123,7 +3427,7 @@ auto map_add_hillshade_layer(
     set_thread_error("source does not exist");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (!source_ptr->is<mbgl::style::RasterDEMSource>()) {
+  if (!source_ptr->is<mln::style::RasterDEMSource>()) {
     set_thread_error("source is not a raster DEM source");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -3137,7 +3441,7 @@ auto map_add_hillshade_layer(
     }
   }
   style.addLayer(
-    std::make_unique<mbgl::style::HillshadeLayer>(layer, source), before
+    std::make_unique<mln::style::HillshadeLayer>(layer, source), before
   );
   return MLN_STATUS_OK;
 }
@@ -3175,7 +3479,7 @@ auto map_add_color_relief_layer(
     set_thread_error("source does not exist");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (!source_ptr->is<mbgl::style::RasterDEMSource>()) {
+  if (!source_ptr->is<mln::style::RasterDEMSource>()) {
     set_thread_error("source is not a raster DEM source");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -3189,7 +3493,7 @@ auto map_add_color_relief_layer(
     }
   }
   style.addLayer(
-    std::make_unique<mbgl::style::ColorReliefLayer>(layer, source), before
+    std::make_unique<mln::style::ColorReliefLayer>(layer, source), before
   );
   return MLN_STATUS_OK;
 }
@@ -3228,7 +3532,7 @@ auto map_add_location_indicator_layer(
     }
   }
   style.addLayer(
-    std::make_unique<mbgl::style::LocationIndicatorLayer>(layer), before
+    std::make_unique<mln::style::LocationIndicatorLayer>(layer), before
   );
   return MLN_STATUS_OK;
 }
@@ -3291,9 +3595,9 @@ auto map_set_location_indicator_location(
   // The style property is [latitude, longitude, altitude]; the renderer reads
   // it back as LatLng{values[0], values[1]}.
   const auto location = serialize_json_value(
-    mbgl::Value{mapbox::base::ValueArray{
-      mbgl::Value{coordinate.latitude}, mbgl::Value{coordinate.longitude},
-      mbgl::Value{altitude}
+    mln::Value{mapbox::base::ValueArray{
+      mln::Value{coordinate.latitude}, mln::Value{coordinate.longitude},
+      mln::Value{altitude}
     }}
   );
   return map_set_layer_property(
@@ -3318,7 +3622,7 @@ auto map_set_location_indicator_bearing(
   if (bearing_status != MLN_STATUS_OK) {
     return bearing_status;
   }
-  const auto value = serialize_json_value(mbgl::Value{bearing});
+  const auto value = serialize_json_value(mln::Value{bearing});
   return map_set_layer_property(
     map, layer_id, string_view_from_literal("bearing"),
     buffer_view_from_string(value)
@@ -3345,7 +3649,7 @@ auto map_set_location_indicator_accuracy_radius(
     set_thread_error("radius must be non-negative");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto value = serialize_json_value(mbgl::Value{radius});
+  const auto value = serialize_json_value(mln::Value{radius});
   return map_set_layer_property(
     map, layer_id, string_view_from_literal("accuracy-radius"),
     buffer_view_from_string(value)
@@ -3392,7 +3696,7 @@ auto map_set_location_indicator_image_name(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto value =
-    serialize_json_value(mbgl::Value{string_from_view(image_id)});
+    serialize_json_value(mln::Value{string_from_view(image_id)});
   return map_set_layer_property(
     map, layer_id, *property, buffer_view_from_string(value)
   );
@@ -3423,9 +3727,9 @@ auto map_add_style_layer_json(
     }
   }
 
-  auto error = mbgl::style::conversion::Error{};
+  auto error = mln::style::conversion::Error{};
   auto layer =
-    mbgl::style::conversion::convertJSON<std::unique_ptr<mbgl::style::Layer>>(
+    mln::style::conversion::convertJSON<std::unique_ptr<mln::style::Layer>>(
       string_from_view(layer_json), error
     );
   if (!layer) {
@@ -3440,7 +3744,7 @@ auto map_add_style_layer_json(
   }
   if (
     (*layer)->getTypeInfo()->source ==
-      mbgl::style::LayerTypeInfo::Source::Required &&
+      mln::style::LayerTypeInfo::Source::Required &&
     style.getSource((*layer)->getSourceID()) == nullptr
   ) {
     set_thread_error("layer source does not exist");
@@ -3513,7 +3817,7 @@ auto map_get_style_layer_info(
   out_info->min_zoom = static_cast<double>(layer->getMinZoom());
   out_info->max_zoom = static_cast<double>(layer->getMaxZoom());
   out_info->visibility =
-    layer->getVisibility() == mbgl::style::VisibilityType::None
+    layer->getVisibility() == mln::style::VisibilityType::None
       ? MLN_STYLE_LAYER_VISIBILITY_NONE
       : MLN_STYLE_LAYER_VISIBILITY_VISIBLE;
 
@@ -3634,8 +3938,8 @@ auto map_set_style_light_json(mln_map map, mln_buffer_view light_json)
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto error = mbgl::style::conversion::Error{};
-  auto light = mbgl::style::conversion::convertJSON<mbgl::style::Light>(
+  auto error = mln::style::conversion::Error{};
+  auto light = mln::style::conversion::convertJSON<mln::style::Light>(
     string_from_view(light_json), error
   );
   if (!light) {
@@ -3644,7 +3948,7 @@ auto map_set_style_light_json(mln_map map, mln_buffer_view light_json)
   }
 
   map_native(live)->getStyle().setLight(
-    std::make_unique<mbgl::style::Light>(*light)
+    std::make_unique<mln::style::Light>(*light)
   );
   return MLN_STATUS_OK;
 }
@@ -3664,7 +3968,7 @@ auto map_set_style_light_property(
     set_thread_error("property_name must not be empty");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto document = mbgl::JSDocument{};
+  auto document = mln::JSDocument{};
   if (!parse_json_document(value, "style light property", document)) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -3677,8 +3981,8 @@ auto map_set_style_light_property(
 
   auto error = light->setProperty(
     string_from_view(property_name),
-    mbgl::style::conversion::Convertible{
-      static_cast<const mbgl::JSValue*>(&document)
+    mln::style::conversion::Convertible{
+      static_cast<const mln::JSValue*>(&document)
     }
   );
   if (error) {
@@ -3717,7 +4021,7 @@ auto map_get_style_light_property(
   }
 
   const auto property = light->getProperty(string_from_view(property_name));
-  if (property.getKind() == mbgl::style::StyleProperty::Kind::Undefined) {
+  if (property.getKind() == mln::style::StyleProperty::Kind::Undefined) {
     return MLN_STATUS_OK;
   }
   return create_buffer(serialize_json_value(property.getValue()), out_value);
@@ -3750,7 +4054,7 @@ auto map_set_style_transition_options(
   }
 
   // The native default is already on, so an omitted field leaves it alone.
-  auto native = mbgl::style::TransitionOptions{};
+  auto native = mln::style::TransitionOptions{};
   if (
     (options->fields &
      MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS) != 0U
@@ -3833,7 +4137,7 @@ auto map_set_layer_property(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto document = mbgl::JSDocument{};
+  auto document = mln::JSDocument{};
   if (!parse_json_document(value, "layer property", document)) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -3847,8 +4151,8 @@ auto map_set_layer_property(
 
   auto error = layer->setProperty(
     string_from_view(property_name),
-    mbgl::style::conversion::Convertible{
-      static_cast<const mbgl::JSValue*>(&document)
+    mln::style::conversion::Convertible{
+      static_cast<const mln::JSValue*>(&document)
     }
   );
   if (error) {
@@ -3893,7 +4197,7 @@ auto map_get_layer_property(
   }
 
   const auto property = layer->getProperty(string_from_view(property_name));
-  if (property.getKind() == mbgl::style::StyleProperty::Kind::Undefined) {
+  if (property.getKind() == mln::style::StyleProperty::Kind::Undefined) {
     return MLN_STATUS_OK;
   }
   return create_buffer(serialize_json_value(property.getValue()), out_value);
@@ -3923,7 +4227,7 @@ auto map_set_layer_filter(
   }
 
   if (filter == nullptr) {
-    layer->setFilter(mbgl::style::Filter{});
+    layer->setFilter(mln::style::Filter{});
     return MLN_STATUS_OK;
   }
 
@@ -3966,7 +4270,7 @@ auto map_get_layer_filter(
   }
 
   const auto filter = layer->getFilter().serialize();
-  if (filter.is<mbgl::NullValue>()) {
+  if (filter.is<mln::NullValue>()) {
     return MLN_STATUS_OK;
   }
   return create_buffer(serialize_json_value(filter), out_filter);
@@ -3975,7 +4279,7 @@ auto map_get_layer_filter(
 namespace {
 
 auto resolve_layer_for_access(
-  mln_map map, mln_buffer_view layer_id, mbgl::style::Layer*& out_layer
+  mln_map map, mln_buffer_view layer_id, mln::style::Layer*& out_layer
 ) -> mln_status {
   MapObject* live = nullptr;
   const auto status = validate_map(map, live);
@@ -4003,10 +4307,10 @@ auto resolve_layer_for_access(
 // MapLibre's setProperty path logs a warning and does nothing when a layer type
 // takes no source, so the typed setters reject that case instead.
 auto require_layer_takes_source(
-  const mbgl::style::Layer& layer, const char* field
+  const mln::style::Layer& layer, const char* field
 ) -> bool {
   if (
-    layer.getTypeInfo()->source == mbgl::style::LayerTypeInfo::Source::Required
+    layer.getTypeInfo()->source == mln::style::LayerTypeInfo::Source::Required
   ) {
     return true;
   }
@@ -4032,7 +4336,7 @@ auto validate_layer_zoom(double zoom, const char* field) -> bool {
 auto map_set_layer_source_layer(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view source_layer
 ) -> mln_status {
-  mbgl::style::Layer* layer = nullptr;
+  mln::style::Layer* layer = nullptr;
   const auto status = resolve_layer_for_access(map, layer_id, layer);
   if (status != MLN_STATUS_OK) {
     return status;
@@ -4052,7 +4356,7 @@ auto map_copy_layer_source_layer(
   mln_map map, mln_buffer_view layer_id, char* out_source_layer,
   size_t source_layer_capacity, size_t* out_source_layer_size
 ) -> mln_status {
-  mbgl::style::Layer* layer = nullptr;
+  mln::style::Layer* layer = nullptr;
   const auto status = resolve_layer_for_access(map, layer_id, layer);
   if (status != MLN_STATUS_OK) {
     return status;
@@ -4066,7 +4370,7 @@ auto map_copy_layer_source_layer(
 auto map_set_layer_source_id(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id
 ) -> mln_status {
-  mbgl::style::Layer* layer = nullptr;
+  mln::style::Layer* layer = nullptr;
   const auto status = resolve_layer_for_access(map, layer_id, layer);
   if (status != MLN_STATUS_OK) {
     return status;
@@ -4090,7 +4394,7 @@ auto map_copy_layer_source_id(
   mln_map map, mln_buffer_view layer_id, char* out_source_id,
   size_t source_id_capacity, size_t* out_source_id_size
 ) -> mln_status {
-  mbgl::style::Layer* layer = nullptr;
+  mln::style::Layer* layer = nullptr;
   const auto status = resolve_layer_for_access(map, layer_id, layer);
   if (status != MLN_STATUS_OK) {
     return status;
@@ -4104,7 +4408,7 @@ auto map_copy_layer_source_id(
 auto map_set_layer_min_zoom(
   mln_map map, mln_buffer_view layer_id, double min_zoom
 ) -> mln_status {
-  mbgl::style::Layer* layer = nullptr;
+  mln::style::Layer* layer = nullptr;
   const auto status = resolve_layer_for_access(map, layer_id, layer);
   if (status != MLN_STATUS_OK) {
     return status;
@@ -4120,7 +4424,7 @@ auto map_set_layer_min_zoom(
 auto map_set_layer_max_zoom(
   mln_map map, mln_buffer_view layer_id, double max_zoom
 ) -> mln_status {
-  mbgl::style::Layer* layer = nullptr;
+  mln::style::Layer* layer = nullptr;
   const auto status = resolve_layer_for_access(map, layer_id, layer);
   if (status != MLN_STATUS_OK) {
     return status;
@@ -4136,18 +4440,18 @@ auto map_set_layer_max_zoom(
 auto map_set_layer_visibility(
   mln_map map, mln_buffer_view layer_id, uint32_t visibility
 ) -> mln_status {
-  mbgl::style::Layer* layer = nullptr;
+  mln::style::Layer* layer = nullptr;
   const auto status = resolve_layer_for_access(map, layer_id, layer);
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  auto native_visibility = mbgl::style::VisibilityType::Visible;
+  auto native_visibility = mln::style::VisibilityType::Visible;
   switch (visibility) {
     case MLN_STYLE_LAYER_VISIBILITY_VISIBLE:
-      native_visibility = mbgl::style::VisibilityType::Visible;
+      native_visibility = mln::style::VisibilityType::Visible;
       break;
     case MLN_STYLE_LAYER_VISIBILITY_NONE:
-      native_visibility = mbgl::style::VisibilityType::None;
+      native_visibility = mln::style::VisibilityType::None;
       break;
     default:
       set_thread_error("visibility is invalid");

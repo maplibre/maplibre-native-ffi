@@ -159,39 +159,6 @@ auto mln_render_session_dump_debug_logs(
   });
 }
 
-auto mln_render_session_set_feature_state(
-  mln_render_session session, mln_buffer_view source, mln_buffer_view layer,
-  mln_buffer_view feature, mln_buffer_view state, const mln_completion* out
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&] {
-    return mln::core::render_session_set_feature_state_start(
-      session, source, layer, feature, state, out
-    );
-  });
-}
-
-auto mln_render_session_get_feature_state(
-  mln_render_session session, mln_buffer_view source, mln_buffer_view layer,
-  mln_buffer_view feature, const mln_completion* out
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&] {
-    return mln::core::render_session_get_feature_state_start(
-      session, source, layer, feature, out
-    );
-  });
-}
-
-auto mln_render_session_remove_feature_state(
-  mln_render_session session, mln_buffer_view source, mln_buffer_view layer,
-  mln_buffer_view feature, mln_buffer_view key, const mln_completion* out
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&] {
-    return mln::core::render_session_remove_feature_state_start(
-      session, source, layer, feature, key, out
-    );
-  });
-}
-
 auto mln_render_session_service_driver_work(
   mln_render_session session, size_t maximum, size_t* serviced
 ) noexcept -> mln_status {

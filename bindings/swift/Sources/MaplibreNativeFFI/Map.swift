@@ -252,6 +252,56 @@ public final class MapHandle: @unchecked Sendable {
     return try await mapNativeFailure { try await future.value() }
   }
 
+  /// Submits a per-feature-state update. The state must contain one UTF-8
+  /// JSON object.
+  @discardableResult
+  public func setFeatureState(
+    selector: FeatureStateSelector,
+    state: Data
+  ) async throws -> CommandCompletion {
+    let future = try mapNativeFailure {
+      let arena = NativeInputArena()
+      defer { withExtendedLifetime(arena) {} }
+      return try selector.nativeSelector.withNativeSelector { selector in
+        try startCommand {
+          mln_map_set_feature_state($0, selector, arena.view(state), $1)
+        }
+      }
+    }
+    return try await mapNativeFailure { try await future.value() }
+  }
+
+  /// Reads per-feature state from the map store, observing every earlier
+  /// accepted command. Missing state is an empty JSON object.
+  public func featureState(
+    selector: FeatureStateSelector
+  ) async throws -> Data {
+    let map = try requireLiveHandle()
+    let future = try mapNativeFailure {
+      try selector.nativeSelector.withNativeSelector { selector in
+        try NativeCompletion.start(
+          { mln_map_get_feature_state(map.raw, selector, $0) },
+          convert: NativeCompletion.data
+        )
+      }
+    }
+    return try await mapNativeFailure { try await future.value() }
+  }
+
+  /// Submits a per-feature-state removal scoped by the selector: one key, one
+  /// feature, or every feature in the source.
+  @discardableResult
+  public func removeFeatureState(
+    selector: FeatureStateSelector
+  ) async throws -> CommandCompletion {
+    let future = try mapNativeFailure {
+      try selector.nativeSelector.withNativeSelector { selector in
+        try startCommand { mln_map_remove_feature_state($0, selector, $1) }
+      }
+    }
+    return try await mapNativeFailure { try await future.value() }
+  }
+
   /// Copies the style document this map's style was last parsed from, byte for
   /// byte, rather than a serialization of the live style. Runtime mutations do
   /// not change it, and a failed parse leaves the previous document in place.

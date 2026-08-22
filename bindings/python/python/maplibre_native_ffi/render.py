@@ -13,7 +13,6 @@ from ._enum import UnknownIntEnum
 from ._future import map_future
 from ._lifecycle import NativeHandleMixin
 from .query import (
-    FeatureStateSelector,
     QueriedFeature,
     RenderedFeatureQueryOptions,
     RenderedQueryGeometry,
@@ -790,7 +789,14 @@ class RenderSessionHandle(NativeHandleMixin):
         return self._native.service_driver_work(max_work)
 
     def resize(self, extent: RenderTargetExtent) -> Future[None]:
-        """Start an ordered logical resize."""
+        """Start an ordered logical resize.
+
+        The session keeps its renderer, along with the tile pyramid, glyph and
+        image atlases, and symbol placement. A new scale factor retires the
+        renderer instead, because shaders are compiled for one pixel ratio.
+        Map-owned feature state survives either way. The same scale-factor
+        rule applies to every ``set_*_target`` method.
+        """
         return self._future(
             self._native.resize,
             None,
@@ -844,7 +850,13 @@ class RenderSessionHandle(NativeHandleMixin):
     def set_metal_surface_target(
         self, descriptor: MetalSurfaceDescriptor
     ) -> Future[None]:
-        """Start an ordered Metal surface replacement."""
+        """Start an ordered Metal surface replacement.
+
+        The session keeps its renderer, along with the tile pyramid, atlases,
+        and symbol placement. Map-owned feature state is unchanged. The
+        descriptor's extent applies as a resize does. The session assigns the
+        layer its own device and pixel format.
+        """
         return self._set_target(
             self._native.set_metal_surface_target,
             descriptor,
@@ -1020,46 +1032,6 @@ class RenderSessionHandle(NativeHandleMixin):
             extension,
             extension_field,
             arguments,
-        )
-
-    def set_feature_state(
-        self, selector: FeatureStateSelector, state: bytes
-    ) -> Future[None]:
-        """Start setting per-feature render state."""
-        if selector.state_key is not None:
-            msg = "state_key is valid only when removing feature state"
-            raise ValueError(msg)
-        return self._future(
-            self._native.set_feature_state,
-            None,
-            selector.source_id,
-            selector.source_layer_id,
-            selector.feature_id,
-            state,
-        )
-
-    def get_feature_state(self, selector: FeatureStateSelector) -> Future[bytes]:
-        """Start reading copied per-feature render state."""
-        if selector.state_key is not None:
-            msg = "state_key is valid only when removing feature state"
-            raise ValueError(msg)
-        return self._future(
-            self._native.get_feature_state,
-            _cast_bytes,
-            selector.source_id,
-            selector.source_layer_id,
-            selector.feature_id,
-        )
-
-    def remove_feature_state(self, selector: FeatureStateSelector) -> Future[None]:
-        """Start removing selected per-feature render state."""
-        return self._future(
-            self._native.remove_feature_state,
-            None,
-            selector.source_id,
-            selector.source_layer_id,
-            selector.feature_id,
-            selector.state_key,
         )
 
     def acquire_metal_owned_texture_frame(self) -> MetalOwnedTextureFrameHandle:

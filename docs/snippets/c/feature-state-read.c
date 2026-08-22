@@ -1,4 +1,4 @@
-// Reading back the feature state that a render session holds for one feature.
+// Reading back the feature state that a map holds for one feature.
 
 #include <maplibre_native_c.h>
 
@@ -20,8 +20,7 @@ static void read_selected(
 }
 
 mln_status start_read_selected(
-  mln_render_session session, const mln_feature_state_selector* selector,
-  bool* selected
+  mln_map map, const mln_feature_state_selector* selector, bool* selected
 ) {
   // #region get
   const mln_completion completion = {
@@ -29,9 +28,6 @@ mln_status start_read_selected(
     .callback = read_selected,
     .user_data = selected,
   };
-  return mln_render_session_get_feature_state(
-    session, selector->source_id, selector->source_layer_id,
-    selector->feature_id, &completion
-  );
+  return mln_map_get_feature_state(map, selector, &completion);
   // #endregion get
 }

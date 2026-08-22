@@ -57,6 +57,7 @@
 #include <mbgl/style/rapidjson_conversion.hpp>
 #include <mbgl/style/source.hpp>
 #include <mbgl/style/sources/custom_geometry_source.hpp>
+#include <mbgl/style/sources/custom_vector_source.hpp>
 #include <mbgl/style/sources/geojson_source.hpp>
 #include <mbgl/style/sources/image_source.hpp>
 #include <mbgl/style/sources/raster_dem_source.hpp>
@@ -105,50 +106,71 @@ auto validate_lat_lng_bounds(mln_lat_lng_bounds bounds) -> mln_status;
 auto validate_lat_lng_array(
   const mln_lat_lng* coordinates, size_t coordinate_count, bool allow_empty
 ) -> mln_status;
-auto to_native_lat_lng(mln_lat_lng coordinate) -> mbgl::LatLng;
-auto from_native_lat_lng(const mbgl::LatLng& coordinate) -> mln_lat_lng;
-auto to_native_lat_lng_bounds(mln_lat_lng_bounds bounds) -> mbgl::LatLngBounds;
-auto from_native_lat_lng_bounds(const mbgl::LatLngBounds& bounds)
+auto to_native_lat_lng(mln_lat_lng coordinate) -> mln::LatLng;
+auto from_native_lat_lng(const mln::LatLng& coordinate) -> mln_lat_lng;
+auto to_native_lat_lng_bounds(mln_lat_lng_bounds bounds) -> mln::LatLngBounds;
+auto from_native_lat_lng_bounds(const mln::LatLngBounds& bounds)
   -> mln_lat_lng_bounds;
 
 }  // namespace
 
 namespace mln::core {
 
-// Holds the release callback owed for each tracked custom geometry source. A
-// host cannot see when a style load drops a source, so this layer tracks it.
+auto callback_source_matches(
+  const mln::style::Source* source, CallbackSourceKind kind
+) -> bool {
+  if (source == nullptr) {
+    return false;
+  }
+  switch (kind) {
+    case CallbackSourceKind::CustomGeometry:
+      return source->as<mln::style::CustomGeometrySource>() != nullptr;
+    case CallbackSourceKind::CustomMvtVector:
+      return source->as<mln::style::CustomVectorSource>() != nullptr;
+  }
+  return false;
+}
+
+// Holds the release callback owed for each tracked callback source. A host
+// cannot see when a style load drops a source, so this layer tracks it.
 //
 // Every mutation runs on the runtime worker, which is the only thread that
 // adds or removes sources and receives MapLibre style-load callbacks.
-class CustomGeometrySourceRegistry final {
+class CallbackSourceRegistry final {
  public:
-  CustomGeometrySourceRegistry() = default;
+  CallbackSourceRegistry() = default;
 
-  // Runs when the owning map is destroyed, after the mbgl::Map that could still
+  // Runs when the owning map is destroyed, after the mln::Map that could still
   // call into the source is gone.
-  ~CustomGeometrySourceRegistry() { release_all(); }
+  ~CallbackSourceRegistry() { release_all(); }
 
-  CustomGeometrySourceRegistry(const CustomGeometrySourceRegistry&) = delete;
-  CustomGeometrySourceRegistry(CustomGeometrySourceRegistry&&) = delete;
-  auto operator=(const CustomGeometrySourceRegistry&)
-    -> CustomGeometrySourceRegistry& = delete;
-  auto operator=(CustomGeometrySourceRegistry&&)
-    -> CustomGeometrySourceRegistry& = delete;
+  CallbackSourceRegistry(const CallbackSourceRegistry&) = delete;
+  CallbackSourceRegistry(CallbackSourceRegistry&&) = delete;
+  auto operator=(const CallbackSourceRegistry&)
+    -> CallbackSourceRegistry& = delete;
+  auto operator=(CallbackSourceRegistry&&) -> CallbackSourceRegistry& = delete;
 
   // A source with no release callback is not tracked.
   auto add(
-    const std::string& source_id,
-    mln_custom_geometry_source_release_callback release, void* user_data
+    const std::string& source_id, CallbackSourceKind kind,
+    CallbackSourceRelease release, void* user_data
   ) -> void {
-    // The style validates duplicate IDs before this registry mutates. Replacing
-    // a tracked entry here would release state for a source that remains live.
+    // An entry already under this ID belongs to a source that the style dropped
+    // before reconciliation ran, so it still owes its release. Invoke it here
+    // rather than letting the assignment below drop it, which keeps
+    // exactly-once independent of when the style-loaded observer reconciles.
+    if (const auto stale = entries_.find(source_id); stale != entries_.end()) {
+      const auto owed = stale->second;
+      entries_.erase(stale);
+      invoke(owed);
+    }
     if (release == nullptr) {
       return;
     }
     // The caller tracks before the style takes the source, so a throw here
     // leaves nothing committed and the caller still owns user_data. A failed
     // add owes no release.
-    entries_.insert_or_assign(source_id, Entry{release, user_data});
+    entries_.insert_or_assign(source_id, Entry{kind, release, user_data});
   }
 
   // Drops an entry without releasing it, for a source the style then rejected.
@@ -159,7 +181,7 @@ class CustomGeometrySourceRegistry final {
 
   // The observer that reports style loads has no route to a style, so the
   // registry keeps the map that it belongs to until close detaches it.
-  auto attach(mbgl::Map& map) noexcept -> void { map_ = &map; }
+  auto attach(mln::Map& map) noexcept -> void { map_ = &map; }
 
   auto detach() noexcept -> void { map_ = nullptr; }
 
@@ -174,8 +196,8 @@ class CustomGeometrySourceRegistry final {
   }
 
   // Releases every tracked source the current style no longer holds. A style
-  // document cannot declare a custom geometry source, so a source of another
-  // type under a tracked ID means the tracked source is gone.
+  // document cannot declare a callback source, so a source of another type
+  // under a tracked ID means the tracked source is gone.
   auto reconcile() -> void {
     if (map_ == nullptr || entries_.empty()) {
       return;
@@ -184,10 +206,7 @@ class CustomGeometrySourceRegistry final {
     auto owed = std::vector<Entry>{};
     for (auto entry = entries_.begin(); entry != entries_.end();) {
       auto* source = style.getSource(entry->first);
-      if (
-        source != nullptr &&
-        source->as<mbgl::style::CustomGeometrySource>() != nullptr
-      ) {
+      if (callback_source_matches(source, entry->second.kind)) {
         ++entry;
         continue;
       }
@@ -209,7 +228,8 @@ class CustomGeometrySourceRegistry final {
 
  private:
   struct Entry {
-    mln_custom_geometry_source_release_callback release = nullptr;
+    CallbackSourceKind kind = CallbackSourceKind::CustomGeometry;
+    CallbackSourceRelease release = nullptr;
     void* user_data = nullptr;
   };
 
@@ -219,63 +239,62 @@ class CustomGeometrySourceRegistry final {
     } catch (const std::exception& exception) {
       mln::core::set_thread_error(exception);
     } catch (...) {
-      mln::core::set_thread_error("custom geometry source release threw");
+      mln::core::set_thread_error("callback source release threw");
     }
   }
 
   std::unordered_map<std::string, Entry> entries_;
-  mbgl::Map* map_ = nullptr;
+  mln::Map* map_ = nullptr;
 };
 
-auto track_custom_geometry_source(
-  MapObject& map, const std::string& source_id,
-  mln_custom_geometry_source_release_callback release, void* user_data
+auto track_callback_source(
+  MapObject& map, const std::string& source_id, CallbackSourceKind kind,
+  CallbackSourceRelease release, void* user_data
 ) -> void {
-  map.custom_geometry_sources->add(source_id, release, user_data);
+  map.callback_sources->add(source_id, kind, release, user_data);
 }
 
-auto untrack_custom_geometry_source(
+auto untrack_callback_source(
   MapObject& map, const std::string& source_id
 ) noexcept -> void {
-  map.custom_geometry_sources->untrack(source_id);
+  map.callback_sources->untrack(source_id);
 }
 
-auto release_custom_geometry_source(
-  MapObject& map, const std::string& source_id
-) -> void {
-  map.custom_geometry_sources->release(source_id);
+auto release_callback_source(MapObject& map, const std::string& source_id)
+  -> void {
+  map.callback_sources->release(source_id);
 }
 
 }  // namespace mln::core
 
 namespace {
 
-using mln::core::CustomGeometrySourceRegistry;
+using mln::core::CallbackSourceRegistry;
 
-auto to_c_camera_change_mode(mbgl::MapObserver::CameraChangeMode mode)
+auto to_c_camera_change_mode(mln::MapObserver::CameraChangeMode mode)
   -> int32_t {
   switch (mode) {
-    case mbgl::MapObserver::CameraChangeMode::Immediate:
+    case mln::MapObserver::CameraChangeMode::Immediate:
       return MLN_CAMERA_CHANGE_MODE_IMMEDIATE;
-    case mbgl::MapObserver::CameraChangeMode::Animated:
+    case mln::MapObserver::CameraChangeMode::Animated:
       return MLN_CAMERA_CHANGE_MODE_ANIMATED;
   }
   assert(false);
   return MLN_CAMERA_CHANGE_MODE_IMMEDIATE;
 }
 
-auto to_c_render_mode(mbgl::MapObserver::RenderMode mode) -> uint32_t {
+auto to_c_render_mode(mln::MapObserver::RenderMode mode) -> uint32_t {
   switch (mode) {
-    case mbgl::MapObserver::RenderMode::Partial:
+    case mln::MapObserver::RenderMode::Partial:
       return MLN_RENDER_MODE_PARTIAL;
-    case mbgl::MapObserver::RenderMode::Full:
+    case mln::MapObserver::RenderMode::Full:
       return MLN_RENDER_MODE_FULL;
   }
   assert(false);
   return MLN_RENDER_MODE_PARTIAL;
 }
 
-auto to_c_rendering_stats(const mbgl::gfx::RenderingStats& stats)
+auto to_c_rendering_stats(const mln::gfx::RenderingStats& stats)
   -> mln_rendering_stats {
   return mln_rendering_stats{
     .encoding_time = stats.encodingTime,
@@ -286,7 +305,7 @@ auto to_c_rendering_stats(const mbgl::gfx::RenderingStats& stats)
   };
 }
 
-auto render_frame_payload(const mbgl::MapObserver::RenderFrameStatus& status)
+auto render_frame_payload(const mln::MapObserver::RenderFrameStatus& status)
   -> mln_runtime_event_payload {
   auto payload = mln::core::zeroed_event_payload();
   payload.render_frame = mln_runtime_event_render_frame{
@@ -298,7 +317,7 @@ auto render_frame_payload(const mbgl::MapObserver::RenderFrameStatus& status)
   return payload;
 }
 
-auto render_map_payload(mbgl::MapObserver::RenderMode mode)
+auto render_map_payload(mln::MapObserver::RenderMode mode)
   -> mln_runtime_event_payload {
   auto payload = mln::core::zeroed_event_payload();
   payload.render_map =
@@ -306,31 +325,31 @@ auto render_map_payload(mbgl::MapObserver::RenderMode mode)
   return payload;
 }
 
-auto to_c_tile_operation(mbgl::TileOperation operation) -> uint32_t {
+auto to_c_tile_operation(mln::TileOperation operation) -> uint32_t {
   switch (operation) {
-    case mbgl::TileOperation::RequestedFromCache:
+    case mln::TileOperation::RequestedFromCache:
       return MLN_TILE_OPERATION_REQUESTED_FROM_CACHE;
-    case mbgl::TileOperation::RequestedFromNetwork:
+    case mln::TileOperation::RequestedFromNetwork:
       return MLN_TILE_OPERATION_REQUESTED_FROM_NETWORK;
-    case mbgl::TileOperation::LoadFromNetwork:
+    case mln::TileOperation::LoadFromNetwork:
       return MLN_TILE_OPERATION_LOAD_FROM_NETWORK;
-    case mbgl::TileOperation::LoadFromCache:
+    case mln::TileOperation::LoadFromCache:
       return MLN_TILE_OPERATION_LOAD_FROM_CACHE;
-    case mbgl::TileOperation::StartParse:
+    case mln::TileOperation::StartParse:
       return MLN_TILE_OPERATION_START_PARSE;
-    case mbgl::TileOperation::EndParse:
+    case mln::TileOperation::EndParse:
       return MLN_TILE_OPERATION_END_PARSE;
-    case mbgl::TileOperation::Error:
+    case mln::TileOperation::Error:
       return MLN_TILE_OPERATION_ERROR;
-    case mbgl::TileOperation::Cancelled:
+    case mln::TileOperation::Cancelled:
       return MLN_TILE_OPERATION_CANCELLED;
-    case mbgl::TileOperation::NullOp:
+    case mln::TileOperation::NullOp:
       return MLN_TILE_OPERATION_NULL;
   }
   return MLN_TILE_OPERATION_NULL;
 }
 
-auto to_c_tile_id(const mbgl::OverscaledTileID& tile_id) -> mln_tile_id {
+auto to_c_tile_id(const mln::OverscaledTileID& tile_id) -> mln_tile_id {
   return mln_tile_id{
     .overscaled_z = tile_id.overscaledZ,
     .wrap = tile_id.wrap,
@@ -341,7 +360,7 @@ auto to_c_tile_id(const mbgl::OverscaledTileID& tile_id) -> mln_tile_id {
 }
 
 auto tile_action_payload(
-  mbgl::TileOperation operation, const mbgl::OverscaledTileID& tile_id
+  mln::TileOperation operation, const mln::OverscaledTileID& tile_id
 ) -> mln_runtime_event_payload {
   auto payload = mln::core::zeroed_event_payload();
   payload.tile_action = mln_runtime_event_tile_action{
@@ -357,17 +376,17 @@ namespace mln::core {
 
 // Every callback tests the map's subscription mask before it builds anything,
 // so an unselected event allocates no payload, message, or queue node.
-class HeadlessObserver final : public mbgl::MapObserver {
+class HeadlessObserver final : public mln::MapObserver {
  public:
   HeadlessObserver(
     mln_runtime runtime, mln_map map,
     std::shared_ptr<mln::core::MapEventState> event_state,
-    std::shared_ptr<CustomGeometrySourceRegistry> custom_geometry_sources
+    std::shared_ptr<CallbackSourceRegistry> callback_sources
   )
       : runtime_(runtime),
         map_(map),
         event_state_(std::move(event_state)),
-        custom_geometry_sources_(std::move(custom_geometry_sources)) {}
+        callback_sources_(std::move(callback_sources)) {}
 
   void onCameraWillChange(CameraChangeMode mode) override {
     if (!selected(MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE)) {
@@ -411,7 +430,7 @@ class HeadlessObserver final : public mbgl::MapObserver {
   // The failure text is map state that both style setters read, so it is
   // recorded whatever the mask selects.
   void onDidFailLoadingMap(
-    mbgl::MapLoadError error, const std::string& message
+    mln::MapLoadError error, const std::string& message
   ) override {
     event_state_->style_load_failure = message;
     event_state_->style_load_failed = true;
@@ -435,7 +454,7 @@ class HeadlessObserver final : public mbgl::MapObserver {
     if (selected(MLN_RUNTIME_EVENT_MAP_STYLE_LOADED)) {
       push(MLN_RUNTIME_EVENT_MAP_STYLE_LOADED);
     }
-    const auto sources = custom_geometry_sources_;
+    const auto sources = callback_sources_;
     sources->reconcile();
   }
 
@@ -491,7 +510,7 @@ class HeadlessObserver final : public mbgl::MapObserver {
   }
 
   void onTileAction(
-    mbgl::TileOperation operation, const mbgl::OverscaledTileID& tile_id,
+    mln::TileOperation operation, const mln::OverscaledTileID& tile_id,
     const std::string& source_id
   ) override {
     if (!selected(MLN_RUNTIME_EVENT_MAP_TILE_ACTION)) {
@@ -544,7 +563,7 @@ class HeadlessObserver final : public mbgl::MapObserver {
   mln_runtime runtime_;
   mln_map map_;
   std::shared_ptr<mln::core::MapEventState> event_state_;
-  std::shared_ptr<CustomGeometrySourceRegistry> custom_geometry_sources_;
+  std::shared_ptr<CallbackSourceRegistry> callback_sources_;
 };
 
 }  // namespace mln::core
@@ -553,17 +572,17 @@ namespace {
 
 using mln::core::HeadlessObserver;
 
-// Delivers mbgl::RendererObserver callbacks on the map's run loop instead of on
-// whichever thread rendered. The delegate is mbgl::Map::Impl, whose handlers
+// Delivers mln::RendererObserver callbacks on the map's run loop instead of on
+// whichever thread rendered. The delegate is mln::Map::Impl, whose handlers
 // must not run concurrently. Every callback therefore becomes a mailbox message
 // submitted to the runtime worker. Forwarding is unconditional, preserving
 // delivery order independently of the callback's native thread.
-class ForwardingRendererObserver final : public mbgl::RendererObserver {
+class ForwardingRendererObserver final : public mln::RendererObserver {
  public:
   ForwardingRendererObserver(
-    mbgl::Scheduler& map_scheduler, mbgl::RendererObserver& delegate
+    mln::Scheduler& map_scheduler, mln::RendererObserver& delegate
   )
-      : mailbox_(std::make_shared<mbgl::Mailbox>(map_scheduler)),
+      : mailbox_(std::make_shared<mln::Mailbox>(map_scheduler)),
         delegate_(delegate, mailbox_) {}
 
   ForwardingRendererObserver(const ForwardingRendererObserver&) = delete;
@@ -580,118 +599,118 @@ class ForwardingRendererObserver final : public mbgl::RendererObserver {
   auto close() -> void { mailbox_->close(); }
 
   void onInvalidate() override {
-    delegate_.invoke(&mbgl::RendererObserver::onInvalidate);
+    delegate_.invoke(&mln::RendererObserver::onInvalidate);
   }
 
   void onResourceError(std::exception_ptr error) override {
-    delegate_.invoke(&mbgl::RendererObserver::onResourceError, error);
+    delegate_.invoke(&mln::RendererObserver::onResourceError, error);
   }
 
   void onWillStartRenderingMap() override {
-    delegate_.invoke(&mbgl::RendererObserver::onWillStartRenderingMap);
+    delegate_.invoke(&mln::RendererObserver::onWillStartRenderingMap);
   }
 
   void onWillStartRenderingFrame() override {
-    delegate_.invoke(&mbgl::RendererObserver::onWillStartRenderingFrame);
+    delegate_.invoke(&mln::RendererObserver::onWillStartRenderingFrame);
   }
 
   void onDidFinishRenderingFrame(
     RenderMode mode, bool repaint_needed, bool placement_changed,
-    const mbgl::gfx::RenderingStats& stats
+    const mln::gfx::RenderingStats& stats
   ) override {
-    // The name carries three overloads; mbgl::Map::Impl implements only this
+    // The name carries three overloads; mln::Map::Impl implements only this
     // one.
-    void (mbgl::RendererObserver::*method)(
-      RenderMode, bool, bool, const mbgl::gfx::RenderingStats&
-    ) = &mbgl::RendererObserver::onDidFinishRenderingFrame;
+    void (mln::RendererObserver::*method)(
+      RenderMode, bool, bool, const mln::gfx::RenderingStats&
+    ) = &mln::RendererObserver::onDidFinishRenderingFrame;
     delegate_.invoke(method, mode, repaint_needed, placement_changed, stats);
   }
 
   void onDidFinishRenderingMap() override {
-    delegate_.invoke(&mbgl::RendererObserver::onDidFinishRenderingMap);
+    delegate_.invoke(&mln::RendererObserver::onDidFinishRenderingMap);
   }
 
   void onStyleImageMissing(
     const std::string& id, const StyleImageMissingCallback& done
   ) override {
-    delegate_.invoke(&mbgl::RendererObserver::onStyleImageMissing, id, done);
+    delegate_.invoke(&mln::RendererObserver::onStyleImageMissing, id, done);
   }
 
   void onRemoveUnusedStyleImages(const std::vector<std::string>& ids) override {
-    delegate_.invoke(&mbgl::RendererObserver::onRemoveUnusedStyleImages, ids);
+    delegate_.invoke(&mln::RendererObserver::onRemoveUnusedStyleImages, ids);
   }
 
   void onPreCompileShader(
-    mbgl::shaders::BuiltIn id, mbgl::gfx::Backend::Type type,
+    mln::shaders::BuiltIn id, mln::gfx::Backend::Type type,
     const std::string& defines
   ) override {
     delegate_.invoke(
-      &mbgl::RendererObserver::onPreCompileShader, id, type, defines
+      &mln::RendererObserver::onPreCompileShader, id, type, defines
     );
   }
 
   void onPostCompileShader(
-    mbgl::shaders::BuiltIn id, mbgl::gfx::Backend::Type type,
+    mln::shaders::BuiltIn id, mln::gfx::Backend::Type type,
     const std::string& defines
   ) override {
     delegate_.invoke(
-      &mbgl::RendererObserver::onPostCompileShader, id, type, defines
+      &mln::RendererObserver::onPostCompileShader, id, type, defines
     );
   }
 
   void onShaderCompileFailed(
-    mbgl::shaders::BuiltIn id, mbgl::gfx::Backend::Type type,
+    mln::shaders::BuiltIn id, mln::gfx::Backend::Type type,
     const std::string& defines
   ) override {
     delegate_.invoke(
-      &mbgl::RendererObserver::onShaderCompileFailed, id, type, defines
+      &mln::RendererObserver::onShaderCompileFailed, id, type, defines
     );
   }
 
   void onGlyphsLoaded(
-    const mbgl::FontStack& stack, const mbgl::GlyphRange& range
+    const mln::FontStack& stack, const mln::GlyphRange& range
   ) override {
-    delegate_.invoke(&mbgl::RendererObserver::onGlyphsLoaded, stack, range);
+    delegate_.invoke(&mln::RendererObserver::onGlyphsLoaded, stack, range);
   }
 
   void onGlyphsError(
-    const mbgl::FontStack& stack, const mbgl::GlyphRange& range,
+    const mln::FontStack& stack, const mln::GlyphRange& range,
     std::exception_ptr error
   ) override {
     delegate_.invoke(
-      &mbgl::RendererObserver::onGlyphsError, stack, range, error
+      &mln::RendererObserver::onGlyphsError, stack, range, error
     );
   }
 
   void onGlyphsRequested(
-    const mbgl::FontStack& stack, const mbgl::GlyphRange& range
+    const mln::FontStack& stack, const mln::GlyphRange& range
   ) override {
-    delegate_.invoke(&mbgl::RendererObserver::onGlyphsRequested, stack, range);
+    delegate_.invoke(&mln::RendererObserver::onGlyphsRequested, stack, range);
   }
 
   void onTileAction(
-    mbgl::TileOperation operation, const mbgl::OverscaledTileID& id,
+    mln::TileOperation operation, const mln::OverscaledTileID& id,
     const std::string& source_id
   ) override {
     delegate_.invoke(
-      &mbgl::RendererObserver::onTileAction, operation, id, source_id
+      &mln::RendererObserver::onTileAction, operation, id, source_id
     );
   }
 
   void onRenderError(std::exception_ptr error) override {
-    delegate_.invoke(&mbgl::RendererObserver::onRenderError, error);
+    delegate_.invoke(&mln::RendererObserver::onRenderError, error);
   }
 
  private:
-  std::shared_ptr<mbgl::Mailbox> mailbox_;
-  mbgl::ActorRef<mbgl::RendererObserver> delegate_;
+  std::shared_ptr<mln::Mailbox> mailbox_;
+  mln::ActorRef<mln::RendererObserver> delegate_;
 };
 
 }  // namespace
 
 namespace mln::core {
 
-class HeadlessFrontend final : public mbgl::RendererFrontend {
+class HeadlessFrontend final : public mln::RendererFrontend {
  public:
   // The thread pool tag must be a default-constructed identity, unique per map.
   // SimpleIdentity::Empty pools every map's work into one bucket that
@@ -699,7 +718,7 @@ class HeadlessFrontend final : public mbgl::RendererFrontend {
   // pool's own identity. The run loop comes in by reference because mbgl calls
   // setObserver() from the map constructor; it outlives the map.
   HeadlessFrontend(
-    mln_runtime runtime, mln_map map, mbgl::util::RunLoop& run_loop,
+    mln_runtime runtime, mln_map map, mln::util::RunLoop& run_loop,
     std::shared_ptr<mln::core::MapEventState> event_state
   )
       : runtime_(runtime),
@@ -707,7 +726,7 @@ class HeadlessFrontend final : public mbgl::RendererFrontend {
         run_loop_(run_loop),
         event_state_(std::move(event_state)),
         thread_pool_(
-          mbgl::Scheduler::GetBackground(), mbgl::util::SimpleIdentity{}
+          mln::Scheduler::GetBackground(), mln::util::SimpleIdentity{}
         ) {}
 
   void reset() override {
@@ -716,14 +735,14 @@ class HeadlessFrontend final : public mbgl::RendererFrontend {
     repaint_demand_ = false;
   }
 
-  // mbgl::Map calls this once from its constructor on the runtime worker.
-  void setObserver(mbgl::RendererObserver& observer) override {
+  // mln::Map calls this once from its constructor on the runtime worker.
+  void setObserver(mln::RendererObserver& observer) override {
     observer_ =
       std::make_unique<ForwardingRendererObserver>(run_loop_, observer);
   }
 
   // Store render state before publishing it to sessions and event consumers.
-  void update(std::shared_ptr<mbgl::UpdateParameters> update) override {
+  void update(std::shared_ptr<mln::UpdateParameters> update) override {
     std::function<void()> publish;
     std::function<void()> publish_session;
     {
@@ -752,14 +771,14 @@ class HeadlessFrontend final : public mbgl::RendererFrontend {
   }
 
   [[nodiscard]] auto latest_update() const
-    -> std::shared_ptr<mbgl::UpdateParameters> {
+    -> std::shared_ptr<mln::UpdateParameters> {
     const std::scoped_lock lock(latest_update_mutex_);
     return latest_update_;
   }
   // One lock hold keeps the pair coherent: a frame result must report the
   // generation of the update that was actually rendered.
   [[nodiscard]] auto latest_update_snapshot(uint64_t& out_generation) const
-    -> std::shared_ptr<mbgl::UpdateParameters> {
+    -> std::shared_ptr<mln::UpdateParameters> {
     const std::scoped_lock lock(latest_update_mutex_);
     out_generation = latest_update_generation_;
     return latest_update_;
@@ -793,7 +812,7 @@ class HeadlessFrontend final : public mbgl::RendererFrontend {
     thread_pool_.waitForEmpty();
   }
 
-  [[nodiscard]] auto renderer_observer() const -> mbgl::RendererObserver* {
+  [[nodiscard]] auto renderer_observer() const -> mln::RendererObserver* {
     return observer_.get();
   }
 
@@ -805,19 +824,19 @@ class HeadlessFrontend final : public mbgl::RendererFrontend {
   }
 
   [[nodiscard]] auto getThreadPool() const
-    -> const mbgl::TaggedScheduler& override {
+    -> const mln::TaggedScheduler& override {
     return thread_pool_;
   }
 
  private:
   mln_runtime runtime_;
   mln_map map_;
-  mbgl::util::RunLoop& run_loop_;
+  mln::util::RunLoop& run_loop_;
   std::shared_ptr<mln::core::MapEventState> event_state_;
   std::unique_ptr<ForwardingRendererObserver> observer_;
-  mbgl::TaggedScheduler thread_pool_;
+  mln::TaggedScheduler thread_pool_;
   mutable std::mutex latest_update_mutex_;
-  std::shared_ptr<mbgl::UpdateParameters> latest_update_;
+  std::shared_ptr<mln::UpdateParameters> latest_update_;
   std::function<void()> publish_;
   std::function<void()> session_publish_;
   uint64_t latest_update_generation_ = 0;
@@ -875,17 +894,17 @@ auto validate_map_options(const mln_map_options* options) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-auto to_native_map_mode(uint32_t mode) -> mbgl::MapMode {
+auto to_native_map_mode(uint32_t mode) -> mln::MapMode {
   switch (mode) {
     case MLN_MAP_MODE_STATIC:
-      return mbgl::MapMode::Static;
+      return mln::MapMode::Static;
     case MLN_MAP_MODE_TILE:
-      return mbgl::MapMode::Tile;
+      return mln::MapMode::Tile;
     case MLN_MAP_MODE_CONTINUOUS:
-      return mbgl::MapMode::Continuous;
+      return mln::MapMode::Continuous;
     default:
       assert(false);
-      return mbgl::MapMode::Continuous;
+      return mln::MapMode::Continuous;
   }
 }
 
@@ -977,23 +996,23 @@ auto validate_camera_options(const mln_camera_options* camera) -> mln_status {
 using DoubleMilliseconds = std::chrono::duration<double, std::milli>;
 
 auto max_native_duration_ms() -> double {
-  return std::chrono::duration_cast<DoubleMilliseconds>(mbgl::Duration::max())
+  return std::chrono::duration_cast<DoubleMilliseconds>(mln::Duration::max())
     .count();
 }
 
-auto duration_from_milliseconds(double milliseconds) -> mbgl::Duration {
-  return std::chrono::duration_cast<mbgl::Duration>(
+auto duration_from_milliseconds(double milliseconds) -> mln::Duration {
+  return std::chrono::duration_cast<mln::Duration>(
     DoubleMilliseconds{milliseconds}
   );
 }
 
-// The accepted bound is exclusive because mbgl::Duration::max() has no exact
+// The accepted bound is exclusive because mln::Duration::max() has no exact
 // double representation: the nearest double converts back to 2^63 ticks, one
 // past the largest representable count. The margin holds for a nanosecond
 // duration only, so pin the representation.
 static_assert(
-  std::is_same_v<mbgl::Duration, std::chrono::nanoseconds>,
-  "the accepted duration bound is derived from a nanosecond mbgl::Duration"
+  std::is_same_v<mln::Duration, std::chrono::nanoseconds>,
+  "the accepted duration bound is derived from a nanosecond mln::Duration"
 );
 
 auto is_native_duration_ms(double milliseconds) -> bool {
@@ -1504,16 +1523,16 @@ auto validate_projected_meters(mln_projected_meters meters) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-auto to_native_screen_point(mln_screen_point point) -> mbgl::ScreenCoordinate;
-auto from_native_screen_point(const mbgl::ScreenCoordinate& point)
+auto to_native_screen_point(mln_screen_point point) -> mln::ScreenCoordinate;
+auto from_native_screen_point(const mln::ScreenCoordinate& point)
   -> mln_screen_point;
-auto to_native_edge_insets(mln_edge_insets padding) -> mbgl::EdgeInsets;
-auto from_native_edge_insets(const mbgl::EdgeInsets& insets) -> mln_edge_insets;
+auto to_native_edge_insets(mln_edge_insets padding) -> mln::EdgeInsets;
+auto from_native_edge_insets(const mln::EdgeInsets& insets) -> mln_edge_insets;
 
-auto to_native_camera(const mln_camera_options& camera) -> mbgl::CameraOptions {
-  auto result = mbgl::CameraOptions{};
+auto to_native_camera(const mln_camera_options& camera) -> mln::CameraOptions {
+  auto result = mln::CameraOptions{};
   if ((camera.fields & MLN_CAMERA_OPTION_CENTER) != 0U) {
-    result.withCenter(mbgl::LatLng{camera.latitude, camera.longitude});
+    result.withCenter(mln::LatLng{camera.latitude, camera.longitude});
   }
   if ((camera.fields & MLN_CAMERA_OPTION_CENTER_ALTITUDE) != 0U) {
     result.withCenterAltitude(camera.center_altitude);
@@ -1542,7 +1561,7 @@ auto to_native_camera(const mln_camera_options& camera) -> mbgl::CameraOptions {
   return result;
 }
 
-auto from_native_camera(const mbgl::CameraOptions& camera)
+auto from_native_camera(const mln::CameraOptions& camera)
   -> mln_camera_options {
   auto result = mln::core::camera_options_default();
   if (camera.center) {
@@ -1603,8 +1622,8 @@ auto to_native_animation(
   mln_runtime runtime, mln_map map,
   const std::shared_ptr<mln::core::MapEventState>& event_state,
   const mln_animation_options* animation
-) -> mbgl::AnimationOptions {
-  auto result = mbgl::AnimationOptions{};
+) -> mln::AnimationOptions {
+  auto result = mln::AnimationOptions{};
   if (animation == nullptr) {
     return result;
   }
@@ -1640,12 +1659,12 @@ auto to_native_animation(
 }
 
 auto camera_fit_padding(const mln_camera_fit_options* options)
-  -> mbgl::EdgeInsets {
+  -> mln::EdgeInsets {
   if (
     options == nullptr ||
     (options->fields & MLN_CAMERA_FIT_OPTION_PADDING) == 0U
   ) {
-    return mbgl::EdgeInsets{};
+    return mln::EdgeInsets{};
   }
   return to_native_edge_insets(options->padding);
 }
@@ -1671,103 +1690,102 @@ auto camera_fit_pitch(const mln_camera_fit_options* options)
   return options->pitch;
 }
 
-auto to_native_debug_options(uint32_t options) -> mbgl::MapDebugOptions {
-  return static_cast<mbgl::MapDebugOptions>(options);
+auto to_native_debug_options(uint32_t options) -> mln::MapDebugOptions {
+  return static_cast<mln::MapDebugOptions>(options);
 }
 
-auto from_native_debug_options(mbgl::MapDebugOptions options) -> uint32_t {
+auto from_native_debug_options(mln::MapDebugOptions options) -> uint32_t {
   return static_cast<uint32_t>(options);
 }
 
 auto to_native_north_orientation(uint32_t orientation)
-  -> mbgl::NorthOrientation {
+  -> mln::NorthOrientation {
   switch (orientation) {
     case MLN_NORTH_ORIENTATION_RIGHT:
-      return mbgl::NorthOrientation::Rightwards;
+      return mln::NorthOrientation::Rightwards;
     case MLN_NORTH_ORIENTATION_DOWN:
-      return mbgl::NorthOrientation::Downwards;
+      return mln::NorthOrientation::Downwards;
     case MLN_NORTH_ORIENTATION_LEFT:
-      return mbgl::NorthOrientation::Leftwards;
+      return mln::NorthOrientation::Leftwards;
     case MLN_NORTH_ORIENTATION_UP:
-      return mbgl::NorthOrientation::Upwards;
+      return mln::NorthOrientation::Upwards;
     default:
       assert(false);
-      return mbgl::NorthOrientation::Upwards;
+      return mln::NorthOrientation::Upwards;
   }
 }
 
-auto from_native_north_orientation(mbgl::NorthOrientation orientation)
+auto from_native_north_orientation(mln::NorthOrientation orientation)
   -> uint32_t {
   switch (orientation) {
-    case mbgl::NorthOrientation::Rightwards:
+    case mln::NorthOrientation::Rightwards:
       return MLN_NORTH_ORIENTATION_RIGHT;
-    case mbgl::NorthOrientation::Downwards:
+    case mln::NorthOrientation::Downwards:
       return MLN_NORTH_ORIENTATION_DOWN;
-    case mbgl::NorthOrientation::Leftwards:
+    case mln::NorthOrientation::Leftwards:
       return MLN_NORTH_ORIENTATION_LEFT;
-    case mbgl::NorthOrientation::Upwards:
+    case mln::NorthOrientation::Upwards:
       return MLN_NORTH_ORIENTATION_UP;
   }
   assert(false);
   return MLN_NORTH_ORIENTATION_UP;
 }
 
-auto to_native_constrain_mode(uint32_t mode) -> mbgl::ConstrainMode {
+auto to_native_constrain_mode(uint32_t mode) -> mln::ConstrainMode {
   switch (mode) {
     case MLN_CONSTRAIN_MODE_NONE:
-      return mbgl::ConstrainMode::None;
+      return mln::ConstrainMode::None;
     case MLN_CONSTRAIN_MODE_WIDTH_AND_HEIGHT:
-      return mbgl::ConstrainMode::WidthAndHeight;
+      return mln::ConstrainMode::WidthAndHeight;
     case MLN_CONSTRAIN_MODE_SCREEN:
-      return mbgl::ConstrainMode::Screen;
+      return mln::ConstrainMode::Screen;
     case MLN_CONSTRAIN_MODE_HEIGHT_ONLY:
-      return mbgl::ConstrainMode::HeightOnly;
+      return mln::ConstrainMode::HeightOnly;
     default:
       assert(false);
-      return mbgl::ConstrainMode::HeightOnly;
+      return mln::ConstrainMode::HeightOnly;
   }
 }
 
-auto from_native_constrain_mode(mbgl::ConstrainMode mode) -> uint32_t {
+auto from_native_constrain_mode(mln::ConstrainMode mode) -> uint32_t {
   switch (mode) {
-    case mbgl::ConstrainMode::None:
+    case mln::ConstrainMode::None:
       return MLN_CONSTRAIN_MODE_NONE;
-    case mbgl::ConstrainMode::WidthAndHeight:
+    case mln::ConstrainMode::WidthAndHeight:
       return MLN_CONSTRAIN_MODE_WIDTH_AND_HEIGHT;
-    case mbgl::ConstrainMode::Screen:
+    case mln::ConstrainMode::Screen:
       return MLN_CONSTRAIN_MODE_SCREEN;
-    case mbgl::ConstrainMode::HeightOnly:
+    case mln::ConstrainMode::HeightOnly:
       return MLN_CONSTRAIN_MODE_HEIGHT_ONLY;
   }
   assert(false);
   return MLN_CONSTRAIN_MODE_HEIGHT_ONLY;
 }
 
-auto to_native_viewport_mode(uint32_t mode) -> mbgl::ViewportMode {
+auto to_native_viewport_mode(uint32_t mode) -> mln::ViewportMode {
   switch (mode) {
     case MLN_VIEWPORT_MODE_FLIPPED_Y:
-      return mbgl::ViewportMode::FlippedY;
+      return mln::ViewportMode::FlippedY;
     case MLN_VIEWPORT_MODE_DEFAULT:
-      return mbgl::ViewportMode::Default;
+      return mln::ViewportMode::Default;
     default:
       assert(false);
-      return mbgl::ViewportMode::Default;
+      return mln::ViewportMode::Default;
   }
 }
 
-auto from_native_viewport_mode(mbgl::ViewportMode mode) -> uint32_t {
+auto from_native_viewport_mode(mln::ViewportMode mode) -> uint32_t {
   switch (mode) {
-    case mbgl::ViewportMode::FlippedY:
+    case mln::ViewportMode::FlippedY:
       return MLN_VIEWPORT_MODE_FLIPPED_Y;
-    case mbgl::ViewportMode::Default:
+    case mln::ViewportMode::Default:
       return MLN_VIEWPORT_MODE_DEFAULT;
   }
   assert(false);
   return MLN_VIEWPORT_MODE_DEFAULT;
 }
 
-auto from_native_edge_insets(const mbgl::EdgeInsets& insets)
-  -> mln_edge_insets {
+auto from_native_edge_insets(const mln::EdgeInsets& insets) -> mln_edge_insets {
   return mln_edge_insets{
     .top = insets.top(),
     .left = insets.left(),
@@ -1776,30 +1794,30 @@ auto from_native_edge_insets(const mbgl::EdgeInsets& insets)
   };
 }
 
-auto to_native_tile_lod_mode(uint32_t mode) -> mbgl::TileLodMode {
+auto to_native_tile_lod_mode(uint32_t mode) -> mln::TileLodMode {
   switch (mode) {
     case MLN_TILE_LOD_MODE_DISTANCE:
-      return mbgl::TileLodMode::Distance;
+      return mln::TileLodMode::Distance;
     case MLN_TILE_LOD_MODE_DEFAULT:
-      return mbgl::TileLodMode::Default;
+      return mln::TileLodMode::Default;
     default:
       assert(false);
-      return mbgl::TileLodMode::Default;
+      return mln::TileLodMode::Default;
   }
 }
 
-auto from_native_tile_lod_mode(mbgl::TileLodMode mode) -> uint32_t {
+auto from_native_tile_lod_mode(mln::TileLodMode mode) -> uint32_t {
   switch (mode) {
-    case mbgl::TileLodMode::Distance:
+    case mln::TileLodMode::Distance:
       return MLN_TILE_LOD_MODE_DISTANCE;
-    case mbgl::TileLodMode::Default:
+    case mln::TileLodMode::Default:
       return MLN_TILE_LOD_MODE_DEFAULT;
   }
   assert(false);
   return MLN_TILE_LOD_MODE_DEFAULT;
 }
 
-auto from_native_projection_mode(const mbgl::ProjectionMode& mode)
+auto from_native_projection_mode(const mln::ProjectionMode& mode)
   -> mln_projection_mode {
   auto result = mln::core::projection_mode_default();
   if (mode.axonometric) {
@@ -1817,23 +1835,23 @@ auto from_native_projection_mode(const mbgl::ProjectionMode& mode)
   return result;
 }
 
-auto to_native_lat_lng(mln_lat_lng coordinate) -> mbgl::LatLng {
-  return mbgl::LatLng{coordinate.latitude, coordinate.longitude};
+auto to_native_lat_lng(mln_lat_lng coordinate) -> mln::LatLng {
+  return mln::LatLng{coordinate.latitude, coordinate.longitude};
 }
 
-auto from_native_lat_lng(const mbgl::LatLng& coordinate) -> mln_lat_lng {
+auto from_native_lat_lng(const mln::LatLng& coordinate) -> mln_lat_lng {
   return mln_lat_lng{
     .latitude = coordinate.latitude(), .longitude = coordinate.longitude()
   };
 }
 
-auto to_native_lat_lng_bounds(mln_lat_lng_bounds bounds) -> mbgl::LatLngBounds {
-  return mbgl::LatLngBounds::hull(
+auto to_native_lat_lng_bounds(mln_lat_lng_bounds bounds) -> mln::LatLngBounds {
+  return mln::LatLngBounds::hull(
     to_native_lat_lng(bounds.southwest), to_native_lat_lng(bounds.northeast)
   );
 }
 
-auto from_native_lat_lng_bounds(const mbgl::LatLngBounds& bounds)
+auto from_native_lat_lng_bounds(const mln::LatLngBounds& bounds)
   -> mln_lat_lng_bounds {
   return mln_lat_lng_bounds{
     .southwest =
@@ -1846,13 +1864,13 @@ auto from_native_lat_lng_bounds(const mbgl::LatLngBounds& bounds)
 // mbgl keeps the unbounded flag private. Its operator== treats unbounded values
 // as equal to each other and distinct from every bounded one, so comparing
 // against a default-constructed value tests the flag exactly.
-auto is_unbounded_lat_lng_bounds(const mbgl::LatLngBounds& bounds) -> bool {
-  return bounds == mbgl::LatLngBounds{};
+auto is_unbounded_lat_lng_bounds(const mln::LatLngBounds& bounds) -> bool {
+  return bounds == mln::LatLngBounds{};
 }
 
 auto to_native_lat_lngs(const mln_lat_lng* coordinates, size_t coordinate_count)
-  -> std::vector<mbgl::LatLng> {
-  auto result = std::vector<mbgl::LatLng>{};
+  -> std::vector<mln::LatLng> {
+  auto result = std::vector<mln::LatLng>{};
   result.reserve(coordinate_count);
   const auto coordinate_span =
     std::span<const mln_lat_lng>{coordinates, coordinate_count};
@@ -1862,18 +1880,18 @@ auto to_native_lat_lngs(const mln_lat_lng* coordinates, size_t coordinate_count)
   return result;
 }
 
-auto to_native_screen_point(mln_screen_point point) -> mbgl::ScreenCoordinate {
-  return mbgl::ScreenCoordinate{point.x, point.y};
+auto to_native_screen_point(mln_screen_point point) -> mln::ScreenCoordinate {
+  return mln::ScreenCoordinate{point.x, point.y};
 }
 
-auto from_native_screen_point(const mbgl::ScreenCoordinate& point)
+auto from_native_screen_point(const mln::ScreenCoordinate& point)
   -> mln_screen_point {
   return mln_screen_point{.x = point.x, .y = point.y};
 }
 
 auto to_native_screen_points(const mln_screen_point* points, size_t point_count)
-  -> std::vector<mbgl::ScreenCoordinate> {
-  auto result = std::vector<mbgl::ScreenCoordinate>{};
+  -> std::vector<mln::ScreenCoordinate> {
+  auto result = std::vector<mln::ScreenCoordinate>{};
   result.reserve(point_count);
   const auto point_span =
     std::span<const mln_screen_point>{points, point_count};
@@ -1883,21 +1901,21 @@ auto to_native_screen_points(const mln_screen_point* points, size_t point_count)
   return result;
 }
 
-auto to_native_edge_insets(mln_edge_insets padding) -> mbgl::EdgeInsets {
-  return mbgl::EdgeInsets{
+auto to_native_edge_insets(mln_edge_insets padding) -> mln::EdgeInsets {
+  return mln::EdgeInsets{
     padding.top, padding.left, padding.bottom, padding.right
   };
 }
 
 auto to_native_bound_options(const mln_bound_options& options)
-  -> mbgl::BoundOptions {
-  auto result = mbgl::BoundOptions{};
+  -> mln::BoundOptions {
+  auto result = mln::BoundOptions{};
   if ((options.fields & MLN_BOUND_OPTION_BOUNDS) != 0U) {
     result.withLatLngBounds(to_native_lat_lng_bounds(options.bounds));
   }
   if ((options.fields & MLN_BOUND_OPTION_UNBOUNDED) != 0U) {
     // A default-constructed LatLngBounds is the mbgl unbounded constraint.
-    result.withLatLngBounds(mbgl::LatLngBounds{});
+    result.withLatLngBounds(mln::LatLngBounds{});
   }
   if ((options.fields & MLN_BOUND_OPTION_MIN_ZOOM) != 0U) {
     result.withMinZoom(options.min_zoom);
@@ -1914,7 +1932,7 @@ auto to_native_bound_options(const mln_bound_options& options)
   return result;
 }
 
-auto from_native_bound_options(const mbgl::BoundOptions& options)
+auto from_native_bound_options(const mln::BoundOptions& options)
   -> mln_bound_options {
   auto result = mln::core::bound_options_default();
   if (options.bounds) {
@@ -1944,20 +1962,20 @@ auto from_native_bound_options(const mbgl::BoundOptions& options)
   return result;
 }
 
-auto to_native_vec3(mln_vec3 value) -> mbgl::vec3 {
-  return mbgl::vec3{{value.x, value.y, value.z}};
+auto to_native_vec3(mln_vec3 value) -> mln::vec3 {
+  return mln::vec3{{value.x, value.y, value.z}};
 }
 
-auto from_native_vec3(const mbgl::vec3& value) -> mln_vec3 {
+auto from_native_vec3(const mln::vec3& value) -> mln_vec3 {
   const auto [x_component, y_component, z_component] = value;
   return mln_vec3{.x = x_component, .y = y_component, .z = z_component};
 }
 
-auto to_native_vec4(mln_quaternion value) -> mbgl::vec4 {
-  return mbgl::vec4{{value.x, value.y, value.z, value.w}};
+auto to_native_vec4(mln_quaternion value) -> mln::vec4 {
+  return mln::vec4{{value.x, value.y, value.z, value.w}};
 }
 
-auto from_native_vec4(const mbgl::vec4& value) -> mln_quaternion {
+auto from_native_vec4(const mln::vec4& value) -> mln_quaternion {
   const auto [x_component, y_component, z_component, w_component] = value;
   return mln_quaternion{
     .x = x_component, .y = y_component, .z = z_component, .w = w_component
@@ -1965,8 +1983,8 @@ auto from_native_vec4(const mbgl::vec4& value) -> mln_quaternion {
 }
 
 auto to_native_free_camera(const mln_free_camera_options& options)
-  -> mbgl::FreeCameraOptions {
-  auto result = mbgl::FreeCameraOptions{};
+  -> mln::FreeCameraOptions {
+  auto result = mln::FreeCameraOptions{};
   if ((options.fields & MLN_FREE_CAMERA_OPTION_POSITION) != 0U) {
     result.position = to_native_vec3(options.position);
   }
@@ -1976,7 +1994,7 @@ auto to_native_free_camera(const mln_free_camera_options& options)
   return result;
 }
 
-auto from_native_free_camera(const mbgl::FreeCameraOptions& options)
+auto from_native_free_camera(const mln::FreeCameraOptions& options)
   -> mln_free_camera_options {
   auto result = mln::core::free_camera_options_default();
   if (options.position) {
@@ -2735,7 +2753,7 @@ auto create_map(
   // so a throw here cannot leave a registered map the caller has no handle to
   // destroy.
   auto event_state = std::make_shared<MapEventState>();
-  auto source_registry = std::make_shared<CustomGeometrySourceRegistry>();
+  auto source_registry = std::make_shared<CallbackSourceRegistry>();
   // Publish the handle first, so the observer and frontend capture an id that
   // already resolves.
   const auto handle = handle_table<MapObject>().insert(owned_map);
@@ -2744,7 +2762,7 @@ auto create_map(
   owned_map->map_mode = effective.map_mode;
   owned_map->logical_extent = effective.initial_extent;
   owned_map->event_state = std::move(event_state);
-  owned_map->custom_geometry_sources = std::move(source_registry);
+  owned_map->callback_sources = std::move(source_registry);
   owned_map->event_state->mask.store(
     effective.event_mask, std::memory_order_relaxed
   );
@@ -2754,27 +2772,26 @@ auto create_map(
     // observer and frontend below are the first producers that need it.
     register_runtime_map_events(runtime, handle, owned_map->event_state);
     owned_map->observer = std::make_unique<HeadlessObserver>(
-      runtime, handle, owned_map->event_state,
-      owned_map->custom_geometry_sources
+      runtime, handle, owned_map->event_state, owned_map->callback_sources
     );
     owned_map->frontend = std::make_unique<HeadlessFrontend>(
       runtime, handle, runtime_run_loop(live_runtime), owned_map->event_state
     );
 
-    auto map_options = mbgl::MapOptions{};
+    auto map_options = mln::MapOptions{};
     map_options.withMapMode(to_native_map_mode(effective.map_mode))
       .withSize(
-        mbgl::Size{
+        mln::Size{
           effective.initial_extent.width, effective.initial_extent.height
         }
       )
       .withPixelRatio(static_cast<float>(effective.initial_extent.scale_factor))
       .withFastPFOREnabled(effective.fast_pfor_enabled);
-    owned_map->map = std::make_unique<mbgl::Map>(
+    owned_map->map = std::make_unique<mln::Map>(
       *owned_map->frontend, *owned_map->observer, map_options,
       resource_options_for_runtime(runtime)
     );
-    owned_map->custom_geometry_sources->attach(*owned_map->map);
+    owned_map->callback_sources->attach(*owned_map->map);
     owned_map->frontend->set_publish_callback(
       [weak = std::weak_ptr<MapObject>{owned_map}]() -> void {
         if (const auto locked = weak.lock(); locked && locked->map) {
@@ -2926,7 +2943,7 @@ auto map_resize(
       }
       try {
         live->logical_extent = extent;
-        live->map->setSize(mbgl::Size{extent.width, extent.height});
+        live->map->setSize(mln::Size{extent.width, extent.height});
         const auto generation = publish_map_snapshot(*live);
         complete_command(
           completion_state, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK,
@@ -3027,7 +3044,7 @@ auto release_map(mln_map map) -> mln_status {
         });
         owned_map->control.wait_for_submissions();
         owned_map->runtime_state->executor.invoke_sync([&]() mutable -> void {
-          owned_map->custom_geometry_sources->detach();
+          owned_map->callback_sources->detach();
           owned_map->frontend->close_renderer_observer();
           owned_map->frontend->shutdown_thread_pool();
           {
@@ -3219,7 +3236,7 @@ auto map_scale_factor(mln_map map) -> double {
 
 // Returns worker-owned native state. Callers must already run on the runtime
 // worker or use the posting helpers below.
-auto map_native(MapObject* map) -> mbgl::Map* { return map->map.get(); }
+auto map_native(MapObject* map) -> mln::Map* { return map->map.get(); }
 
 namespace {
 
@@ -3248,7 +3265,7 @@ auto map_post_trigger_repaint(mln_map map) -> mln_status {
   return map_request_repaint(map, &completion);
 }
 
-auto map_latest_update(mln_map map) -> std::shared_ptr<mbgl::UpdateParameters> {
+auto map_latest_update(mln_map map) -> std::shared_ptr<mln::UpdateParameters> {
   auto* live = handle_table<MapObject>().try_resolve(map);
   return live == nullptr ? nullptr : live->frontend->latest_update();
 }
@@ -3257,13 +3274,20 @@ auto map_latest_update_generation(mln_map map) noexcept -> uint64_t {
   return live == nullptr ? 0 : live->frontend->latest_update_generation();
 }
 auto map_latest_update_snapshot(mln_map map, uint64_t& out_generation)
-  -> std::shared_ptr<mbgl::UpdateParameters> {
+  -> std::shared_ptr<mln::UpdateParameters> {
   auto* live = handle_table<MapObject>().try_resolve(map);
   if (live == nullptr) {
     out_generation = 0;
     return nullptr;
   }
   return live->frontend->latest_update_snapshot(out_generation);
+}
+
+auto map_feature_state_snapshot(mln_map map)
+  -> std::shared_ptr<const FeatureStateSnapshot> {
+  auto* live = handle_table<MapObject>().try_resolve(map);
+  return live == nullptr ? std::make_shared<FeatureStateSnapshot>()
+                         : live->feature_state.snapshot();
 }
 
 auto map_set_render_session_publish_callback(
@@ -3277,7 +3301,7 @@ auto map_set_render_session_publish_callback(
   return MLN_STATUS_OK;
 }
 
-auto map_renderer_observer(mln_map map) -> mbgl::RendererObserver* {
+auto map_renderer_observer(mln_map map) -> mln::RendererObserver* {
   auto* live = handle_table<MapObject>().try_resolve(map);
   return live == nullptr ? nullptr : live->frontend->renderer_observer();
 }
@@ -3460,6 +3484,94 @@ auto start_map_string_operation(
   else
     completion_state->reject();
   return submit_status;
+}
+
+namespace {
+auto feature_state_string_from_view(mln_buffer_view value) -> std::string {
+  return value.data == nullptr
+           ? std::string{}
+           : std::string{static_cast<const char*>(value.data), value.size};
+}
+}  // namespace
+
+auto map_set_feature_state(
+  mln_map map, const mln_feature_state_selector* selector, mln_buffer_view state
+) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  const auto selector_status = validate_feature_state_selector(selector, true);
+  if (selector_status != MLN_STATUS_OK) {
+    return selector_status;
+  }
+
+  auto native_state = to_native_json_value(state);
+  if (!native_state) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto* state_object = native_state->getObject();
+  if (state_object == nullptr) {
+    set_thread_error("feature state value must be a JSON object");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  live->feature_state.set(
+    feature_state_string_from_view(selector->source_id),
+    feature_state_source_layer(*selector),
+    feature_state_string_from_view(selector->feature_id), *state_object
+  );
+  live->map->triggerRepaint();
+  return MLN_STATUS_OK;
+}
+
+auto map_get_feature_state_start(
+  mln_map map, const mln_feature_state_selector* selector,
+  const mln_completion* completion
+) -> mln_status {
+  const auto selector_status = validate_feature_state_selector(selector, true);
+  if (selector_status != MLN_STATUS_OK) {
+    return selector_status;
+  }
+  auto source_id = feature_state_string_from_view(selector->source_id);
+  auto source_layer = feature_state_source_layer(*selector);
+  auto feature_id = feature_state_string_from_view(selector->feature_id);
+  return start_map_string_operation(
+    map, completion,
+    [source_id = std::move(source_id), source_layer = std::move(source_layer),
+     feature_id = std::move(feature_id)](MapObject& live) -> std::string {
+      auto state = live.feature_state.get(source_id, source_layer, feature_id);
+      return serialize_json_value(mln::Value{std::move(state)});
+    }
+  );
+}
+
+auto map_remove_feature_state(
+  mln_map map, const mln_feature_state_selector* selector
+) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  const auto selector_status = validate_feature_state_selector(selector, false);
+  if (selector_status != MLN_STATUS_OK) {
+    return selector_status;
+  }
+
+  live->feature_state.remove(
+    feature_state_string_from_view(selector->source_id),
+    feature_state_source_layer(*selector),
+    optional_selector_string(
+      *selector, MLN_FEATURE_STATE_SELECTOR_FEATURE_ID, selector->feature_id
+    ),
+    optional_selector_string(
+      *selector, MLN_FEATURE_STATE_SELECTOR_STATE_KEY, selector->state_key
+    )
+  );
+  live->map->triggerRepaint();
+  return MLN_STATUS_OK;
 }
 
 auto map_loaded_style_json_start(mln_map map, const mln_completion* completion)
@@ -3708,7 +3820,7 @@ auto map_apply_camera_delta(
       );
       const auto anchor =
         copied.has_anchor
-          ? std::optional<mbgl::ScreenCoordinate>{to_native_screen_point(
+          ? std::optional<mln::ScreenCoordinate>{to_native_screen_point(
               copied.anchor
             )}
           : std::nullopt;
@@ -3721,7 +3833,7 @@ auto map_apply_camera_delta(
           break;
         case MLN_CAMERA_DELTA_BEARING: {
           const auto current = live.map->getCameraOptions();
-          auto camera = mbgl::CameraOptions{}.withBearing(
+          auto camera = mln::CameraOptions{}.withBearing(
             current.bearing.value_or(0) + copied.amount
           );
           if (anchor.has_value()) camera.withAnchor(*anchor);
@@ -4138,7 +4250,7 @@ auto map_projection_create_start(mln_map map, const mln_completion* completion)
       try {
         auto projection = std::make_shared<MapProjectionObject>();
         projection->projection =
-          std::make_unique<mbgl::MapProjection>(*parent->map);
+          std::make_unique<mln::MapProjection>(*parent->map);
         state->complete(MLN_STATUS_OK, {}, std::any{std::move(projection)});
       } catch (...) {
         state->complete(
@@ -4182,7 +4294,7 @@ auto map_projection_get_camera(
     set_thread_error("out_camera must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  return with_projection(projection, [out_camera](mbgl::MapProjection& value) {
+  return with_projection(projection, [out_camera](mln::MapProjection& value) {
     *out_camera = from_native_camera(value.getCamera());
   });
 }
@@ -4196,7 +4308,7 @@ auto map_projection_set_camera(
   }
   const auto native_camera = to_native_camera(*camera);
   return with_projection(
-    projection, [&native_camera](mbgl::MapProjection& value) {
+    projection, [&native_camera](mln::MapProjection& value) {
       value.setCamera(native_camera);
     }
   );
@@ -4220,7 +4332,7 @@ auto map_projection_set_visible_coordinates(
   const auto native_padding = to_native_edge_insets(padding);
   return with_projection(
     projection,
-    [&native_coordinates, &native_padding](mbgl::MapProjection& value) {
+    [&native_coordinates, &native_padding](mln::MapProjection& value) {
       value.setVisibleCoordinates(native_coordinates, native_padding);
     }
   );
@@ -4245,7 +4357,7 @@ auto map_projection_set_visible_geometry(
   }
   const auto native_padding = to_native_edge_insets(padding);
   return with_projection(
-    projection, [&coordinates, &native_padding](mbgl::MapProjection& value) {
+    projection, [&coordinates, &native_padding](mln::MapProjection& value) {
       value.setVisibleCoordinates(coordinates, native_padding);
     }
   );
@@ -4265,7 +4377,7 @@ auto map_projection_pixel_for_lat_lng(
   }
   const auto native_coordinate = to_native_lat_lng(coordinate);
   return with_projection(
-    projection, [&native_coordinate, out_point](mbgl::MapProjection& value) {
+    projection, [&native_coordinate, out_point](mln::MapProjection& value) {
       *out_point =
         from_native_screen_point(value.pixelForLatLng(native_coordinate));
     }
@@ -4286,7 +4398,7 @@ auto map_projection_lat_lng_for_pixel(
   }
   const auto native_point = to_native_screen_point(point);
   return with_projection(
-    projection, [&native_point, out_coordinate](mbgl::MapProjection& value) {
+    projection, [&native_point, out_coordinate](mln::MapProjection& value) {
       *out_coordinate = from_native_lat_lng(value.latLngForPixel(native_point));
     }
   );
@@ -4305,7 +4417,7 @@ auto projected_meters_for_lat_lng(
   }
 
   const auto meters =
-    mbgl::Projection::projectedMetersForLatLng(to_native_lat_lng(coordinate));
+    mln::Projection::projectedMetersForLatLng(to_native_lat_lng(coordinate));
   *out_meters = mln_projected_meters{
     .northing = meters.northing(), .easting = meters.easting()
   };
@@ -4325,8 +4437,8 @@ auto lat_lng_for_projected_meters(
   }
 
   *out_coordinate = from_native_lat_lng(
-    mbgl::Projection::latLngForProjectedMeters(
-      mbgl::ProjectedMeters{meters.northing, meters.easting}
+    mln::Projection::latLngForProjectedMeters(
+      mln::ProjectedMeters{meters.northing, meters.easting}
     )
   );
   return MLN_STATUS_OK;
@@ -4665,7 +4777,7 @@ auto map_set_projection_mode(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto copied = mbgl::ProjectionMode{};
+  auto copied = mln::ProjectionMode{};
   if ((mode->fields & MLN_PROJECTION_MODE_AXONOMETRIC) != 0U) {
     copied.withAxonometric(mode->axonometric);
   }

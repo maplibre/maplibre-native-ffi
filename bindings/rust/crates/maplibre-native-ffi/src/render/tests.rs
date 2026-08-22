@@ -2754,18 +2754,13 @@ fn feature_state_and_rendered_queries_copy_native_results() {
     );
 
     let selector = FeatureStateSelector::new("point").with_feature_id("feature-1");
-    finish_unit(
-        &session,
-        session
-            .set_feature_state(&selector, br#"{"hover":true,"count":3}"#)
-            .unwrap(),
-    );
-    let state_operation = session.get_feature_state(&selector).unwrap();
-    wait_until_completed(&session, &state_operation);
-    let state: JsonValue = serde_json::from_slice(&state_operation.take().unwrap()).unwrap();
+    crate::completion::blocking(map.set_feature_state(&selector, br#"{"hover":true,"count":3}"#));
+    let state: JsonValue = serde_json::from_slice(&crate::completion::blocking(
+        map.get_feature_state(&selector),
+    ))
+    .unwrap();
     assert_eq!(state["hover"], true);
     assert_eq!(state["count"], 3);
-    drop(state_operation);
 
     let deadline = Instant::now() + Duration::from_secs(5);
     let features = loop {
@@ -2848,7 +2843,30 @@ fn feature_state_and_rendered_queries_copy_native_results() {
     );
     assert!(offscreen.is_empty());
 
-    finish_unit(&session, session.remove_feature_state(&selector).unwrap());
+    // Feature state belongs to the map, so a style replacement copies it into
+    // the reloaded style instead of dropping it.
+    crate::completion::blocking(map.set_style_json(FEATURE_STATE_STYLE_JSON.as_bytes()));
+    let copied: JsonValue = serde_json::from_slice(&crate::completion::blocking(
+        map.get_feature_state(&selector),
+    ))
+    .unwrap();
+    assert_eq!(copied["hover"], true);
+    assert_eq!(copied["count"], 3);
+
+    // A selector with a state key removes only that key.
+    let hover_selector = FeatureStateSelector::new("point")
+        .with_feature_id("feature-1")
+        .with_state_key("hover")
+        .unwrap();
+    crate::completion::blocking(map.remove_feature_state(&hover_selector));
+    let after_remove: JsonValue = serde_json::from_slice(&crate::completion::blocking(
+        map.get_feature_state(&selector),
+    ))
+    .unwrap();
+    assert_eq!(after_remove["count"], 3);
+    assert!(after_remove.get("hover").is_none());
+
+    crate::completion::blocking(map.remove_feature_state(&selector));
     close_session(session);
     map.close().unwrap();
     runtime.close().unwrap();

@@ -97,6 +97,28 @@ class _MapHandle:
     def create_projection(self) -> _MapProjectionHandle: ...
     def set_style_url(self, url: str) -> int: ...
     def set_style_json(self, json: bytes) -> int: ...
+    def set_feature_state(
+        self,
+        source_id: str,
+        source_layer_id: str | None,
+        feature_id: str | None,
+        state_key: str | None,
+        state_value: bytes,
+    ) -> int: ...
+    def get_feature_state(
+        self,
+        source_id: str,
+        source_layer_id: str | None,
+        feature_id: str | None,
+        state_key: str | None,
+    ) -> bytes: ...
+    def remove_feature_state(
+        self,
+        source_id: str,
+        source_layer_id: str | None,
+        feature_id: str | None,
+        state_key: str | None,
+    ) -> int: ...
     def copy_loaded_style_json(self) -> bytes: ...
     def copy_style_url(self) -> str: ...
     def get_camera(self) -> _WireDict: ...
@@ -443,6 +465,23 @@ class _MapHandle:
     def invalidate_custom_geometry_source_region(
         self, source_id: str, southwest: _Point, northeast: _Point
     ) -> int: ...
+    def add_custom_mvt_vector_source(
+        self,
+        source_id: str,
+        max_queued_events: int,
+        min_zoom: float | None,
+        max_zoom: float | None,
+        has_cancel_tile: bool,
+    ) -> tuple[_CustomMvtVectorSourceHandle, int]: ...
+    def set_custom_mvt_vector_source_tile_data(
+        self, source_id: str, z: int, x: int, y: int, data: bytes
+    ) -> int: ...
+    def set_custom_mvt_vector_source_tile_error(
+        self, source_id: str, z: int, x: int, y: int, message: str
+    ) -> int: ...
+    def invalidate_custom_mvt_vector_source_tile(
+        self, source_id: str, z: int, x: int, y: int
+    ) -> int: ...
 
 class _MapProjectionHandle:
     @property
@@ -619,26 +658,6 @@ class _RenderSessionHandle:
         extension_field: str,
         arguments: bytes | None,
     ) -> Future[bytes]: ...
-    def set_feature_state(
-        self,
-        source_id: str,
-        source_layer_id: str | None,
-        feature_id: str | None,
-        state_value: bytes,
-    ) -> Future[None]: ...
-    def get_feature_state(
-        self,
-        source_id: str,
-        source_layer_id: str | None,
-        feature_id: str | None,
-    ) -> Future[bytes]: ...
-    def remove_feature_state(
-        self,
-        source_id: str,
-        source_layer_id: str | None,
-        feature_id: str | None,
-        state_key: str | None,
-    ) -> Future[None]: ...
     def read_premultiplied_rgba8(self) -> Future[_WireDict]: ...
     def acquire_metal_owned_texture_frame(self) -> _MetalOwnedTextureFrameHandle: ...
     def acquire_vulkan_owned_texture_frame(self) -> _VulkanOwnedTextureFrameHandle: ...
@@ -698,6 +717,16 @@ class _LogReceiver:
     def poll_record(self) -> _WireDict | None: ...
 
 class _CustomGeometrySourceHandle:
+    @property
+    def closed(self) -> bool: ...
+    @property
+    def dropped_event_count(self) -> int: ...
+    def close(self) -> None: ...
+    def poll_event(self) -> _WireDict | None: ...
+    def push_fetch_for_test(self, z: int, x: int, y: int) -> None: ...
+    def push_cancel_for_test(self, z: int, x: int, y: int) -> None: ...
+
+class _CustomMvtVectorSourceHandle:
     @property
     def closed(self) -> bool: ...
     @property

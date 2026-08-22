@@ -14,10 +14,10 @@ namespace mln::core {
 // resolved_url applies the tile server normalization the online source would
 // have applied. The provider sees it alongside the request URL.
 auto request_custom_resource(
-  const mbgl::Resource& resource, std::string resolved_url,
+  const mln::Resource& resource, std::string resolved_url,
   mln_resource_provider_callback provider_callback, void* user_data,
-  mbgl::FileSource::Callback file_source_callback
-) -> std::unique_ptr<mbgl::AsyncRequest>;
+  mln::FileSource::Callback file_source_callback
+) -> std::unique_ptr<mln::AsyncRequest>;
 
 auto complete_resource_request(
   mln_resource_request_handle handle, const mln_resource_response* response

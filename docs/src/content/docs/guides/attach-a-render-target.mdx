@@ -68,11 +68,19 @@ capture that generation.
 
 <Code code={region(renderTarget, "resize")} lang="c" title="render-target.c" />
 
-A borrowed texture gets its allocation from the host, so replacement supplies a
-new descriptor. A host can replace a native surface after recreating a window or
-view allocation. Both paths preserve the session's rendering resources.
+A borrowed texture gets its size from the host allocation, so resizing it
+reports an unsupported status. Allocate a texture at the new size and replace
+the target with a new descriptor. A host can replace a native surface the same
+way after recreating a window or view allocation; Android rotation and Flutter
+surface lifecycle changes use this path. Both paths preserve the session's
+rendering resources, including loaded tiles, and leave map-owned feature state
+unchanged.
 
 <Code code={region(renderTarget, "set-target")} lang="c" title="render-target.c" />
+
+Changing the scale factor recreates the session's rendering resources because
+its shaders use a fixed pixel ratio. Map-owned feature state survives, and the
+next render update pushes it into the new renderer.
 
 Normal detach completes asynchronously. The selected driver destroys graphics
 resources on its owner and detaches the map. Continue servicing a caller driver

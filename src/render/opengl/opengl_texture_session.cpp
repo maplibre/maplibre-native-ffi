@@ -103,7 +103,7 @@ auto configure_transferred_webgl_worker(
 #endif
 
 [[noreturn]] void throw_opengl_framebuffer_error() {
-  switch (mbgl::platform::glCheckFramebufferStatus(GL_FRAMEBUFFER)) {
+  switch (mln::platform::glCheckFramebufferStatus(GL_FRAMEBUFFER)) {
     case GL_FRAMEBUFFER_COMPLETE:
       break;
     case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT:
@@ -122,7 +122,7 @@ auto configure_transferred_webgl_worker(
 
 auto check_opengl_framebuffer() -> void {
   if (
-    mbgl::platform::glCheckFramebufferStatus(GL_FRAMEBUFFER) !=
+    mln::platform::glCheckFramebufferStatus(GL_FRAMEBUFFER) !=
     GL_FRAMEBUFFER_COMPLETE
   ) {
     throw_opengl_framebuffer_error();
@@ -130,10 +130,10 @@ auto check_opengl_framebuffer() -> void {
 }
 
 class OpenGLTextureRenderableResource final
-    : public mbgl::gl::RenderableResource {
+    : public mln::gl::RenderableResource {
  public:
   OpenGLTextureRenderableResource(
-    mbgl::gl::Context& context_, mbgl::Size size_, uint32_t borrowed_texture
+    mln::gl::Context& context_, mln::Size size_, uint32_t borrowed_texture
   )
       : context(context_), size(size_), borrowed_texture_(borrowed_texture) {}
 
@@ -161,9 +161,9 @@ class OpenGLTextureRenderableResource final
     }
   }
 
-  auto readStillImage() -> mbgl::PremultipliedImage {
+  auto readStillImage() -> mln::PremultipliedImage {
     bind();
-    return context.readFramebuffer<mbgl::PremultipliedImage>(size);
+    return context.readFramebuffer<mln::PremultipliedImage>(size);
   }
 
   auto texture() -> uint32_t {
@@ -171,7 +171,7 @@ class OpenGLTextureRenderableResource final
     if (borrowed_texture_ != 0) {
       return borrowed_texture_;
     }
-    return static_cast<mbgl::gl::Texture2D&>(*texture_).getTextureID();
+    return static_cast<mln::gl::Texture2D&>(*texture_).getTextureID();
   }
 
  private:
@@ -185,47 +185,46 @@ class OpenGLTextureRenderableResource final
       texture_ = context.createTexture2D();
       texture_->setSize(size);
       texture_->setFormat(
-        mbgl::gfx::TexturePixelType::RGBA,
-        mbgl::gfx::TextureChannelDataType::UnsignedByte
+        mln::gfx::TexturePixelType::RGBA,
+        mln::gfx::TextureChannelDataType::UnsignedByte
       );
       texture_->setSamplerConfiguration(
-        {.filter = mbgl::gfx::TextureFilterType::Linear,
-         .wrapU = mbgl::gfx::TextureWrapType::Clamp,
-         .wrapV = mbgl::gfx::TextureWrapType::Clamp}
+        {.filter = mln::gfx::TextureFilterType::Linear,
+         .wrapU = mln::gfx::TextureWrapType::Clamp,
+         .wrapV = mln::gfx::TextureWrapType::Clamp}
       );
       texture_->create();
-      texture_id = static_cast<mbgl::gl::Texture2D&>(*texture_).getTextureID();
+      texture_id = static_cast<mln::gl::Texture2D&>(*texture_).getTextureID();
     }
 
     depth_stencil_ =
-      context
-        .createRenderbuffer<mbgl::gfx::RenderbufferPixelType::DepthStencil>(
-          size
-        );
-    auto framebuffer_id = mbgl::platform::GLuint{};
-    mbgl::platform::glGenFramebuffers(1, &framebuffer_id);
-    auto framebuffer = mbgl::gl::Framebuffer{
+      context.createRenderbuffer<mln::gfx::RenderbufferPixelType::DepthStencil>(
+        size
+      );
+    auto framebuffer_id = mln::platform::GLuint{};
+    mln::platform::glGenFramebuffers(1, &framebuffer_id);
+    auto framebuffer = mln::gl::Framebuffer{
       .size = size,
       .framebuffer =
-        mbgl::gl::UniqueFramebuffer{std::move(framebuffer_id), {&context}}
+        mln::gl::UniqueFramebuffer{std::move(framebuffer_id), {&context}}
     };
     context.bindFramebuffer = framebuffer.framebuffer;
-    mbgl::platform::glFramebufferTexture2D(
+    mln::platform::glFramebufferTexture2D(
       GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture_id, 0
     );
     auto& depth_stencil_resource =
-      depth_stencil_->getResource<mbgl::gl::RenderbufferResource>();
+      depth_stencil_->getResource<mln::gl::RenderbufferResource>();
 #ifdef GL_DEPTH_STENCIL_ATTACHMENT
-    mbgl::platform::glFramebufferRenderbuffer(
+    mln::platform::glFramebufferRenderbuffer(
       GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER,
       depth_stencil_resource.renderbuffer
     );
 #else
-    mbgl::platform::glFramebufferRenderbuffer(
+    mln::platform::glFramebufferRenderbuffer(
       GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER,
       depth_stencil_resource.renderbuffer
     );
-    mbgl::platform::glFramebufferRenderbuffer(
+    mln::platform::glFramebufferRenderbuffer(
       GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER,
       depth_stencil_resource.renderbuffer
     );
@@ -234,34 +233,34 @@ class OpenGLTextureRenderableResource final
     framebuffer_ = std::move(framebuffer);
   }
 
-  mbgl::gl::Context& context;
-  mbgl::Size size;
+  mln::gl::Context& context;
+  mln::Size size;
   uint32_t borrowed_texture_ = 0;
-  mbgl::gfx::Texture2DPtr texture_;
+  mln::gfx::Texture2DPtr texture_;
   std::optional<
-    mbgl::gfx::Renderbuffer<mbgl::gfx::RenderbufferPixelType::DepthStencil>>
+    mln::gfx::Renderbuffer<mln::gfx::RenderbufferPixelType::DepthStencil>>
     depth_stencil_;
-  std::optional<mbgl::gl::Framebuffer> framebuffer_;
+  std::optional<mln::gl::Framebuffer> framebuffer_;
 };
 
-class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
-                                   public mbgl::gfx::HeadlessBackend {
+class OpenGLTextureBackend final : public mln::gl::RendererBackend,
+                                   public mln::gfx::HeadlessBackend {
  public:
   OpenGLTextureBackend(
-    const mln_opengl_owned_texture_descriptor& descriptor, mbgl::Size size,
+    const mln_opengl_owned_texture_descriptor& descriptor, mln::Size size,
     std::size_t ring_depth
   )
-      : mbgl::gl::RendererBackend(mln::core::opengl::session_context_mode),
-        mbgl::gfx::HeadlessBackend(size),
+      : mln::gl::RendererBackend(mln::core::opengl::session_context_mode),
+        mln::gfx::HeadlessBackend(size),
         context_(descriptor.context),
         slot_resources_(ring_depth),
         slot_sizes_(ring_depth) {}
 
   OpenGLTextureBackend(
-    const mln_opengl_borrowed_texture_descriptor& descriptor, mbgl::Size size
+    const mln_opengl_borrowed_texture_descriptor& descriptor, mln::Size size
   )
-      : mbgl::gl::RendererBackend(mln::core::opengl::session_context_mode),
-        mbgl::gfx::HeadlessBackend(size),
+      : mln::gl::RendererBackend(mln::core::opengl::session_context_mode),
+        mln::gfx::HeadlessBackend(size),
         context_(descriptor.context),
         borrowed_texture_(descriptor.texture) {}
 
@@ -287,7 +286,7 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
       context.reset();
     };
     if (has_native_context()) {
-      auto guard = mbgl::gfx::BackendScope{*this};
+      auto guard = mln::gfx::BackendScope{*this};
       cleanup();
     } else {
       cleanup();
@@ -296,11 +295,11 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
     destroy_native_context();
   }
 
-  auto getDefaultRenderable() -> mbgl::gfx::Renderable& override {
+  auto getDefaultRenderable() -> mln::gfx::Renderable& override {
     const auto current_size = getSize();
     if (!resource || resource_size_ != current_size) {
       resource = std::make_unique<OpenGLTextureRenderableResource>(
-        getContext<mbgl::gl::Context>(), current_size, borrowed_texture_
+        getContext<mln::gl::Context>(), current_size, borrowed_texture_
       );
       resource_size_ = current_size;
       if (!slot_sizes_.empty()) slot_sizes_[selected_slot_] = current_size;
@@ -308,19 +307,19 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
     return *this;
   }
 
-  auto readStillImage() -> mbgl::PremultipliedImage override {
+  auto readStillImage() -> mln::PremultipliedImage override {
     auto& renderable =
       getDefaultRenderable().getResource<OpenGLTextureRenderableResource>();
     return renderable.readStillImage();
   }
 
-  auto getRendererBackend() -> mbgl::gfx::RendererBackend* override {
+  auto getRendererBackend() -> mln::gfx::RendererBackend* override {
     return this;
   }
 
   void updateAssumedState() override {
     assumeFramebufferBinding(
-      mbgl::gl::RendererBackend::ImplicitFramebufferBinding
+      mln::gl::RendererBackend::ImplicitFramebufferBinding
     );
   }
 
@@ -362,13 +361,13 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
     return true;
   }
 
-  void set_ring_size(mbgl::Size new_size) { size = new_size; }
+  void set_ring_size(mln::Size new_size) { size = new_size; }
 
-  void finish_rendering() { getContext<mbgl::gl::Context>().finish(); }
+  void finish_rendering() { getContext<mln::gl::Context>().finish(); }
 
   // Renders into a different caller-owned texture from here on, keeping the
   // session's context and everything the renderer built in it.
-  void set_borrowed_texture(uint32_t texture, mbgl::Size new_size) {
+  void set_borrowed_texture(uint32_t texture, mln::Size new_size) {
     borrowed_texture_ = texture;
     // setSize() drops the renderable unconditionally, rebuilding the
     // framebuffer against the new texture even when the size is unchanged. No
@@ -396,7 +395,7 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
   }
 
   auto getExtensionFunctionPointer(const char* name)
-    -> mbgl::gl::ProcAddress override {
+    -> mln::gl::ProcAddress override {
 #if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
     using GetProcAddressFunction = PROC(WINAPI*)(LPCSTR);
     auto* loader = reinterpret_cast<GetProcAddressFunction>(
@@ -405,18 +404,18 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
     if (loader != nullptr) {
       auto* proc = loader(name);
       if (mln::core::opengl::is_valid_wgl_proc_address(proc)) {
-        return reinterpret_cast<mbgl::gl::ProcAddress>(proc);
+        return reinterpret_cast<mln::gl::ProcAddress>(proc);
       }
     }
     auto* proc = wglGetProcAddress(name);
     if (mln::core::opengl::is_valid_wgl_proc_address(proc)) {
-      return reinterpret_cast<mbgl::gl::ProcAddress>(proc);
+      return reinterpret_cast<mln::gl::ProcAddress>(proc);
     }
-    return reinterpret_cast<mbgl::gl::ProcAddress>(
+    return reinterpret_cast<mln::gl::ProcAddress>(
       mln::core::opengl::get_opengl32_proc_address(name)
     );
 #elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
-    return reinterpret_cast<mbgl::gl::ProcAddress>(
+    return reinterpret_cast<mln::gl::ProcAddress>(
       mln::core::opengl::get_egl_proc_address(
         context_.data.egl, name,
         egl_context_ ? egl_context_->active_api() : EGL_NONE
@@ -538,9 +537,9 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
 
   mln_opengl_context_descriptor context_{};
   uint32_t borrowed_texture_ = 0;
-  mbgl::Size resource_size_{};
-  std::vector<std::unique_ptr<mbgl::gfx::RenderableResource>> slot_resources_;
-  std::vector<mbgl::Size> slot_sizes_;
+  mln::Size resource_size_{};
+  std::vector<std::unique_ptr<mln::gfx::RenderableResource>> slot_resources_;
+  std::vector<mln::Size> slot_sizes_;
   std::size_t selected_slot_ = 0;
 
 #if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
@@ -558,20 +557,20 @@ class OpenGLTextureSessionBackend final
     : public mln::core::TextureSessionBackend {
  public:
   OpenGLTextureSessionBackend(
-    const mln_opengl_owned_texture_descriptor& descriptor, mbgl::Size size,
+    const mln_opengl_owned_texture_descriptor& descriptor, mln::Size size,
     std::size_t ring_depth
   )
       : backend_(descriptor, size, ring_depth) {}
 
   OpenGLTextureSessionBackend(
-    const mln_opengl_borrowed_texture_descriptor& descriptor, mbgl::Size size
+    const mln_opengl_borrowed_texture_descriptor& descriptor, mln::Size size
   )
       : backend_(descriptor, size) {}
 
-  auto headless_backend() -> mbgl::gfx::HeadlessBackend& override {
+  auto headless_backend() -> mln::gfx::HeadlessBackend& override {
     return backend_;
   }
-  void resize(mbgl::Size size) override { backend_.set_ring_size(size); }
+  void resize(mln::Size size) override { backend_.set_ring_size(size); }
 
   auto set_opengl_borrowed_target(
     const mln_opengl_borrowed_texture_descriptor& descriptor
@@ -587,7 +586,7 @@ class OpenGLTextureSessionBackend final
     }
     backend_.set_borrowed_texture(
       descriptor.texture,
-      mbgl::Size{descriptor.physical_width, descriptor.physical_height}
+      mln::Size{descriptor.physical_width, descriptor.physical_height}
     );
     return MLN_STATUS_OK;
   }
@@ -611,7 +610,7 @@ class OpenGLTextureSessionBackend final
   ) -> mln_status override {
     // CPU-complete producer synchronization requires all preceding writes to
     // finish before the texture name is published.
-    auto guard = mbgl::gfx::BackendScope{backend_};
+    auto guard = mln::gfx::BackendScope{backend_};
     backend_.finish_rendering();
     out_metadata = mln_opengl_owned_texture_frame{
       .size = sizeof(mln_opengl_owned_texture_frame),
@@ -724,7 +723,7 @@ auto opengl_owned_texture_attach_start(
       }
 #endif
       target.texture.backend = std::make_unique<OpenGLTextureSessionBackend>(
-        copied, mbgl::Size{target.physical_width, target.physical_height},
+        copied, mln::Size{target.physical_width, target.physical_height},
         ring_depth
       );
       return MLN_STATUS_OK;
@@ -790,7 +789,7 @@ auto opengl_borrowed_texture_attach_start(
   const auto copied = *descriptor;
   session->initialize_backend = [copied](mln_render_session_object& target) {
     target.texture.backend = std::make_unique<OpenGLTextureSessionBackend>(
-      copied, mbgl::Size{target.physical_width, target.physical_height}
+      copied, mln::Size{target.physical_width, target.physical_height}
     );
     return MLN_STATUS_OK;
   };

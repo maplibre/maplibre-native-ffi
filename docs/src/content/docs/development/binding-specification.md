@@ -304,8 +304,8 @@ the child calls binding-owned behavior through it; they do not duplicate the C
 relationship with child counters or close preflights.
 
 A `MapProjectionHandle` owns a transform snapshot independently of its source
-map and runtime. Every call after creation, including close, is synchronous and
-usable from any thread.
+map and runtime, and it MUST remain valid after the source map closes. Every
+call after creation, including close, is synchronous and usable from any thread.
 
 Accepted one-shot work owns its completion state independently of the initiating
 wrapper. A completion copies borrowed native data before returning and resolves
@@ -802,9 +802,9 @@ The subscription follows this design:
    type the host left out to drive its own bookkeeping, and it MUST NOT hide a
    queued event from a host.
 5. Where a binding needs a native signal for its own state, it MUST use the
-   dedicated C mechanism, as `release_user_data` provides for callback state.
-   Binding-owned state that such a mechanism maintains keeps working for every
-   subscription.
+   dedicated C mechanism that style-scoped source callback state uses, as
+   `release_user_data` provides. Binding-owned state that such a mechanism
+   maintains keeps working for every subscription.
 6. Documentation for a subscription setter names the event types that carry
    state a host reaches no other way.
 

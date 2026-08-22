@@ -6,7 +6,7 @@ use crate::string::{StringView, buffer_view, string_view};
 use crate::values::{ScreenBox, ScreenPoint, screen_point_to_native};
 use crate::{Error, Result};
 
-/// Source, feature, and state-key selector for render-session feature state.
+/// Source, feature, and state-key selector for map feature state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct FeatureStateSelector {

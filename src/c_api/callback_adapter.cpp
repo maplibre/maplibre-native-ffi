@@ -1168,3 +1168,20 @@ extern "C" MLN_API void mln_adapter_custom_geometry_callbacks_retire(
     cancel_tile(user_data, RetirementTile);
   }
 }
+
+extern "C" MLN_API void mln_adapter_custom_mvt_vector_callbacks_retire(
+  mln_custom_mvt_vector_source_tile_callback fetch_tile,
+  mln_custom_mvt_vector_source_tile_callback cancel_tile, void* user_data
+) noexcept {
+  constexpr auto RetirementTile = mln_canonical_tile_id{
+    .z = std::numeric_limits<std::uint8_t>::max(),
+    .x = 0,
+    .y = 0,
+  };
+  if (fetch_tile != nullptr) {
+    fetch_tile(user_data, RetirementTile);
+  }
+  if (cancel_tile != nullptr) {
+    cancel_tile(user_data, RetirementTile);
+  }
+}

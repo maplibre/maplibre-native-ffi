@@ -7,8 +7,8 @@ use std::time::Duration;
 use crate::custom_geometry::CustomGeometrySourceOptions;
 use crate::events::{CommandDisposition, RuntimeEventSource, RuntimeEventType};
 use crate::{
-    CommandCompletion, ErrorKind, NativeFuture, RasterDemEncoding, ResourceKind,
-    ResourceProviderDecision, ResourceResponse, RuntimeEventMask, TextureImageInfo,
+    CommandCompletion, CustomMvtVectorSourceOptions, ErrorKind, NativeFuture, RasterDemEncoding,
+    ResourceKind, ResourceProviderDecision, ResourceResponse, RuntimeEventMask, TextureImageInfo,
 };
 
 const VALID_STYLE_JSON: &str = r#"{"version":8,"sources":{},"layers":[]}"#;
@@ -32,6 +32,27 @@ fn await_runtime_barrier(runtime: &RuntimeHandle) {
     assert!(barrier.wait(Duration::from_secs(5)).unwrap());
     barrier.finish().unwrap();
     barrier.release();
+}
+/// Waits for exactly `expected` source callback-state releases.
+///
+/// A command's completion reports the command, not the release of the callback
+/// state it dropped, and native may free that state on another thread, so the
+/// count is only eventually consistent with the commands the test submitted.
+fn await_release_count(runtime: &RuntimeHandle, releases: &Arc<AtomicUsize>, expected: usize) {
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    loop {
+        await_runtime_barrier(runtime);
+        let observed = releases.load(Ordering::SeqCst);
+        if observed >= expected {
+            assert_eq!(observed, expected);
+            return;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "expected {expected} releases, observed {observed}"
+        );
+        std::thread::sleep(Duration::from_millis(5));
+    }
 }
 fn assert_command_disposition(
     _runtime: &RuntimeHandle,
@@ -867,7 +888,7 @@ fn custom_geometry_source_apis_call_real_c_api_and_style_replacement_releases_st
     assert_eq!(releases.load(Ordering::SeqCst), 0);
     let removed = map.remove_style_source("custom").unwrap();
     assert_command_disposition(&runtime, removed, CommandDisposition::Committed);
-    assert_eq!(releases.load(Ordering::SeqCst), 1);
+    await_release_count(&runtime, &releases, 1);
     assert!(source_type_of(&map, "custom").is_none());
 
     let first_add = map
@@ -878,11 +899,10 @@ fn custom_geometry_source_apis_call_real_c_api_and_style_replacement_releases_st
         .unwrap();
     assert_command_disposition(&runtime, first_add, CommandDisposition::Committed);
     assert_command_disposition(&runtime, duplicate_add, CommandDisposition::Failed);
-    assert_eq!(releases.load(Ordering::SeqCst), 2);
+    await_release_count(&runtime, &releases, 2);
 
     map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
-    await_runtime_barrier(&runtime);
-    assert_eq!(releases.load(Ordering::SeqCst), 3);
+    await_release_count(&runtime, &releases, 3);
 
     map.close().unwrap();
     runtime.close().unwrap();
@@ -977,6 +997,83 @@ fn custom_geometry_source_state_releases_after_url_style_replacement() {
     );
 
     map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+fn mvt_options_counting_releases(releases: &Arc<AtomicUsize>) -> CustomMvtVectorSourceOptions {
+    let probe = ReleaseProbe {
+        releases: Arc::clone(releases),
+    };
+    CustomMvtVectorSourceOptions::new(move |_| {
+        let _ = &probe;
+    })
+}
+
+#[test]
+// Spec coverage: BND-105 and BND-124.
+fn custom_mvt_vector_source_apis_call_real_c_api_and_style_replacement_releases_state() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
+    let releases = Arc::new(AtomicUsize::new(0));
+
+    let mut custom_options = mvt_options_counting_releases(&releases).with_cancel_tile(|_| {});
+    custom_options.min_zoom = Some(0.0);
+    custom_options.max_zoom = Some(2.0);
+    map.add_custom_mvt_vector_source("custom", custom_options)
+        .unwrap();
+    assert_eq!(
+        source_type_of(&map, "custom"),
+        Some(SourceType::CustomMvtVector)
+    );
+
+    let tile_id = CanonicalTileId::new(0, 0, 0);
+    map.set_custom_mvt_vector_source_tile_data("custom", tile_id, &[])
+        .unwrap();
+    map.set_custom_mvt_vector_source_tile_error("custom", tile_id, "missing")
+        .unwrap();
+    map.invalidate_custom_mvt_vector_source_tile("custom", tile_id)
+        .unwrap();
+    assert_eq!(releases.load(Ordering::SeqCst), 0);
+
+    let removed = map.remove_style_source("custom").unwrap();
+    assert_command_disposition(&runtime, removed, CommandDisposition::Committed);
+    await_release_count(&runtime, &releases, 1);
+    assert!(source_type_of(&map, "custom").is_none());
+
+    let first_add = map
+        .add_custom_mvt_vector_source("custom", mvt_options_counting_releases(&releases))
+        .unwrap();
+    let duplicate_add = map
+        .add_custom_mvt_vector_source("custom", mvt_options_counting_releases(&releases))
+        .unwrap();
+    assert_command_disposition(&runtime, first_add, CommandDisposition::Committed);
+    assert_command_disposition(&runtime, duplicate_add, CommandDisposition::Failed);
+    await_release_count(&runtime, &releases, 2);
+
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
+    await_release_count(&runtime, &releases, 3);
+
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+// Spec coverage: BND-124.
+fn custom_mvt_vector_source_state_is_released_on_map_close() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map =
+        crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
+    let releases = Arc::new(AtomicUsize::new(0));
+    map.add_custom_mvt_vector_source("custom", mvt_options_counting_releases(&releases))
+        .unwrap();
+
+    map.close().unwrap();
+    await_runtime_barrier(&runtime);
+
+    assert_eq!(releases.load(Ordering::SeqCst), 1);
     runtime.close().unwrap();
 }
 

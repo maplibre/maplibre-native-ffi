@@ -14,12 +14,12 @@
 namespace mln::core {
 
 // Prepared GeoJSON source data: a parsed document tiled or clustered into the
-// index mbgl::style::GeoJSONSource consumes, together with the options the
+// index mln::style::GeoJSONSource consumes, together with the options the
 // index was built with. Immutable after creation, so any thread may create,
 // read, destroy, or install one on a map.
 struct GeoJsonSourceDataObject {
-  std::shared_ptr<mbgl::style::GeoJSONData> data;
-  mbgl::Immutable<mbgl::style::GeoJSONOptions> options;
+  std::shared_ptr<mln::style::GeoJSONData> data;
+  mln::Immutable<mln::style::GeoJSONOptions> options;
 };
 
 template <>
@@ -35,13 +35,13 @@ auto validate_geojson_source_options(const mln_geojson_source_options* options)
 auto effective_geojson_source_options(const mln_geojson_source_options* options)
   -> mln_geojson_source_options;
 auto to_native_geojson_source_options(const mln_geojson_source_options& options)
-  -> std::optional<mbgl::Immutable<mbgl::style::GeoJSONOptions>>;
+  -> std::optional<mln::Immutable<mln::style::GeoJSONOptions>>;
 
 // Compares every scalar option; cluster_properties expressions carry no
 // equality, so they stay outside the comparison.
 auto geojson_source_options_equal(
-  const mbgl::style::GeoJSONOptions& left,
-  const mbgl::style::GeoJSONOptions& right
+  const mln::style::GeoJSONOptions& left,
+  const mln::style::GeoJSONOptions& right
 ) -> bool;
 
 auto geojson_source_data_create(

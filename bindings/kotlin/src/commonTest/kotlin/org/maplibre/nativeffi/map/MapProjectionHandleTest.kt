@@ -1,10 +1,13 @@
 package org.maplibre.nativeffi.map
 
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -14,8 +17,10 @@ import org.maplibre.nativeffi.camera.CameraUpdate
 import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ScreenPoint
+import org.maplibre.nativeffi.runOnBackgroundThread
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 
+@OptIn(ExperimentalAtomicApi::class)
 class MapProjectionHandleTest {
   // BND-043, BND-103.
 
@@ -136,5 +141,37 @@ class MapProjectionHandleTest {
         map.close()
         runtime.close()
       }
+    }
+
+  @Test
+  fun projectionRemainsUsableOnAnotherThreadAfterMapClose(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
+      val map =
+        MapHandle.create(
+            runtime,
+            MapOptions().apply {
+              width = 64
+              height = 64
+              scaleFactor = 1.0
+            },
+          )
+          .await()
+      val projection = map.createProjection().await()
+      map.close()
+      runtime.close()
+      val failure = AtomicReference<Throwable?>(null)
+
+      // A projection stays usable, and closable, on a thread that never touched the map.
+      runOnBackgroundThread {
+        try {
+          projection.camera()
+          projection.close()
+        } catch (error: Throwable) {
+          failure.store(error)
+        }
+      }
+
+      assertNull(failure.load())
     }
 }

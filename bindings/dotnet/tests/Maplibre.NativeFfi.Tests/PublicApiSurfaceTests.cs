@@ -172,6 +172,8 @@ public sealed class PublicApiSurfaceTests
             "Maplibre.NativeFfi.Runtime.RuntimeOptions",
             "Maplibre.NativeFfi.Style.CustomGeometrySourceCallback",
             "Maplibre.NativeFfi.Style.CustomGeometrySourceOptions",
+            "Maplibre.NativeFfi.Style.CustomMvtVectorSourceCallback",
+            "Maplibre.NativeFfi.Style.CustomMvtVectorSourceOptions",
             "Maplibre.NativeFfi.Style.GeoJsonSourceDataHandle",
             "Maplibre.NativeFfi.Style.GeoJsonSourceOptions",
             "Maplibre.NativeFfi.Style.LayerInfo",

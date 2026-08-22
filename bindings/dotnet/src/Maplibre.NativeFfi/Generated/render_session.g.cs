@@ -196,15 +196,6 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_status mln_render_session_dump_debug_logs([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_set_feature_state([NativeTypeName("mln_render_session")] MlnRenderSession session, mln_buffer_view source_id, mln_buffer_view source_layer_id, mln_buffer_view feature_id, mln_buffer_view state_json, [NativeTypeName("const mln_completion *")] mln_completion* completion);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_get_feature_state([NativeTypeName("mln_render_session")] MlnRenderSession session, mln_buffer_view source_id, mln_buffer_view source_layer_id, mln_buffer_view feature_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_remove_feature_state([NativeTypeName("mln_render_session")] MlnRenderSession session, mln_buffer_view source_id, mln_buffer_view source_layer_id, mln_buffer_view feature_id, mln_buffer_view state_key, [NativeTypeName("const mln_completion *")] mln_completion* completion);
-
-        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_render_session_service_driver_work([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("size_t")] nuint max_work, [NativeTypeName("size_t *")] nuint* out_serviced);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]

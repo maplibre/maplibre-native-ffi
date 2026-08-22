@@ -10,9 +10,14 @@ canonical Windows drive paths and opens UTF-8 filenames through wide filesystem
 APIs. This lets the local file source load percent-encoded `file:///C:/...`
 resources whose paths contain spaces or non-ASCII characters.
 
-Drop a patch once the pin moves to a commit that carries it. Applying is
-idempotent, and the sync restores the files a patch touches before moving the
-submodule, so a pin bump and an edit to a patch both take effect on a worktree
-that already carries the old version. A patch that no longer applies fails the
-sync rather than being skipped. Each patch changes files that the pinned commit
-already has, because restoring a path is how the sync clears what it applied.
+Drop a patch once the pin moves to a commit that carries it. The sync checks out
+the pinned commit with `--force`, so it discards whatever the last sync applied
+before applying the list again. A pin bump, an edit to a patch, and a dropped
+patch all take effect on a worktree that still carries the old version. A patch
+that no longer applies fails the sync rather than being skipped.
+
+Local edits to the submodule worktree, including edits inside a nested vendor
+submodule, are discarded by the same checkout, and a sync runs it whenever the
+worktree carries a tracked change that no listed patch accounts for. The sync
+prints those paths first. A forced checkout also removes an untracked file that
+sits where a new pin adds a tracked one.

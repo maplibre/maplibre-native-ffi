@@ -715,3 +715,29 @@ final class CustomGeometrySourceOptions {
   /// Optional wrapping flag.
   final bool? wrap;
 }
+
+/// Callback invoked when a custom MVT vector source needs or cancels one tile.
+typedef CustomMvtVectorTileCallback = void Function(CanonicalTileId tileId);
+
+/// Custom MVT vector source options.
+final class CustomMvtVectorSourceOptions {
+  /// Creates custom MVT vector source options.
+  const CustomMvtVectorSourceOptions({
+    required this.fetchTile,
+    this.cancelTile,
+    this.minZoom,
+    this.maxZoom,
+  });
+
+  /// Required tile fetch notification.
+  final CustomMvtVectorTileCallback fetchTile;
+
+  /// Optional best-effort tile cancel notification.
+  final CustomMvtVectorTileCallback? cancelTile;
+
+  /// Optional minimum zoom.
+  final double? minZoom;
+
+  /// Optional maximum zoom.
+  final double? maxZoom;
+}

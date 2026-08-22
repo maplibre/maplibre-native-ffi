@@ -208,6 +208,9 @@
 --include-function mln_map_resize
 --include-function mln_map_request_still_image
 --include-function mln_map_set_event_mask
+--include-function mln_map_set_feature_state
+--include-function mln_map_get_feature_state
+--include-function mln_map_remove_feature_state
 --include-function mln_map_set_style_json
 --include-function mln_map_set_style_url
 --include-function mln_map_snapshot_get
@@ -318,10 +321,7 @@
 --include-function mln_render_session_clear_data
 --include-function mln_render_session_detach
 --include-function mln_render_session_dump_debug_logs
---include-function mln_render_session_get_feature_state
 --include-function mln_render_session_reduce_memory_use
---include-function mln_render_session_remove_feature_state
---include-function mln_render_session_set_feature_state
 --include-function mln_render_session_service_driver_work
 --include-function mln_render_session_abandon
 --include-function mln_render_session_destroy
@@ -343,8 +343,8 @@
 --include-struct mln_render_target_extent
 --include-struct mln_vulkan_context_descriptor
 --include-struct mln_webgl_context_descriptor
---include-constant MLN_WEBGL_CONTEXT_KIND_EXISTING
---include-constant MLN_WEBGL_CONTEXT_KIND_TRANSFERRED_OFFSCREEN_CANVAS
+--include-constant MLN_WEBGL_CONTEXT_EXISTING
+--include-constant MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS
 --include-struct mln_webgpu_context_descriptor
 --include-struct mln_wgl_context_descriptor
 --include-function mln_opengl_supported_context_provider_mask
@@ -521,6 +521,8 @@
 --include-constant MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE
 --include-constant MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE
 --include-constant MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP
+--include-constant MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM
+--include-constant MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM
 --include-constant MLN_GEOJSON_SOURCE_OPTION_BUFFER
 --include-constant MLN_GEOJSON_SOURCE_OPTION_CLUSTER
 --include-constant MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM
@@ -583,6 +585,7 @@
 --include-constant MLN_STYLE_VECTOR_TILE_ENCODING_MVT
 --include-struct mln_canonical_tile_id
 --include-struct mln_custom_geometry_source_options
+--include-struct mln_custom_mvt_vector_source_options
 --include-struct mln_geojson_source_options
 --include-struct mln_image_content
 --include-struct mln_image_stretch
@@ -598,11 +601,13 @@
 --include-struct mln_style_tile_source_options
 --include-struct mln_style_transition_options
 --include-function mln_custom_geometry_source_options_default
+--include-function mln_custom_mvt_vector_source_options_default
 --include-function mln_geojson_source_data_create
 --include-function mln_geojson_source_data_destroy
 --include-function mln_geojson_source_options_default
 --include-function mln_map_add_color_relief_layer
 --include-function mln_map_add_custom_geometry_source
+--include-function mln_map_add_custom_mvt_vector_source
 --include-function mln_map_add_geojson_source_data
 --include-function mln_map_add_geojson_source_url
 --include-function mln_map_add_hillshade_layer
@@ -635,6 +640,7 @@
 --include-function mln_map_get_style_transition_options
 --include-function mln_map_invalidate_custom_geometry_source_region
 --include-function mln_map_invalidate_custom_geometry_source_tile
+--include-function mln_map_invalidate_custom_mvt_vector_source_tile
 --include-function mln_map_list_style_layer_ids
 --include-function mln_map_list_style_source_ids
 --include-function mln_map_move_style_layer
@@ -642,6 +648,8 @@
 --include-function mln_map_remove_style_layer
 --include-function mln_map_remove_style_source
 --include-function mln_map_set_custom_geometry_source_tile_data
+--include-function mln_map_set_custom_mvt_vector_source_tile_data
+--include-function mln_map_set_custom_mvt_vector_source_tile_error
 --include-function mln_map_set_geojson_source_data
 --include-function mln_map_set_geojson_source_synchronous_tiling
 --include-function mln_map_set_geojson_source_url
@@ -676,6 +684,8 @@
 --include-function mln_style_transition_options_default
 --include-typedef mln_custom_geometry_source_release_callback
 --include-typedef mln_custom_geometry_source_tile_callback
+--include-typedef mln_custom_mvt_vector_source_release_callback
+--include-typedef mln_custom_mvt_vector_source_tile_callback
 --include-typedef mln_style_id_list
 --include-typedef mln_style_string_list
 --include-struct mln_metal_surface_descriptor

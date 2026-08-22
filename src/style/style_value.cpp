@@ -14,15 +14,15 @@
 namespace mln::core {
 
 auto to_native_style_filter(const mln_buffer_view* filter)
-  -> std::optional<mbgl::style::Filter> {
+  -> std::optional<mln::style::Filter> {
   if (filter == nullptr) {
-    return mbgl::style::Filter{};
+    return mln::style::Filter{};
   }
   if (!validate_bytes(*filter, "style filter")) {
     return std::nullopt;
   }
-  auto error = mbgl::style::conversion::Error{};
-  auto converted = mbgl::style::conversion::convertJSON<mbgl::style::Filter>(
+  auto error = mln::style::conversion::Error{};
+  auto converted = mln::style::conversion::convertJSON<mln::style::Filter>(
     std::string{static_cast<const char*>(filter->data), filter->size}, error
   );
   if (!converted) {
@@ -32,7 +32,7 @@ auto to_native_style_filter(const mln_buffer_view* filter)
 }
 
 auto set_style_conversion_error(
-  const char* context, const mbgl::style::conversion::Error& error
+  const char* context, const mln::style::conversion::Error& error
 ) -> void {
   auto message = std::string{context} + ": " + error.message;
   set_thread_error(message.c_str());

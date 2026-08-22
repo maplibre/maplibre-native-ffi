@@ -27,14 +27,14 @@
 namespace {
 
 auto parse_geojson(mln_buffer_view bytes, const char* name)
-  -> std::optional<mbgl::GeoJSON> {
-  auto document = mbgl::JSDocument{};
+  -> std::optional<mln::GeoJSON> {
+  auto document = mln::JSDocument{};
   if (!mln::core::parse_json_document(bytes, name, document)) {
     return std::nullopt;
   }
-  auto error = mbgl::style::conversion::Error{};
-  auto converted = mbgl::style::conversion::convert<mbgl::GeoJSON>(
-    static_cast<const mbgl::JSValue*>(&document), error
+  auto error = mln::style::conversion::Error{};
+  auto converted = mln::style::conversion::convert<mln::GeoJSON>(
+    static_cast<const mln::JSValue*>(&document), error
   );
   if (!converted) {
     auto message = std::string{name} + " is invalid: " + error.message;
@@ -69,7 +69,7 @@ auto validate_bytes(mln_buffer_view bytes, const char* name) -> bool {
 }
 
 auto parse_json_document(
-  mln_buffer_view bytes, const char* name, mbgl::JSDocument& out_document
+  mln_buffer_view bytes, const char* name, mln::JSDocument& out_document
 ) -> bool {
   if (!validate_bytes(bytes, name)) {
     return false;
@@ -85,64 +85,63 @@ auto parse_json_document(
 }
 
 auto to_native_geometry(mln_buffer_view geometry)
-  -> std::optional<mbgl::Geometry<double>> {
+  -> std::optional<mln::Geometry<double>> {
   auto converted = parse_geojson(geometry, "geometry");
   if (!converted) {
     return std::nullopt;
   }
-  if (!converted->is<mbgl::Geometry<double>>()) {
+  if (!converted->is<mln::Geometry<double>>()) {
     set_thread_error("geometry must contain one GeoJSON Geometry");
     return std::nullopt;
   }
-  return converted->get<mbgl::Geometry<double>>();
+  return converted->get<mln::Geometry<double>>();
 }
 
-auto to_native_json_value(mln_buffer_view value) -> std::optional<mbgl::Value> {
-  auto document = mbgl::JSDocument{};
+auto to_native_json_value(mln_buffer_view value) -> std::optional<mln::Value> {
+  auto document = mln::JSDocument{};
   if (!parse_json_document(value, "JSON value", document)) {
     return std::nullopt;
   }
-  return mapbox::geojson::convert<mbgl::Value>(document);
+  return mapbox::geojson::convert<mln::Value>(document);
 }
 
 auto to_native_feature(mln_buffer_view feature)
-  -> std::optional<mbgl::GeoJSONFeature> {
+  -> std::optional<mln::GeoJSONFeature> {
   auto converted = parse_geojson(feature, "feature");
   if (!converted) {
     return std::nullopt;
   }
-  if (!converted->is<mbgl::GeoJSONFeature>()) {
+  if (!converted->is<mln::GeoJSONFeature>()) {
     set_thread_error("feature must contain one GeoJSON Feature");
     return std::nullopt;
   }
-  return converted->get<mbgl::GeoJSONFeature>();
+  return converted->get<mln::GeoJSONFeature>();
 }
 
-auto to_native_geojson(mln_buffer_view geojson)
-  -> std::optional<mbgl::GeoJSON> {
+auto to_native_geojson(mln_buffer_view geojson) -> std::optional<mln::GeoJSON> {
   return parse_geojson(geojson, "GeoJSON");
 }
 
-auto serialize_json_value(const mbgl::Value& value) -> std::string {
+auto serialize_json_value(const mln::Value& value) -> std::string {
   auto buffer = rapidjson::StringBuffer{};
   auto writer = rapidjson::Writer<rapidjson::StringBuffer>{buffer};
-  mbgl::style::conversion::stringify(writer, value);
+  mln::style::conversion::stringify(writer, value);
   return {buffer.GetString(), buffer.GetSize()};
 }
 
-auto serialize_geojson(const mbgl::GeoJSON& geojson) -> std::string {
+auto serialize_geojson(const mln::GeoJSON& geojson) -> std::string {
   return mapbox::geojson::stringify(geojson);
 }
 
-auto serialize_feature_collection(const mbgl::FeatureCollection& features)
+auto serialize_feature_collection(const mln::FeatureCollection& features)
   -> std::string {
   return mapbox::geojson::stringify(features);
 }
 
-auto geometry_lat_lngs(const mbgl::Geometry<double>& geometry)
-  -> std::vector<mbgl::LatLng> {
-  auto result = std::vector<mbgl::LatLng>{};
-  mbgl::forEachPoint(geometry, [&](const mbgl::Point<double>& point) -> void {
+auto geometry_lat_lngs(const mln::Geometry<double>& geometry)
+  -> std::vector<mln::LatLng> {
+  auto result = std::vector<mln::LatLng>{};
+  mln::forEachPoint(geometry, [&](const mln::Point<double>& point) -> void {
     result.emplace_back(point.y, point.x);
   });
   return result;

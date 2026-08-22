@@ -20,7 +20,7 @@ auto RuntimeExecutor::start(std::function<void()> initialize) -> void {
   worker_ = std::thread(
     [this, initialize = std::move(initialize)]() mutable noexcept -> void {
       try {
-        auto loop = mbgl::util::RunLoop{mbgl::util::RunLoop::Type::New};
+        auto loop = mln::util::RunLoop{mln::util::RunLoop::Type::New};
         {
           const std::scoped_lock lock(mutex_);
           worker_id_ = std::this_thread::get_id();

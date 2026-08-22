@@ -46,4 +46,13 @@ internal object JavaCppSupport {
     BytePointer(pointer).get(bytes, 0, bytes.size)
     return bytes
   }
+
+  /** A `void*` built from a raw address, for callback `user_data` cookies. */
+  fun addressPointer(address: Long): Pointer = AddressPointer(address)
+
+  private class AddressPointer(address: Long) : Pointer(null as Pointer?) {
+    init {
+      this.address = address
+    }
+  }
 }

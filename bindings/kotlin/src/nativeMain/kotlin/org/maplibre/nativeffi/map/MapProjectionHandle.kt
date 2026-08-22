@@ -56,14 +56,16 @@ public actual class MapProjectionHandle internal constructor(handle: NativeMapPr
   public actual fun setVisibleCoordinates(coordinates: List<LatLng>, padding: EdgeInsets) {
     val coordinateSnapshot = coordinates.toList()
     memScoped {
-      Status.check(
-        mln_map_projection_set_visible_coordinates(
-          state.requireLive().rawHandleValue,
-          CoreStructs.latLngArray(coordinateSnapshot, this),
-          coordinateSnapshot.size.toULong(),
-          CoreStructs.edgeInsets(padding),
+      state.withLive { handle ->
+        Status.check(
+          mln_map_projection_set_visible_coordinates(
+            handle.rawHandleValue,
+            CoreStructs.latLngArray(coordinateSnapshot, this),
+            coordinateSnapshot.size.toULong(),
+            CoreStructs.edgeInsets(padding),
+          )
         )
-      )
+      }
     }
   }
 
@@ -79,25 +81,29 @@ public actual class MapProjectionHandle internal constructor(handle: NativeMapPr
 
   public actual fun pixelForLatLng(coordinate: LatLng): ScreenPoint = memScoped {
     val outPoint = alloc<mln_screen_point>()
-    Status.check(
-      mln_map_projection_pixel_for_lat_lng(
-        state.requireLive().rawHandleValue,
-        CoreStructs.latLng(coordinate),
-        outPoint.ptr,
+    state.withLive { handle ->
+      Status.check(
+        mln_map_projection_pixel_for_lat_lng(
+          handle.rawHandleValue,
+          CoreStructs.latLng(coordinate),
+          outPoint.ptr,
+        )
       )
-    )
+    }
     CoreStructs.screenPoint(outPoint)
   }
 
   public actual fun latLngForPixel(point: ScreenPoint): LatLng = memScoped {
     val outCoordinate = alloc<mln_lat_lng>()
-    Status.check(
-      mln_map_projection_lat_lng_for_pixel(
-        state.requireLive().rawHandleValue,
-        CoreStructs.screenPoint(point),
-        outCoordinate.ptr,
+    state.withLive { handle ->
+      Status.check(
+        mln_map_projection_lat_lng_for_pixel(
+          handle.rawHandleValue,
+          CoreStructs.screenPoint(point),
+          outCoordinate.ptr,
+        )
       )
-    )
+    }
     CoreStructs.latLng(outCoordinate)
   }
 

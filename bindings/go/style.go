@@ -463,6 +463,46 @@ type CustomGeometrySourceOptions struct {
 	Wrap       *bool
 }
 
+// CustomMVTVectorTileCallback receives custom MVT vector tile requests. Native
+// code may invoke it concurrently on worker threads, so it must be thread-safe
+// and must not call MapLibre map APIs directly. Queue tile-data, tile-error,
+// and invalidation commands for later submission. Panics are recovered and
+// ignored.
+type CustomMVTVectorTileCallback func(CanonicalTileID)
+
+// CustomMVTVectorSourceOptions configures a custom MVT vector source. CancelTile
+// is best-effort and may be repeated or race with FetchTile.
+type CustomMVTVectorSourceOptions struct {
+	FetchTile  CustomMVTVectorTileCallback
+	CancelTile CustomMVTVectorTileCallback
+	MinZoom    *float64
+	MaxZoom    *float64
+}
+
+func (options CustomMVTVectorSourceOptions) toCallback() callback.CustomMVTVectorSourceOptions {
+	raw := callback.CustomMVTVectorSourceOptions{
+		FetchTile: func(tileID callback.CanonicalTileID) {
+			if options.FetchTile != nil {
+				options.FetchTile(CanonicalTileID{Z: tileID.Z, X: tileID.X, Y: tileID.Y})
+			}
+		},
+	}
+	if options.CancelTile != nil {
+		raw.CancelTile = func(tileID callback.CanonicalTileID) {
+			options.CancelTile(CanonicalTileID{Z: tileID.Z, X: tileID.X, Y: tileID.Y})
+		}
+	}
+	if options.MinZoom != nil {
+		raw.Fields |= C.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM
+		raw.MinZoom = *options.MinZoom
+	}
+	if options.MaxZoom != nil {
+		raw.Fields |= C.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM
+		raw.MaxZoom = *options.MaxZoom
+	}
+	return raw
+}
+
 func (options CustomGeometrySourceOptions) toCallback() callback.CustomGeometrySourceOptions {
 	raw := callback.CustomGeometrySourceOptions{
 		FetchTile: func(tileID callback.CanonicalTileID) {
@@ -1051,6 +1091,90 @@ func (m *MapHandle) InvalidateCustomGeometrySourceRegion(sourceID string, bounds
 	}, completionCommand)
 }
 
+// AddCustomMVTVectorSource adds a custom MVT vector source to the current style.
+// Callback state remains valid until source removal, style replacement, or map
+// close, each of which frees it through the C API's release callback. A failed
+// add frees it before returning.
+func (m *MapHandle) AddCustomMVTVectorSource(sourceID string, options CustomMVTVectorSourceOptions) (*Future[CommandCompletion], error) {
+	if sourceID == "" {
+		return nil, newBindingError(ErrInvalidArgument, "source ID is empty")
+	}
+	if options.FetchTile == nil {
+		return nil, newBindingError(ErrInvalidArgument, "CustomMVTVectorSourceOptions.FetchTile is nil")
+	}
+	ptr, err := m.ptr()
+	if err != nil {
+		return nil, err
+	}
+	defer m.state.KeepAlive()
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return callback.AddCustomMVTVectorSource(
+			uint64(ptr), sourceID, options.toCallback(), unsafe.Pointer(completion),
+		)
+	}, completionCommand)
+}
+
+// SetCustomMVTVectorSourceTileData sets custom MVT vector data for one tile.
+func (m *MapHandle) SetCustomMVTVectorSourceTileData(sourceID string, tileID CanonicalTileID, data []byte) (*Future[CommandCompletion], error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return nil, err
+	}
+
+	defer m.state.KeepAlive()
+	sourceView := newCStringView(sourceID)
+	defer sourceView.free()
+	rawData := newCBufferView(data)
+	defer rawData.free()
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_set_custom_mvt_vector_source_tile_data(
+			C.mln_map(ptr),
+			sourceView.raw(),
+			cCanonicalTileID(tileID),
+			rawData.raw(),
+			completion,
+		))
+	}, completionCommand)
+}
+
+// SetCustomMVTVectorSourceTileError reports a custom MVT vector source error for one tile.
+func (m *MapHandle) SetCustomMVTVectorSourceTileError(sourceID string, tileID CanonicalTileID, message string) (*Future[CommandCompletion], error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return nil, err
+	}
+
+	defer m.state.KeepAlive()
+	sourceView := newCStringView(sourceID)
+	defer sourceView.free()
+	messageView := newCStringView(message)
+	defer messageView.free()
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_set_custom_mvt_vector_source_tile_error(
+			C.mln_map(ptr),
+			sourceView.raw(),
+			cCanonicalTileID(tileID),
+			messageView.raw(),
+			completion,
+		))
+	}, completionCommand)
+}
+
+// InvalidateCustomMVTVectorSourceTile invalidates custom MVT vector data for one tile.
+func (m *MapHandle) InvalidateCustomMVTVectorSourceTile(sourceID string, tileID CanonicalTileID) (*Future[CommandCompletion], error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return nil, err
+	}
+
+	defer m.state.KeepAlive()
+	sourceView := newCStringView(sourceID)
+	defer sourceView.free()
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_invalidate_custom_mvt_vector_source_tile(C.mln_map(ptr), sourceView.raw(), cCanonicalTileID(tileID), completion))
+	}, completionCommand)
+}
+
 // SetStyleImage sets or replaces one runtime style image.
 func (m *MapHandle) SetStyleImage(imageID string, image PremultipliedRGBA8Image, options StyleImageOptions) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
@@ -1495,7 +1619,8 @@ func (m *MapHandle) SetLocationIndicatorBearing(layerID string, bearing float64)
 	}, completionCommand)
 }
 
-// SetLocationIndicatorAccuracyRadius sets a location indicator layer accuracy radius.
+// SetLocationIndicatorAccuracyRadius sets a location indicator layer accuracy
+// radius in meters.
 func (m *MapHandle) SetLocationIndicatorAccuracyRadius(layerID string, radius float64) (*Future[CommandCompletion], error) {
 	ptr, err := m.ptr()
 	if err != nil {

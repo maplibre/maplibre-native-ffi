@@ -54,6 +54,25 @@ CustomGeometryCallbackLifecycleProbe? customGeometryCallbackProbeForTesting(
   return state == null ? null : CustomGeometryCallbackLifecycleProbe._(state);
 }
 
+/// Read-only view of one custom-MVT-vector callback root for lifecycle tests.
+final class CustomMvtVectorCallbackLifecycleProbe {
+  CustomMvtVectorCallbackLifecycleProbe._(this._state);
+
+  final _CustomMvtVectorCallbackState _state;
+
+  bool get retirementQueued => _state.retirementQueuedForTesting;
+  bool get closed => _state.closedForTesting;
+}
+
+/// Returns the callback root currently owned by [map] for lifecycle tests.
+CustomMvtVectorCallbackLifecycleProbe? customMvtVectorCallbackProbeForTesting(
+  MapHandle map,
+  String sourceId,
+) {
+  final state = map._customMvtVectorCallbacks[sourceId];
+  return state == null ? null : CustomMvtVectorCallbackLifecycleProbe._(state);
+}
+
 /// Dart resource provider callback run asynchronously on its receiver isolate.
 typedef ResourceProviderCallback =
     void Function(ResourceRequest request, ResourceRequestHandle handle);
@@ -1719,6 +1738,7 @@ final class MapHandle {
   /// Callback roots of the custom-geometry sources this map still holds, each
   /// released by the C API's own release callback.
   final _customGeometryCallbacks = <String, _CustomGeometryCallbackState>{};
+  final _customMvtVectorCallbacks = <String, _CustomMvtVectorCallbackState>{};
 
   /// Whether this map has been closed by the Dart binding.
   bool get isClosed => _state.isClosed;
@@ -1771,6 +1791,61 @@ final class MapHandle {
       return raw.mln_map_set_style_json(_handle.raw, nativeJson, completion);
     }),
   );
+
+  /// Sets per-feature state on this map.
+  Future<CommandCompletion> setFeatureState(
+    FeatureStateSelector selector,
+    Uint8List state,
+  ) {
+    return _startCommandInArena((arena, completion) {
+      final nativeSelector = _featureStateSelectorToNative(selector, arena);
+      final nativeState = nativeBufferView(state, arena);
+      _check(
+        raw.mln_map_set_feature_state(
+          _handle.raw,
+          nativeSelector,
+          nativeState,
+          completion,
+        ),
+      );
+    });
+  }
+
+  /// Copies per-feature state from this map after prior commands.
+  ///
+  /// Missing feature state is reported as an empty JSON object.
+  Future<Uint8List> getFeatureState(FeatureStateSelector selector) {
+    return _startMapValue(
+      copyKind: raw
+          .mln_adapter_completion_copy_kind
+          .MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEWS,
+      elementSize: sizeOf<raw.mln_buffer_view>(),
+      start: (completion) => withNativeArena((arena) {
+        final nativeSelector = _featureStateSelectorToNative(selector, arena);
+        return raw.mln_map_get_feature_state(
+          _handle.raw,
+          nativeSelector,
+          completion,
+        );
+      }),
+      decode: (result) =>
+          _copyBufferView(result.value.cast<raw.mln_buffer_view>().ref),
+    );
+  }
+
+  /// Removes per-feature state from this map.
+  Future<CommandCompletion> removeFeatureState(FeatureStateSelector selector) {
+    return _startCommandInArena((arena, completion) {
+      final nativeSelector = _featureStateSelectorToNative(selector, arena);
+      _check(
+        raw.mln_map_remove_feature_state(
+          _handle.raw,
+          nativeSelector,
+          completion,
+        ),
+      );
+    });
+  }
 
   /// Returns the style document this map's style was last parsed from.
   ///
@@ -2876,6 +2951,106 @@ final class MapHandle {
     });
   }
 
+  /// Adds a custom MVT vector source with queued fetch/cancel notifications.
+  ///
+  /// The C API releases the source's callback root when the source is removed,
+  /// when a style load drops it, or when this map is destroyed, so a host that
+  /// adds a source subscribes to nothing to keep it alive.
+  Future<CommandCompletion> addCustomMvtVectorSource(
+    String sourceId,
+    CustomMvtVectorSourceOptions options,
+  ) {
+    final callbackState = _CustomMvtVectorCallbackState(
+      options,
+      () => _releaseCustomMvtVectorCallbacks(sourceId),
+    );
+    final future = _runtime._startCommand(
+      (completion) => withNativeArena((arena) {
+        final nativeId = nativeStringView(sourceId, arena);
+        final nativeOptions = arena<raw.mln_custom_mvt_vector_source_options>();
+        nativeOptions.ref = _customMvtVectorSourceOptionsToNative(
+          options,
+          callbackState,
+        );
+        return raw.mln_map_add_custom_mvt_vector_source(
+          _handle.raw,
+          nativeId.value,
+          nativeOptions,
+          completion,
+        );
+      }),
+      onRejected: callbackState.close,
+    );
+    future.then((completion) {
+      if (completion.disposition == CommandDisposition.committed) {
+        _customMvtVectorCallbacks[sourceId] = callbackState;
+      } else {
+        callbackState.close();
+      }
+    }, onError: (_, _) => callbackState.close());
+    return future;
+  }
+
+  /// Sets custom MVT vector source data for one canonical tile.
+  Future<CommandCompletion> setCustomMvtVectorSourceTileData(
+    String sourceId,
+    CanonicalTileId tileId,
+    Uint8List data,
+  ) {
+    return _startCommandInArena((arena, completion) {
+      final nativeId = nativeStringView(sourceId, arena);
+      final nativeData = nativeBufferView(data, arena);
+      _check(
+        raw.mln_map_set_custom_mvt_vector_source_tile_data(
+          _handle.raw,
+          nativeId.value,
+          _canonicalTileIdToNative(tileId),
+          nativeData,
+          completion,
+        ),
+      );
+    });
+  }
+
+  /// Reports a custom MVT vector source error for one canonical tile.
+  Future<CommandCompletion> setCustomMvtVectorSourceTileError(
+    String sourceId,
+    CanonicalTileId tileId,
+    String message,
+  ) {
+    return _startCommandInArena((arena, completion) {
+      final nativeId = nativeStringView(sourceId, arena);
+      final nativeMessage = nativeStringView(message, arena);
+      _check(
+        raw.mln_map_set_custom_mvt_vector_source_tile_error(
+          _handle.raw,
+          nativeId.value,
+          _canonicalTileIdToNative(tileId),
+          nativeMessage.value,
+          completion,
+        ),
+      );
+    });
+  }
+
+  /// Invalidates custom MVT vector source data for one canonical tile.
+  Future<CommandCompletion> invalidateCustomMvtVectorSourceTile(
+    String sourceId,
+    CanonicalTileId tileId,
+  ) {
+    return _startCommandInArena((arena, completion) {
+      final nativeId = nativeStringView(sourceId, arena);
+      _check(
+        raw.mln_map_invalidate_custom_mvt_vector_source_tile(
+          _handle.raw,
+          nativeId.value,
+          _canonicalTileIdToNative(tileId),
+          completion,
+        ),
+      );
+    });
+  }
+
   /// Removes one style source by ID.
   ///
   /// The command fails with [MaplibreStatus.notFound] when no style source
@@ -3117,7 +3292,7 @@ final class MapHandle {
     });
   }
 
-  /// Sets a location indicator layer accuracy radius in logical pixels.
+  /// Sets a location indicator layer accuracy radius in meters.
   Future<CommandCompletion> setLocationIndicatorAccuracyRadius(
     String layerId,
     double radius,
@@ -3554,5 +3729,10 @@ final class MapHandle {
 
   void _releaseCustomGeometryCallbacks(String sourceId) {
     _customGeometryCallbacks.remove(sourceId);
+  }
+
+  /// Drops [sourceId]'s callback root once the C API has released it.
+  void _releaseCustomMvtVectorCallbacks(String sourceId) {
+    _customMvtVectorCallbacks.remove(sourceId);
   }
 }

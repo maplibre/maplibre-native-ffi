@@ -217,10 +217,14 @@ mod tests {
 
         map.close().unwrap();
         runtime.close().unwrap();
-        let round_tripped = projection.lat_lng_for_pixel(center_point).unwrap();
-        assert!((round_tripped.latitude - center.latitude).abs() < 1e-7);
-        assert!((round_tripped.longitude - center.longitude).abs() < 1e-7);
-        projection.close().unwrap();
+        std::thread::spawn(move || {
+            let round_tripped = projection.lat_lng_for_pixel(center_point).unwrap();
+            assert!((round_tripped.latitude - center.latitude).abs() < 1e-7);
+            assert!((round_tripped.longitude - center.longitude).abs() < 1e-7);
+            projection.close().unwrap();
+        })
+        .join()
+        .unwrap();
     }
 
     #[test]
@@ -232,7 +236,7 @@ mod tests {
             crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
 
         {
-            let _projection = map.create_projection().unwrap();
+            let _projection = crate::completion::blocking(map.create_projection());
         }
 
         map.close().unwrap();

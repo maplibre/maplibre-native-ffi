@@ -784,6 +784,77 @@ MLN_API mln_status mln_map_request_repaint(
 ) MLN_NOEXCEPT;
 
 /**
+ * Submits a copied per-feature-state command.
+ *
+ * selector->source_id, selector->feature_id, and state are copied before
+ * return. state must contain one UTF-8 JSON object and is validated before
+ * return. The committed command requests a map repaint.
+ *
+ * Feature state belongs to the map. A render session pushes it into the
+ * renderer on the next render update, including the first presented frame that
+ * contains the source. mln_map_get_feature_state copies this map store, not
+ * the last rendered frame.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the command was accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, selector is
+ *   null or invalid, selector lacks MLN_FEATURE_STATE_SELECTOR_FEATURE_ID,
+ *   state is empty, invalid JSON, or not an object, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
+ */
+MLN_API mln_status mln_map_set_feature_state(
+  mln_map map, const mln_feature_state_selector* selector,
+  mln_buffer_view state, const mln_completion* completion
+) MLN_NOEXCEPT;
+
+/**
+ * Starts an ordered read of per-feature state from this map.
+ *
+ * selector->source_id and selector->feature_id are copied before return. The
+ * read observes every map command accepted before it and copies the map
+ * store, not the last rendered frame, so it does not require a render session
+ * or a loaded source. The completion borrows UTF-8 bytes holding one JSON
+ * object for the callback. Missing feature state is reported as an empty
+ * object.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the read was accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, selector is
+ *   null or invalid, selector lacks MLN_FEATURE_STATE_SELECTOR_FEATURE_ID, or
+ *   completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_get_feature_state(
+  mln_map map, const mln_feature_state_selector* selector,
+  const mln_completion* completion
+) MLN_NOEXCEPT;
+
+/**
+ * Removes per-feature state from this map.
+ *
+ * selector->source_id is required. selector->feature_id and selector->state_key
+ * are optional. Passing both removes one state key from one feature. Passing
+ * only feature_id removes all state for that feature. Passing neither removes
+ * all feature state for the source/source-layer. The accepted command requests
+
+ * a map repaint.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the command was accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, selector is
+ *   null or invalid, selector has MLN_FEATURE_STATE_SELECTOR_STATE_KEY
+ *   without MLN_FEATURE_STATE_SELECTOR_FEATURE_ID, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
+ */
+MLN_API mln_status mln_map_remove_feature_state(
+  mln_map map, const mln_feature_state_selector* selector,
+  const mln_completion* completion
+) MLN_NOEXCEPT;
+
+/**
  * Requests one still image for a static or tile map.
  *
  * Keep servicing the selected render driver while this request is pending.

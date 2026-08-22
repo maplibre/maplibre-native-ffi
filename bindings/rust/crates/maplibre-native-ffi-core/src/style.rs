@@ -300,6 +300,42 @@ pub fn custom_geometry_source_options_to_native(
     raw
 }
 
+pub type CustomMvtVectorTileCallbackFn =
+    unsafe extern "C" fn(*mut c_void, sys::mln_canonical_tile_id);
+
+pub type CustomMvtVectorReleaseCallbackFn = unsafe extern "C" fn(*mut c_void);
+
+#[derive(Debug, Clone, Copy)]
+pub struct CustomMvtVectorSourceDescriptorFields {
+    pub fetch_tile: Option<CustomMvtVectorTileCallbackFn>,
+    pub cancel_tile: Option<CustomMvtVectorTileCallbackFn>,
+    /// Invoked once when the C API stops referencing `user_data`.
+    pub release_user_data: Option<CustomMvtVectorReleaseCallbackFn>,
+    pub user_data: *mut c_void,
+    pub min_zoom: Option<f64>,
+    pub max_zoom: Option<f64>,
+}
+
+pub fn custom_mvt_vector_source_options_to_native(
+    fields: CustomMvtVectorSourceDescriptorFields,
+) -> sys::mln_custom_mvt_vector_source_options {
+    // SAFETY: This C helper returns a plain value with no preconditions.
+    let mut raw = unsafe { sys::mln_custom_mvt_vector_source_options_default() };
+    raw.fetch_tile = fields.fetch_tile;
+    raw.cancel_tile = fields.cancel_tile;
+    raw.release_user_data = fields.release_user_data;
+    raw.user_data = fields.user_data;
+    if let Some(min_zoom) = fields.min_zoom {
+        raw.fields |= sys::MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM;
+        raw.min_zoom = min_zoom;
+    }
+    if let Some(max_zoom) = fields.max_zoom {
+        raw.fields |= sys::MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM;
+        raw.max_zoom = max_zoom;
+    }
+    raw
+}
+
 /// Copied fields from an inline TileJSON source description.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
@@ -978,6 +1014,49 @@ mod tests {
         assert_eq!(raw.buffer, 8);
         assert!(raw.clip);
         assert!(!raw.wrap);
+    }
+
+    #[test]
+    fn custom_mvt_vector_source_options_materialize_masks_and_callbacks() {
+        unsafe extern "C" fn fetch(_user_data: *mut c_void, _tile_id: sys::mln_canonical_tile_id) {}
+        unsafe extern "C" fn cancel(_user_data: *mut c_void, _tile_id: sys::mln_canonical_tile_id) {
+        }
+        unsafe extern "C" fn release(_user_data: *mut c_void) {}
+
+        let raw =
+            custom_mvt_vector_source_options_to_native(CustomMvtVectorSourceDescriptorFields {
+                fetch_tile: Some(fetch),
+                cancel_tile: Some(cancel),
+                release_user_data: Some(release),
+                user_data: 0x1234usize as *mut c_void,
+                min_zoom: Some(1.0),
+                max_zoom: Some(14.0),
+            });
+
+        assert_eq!(
+            raw.size,
+            std::mem::size_of::<sys::mln_custom_mvt_vector_source_options>() as u32
+        );
+        assert_eq!(
+            raw.fetch_tile.map(|callback| callback as usize),
+            Some(fetch as *const () as usize)
+        );
+        assert_eq!(
+            raw.cancel_tile.map(|callback| callback as usize),
+            Some(cancel as *const () as usize)
+        );
+        assert_eq!(
+            raw.release_user_data.map(|callback| callback as usize),
+            Some(release as *const () as usize)
+        );
+        assert_eq!(raw.user_data, 0x1234usize as *mut c_void);
+        assert_eq!(
+            raw.fields,
+            sys::MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM
+                | sys::MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM
+        );
+        assert_eq!(raw.min_zoom, 1.0);
+        assert_eq!(raw.max_zoom, 14.0);
     }
 
     #[test]

@@ -33,6 +33,8 @@ import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
 import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
+import org.maplibre.nativeffi.query.FeatureStateSelector
+import org.maplibre.nativeffi.render.FeatureStateSelectorScope
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalSurfaceDescriptor
@@ -50,6 +52,7 @@ import org.maplibre.nativeffi.runtime.CommandCompletion
 import org.maplibre.nativeffi.runtime.RuntimeEventMask
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.CustomMvtVectorSourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceDataHandle
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.ImageContent
@@ -87,6 +90,8 @@ private constructor(
 
   private val customGeometrySources =
     CustomGeometrySourceRegistry<CustomGeometrySourceState>(::releaseCallbackRoot)
+  private val customMvtVectorSources =
+    CustomGeometrySourceRegistry<CustomMvtVectorSourceState>(::releaseCallbackRoot)
 
   public actual val isClosed: Boolean
     get() = core.isReleased()
@@ -128,6 +133,53 @@ private constructor(
         )
       }
     }
+
+  public actual fun setFeatureState(
+    selector: FeatureStateSelector,
+    value: ByteArray,
+  ): Deferred<CommandCompletion> = command { completion ->
+    NativeAccess.ensureLoaded()
+    FeatureStateSelectorScope(selector).use { nativeSelector ->
+      ByteArrayViewScope(value).use { nativeValue ->
+        Status.check(
+          MaplibreNativeC.mln_map_set_feature_state(
+            requireLiveHandle(),
+            nativeSelector.selector,
+            nativeValue.view,
+            completion,
+          )
+        )
+      }
+    }
+  }
+
+  public actual fun getFeatureState(selector: FeatureStateSelector): Deferred<ByteArray> {
+    NativeAccess.ensureLoaded()
+    return FeatureStateSelectorScope(selector).use { nativeSelector ->
+      CompletionBridge.submit(::requiredBuffer) { completion ->
+        MaplibreNativeC.mln_map_get_feature_state(
+          requireLiveHandle(),
+          nativeSelector.selector,
+          completion,
+        )
+      }
+    }
+  }
+
+  public actual fun removeFeatureState(
+    selector: FeatureStateSelector
+  ): Deferred<CommandCompletion> = command { completion ->
+    NativeAccess.ensureLoaded()
+    FeatureStateSelectorScope(selector).use { nativeSelector ->
+      Status.check(
+        MaplibreNativeC.mln_map_remove_feature_state(
+          requireLiveHandle(),
+          nativeSelector.selector,
+          completion,
+        )
+      )
+    }
+  }
 
   public actual fun loadedStyleJson(): Deferred<ByteArray> =
     CompletionBridge.submit(::requiredBuffer) { completion ->
@@ -406,6 +458,95 @@ private constructor(
           completion,
         )
       )
+    }
+  }
+
+  public actual fun addCustomMvtVectorSource(
+    sourceId: String,
+    options: CustomMvtVectorSourceOptions,
+  ): Deferred<CommandCompletion> = command { completion ->
+    NativeAccess.ensureLoaded()
+    // The release callback captures the registry rather than this map, so a map a
+    // host leaks with a live source still reports as leaked.
+    val registry = customMvtVectorSources
+    val sourceState = CustomMvtVectorSourceState(options) { registry.remove(sourceId) }
+    registry.install(sourceId, sourceState) {
+      StringViewScope(sourceId).use { nativeSourceId ->
+        Status.check(
+          MaplibreNativeC.mln_map_add_custom_mvt_vector_source(
+            requireLiveHandle(),
+            nativeSourceId.view,
+            sourceState.descriptor,
+            completion,
+          )
+        )
+      }
+      HandleLeakCleaner.retainNativeCallbackRoot(sourceState)
+    }
+  }
+
+  public actual fun setCustomMvtVectorSourceTileData(
+    sourceId: String,
+    tileId: CanonicalTileId,
+    data: ByteArray,
+  ): Deferred<CommandCompletion> = command { completion ->
+    NativeAccess.ensureLoaded()
+    StringViewScope(sourceId).use { nativeSourceId ->
+      CanonicalTileIdScope(tileId).use { nativeTileId ->
+        ByteArrayViewScope(data).use { nativeData ->
+          Status.check(
+            MaplibreNativeC.mln_map_set_custom_mvt_vector_source_tile_data(
+              requireLiveHandle(),
+              nativeSourceId.view,
+              nativeTileId.tileId,
+              nativeData.view,
+              completion,
+            )
+          )
+        }
+      }
+    }
+  }
+
+  public actual fun setCustomMvtVectorSourceTileError(
+    sourceId: String,
+    tileId: CanonicalTileId,
+    message: String,
+  ): Deferred<CommandCompletion> = command { completion ->
+    NativeAccess.ensureLoaded()
+    StringViewScope(sourceId).use { nativeSourceId ->
+      CanonicalTileIdScope(tileId).use { nativeTileId ->
+        StringViewScope(message).use { nativeMessage ->
+          Status.check(
+            MaplibreNativeC.mln_map_set_custom_mvt_vector_source_tile_error(
+              requireLiveHandle(),
+              nativeSourceId.view,
+              nativeTileId.tileId,
+              nativeMessage.view,
+              completion,
+            )
+          )
+        }
+      }
+    }
+  }
+
+  public actual fun invalidateCustomMvtVectorSourceTile(
+    sourceId: String,
+    tileId: CanonicalTileId,
+  ): Deferred<CommandCompletion> = command { completion ->
+    NativeAccess.ensureLoaded()
+    StringViewScope(sourceId).use { nativeSourceId ->
+      CanonicalTileIdScope(tileId).use { nativeTileId ->
+        Status.check(
+          MaplibreNativeC.mln_map_invalidate_custom_mvt_vector_source_tile(
+            requireLiveHandle(),
+            nativeSourceId.view,
+            nativeTileId.tileId,
+            completion,
+          )
+        )
+      }
     }
   }
 
@@ -2116,26 +2257,12 @@ internal class CustomGeometrySourceState(
 ) : AutoCloseable {
   private val token = TOKENS.getAndIncrement()
   private val gate = CallbackGate("custom geometry callbacks", ::closeNative)
-  // JavaCPP passes null for a null void* and drops the upcall if the Kotlin
-  // override rejects it, so every parameter stays nullable.
-  private val fetchTile =
-    object : MaplibreNativeC.mln_custom_geometry_source_tile_callback() {
-      override fun call(userData: Pointer?, tileId: MaplibreNativeC.mln_canonical_tile_id?) {
-        fetchTile(tileId)
-      }
-    }
-  private val cancelTile =
-    object : MaplibreNativeC.mln_custom_geometry_source_tile_callback() {
-      override fun call(userData: Pointer?, tileId: MaplibreNativeC.mln_canonical_tile_id?) {
-        cancelTile(tileId)
-      }
-    }
   val descriptor: MaplibreNativeC.mln_custom_geometry_source_options =
     MaplibreNativeC.mln_custom_geometry_source_options_default()
 
   init {
-    descriptor.fetch_tile(fetchTile)
-    descriptor.cancel_tile(cancelTile)
+    descriptor.fetch_tile(FETCH_TILE)
+    descriptor.cancel_tile(CANCEL_TILE)
     descriptor.release_user_data(RELEASE_CALLBACK)
     descriptor.user_data(AddressPointer(token))
     STATES[token] = this
@@ -2208,8 +2335,6 @@ internal class CustomGeometrySourceState(
   private fun closeNative() {
     STATES.remove(token)
     descriptor.close()
-    fetchTile.close()
-    cancelTile.close()
   }
 
   private fun canonicalTileId(tileId: MaplibreNativeC.mln_canonical_tile_id): CanonicalTileId =
@@ -2226,11 +2351,149 @@ internal class CustomGeometrySourceState(
     private val STATES = ConcurrentHashMap<Long, CustomGeometrySourceState>()
 
     /**
-     * One process-wide release callback, so releasing a state can close that state's own callbacks.
-     * A per-state callback would be one of the callbacks it has to close.
+     * One process-wide thunk per callback type. JavaCPP's FunctionPointer pool is ten slots per
+     * generated class, and fetch_tile and cancel_tile share a class, so per-source thunks ran out
+     * at six live sources.
+     *
+     * JavaCPP passes null for a null void* and drops the upcall if the Kotlin override rejects it,
+     * so every parameter stays nullable.
      */
+    private val FETCH_TILE =
+      object : MaplibreNativeC.mln_custom_geometry_source_tile_callback() {
+        override fun call(userData: Pointer?, tileId: MaplibreNativeC.mln_canonical_tile_id?) {
+          STATES[userData?.address() ?: 0L]?.fetchTile(tileId)
+        }
+      }
+
+    private val CANCEL_TILE =
+      object : MaplibreNativeC.mln_custom_geometry_source_tile_callback() {
+        override fun call(userData: Pointer?, tileId: MaplibreNativeC.mln_canonical_tile_id?) {
+          STATES[userData?.address() ?: 0L]?.cancelTile(tileId)
+        }
+      }
+
     private val RELEASE_CALLBACK =
       object : MaplibreNativeC.mln_custom_geometry_source_release_callback() {
+        override fun call(userData: Pointer?) {
+          try {
+            STATES[userData?.address() ?: 0L]?.onReleased?.invoke()
+          } catch (_: Throwable) {
+            // Native callbacks must not unwind through the C ABI.
+          }
+        }
+      }
+  }
+}
+
+/**
+ * Owns map/style-scoped custom MVT vector source callback state.
+ *
+ * Native invokes [onReleased] after it stops referencing this state, which drops it from its map's
+ * registry and closes it.
+ */
+internal class CustomMvtVectorSourceState(
+  private val options: CustomMvtVectorSourceOptions,
+  private val onReleased: () -> Unit,
+) : AutoCloseable {
+  private val token = TOKENS.getAndIncrement()
+  private val gate = CallbackGate("custom MVT vector callbacks", ::closeNative)
+  val descriptor: MaplibreNativeC.mln_custom_mvt_vector_source_options =
+    MaplibreNativeC.mln_custom_mvt_vector_source_options_default()
+
+  init {
+    descriptor.fetch_tile(FETCH_TILE)
+    descriptor.cancel_tile(CANCEL_TILE)
+    descriptor.release_user_data(RELEASE_CALLBACK)
+    descriptor.user_data(AddressPointer(token))
+    STATES[token] = this
+    var fields = 0
+    options.minZoom?.let {
+      fields = fields or MaplibreNativeC.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM
+      descriptor.min_zoom(it)
+    }
+    options.maxZoom?.let {
+      fields = fields or MaplibreNativeC.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM
+      descriptor.max_zoom(it)
+    }
+    descriptor.fields(fields)
+  }
+
+  override fun close() {
+    gate.close()
+  }
+
+  internal fun fetchTileForTesting(tileId: CanonicalTileId) {
+    val lease = gate.enter() ?: return
+    try {
+      options.callback.fetchTile(tileId)
+    } catch (_: Throwable) {
+      // Native callbacks must not unwind through the C ABI.
+    } finally {
+      lease.close()
+    }
+  }
+
+  internal fun isClosedForTesting(): Boolean = gate.isClosedForTesting()
+
+  private fun fetchTile(tileId: MaplibreNativeC.mln_canonical_tile_id?) {
+    if (tileId == null) return
+    fetchTileForTesting(canonicalTileId(tileId))
+  }
+
+  private fun cancelTile(tileId: MaplibreNativeC.mln_canonical_tile_id?) {
+    if (tileId == null) return
+    val lease = gate.enter() ?: return
+    try {
+      options.callback.cancelTile(canonicalTileId(tileId))
+    } catch (_: Throwable) {
+      // Native callbacks must not unwind through the C ABI.
+    } finally {
+      lease.close()
+    }
+  }
+
+  private fun closeNative() {
+    STATES.remove(token)
+    descriptor.close()
+  }
+
+  private fun canonicalTileId(tileId: MaplibreNativeC.mln_canonical_tile_id): CanonicalTileId =
+    CanonicalTileId(
+      tileId.z(),
+      Integer.toUnsignedLong(tileId.x()),
+      Integer.toUnsignedLong(tileId.y()),
+    )
+
+  private companion object {
+    private val TOKENS = AtomicLong(1)
+
+    /** The live states by token, which is the `user_data` this binding hands to native. */
+    private val STATES = ConcurrentHashMap<Long, CustomMvtVectorSourceState>()
+
+    /**
+     * One process-wide thunk per callback type. JavaCPP's FunctionPointer pool is ten slots per
+     * generated class, and fetch_tile and cancel_tile share a class, so per-source thunks ran out
+     * at six live sources.
+     *
+     * JavaCPP passes null for a null void* and drops the upcall if the Kotlin override rejects it,
+     * so every parameter stays nullable.
+     */
+    private val FETCH_TILE =
+      object : MaplibreNativeC.mln_custom_mvt_vector_source_tile_callback() {
+        override fun call(userData: Pointer?, tileId: MaplibreNativeC.mln_canonical_tile_id?) {
+          STATES[userData?.address() ?: 0L]?.fetchTile(tileId)
+        }
+      }
+
+    private val CANCEL_TILE =
+      object : MaplibreNativeC.mln_custom_mvt_vector_source_tile_callback() {
+        override fun call(userData: Pointer?, tileId: MaplibreNativeC.mln_canonical_tile_id?) {
+          STATES[userData?.address() ?: 0L]?.cancelTile(tileId)
+        }
+      }
+
+    private val RELEASE_CALLBACK =
+      object : MaplibreNativeC.mln_custom_mvt_vector_source_release_callback() {
         override fun call(userData: Pointer?) {
           try {
             STATES[userData?.address() ?: 0L]?.onReleased?.invoke()

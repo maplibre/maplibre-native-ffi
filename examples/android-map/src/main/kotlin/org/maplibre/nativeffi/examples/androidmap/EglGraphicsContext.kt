@@ -41,7 +41,7 @@ private constructor(
         NativePointer.ofAddress(display.nativeHandle),
         NativePointer.ofAddress(config.nativeHandle),
         NativePointer.ofAddress(shareContext.nativeHandle),
-        NativePointer.NULL,
+        NativePointer.NULL_POINTER,
       )
 
   /** The EGL surface a session presents through: the host window, or the parking surface. */

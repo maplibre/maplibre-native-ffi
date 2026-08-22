@@ -238,27 +238,6 @@ MLN_API mln_status mln_render_session_dump_debug_logs(
   mln_render_session session, const mln_completion* completion
 ) MLN_NOEXCEPT;
 
-/** Starts setting feature state from copied UTF-8 inputs. */
-MLN_API mln_status mln_render_session_set_feature_state(
-  mln_render_session session, mln_buffer_view source_id,
-  mln_buffer_view source_layer_id, mln_buffer_view feature_id,
-  mln_buffer_view state_json, const mln_completion* completion
-) MLN_NOEXCEPT;
-
-/** Starts reading feature state from copied UTF-8 inputs. */
-MLN_API mln_status mln_render_session_get_feature_state(
-  mln_render_session session, mln_buffer_view source_id,
-  mln_buffer_view source_layer_id, mln_buffer_view feature_id,
-  const mln_completion* completion
-) MLN_NOEXCEPT;
-
-/** Starts removal of feature state selected by copied UTF-8 inputs. */
-MLN_API mln_status mln_render_session_remove_feature_state(
-  mln_render_session session, mln_buffer_view source_id,
-  mln_buffer_view source_layer_id, mln_buffer_view feature_id,
-  mln_buffer_view state_key, const mln_completion* completion
-) MLN_NOEXCEPT;
-
 /**
  * Services up to max_work items for a caller-graphics-thread driver; zero
  * services every item currently queued. The first successful service call

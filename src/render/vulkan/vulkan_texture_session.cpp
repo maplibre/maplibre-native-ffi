@@ -112,21 +112,21 @@ class VulkanTextureSessionBackend final
     : public mln::core::TextureSessionBackend {
  public:
   VulkanTextureSessionBackend(
-    const mln_vulkan_owned_texture_descriptor& descriptor, mbgl::Size size,
+    const mln_vulkan_owned_texture_descriptor& descriptor, mln::Size size,
     std::size_t ring_depth
   )
       : backend_(descriptor, size, ring_depth) {}
 
   VulkanTextureSessionBackend(
-    const mln_vulkan_borrowed_texture_descriptor& descriptor, mbgl::Size size
+    const mln_vulkan_borrowed_texture_descriptor& descriptor, mln::Size size
   )
       : backend_(descriptor, size) {}
 
-  auto headless_backend() -> mbgl::gfx::HeadlessBackend& override {
+  auto headless_backend() -> mln::gfx::HeadlessBackend& override {
     return backend_;
   }
 
-  void resize(mbgl::Size size) override { backend_.resize(size); }
+  void resize(mln::Size size) override { backend_.resize(size); }
 
   auto set_vulkan_borrowed_target(
     const mln_vulkan_borrowed_texture_descriptor& descriptor
@@ -234,7 +234,7 @@ auto vulkan_owned_texture_attach_start(
         return handles_status;
       }
       target.texture.backend = std::make_unique<VulkanTextureSessionBackend>(
-        copied, mbgl::Size{target.physical_width, target.physical_height},
+        copied, mln::Size{target.physical_width, target.physical_height},
         ring_depth
       );
       return MLN_STATUS_OK;
@@ -295,7 +295,7 @@ auto vulkan_borrowed_texture_attach_start(
       return handles_status;
     }
     target.texture.backend = std::make_unique<VulkanTextureSessionBackend>(
-      copied, mbgl::Size{target.physical_width, target.physical_height}
+      copied, mln::Size{target.physical_width, target.physical_height}
     );
     return MLN_STATUS_OK;
   };

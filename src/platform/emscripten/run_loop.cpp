@@ -13,7 +13,7 @@
 
 #include "run_loop_wake.hpp"
 
-namespace mbgl {
+namespace mln {
 namespace util {
 
 class RunLoop::Impl {
@@ -93,7 +93,7 @@ void RunLoop::updateTime() {}
 // through runOnce(), whose browser timer costs a proxy hop per pass and has no
 // waiter to release.
 void RunLoop::waitForEmpty(
-  [[maybe_unused]] const mbgl::util::SimpleIdentity tag
+  [[maybe_unused]] const mln::util::SimpleIdentity tag
 ) {
   MBGL_VERIFY_THREAD(tid);
   while (true) {
@@ -119,4 +119,4 @@ void RunLoop::addWatch(int, Event, std::function<void(int, Event)>&&) {
 void RunLoop::removeWatch(int) {}
 
 }  // namespace util
-}  // namespace mbgl
+}  // namespace mln

@@ -396,15 +396,15 @@ auto validate_offline_region_definition(
 
 auto to_native_offline_region_definition(
   const mln_offline_region_definition& definition
-) -> mbgl::OfflineRegionDefinition {
+) -> mln::OfflineRegionDefinition {
   switch (definition.type) {
     case MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID: {
       const auto& tile = definition.data.tile_pyramid;
-      auto bounds = mbgl::LatLngBounds::hull(
+      auto bounds = mln::LatLngBounds::hull(
         {tile.bounds.southwest.latitude, tile.bounds.southwest.longitude},
         {tile.bounds.northeast.latitude, tile.bounds.northeast.longitude}
       );
-      return mbgl::OfflineTilePyramidRegionDefinition{
+      return mln::OfflineTilePyramidRegionDefinition{
         std::string{tile.style_url},
         bounds,
         tile.min_zoom,
@@ -421,7 +421,7 @@ auto to_native_offline_region_definition(
           "offline geometry definition failed after validation"
         );
       }
-      return mbgl::OfflineGeometryRegionDefinition{
+      return mln::OfflineGeometryRegionDefinition{
         std::string{geometry.style_url},
         std::move(native_geometry.value()),
         geometry.min_zoom,
@@ -437,18 +437,18 @@ auto to_native_offline_region_definition(
   }
 }
 
-auto to_c_download_state(mbgl::OfflineRegionDownloadState state) -> uint32_t {
+auto to_c_download_state(mln::OfflineRegionDownloadState state) -> uint32_t {
   switch (state) {
-    case mbgl::OfflineRegionDownloadState::Inactive:
+    case mln::OfflineRegionDownloadState::Inactive:
       return MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE;
-    case mbgl::OfflineRegionDownloadState::Active:
+    case mln::OfflineRegionDownloadState::Active:
       return MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE;
   }
   assert(false);
   return MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE;
 }
 
-auto to_c_status(const mbgl::OfflineRegionStatus& status)
+auto to_c_status(const mln::OfflineRegionStatus& status)
   -> mln_offline_region_status {
   return mln_offline_region_status{
     .size = sizeof(mln_offline_region_status),
@@ -465,38 +465,38 @@ auto to_c_status(const mbgl::OfflineRegionStatus& status)
 }
 
 auto to_native_download_state(uint32_t state)
-  -> std::optional<mbgl::OfflineRegionDownloadState> {
+  -> std::optional<mln::OfflineRegionDownloadState> {
   switch (state) {
     case MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE:
-      return mbgl::OfflineRegionDownloadState::Inactive;
+      return mln::OfflineRegionDownloadState::Inactive;
     case MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE:
-      return mbgl::OfflineRegionDownloadState::Active;
+      return mln::OfflineRegionDownloadState::Active;
     default:
       return std::nullopt;
   }
 }
 
-auto to_c_resource_error_reason(mbgl::Response::Error::Reason reason)
+auto to_c_resource_error_reason(mln::Response::Error::Reason reason)
   -> uint32_t {
   switch (reason) {
-    case mbgl::Response::Error::Reason::Success:
+    case mln::Response::Error::Reason::Success:
       return MLN_RESOURCE_ERROR_REASON_NONE;
-    case mbgl::Response::Error::Reason::NotFound:
+    case mln::Response::Error::Reason::NotFound:
       return MLN_RESOURCE_ERROR_REASON_NOT_FOUND;
-    case mbgl::Response::Error::Reason::Server:
+    case mln::Response::Error::Reason::Server:
       return MLN_RESOURCE_ERROR_REASON_SERVER;
-    case mbgl::Response::Error::Reason::Connection:
+    case mln::Response::Error::Reason::Connection:
       return MLN_RESOURCE_ERROR_REASON_CONNECTION;
-    case mbgl::Response::Error::Reason::RateLimit:
+    case mln::Response::Error::Reason::RateLimit:
       return MLN_RESOURCE_ERROR_REASON_RATE_LIMIT;
-    case mbgl::Response::Error::Reason::Other:
+    case mln::Response::Error::Reason::Other:
       return MLN_RESOURCE_ERROR_REASON_OTHER;
   }
   assert(false);
   return MLN_RESOURCE_ERROR_REASON_OTHER;
 }
 
-auto to_c_region_data(const mbgl::OfflineRegion& region)
+auto to_c_region_data(const mln::OfflineRegion& region)
   -> std::optional<OfflineRegionData> {
   auto data = OfflineRegionData{
     .id = region.getID(),
@@ -512,7 +512,7 @@ auto to_c_region_data(const mbgl::OfflineRegion& region)
   };
 
   if (
-    const auto* tile = std::get_if<mbgl::OfflineTilePyramidRegionDefinition>(
+    const auto* tile = std::get_if<mln::OfflineTilePyramidRegionDefinition>(
       &region.getDefinition()
     )
   ) {
@@ -534,9 +534,8 @@ auto to_c_region_data(const mbgl::OfflineRegion& region)
   }
 
   if (
-    const auto* geometry = std::get_if<mbgl::OfflineGeometryRegionDefinition>(
-      &region.getDefinition()
-    )
+    const auto* geometry =
+      std::get_if<mln::OfflineGeometryRegionDefinition>(&region.getDefinition())
   ) {
     data.definition_type = MLN_OFFLINE_REGION_DEFINITION_GEOMETRY;
     data.style_url = geometry->styleURL;
@@ -545,7 +544,7 @@ auto to_c_region_data(const mbgl::OfflineRegion& region)
     data.pixel_ratio = geometry->pixelRatio;
     data.include_ideographs = geometry->includeIdeographs;
     data.geometry =
-      mln::core::serialize_geojson(mbgl::GeoJSON{geometry->geometry});
+      mln::core::serialize_geojson(mln::GeoJSON{geometry->geometry});
     return data;
   }
 
@@ -671,7 +670,7 @@ auto push_offline_region_event(
   if (should_wake) runtime->event_queue->wake->notify();
 }
 
-class OfflineRegionRuntimeObserver final : public mbgl::OfflineRegionObserver {
+class OfflineRegionRuntimeObserver final : public mln::OfflineRegionObserver {
  public:
   OfflineRegionRuntimeObserver(
     std::shared_ptr<mln::core::OfflineRegionEventState> state,
@@ -679,7 +678,7 @@ class OfflineRegionRuntimeObserver final : public mbgl::OfflineRegionObserver {
   )
       : state_(std::move(state)), region_id_(region_id) {}
 
-  void statusChanged(mbgl::OfflineRegionStatus status) override {
+  void statusChanged(mln::OfflineRegionStatus status) override {
     if (!region_event_selected(
           state_, region_id_, MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED
         )) {
@@ -695,7 +694,7 @@ class OfflineRegionRuntimeObserver final : public mbgl::OfflineRegionObserver {
     );
   }
 
-  void responseError(mbgl::Response::Error error) override {
+  void responseError(mln::Response::Error error) override {
     if (!region_event_selected(
           state_, region_id_, MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR
         )) {
@@ -771,7 +770,7 @@ auto register_offline_region_list_from_result(Fill&& fill)
   );
 }
 
-auto to_c_region_data_list(const mbgl::OfflineRegions& native_regions)
+auto to_c_region_data_list(const mln::OfflineRegions& native_regions)
   -> std::optional<std::vector<OfflineRegionData>> {
   auto regions = std::vector<OfflineRegionData>{};
   regions.reserve(native_regions.size());
@@ -1008,18 +1007,18 @@ namespace mln::core {
 namespace {
 
 auto database_source_for_runtime(RuntimeObject* runtime)
-  -> std::shared_ptr<mbgl::DatabaseFileSource> {
+  -> std::shared_ptr<mln::DatabaseFileSource> {
   if (runtime->database_source != nullptr) {
     return runtime->database_source;
   }
 
-  auto source = mbgl::FileSourceManager::get()->getFileSource(
-    mbgl::FileSourceType::Database, resource_options_for_runtime(runtime->self),
-    mbgl::ClientOptions()
+  auto source = mln::FileSourceManager::get()->getFileSource(
+    mln::FileSourceType::Database, resource_options_for_runtime(runtime->self),
+    mln::ClientOptions()
   );
   // MapLibre is built without RTTI. The registered FileSourceType::Database
   // factory always returns a DatabaseFileSource.
-  auto database = std::static_pointer_cast<mbgl::DatabaseFileSource>(source);
+  auto database = std::static_pointer_cast<mln::DatabaseFileSource>(source);
   runtime->database_source = database;
   return runtime->database_source;
 }
@@ -1931,7 +1930,7 @@ auto offline_region_create_start(
 
   const auto native_definition =
     to_native_offline_region_definition(*definition);
-  auto native_metadata = mbgl::OfflineRegionMetadata{};
+  auto native_metadata = mln::OfflineRegionMetadata{};
   if (metadata_size != 0) {
     native_metadata.resize(metadata_size);
     std::memcpy(native_metadata.data(), metadata, metadata_size);
@@ -1941,7 +1940,7 @@ auto offline_region_create_start(
     [&](auto state) -> void {
       database->createOfflineRegion(
         native_definition, native_metadata,
-        [state](mbgl::expected<mbgl::OfflineRegion, std::exception_ptr> result)
+        [state](mln::expected<mln::OfflineRegion, std::exception_ptr> result)
           -> void {
           if (!result) {
             complete_offline_operation_error(
@@ -1993,7 +1992,7 @@ auto offline_region_get_start(
       database->getOfflineRegion(
         region_id,
         [state](
-          mbgl::expected<std::optional<mbgl::OfflineRegion>, std::exception_ptr>
+          mln::expected<std::optional<mln::OfflineRegion>, std::exception_ptr>
             result
         ) -> void {
           if (!result) {
@@ -2049,7 +2048,7 @@ auto offline_regions_list_start(
     [&](auto state) -> void {
       database->listOfflineRegions(
         [state](
-          mbgl::expected<mbgl::OfflineRegions, std::exception_ptr> result
+          mln::expected<mln::OfflineRegions, std::exception_ptr> result
         ) -> void {
           if (!result) {
             complete_offline_operation_error(
@@ -2103,7 +2102,7 @@ auto offline_regions_merge_database_start(
     [&](auto state) -> void {
       database->mergeOfflineRegions(
         path,
-        [state](mbgl::expected<mbgl::OfflineRegions, std::exception_ptr> result)
+        [state](mln::expected<mln::OfflineRegions, std::exception_ptr> result)
           -> void {
           if (!result) {
             complete_offline_operation_error(
@@ -2153,7 +2152,7 @@ auto offline_region_update_metadata_start(
     return MLN_STATUS_NATIVE_ERROR;
   }
 
-  auto native_metadata = mbgl::OfflineRegionMetadata{};
+  auto native_metadata = mln::OfflineRegionMetadata{};
   if (metadata_size != 0) {
     native_metadata.resize(metadata_size);
     std::memcpy(native_metadata.data(), metadata, metadata_size);
@@ -2164,7 +2163,7 @@ auto offline_region_update_metadata_start(
       database->updateOfflineMetadata(
         region_id, native_metadata,
         [database, state, region_id](
-          mbgl::expected<mbgl::OfflineRegionMetadata, std::exception_ptr> result
+          mln::expected<mln::OfflineRegionMetadata, std::exception_ptr> result
         ) -> void {
           if (!result) {
             complete_offline_operation_error(
@@ -2178,8 +2177,8 @@ auto offline_region_update_metadata_start(
           database->getOfflineRegion(
             region_id,
             [state](
-              mbgl::expected<
-                std::optional<mbgl::OfflineRegion>, std::exception_ptr>
+              mln::expected<
+                std::optional<mln::OfflineRegion>, std::exception_ptr>
                 result
             ) -> void {
               if (!result) {
@@ -2241,7 +2240,7 @@ auto offline_region_get_status_start(
       database->getOfflineRegion(
         region_id,
         [database, state](
-          mbgl::expected<std::optional<mbgl::OfflineRegion>, std::exception_ptr>
+          mln::expected<std::optional<mln::OfflineRegion>, std::exception_ptr>
             result
         ) -> void {
           if (!result) {
@@ -2261,8 +2260,7 @@ auto offline_region_get_status_start(
           database->getOfflineRegionStatus(
             region.value(),
             [state](
-              mbgl::expected<mbgl::OfflineRegionStatus, std::exception_ptr>
-                result
+              mln::expected<mln::OfflineRegionStatus, std::exception_ptr> result
             ) -> void {
               if (!result) {
                 complete_offline_operation_error(
@@ -2311,7 +2309,7 @@ auto offline_region_set_observed_start(
       database->getOfflineRegion(
         region_id,
         [database, state, region_id, observed, offline_event_state](
-          mbgl::expected<std::optional<mbgl::OfflineRegion>, std::exception_ptr>
+          mln::expected<std::optional<mln::OfflineRegion>, std::exception_ptr>
             result
         ) -> void {
           if (!result) {
@@ -2389,7 +2387,7 @@ auto offline_region_set_download_state_start(
       database->getOfflineRegion(
         request.region_id,
         [database, state, native_state](
-          mbgl::expected<std::optional<mbgl::OfflineRegion>, std::exception_ptr>
+          mln::expected<std::optional<mln::OfflineRegion>, std::exception_ptr>
             result
         ) -> void {
           if (!result) {
@@ -2442,7 +2440,7 @@ auto offline_region_invalidate_start(
       database->getOfflineRegion(
         region_id,
         [database, state](
-          mbgl::expected<std::optional<mbgl::OfflineRegion>, std::exception_ptr>
+          mln::expected<std::optional<mln::OfflineRegion>, std::exception_ptr>
             result
         ) -> void {
           if (!result) {
@@ -2499,7 +2497,7 @@ auto offline_region_delete_start(
       database->getOfflineRegion(
         region_id,
         [database, state, region_id, offline_event_state](
-          mbgl::expected<std::optional<mbgl::OfflineRegion>, std::exception_ptr>
+          mln::expected<std::optional<mln::OfflineRegion>, std::exception_ptr>
             result
         ) -> void {
           if (!result) {
@@ -2529,7 +2527,7 @@ auto offline_region_delete_start(
           }
           database->setOfflineRegionObserver(region.value(), nullptr);
           database->setOfflineRegionDownloadState(
-            region.value(), mbgl::OfflineRegionDownloadState::Inactive
+            region.value(), mln::OfflineRegionDownloadState::Inactive
           );
           database->deleteOfflineRegion(
             region.value(), [state](std::exception_ptr exception) -> void {
@@ -2993,13 +2991,12 @@ auto release_runtime_map(mln_runtime runtime) noexcept -> void {
   }
 }
 
-auto runtime_run_loop(RuntimeObject* runtime) -> mbgl::util::RunLoop& {
+auto runtime_run_loop(RuntimeObject* runtime) -> mln::util::RunLoop& {
   return *runtime->executor.run_loop();
 }
 
-auto resource_options_for_runtime(mln_runtime runtime)
-  -> mbgl::ResourceOptions {
-  auto options = mbgl::ResourceOptions::Default();
+auto resource_options_for_runtime(mln_runtime runtime) -> mln::ResourceOptions {
+  auto options = mln::ResourceOptions::Default();
   const auto* live = handle_table<RuntimeObject>().try_resolve(runtime);
   if (live == nullptr) {
     return options;

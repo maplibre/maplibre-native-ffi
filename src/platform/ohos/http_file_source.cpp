@@ -25,7 +25,7 @@
 
 #include "http_user_agent.hpp"
 
-namespace mbgl {
+namespace mln {
 namespace {
 
 constexpr std::size_t kMaxActiveRequests = 128;
@@ -900,4 +900,4 @@ ClientOptions HTTPFileSource::getClientOptions() {
   return impl->getClientOptions();
 }
 
-}  // namespace mbgl
+}  // namespace mln

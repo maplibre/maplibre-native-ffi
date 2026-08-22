@@ -518,7 +518,7 @@ auto texture_read_premultiplied_rgba8(
     return MLN_STATUS_NATIVE_ERROR;
   }
   auto current = ScopedCurrentScheduler{live->scheduler};
-  auto guard = mbgl::gfx::BackendScope{*renderer_backend};
+  auto guard = mln::gfx::BackendScope{*renderer_backend};
   auto image = live->texture.backend->headless_backend().readStillImage();
   if (!image.valid()) {
     set_thread_error("texture readback did not produce an image");

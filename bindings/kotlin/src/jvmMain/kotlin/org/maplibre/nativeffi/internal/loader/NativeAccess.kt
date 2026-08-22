@@ -47,10 +47,14 @@ import org.maplibre.nativeffi.internal.c.mln_camera_update
 import org.maplibre.nativeffi.internal.c.mln_canonical_tile_id
 import org.maplibre.nativeffi.internal.c.mln_completion_result
 import org.maplibre.nativeffi.internal.c.mln_custom_geometry_source_options
+import org.maplibre.nativeffi.internal.c.mln_custom_mvt_vector_source_options
 import org.maplibre.nativeffi.internal.c.mln_edge_insets
 import org.maplibre.nativeffi.internal.c.mln_egl_context_descriptor
+import org.maplibre.nativeffi.internal.c.mln_feature_state_selector
+import org.maplibre.nativeffi.internal.c.mln_frame_demand
 import org.maplibre.nativeffi.internal.c.mln_free_camera_options
 import org.maplibre.nativeffi.internal.c.mln_geojson_source_options
+import org.maplibre.nativeffi.internal.c.mln_gpu_sync
 import org.maplibre.nativeffi.internal.c.mln_image_content
 import org.maplibre.nativeffi.internal.c.mln_image_stretch
 import org.maplibre.nativeffi.internal.c.mln_lat_lng
@@ -80,6 +84,11 @@ import org.maplibre.nativeffi.internal.c.mln_projected_meters
 import org.maplibre.nativeffi.internal.c.mln_projection_mode
 import org.maplibre.nativeffi.internal.c.mln_quaternion
 import org.maplibre.nativeffi.internal.c.mln_queried_feature
+import org.maplibre.nativeffi.internal.c.mln_render_abandon_result
+import org.maplibre.nativeffi.internal.c.mln_render_frame_result
+import org.maplibre.nativeffi.internal.c.mln_render_session_attach_options
+import org.maplibre.nativeffi.internal.c.mln_render_session_capabilities
+import org.maplibre.nativeffi.internal.c.mln_render_session_snapshot
 import org.maplibre.nativeffi.internal.c.mln_render_target_extent
 import org.maplibre.nativeffi.internal.c.mln_rendered_feature_query_options
 import org.maplibre.nativeffi.internal.c.mln_rendered_query_geometry
@@ -120,6 +129,7 @@ import org.maplibre.nativeffi.internal.c.mln_vulkan_context_descriptor
 import org.maplibre.nativeffi.internal.c.mln_vulkan_owned_texture_descriptor
 import org.maplibre.nativeffi.internal.c.mln_vulkan_owned_texture_frame
 import org.maplibre.nativeffi.internal.c.mln_vulkan_surface_descriptor
+import org.maplibre.nativeffi.internal.c.mln_wake
 import org.maplibre.nativeffi.internal.c.mln_wgl_context_descriptor
 import org.maplibre.nativeffi.internal.lifecycle.NativeGeoJsonSourceData
 import org.maplibre.nativeffi.internal.lifecycle.NativeHandle
@@ -205,6 +215,7 @@ import org.maplibre.nativeffi.runtime.CommandCompletion
 import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 import org.maplibre.nativeffi.runtime.RuntimeOptions
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.CustomMvtVectorSourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.ImageContent
 import org.maplibre.nativeffi.style.ImageStretch
@@ -606,6 +617,50 @@ internal object NativeAccess {
       }
     }
 
+  internal fun setMapFeatureState(
+    map: NativeMap,
+    selector: FeatureStateSelector,
+    value: ByteArray,
+  ): Deferred<CommandCompletion> = command { completion ->
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapTwoAddressStatusFunction("mln_map_set_feature_state")
+          .invokeNative(
+            map,
+            featureStateSelector(arena, selector),
+            byteArrayView(arena, value),
+            completion,
+          ) as Int
+      )
+    }
+  }
+
+  internal fun getMapFeatureState(
+    map: NativeMap,
+    selector: FeatureStateSelector,
+  ): Deferred<ByteArray> =
+    Arena.ofConfined().use { arena ->
+      CompletionBridge.submit(
+        ::requiredBufferCompletion,
+        { completion ->
+          mapAddressStatusFunction("mln_map_get_feature_state")
+            .invokeNative(map, featureStateSelector(arena, selector), completion) as Int
+        },
+      )
+    }
+
+  internal fun removeMapFeatureState(
+    map: NativeMap,
+    selector: FeatureStateSelector,
+  ): Deferred<CommandCompletion> = command { completion ->
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapAddressStatusFunction("mln_map_remove_feature_state")
+          .invokeNative(map, featureStateSelector(arena, selector), completion) as Int
+      )
+    }
+  }
+
   internal fun addStyleSourceJson(
     map: NativeMap,
     sourceId: String,
@@ -787,6 +842,83 @@ internal object NativeAccess {
     Arena.ofConfined().use { arena ->
       Status.check(
         mapStringViewCanonicalTileIdStatusFunction("mln_map_invalidate_custom_geometry_source_tile")
+          .invokeNative(
+            map,
+            stringView(arena, sourceId),
+            canonicalTileId(arena, tileId),
+            completion,
+          ) as Int
+      )
+    }
+  }
+
+  internal fun addCustomMvtVectorSource(
+    map: NativeMap,
+    sourceId: String,
+    options: MemorySegment,
+  ): Deferred<CommandCompletion> = command { completion ->
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewAddressStatusFunction("mln_map_add_custom_mvt_vector_source")
+          .invokeNative(map, stringView(arena, sourceId), options, completion) as Int
+      )
+    }
+  }
+
+  internal fun setCustomMvtVectorSourceTileData(
+    map: NativeMap,
+    sourceId: String,
+    tileId: CanonicalTileId,
+    data: ByteArray,
+  ): Deferred<CommandCompletion> = command { completion ->
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewCanonicalTileIdAddressStatusFunction(
+            "mln_map_set_custom_mvt_vector_source_tile_data"
+          )
+          .invokeNative(
+            map,
+            stringView(arena, sourceId),
+            canonicalTileId(arena, tileId),
+            byteArrayView(arena, data),
+            completion,
+          ) as Int
+      )
+    }
+  }
+
+  internal fun setCustomMvtVectorSourceTileError(
+    map: NativeMap,
+    sourceId: String,
+    tileId: CanonicalTileId,
+    message: String,
+  ): Deferred<CommandCompletion> = command { completion ->
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewCanonicalTileIdAddressStatusFunction(
+            "mln_map_set_custom_mvt_vector_source_tile_error"
+          )
+          .invokeNative(
+            map,
+            stringView(arena, sourceId),
+            canonicalTileId(arena, tileId),
+            stringView(arena, message),
+            completion,
+          ) as Int
+      )
+    }
+  }
+
+  internal fun invalidateCustomMvtVectorSourceTile(
+    map: NativeMap,
+    sourceId: String,
+    tileId: CanonicalTileId,
+  ): Deferred<CommandCompletion> = command { completion ->
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewCanonicalTileIdStatusFunction(
+            "mln_map_invalidate_custom_mvt_vector_source_tile"
+          )
           .invokeNative(
             map,
             stringView(arena, sourceId),
@@ -2167,74 +2299,6 @@ internal object NativeAccess {
   internal fun renderControl(session: NativeRenderSession, functionName: String): Deferred<Unit> =
     renderOperation(functionName, session)
 
-  internal fun setFeatureState(
-    session: NativeRenderSession,
-    selector: FeatureStateSelector,
-    value: ByteArray,
-  ): Deferred<Unit> =
-    Arena.ofConfined().use { arena ->
-      featureStateOperation(
-        "mln_render_session_set_feature_state",
-        session,
-        selector,
-        byteArrayView(arena, value),
-        arena,
-      )
-    }
-
-  internal fun getFeatureState(
-    session: NativeRenderSession,
-    selector: FeatureStateSelector,
-  ): Deferred<ByteArray> =
-    Arena.ofConfined().use { arena ->
-      CompletionBridge.submit(
-        ::requiredBufferCompletion,
-        { completion ->
-          dynamicStatusDowncall(
-              "mln_render_session_get_feature_state",
-              ValueLayout.JAVA_LONG,
-              stringViewLayout,
-              stringViewLayout,
-              stringViewLayout,
-              ValueLayout.ADDRESS,
-            )
-            .invokeNative(
-              session,
-              stringView(arena, selector.sourceId),
-              optionalStringView(arena, selector.sourceLayerId),
-              optionalStringView(arena, selector.featureId),
-              completion,
-            ) as Int
-        },
-      )
-    }
-
-  internal fun removeFeatureState(
-    session: NativeRenderSession,
-    selector: FeatureStateSelector,
-  ): Deferred<Unit> =
-    Arena.ofConfined().use { arena ->
-      CompletionBridge.unit { completion ->
-        dynamicStatusDowncall(
-            "mln_render_session_remove_feature_state",
-            ValueLayout.JAVA_LONG,
-            stringViewLayout,
-            stringViewLayout,
-            stringViewLayout,
-            stringViewLayout,
-            ValueLayout.ADDRESS,
-          )
-          .invokeNative(
-            session,
-            stringView(arena, selector.sourceId),
-            optionalStringView(arena, selector.sourceLayerId),
-            optionalStringView(arena, selector.featureId),
-            optionalStringView(arena, selector.stateKey),
-            completion,
-          ) as Int
-      }
-    }
-
   internal fun queryRenderedFeatures(
     session: NativeRenderSession,
     geometry: RenderedQueryGeometry,
@@ -2597,6 +2661,45 @@ internal object NativeAccess {
     return segment
   }
 
+  internal fun customMvtVectorSourceOptions(
+    arena: Arena,
+    value: CustomMvtVectorSourceOptions,
+    fetchTile: MemorySegment,
+    cancelTile: MemorySegment,
+    releaseUserData: MemorySegment,
+    userData: MemorySegment,
+  ): MemorySegment {
+    val segment = arena.allocate(CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_SIZE)
+    segment.set(
+      ValueLayout.JAVA_INT,
+      CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_SIZE_OFFSET,
+      CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_SIZE.toInt(),
+    )
+    segment.set(ValueLayout.ADDRESS, CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_FETCH_TILE_OFFSET, fetchTile)
+    segment.set(
+      ValueLayout.ADDRESS,
+      CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_CANCEL_TILE_OFFSET,
+      cancelTile,
+    )
+    segment.set(ValueLayout.ADDRESS, CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_USER_DATA_OFFSET, userData)
+    segment.set(
+      ValueLayout.ADDRESS,
+      CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_RELEASE_USER_DATA_OFFSET,
+      releaseUserData,
+    )
+    var fields = 0
+    value.minZoom?.let {
+      fields = fields or CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM
+      segment.set(ValueLayout.JAVA_DOUBLE, CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_MIN_ZOOM_OFFSET, it)
+    }
+    value.maxZoom?.let {
+      fields = fields or CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM
+      segment.set(ValueLayout.JAVA_DOUBLE, CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_MAX_ZOOM_OFFSET, it)
+    }
+    segment.set(ValueLayout.JAVA_INT, CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_FIELDS_OFFSET, fields)
+    return segment
+  }
+
   internal fun canonicalTileId(segment: MemorySegment): CanonicalTileId =
     CanonicalTileId(
       segment.get(ValueLayout.JAVA_INT, CANONICAL_TILE_ID_Z_OFFSET),
@@ -2623,6 +2726,9 @@ internal object NativeAccess {
       nativeOptions.set(ValueLayout.JAVA_INT, 0, RENDER_SESSION_ATTACH_OPTIONS_SIZE.toInt())
       nativeOptions.set(ValueLayout.JAVA_INT, 4, options.driver.nativeValue)
       nativeOptions.set(ValueLayout.JAVA_INT, 8, options.requestedTextureRingDepth)
+      // Both wakes stay disabled, and a disabled wake still carries its own size.
+      nativeOptions.set(ValueLayout.JAVA_INT, ATTACH_OPTIONS_FRAME_WAKE_OFFSET, WAKE_SIZE)
+      nativeOptions.set(ValueLayout.JAVA_INT, ATTACH_OPTIONS_DRIVER_WORK_WAKE_OFFSET, WAKE_SIZE)
       val outSession = zeroHandle(arena)
       val completed = CompletionBridge.unitChecked { completion ->
         dynamicStatusDowncall(
@@ -2663,34 +2769,6 @@ internal object NativeAccess {
           ValueLayout.ADDRESS,
         )
         .invokeNative(session, argument, completion) as Int
-    }
-  }
-
-  private fun featureStateOperation(
-    functionName: String,
-    session: NativeRenderSession,
-    selector: FeatureStateSelector,
-    value: MemorySegment?,
-    arena: Arena,
-  ): Deferred<Unit> {
-    return CompletionBridge.unit { completion ->
-      val arguments =
-        mutableListOf<Any?>(
-          session,
-          stringView(arena, selector.sourceId),
-          optionalStringView(arena, selector.sourceLayerId),
-          optionalStringView(arena, selector.featureId),
-        )
-      if (value != null) arguments += value
-      arguments += completion
-      val layouts = buildList {
-        add(ValueLayout.JAVA_LONG)
-        repeat(3) { add(stringViewLayout) }
-        if (value != null) add(stringViewLayout)
-        add(ValueLayout.ADDRESS)
-      }
-      dynamicStatusDowncall(functionName, *layouts.toTypedArray())
-        .invokeNative(*arguments.toTypedArray()) as Int
     }
   }
 
@@ -2880,6 +2958,39 @@ internal object NativeAccess {
     mln_egl_context_descriptor.get_proc_address(segment, nativePointer(context.getProcAddress))
   }
 
+  private fun featureStateSelector(arena: Arena, selector: FeatureStateSelector): MemorySegment {
+    val segment = arena.allocate(FEATURE_STATE_SELECTOR_SIZE)
+    segment.set(
+      ValueLayout.JAVA_INT,
+      FEATURE_STATE_SELECTOR_SIZE_OFFSET,
+      FEATURE_STATE_SELECTOR_SIZE.toInt(),
+    )
+    segment
+      .asSlice(FEATURE_STATE_SELECTOR_SOURCE_ID_OFFSET, STRING_VIEW_SIZE)
+      .copyFrom(stringView(arena, selector.sourceId))
+    var fields = 0
+    selector.sourceLayerId?.let {
+      fields = fields or FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID
+      segment
+        .asSlice(FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID_OFFSET, STRING_VIEW_SIZE)
+        .copyFrom(stringView(arena, it))
+    }
+    selector.featureId?.let {
+      fields = fields or FEATURE_STATE_SELECTOR_FEATURE_ID
+      segment
+        .asSlice(FEATURE_STATE_SELECTOR_FEATURE_ID_OFFSET, STRING_VIEW_SIZE)
+        .copyFrom(stringView(arena, it))
+    }
+    selector.stateKey?.let {
+      fields = fields or FEATURE_STATE_SELECTOR_STATE_KEY
+      segment
+        .asSlice(FEATURE_STATE_SELECTOR_STATE_KEY_OFFSET, STRING_VIEW_SIZE)
+        .copyFrom(stringView(arena, it))
+    }
+    segment.set(ValueLayout.JAVA_INT, FEATURE_STATE_SELECTOR_FIELDS_OFFSET, fields)
+    return segment
+  }
+
   private fun renderedQueryGeometry(arena: Arena, value: RenderedQueryGeometry): MemorySegment {
     val segment = arena.allocate(RENDERED_QUERY_GEOMETRY_SIZE)
     segment.set(
@@ -3009,7 +3120,7 @@ internal object NativeAccess {
     if (pointer.isNull) MemorySegment.NULL else MemorySegment.ofAddress(pointer.address)
 
   private fun scopedPointer(pointer: MemorySegment, scope: FrameScope): NativePointer =
-    if (pointer == MemorySegment.NULL) NativePointer.NULL
+    if (pointer == MemorySegment.NULL) NativePointer.NULL_POINTER
     else NativePointer.scoped(pointer.address(), scope)
 
   /** Copies every queued event out of the owned batch before releasing it. */
@@ -3163,6 +3274,8 @@ internal object NativeAccess {
     downcall("mln_resource_request_release")
 
   private fun mapAddressStatusFunction(name: String): MethodHandle = downcall(name)
+
+  private fun mapTwoAddressStatusFunction(name: String): MethodHandle = downcall(name)
 
   private fun mapStringViewAddressStatusFunction(name: String): MethodHandle = downcall(name)
 
@@ -5073,15 +5186,20 @@ internal object NativeAccess {
   private val canonicalTileIdLayout = mln_canonical_tile_id.layout()
   private val unitBezierLayout = mln_unit_bezier.layout()
 
-  private const val RENDER_SESSION_ATTACH_OPTIONS_SIZE: Long = 80
+  private val RENDER_SESSION_ATTACH_OPTIONS_SIZE: Long = mln_render_session_attach_options.sizeof()
+  private val ATTACH_OPTIONS_FRAME_WAKE_OFFSET: Long =
+    mln_render_session_attach_options.`frame_wake$offset`()
+  private val ATTACH_OPTIONS_DRIVER_WORK_WAKE_OFFSET: Long =
+    mln_render_session_attach_options.`driver_work_wake$offset`()
+  private val WAKE_SIZE: Int = mln_wake.sizeof().toInt()
   private val dynamicDowncallCache = ConcurrentHashMap<String, MethodHandle>()
 
-  private const val RENDER_SESSION_CAPABILITIES_SIZE: Long = 16
-  private const val FRAME_DEMAND_SIZE: Long = 32
-  private const val RENDER_FRAME_RESULT_SIZE: Long = 48
-  private const val RENDER_SESSION_SNAPSHOT_SIZE: Long = 96
-  private const val GPU_SYNC_SIZE: Long = 24
-  private const val RENDER_ABANDON_RESULT_SIZE: Long = 16
+  private val RENDER_SESSION_CAPABILITIES_SIZE: Long = mln_render_session_capabilities.sizeof()
+  private val FRAME_DEMAND_SIZE: Long = mln_frame_demand.sizeof()
+  private val RENDER_FRAME_RESULT_SIZE: Long = mln_render_frame_result.sizeof()
+  private val RENDER_SESSION_SNAPSHOT_SIZE: Long = mln_render_session_snapshot.sizeof()
+  private val GPU_SYNC_SIZE: Long = mln_gpu_sync.sizeof()
+  private val RENDER_ABANDON_RESULT_SIZE: Long = mln_render_abandon_result.sizeof()
   private const val RENDER_CAPABILITY_FRAME_ACQUISITION: Int = 1 shl 0
   private const val RENDER_CAPABILITY_READBACK: Int = 1 shl 1
   private const val RENDER_CAPABILITY_CONSUMER_SYNC: Int = 1 shl 2
@@ -5314,6 +5432,45 @@ internal object NativeAccess {
     mln_custom_geometry_source_options.`wrap$offset`()
   private val CUSTOM_GEOMETRY_SOURCE_OPTIONS_RELEASE_USER_DATA_OFFSET: Long =
     mln_custom_geometry_source_options.`release_user_data$offset`()
+
+  private const val CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM: Int = 1 shl 0
+  private const val CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM: Int = 1 shl 1
+
+  private val CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_SIZE: Long =
+    mln_custom_mvt_vector_source_options.sizeof()
+  private val CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_SIZE_OFFSET: Long =
+    mln_custom_mvt_vector_source_options.`size$offset`()
+  private val CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_FIELDS_OFFSET: Long =
+    mln_custom_mvt_vector_source_options.`fields$offset`()
+  private val CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_FETCH_TILE_OFFSET: Long =
+    mln_custom_mvt_vector_source_options.`fetch_tile$offset`()
+  private val CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_CANCEL_TILE_OFFSET: Long =
+    mln_custom_mvt_vector_source_options.`cancel_tile$offset`()
+  private val CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_USER_DATA_OFFSET: Long =
+    mln_custom_mvt_vector_source_options.`user_data$offset`()
+  private val CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_MIN_ZOOM_OFFSET: Long =
+    mln_custom_mvt_vector_source_options.`min_zoom$offset`()
+  private val CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_MAX_ZOOM_OFFSET: Long =
+    mln_custom_mvt_vector_source_options.`max_zoom$offset`()
+  private val CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_RELEASE_USER_DATA_OFFSET: Long =
+    mln_custom_mvt_vector_source_options.`release_user_data$offset`()
+
+  private const val FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID: Int = 1 shl 0
+  private const val FEATURE_STATE_SELECTOR_FEATURE_ID: Int = 1 shl 1
+  private const val FEATURE_STATE_SELECTOR_STATE_KEY: Int = 1 shl 2
+
+  private val FEATURE_STATE_SELECTOR_SIZE: Long = mln_feature_state_selector.sizeof()
+  private val FEATURE_STATE_SELECTOR_SIZE_OFFSET: Long = mln_feature_state_selector.`size$offset`()
+  private val FEATURE_STATE_SELECTOR_FIELDS_OFFSET: Long =
+    mln_feature_state_selector.`fields$offset`()
+  private val FEATURE_STATE_SELECTOR_SOURCE_ID_OFFSET: Long =
+    mln_feature_state_selector.`source_id$offset`()
+  private val FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID_OFFSET: Long =
+    mln_feature_state_selector.`source_layer_id$offset`()
+  private val FEATURE_STATE_SELECTOR_FEATURE_ID_OFFSET: Long =
+    mln_feature_state_selector.`feature_id$offset`()
+  private val FEATURE_STATE_SELECTOR_STATE_KEY_OFFSET: Long =
+    mln_feature_state_selector.`state_key$offset`()
 
   private const val STYLE_IMAGE_OPTION_PIXEL_RATIO: Int = 1 shl 0
   private const val STYLE_IMAGE_OPTION_SDF: Int = 1 shl 1

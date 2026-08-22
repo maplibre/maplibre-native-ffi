@@ -526,6 +526,37 @@ public struct CustomGeometrySourceOptions: Sendable {
   }
 }
 
+public struct CustomMvtVectorSourceOptions: Sendable {
+  public typealias TileCallback = @Sendable (CanonicalTileID) -> Void
+
+  public var fetchTile: TileCallback
+  public var cancelTile: TileCallback?
+  public var minZoom: Double?
+  public var maxZoom: Double?
+
+  public init(
+    fetchTile: @escaping TileCallback,
+    cancelTile: TileCallback? = nil,
+    minZoom: Double? = nil,
+    maxZoom: Double? = nil
+  ) {
+    self.fetchTile = fetchTile
+    self.cancelTile = cancelTile
+    self.minZoom = minZoom
+    self.maxZoom = maxZoom
+  }
+
+  func nativeOptions(callbacks: NativeCustomMvtVectorSourceCallbacks)
+    -> NativeCustomMvtVectorSourceOptions
+  {
+    NativeCustomMvtVectorSourceOptions(
+      callbacks: callbacks,
+      minZoom: minZoom,
+      maxZoom: maxZoom
+    )
+  }
+}
+
 /// Prepared GeoJSON source data: one UTF-8 GeoJSON document parsed and tiled
 /// into an immutable index that map calls install when adding or updating a
 /// GeoJSON source.
@@ -916,6 +947,93 @@ public extension MapHandle {
     try await styleCommand {
       mln_map_invalidate_custom_geometry_source_region(
         $0, $1.view(sourceId), bounds.nativeInput.native, $2
+      )
+    }
+  }
+
+  /// Adds a custom MVT vector source, whose tile callbacks run on native
+  /// worker threads.
+  ///
+  /// The source's callbacks stay alive until the C API stops referencing them,
+  /// which is when the source is removed, when a style load drops it, or when
+  /// the map is destroyed. The C API then releases them, waiting for any tile
+  /// callback still running, so a closure is never entered afterwards.
+  @discardableResult
+  func addCustomMvtVectorSource(
+    sourceId: String,
+    options: CustomMvtVectorSourceOptions
+  ) async throws -> CommandCompletion {
+    let fetchTile: NativeCustomMvtVectorSourceCallbacks
+      .TileCallback = { tileId in
+        options.fetchTile(CanonicalTileID(native: tileId))
+      }
+    let cancelTile: NativeCustomMvtVectorSourceCallbacks.TileCallback?
+    if let callback = options.cancelTile {
+      cancelTile = { tileId in callback(CanonicalTileID(native: tileId)) }
+    } else {
+      cancelTile = nil
+    }
+    let callbacks = NativeCustomMvtVectorSourceCallbacks(
+      fetchTile: fetchTile,
+      cancelTile: cancelTile
+    )
+    let future: NativeFuture<CommandCompletion>
+    do {
+      future = try mapNativeFailure {
+        let arena = NativeInputArena()
+        defer { withExtendedLifetime(arena) {} }
+        return try options.nativeOptions(callbacks: callbacks)
+          .withNativeOptions { native in
+            try startCommand {
+              mln_map_add_custom_mvt_vector_source(
+                $0, arena.view(sourceId), native, $1
+              )
+            }
+          }
+      }
+    } catch {
+      // A rejected add is the one case the C API never releases, because it
+      // never took the callbacks on.
+      callbacks.release()
+      throw error
+    }
+    return try await mapNativeFailure { try await future.value() }
+  }
+
+  @discardableResult
+  func setCustomMvtVectorSourceTileData(
+    sourceId: String,
+    tileId: CanonicalTileID,
+    data: Data
+  ) async throws -> CommandCompletion {
+    try await styleCommand {
+      mln_map_set_custom_mvt_vector_source_tile_data(
+        $0, $1.view(sourceId), tileId.nativeTileID.native, $1.view(data), $2
+      )
+    }
+  }
+
+  @discardableResult
+  func setCustomMvtVectorSourceTileError(
+    sourceId: String,
+    tileId: CanonicalTileID,
+    message: String
+  ) async throws -> CommandCompletion {
+    try await styleCommand {
+      mln_map_set_custom_mvt_vector_source_tile_error(
+        $0, $1.view(sourceId), tileId.nativeTileID.native, $1.view(message), $2
+      )
+    }
+  }
+
+  @discardableResult
+  func invalidateCustomMvtVectorSourceTile(
+    sourceId: String,
+    tileId: CanonicalTileID
+  ) async throws -> CommandCompletion {
+    try await styleCommand {
+      mln_map_invalidate_custom_mvt_vector_source_tile(
+        $0, $1.view(sourceId), tileId.nativeTileID.native, $2
       )
     }
   }

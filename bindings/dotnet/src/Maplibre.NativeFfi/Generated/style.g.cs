@@ -153,6 +153,13 @@ namespace Maplibre.NativeFfi.Internal.C
     }
 
     [NativeTypeName("uint32_t")]
+    internal enum mln_custom_mvt_vector_source_option_field : uint
+    {
+        MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM = 1U << 0,
+        MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM = 1U << 1,
+    }
+
+    [NativeTypeName("uint32_t")]
     internal enum mln_style_image_option_field : uint
     {
         MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO = 1U << 0,
@@ -407,6 +414,30 @@ namespace Maplibre.NativeFfi.Internal.C
         public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
     }
 
+    internal unsafe partial struct mln_custom_mvt_vector_source_options
+    {
+        [NativeTypeName("uint32_t")]
+        public uint size;
+
+        [NativeTypeName("uint32_t")]
+        public uint fields;
+
+        [NativeTypeName("mln_custom_mvt_vector_source_tile_callback")]
+        public delegate* unmanaged[Cdecl]<void*, mln_canonical_tile_id, void> fetch_tile;
+
+        [NativeTypeName("mln_custom_mvt_vector_source_tile_callback")]
+        public delegate* unmanaged[Cdecl]<void*, mln_canonical_tile_id, void> cancel_tile;
+
+        public void* user_data;
+
+        public double min_zoom;
+
+        public double max_zoom;
+
+        [NativeTypeName("mln_custom_mvt_vector_source_release_callback")]
+        public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
+    }
+
     internal unsafe partial struct mln_premultiplied_rgba8_image
     {
         [NativeTypeName("uint32_t")]
@@ -561,6 +592,9 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_custom_geometry_source_options mln_custom_geometry_source_options_default();
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_custom_mvt_vector_source_options mln_custom_mvt_vector_source_options_default();
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_premultiplied_rgba8_image mln_premultiplied_rgba8_image_default();
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
@@ -661,6 +695,18 @@ namespace Maplibre.NativeFfi.Internal.C
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_invalidate_custom_geometry_source_region([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_lat_lng_bounds bounds, [NativeTypeName("const mln_completion *")] mln_completion* completion);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_add_custom_mvt_vector_source([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, [NativeTypeName("const mln_custom_mvt_vector_source_options *")] mln_custom_mvt_vector_source_options* options, [NativeTypeName("const mln_completion *")] mln_completion* completion);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_set_custom_mvt_vector_source_tile_data([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, mln_buffer_view data, [NativeTypeName("const mln_completion *")] mln_completion* completion);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_set_custom_mvt_vector_source_tile_error([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, mln_buffer_view message, [NativeTypeName("const mln_completion *")] mln_completion* completion);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_invalidate_custom_mvt_vector_source_tile([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view source_id, mln_canonical_tile_id tile_id, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_set_style_image([NativeTypeName("mln_map")] MlnMap map, mln_buffer_view image_id, [NativeTypeName("const mln_premultiplied_rgba8_image *")] mln_premultiplied_rgba8_image* image, [NativeTypeName("const mln_style_image_options *")] mln_style_image_options* options, [NativeTypeName("const mln_completion *")] mln_completion* completion);

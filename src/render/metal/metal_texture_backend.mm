@@ -17,11 +17,11 @@
 namespace mln::core {
 
 class MetalTextureBackend::MetalTextureRenderableResource final
-    : public mbgl::mtl::RenderableResource {
+    : public mln::mtl::RenderableResource {
  public:
   MetalTextureRenderableResource(
-    MetalTextureBackend& backend_, mbgl::mtl::Context& context_,
-    mbgl::Size size_, MTL::Texture* borrowed_texture_
+    MetalTextureBackend& backend_, mln::mtl::Context& context_, mln::Size size_,
+    MTL::Texture* borrowed_texture_
   )
       : backend(backend_),
         context(context_),
@@ -29,24 +29,23 @@ class MetalTextureBackend::MetalTextureRenderableResource final
         borrowedTexture(borrowed_texture_) {
     if (borrowedTexture == nullptr) {
       offscreenTexture = context.createOffscreenTexture(
-        size, mbgl::gfx::TextureChannelDataType::UnsignedByte, true, true
+        size, mln::gfx::TextureChannelDataType::UnsignedByte, true, true
       );
       return;
     }
     depthTexture = context.createTexture2D();
     depthTexture->setSize(size);
     depthTexture->setFormat(
-      mbgl::gfx::TexturePixelType::Depth,
-      mbgl::gfx::TextureChannelDataType::Float
+      mln::gfx::TexturePixelType::Depth, mln::gfx::TextureChannelDataType::Float
     );
     depthTexture->setSamplerConfiguration(
-      {.filter = mbgl::gfx::TextureFilterType::Linear,
-       .wrapU = mbgl::gfx::TextureWrapType::Clamp,
-       .wrapV = mbgl::gfx::TextureWrapType::Clamp}
+      {.filter = mln::gfx::TextureFilterType::Linear,
+       .wrapU = mln::gfx::TextureWrapType::Clamp,
+       .wrapV = mln::gfx::TextureWrapType::Clamp}
     );
-    // The texture was created by mbgl::mtl::Context above.
+    // The texture was created by mln::mtl::Context above.
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
-    static_cast<mbgl::mtl::Texture2D*>(depthTexture.get())
+    static_cast<mln::mtl::Texture2D*>(depthTexture.get())
       ->setUsage(
         MTL::TextureUsageShaderRead | MTL::TextureUsageShaderWrite |
         MTL::TextureUsageRenderTarget
@@ -56,17 +55,17 @@ class MetalTextureBackend::MetalTextureRenderableResource final
     stencilTexture = context.createTexture2D();
     stencilTexture->setSize(size);
     stencilTexture->setFormat(
-      mbgl::gfx::TexturePixelType::Stencil,
-      mbgl::gfx::TextureChannelDataType::UnsignedByte
+      mln::gfx::TexturePixelType::Stencil,
+      mln::gfx::TextureChannelDataType::UnsignedByte
     );
     stencilTexture->setSamplerConfiguration(
-      {.filter = mbgl::gfx::TextureFilterType::Linear,
-       .wrapU = mbgl::gfx::TextureWrapType::Clamp,
-       .wrapV = mbgl::gfx::TextureWrapType::Clamp}
+      {.filter = mln::gfx::TextureFilterType::Linear,
+       .wrapU = mln::gfx::TextureWrapType::Clamp,
+       .wrapV = mln::gfx::TextureWrapType::Clamp}
     );
-    // The texture was created by mbgl::mtl::Context above.
+    // The texture was created by mln::mtl::Context above.
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
-    static_cast<mbgl::mtl::Texture2D*>(stencilTexture.get())
+    static_cast<mln::mtl::Texture2D*>(stencilTexture.get())
       ->setUsage(
         MTL::TextureUsageShaderRead | MTL::TextureUsageShaderWrite |
         MTL::TextureUsageRenderTarget
@@ -91,7 +90,7 @@ class MetalTextureBackend::MetalTextureRenderableResource final
 
   void bind() override {
     if (offscreenTexture != nullptr) {
-      offscreenTexture->getResource<mbgl::mtl::RenderableResource>().bind();
+      offscreenTexture->getResource<mln::mtl::RenderableResource>().bind();
       return;
     }
 
@@ -109,9 +108,9 @@ class MetalTextureBackend::MetalTextureRenderableResource final
       depthTexture->create();
       if (auto* depthTarget = renderPassDescriptor->depthAttachment()) {
         depthTarget->setTexture(
-          // The texture was created by mbgl::mtl::Context above.
+          // The texture was created by mln::mtl::Context above.
           // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
-          static_cast<mbgl::mtl::Texture2D*>(depthTexture.get())
+          static_cast<mln::mtl::Texture2D*>(depthTexture.get())
             ->getMetalTexture()
         );
       }
@@ -120,9 +119,9 @@ class MetalTextureBackend::MetalTextureRenderableResource final
       stencilTexture->create();
       if (auto* stencilTarget = renderPassDescriptor->stencilAttachment()) {
         stencilTarget->setTexture(
-          // The texture was created by mbgl::mtl::Context above.
+          // The texture was created by mln::mtl::Context above.
           // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
-          static_cast<mbgl::mtl::Texture2D*>(stencilTexture.get())
+          static_cast<mln::mtl::Texture2D*>(stencilTexture.get())
             ->getMetalTexture()
         );
       }
@@ -131,7 +130,7 @@ class MetalTextureBackend::MetalTextureRenderableResource final
 
   void swap() override {
     if (offscreenTexture != nullptr) {
-      offscreenTexture->getResource<mbgl::mtl::RenderableResource>().swap();
+      offscreenTexture->getResource<mln::mtl::RenderableResource>().swap();
       return;
     }
 
@@ -142,7 +141,7 @@ class MetalTextureBackend::MetalTextureRenderableResource final
     renderPassDescriptor.reset();
   }
 
-  auto readStillImage() -> mbgl::PremultipliedImage {
+  auto readStillImage() -> mln::PremultipliedImage {
     if (offscreenTexture == nullptr) {
       return {};
     }
@@ -155,39 +154,39 @@ class MetalTextureBackend::MetalTextureRenderableResource final
     }
     // Offscreen textures are created by the Metal context for this backend.
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
-    return static_cast<mbgl::mtl::Texture2D*>(
+    return static_cast<mln::mtl::Texture2D*>(
              offscreenTexture->getTexture().get()
     )
       ->getMetalTexture();
   }
 
   [[nodiscard]] auto getBackend() const
-    -> const mbgl::mtl::RendererBackend& override {
+    -> const mln::mtl::RendererBackend& override {
     return backend;
   }
 
   [[nodiscard]] auto getCommandBuffer() const
-    -> const mbgl::mtl::MTLCommandBufferPtr& override {
+    -> const mln::mtl::MTLCommandBufferPtr& override {
     if (offscreenTexture != nullptr) {
-      return offscreenTexture->getResource<mbgl::mtl::RenderableResource>()
+      return offscreenTexture->getResource<mln::mtl::RenderableResource>()
         .getCommandBuffer();
     }
     return commandBuffer;
   }
 
   [[nodiscard]] auto getUploadPassDescriptor() const
-    -> mbgl::mtl::MTLBlitPassDescriptorPtr override {
+    -> mln::mtl::MTLBlitPassDescriptorPtr override {
     if (offscreenTexture != nullptr) {
-      return offscreenTexture->getResource<mbgl::mtl::RenderableResource>()
+      return offscreenTexture->getResource<mln::mtl::RenderableResource>()
         .getUploadPassDescriptor();
     }
     return NS::TransferPtr(MTL::BlitPassDescriptor::alloc()->init());
   }
 
   [[nodiscard]] auto getRenderPassDescriptor() const
-    -> const mbgl::mtl::MTLRenderPassDescriptorPtr& override {
+    -> const mln::mtl::MTLRenderPassDescriptorPtr& override {
     if (offscreenTexture != nullptr) {
-      return offscreenTexture->getResource<mbgl::mtl::RenderableResource>()
+      return offscreenTexture->getResource<mln::mtl::RenderableResource>()
         .getRenderPassDescriptor();
     }
     assert(renderPassDescriptor);
@@ -196,21 +195,21 @@ class MetalTextureBackend::MetalTextureRenderableResource final
 
  private:
   MetalTextureBackend& backend;
-  mbgl::mtl::Context& context;
-  mbgl::Size size;
+  mln::mtl::Context& context;
+  mln::Size size;
   MTL::Texture* borrowedTexture = nullptr;
-  std::unique_ptr<mbgl::gfx::OffscreenTexture> offscreenTexture;
-  mbgl::gfx::Texture2DPtr depthTexture;
-  mbgl::gfx::Texture2DPtr stencilTexture;
-  mbgl::mtl::MTLCommandBufferPtr commandBuffer;
-  mbgl::mtl::MTLRenderPassDescriptorPtr renderPassDescriptor;
+  std::unique_ptr<mln::gfx::OffscreenTexture> offscreenTexture;
+  mln::gfx::Texture2DPtr depthTexture;
+  mln::gfx::Texture2DPtr stencilTexture;
+  mln::mtl::MTLCommandBufferPtr commandBuffer;
+  mln::mtl::MTLRenderPassDescriptorPtr renderPassDescriptor;
 };
 
 MetalTextureBackend::MetalTextureBackend(
-  MTL::Device* host_device, mbgl::Size size, std::size_t ring_depth
+  MTL::Device* host_device, mln::Size size, std::size_t ring_depth
 )
-    : mbgl::mtl::RendererBackend(mbgl::gfx::ContextMode::Unique),
-      mbgl::gfx::HeadlessBackend(size),
+    : mln::mtl::RendererBackend(mln::gfx::ContextMode::Unique),
+      mln::gfx::HeadlessBackend(size),
       slot_resources_(ring_depth),
       slot_sizes_(ring_depth) {
   device = NS::RetainPtr(host_device);
@@ -218,10 +217,10 @@ MetalTextureBackend::MetalTextureBackend(
 }
 
 MetalTextureBackend::MetalTextureBackend(
-  MTL::Texture* borrowed_texture, mbgl::Size size
+  MTL::Texture* borrowed_texture, mln::Size size
 )
-    : mbgl::mtl::RendererBackend(mbgl::gfx::ContextMode::Unique),
-      mbgl::gfx::HeadlessBackend(size),
+    : mln::mtl::RendererBackend(mln::gfx::ContextMode::Unique),
+      mln::gfx::HeadlessBackend(size),
       borrowed_texture_(borrowed_texture),
       borrowed_pixel_format_(borrowed_texture->pixelFormat()),
       slot_resources_(1),
@@ -230,18 +229,18 @@ MetalTextureBackend::MetalTextureBackend(
   commandQueue = NS::TransferPtr(device->newCommandQueue());
 }
 MetalTextureBackend::~MetalTextureBackend() {
-  auto guard = mbgl::gfx::BackendScope{*this};
+  auto guard = mln::gfx::BackendScope{*this};
   resource.reset();
   slot_resources_.clear();
   context.reset();
 }
 
-auto MetalTextureBackend::getDefaultRenderable() -> mbgl::gfx::Renderable& {
+auto MetalTextureBackend::getDefaultRenderable() -> mln::gfx::Renderable& {
   if (!resource) {
     resource = std::make_unique<MetalTextureRenderableResource>(
       // MetalTextureBackend always creates a Metal context.
       // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
-      *this, static_cast<mbgl::mtl::Context&>(getContext()), size,
+      *this, static_cast<mln::mtl::Context&>(getContext()), size,
       borrowed_texture_
     );
   }
@@ -249,11 +248,11 @@ auto MetalTextureBackend::getDefaultRenderable() -> mbgl::gfx::Renderable& {
   return *this;
 }
 
-auto MetalTextureBackend::readStillImage() -> mbgl::PremultipliedImage {
+auto MetalTextureBackend::readStillImage() -> mln::PremultipliedImage {
   return getResource<MetalTextureRenderableResource>().readStillImage();
 }
 
-auto MetalTextureBackend::getRendererBackend() -> mbgl::gfx::RendererBackend* {
+auto MetalTextureBackend::getRendererBackend() -> mln::gfx::RendererBackend* {
   return this;
 }
 
@@ -303,9 +302,7 @@ auto MetalTextureBackend::select_slot(std::size_t slot) -> bool {
   return true;
 }
 
-void MetalTextureBackend::set_ring_size(mbgl::Size new_size) {
-  size = new_size;
-}
+void MetalTextureBackend::set_ring_size(mln::Size new_size) { size = new_size; }
 
 auto MetalTextureBackend::has_device(const MTL::Device* other) const -> bool {
   return other == device.get();
@@ -324,7 +321,7 @@ auto MetalTextureBackend::has_borrowed_pixel_format(
 }
 
 void MetalTextureBackend::set_borrowed_texture(
-  MTL::Texture* texture, mbgl::Size new_size
+  MTL::Texture* texture, mln::Size new_size
 ) {
   borrowed_texture_ = texture;
   size = new_size;
@@ -332,7 +329,7 @@ void MetalTextureBackend::set_borrowed_texture(
   // are sized with the color attachment, and any command buffer in hand was
   // opened against the texture being replaced.
   {
-    auto guard = mbgl::gfx::BackendScope{*this};
+    auto guard = mln::gfx::BackendScope{*this};
     resource.reset();
   }
 }

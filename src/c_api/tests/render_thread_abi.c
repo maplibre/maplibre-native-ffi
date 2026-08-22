@@ -681,6 +681,50 @@ static void abandon_completes_pending_work_and_invalidates_accessors(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// A pending still image on a static map must complete while the host's
+// keep-alive demands all resolve on the render-if-needed fast path. Worker
+// results and the observer delivery that completes the still ride the session
+// scheduler; only a rendering demand used to drain it, which stranded this
+// exact await shape.
+static void still_image_completes_under_if_needed_keepalive_demands(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map_options options = mln_map_options_default();
+  options.map_mode = MLN_MAP_MODE_STATIC;
+  options.initial_extent.width = 64;
+  options.initial_extent.height = 64;
+  mln_map map = mln_test_create_map_with_options(runtime, &options);
+  prepare_renderable_map(runtime, map);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+
+  mln_test_completion still = mln_test_completion_default(0);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_request_still_image(map, &still.descriptor)
+  );
+
+  bool completed = false;
+  for (unsigned int attempt = 0; attempt < 10000 && !completed; attempt += 1) {
+    mln_frame_demand demand = mln_frame_demand_default();
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK, mln_render_session_request_frame(fixture.session, &demand)
+    );
+    mln_render_frame_batch batch = MLN_HANDLE_NULL;
+    TEST_ASSERT_TRUE(wait_for_results(&fixture, 1, &batch));
+    mln_render_frame_batch_release(batch);
+    completed = mln_test_completion_wait(&still, 0);
+    if (!completed) {
+      mln_test_sleep_millisecond();
+    }
+  }
+  TEST_ASSERT_TRUE(completed);
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_status(&still));
+  mln_test_completion_destroy(&still);
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 #if defined(MLN_FFI_TEST_BACKEND_OPENGL) && defined(MLN_FFI_TEST_OPENGL_WEBGL)
 static void transferred_offscreen_canvas_runs_on_core_worker(void) {
   mln_runtime runtime = mln_test_create_runtime();
@@ -729,6 +773,7 @@ void run_render_thread_abi_tests(void) {
   RUN_TEST(resize_and_barrier_order_frame_and_extent_generations);
   RUN_TEST(abandon_completes_pending_work_and_invalidates_accessors);
   RUN_TEST(acquired_frame_release_after_abandon_is_cpu_only);
+  RUN_TEST(still_image_completes_under_if_needed_keepalive_demands);
 #if defined(MLN_FFI_TEST_BACKEND_OPENGL) && defined(MLN_FFI_TEST_OPENGL_WEBGL)
   RUN_TEST(transferred_offscreen_canvas_runs_on_core_worker);
 #endif

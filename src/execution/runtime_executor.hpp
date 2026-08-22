@@ -35,7 +35,7 @@ class RuntimeExecutor {
     return std::this_thread::get_id() == worker_id_;
   }
 
-  [[nodiscard]] auto run_loop() const noexcept -> mbgl::util::RunLoop* {
+  [[nodiscard]] auto run_loop() const noexcept -> mln::util::RunLoop* {
     const std::scoped_lock lock(mutex_);
     return run_loop_;
   }
@@ -91,7 +91,7 @@ class RuntimeExecutor {
   std::condition_variable started_;
   std::thread worker_;
   std::thread::id worker_id_;
-  mbgl::util::RunLoop* run_loop_ = nullptr;
+  mln::util::RunLoop* run_loop_ = nullptr;
   std::exception_ptr startup_error_;
   bool starting_ = false;
 };

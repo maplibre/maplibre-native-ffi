@@ -69,6 +69,7 @@ shared = [
   "!pyproject.toml",
   "!uv.lock",
   "!Directory.Packages.props",
+  "!global.json",
   "!Maplibre.NativeFfi.slnx",
   "!.config/dotnet-tools.json",
   "!Package.swift",
@@ -147,6 +148,7 @@ paths = [
   "!.github/workflows/_native-package.yml",
   "!ci/native_package_release.py",
   "Directory.Packages.props",
+  "global.json",
   "Maplibre.NativeFfi.slnx",
   ".config/dotnet-tools.json",
 ]
@@ -168,6 +170,7 @@ paths = [
   "pnpm-workspace.yaml",
   ".npmrc",
   "Directory.Packages.props",
+  "global.json",
   "Maplibre.NativeFfi.slnx",
   ".config/dotnet-tools.json",
   "Package.swift",

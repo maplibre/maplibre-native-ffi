@@ -421,13 +421,6 @@ pub const TextureImageInfo = struct {
     byte_length: usize,
 };
 
-pub const FeatureStateSelector = struct {
-    source_id: []const u8,
-    source_layer_id: ?[]const u8 = null,
-    feature_id: ?[]const u8 = null,
-    state_key: ?[]const u8 = null,
-};
-
 /// Screen-space box in logical map pixels. Corners may be given in any order
 /// and may extend past the viewport; rendered queries normalize and clip them.
 pub const ScreenBox = struct {
@@ -743,24 +736,6 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
 
     pub fn dumpDebugLogs(self: RenderSessionHandle) status.Error!completion.Future(void) {
         return submitRender(void, self, completion.unit, c.mln_render_session_dump_debug_logs, .{});
-    }
-
-    pub fn setFeatureState(self: RenderSessionHandle, allocator: std.mem.Allocator, selector: FeatureStateSelector, state_json: []const u8) status.Error!completion.Future(void) {
-        var temp = native_temp.TempStorage.init(allocator);
-        defer temp.deinit();
-        return submitRender(void, self, completion.unit, c.mln_render_session_set_feature_state, .{ try temp.stringView(selector.source_id), try optionalStringView(&temp, selector.source_layer_id), try optionalStringView(&temp, selector.feature_id), try temp.stringView(state_json) });
-    }
-
-    pub fn getFeatureState(self: RenderSessionHandle, allocator: std.mem.Allocator, selector: FeatureStateSelector) status.Error!completion.Future(values.OwnedString) {
-        var temp = native_temp.TempStorage.init(allocator);
-        defer temp.deinit();
-        return submitAllocatedRender(values.OwnedString, self, allocator, copyOwnedBufferViewCompletion, c.mln_render_session_get_feature_state, .{ try temp.stringView(selector.source_id), try optionalStringView(&temp, selector.source_layer_id), try optionalStringView(&temp, selector.feature_id) });
-    }
-
-    pub fn removeFeatureState(self: RenderSessionHandle, allocator: std.mem.Allocator, selector: FeatureStateSelector) status.Error!completion.Future(void) {
-        var temp = native_temp.TempStorage.init(allocator);
-        defer temp.deinit();
-        return submitRender(void, self, completion.unit, c.mln_render_session_remove_feature_state, .{ try temp.stringView(selector.source_id), try optionalStringView(&temp, selector.source_layer_id), try optionalStringView(&temp, selector.feature_id), try optionalStringView(&temp, selector.state_key) });
     }
 
     pub fn queryRenderedFeatures(self: RenderSessionHandle, allocator: std.mem.Allocator, geometry: RenderedQueryGeometry, options: ?RenderedFeatureQueryOptions) status.Error!completion.Future(QueriedFeatureList) {
@@ -1159,10 +1134,6 @@ fn gpuSyncFromNative(raw: c.mln_gpu_sync) status.Error!GpuSync {
         c.MLN_GPU_SYNC_WEBGPU_TOKEN => .{ .webgpu_token = .{ .object = NativePointer.fromPtr(raw.object orelse return error.NativeError), .value = raw.value } },
         else => error.NativeError,
     };
-}
-
-fn optionalStringView(temp: *native_temp.TempStorage, value: ?[]const u8) status.Error!c.mln_buffer_view {
-    return if (value) |bytes| try temp.stringView(bytes) else .{ .data = null, .size = 0 };
 }
 
 fn copyNativeBuffer(allocator: std.mem.Allocator, buffer: c.mln_buffer, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error![]u8 {

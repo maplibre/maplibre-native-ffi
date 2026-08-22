@@ -26,32 +26,36 @@ internal constructor(private val handle: NativeMapProjection) {
 
   public actual fun camera(): CameraOptions {
     NativeAccess.ensureLoaded()
-    return NativeAccess.projectionCamera(requireLiveHandle())
+    return withLiveHandle { handle -> NativeAccess.projectionCamera(handle) }
   }
 
   public actual fun setCamera(camera: CameraOptions) {
     NativeAccess.ensureLoaded()
-    NativeAccess.setProjectionCamera(requireLiveHandle(), camera)
+    withLiveHandle { handle -> NativeAccess.setProjectionCamera(handle, camera) }
   }
 
   public actual fun setVisibleCoordinates(coordinates: List<LatLng>, padding: EdgeInsets) {
     NativeAccess.ensureLoaded()
-    NativeAccess.setProjectionVisibleCoordinates(requireLiveHandle(), coordinates, padding)
+    withLiveHandle { handle ->
+      NativeAccess.setProjectionVisibleCoordinates(handle, coordinates, padding)
+    }
   }
 
   public actual fun setVisibleGeometry(geometry: ByteArray, padding: EdgeInsets) {
     NativeAccess.ensureLoaded()
-    NativeAccess.setProjectionVisibleGeometry(requireLiveHandle(), geometry, padding)
+    withLiveHandle { handle ->
+      NativeAccess.setProjectionVisibleGeometry(handle, geometry, padding)
+    }
   }
 
   public actual fun pixelForLatLng(coordinate: LatLng): ScreenPoint {
     NativeAccess.ensureLoaded()
-    return NativeAccess.projectionPixelForLatLng(requireLiveHandle(), coordinate)
+    return withLiveHandle { handle -> NativeAccess.projectionPixelForLatLng(handle, coordinate) }
   }
 
   public actual fun latLngForPixel(point: ScreenPoint): LatLng {
     NativeAccess.ensureLoaded()
-    return NativeAccess.projectionLatLngForPixel(requireLiveHandle(), point)
+    return withLiveHandle { handle -> NativeAccess.projectionLatLngForPixel(handle, point) }
   }
 
   public actual val isClosed: Boolean
@@ -68,8 +72,7 @@ internal constructor(private val handle: NativeMapProjection) {
     core.completeClose()
   }
 
-  private fun requireLiveHandle(): NativeMapProjection {
-    core.requireLive()
-    return handle
+  private fun <T> withLiveHandle(block: (NativeMapProjection) -> T): T = core.withLive {
+    block(handle)
   }
 }

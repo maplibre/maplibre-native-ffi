@@ -47,6 +47,7 @@ public sealed unsafe class MapProjectionHandle : IDisposable
 
     internal MlnMapProjection Handle => state.Handle;
 
+    /// <summary>Whether this wrapper has successfully closed its native handle.</summary>
     public bool IsClosed => state.IsClosed;
 
     /// <summary>Copies the projection camera, observing every earlier projection setter.</summary>

@@ -1,5 +1,7 @@
 package org.maplibre.nativeffi.internal.callback
 
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.Pointer
 import org.maplibre.nativeffi.internal.javacpp.JavaCppSupport
@@ -17,29 +19,16 @@ import org.maplibre.nativeffi.resource.ResourceUsage
 /** Owns runtime-scoped Android JNI resource provider callback state. */
 internal class ResourceProviderState(private val callback: ResourceProviderCallback) :
   AutoCloseable {
+  private val token = TOKENS.getAndIncrement()
   private val gate = CallbackGate("resource provider callbacks") { closeNative() }
-  private val nativeCallback =
-    object : MaplibreNativeC.mln_resource_provider_callback() {
-      override fun call(
-        userData: Pointer?,
-        request: MaplibreNativeC.mln_resource_request?,
-        handle: Long,
-      ): Int = invoke(request, handle)
-    }
   private val provider = MaplibreNativeC.mln_resource_provider()
-  private val nativeRelease =
-    object : MaplibreNativeC.mln_runtime_callback_release() {
-      override fun call(userData: Pointer?) {
-        HandleLeakCleaner.releaseNativeCallbackRoot(this@ResourceProviderState)
-        close()
-      }
-    }
 
   init {
     provider.size(provider.sizeof())
-    provider.callback(nativeCallback)
-    provider.user_data(null)
-    provider.release_user_data(nativeRelease)
+    provider.callback(NATIVE_CALLBACK)
+    provider.user_data(JavaCppSupport.addressPointer(token))
+    provider.release_user_data(NATIVE_RELEASE)
+    STATES[token] = this
   }
 
   fun descriptor(): MaplibreNativeC.mln_resource_provider = provider
@@ -66,8 +55,8 @@ internal class ResourceProviderState(private val callback: ResourceProviderCallb
   override fun close() = gate.close()
 
   private fun closeNative() {
+    STATES.remove(token)
     provider.close()
-    nativeCallback.close()
   }
 
   private fun resourceRequest(request: MaplibreNativeC.mln_resource_request): ResourceRequest =
@@ -92,5 +81,30 @@ internal class ResourceProviderState(private val callback: ResourceProviderCallb
 
   private companion object {
     private const val UNKNOWN_DECISION: Int = -1
+    private val TOKENS = AtomicLong(1)
+    private val STATES = ConcurrentHashMap<Long, ResourceProviderState>()
+
+    /**
+     * One process-wide thunk. JavaCPP's FunctionPointer pool is ten slots per generated class, so
+     * per-runtime thunks ran out at eleven live runtimes.
+     */
+    private val NATIVE_CALLBACK =
+      object : MaplibreNativeC.mln_resource_provider_callback() {
+        override fun call(
+          userData: Pointer?,
+          request: MaplibreNativeC.mln_resource_request?,
+          handle: Long,
+        ): Int = STATES[userData?.address() ?: 0L]?.invoke(request, handle) ?: UNKNOWN_DECISION
+      }
+
+    /** One process-wide release thunk; per-state thunks would exhaust the same pool. */
+    private val NATIVE_RELEASE =
+      object : MaplibreNativeC.mln_runtime_callback_release() {
+        override fun call(userData: Pointer?) {
+          val state = STATES[userData?.address() ?: 0L] ?: return
+          HandleLeakCleaner.releaseNativeCallbackRoot(state)
+          state.close()
+        }
+      }
   }
 }

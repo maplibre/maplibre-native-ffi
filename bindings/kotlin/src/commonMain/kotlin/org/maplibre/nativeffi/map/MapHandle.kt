@@ -9,6 +9,7 @@ import org.maplibre.nativeffi.camera.FreeCameraOptions
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
+import org.maplibre.nativeffi.query.FeatureStateSelector
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalSurfaceDescriptor
@@ -26,6 +27,7 @@ import org.maplibre.nativeffi.runtime.CommandCompletion
 import org.maplibre.nativeffi.runtime.RuntimeEventMask
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.CustomMvtVectorSourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceDataHandle
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.ImageStretch
@@ -75,6 +77,30 @@ public expect class MapHandle {
    * @see org.maplibre.nativeffi.runtime.RuntimeHandle.drainEvents
    */
   public fun setStyleJson(json: ByteArray): Deferred<CommandCompletion>
+
+  /**
+   * Submits one copied per-feature-state command. [value] must hold one UTF-8 JSON object. Feature
+   * state belongs to this map; render sessions push it into the renderer on the next render update.
+   */
+  public fun setFeatureState(
+    selector: FeatureStateSelector,
+    value: ByteArray,
+  ): Deferred<CommandCompletion>
+
+  /**
+   * Reads per-feature state behind commands accepted before this call. The bytes hold one JSON
+   * object; missing feature state reads as an empty object. The read copies this map's store, not
+   * the last rendered frame, so it does not require a render session or a loaded source.
+   */
+  public fun getFeatureState(selector: FeatureStateSelector): Deferred<ByteArray>
+
+  /**
+   * Removes per-feature state. [FeatureStateSelector.featureId] and [FeatureStateSelector.stateKey]
+   * narrow the removal: passing both removes one state key from one feature, passing only a feature
+   * ID removes all state for that feature, and passing neither removes all feature state for the
+   * source and source-layer.
+   */
+  public fun removeFeatureState(selector: FeatureStateSelector): Deferred<CommandCompletion>
 
   /**
    * Returns the style document this map's style was last parsed from, byte-for-byte, or an empty
@@ -170,6 +196,37 @@ public expect class MapHandle {
   public fun invalidateCustomGeometrySourceRegion(
     sourceId: String,
     bounds: LatLngBounds,
+  ): Deferred<CommandCompletion>
+
+  /**
+   * Adds a custom MVT vector source that calls [options] back for encoded tile bytes.
+   *
+   * The source belongs to this map's current style. Its callback state lives until the source
+   * leaves the style, which happens when [removeStyleSource] removes it, when a style load replaces
+   * the style that held it, or when this map closes. Native reports that moment on the runtime
+   * worker, and the binding closes the source's callbacks there, waiting for any in-flight tile
+   * callback to return.
+   */
+  public fun addCustomMvtVectorSource(
+    sourceId: String,
+    options: CustomMvtVectorSourceOptions,
+  ): Deferred<CommandCompletion>
+
+  public fun setCustomMvtVectorSourceTileData(
+    sourceId: String,
+    tileId: CanonicalTileId,
+    data: ByteArray,
+  ): Deferred<CommandCompletion>
+
+  public fun setCustomMvtVectorSourceTileError(
+    sourceId: String,
+    tileId: CanonicalTileId,
+    message: String,
+  ): Deferred<CommandCompletion>
+
+  public fun invalidateCustomMvtVectorSourceTile(
+    sourceId: String,
+    tileId: CanonicalTileId,
   ): Deferred<CommandCompletion>
 
   public fun addVectorSourceUrl(
@@ -472,6 +529,11 @@ public expect class MapHandle {
       RenderSessionAttachOptions(driver = RenderDriver.CALLER_GRAPHICS_THREAD),
   ): RenderSessionAttachment
 
+  /**
+   * Attaches a Metal `CAMetalLayer` render target.
+   *
+   * A null `context.device` is accepted. The session then uses `MTLCreateSystemDefaultDevice()`.
+   */
   public fun attachMetalSurface(
     descriptor: MetalSurfaceDescriptor,
     options: RenderSessionAttachOptions = RenderSessionAttachOptions(),

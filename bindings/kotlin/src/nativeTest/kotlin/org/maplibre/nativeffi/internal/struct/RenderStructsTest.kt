@@ -83,7 +83,7 @@ class RenderStructsTest : org.maplibre.nativeffi.NativeTestBase() {
           RenderStructs.metalSurfaceDescriptor(
               MetalSurfaceDescriptor(
                 extent,
-                MetalContextDescriptor(NativePointer.NULL),
+                MetalContextDescriptor(NativePointer.NULL_POINTER),
                 NativePointer.ofAddress(0x30L),
               ),
               this,
@@ -212,7 +212,7 @@ class RenderStructsTest : org.maplibre.nativeffi.NativeTestBase() {
           EglContextDescriptor(
             NativePointer.ofAddress(0x40L),
             NativePointer.ofAddress(0x50L),
-            NativePointer.NULL,
+            NativePointer.NULL_POINTER,
             NativePointer.ofAddress(0x70L),
             clientApi = OpenGLClientApi.GLES,
             ownership = OpenGLContextOwnership.DEDICATED,
@@ -237,7 +237,7 @@ class RenderStructsTest : org.maplibre.nativeffi.NativeTestBase() {
           EglContextDescriptor(
             NativePointer.ofAddress(0x40L),
             NativePointer.ofAddress(0x50L),
-            NativePointer.NULL,
+            NativePointer.NULL_POINTER,
             NativePointer.ofAddress(0x70L),
             clientApi = OpenGLClientApi(97),
             ownership = OpenGLContextOwnership(98),

@@ -294,6 +294,145 @@ void _invokeTileCallback(
   }
 }
 
+final class _CustomMvtVectorCallbackState extends RetainedCallbackState {
+  _CustomMvtVectorCallbackState(
+    CustomMvtVectorSourceOptions options,
+    void Function() onReleased,
+  ) {
+    // The C API invokes this once when a removal, style load, or map close
+    // stops referencing the source.
+    releaseUserData =
+        NativeCallable<
+          raw.mln_custom_mvt_vector_source_release_callbackFunction
+        >.listener((Pointer<Void> _) {
+          onReleased();
+          _retire();
+        });
+    fetchTile =
+        NativeCallable<
+          raw.mln_custom_mvt_vector_source_tile_callbackFunction
+        >.listener((Pointer<Void> _, raw.mln_canonical_tile_id tileId) {
+          if (_isRetirementTile(tileId)) {
+            _receiveRetirementSignal();
+            return;
+          }
+          runUpcall(() => _invokeMvtTileCallback(options.fetchTile, tileId));
+        });
+    cancelTile = options.cancelTile == null
+        ? null
+        : NativeCallable<
+            raw.mln_custom_mvt_vector_source_tile_callbackFunction
+          >.listener((Pointer<Void> _, raw.mln_canonical_tile_id tileId) {
+            if (_isRetirementTile(tileId)) {
+              _receiveRetirementSignal();
+              return;
+            }
+            runUpcall(
+              () => _invokeMvtTileCallback(options.cancelTile!, tileId),
+            );
+          });
+  }
+
+  late final NativeCallable<
+    raw.mln_custom_mvt_vector_source_tile_callbackFunction
+  >
+  fetchTile;
+  late final NativeCallable<
+    raw.mln_custom_mvt_vector_source_tile_callbackFunction
+  >?
+  cancelTile;
+  late final NativeCallable<
+    raw.mln_custom_mvt_vector_source_release_callbackFunction
+  >
+  releaseUserData;
+  var _retirementSignals = 0;
+  var _retirementQueued = false;
+
+  bool get retirementQueuedForTesting => _retirementQueued;
+
+  void _retire() {
+    if (_retirementQueued) {
+      return;
+    }
+    _retirementQueued = true;
+    _retirementSignals = cancelTile == null ? 1 : 2;
+    raw.mln_adapter_custom_mvt_vector_callbacks_retire(
+      fetchTile.nativeFunction,
+      cancelTile?.nativeFunction ??
+          nullptr
+              .cast<
+                NativeFunction<
+                  raw.mln_custom_mvt_vector_source_tile_callbackFunction
+                >
+              >(),
+      nullptr,
+    );
+  }
+
+  void _receiveRetirementSignal() {
+    _retirementSignals -= 1;
+    if (_retirementSignals == 0) {
+      close();
+    }
+  }
+
+  bool _isRetirementTile(raw.mln_canonical_tile_id tileId) =>
+      tileId.z == 255 && tileId.x == 0 && tileId.y == 0;
+
+  @override
+  void closeResources() {
+    fetchTile.close();
+    cancelTile?.close();
+    releaseUserData.close();
+  }
+}
+
+void _invokeMvtTileCallback(
+  CustomMvtVectorTileCallback callback,
+  raw.mln_canonical_tile_id tileId,
+) {
+  try {
+    callback(CanonicalTileId(z: tileId.z, x: tileId.x, y: tileId.y));
+  } catch (_) {
+    // An exception must not escape into native callback machinery.
+  }
+}
+
+raw.mln_custom_mvt_vector_source_options _customMvtVectorSourceOptionsToNative(
+  CustomMvtVectorSourceOptions options,
+  _CustomMvtVectorCallbackState callbackState,
+) {
+  final result = raw.mln_custom_mvt_vector_source_options_default();
+  result.fetch_tile = callbackState.fetchTile.nativeFunction;
+  result.cancel_tile =
+      callbackState.cancelTile?.nativeFunction ??
+      nullptr
+          .cast<
+            NativeFunction<
+              raw.mln_custom_mvt_vector_source_tile_callbackFunction
+            >
+          >();
+  result.user_data = nullptr;
+  result.release_user_data = callbackState.releaseUserData.nativeFunction;
+  var fields = 0;
+  if (options.minZoom != null) {
+    fields |= raw
+        .mln_custom_mvt_vector_source_option_field
+        .MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM
+        .value;
+    result.min_zoom = options.minZoom!;
+  }
+  if (options.maxZoom != null) {
+    fields |= raw
+        .mln_custom_mvt_vector_source_option_field
+        .MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM
+        .value;
+    result.max_zoom = options.maxZoom!;
+  }
+  result.fields = fields;
+  return result;
+}
+
 raw.mln_custom_geometry_source_options _customGeometrySourceOptionsToNative(
   CustomGeometrySourceOptions options,
   _CustomGeometryCallbackState callbackState,
@@ -1029,6 +1168,49 @@ Pointer<raw.mln_animation_options> _nativeAnimation(
     raw.mln_animation_options_default(),
   );
   return nativeAnimation;
+}
+
+Pointer<raw.mln_feature_state_selector> _featureStateSelectorToNative(
+  FeatureStateSelector selector,
+  Allocator allocator,
+) {
+  final nativeSelector = allocator<raw.mln_feature_state_selector>();
+  nativeSelector.ref.size = sizeOf<raw.mln_feature_state_selector>();
+  nativeSelector.ref.source_id = nativeStringView(
+    selector.sourceId,
+    allocator,
+  ).value;
+  final sourceLayerId = selector.sourceLayerId;
+  if (sourceLayerId != null) {
+    nativeSelector.ref.fields |= raw
+        .mln_feature_state_selector_field
+        .MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID
+        .value;
+    nativeSelector.ref.source_layer_id = nativeStringView(
+      sourceLayerId,
+      allocator,
+    ).value;
+  }
+  final featureId = selector.featureId;
+  if (featureId != null) {
+    nativeSelector.ref.fields |= raw
+        .mln_feature_state_selector_field
+        .MLN_FEATURE_STATE_SELECTOR_FEATURE_ID
+        .value;
+    nativeSelector.ref.feature_id = nativeStringView(
+      featureId,
+      allocator,
+    ).value;
+  }
+  final stateKey = selector.stateKey;
+  if (stateKey != null) {
+    nativeSelector.ref.fields |= raw
+        .mln_feature_state_selector_field
+        .MLN_FEATURE_STATE_SELECTOR_STATE_KEY
+        .value;
+    nativeSelector.ref.state_key = nativeStringView(stateKey, allocator).value;
+  }
+  return nativeSelector;
 }
 
 QueriedFeature _queriedFeatureFromNative(raw.mln_queried_feature hit) {

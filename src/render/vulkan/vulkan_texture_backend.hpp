@@ -22,18 +22,18 @@ struct VulkanTextureFrameResources {
   VkFormat format = VK_FORMAT_UNDEFINED;
 };
 
-class VulkanTextureBackend final : public mbgl::vulkan::RendererBackend,
-                                   public mbgl::gfx::HeadlessBackend {
+class VulkanTextureBackend final : public mln::vulkan::RendererBackend,
+                                   public mln::gfx::HeadlessBackend {
  private:
   class VulkanTextureRenderableResource;
 
  public:
   VulkanTextureBackend(
-    const mln_vulkan_owned_texture_descriptor& descriptor, mbgl::Size size,
+    const mln_vulkan_owned_texture_descriptor& descriptor, mln::Size size,
     std::size_t ring_depth = 1
   );
   VulkanTextureBackend(
-    const mln_vulkan_borrowed_texture_descriptor& descriptor, mbgl::Size size
+    const mln_vulkan_borrowed_texture_descriptor& descriptor, mln::Size size
   );
   VulkanTextureBackend(const VulkanTextureBackend&) = delete;
   auto operator=(const VulkanTextureBackend&) -> VulkanTextureBackend& = delete;
@@ -41,10 +41,10 @@ class VulkanTextureBackend final : public mbgl::vulkan::RendererBackend,
   auto operator=(VulkanTextureBackend&&) -> VulkanTextureBackend& = delete;
   ~VulkanTextureBackend() override;
 
-  auto getDefaultRenderable() -> mbgl::gfx::Renderable& override;
+  auto getDefaultRenderable() -> mln::gfx::Renderable& override;
   // Follows a new physical size while preserving the render pass, so the
   // renderer's Vulkan pipeline cache survives the resize.
-  void resize(mbgl::Size new_size);
+  void resize(mln::Size new_size);
   // Whether a replacement image can use the render pass already in hand.
   [[nodiscard]] auto matches_borrowed_target(
     const mln_vulkan_borrowed_texture_descriptor& descriptor
@@ -58,8 +58,8 @@ class VulkanTextureBackend final : public mbgl::vulkan::RendererBackend,
     -> const mln_vulkan_context_descriptor& {
     return descriptor_.context;
   }
-  auto readStillImage() -> mbgl::PremultipliedImage override;
-  auto getRendererBackend() -> mbgl::gfx::RendererBackend* override;
+  auto readStillImage() -> mln::PremultipliedImage override;
+  auto getRendererBackend() -> mln::gfx::RendererBackend* override;
   void activate() override;
   void deactivate() override;
 
@@ -80,9 +80,9 @@ class VulkanTextureBackend final : public mbgl::vulkan::RendererBackend,
   mln_vulkan_owned_texture_descriptor descriptor_;
   mln_vulkan_borrowed_texture_descriptor borrowed_descriptor_{};
   bool uses_borrowed_texture_ = false;
-  std::vector<std::unique_ptr<mbgl::gfx::RenderableResource>> slot_resources_;
+  std::vector<std::unique_ptr<mln::gfx::RenderableResource>> slot_resources_;
   std::size_t selected_slot_ = 0;
-  std::vector<mbgl::Size> slot_sizes_;
+  std::vector<mln::Size> slot_sizes_;
 };
 
 }  // namespace mln::core

@@ -36,7 +36,7 @@
 
 #include "../offline_url.hpp"
 
-namespace mbgl {
+namespace mln {
 namespace {
 
 // FETCH_LOAD_TO_MEMORY copies each completed XHR body into the fixed pthread
@@ -859,4 +859,4 @@ ClientOptions HTTPFileSource::getClientOptions() {
   return impl->getClientOptions();
 }
 
-}  // namespace mbgl
+}  // namespace mln

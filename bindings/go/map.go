@@ -246,6 +246,38 @@ func (m *MapHandle) SetStyleJSON(json []byte) (*Future[CommandCompletion], error
 	}, completionCommand)
 }
 
+// SetFeatureState submits a copied per-feature-state command. The selector
+// and state value are copied before the call returns.
+func (m *MapHandle) SetFeatureState(selector FeatureStateSelector, state []byte) (*Future[CommandCompletion], error) {
+	rawSelector := newCFeatureStateSelector(selector)
+	defer rawSelector.free()
+	rawState := newCBufferView(state)
+	defer rawState.free()
+	return startMapCompletion(m, func(raw C.mln_map, completion *C.mln_completion) int32 {
+		return int32(C.mln_map_set_feature_state(raw, &rawSelector.raw, rawState.raw(), completion))
+	}, completionCommand)
+}
+
+// FeatureState starts an ordered read of copied per-feature state from this
+// map's store. Missing feature state is reported as an empty JSON object.
+func (m *MapHandle) FeatureState(selector FeatureStateSelector) (*Future[[]byte], error) {
+	rawSelector := newCFeatureStateSelector(selector)
+	defer rawSelector.free()
+	return startMapCompletion(m, func(raw C.mln_map, completion *C.mln_completion) int32 {
+		return int32(C.mln_map_get_feature_state(raw, &rawSelector.raw, completion))
+	}, completionBuffer)
+}
+
+// RemoveFeatureState submits a per-feature-state removal command. The selector
+// is copied before the call returns.
+func (m *MapHandle) RemoveFeatureState(selector FeatureStateSelector) (*Future[CommandCompletion], error) {
+	rawSelector := newCFeatureStateSelector(selector)
+	defer rawSelector.free()
+	return startMapCompletion(m, func(raw C.mln_map, completion *C.mln_completion) int32 {
+		return int32(C.mln_map_remove_feature_state(raw, &rawSelector.raw, completion))
+	}, completionCommand)
+}
+
 // LoadedStyleJSON returns an ordered copy of the last loaded style document.
 func (m *MapHandle) LoadedStyleJSON() (*Future[[]byte], error) {
 	return startMapCompletion(m, func(raw C.mln_map, completion *C.mln_completion) int32 {

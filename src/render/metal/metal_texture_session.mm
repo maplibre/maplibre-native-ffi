@@ -59,17 +59,17 @@ class MetalTextureSessionBackend final
     : public mln::core::TextureSessionBackend {
  public:
   MetalTextureSessionBackend(
-    MTL::Device* host_device, mbgl::Size size, std::size_t ring_depth
+    MTL::Device* host_device, mln::Size size, std::size_t ring_depth
   )
       : backend_(host_device, size, ring_depth) {}
 
-  MetalTextureSessionBackend(MTL::Texture* borrowed_texture, mbgl::Size size)
+  MetalTextureSessionBackend(MTL::Texture* borrowed_texture, mln::Size size)
       : backend_(borrowed_texture, size) {}
 
-  auto headless_backend() -> mbgl::gfx::HeadlessBackend& override {
+  auto headless_backend() -> mln::gfx::HeadlessBackend& override {
     return backend_;
   }
-  void resize(mbgl::Size size) override { backend_.set_ring_size(size); }
+  void resize(mln::Size size) override { backend_.set_ring_size(size); }
 
   auto set_metal_borrowed_target(
     const mln_metal_borrowed_texture_descriptor& descriptor
@@ -90,7 +90,7 @@ class MetalTextureSessionBackend final
       );
     }
     backend_.set_borrowed_texture(
-      texture, mbgl::Size{descriptor.physical_width, descriptor.physical_height}
+      texture, mln::Size{descriptor.physical_width, descriptor.physical_height}
     );
     return MLN_STATUS_OK;
   }
@@ -189,7 +189,7 @@ auto metal_owned_texture_attach_start(
                                   mln_render_session_object& target
                                 ) mutable {
     target.texture.backend = std::make_unique<MetalTextureSessionBackend>(
-      device.get(), mbgl::Size{target.physical_width, target.physical_height},
+      device.get(), mln::Size{target.physical_width, target.physical_height},
       ring_depth
     );
     return MLN_STATUS_OK;
@@ -238,14 +238,14 @@ auto metal_borrowed_texture_attach_start(
   session->texture.mode = TextureSessionMode::Borrowed;
   auto* const borrowed_texture =
     static_cast<MTL::Texture*>(descriptor->texture);
-  session->initialize_backend =
-    [borrowed_texture](mln_render_session_object& target) {
-      target.texture.backend = std::make_unique<MetalTextureSessionBackend>(
-        borrowed_texture,
-        mbgl::Size{target.physical_width, target.physical_height}
-      );
-      return MLN_STATUS_OK;
-    };
+  session->initialize_backend = [borrowed_texture](
+                                  mln_render_session_object& target
+                                ) {
+    target.texture.backend = std::make_unique<MetalTextureSessionBackend>(
+      borrowed_texture, mln::Size{target.physical_width, target.physical_height}
+    );
+    return MLN_STATUS_OK;
+  };
   const auto capabilities = mln_render_session_capabilities{
     .size = sizeof(mln_render_session_capabilities),
     .driver = options == nullptr ? 0u : options->driver,

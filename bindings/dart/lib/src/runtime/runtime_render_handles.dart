@@ -633,49 +633,6 @@ final class RenderSessionHandle implements Finalizable {
         ],
       );
 
-  Future<void> setFeatureState(
-    FeatureStateSelector selector,
-    Uint8List state,
-  ) => _voidOperation(
-    (completion) => withNativeArena((arena) {
-      return raw.mln_render_session_set_feature_state(
-        _handle.raw,
-        nativeStringView(selector.sourceId, arena).value,
-        nativeStringView(selector.sourceLayerId ?? '', arena).value,
-        nativeStringView(selector.featureId ?? '', arena).value,
-        nativeBufferView(state, arena),
-        completion,
-      );
-    }),
-  );
-
-  Future<Uint8List> getFeatureState(FeatureStateSelector selector) =>
-      _bufferOperation(
-        (completion) => withNativeArena((arena) {
-          return raw.mln_render_session_get_feature_state(
-            _handle.raw,
-            nativeStringView(selector.sourceId, arena).value,
-            nativeStringView(selector.sourceLayerId ?? '', arena).value,
-            nativeStringView(selector.featureId ?? '', arena).value,
-            completion,
-          );
-        }),
-      );
-
-  Future<void> removeFeatureState(FeatureStateSelector selector) =>
-      _voidOperation(
-        (completion) => withNativeArena((arena) {
-          return raw.mln_render_session_remove_feature_state(
-            _handle.raw,
-            nativeStringView(selector.sourceId, arena).value,
-            nativeStringView(selector.sourceLayerId ?? '', arena).value,
-            nativeStringView(selector.featureId ?? '', arena).value,
-            nativeStringView(selector.stateKey ?? '', arena).value,
-            completion,
-          );
-        }),
-      );
-
   Future<TextureImage> readPremultipliedRgba8() => _runtime._startValue(
     copyKind: raw
         .mln_adapter_completion_copy_kind

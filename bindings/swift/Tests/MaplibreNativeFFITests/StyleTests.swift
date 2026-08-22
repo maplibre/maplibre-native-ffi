@@ -488,6 +488,132 @@ private func addSourceReportingItsRelease(
   #expect(accepted.value == 0)
 }
 
+/// Adds a custom MVT vector source whose callback state reports its own
+/// release through `counter`.
+private func addMvtSourceReportingItsRelease(
+  to map: MapHandle,
+  sourceId: String = "custom-mvt",
+  counter: ReleaseCounter
+) async throws -> CommandCompletion {
+  let sentinel = ReleaseSentinel(counter)
+  return try await map.addCustomMvtVectorSource(
+    sourceId: sourceId,
+    options: CustomMvtVectorSourceOptions(fetchTile: { _ in
+      withExtendedLifetime(sentinel) {}
+    })
+  )
+}
+
+@Test func customMvtVectorOptionsRetainAndInvokeTileCallbacks() throws {
+  final class TileBox: @unchecked Sendable {
+    var fetched: [NativeCanonicalTileID] = []
+    var cancelled: [NativeCanonicalTileID] = []
+  }
+
+  let box = TileBox()
+  let callbacks = NativeCustomMvtVectorSourceCallbacks(
+    fetchTile: { box.fetched.append($0) },
+    cancelTile: { box.cancelled.append($0) }
+  )
+  defer { callbacks.release() }
+  let options = NativeCustomMvtVectorSourceOptions(
+    callbacks: callbacks,
+    minZoom: 1,
+    maxZoom: 10
+  )
+
+  try options.withNativeOptions { native in
+    #expect((native.pointee
+        .fields & MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM
+        .rawValue) != 0)
+    #expect(native.pointee.min_zoom == 1)
+    #expect(native.pointee.max_zoom == 10)
+    native.pointee.fetch_tile!(
+      native.pointee.user_data,
+      mln_canonical_tile_id(z: 1, x: 2, y: 3)
+    )
+    native.pointee.cancel_tile!(
+      native.pointee.user_data,
+      mln_canonical_tile_id(z: 4, x: 5, y: 6)
+    )
+  }
+
+  #expect(box.fetched == [NativeCanonicalTileID(z: 1, x: 2, y: 3)])
+  #expect(box.cancelled == [NativeCanonicalTileID(z: 4, x: 5, y: 6)])
+}
+
+@Test func customMvtVectorSourcesCanBeAddedInspectedAndReleased(
+) async throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.closeBlockingForTests() }
+  let map = try await MapHandle(runtime: runtime,
+                                options: MapOptions(width: 64, height: 64))
+  defer { try? map.closeBlockingForTests() }
+
+  try await map.setStyleJSON(emptyStyleJSON)
+  let counter = ReleaseCounter()
+  let addCommand = try await addMvtSourceReportingItsRelease(
+    to: map, counter: counter
+  )
+  #expect(try await commandDisposition(
+    addCommand, runtime: runtime
+  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+  #expect(try await map.styleSourceInfo("custom-mvt")?
+    .type == .customMVTVector)
+
+  let tileId = CanonicalTileID(z: 0, x: 0, y: 0)
+  try await map.setCustomMvtVectorSourceTileData(
+    sourceId: "custom-mvt",
+    tileId: tileId,
+    data: Data()
+  )
+  try await map.setCustomMvtVectorSourceTileError(
+    sourceId: "custom-mvt",
+    tileId: tileId,
+    message: "tile missing"
+  )
+  try await map.invalidateCustomMvtVectorSourceTile(
+    sourceId: "custom-mvt",
+    tileId: tileId
+  )
+
+  let removeCommand = try await map.removeStyleSource("custom-mvt")
+  #expect(try await commandDisposition(
+    removeCommand, runtime: runtime
+  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+  #expect(counter.value == 1)
+}
+
+@Test func aRejectedCustomMvtVectorSourceAddReleasesItsCallbacks(
+) async throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.closeBlockingForTests() }
+  let map = try await MapHandle(runtime: runtime,
+                                options: MapOptions(width: 64, height: 64))
+  defer { try? map.closeBlockingForTests() }
+
+  try await map.setStyleJSON(emptyStyleJSON)
+  let accepted = ReleaseCounter()
+  let acceptedCommand = try await addMvtSourceReportingItsRelease(
+    to: map, counter: accepted
+  )
+  #expect(try await commandDisposition(
+    acceptedCommand, runtime: runtime
+  ) == MLN_COMMAND_DISPOSITION_COMMITTED.rawValue)
+
+  let rejected = ReleaseCounter()
+  try expectCommandFailure(
+    await addMvtSourceReportingItsRelease(to: map, counter: rejected),
+    status: MLN_STATUS_INVALID_ARGUMENT
+  )
+  try await runtime.barrier()
+
+  #expect(rejected.value == 1)
+  #expect(accepted.value == 0)
+}
+
 @Test func loadedStyleDocumentAndURLReadBackWhatWasLoaded() async throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))

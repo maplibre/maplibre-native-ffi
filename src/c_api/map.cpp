@@ -15,6 +15,8 @@
 #include "bytes/buffer.hpp"
 #include "c_api/boundary.hpp"
 #include "diagnostics/diagnostics.hpp"
+#include "geojson/geojson.hpp"
+#include "map/feature_state.hpp"
 #include "maplibre_native_c.h"
 #include "runtime/runtime.hpp"
 
@@ -73,5 +75,116 @@ auto mln_map_set_event_mask(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_set_event_mask(map, mask, completion);
+  });
+}
+
+namespace {
+
+// Owns copies of the selector strings so a deferred command outlives the
+// caller's buffers.
+struct OwnedFeatureStateSelector {
+  uint32_t fields = 0;
+  std::string source_id;
+  std::string source_layer_id;
+  std::string feature_id;
+  std::string state_key;
+
+  explicit OwnedFeatureStateSelector(const mln_feature_state_selector& selector)
+      : fields(selector.fields),
+        source_id(copy_view(selector.source_id)),
+        source_layer_id(copy_view(selector.source_layer_id)),
+        feature_id(copy_view(selector.feature_id)),
+        state_key(copy_view(selector.state_key)) {}
+
+  [[nodiscard]] auto view() const -> mln_feature_state_selector {
+    return mln_feature_state_selector{
+      .size = sizeof(mln_feature_state_selector),
+      .fields = fields,
+      .source_id = {.data = source_id.data(), .size = source_id.size()},
+      .source_layer_id =
+        {.data = source_layer_id.data(), .size = source_layer_id.size()},
+      .feature_id = {.data = feature_id.data(), .size = feature_id.size()},
+      .state_key = {.data = state_key.data(), .size = state_key.size()},
+    };
+  }
+
+ private:
+  static auto copy_view(mln_buffer_view value) -> std::string {
+    return value.data == nullptr
+             ? std::string{}
+             : std::string{static_cast<const char*>(value.data), value.size};
+  }
+};
+
+}  // namespace
+
+auto mln_map_set_feature_state(
+  mln_map map, const mln_feature_state_selector* selector,
+  mln_buffer_view state, const mln_completion* completion
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    const auto selector_status =
+      mln::core::validate_feature_state_selector(selector, true);
+    if (selector_status != MLN_STATUS_OK) {
+      return selector_status;
+    }
+    if (state.data == nullptr || state.size == 0) {
+      mln::core::set_thread_error("state must not be empty");
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    // The header promises validation before return, so parse here; the
+    // command parses again on the worker, which stays cheap for the small
+    // objects feature state carries.
+    const auto parsed = mln::core::to_native_json_value(state);
+    if (!parsed || parsed->getObject() == nullptr) {
+      mln::core::set_thread_error("feature state value must be a JSON object");
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    auto owned_selector = OwnedFeatureStateSelector{*selector};
+    auto owned_state =
+      std::string{static_cast<const char*>(state.data), state.size};
+    return mln::core::submit_map_command(
+      map,
+      [map, owned_selector = std::move(owned_selector),
+       owned_state = std::move(owned_state)]() -> mln_status {
+        const auto selector = owned_selector.view();
+        return mln::core::map_set_feature_state(
+          map, &selector,
+          {.data = owned_state.data(), .size = owned_state.size()}
+        );
+      },
+      completion
+    );
+  });
+}
+
+auto mln_map_get_feature_state(
+  mln_map map, const mln_feature_state_selector* selector,
+  const mln_completion* completion
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_get_feature_state_start(map, selector, completion);
+  });
+}
+
+auto mln_map_remove_feature_state(
+  mln_map map, const mln_feature_state_selector* selector,
+  const mln_completion* completion
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    const auto selector_status =
+      mln::core::validate_feature_state_selector(selector, false);
+    if (selector_status != MLN_STATUS_OK) {
+      return selector_status;
+    }
+    auto owned_selector = OwnedFeatureStateSelector{*selector};
+    return mln::core::submit_map_command(
+      map,
+      [map, owned_selector = std::move(owned_selector)]() -> mln_status {
+        const auto selector = owned_selector.view();
+        return mln::core::map_remove_feature_state(map, &selector);
+      },
+      completion
+    );
   });
 }

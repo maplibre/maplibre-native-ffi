@@ -5,6 +5,7 @@
 // the release runs independently of the event mask. A binding observes its own
 // release only through that same mechanism.
 
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -21,18 +22,20 @@ static const char empty_style_json[] =
 static const char source_id[] = "custom-geometry";
 static const size_t style_wait_attempts = 200;
 
+// The counters are written from native threads and read from the test thread,
+// so they are atomic; the barrier polls below provide the ordering.
 typedef struct release_probe {
-  size_t release_count;
-  size_t fetch_count;
+  atomic_size_t release_count;
+  atomic_size_t fetch_count;
 } release_probe;
 
 static void probe_fetch_tile(void* user_data, mln_canonical_tile_id tile_id) {
   (void)tile_id;
-  ((release_probe*)user_data)->fetch_count += 1;
+  atomic_fetch_add(&((release_probe*)user_data)->fetch_count, 1);
 }
 
 static void probe_release(void* user_data) {
-  ((release_probe*)user_data)->release_count += 1;
+  atomic_fetch_add(&((release_probe*)user_data)->release_count, 1);
 }
 
 static mln_custom_geometry_source_options probe_options(release_probe* probe) {
@@ -85,17 +88,17 @@ static void a_style_replacement_releases_a_dropped_source_unsubscribed(void) {
   TEST_ASSERT_TRUE(mln_test_completion_wait(&command, -1));
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_completion_status(&command));
   mln_test_completion_destroy(&command);
-  TEST_ASSERT_EQUAL_size_t(0, probe.release_count);
+  TEST_ASSERT_EQUAL_size_t(0, atomic_load(&probe.release_count));
 
   load_style_and_wait(runtime, map, MLN_BUFFER_LITERAL(empty_style_json));
-  TEST_ASSERT_EQUAL_size_t(1, probe.release_count);
+  TEST_ASSERT_EQUAL_size_t(1, atomic_load(&probe.release_count));
   TEST_ASSERT_EQUAL_size_t(
     0, mln_test_drain_counting(runtime, MLN_RUNTIME_EVENT_MAP_STYLE_LOADED)
   );
 
   // The map no longer references the state, so retiring it releases nothing.
   mln_test_destroy_map(map);
-  TEST_ASSERT_EQUAL_size_t(1, probe.release_count);
+  TEST_ASSERT_EQUAL_size_t(1, atomic_load(&probe.release_count));
   mln_test_destroy_runtime(runtime);
 }
 
@@ -129,12 +132,12 @@ static void an_explicit_removal_releases_once(void) {
     MLN_COMMAND_DISPOSITION_COMMITTED, mln_test_completion_disposition(&removal)
   );
   mln_test_completion_destroy(&removal);
-  TEST_ASSERT_EQUAL_size_t(1, probe.release_count);
+  TEST_ASSERT_EQUAL_size_t(1, atomic_load(&probe.release_count));
 
   // A style load after the removal has nothing left to reconcile.
   load_style_and_wait(runtime, map, MLN_BUFFER_LITERAL(empty_style_json));
   mln_test_destroy_map(map);
-  TEST_ASSERT_EQUAL_size_t(1, probe.release_count);
+  TEST_ASSERT_EQUAL_size_t(1, atomic_load(&probe.release_count));
   mln_test_destroy_runtime(runtime);
 }
 
@@ -186,14 +189,15 @@ static void accepted_adds_release_their_callback_state(void) {
   // The duplicate's release is not ordered before a single barrier, so poll
   // barriers until the count lands.
   for (size_t attempt = 0;
-       attempt < style_wait_attempts && probe.release_count < 1; attempt += 1) {
+       attempt < style_wait_attempts && atomic_load(&probe.release_count) < 1;
+       attempt += 1) {
     TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
   }
-  TEST_ASSERT_EQUAL_size_t(1, probe.release_count);
+  TEST_ASSERT_EQUAL_size_t(1, atomic_load(&probe.release_count));
 
   mln_test_destroy_map(map);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_barrier(runtime));
-  TEST_ASSERT_EQUAL_size_t(2, probe.release_count);
+  TEST_ASSERT_EQUAL_size_t(2, atomic_load(&probe.release_count));
   mln_test_destroy_runtime(runtime);
 }
 

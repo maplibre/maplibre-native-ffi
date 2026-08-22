@@ -102,13 +102,13 @@ internal object OpenGLRenderTarget {
         NativePointer.ofAddress(context.eglDisplayAddress()),
         NativePointer.ofAddress(context.eglConfigAddress()),
         NativePointer.ofAddress(context.eglContextAddress()),
-        NativePointer.NULL,
+        NativePointer.NULL_POINTER,
       )
     } else {
       WglContextDescriptor(
         NativePointer.ofAddress(context.hdcAddress()),
         NativePointer.ofAddress(context.wglContextAddress()),
-        NativePointer.NULL,
+        NativePointer.NULL_POINTER,
       )
     }
 

@@ -46,6 +46,6 @@ dir = "../.."
 run = '''
 MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   dotnet test \
-    bindings/dotnet/tests/Maplibre.NativeFfi.Tests/Maplibre.NativeFfi.Tests.csproj \
+    --project bindings/dotnet/tests/Maplibre.NativeFfi.Tests/Maplibre.NativeFfi.Tests.csproj \
     -p:Platform="Any CPU"
 '''

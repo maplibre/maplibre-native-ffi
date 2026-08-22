@@ -6,6 +6,7 @@ using Maplibre.NativeFfi.Internal.Memory;
 using Maplibre.NativeFfi.Internal.Pointer;
 using Maplibre.NativeFfi.Internal.Status;
 using Maplibre.NativeFfi.Internal.Struct;
+using Maplibre.NativeFfi.Query;
 using Maplibre.NativeFfi.Render;
 using Maplibre.NativeFfi.Runtime;
 using Maplibre.NativeFfi.Style;
@@ -19,6 +20,13 @@ internal unsafe delegate mln_status MapAddCustomGeometrySource(
     mln_completion* completion
 );
 
+internal unsafe delegate mln_status MapAddCustomMvtVectorSource(
+    MlnMap map,
+    mln_buffer_view sourceId,
+    mln_custom_mvt_vector_source_options* options,
+    mln_completion* completion
+);
+
 /// <summary>Any-thread map handle bound to a runtime.</summary>
 public sealed unsafe partial class MapHandle : IDisposable
 {
@@ -29,8 +37,18 @@ public sealed unsafe partial class MapHandle : IDisposable
         completion
     ) => NativeMethods.mln_map_add_custom_geometry_source(map, sourceId, options, completion);
 
+    private static readonly MapAddCustomMvtVectorSource DefaultAddCustomMvtVectorSource = static (
+        map,
+        sourceId,
+        options,
+        completion
+    ) => NativeMethods.mln_map_add_custom_mvt_vector_source(map, sourceId, options, completion);
+
     [ThreadStatic]
     private static MapAddCustomGeometrySource? addCustomGeometrySourceForTest;
+
+    [ThreadStatic]
+    private static MapAddCustomMvtVectorSource? addCustomMvtVectorSourceForTest;
 
     private readonly RuntimeHandle runtime;
     private readonly ulong nativeId;
@@ -540,6 +558,60 @@ public sealed unsafe partial class MapHandle : IDisposable
         });
     }
 
+    /// <summary>Sets per-feature state on this map.</summary>
+    public Task<CommandCompletion> SetFeatureStateAsync(FeatureStateSelector selector, byte[] state)
+    {
+        ArgumentNullException.ThrowIfNull(selector);
+        ArgumentNullException.ThrowIfNull(state);
+        return NativeCompletion.SubmitCommandChecked(completion =>
+        {
+            using var nativeSelector = NativeFeatureStateSelector.From(selector);
+            using var nativeState = NativeStringView.From(state, nameof(state));
+            var selectorValue = nativeSelector.Value;
+            NativeStatus.Check(
+                NativeMethods.mln_map_set_feature_state(
+                    Handle,
+                    &selectorValue,
+                    nativeState.Value,
+                    completion
+                )
+            );
+        });
+    }
+
+    /// <summary>Copies per-feature state from this map.</summary>
+    public Task<byte[]> GetFeatureStateAsync(
+        FeatureStateSelector selector,
+        CancellationToken cancellationToken = default
+    )
+    {
+        ArgumentNullException.ThrowIfNull(selector);
+        return RunMapOperationAsync(
+            completion =>
+            {
+                using var nativeSelector = NativeFeatureStateSelector.From(selector);
+                var selectorValue = nativeSelector.Value;
+                return NativeMethods.mln_map_get_feature_state(Handle, &selectorValue, completion);
+            },
+            ReadBuffer,
+            cancellationToken
+        );
+    }
+
+    /// <summary>Removes per-feature state from this map.</summary>
+    public Task<CommandCompletion> RemoveFeatureStateAsync(FeatureStateSelector selector)
+    {
+        ArgumentNullException.ThrowIfNull(selector);
+        return NativeCompletion.SubmitCommandChecked(completion =>
+        {
+            using var nativeSelector = NativeFeatureStateSelector.From(selector);
+            var selectorValue = nativeSelector.Value;
+            NativeStatus.Check(
+                NativeMethods.mln_map_remove_feature_state(Handle, &selectorValue, completion)
+            );
+        });
+    }
+
     /// <summary>Gets the style document that this map's style was last parsed from.</summary>
     public Task<byte[]> GetLoadedStyleJsonAsync(CancellationToken cancellationToken = default) =>
         RunMapOperationAsync(
@@ -837,6 +909,119 @@ public sealed unsafe partial class MapHandle : IDisposable
                     Handle,
                     nativeSourceId.Value,
                     MapStructs.ToNative(bounds),
+                    completion
+                )
+            );
+        });
+    }
+
+    /// <summary>Adds a custom MVT vector source with tile callbacks.</summary>
+    /// <remarks>
+    /// The upcall stubs this installs live until MapLibre stops referencing them: until the source
+    /// is removed, until a style load leaves a style without it, or until this map closes. The
+    /// binding releases them from the callback the C API invokes then, so nothing here depends on
+    /// the events <see cref="SetEventMaskAsync" /> selects.
+    /// </remarks>
+    public Task<CommandCompletion> AddCustomMvtVectorSourceAsync(
+        string sourceId,
+        CustomMvtVectorSourceOptions options
+    )
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        return AddCustomMvtVectorSourceAsync(sourceId, new CustomMvtVectorSourceState(options));
+    }
+
+    internal Task<CommandCompletion> AddCustomMvtVectorSourceAsync(
+        string sourceId,
+        CustomMvtVectorSourceState sourceState
+    )
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        try
+        {
+            return NativeCompletion.SubmitCommandChecked(completion =>
+            {
+                var descriptor = sourceState.Descriptor;
+                NativeStatus.Check(
+                    AddCustomMvtVectorSourceNative(
+                        Handle,
+                        nativeSourceId.Value,
+                        &descriptor,
+                        completion
+                    )
+                );
+            });
+        }
+        catch
+        {
+            // A rejected add never referenced the state, so no release callback is owed for it.
+            sourceState.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>Sets custom MVT vector source tile data.</summary>
+    public Task<CommandCompletion> SetCustomMvtVectorSourceTileDataAsync(
+        string sourceId,
+        CanonicalTileId tileId,
+        byte[] data
+    )
+    {
+        return NativeCompletion.SubmitCommandChecked(completion =>
+        {
+            using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+            using var nativeData = NativeStringView.From(data, nameof(data));
+            var nativeTileId = StyleStructs.ToNative(tileId);
+            NativeStatus.Check(
+                NativeMethods.mln_map_set_custom_mvt_vector_source_tile_data(
+                    Handle,
+                    nativeSourceId.Value,
+                    nativeTileId,
+                    nativeData.Value,
+                    completion
+                )
+            );
+        });
+    }
+
+    /// <summary>Reports a custom MVT vector source error for one tile.</summary>
+    public Task<CommandCompletion> SetCustomMvtVectorSourceTileErrorAsync(
+        string sourceId,
+        CanonicalTileId tileId,
+        string message
+    )
+    {
+        return NativeCompletion.SubmitCommandChecked(completion =>
+        {
+            using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+            using var nativeMessage = NativeStringView.From(message, nameof(message));
+            var nativeTileId = StyleStructs.ToNative(tileId);
+            NativeStatus.Check(
+                NativeMethods.mln_map_set_custom_mvt_vector_source_tile_error(
+                    Handle,
+                    nativeSourceId.Value,
+                    nativeTileId,
+                    nativeMessage.Value,
+                    completion
+                )
+            );
+        });
+    }
+
+    /// <summary>Invalidates one custom MVT vector source tile.</summary>
+    public Task<CommandCompletion> InvalidateCustomMvtVectorSourceTileAsync(
+        string sourceId,
+        CanonicalTileId tileId
+    )
+    {
+        return NativeCompletion.SubmitCommandChecked(completion =>
+        {
+            using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+            NativeStatus.Check(
+                NativeMethods.mln_map_invalidate_custom_mvt_vector_source_tile(
+                    Handle,
+                    nativeSourceId.Value,
+                    StyleStructs.ToNative(tileId),
                     completion
                 )
             );
@@ -1313,7 +1498,7 @@ public sealed unsafe partial class MapHandle : IDisposable
         });
     }
 
-    /// <summary>Sets a location indicator layer accuracy radius in logical pixels.</summary>
+    /// <summary>Sets a location indicator layer accuracy radius in meters.</summary>
     public Task<CommandCompletion> SetLocationIndicatorAccuracyRadiusAsync(
         string layerId,
         double radius
@@ -1699,12 +1884,33 @@ public sealed unsafe partial class MapHandle : IDisposable
     private static MapAddCustomGeometrySource AddCustomGeometrySourceNative =>
         addCustomGeometrySourceForTest ?? DefaultAddCustomGeometrySource;
 
+    internal static IDisposable UseCustomMvtVectorSourceInstallForTest(
+        MapAddCustomMvtVectorSource addCustomMvtVectorSource
+    )
+    {
+        var previous = addCustomMvtVectorSourceForTest;
+        addCustomMvtVectorSourceForTest = addCustomMvtVectorSource;
+        return new RestoreCustomMvtVectorSourceInstall(previous);
+    }
+
+    private static MapAddCustomMvtVectorSource AddCustomMvtVectorSourceNative =>
+        addCustomMvtVectorSourceForTest ?? DefaultAddCustomMvtVectorSource;
+
     private sealed class RestoreCustomGeometrySourceInstall(MapAddCustomGeometrySource? previous)
         : IDisposable
     {
         public void Dispose()
         {
             addCustomGeometrySourceForTest = previous;
+        }
+    }
+
+    private sealed class RestoreCustomMvtVectorSourceInstall(MapAddCustomMvtVectorSource? previous)
+        : IDisposable
+    {
+        public void Dispose()
+        {
+            addCustomMvtVectorSourceForTest = previous;
         }
     }
 

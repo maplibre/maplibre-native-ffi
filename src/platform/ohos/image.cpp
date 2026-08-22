@@ -11,7 +11,7 @@
 #include <multimedia/image_framework/image/image_source_native.h>
 #include <multimedia/image_framework/image/pixelmap_native.h>
 
-namespace mbgl {
+namespace mln {
 namespace {
 
 const char* imageErrorCodeName(Image_ErrorCode code) {
@@ -359,4 +359,4 @@ PremultipliedImage decodeImage(const std::string& string) {
   return image;
 }
 
-}  // namespace mbgl
+}  // namespace mln

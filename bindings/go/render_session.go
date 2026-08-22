@@ -588,6 +588,12 @@ func (f *AcquiredFrame) WebGPUTexture() (WebGPUOwnedTextureFrameInfo, error) {
 	return info, err
 }
 
+// Resize starts a render target extent update.
+//
+// The session keeps its renderer across a resize, along with the tile pyramid,
+// glyph and image atlases, and symbol placement. A scale factor change retires
+// the renderer instead, because shaders are compiled for one pixel ratio.
+// Map-owned feature state survives either way.
 func (s *RenderSessionHandle) Resize(extent RenderTargetExtent) (*Future[struct{}], error) {
 	if err := extent.validate(); err != nil {
 		return nil, err

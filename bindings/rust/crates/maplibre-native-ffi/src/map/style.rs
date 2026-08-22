@@ -13,15 +13,17 @@ pub use maplibre_core::{
 };
 use maplibre_native_ffi_core as maplibre_core;
 use maplibre_native_ffi_core::ptr::const_ptr_or_null;
+use maplibre_native_ffi_core::query::FeatureStateSelectorNativeExt;
 use maplibre_native_ffi_core::values::lat_lngs_to_native;
 use maplibre_native_ffi_sys as sys;
 
 use crate::custom_geometry::{
     CanonicalTileId, CustomGeometrySourceOptions, CustomGeometrySourceState,
 };
+use crate::custom_mvt_vector::{CustomMvtVectorSourceOptions, CustomMvtVectorSourceState};
 use crate::render::PremultipliedRgba8Image;
 use crate::values::NativeValue;
-use crate::{CommandCompletion, LatLng, LatLngBounds, NativeFuture, Result};
+use crate::{CommandCompletion, FeatureStateSelector, LatLng, LatLngBounds, NativeFuture, Result};
 
 /// Horizontal and vertical stretch intervals for one style image.
 pub type StyleImageStretches = (Vec<ImageStretch>, Vec<ImageStretch>);
@@ -55,6 +57,66 @@ impl super::MapHandle {
         // released the callback state of the sources this load dropped.
         crate::completion::submit(
             move |completion| unsafe { sys::mln_map_set_style_json(map, json, completion) },
+            crate::completion::command,
+        )
+    }
+
+    /// Sets per-feature state on this map. The state bytes must contain one
+    /// UTF-8 JSON object and are copied before the call returns.
+    pub fn set_feature_state(
+        &self,
+        selector: &FeatureStateSelector,
+        state: &[u8],
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let map = self.inner.native()?;
+        let selector = selector.to_native();
+        let state = maplibre_core::string::buffer_view(state);
+        // SAFETY: map is live and all borrowed storage remains valid for the
+        // synchronous submission; the C API copies selector and state bytes
+        // before return.
+        crate::completion::submit(
+            |completion| unsafe {
+                sys::mln_map_set_feature_state(map, selector.as_ptr(), state, completion)
+            },
+            crate::completion::command,
+        )
+    }
+
+    /// Copies per-feature state from this map. The read observes every map
+    /// command accepted before it, and missing state is an empty JSON object.
+    pub fn get_feature_state(
+        &self,
+        selector: &FeatureStateSelector,
+    ) -> Result<NativeFuture<Vec<u8>>> {
+        let map = self.inner.native()?;
+        let selector = selector.to_native();
+        // SAFETY: map is live and selector storage remains valid for the
+        // synchronous submission; the C API copies selector bytes before
+        // return.
+        crate::completion::submit(
+            |completion| unsafe {
+                sys::mln_map_get_feature_state(map, selector.as_ptr(), completion)
+            },
+            crate::completion::buffer,
+        )
+    }
+
+    /// Removes per-feature state selected on this map. A selector with a state
+    /// key removes one key, one with only a feature ID removes that feature's
+    /// state, and one with neither removes all state for the source.
+    pub fn remove_feature_state(
+        &self,
+        selector: &FeatureStateSelector,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let map = self.inner.native()?;
+        let selector = selector.to_native();
+        // SAFETY: map is live and selector storage remains valid for the
+        // synchronous submission; the C API copies selector bytes before
+        // return.
+        crate::completion::submit(
+            |completion| unsafe {
+                sys::mln_map_remove_feature_state(map, selector.as_ptr(), completion)
+            },
             crate::completion::command,
         )
     }
@@ -189,6 +251,123 @@ impl super::MapHandle {
                     map,
                     source_id.raw(),
                     bounds.to_native(),
+                    completion,
+                )
+            },
+            crate::completion::command,
+        )
+    }
+
+    /// Adds a custom MVT vector source to the current style.
+    ///
+    /// The callback state is scoped to this map's current style. The C API
+    /// frees it once it stops referencing it, whether the source is removed,
+    /// dropped by a style load, or retired with the map. Native may invoke
+    /// callbacks from worker threads, so schedule host-context work before
+    /// calling map APIs.
+    pub fn add_custom_mvt_vector_source(
+        &self,
+        source_id: &str,
+        options: CustomMvtVectorSourceOptions,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let map = self.inner.native()?;
+        let source_id_view = maplibre_core::string::string_view(source_id);
+        let state = CustomMvtVectorSourceState::new(options);
+        let descriptor = state.descriptor();
+        // The descriptor's release callback frees this box, so the C API owns
+        // the callback state from a successful add onwards.
+        let state = Box::into_raw(state);
+        // SAFETY: map is live, source_id_view is valid for this call, and
+        // descriptor names callback state that lives until the release callback.
+        let result = crate::completion::submit(
+            move |completion| unsafe {
+                sys::mln_map_add_custom_mvt_vector_source(
+                    map,
+                    source_id_view.raw(),
+                    &descriptor,
+                    completion,
+                )
+            },
+            crate::completion::command,
+        );
+        if result.is_err() {
+            // SAFETY: rejected submissions retain ownership of callback state.
+            drop(unsafe { Box::from_raw(state) });
+        }
+        result
+    }
+
+    /// Sets custom MVT vector source data for one canonical tile.
+    ///
+    /// Pass an empty slice for an empty tile. Native ignores the bytes when
+    /// that tile is not awaiting a response after fetch.
+    pub fn set_custom_mvt_vector_source_tile_data(
+        &self,
+        source_id: &str,
+        tile_id: CanonicalTileId,
+        data: &[u8],
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let map = self.inner.native()?;
+        let source_id = maplibre_core::string::string_view(source_id);
+        let data = maplibre_core::string::buffer_view(data);
+        // SAFETY: map is live, source_id is valid for this call, tile_id is
+        // passed by value, and data remains valid for this call.
+        crate::completion::submit(
+            move |completion| unsafe {
+                sys::mln_map_set_custom_mvt_vector_source_tile_data(
+                    map,
+                    source_id.raw(),
+                    tile_id.to_native(),
+                    data,
+                    completion,
+                )
+            },
+            crate::completion::command,
+        )
+    }
+
+    /// Reports a custom MVT vector source error for one canonical tile.
+    pub fn set_custom_mvt_vector_source_tile_error(
+        &self,
+        source_id: &str,
+        tile_id: CanonicalTileId,
+        message: &str,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let map = self.inner.native()?;
+        let source_id = maplibre_core::string::string_view(source_id);
+        let message = maplibre_core::string::string_view(message);
+        // SAFETY: map is live, source_id and message are valid for this call,
+        // and tile_id is passed by value.
+        crate::completion::submit(
+            move |completion| unsafe {
+                sys::mln_map_set_custom_mvt_vector_source_tile_error(
+                    map,
+                    source_id.raw(),
+                    tile_id.to_native(),
+                    message.raw(),
+                    completion,
+                )
+            },
+            crate::completion::command,
+        )
+    }
+
+    /// Invalidates custom MVT vector source data for one canonical tile.
+    pub fn invalidate_custom_mvt_vector_source_tile(
+        &self,
+        source_id: &str,
+        tile_id: CanonicalTileId,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let map = self.inner.native()?;
+        let source_id = maplibre_core::string::string_view(source_id);
+        // SAFETY: map is live, source_id is valid for this call, and tile_id is
+        // passed by value.
+        crate::completion::submit(
+            move |completion| unsafe {
+                sys::mln_map_invalidate_custom_mvt_vector_source_tile(
+                    map,
+                    source_id.raw(),
+                    tile_id.to_native(),
                     completion,
                 )
             },
@@ -926,7 +1105,7 @@ impl super::MapHandle {
         )
     }
 
-    /// Sets a location indicator layer accuracy radius in logical pixels.
+    /// Sets a location indicator layer accuracy radius in meters.
     pub fn set_location_indicator_accuracy_radius(
         &self,
         layer_id: &str,

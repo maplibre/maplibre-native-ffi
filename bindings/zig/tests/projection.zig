@@ -27,6 +27,21 @@ fn waitForCameraCommands(map: *maplibre.MapHandle) !void {
     _ = try future.wait(null);
 }
 
+fn useAndCloseProjectionOnThread(
+    projection: *maplibre.MapProjectionHandle,
+    out_error: *?anyerror,
+) void {
+    _ = projection.getCamera() catch |err| {
+        out_error.* = err;
+        return;
+    };
+    projection.close() catch |err| {
+        out_error.* = err;
+        return;
+    };
+    out_error.* = null;
+}
+
 test "map projection mode updates snapshot fields through public binding" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
@@ -179,6 +194,27 @@ test "standalone projection conversions run from another thread" {
     thread.join();
     try testing.expect(thread_error == null);
     try expectCenterPoint(point);
+}
+
+test "standalone projection remains usable on another thread" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    var map_future = try maplibre.MapHandle.create(&runtime, .{});
+    defer map_future.deinit();
+    var map = try map_future.wait(null);
+    var projection_future = try maplibre.MapProjectionHandle.create(&map);
+    defer projection_future.deinit();
+    var projection = try projection_future.wait(null);
+    try map.close();
+    try runtime.close();
+
+    var thread_error: ?anyerror = null;
+    const thread = try std.Thread.spawn(
+        .{},
+        useAndCloseProjectionOnThread,
+        .{ &projection, &thread_error },
+    );
+    thread.join();
+    try testing.expect(thread_error == null);
 }
 
 test "projected meters convert to and from lat lng" {
