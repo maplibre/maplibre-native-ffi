@@ -30,6 +30,12 @@ native preset, and verifies that Flutter packages its code asset. Device and
 simulator iOS use separate presets because their dynamic libraries target
 different Apple SDKs.
 
+Use Metal or Vulkan for Dart on macOS. The macOS EGL target is temporarily
+excluded because the prebuilt ANGLE libraries do not have enough Mach-O header
+padding for Dart native assets to update their install names. The target can be
+enabled after the ANGLE libraries are relinked with
+`-headerpad_max_install_names` and the repository uses the new artifact.
+
 The native library reaches Dart as a code asset that `hook/build.dart` declares,
 which is how the generated `@Native` declarations resolve it. Build hooks run in
 a semi-hermetic environment that strips arbitrary environment variables, so the
