@@ -9,7 +9,10 @@ if(NOT EMSCRIPTEN)
   return()
 endif()
 
-set(MLN_FFI_EMSCRIPTEN_PTHREAD_POOL_SIZE "16"
+# Leave capacity beyond MapLibre's active workers for the runtime executor and
+# process-wide teardown coordinator. A saturated fixed pool cannot run the
+# coordinator that releases those workers.
+set(MLN_FFI_EMSCRIPTEN_PTHREAD_POOL_SIZE "32"
     CACHE STRING "Emscripten pre-spawned pthread pool size")
 set(MLN_FFI_EMSCRIPTEN_INITIAL_MEMORY "512MB"
     CACHE STRING "Initial WASM linear memory")
