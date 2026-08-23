@@ -2728,6 +2728,10 @@ auto with_projection(mln_map_projection projection, Work work) -> mln_status {
 
 }  // namespace
 
+namespace {
+auto ensure_map_teardown_lane() -> void;
+}
+
 auto create_map(
   mln_runtime runtime, const mln_map_options* options, mln_map* out_map
 ) -> mln_status {
@@ -2749,6 +2753,7 @@ auto create_map(
   if (runtime_status != MLN_STATUS_OK) {
     return runtime_status;
   }
+  ensure_map_teardown_lane();
 
   const auto retain_status = retain_runtime_map(runtime);
   if (retain_status != MLN_STATUS_OK) {
@@ -2974,24 +2979,21 @@ auto map_resize(
 namespace {
 auto discarded_completion() noexcept -> mln_completion;
 
-// Serializes blocking map destruction away from runtime executors. The worker
-// exists only while teardown is pending, so browser builds do not permanently
-// lose a worker from their fixed pthread pool.
+// Serializes blocking map destruction away from runtime executors. One shared
+// worker is reserved before a map creates its own worker pool, so close never
+// depends on creating a thread after that pool is saturated.
 class MapTeardownLane {
  public:
+  MapTeardownLane() {
+    std::thread([this]() noexcept -> void { run(); }).detach();
+  }
+
   auto submit(std::function<void()> teardown) -> void {
-    auto start = false;
     {
       const std::scoped_lock lock(mutex_);
       pending_.push_back(std::move(teardown));
-      if (!running_) {
-        running_ = true;
-        start = true;
-      }
     }
-    if (start) {
-      std::thread([this]() noexcept -> void { run(); }).detach();
-    }
+    condition_.notify_one();
   }
 
  private:
@@ -2999,11 +3001,10 @@ class MapTeardownLane {
     for (;;) {
       auto teardown = std::function<void()>{};
       {
-        const std::scoped_lock lock(mutex_);
-        if (pending_.empty()) {
-          running_ = false;
-          return;
-        }
+        auto lock = std::unique_lock{mutex_};
+        condition_.wait(lock, [this]() noexcept -> bool {
+          return !pending_.empty();
+        });
         teardown = std::move(pending_.front());
         pending_.pop_front();
       }
@@ -3015,14 +3016,18 @@ class MapTeardownLane {
   }
 
   std::mutex mutex_;
+  std::condition_variable condition_;
   std::deque<std::function<void()>> pending_;
-  bool running_ = false;
 };
 
 auto map_teardown_lane() -> MapTeardownLane& {
   // Process lifetime avoids a static-destruction race with the retiring lane.
   static auto* lane = new MapTeardownLane{};
   return *lane;
+}
+
+auto ensure_map_teardown_lane() -> void {
+  static_cast<void>(map_teardown_lane());
 }
 }  // namespace
 

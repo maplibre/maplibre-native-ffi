@@ -9,7 +9,8 @@ if(NOT EMSCRIPTEN)
   return()
 endif()
 
-set(MLN_FFI_EMSCRIPTEN_PTHREAD_POOL_SIZE "16"
+# The shared map teardown lane is reserved before map worker pools start.
+set(MLN_FFI_EMSCRIPTEN_PTHREAD_POOL_SIZE "17"
     CACHE STRING "Emscripten pre-spawned pthread pool size")
 set(MLN_FFI_EMSCRIPTEN_INITIAL_MEMORY "512MB"
     CACHE STRING "Initial WASM linear memory")
