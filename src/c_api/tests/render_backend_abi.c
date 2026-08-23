@@ -713,7 +713,8 @@ static void frame_results_report_whether_the_map_needs_another_frame(void) {
   // Render until the map settles: the last frame asks for no repaint.
   mln_render_frame_result result = {.size = sizeof(mln_render_frame_result)};
   bool settled = false;
-  for (unsigned int attempt = 0; attempt < 500 && !settled; attempt += 1) {
+  const uint64_t settle_deadline = mln_test_monotonic_milliseconds() + 30000;
+  while (!settled && mln_test_monotonic_milliseconds() < settle_deadline) {
     mln_frame_demand demand = mln_frame_demand_default();
     demand.flags = 0;
     TEST_ASSERT_EQUAL_INT(
@@ -751,8 +752,9 @@ static void frame_results_report_whether_the_map_needs_another_frame(void) {
   // rendering the same update again. A rendered result here only means a
   // fresh update slipped in, so keep demanding until one demand finds none.
   bool saw_no_update = false;
-  for (unsigned int attempt = 0; attempt < 500 && !saw_no_update;
-       attempt += 1) {
+  const uint64_t no_update_deadline = mln_test_monotonic_milliseconds() + 30000;
+  while (!saw_no_update &&
+         mln_test_monotonic_milliseconds() < no_update_deadline) {
     mln_frame_demand demand = mln_frame_demand_default();
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK, mln_render_session_request_frame(fixture.session, &demand)
@@ -795,8 +797,9 @@ static void frame_results_report_whether_the_map_needs_another_frame(void) {
   );
 
   bool saw_repaint_request = false;
-  for (unsigned int attempt = 0; attempt < 500 && !saw_repaint_request;
-       attempt += 1) {
+  const uint64_t repaint_deadline = mln_test_monotonic_milliseconds() + 30000;
+  while (!saw_repaint_request &&
+         mln_test_monotonic_milliseconds() < repaint_deadline) {
     mln_frame_demand demand = mln_frame_demand_default();
     demand.flags = 0;
     TEST_ASSERT_EQUAL_INT(
