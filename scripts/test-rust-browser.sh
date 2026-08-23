@@ -53,11 +53,10 @@ export CARGO_ENCODED_RUSTFLAGS="$encoded"
 # Shared memory requires an atomics-enabled standard library.
 export RUSTC_BOOTSTRAP=1
 export CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUNNER="$MISE_MONOREPO_ROOT/scripts/run-browser-cargo-test.sh"
-cargo_test() {
+cargo_support_tests() {
   cargo test \
     -p maplibre-native-ffi-sys \
     -p maplibre-native-ffi-core \
-    -p maplibre-native-ffi \
     --target wasm32-unknown-emscripten \
     -Zbuild-std=std,panic_abort \
     -- "$@" --test-threads=1
@@ -71,32 +70,41 @@ cargo_binding_test() {
     -- "$@" --test-threads=1
 }
 
-# A browser process retains GPU and pthread resources longer than their native
-# handles. Keep lifecycle-heavy map tests in bounded batches, and give every
-# render test a fresh process so Chromium's context budget is not shared across
-# otherwise independent fixtures.
-cargo_binding_test map::tests::
-cargo_binding_test projection::tests::
-render_tests=(
-  cloned_session_controls_can_be_used_from_another_thread
-  cluster_feature_extensions_copy_values_and_feature_collections
-  feature_state_and_rendered_queries_copy_native_results
-  live_session_blocks_map_close_and_drop_reports_the_leaked_map
-  native_pointer_round_trips_address
-  opengl_borrowed_texture_session_replaces_its_target
-  opengl_context_provider_mask_matches_backend_availability
-  opengl_owned_texture_exposes_backend_metadata
-  opengl_surface_session_renders_into_the_platform_surface
-  owned_texture_session_renders_acquires_resizes_and_reads_back
-  sustained_frame_demands_outlast_the_texture_ring_depth
-  texture_readback_before_a_frame_reports_invalid_state
-  webgpu_borrowed_texture_session_renders_into_a_host_texture
-  webgpu_surface_session_renders_into_the_browser_canvas
-)
-for test_name in "${render_tests[@]}"; do
-  cargo_binding_test "render::tests::$test_name" --exact
-done
-cargo_test --skip map::tests:: --skip projection::tests:: --skip render::tests::
+# Chromium retains GPU and pthread resources longer than their native handles.
+# Give every integration test a fresh process so otherwise independent tests
+# cannot inherit a context budget or worker-pool state from their predecessors.
+run_file_tests() {
+  local prefix=$1
+  local source=$2
+  while IFS= read -r test_name; do
+    cargo_binding_test "$prefix$test_name" --exact
+  done < <(
+    awk '
+      /#\[test\]/ { test = 1; next }
+      test && /^fn / {
+        sub(/^fn /, "")
+        sub(/\(.*/, "")
+        print
+        test = 0
+      }
+    ' "$source"
+  )
+}
+
+binding_source="$MISE_MONOREPO_ROOT/bindings/rust/crates/maplibre-native-ffi/src"
+run_file_tests 'completion::tests::' "$binding_source/completion.rs"
+run_file_tests 'custom_geometry::tests::' "$binding_source/custom_geometry.rs"
+run_file_tests 'custom_mvt_vector::tests::' "$binding_source/custom_mvt_vector.rs"
+run_file_tests 'events::tests::' "$binding_source/events.rs"
+run_file_tests 'handle::tests::' "$binding_source/handle.rs"
+run_file_tests 'logging::tests::' "$binding_source/logging.rs"
+run_file_tests 'map::tests::' "$binding_source/map/tests.rs"
+run_file_tests 'projection::tests::' "$binding_source/projection.rs"
+run_file_tests 'render::tests::' "$binding_source/render/tests.rs"
+run_file_tests 'resource::tests::' "$binding_source/resource.rs"
+run_file_tests 'runtime::tests::' "$binding_source/runtime.rs"
+run_file_tests 'tests::' "$binding_source/lib.rs"
+cargo_support_tests
 cargo clippy \
   -p maplibre-native-ffi-sys \
   -p maplibre-native-ffi-core \
