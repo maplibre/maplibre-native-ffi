@@ -21,7 +21,7 @@ gradle_args=(
 if [[ "$usage_prebuilt" == "true" ]]; then
   gradle_args+=(-Pmaplibre.android.prebuiltBuildRoot=build)
 fi
-./gradlew "${gradle_args[@]}" :examples:android-map:assembleDebug
+./gradlew "${gradle_args[@]}" :examples:android-map:assembleRelease
 '''
 
 [tasks.run]

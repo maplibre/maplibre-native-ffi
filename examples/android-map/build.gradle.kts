@@ -45,6 +45,18 @@ android {
     buildConfigField("String", "RENDER_BACKEND", "\"$androidBackend\"")
   }
 
+  // CI assembles this variant so R8 runs over the binding and its consumer keep
+  // rules on every change. Signing with the debug key keeps the APK installable
+  // without carrying a release keystore.
+  buildTypes {
+    release {
+      isMinifyEnabled = true
+      isShrinkResources = true
+      signingConfig = signingConfigs.getByName("debug")
+      proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+    }
+  }
+
   buildFeatures { buildConfig = true }
 
   if (androidBackend == "vulkan") {

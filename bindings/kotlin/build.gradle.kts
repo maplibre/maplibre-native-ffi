@@ -39,6 +39,10 @@ val generatedJavaCppSources =
 val mavenGroup = providers.gradleProperty("maplibre.maven.group").get()
 val mavenVersion = providers.gradleProperty("maplibre.maven.version").get()
 val mavenArtifact = "maplibre-native-ffi"
+val minifyAndroidDeviceTests =
+  providers.gradleProperty("maplibre.android.testMinify").map(String::toBoolean).getOrElse(false)
+val androidConsumerKeepRules =
+  file("src/androidMain/resources/META-INF/proguard/maplibre-native-ffi-javacpp.pro")
 
 kotlin {
   androidNativeArm64()
@@ -76,9 +80,14 @@ kotlin {
       }
 
     optimization {
-      consumerKeepRules.file(
-        "src/androidMain/resources/META-INF/proguard/maplibre-native-ffi-javacpp.pro"
-      )
+      // CI enables minification while building the device-test artifact. Reuse
+      // the published consumer rules so JavaCPP is optimized exactly as it is
+      // in a shrinking Android application.
+      minify = minifyAndroidDeviceTests
+      keepRules.file(androidConsumerKeepRules)
+      testKeepRules.file(androidConsumerKeepRules)
+      testKeepRules.file("src/androidDeviceTest/resources/proguard-rules.pro")
+      consumerKeepRules.file(androidConsumerKeepRules)
       consumerKeepRules.publish = true
     }
 

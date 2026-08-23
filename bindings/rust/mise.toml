@@ -22,7 +22,13 @@ exec cargo build \
 '''
 
 [tasks.test]
-extends = "ffi:preset"
+usage = '''
+arg "[preset]" default="{{vars.host_native_preset}}"
+arg "[profile]" default="dev" {
+  choices "dev" "release"
+}
+'''
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
 # The preset selects the runner: Android and OpenHarmony x64 presets push to an
 # emulator, Emscripten presets run as a page in headless Chromium, and host
@@ -53,31 +59,45 @@ fi
 export LD_LIBRARY_PATH="$lib_dirs${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export DYLD_LIBRARY_PATH="$lib_dirs${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
 export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
-cargo test \
+cargo_args=()
+if [[ "$usage_profile" == "release" ]]; then
+  cargo_args+=(--release)
+fi
+cargo test "${cargo_args[@]}" \
   -p maplibre-native-ffi-sys \
   -p maplibre-native-ffi-core \
   -p maplibre-native-ffi \
   -- --test-threads=1
-cargo clippy \
-  -p maplibre-native-ffi-sys \
-  -p maplibre-native-ffi-core \
-  -p maplibre-native-ffi \
-  --all-targets -- -D warnings
+# Clippy is profile-independent. Every other host preset runs it against the
+# dev graph, so the release variant avoids compiling that graph a second time.
+if [[ "$usage_profile" == "dev" ]]; then
+  cargo clippy \
+    -p maplibre-native-ffi-sys \
+    -p maplibre-native-ffi-core \
+    -p maplibre-native-ffi \
+    --all-targets -- -D warnings
+fi
 '''
 run_windows = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
 export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
-cargo test \
+cargo_args=()
+if [[ "$usage_profile" == "release" ]]; then
+  cargo_args+=(--release)
+fi
+cargo test "${cargo_args[@]}" \
   -p maplibre-native-ffi-sys \
   -p maplibre-native-ffi-core \
   -p maplibre-native-ffi \
   -- --test-threads=1
-cargo clippy \
-  -p maplibre-native-ffi-sys \
-  -p maplibre-native-ffi-core \
-  -p maplibre-native-ffi \
-  --all-targets -- -D warnings
+if [[ "$usage_profile" == "dev" ]]; then
+  cargo clippy \
+    -p maplibre-native-ffi-sys \
+    -p maplibre-native-ffi-core \
+    -p maplibre-native-ffi \
+    --all-targets -- -D warnings
+fi
 '''
 
 [tasks."test:download"]

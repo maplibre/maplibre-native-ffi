@@ -2,7 +2,8 @@
 [[suites]]
 platforms = ["linux", "macos", "windows"]
 commands = [
-  { task = "//bindings/rust:test" },
+  { task = "//bindings/rust:test", exclude = ["linux-x64-vulkan"] },
+  { task = "//bindings/rust:test", args = ["release"], include = ["linux-x64-vulkan"] },
   { task = "//examples/rust-map:check", exclude = ["macos-arm64-egl"] },
 ]
 
@@ -38,7 +39,8 @@ commands = [
 [[suites]]
 platforms = ["linux", "macos"]
 commands = [
-  { task = "//bindings/swift:test" },
+  { task = "//bindings/swift:test", exclude = ["linux-x64-vulkan"] },
+  { task = "//bindings/swift:test", args = ["release"], include = ["linux-x64-vulkan"] },
   { task = "//examples/swift-map:build", include = ["macos-arm64-metal"] },
 ]
 

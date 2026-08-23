@@ -32,11 +32,15 @@ mkdir -p build
 [tasks.build]
 extends = "ffi:preset"
 # Visual Studio exports Platform=x64 on Windows; the .NET solution uses Any CPU.
+# Release exercises the JIT lifetime rules that shipped applications use. The
+# Debug JIT keeps locals alive for the debugger and can hide a missing
+# GC.KeepAlive around a native call.
 dir = "../.."
 run = '''
 MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   dotnet build \
     Maplibre.NativeFfi.slnx \
+    -c Release \
     -p:Platform="Any CPU"
 '''
 
@@ -47,5 +51,6 @@ run = '''
 MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   dotnet test \
     --project bindings/dotnet/tests/Maplibre.NativeFfi.Tests/Maplibre.NativeFfi.Tests.csproj \
+    -c Release \
     -p:Platform="Any CPU"
 '''
