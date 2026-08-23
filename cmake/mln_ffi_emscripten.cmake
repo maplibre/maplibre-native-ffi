@@ -9,11 +9,7 @@ if(NOT EMSCRIPTEN)
   return()
 endif()
 
-# A browser module must cover the proxied host thread, runtime and renderer
-# workers, and MapLibre's shared tile work at the same time. Sixteen workers
-# can deadlock a synchronous host wait before a retiring worker returns to the
-# pool, especially while WebGPU has a thread suspended in JSPI.
-set(MLN_FFI_EMSCRIPTEN_PTHREAD_POOL_SIZE "32"
+set(MLN_FFI_EMSCRIPTEN_PTHREAD_POOL_SIZE "16"
     CACHE STRING "Emscripten pre-spawned pthread pool size")
 set(MLN_FFI_EMSCRIPTEN_INITIAL_MEMORY "512MB"
     CACHE STRING "Initial WASM linear memory")
