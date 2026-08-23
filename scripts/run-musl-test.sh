@@ -37,7 +37,7 @@ esac
   alpine:3.22 \
   sh -euc '
     case "$1" in
-      egl) apk add --no-cache mesa-dri-gallium mesa-egl ;;
+      egl) apk add --no-cache mesa-dri-gallium mesa-egl mesa-gles ;;
       vulkan) apk add --no-cache mesa-vulkan-swrast vulkan-loader ;;
     esac
     export LIBGL_ALWAYS_SOFTWARE=true
