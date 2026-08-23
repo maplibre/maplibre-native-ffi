@@ -572,11 +572,20 @@ impl RuntimeHandle {
             .map_err(|error| HandleOperationError::new(error, self))
     }
 
-    /// Closes this runtime and blocks until native teardown finishes, so a
-    /// test binary exits after the runtime's threads are gone.
+    /// Closes this runtime and waits for teardown when the test target permits
+    /// a synchronous wait.
     #[cfg(test)]
     pub(crate) fn close_and_wait(self) {
-        completion::blocking(self.close().map_err(HandleOperationError::into_error));
+        let completion = self
+            .close()
+            .map_err(HandleOperationError::into_error)
+            .expect("native close submission failed");
+        #[cfg(not(target_os = "emscripten"))]
+        completion::blocking(Ok(completion));
+        // Each browser integration test has a dedicated process, so returning
+        // keeps the runtime owner thread available until process teardown.
+        #[cfg(target_os = "emscripten")]
+        drop(completion);
     }
 }
 

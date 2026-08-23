@@ -187,11 +187,21 @@ impl MapHandle {
             .map_err(|error| HandleOperationError::new(error, self))
     }
 
-    /// Closes this map and blocks until its native map and callbacks have
-    /// retired.
+    /// Closes this map and waits for retirement when the test target permits a
+    /// synchronous wait.
     #[cfg(test)]
     pub(crate) fn close_and_wait(self) {
-        completion::blocking(self.close().map_err(HandleOperationError::into_error));
+        let completion = self
+            .close()
+            .map_err(HandleOperationError::into_error)
+            .expect("native close submission failed");
+        #[cfg(not(target_os = "emscripten"))]
+        completion::blocking(Ok(completion));
+        // Emscripten graphics teardown can require the test's pthread. The
+        // browser runner isolates every integration test in its own process,
+        // which provides the resource boundary without blocking that thread.
+        #[cfg(target_os = "emscripten")]
+        drop(completion);
     }
 
     /// Copies the latest immutable map publication.
