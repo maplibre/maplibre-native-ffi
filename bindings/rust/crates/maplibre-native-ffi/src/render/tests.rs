@@ -290,7 +290,7 @@ fn create_owned_texture_session(
         let context = WebGpuTestContext::new()?;
         let session = finish_attachment(map.attach_webgpu_owned_texture(
             &WebGpuOwnedTextureDescriptor::new(extent, context.descriptor()),
-            RenderSessionAttachOptions::core_worker(2),
+            caller_attach_options(),
         )?)?;
         return Ok((OwnedTextureTestContext::WebGpu(context), session));
     }
@@ -434,7 +434,7 @@ fn create_webgpu_borrowed_texture_session(
     let texture = WebGpuBorrowedTexture::new(&context, physical_width, physical_height)?;
     let session = finish_attachment(map.attach_webgpu_borrowed_texture(
         &texture.descriptor(extent, &context),
-        RenderSessionAttachOptions::core_worker(2),
+        caller_attach_options(),
     )?)?;
     Ok((context, texture, session))
 }
@@ -470,7 +470,7 @@ impl OwnedTextureTestContext {
             #[cfg(mln_webgpu_backend)]
             Self::WebGpu(context) => map.attach_webgpu_owned_texture(
                 &WebGpuOwnedTextureDescriptor::new(extent, context.descriptor()),
-                RenderSessionAttachOptions::core_worker(2),
+                caller_attach_options(),
             ),
             Self::OpenGL(context) => map.attach_opengl_owned_texture(
                 &OpenGLOwnedTextureDescriptor::new(extent, context.descriptor()),
@@ -2897,6 +2897,47 @@ fn opengl_borrowed_texture_session_replaces_its_target() {
     );
     assert!(texture.read_rgba().unwrap().iter().any(|byte| *byte != 0));
     assert_eq!(session.snapshot().unwrap().extent, replacement_extent);
+
+    close_session(session);
+    map.close().unwrap();
+    runtime.close_and_wait();
+}
+
+#[cfg(mln_webgpu_backend)]
+#[test]
+fn webgpu_surface_session_renders_into_the_browser_canvas() {
+    if !crate::supported_render_backends().contains(RenderBackendMask::WEBGPU) {
+        return;
+    }
+
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = crate::completion::blocking(MapHandle::with_options(
+        &runtime,
+        &MapOptions::new(64, 64, 1.0),
+    ));
+    let context = WebGpuTestContext::new().unwrap();
+    let surface = WebGpuTestSurface::new(&context, 64, 64).unwrap();
+    let session = finish_attachment(
+        map.attach_webgpu_surface(
+            &surface.descriptor(RenderTargetExtent::new(64, 64, 1.0), &context),
+            caller_attach_options(),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    map.set_style_json(QUERY_STYLE_JSON.as_bytes()).unwrap();
+    await_runtime_barrier(&runtime);
+    assert_eq!(
+        render_frame(&session, false).disposition,
+        FrameDisposition::Rendered
+    );
+    assert!(
+        surface
+            .read_rgba(64, 64)
+            .unwrap()
+            .chunks_exact(4)
+            .any(|pixel| pixel == QUERY_STYLE_BACKGROUND_RGBA)
+    );
 
     close_session(session);
     map.close().unwrap();

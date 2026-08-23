@@ -1256,42 +1256,34 @@ mod tests {
         let first = Arc::new(());
         let first_callback = Arc::clone(&first);
 
-        runtime
-            .set_resource_provider(move |_, _| {
-                let _ = &first_callback;
-                crate::ResourceProviderDecision::PassThrough
-            })
-            .unwrap();
+        completion::blocking(runtime.set_resource_provider(move |_, _| {
+            let _ = &first_callback;
+            crate::ResourceProviderDecision::PassThrough
+        }));
         assert_eq!(Arc::strong_count(&first), 2);
 
         let second = Arc::new(());
         let second_callback = Arc::clone(&second);
-        runtime
-            .set_resource_provider(move |_, _| {
-                let _ = &second_callback;
-                crate::ResourceProviderDecision::PassThrough
-            })
-            .unwrap();
-        assert_eq!(Arc::strong_count(&first), 2);
+        completion::blocking(runtime.set_resource_provider(move |_, _| {
+            let _ = &second_callback;
+            crate::ResourceProviderDecision::PassThrough
+        }));
+        wait_for_arc_release(&first);
         assert_eq!(Arc::strong_count(&second), 2);
 
-        runtime.clear_resource_provider().unwrap();
-        assert_eq!(Arc::strong_count(&second), 2);
+        completion::blocking(runtime.clear_resource_provider());
+        wait_for_arc_release(&second);
 
         let third = Arc::new(());
         let third_callback = Arc::clone(&third);
-        runtime
-            .set_resource_provider(move |_, _| {
-                let _ = &third_callback;
-                crate::ResourceProviderDecision::PassThrough
-            })
-            .unwrap();
+        completion::blocking(runtime.set_resource_provider(move |_, _| {
+            let _ = &third_callback;
+            crate::ResourceProviderDecision::PassThrough
+        }));
         assert_eq!(Arc::strong_count(&third), 2);
 
         runtime.close_and_wait();
         wait_for_arc_release(&third);
-        wait_for_arc_release(&first);
-        wait_for_arc_release(&second);
     }
 
     #[test]
@@ -1557,34 +1549,28 @@ mod tests {
         let first = Arc::new(());
         let first_callback = Arc::clone(&first);
 
-        runtime
-            .set_resource_transform(move |request| {
-                let _ = &first_callback;
-                assert!(matches!(
-                    request.kind,
-                    ResourceKind::Style | ResourceKind::UnknownRaw(_)
-                ));
-                None
-            })
-            .unwrap();
+        completion::blocking(runtime.set_resource_transform(move |request| {
+            let _ = &first_callback;
+            assert!(matches!(
+                request.kind,
+                ResourceKind::Style | ResourceKind::UnknownRaw(_)
+            ));
+            None
+        }));
         assert_eq!(Arc::strong_count(&first), 2);
 
         let second = Arc::new(());
         let second_callback = Arc::clone(&second);
-        runtime
-            .set_resource_transform(move |_| {
-                let _ = &second_callback;
-                Some("https://example.test/replacement".to_owned())
-            })
-            .unwrap();
-        assert_eq!(Arc::strong_count(&first), 2);
+        completion::blocking(runtime.set_resource_transform(move |_| {
+            let _ = &second_callback;
+            Some("https://example.test/replacement".to_owned())
+        }));
+        wait_for_arc_release(&first);
         assert_eq!(Arc::strong_count(&second), 2);
 
-        runtime.clear_resource_transform().unwrap();
-        assert_eq!(Arc::strong_count(&second), 2);
-        runtime.close_and_wait();
-        wait_for_arc_release(&first);
+        completion::blocking(runtime.clear_resource_transform());
         wait_for_arc_release(&second);
+        runtime.close_and_wait();
     }
 
     /// The browser has no in-process TCP server, so the runner serves the two
@@ -1844,31 +1830,26 @@ mod tests {
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let first = Arc::new(());
         let first_callback = Arc::clone(&first);
-        runtime
-            .set_resource_transform(move |_| {
-                let _ = &first_callback;
-                None
-            })
-            .unwrap();
+        completion::blocking(runtime.set_resource_transform(move |_| {
+            let _ = &first_callback;
+            None
+        }));
         let map =
             crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
 
         let second = Arc::new(());
         let second_callback = Arc::clone(&second);
-        runtime
-            .set_resource_transform(move |_| {
-                let _ = &second_callback;
-                None
-            })
-            .unwrap();
+        completion::blocking(runtime.set_resource_transform(move |_| {
+            let _ = &second_callback;
+            None
+        }));
 
-        assert_eq!(Arc::strong_count(&first), 2);
+        wait_for_arc_release(&first);
         assert_eq!(Arc::strong_count(&second), 2);
 
         map.close().unwrap();
         runtime.close_and_wait();
         wait_for_arc_release(&second);
-        wait_for_arc_release(&first);
     }
 
     #[test]
@@ -1877,12 +1858,10 @@ mod tests {
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let token = Arc::new(());
         let callback_token = Arc::clone(&token);
-        runtime
-            .set_resource_transform(move |_| {
-                let _ = &callback_token;
-                None
-            })
-            .unwrap();
+        completion::blocking(runtime.set_resource_transform(move |_| {
+            let _ = &callback_token;
+            None
+        }));
         assert_eq!(Arc::strong_count(&token), 2);
 
         runtime.close_and_wait();
@@ -1922,12 +1901,10 @@ mod tests {
             crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
         map.close().unwrap();
 
-        runtime.clear_resource_transform().unwrap();
-
-        assert_eq!(Arc::strong_count(&token), 2);
+        completion::blocking(runtime.clear_resource_transform());
+        wait_for_arc_release(&token);
 
         runtime.close_and_wait();
-        wait_for_arc_release(&token);
     }
 
     #[test]

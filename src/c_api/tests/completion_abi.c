@@ -10,7 +10,7 @@ typedef struct callback_probe {
   atomic_uint calls;
   atomic_uint releases;
   atomic_int status;
-  atomic_uintptr_t value;
+  atomic_uint_fast64_t value;
 } callback_probe;
 
 static void record_completion(

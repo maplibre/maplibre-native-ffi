@@ -214,6 +214,7 @@ static void demand_coalescing_preserves_boundaries_and_generations(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_render_session_request_frame(fixture.session, &timed_out)
   );
+  mln_test_sleep_millisecond();
   batch = MLN_HANDLE_NULL;
   TEST_ASSERT_TRUE(wait_for_results(&fixture, 1, &batch));
   const mln_render_frame_result missed = batch_result(batch, 0);

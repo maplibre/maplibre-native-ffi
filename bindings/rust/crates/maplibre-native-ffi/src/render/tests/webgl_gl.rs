@@ -45,7 +45,6 @@ pub enum PixelUnpackData<'a> {
 
 unsafe extern "C" {
     fn glGetError() -> u32;
-    fn glFinish();
     fn glGenTextures(count: i32, textures: *mut u32);
     fn glBindTexture(target: u32, texture: u32);
     fn glTexParameteri(target: u32, name: u32, parameter: i32);
@@ -109,12 +108,6 @@ impl Context {
     /// glow's `HasContext` does.
     pub unsafe fn get_error(&self) -> u32 {
         unsafe { glGetError() }
-    }
-
-    /// # Safety
-    /// See [`Context::get_error`].
-    pub unsafe fn finish(&self) {
-        unsafe { glFinish() };
     }
 
     /// # Safety

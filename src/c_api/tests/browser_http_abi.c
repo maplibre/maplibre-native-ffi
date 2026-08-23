@@ -62,6 +62,7 @@ static bool wait_for_style_loaded(
         }
       }
     }
+    mln_test_sleep_millisecond();
   }
   snprintf(
     out_message, capacity,
