@@ -879,9 +879,10 @@ MLN_API mln_status mln_map_request_still_image(
  * Releases a map after synchronous state preflight.
  *
  * A successful call consumes the public handle before returning. The
- * completion runs after previously accepted work is terminal and map-owned
- * native state, callback registrations, and callback-source state have been
- * destroyed. The completion state follows the one-shot ownership contract.
+ * completion runs after previously accepted work is terminal, the native map
+ * can no longer call the host, and map-owned callback state has been released.
+ * Backend worker and graphics-resource cleanup may continue after completion.
+ * The completion state follows the one-shot ownership contract.
  *
  * Returns:
  * - MLN_STATUS_OK when release was accepted and the handle was consumed.

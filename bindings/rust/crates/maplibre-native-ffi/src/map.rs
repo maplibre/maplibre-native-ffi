@@ -187,8 +187,8 @@ impl MapHandle {
             .map_err(|error| HandleOperationError::new(error, self))
     }
 
-    /// Closes this map and blocks until its native state and callbacks have
-    /// retired, so the next test cannot overlap this map's teardown.
+    /// Closes this map and blocks until its native map and callbacks have
+    /// retired.
     #[cfg(test)]
     pub(crate) fn close_and_wait(self) {
         completion::blocking(self.close().map_err(HandleOperationError::into_error));

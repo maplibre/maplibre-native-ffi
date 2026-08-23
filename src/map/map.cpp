@@ -3097,17 +3097,23 @@ auto release_map(mln_map map, const mln_completion* completion) -> mln_status {
         auto owned = std::move(close->owned_map);
         owned->callback_sources->detach();
         owned->frontend->close_renderer_observer();
-        owned->frontend->shutdown_thread_pool();
+        // Retire the map before reporting completion, so it can no longer
+        // reach host callback state. Browser backends can require main-thread
+        // service while their worker pool shuts down, so that backend cleanup
+        // continues after the public retirement boundary.
+        owned->map.reset();
+        owned->callback_sources->release_all();
         {
           const std::scoped_lock event_lock(
             owned->runtime_state->event_queue->mutex
           );
           owned->runtime_state->event_queue->event_maps.erase(close->map);
         }
-        owned.reset();
         close->operation->complete(
           MLN_STATUS_OK, {}, std::any{std::monostate{}}
         );
+        owned->frontend->shutdown_thread_pool();
+        owned.reset();
       });
     } catch (...) {
       close->operation->complete(
