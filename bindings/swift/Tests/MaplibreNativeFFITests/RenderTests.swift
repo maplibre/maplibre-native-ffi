@@ -6,7 +6,10 @@ import Testing
 #endif
 
 #if canImport(Metal)
-  @Test func metalCallerDriverCanServiceAttachmentBeforeCompletion(
+  @Test(.enabled(
+    if: Maplibre.supportedRenderBackends().contains(.metal),
+    "The selected native preset does not provide Metal."
+  )) func metalCallerDriverCanServiceAttachmentBeforeCompletion(
   ) async throws {
     let runtime = try RuntimeHandle(
       options: RuntimeOptions(cachePath: ":memory:")
