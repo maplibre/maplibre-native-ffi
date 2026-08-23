@@ -63,6 +63,7 @@ ROOT_TARGET_MODULES = {
     },
     "maplibre-native-ffi-runtime-vulkan": {
         "android": "maplibre-native-ffi-runtime-vulkan-android",
+        "androidNativeArm32": "maplibre-native-ffi-runtime-vulkan-androidnativearm32",
         "androidNativeArm64": "maplibre-native-ffi-runtime-vulkan-androidnativearm64",
         "androidNativeX64": "maplibre-native-ffi-runtime-vulkan-androidnativex64",
         "jvm": "maplibre-native-ffi-runtime-vulkan-jvm",
@@ -449,6 +450,10 @@ def verify_native(root: pathlib.Path) -> None:
         "maplibre-native-ffi-runtime-opengl-linuxarm64": ("opengl", "linux-arm64"),
         "maplibre-native-ffi-runtime-opengl-linuxx64": ("opengl", "linux-x64"),
         "maplibre-native-ffi-runtime-opengl-macosarm64": ("opengl", "macos-arm64"),
+        "maplibre-native-ffi-runtime-vulkan-androidnativearm32": (
+            "vulkan",
+            "android-arm",
+        ),
         "maplibre-native-ffi-runtime-vulkan-androidnativearm64": (
             "vulkan",
             "android-arm64",

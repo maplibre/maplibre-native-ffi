@@ -896,8 +896,9 @@ pub const VulkanOwnedTextureFrameHandle = enum(u128) {
 
     /// Returns native Vulkan objects for this acquired frame.
     ///
-    /// Safety: the returned pointers stay valid only until this frame handle is
-    /// released, under the C API's backend synchronization rules.
+    /// Safety: the returned Vulkan handles and device pointer stay valid only
+    /// until this frame handle is released, under the C API's backend
+    /// synchronization rules.
     pub fn info(self: *const VulkanOwnedTextureFrameHandle) status.BindingError!VulkanOwnedTextureFrameInfo {
         const lease = try ownedTextureFrameLease(self.*, .vulkan);
         defer lease.release();

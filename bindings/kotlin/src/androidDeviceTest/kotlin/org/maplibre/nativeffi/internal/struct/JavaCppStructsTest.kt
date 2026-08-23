@@ -209,15 +209,15 @@ class JavaCppStructsTest {
             65,
             33,
             context,
-            VulkanHandle.ofBits(0x50),
-            VulkanHandle.ofBits(0x60),
+            VulkanHandle.ofBits(Long.MIN_VALUE),
+            VulkanHandle.ofBits(-1L),
             44,
             1,
           )
           .apply { finalLayout = 2 }
       )
-    assertEquals(0x50, vulkan.firstPointer)
-    assertEquals(0x60, vulkan.secondPointer)
+    assertEquals(Long.MIN_VALUE, vulkan.firstPointer)
+    assertEquals(-1L, vulkan.secondPointer)
     assertEquals(2, vulkan.extra)
 
     val egl =

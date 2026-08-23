@@ -116,8 +116,8 @@ class RenderStructsTest : org.maplibre.nativeffi.NativeTestBase() {
                 65,
                 33,
                 context,
-                VulkanHandle.ofBits(0x50L),
-                VulkanHandle.ofBits(0x60L),
+                VulkanHandle.ofBits(Long.MIN_VALUE),
+                VulkanHandle.ofBits(-1L),
                 44,
                 1,
               )
@@ -129,6 +129,8 @@ class RenderStructsTest : org.maplibre.nativeffi.NativeTestBase() {
       assertEquals(7U, borrowed.context.graphics_queue_family_index)
       assertFalse(borrowed.context.get_instance_proc_addr == null)
       assertFalse(borrowed.context.get_device_proc_addr == null)
+      assertEquals(Long.MIN_VALUE.toULong(), borrowed.image)
+      assertEquals(ULong.MAX_VALUE, borrowed.image_view)
       assertEquals(44U, borrowed.format)
       assertEquals(2U, borrowed.final_layout)
 

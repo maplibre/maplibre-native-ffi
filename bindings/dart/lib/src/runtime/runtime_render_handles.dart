@@ -1010,7 +1010,7 @@ final class VulkanOwnedTextureFrame implements Finalizable {
 
   /// Unsafe borrowed VkImage handle.
   ///
-  /// The pointer is valid only until [close] releases this frame.
+  /// The handle is valid only until [close] releases this frame.
   ScopedVulkanHandle get unsafeImage => ScopedVulkanHandle(
     _imageBits,
     checkValid: _checkOpen,
@@ -1019,7 +1019,7 @@ final class VulkanOwnedTextureFrame implements Finalizable {
 
   /// Unsafe borrowed VkImageView handle.
   ///
-  /// The pointer is valid only until [close] releases this frame.
+  /// The handle is valid only until [close] releases this frame.
   ScopedVulkanHandle get unsafeImageView => ScopedVulkanHandle(
     _imageViewBits,
     checkValid: _checkOpen,

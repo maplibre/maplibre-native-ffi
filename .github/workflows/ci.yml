@@ -1014,6 +1014,9 @@ jobs:
           mise run install-native-package
           android-arm-vulkan
           build/packages/native/dist/maplibre-native-c-android-arm-vulkan.tar.gz
+      - run: mise run //bindings/kotlin:build android-arm-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/kotlin:android-build vulkan armeabi-v7a --prebuilt
         env:
           MISE_TASK_SKIP: "//:build"

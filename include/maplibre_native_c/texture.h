@@ -743,10 +743,10 @@ MLN_API mln_status mln_metal_owned_texture_release_frame(
  *
  * Use this function with sessions created by mln_vulkan_owned_texture_attach().
  *
- * The returned image, image view, and device pointers are borrowed and remain
- * valid only until mln_vulkan_owned_texture_release_frame() is called for the
- * same frame. While acquired, resize, render update, detach, destroy, and a
- * second acquire return MLN_STATUS_INVALID_STATE.
+ * The returned image and image view handles and device pointer are borrowed and
+ * remain valid only until mln_vulkan_owned_texture_release_frame() is called
+ * for the same frame. While acquired, resize, render update, detach, destroy,
+ * and a second acquire return MLN_STATUS_INVALID_STATE.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

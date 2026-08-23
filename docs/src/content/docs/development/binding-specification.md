@@ -1118,7 +1118,7 @@ When the binding routes provider requests through
 | ID      | Test                                                                                                                                                      |
 | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | BND-160 | Supported render-backend queries gate configured workflows and unsupported backend/mode errors.                                                           |
-| BND-161 | Render-target descriptors materialize extents and `NativePointer` backend handles without taking ownership.                                               |
+| BND-161 | Render-target descriptors materialize extents, `NativePointer` resources, and `VulkanHandle` non-dispatchable handles without taking ownership.           |
 | BND-162 | Surface, session-owned texture, and caller-owned texture attach paths call the matching C session family and report the same public session handle shape. |
 | BND-163 | Attaching a second render session to the same map reports invalid state.                                                                                  |
 | BND-164 | `render_update` reports a result other than a rendered frame without closing the session.                                                                 |

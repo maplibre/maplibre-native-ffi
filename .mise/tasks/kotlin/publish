@@ -53,6 +53,7 @@ prepare_native_inputs() {
       # the Linux partition publishes them; their install dirs must exist here.
       presets=(
         android-arm-egl
+        android-arm-vulkan
         android-arm64-egl
         android-arm64-vulkan
         android-x64-egl
@@ -119,6 +120,7 @@ publish_linux_leaves() {
     -Pmaplibre.runtime.opengl.linuxX64.installDir="$install_root/linux-x64-egl"
   )
   local vulkan=(
+    -Pmaplibre.runtime.vulkan.androidNativeArm32.installDir="$install_root/android-arm-vulkan"
     -Pmaplibre.runtime.vulkan.androidNativeArm64.installDir="$install_root/android-arm64-vulkan"
     -Pmaplibre.runtime.vulkan.androidNativeX64.installDir="$install_root/android-x64-vulkan"
     -Pmaplibre.runtime.vulkan.linuxArm64.installDir="$install_root/linux-arm64-vulkan"
@@ -146,7 +148,7 @@ publish_linux_leaves() {
   publish_tasks \
     :bindings:kotlin:runtimes:vulkan \
     "$repository" \
-    Android AndroidNativeArm64 AndroidNativeX64 -- \
+    Android AndroidNativeArm32 AndroidNativeArm64 AndroidNativeX64 -- \
     "$@" \
     "${common[@]}" \
     "${vulkan[@]}" \
@@ -228,6 +230,7 @@ publish_apple_leaves() {
     -Pmaplibre.runtime.opengl.jvm.natives-windows-arm64.installDir="$install_root/windows-arm64-wgl"
   )
   local vulkan=(
+    -Pmaplibre.runtime.vulkan.androidNativeArm32.installDir="$install_root/android-arm-vulkan"
     -Pmaplibre.runtime.vulkan.androidNativeArm64.installDir="$install_root/android-arm64-vulkan"
     -Pmaplibre.runtime.vulkan.androidNativeX64.installDir="$install_root/android-x64-vulkan"
     -Pmaplibre.runtime.vulkan.linuxArm64.installDir="$install_root/linux-arm64-vulkan"
@@ -288,6 +291,7 @@ publish_apple_roots() {
     -Pmaplibre.runtime.opengl.macosArm64.installDir="$install_root/macos-arm64-egl"
   )
   local vulkan=(
+    -Pmaplibre.runtime.vulkan.androidNativeArm32.installDir="$install_root/android-arm-vulkan"
     -Pmaplibre.runtime.vulkan.androidNativeArm64.installDir="$install_root/android-arm64-vulkan"
     -Pmaplibre.runtime.vulkan.androidNativeX64.installDir="$install_root/android-x64-vulkan"
     -Pmaplibre.runtime.vulkan.linuxArm64.installDir="$install_root/linux-arm64-vulkan"

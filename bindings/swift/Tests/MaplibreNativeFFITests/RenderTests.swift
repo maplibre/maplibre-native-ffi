@@ -227,6 +227,13 @@ private final class RenderLeakBox: @unchecked Sendable {
     #expect(error.kind == .invalidState)
     #expect(error.rawStatus == nil)
   }
+  do {
+    _ = try escapedTexture?.isNull
+    Issue.record("escaped frame pointer null check after scope should throw")
+  } catch let error as MaplibreError {
+    #expect(error.kind == .invalidState)
+    #expect(error.rawStatus == nil)
+  }
 
   try frame.close()
   try frame.close()
@@ -279,6 +286,13 @@ private final class RenderLeakBox: @unchecked Sendable {
     #expect(error.kind == .invalidState)
     #expect(error.rawStatus == nil)
   }
+  do {
+    _ = try escapedImage?.isNull
+    Issue.record("escaped frame handle null check after scope should throw")
+  } catch let error as MaplibreError {
+    #expect(error.kind == .invalidState)
+    #expect(error.rawStatus == nil)
+  }
 
   try frame.close()
   try frame.close()
@@ -327,6 +341,13 @@ private final class RenderLeakBox: @unchecked Sendable {
   do {
     _ = try escapedTexture?.value
     Issue.record("escaped OpenGL texture access after scope should throw")
+  } catch let error as MaplibreError {
+    #expect(error.kind == .invalidState)
+    #expect(error.rawStatus == nil)
+  }
+  do {
+    _ = try escapedTexture?.isZero
+    Issue.record("escaped OpenGL texture zero check after scope should throw")
   } catch let error as MaplibreError {
     #expect(error.kind == .invalidState)
     #expect(error.rawStatus == nil)

@@ -1404,7 +1404,7 @@ impl VulkanOwnedTextureFrameHandle {
     ///
     /// # Safety
     ///
-    /// The returned pointer has the same lifetime and synchronization
+    /// The returned handle has the same lifetime and synchronization
     /// requirements as [`VulkanOwnedTextureFrameHandle::image`].
     pub unsafe fn image_view(&self) -> Result<FrameVulkanHandle<'_>> {
         if self.closed.get() {

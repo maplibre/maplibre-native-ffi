@@ -82,7 +82,7 @@ final class NativeFrameScope: @unchecked Sendable {
   }
 }
 
-public struct FrameNativePointer: Sendable, Hashable, CustomStringConvertible {
+public struct FrameNativePointer: Sendable {
   let bitPattern: UInt
   private let scope: NativeFrameScope
   private let diagnosticName: String
@@ -106,25 +106,9 @@ public struct FrameNativePointer: Sendable, Hashable, CustomStringConvertible {
       return bitPattern == 0
     }
   }
-
-  public var description: String {
-    "FrameNativePointer(address: 0x\(String(bitPattern, radix: 16)))"
-  }
-
-  public static func == (lhs: FrameNativePointer,
-                         rhs: FrameNativePointer) -> Bool
-  {
-    lhs.bitPattern == rhs.bitPattern
-  }
-
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(bitPattern)
-  }
 }
 
-public struct FrameVulkanHandle: Sendable, Hashable,
-  CustomStringConvertible
-{
+public struct FrameVulkanHandle: Sendable {
   private let bitPattern: UInt64
   private let scope: NativeFrameScope
   private let diagnosticName: String
@@ -148,25 +132,9 @@ public struct FrameVulkanHandle: Sendable, Hashable,
       return bitPattern == 0
     }
   }
-
-  public var description: String {
-    "FrameVulkanHandle(bits: 0x\(String(bitPattern, radix: 16)))"
-  }
-
-  public static func == (lhs: FrameVulkanHandle,
-                         rhs: FrameVulkanHandle) -> Bool
-  {
-    lhs.bitPattern == rhs.bitPattern
-  }
-
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(bitPattern)
-  }
 }
 
-public struct FrameOpenGLTextureName: Sendable, Hashable,
-  CustomStringConvertible
-{
+public struct FrameOpenGLTextureName: Sendable {
   private let name: UInt32
   private let scope: NativeFrameScope
 
@@ -187,20 +155,5 @@ public struct FrameOpenGLTextureName: Sendable, Hashable,
       try scope.requireActive("OpenGL texture")
       return name == 0
     }
-  }
-
-  public var description: String {
-    "FrameOpenGLTextureName(\(name))"
-  }
-
-  public static func == (
-    lhs: FrameOpenGLTextureName,
-    rhs: FrameOpenGLTextureName
-  ) -> Bool {
-    lhs.name == rhs.name
-  }
-
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(name)
   }
 }
