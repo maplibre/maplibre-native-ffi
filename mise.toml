@@ -185,7 +185,11 @@ run = ".mise/bin/sync-rustls-platform-verifier"
 timeout = "2m"
 
 [hooks]
+# The OpenHarmony SDK plugin lives in the repository, and mise resolves a plugin
+# from its own directory. Refresh its checkout-dependent symlink before mise
+# inspects installed tool environments. The SDK remains opt-in through mise.ohos.toml.
 postinstall = [
+  "mise plugins link --force ohos-sdk .mise/plugins/ohos-sdk",
   "hk install --mise --quiet",
 ]
 
