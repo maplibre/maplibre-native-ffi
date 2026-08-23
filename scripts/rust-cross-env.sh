@@ -1,8 +1,8 @@
 # Sourced by the Rust binding's cross-compilation tasks with a native preset as
-# $1. Maps android-*/ohos-* presets to their cargo target and exports the
-# cross-compilation environment (bindgen, CC/CXX, linker) from the Android NDK
-# or OpenHarmony SDK. Leaves `cargo_target` empty for host presets, where cargo
-# picks its own target and toolchain.
+# $1. Maps musl, Android, and OpenHarmony presets to their Cargo target. Exports
+# the cross-compilation environment (bindgen, CC/CXX, linker) from the native Zig
+# toolchain, Android NDK, or OpenHarmony SDK. Leaves `cargo_target` empty for
+# host presets, where Cargo picks its own target and toolchain.
 # shellcheck shell=bash
 
 cargo_target=
@@ -11,11 +11,21 @@ case "$1" in
   android-arm-*) cargo_target=armv7-linux-androideabi ;;
   android-arm64-*) cargo_target=aarch64-linux-android ;;
   android-x64-*) cargo_target=x86_64-linux-android ;;
+  linux-musl-arm64-*) cargo_target=aarch64-unknown-linux-musl ;;
+  linux-musl-x64-*) cargo_target=x86_64-unknown-linux-musl ;;
   ohos-arm64-*) cargo_target=aarch64-unknown-linux-ohos ;;
   ohos-x64-*) cargo_target=x86_64-unknown-linux-ohos ;;
 esac
 
 case "$1" in
+  linux-musl-*64-*)
+    target_env="${cargo_target//-/_}"
+    target_env_upper="$(printf '%s' "$target_env" | tr '[:lower:]' '[:upper:]')"
+    compiler="$MISE_MONOREPO_ROOT/build/$1/zig-shim/zig-cc"
+    export "CC_$target_env=$compiler"
+    export "CXX_$target_env=$MISE_MONOREPO_ROOT/build/$1/zig-shim/zig-c++"
+    export "CARGO_TARGET_${target_env_upper}_LINKER=$compiler"
+    ;;
   android-*)
     ndk_prebuilt="$ANDROID_HOME/ndk/$MLN_FFI_ANDROID_NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64"
     compiler_target="$cargo_target"

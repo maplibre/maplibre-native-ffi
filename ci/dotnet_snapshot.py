@@ -26,6 +26,8 @@ BACKENDS = {
     "OpenGL": {
         "linux-x64-egl": "linux-x64",
         "linux-arm64-egl": "linux-arm64",
+        "linux-musl-x64-egl": "linux-musl-x64",
+        "linux-musl-arm64-egl": "linux-musl-arm64",
         "macos-arm64-egl": "osx-arm64",
         "windows-x64-wgl": "win-x64",
         "windows-arm64-wgl": "win-arm64",
@@ -36,6 +38,8 @@ BACKENDS = {
     "Vulkan": {
         "linux-x64-vulkan": "linux-x64",
         "linux-arm64-vulkan": "linux-arm64",
+        "linux-musl-x64-vulkan": "linux-musl-x64",
+        "linux-musl-arm64-vulkan": "linux-musl-arm64",
         "macos-arm64-vulkan": "osx-arm64",
         "windows-x64-vulkan": "win-x64",
         "windows-arm64-vulkan": "win-arm64",

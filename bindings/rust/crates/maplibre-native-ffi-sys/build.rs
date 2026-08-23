@@ -297,9 +297,9 @@ mod download {
     const APPLE_MOBILE: &[(&str, &str)] = &[("metal", "metal")];
 
     /// The presets `.github/workflows/publish-snapshots.yml` publishes a shared
-    /// library for. musl and windows-gnu ship no archive. Device iOS ships only
-    /// a static archive, which needs Apple framework link metadata this does
-    /// not emit.
+    /// library for. windows-gnu ships no archive. Device iOS ships only a
+    /// static archive, which needs Apple framework link metadata this does not
+    /// emit.
     const PLATFORM_TARGETS: &[PlatformTarget] = &[
         PlatformTarget {
             os: "linux",
@@ -314,6 +314,22 @@ mod download {
             arch: "aarch64",
             env: "gnu",
             platform: "linux-arm64",
+            default_backend: "vulkan",
+            backends: OPENGL_EGL,
+        },
+        PlatformTarget {
+            os: "linux",
+            arch: "x86_64",
+            env: "musl",
+            platform: "linux-musl-x64",
+            default_backend: "vulkan",
+            backends: OPENGL_EGL,
+        },
+        PlatformTarget {
+            os: "linux",
+            arch: "aarch64",
+            env: "musl",
+            platform: "linux-musl-arm64",
             default_backend: "vulkan",
             backends: OPENGL_EGL,
         },

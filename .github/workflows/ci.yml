@@ -432,6 +432,158 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-linux-arm64-vulkan.tar.gz
           if-no-files-found: error
 
+  target-linux-musl-x64-egl:
+    name: target / linux-musl-x64-egl
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || github.base_ref == 'main'
+      || github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        with:
+          target: linux-musl-x64-egl
+          gradle: false
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run test linux-musl-x64-egl
+      - run: mise run check-musl-abi linux-musl-x64-egl
+      - name: Archive native artifact
+        run: mise run archive-native linux-musl-x64-egl
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package
+          linux-musl-x64-egl
+          build/packages/native/dist/maplibre-native-c-linux-musl-x64-egl.tar.gz
+      - run: mise run //bindings/rust:build linux-musl-x64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload native artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-package-linux-musl-x64-egl-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-linux-musl-x64-egl.tar.gz
+          if-no-files-found: error
+
+  target-linux-musl-x64-vulkan:
+    name: target / linux-musl-x64-vulkan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || github.base_ref == 'main'
+      || github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        with:
+          target: linux-musl-x64-vulkan
+          gradle: false
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run test linux-musl-x64-vulkan
+      - run: mise run check-musl-abi linux-musl-x64-vulkan
+      - name: Archive native artifact
+        run: mise run archive-native linux-musl-x64-vulkan
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package
+          linux-musl-x64-vulkan
+          build/packages/native/dist/maplibre-native-c-linux-musl-x64-vulkan.tar.gz
+      - run: mise run //bindings/rust:build linux-musl-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload native artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-package-linux-musl-x64-vulkan-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-linux-musl-x64-vulkan.tar.gz
+          if-no-files-found: error
+
+  target-linux-musl-arm64-egl:
+    name: target / linux-musl-arm64-egl
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || github.base_ref == 'main'
+      || github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        with:
+          target: linux-musl-arm64-egl
+          gradle: false
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run test linux-musl-arm64-egl
+      - run: mise run check-musl-abi linux-musl-arm64-egl
+      - name: Archive native artifact
+        run: mise run archive-native linux-musl-arm64-egl
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package
+          linux-musl-arm64-egl
+          build/packages/native/dist/maplibre-native-c-linux-musl-arm64-egl.tar.gz
+      - run: mise run //bindings/rust:build linux-musl-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload native artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-package-linux-musl-arm64-egl-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-linux-musl-arm64-egl.tar.gz
+          if-no-files-found: error
+
+  target-linux-musl-arm64-vulkan:
+    name: target / linux-musl-arm64-vulkan
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || github.base_ref == 'main'
+      || github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        with:
+          target: linux-musl-arm64-vulkan
+          gradle: false
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run test linux-musl-arm64-vulkan
+      - run: mise run check-musl-abi linux-musl-arm64-vulkan
+      - name: Archive native artifact
+        run: mise run archive-native linux-musl-arm64-vulkan
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package
+          linux-musl-arm64-vulkan
+          build/packages/native/dist/maplibre-native-c-linux-musl-arm64-vulkan.tar.gz
+      - run: mise run //bindings/rust:build linux-musl-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload native artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-package-linux-musl-arm64-vulkan-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-linux-musl-arm64-vulkan.tar.gz
+          if-no-files-found: error
+
   target-emscripten-wasm32-webgl:
     name: target / emscripten-wasm32-webgl
     runs-on: ubuntu-latest
@@ -1781,6 +1933,10 @@ jobs:
       - target-linux-x64-vulkan
       - target-linux-arm64-egl
       - target-linux-arm64-vulkan
+      - target-linux-musl-x64-egl
+      - target-linux-musl-x64-vulkan
+      - target-linux-musl-arm64-egl
+      - target-linux-musl-arm64-vulkan
       - target-emscripten-wasm32-webgl
       - target-emscripten-wasm32-webgpu
       - target-macos-arm64-metal

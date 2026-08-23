@@ -1,7 +1,7 @@
-# The toolchain builds against a glibc older than any the project supports and
-# links its own static C++ runtime, rather than taking either from the build
-# host. That keeps the artifacts loadable on older distributions, and it is what
-# lets the distributed archive stand on its own.
+# The toolchain builds against its selected libc and links its own static C++
+# runtime, rather than taking either from the build host. The glibc target uses
+# an old ABI floor, and the musl target stays independent of a host sysroot.
+# That is what lets each distributed archive stand on its own.
 #
 # See cmake/toolchains/zig-linux.cmake and the Kotlin publishing doc.
 function(mln_ffi_configure_linux_archive_contents target)
@@ -76,10 +76,9 @@ function(mln_ffi_configure_linux_archive_contents target)
       "mln_*;__mln_personality_v0"
       MLN_FFI_ARCHIVE_RENAME_SYMBOLS
       "__gxx_personality_v0=__mln_personality_v0;DW.ref.__gxx_personality_v0=DW.ref.__mln_personality_v0"
-      # The graphics loaders the test harness links come from the machine
-      # running the tests, so they are built against a newer glibc than this
-      # toolchain targets. The loader resolves their libc references at run
-      # time.
+      # The graphics loaders the test harness links come from the build host.
+      # The glibc test runs there, and the musl test resolves matching loaders
+      # inside its Alpine container.
       MLN_FFI_TEST_LINK_OPTIONS
       "LINKER:--allow-shlib-undefined")
 endfunction()
@@ -138,16 +137,24 @@ function(mln_ffi_configure_platform_dependencies target)
       TRUE)
   mln_ffi_configure_linux_archive_contents(${target})
   if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
-    set_target_properties(
-      ${target}
-      PROPERTIES
-        MLN_FFI_TARGET_PLATFORM linux-arm64 MLN_FFI_ZIG_TARGET aarch64-linux-gnu)
+    set(target_architecture arm64)
+    set(zig_architecture aarch64)
   else()
-    set_target_properties(
-      ${target}
-      PROPERTIES
-        MLN_FFI_TARGET_PLATFORM linux-x64 MLN_FFI_ZIG_TARGET x86_64-linux-gnu)
+    set(target_architecture x64)
+    set(zig_architecture x86_64)
   endif()
+  if(MLN_FFI_ZIG_LIBC STREQUAL "musl")
+    set(target_platform "linux-musl-${target_architecture}")
+    set(zig_target "${zig_architecture}-linux-musl")
+  else()
+    set(target_platform "linux-${target_architecture}")
+    set(zig_target "${zig_architecture}-linux-gnu")
+  endif()
+  set_target_properties(
+    ${target}
+    PROPERTIES
+      MLN_FFI_TARGET_PLATFORM "${target_platform}" MLN_FFI_ZIG_TARGET
+      "${zig_target}")
 endfunction()
 
 function(mln_ffi_configure_platform target)

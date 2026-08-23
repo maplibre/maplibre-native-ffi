@@ -7,6 +7,12 @@ commands = [
   { task = "//examples/rust-map:check", exclude = ["macos-arm64-egl"] },
 ]
 
+# A glibc runner cross-compiles the public Rust binding for musl. The C suite
+# provides runtime coverage for the native library in Alpine.
+[[suites]]
+platforms = ["linux-musl"]
+commands = [{ task = "//bindings/rust:build" }]
+
 # Every other binding step is handed a local install prefix, so this is the only
 # coverage of acquiring the native library from the snapshot release. The
 # download path differs only in which preset it resolves, so one platform is

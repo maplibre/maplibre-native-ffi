@@ -31,6 +31,8 @@ A preset name has the form `<platform>-<arch>-<backend>`, as in
 `macos-arm64-metal` or `linux-x64-vulkan`. OpenGL presets name their context
 provider in place of the backend: `egl`, `wgl`, or `webgl`.
 [Platforms](#platforms) gives the provider for each platform.
+Musl-based Linux uses the `linux-musl` platform, as in
+`linux-musl-x64-vulkan`.
 
 On Windows, add `<prefix>/bin` to `PATH` or copy `maplibre-native-c.dll` beside
 your executable, because a prefix carries no loader path there. Linux and macOS

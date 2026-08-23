@@ -35,6 +35,18 @@
       "cacheVariables": { "MLN_FFI_TARGET_ARCHITECTURE": "arm64" }
     },
     {
+      "name": "_linux-musl-x64",
+      "hidden": true,
+      "inherits": "_linux-x64",
+      "cacheVariables": { "MLN_FFI_ZIG_LIBC": "musl" }
+    },
+    {
+      "name": "_linux-musl-arm64",
+      "hidden": true,
+      "inherits": "_linux-arm64",
+      "cacheVariables": { "MLN_FFI_ZIG_LIBC": "musl" }
+    },
+    {
       "name": "_macos-arm64",
       "hidden": true,
       "inherits": "_single-config",
@@ -216,6 +228,26 @@
       "inherits": ["_linux-arm64", "_vulkan"]
     },
     {
+      "name": "linux-musl-x64-egl",
+      "displayName": "Linux musl x64 EGL",
+      "inherits": ["_linux-musl-x64", "_egl"]
+    },
+    {
+      "name": "linux-musl-x64-vulkan",
+      "displayName": "Linux musl x64 Vulkan",
+      "inherits": ["_linux-musl-x64", "_vulkan"]
+    },
+    {
+      "name": "linux-musl-arm64-egl",
+      "displayName": "Linux musl ARM64 EGL",
+      "inherits": ["_linux-musl-arm64", "_egl"]
+    },
+    {
+      "name": "linux-musl-arm64-vulkan",
+      "displayName": "Linux musl ARM64 Vulkan",
+      "inherits": ["_linux-musl-arm64", "_vulkan"]
+    },
+    {
       "name": "emscripten-wasm32-webgl",
       "displayName": "Browser WASM32 WebGL",
       "inherits": ["_emscripten-wasm32", "_webgl"]
@@ -369,6 +401,30 @@
     {
       "name": "linux-arm64-vulkan",
       "configurePreset": "linux-arm64-vulkan",
+      "targets": ["install"],
+      "jobs": 0
+    },
+    {
+      "name": "linux-musl-x64-egl",
+      "configurePreset": "linux-musl-x64-egl",
+      "targets": ["install"],
+      "jobs": 0
+    },
+    {
+      "name": "linux-musl-x64-vulkan",
+      "configurePreset": "linux-musl-x64-vulkan",
+      "targets": ["install"],
+      "jobs": 0
+    },
+    {
+      "name": "linux-musl-arm64-egl",
+      "configurePreset": "linux-musl-arm64-egl",
+      "targets": ["install"],
+      "jobs": 0
+    },
+    {
+      "name": "linux-musl-arm64-vulkan",
+      "configurePreset": "linux-musl-arm64-vulkan",
       "targets": ["install"],
       "jobs": 0
     },
@@ -546,6 +602,26 @@
       "inherits": "_test-base"
     },
     {
+      "name": "linux-musl-x64-egl",
+      "configurePreset": "linux-musl-x64-egl",
+      "inherits": "_test-base"
+    },
+    {
+      "name": "linux-musl-x64-vulkan",
+      "configurePreset": "linux-musl-x64-vulkan",
+      "inherits": "_test-base"
+    },
+    {
+      "name": "linux-musl-arm64-egl",
+      "configurePreset": "linux-musl-arm64-egl",
+      "inherits": "_test-base"
+    },
+    {
+      "name": "linux-musl-arm64-vulkan",
+      "configurePreset": "linux-musl-arm64-vulkan",
+      "inherits": "_test-base"
+    },
+    {
       "name": "macos-arm64-metal",
       "configurePreset": "macos-arm64-metal",
       "inherits": "_test-base"
@@ -629,6 +705,30 @@
     {
       "name": "linux-arm64-vulkan",
       "configurePreset": "linux-arm64-vulkan",
+      "generators": ["TGZ"],
+      "configurations": ["Release"]
+    },
+    {
+      "name": "linux-musl-x64-egl",
+      "configurePreset": "linux-musl-x64-egl",
+      "generators": ["TGZ"],
+      "configurations": ["Release"]
+    },
+    {
+      "name": "linux-musl-x64-vulkan",
+      "configurePreset": "linux-musl-x64-vulkan",
+      "generators": ["TGZ"],
+      "configurations": ["Release"]
+    },
+    {
+      "name": "linux-musl-arm64-egl",
+      "configurePreset": "linux-musl-arm64-egl",
+      "generators": ["TGZ"],
+      "configurations": ["Release"]
+    },
+    {
+      "name": "linux-musl-arm64-vulkan",
+      "configurePreset": "linux-musl-arm64-vulkan",
       "generators": ["TGZ"],
       "configurations": ["Release"]
     },
@@ -800,6 +900,34 @@
       "steps": [
         { "type": "configure", "name": "linux-arm64-vulkan" },
         { "type": "build", "name": "linux-arm64-vulkan" }
+      ]
+    },
+    {
+      "name": "linux-musl-x64-egl",
+      "steps": [
+        { "type": "configure", "name": "linux-musl-x64-egl" },
+        { "type": "build", "name": "linux-musl-x64-egl" }
+      ]
+    },
+    {
+      "name": "linux-musl-x64-vulkan",
+      "steps": [
+        { "type": "configure", "name": "linux-musl-x64-vulkan" },
+        { "type": "build", "name": "linux-musl-x64-vulkan" }
+      ]
+    },
+    {
+      "name": "linux-musl-arm64-egl",
+      "steps": [
+        { "type": "configure", "name": "linux-musl-arm64-egl" },
+        { "type": "build", "name": "linux-musl-arm64-egl" }
+      ]
+    },
+    {
+      "name": "linux-musl-arm64-vulkan",
+      "steps": [
+        { "type": "configure", "name": "linux-musl-arm64-vulkan" },
+        { "type": "build", "name": "linux-musl-arm64-vulkan" }
       ]
     },
     {

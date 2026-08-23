@@ -28,6 +28,7 @@ PLATFORM_LABELS = {
     "emscripten": "Emscripten",
     "ios": "iOS",
     "linux": "Linux",
+    "linux-musl": "Linux musl",
     "macos": "macOS",
     "ohos": "OpenHarmony",
     "tvos": "tvOS",
@@ -43,6 +44,8 @@ BACKEND_ORDER = ["vulkan", "opengl", "metal", "webgpu"]
 ENVIRONMENT_ORDER = [
     "linux-x64",
     "linux-arm64",
+    "linux-musl-x64",
+    "linux-musl-arm64",
     "macos-arm64",
     "windows-x64",
     "windows-arm64",
