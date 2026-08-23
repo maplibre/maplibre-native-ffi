@@ -3255,7 +3255,10 @@ fn live_session_blocks_map_close_and_drop_reports_the_leaked_map() {
     assert_ne!(reported[0].id, 0);
 
     close_session(session);
-    maplibre_core::check(unsafe { sys::mln_map_release(sys::mln_map(reported[0].id)) }).unwrap();
+    crate::completion::blocking(crate::completion::submit(
+        |completion| unsafe { sys::mln_map_release(sys::mln_map(reported[0].id), completion) },
+        crate::completion::unit,
+    ));
     runtime.close_and_wait();
 }
 

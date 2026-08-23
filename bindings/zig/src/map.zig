@@ -1582,6 +1582,11 @@ pub const MapHandle = enum(c.mln_map) {
     }
 
     pub fn close(self: *MapHandle) status.Error!void {
+        var teardown = try self.closeAsync();
+        teardown.deinit();
+    }
+
+    pub fn closeAsync(self: *MapHandle) status.Error!completion.Future(void) {
         const map_close = beginMapClose(self.*) catch |err| {
             if (err == error.InvalidState) {
                 if (diagnosticStore(self)) |store| {
@@ -1589,14 +1594,19 @@ pub const MapHandle = enum(c.mln_map) {
                 }
             }
             return err;
-        } orelse return;
-        status.checkStatus(c.mln_map_release(map_close.native), map_close.diagnostic_store) catch |err| {
+        } orelse return completion.completed(void, {});
+        const teardown = completion.submit(void, map_close.diagnostic_store, completion.unit, map_close.native, struct {
+            fn start(raw_map: c.mln_map, descriptor: *const c.mln_completion) c.mln_status {
+                return c.mln_map_release(raw_map, descriptor);
+            }
+        }.start) catch |err| {
             cancelMapClose(map_close.state);
             return err;
         };
         runtime_module.unregisterMap(map_close.runtime_registry, map_close.native);
         const map_state = finishMapClose(self.*) orelse map_close.state;
         std.heap.smp_allocator.destroy(map_state);
+        return teardown;
     }
 };
 

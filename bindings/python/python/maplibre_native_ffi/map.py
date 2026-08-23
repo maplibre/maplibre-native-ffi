@@ -607,14 +607,15 @@ class MapHandle(NativeHandleMixin):
     def _native_id(self) -> int:
         return self._native_id_value
 
-    def close(self) -> None:
+    def close(self) -> Future[None]:
         """Release this map handle exactly once.
 
         Closing prevents future runtime events from this map and leaves queued
         events unchanged. A queued event keeps the map's copied source ID.
         """
-        self._native.close()
+        teardown: Future[None] = self._native.close()
         self._runtime._unregister_map(self)
+        return teardown
 
     def request_repaint(self) -> Future[CommandCompletion]:
         """Request a repaint and return its completion future."""

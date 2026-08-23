@@ -107,11 +107,20 @@ typedef struct teardown_state {
   mln_render_session session;
 } teardown_state;
 
+static void map_released(void* user_data, const mln_completion_result* result) {
+  (void)user_data;
+  (void)result;
+}
+
 static void detached(void* user_data, const mln_completion_result* result) {
   teardown_state* state = user_data;
   if (result->status != MLN_STATUS_OK) return;
   mln_render_session_destroy(state->session);
-  (void)mln_map_release(state->map);
+  const mln_completion completion = {
+    .size = sizeof(mln_completion),
+    .callback = map_released,
+  };
+  (void)mln_map_release(state->map, &completion);
 }
 
 mln_status release_map(

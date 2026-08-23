@@ -594,9 +594,10 @@ internal object NativeAccess {
       )
     }
 
-  internal fun releaseMap(map: NativeMap) {
-    Status.check(MapLibreNativeC.mln_map_release(map.raw))
-  }
+  internal fun releaseMap(map: NativeMap): Deferred<Unit> =
+    CompletionBridge.unitChecked { completion ->
+      MapLibreNativeC.mln_map_release(map.raw, completion)
+    }
 
   internal fun setMapStyleUrl(map: NativeMap, url: String): Deferred<CommandCompletion> =
     command { completion ->

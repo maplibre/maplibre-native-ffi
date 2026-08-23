@@ -740,15 +740,17 @@ private constructor(
     return NativeAccess.createMapProjection(requireLiveHandle()).mapDeferred(::MapProjectionHandle)
   }
 
-  public actual fun close() {
-    if (!core.beginClose()) return
-    try {
-      NativeAccess.releaseMap(handle)
-    } catch (error: Throwable) {
-      core.abortClose()
-      throw error
-    }
+  public actual fun close(): Deferred<Unit> {
+    if (!core.beginClose()) return kotlinx.coroutines.CompletableDeferred(Unit)
+    val completed =
+      try {
+        NativeAccess.releaseMap(handle)
+      } catch (error: Throwable) {
+        core.abortClose()
+        throw error
+      }
     core.completeClose { runtime.unregisterMap(this) }
+    return completed
   }
 
   public actual companion object {

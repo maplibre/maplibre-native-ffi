@@ -932,9 +932,10 @@ func (runtime *RuntimeHandle) NewMapWithOptions(options MapOptions) (*Future[*Ma
 }
 
 func closeNativeMap(m nativeMap) error {
-	return checkNative(func() int32 {
-		return int32(C.mln_map_release(C.mln_map(m)))
-	})
+	_, err := startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_map_release(C.mln_map(m), completion))
+	}, completionUnit)
+	return err
 }
 
 // Close releases this runtime's public native handle and returns the future for

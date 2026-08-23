@@ -721,8 +721,9 @@ Bindings preserve the C execution category:
 Lifecycle wrappers do not publish a map until its creation completion transfers
 the live handle. Explicit close performs native release preflight and makes
 every public alias observe closed state when native consumes the handle. Native
-teardown retains its own callbacks and dependencies. A preflight failure leaves
-the wrapper open.
+teardown retains its own callbacks and dependencies. Map and runtime close
+expose their teardown completion through the language's asynchronous idiom. A
+preflight failure leaves the wrapper open.
 
 A binding roots completion state before calling C because completion may happen
 inline. A rejected submission leaves that state binding-owned. A successful
@@ -1029,6 +1030,7 @@ that a real native failure would expose.
 | BND-045 | A released handle's id, replayed through an internal seam after a new handle of the same kind is created, reports the binding's invalid-argument error naming it stale, and the new handle keeps working.                                                                    |
 | BND-047 | A handle id of one kind passed to another kind's operation through an internal seam reports the binding's invalid-argument error, and the safe public API has no expression of that call.                                                                                    |
 | BND-049 | A runtime, map, or projection handle remains usable when an asynchronous continuation resumes on another native thread.                                                                                                                                                      |
+| BND-050 | Map close exposes a completion that runs after earlier map work and map-owned callback teardown; awaiting it requires no runtime barrier or host polling.                                                                                                                    |
 
 ### Input Structs, Values, and Copied Data
 

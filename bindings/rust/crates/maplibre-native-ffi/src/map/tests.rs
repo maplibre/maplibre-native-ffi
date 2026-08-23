@@ -206,13 +206,13 @@ fn object_member<'a>(value: &'a JsonValue, key: &str) -> Option<&'a JsonValue> {
 }
 
 #[test]
-// Spec coverage: BND-040 and BND-100.
+// Spec coverage: BND-040, BND-050, and BND-100.
 fn map_close_consumes_handle_and_drop_stays_idempotent() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map =
         crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
 
-    map.close().unwrap();
+    crate::completion::blocking(map.close().map_err(HandleOperationError::into_error));
     runtime.close_and_wait();
 }
 
@@ -919,8 +919,7 @@ fn custom_geometry_source_state_is_released_on_map_close() {
     map.add_custom_geometry_source("custom", options_counting_releases(&releases))
         .unwrap();
 
-    map.close().unwrap();
-    await_runtime_barrier(&runtime);
+    crate::completion::blocking(map.close().map_err(HandleOperationError::into_error));
 
     assert_eq!(releases.load(Ordering::SeqCst), 1);
     runtime.close_and_wait();
@@ -1070,8 +1069,7 @@ fn custom_mvt_vector_source_state_is_released_on_map_close() {
     map.add_custom_mvt_vector_source("custom", mvt_options_counting_releases(&releases))
         .unwrap();
 
-    map.close().unwrap();
-    await_runtime_barrier(&runtime);
+    crate::completion::blocking(map.close().map_err(HandleOperationError::into_error));
 
     assert_eq!(releases.load(Ordering::SeqCst), 1);
     runtime.close_and_wait();

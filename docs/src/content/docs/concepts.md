@@ -30,6 +30,11 @@ the host when its event queue is ready to drain.
 A map belongs to a runtime. It owns style documents, sources, layers, images,
 camera state, observer events, and render invalidation.
 
+Closing a map consumes its public handle synchronously and returns a completion
+for native retirement. That completion runs after earlier map work is terminal
+and map-owned callback state has been destroyed. Await it when later host work
+depends on cleanup; a runtime close also remains ordered after it.
+
 A map is independent of a render target. The host can create, configure, query,
 and observe a map before the first frame.
 

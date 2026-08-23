@@ -29,7 +29,7 @@ private func mapSize(_ map: NativeMapHandle) throws {
 
   let first = try await makeMap(runtime)
   let released = try first.requireLiveHandle()
-  try first.close()
+  try await first.close()
 
   // The released slot is the one the next map takes, so the replayed id
   // names a retired generation of a slot that is live again.

@@ -12,8 +12,10 @@ enum NativeMap {
     }
   }
 
-  static func release(_ map: NativeMapHandle) throws {
-    try checkStatus(mln_map_release(map.raw))
+  static func release(_ map: NativeMapHandle) throws -> NativeFuture<Void> {
+    try NativeCompletion.startUnit { completion in
+      mln_map_release(map.raw, completion)
+    }
   }
 
   static func snapshot(_ map: NativeMapHandle) throws -> mln_map_snapshot {

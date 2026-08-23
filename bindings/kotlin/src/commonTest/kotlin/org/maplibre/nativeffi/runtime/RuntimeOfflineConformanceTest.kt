@@ -66,7 +66,7 @@ class RuntimeOfflineConformanceTest {
         runtime.deleteOfflineRegion(created.id).await()
         assertNull(offlineRegion(runtime, created.id))
       } finally {
-        runtime.close()
+        runtime.close().await()
       }
     }
 

@@ -1674,15 +1674,19 @@ private constructor(
       { completion -> mln_map_projection_create(state.requireLive().rawHandleValue, completion) },
     )
 
-  public actual fun close() {
-    if (!state.beginClose()) return
-    try {
-      Status.check(mln_map_release(state.handleForClose().rawHandleValue))
-    } catch (error: Throwable) {
-      state.abortClose()
-      throw error
-    }
+  public actual fun close(): Deferred<Unit> {
+    if (!state.beginClose()) return kotlinx.coroutines.CompletableDeferred(Unit)
+    val completed =
+      try {
+        CompletionBridge.unitChecked { completion ->
+          mln_map_release(state.handleForClose().rawHandleValue, completion)
+        }
+      } catch (error: Throwable) {
+        state.abortClose()
+        throw error
+      }
     state.completeClose { runtime.unregisterMap(this) }
+    return completed
   }
 
   public actual val isClosed: Boolean

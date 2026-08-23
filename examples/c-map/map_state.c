@@ -152,19 +152,23 @@ static void complete_runtime_teardown(
 }
 
 void map_state_deinit(map_state* state) {
+  runtime_teardown_completion teardown = {.completed = false};
+  const mln_completion completion = {
+    .size = sizeof(mln_completion),
+    .callback = complete_runtime_teardown,
+    .user_data = &teardown,
+  };
   if (state->map != MLN_HANDLE_NULL) {
-    const mln_status status = mln_map_release(state->map);
+    const mln_status status = mln_map_release(state->map, &completion);
     if (status != MLN_STATUS_OK)
       diagnostics_log_status("map release failed", status);
+    else
+      while (!atomic_load_explicit(&teardown.completed, memory_order_acquire))
+        thrd_yield();
     state->map = MLN_HANDLE_NULL;
   }
   if (state->runtime != MLN_HANDLE_NULL) {
-    runtime_teardown_completion teardown = {.completed = false};
-    const mln_completion completion = {
-      .size = sizeof(mln_completion),
-      .callback = complete_runtime_teardown,
-      .user_data = &teardown,
-    };
+    atomic_store_explicit(&teardown.completed, false, memory_order_release);
     const mln_status status = mln_runtime_release(state->runtime, &completion);
     if (status != MLN_STATUS_OK) {
       diagnostics_log_status("runtime release failed", status);

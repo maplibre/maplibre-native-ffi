@@ -5212,7 +5212,8 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     private static class mln_map_release {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
-            MapLibreNativeC.C_LONG
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
         );
 
         public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_map_release");
@@ -5223,7 +5224,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_map_release(mln_map map)
+     * mln_status mln_map_release(mln_map map, const mln_completion *completion)
      * }
      */
     public static FunctionDescriptor mln_map_release$descriptor() {
@@ -5233,7 +5234,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_map_release(mln_map map)
+     * mln_status mln_map_release(mln_map map, const mln_completion *completion)
      * }
      */
     public static MethodHandle mln_map_release$handle() {
@@ -5243,7 +5244,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_map_release(mln_map map)
+     * mln_status mln_map_release(mln_map map, const mln_completion *completion)
      * }
      */
     public static MemorySegment mln_map_release$address() {
@@ -5252,16 +5253,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_map_release(mln_map map)
+     * mln_status mln_map_release(mln_map map, const mln_completion *completion)
      * }
      */
-    public static int mln_map_release(long map) {
+    public static int mln_map_release(long map, MemorySegment completion) {
         var mh$ = mln_map_release.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_map_release", map);
+                traceDowncall("mln_map_release", map, completion);
             }
-            return (int)mh$.invokeExact(map);
+            return (int)mh$.invokeExact(map, completion);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {

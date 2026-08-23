@@ -33,9 +33,10 @@ auto mln_map_create(
   });
 }
 
-auto mln_map_release(mln_map map) noexcept -> mln_status {
+auto mln_map_release(mln_map map, const mln_completion* completion) noexcept
+  -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::release_map(map);
+    return mln::core::release_map(map, completion);
   });
 }
 

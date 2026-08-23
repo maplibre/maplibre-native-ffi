@@ -60,7 +60,7 @@ import Testing
   #expect(resized.logicalExtent.width == 512)
   #expect(resized.logicalExtent.height == 256)
 
-  try map.close()
+  try await map.close()
   #expect(map.isClosed)
   try await runtime.close()
   #expect(runtime.isClosed)

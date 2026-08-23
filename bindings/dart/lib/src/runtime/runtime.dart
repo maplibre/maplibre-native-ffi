@@ -3729,10 +3729,9 @@ final class MapHandle {
   Future<void> close() async {
     final id = _state.handleId;
     await _state.closeAsync((handle) async {
-      _check(raw.mln_map_release(handle.raw));
-      // Dart listener callbacks arrive on this isolate. A barrier submitted
-      // after release keeps the callback roots alive through native teardown.
-      await _runtime.barrier();
+      await _runtime._startUnit(
+        (completion) => raw.mln_map_release(handle.raw, completion),
+      );
       // Native release callbacks are listener callbacks. Yield on this isolate
       // before retiring any root whose release message has not run yet.
       await Future<void>.delayed(Duration.zero);

@@ -688,7 +688,7 @@ namespace Maplibre.NativeFfi.Internal.C
         public static extern mln_status mln_map_request_still_image([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_release([NativeTypeName("mln_map")] MlnMap map);
+        public static extern mln_status mln_map_release([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_completion *")] mln_completion* completion);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_set_style_url([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const char *")] sbyte* url, [NativeTypeName("const mln_completion *")] mln_completion* completion);

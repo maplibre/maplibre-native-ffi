@@ -234,7 +234,19 @@ mln_status mln_test_map_create_status(
   return status;
 }
 
-mln_status mln_test_map_close(mln_map map) { return mln_map_release(map); }
+mln_status mln_test_map_close(mln_map map) {
+  mln_test_completion teardown = mln_test_completion_default(0);
+  const mln_status status = mln_map_release(map, &teardown.descriptor);
+  if (status != MLN_STATUS_OK) {
+    mln_test_completion_reject(&teardown);
+    mln_test_completion_destroy(&teardown);
+    return status;
+  }
+  const bool completed = mln_test_completion_wait(&teardown, -1);
+  const mln_status teardown_status = mln_test_completion_status(&teardown);
+  mln_test_completion_destroy(&teardown);
+  return completed ? teardown_status : MLN_STATUS_NATIVE_ERROR;
+}
 
 mln_status mln_test_map_get_event_mask(mln_map map, uint64_t* out_mask) {
   if (out_mask == NULL) {
@@ -403,7 +415,8 @@ mln_status mln_test_runtime_barrier(mln_runtime runtime) {
 void mln_test_destroy_map(mln_map map) {
   mln_event_batch_release(compatibility_batch_handle);
   compatibility_batch_handle = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_release(map));
+  const mln_completion release = mln_test_discard_completion();
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_release(map, &release));
   untrack_map(map);
 }
 
@@ -1974,7 +1987,7 @@ bool mln_test_reclaim_thread_resources(void) {
   }
   while (tracked_map_count > 0) {
     tracked_map_count -= 1;
-    (void)mln_map_release(tracked_maps[tracked_map_count]);
+    (void)mln_test_map_close(tracked_maps[tracked_map_count]);
     reclaimed = true;
   }
   if (tracked_runtime != MLN_HANDLE_NULL) {

@@ -147,7 +147,7 @@ auto create_map_start(
   mln_runtime runtime, const mln_map_options* options,
   const mln_completion* completion
 ) -> mln_status;
-auto release_map(mln_map map) -> mln_status;
+auto release_map(mln_map map, const mln_completion* completion) -> mln_status;
 auto map_snapshot_get(mln_map map, mln_map_snapshot* out_snapshot)
   -> mln_status;
 auto map_resize(

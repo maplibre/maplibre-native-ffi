@@ -652,11 +652,18 @@ func (m *MapHandle) LatLngsForPixels(points []ScreenPoint) (*Future[[]LatLng], e
 	})
 }
 
-// Close releases this map's public native handle. Native teardown continues in
-// submission order after this method returns.
+// Close releases this map's public native handle. Use CloseAsync when later
+// work depends on the end of native teardown.
 func (m *MapHandle) Close() error {
+	_, err := m.CloseAsync()
+	return err
+}
+
+// CloseAsync releases this map's public native handle and returns the future
+// for native teardown.
+func (m *MapHandle) CloseAsync() (*Future[struct{}], error) {
 	if m == nil || m.state == nil {
-		return newBindingError(ErrInvalidArgument, "MapHandle is nil")
+		return nil, newBindingError(ErrInvalidArgument, "MapHandle is nil")
 	}
 	defer func() {
 		if m.runtime != nil && m.runtime.state != nil {
@@ -664,6 +671,7 @@ func (m *MapHandle) Close() error {
 		}
 	}()
 	var closeErr error
+	teardown := completedFuture(struct{}{})
 	_ = m.state.Close(func(native nativeMap) int32 {
 		if destroyMapHandle != nil {
 			status := destroyMapHandle(native)
@@ -677,21 +685,23 @@ func (m *MapHandle) Close() error {
 			}
 			return status
 		}
-		if err := checkNative(func() int32 {
-			return int32(C.mln_map_release(C.mln_map(native)))
-		}); err != nil {
+		var err error
+		teardown, err = startCompletion(func(completion *C.mln_completion) int32 {
+			return int32(C.mln_map_release(C.mln_map(native), completion))
+		}, completionUnit)
+		if err != nil {
 			closeErr = err
 			return statusFromError(err)
 		}
 		return int32(C.MLN_STATUS_OK)
 	})
 	if closeErr != nil {
-		return closeErr
+		return nil, closeErr
 	}
 	if m.runtime != nil {
 		m.runtime.unregisterMap(m)
 	}
-	return nil
+	return teardown, nil
 }
 
 // mapSizeByIDForTest calls the C snapshot accessor with a raw map id, so a test

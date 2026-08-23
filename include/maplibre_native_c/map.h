@@ -878,17 +878,21 @@ MLN_API mln_status mln_map_request_still_image(
 /**
  * Releases a map after synchronous state preflight.
  *
- * A successful call consumes the public handle before returning. Previously
- * accepted work and native teardown continue in submission order without
- * requiring caller-owned close state.
+ * A successful call consumes the public handle before returning. The
+ * completion runs after previously accepted work is terminal and map-owned
+ * native state, callback registrations, and callback-source state have been
+ * destroyed. The completion state follows the one-shot ownership contract.
  *
  * Returns:
- * - MLN_STATUS_OK when the handle was consumed.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live.
- * - MLN_STATUS_INVALID_STATE when the map is already closing.
+ * - MLN_STATUS_OK when release was accepted and the handle was consumed.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or completion is
+ *   invalid.
+ * - MLN_STATUS_INVALID_STATE when the map is already closing or still has an
+ *   attached render session.
  * - MLN_STATUS_NATIVE_ERROR when teardown could not be scheduled.
  */
-MLN_API mln_status mln_map_release(mln_map map) MLN_NOEXCEPT;
+MLN_API mln_status
+mln_map_release(mln_map map, const mln_completion* completion) MLN_NOEXCEPT;
 
 /**
  * Queues a style URL command.

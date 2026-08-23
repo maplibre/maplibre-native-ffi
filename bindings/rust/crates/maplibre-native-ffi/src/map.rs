@@ -12,6 +12,7 @@ use crate::camera::{
     BoundOptionsNativeExt, CameraDeltaNativeExt, CameraFitOptionsNativeExt, CameraOptionsNativeExt,
     CameraUpdateNativeExt, FreeCameraOptionsNativeExt, ProjectionModeNativeExt,
 };
+use crate::completion;
 #[cfg(test)]
 use crate::custom_geometry::CanonicalTileId;
 use crate::events::MapId;
@@ -70,16 +71,20 @@ impl MapState {
         self.handle.is_closed()
     }
 
-    fn close(&self) -> Result<()> {
-        self.handle.close_with(|map| {
-            // SAFETY: map is live and native consumes it only on success.
-            maplibre_core::check(unsafe { sys::mln_map_release(map) })
+    fn close(&self) -> Result<NativeFuture<()>> {
+        let teardown = self.handle.close_with(|map| {
+            // SAFETY: map is live and native consumes it only on success. A
+            // rejected release leaves the completion state owned by submit.
+            completion::submit(
+                |completion| unsafe { sys::mln_map_release(map, completion) },
+                completion::unit,
+            )
         })?;
         self.runtime
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .take();
-        Ok(())
+        Ok(teardown.unwrap_or_else(|| completion::ready(())))
     }
 }
 
@@ -173,9 +178,9 @@ impl MapHandle {
     }
 
     /// Explicitly releases the map's public handle.
-    pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
+    pub fn close(self) -> std::result::Result<NativeFuture<()>, HandleOperationError<Self>> {
         if self.inner.is_closed() {
-            return Ok(());
+            return Ok(completion::ready(()));
         }
         self.inner
             .close()

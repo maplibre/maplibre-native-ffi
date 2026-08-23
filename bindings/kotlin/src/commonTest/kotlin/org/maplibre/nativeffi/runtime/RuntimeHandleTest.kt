@@ -454,26 +454,18 @@ class RuntimeHandleTest {
               .await()
           try {
             map.setStyleUrl("http://example.invalid/original-style.json").await()
-            assertTrue(
-              waitForCondition {
-                runtime.barrier().await()
-                calls.load() > 0
-              }
-            )
-            assertEquals(1, calls.load())
+            waitForMapLoadingFailure(runtime, map)
+            val callsBeforeClear = calls.load()
+            assertTrue(callsBeforeClear > 0)
             assertEquals("http://example.invalid/original-style.json", lastUrl.load())
             assertEquals(ResourceKind.STYLE, lastKind.load())
 
             runtime.clearResourceTransform().await()
             map.setStyleUrl("unsupported://after-clear-style.json").await()
-            repeat(100) {
-              runtime.barrier().await()
-              // Keep native loading moving while proving the retired transform stays retired.
-              runtime.drainEvents()
-              assertEquals(1, calls.load())
-            }
+            waitForMapLoadingFailure(runtime, map, "unsupported://after-clear-style.json")
+            assertEquals(callsBeforeClear, calls.load())
           } finally {
-            map.close()
+            map.close().await()
           }
         }
       } finally {
@@ -663,7 +655,7 @@ class RuntimeHandleTest {
   private suspend fun waitForMapLoadingFailure(
     runtime: RuntimeHandle,
     map: MapHandle,
-    styleUrl: String,
+    styleUrl: String? = null,
   ): String {
     repeat(10_000) {
       runtime.barrier().await()
@@ -671,7 +663,7 @@ class RuntimeHandleTest {
         if (
           event.type == RuntimeEventType.MAP_LOADING_FAILED &&
             event.mapSource == map &&
-            event.message.contains(styleUrl)
+            (styleUrl == null || event.message.contains(styleUrl))
         ) {
           return event.message
         }

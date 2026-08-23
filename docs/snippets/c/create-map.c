@@ -64,9 +64,20 @@ static void runtime_torn_down(
   (void)user_data;
 }
 
+static void map_torn_down(
+  void* user_data, const mln_completion_result* result
+) {
+  (void)user_data;
+  (void)result;
+}
+
 void close_map(mln_runtime runtime, mln_map map) {
   // #region release
-  (void)mln_map_release(map);
+  const mln_completion map_teardown = {
+    .size = sizeof(mln_completion),
+    .callback = map_torn_down,
+  };
+  (void)mln_map_release(map, &map_teardown);
   const mln_completion teardown = {
     .size = sizeof(mln_completion),
     .callback = runtime_torn_down,

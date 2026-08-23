@@ -2,6 +2,7 @@
 
 #include <condition_variable>
 #include <cstddef>
+#include <functional>
 #include <mutex>
 #include <utility>
 
@@ -25,13 +26,23 @@ class ControlState {
   }
 
   auto release() noexcept -> void {
+    auto drained = std::function<void()>{};
     {
       const std::scoped_lock lock(mutex_);
       if (submissions_ > 0) {
         --submissions_;
       }
+      if (closing_ && submissions_ == 0) {
+        drained = std::move(drained_);
+      }
     }
     condition_.notify_all();
+    if (drained) {
+      try {
+        drained();
+      } catch (...) {
+      }
+    }
   }
 
   [[nodiscard]] auto reserve_child() -> bool {
@@ -89,6 +100,27 @@ class ControlState {
   auto abort_close() noexcept -> void {
     const std::scoped_lock lock(mutex_);
     closing_ = false;
+    drained_ = {};
+  }
+
+  // Runs once, outside the control lock, after close has begun and every
+  // submission lease has retired.
+  auto notify_when_drained(std::function<void()> callback) noexcept -> void {
+    auto invoke_now = false;
+    {
+      const std::scoped_lock lock(mutex_);
+      if (closing_ && submissions_ == 0) {
+        invoke_now = true;
+      } else {
+        drained_ = std::move(callback);
+      }
+    }
+    if (invoke_now && callback) {
+      try {
+        callback();
+      } catch (...) {
+      }
+    }
   }
 
   auto wait_for_submissions() noexcept -> void {
@@ -110,6 +142,7 @@ class ControlState {
   std::size_t children_ = 0;
   std::size_t child_reservations_ = 0;
   bool closing_ = false;
+  std::function<void()> drained_;
 };
 
 class ControlLease {

@@ -1566,14 +1566,18 @@ impl RuntimeHandle {
 
 #[pymethods]
 impl MapHandle {
-    fn close(&self) -> PyResult<()> {
+    fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let state = self.state();
         let Some(handle) = state.live_handle() else {
-            return Ok(());
+            return completed_python_future(py);
         };
-        maplibre_core::check(unsafe { sys::mln_map_release(handle) }).map_err(map_error)?;
+        let teardown = submit_python_future(
+            py,
+            |completion| unsafe { sys::mln_map_release(handle, completion) },
+            py_none,
+        )?;
         state.mark_closed();
-        Ok(())
+        Ok(teardown)
     }
 
     /// This map's native handle, which names one map for the life of the

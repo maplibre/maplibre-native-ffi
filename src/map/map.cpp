@@ -2970,144 +2970,118 @@ auto map_resize(
   return status;
 }
 
-auto release_map(mln_map map) -> mln_status {
+namespace {
+auto discarded_completion() noexcept -> mln_completion;
+}  // namespace
+
+auto release_map(mln_map map, const mln_completion* completion) -> mln_status {
+  CompletionOperation teardown;
+  const auto completion_status =
+    create_completion_operation(completion, {}, teardown);
+  if (completion_status != MLN_STATUS_OK) {
+    return completion_status;
+  }
   auto owned_map = handle_table<MapObject>().lease(map);
   if (owned_map == nullptr) {
+    teardown.completion->reject();
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   {
     const std::scoped_lock lock(handle_table<MapObject>().mutex());
     auto* live = handle_table<MapObject>().resolve_locked(map);
     if (live == nullptr || live != owned_map.get()) {
+      teardown.completion->reject();
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     if (live->render_target_session != nullptr) {
+      teardown.completion->reject();
       set_thread_error("map still has an attached render session");
       return MLN_STATUS_INVALID_STATE;
     }
     const auto close_status = live->control.begin_close();
     if (close_status != MLN_STATUS_OK) {
+      teardown.completion->reject();
       return close_status;
     }
   }
-  auto state = std::shared_ptr<OperationObject>{};
-  try {
-    state = std::make_shared<OperationObject>();
-  } catch (...) {
-    owned_map->control.abort_close();
-    set_thread_error("map release could not allocate its teardown state");
-    return MLN_STATUS_NATIVE_ERROR;
-  }
-  struct CloseGate {
+  struct CloseState {
     std::mutex mutex;
-    std::condition_variable condition;
     bool ordered = false;
-    bool retired = false;
-    bool aborted = false;
+    bool drained = false;
+    bool scheduled = false;
     mln_map map = MLN_HANDLE_NULL;
     std::shared_ptr<MapObject> owned_map;
-    std::shared_ptr<OperationObject> state;
+    std::shared_ptr<OperationObject> operation;
   };
-  auto gate = std::shared_ptr<CloseGate>{};
+  auto close = std::shared_ptr<CloseState>{};
   try {
-    gate = std::make_shared<CloseGate>();
+    close = std::make_shared<CloseState>();
   } catch (...) {
     owned_map->control.abort_close();
+    teardown.completion->reject();
     set_thread_error("map release could not allocate its teardown gate");
     return MLN_STATUS_NATIVE_ERROR;
   }
-  gate->map = map;
-  gate->owned_map = owned_map;
-  gate->state = state;
-  auto signal_abort = [gate]() noexcept -> void {
+  close->map = map;
+  close->owned_map = owned_map;
+  close->operation = teardown.operation;
+  auto schedule_if_ready = [close]() noexcept -> void {
+    auto schedule = false;
     {
-      const std::scoped_lock lock(gate->mutex);
-      gate->aborted = true;
+      const std::scoped_lock lock(close->mutex);
+      if (close->ordered && close->drained && !close->scheduled) {
+        close->scheduled = true;
+        schedule = true;
+      }
     }
-    gate->condition.notify_one();
-  };
-  auto waiter = std::thread{};
-  try {
-    // Map teardown waits for active submissions and calls back into the runtime
-    // executor, so it cannot run on that executor or the initiating caller.
-    waiter = std::thread([gate]() mutable -> void {
-      {
-        auto lock = std::unique_lock{gate->mutex};
-        gate->condition.wait(lock, [&]() noexcept -> bool {
-          return (gate->ordered && gate->retired) || gate->aborted;
-        });
-        if (gate->aborted) {
-          return;
+    if (!schedule) return;
+    try {
+      close->owned_map->runtime_state->executor.invoke([close]() mutable {
+        auto owned = std::move(close->owned_map);
+        owned->callback_sources->detach();
+        owned->frontend->close_renderer_observer();
+        owned->frontend->shutdown_thread_pool();
+        {
+          const std::scoped_lock event_lock(
+            owned->runtime_state->event_queue->mutex
+          );
+          owned->runtime_state->event_queue->event_maps.erase(close->map);
         }
-      }
-      auto owned_map = std::move(gate->owned_map);
-      try {
-        owned_map->runtime_state->executor.invoke_sync([&]() -> void {
-          if (owned_map->still_image_operation != nullptr) {
-            owned_map->still_image_operation->complete(
-              MLN_STATUS_CANCELLED, "map closed before still image completed",
-              {}
-            );
-          }
-          // Release the still request's submission lease now: the mbgl
-          // callback that normally releases it fires only when the map is
-          // destroyed, which happens after the submission wait below.
-          if (
-            auto release =
-              std::exchange(owned_map->still_image_release_submission, {})
-          ) {
-            release();
-          }
-        });
-        owned_map->control.wait_for_submissions();
-        owned_map->runtime_state->executor.invoke_sync([&]() mutable -> void {
-          owned_map->callback_sources->detach();
-          owned_map->frontend->close_renderer_observer();
-          owned_map->frontend->shutdown_thread_pool();
-          {
-            const std::scoped_lock event_lock(
-              owned_map->runtime_state->event_queue->mutex
-            );
-            owned_map->runtime_state->event_queue->event_maps.erase(gate->map);
-          }
-          owned_map.reset();
-        });
-      } catch (...) {
-        // The public handle is already retired. Teardown failures are not
-        // actionable by its former owner, but the tracked submission must
-        // still become terminal so runtime release can continue.
-      }
-      gate->state->complete(MLN_STATUS_OK, {}, std::any{std::monostate{}});
-    });
-  } catch (...) {
-    signal_abort();
-    owned_map->control.abort_close();
-    set_thread_error("map release could not start its teardown waiter");
-    return MLN_STATUS_NATIVE_ERROR;
-  }
-  try {
-    waiter.detach();
-  } catch (...) {
-    signal_abort();
-    if (waiter.joinable()) {
-      waiter.join();
+        owned.reset();
+        close->operation->complete(
+          MLN_STATUS_OK, {}, std::any{std::monostate{}}
+        );
+      });
+    } catch (...) {
+      close->operation->complete(
+        MLN_STATUS_NATIVE_ERROR, exception_message(std::current_exception()), {}
+      );
     }
-    owned_map->control.abort_close();
-    set_thread_error("map release could not detach its teardown waiter");
-    return MLN_STATUS_NATIVE_ERROR;
-  }
+  };
   const auto submit_status = submit_runtime_operation(
-    owned_map->runtime_state, state, [gate]() mutable -> void {
-      {
-        const std::scoped_lock lock(gate->mutex);
-        gate->ordered = true;
+    owned_map->runtime_state, teardown.operation,
+    [close, schedule_if_ready]() mutable -> void {
+      if (close->owned_map->still_image_operation != nullptr) {
+        close->owned_map->still_image_operation->complete(
+          MLN_STATUS_CANCELLED, "map closed before still image completed", {}
+        );
       }
-      gate->condition.notify_one();
+      if (
+        auto release =
+          std::exchange(close->owned_map->still_image_release_submission, {})
+      ) {
+        release();
+      }
+      {
+        const std::scoped_lock lock(close->mutex);
+        close->ordered = true;
+      }
+      schedule_if_ready();
     }
   );
   if (submit_status != MLN_STATUS_OK) {
     owned_map->control.abort_close();
-    signal_abort();
+    teardown.completion->reject();
     return submit_status;
   }
   {
@@ -3115,11 +3089,14 @@ auto release_map(mln_map map) -> mln_status {
     static_cast<void>(handle_table<MapObject>().remove_locked(map));
   }
   release_runtime_map(owned_map->runtime);
-  {
-    const std::scoped_lock lock(gate->mutex);
-    gate->retired = true;
-  }
-  gate->condition.notify_one();
+  owned_map->control.notify_when_drained([close, schedule_if_ready]() {
+    {
+      const std::scoped_lock lock(close->mutex);
+      close->drained = true;
+    }
+    schedule_if_ready();
+  });
+  teardown.completion->accept();
   return MLN_STATUS_OK;
 }
 PendingMapResult::~PendingMapResult() {
@@ -3127,7 +3104,8 @@ PendingMapResult::~PendingMapResult() {
     return;
   }
   try {
-    static_cast<void>(release_map(value_));
+    const auto completion = discarded_completion();
+    static_cast<void>(release_map(value_, &completion));
   } catch (...) {
   }
 }

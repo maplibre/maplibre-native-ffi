@@ -1627,15 +1627,19 @@ private constructor(
       { completion -> MaplibreNativeC.mln_map_projection_create(requireLiveHandle(), completion) },
     )
 
-  public actual fun close() {
-    if (!core.beginClose()) return
-    try {
-      Status.check(MaplibreNativeC.mln_map_release(handleId))
-    } catch (error: Throwable) {
-      core.abortClose()
-      throw error
-    }
+  public actual fun close(): Deferred<Unit> {
+    if (!core.beginClose()) return kotlinx.coroutines.CompletableDeferred(Unit)
+    val completed =
+      try {
+        CompletionBridge.unitChecked { completion ->
+          MaplibreNativeC.mln_map_release(handleId, completion)
+        }
+      } catch (error: Throwable) {
+        core.abortClose()
+        throw error
+      }
     core.completeClose { runtime.unregisterMap(this) }
+    return completed
   }
 
   internal fun nativeHandleId(): Long = handleId

@@ -208,14 +208,22 @@ public final class MapHandle: @unchecked Sendable {
   }
 
   /// Releases this map's public native handle.
-  public func close() throws {
+  public func close() async throws {
+    guard let teardown = try startClose() else { return }
+    try await mapNativeFailure { try await teardown.value() }
+  }
+
+  private func startClose() throws -> NativeFuture<Void>? {
+    var teardown: NativeFuture<Void>?
     try mapNativeFailure {
-      try handle.closeOnce { try NativeMap.release($0) }
+      try handle.closeOnce { teardown = try NativeMap.release($0) }
     }
+    return teardown
   }
 
   func closeBlockingForTests() throws {
-    try close()
+    guard let teardown = try startClose() else { return }
+    try mapNativeFailure { try teardown.valueBlocking() }
   }
 
   /// Loads a style URL.

@@ -28,7 +28,7 @@ internal unsafe delegate mln_status MapAddCustomMvtVectorSource(
 );
 
 /// <summary>Any-thread map handle bound to a runtime.</summary>
-public sealed unsafe partial class MapHandle : IDisposable
+public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable
 {
     private static readonly MapAddCustomGeometrySource DefaultAddCustomGeometrySource = static (
         map,
@@ -53,16 +53,13 @@ public sealed unsafe partial class MapHandle : IDisposable
     private readonly RuntimeHandle runtime;
     private readonly ulong nativeId;
     private readonly NativeHandleState<MlnMap> state;
+    private Task teardown = Task.CompletedTask;
 
     private MapHandle(RuntimeHandle runtime, MlnMap handle)
     {
         this.runtime = runtime;
         nativeId = handle.Value;
-        state = new NativeHandleState<MlnMap>(
-            handle,
-            NativeMethods.mln_map_release,
-            nameof(MapHandle)
-        );
+        state = new NativeHandleState<MlnMap>(handle, StartRelease, nameof(MapHandle));
     }
 
     /// <summary>Creates a map asynchronously.</summary>
@@ -1861,15 +1858,27 @@ public sealed unsafe partial class MapHandle : IDisposable
         });
     }
 
-    /// <summary>Releases the map's public native handle.</summary>
-    public void Close()
+    /// <summary>Releases the map and waits for native teardown.</summary>
+    public void Close() => CloseAsync().GetAwaiter().GetResult();
+
+    /// <summary>Releases the map without blocking and reports native teardown.</summary>
+    public Task CloseAsync()
     {
-        if (IsClosed)
+        if (!IsClosed)
         {
-            return;
+            state.Close();
+            runtime.UnregisterMap(this);
         }
-        state.Close();
-        runtime.UnregisterMap(this);
+
+        return teardown;
+    }
+
+    private mln_status StartRelease(MlnMap handle)
+    {
+        teardown = NativeCompletion.SubmitUnit(completion =>
+            NativeMethods.mln_map_release(handle, completion)
+        );
+        return mln_status.MLN_STATUS_OK;
     }
 
     internal static IDisposable UseCustomGeometrySourceInstallForTest(
@@ -1975,4 +1984,7 @@ public sealed unsafe partial class MapHandle : IDisposable
         Close();
         GC.KeepAlive(runtime);
     }
+
+    /// <inheritdoc />
+    public ValueTask DisposeAsync() => new(CloseAsync());
 }

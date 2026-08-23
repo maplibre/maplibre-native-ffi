@@ -1193,8 +1193,8 @@ external int mln_map_projection_set_visible_geometry(
   mln_edge_insets padding,
 );
 
-@ffi.Native<ffi.Int32 Function(mln_map)>()
-external int mln_map_release(int map);
+@ffi.Native<ffi.Int32 Function(mln_map, ffi.Pointer<mln_completion>)>()
+external int mln_map_release(int map, ffi.Pointer<mln_completion> completion);
 
 @ffi.Native<
   ffi.Int32 Function(
