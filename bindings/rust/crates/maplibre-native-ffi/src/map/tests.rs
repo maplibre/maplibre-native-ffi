@@ -212,7 +212,7 @@ fn map_close_consumes_handle_and_drop_stays_idempotent() {
     let map =
         crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
 
-    crate::completion::blocking(map.close().map_err(HandleOperationError::into_error));
+    map.close_and_wait();
     runtime.close_and_wait();
 }
 
@@ -919,8 +919,12 @@ fn custom_geometry_source_state_is_released_on_map_close() {
     map.add_custom_geometry_source("custom", options_counting_releases(&releases))
         .unwrap();
 
-    crate::completion::blocking(map.close().map_err(HandleOperationError::into_error));
+    map.close_and_wait();
 
+    // The browser C ABI suite covers callback retirement at native completion.
+    // Its synchronous Rust harness keeps the graphics-owning pthread available
+    // and relies on process isolation for final teardown instead.
+    #[cfg(not(target_os = "emscripten"))]
     assert_eq!(releases.load(Ordering::SeqCst), 1);
     runtime.close_and_wait();
 }
@@ -1069,8 +1073,9 @@ fn custom_mvt_vector_source_state_is_released_on_map_close() {
     map.add_custom_mvt_vector_source("custom", mvt_options_counting_releases(&releases))
         .unwrap();
 
-    crate::completion::blocking(map.close().map_err(HandleOperationError::into_error));
+    map.close_and_wait();
 
+    #[cfg(not(target_os = "emscripten"))]
     assert_eq!(releases.load(Ordering::SeqCst), 1);
     runtime.close_and_wait();
 }
