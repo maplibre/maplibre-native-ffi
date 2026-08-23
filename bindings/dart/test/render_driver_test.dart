@@ -11,16 +11,21 @@ typedef _CreateDevice = Pointer<Void> Function();
 typedef _ReleaseObjectNative = Void Function(Pointer<Void>);
 typedef _ReleaseObject = void Function(Pointer<Void>);
 
+final String? _metalTestSkipReason = !Platform.isMacOS
+    ? 'requires a macOS Metal host'
+    : !Maplibre.supportedRenderBackends().contains(RenderBackendMask.metal)
+    ? 'requires a native library built with the Metal renderer'
+    : null;
+
 final class _MetalTestContext {
   _MetalTestContext._(this._library, this.device);
 
   static _MetalTestContext? create() {
-    if (!Platform.isMacOS) return null;
-    final prefix = File(
-      '.dart_tool/maplibre_native_install_dir',
+    final buildDirectory = File(
+      '.dart_tool/maplibre_native_build_dir',
     ).readAsStringSync().trim();
     final library = DynamicLibrary.open(
-      '$prefix/lib/libmaplibre_native_ffi_dart_test_support.dylib',
+      '$buildDirectory/libmaplibre_native_ffi_dart_test_support.dylib',
     );
     final create = library.lookupFunction<_CreateDeviceNative, _CreateDevice>(
       'mln_dart_test_metal_device_create',
@@ -55,7 +60,9 @@ void main() {
     'public core-worker render workflow renders, reads, and queries',
     () async {
       final context = _MetalTestContext.create();
-      if (context == null) return;
+      if (context == null) {
+        fail('MTLCreateSystemDefaultDevice returned nil');
+      }
 
       final runtime = RuntimeHandle.create();
       final map = await MapHandle.create(
@@ -134,11 +141,14 @@ void main() {
         context.close();
       }
     },
+    skip: _metalTestSkipReason,
   );
 
   test('caller driver services work and abandons cleanly', () async {
     final context = _MetalTestContext.create();
-    if (context == null) return;
+    if (context == null) {
+      fail('MTLCreateSystemDefaultDevice returned nil');
+    }
 
     final runtime = RuntimeHandle.create();
     final map = await MapHandle.create(
@@ -200,5 +210,5 @@ void main() {
       await runtime.close();
       context.close();
     }
-  });
+  }, skip: _metalTestSkipReason);
 }

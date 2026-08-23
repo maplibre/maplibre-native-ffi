@@ -1,6 +1,8 @@
 package org.maplibre.nativeffi.render
 
 import kotlinx.coroutines.Deferred
+import org.maplibre.nativeffi.error.MaplibreException
+import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.map.MapOptions
@@ -56,7 +58,7 @@ internal fun RenderSessionHandle.renderOneFrame(
   requestFrame(demand)
   while (true) {
     serviceDriverWork()
-    val results = drainFrameResults()
+    val results = drainFrameResultsOrEmpty()
     if (results.isNotEmpty()) return results.last()
   }
 }
@@ -83,18 +85,30 @@ internal fun RenderSessionHandle.renderUntilSettled(attempts: Int = 500): Render
  */
 internal fun RenderSessionHandle.awaitRenderedFrame(attempts: Int = 1000): RenderFrameResult {
   var last: RenderFrameResult? = null
-  repeat(attempts) {
-    requestFrame(FrameDemand(ifNeeded = false))
-    val results = drainFrameResults()
-    if (results.isNotEmpty()) {
-      val result = results.last()
-      if (result.disposition == RenderResult.RENDERED) return result
-      last = result
+  val present = capabilities().presentation
+  for (attempt in 0 until attempts) {
+    val token = snapshot().latestDemandToken + 1uL
+    requestFrame(FrameDemand(ifNeeded = false, present = present, token = token))
+    for (poll in 0 until 10) {
+      val result = drainFrameResultsOrEmpty().lastOrNull { it.token == token }
+      if (result != null) {
+        if (result.disposition == RenderResult.RENDERED) return result
+        last = result
+        break
+      }
+      sleepMillis(1)
     }
-    sleepMillis(1)
   }
   error("the session never rendered a frame; last frame result: $last")
 }
+
+/** Treats an empty native frame-result queue as an empty Kotlin collection. */
+private fun RenderSessionHandle.drainFrameResultsOrEmpty(): List<RenderFrameResult> =
+  try {
+    drainFrameResults()
+  } catch (error: MaplibreException) {
+    if (error.status == MaplibreStatus.NOT_READY) emptyList() else throw error
+  }
 
 /** Leaves a session closable: an attached session is abandoned rather than leaked. */
 internal fun RenderSessionHandle.abandonAndClose() {

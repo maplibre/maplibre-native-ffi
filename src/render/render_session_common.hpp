@@ -780,10 +780,16 @@ inline auto validate_physical_size(
 
 enum class RetargetTargetKind : uint8_t { Surface, BorrowedTexture };
 
-// Checks that a session can take a replacement target of this kind, before any
-// descriptor is read. Entry points call this first, including in builds without
-// that backend, so the reported status does not depend on which failure the
-// build notices first.
+// Checks the completion and session before a backend reads opaque target
+// objects from the descriptor.
+auto validate_render_session_retarget_submission(
+  mln_render_session session, RetargetTargetKind kind,
+  const mln_completion* completion
+) -> mln_status;
+
+// Rechecks on the driver thread that the session can take the replacement.
+// Submission entry points perform the descriptor-safe check above first; this
+// second check closes state-change races before the backend swaps resources.
 auto validate_render_session_retarget(
   mln_render_session session, RetargetTargetKind kind,
   mln_render_session_object*& out_session

@@ -152,6 +152,13 @@ function(mln_ffi_add_c_api_test)
       ${PROJECT_SOURCE_DIR}/src/c_api/tests/main.c
       ${PROJECT_SOURCE_DIR}/src/c_api/tests/test_support.c
       ${PROJECT_SOURCE_DIR}/src/c_api/tests/test_support.cpp ${test_abi_sources})
+  if(MLN_FFI_RENDER_BACKEND STREQUAL "metal")
+    list(APPEND test_sources
+         ${PROJECT_SOURCE_DIR}/src/c_api/tests/metal_surface_test_support.mm)
+    set_source_files_properties(
+      ${PROJECT_SOURCE_DIR}/src/c_api/tests/metal_surface_test_support.mm
+      PROPERTIES COMPILE_OPTIONS -fobjc-arc)
+  endif()
 
   # Each *_abi.c reaches the runner through one run_<file>_tests() call in
   # main.c. main.c carries no preprocessor guards, so a plain text match is

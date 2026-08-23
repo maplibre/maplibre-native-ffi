@@ -18,8 +18,8 @@ import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.map.MapHandle
-import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.map.MapOptions
+import org.maplibre.nativeffi.map.MapSize
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
 import org.maplibre.nativeffi.runtime.runSuspendTest
@@ -51,7 +51,7 @@ class MetalRenderTargetTest {
     val runtime = RuntimeHandle.create(RuntimeOptions())
     try {
       val borrowedTexture = createMetalTexture(device, 32, 16)
-      val borrowedMap = createStaticMap(runtime)
+      val borrowedMap = createMap(runtime)
       try {
         val borrowedTextureAddress = borrowedTexture.address()
         val borrowedDescriptor =
@@ -76,15 +76,17 @@ class MetalRenderTargetTest {
           assertUnsupported { session.readPremultipliedRgba8() }
         } finally {
           session.abandonAndClose()
+          runtime.barrier().await()
         }
         // The session never retained the texture the host attached with.
         assertEquals(borrowedTextureAddress, borrowedDescriptor.texture.address)
       } finally {
         borrowedMap.close()
+        runtime.barrier().await()
       }
 
       val layer = createMetalLayer(device, 32, 16)
-      val surfaceMap = createStaticMap(runtime)
+      val surfaceMap = createMap(runtime)
       try {
         val attachment =
           surfaceMap.attachMetalSurface(
@@ -107,12 +109,14 @@ class MetalRenderTargetTest {
           assertUnsupported { session.readPremultipliedRgba8() }
         } finally {
           session.abandonAndClose()
+          runtime.barrier().await()
         }
       } finally {
         surfaceMap.close()
+        runtime.barrier().await()
       }
     } finally {
-      runtime.close()
+      runtime.close().await()
     }
   }
 
@@ -124,7 +128,7 @@ class MetalRenderTargetTest {
     if (!metalSupportedOrInapplicable()) return@runSuspendTest
     val runtime = RuntimeHandle.create(RuntimeOptions())
     try {
-      val map = createStaticMap(runtime)
+      val map = createMap(runtime)
       try {
         val layer = CAMetalLayer()
         layer.drawableSize = CGSizeMake(1.0, 1.0)
@@ -150,12 +154,14 @@ class MetalRenderTargetTest {
           assertEquals(RenderResult.RENDERED, session.awaitRenderedFrame().disposition)
         } finally {
           session.abandonAndClose()
+          runtime.barrier().await()
         }
       } finally {
         map.close()
+        runtime.barrier().await()
       }
     } finally {
-      runtime.close()
+      runtime.close().await()
     }
   }
 
@@ -170,7 +176,7 @@ class MetalRenderTargetTest {
     val runtime = RuntimeHandle.create(RuntimeOptions())
     try {
       val borrowedTexture = createMetalTexture(device, 32, 16)
-      val borrowedMap = createStaticMap(runtime)
+      val borrowedMap = createMap(runtime)
       try {
         val borrowedTextureAddress = borrowedTexture.address()
         val attachment =
@@ -189,8 +195,8 @@ class MetalRenderTargetTest {
           runtime.barrier().await()
           assertEquals(RenderResult.RENDERED, session.awaitRenderedFrame().disposition)
 
-          // A caller-owned texture is sized by its owner, so the host
-          // reallocates and hands the replacement over instead of resizing.
+          // A caller-owned texture is sized by its owner, so the host reallocates it and hands the
+          // replacement over. The map remains the independent logical-size authority.
           assertUnsupported { session.resize(RenderTargetExtent(16, 8, 1.0)) }
           val replacementTexture = createMetalTexture(device, 16, 8)
           val replacement =
@@ -207,6 +213,8 @@ class MetalRenderTargetTest {
             "a freshly allocated replacement should start blank",
           )
           session.setMetalBorrowedTextureTarget(replacement).await()
+          borrowedMap.resize(MapSize(16, 8, 1.0)).await()
+          runtime.barrier().await()
           assertSame(borrowedMap, session.map())
           assertEquals(RenderResult.RENDERED, session.awaitRenderedFrame().disposition)
           // The session paints the texture it was handed, not the one it had.
@@ -220,14 +228,16 @@ class MetalRenderTargetTest {
           assertEquals(borrowedTextureAddress, borrowedTexture.address())
         } finally {
           session.abandonAndClose()
+          runtime.barrier().await()
         }
       } finally {
         borrowedMap.close()
+        runtime.barrier().await()
       }
 
       val layer = createMetalLayer(device, 32, 16)
       val replacementLayer = createMetalLayer(device, 16, 8)
-      val surfaceMap = createStaticMap(runtime)
+      val surfaceMap = createMap(runtime)
       try {
         val attachment =
           surfaceMap.attachMetalSurface(
@@ -255,16 +265,20 @@ class MetalRenderTargetTest {
               )
             )
             .await()
+          surfaceMap.resize(MapSize(16, 8, 1.0)).await()
+          runtime.barrier().await()
           assertSame(surfaceMap, session.map())
           assertEquals(RenderResult.RENDERED, session.awaitRenderedFrame().disposition)
         } finally {
           session.abandonAndClose()
+          runtime.barrier().await()
         }
       } finally {
         surfaceMap.close()
+        runtime.barrier().await()
       }
     } finally {
-      runtime.close()
+      runtime.close().await()
     }
   }
 
@@ -294,7 +308,7 @@ class MetalRenderTargetTest {
           layer = NativePointer.ofAddress(layer.address()),
         )
 
-      val borrowedMap = createStaticMap(runtime)
+      val borrowedMap = createMap(runtime)
       try {
         val attachment = borrowedMap.attachMetalBorrowedTexture(textureTarget)
         try {
@@ -302,12 +316,14 @@ class MetalRenderTargetTest {
           assertUnsupported { attachment.session.setMetalSurfaceTarget(surfaceTarget) }
         } finally {
           attachment.session.abandonAndClose()
+          runtime.barrier().await()
         }
       } finally {
         borrowedMap.close()
+        runtime.barrier().await()
       }
 
-      val surfaceMap = createStaticMap(runtime)
+      val surfaceMap = createMap(runtime)
       try {
         val attachment = surfaceMap.attachMetalSurface(surfaceTarget)
         try {
@@ -315,12 +331,14 @@ class MetalRenderTargetTest {
           assertUnsupported { attachment.session.setMetalBorrowedTextureTarget(textureTarget) }
         } finally {
           attachment.session.abandonAndClose()
+          runtime.barrier().await()
         }
       } finally {
         surfaceMap.close()
+        runtime.barrier().await()
       }
     } finally {
-      runtime.close()
+      runtime.close().await()
     }
   }
 
@@ -335,13 +353,12 @@ class MetalRenderTargetTest {
     return RenderBackend.METAL in Maplibre.supportedRenderBackends()
   }
 
-  private suspend fun createStaticMap(runtime: RuntimeHandle): MapHandle =
+  private suspend fun createMap(runtime: RuntimeHandle): MapHandle =
     MapHandle.create(
         runtime,
         MapOptions().apply {
           width = 32
           height = 16
-          mapMode = MapMode.STATIC
         },
       )
       .await()

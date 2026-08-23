@@ -701,6 +701,24 @@ public struct RenderSessionAttachOptions: Sendable, Hashable {
   }
 }
 
+/// A render session that native code is still attaching and the task that
+/// reports the attachment result.
+///
+/// A caller-graphics-thread host services driver work through ``session``
+/// while ``completion`` is pending.
+public struct RenderSessionAttachment: Sendable {
+  public let session: RenderSessionHandle
+  public let completion: Task<Void, Error>
+
+  fileprivate init(
+    session: RenderSessionHandle,
+    completion: Task<Void, Error>
+  ) {
+    self.session = session
+    self.completion = completion
+  }
+}
+
 public struct RenderSessionCapabilities: Sendable, Hashable {
   public struct Features: OptionSet, Sendable, Hashable {
     public let rawValue: UInt32
@@ -1467,26 +1485,25 @@ public extension MapHandle {
 
   private func finishRenderSession(
     _ started: StartedRenderSession
-  ) async throws -> RenderSessionHandle {
+  ) throws -> RenderSessionAttachment {
     let session = try RenderSessionHandle(
       session: started.attachment.session,
       frameWake: started.frameWake,
       driverWorkWake: started.driverWorkWake
     )
-    do {
-      try await started.attachment.completion.value()
-      return session
-    } catch {
-      _ = try? session.abandon()
-      try? session.close()
-      throw error
+    let completed = Task { [session] in
+      try await mapNativeFailure {
+        try await started.attachment.completion.value()
+      }
+      withExtendedLifetime(session) {}
     }
+    return RenderSessionAttachment(session: session, completion: completed)
   }
 
   func attachMetalSurface(
     _ descriptor: MetalSurfaceDescriptor,
     options: RenderSessionAttachOptions
-  ) async throws -> RenderSessionHandle {
+  ) throws -> RenderSessionAttachment {
     let attachment = try descriptor.nativeInput.withNativeDescriptor { value in
       try startRenderSession(options: options) { options in
         try NativeRender.metalSurfaceAttachStart(
@@ -1496,13 +1513,13 @@ public extension MapHandle {
         )
       }
     }
-    return try await finishRenderSession(attachment)
+    return try finishRenderSession(attachment)
   }
 
   func attachVulkanSurface(
     _ descriptor: VulkanSurfaceDescriptor,
     options: RenderSessionAttachOptions
-  ) async throws -> RenderSessionHandle {
+  ) throws -> RenderSessionAttachment {
     let attachment = try descriptor.nativeInput.withNativeDescriptor { value in
       try startRenderSession(options: options) { options in
         try NativeRender.vulkanSurfaceAttachStart(
@@ -1512,13 +1529,13 @@ public extension MapHandle {
         )
       }
     }
-    return try await finishRenderSession(attachment)
+    return try finishRenderSession(attachment)
   }
 
   func attachOpenGLSurface(
     _ descriptor: OpenGLSurfaceDescriptor,
     options: RenderSessionAttachOptions = .init(driver: .callerGraphicsThread)
-  ) async throws -> RenderSessionHandle {
+  ) throws -> RenderSessionAttachment {
     let attachment = try descriptor.nativeInput.withNativeDescriptor { value in
       try startRenderSession(options: options) { options in
         try NativeRender.openGLSurfaceAttachStart(
@@ -1528,13 +1545,13 @@ public extension MapHandle {
         )
       }
     }
-    return try await finishRenderSession(attachment)
+    return try finishRenderSession(attachment)
   }
 
   func attachMetalOwnedTexture(
     _ descriptor: MetalOwnedTextureDescriptor,
     options: RenderSessionAttachOptions
-  ) async throws -> RenderSessionHandle {
+  ) throws -> RenderSessionAttachment {
     let attachment = try descriptor.nativeInput.withNativeDescriptor { value in
       try startRenderSession(options: options) { options in
         try NativeRender.metalOwnedTextureAttachStart(
@@ -1544,13 +1561,13 @@ public extension MapHandle {
         )
       }
     }
-    return try await finishRenderSession(attachment)
+    return try finishRenderSession(attachment)
   }
 
   func attachMetalBorrowedTexture(
     _ descriptor: MetalBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions
-  ) async throws -> RenderSessionHandle {
+  ) throws -> RenderSessionAttachment {
     let attachment = try descriptor.nativeInput.withNativeDescriptor { value in
       try startRenderSession(options: options) { options in
         try NativeRender.metalBorrowedTextureAttachStart(
@@ -1560,13 +1577,13 @@ public extension MapHandle {
         )
       }
     }
-    return try await finishRenderSession(attachment)
+    return try finishRenderSession(attachment)
   }
 
   func attachVulkanOwnedTexture(
     _ descriptor: VulkanOwnedTextureDescriptor,
     options: RenderSessionAttachOptions
-  ) async throws -> RenderSessionHandle {
+  ) throws -> RenderSessionAttachment {
     let attachment = try descriptor.nativeInput.withNativeDescriptor { value in
       try startRenderSession(options: options) { options in
         try NativeRender.vulkanOwnedTextureAttachStart(
@@ -1576,13 +1593,13 @@ public extension MapHandle {
         )
       }
     }
-    return try await finishRenderSession(attachment)
+    return try finishRenderSession(attachment)
   }
 
   func attachVulkanBorrowedTexture(
     _ descriptor: VulkanBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions
-  ) async throws -> RenderSessionHandle {
+  ) throws -> RenderSessionAttachment {
     let attachment = try descriptor.nativeInput.withNativeDescriptor { value in
       try startRenderSession(options: options) { options in
         try NativeRender.vulkanBorrowedTextureAttachStart(
@@ -1592,13 +1609,13 @@ public extension MapHandle {
         )
       }
     }
-    return try await finishRenderSession(attachment)
+    return try finishRenderSession(attachment)
   }
 
   func attachOpenGLOwnedTexture(
     _ descriptor: OpenGLOwnedTextureDescriptor,
     options: RenderSessionAttachOptions = .init(driver: .callerGraphicsThread)
-  ) async throws -> RenderSessionHandle {
+  ) throws -> RenderSessionAttachment {
     let attachment = try descriptor.nativeInput.withNativeDescriptor { value in
       try startRenderSession(options: options) { options in
         try NativeRender.openGLOwnedTextureAttachStart(
@@ -1608,13 +1625,13 @@ public extension MapHandle {
         )
       }
     }
-    return try await finishRenderSession(attachment)
+    return try finishRenderSession(attachment)
   }
 
   func attachOpenGLBorrowedTexture(
     _ descriptor: OpenGLBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions = .init(driver: .callerGraphicsThread)
-  ) async throws -> RenderSessionHandle {
+  ) throws -> RenderSessionAttachment {
     let attachment = try descriptor.nativeInput.withNativeDescriptor { value in
       try startRenderSession(options: options) { options in
         try NativeRender.openGLBorrowedTextureAttachStart(
@@ -1624,13 +1641,13 @@ public extension MapHandle {
         )
       }
     }
-    return try await finishRenderSession(attachment)
+    return try finishRenderSession(attachment)
   }
 
   func attachWebGPUSurface(
     _ descriptor: WebGPUSurfaceDescriptor,
     options: RenderSessionAttachOptions = .init(driver: .callerGraphicsThread)
-  ) async throws -> RenderSessionHandle {
+  ) throws -> RenderSessionAttachment {
     let attachment = try descriptor.nativeInput.withNativeDescriptor { value in
       try startRenderSession(options: options) { options in
         try NativeRender.webGPUSurfaceAttachStart(
@@ -1640,13 +1657,13 @@ public extension MapHandle {
         )
       }
     }
-    return try await finishRenderSession(attachment)
+    return try finishRenderSession(attachment)
   }
 
   func attachWebGPUOwnedTexture(
     _ descriptor: WebGPUOwnedTextureDescriptor,
     options: RenderSessionAttachOptions = .init(driver: .callerGraphicsThread)
-  ) async throws -> RenderSessionHandle {
+  ) throws -> RenderSessionAttachment {
     let attachment = try descriptor.nativeInput.withNativeDescriptor { value in
       try startRenderSession(options: options) { options in
         try NativeRender.webGPUOwnedTextureAttachStart(
@@ -1656,13 +1673,13 @@ public extension MapHandle {
         )
       }
     }
-    return try await finishRenderSession(attachment)
+    return try finishRenderSession(attachment)
   }
 
   func attachWebGPUBorrowedTexture(
     _ descriptor: WebGPUBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions = .init(driver: .callerGraphicsThread)
-  ) async throws -> RenderSessionHandle {
+  ) throws -> RenderSessionAttachment {
     let attachment = try descriptor.nativeInput.withNativeDescriptor { value in
       try startRenderSession(options: options) { options in
         try NativeRender.webGPUBorrowedTextureAttachStart(
@@ -1672,6 +1689,6 @@ public extension MapHandle {
         )
       }
     }
-    return try await finishRenderSession(attachment)
+    return try finishRenderSession(attachment)
   }
 }

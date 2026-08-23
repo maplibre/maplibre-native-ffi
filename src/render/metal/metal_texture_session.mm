@@ -250,7 +250,7 @@ auto metal_borrowed_texture_attach_start(
     .size = sizeof(mln_render_session_capabilities),
     .driver = options == nullptr ? 0u : options->driver,
     .texture_ring_depth = 0,
-    .flags = MLN_RENDER_SESSION_CAPABILITY_READBACK
+    .flags = 0
   };
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Texture, options, capabilities,
@@ -263,6 +263,12 @@ auto metal_borrowed_texture_set_target_start(
   const mln_metal_borrowed_texture_descriptor* descriptor,
   const mln_completion* completion
 ) -> mln_status {
+  const auto submission_status = validate_render_session_retarget_submission(
+    session, RetargetTargetKind::BorrowedTexture, completion
+  );
+  if (submission_status != MLN_STATUS_OK) {
+    return submission_status;
+  }
   const auto descriptor_status = validate_borrowed_texture(descriptor);
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;

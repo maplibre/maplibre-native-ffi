@@ -155,6 +155,16 @@ static void metal_owned_texture_attach_rejects_unsafe_raw_inputs(void) {
   );
 }
 
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+static void metal_surface_retarget_retains_submission_inputs(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  TEST_ASSERT_TRUE(mln_test_metal_surface_retarget_retains_submission(map));
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+#endif
+
 static void metal_borrowed_texture_rejects_unsafe_raw_descriptors(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -995,6 +1005,9 @@ void run_render_backend_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(metal_surface_attach_rejects_unsafe_raw_inputs);
   RUN_TEST(metal_owned_texture_attach_rejects_unsafe_raw_inputs);
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+  RUN_TEST(metal_surface_retarget_retains_submission_inputs);
+#endif
   RUN_TEST(metal_borrowed_texture_rejects_unsafe_raw_descriptors);
   RUN_TEST(opengl_surface_attach_rejects_unsafe_raw_inputs);
 #if defined(MLN_FFI_TEST_OPENGL_WEBGL)

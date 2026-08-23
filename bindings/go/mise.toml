@@ -26,6 +26,7 @@ mkdir -p build
 # Document the public maplibre package only; omit ./... so internal/
 # packages are not published under the docs site.
 PKG_CONFIG_PATH="$MISE_MONOREPO_ROOT/build/$usage_preset/install/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}" \
+  GOCACHE="$MISE_MONOREPO_ROOT/build/$usage_preset/go-cache" \
   doc2go \
     -out build/doc2go \
     -home github.com/maplibre/maplibre-native-ffi/bindings/go \
@@ -50,6 +51,7 @@ extends = "ffi:preset"
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+export GOCACHE="$MISE_MONOREPO_ROOT/build/$usage_preset/go-cache"
 
 # A host build runs the suite; a cross build proves the package compiles and
 # links for the target.
@@ -79,6 +81,7 @@ esac
 
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+export GOCACHE="$MISE_MONOREPO_ROOT/build/$usage_preset/go-cache"
 go test ./...
 go vet ./...
 '''

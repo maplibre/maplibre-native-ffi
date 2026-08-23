@@ -41,15 +41,17 @@ impl RuntimeState {
     }
 
     fn close(&self) -> Result<NativeFuture<()>> {
-        let runtime = self.native()?;
-        // SAFETY: runtime is live and native consumes it only on success. A
-        // rejected release leaves the completion state owned by `submit`.
-        let teardown = completion::submit(
-            |completion| unsafe { sys::mln_runtime_release(runtime, completion) },
-            completion::unit,
-        )?;
-        self.handle.mark_closed();
-        Ok(teardown)
+        self.handle
+            .close_with(|runtime| {
+                // SAFETY: runtime is live and native consumes it only on
+                // success. A rejected release leaves the completion state
+                // owned by `submit`.
+                completion::submit(
+                    |completion| unsafe { sys::mln_runtime_release(runtime, completion) },
+                    completion::unit,
+                )
+            })
+            .map(|teardown| teardown.unwrap_or_else(|| completion::ready(())))
     }
 
     fn set_resource_provider<F>(&self, callback: F) -> Result<NativeFuture<CommandCompletion>>

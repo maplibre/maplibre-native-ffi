@@ -38,11 +38,12 @@ impl MapProjectionState {
     }
 
     fn close(&self) -> Result<()> {
-        let projection = self.native()?;
-        // SAFETY: projection is live; the synchronous close waits for calls
-        // already running on other threads before it retires the handle.
-        maplibre_core::check(unsafe { sys::mln_map_projection_close(projection) })?;
-        self.handle.mark_closed();
+        self.handle.close_with(|projection| {
+            // SAFETY: projection is live; the synchronous close waits for
+            // calls already running on other threads before it retires the
+            // handle.
+            maplibre_core::check(unsafe { sys::mln_map_projection_close(projection) })
+        })?;
         Ok(())
     }
 }

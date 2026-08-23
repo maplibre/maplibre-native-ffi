@@ -248,6 +248,17 @@ struct PyCompletionBridge {
     accept_error_status: bool,
 }
 
+fn new_python_future(py: Python<'_>) -> PyResult<Py<PyAny>> {
+    let future = py
+        .import("concurrent.futures")?
+        .getattr("Future")?
+        .call0()?;
+    // Native work is already running once its C submission is accepted. Mark
+    // the future accordingly so cancel() cannot claim that it stopped the work.
+    future.call_method0("set_running_or_notify_cancel")?;
+    Ok(future.unbind())
+}
+
 struct OwnedRenderFrameBatch(sys::mln_render_frame_batch);
 
 impl Drop for OwnedRenderFrameBatch {
@@ -323,11 +334,7 @@ where
     S: FnOnce(*const sys::mln_completion) -> sys::mln_status,
     C: FnOnce(Python<'_>, &sys::mln_completion_result) -> PyResult<Py<PyAny>> + Send + 'static,
 {
-    let future = py
-        .import("concurrent.futures")?
-        .getattr("Future")?
-        .call0()?
-        .unbind();
+    let future = new_python_future(py)?;
     let bridge = Box::new(PyCompletionBridge {
         future: future.clone_ref(py),
         convert: Mutex::new(Some(Box::new(convert))),
@@ -355,11 +362,7 @@ fn submit_python_command_future<S>(py: Python<'_>, submit: S) -> PyResult<Py<PyA
 where
     S: FnOnce(*const sys::mln_completion) -> sys::mln_status,
 {
-    let future = py
-        .import("concurrent.futures")?
-        .getattr("Future")?
-        .call0()?
-        .unbind();
+    let future = new_python_future(py)?;
     let bridge = Box::new(PyCompletionBridge {
         future: future.clone_ref(py),
         convert: Mutex::new(Some(Box::new(py_command))),

@@ -433,6 +433,17 @@ def test_multiple_runtimes_are_independent() -> None:
         first.close()
 
 
+def test_accepted_native_future_cannot_claim_successful_cancellation() -> None:
+    runtime = mln.RuntimeHandle()
+    try:
+        future = runtime.barrier()
+
+        assert future.cancel() is False
+        future.result(timeout=5)
+    finally:
+        runtime.close().result(timeout=30)
+
+
 def test_runtime_and_map_are_usable_across_python_threads() -> None:
     runtime = mln.RuntimeHandle()
     map_handle = runtime.create_map().result(timeout=5)

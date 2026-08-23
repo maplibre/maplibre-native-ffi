@@ -57,7 +57,7 @@ final class MetalRenderTarget {
     graphics: MetalGraphicsContext,
     viewport: Viewport
   ) async throws -> MetalRenderTarget {
-    let session = try await map.attachMetalSurface(
+    let attachment = try map.attachMetalSurface(
       MetalSurfaceDescriptor(
         extent: viewport.extent,
         context: graphics.contextDescriptor,
@@ -65,7 +65,21 @@ final class MetalRenderTarget {
       ),
       options: .init(driver: .callerGraphicsThread)
     )
-    return MetalRenderTarget(session: session)
+    let session = attachment.session
+    do {
+      try session.setDriverWorkReadyHandler { [weak session] in
+        Task { @MainActor in
+          _ = try? session?.serviceDriverWork(maxWork: 0)
+        }
+      }
+      try session.serviceDriverWork(maxWork: 0)
+      try await attachment.completion.value
+      return MetalRenderTarget(session: session)
+    } catch {
+      _ = try? session.abandon()
+      try? session.close()
+      throw error
+    }
   }
 
   func resize(_ viewport: Viewport) async throws {

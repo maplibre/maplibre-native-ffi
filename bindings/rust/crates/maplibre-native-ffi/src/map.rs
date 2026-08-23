@@ -71,10 +71,10 @@ impl MapState {
     }
 
     fn close(&self) -> Result<()> {
-        let map = self.native()?;
-        // SAFETY: map is live and native consumes it only on success.
-        maplibre_core::check(unsafe { sys::mln_map_release(map) })?;
-        self.handle.mark_closed();
+        self.handle.close_with(|map| {
+            // SAFETY: map is live and native consumes it only on success.
+            maplibre_core::check(unsafe { sys::mln_map_release(map) })
+        })?;
         self.runtime
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())

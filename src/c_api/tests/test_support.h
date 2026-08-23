@@ -65,6 +65,10 @@ bool mln_test_completion_copy_value(
 );
 bool mln_test_completion_contract(void);
 
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+bool mln_test_metal_surface_retarget_retains_submission(mln_map map);
+#endif
+
 mln_status mln_test_runtime_reserve_child(mln_runtime runtime);
 void mln_test_runtime_abandon_child(mln_runtime runtime);
 mln_status mln_test_render_session_blocking_operation_create(

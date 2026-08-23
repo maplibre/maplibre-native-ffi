@@ -179,7 +179,7 @@ enum MetalRenderTarget {
     graphics: MetalGraphicsContext,
     viewport: Viewport
   ) async throws -> MetalRenderTarget {
-    let session = try await map.attachMetalOwnedTexture(
+    let attachment = try map.attachMetalOwnedTexture(
       MetalOwnedTextureDescriptor(
         extent: viewport.extent,
         context: graphics.contextDescriptor
@@ -189,6 +189,7 @@ enum MetalRenderTarget {
         requestedTextureRingDepth: 3
       )
     )
+    let session = try await finishAttachment(attachment)
     do {
       let compositor = try MetalTextureCompositor(graphics: graphics)
       return .ownedTexture(session: session, compositor: compositor)
@@ -208,7 +209,7 @@ enum MetalRenderTarget {
       graphics: graphics,
       viewport: viewport
     )
-    let session = try await map.attachMetalBorrowedTexture(
+    let attachment = try map.attachMetalBorrowedTexture(
       MetalBorrowedTextureDescriptor(
         extent: viewport.extent,
         physicalWidth: viewport.physicalWidth,
@@ -217,6 +218,7 @@ enum MetalRenderTarget {
       ),
       options: .init(driver: .callerGraphicsThread)
     )
+    let session = try await finishAttachment(attachment)
     do {
       let compositor = try MetalTextureCompositor(graphics: graphics)
       return .borrowedTexture(
@@ -236,7 +238,7 @@ enum MetalRenderTarget {
     graphics: MetalGraphicsContext,
     viewport: Viewport
   ) async throws -> MetalRenderTarget {
-    let session = try await map.attachMetalSurface(
+    let attachment = try map.attachMetalSurface(
       MetalSurfaceDescriptor(
         extent: viewport.extent,
         context: graphics.contextDescriptor,
@@ -244,7 +246,27 @@ enum MetalRenderTarget {
       ),
       options: .init(driver: .callerGraphicsThread)
     )
-    return .nativeSurface(session: session)
+    return try .nativeSurface(session: await finishAttachment(attachment))
+  }
+
+  private static func finishAttachment(
+    _ attachment: RenderSessionAttachment
+  ) async throws -> RenderSessionHandle {
+    let session = attachment.session
+    do {
+      try session.setDriverWorkReadyHandler { [weak session] in
+        Task { @MainActor in
+          _ = try? session?.serviceDriverWork(maxWork: 0)
+        }
+      }
+      try session.serviceDriverWork(maxWork: 0)
+      try await attachment.completion.value
+      return session
+    } catch {
+      _ = try? session.abandon()
+      try? session.close()
+      throw error
+    }
   }
 }
 

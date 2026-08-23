@@ -1173,11 +1173,9 @@ impl RenderSessionState {
     }
 
     fn destroy(&self) -> Result<()> {
-        let Some(session) = self.handle.live_handle() else {
-            return Ok(());
-        };
-        maplibre_core::check(unsafe { sys::mln_render_session_destroy(session) })?;
-        self.handle.mark_closed();
+        self.handle.close_with(|session| {
+            maplibre_core::check(unsafe { sys::mln_render_session_destroy(session) })
+        })?;
         Ok(())
     }
 }

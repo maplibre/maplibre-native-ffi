@@ -121,46 +121,54 @@ final class MetalMapView: NSView {
   }
 
   override func mouseDown(with event: NSEvent) {
-    updateMap { try input.mouseDown(event, mapState: $0) }
+    updateMap { try await self.input.mouseDown(event, mapState: $0) }
   }
 
   override func rightMouseDown(with event: NSEvent) {
-    updateMap { try input.rightMouseDown(event, mapState: $0) }
+    updateMap { try await self.input.rightMouseDown(event, mapState: $0) }
   }
 
   override func mouseUp(with event: NSEvent) {
-    updateMap { try input.mouseUp(event, mapState: $0) }
+    updateMap { try await self.input.mouseUp(event, mapState: $0) }
   }
 
   override func rightMouseUp(with event: NSEvent) {
-    updateMap { try input.rightMouseUp(event, mapState: $0) }
+    updateMap { try await self.input.rightMouseUp(event, mapState: $0) }
   }
 
   override func mouseDragged(with event: NSEvent) {
-    updateMap { try input.mouseDragged(event, mapState: $0) }
+    updateMap { try await self.input.mouseDragged(event, mapState: $0) }
   }
 
   override func rightMouseDragged(with event: NSEvent) {
-    updateMap { try input.mouseDragged(event, mapState: $0) }
+    updateMap { try await self.input.mouseDragged(event, mapState: $0) }
   }
 
   override func scrollWheel(with event: NSEvent) {
-    updateMap { try input.scrollWheel(event, in: self, mapState: $0) }
+    updateMap {
+      try await self.input.scrollWheel(event, in: self, mapState: $0)
+    }
   }
 
   override func keyDown(with event: NSEvent) {
     guard let viewport = currentViewport else { return }
-    updateMap { try input.keyDown(event, viewport: viewport, mapState: $0) }
+    updateMap {
+      try await self.input.keyDown(event, viewport: viewport, mapState: $0)
+    }
   }
 
-  private func updateMap(_ update: (MapState) throws -> Bool) {
+  private func updateMap(
+    _ update: @escaping (MapState) async throws -> Bool
+  ) {
     guard !isShutDown, let state = mapState else { return }
-    do {
-      if try update(state) {
-        renderRequested = true
+    Task { @MainActor in
+      do {
+        if try await update(state) {
+          renderRequested = true
+        }
+      } catch {
+        fail(String(describing: error))
       }
-    } catch {
-      fail(String(describing: error))
     }
   }
 
@@ -190,7 +198,7 @@ final class MetalMapView: NSView {
           if let latest = self.currentViewport, !latest.isEmpty,
              latest != viewport
           {
-            try state.resize(MapLogicalExtent(
+            try await state.resize(MapLogicalExtent(
               width: latest.logicalWidth,
               height: latest.logicalHeight,
               scaleFactor: latest.scaleFactor
@@ -233,7 +241,7 @@ final class MetalMapView: NSView {
     graphics.resize(viewport)
     currentViewport = viewport
     updateMap { state in
-      try state.resize(MapLogicalExtent(
+      try await state.resize(MapLogicalExtent(
         width: viewport.logicalWidth,
         height: viewport.logicalHeight,
         scaleFactor: viewport.scaleFactor

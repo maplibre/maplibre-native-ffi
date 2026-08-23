@@ -34,18 +34,32 @@ extends = "ffi:preset"
 # Visual Studio exports Platform=x64 on Windows; the .NET solution uses Any CPU.
 dir = "../.."
 run = '''
+case "$usage_preset" in
+  ios-* | tvos-*)
+    echo "The .NET binding has no iOS or tvOS target." >&2
+    exit 2
+    ;;
+esac
 MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   dotnet build \
     Maplibre.NativeFfi.slnx \
-    -p:Platform="Any CPU"
+    -p:Platform="Any CPU" \
+    -p:BaseOutputPath="$MISE_MONOREPO_ROOT/build/dotnet/$usage_preset/"
 '''
 
 [tasks.test]
 extends = "ffi:preset"
 dir = "../.."
 run = '''
+case "$usage_preset" in
+  ios-* | tvos-*)
+    echo "The .NET binding has no iOS or tvOS target." >&2
+    exit 2
+    ;;
+esac
 MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   dotnet test \
     --project bindings/dotnet/tests/Maplibre.NativeFfi.Tests/Maplibre.NativeFfi.Tests.csproj \
-    -p:Platform="Any CPU"
+    -p:Platform="Any CPU" \
+    -p:BaseOutputPath="$MISE_MONOREPO_ROOT/build/dotnet/$usage_preset/"
 '''

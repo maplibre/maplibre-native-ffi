@@ -63,15 +63,19 @@ final class MapState {
 
     self.runtime = runtime
     self.map = map
-    try map.setEventMask([.mapRenderUpdateAvailable, .mapRenderFrameFinished])
-    try map.setStyleURL("https://tiles.openfreemap.org/styles/bright")
-    _ = try map.updateCamera(CameraUpdate(camera: CameraOptions(
+    try await map.setEventMask([
+      .mapRenderUpdateAvailable, .mapRenderFrameFinished,
+    ])
+    _ = try await map.setStyleURL(
+      "https://tiles.openfreemap.org/styles/bright"
+    )
+    _ = try await map.updateCamera(CameraUpdate(camera: CameraOptions(
       center: LatLng(latitude: 37.7749, longitude: -122.4194),
       zoom: 13,
       bearing: 12,
       pitch: 30
     )))
-    _ = try map.requestRepaint()
+    _ = try await map.requestRepaint()
   }
 
   var mapHandle: MapHandle {
@@ -123,50 +127,55 @@ final class MapState {
     return renderPending
   }
 
-  func resize(_ extent: MapLogicalExtent) throws {
-    _ = try map.resize(to: extent)
+  func resize(_ extent: MapLogicalExtent) async throws {
+    _ = try await map.resize(to: extent)
   }
 
-  func setGestureInProgress(_ inProgress: Bool) throws {
-    _ = try map.updateCamera(CameraUpdate(
+  func setGestureInProgress(_ inProgress: Bool) async throws {
+    _ = try await map.updateCamera(CameraUpdate(
       camera: CameraOptions(),
       gesturePhase: inProgress ? .begin : .end
     ))
   }
 
-  func cancelTransitions() throws {
-    _ = try map.updateCamera(CameraUpdate(camera: CameraOptions()))
+  func cancelTransitions() async throws {
+    _ = try await map.updateCamera(CameraUpdate(camera: CameraOptions()))
   }
 
-  func moveBy(dx: Double, dy: Double) throws {
-    _ = try map.applyCameraDelta(CameraDelta(offset: ScreenPoint(x: dx, y: dy)))
+  func moveBy(dx: Double, dy: Double) async throws {
+    _ = try await map.applyCameraDelta(
+      CameraDelta(offset: ScreenPoint(x: dx, y: dy))
+    )
   }
 
-  func scaleBy(_ scale: Double, anchor: ScreenPoint) throws {
-    _ = try map.applyCameraDelta(CameraDelta(
+  func scaleBy(_ scale: Double, anchor: ScreenPoint) async throws {
+    _ = try await map.applyCameraDelta(CameraDelta(
       kind: .scale,
       amount: scale,
       anchor: anchor
     ))
   }
 
-  func adjustBearing(delta: Double, anchor: ScreenPoint) throws {
-    _ = try map.applyCameraDelta(CameraDelta(
+  func adjustBearing(delta: Double, anchor: ScreenPoint) async throws {
+    _ = try await map.applyCameraDelta(CameraDelta(
       kind: .bearing,
       amount: delta,
       anchor: anchor
     ))
   }
 
-  func adjustPitch(delta: Double) throws {
-    _ = try map.applyCameraDelta(CameraDelta(kind: .pitch, amount: delta))
+  func adjustPitch(delta: Double) async throws {
+    _ = try await map.applyCameraDelta(CameraDelta(
+      kind: .pitch,
+      amount: delta
+    ))
   }
 
   func zoomToNextStep(
     anchor: ScreenPoint,
     animation: AnimationOptions
-  ) throws {
-    _ = try map.applyCameraDelta(CameraDelta(
+  ) async throws {
+    _ = try await map.applyCameraDelta(CameraDelta(
       kind: .scale,
       amount: 2,
       anchor: anchor,

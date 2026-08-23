@@ -480,8 +480,8 @@ final class RenderSessionHandle implements Finalizable {
 
   final RuntimeHandle _runtime;
   final NativeHandleState<NativeRenderSession> _state;
-  final _frameResultsReady = StreamController<void>.broadcast(sync: true);
-  final _driverWorkReady = StreamController<void>.broadcast(sync: true);
+  final _frameResultsReady = StreamController<void>.broadcast();
+  final _driverWorkReady = StreamController<void>.broadcast();
 
   /// Notifications that frame results are available to drain.
   ///

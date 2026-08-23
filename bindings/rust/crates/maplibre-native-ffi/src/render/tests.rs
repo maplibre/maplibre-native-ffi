@@ -4,7 +4,12 @@ use std::ffi::CStr;
 use std::ffi::CString;
 #[cfg(target_os = "windows")]
 use std::ffi::c_char;
-#[cfg(any(target_os = "linux", target_os = "android", target_os = "windows"))]
+#[cfg(any(
+    target_os = "linux",
+    target_os = "android",
+    target_os = "macos",
+    target_os = "windows"
+))]
 use std::ffi::c_void;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -26,11 +31,194 @@ mod webgl_gl;
 use glutin_egl_sys::egl;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use glutin_egl_sys::egl::types::{EGLConfig, EGLContext, EGLDisplay, EGLSurface, EGLint};
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 use libloading::Library;
+#[cfg(target_os = "macos")]
+use macos_egl as egl;
+#[cfg(target_os = "macos")]
+use macos_egl::types::{EGLConfig, EGLContext, EGLDisplay, EGLSurface, EGLint};
 use static_assertions::{assert_impl_all, assert_not_impl_any};
 #[cfg(target_os = "emscripten")]
 use webgl_gl as gl_api;
+
+#[cfg(target_os = "macos")]
+#[allow(non_snake_case)]
+mod macos_egl {
+    use std::ffi::{c_char, c_void};
+
+    pub mod types {
+        use std::ffi::c_void;
+
+        pub type EGLConfig = *const c_void;
+        pub type EGLContext = *const c_void;
+        pub type EGLDisplay = *const c_void;
+        pub type EGLSurface = *const c_void;
+        pub type EGLint = i32;
+    }
+
+    use types::{EGLConfig, EGLContext, EGLDisplay, EGLSurface, EGLint};
+
+    pub const FALSE: u32 = 0;
+    pub const NONE: u32 = 0x3038;
+    pub const WIDTH: u32 = 0x3057;
+    pub const HEIGHT: u32 = 0x3056;
+    pub const SURFACE_TYPE: u32 = 0x3033;
+    pub const PBUFFER_BIT: u32 = 0x0001;
+    pub const RENDERABLE_TYPE: u32 = 0x3040;
+    pub const OPENGL_ES3_BIT: u32 = 0x0040;
+    pub const RED_SIZE: u32 = 0x3024;
+    pub const GREEN_SIZE: u32 = 0x3023;
+    pub const BLUE_SIZE: u32 = 0x3022;
+    pub const ALPHA_SIZE: u32 = 0x3021;
+    pub const DEPTH_SIZE: u32 = 0x3025;
+    pub const STENCIL_SIZE: u32 = 0x3026;
+    pub const CONTEXT_CLIENT_VERSION: u32 = 0x3098;
+    pub const OPENGL_ES_API: u32 = 0x30A0;
+    pub const DEFAULT_DISPLAY: usize = 0;
+    pub const NO_CONTEXT: EGLContext = std::ptr::null();
+    pub const NO_DISPLAY: EGLDisplay = std::ptr::null();
+    pub const NO_SURFACE: EGLSurface = std::ptr::null();
+
+    type GetDisplay = unsafe extern "system" fn(*mut c_void) -> EGLDisplay;
+    type Initialize = unsafe extern "system" fn(EGLDisplay, *mut EGLint, *mut EGLint) -> u32;
+    type BindApi = unsafe extern "system" fn(u32) -> u32;
+    type ChooseConfig = unsafe extern "system" fn(
+        EGLDisplay,
+        *const EGLint,
+        *mut EGLConfig,
+        EGLint,
+        *mut EGLint,
+    ) -> u32;
+    type CreateContext =
+        unsafe extern "system" fn(EGLDisplay, EGLConfig, EGLContext, *const EGLint) -> EGLContext;
+    type CreatePbufferSurface =
+        unsafe extern "system" fn(EGLDisplay, EGLConfig, *const EGLint) -> EGLSurface;
+    type MakeCurrent =
+        unsafe extern "system" fn(EGLDisplay, EGLSurface, EGLSurface, EGLContext) -> u32;
+    type GetError = unsafe extern "system" fn() -> u32;
+    type DestroySurface = unsafe extern "system" fn(EGLDisplay, EGLSurface) -> u32;
+    type DestroyContext = unsafe extern "system" fn(EGLDisplay, EGLContext) -> u32;
+    type Terminate = unsafe extern "system" fn(EGLDisplay) -> u32;
+    type GetCurrentContext = unsafe extern "system" fn() -> EGLContext;
+    type GetProcAddress = unsafe extern "system" fn(*const c_char) -> *const c_void;
+
+    pub struct Egl {
+        GetDisplay: GetDisplay,
+        Initialize: Initialize,
+        BindAPI: BindApi,
+        ChooseConfig: ChooseConfig,
+        CreateContext: CreateContext,
+        CreatePbufferSurface: CreatePbufferSurface,
+        MakeCurrent: MakeCurrent,
+        GetError: GetError,
+        DestroySurface: DestroySurface,
+        DestroyContext: DestroyContext,
+        Terminate: Terminate,
+        GetCurrentContext: GetCurrentContext,
+        GetProcAddress: GetProcAddress,
+    }
+
+    impl Egl {
+        pub unsafe fn load_with(mut load: impl FnMut(&str) -> *const c_void) -> Self {
+            unsafe fn symbol<T: Copy>(pointer: *const c_void, name: &str) -> T {
+                assert!(!pointer.is_null(), "EGL loader did not provide {name}");
+                // SAFETY: the loader returns the function named by `name`, and
+                // every field below declares that function's EGL signature.
+                unsafe { std::mem::transmute_copy(&pointer) }
+            }
+
+            macro_rules! load {
+                ($name:literal) => {
+                    unsafe { symbol(load($name), $name) }
+                };
+            }
+            Self {
+                GetDisplay: load!("eglGetDisplay"),
+                Initialize: load!("eglInitialize"),
+                BindAPI: load!("eglBindAPI"),
+                ChooseConfig: load!("eglChooseConfig"),
+                CreateContext: load!("eglCreateContext"),
+                CreatePbufferSurface: load!("eglCreatePbufferSurface"),
+                MakeCurrent: load!("eglMakeCurrent"),
+                GetError: load!("eglGetError"),
+                DestroySurface: load!("eglDestroySurface"),
+                DestroyContext: load!("eglDestroyContext"),
+                Terminate: load!("eglTerminate"),
+                GetCurrentContext: load!("eglGetCurrentContext"),
+                GetProcAddress: load!("eglGetProcAddress"),
+            }
+        }
+
+        pub unsafe fn GetDisplay(&self, display: *mut c_void) -> EGLDisplay {
+            unsafe { (self.GetDisplay)(display) }
+        }
+        pub unsafe fn Initialize(
+            &self,
+            display: EGLDisplay,
+            major: *mut EGLint,
+            minor: *mut EGLint,
+        ) -> u32 {
+            unsafe { (self.Initialize)(display, major, minor) }
+        }
+        pub unsafe fn BindAPI(&self, api: u32) -> u32 {
+            unsafe { (self.BindAPI)(api) }
+        }
+        pub unsafe fn ChooseConfig(
+            &self,
+            display: EGLDisplay,
+            attributes: *const EGLint,
+            config: *mut EGLConfig,
+            config_size: EGLint,
+            count: *mut EGLint,
+        ) -> u32 {
+            unsafe { (self.ChooseConfig)(display, attributes, config, config_size, count) }
+        }
+        pub unsafe fn CreateContext(
+            &self,
+            display: EGLDisplay,
+            config: EGLConfig,
+            share: EGLContext,
+            attributes: *const EGLint,
+        ) -> EGLContext {
+            unsafe { (self.CreateContext)(display, config, share, attributes) }
+        }
+        pub unsafe fn CreatePbufferSurface(
+            &self,
+            display: EGLDisplay,
+            config: EGLConfig,
+            attributes: *const EGLint,
+        ) -> EGLSurface {
+            unsafe { (self.CreatePbufferSurface)(display, config, attributes) }
+        }
+        pub unsafe fn MakeCurrent(
+            &self,
+            display: EGLDisplay,
+            draw: EGLSurface,
+            read: EGLSurface,
+            context: EGLContext,
+        ) -> u32 {
+            unsafe { (self.MakeCurrent)(display, draw, read, context) }
+        }
+        pub unsafe fn GetError(&self) -> u32 {
+            unsafe { (self.GetError)() }
+        }
+        pub unsafe fn DestroySurface(&self, display: EGLDisplay, surface: EGLSurface) -> u32 {
+            unsafe { (self.DestroySurface)(display, surface) }
+        }
+        pub unsafe fn DestroyContext(&self, display: EGLDisplay, context: EGLContext) -> u32 {
+            unsafe { (self.DestroyContext)(display, context) }
+        }
+        pub unsafe fn Terminate(&self, display: EGLDisplay) -> u32 {
+            unsafe { (self.Terminate)(display) }
+        }
+        pub unsafe fn GetCurrentContext(&self) -> EGLContext {
+            unsafe { (self.GetCurrentContext)() }
+        }
+        pub unsafe fn GetProcAddress(&self, name: *const c_char) -> *const c_void {
+            unsafe { (self.GetProcAddress)(name) }
+        }
+    }
+}
 
 use super::*;
 use crate::{
@@ -145,7 +333,7 @@ fn has_opengl_test_context_backend() -> bool {
         return false;
     }
 
-    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
     {
         crate::supported_opengl_context_providers().contains(OpenGLContextProviderMask::EGL)
     }
@@ -160,11 +348,13 @@ fn has_opengl_test_context_backend() -> bool {
     #[cfg(not(any(
         target_os = "linux",
         target_os = "android",
+        target_os = "macos",
         target_os = "windows",
         target_os = "emscripten"
     )))]
     {
-        // The Rust test helper implements Linux EGL, Windows WGL, and browser WebGL.
+        // The Rust test helper implements desktop and Android EGL, Windows WGL,
+        // and browser WebGL.
         false
     }
 }
@@ -453,7 +643,7 @@ struct OpenGLTestContext {
     descriptor: OpenGLContextDescriptor,
     surface_handle: NativePointer,
     gl: gl_api::Context,
-    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
     platform: EglTestContext,
     #[cfg(target_os = "windows")]
     platform: WglTestContext,
@@ -461,7 +651,7 @@ struct OpenGLTestContext {
     platform: WebGlTestContext,
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 struct EglTestContext {
     egl: egl::Egl,
     _lib: Library,
@@ -471,9 +661,9 @@ struct EglTestContext {
     context: EGLContext,
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 impl EglTestContext {
-    fn new() -> std::result::Result<Self, Box<dyn StdError>> {
+    fn new(width: u32, height: u32) -> std::result::Result<Self, Box<dyn StdError>> {
         let lib = load_egl_library()?;
         let egl = load_egl_bindings(&lib)?;
         let display = open_egl_display(&egl)?;
@@ -517,9 +707,9 @@ impl EglTestContext {
 
         let surface_attributes = [
             egl::WIDTH as EGLint,
-            8,
+            width as EGLint,
             egl::HEIGHT as EGLint,
-            8,
+            height as EGLint,
             egl::NONE as EGLint,
         ];
         let surface =
@@ -585,7 +775,7 @@ impl EglTestContext {
     }
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 impl Drop for EglTestContext {
     fn drop(&mut self) {
         unsafe {
@@ -607,7 +797,7 @@ impl Drop for EglTestContext {
 /// This fixture creates no context and makes none current: naming dedicated
 /// ownership is what asks the session to create its own context and keep it
 /// current between renders.
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 struct DedicatedEglTestSurface {
     egl: egl::Egl,
     _lib: Library,
@@ -616,7 +806,7 @@ struct DedicatedEglTestSurface {
     surface: EGLSurface,
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 impl DedicatedEglTestSurface {
     fn new(width: u32, height: u32) -> std::result::Result<Self, Box<dyn StdError>> {
         let lib = load_egl_library()?;
@@ -675,7 +865,7 @@ impl DedicatedEglTestSurface {
     }
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 impl Drop for DedicatedEglTestSurface {
     fn drop(&mut self) {
         unsafe {
@@ -686,16 +876,15 @@ impl Drop for DedicatedEglTestSurface {
 }
 
 /// Opens and initializes the EGL display the OpenGL fixtures render through.
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 fn open_egl_display(egl: &egl::Egl) -> std::result::Result<EGLDisplay, Box<dyn StdError>> {
     // A desktop Linux run without a display server needs Mesa's surfaceless
-    // platform. Device EGL implementations ship no such platform, so they take
-    // the default display.
-    #[cfg(any(target_env = "ohos", target_os = "android"))]
+    // platform. Android and macOS ANGLE take their default displays.
+    #[cfg(any(target_env = "ohos", target_os = "android", target_os = "macos"))]
     let display = unsafe { egl.GetDisplay(egl::DEFAULT_DISPLAY as *mut c_void) };
-    #[cfg(any(target_env = "ohos", target_os = "android"))]
+    #[cfg(any(target_env = "ohos", target_os = "android", target_os = "macos"))]
     let display_operation = "eglGetDisplay";
-    #[cfg(not(any(target_env = "ohos", target_os = "android")))]
+    #[cfg(not(any(target_env = "ohos", target_os = "android", target_os = "macos")))]
     let display = {
         const EGL_PLATFORM_SURFACELESS_MESA: u32 = 0x31DD;
         if !egl.GetPlatformDisplayEXT.is_loaded() {
@@ -709,7 +898,7 @@ fn open_egl_display(egl: &egl::Egl) -> std::result::Result<EGLDisplay, Box<dyn S
             )
         }
     };
-    #[cfg(not(any(target_env = "ohos", target_os = "android")))]
+    #[cfg(not(any(target_env = "ohos", target_os = "android", target_os = "macos")))]
     let display_operation = "eglGetPlatformDisplayEXT";
     if display == egl::NO_DISPLAY {
         return Err(format!("{display_operation} failed with 0x{:x}", unsafe {
@@ -731,7 +920,7 @@ fn open_egl_display(egl: &egl::Egl) -> std::result::Result<EGLDisplay, Box<dyn S
 
 /// Chooses a pbuffer-capable OpenGL ES 3 config, which the C API requires of
 /// every EGL context descriptor.
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 fn choose_egl_pbuffer_config(
     egl: &egl::Egl,
     display: EGLDisplay,
@@ -777,14 +966,18 @@ fn choose_egl_pbuffer_config(
     Ok(config)
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 fn load_egl_library() -> std::result::Result<Library, Box<dyn StdError>> {
-    unsafe { Library::new("libEGL.so.1") }
+    #[cfg(target_os = "macos")]
+    let library = unsafe { Library::new("libEGL.dylib") };
+    #[cfg(not(target_os = "macos"))]
+    let library = unsafe { Library::new("libEGL.so.1") }
         .or_else(|_| unsafe { Library::new("libEGL.so") })
-        .map_err(|error| format!("failed to load libEGL: {error}").into())
+        .map_err(|error| format!("failed to load libEGL: {error}"));
+    library.map_err(|error| format!("failed to load libEGL: {error}").into())
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 fn load_egl_bindings(lib: &Library) -> std::result::Result<egl::Egl, Box<dyn StdError>> {
     type EglGetProcAddress = unsafe extern "system" fn(*const c_void) -> *const c_void;
 
@@ -1860,9 +2053,9 @@ impl OpenGLTestContext {
         Self::new_platform(width, height)
     }
 
-    #[cfg(any(target_os = "linux", target_os = "android"))]
-    fn new_platform(_width: u32, _height: u32) -> std::result::Result<Self, Box<dyn StdError>> {
-        let platform = EglTestContext::new()?;
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
+    fn new_platform(width: u32, height: u32) -> std::result::Result<Self, Box<dyn StdError>> {
+        let platform = EglTestContext::new(width, height)?;
         let gl = unsafe {
             gl_api::Context::from_loader_function(|symbol| {
                 let symbol = CString::new(symbol).expect("GL symbol names do not contain NULs");
@@ -1925,6 +2118,7 @@ impl OpenGLTestContext {
     #[cfg(not(any(
         target_os = "linux",
         target_os = "android",
+        target_os = "macos",
         target_os = "windows",
         target_os = "emscripten"
     )))]
@@ -1941,7 +2135,7 @@ impl OpenGLTestContext {
     }
 
     fn make_current(&self) -> std::result::Result<(), Box<dyn StdError>> {
-        #[cfg(any(target_os = "linux", target_os = "android"))]
+        #[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
         {
             self.platform.make_current()?;
             Ok(())
@@ -1959,6 +2153,7 @@ impl OpenGLTestContext {
         #[cfg(not(any(
             target_os = "linux",
             target_os = "android",
+            target_os = "macos",
             target_os = "windows",
             target_os = "emscripten"
         )))]
@@ -2579,7 +2774,7 @@ fn opengl_owned_texture_exposes_backend_metadata() {
     runtime.close_and_wait();
 }
 
-#[cfg(any(target_os = "linux", target_os = "android"))]
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "macos"))]
 #[test]
 fn dedicated_opengl_surface_keeps_its_context_on_the_graphics_thread() {
     if !has_opengl_backend() {
@@ -2628,7 +2823,7 @@ fn opengl_surface_session_renders_into_the_platform_surface() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = crate::completion::blocking(MapHandle::with_options(
         &runtime,
-        &MapOptions::new(64, 64, 1.0),
+        &MapOptions::new(32, 16, 1.0),
     ));
     let (_context, session) =
         create_opengl_surface_session(&map, RenderTargetExtent::new(32, 16, 1.0)).unwrap();
@@ -2659,7 +2854,7 @@ fn opengl_borrowed_texture_session_replaces_its_target() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = crate::completion::blocking(MapHandle::with_options(
         &runtime,
-        &MapOptions::new(64, 64, 1.0),
+        &MapOptions::new(32, 16, 1.0),
     ));
     let initial_extent = RenderTargetExtent::new(32, 16, 1.0);
     let (mut texture, session) =
@@ -2687,6 +2882,15 @@ fn opengl_borrowed_texture_session_replaces_its_target() {
         .unwrap();
     finish_unit(&session, operation);
     texture.adopt(replacement, 48, 24).unwrap();
+    drop(
+        map.resize(crate::LogicalExtent {
+            width: 48,
+            height: 24,
+            scale_factor: 1.0,
+        })
+        .unwrap(),
+    );
+    await_runtime_barrier(&runtime);
     assert_eq!(
         render_frame(&session, false).disposition,
         FrameDisposition::Rendered

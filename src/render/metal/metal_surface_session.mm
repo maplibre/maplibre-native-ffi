@@ -379,17 +379,31 @@ auto metal_surface_set_target_start(
   mln_render_session session, const mln_metal_surface_descriptor* descriptor,
   const mln_completion* completion
 ) -> mln_status {
+  const auto submission_status = validate_render_session_retarget_submission(
+    session, RetargetTargetKind::Surface, completion
+  );
+  if (submission_status != MLN_STATUS_OK) {
+    return submission_status;
+  }
   const auto descriptor_status = validate_metal_surface_descriptor(descriptor);
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
   const auto copied = *descriptor;
+  auto layer = NS::RetainPtr(static_cast<CA::MetalLayer*>(descriptor->layer));
+  auto device =
+    NS::RetainPtr(static_cast<MTL::Device*>(descriptor->context.device));
   return enqueue_driver_operation(
     session,
-    [copied](mln_render_session_object& target) {
+    [copied, layer = std::move(layer),
+     device = std::move(device)](mln_render_session_object& target) {
+      auto retained = copied;
+      retained.layer = layer.get();
+      retained.context.device = device.get();
       return surface_session_set_target(
-        target.self, copied.extent, [&copied](mln_render_session_object& live) {
-          return live.surface.backend->set_metal_target(copied);
+        target.self, retained.extent,
+        [&retained](mln_render_session_object& live) {
+          return live.surface.backend->set_metal_target(retained);
         }
       );
     },

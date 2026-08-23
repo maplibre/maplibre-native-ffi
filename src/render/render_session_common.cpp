@@ -1570,6 +1570,46 @@ auto unsupported_retarget(const char* message) -> mln_status {
   return MLN_STATUS_UNSUPPORTED;
 }
 
+auto validate_render_session_retarget_submission(
+  mln_render_session session, RetargetTargetKind kind,
+  const mln_completion* completion
+) -> mln_status {
+  const auto completion_status = validate_completion(completion);
+  if (completion_status != MLN_STATUS_OK) return completion_status;
+  const auto live = lease_render_session(session);
+  if (live == nullptr) return MLN_STATUS_INVALID_ARGUMENT;
+
+  const auto lock = std::scoped_lock{live->control_mutex};
+  if (live->state != MLN_RENDER_SESSION_STATE_ATTACHED) {
+    set_thread_error("render session is not attached");
+    return MLN_STATUS_INVALID_STATE;
+  }
+  if (kind == RetargetTargetKind::Surface) {
+    return live->kind == RenderSessionKind::Surface
+             ? MLN_STATUS_OK
+             : unsupported_retarget(
+                 "session does not render through a native surface"
+               );
+  }
+  if (live->kind != RenderSessionKind::Texture) {
+    return unsupported_retarget(
+      "session does not render into a caller-owned texture"
+    );
+  }
+  if (live->texture.acquired) {
+    set_thread_error(
+      "cannot replace the render target while a texture frame is acquired"
+    );
+    return MLN_STATUS_INVALID_STATE;
+  }
+  return live->texture.mode == TextureSessionMode::Borrowed
+           ? MLN_STATUS_OK
+           : unsupported_retarget(
+               "a session-owned texture is sized and replaced by its session; "
+               "resize it instead"
+             );
+}
+
 auto validate_render_session_retarget(
   mln_render_session session, RetargetTargetKind kind,
   mln_render_session_object*& out_session
@@ -2796,6 +2836,15 @@ auto acquired_frame_release(
 }
 
 namespace {
+void invalidate_unacquired_texture_frames_locked(
+  mln_render_session_object& session
+) {
+  if (session.kind != RenderSessionKind::Texture) return;
+  for (auto& slot : session.texture.slots) {
+    if (!slot.acquired) slot.available = false;
+  }
+}
+
 auto make_ordered_resize_work(
   const std::shared_ptr<mln_render_session_object>& session,
   const std::shared_ptr<OperationObject>& operation,
@@ -2830,6 +2879,14 @@ auto make_ordered_resize_work(
         physical_dimension(extent.width, extent.scale_factor);
       const auto physical_height =
         physical_dimension(extent.height, extent.scale_factor);
+      {
+        // A render that was already executing when resize was accepted may
+        // have published an old-size frame afterward. Retire it before the
+        // backend changes its ring resources. Acquired slots remain leased
+        // until their consumer releases them.
+        const auto lock = std::scoped_lock{session->control_mutex};
+        invalidate_unacquired_texture_frames_locked(*session);
+      }
       if (session->kind == RenderSessionKind::Surface)
         session->surface.backend->resize(physical_width, physical_height);
       else
@@ -2909,6 +2966,10 @@ auto render_session_resize_start(
     const auto lock = std::scoped_lock{s->control_mutex};
     s->pending_extent = copied;
     s->pending_changes = true;
+    // An owned-texture ring may contain several completed frames. None of its
+    // old-size, unacquired entries may survive an accepted resize and outrank
+    // the first new-size frame when the host next acquires the oldest result.
+    invalidate_unacquired_texture_frames_locked(*s);
   }
   const auto post = map_post_resize(
     s->map, mln_logical_extent{

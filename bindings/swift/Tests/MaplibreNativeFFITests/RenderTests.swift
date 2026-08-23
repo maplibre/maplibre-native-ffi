@@ -1,6 +1,46 @@
 import CMaplibreNativeC
 @testable import MaplibreNativeFFI
 import Testing
+#if canImport(Metal)
+  import Metal
+#endif
+
+#if canImport(Metal)
+  @Test func metalCallerDriverCanServiceAttachmentBeforeCompletion(
+  ) async throws {
+    let runtime = try RuntimeHandle(
+      options: RuntimeOptions(cachePath: ":memory:")
+    )
+    defer { try? runtime.closeBlockingForTests() }
+    let map = try await MapHandle(
+      runtime: runtime,
+      options: MapOptions(width: 32, height: 32)
+    )
+    defer { try? map.close() }
+    let device = try #require(MTLCreateSystemDefaultDevice())
+    let devicePointer = NativePointer(bitPattern: UInt(bitPattern:
+      Unmanaged.passUnretained(device as AnyObject).toOpaque()))
+
+    let attachment = try map.attachMetalOwnedTexture(
+      MetalOwnedTextureDescriptor(
+        extent: RenderTargetExtent(width: 32, height: 32, scaleFactor: 1),
+        context: MetalContextDescriptor(device: devicePointer)
+      ),
+      options: RenderSessionAttachOptions(driver: .callerGraphicsThread)
+    )
+    let session = attachment.session
+    defer {
+      _ = try? session.abandon()
+      try? session.close()
+    }
+
+    #expect(try session.snapshot().state == RenderSessionState.attaching)
+    #expect(try session.serviceDriverWork(maxWork: 0) > 0)
+    try await attachment.completion.value
+    #expect(try session.snapshot().state == RenderSessionState.attached)
+    withExtendedLifetime(device) {}
+  }
+#endif
 
 @Test func frameDemandPreservesCoalescingAndTimeout() {
   let demand = FrameDemand(

@@ -228,7 +228,7 @@ final class MetalMapView: UIView {
           if let latest = self.currentViewport, !latest.isEmpty,
              latest != viewport
           {
-            try state.resize(MapLogicalExtent(
+            try await state.resize(MapLogicalExtent(
               width: latest.logicalWidth,
               height: latest.logicalHeight,
               scaleFactor: latest.scaleFactor
@@ -272,7 +272,7 @@ final class MetalMapView: UIView {
     currentViewport = viewport
     pendingResize = renderTarget != nil
     updateMap { state in
-      try state.resize(MapLogicalExtent(
+      try await state.resize(MapLogicalExtent(
         width: viewport.logicalWidth,
         height: viewport.logicalHeight,
         scaleFactor: viewport.scaleFactor
@@ -359,27 +359,28 @@ final class MetalMapView: UIView {
     )
   }
 
-  @discardableResult
-  private func updateMap(_ update: (MapState) throws -> Void) -> Bool {
-    guard !isShutDown, let state = mapState else { return false }
+  private func updateMap(
+    _ update: @escaping @MainActor (MapState) async throws -> Void
+  ) {
+    guard !isShutDown, let state = mapState else { return }
     renderRequested = true
-    do {
-      try update(state)
-      return true
-    } catch {
-      showError(error)
-      beginTeardown()
-      return false
+    Task { @MainActor in
+      do {
+        try await update(state)
+      } catch {
+        showError(error)
+        beginTeardown()
+      }
     }
   }
 
   /// Opens the gesture bracket for the first recognizer to begin.
   private func beginGesture(_ recognizer: UIGestureRecognizer) {
     if openGestures.isEmpty {
-      guard updateMap({ state in
-        try state.cancelTransitions()
-        try state.setGestureInProgress(true)
-      }) else { return }
+      updateMap { state in
+        try await state.cancelTransitions()
+        try await state.setGestureInProgress(true)
+      }
     }
     openGestures.insert(ObjectIdentifier(recognizer))
   }
@@ -391,7 +392,7 @@ final class MetalMapView: UIView {
       return
     }
     if openGestures.isEmpty {
-      updateMap { try $0.setGestureInProgress(false) }
+      updateMap { try await $0.setGestureInProgress(false) }
     }
   }
 
@@ -405,7 +406,7 @@ final class MetalMapView: UIView {
       recognizer.setTranslation(.zero, in: self)
       guard translation != .zero else { return }
       updateMap { state in
-        try state.moveBy(
+        try await state.moveBy(
           dx: Double(translation.x),
           dy: Double(translation.y)
         )
@@ -425,7 +426,7 @@ final class MetalMapView: UIView {
       recognizer.scale = 1.0
       guard scale.isFinite, scale > 0 else { return }
       let anchor = screenPoint(recognizer.location(in: self))
-      updateMap { try $0.scaleBy(scale, anchor: anchor) }
+      updateMap { try await $0.scaleBy(scale, anchor: anchor) }
     default:
       endGesture(recognizer)
     }
@@ -442,7 +443,7 @@ final class MetalMapView: UIView {
       guard deltaRadians != 0 else { return }
       let anchor = screenPoint(recognizer.location(in: self))
       updateMap {
-        try $0.adjustBearing(
+        try await $0.adjustBearing(
           delta: -Double(deltaRadians * 180 / .pi),
           anchor: anchor
         )
@@ -464,7 +465,7 @@ final class MetalMapView: UIView {
       recognizer.setTranslation(.zero, in: self)
       guard translation.y != 0 else { return }
       updateMap {
-        try $0.adjustPitch(delta: -Double(translation.y) * 0.1)
+        try await $0.adjustPitch(delta: -Double(translation.y) * 0.1)
       }
     default:
       endGesture(recognizer)
@@ -474,7 +475,7 @@ final class MetalMapView: UIView {
   @objc private func handleDoubleTap(_ recognizer: UITapGestureRecognizer) {
     let anchor = screenPoint(recognizer.location(in: self))
     updateMap {
-      try $0.zoomToNextStep(
+      try await $0.zoomToNextStep(
         anchor: anchor,
         animation: MaplibreNativeFFI.AnimationOptions(durationMilliseconds: 160)
       )

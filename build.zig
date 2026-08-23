@@ -599,6 +599,14 @@ fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native_ffi: *s
             tests.root_module.addImport("wgl_test_context", wgl_test_context);
         }
     }
+    if (options.render_backend == .metal and options.target.result.os.tag.isDarwin()) {
+        tests.root_module.addCSourceFile(.{ .file = b.path("bindings/zig/tests/metal_support_apple.m") });
+        tests.root_module.linkSystemLibrary("objc", .{});
+        tests.root_module.linkFramework("Foundation", .{});
+        if (options.target.result.os.tag == .macos) {
+            tests.root_module.linkFramework("AppKit", .{});
+        }
+    }
     return tests;
 }
 
