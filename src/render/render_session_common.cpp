@@ -15,6 +15,10 @@
 #include <utility>
 #include <vector>
 
+#if defined(__ANDROID__) && defined(MLN_RENDER_BACKEND_OPENGL)
+#include <sys/system_properties.h>
+#endif
+
 #include <mbgl/gfx/backend_scope.hpp>
 #include <mbgl/gfx/renderer_backend.hpp>
 #include <mbgl/map/map.hpp>
@@ -30,8 +34,6 @@
 #include <mbgl/util/size.hpp>
 #include <mbgl/util/string.hpp>
 
-#include "render/render_session_common.hpp"
-
 #include "bytes/buffer.hpp"
 #include "c_api/autorelease_pool.hpp"
 #include "diagnostics/diagnostics.hpp"
@@ -41,6 +43,7 @@
 #include "map/map_internal.hpp"
 #include "maplibre_native_c.h"
 #include "operation/operation.hpp"
+#include "render/render_session_common.hpp"
 #include "render/render_session_test_support.hpp"
 #include "runtime/runtime.hpp"
 #include "style/style_value.hpp"
@@ -465,6 +468,22 @@ struct HandleTraits<QueriedFeatureListObject> {
 }  // namespace mln::core
 
 namespace {
+
+#if defined(__ANDROID__) && defined(MLN_RENDER_BACKEND_OPENGL)
+// Same property check MapLibre Android uses before it enables the Goldfish
+// drawable-clear workaround on the emulator OpenGL translation layer.
+auto android_system_property(const char* key) -> std::string {
+  char value[PROP_VALUE_MAX + 1] = {};
+  __system_property_get(key, value);
+  return value;
+}
+
+auto android_opengl_emulator() -> bool {
+  return android_system_property("ro.kernel.qemu") == "1" ||
+         android_system_property("ro.boot.qemu") == "1" ||
+         android_system_property("ro.hardware.egl") == "emulation";
+}
+#endif
 
 auto set_native_stage_error(const char* stage, const std::exception& exception)
   -> void {
@@ -1814,6 +1833,15 @@ auto render_session_render_update_on_driver(
       live->renderer = std::make_unique<mln::Renderer>(
         *backend, static_cast<float>(live->scale_factor)
       );
+#if defined(__ANDROID__) && defined(MLN_RENDER_BACKEND_OPENGL)
+      // Surface and texture sessions share this construction. Android OpenGL
+      // emulator hosts crash in the Goldfish translation layer when a later
+      // symbol-layer update keeps retained drawables, so apply the same
+      // mitigation MapLibre Android enables after it constructs a Renderer.
+      if (android_opengl_emulator()) {
+        live->renderer->enableAndroidEmulatorGoldfishMitigation(true);
+      }
+#endif
       live->frame_observer.set_delegate(map_renderer_observer(live->map));
       live->renderer->setObserver(&live->frame_observer);
     } catch (const std::exception& exception) {
