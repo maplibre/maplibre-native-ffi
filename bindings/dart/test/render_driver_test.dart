@@ -18,28 +18,29 @@ final String? _metalTestSkipReason = !Platform.isMacOS
     : null;
 
 final class _MetalTestContext {
-  _MetalTestContext._(this._library, this.device);
+  _MetalTestContext._(this._objectiveCRuntime, this.device);
 
   static _MetalTestContext? create() {
-    final buildDirectory = File(
-      '.dart_tool/maplibre_native_build_dir',
-    ).readAsStringSync().trim();
-    final library = DynamicLibrary.open(
-      '$buildDirectory/libmaplibre_native_ffi_dart_test_support.dylib',
+    final metal = DynamicLibrary.open(
+      '/System/Library/Frameworks/Metal.framework/Metal',
     );
-    final create = library.lookupFunction<_CreateDeviceNative, _CreateDevice>(
-      'mln_dart_test_metal_device_create',
+    final create = metal.lookupFunction<_CreateDeviceNative, _CreateDevice>(
+      'MTLCreateSystemDefaultDevice',
     );
+    final objectiveCRuntime = DynamicLibrary.open('/usr/lib/libobjc.A.dylib');
     final device = create();
-    return device == nullptr ? null : _MetalTestContext._(library, device);
+    return device == nullptr
+        ? null
+        : _MetalTestContext._(objectiveCRuntime, device);
   }
 
-  final DynamicLibrary _library;
+  final DynamicLibrary _objectiveCRuntime;
   final Pointer<Void> device;
 
-  void close() => _library.lookupFunction<_ReleaseObjectNative, _ReleaseObject>(
-    'mln_dart_test_metal_object_release',
-  )(device);
+  void close() =>
+      _objectiveCRuntime.lookupFunction<_ReleaseObjectNative, _ReleaseObject>(
+        'objc_release',
+      )(device);
 }
 
 Future<void> _serviceAndComplete(

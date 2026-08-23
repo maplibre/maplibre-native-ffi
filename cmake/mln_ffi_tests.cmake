@@ -81,18 +81,6 @@ function(mln_ffi_add_c_api_test)
   if(NOT test_supported)
     return()
   endif()
-  if(APPLE)
-    enable_language(OBJC)
-    add_library(
-      mln_ffi_dart_test_support
-      SHARED ${PROJECT_SOURCE_DIR}/bindings/dart/test/native/render_context.m)
-    target_link_libraries(
-      mln_ffi_dart_test_support
-      PRIVATE "-framework Foundation" "-framework Metal")
-    set_target_properties(
-      mln_ffi_dart_test_support
-      PROPERTIES OUTPUT_NAME maplibre_native_ffi_dart_test_support)
-  endif()
   get_target_property(dependency_runtime_dirs mln_ffi_render_dependencies
                       MLN_FFI_RUNTIME_DIRS)
   get_target_property(dependency_include_dirs mln_ffi_render_dependencies
