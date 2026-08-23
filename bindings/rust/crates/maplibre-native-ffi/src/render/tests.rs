@@ -2737,7 +2737,7 @@ fn owned_texture_session_renders_acquires_resizes_and_reads_back() {
         .attach_owned_texture(&map, RenderTargetExtent::new(24, 12, 1.0))
         .unwrap();
     close_session(session);
-    map.close().unwrap();
+    map.close_and_wait();
     runtime.close_and_wait();
 }
 
@@ -2770,7 +2770,7 @@ fn opengl_owned_texture_exposes_backend_metadata() {
     release_frame(frame);
 
     close_session(session);
-    map.close().unwrap();
+    map.close_and_wait();
     runtime.close_and_wait();
 }
 
@@ -2810,7 +2810,7 @@ fn dedicated_opengl_surface_keeps_its_context_on_the_graphics_thread() {
     assert!(surface.has_current_context());
 
     close_session(session);
-    map.close().unwrap();
+    map.close_and_wait();
     runtime.close_and_wait();
 }
 
@@ -2841,7 +2841,7 @@ fn opengl_surface_session_renders_into_the_platform_surface() {
     }
 
     close_session(session);
-    map.close().unwrap();
+    map.close_and_wait();
     runtime.close_and_wait();
 }
 
@@ -2899,7 +2899,7 @@ fn opengl_borrowed_texture_session_replaces_its_target() {
     assert_eq!(session.snapshot().unwrap().extent, replacement_extent);
 
     close_session(session);
-    map.close().unwrap();
+    map.close_and_wait();
     runtime.close_and_wait();
 }
 
@@ -2940,7 +2940,7 @@ fn webgpu_surface_session_renders_into_the_browser_canvas() {
     );
 
     close_session(session);
-    map.close().unwrap();
+    map.close_and_wait();
     runtime.close_and_wait();
 }
 
@@ -2973,7 +2973,7 @@ fn webgpu_borrowed_texture_session_renders_into_a_host_texture() {
     );
 
     close_session(session);
-    map.close().unwrap();
+    map.close_and_wait();
     runtime.close_and_wait();
 }
 
@@ -3113,7 +3113,7 @@ fn feature_state_and_rendered_queries_copy_native_results() {
 
     crate::completion::blocking(map.remove_feature_state(&selector));
     close_session(session);
-    map.close().unwrap();
+    map.close_and_wait();
     runtime.close_and_wait();
 }
 
@@ -3219,7 +3219,7 @@ fn cluster_feature_extensions_copy_values_and_feature_collections() {
     assert!(expansion_zoom.is_u64());
 
     close_session(session);
-    map.close().unwrap();
+    map.close_and_wait();
     runtime.close_and_wait();
 }
 
@@ -3289,7 +3289,7 @@ fn sustained_frame_demands_outlast_the_texture_ring_depth() {
     assert!(session.snapshot().unwrap().frame_generation >= 64);
 
     close_session(session);
-    map.close().unwrap();
+    map.close_and_wait();
     runtime.close_and_wait();
 }
 
@@ -3313,7 +3313,7 @@ fn cloned_session_controls_can_be_used_from_another_thread() {
     assert_eq!(snapshot.state, RenderSessionLifecycle::Attached);
 
     close_session(session);
-    map.close().unwrap();
+    map.close_and_wait();
     runtime.close_and_wait();
 }
 
@@ -3343,6 +3343,6 @@ fn texture_readback_before_a_frame_reports_invalid_state() {
     }
 
     close_session(session);
-    map.close().unwrap();
+    map.close_and_wait();
     runtime.close_and_wait();
 }

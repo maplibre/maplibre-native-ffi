@@ -216,7 +216,7 @@ mod tests {
         assert!((center_point.x - 256.0).abs() < 1e-6);
         assert!((center_point.y - 256.0).abs() < 1e-6);
 
-        map.close().unwrap();
+        map.close_and_wait();
         runtime.close_and_wait();
         std::thread::spawn(move || {
             let round_tripped = projection.lat_lng_for_pixel(center_point).unwrap();
@@ -240,7 +240,7 @@ mod tests {
             let _projection = crate::completion::blocking(map.create_projection());
         }
 
-        map.close().unwrap();
+        map.close_and_wait();
         runtime.close_and_wait();
     }
 
@@ -290,7 +290,7 @@ mod tests {
             .unwrap();
 
         projection.close().unwrap();
-        map.close().unwrap();
+        map.close_and_wait();
         runtime.close_and_wait();
     }
 
@@ -327,7 +327,7 @@ mod tests {
         });
 
         projection.close().unwrap();
-        map.close().unwrap();
+        map.close_and_wait();
         runtime.close_and_wait();
     }
 }

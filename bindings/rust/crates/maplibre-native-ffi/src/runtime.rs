@@ -1168,7 +1168,7 @@ mod tests {
 
         assert!(wait_for_event(&runtime, RuntimeEventType::MapStyleLoaded));
 
-        map.close().unwrap();
+        map.close_and_wait();
         runtime.close_and_wait();
     }
 
@@ -1381,7 +1381,7 @@ mod tests {
         // Clearing an already cleared provider stays a successful no-op.
         runtime.clear_resource_provider().unwrap();
 
-        map.close().unwrap();
+        map.close_and_wait();
         runtime.close_and_wait();
     }
 
@@ -1416,7 +1416,7 @@ mod tests {
             RuntimeEventType::MapStyleLoaded
         ));
         assert_eq!(calls.load(Ordering::SeqCst), 1);
-        map.close().unwrap();
+        map.close_and_wait();
         runtime.close_and_wait();
     }
 
@@ -1453,7 +1453,7 @@ mod tests {
             resolved.lock().unwrap().as_deref(),
             Some("https://demotiles.maplibre.org/style.json")
         );
-        map.close().unwrap();
+        map.close_and_wait();
         runtime.close_and_wait();
     }
 
@@ -1494,7 +1494,7 @@ mod tests {
             &mut runtime,
             RuntimeEventType::MapStyleLoaded
         ));
-        map.close().unwrap();
+        map.close_and_wait();
         runtime.close_and_wait();
     }
 
@@ -1538,7 +1538,7 @@ mod tests {
                 .is_some_and(|message| message.contains("provider failed"))
         );
 
-        map.close().unwrap();
+        map.close_and_wait();
         runtime.close_and_wait();
     }
 
@@ -1631,7 +1631,7 @@ mod tests {
         );
         layer_ids.release();
 
-        map.close().unwrap();
+        map.close_and_wait();
         runtime.close_and_wait();
     }
 
@@ -1683,7 +1683,7 @@ mod tests {
             "/original-after-clear.json"
         );
 
-        map.close().unwrap();
+        map.close_and_wait();
         runtime.close_and_wait();
         server.join().unwrap();
     }
@@ -1730,7 +1730,7 @@ mod tests {
                 .any(|line| line.to_ascii_lowercase().starts_with("x-map-token:"))
         );
 
-        map.close().unwrap();
+        map.close_and_wait();
         runtime.close_and_wait();
         server.join().unwrap();
     }
@@ -1756,7 +1756,7 @@ mod tests {
         let _ = wait_for_map_loading_failure(&mut runtime);
         assert_eq!(calls.load(Ordering::SeqCst), 0);
 
-        map.close().unwrap();
+        map.close_and_wait();
         runtime.close_and_wait();
     }
 
@@ -1802,7 +1802,7 @@ mod tests {
             ("/cross-final.json".to_owned(), false)
         );
 
-        map.close().unwrap();
+        map.close_and_wait();
         runtime.close_and_wait();
         for server in servers {
             server.join().unwrap();
@@ -1847,7 +1847,7 @@ mod tests {
         wait_for_arc_release(&first);
         assert_eq!(Arc::strong_count(&second), 2);
 
-        map.close().unwrap();
+        map.close_and_wait();
         runtime.close_and_wait();
         wait_for_arc_release(&second);
     }
@@ -1879,7 +1879,7 @@ mod tests {
 
         runtime.set_resource_transform(|_| None).unwrap();
 
-        map.close().unwrap();
+        map.close_and_wait();
         runtime.close_and_wait();
     }
 
@@ -1899,7 +1899,7 @@ mod tests {
 
         let map =
             crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
-        map.close().unwrap();
+        map.close_and_wait();
 
         completion::blocking(runtime.clear_resource_transform());
         wait_for_arc_release(&token);
@@ -1957,7 +1957,7 @@ mod tests {
                 .is_some_and(|message| !message.is_empty())
         );
 
-        map.close().unwrap();
+        map.close_and_wait();
         runtime.close_and_wait();
     }
 
@@ -1974,7 +1974,7 @@ mod tests {
         let runtime = error.into_handle();
 
         std::thread::sleep(std::time::Duration::from_millis(1));
-        map.close().unwrap();
+        map.close_and_wait();
         runtime.close_and_wait();
     }
 }
