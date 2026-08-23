@@ -3,11 +3,9 @@
 #include <atomic>
 #include <cassert>
 #include <cmath>
-#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <deque>
 #include <exception>
 #include <functional>
 #include <memory>
@@ -1281,74 +1279,6 @@ auto submit_runtime_operation(
 
 namespace {
 
-class RuntimeTeardownCoordinator {
- public:
-  RuntimeTeardownCoordinator()
-      : worker_([this]() noexcept -> void { run(); }) {}
-  RuntimeTeardownCoordinator(const RuntimeTeardownCoordinator&) = delete;
-  RuntimeTeardownCoordinator(RuntimeTeardownCoordinator&&) = delete;
-  auto operator=(const RuntimeTeardownCoordinator&)
-    -> RuntimeTeardownCoordinator& = delete;
-  auto operator=(RuntimeTeardownCoordinator&&)
-    -> RuntimeTeardownCoordinator& = delete;
-
-  ~RuntimeTeardownCoordinator() {
-    {
-      const std::scoped_lock lock(mutex_);
-      stopping_ = true;
-    }
-    condition_.notify_one();
-    if (worker_.joinable()) {
-      worker_.join();
-    }
-  }
-
-  auto submit(std::function<void()> teardown) -> void {
-    {
-      const std::scoped_lock lock(mutex_);
-      if (stopping_) {
-        throw std::runtime_error{"runtime teardown coordinator is stopping"};
-      }
-      pending_.push_back(std::move(teardown));
-    }
-    condition_.notify_one();
-  }
-
- private:
-  auto run() noexcept -> void {
-    for (;;) {
-      auto teardown = std::function<void()>{};
-      {
-        auto lock = std::unique_lock{mutex_};
-        condition_.wait(lock, [this]() noexcept -> bool {
-          return stopping_ || !pending_.empty();
-        });
-        if (pending_.empty()) {
-          if (stopping_) return;
-          continue;
-        }
-        teardown = std::move(pending_.front());
-        pending_.pop_front();
-      }
-      try {
-        teardown();
-      } catch (...) {
-      }
-    }
-  }
-
-  std::mutex mutex_;
-  std::condition_variable condition_;
-  std::deque<std::function<void()>> pending_;
-  std::thread worker_;
-  bool stopping_ = false;
-};
-
-auto runtime_teardown_coordinator() -> RuntimeTeardownCoordinator& {
-  static auto coordinator = RuntimeTeardownCoordinator{};
-  return coordinator;
-}
-
 struct RuntimeCreationGuard {
   RuntimeCreationGuard() = default;
   RuntimeCreationGuard(const RuntimeCreationGuard&) = delete;
@@ -1383,10 +1313,6 @@ auto create_runtime(
   if (options_status != MLN_STATUS_OK) {
     return options_status;
   }
-  // Reserve the one teardown worker before a runtime starts its own executor.
-  // Fixed pthread pools can otherwise deadlock while trying to create a waiter
-  // that must stop an executor occupying the last available worker.
-  static_cast<void>(runtime_teardown_coordinator());
   const auto event_wake = std::make_shared<Wake>(options->event_wake);
 
   RuntimeCreationGuard result;
@@ -2890,6 +2816,7 @@ auto release_runtime(mln_runtime runtime, const mln_completion* completion)
     std::mutex mutex;
     std::condition_variable condition;
     bool committed = false;
+    bool aborted = false;
     uint64_t sequence = 0;
     std::shared_ptr<RuntimeObject> live;
     std::shared_ptr<Completion> teardown_completion;
@@ -2905,15 +2832,19 @@ auto release_runtime(mln_runtime runtime, const mln_completion* completion)
   }
   gate->live = live;
   gate->teardown_completion = teardown_completion;
+  auto waiter = std::thread{};
   try {
-    // Teardown stops and joins the executor, so the process-wide coordinator
-    // runs it outside that executor and outside callers servicing host work.
-    runtime_teardown_coordinator().submit([gate]() mutable -> void {
+    // Teardown stops and joins the executor, so it cannot run on that executor
+    // or on the caller that may also service host callbacks.
+    waiter = std::thread([gate]() mutable -> void {
       {
         auto lock = std::unique_lock{gate->mutex};
         gate->condition.wait(lock, [&]() noexcept -> bool {
-          return gate->committed;
+          return gate->committed || gate->aborted;
         });
+        if (gate->aborted) {
+          return;
+        }
       }
       auto live = std::move(gate->live);
       wait_for_prior_runtime_submissions(live, gate->sequence);
@@ -2937,7 +2868,23 @@ auto release_runtime(mln_runtime runtime, const mln_completion* completion)
   } catch (...) {
     live->control.abort_close();
     teardown_completion->reject();
-    set_thread_error("runtime release could not queue its teardown");
+    set_thread_error("runtime release could not start its teardown waiter");
+    return MLN_STATUS_NATIVE_ERROR;
+  }
+  try {
+    waiter.detach();
+  } catch (...) {
+    {
+      const std::scoped_lock lock(gate->mutex);
+      gate->aborted = true;
+    }
+    gate->condition.notify_one();
+    if (waiter.joinable()) {
+      waiter.join();
+    }
+    live->control.abort_close();
+    teardown_completion->reject();
+    set_thread_error("runtime release could not detach its teardown waiter");
     return MLN_STATUS_NATIVE_ERROR;
   }
 
