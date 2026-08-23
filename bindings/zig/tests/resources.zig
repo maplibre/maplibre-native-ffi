@@ -157,7 +157,7 @@ test "network status APIs wrap process-global MapLibre status" {
 test "ambient cache operations validate cache configuration" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     try runAmbientCacheOperation(&runtime, .pack_database);
-    try runtime.close();
+    try support.closeRuntime(&runtime);
 
     var tmp = testing.tmpDir(.{});
     defer tmp.cleanup();
@@ -165,7 +165,7 @@ test "ambient cache operations validate cache configuration" {
     defer testing.allocator.free(cache_path);
 
     var cached_runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path }, null);
-    defer cached_runtime.close() catch @panic("cached runtime close failed");
+    defer support.closeRuntime(&cached_runtime) catch @panic("cached runtime close failed");
     try runAmbientCacheOperation(&cached_runtime, .reset_database);
     try runAmbientCacheOperation(&cached_runtime, .pack_database);
     try runAmbientCacheOperation(&cached_runtime, .invalidate);
@@ -177,7 +177,7 @@ test "file URL style loads through public binding" {
     defer fixture.deinit();
 
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
 
@@ -200,7 +200,7 @@ test "asset URL style loads through public binding runtime asset path" {
     defer fixture.deinit();
 
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .asset_path = fixture.dir_path }, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
 
@@ -223,7 +223,7 @@ test "missing file URL reports map loading failure through public events" {
     defer testing.allocator.free(missing_url);
 
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
 
@@ -313,7 +313,7 @@ test "resource transform can be cleared after map creation" {
     defer maplibre.setNetworkStatus(.online, null) catch @panic("network status restore failed");
 
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var state = TransformState{ .replacement_url = "unsupported://rewritten-style.json" };
     _ = try runtime.setResourceTransform(.{ .handler = rewriteStyleUrl, .context = &state });
@@ -364,7 +364,7 @@ test "http URL style loads through native network provider" {
     defer testing.allocator.free(style_url);
 
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
 
@@ -421,7 +421,7 @@ test "http style can load from ambient cache after online load" {
 
     {
         var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path }, null);
-        defer runtime.close() catch @panic("runtime close failed");
+        defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
         try setMaximumAmbientCacheSize(&runtime, 1024 * 1024);
         var map_future = try maplibre.MapHandle.create(&runtime, .{});
         defer map_future.deinit();
@@ -439,7 +439,7 @@ test "http style can load from ambient cache after online load" {
 
     try maplibre.setNetworkStatus(.offline, null);
     var cached_runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path }, null);
-    defer cached_runtime.close() catch @panic("cached runtime close failed");
+    defer support.closeRuntime(&cached_runtime) catch @panic("cached runtime close failed");
     var cached_map_future = try maplibre.MapHandle.create(&cached_runtime, .{});
     defer cached_map_future.deinit();
     var cached_map = try cached_map_future.wait(null);
@@ -466,7 +466,7 @@ test "resource provider pass-through delegates to native HTTP" {
 
     var state = PassThroughProviderState{};
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     _ = try runtime.setResourceProvider(.{ .handler = passThroughStyleProvider, .context = &state });
 
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
@@ -491,7 +491,7 @@ test "resource transform rewrites network style URL" {
     defer maplibre.setNetworkStatus(.online, null) catch @panic("network status restore failed");
 
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     const original_url = "http://example.invalid/original-style.json";
     var state = TransformState{
@@ -527,7 +527,7 @@ test "resource transform replacement is accepted from another thread" {
     defer maplibre.setNetworkStatus(.online, null) catch @panic("network status restore failed");
 
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var state = TransformState{ .replacement_url = "unsupported://active-transform.json" };
     var replacement_state = TransformState{ .replacement_url = "unsupported://replacement.json" };
@@ -683,7 +683,7 @@ fn waitForPmtilesRangeRequest(_: *maplibre.RuntimeHandle, state: *PmtilesRangePr
 
 test "resource provider observes PMTiles range metadata" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var state = PmtilesRangeProviderState{};
     _ = try runtime.setResourceProvider(.{ .handler = pmtilesRangeProvider, .context = &state });
@@ -702,7 +702,7 @@ test "resource provider observes PMTiles range metadata" {
 
 test "custom URL style loads through resource provider" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var state = ProviderState{};
     _ = try runtime.setResourceProvider(.{ .handler = customStyleProvider, .context = &state });
@@ -758,7 +758,7 @@ fn aliasStyleProvider(
 
 test "resource provider sees scheme alias and its resolved URL" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var state = AliasProviderState{};
     _ = try runtime.setResourceProvider(.{ .handler = aliasStyleProvider, .context = &state });
@@ -812,7 +812,7 @@ test "resource provider can be replaced and cleared after map creation" {
     defer maplibre.setNetworkStatus(.online, null) catch @panic("network status restore failed");
 
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
 
@@ -886,7 +886,7 @@ test "offline tile-pyramid regions copy definitions and metadata" {
 
     {
         var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path }, null);
-        defer runtime.close() catch @panic("runtime close failed");
+        defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
         var created = try createOfflineRegion(&runtime, testing.allocator, offlineTileDefinition(), metadata[0..]);
         defer created.deinit();
@@ -908,7 +908,7 @@ test "offline tile-pyramid regions copy definitions and metadata" {
 
     {
         var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path }, null);
-        defer runtime.close() catch @panic("runtime close failed");
+        defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
         var reloaded = (try getOfflineRegion(&runtime, testing.allocator, region_id)) orelse return error.RegionReloadFailed;
         defer reloaded.deinit();
@@ -933,7 +933,7 @@ test "offline region definitions reject invalid public values" {
     defer testing.allocator.free(cache_path);
 
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path }, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var invalid_zoom = offlineTileDefinition();
     invalid_zoom.tile_pyramid.min_zoom = 8.0;
@@ -958,7 +958,7 @@ test "offline region style URL rejects embedded NUL with binding diagnostic" {
     try diagnostics.set(-5, "stale native diagnostic");
 
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, &diagnostics);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var definition = offlineTileDefinition();
     definition.tile_pyramid.style_url = "asset://offline\x00style.json";
@@ -997,13 +997,13 @@ test "offline database merge returns copied region list" {
     const metadata = [_]u8{ 5, 4, 3 };
     {
         var side_runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = side_cache_path }, null);
-        defer side_runtime.close() catch @panic("side runtime close failed");
+        defer support.closeRuntime(&side_runtime) catch @panic("side runtime close failed");
         var created = try createOfflineRegion(&side_runtime, testing.allocator, offlineTileDefinition(), metadata[0..]);
         defer created.deinit();
     }
 
     var main_runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = main_cache_path }, null);
-    defer main_runtime.close() catch @panic("main runtime close failed");
+    defer support.closeRuntime(&main_runtime) catch @panic("main runtime close failed");
     var merged = try mergeOfflineRegionsDatabase(&main_runtime, testing.allocator, side_cache_path);
     defer merged.deinit();
     try testing.expectEqual(@as(usize, 1), merged.items.len);
@@ -1021,7 +1021,7 @@ test "offline geometry regions expose copied geometry values" {
 
     {
         var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path }, null);
-        defer runtime.close() catch @panic("runtime close failed");
+        defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
         var created = try createOfflineRegion(&runtime, testing.allocator, .{ .geometry = .{
             .style_url = offline_style_url,
@@ -1043,7 +1043,7 @@ test "offline geometry regions expose copied geometry values" {
 
     {
         var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path }, null);
-        defer runtime.close() catch @panic("runtime close failed");
+        defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
         var reloaded = (try getOfflineRegion(&runtime, testing.allocator, region_id)) orelse return error.RegionReloadFailed;
         defer reloaded.deinit();
@@ -1162,7 +1162,7 @@ fn probeCancellationUntilClosed(handle: maplibre.ResourceRequestHandle, state: *
 
 test "resource provider can complete style request later" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var state = AsyncProviderState{};
     _ = try runtime.setResourceProvider(.{ .handler = delayedStyleProvider, .context = &state });
@@ -1192,7 +1192,7 @@ test "resource provider can complete style request later" {
 
 test "released resource request handle copies stay closed after later requests" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var state = AsyncProviderState{};
     _ = try runtime.setResourceProvider(.{ .handler = delayedStyleProvider, .context = &state });
@@ -1220,7 +1220,7 @@ test "released resource request handle copies stay closed after later requests" 
 
 test "resource request release is synchronized with cancellation checks" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var state = AsyncProviderState{};
     _ = try runtime.setResourceProvider(.{ .handler = delayedStyleProvider, .context = &state });
@@ -1254,7 +1254,7 @@ test "resource request release is synchronized with cancellation checks" {
 
 test "resource request handles stay usable across many handled requests" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var state = AsyncProviderState{};
     _ = try runtime.setResourceProvider(.{ .handler = delayedStyleProvider, .context = &state });
@@ -1282,7 +1282,7 @@ test "resource request handles stay usable across many handled requests" {
 
 test "resource provider can complete request from another thread" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var state = AsyncProviderState{};
     _ = try runtime.setResourceProvider(.{ .handler = delayedStyleProvider, .context = &state });
@@ -1326,7 +1326,7 @@ fn errorStyleProvider(
 
 test "resource provider error response fails style load" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     _ = try runtime.setResourceProvider(.{ .handler = errorStyleProvider });
 
@@ -1343,7 +1343,7 @@ test "resource provider error response fails style load" {
 
 test "offline region download errors are runtime events" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     _ = try runtime.setResourceProvider(.{ .handler = errorStyleProvider });
 
@@ -1384,7 +1384,7 @@ test "resource provider observes cancellation before late completion" {
     defer diagnostics.deinit();
 
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, &diagnostics);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var state = AsyncProviderState{};
     _ = try runtime.setResourceProvider(.{ .handler = delayedStyleProvider, .context = &state });
@@ -1414,7 +1414,7 @@ test "offline region download control emits copied status events" {
     defer testing.allocator.free(cache_path);
 
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path }, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     const metadata = [_]u8{9};
     var created = try createOfflineRegion(&runtime, testing.allocator, offlineTileDefinition(), metadata[0..]);

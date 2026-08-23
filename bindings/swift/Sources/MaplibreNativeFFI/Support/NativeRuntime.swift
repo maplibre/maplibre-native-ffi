@@ -11,8 +11,11 @@ enum NativeRuntime {
     }
   }
 
-  static func release(_ runtime: NativeRuntimeHandle) throws {
-    try checkStatus(mln_runtime_release(runtime.raw))
+  /// Releases a runtime and returns the future for its native teardown.
+  static func release(_ runtime: NativeRuntimeHandle) throws
+    -> NativeFuture<Void>
+  {
+    try NativeCompletion.startUnit { mln_runtime_release(runtime.raw, $0) }
   }
 
   static func drainEvents(_ runtime: NativeRuntimeHandle) throws

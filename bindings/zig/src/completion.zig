@@ -118,6 +118,25 @@ pub fn Future(comptime T: type) type {
     };
 }
 
+/// Returns a future that already carries `value`, for work the binding
+/// satisfied without a native submission. The caller deinitializes it like any
+/// other future.
+pub fn completed(comptime T: type, terminal_value: T) std.mem.Allocator.Error!Future(T) {
+    const FutureType = Future(T);
+    const state = try std.heap.smp_allocator.create(FutureType.State);
+    state.* = .{
+        .refs = .init(1),
+        .completed = .init(1),
+        .value = terminal_value,
+        .copy = struct {
+            fn copyResult(_: *const c.mln_completion_result, _: ?*anyopaque) status.Error!T {
+                unreachable;
+            }
+        }.copyResult,
+    };
+    return .{ .state = state };
+}
+
 pub fn submit(
     comptime T: type,
     diagnostic_store: ?*diagnostics.DiagnosticStore,

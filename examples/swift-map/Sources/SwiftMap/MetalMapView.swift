@@ -185,7 +185,7 @@ final class MetalMapView: NSView {
       do {
         let state = try await MapState(viewport: viewport)
         if self.isShutDown {
-          try state.close()
+          try await state.close()
         } else {
           if let latest = self.currentViewport, !latest.isEmpty,
              latest != viewport

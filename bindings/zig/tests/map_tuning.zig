@@ -8,7 +8,7 @@ const support = @import("support.zig");
 // or past the commit's observes the committed value.
 test "map debug options fence and round trip through the snapshot" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
     defer map_future.deinit();
     var map = try map_future.wait(null);
@@ -36,7 +36,7 @@ test "map debug options fence and round trip through the snapshot" {
 
 test "map viewport options update selected snapshot fields" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
     defer map_future.deinit();
     var map = try map_future.wait(null);
@@ -66,7 +66,7 @@ test "map viewport options update selected snapshot fields" {
 
 test "map tile options update selected snapshot fields" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
     defer map_future.deinit();
     var map = try map_future.wait(null);
@@ -97,7 +97,7 @@ test "map tile options update selected snapshot fields" {
 
 test "map tuning public descriptors report invalid native arguments" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
     defer map_future.deinit();
     var map = try map_future.wait(null);

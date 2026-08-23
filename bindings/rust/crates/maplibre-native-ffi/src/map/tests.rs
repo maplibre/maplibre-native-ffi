@@ -122,7 +122,7 @@ fn nine_patch_style_image_round_trips_stretch_content_and_text_fit() {
     assert_eq!(error.kind(), ErrorKind::InvalidArgument);
 
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 #[test]
@@ -198,7 +198,7 @@ fn layer_base_accessors_round_trip_through_real_c_abi() {
     );
 
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 fn object_member<'a>(value: &'a JsonValue, key: &str) -> Option<&'a JsonValue> {
@@ -213,7 +213,7 @@ fn map_close_consumes_handle_and_drop_stays_idempotent() {
         crate::completion::blocking(MapHandle::with_options(&runtime, &MapOptions::default()));
 
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 #[test]
@@ -259,7 +259,7 @@ fn style_setters_accept_valid_input_and_reject_embedded_nul() {
     assert_command_disposition(&runtime, malformed_id, CommandDisposition::Failed);
 
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 #[test]
@@ -298,7 +298,7 @@ fn loaded_style_document_and_url_read_back_what_was_loaded() {
     );
 
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 #[test]
@@ -360,7 +360,7 @@ fn style_removals_commit_or_fail_with_not_found() {
     assert_eq!(code, sys::MLN_STATUS_NOT_FOUND);
 
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 fn source_type_of(map: &MapHandle, source_id: &str) -> Option<SourceType> {
@@ -550,7 +550,7 @@ fn geojson_source_helpers_accept_prepared_data_and_keep_options_across_updates()
     );
 
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 #[test]
@@ -596,7 +596,7 @@ fn set_geojson_source_data_rejects_mismatched_prepared_options() {
     assert_command_disposition(&runtime, accepted, CommandDisposition::Committed);
 
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 #[test]
@@ -687,7 +687,7 @@ fn geojson_data_prepared_off_thread_installs_on_the_map_thread() {
     std::thread::spawn(move || drop(data)).join().unwrap();
 
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 #[test]
@@ -714,7 +714,7 @@ fn synchronous_tiling_override_targets_live_geojson_sources_only() {
     assert_eq!(code, sys::MLN_STATUS_INVALID_ARGUMENT);
 
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 #[test]
@@ -761,7 +761,7 @@ fn style_source_info_reports_type_and_found_flag() {
     assert_eq!(info.attribution.as_deref(), Some("Example attribution"));
 
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 #[test]
@@ -816,7 +816,7 @@ fn style_source_info_copies_reconstructible_source_state() {
     let removed = map.remove_style_source("inline").unwrap();
     assert_command_disposition(&runtime, removed, CommandDisposition::Committed);
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 
     assert_eq!(
         copied.tile_json.unwrap().tiles,
@@ -905,7 +905,7 @@ fn custom_geometry_source_apis_call_real_c_api_and_style_replacement_releases_st
     await_release_count(&runtime, &releases, 3);
 
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 #[test]
@@ -923,7 +923,7 @@ fn custom_geometry_source_state_is_released_on_map_close() {
     await_runtime_barrier(&runtime);
 
     assert_eq!(releases.load(Ordering::SeqCst), 1);
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 #[test]
@@ -942,7 +942,7 @@ fn custom_geometry_source_adds_to_current_style_after_url_style_request() {
     assert!(source_type_of(&map, "custom").is_some());
     assert_eq!(releases.load(Ordering::SeqCst), 0);
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 #[test]
@@ -997,7 +997,7 @@ fn custom_geometry_source_state_releases_after_url_style_replacement() {
     );
 
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 fn mvt_options_counting_releases(releases: &Arc<AtomicUsize>) -> CustomMvtVectorSourceOptions {
@@ -1056,7 +1056,7 @@ fn custom_mvt_vector_source_apis_call_real_c_api_and_style_replacement_releases_
     await_release_count(&runtime, &releases, 3);
 
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 #[test]
@@ -1074,7 +1074,7 @@ fn custom_mvt_vector_source_state_is_released_on_map_close() {
     await_runtime_barrier(&runtime);
 
     assert_eq!(releases.load(Ordering::SeqCst), 1);
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 fn drain_runtime_events(runtime: &mut RuntimeHandle) {
@@ -1131,7 +1131,7 @@ fn a_narrowed_map_mask_delivers_the_kept_type_alone() {
     assert!(types.is_empty(), "{types:?}");
 
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 #[test]
@@ -1154,7 +1154,7 @@ fn a_creation_mask_narrows_a_map_from_its_first_style_load() {
     );
 
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 #[test]
@@ -1178,7 +1178,7 @@ fn map_mask_commands_complete_and_reject_undefined_bits() {
     assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_INVALID_ARGUMENT));
 
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 #[test]
@@ -1257,7 +1257,7 @@ fn style_transition_options_round_trip_through_the_real_c_api() {
     assert!(diagnostic.unwrap().contains("delay_ms"));
 
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 #[test]
@@ -1319,7 +1319,7 @@ fn style_json_buffers_copy_owned_rust_values() {
     );
 
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 #[test]
@@ -1345,7 +1345,7 @@ fn camera_commands_and_ordered_queries_return_typed_completions() {
     let published = map.camera_snapshot().unwrap();
     assert!(published.generation <= queried.generation);
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 #[test]
@@ -1367,7 +1367,7 @@ fn map_accepts_concurrent_commands_and_cross_thread_snapshots() {
         assert_eq!(snapshot.logical_extent.width, MapOptions::default().width);
     });
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 #[test]
@@ -1396,7 +1396,7 @@ fn a_snapshot_at_the_committed_generation_observes_the_commit() {
     assert_eq!(snapshot.debug_options, MapDebugOptions::TILE_BORDERS);
 
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 #[test]
@@ -1446,5 +1446,5 @@ fn snapshot_fields_round_trip_through_their_set_commands() {
     assert!(snapshot.rendering_stats_view_enabled);
 
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }

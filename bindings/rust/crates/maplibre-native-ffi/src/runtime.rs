@@ -40,12 +40,16 @@ impl RuntimeState {
         self.handle.is_closed()
     }
 
-    fn close(&self) -> Result<()> {
+    fn close(&self) -> Result<NativeFuture<()>> {
         let runtime = self.native()?;
-        // SAFETY: runtime is live and native consumes it only on success.
-        maplibre_core::check(unsafe { sys::mln_runtime_release(runtime) })?;
+        // SAFETY: runtime is live and native consumes it only on success. A
+        // rejected release leaves the completion state owned by `submit`.
+        let teardown = completion::submit(
+            |completion| unsafe { sys::mln_runtime_release(runtime, completion) },
+            completion::unit,
+        )?;
         self.handle.mark_closed();
-        Ok(())
+        Ok(teardown)
     }
 
     fn set_resource_provider<F>(&self, callback: F) -> Result<NativeFuture<CommandCompletion>>
@@ -170,6 +174,9 @@ impl RuntimeState {
 
 impl Drop for RuntimeState {
     fn drop(&mut self) {
+        // Dropping the teardown future discards its completion rather than
+        // blocking here. Native teardown still runs to the end; a host that
+        // must observe it calls RuntimeHandle::close and awaits the future.
         if self.close().is_err() {
             self.handle.leak_for_report();
         }
@@ -545,14 +552,29 @@ impl RuntimeHandle {
         Ok(RuntimeEventMask::from_bits_retain(raw))
     }
 
-    /// Explicitly releases the runtime's public handle.
-    pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
+    /// Explicitly releases the runtime's public handle and reports when native
+    /// teardown finishes.
+    ///
+    /// The returned future completes after every earlier accepted submission,
+    /// including released maps' teardown, has finished and the runtime's
+    /// threads and resources are gone. No library thread touches library state
+    /// afterward, so a host that awaits it may exit the process without racing
+    /// native teardown. Dropping the handle, or the future, starts the same
+    /// teardown and discards its completion.
+    pub fn close(self) -> std::result::Result<NativeFuture<()>, HandleOperationError<Self>> {
         if self.inner.is_closed() {
-            return Ok(());
+            return Ok(completion::ready(()));
         }
         self.inner
             .close()
             .map_err(|error| HandleOperationError::new(error, self))
+    }
+
+    /// Closes this runtime and blocks until native teardown finishes, so a
+    /// test binary exits after the runtime's threads are gone.
+    #[cfg(test)]
+    pub(crate) fn close_and_wait(self) {
+        completion::blocking(self.close().map_err(HandleOperationError::into_error));
     }
 }
 
@@ -808,7 +830,7 @@ mod tests {
             operation.release();
         }
 
-        runtime.close().unwrap();
+        runtime.close_and_wait();
     }
 
     #[test]
@@ -829,7 +851,7 @@ mod tests {
             operation.release();
         }
 
-        runtime.close().unwrap();
+        runtime.close_and_wait();
     }
 
     #[test]
@@ -842,7 +864,7 @@ mod tests {
             .ambient_cache_operation(AmbientCacheOperation::Clear)
             .unwrap();
 
-        runtime.close().unwrap();
+        runtime.close_and_wait();
         assert!(operation.wait(Duration::from_secs(10)).unwrap());
         operation.finish().unwrap();
     }
@@ -954,7 +976,7 @@ mod tests {
         assert!(missing_geometry.take().unwrap().is_none());
         missing_geometry.release();
 
-        runtime.close().unwrap();
+        runtime.close_and_wait();
     }
 
     #[test]
@@ -975,7 +997,7 @@ mod tests {
             wait_for_operation(&mut side_runtime, &create).unwrap();
             create.take().unwrap();
             create.release();
-            side_runtime.close().unwrap();
+            side_runtime.close_and_wait();
         }
 
         let mut main_options = RuntimeOptions::default();
@@ -990,7 +1012,7 @@ mod tests {
         assert_eq!(merged.len(), 1);
         assert_eq!(merged[0].definition, definition);
         assert_eq!(merged[0].metadata, b"merge");
-        main_runtime.close().unwrap();
+        main_runtime.close_and_wait();
     }
 
     fn test_offline_region_definition(style_url: &str) -> OfflineRegionDefinition {
@@ -1043,7 +1065,7 @@ mod tests {
         let runtime = RuntimeHandle::with_options(&options).unwrap();
 
         std::thread::sleep(std::time::Duration::from_millis(1));
-        runtime.close().unwrap();
+        runtime.close_and_wait();
     }
 
     #[test]
@@ -1122,7 +1144,7 @@ mod tests {
         assert_eq!(batch.iter().count(), 0);
         // A second drain of an empty queue reports the same empty batch.
         assert!(runtime.drain_events().unwrap().is_empty());
-        runtime.close().unwrap();
+        runtime.close_and_wait();
     }
 
     fn wait_for_event(runtime: &RuntimeHandle, event_type: RuntimeEventType) -> bool {
@@ -1145,7 +1167,7 @@ mod tests {
         assert!(wait_for_event(&runtime, RuntimeEventType::MapStyleLoaded));
 
         map.close().unwrap();
-        runtime.close().unwrap();
+        runtime.close_and_wait();
     }
 
     #[test]
@@ -1160,7 +1182,7 @@ mod tests {
                 operation.finish().unwrap();
             }
         });
-        runtime.close().unwrap();
+        runtime.close_and_wait();
     }
 
     #[test]
@@ -1174,7 +1196,7 @@ mod tests {
             runtime.event_mask().unwrap(),
             RuntimeEventMask::MAP_STYLE_LOADED
         );
-        runtime.close().unwrap();
+        runtime.close_and_wait();
 
         // A creation mask carrying an undefined bit fails before the runtime
         // exists.
@@ -1209,7 +1231,7 @@ mod tests {
         assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_INVALID_ARGUMENT));
         assert_eq!(runtime.event_mask().unwrap(), read_back);
 
-        runtime.close().unwrap();
+        runtime.close_and_wait();
     }
 
     #[test]
@@ -1222,7 +1244,7 @@ mod tests {
                 .unwrap();
             assert_eq!(mask, RuntimeEventMask::ALL);
         });
-        runtime.close().unwrap();
+        runtime.close_and_wait();
     }
 
     #[test]
@@ -1264,7 +1286,7 @@ mod tests {
             .unwrap();
         assert_eq!(Arc::strong_count(&third), 2);
 
-        runtime.close().unwrap();
+        runtime.close_and_wait();
         wait_for_arc_release(&third);
         wait_for_arc_release(&first);
         wait_for_arc_release(&second);
@@ -1298,7 +1320,7 @@ mod tests {
         assert_eq!(Arc::strong_count(&first), 2);
         assert_eq!(Arc::strong_count(&second), 1);
 
-        runtime.close().unwrap();
+        runtime.close_and_wait();
         wait_for_arc_release(&first);
     }
 
@@ -1366,7 +1388,7 @@ mod tests {
         runtime.clear_resource_provider().unwrap();
 
         map.close().unwrap();
-        runtime.close().unwrap();
+        runtime.close_and_wait();
     }
 
     #[test]
@@ -1401,7 +1423,7 @@ mod tests {
         ));
         assert_eq!(calls.load(Ordering::SeqCst), 1);
         map.close().unwrap();
-        runtime.close().unwrap();
+        runtime.close_and_wait();
     }
 
     #[test]
@@ -1438,7 +1460,7 @@ mod tests {
             Some("https://demotiles.maplibre.org/style.json")
         );
         map.close().unwrap();
-        runtime.close().unwrap();
+        runtime.close_and_wait();
     }
 
     #[test]
@@ -1479,7 +1501,7 @@ mod tests {
             RuntimeEventType::MapStyleLoaded
         ));
         map.close().unwrap();
-        runtime.close().unwrap();
+        runtime.close_and_wait();
     }
 
     #[test]
@@ -1523,7 +1545,7 @@ mod tests {
         );
 
         map.close().unwrap();
-        runtime.close().unwrap();
+        runtime.close_and_wait();
     }
 
     #[test]
@@ -1558,7 +1580,7 @@ mod tests {
 
         runtime.clear_resource_transform().unwrap();
         assert_eq!(Arc::strong_count(&second), 2);
-        runtime.close().unwrap();
+        runtime.close_and_wait();
         wait_for_arc_release(&first);
         wait_for_arc_release(&second);
     }
@@ -1622,7 +1644,7 @@ mod tests {
         layer_ids.release();
 
         map.close().unwrap();
-        runtime.close().unwrap();
+        runtime.close_and_wait();
     }
 
     #[cfg(not(target_os = "emscripten"))]
@@ -1674,7 +1696,7 @@ mod tests {
         );
 
         map.close().unwrap();
-        runtime.close().unwrap();
+        runtime.close_and_wait();
         server.join().unwrap();
     }
 
@@ -1721,7 +1743,7 @@ mod tests {
         );
 
         map.close().unwrap();
-        runtime.close().unwrap();
+        runtime.close_and_wait();
         server.join().unwrap();
     }
 
@@ -1747,7 +1769,7 @@ mod tests {
         assert_eq!(calls.load(Ordering::SeqCst), 0);
 
         map.close().unwrap();
-        runtime.close().unwrap();
+        runtime.close_and_wait();
     }
 
     #[cfg(not(any(target_env = "ohos", target_os = "emscripten")))]
@@ -1793,7 +1815,7 @@ mod tests {
         );
 
         map.close().unwrap();
-        runtime.close().unwrap();
+        runtime.close_and_wait();
         for server in servers {
             server.join().unwrap();
         }
@@ -1811,7 +1833,7 @@ mod tests {
             .set_http_header_transform(|_| Vec::new())
             .unwrap_err();
         assert_eq!(error.kind(), ErrorKind::Unsupported);
-        runtime.close().unwrap();
+        runtime.close_and_wait();
     }
 
     #[test]
@@ -1842,7 +1864,7 @@ mod tests {
         assert_eq!(Arc::strong_count(&second), 2);
 
         map.close().unwrap();
-        runtime.close().unwrap();
+        runtime.close_and_wait();
         wait_for_arc_release(&second);
         wait_for_arc_release(&first);
     }
@@ -1861,7 +1883,7 @@ mod tests {
             .unwrap();
         assert_eq!(Arc::strong_count(&token), 2);
 
-        runtime.close().unwrap();
+        runtime.close_and_wait();
 
         wait_for_arc_release(&token);
     }
@@ -1877,7 +1899,7 @@ mod tests {
         runtime.set_resource_transform(|_| None).unwrap();
 
         map.close().unwrap();
-        runtime.close().unwrap();
+        runtime.close_and_wait();
     }
 
     #[test]
@@ -1902,7 +1924,7 @@ mod tests {
 
         assert_eq!(Arc::strong_count(&token), 2);
 
-        runtime.close().unwrap();
+        runtime.close_and_wait();
         wait_for_arc_release(&token);
     }
 
@@ -1957,7 +1979,7 @@ mod tests {
         );
 
         map.close().unwrap();
-        runtime.close().unwrap();
+        runtime.close_and_wait();
     }
 
     #[test]
@@ -1974,6 +1996,6 @@ mod tests {
 
         std::thread::sleep(std::time::Duration::from_millis(1));
         map.close().unwrap();
-        runtime.close().unwrap();
+        runtime.close_and_wait();
     }
 }

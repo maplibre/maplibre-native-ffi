@@ -1093,7 +1093,7 @@ fn closeSession(session: *maplibre.RenderSessionHandle) !void {
 test "owned texture session renders acquires resizes and reads back" {
     if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map_future = try maplibre.MapHandle.create(&runtime, .{ .width = 32, .height = 16 });
     defer map_future.deinit();
     var map = try map_future.wait(null);
@@ -1140,7 +1140,7 @@ test "owned texture session renders acquires resizes and reads back" {
 test "texture readback before a frame completes with invalid state" {
     if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map_future = try maplibre.MapHandle.create(&runtime, .{ .width = 16, .height = 16 });
     defer map_future.deinit();
     var map = try map_future.wait(null);
@@ -1159,7 +1159,7 @@ test "live render session blocks map close until detached" {
     defer diagnostics.deinit();
 
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, &diagnostics);
-    errdefer runtime.close() catch {};
+    errdefer support.closeRuntime(&runtime) catch {};
     var map_future = try maplibre.MapHandle.create(&runtime, .{ .width = 32, .height = 32 });
     defer map_future.deinit();
     var map = try map_future.wait(null);
@@ -1172,14 +1172,14 @@ test "live render session blocks map close until detached" {
 
     try owned.close();
     try map.close();
-    try runtime.close();
+    try support.closeRuntime(&runtime);
 }
 
 test "still-image map modes complete owned texture renders" {
     if (!supports_test_owned_texture) return error.SkipZigTest;
     inline for (.{ maplibre.MapMode.static, maplibre.MapMode.tile }) |mode| {
         var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-        defer runtime.close() catch @panic("runtime close failed");
+        defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
         var map_future = try maplibre.MapHandle.create(&runtime, .{ .width = 32, .height = 32, .mode = mode });
         defer map_future.deinit();
         var map = try map_future.wait(null);
@@ -1287,7 +1287,7 @@ fn firstLeafName(collection: []const u8) ?[]const u8 {
 test "feature state and rendered queries copy operation results" {
     if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map_future = try maplibre.MapHandle.create(&runtime, .{ .width = 64, .height = 64 });
     defer map_future.deinit();
     var map = try map_future.wait(null);
@@ -1366,7 +1366,7 @@ fn commitMapCommand(runtime: *maplibre.RuntimeHandle, future: maplibre.Future(ma
 test "map feature state set get and remove" {
     if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map_future = try maplibre.MapHandle.create(&runtime, .{ .width = 64, .height = 64 });
     defer map_future.deinit();
     var map = try map_future.wait(null);
@@ -1414,7 +1414,7 @@ test "map feature state set get and remove" {
 test "cluster feature extensions copy values and feature collections" {
     if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map_future = try maplibre.MapHandle.create(&runtime, .{ .width = 64, .height = 64 });
     defer map_future.deinit();
     var map = try map_future.wait(null);
@@ -1513,7 +1513,7 @@ test "cluster feature extensions copy values and feature collections" {
 test "sustained frame demands outlast the texture ring depth" {
     if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map_future = try maplibre.MapHandle.create(&runtime, .{ .width = 32, .height = 32 });
     defer map_future.deinit();
     var map = try map_future.wait(null);
@@ -1534,7 +1534,7 @@ test "sustained frame demands outlast the texture ring depth" {
 test "a rendered frame during an ease reports needs repaint" {
     if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map_future = try maplibre.MapHandle.create(&runtime, .{ .width = 32, .height = 16 });
     defer map_future.deinit();
     var map = try map_future.wait(null);
@@ -1579,7 +1579,7 @@ const SnapshotThread = struct {
 test "render session controls are usable from another thread" {
     if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map_future = try maplibre.MapHandle.create(&runtime, .{ .width = 16, .height = 16 });
     defer map_future.deinit();
     var map = try map_future.wait(null);
@@ -1596,7 +1596,7 @@ test "render session controls are usable from another thread" {
 test "Vulkan borrowed texture replaces its target" {
     if (!build_options.supports_vulkan) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map_future = try maplibre.MapHandle.create(&runtime, .{ .width = 32, .height = 16 });
     defer map_future.deinit();
     var map = try map_future.wait(null);
@@ -1640,7 +1640,7 @@ test "Vulkan borrowed texture replaces its target" {
 test "OpenGL borrowed texture replaces its target" {
     if (!build_options.supports_opengl) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map_future = try maplibre.MapHandle.create(&runtime, .{ .width = 32, .height = 16 });
     defer map_future.deinit();
     var map = try map_future.wait(null);

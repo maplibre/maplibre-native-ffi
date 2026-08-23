@@ -14,14 +14,14 @@ func TestDedicatedStyleLayerHelpers(t *testing.T) {
 	}
 	m, err := awaitForTest(runtime.NewMap())
 	if err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewMap(): %v", err)
 	}
 	defer func() {
 		if err := m.Close(); err != nil {
 			t.Errorf("Map Close(): %v", err)
 		}
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Runtime Close(): %v", err)
 		}
 	}()
@@ -96,14 +96,14 @@ func TestLayerBaseAccessorsRoundTrip(t *testing.T) {
 	}
 	m, err := awaitForTest(runtime.NewMap())
 	if err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewMap(): %v", err)
 	}
 	defer func() {
 		if err := m.Close(); err != nil {
 			t.Errorf("Map Close(): %v", err)
 		}
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Runtime Close(): %v", err)
 		}
 	}()
@@ -195,14 +195,14 @@ func TestStyleLayerJSONAndPropertySnapshots(t *testing.T) {
 	}
 	m, err := awaitForTest(runtime.NewMap())
 	if err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewMap(): %v", err)
 	}
 	defer func() {
 		if err := m.Close(); err != nil {
 			t.Errorf("Map Close(): %v", err)
 		}
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Runtime Close(): %v", err)
 		}
 	}()
@@ -273,14 +273,14 @@ func TestStyleLightPropertyJSONSnapshots(t *testing.T) {
 	}
 	m, err := awaitForTest(runtime.NewMap())
 	if err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewMap(): %v", err)
 	}
 	defer func() {
 		if err := m.Close(); err != nil {
 			t.Errorf("Map Close(): %v", err)
 		}
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Runtime Close(): %v", err)
 		}
 	}()
@@ -319,14 +319,14 @@ func TestStyleLayerMetadataForMissingLayers(t *testing.T) {
 	}
 	m, err := awaitForTest(runtime.NewMap())
 	if err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewMap(): %v", err)
 	}
 	defer func() {
 		if err := m.Close(); err != nil {
 			t.Errorf("Map Close(): %v", err)
 		}
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Runtime Close(): %v", err)
 		}
 	}()
@@ -366,14 +366,14 @@ func TestStyleTransitionOptionsRoundTrip(t *testing.T) {
 	}
 	m, err := awaitForTest(runtime.NewMap())
 	if err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewMap(): %v", err)
 	}
 	defer func() {
 		if err := m.Close(); err != nil {
 			t.Errorf("Map Close(): %v", err)
 		}
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Runtime Close(): %v", err)
 		}
 	}()

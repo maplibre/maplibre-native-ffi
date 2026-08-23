@@ -1,6 +1,7 @@
 package org.maplibre.nativeffi.runtime
 
 import java.lang.ref.WeakReference
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.internal.callback.HttpHeaderTransformState
 import org.maplibre.nativeffi.internal.callback.ResourceProviderState
@@ -29,6 +30,9 @@ public actual class RuntimeHandle private constructor(private val handle: Native
   }
 
   private val liveMaps = mutableMapOf<Long, WeakReference<MapHandle>>()
+
+  /** Teardown report of the close that consumed this handle. */
+  @Volatile private var tornDown: Deferred<Unit>? = null
 
   public actual val isClosed: Boolean
     get() = core.isReleased()
@@ -169,15 +173,18 @@ public actual class RuntimeHandle private constructor(private val handle: Native
       NativeAccess.setRuntimeEventMask(requireLiveHandle(), value.nativeValue)
     }
 
-  public actual fun close() {
-    if (!core.beginClose()) return
-    try {
-      NativeAccess.releaseRuntime(handle)
-    } catch (error: Throwable) {
-      core.abortClose()
-      throw error
-    }
+  public actual fun close(): Deferred<Unit> {
+    if (!core.beginClose()) return tornDown ?: CompletableDeferred(Unit)
+    val completed =
+      try {
+        NativeAccess.releaseRuntime(handle)
+      } catch (error: Throwable) {
+        core.abortClose()
+        throw error
+      }
+    tornDown = completed
     core.completeClose { liveMaps.clear() }
+    return completed
   }
 
   public actual companion object {

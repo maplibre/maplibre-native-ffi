@@ -2,6 +2,7 @@ const std = @import("std");
 const testing = std.testing;
 
 const maplibre = @import("maplibre_native_ffi");
+const support = @import("support.zig");
 
 const LogState = struct {
     count: usize = 0,
@@ -31,7 +32,7 @@ test "log callback receives and consumes native logs" {
     }
 
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
 
@@ -65,7 +66,7 @@ test "log callback can be cleared" {
     try maplibre.clearLogCallback(null);
 
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
 
@@ -93,7 +94,7 @@ test "log callback replacement invokes only the replacement" {
     try maplibre.setLogCallback(.{ .handler = recordLog, .context = &replacement_state }, null);
 
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
 

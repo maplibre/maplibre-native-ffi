@@ -1369,6 +1369,12 @@ public final class RenderSessionHandle: @unchecked Sendable {
     driverWorkWake.setHandler(nil)
   }
 
+  /// Irreversibly closes control and mailboxes without a graphics call.
+  ///
+  /// The call waits for the map's in-flight tile work before returning, so no
+  /// library thread touches the session's target or device afterward and the
+  /// host may destroy its graphics objects immediately. Do not call it from a
+  /// MapLibre worker callback.
   public func abandon() throws -> RenderAbandonResult {
     try mapNativeFailure {
       try handle.withLive { session in

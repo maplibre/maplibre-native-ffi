@@ -24,7 +24,7 @@ internal unsafe delegate mln_status RuntimeSetResourceTransform(
 );
 
 /// <summary>Any-thread runtime handle with autonomous native execution.</summary>
-public sealed unsafe class RuntimeHandle : IDisposable
+public sealed unsafe class RuntimeHandle : IDisposable, IAsyncDisposable
 {
     private static readonly RuntimeSetResourceProvider DefaultSetResourceProvider = static (
         runtime,
@@ -46,14 +46,11 @@ public sealed unsafe class RuntimeHandle : IDisposable
     private readonly Lock mapGate = new();
     private readonly Dictionary<ulong, WeakReference<Map.MapHandle>> liveMaps = [];
     private readonly NativeHandleState<MlnRuntime> state;
+    private volatile Task teardown = Task.CompletedTask;
 
     private RuntimeHandle(MlnRuntime handle)
     {
-        state = new NativeHandleState<MlnRuntime>(
-            handle,
-            NativeMethods.mln_runtime_release,
-            nameof(RuntimeHandle)
-        );
+        state = new NativeHandleState<MlnRuntime>(handle, StartRelease, nameof(RuntimeHandle));
     }
 
     /// <summary>Creates a runtime.</summary>
@@ -425,18 +422,45 @@ public sealed unsafe class RuntimeHandle : IDisposable
             NativeMethods.mln_runtime_barrier(Handle, completion)
         );
 
-    /// <summary>Releases the runtime's public native handle.</summary>
-    public void Close()
+    /// <summary>Releases the runtime's public native handle and waits for native teardown.</summary>
+    /// <remarks>
+    /// The wait covers this runtime's threads and its released maps' teardown, so a host that
+    /// returns from this call may exit the process. Call it from a host thread: a MapLibre callback
+    /// that waits here blocks the teardown it waits for. Use <see cref="CloseAsync" /> to release
+    /// the handle without blocking.
+    /// </remarks>
+    public void Close() => CloseAsync().GetAwaiter().GetResult();
+
+    /// <summary>Releases the runtime's public native handle without blocking.</summary>
+    /// <remarks>
+    /// The returned task completes after every earlier accepted submission, including released
+    /// maps' teardown, has finished and the runtime's threads and resources are gone. A host that
+    /// awaits it may exit the process. The handle is consumed once this method returns, so a
+    /// rejected release throws before there is a task to await.
+    /// </remarks>
+    public Task CloseAsync()
     {
-        if (IsClosed)
+        if (!IsClosed)
         {
-            return;
+            state.Close();
         }
-        state.Close();
+
+        return teardown;
     }
 
     /// <inheritdoc />
     public void Dispose() => Close();
+
+    /// <inheritdoc />
+    public ValueTask DisposeAsync() => new(CloseAsync());
+
+    private mln_status StartRelease(MlnRuntime handle)
+    {
+        teardown = NativeCompletion.SubmitUnit(completion =>
+            NativeMethods.mln_runtime_release(handle, completion)
+        );
+        return mln_status.MLN_STATUS_OK;
+    }
 
     private static OfflineRegionInfo ReadOfflineRegion(mln_completion_result* result)
     {

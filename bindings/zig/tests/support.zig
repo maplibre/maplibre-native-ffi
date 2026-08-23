@@ -25,6 +25,14 @@ pub const style_json =
     \\}
 ;
 
+/// Closes a runtime and waits for its native teardown, so a test leaves no
+/// native thread or resource behind.
+pub fn closeRuntime(runtime: *maplibre.RuntimeHandle) !void {
+    var teardown = try runtime.close();
+    defer teardown.deinit();
+    try teardown.wait(null);
+}
+
 /// Waits for an autonomously produced event of `event_type`, reporting whether
 /// it arrived.
 ///

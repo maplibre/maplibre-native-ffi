@@ -2543,7 +2543,7 @@ fn owned_texture_session_renders_acquires_resizes_and_reads_back() {
         .unwrap();
     close_session(session);
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 #[test]
@@ -2576,7 +2576,7 @@ fn opengl_owned_texture_exposes_backend_metadata() {
 
     close_session(session);
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -2616,7 +2616,7 @@ fn dedicated_opengl_surface_keeps_its_context_on_the_graphics_thread() {
 
     close_session(session);
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 #[test]
@@ -2647,7 +2647,7 @@ fn opengl_surface_session_renders_into_the_platform_surface() {
 
     close_session(session);
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 #[test]
@@ -2696,7 +2696,7 @@ fn opengl_borrowed_texture_session_replaces_its_target() {
 
     close_session(session);
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 #[cfg(mln_webgpu_backend)]
@@ -2729,7 +2729,7 @@ fn webgpu_borrowed_texture_session_renders_into_a_host_texture() {
 
     close_session(session);
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 #[test]
@@ -2869,7 +2869,7 @@ fn feature_state_and_rendered_queries_copy_native_results() {
     crate::completion::blocking(map.remove_feature_state(&selector));
     close_session(session);
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 #[test]
@@ -2975,7 +2975,7 @@ fn cluster_feature_extensions_copy_values_and_feature_collections() {
 
     close_session(session);
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 #[test]
@@ -3011,7 +3011,7 @@ fn live_session_blocks_map_close_and_drop_reports_the_leaked_map() {
 
     close_session(session);
     maplibre_core::check(unsafe { sys::mln_map_release(sys::mln_map(reported[0].id)) }).unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 #[test]
@@ -3042,7 +3042,7 @@ fn sustained_frame_demands_outlast_the_texture_ring_depth() {
 
     close_session(session);
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 #[test]
@@ -3066,7 +3066,7 @@ fn cloned_session_controls_can_be_used_from_another_thread() {
 
     close_session(session);
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }
 
 #[test]
@@ -3096,5 +3096,5 @@ fn texture_readback_before_a_frame_reports_invalid_state() {
 
     close_session(session);
     map.close().unwrap();
-    runtime.close().unwrap();
+    runtime.close_and_wait();
 }

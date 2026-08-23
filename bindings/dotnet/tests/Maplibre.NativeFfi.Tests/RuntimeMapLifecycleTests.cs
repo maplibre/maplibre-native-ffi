@@ -55,6 +55,43 @@ public sealed class RuntimeMapLifecycleTests
         Assert.True(runtime.IsClosed);
     }
 
+    [BindingSpecTest("BND-040")]
+    [Fact]
+    public async Task RuntimeCloseAsyncCompletesAfterNativeTeardown()
+    {
+        var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        var map = await MapHandle.CreateAsync(
+            runtime,
+            new MapOptions { Width = 512, Height = 512 },
+            TestContext.Current.CancellationToken
+        );
+
+        map.SetStyleUrlAsync("unsupported://style.json");
+        map.Close();
+
+        var teardown = runtime.CloseAsync();
+
+        Assert.True(runtime.IsClosed);
+        await teardown;
+
+        var second = runtime.CloseAsync();
+        Assert.True(second.IsCompletedSuccessfully);
+        await second;
+    }
+
+    [BindingSpecTest("BND-040")]
+    [Fact]
+    public async Task RuntimeDisposeAsyncWaitsForNativeTeardown()
+    {
+        var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        await using (runtime)
+        {
+            await runtime.BarrierAsync();
+        }
+
+        Assert.True(runtime.IsClosed);
+    }
+
     [BindingSpecTest("BND-042")]
     [Fact]
     public void RuntimeCloseFailsWhileMapIsLiveAndCanRetryAfterMapClose()

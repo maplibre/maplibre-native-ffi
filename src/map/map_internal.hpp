@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -40,6 +41,11 @@ struct MapObject {
   // snapshots and push diffs into their renderer.
   FeatureStateStore feature_state;
   std::shared_ptr<OperationObject> still_image_operation;
+  // Releases the pending still request's submission lease exactly once.
+  // Cancellation paths invoke it directly, because the mbgl callback that
+  // otherwise releases it only fires when the mln::Map is destroyed — after
+  // teardown already waits for submissions.
+  std::function<void()> still_image_release_submission;
   // Declared first so reverse-order destruction runs the release callbacks it
   // still owes after the mln::Map that could still reach a source is gone.
   std::shared_ptr<CallbackSourceRegistry> callback_sources;

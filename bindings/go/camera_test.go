@@ -17,7 +17,7 @@ func TestCameraSnapshotAndOrderedQueryCopyValues(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewMap(): %v", err)
 	}
-	defer runtime.Close()
+	defer closeRuntimeForTest(runtime)
 	defer m.Close()
 
 	command, err := m.JumpTo(CameraOptions{}.WithCenter(LatLng{Latitude: 12, Longitude: 34}).WithZoom(4))
@@ -68,7 +68,7 @@ func TestCameraCommandsAcceptConcurrentGoroutines(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewMap(): %v", err)
 	}
-	defer runtime.Close()
+	defer closeRuntimeForTest(runtime)
 	defer m.Close()
 
 	const count = 16
@@ -122,7 +122,7 @@ func TestCameraOperationProgressesAutonomously(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewMap(): %v", err)
 	}
-	defer runtime.Close()
+	defer closeRuntimeForTest(runtime)
 	defer m.Close()
 
 	operation, err := m.QueryCamera()

@@ -44,7 +44,7 @@ fn useAndCloseProjectionOnThread(
 
 test "map projection mode updates snapshot fields through public binding" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
     defer map_future.deinit();
     var map = try map_future.wait(null);
@@ -61,7 +61,7 @@ test "map projection mode updates snapshot fields through public binding" {
 
 test "map converts between lat lngs and screen points" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map_future = try maplibre.MapHandle.create(&runtime, .{ .width = viewport_extent, .height = viewport_extent });
     defer map_future.deinit();
     var map = try map_future.wait(null);
@@ -118,7 +118,7 @@ test "map converts between lat lngs and screen points" {
 // right after a camera command observes that command without an explicit wait.
 test "standalone projection converts and updates camera" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map_future = try maplibre.MapHandle.create(&runtime, .{ .width = viewport_extent, .height = viewport_extent });
     defer map_future.deinit();
     var map = try map_future.wait(null);
@@ -176,7 +176,7 @@ fn convertOnThread(projection: *maplibre.MapProjectionHandle, out_point: *maplib
 
 test "standalone projection conversions run from another thread" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map_future = try maplibre.MapHandle.create(&runtime, .{ .width = viewport_extent, .height = viewport_extent });
     defer map_future.deinit();
     var map = try map_future.wait(null);
@@ -205,7 +205,7 @@ test "standalone projection remains usable on another thread" {
     defer projection_future.deinit();
     var projection = try projection_future.wait(null);
     try map.close();
-    try runtime.close();
+    try support.closeRuntime(&runtime);
 
     var thread_error: ?anyerror = null;
     const thread = try std.Thread.spawn(
@@ -230,7 +230,7 @@ test "projected meters convert to and from lat lng" {
 
 test "projection public descriptors report invalid native arguments" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
     defer map_future.deinit();
     var map = try map_future.wait(null);

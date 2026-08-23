@@ -55,9 +55,22 @@ mln_status open_static_map(
   // #endregion mode
 }
 
+static void runtime_torn_down(
+  void* user_data, const mln_completion_result* result
+) {
+  (void)result;
+  // Signal the host's own shutdown gate here; after this callback returns, no
+  // library thread runs, so the process may exit.
+  (void)user_data;
+}
+
 void close_map(mln_runtime runtime, mln_map map) {
   // #region release
   (void)mln_map_release(map);
-  (void)mln_runtime_release(runtime);
+  const mln_completion teardown = {
+    .size = sizeof(mln_completion),
+    .callback = runtime_torn_down,
+  };
+  (void)mln_runtime_release(runtime, &teardown);
   // #endregion release
 }

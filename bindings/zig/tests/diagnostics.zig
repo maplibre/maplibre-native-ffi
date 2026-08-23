@@ -1,6 +1,7 @@
 const testing = @import("std").testing;
 
 const maplibre = @import("maplibre_native_ffi");
+const support = @import("support.zig");
 
 test "diagnostics capture public lifecycle failures and keep copied messages" {
     var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
@@ -11,7 +12,7 @@ test "diagnostics capture public lifecycle failures and keep copied messages" {
     defer map_future.deinit();
     var map = try map_future.wait(null);
 
-    try testing.expectError(error.InvalidState, runtime.close());
+    try testing.expectError(error.InvalidState, support.closeRuntime(&runtime));
     const first = diagnostics.get().?;
     try testing.expectEqual(@as(?i32, null), first.raw_status);
     try testing.expectEqualStrings("runtime has live maps", first.message);
@@ -20,5 +21,5 @@ test "diagnostics capture public lifecycle failures and keep copied messages" {
 
     try map.close();
     try testing.expectEqualStrings(copied, diagnostics.get().?.message);
-    try runtime.close();
+    try support.closeRuntime(&runtime);
 }

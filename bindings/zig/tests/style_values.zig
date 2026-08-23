@@ -20,7 +20,7 @@ fn listIndexOf(list: maplibre.StringList, expected: []const u8) !usize {
 
 test "style ID lists are copied into owned Zig output" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
@@ -36,7 +36,7 @@ test "style ID lists are copied into owned Zig output" {
 
 test "style layer JSON helpers manage lifecycle and order" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
@@ -70,7 +70,7 @@ test "style layer JSON helpers manage lifecycle and order" {
 
 test "nine-patch style images round-trip stretch, content, and text fit" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
@@ -120,7 +120,7 @@ test "nine-patch style images round-trip stretch, content, and text fit" {
 
 test "layer base accessors round-trip source, zoom range, and visibility" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
@@ -189,7 +189,7 @@ test "layer base accessors round-trip source, zoom range, and visibility" {
 
 test "layer properties accept semantic JSON values and return owned snapshots" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
@@ -202,7 +202,7 @@ test "layer properties accept semantic JSON values and return owned snapshots" {
 
 test "layer filters accept nested semantic JSON arrays and return owned snapshots" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
@@ -218,7 +218,7 @@ test "layer filters accept nested semantic JSON arrays and return owned snapshot
 
 test "style light accepts full JSON and property updates" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
@@ -239,7 +239,7 @@ test "style light accepts full JSON and property updates" {
 
 test "runtime style images copy premultiplied RGBA8 pixels" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
@@ -288,7 +288,7 @@ test "runtime style images copy premultiplied RGBA8 pixels" {
 
 test "location indicator helpers set focused properties" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
@@ -323,7 +323,7 @@ test "location indicator helpers set focused properties" {
 
 test "style JSON buffers reject invalid values" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
@@ -337,7 +337,7 @@ const transition_style_json =
 
 test "style transition options round trip through the C API" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 

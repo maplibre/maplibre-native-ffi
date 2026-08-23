@@ -2497,8 +2497,11 @@ external int mln_runtime_offline_regions_merge_database(
 @ffi.Native<mln_runtime_options Function()>()
 external mln_runtime_options mln_runtime_options_default();
 
-@ffi.Native<ffi.Int32 Function(mln_runtime)>()
-external int mln_runtime_release(int runtime);
+@ffi.Native<ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_completion>)>()
+external int mln_runtime_release(
+  int runtime,
+  ffi.Pointer<mln_completion> completion,
+);
 
 @ffi.Native<
   ffi.Int32 Function(mln_runtime, ffi.Uint32, ffi.Pointer<mln_completion>)

@@ -1,5 +1,7 @@
 package org.maplibre.nativeffi.runtime
 
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.experimental.ExperimentalNativeApi
 import kotlin.native.ref.WeakReference
 import kotlinx.cinterop.ByteVar
@@ -16,6 +18,7 @@ import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.toLong
 import kotlinx.cinterop.value
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.internal.async.CompletionBridge
@@ -74,10 +77,13 @@ import org.maplibre.nativeffi.resource.ResourceProviderCallback
 import org.maplibre.nativeffi.resource.ResourceTransformCallback
 
 /** Owned native runtime handle. */
-@OptIn(ExperimentalForeignApi::class, ExperimentalNativeApi::class)
+@OptIn(ExperimentalAtomicApi::class, ExperimentalForeignApi::class, ExperimentalNativeApi::class)
 public actual class RuntimeHandle internal constructor(handle: NativeRuntime) {
   private val state = HandleState("RuntimeHandle", handle)
   private val liveMaps = mutableMapOf<Long, WeakReference<MapHandle>>()
+
+  /** Teardown report of the close that consumed this handle. */
+  private val tornDown = AtomicReference<Deferred<Unit>?>(null)
 
   public actual fun barrier(): Deferred<Unit> = CompletionBridge.unit { completion ->
     mln_runtime_barrier(state.requireLive().rawHandleValue, completion)
@@ -328,15 +334,19 @@ public actual class RuntimeHandle internal constructor(handle: NativeRuntime) {
       )
     }
 
-  public actual fun close() {
-    if (!state.beginClose()) return
-    try {
-      Status.check(mln_runtime_release(state.handleForClose().rawHandleValue))
-    } catch (error: Throwable) {
-      state.abortClose()
-      throw error
-    }
+  public actual fun close(): Deferred<Unit> {
+    if (!state.beginClose()) return tornDown.load() ?: CompletableDeferred(Unit)
+    val handle = state.handleForClose().rawHandleValue
+    val completed =
+      try {
+        CompletionBridge.unitChecked { completion -> mln_runtime_release(handle, completion) }
+      } catch (error: Throwable) {
+        state.abortClose()
+        throw error
+      }
+    tornDown.store(completed)
     state.completeClose {}
+    return completed
   }
 
   public actual val isClosed: Boolean

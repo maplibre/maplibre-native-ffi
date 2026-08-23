@@ -804,6 +804,11 @@ class HeadlessFrontend final : public mln::RendererFrontend {
 
   auto run_render_jobs() -> void { thread_pool_.runRenderJobs(); }
 
+  // Drains queued and running worker jobs without closing the queue; later
+  // work re-creates the pool bucket, and shutdown_thread_pool() still runs at
+  // close. Must not be called from a pool thread.
+  auto wait_thread_pool() -> void { thread_pool_.waitForEmpty(); }
+
   // Every map must call this: only waitForEmpty() erases the map's bucket in
   // the process-global scheduler, which the worker loop otherwise keeps
   // walking.
@@ -2089,6 +2094,9 @@ auto finish_still_image_request(mln_map map, std::exception_ptr error) -> void {
   }
   live->still_image_request_pending = false;
   auto operation = std::exchange(live->still_image_operation, {});
+  if (auto release = std::exchange(live->still_image_release_submission, {})) {
+    release();
+  }
   if (error) {
     const auto message = exception_message(error);
     if (operation) {
@@ -3041,6 +3049,15 @@ auto release_map(mln_map map) -> mln_status {
               {}
             );
           }
+          // Release the still request's submission lease now: the mbgl
+          // callback that normally releases it fires only when the map is
+          // destroyed, which happens after the submission wait below.
+          if (
+            auto release =
+              std::exchange(owned_map->still_image_release_submission, {})
+          ) {
+            release();
+          }
         });
         owned_map->control.wait_for_submissions();
         owned_map->runtime_state->executor.invoke_sync([&]() mutable -> void {
@@ -3202,6 +3219,7 @@ auto map_request_still_image_start(
       try {
         live->still_image_request_pending = true;
         live->still_image_operation = state;
+        live->still_image_release_submission = release_submission;
         live->map->renderStill(
           [map, release_submission](std::exception_ptr error) mutable -> void {
             finish_still_image_request(map, error);
@@ -3311,6 +3329,13 @@ auto map_run_render_jobs(mln_map map) -> void {
     auto* live = handle_table<MapObject>().try_resolve(map); live != nullptr
   ) {
     live->frontend->run_render_jobs();
+  }
+}
+
+auto map_quiesce_render_workers(mln_map map) -> void {
+  auto* live = handle_table<MapObject>().try_resolve(map);
+  if (live != nullptr) {
+    live->frontend->wait_thread_pool();
   }
 }
 

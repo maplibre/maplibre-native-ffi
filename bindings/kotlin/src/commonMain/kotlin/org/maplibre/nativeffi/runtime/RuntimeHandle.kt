@@ -82,8 +82,16 @@ public expect class RuntimeHandle {
    */
   public var eventMask: RuntimeEventMask
 
-  /** Releases this runtime and its callback state synchronously. */
-  public fun close()
+  /**
+   * Releases this runtime and its callback state, and reports the end of native teardown.
+   *
+   * The call consumes the handle before it returns, and it throws when this runtime still has a
+   * live or pending child. The returned [Deferred] completes after every earlier accepted
+   * submission, including released maps' teardown, has finished and the runtime's threads and
+   * resources are gone, so a host that awaits it may exit the process without racing native
+   * teardown. Closing an already closed runtime returns that same [Deferred].
+   */
+  public fun close(): Deferred<Unit>
 
   public companion object {
     /** Creates a runtime. */

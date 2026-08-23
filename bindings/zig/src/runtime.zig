@@ -1434,12 +1434,23 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
         }.start);
     }
 
-    pub fn close(self: *RuntimeHandle) status.Error!void {
-        const runtime_close = try beginRuntimeClose(self.*) orelse return;
-        status.checkStatus(
-            c.mln_runtime_release(runtime_close.native),
-            runtime_close.diagnostic_store,
-        ) catch |err| {
+    /// Releases the runtime handle and returns the future for its native
+    /// teardown.
+    ///
+    /// The future completes after every accepted submission, including released
+    /// maps' teardown, has finished and the runtime's threads and resources are
+    /// gone, so a host that waits for it may exit the process without racing
+    /// native teardown. A host that outlives its runtimes deinitializes the
+    /// future without waiting. Closing an already closed runtime returns a
+    /// future that has already completed.
+    pub fn close(self: *RuntimeHandle) status.Error!completion.Future(void) {
+        const runtime_close = try beginRuntimeClose(self.*) orelse
+            return completion.completed(void, {});
+        const teardown = completion.submit(void, runtime_close.diagnostic_store, completion.unit, runtime_close.native, struct {
+            fn start(native: c.mln_runtime, descriptor: *const c.mln_completion) c.mln_status {
+                return c.mln_runtime_release(native, descriptor);
+            }
+        }.start) catch |err| {
             cancelRuntimeClose(runtime_close.state);
             return err;
         };
@@ -1447,8 +1458,16 @@ pub const RuntimeHandle = enum(c.mln_runtime) {
         std.heap.smp_allocator.destroy(runtime_close.registry);
         const runtime_state = finishRuntimeClose(self.*) orelse runtime_close.state;
         std.heap.smp_allocator.destroy(runtime_state);
+        return teardown;
     }
 };
+
+/// Test-only teardown that closes a runtime and waits for its native teardown.
+pub fn closeRuntimeForTesting(handle: *RuntimeHandle) status.Error!void {
+    var teardown = try handle.close();
+    defer teardown.deinit();
+    try teardown.wait(null);
+}
 
 pub fn getNetworkStatus(diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!NetworkStatus {
     var raw: u32 = 0;
@@ -2349,7 +2368,7 @@ test "raw event masks reject bits outside the mask enum" {
     defer store.deinit();
 
     var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, &store);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer closeRuntimeForTesting(&runtime) catch @panic("runtime close failed");
     const native_runtime: c.mln_runtime = @intFromEnum(runtime);
 
     // The binding can retain an unnamed bit reported by a newer library, but

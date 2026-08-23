@@ -71,13 +71,14 @@ func TestMapFeatureStateRejectsInvalidSelectors(t *testing.T) {
 		t.Fatalf("RemoveFeatureState() with key but no feature ID error = %v, want ErrInvalidArgument", err)
 	}
 
-	// State must be one JSON object. An empty view is rejected before
-	// acceptance; a non-object fails the accepted command.
+	// State must be one JSON object. An empty view and a non-object are both
+	// rejected before acceptance.
 	featureID := "42"
 	withFeature := FeatureStateSelector{SourceID: "source", FeatureID: &featureID}
 	if _, err := m.SetFeatureState(withFeature, nil); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("SetFeatureState() with empty state error = %v, want ErrInvalidArgument", err)
 	}
-	future, err := m.SetFeatureState(withFeature, []byte(`[1,2,3]`))
-	requireCommandFailedWith(t, nil, future, err, ErrInvalidArgument)
+	if _, err := m.SetFeatureState(withFeature, []byte(`[1,2,3]`)); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("SetFeatureState() with a non-object state error = %v, want ErrInvalidArgument", err)
+	}
 }

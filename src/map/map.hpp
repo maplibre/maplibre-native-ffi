@@ -563,6 +563,10 @@ auto map_feature_state_snapshot(mln_map map)
   -> std::shared_ptr<const FeatureStateSnapshot>;
 auto map_renderer_observer(mln_map map) -> mln::RendererObserver*;
 auto map_run_render_jobs(mln_map map) -> void;
+// Blocks until the map's queued and running tile-worker jobs drain. Abandon
+// uses it so a host may destroy its graphics device as soon as abandon
+// returns. Must not be called from a MapLibre worker thread.
+auto map_quiesce_render_workers(mln_map map) -> void;
 auto map_attach_render_target_session(mln_map map, void* session) -> mln_status;
 auto map_detach_render_target_session(mln_map map, void* session) -> mln_status;
 

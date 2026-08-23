@@ -217,12 +217,24 @@ final class RuntimeHandle {
       return created;
     } catch (_) {
       if (runtimeHandle != 0) {
-        _check(raw.mln_runtime_release(runtimeHandle));
+        // No wrapper owns this handle, so nothing waits for its teardown.
+        _releaseRuntimeHandle(runtimeHandle).ignore();
       }
       eventWake.reject();
       rethrow;
     }
   }
+
+  /// Starts native teardown of an owned runtime handle.
+  static Future<void> _releaseRuntimeHandle(int handle) =>
+      startNativeCompletion(
+        copyKind: raw
+            .mln_adapter_completion_copy_kind
+            .MLN_ADAPTER_COMPLETION_COPY_FLAT,
+        elementSize: 0,
+        start: (completion) => raw.mln_runtime_release(handle, completion),
+        decode: (_) {},
+      );
 
   NativeRuntime get _handle => _state.handle;
 
@@ -641,11 +653,16 @@ final class RuntimeHandle {
     (completion) => raw.mln_runtime_barrier(_handle.raw, completion),
   );
 
-  /// Releases this runtime's public native handle.
+  /// Releases this runtime's public native handle and waits for native
+  /// teardown.
+  ///
+  /// The native handle is consumed before this returns to the event loop, so a
+  /// rejected release throws and leaves the runtime open. The returned future
+  /// completes after every earlier accepted submission, including released
+  /// maps' teardown, has finished and the runtime's threads and resources are
+  /// gone, so a host that awaits it may exit the process.
   Future<void> close() async {
-    await _state.closeAsync((handle) async {
-      _check(raw.mln_runtime_release(handle.raw));
-    });
+    await _state.closeAsync((handle) => _releaseRuntimeHandle(handle.raw));
     while (_nativeCallbackReleases.isNotEmpty) {
       await Future<void>.delayed(Duration.zero);
     }

@@ -506,14 +506,33 @@ public final class RuntimeHandle: @unchecked Sendable {
     handle.isClosed
   }
 
-  public func close() throws {
-    try mapNativeFailure {
-      try handle.closeOnce { try NativeRuntime.release($0) }
-    }
+  /// Releases this runtime's public native handle and waits for its native
+  /// teardown.
+  ///
+  /// The call returns once every accepted submission, including released maps'
+  /// teardown, has finished and the runtime's threads and resources are gone,
+  /// so a host that awaits it may exit the process without racing native
+  /// teardown. Closing an already closed runtime returns without waiting.
+  public func close() async throws {
+    guard let teardown = try startClose() else { return }
+    try await mapNativeFailure { try await teardown.value() }
   }
 
+  /// Releases the native handle and returns the future for its teardown, or nil
+  /// when this runtime was already closed.
+  private func startClose() throws -> NativeFuture<Void>? {
+    var teardown: NativeFuture<Void>?
+    try mapNativeFailure {
+      try handle.closeOnce { teardown = try NativeRuntime.release($0) }
+    }
+    return teardown
+  }
+
+  /// Closes and waits for native teardown without an async context, so a test
+  /// leaves no native thread running past its own end.
   func closeBlockingForTests() throws {
-    try close()
+    guard let teardown = try startClose() else { return }
+    try mapNativeFailure { try teardown.valueBlocking() }
   }
 
   /// Waits until every command accepted before this call has committed.

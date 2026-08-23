@@ -41,7 +41,11 @@ pub fn main(init_args: std.process.Init) !void {
     defer diagnostic_store.deinit();
 
     var runtime = try maplibre.RuntimeHandle.create(allocator, .{ .cache_path = ":memory:" }, &diagnostic_store);
-    defer runtime.close() catch {};
+    defer if (runtime.close()) |future| {
+        var teardown = future;
+        _ = teardown.wait(null) catch {};
+        teardown.deinit();
+    } else |_| {};
 
     var map_future = try maplibre.MapHandle.create(&runtime, .{ .mode = .static });
     defer map_future.deinit();

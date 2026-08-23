@@ -3078,6 +3078,11 @@ auto render_session_abandon(
   s->scheduler.discard();
   s->frame_wake.reset();
   s->driver_wake.reset();
+  // Tile workers can still hold the quarantined renderer's atlas, which holds
+  // the host's graphics device. Drain them before returning so the documented
+  // contract — no graphics calls after abandon — covers worker threads and
+  // the host may destroy its device immediately.
+  map_quiesce_render_workers(s->map);
   *out = mln_render_abandon_result{
     sizeof(*out),
     quarantined == 0 ? MLN_RENDER_ABANDON_DISPOSITION_CLEAN

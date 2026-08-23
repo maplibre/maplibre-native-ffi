@@ -13,13 +13,13 @@ func TestMapProjectionCameraAndVisibleCoordinates(t *testing.T) {
 	}
 	m, err := awaitForTest(runtime.NewMapWithOptions(NewMapOptions(512, 512, 1)))
 	if err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewMapWithOptions(): %v", err)
 	}
 	projection, err := awaitForTest(m.NewProjection())
 	if err != nil {
 		_ = m.Close()
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewProjection(): %v", err)
 	}
 	defer func() {
@@ -29,7 +29,7 @@ func TestMapProjectionCameraAndVisibleCoordinates(t *testing.T) {
 		if err := m.Close(); err != nil {
 			t.Errorf("Map Close(): %v", err)
 		}
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Runtime Close(): %v", err)
 		}
 	}()
@@ -81,14 +81,14 @@ func TestMapProjectionObservesEarlierMapCommands(t *testing.T) {
 	}
 	m, err := awaitForTest(runtime.NewMapWithOptions(NewMapOptions(512, 512, 1)))
 	if err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewMapWithOptions(): %v", err)
 	}
 	defer func() {
 		if err := m.Close(); err != nil {
 			t.Errorf("Map Close(): %v", err)
 		}
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Runtime Close(): %v", err)
 		}
 	}()
@@ -123,20 +123,20 @@ func TestMapProjectionOutlivesMapAndRuntime(t *testing.T) {
 	}
 	m, err := awaitForTest(runtime.NewMapWithOptions(NewMapOptions(512, 512, 1)))
 	if err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewMapWithOptions(): %v", err)
 	}
 	projection, err := awaitForTest(m.NewProjection())
 	if err != nil {
 		_ = m.Close()
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewProjection(): %v", err)
 	}
 	coordinate := LatLng{Latitude: 0, Longitude: 0}
 	if err := m.Close(); err != nil {
 		t.Fatalf("Map Close(): %v", err)
 	}
-	if err := runtime.Close(); err != nil {
+	if err := closeRuntimeForTest(runtime); err != nil {
 		t.Fatalf("Runtime Close(): %v", err)
 	}
 	point, err := projection.PixelForLatLng(coordinate)
@@ -172,16 +172,16 @@ func TestMapProjectionCanMigrateAcrossGoroutines(t *testing.T) {
 	}
 	m, err := awaitForTest(runtime.NewMapWithOptions(NewMapOptions(512, 512, 1)))
 	if err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewMapWithOptions(): %v", err)
 	}
 	projection, err := awaitForTest(m.NewProjection())
 	if err != nil {
 		_ = m.Close()
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewProjection(): %v", err)
 	}
-	defer runtime.Close()
+	defer closeRuntimeForTest(runtime)
 	defer m.Close()
 	defer projection.Close()
 

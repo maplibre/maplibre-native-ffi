@@ -366,9 +366,6 @@ type RuntimeHandle struct {
 	maps map[MapID]*MapHandle
 }
 
-// Test seam for synthetic handles. Production close uses closeNativeRuntime.
-var destroyRuntimeHandle func(nativeRuntime) int32
-
 func statusFromError(err error) int32 {
 	var native *Error
 	if errors.As(err, &native) {
@@ -461,10 +458,19 @@ func NewRuntimeWithOptions(options RuntimeOptions) (*RuntimeHandle, error) {
 	return &RuntimeHandle{state: state}, nil
 }
 
+// closeNativeRuntime releases a native runtime whose Go wrapper never became
+// visible, so no caller can await its teardown future.
 func closeNativeRuntime(runtime nativeRuntime) error {
-	return checkNative(func() int32 {
-		return int32(C.mln_runtime_release(C.mln_runtime(runtime)))
-	})
+	_, err := startNativeRuntimeRelease(runtime)
+	return err
+}
+
+// startNativeRuntimeRelease releases a native runtime and returns the future
+// that completes after its teardown finishes.
+func startNativeRuntimeRelease(runtime nativeRuntime) (*Future[struct{}], error) {
+	return startCompletion(func(completion *C.mln_completion) int32 {
+		return int32(C.mln_runtime_release(C.mln_runtime(runtime), completion))
+	}, completionUnit)
 }
 
 func newRuntimeState(runtime nativeRuntime) (*handle.State[nativeRuntime], error) {
@@ -931,40 +937,35 @@ func closeNativeMap(m nativeMap) error {
 	})
 }
 
-// Close releases this runtime's public native handle. Native teardown continues
-// in submission order after this method returns. A failed close leaves the
-// handle live so callers can correct the native precondition and retry.
-func (runtime *RuntimeHandle) Close() error {
+// Close releases this runtime's public native handle and returns the future for
+// its native teardown. Native teardown continues in submission order after this
+// method returns; the future completes once every accepted submission,
+// including released maps' teardown, has finished and the runtime's threads and
+// resources are gone. A host that awaits it may exit the process without racing
+// native teardown, and a host that outlives its runtimes may drop it. Closing an
+// already closed runtime returns a future that has already completed. A failed
+// close returns no future and leaves the handle live so callers can correct the
+// native precondition and retry.
+func (runtime *RuntimeHandle) Close() (*Future[struct{}], error) {
 	if runtime == nil || runtime.state == nil {
-		return newBindingError(ErrInvalidArgument, "RuntimeHandle is nil")
+		return nil, newBindingError(ErrInvalidArgument, "RuntimeHandle is nil")
 	}
 	var closeErr error
+	teardown := completedFuture(struct{}{})
 	_ = runtime.state.Close(func(native nativeRuntime) int32 {
-		if destroyRuntimeHandle != nil {
-			status := destroyRuntimeHandle(native)
-			if status != int32(C.MLN_STATUS_OK) {
-				closeErr = &Error{
-					kind:       kindForStatus(status),
-					rawStatus:  status,
-					hasStatus:  true,
-					diagnostic: "synthetic runtime close failure",
-				}
-			}
-			return status
-		}
-		if err := checkNative(func() int32 {
-			return int32(C.mln_runtime_release(C.mln_runtime(native)))
-		}); err != nil {
+		future, err := startNativeRuntimeRelease(native)
+		if err != nil {
 			closeErr = err
 			return statusFromError(err)
 		}
+		teardown = future
 		return int32(C.MLN_STATUS_OK)
 	})
 	if closeErr != nil {
-		return closeErr
+		return nil, closeErr
 	}
 	runtime.mapsMu.Lock()
 	runtime.maps = nil
 	runtime.mapsMu.Unlock()
-	return nil
+	return teardown, nil
 }

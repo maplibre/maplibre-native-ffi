@@ -139,6 +139,18 @@ app_error map_state_init(
   return error;
 }
 
+typedef struct runtime_teardown_completion {
+  atomic_bool completed;
+} runtime_teardown_completion;
+
+static void complete_runtime_teardown(
+  void* user_data, const mln_completion_result* result
+) {
+  (void)result;
+  runtime_teardown_completion* teardown = user_data;
+  atomic_store_explicit(&teardown->completed, true, memory_order_release);
+}
+
 void map_state_deinit(map_state* state) {
   if (state->map != MLN_HANDLE_NULL) {
     const mln_status status = mln_map_release(state->map);
@@ -147,9 +159,22 @@ void map_state_deinit(map_state* state) {
     state->map = MLN_HANDLE_NULL;
   }
   if (state->runtime != MLN_HANDLE_NULL) {
-    const mln_status status = mln_runtime_release(state->runtime);
-    if (status != MLN_STATUS_OK)
+    runtime_teardown_completion teardown = {.completed = false};
+    const mln_completion completion = {
+      .size = sizeof(mln_completion),
+      .callback = complete_runtime_teardown,
+      .user_data = &teardown,
+    };
+    const mln_status status = mln_runtime_release(state->runtime, &completion);
+    if (status != MLN_STATUS_OK) {
       diagnostics_log_status("runtime release failed", status);
+    } else {
+      // Waiting for the completion keeps process exit ordered after native
+      // teardown.
+      while (!atomic_load_explicit(&teardown.completed, memory_order_acquire)) {
+        thrd_yield();
+      }
+    }
     state->runtime = MLN_HANDLE_NULL;
   }
 }

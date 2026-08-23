@@ -13,7 +13,7 @@ func TestReleasedMapIDReplayedAfterANewMapReportsItStale(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
-	defer runtime.Close()
+	defer closeRuntimeForTest(runtime)
 
 	first, err := awaitForTest(runtime.NewMap())
 	if err != nil {

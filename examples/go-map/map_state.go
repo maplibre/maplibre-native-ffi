@@ -69,7 +69,14 @@ func (state *runtimeMapState) Close() error {
 		state.mapRef = nil
 	}
 	if state.runtime != nil {
-		result = errors.Join(result, state.runtime.Close())
+		teardown, err := state.runtime.Close()
+		result = errors.Join(result, err)
+		if err == nil {
+			// Awaiting the release completion keeps process exit ordered
+			// after native teardown.
+			_, waitErr := teardown.Await(context.Background())
+			result = errors.Join(result, waitErr)
+		}
 		state.runtime = nil
 	}
 	return result

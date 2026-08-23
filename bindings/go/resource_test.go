@@ -47,14 +47,14 @@ func TestRuntimeResourceProviderInstallsReplacesAndClears(t *testing.T) {
 	}
 	m, err := awaitForTest(runtime.NewMap())
 	if err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewMap(): %v", err)
 	}
 	defer func() {
 		if err := m.Close(); err != nil {
 			t.Errorf("Map Close(): %v", err)
 		}
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Runtime Close(): %v", err)
 		}
 	}()
@@ -118,19 +118,19 @@ func TestResourceProviderSeesSchemeAliasAndItsResolvedURL(t *testing.T) {
 		}
 		return ResourceProviderDecisionHandle
 	}); err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("SetResourceProvider(): %v", err)
 	}
 	m, err := awaitForTest(runtime.NewMap())
 	if err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewMap(): %v", err)
 	}
 	defer func() {
 		if err := m.Close(); err != nil {
 			t.Errorf("Map Close(): %v", err)
 		}
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Runtime Close(): %v", err)
 		}
 	}()
@@ -196,7 +196,7 @@ func TestRuntimeResourceProviderRejectsNilCallback(t *testing.T) {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
 	defer func() {
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Close(): %v", err)
 		}
 	}()
@@ -214,24 +214,24 @@ func TestRuntimeResourceTransformLifecycle(t *testing.T) {
 	if _, err := runtime.SetResourceTransform(func(request ResourceTransformRequest) (string, bool) {
 		return request.URL + "?first", true
 	}); err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("SetResourceTransform(): %v", err)
 	}
 	if _, err := runtime.SetResourceTransform(func(request ResourceTransformRequest) (string, bool) {
 		return "", false
 	}); err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("SetResourceTransform(replace): %v", err)
 	}
 	if _, err := runtime.ClearResourceTransform(); err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("ClearResourceTransform(): %v", err)
 	}
 	if _, err := runtime.ClearResourceTransform(); err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("second ClearResourceTransform(): %v", err)
 	}
-	if err := runtime.Close(); err != nil {
+	if err := closeRuntimeForTest(runtime); err != nil {
 		t.Fatalf("Close(): %v", err)
 	}
 }
@@ -242,7 +242,7 @@ func TestRuntimeResourceTransformRejectsNilCallback(t *testing.T) {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
 	defer func() {
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Close(): %v", err)
 		}
 	}()

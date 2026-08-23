@@ -40,6 +40,15 @@ type Future[T any] struct {
 	state *futureState[T]
 }
 
+// completedFuture returns a future that already carries value, for work the
+// binding satisfied without a native submission.
+func completedFuture[T any](value T) *Future[T] {
+	state := &futureState[T]{ready: make(chan struct{}), completed: true}
+	state.result = futureResult[T]{value: value}
+	close(state.ready)
+	return &Future[T]{state: state}
+}
+
 func (future *Future[T]) retain(value any) {
 	future.state.mu.Lock()
 	defer future.state.mu.Unlock()

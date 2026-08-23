@@ -248,7 +248,8 @@ auto create_runtime(
 auto runtime_barrier_start(
   mln_runtime runtime, const mln_completion* completion
 ) -> mln_status;
-auto release_runtime(mln_runtime runtime) -> mln_status;
+auto release_runtime(mln_runtime runtime, const mln_completion* completion)
+  -> mln_status;
 auto drain_runtime_events(mln_runtime runtime, mln_event_batch* out_batch)
   -> mln_status;
 auto get_event_batch(

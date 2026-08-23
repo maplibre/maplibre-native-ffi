@@ -2787,15 +2787,28 @@ auto runtime_barrier_start(
   return MLN_STATUS_OK;
 }
 
-auto release_runtime(mln_runtime runtime) -> mln_status {
+auto release_runtime(mln_runtime runtime, const mln_completion* completion)
+  -> mln_status {
+  const auto completion_status = validate_completion(completion);
+  if (completion_status != MLN_STATUS_OK) {
+    return completion_status;
+  }
   auto live = lease_runtime(runtime);
   if (live == nullptr) {
     return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto teardown_completion = std::shared_ptr<Completion>{};
+  try {
+    teardown_completion = std::make_shared<Completion>(*completion);
+  } catch (...) {
+    set_thread_error("runtime release could not allocate its completion");
+    return MLN_STATUS_NATIVE_ERROR;
   }
   {
     const std::scoped_lock commit_lock(live->submission_mutex);
     const auto release_status = live->control.begin_close();
     if (release_status != MLN_STATUS_OK) {
+      teardown_completion->reject();
       return release_status;
     }
   }
@@ -2806,16 +2819,19 @@ auto release_runtime(mln_runtime runtime) -> mln_status {
     bool aborted = false;
     uint64_t sequence = 0;
     std::shared_ptr<RuntimeObject> live;
+    std::shared_ptr<Completion> teardown_completion;
   };
   auto gate = std::shared_ptr<ReleaseGate>{};
   try {
     gate = std::make_shared<ReleaseGate>();
   } catch (...) {
     live->control.abort_close();
+    teardown_completion->reject();
     set_thread_error("runtime release could not allocate its teardown gate");
     return MLN_STATUS_NATIVE_ERROR;
   }
   gate->live = live;
+  gate->teardown_completion = teardown_completion;
   auto waiter = std::thread{};
   try {
     // Teardown stops and joins the executor, so it cannot run on that executor
@@ -2843,9 +2859,15 @@ auto release_runtime(mln_runtime runtime) -> mln_status {
         // actionable by its former owner.
       }
       live->executor.stop();
+      // Drop this thread's reference before reporting, so a host that waits
+      // for the completion and then exits cannot race member destruction.
+      // Nothing after complete() touches library state.
+      live.reset();
+      complete(gate->teardown_completion, MLN_STATUS_OK);
     });
   } catch (...) {
     live->control.abort_close();
+    teardown_completion->reject();
     set_thread_error("runtime release could not start its teardown waiter");
     return MLN_STATUS_NATIVE_ERROR;
   }
@@ -2861,6 +2883,7 @@ auto release_runtime(mln_runtime runtime) -> mln_status {
       waiter.join();
     }
     live->control.abort_close();
+    teardown_completion->reject();
     set_thread_error("runtime release could not detach its teardown waiter");
     return MLN_STATUS_NATIVE_ERROR;
   }
@@ -2875,6 +2898,7 @@ auto release_runtime(mln_runtime runtime) -> mln_status {
     gate->committed = true;
   }
   gate->condition.notify_one();
+  teardown_completion->accept();
   return MLN_STATUS_OK;
 }
 

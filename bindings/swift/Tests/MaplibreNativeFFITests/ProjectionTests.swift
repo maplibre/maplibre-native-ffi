@@ -52,7 +52,7 @@ import Testing
   #expect(abs(moved.x - point.x) > 1 || abs(moved.y - point.y) > 1)
 
   try map.close()
-  try runtime.close()
+  try await runtime.close()
   let detached = try projection.latLng(for: moved)
   #expect(abs(detached.latitude - 10) < 0.000001)
   #expect(abs(detached.longitude - 20) < 0.000001)

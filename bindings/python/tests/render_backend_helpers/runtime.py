@@ -131,10 +131,15 @@ def request_and_finish_frame(
     session: render.RenderSessionHandle,
     *,
     token: int = 1,
+    flags: render.FrameDemandFlag = render.FrameDemandFlag.IF_NEEDED,
     iterations: int = 5000,
 ) -> render.RenderFrameResult:
-    """Request one frame and return its owned terminal result."""
-    session.request_frame(render.FrameDemand(token=token))
+    """Request one frame and return its owned terminal result.
+
+    Clearing ``IF_NEEDED`` renders even when nothing newer is pending, which
+    is how a test gets a fresh frame out of a settled style.
+    """
+    session.request_frame(render.FrameDemand(flags=flags, token=token))
     for _ in range(iterations):
         if session.snapshot.driver == render.RenderDriver.CALLER_GRAPHICS_THREAD:
             session.service_driver_work(16)
@@ -225,7 +230,7 @@ def wait_for_rendered_layer_feature(
     iterations: int = 5000,
 ) -> query.QueriedFeature:
     """Render until one feature of `layer_id` covers the map center."""
-    query_point = map_handle.pixel_for_lat_lng(geo.LatLng(0.0, 0.0))
+    query_point = map_handle.pixel_for_lat_lng(geo.LatLng(0.0, 0.0)).result(timeout=5)
     geometry = query.RenderedQueryGeometry.box_geometry(
         query.ScreenBox(
             camera.ScreenPoint(query_point.x - 30.0, query_point.y - 30.0),
@@ -233,7 +238,6 @@ def wait_for_rendered_layer_feature(
         )
     )
     options = query.RenderedFeatureQueryOptions(layer_ids=(layer_id,))
-    operation = map_handle.request_still_image()
     for _ in range(iterations):
         # Native execution advances independently; rendering remains host-driven.
         time.sleep(0.001)
@@ -251,12 +255,10 @@ def wait_for_rendered_layer_feature(
             features = []
         assert isinstance(features, list)
         if features:
-            operation.close()
             first = features[0]
             assert isinstance(first, query.QueriedFeature)
             return first
         time.sleep(0.001)
-    operation.close()
     raise AssertionError(f"rendered feature query for {layer_id} returned no features")
 
 
@@ -268,9 +270,10 @@ def wait_for_rendered_cluster(
     iterations: int = 5000,
 ) -> query.QueriedFeature:
     """Load the cluster style and return the first rendered cluster feature."""
-    map_handle.jump_to(camera.CameraOptions(center=geo.LatLng(0.0, 0.0), zoom=0.0))
-    map_handle.set_style_json(CLUSTER_STYLE_JSON.encode())
-    runtime.barrier().result(timeout=5)
+    map_handle.jump_to(
+        camera.CameraOptions(center=geo.LatLng(0.0, 0.0), zoom=0.0)
+    ).result(timeout=5)
+    map_handle.set_style_json(CLUSTER_STYLE_JSON.encode()).result(timeout=5)
     return wait_for_rendered_layer_feature(
         runtime,
         map_handle,
@@ -314,8 +317,10 @@ def assert_geojson_cluster_source(
     session: render.RenderSessionHandle,
 ) -> None:
     """Cluster nearby points added through the GeoJSON source data API."""
-    map_handle.jump_to(camera.CameraOptions(center=geo.LatLng(0.0, 0.0), zoom=0.0))
-    map_handle.set_style_json(EMPTY_STYLE_JSON.encode())
+    map_handle.jump_to(
+        camera.CameraOptions(center=geo.LatLng(0.0, 0.0), zoom=0.0)
+    ).result(timeout=5)
+    map_handle.set_style_json(EMPTY_STYLE_JSON.encode()).result(timeout=5)
     with style.GeoJsonSourceDataHandle(
         CLUSTER_POINTS,
         style.GeoJsonSourceOptions(
@@ -327,13 +332,14 @@ def assert_geojson_cluster_source(
             cluster_properties=b'{"weight_sum":["+",["get","weight"]]}',
         ),
     ) as cluster_data:
-        map_handle.add_geojson_source_data("typed-cluster-source", cluster_data)
+        map_handle.add_geojson_source_data("typed-cluster-source", cluster_data).result(
+            timeout=5
+        )
     map_handle.add_style_layer_json(
         b'{"id":"typed-cluster-circle","type":"circle",'
         b'"source":"typed-cluster-source","filter":["has","point_count"],'
         b'"paint":{"circle-color":"#2563eb","circle-radius":20}}'
-    )
-    runtime.barrier().result(timeout=5)
+    ).result(timeout=5)
 
     queried = wait_for_rendered_layer_feature(
         runtime, map_handle, session, "typed-cluster-circle"

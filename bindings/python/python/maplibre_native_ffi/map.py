@@ -620,7 +620,7 @@ class MapHandle(NativeHandleMixin):
         """Request a repaint and return its completion future."""
         return self._native.request_repaint()
 
-    def request_still_image(self) -> Future[CommandCompletion]:
+    def request_still_image(self) -> Future[None]:
         """Start one noncoalescing still-image operation."""
         return self._native.request_still_image()
 
@@ -674,8 +674,8 @@ class MapHandle(NativeHandleMixin):
     def get_size(self) -> tuple[int, int, float]:
         """Return the map's logical width, height, and pixel ratio.
 
-        The scale factor is fixed for the lifetime of the map and is
-        independent of any render target's scale factor.
+        An attached render session updates the map viewport when it applies an
+        extent, so a session resize moves all three values.
         """
         return self._native.get_size()
 
@@ -1381,30 +1381,6 @@ class MapHandle(NativeHandleMixin):
         """Return a future for a camera read ordered after prior commands."""
         return map_future(
             self._native.get_camera_ordered(), CameraSnapshot._from_native
-        )
-
-    def set_camera(self, camera: CameraOptions) -> Future[CommandCompletion]:
-        """Submit camera fields and return its completion future."""
-        return self._native.set_camera(*_camera_parts(camera))
-
-    def set_visible_coordinates(
-        self,
-        coordinates: list[LatLng] | tuple[LatLng, ...],
-        padding: EdgeInsets,
-    ) -> Future[CommandCompletion]:
-        """Submit a visible-coordinate fit and return its completion future."""
-        return self._native.set_visible_coordinates(
-            [(coordinate.latitude, coordinate.longitude) for coordinate in coordinates],
-            (padding.top, padding.left, padding.bottom, padding.right),
-        )
-
-    def set_visible_geometry(
-        self, geometry: bytes, padding: EdgeInsets
-    ) -> Future[CommandCompletion]:
-        """Submit a visible-geometry fit and return its completion future."""
-        return self._native.set_visible_geometry(
-            geometry,
-            (padding.top, padding.left, padding.bottom, padding.right),
         )
 
     def jump_to(self, camera: CameraOptions) -> Future[CommandCompletion]:

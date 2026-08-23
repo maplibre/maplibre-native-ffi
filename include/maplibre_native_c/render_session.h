@@ -263,6 +263,12 @@ MLN_API mln_status mln_render_session_detach(
 /**
  * Irreversibly closes control and mailboxes without graphics calls. The call
  * returns MLN_STATUS_BUSY while a driver call is in flight.
+ *
+ * Before returning, the call waits for the map's in-flight tile work, which
+ * can still reference quarantined renderer resources and through them the
+ * host's graphics objects. After it returns, no library thread touches the
+ * session's target or device, so the host may destroy them immediately. Do
+ * not call from a MapLibre worker callback.
  */
 MLN_API mln_status mln_render_session_abandon(
   mln_render_session session, mln_render_abandon_result* out_result

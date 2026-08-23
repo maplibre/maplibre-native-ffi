@@ -22,7 +22,11 @@ pub const MapState = struct {
             diagnostics.logError("runtime create failed", err, diagnostic_store);
             return types.AppError.RuntimeCreateFailed;
         };
-        errdefer runtime.close() catch {};
+        errdefer if (runtime.close()) |future| {
+            var teardown = future;
+            _ = teardown.wait(null) catch {};
+            teardown.deinit();
+        } else |_| {};
 
         var map_future = maplibre.MapHandle.create(&runtime, .{ .mode = .continuous }) catch |err| {
             diagnostics.logError("map create failed", err, diagnostic_store);
@@ -53,7 +57,13 @@ pub const MapState = struct {
 
     pub fn deinit(self: *MapState) void {
         self.map.close() catch {};
-        self.runtime.close() catch {};
+        // Awaiting the release completion keeps process exit ordered after
+        // native teardown.
+        if (self.runtime.close()) |future| {
+            var teardown = future;
+            _ = teardown.wait(null) catch {};
+            teardown.deinit();
+        } else |_| {}
         self.diagnostic_store.deinit();
         self.allocator.destroy(self.diagnostic_store);
     }

@@ -2347,7 +2347,7 @@ fn testStyleJsonProvider(
 // the tests below watch the live-state count rather than a style load.
 test "an explicit source removal releases the callback state" {
     var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer runtime_module.closeRuntimeForTesting(&runtime) catch @panic("runtime close failed");
     var map = try createLoadedMapForTesting(&runtime);
     defer map.close() catch @panic("map close failed");
 
@@ -2367,7 +2367,7 @@ test "an explicit source removal releases the callback state" {
 
 test "an explicit custom MVT vector source removal releases the callback state" {
     var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer runtime_module.closeRuntimeForTesting(&runtime) catch @panic("runtime close failed");
     var map = try createLoadedMapForTesting(&runtime);
     defer map.close() catch @panic("map close failed");
 
@@ -2396,7 +2396,7 @@ test "a style load that drops a source releases the callback state unsubscribed"
     };
 
     var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer runtime_module.closeRuntimeForTesting(&runtime) catch @panic("runtime close failed");
     var provider_future = try runtime.setResourceProvider(.{ .handler = testStyleJsonProvider });
     defer provider_future.deinit();
     _ = try provider_future.wait(null);
@@ -2446,7 +2446,7 @@ test "a style load that drops a source releases the callback state unsubscribed"
 
 test "closing a map releases its surviving source callback states" {
     var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer runtime_module.closeRuntimeForTesting(&runtime) catch @panic("runtime close failed");
     var map = try createLoadedMapForTesting(&runtime);
     var map_open = true;
     defer if (map_open) map.close() catch @panic("map close failed");
@@ -2469,7 +2469,7 @@ test "closing a map releases its surviving source callback states" {
 // A rejected add releases nothing, so the state belongs to the failing call.
 test "a rejected custom geometry source add releases its own callback state" {
     var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer runtime_module.closeRuntimeForTesting(&runtime) catch @panic("runtime close failed");
     var map = try createLoadedMapForTesting(&runtime);
     defer map.close() catch @panic("map close failed");
 
@@ -2491,7 +2491,7 @@ test "a rejected custom geometry source add releases its own callback state" {
 
 test "a released map id is stale and map snapshots work from another thread" {
     var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer runtime_module.closeRuntimeForTesting(&runtime) catch @panic("runtime close failed");
 
     var first_future = try MapHandle.create(&runtime, .{});
 

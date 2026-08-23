@@ -17,7 +17,7 @@ fn expectListContains(list: maplibre.StringList, expected: []const u8) !void {
 
 test "prepared GeoJSON data adds and updates sources through public binding" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
@@ -47,7 +47,7 @@ test "prepared GeoJSON data adds and updates sources through public binding" {
 
 test "prepared GeoJSON data supports nested geometry collections" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
@@ -65,7 +65,7 @@ test "GeoJSON preparation rejects invalid data and passes explicit-length string
     );
 
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
@@ -84,7 +84,7 @@ test "GeoJSON preparation rejects invalid data and passes explicit-length string
 
 test "GeoJSON preparation bakes in options and validates clustering" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
@@ -143,7 +143,7 @@ test "GeoJSON preparation bakes in options and validates clustering" {
 
 test "prepared GeoJSON data installs on many sources and outlives release" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
@@ -166,7 +166,7 @@ test "prepared GeoJSON data installs on many sources and outlives release" {
 
 test "GeoJSON preparation runs on a worker thread" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
@@ -186,7 +186,7 @@ test "GeoJSON preparation runs on a worker thread" {
 
 test "synchronous tiling override applies at runtime" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 

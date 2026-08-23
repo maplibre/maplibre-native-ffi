@@ -333,9 +333,11 @@ auto mln_runtime_barrier(
   });
 }
 
-auto mln_runtime_release(mln_runtime runtime) noexcept -> mln_status {
+auto mln_runtime_release(
+  mln_runtime runtime, const mln_completion* completion
+) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::release_runtime(runtime);
+    return mln::core::release_runtime(runtime, completion);
   });
 }
 

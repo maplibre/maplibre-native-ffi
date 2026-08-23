@@ -394,9 +394,10 @@ internal object NativeAccess {
       MapLibreNativeC.mln_runtime_barrier(runtime.raw, completion)
     }
 
-  internal fun releaseRuntime(runtime: NativeRuntime) {
-    Status.check(MapLibreNativeC.mln_runtime_release(runtime.raw))
-  }
+  internal fun releaseRuntime(runtime: NativeRuntime): Deferred<Unit> =
+    CompletionBridge.unitChecked { completion ->
+      MapLibreNativeC.mln_runtime_release(runtime.raw, completion)
+    }
 
   private inline fun command(
     crossinline call: (MemorySegment) -> Any?

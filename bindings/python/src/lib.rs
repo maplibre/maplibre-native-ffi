@@ -383,6 +383,16 @@ where
     Ok(future)
 }
 
+/// An already-resolved future, for a call that finished without submitting.
+fn completed_python_future(py: Python<'_>) -> PyResult<Py<PyAny>> {
+    let future = py
+        .import("concurrent.futures")?
+        .getattr("Future")?
+        .call0()?;
+    future.call_method1("set_result", (py.None(),))?;
+    Ok(future.unbind())
+}
+
 fn py_none(py: Python<'_>, result: &sys::mln_completion_result) -> PyResult<Py<PyAny>> {
     if !result.value.is_null() || result.value_count != 0 {
         return Err(py_errors::NativeError::new_err((
@@ -1163,25 +1173,28 @@ impl RenderSessionState {
 }
 #[pymethods]
 impl RuntimeHandle {
-    fn close(&self, py: Python<'_>) -> PyResult<()> {
-        {
+    fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let teardown = {
             let state = self.state();
             let Some(runtime_handle) = state.live_handle() else {
-                return Ok(());
+                return completed_python_future(py);
             };
-            if let Err(error) = py.detach(|| {
-                maplibre_core::check(unsafe { sys::mln_runtime_release(runtime_handle) })
-            }) {
-                return Err(map_error(error));
-            }
+            // Release returns after synchronous child preflight, so this does
+            // not block; the future reports the end of native teardown.
+            let teardown = submit_python_future(
+                py,
+                |completion| unsafe { sys::mln_runtime_release(runtime_handle, completion) },
+                py_none,
+            )?;
             state.mark_closed();
-        }
+            teardown
+        };
 
         self.event_wake
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .take();
-        Ok(())
+        Ok(teardown)
     }
 
     fn barrier(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {

@@ -12,14 +12,14 @@ func TestNinePatchStyleImageRoundTripsStretchContentAndTextFit(t *testing.T) {
 	}
 	m, err := awaitForTest(runtime.NewMap())
 	if err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewMap(): %v", err)
 	}
 	defer func() {
 		if err := m.Close(); err != nil {
 			t.Errorf("Map Close(): %v", err)
 		}
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Runtime Close(): %v", err)
 		}
 	}()
@@ -108,14 +108,14 @@ func TestStyleImageCopiesPixelsAndMetadata(t *testing.T) {
 	}
 	m, err := awaitForTest(runtime.NewMap())
 	if err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewMap(): %v", err)
 	}
 	defer func() {
 		if err := m.Close(); err != nil {
 			t.Errorf("Map Close(): %v", err)
 		}
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Runtime Close(): %v", err)
 		}
 	}()
@@ -161,14 +161,14 @@ func TestImageSourceCopiesPixelsAndCoordinates(t *testing.T) {
 	}
 	m, err := awaitForTest(runtime.NewMap())
 	if err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewMap(): %v", err)
 	}
 	defer func() {
 		if err := m.Close(); err != nil {
 			t.Errorf("Map Close(): %v", err)
 		}
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Runtime Close(): %v", err)
 		}
 	}()

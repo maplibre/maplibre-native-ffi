@@ -6,7 +6,7 @@ const support = @import("support.zig");
 
 test "style source JSON buffers expose type info and copied attribution" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
@@ -36,7 +36,7 @@ test "style source JSON buffers expose type info and copied attribution" {
 
 test "style source removal reports state and copies missing results" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
@@ -57,7 +57,7 @@ test "style source removal reports state and copies missing results" {
 
 test "tile source helpers expose copied reconstructible source information" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
@@ -146,7 +146,7 @@ test "tile source helpers expose copied reconstructible source information" {
 
 test "image source helpers add update and copy coordinates" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
@@ -198,7 +198,7 @@ test "image source helpers add update and copy coordinates" {
 
 test "style source JSON buffers reject invalid source data and pass explicit-length IDs" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
@@ -236,7 +236,7 @@ fn releaseCustomGeometryContext(context: ?*anyopaque) void {
 
 test "custom geometry source helpers add sources and accept tile updates" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
@@ -286,7 +286,7 @@ test "custom geometry source helpers add sources and accept tile updates" {
 
 test "custom MVT vector source helpers add sources and accept tile updates" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
 
@@ -330,7 +330,7 @@ test "custom MVT vector source helpers add sources and accept tile updates" {
 // only report that the map stopped referencing it.
 test "a custom geometry source releases its context once per lifetime end" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map = try support.createLoadedMap(&runtime);
     var map_open = true;
     defer if (map_open) map.close() catch @panic("map close failed");

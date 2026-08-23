@@ -5,6 +5,7 @@ import java.nio.Buffer
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.charset.StandardCharsets
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.LongPointer
@@ -41,6 +42,9 @@ import org.maplibre.nativeffi.resource.ResourceTransformCallback
 public actual class RuntimeHandle private constructor(private val handleId: Long) {
   private val core = HandleStateCore("RuntimeHandle", handleId)
   private val liveMaps = mutableMapOf<Long, WeakReference<MapHandle>>()
+
+  /** Teardown report of the close that consumed this handle. */
+  @Volatile private var tornDown: Deferred<Unit>? = null
 
   init {
     HandleLeakCleaner.register(this, core.leakReport)
@@ -309,15 +313,20 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
       )
     }
 
-  public actual fun close() {
-    if (!core.beginClose()) return
-    try {
-      Status.check(MaplibreNativeC.mln_runtime_release(handleId))
-    } catch (error: Throwable) {
-      core.abortClose()
-      throw error
-    }
+  public actual fun close(): Deferred<Unit> {
+    if (!core.beginClose()) return tornDown ?: CompletableDeferred(Unit)
+    val completed =
+      try {
+        CompletionBridge.unitChecked { completion ->
+          MaplibreNativeC.mln_runtime_release(handleId, completion)
+        }
+      } catch (error: Throwable) {
+        core.abortClose()
+        throw error
+      }
+    tornDown = completed
     core.completeClose { liveMaps.clear() }
+    return completed
   }
 
   public actual companion object {

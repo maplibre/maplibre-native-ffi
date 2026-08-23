@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
@@ -94,6 +95,9 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
   }
 
   /// Releases the native handle asynchronously exactly once after success.
+  ///
+  /// [close] starts before this returns, so a release that rejects on the
+  /// calling turn still leaves this state open for a later attempt.
   Future<void> closeAsync(Future<void> Function(H) close) {
     if (_closed) {
       return Future.value();
@@ -102,20 +106,24 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
     if (pending != null) {
       return pending;
     }
-    final future = _runClose(close);
-    _closeFuture = future;
-    return future;
+    // The completer holds the shared future before the release runs, because a
+    // rejected release reports its failure while `close` is still on the stack.
+    final completer = Completer<void>();
+    _closeFuture = completer.future;
+    _runClose(close).then(
+      (_) => completer.complete(),
+      onError: (Object error, StackTrace stack) {
+        _closeFuture = null;
+        completer.completeError(error, stack);
+      },
+    );
+    return completer.future;
   }
 
   Future<void> _runClose(Future<void> Function(H) close) async {
-    try {
-      await close(_handle);
-      _closed = true;
-      _detachLeakReporter();
-    } catch (_) {
-      _closeFuture = null;
-      rethrow;
-    }
+    await close(_handle);
+    _closed = true;
+    _detachLeakReporter();
   }
 
   void _attachLeakReporter(NativeHandle handle) {

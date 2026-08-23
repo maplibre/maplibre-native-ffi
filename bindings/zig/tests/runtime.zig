@@ -30,7 +30,7 @@ fn setMapEventMaskOnThread(map: *maplibre.MapHandle, out_error: *?anyerror) void
 }
 
 fn closeRuntimeOnThread(runtime: *maplibre.RuntimeHandle, out_error: *?anyerror) void {
-    runtime.close() catch |err| {
+    support.closeRuntime(runtime) catch |err| {
         out_error.* = err;
         return;
     };
@@ -42,7 +42,7 @@ fn createRuntimeOnThread(out_error: *?anyerror) void {
         out_error.* = err;
         return;
     };
-    runtime.close() catch |err| {
+    support.closeRuntime(&runtime) catch |err| {
         out_error.* = err;
         return;
     };
@@ -91,10 +91,10 @@ fn expectOnlySelectedTypes(
 
 test "runtimes can be created on the current thread or another thread" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var second = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer second.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&second) catch @panic("runtime close failed");
 
     var thread_error: ?anyerror = error.InvalidState;
     const thread = try std.Thread.spawn(.{}, createRuntimeOnThread, .{&thread_error});
@@ -118,7 +118,7 @@ test "runtime drain and close are callable from another thread" {
 
 test "event mask setters accept calls from another thread" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
 
@@ -155,7 +155,7 @@ test "runtime option strings reject embedded NUL before C calls" {
 
 test "one drain reports the events a style load queued together" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
 
@@ -187,7 +187,7 @@ test "one drain reports the events a style load queued together" {
 test "a drained batch outlives its runtime" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     var runtime_open = true;
-    defer if (runtime_open) runtime.close() catch @panic("runtime close failed");
+    defer if (runtime_open) support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
 
@@ -227,7 +227,7 @@ test "a drained batch outlives its runtime" {
 
     try map.close();
     map_open = false;
-    try runtime.close();
+    try support.closeRuntime(&runtime);
     runtime_open = false;
 
     const after_close = try kept.at(kept_index);
@@ -237,7 +237,7 @@ test "a drained batch outlives its runtime" {
 
 test "closing a map leaves its queued runtime events unchanged" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
 
@@ -261,7 +261,7 @@ test "closing a map leaves its queued runtime events unchanged" {
 
 test "event masks round-trip through both handles" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
 
@@ -296,7 +296,7 @@ test "mask membership rejects an unknown type no mask bit can hold" {
 
 test "a narrowed map mask drops the type it clears and keeps the rest" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
 
@@ -326,7 +326,7 @@ test "masks passed as create options narrow both handles" {
         .{ .event_mask = narrowed_runtime_mask },
         null,
     );
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     try testing.expectEqual(narrowed_runtime_mask, try runtime.eventMask());
 
     const narrowed_map_mask = maskWithout("map_render_update_available");

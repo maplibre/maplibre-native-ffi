@@ -216,7 +216,7 @@ mod tests {
         assert!((center_point.y - 256.0).abs() < 1e-6);
 
         map.close().unwrap();
-        runtime.close().unwrap();
+        runtime.close_and_wait();
         std::thread::spawn(move || {
             let round_tripped = projection.lat_lng_for_pixel(center_point).unwrap();
             assert!((round_tripped.latitude - center.latitude).abs() < 1e-7);
@@ -240,7 +240,7 @@ mod tests {
         }
 
         map.close().unwrap();
-        runtime.close().unwrap();
+        runtime.close_and_wait();
     }
 
     #[test]
@@ -290,7 +290,7 @@ mod tests {
 
         projection.close().unwrap();
         map.close().unwrap();
-        runtime.close().unwrap();
+        runtime.close_and_wait();
     }
 
     #[test]
@@ -327,6 +327,6 @@ mod tests {
 
         projection.close().unwrap();
         map.close().unwrap();
-        runtime.close().unwrap();
+        runtime.close_and_wait();
     }
 }

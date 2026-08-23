@@ -34,11 +34,36 @@ class RuntimeHandleTest {
 
       assertFalse(runtime.isClosed)
       runtime.barrier().await()
-      runtime.close()
-      runtime.close()
+      val tornDown = runtime.close()
+      // A second close reports the same teardown instead of starting another one.
+      assertEquals(tornDown, runtime.close())
 
       assertTrue(runtime.isClosed)
       assertFailsWith<InvalidStateException> { runSuspendTest { runtime.barrier().await() } }
+    }
+
+  // BND-040.
+  @Test
+  fun runtimeCloseReportsTheEndOfNativeTeardown(): Unit =
+    org.maplibre.nativeffi.runtime.runSuspendTest {
+      val runtime = RuntimeHandle.create(RuntimeOptions())
+      val map =
+        MapHandle.create(
+            runtime,
+            MapOptions().apply {
+              width = 64
+              height = 64
+            },
+          )
+          .await()
+      map.setStyleUrl("custom://never-served.json").await()
+      map.close()
+
+      // The report arrives only after the released map's teardown finishes too.
+      runtime.close().await()
+
+      assertTrue(runtime.isClosed)
+      assertTrue(map.isClosed)
     }
 
   @Test

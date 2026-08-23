@@ -127,7 +127,7 @@ import Testing
 ) async throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
-  try runtime.close()
+  try await runtime.close()
 
   do {
     _ = try await runtime.offlineRegions()

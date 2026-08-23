@@ -14,31 +14,31 @@ func TestRuntimeMapLifecycle(t *testing.T) {
 
 	m, err := awaitForTest(runtime.NewMap())
 	if err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewMap(): %v", err)
 	}
-	if err := runtime.Close(); !errors.Is(err, ErrInvalidState) {
+	if err := closeRuntimeForTest(runtime); !errors.Is(err, ErrInvalidState) {
 		_ = m.Close()
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("Close() with live map error = %v, want ErrInvalidState", err)
 	} else {
 		var bindingErr *Error
 		if !errors.As(err, &bindingErr) ||
 			bindingErr.Diagnostic() != "handle still owns live or pending children" {
 			_ = m.Close()
-			_ = runtime.Close()
+			_ = closeRuntimeForTest(runtime)
 			t.Fatalf("Close() with live map diagnostic = %v", err)
 		}
 	}
 	if err := m.Close(); err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("Map Close(): %v", err)
 	}
 	if err := m.Close(); err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("second Map Close(): %v", err)
 	}
-	if err := runtime.Close(); err != nil {
+	if err := closeRuntimeForTest(runtime); err != nil {
 		t.Fatalf("Runtime Close(): %v", err)
 	}
 }
@@ -49,7 +49,7 @@ func TestMapIDIdentifiesEachMapUntilClose(t *testing.T) {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
 	defer func() {
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Runtime Close(): %v", err)
 		}
 	}()
@@ -103,14 +103,14 @@ func TestMapCommandsAndStyleLoadingUseNativeABI(t *testing.T) {
 	}
 	m, err := awaitForTest(runtime.NewMap())
 	if err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewMap(): %v", err)
 	}
 	defer func() {
 		if err := m.Close(); err != nil {
 			t.Errorf("Map Close(): %v", err)
 		}
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Runtime Close(): %v", err)
 		}
 	}()
@@ -136,14 +136,14 @@ func TestMapReportsLoadedStyleDocumentAndURL(t *testing.T) {
 	}
 	m, err := awaitForTest(runtime.NewMap())
 	if err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewMap(): %v", err)
 	}
 	defer func() {
 		if err := m.Close(); err != nil {
 			t.Errorf("Map Close(): %v", err)
 		}
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Runtime Close(): %v", err)
 		}
 	}()
@@ -197,14 +197,14 @@ func TestMapSnapshotObservesCommittedCommands(t *testing.T) {
 	}
 	m, err := awaitForTest(runtime.NewMap())
 	if err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewMap(): %v", err)
 	}
 	defer func() {
 		if err := m.Close(); err != nil {
 			t.Errorf("Map Close(): %v", err)
 		}
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Runtime Close(): %v", err)
 		}
 	}()
@@ -247,14 +247,14 @@ func TestMapSnapshotRoundTripsOptionCommands(t *testing.T) {
 	}
 	m, err := awaitForTest(runtime.NewMapWithOptions(NewMapOptions(256, 256, 1)))
 	if err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewMapWithOptions(): %v", err)
 	}
 	defer func() {
 		if err := m.Close(); err != nil {
 			t.Errorf("Map Close(): %v", err)
 		}
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Runtime Close(): %v", err)
 		}
 	}()
@@ -307,14 +307,14 @@ func TestMapSizeReportsCreationExtentAndPixelRatio(t *testing.T) {
 	}
 	m, err := awaitForTest(runtime.NewMapWithOptions(NewMapOptions(512, 256, 2)))
 	if err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewMapWithOptions(): %v", err)
 	}
 	defer func() {
 		if err := m.Close(); err != nil {
 			t.Errorf("Map Close(): %v", err)
 		}
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Runtime Close(): %v", err)
 		}
 	}()
@@ -340,13 +340,13 @@ func TestMapAcceptsFastPFORDecoding(t *testing.T) {
 	options.FastPFOREnabled = true
 	m, err := awaitForTest(runtime.NewMapWithOptions(options))
 	if err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewMapWithOptions(): %v", err)
 	}
 	if err := m.Close(); err != nil {
 		t.Errorf("Map Close(): %v", err)
 	}
-	if err := runtime.Close(); err != nil {
+	if err := closeRuntimeForTest(runtime); err != nil {
 		t.Errorf("Runtime Close(): %v", err)
 	}
 }
@@ -358,14 +358,14 @@ func TestMapDebugOptionsRejectUnknownBitsBeforeSubmission(t *testing.T) {
 	}
 	m, err := awaitForTest(runtime.NewMap())
 	if err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewMap(): %v", err)
 	}
 	defer func() {
 		if err := m.Close(); err != nil {
 			t.Errorf("Map Close(): %v", err)
 		}
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Runtime Close(): %v", err)
 		}
 	}()
@@ -383,14 +383,14 @@ func TestMapStyleStringsRejectEmbeddedNUL(t *testing.T) {
 	}
 	m, err := awaitForTest(runtime.NewMap())
 	if err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewMap(): %v", err)
 	}
 	defer func() {
 		if err := m.Close(); err != nil {
 			t.Errorf("Map Close(): %v", err)
 		}
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Runtime Close(): %v", err)
 		}
 	}()
@@ -410,10 +410,10 @@ func TestMapCommandsCanMigrateAcrossGoroutines(t *testing.T) {
 	}
 	m, err := awaitForTest(runtime.NewMap())
 	if err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewMap(): %v", err)
 	}
-	defer runtime.Close()
+	defer closeRuntimeForTest(runtime)
 	defer m.Close()
 
 	result := make(chan struct {

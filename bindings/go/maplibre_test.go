@@ -10,6 +10,13 @@ func awaitForTest[T any](future *Future[T], err error) (T, error) {
 	return future.Await(context.Background())
 }
 
+// closeRuntimeForTest closes a runtime and waits for its native teardown, so a
+// test leaves no native thread running past its own end.
+func closeRuntimeForTest(runtime *RuntimeHandle) error {
+	_, err := awaitForTest(runtime.Close())
+	return err
+}
+
 const minimalStyleJSON = `{
   "version": 8,
   "name": "go-binding-style-test",

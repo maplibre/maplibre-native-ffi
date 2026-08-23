@@ -650,6 +650,11 @@ func (s *RenderSessionHandle) ReadPremultipliedRGBA8() (*Future[TextureReadback]
 	})
 }
 
+// Abandon irreversibly closes control and mailboxes without a graphics call.
+// It waits for the map's in-flight tile work before returning, so no library
+// thread touches the session's target or device afterward and the host may
+// destroy its graphics objects immediately. Do not call it from a MapLibre
+// worker callback.
 func (s *RenderSessionHandle) Abandon() (RenderAbandonResult, error) {
 	ptr, err := s.ptr()
 	if err != nil {

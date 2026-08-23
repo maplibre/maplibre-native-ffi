@@ -40,7 +40,7 @@ func TestOfflineRegionStartOperationsReturnTypedHandles(t *testing.T) {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
 	defer func() {
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Close(): %v", err)
 		}
 	}()
@@ -114,7 +114,7 @@ func TestOfflineOperationResultDoesNotUseRuntimeEventQueue(t *testing.T) {
 		t.Fatalf("NewRuntimeWithOptions(): %v", err)
 	}
 	defer func() {
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Close(): %v", err)
 		}
 	}()
@@ -151,7 +151,7 @@ func TestOfflineCreateAndListTakeResultsCopyNativeData(t *testing.T) {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
 	defer func() {
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Close(): %v", err)
 		}
 	}()
@@ -191,7 +191,7 @@ func TestSetMaximumAmbientCacheSizeReportsCompletion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRuntimeWithOptions(): %v", err)
 	}
-	defer runtime.Close()
+	defer closeRuntimeForTest(runtime)
 
 	future, err := runtime.SetMaximumAmbientCacheSize(8 << 20)
 	if _, err := awaitForTest(future, err); err != nil {
@@ -205,7 +205,7 @@ func TestOfflineRegionStartOperationsValidateGoInputs(t *testing.T) {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
 	defer func() {
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Close(): %v", err)
 		}
 	}()

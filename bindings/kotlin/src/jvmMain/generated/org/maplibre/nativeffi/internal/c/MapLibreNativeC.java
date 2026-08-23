@@ -2730,7 +2730,8 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     private static class mln_runtime_release {
         public static final FunctionDescriptor DESC = FunctionDescriptor.of(
             MapLibreNativeC.C_INT,
-            MapLibreNativeC.C_LONG
+            MapLibreNativeC.C_LONG,
+            MapLibreNativeC.C_POINTER
         );
 
         public static final MemorySegment ADDR = SYMBOL_LOOKUP.findOrThrow("mln_runtime_release");
@@ -2741,7 +2742,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Function descriptor for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_release(mln_runtime runtime)
+     * mln_status mln_runtime_release(mln_runtime runtime, const mln_completion *completion)
      * }
      */
     public static FunctionDescriptor mln_runtime_release$descriptor() {
@@ -2751,7 +2752,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Downcall method handle for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_release(mln_runtime runtime)
+     * mln_status mln_runtime_release(mln_runtime runtime, const mln_completion *completion)
      * }
      */
     public static MethodHandle mln_runtime_release$handle() {
@@ -2761,7 +2762,7 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
     /**
      * Address for:
      * {@snippet lang=c :
-     * mln_status mln_runtime_release(mln_runtime runtime)
+     * mln_status mln_runtime_release(mln_runtime runtime, const mln_completion *completion)
      * }
      */
     public static MemorySegment mln_runtime_release$address() {
@@ -2770,16 +2771,16 @@ public class MapLibreNativeC extends MapLibreNativeC$shared {
 
     /**
      * {@snippet lang=c :
-     * mln_status mln_runtime_release(mln_runtime runtime)
+     * mln_status mln_runtime_release(mln_runtime runtime, const mln_completion *completion)
      * }
      */
-    public static int mln_runtime_release(long runtime) {
+    public static int mln_runtime_release(long runtime, MemorySegment completion) {
         var mh$ = mln_runtime_release.HANDLE;
         try {
             if (TRACE_DOWNCALLS) {
-                traceDowncall("mln_runtime_release", runtime);
+                traceDowncall("mln_runtime_release", runtime, completion);
             }
-            return (int)mh$.invokeExact(runtime);
+            return (int)mh$.invokeExact(runtime, completion);
         } catch (Error | RuntimeException ex) {
            throw ex;
         } catch (Throwable ex$) {

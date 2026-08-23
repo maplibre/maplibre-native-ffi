@@ -14,7 +14,7 @@ fn requestRepaintOnThread(map: *maplibre.MapHandle, out_error: *?anyerror) void 
 
 fn createRuntimeAndMap() !struct { runtime: maplibre.RuntimeHandle, map: maplibre.MapHandle } {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    errdefer runtime.close() catch @panic("runtime close failed");
+    errdefer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
     defer map_future.deinit();
     const map = try map_future.wait(null);
@@ -26,7 +26,7 @@ test "runtime and map vertical slice" {
     defer diagnostics.deinit();
 
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, &diagnostics);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     try testing.expectEqual(@as(usize, 0), try support.drainEvents(&runtime));
 
@@ -54,7 +54,7 @@ test "runtime and map vertical slice" {
 
 test "loaded style document and URL read back what was loaded" {
     var handles = try createRuntimeAndMap();
-    defer handles.runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&handles.runtime) catch @panic("runtime close failed");
     defer handles.map.close() catch @panic("map close failed");
 
     var empty_json = try support.loadedStyleJson(&handles.map);
@@ -88,7 +88,7 @@ test "loaded style document and URL read back what was loaded" {
 test "map can close after moving with its runtime" {
     var handles = try createRuntimeAndMap();
     try handles.map.close();
-    try handles.runtime.close();
+    try support.closeRuntime(&handles.runtime);
 }
 
 test "copied runtime and map handles share closed state" {
@@ -111,8 +111,8 @@ test "copied runtime and map handles share closed state" {
     try map_alias.close();
     try testing.expectError(error.ClosedHandle, map_alias.id());
 
-    try runtime.close();
-    try runtime_alias.close();
+    try support.closeRuntime(&runtime);
+    try support.closeRuntime(&runtime_alias);
     try testing.expectError(error.ClosedHandle, runtime_alias.drainEvents(testing.allocator));
 }
 
@@ -130,8 +130,8 @@ test "successful close releases lifecycle handles" {
 
     try map.close();
     try map.close();
-    try runtime.close();
-    try runtime.close();
+    try support.closeRuntime(&runtime);
+    try support.closeRuntime(&runtime);
     _ = try projection.getCamera();
     try projection.close();
     try projection.close();
@@ -146,14 +146,14 @@ test "failed close remains retryable" {
     defer map_future.deinit();
     var map = try map_future.wait(null);
 
-    try testing.expectError(error.InvalidState, runtime.close());
+    try testing.expectError(error.InvalidState, support.closeRuntime(&runtime));
     try map.close();
-    try runtime.close();
+    try support.closeRuntime(&runtime);
 }
 
 test "map options validate through public binding" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     try testing.expectError(error.InvalidArgument, maplibre.MapHandle.create(&runtime, .{ .width = 0 }));
     try testing.expectError(error.InvalidArgument, maplibre.MapHandle.create(&runtime, .{ .height = 0 }));
@@ -162,7 +162,7 @@ test "map options validate through public binding" {
 
 test "map creation accepts FastPFOR decoding" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var map_future = try maplibre.MapHandle.create(&runtime, .{ .fast_pfor_enabled = true });
 
@@ -174,7 +174,7 @@ test "map creation accepts FastPFOR decoding" {
 
 test "unset map options take the C creation defaults" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
 
@@ -191,7 +191,7 @@ test "unset map options take the C creation defaults" {
 
 test "continuous repaint request makes render update available" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
     defer map_future.deinit();
     var map = try map_future.wait(null);
@@ -203,7 +203,7 @@ test "continuous repaint request makes render update available" {
 
 test "map commands are accepted from another thread" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
     defer map_future.deinit();
     var map = try map_future.wait(null);
@@ -217,7 +217,7 @@ test "map commands are accepted from another thread" {
 
 test "runtime supports multiple maps" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
 
     var first_future = try maplibre.MapHandle.create(&runtime, .{});
 
@@ -237,7 +237,7 @@ test "style JSON buffers preserve embedded NUL for native validation" {
     try diagnostics.set(-5, "stale native diagnostic");
 
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, &diagnostics);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
     defer map_future.deinit();
     var map = try map_future.wait(null);

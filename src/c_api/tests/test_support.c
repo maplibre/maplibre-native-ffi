@@ -179,7 +179,24 @@ mln_status mln_test_runtime_create(
 }
 
 mln_status mln_test_runtime_close(mln_runtime runtime) {
-  return mln_runtime_release(runtime);
+  mln_test_completion teardown = mln_test_completion_default(0);
+  const mln_status status = mln_runtime_release(runtime, &teardown.descriptor);
+  if (status != MLN_STATUS_OK) {
+    // A rejected submission leaves user_data caller-owned, so release it here
+    // before destroy waits for the release marker.
+    mln_test_completion_reject(&teardown);
+    mln_test_completion_destroy(&teardown);
+    return status;
+  }
+  // Waiting keeps process exit ordered after native teardown, which otherwise
+  // races MapLibre's process-wide singletons in short-lived hosts.
+  const bool completed = mln_test_completion_wait(&teardown, -1);
+  const mln_status teardown_status = mln_test_completion_status(&teardown);
+  mln_test_completion_destroy(&teardown);
+  if (!completed) {
+    return MLN_STATUS_NATIVE_ERROR;
+  }
+  return teardown_status;
 }
 
 mln_runtime mln_test_create_runtime(void) {
@@ -360,7 +377,7 @@ mln_map mln_test_create_map(mln_runtime runtime) {
 void mln_test_destroy_runtime(mln_runtime runtime) {
   mln_event_batch_release(compatibility_batch_handle);
   compatibility_batch_handle = MLN_HANDLE_NULL;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_release(runtime));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_close(runtime));
   if (tracked_runtime == runtime) {
     tracked_runtime = MLN_HANDLE_NULL;
   }
@@ -1961,7 +1978,7 @@ bool mln_test_reclaim_thread_resources(void) {
     reclaimed = true;
   }
   if (tracked_runtime != MLN_HANDLE_NULL) {
-    (void)mln_runtime_release(tracked_runtime);
+    (void)mln_test_runtime_close(tracked_runtime);
     tracked_runtime = MLN_HANDLE_NULL;
     reclaimed = true;
   }

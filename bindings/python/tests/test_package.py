@@ -403,7 +403,9 @@ def test_closed_handle_finalizers_are_quiet_at_interpreter_shutdown() -> None:
         completion.result(timeout=5)
         source.close()
         map_handle.close()
-        runtime.close()
+        # Waiting orders interpreter shutdown after native teardown, which
+        # otherwise races MapLibre's process-wide state in a short-lived host.
+        runtime.close().result(timeout=30)
         """
     )
 

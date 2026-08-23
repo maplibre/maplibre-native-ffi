@@ -23,6 +23,15 @@ final class MaplibreStatus {
   /// The operation completed after cancellation was requested.
   static const cancelled = MaplibreStatus._('cancelled', -6);
 
+  /// The call raced a driver call in flight; retry once it returns.
+  static const busy = MaplibreStatus._('busy', -7);
+
+  /// The render target was lost and the session cannot continue with it.
+  static const targetLost = MaplibreStatus._('targetLost', -8);
+
+  /// No result was ready yet; poll or wait for the wake and retry.
+  static const notReady = MaplibreStatus._('notReady', -9);
+
   /// No object has the requested ID.
   static const notFound = MaplibreStatus._('notFound', -10);
 
@@ -46,6 +55,9 @@ final class MaplibreStatus {
         -4 => unsupported,
         -5 => nativeError,
         -6 => cancelled,
+        -7 => busy,
+        -8 => targetLost,
+        -9 => notReady,
         -10 => notFound,
         _ => unknown(nativeStatusCode),
       };

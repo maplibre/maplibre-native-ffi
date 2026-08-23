@@ -30,7 +30,7 @@ fn updateCameraOnThread(map: *maplibre.MapHandle, out_generation: *u64, out_erro
 
 test "camera jump updates snapshot fields through public binding" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
     defer map_future.deinit();
     var map = try map_future.wait(null);
@@ -47,7 +47,7 @@ test "camera jump updates snapshot fields through public binding" {
 
 test "camera commands accept valid public descriptors" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
     defer map_future.deinit();
     var map = try map_future.wait(null);
@@ -79,7 +79,7 @@ test "camera commands accept valid public descriptors" {
 
 test "camera commands are accepted from another thread" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
     defer map_future.deinit();
     var map = try map_future.wait(null);
@@ -98,7 +98,7 @@ test "camera commands are accepted from another thread" {
 
 test "camera fitting computes camera and visible bounds" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
     defer map_future.deinit();
     var map = try map_future.wait(null);
@@ -146,7 +146,7 @@ test "camera fitting computes camera and visible bounds" {
 
 test "camera constraints and free camera options round-trip public values" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
     defer map_future.deinit();
     var map = try map_future.wait(null);
@@ -189,7 +189,7 @@ fn jumpedLongitude(map: *maplibre.MapHandle, longitude: f64) !f64 {
 // longitude to -180..180.
 test "camera bounds separate the unbounded constraint from world bounds" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
     defer map_future.deinit();
     var map = try map_future.wait(null);
@@ -219,7 +219,7 @@ test "camera bounds separate the unbounded constraint from world bounds" {
 
 test "camera public descriptors report invalid native arguments" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    defer support.closeRuntime(&runtime) catch @panic("runtime close failed");
     var map_future = try maplibre.MapHandle.create(&runtime, .{});
     defer map_future.deinit();
     var map = try map_future.wait(null);

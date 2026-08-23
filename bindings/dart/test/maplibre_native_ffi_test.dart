@@ -2394,6 +2394,26 @@ void main() {
     await map.close();
     await runtime.close();
   });
+
+  test('runtime close waits for native teardown', () async {
+    final runtime = RuntimeHandle.create();
+    final map = await runtime.createMap();
+    map.setStyleUrl('unsupported://runtime-teardown.json');
+
+    // The live map rejects the release before native teardown starts.
+    await expectLater(runtime.close(), throwsA(isA<InvalidStateException>()));
+    expect(runtime.isClosed, isFalse);
+
+    await map.close();
+    // This future resolves only after the runtime's threads and its released
+    // map's teardown are gone.
+    await runtime.close();
+    expect(runtime.isClosed, isTrue);
+
+    // A second close no-ops rather than releasing again.
+    await runtime.close();
+    expect(runtime.isClosed, isTrue);
+  });
 }
 
 Future<bool> _completeTransferredRequest(ResourceRequestHandle token) {

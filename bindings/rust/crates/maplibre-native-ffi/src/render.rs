@@ -1397,6 +1397,14 @@ impl RenderSessionHandle {
         })
     }
 
+    /// Irreversibly closes control and mailboxes without making graphics
+    /// calls, for a host whose device or target is already gone.
+    ///
+    /// Before returning, the call waits for the map's in-flight tile work,
+    /// which can still reference quarantined renderer resources and through
+    /// them the host's graphics objects. After it returns, no library thread
+    /// touches the session's target or device, so the host may destroy them
+    /// immediately. Do not call it from a MapLibre worker callback.
     pub fn abandon(&self) -> Result<RenderAbandonResult> {
         let mut raw: sys::mln_render_abandon_result = unsafe { mem::zeroed() };
         raw.size = mem::size_of::<sys::mln_render_abandon_result>() as u32;

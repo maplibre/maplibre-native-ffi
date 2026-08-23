@@ -62,7 +62,7 @@ import Testing
 
   try map.close()
   #expect(map.isClosed)
-  try runtime.close()
+  try await runtime.close()
   #expect(runtime.isClosed)
 }
 

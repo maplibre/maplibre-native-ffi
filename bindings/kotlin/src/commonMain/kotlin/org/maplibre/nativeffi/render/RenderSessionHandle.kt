@@ -76,7 +76,13 @@ public expect class RenderSessionHandle : AutoCloseable {
 
   public fun readPremultipliedRgba8(): Deferred<TextureReadback>
 
-  /** Irreversibly abandons a lost target without graphics calls. */
+  /**
+   * Irreversibly abandons a lost target without graphics calls.
+   *
+   * The call waits for the map's in-flight tile work before it returns, after which no library
+   * thread touches the target or its device, so the host may destroy them immediately. Calling it
+   * from a MapLibre callback is unsupported.
+   */
   public fun abandon(): RenderAbandonResult
 
   /** Destroys detached or abandoned CPU-side session state. */

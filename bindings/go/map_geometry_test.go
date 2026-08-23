@@ -12,14 +12,14 @@ func TestMapCameraGeometryAndCoordinateConversions(t *testing.T) {
 	}
 	m, err := awaitForTest(runtime.NewMapWithOptions(NewMapOptions(512, 512, 1)))
 	if err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewMapWithOptions(): %v", err)
 	}
 	defer func() {
 		if err := m.Close(); err != nil {
 			t.Errorf("Map Close(): %v", err)
 		}
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Runtime Close(): %v", err)
 		}
 	}()

@@ -35,7 +35,7 @@ class ResourceRequestHandleAndroidTest {
           completer = { _, _ -> MaplibreNativeC.mln_network_status_set(999_999) },
           releaser = {
             releases.incrementAndGet()
-            MaplibreNativeC.mln_runtime_release(0L)
+            MaplibreNativeC.mln_runtime_release(0L, null)
           },
         )
       assertEquals(
@@ -48,7 +48,8 @@ class ResourceRequestHandleAndroidTest {
           handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
         }
       assertTrue(failure.diagnostic.contains("network status"))
-      assertFalse(failure.diagnostic.contains("runtime"))
+      // The releaser's own failing call must not overwrite the copied diagnostic.
+      assertFalse(failure.diagnostic.contains("completion"))
       assertEquals(1, releases.get())
       assertFailsWith<InvalidStateException> {
         handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))

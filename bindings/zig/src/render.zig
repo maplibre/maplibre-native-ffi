@@ -813,6 +813,12 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
         return submitRender(void, self, completion.unit, c.mln_render_session_detach, .{});
     }
 
+    /// Irreversibly closes control and mailboxes without a graphics call.
+    ///
+    /// The call waits for the map's in-flight tile work before returning, so no
+    /// library thread touches the session's target or device afterward and the
+    /// host may destroy its graphics objects immediately. Do not call it from a
+    /// MapLibre worker callback.
     pub fn abandon(self: RenderSessionHandle) status.Error!AbandonResult {
         const lease = try renderSessionLease(self);
         defer lease.release();

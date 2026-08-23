@@ -1084,14 +1084,24 @@ MLN_API mln_status mln_runtime_barrier(
  * callback user data remains native-owned until its release callback runs.
  * This function may be called from any thread.
  *
+ * The completion runs after every earlier accepted submission, including
+ * released maps' teardown, has finished and the runtime's threads and
+ * resources are gone. The invoking thread touches no library state after the
+ * callback returns, so a host that waits for it may exit the process without
+ * racing native teardown. A host that outlives its runtimes may pass a
+ * discarding completion.
+ *
  * Returns:
  * - MLN_STATUS_OK when the handle was consumed.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
+ *   completion is invalid.
  * - MLN_STATUS_INVALID_STATE when the runtime has a live or pending child or is
  *   already closing.
  * - MLN_STATUS_NATIVE_ERROR when teardown could not be scheduled.
  */
-MLN_API mln_status mln_runtime_release(mln_runtime runtime) MLN_NOEXCEPT;
+MLN_API mln_status mln_runtime_release(
+  mln_runtime runtime, const mln_completion* completion
+) MLN_NOEXCEPT;
 
 /**
  * Drains this runtime's queued events into a new owned batch.

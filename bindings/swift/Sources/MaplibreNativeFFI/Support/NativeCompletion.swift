@@ -8,7 +8,7 @@ private protocol AnyNativeCompletionState: AnyObject {
 private final class NativeCompletionState<Value: Sendable>:
   AnyNativeCompletionState, @unchecked Sendable
 {
-  private let lock = NSLock()
+  private let lock = NSCondition()
   private let convert: (UnsafePointer<mln_completion_result>) throws -> Value
   private let acceptErrorStatus: Bool
   private var result: Result<Value, Error>?
@@ -47,6 +47,7 @@ private final class NativeCompletionState<Value: Sendable>:
         return waiter
       }
       result = converted
+      lock.broadcast()
       return nil
     }
     waiter?.resume(with: converted)
@@ -66,6 +67,22 @@ private final class NativeCompletionState<Value: Sendable>:
       if let completed { continuation.resume(with: completed) }
     }
   }
+
+  /// Blocks the calling thread until the completion runs.
+  ///
+  /// Native runs the completion on its own thread, so this suits a host that
+  /// must not return before native work finishes, such as one tearing a runtime
+  /// down before process exit.
+  func valueBlocking() throws -> Value {
+    lock.lock()
+    defer { lock.unlock() }
+    while result == nil {
+      lock.wait()
+    }
+    let completed = result
+    result = nil
+    return try completed!.get()
+  }
 }
 
 struct NativeFuture<Value: Sendable> {
@@ -73,6 +90,10 @@ struct NativeFuture<Value: Sendable> {
 
   func value() async throws -> Value {
     try await state.value()
+  }
+
+  func valueBlocking() throws -> Value {
+    try state.valueBlocking()
   }
 }
 

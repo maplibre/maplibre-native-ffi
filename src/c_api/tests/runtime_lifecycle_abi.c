@@ -18,13 +18,16 @@ static void runtime_creation_returns_a_runtime(void) {
     MLN_STATUS_INVALID_ARGUMENT, mln_runtime_create(&options, &runtime)
   );
 
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_release(runtime));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_close(runtime));
 }
 
 static void close_preflight_leaves_a_runtime_with_a_live_child_open(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_INVALID_STATE, mln_runtime_release(runtime));
+  const mln_completion discard = mln_test_discard_completion();
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_STATE, mln_runtime_release(runtime, &discard)
+  );
 
   uint64_t mask = 0;
   TEST_ASSERT_EQUAL_INT(
@@ -32,7 +35,9 @@ static void close_preflight_leaves_a_runtime_with_a_live_child_open(void) {
   );
   mln_test_destroy_map(map);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_test_runtime_reserve_child(runtime));
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_INVALID_STATE, mln_runtime_release(runtime));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_STATE, mln_runtime_release(runtime, &discard)
+  );
   mln_test_runtime_abandon_child(runtime);
   mln_test_destroy_runtime(runtime);
 }
@@ -62,7 +67,8 @@ static mln_runtime create_untracked_runtime(void) {
 
 static void close_from_foreign_thread(void* argument) {
   close_probe* probe = argument;
-  atomic_store(&probe->status, mln_runtime_release(probe->runtime));
+  const mln_completion discard = mln_test_discard_completion();
+  atomic_store(&probe->status, mln_runtime_release(probe->runtime, &discard));
 }
 
 static void accepted_close_is_any_thread_and_retires_the_handle(void) {

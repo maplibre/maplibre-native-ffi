@@ -443,9 +443,17 @@ class RuntimeHandle(NativeHandleMixin):
         )
         self._maps: dict[int, weakref.ReferenceType[MapHandle]] = {}
 
-    def close(self) -> None:
-        """Release this runtime handle exactly once."""
-        self._native.close()
+    def close(self) -> Future[None]:
+        """Release this runtime handle exactly once and report native teardown.
+
+        The returned future resolves after every earlier accepted submission,
+        including released maps' teardown, has finished and the runtime's
+        threads and resources are gone. No library thread touches library state
+        afterward, so a host that waits for it may exit the process without
+        racing native teardown. Discarding the future starts the same teardown
+        and drops its completion.
+        """
+        return self._native.close()
 
     def barrier(self) -> Future[None]:
         """Return a future for all previously accepted runtime commands."""

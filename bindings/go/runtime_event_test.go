@@ -105,14 +105,14 @@ func newRuntimeAndMap(t *testing.T, options *MapOptions) (*RuntimeHandle, *MapHa
 		m, err = awaitForTest(runtime.NewMapWithOptions(*options))
 	}
 	if err != nil {
-		_ = runtime.Close()
+		_ = closeRuntimeForTest(runtime)
 		t.Fatalf("NewMap(): %v", err)
 	}
 	t.Cleanup(func() {
 		if err := m.Close(); err != nil {
 			t.Errorf("Map Close(): %v", err)
 		}
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Runtime Close(): %v", err)
 		}
 	})
@@ -161,7 +161,7 @@ func TestRuntimeDrainEmptiesFreshRuntime(t *testing.T) {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
 	defer func() {
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Close(): %v", err)
 		}
 	}()
@@ -247,7 +247,7 @@ func TestOptionsEventMaskRejectsUnknownBits(t *testing.T) {
 	runtimeOptions.EventMask = RuntimeEventMaskAll | RuntimeEventMask(1)<<63
 	if runtime, err := NewRuntimeWithOptions(runtimeOptions); !errors.Is(err, ErrInvalidArgument) {
 		if err == nil {
-			_ = runtime.Close()
+			_ = closeRuntimeForTest(runtime)
 		}
 		t.Fatalf("NewRuntimeWithOptions(unknown bit) error = %v, want ErrInvalidArgument", err)
 	}
@@ -405,7 +405,7 @@ func TestRuntimeEventKnownPayloadsDecodeFromTheUnion(t *testing.T) {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
 	defer func() {
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Close(): %v", err)
 		}
 	}()
@@ -471,7 +471,7 @@ func TestRuntimeEventUnknownDomainsPreserveRawValues(t *testing.T) {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
 	defer func() {
-		if err := runtime.Close(); err != nil {
+		if err := closeRuntimeForTest(runtime); err != nil {
 			t.Errorf("Close(): %v", err)
 		}
 	}()

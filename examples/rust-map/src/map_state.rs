@@ -45,7 +45,7 @@ impl MapState {
             Ok(map) => map,
             Err(error) => {
                 let mut message = format!("map creation failed: {error}");
-                append_cleanup_result(&mut message, "runtime", runtime.close());
+                append_cleanup_result(&mut message, "runtime", close_runtime(runtime));
                 return Err(message.into());
             }
         };
@@ -168,7 +168,7 @@ impl MapState {
         if let Err(error) = map.close() {
             append_optional_error(&mut first_error, format!("map close failed: {error}"));
         }
-        if let Err(error) = runtime.close() {
+        if let Err(error) = close_runtime(runtime) {
             append_optional_error(&mut first_error, format!("runtime close failed: {error}"));
         }
         match first_error {
@@ -200,6 +200,19 @@ fn animation(duration_ms: f64) -> AnimationOptions {
     let mut animation = AnimationOptions::default();
     animation.duration_ms = Some(duration_ms);
     animation
+}
+
+/// Closes a runtime and waits for native teardown, so the process exits after
+/// MapLibre's threads and resources are gone rather than racing them.
+fn close_runtime(runtime: RuntimeHandle) -> std::result::Result<(), String> {
+    let teardown = runtime
+        .close()
+        .map_err(|error| error.into_error().to_string())?;
+    match teardown.wait(Duration::from_secs(30)) {
+        Ok(true) => teardown.take().map_err(|error| error.to_string()),
+        Ok(false) => Err("runtime teardown timed out".to_owned()),
+        Err(error) => Err(error.to_string()),
+    }
 }
 
 fn append_cleanup_result<E: std::fmt::Display>(

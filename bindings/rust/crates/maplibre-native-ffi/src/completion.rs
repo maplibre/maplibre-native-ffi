@@ -301,6 +301,19 @@ where
     Ok(NativeFuture { state })
 }
 
+/// An already-complete future, for a call that finished without submitting.
+pub(crate) fn ready<T>(value: T) -> NativeFuture<T> {
+    NativeFuture {
+        state: Arc::new(State {
+            result: Mutex::new(Some(Ok(value))),
+            terminal: Mutex::new(None),
+            retained: Mutex::new(None),
+            ready: Condvar::new(),
+            waker: Mutex::new(None),
+        }),
+    }
+}
+
 pub(crate) fn unit(result: &sys::mln_completion_result) -> Result<()> {
     if !result.value.is_null() || result.value_count != 0 {
         return Err(Error::new(

@@ -70,7 +70,7 @@ private final class ResourceHandleStateCapture: @unchecked Sendable {
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   try await runtime.barrier()
   _ = try runtime.drainEvents()
-  try runtime.close()
+  try await runtime.close()
 
   #expect(runtime.isClosed)
 }
