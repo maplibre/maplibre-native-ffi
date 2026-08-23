@@ -238,8 +238,8 @@ struct VulkanOwnedTextureFrameRaw {
     height: u32,
     scale_factor: f64,
     frame_id: u64,
-    image_address: usize,
-    image_view_address: usize,
+    image_bits: u64,
+    image_view_bits: u64,
     device_address: usize,
     format: u32,
     layout: u32,
@@ -4126,7 +4126,7 @@ impl RenderSessionHandle {
         graphics_queue_family_index: u32,
         get_instance_proc_addr: usize,
         get_device_proc_addr: usize,
-        surface_address: usize,
+        surface_bits: u64,
     ) -> PyResult<()> {
         let descriptor = maplibre_core::render::vulkan_surface_descriptor_to_native(
             maplibre_core::render::VulkanSurfaceDescriptorFields {
@@ -4144,7 +4144,7 @@ impl RenderSessionHandle {
                     get_instance_proc_addr,
                     get_device_proc_addr,
                 ),
-                surface: surface_address as *mut c_void,
+                surface: surface_bits,
             },
         );
         self.set_target(descriptor, |session, raw| {
@@ -4238,8 +4238,8 @@ impl RenderSessionHandle {
         graphics_queue_family_index: u32,
         get_instance_proc_addr: usize,
         get_device_proc_addr: usize,
-        image_address: usize,
-        image_view_address: usize,
+        image_bits: u64,
+        image_view_bits: u64,
         format: u32,
         initial_layout: u32,
         final_layout: u32,
@@ -4262,8 +4262,8 @@ impl RenderSessionHandle {
                     get_instance_proc_addr,
                     get_device_proc_addr,
                 ),
-                image: image_address as *mut c_void,
-                image_view: image_view_address as *mut c_void,
+                image: image_bits,
+                image_view: image_view_bits,
                 format,
                 initial_layout,
                 final_layout,
@@ -6682,8 +6682,8 @@ impl VulkanOwnedTextureFrameRaw {
             height: raw.height,
             scale_factor: raw.scale_factor,
             frame_id: raw.frame_id,
-            image_address: raw.image as usize,
-            image_view_address: raw.image_view as usize,
+            image_bits: raw.image,
+            image_view_bits: raw.image_view,
             device_address: raw.device as usize,
             format: raw.format,
             layout: raw.layout,
@@ -6698,8 +6698,8 @@ impl VulkanOwnedTextureFrameRaw {
             height: self.height,
             scale_factor: self.scale_factor,
             frame_id: self.frame_id,
-            image: self.image_address as *mut c_void,
-            image_view: self.image_view_address as *mut c_void,
+            image: self.image_bits,
+            image_view: self.image_view_bits,
             device: self.device_address as *mut c_void,
             format: self.format,
             layout: self.layout,
@@ -6762,8 +6762,8 @@ fn empty_vulkan_owned_texture_frame() -> sys::mln_vulkan_owned_texture_frame {
         height: 0,
         scale_factor: 0.0,
         frame_id: 0,
-        image: std::ptr::null_mut(),
-        image_view: std::ptr::null_mut(),
+        image: 0,
+        image_view: 0,
         device: std::ptr::null_mut(),
         format: 0,
         layout: 0,
@@ -6989,7 +6989,7 @@ impl VulkanOwnedTextureFrameHandle {
         Ok(dict.into_any().unbind())
     }
 
-    fn image_address(&self) -> PyResult<usize> {
+    fn image_bits(&self) -> PyResult<u64> {
         if *self
             .closed
             .lock()
@@ -6999,11 +6999,11 @@ impl VulkanOwnedTextureFrameHandle {
                 "VulkanOwnedTextureFrameHandle is closed",
             ))
         } else {
-            Ok(self.raw.image_address)
+            Ok(self.raw.image_bits)
         }
     }
 
-    fn image_view_address(&self) -> PyResult<usize> {
+    fn image_view_bits(&self) -> PyResult<u64> {
         if *self
             .closed
             .lock()
@@ -7013,7 +7013,7 @@ impl VulkanOwnedTextureFrameHandle {
                 "VulkanOwnedTextureFrameHandle is closed",
             ))
         } else {
-            Ok(self.raw.image_view_address)
+            Ok(self.raw.image_view_bits)
         }
     }
 
@@ -7882,7 +7882,7 @@ fn attach_vulkan_surface(
     graphics_queue_family_index: u32,
     get_instance_proc_addr: usize,
     get_device_proc_addr: usize,
-    surface_address: usize,
+    surface_bits: u64,
 ) -> PyResult<RenderSessionHandle> {
     let descriptor = maplibre_core::render::vulkan_surface_descriptor_to_native(
         maplibre_core::render::VulkanSurfaceDescriptorFields {
@@ -7900,7 +7900,7 @@ fn attach_vulkan_surface(
                 get_instance_proc_addr,
                 get_device_proc_addr,
             ),
-            surface: surface_address as *mut c_void,
+            surface: surface_bits,
         },
     );
     attach_render_session(map, |map_ptr, out| {
@@ -8021,8 +8021,8 @@ fn attach_vulkan_borrowed_texture(
     graphics_queue_family_index: u32,
     get_instance_proc_addr: usize,
     get_device_proc_addr: usize,
-    image_address: usize,
-    image_view_address: usize,
+    image_bits: u64,
+    image_view_bits: u64,
     format: u32,
     initial_layout: u32,
     final_layout: u32,
@@ -8045,8 +8045,8 @@ fn attach_vulkan_borrowed_texture(
                 get_instance_proc_addr,
                 get_device_proc_addr,
             ),
-            image: image_address as *mut c_void,
-            image_view: image_view_address as *mut c_void,
+            image: image_bits,
+            image_view: image_view_bits,
             format,
             initial_layout,
             final_layout,

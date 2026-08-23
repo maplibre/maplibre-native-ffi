@@ -197,7 +197,7 @@ _platformTargets = {
   'macos-arm64': (defaultBackend: 'metal', backends: _appleDesktop),
   'windows-x64': (defaultBackend: 'vulkan', backends: _openglWgl),
   'windows-arm64': (defaultBackend: 'vulkan', backends: _openglWgl),
-  'android-arm': (defaultBackend: 'opengl', backends: {'opengl': 'egl'}),
+  'android-arm': (defaultBackend: 'opengl', backends: _openglEgl),
   'android-arm64': (defaultBackend: 'opengl', backends: _openglEgl),
   'android-x64': (defaultBackend: 'opengl', backends: _openglEgl),
   'ios-arm64': (defaultBackend: 'metal', backends: _appleMobile),

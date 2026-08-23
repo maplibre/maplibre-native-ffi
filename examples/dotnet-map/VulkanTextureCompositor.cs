@@ -116,7 +116,7 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
             throw new InvalidOperationException("MapLibre returned a null Vulkan image view.");
         }
 
-        return DrawImageView(new ImageView((ulong)frame.ImageView.Address));
+        return DrawImageView(new ImageView(frame.ImageView.Bits));
     }
 
     public bool DrawImageView(ImageView imageView)

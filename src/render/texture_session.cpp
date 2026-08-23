@@ -96,8 +96,8 @@ auto vulkan_borrowed_texture_descriptor_default() noexcept
         .get_instance_proc_addr = nullptr,
         .get_device_proc_addr = nullptr,
       },
-    .image = nullptr,
-    .image_view = nullptr,
+    .image = MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL,
+    .image_view = MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL,
     .format = 0,
     .initial_layout = 0,
     .final_layout = 5,
@@ -296,7 +296,10 @@ auto validate_vulkan_borrowed_texture_descriptor(
   if (context_status != MLN_STATUS_OK) {
     return context_status;
   }
-  if (descriptor->image == nullptr || descriptor->image_view == nullptr) {
+  if (
+    descriptor->image == MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL ||
+    descriptor->image_view == MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL
+  ) {
     set_thread_error("Vulkan handles must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }

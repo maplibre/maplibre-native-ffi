@@ -230,7 +230,7 @@ public sealed class MetalSurfaceDescriptor
 public sealed class VulkanSurfaceDescriptor
 {
     public RenderTargetExtent Extent { get; set; }
-    public NativePointer Surface { get; set; }
+    public VulkanHandle Surface { get; set; }
     public VulkanContextDescriptor? Context { get; set; }
 }
 
@@ -276,8 +276,8 @@ public sealed class VulkanBorrowedTextureDescriptor
     /// </summary>
     public uint PhysicalWidth { get; set; }
     public uint PhysicalHeight { get; set; }
-    public NativePointer Image { get; set; }
-    public NativePointer ImageView { get; set; }
+    public VulkanHandle Image { get; set; }
+    public VulkanHandle ImageView { get; set; }
     public VulkanContextDescriptor? Context { get; set; }
     public uint Format { get; set; }
     public uint InitialLayout { get; set; }
@@ -414,8 +414,8 @@ public sealed class VulkanOwnedTextureFrame
     private readonly uint height;
     private readonly double scaleFactor;
     private readonly ulong frameId;
-    private readonly NativePointer image;
-    private readonly NativePointer imageView;
+    private readonly VulkanHandle image;
+    private readonly VulkanHandle imageView;
     private readonly NativePointer device;
     private readonly uint format;
     private readonly uint layout;
@@ -427,8 +427,8 @@ public sealed class VulkanOwnedTextureFrame
         uint height,
         double scaleFactor,
         ulong frameId,
-        NativePointer image,
-        NativePointer imageView,
+        VulkanHandle image,
+        VulkanHandle imageView,
         NativePointer device,
         uint format,
         uint layout
@@ -487,7 +487,7 @@ public sealed class VulkanOwnedTextureFrame
             return frameId;
         }
     }
-    public NativePointer Image
+    public VulkanHandle Image
     {
         get
         {
@@ -495,7 +495,7 @@ public sealed class VulkanOwnedTextureFrame
             return image;
         }
     }
-    public NativePointer ImageView
+    public VulkanHandle ImageView
     {
         get
         {

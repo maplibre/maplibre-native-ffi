@@ -29,6 +29,7 @@
 #include "maplibre_native_c/texture.h"
 #include "render/discard_present.hpp"
 #include "render/vulkan/vulkan_dispatch.hpp"
+#include "render/vulkan/vulkan_handle.hpp"
 
 namespace {
 
@@ -113,9 +114,11 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
     uint32_t height
   ) {
     usesBorrowedImage = true;
-    borrowedImage = vk::Image(static_cast<VkImage>(descriptor.image));
-    borrowedImageView =
-      vk::ImageView(static_cast<VkImageView>(descriptor.image_view));
+    borrowedImage =
+      vk::Image(mln::core::vulkan_handle_from_abi<VkImage>(descriptor.image));
+    borrowedImageView = vk::ImageView(
+      mln::core::vulkan_handle_from_abi<VkImageView>(descriptor.image_view)
+    );
     colorFormat = static_cast<vk::Format>(descriptor.format);
     extent = vk::Extent2D(width, height);
     swapchainImages.push_back(borrowedImage);
@@ -148,16 +151,18 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
 
   [[nodiscard]] auto image() const -> VkImage {
     if (usesBorrowedImage) {
-      return borrowedImage;
+      return static_cast<VkImage>(borrowedImage);
     }
-    return getAcquiredImage();
+    return static_cast<VkImage>(getAcquiredImage());
   }
 
   [[nodiscard]] auto image_view() const -> VkImageView {
     if (usesBorrowedImage) {
-      return borrowedImageView;
+      return static_cast<VkImageView>(borrowedImageView);
     }
-    return swapchainImageViews.at(getAcquiredImageIndex()).get();
+    return static_cast<VkImageView>(
+      swapchainImageViews.at(getAcquiredImageIndex()).get()
+    );
   }
 
   [[nodiscard]] auto format() const -> VkFormat {
@@ -503,7 +508,7 @@ auto VulkanTextureBackend::readStillImage() -> mln::PremultipliedImage {
   // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
   auto& context_impl = static_cast<mln::vulkan::Context&>(getContext());
   auto& resource_impl = getResource<VulkanTextureRenderableResource>();
-  auto* const source_image = resource_impl.image();
+  const auto source_image = vk::Image(resource_impl.image());
   context_impl.waitFrame();
   context_impl.submitOneTimeCommand(
     [&](const vk::UniqueCommandBuffer& command_buffer) -> void {

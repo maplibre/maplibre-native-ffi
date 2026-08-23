@@ -3,6 +3,7 @@ package org.maplibre.nativeffi.examples.androidmap
 import android.view.Surface
 import org.maplibre.nativeffi.render.NativePointer
 import org.maplibre.nativeffi.render.VulkanContextDescriptor
+import org.maplibre.nativeffi.render.VulkanHandle
 
 /**
  * The Vulkan context. The instance, the device, and the queue are chosen for the `VkSurfaceKHR`
@@ -28,8 +29,8 @@ internal class VulkanGraphicsContext private constructor(private var handle: Lon
         NativePointer.ofAddress(VulkanNativeBridge.getDeviceProcAddr()),
       )
 
-  val surfacePointer: NativePointer
-    get() = NativePointer.ofAddress(VulkanNativeBridge.surface(handle))
+  val surfaceHandle: VulkanHandle
+    get() = VulkanHandle.ofBits(VulkanNativeBridge.surface(handle))
 
   /**
    * Takes the window this context was built for, which is the only one that reaches here: a live

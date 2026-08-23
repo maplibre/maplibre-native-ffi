@@ -4,11 +4,11 @@ package org.maplibre.nativeffi.render
 public class VulkanSurfaceDescriptor(
   extent: RenderTargetExtent,
   context: VulkanContextDescriptor,
-  surface: NativePointer,
+  surface: VulkanHandle,
 ) {
   public var extent: RenderTargetExtent = extent
 
   public var context: VulkanContextDescriptor = context
 
-  public var surface: NativePointer = surface
+  public var surface: VulkanHandle = surface
 }

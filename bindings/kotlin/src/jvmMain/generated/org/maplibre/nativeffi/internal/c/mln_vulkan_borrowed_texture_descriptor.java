@@ -20,8 +20,8 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  *     uint32_t physical_width;
  *     uint32_t physical_height;
  *     mln_vulkan_context_descriptor context;
- *     void *image;
- *     void *image_view;
+ *     mln_vulkan_non_dispatchable_handle image;
+ *     mln_vulkan_non_dispatchable_handle image_view;
  *     uint32_t format;
  *     uint32_t initial_layout;
  *     uint32_t final_layout;
@@ -41,8 +41,8 @@ public class mln_vulkan_borrowed_texture_descriptor {
         MapLibreNativeC.C_INT.withName("physical_width"),
         MapLibreNativeC.C_INT.withName("physical_height"),
         mln_vulkan_context_descriptor.layout().withName("context"),
-        MapLibreNativeC.C_POINTER.withName("image"),
-        MapLibreNativeC.C_POINTER.withName("image_view"),
+        MapLibreNativeC.C_LONG.withName("image"),
+        MapLibreNativeC.C_LONG.withName("image_view"),
         MapLibreNativeC.C_INT.withName("format"),
         MapLibreNativeC.C_INT.withName("initial_layout"),
         MapLibreNativeC.C_INT.withName("final_layout"),
@@ -276,15 +276,15 @@ public class mln_vulkan_borrowed_texture_descriptor {
         MemorySegment.copy(fieldValue, 0L, struct, context$OFFSET, context$LAYOUT.byteSize());
     }
 
-    private static final AddressLayout image$LAYOUT = (AddressLayout)$LAYOUT.select(groupElement("image"));
+    private static final OfLong image$LAYOUT = (OfLong)$LAYOUT.select(groupElement("image"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * void *image
+     * mln_vulkan_non_dispatchable_handle image
      * }
      */
-    public static final AddressLayout image$layout() {
+    public static final OfLong image$layout() {
         return image$LAYOUT;
     }
 
@@ -293,7 +293,7 @@ public class mln_vulkan_borrowed_texture_descriptor {
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * void *image
+     * mln_vulkan_non_dispatchable_handle image
      * }
      */
     public static final long image$offset() {
@@ -303,32 +303,32 @@ public class mln_vulkan_borrowed_texture_descriptor {
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * void *image
+     * mln_vulkan_non_dispatchable_handle image
      * }
      */
-    public static MemorySegment image(MemorySegment struct) {
+    public static long image(MemorySegment struct) {
         return struct.get(image$LAYOUT, image$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * void *image
+     * mln_vulkan_non_dispatchable_handle image
      * }
      */
-    public static void image(MemorySegment struct, MemorySegment fieldValue) {
+    public static void image(MemorySegment struct, long fieldValue) {
         struct.set(image$LAYOUT, image$OFFSET, fieldValue);
     }
 
-    private static final AddressLayout image_view$LAYOUT = (AddressLayout)$LAYOUT.select(groupElement("image_view"));
+    private static final OfLong image_view$LAYOUT = (OfLong)$LAYOUT.select(groupElement("image_view"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * void *image_view
+     * mln_vulkan_non_dispatchable_handle image_view
      * }
      */
-    public static final AddressLayout image_view$layout() {
+    public static final OfLong image_view$layout() {
         return image_view$LAYOUT;
     }
 
@@ -337,7 +337,7 @@ public class mln_vulkan_borrowed_texture_descriptor {
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * void *image_view
+     * mln_vulkan_non_dispatchable_handle image_view
      * }
      */
     public static final long image_view$offset() {
@@ -347,20 +347,20 @@ public class mln_vulkan_borrowed_texture_descriptor {
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * void *image_view
+     * mln_vulkan_non_dispatchable_handle image_view
      * }
      */
-    public static MemorySegment image_view(MemorySegment struct) {
+    public static long image_view(MemorySegment struct) {
         return struct.get(image_view$LAYOUT, image_view$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * void *image_view
+     * mln_vulkan_non_dispatchable_handle image_view
      * }
      */
-    public static void image_view(MemorySegment struct, MemorySegment fieldValue) {
+    public static void image_view(MemorySegment struct, long fieldValue) {
         struct.set(image_view$LAYOUT, image_view$OFFSET, fieldValue);
     }
 

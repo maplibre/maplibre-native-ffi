@@ -14,6 +14,7 @@ input_root="$1"
 install_root="${MISE_MONOREPO_ROOT}/build/packages/kotlin/android-multi-install"
 presets=(
   android-arm-egl
+  android-arm-vulkan
   android-arm64-egl
   android-arm64-vulkan
   android-x64-egl
@@ -44,10 +45,7 @@ for preset in "${presets[@]}"; do
 done
 
 for backend in opengl vulkan; do
-  abis=arm64-v8a,x86_64
-  if [[ "$backend" == opengl ]]; then
-    abis=armeabi-v7a,arm64-v8a,x86_64
-  fi
+  abis=armeabi-v7a,arm64-v8a,x86_64
   ./gradlew \
     -Pmaplibre.android.prebuiltInstallRoot="$install_root" \
     -Pmaplibre.android.backend="$backend" \

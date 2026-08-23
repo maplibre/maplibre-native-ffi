@@ -36,6 +36,7 @@ prepare_native_inputs() {
     linux)
       presets=(
         android-arm-egl
+        android-arm-vulkan
         android-arm64-egl
         android-arm64-vulkan
         android-x64-egl
@@ -149,7 +150,7 @@ publish_linux_leaves() {
     "$@" \
     "${common[@]}" \
     "${vulkan[@]}" \
-    -Pmaplibre.android.abis=arm64-v8a,x86_64 \
+    -Pmaplibre.android.abis=armeabi-v7a,arm64-v8a,x86_64 \
     -Pmaplibre.android.backend=vulkan
 
   publish_tasks \

@@ -16,8 +16,8 @@
 namespace mln::core {
 
 struct VulkanTextureFrameResources {
-  VkImage image = nullptr;
-  VkImageView image_view = nullptr;
+  VkImage image = VK_NULL_HANDLE;
+  VkImageView image_view = VK_NULL_HANDLE;
   VkDevice device = nullptr;
   VkFormat format = VK_FORMAT_UNDEFINED;
 };

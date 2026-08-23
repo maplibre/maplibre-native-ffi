@@ -23,11 +23,11 @@ pub const Commands = struct {
     ) !Commands {
         var self = Commands{
             .allocator = allocator,
-            .command_pool = null,
+            .command_pool = util.nullHandle(c.VkCommandPool),
             .command_buffer = null,
-            .image_available = null,
+            .image_available = util.nullHandle(c.VkSemaphore),
             .render_finished = &.{},
-            .in_flight = null,
+            .in_flight = util.nullHandle(c.VkFence),
         };
         errdefer self.deinit(device);
 
@@ -77,11 +77,11 @@ pub const Commands = struct {
 
     pub fn deinit(self: *Commands, device: c.VkDevice) void {
         self.destroyPresentSemaphores(device);
-        if (self.in_flight != null) c.vkDestroyFence(device, self.in_flight, null);
-        if (self.image_available != null) {
+        if (!util.isNullHandle(self.in_flight)) c.vkDestroyFence(device, self.in_flight, null);
+        if (!util.isNullHandle(self.image_available)) {
             c.vkDestroySemaphore(device, self.image_available, null);
         }
-        if (self.command_pool != null) {
+        if (!util.isNullHandle(self.command_pool)) {
             c.vkDestroyCommandPool(device, self.command_pool, null);
         }
     }
@@ -94,7 +94,7 @@ pub const Commands = struct {
         image_count: u32,
     ) !void {
         self.render_finished = try self.allocator.alloc(c.VkSemaphore, image_count);
-        @memset(self.render_finished, null);
+        @memset(self.render_finished, util.nullHandle(c.VkSemaphore));
         const semaphore_info = c.VkSemaphoreCreateInfo{
             .sType = c.VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
             .pNext = null,
@@ -112,7 +112,7 @@ pub const Commands = struct {
 
     pub fn destroyPresentSemaphores(self: *Commands, device: c.VkDevice) void {
         for (self.render_finished) |semaphore| {
-            if (semaphore != null) c.vkDestroySemaphore(device, semaphore, null);
+            if (!util.isNullHandle(semaphore)) c.vkDestroySemaphore(device, semaphore, null);
         }
         self.allocator.free(self.render_finished);
         self.render_finished = &.{};

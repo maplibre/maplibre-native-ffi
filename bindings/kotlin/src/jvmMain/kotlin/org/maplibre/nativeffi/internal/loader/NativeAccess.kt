@@ -161,6 +161,7 @@ import org.maplibre.nativeffi.render.RenderUpdate
 import org.maplibre.nativeffi.render.TextureImageInfo
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanContextDescriptor
+import org.maplibre.nativeffi.render.VulkanHandle
 import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanOwnedTextureFrame
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
@@ -2485,8 +2486,8 @@ internal object NativeAccess {
       mln_vulkan_owned_texture_frame.height(segment),
       mln_vulkan_owned_texture_frame.scale_factor(segment),
       mln_vulkan_owned_texture_frame.frame_id(segment),
-      scopedPointer(mln_vulkan_owned_texture_frame.image(segment), scope),
-      scopedPointer(mln_vulkan_owned_texture_frame.image_view(segment), scope),
+      VulkanHandle.scoped(mln_vulkan_owned_texture_frame.image(segment), scope),
+      VulkanHandle.scoped(mln_vulkan_owned_texture_frame.image_view(segment), scope),
       scopedPointer(mln_vulkan_owned_texture_frame.device(segment), scope),
       mln_vulkan_owned_texture_frame.format(segment),
       mln_vulkan_owned_texture_frame.layout(segment),
@@ -2813,11 +2814,8 @@ internal object NativeAccess {
       mln_vulkan_borrowed_texture_descriptor.physical_width(segment, descriptor.physicalWidth)
       mln_vulkan_borrowed_texture_descriptor.physical_height(segment, descriptor.physicalHeight)
       fillVulkanContext(mln_vulkan_borrowed_texture_descriptor.context(segment), descriptor.context)
-      mln_vulkan_borrowed_texture_descriptor.image(segment, nativePointer(descriptor.image))
-      mln_vulkan_borrowed_texture_descriptor.image_view(
-        segment,
-        nativePointer(descriptor.imageView),
-      )
+      mln_vulkan_borrowed_texture_descriptor.image(segment, descriptor.image.bits)
+      mln_vulkan_borrowed_texture_descriptor.image_view(segment, descriptor.imageView.bits)
       mln_vulkan_borrowed_texture_descriptor.format(segment, descriptor.format)
       mln_vulkan_borrowed_texture_descriptor.initial_layout(segment, descriptor.initialLayout)
       descriptor.finalLayout?.let {
@@ -2866,7 +2864,7 @@ internal object NativeAccess {
     MapLibreNativeC.mln_vulkan_surface_descriptor_default(arena).also { segment ->
       fillRenderTargetExtent(mln_vulkan_surface_descriptor.extent(segment), descriptor.extent)
       fillVulkanContext(mln_vulkan_surface_descriptor.context(segment), descriptor.context)
-      mln_vulkan_surface_descriptor.surface(segment, nativePointer(descriptor.surface))
+      mln_vulkan_surface_descriptor.surface(segment, descriptor.surface.bits)
     }
   }
 
@@ -6291,8 +6289,8 @@ internal object NativeAccess {
           mln_render_target_extent.width(extent),
           mln_render_target_extent.height(extent),
           mln_render_target_extent.scale_factor(extent),
-          mln_vulkan_borrowed_texture_descriptor.image(native).address(),
-          mln_vulkan_borrowed_texture_descriptor.image_view(native).address(),
+          mln_vulkan_borrowed_texture_descriptor.image(native),
+          mln_vulkan_borrowed_texture_descriptor.image_view(native),
           mln_vulkan_borrowed_texture_descriptor.final_layout(native),
         )
       }

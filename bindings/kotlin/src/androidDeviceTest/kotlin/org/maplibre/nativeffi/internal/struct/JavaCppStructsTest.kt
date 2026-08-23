@@ -33,6 +33,7 @@ import org.maplibre.nativeffi.render.RenderTargetExtent
 import org.maplibre.nativeffi.render.TextureImageInfo
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanContextDescriptor
+import org.maplibre.nativeffi.render.VulkanHandle
 import org.maplibre.nativeffi.resource.ResourceResponse
 import org.maplibre.nativeffi.resource.ResourceResponseStatus
 import org.maplibre.nativeffi.runtime.RuntimeEventPayload
@@ -208,8 +209,8 @@ class JavaCppStructsTest {
             65,
             33,
             context,
-            NativePointer.ofAddress(0x50),
-            NativePointer.ofAddress(0x60),
+            VulkanHandle.ofBits(0x50),
+            VulkanHandle.ofBits(0x60),
             44,
             1,
           )

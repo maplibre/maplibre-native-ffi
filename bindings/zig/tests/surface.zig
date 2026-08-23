@@ -10,6 +10,10 @@ fn nativePointer(ptr: *anyopaque) maplibre.NativePointer {
     return maplibre.NativePointer.fromPtr(ptr);
 }
 
+fn fakeVulkanHandle() maplibre.VulkanHandle {
+    return maplibre.VulkanHandle.fromBits(1);
+}
+
 test "Metal surface renders to window-attached layer through public binding" {
     if (!build_options.supports_metal) return error.SkipZigTest;
 
@@ -142,7 +146,7 @@ test "surface public descriptors report invalid native arguments" {
                 .get_instance_proc_addr = null,
                 .get_device_proc_addr = null,
             },
-            .surface = fake,
+            .surface = fakeVulkanHandle(),
         };
         try testing.expectError(error.InvalidArgument, maplibre.attachVulkanSurface(&map, .{ .extent = .{ .width = 0 }, .context = descriptor.context, .surface = descriptor.surface }));
         try testing.expectError(error.InvalidArgument, maplibre.attachVulkanSurface(&map, .{ .extent = .{ .height = 0 }, .context = descriptor.context, .surface = descriptor.surface }));
@@ -169,7 +173,7 @@ test "unsupported public surface backends report unsupported" {
                 .get_instance_proc_addr = null,
                 .get_device_proc_addr = null,
             },
-            .surface = fake,
+            .surface = fakeVulkanHandle(),
         }));
     } else if (build_options.supports_vulkan) {
         try testing.expectError(error.Unsupported, maplibre.attachMetalSurface(&map, .{ .layer = nativePointer(@ptrFromInt(1)) }));

@@ -114,6 +114,21 @@ pub const NativePointer = enum(usize) {
     }
 };
 
+/// Borrowed Vulkan non-dispatchable handle represented with Vulkan's stable
+/// 64-bit ABI width on every target.
+pub const VulkanHandle = enum(u64) {
+    null_handle = 0,
+    _,
+
+    pub fn fromBits(raw_bits: u64) VulkanHandle {
+        return @enumFromInt(raw_bits);
+    }
+
+    pub fn bits(self: VulkanHandle) u64 {
+        return @intFromEnum(self);
+    }
+};
+
 /// Which outcome a successful `RenderSessionHandle.renderUpdate` call reached.
 pub const RenderResult = union(enum) {
     /// The call rendered a frame into the render target.
@@ -318,8 +333,8 @@ pub const VulkanBorrowedTextureDescriptor = struct {
     physical_width: u32,
     physical_height: u32,
     context: VulkanContextDescriptor,
-    image: NativePointer,
-    image_view: NativePointer,
+    image: VulkanHandle,
+    image_view: VulkanHandle,
     format: u32,
     initial_layout: u32,
     final_layout: u32,
@@ -349,7 +364,7 @@ pub const MetalSurfaceDescriptor = struct {
 pub const VulkanSurfaceDescriptor = struct {
     extent: RenderTargetExtent = .{},
     context: VulkanContextDescriptor,
-    surface: NativePointer,
+    surface: VulkanHandle,
 };
 
 pub const OpenGLSurfaceDescriptor = struct {
@@ -459,8 +474,8 @@ pub const VulkanOwnedTextureFrameInfo = struct {
     width: u32,
     height: u32,
     scale_factor: f64,
-    image: NativePointer,
-    image_view: NativePointer,
+    image: VulkanHandle,
+    image_view: VulkanHandle,
     device: NativePointer,
     format: u32,
     layout: u32,
@@ -749,8 +764,8 @@ pub const RenderSessionHandle = enum(c.mln_render_session) {
             .height = 0,
             .scale_factor = 0,
             .frame_id = 0,
-            .image = null,
-            .image_view = null,
+            .image = c.MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL,
+            .image_view = c.MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL,
             .device = null,
             .format = 0,
             .layout = 0,
@@ -892,8 +907,8 @@ pub const VulkanOwnedTextureFrameHandle = enum(u128) {
             .width = frame.width,
             .height = frame.height,
             .scale_factor = frame.scale_factor,
-            .image = NativePointer.fromPtr(frame.image orelse return error.ClosedHandle),
-            .image_view = NativePointer.fromPtr(frame.image_view orelse return error.ClosedHandle),
+            .image = VulkanHandle.fromBits(frame.image),
+            .image_view = VulkanHandle.fromBits(frame.image_view),
             .device = NativePointer.fromPtr(frame.device orelse return error.ClosedHandle),
             .format = frame.format,
             .layout = frame.layout,
@@ -1465,7 +1480,7 @@ fn vulkanSurfaceDescriptorToNative(descriptor: VulkanSurfaceDescriptor) c.mln_vu
     var raw = c.mln_vulkan_surface_descriptor_default();
     raw.extent = renderTargetExtentToNative(descriptor.extent);
     raw.context = vulkanContextToNative(descriptor.context);
-    raw.surface = descriptor.surface.toPtr();
+    raw.surface = descriptor.surface.bits();
     return raw;
 }
 
@@ -1492,8 +1507,8 @@ fn vulkanBorrowedTextureDescriptorToNative(descriptor: VulkanBorrowedTextureDesc
     raw.physical_width = descriptor.physical_width;
     raw.physical_height = descriptor.physical_height;
     raw.context = vulkanContextToNative(descriptor.context);
-    raw.image = descriptor.image.toPtr();
-    raw.image_view = descriptor.image_view.toPtr();
+    raw.image = descriptor.image.bits();
+    raw.image_view = descriptor.image_view.bits();
     raw.format = descriptor.format;
     raw.initial_layout = descriptor.initial_layout;
     raw.final_layout = descriptor.final_layout;

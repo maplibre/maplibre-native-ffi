@@ -135,7 +135,7 @@ namespace Maplibre.NativeFfi.Internal.C
 
         public mln_opengl_context_ownership ownership;
 
-        [NativeTypeName("__AnonymousRecord_render_target_L179_C3")]
+        [NativeTypeName("__AnonymousRecord_render_target_L191_C3")]
         public _data_e__Union data;
 
         [StructLayout(LayoutKind.Explicit)]

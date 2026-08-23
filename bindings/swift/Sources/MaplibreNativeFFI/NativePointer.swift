@@ -30,6 +30,24 @@ public struct NativePointer: Sendable, Hashable, CustomStringConvertible {
   }
 }
 
+public struct VulkanHandle: Sendable, Hashable, CustomStringConvertible {
+  public static let null = VulkanHandle(bitPattern: 0)
+
+  public let bitPattern: UInt64
+
+  public init(bitPattern: UInt64) {
+    self.bitPattern = bitPattern
+  }
+
+  public var isNull: Bool {
+    bitPattern == 0
+  }
+
+  public var description: String {
+    "VulkanHandle(bits: 0x\(String(bitPattern, radix: 16)))"
+  }
+}
+
 final class NativeFrameScope: @unchecked Sendable {
   private let lock = NSLock()
   private let isFrameLive: () -> Bool
@@ -95,6 +113,48 @@ public struct FrameNativePointer: Sendable, Hashable, CustomStringConvertible {
 
   public static func == (lhs: FrameNativePointer,
                          rhs: FrameNativePointer) -> Bool
+  {
+    lhs.bitPattern == rhs.bitPattern
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(bitPattern)
+  }
+}
+
+public struct FrameVulkanHandle: Sendable, Hashable,
+  CustomStringConvertible
+{
+  private let bitPattern: UInt64
+  private let scope: NativeFrameScope
+  private let diagnosticName: String
+
+  init(bitPattern: UInt64, scope: NativeFrameScope, diagnosticName: String) {
+    self.bitPattern = bitPattern
+    self.scope = scope
+    self.diagnosticName = diagnosticName
+  }
+
+  public var bits: UInt64 {
+    get throws {
+      try scope.requireActive(diagnosticName)
+      return bitPattern
+    }
+  }
+
+  public var isNull: Bool {
+    get throws {
+      try scope.requireActive(diagnosticName)
+      return bitPattern == 0
+    }
+  }
+
+  public var description: String {
+    "FrameVulkanHandle(bits: 0x\(String(bitPattern, radix: 16)))"
+  }
+
+  public static func == (lhs: FrameVulkanHandle,
+                         rhs: FrameVulkanHandle) -> Bool
   {
     lhs.bitPattern == rhs.bitPattern
   }

@@ -43,9 +43,7 @@ enum class AndroidTarget(
 
   fun ndkCompilerName(apiLevel: Int): String = "$ndkTargetTriple$apiLevel-clang++"
 
-  // Vulkan non-dispatchable handles are 64-bit integers on ARM32, while the C
-  // API currently carries backend-native handles in pointer-width fields.
-  fun supportsBackend(backend: String): Boolean = this != ARM || backend == "opengl"
+  fun supportsBackend(backend: String): Boolean = backend == "opengl" || backend == "vulkan"
 
   fun cmakePreset(backend: String): String {
     require(supportsBackend(backend)) {

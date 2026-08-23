@@ -53,8 +53,8 @@ class FrameScopeTest {
         3,
         2.0,
         ULong.MAX_VALUE.toLong(),
-        NativePointer.ofAddress(0x10L),
-        NativePointer.ofAddress(0x20L),
+        VulkanHandle.scoped(0x10L, scope),
+        VulkanHandle.scoped(0x20L, scope),
         NativePointer.ofAddress(0x30L),
         UInt.MAX_VALUE.toInt(),
         0x8000_0000U.toInt(),
@@ -64,10 +64,12 @@ class FrameScopeTest {
     assertEquals(ULong.MAX_VALUE.toLong(), frame.frameId())
     assertEquals(UInt.MAX_VALUE.toInt(), frame.format())
     assertEquals(0x8000_0000U.toInt(), frame.layout())
-    assertEquals(NativePointer.ofAddress(0x20L), frame.imageView())
+    assertEquals(VulkanHandle.ofBits(0x20L), frame.imageView())
+    val retainedImage = frame.image()
     scope.close()
     assertFailsWith<IllegalStateException> { frame.format() }
     assertFailsWith<IllegalStateException> { frame.imageView() }
+    assertFailsWith<IllegalStateException> { retainedImage.bits }
   }
 
   @Test

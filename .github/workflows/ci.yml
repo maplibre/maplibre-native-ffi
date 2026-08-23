@@ -988,6 +988,57 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-android-arm-egl.tar.gz
           if-no-files-found: error
 
+  target-android-arm-vulkan:
+    name: target / android-arm-vulkan
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || github.base_ref == 'main'
+      || github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        with:
+          target: android-arm-vulkan
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run build android-arm-vulkan
+      - name: Archive native artifact
+        run: mise run archive-native android-arm-vulkan
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package
+          android-arm-vulkan
+          build/packages/native/dist/maplibre-native-c-android-arm-vulkan.tar.gz
+      - run: mise run //bindings/kotlin:android-build vulkan armeabi-v7a --prebuilt
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/go:build android-arm-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/rust:build android-arm-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/zig:build android-arm-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/android-map:build vulkan armeabi-v7a --prebuilt
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/dart:build:mobile android-arm-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload native artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-package-android-arm-vulkan-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-android-arm-vulkan.tar.gz
+          if-no-files-found: error
+
   target-android-arm64-egl:
     name: target / android-arm64-egl
     runs-on: ubuntu-latest
@@ -1081,6 +1132,9 @@ jobs:
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/zig:build android-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/android-map:build vulkan arm64-v8a --prebuilt
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/dart:build:mobile android-arm64-vulkan
@@ -1192,6 +1246,9 @@ jobs:
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/python:test android-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/android-map:build vulkan x86_64 --prebuilt
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/dart:build:mobile android-x64-vulkan
@@ -1643,6 +1700,7 @@ jobs:
       || github.event.pull_request.draft == false
     needs:
       - target-android-arm-egl
+      - target-android-arm-vulkan
       - target-android-arm64-egl
       - target-android-arm64-vulkan
       - target-android-x64-egl
@@ -1687,6 +1745,7 @@ jobs:
       - target-tvos-arm64-metal
       - target-tvos-simulator-arm64-metal
       - target-android-arm-egl
+      - target-android-arm-vulkan
       - target-android-arm64-egl
       - target-android-arm64-vulkan
       - target-android-x64-egl
@@ -1729,6 +1788,7 @@ jobs:
       - target-tvos-arm64-metal
       - target-tvos-simulator-arm64-metal
       - target-android-arm-egl
+      - target-android-arm-vulkan
       - target-android-arm64-egl
       - target-android-arm64-vulkan
       - target-android-x64-egl

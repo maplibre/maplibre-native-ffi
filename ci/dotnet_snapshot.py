@@ -39,6 +39,7 @@ BACKENDS = {
         "macos-arm64-vulkan": "osx-arm64",
         "windows-x64-vulkan": "win-x64",
         "windows-arm64-vulkan": "win-arm64",
+        "android-arm-vulkan": "android-arm",
         "android-arm64-vulkan": "android-arm64",
         "android-x64-vulkan": "android-x64",
     },

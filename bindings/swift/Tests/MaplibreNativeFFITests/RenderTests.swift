@@ -58,8 +58,8 @@ private final class RenderLeakBox: @unchecked Sendable {
     physicalWidth: 65,
     physicalHeight: 33,
     context: vulkanContext,
-    image: NativePointer(bitPattern: 0x70),
-    imageView: NativePointer(bitPattern: 0x80),
+    image: VulkanHandle(bitPattern: 0x70),
+    imageView: VulkanHandle(bitPattern: 0x80),
     format: 44,
     initialLayout: 1,
     finalLayout: 2
@@ -77,8 +77,8 @@ private final class RenderLeakBox: @unchecked Sendable {
       0x90)
     #expect(UInt(bitPattern: descriptor.pointee.context.get_device_proc_addr) ==
       0xA0)
-    #expect(UInt(bitPattern: descriptor.pointee.image) == 0x70)
-    #expect(UInt(bitPattern: descriptor.pointee.image_view) == 0x80)
+    #expect(descriptor.pointee.image == 0x70)
+    #expect(descriptor.pointee.image_view == 0x80)
     #expect(descriptor.pointee.format == 44)
     #expect(descriptor.pointee.initial_layout == 1)
     #expect(descriptor.pointee.final_layout == 2)
@@ -246,8 +246,8 @@ private final class RenderLeakBox: @unchecked Sendable {
   let releases = RenderCounter()
   var raw = mln_vulkan_owned_texture_frame()
   raw.size = UInt32(MemoryLayout<mln_vulkan_owned_texture_frame>.size)
-  raw.image = UnsafeMutableRawPointer(bitPattern: 0x1234)
-  raw.image_view = UnsafeMutableRawPointer(bitPattern: 0x5678)
+  raw.image = 0x1234
+  raw.image_view = 0x5678
   let frame =
     VulkanOwnedTextureFrameHandle(frame: NativeVulkanOwnedTextureFrame(
       raw
@@ -256,14 +256,14 @@ private final class RenderLeakBox: @unchecked Sendable {
     }
 
   var capturedView: VulkanOwnedTextureFrameView?
-  var escapedImage: FrameNativePointer?
-  try frame.withBackendPointers { view in
+  var escapedImage: FrameVulkanHandle?
+  try frame.withBackendHandles { view in
     capturedView = view
     let image = try view.image
     let imageView = try view.imageView
     escapedImage = image
-    #expect(try image.addressBitPattern == 0x1234)
-    #expect(try imageView.addressBitPattern == 0x5678)
+    #expect(try image.bits == 0x1234)
+    #expect(try imageView.bits == 0x5678)
   }
   do {
     _ = try capturedView?.image
@@ -273,8 +273,8 @@ private final class RenderLeakBox: @unchecked Sendable {
     #expect(error.rawStatus == nil)
   }
   do {
-    _ = try escapedImage?.addressBitPattern
-    Issue.record("escaped frame pointer access after scope should throw")
+    _ = try escapedImage?.bits
+    Issue.record("escaped frame handle access after scope should throw")
   } catch let error as MaplibreError {
     #expect(error.kind == .invalidState)
     #expect(error.rawStatus == nil)
@@ -286,7 +286,7 @@ private final class RenderLeakBox: @unchecked Sendable {
   #expect(frame.isClosed)
   #expect(releases.value() == 1)
   do {
-    try frame.withBackendPointers { _ in }
+    try frame.withBackendHandles { _ in }
     Issue.record("closed frame access should throw")
   } catch let error as MaplibreError {
     #expect(error.kind == .invalidState)

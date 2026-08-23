@@ -347,9 +347,7 @@ def verify_android(root: pathlib.Path) -> None:
                 )
                 if expected not in names:
                     raise SystemExit(f"{runtime} is missing {expected}")
-            abis = ("arm64-v8a", "x86_64")
-            if backend == "opengl":
-                abis = ("armeabi-v7a", *abis)
+            abis = ("armeabi-v7a", "arm64-v8a", "x86_64")
             for abi in abis:
                 expected = f"jni/{abi}/libmaplibre-native-c.so"
                 if expected not in names:

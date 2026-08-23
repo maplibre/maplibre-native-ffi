@@ -8,6 +8,8 @@
 #include "unity.h"
 
 static void* const fake_handle = (void*)(uintptr_t)1;
+static const mln_vulkan_non_dispatchable_handle fake_vulkan_handle =
+  UINT64_C(1);
 
 #define EXPECT_ATTACH_REJECTS_UNSAFE_INPUTS(                          \
   descriptor_type, default_descriptor, attach, clear_required, shrink \
@@ -563,11 +565,11 @@ static mln_vulkan_context_descriptor fake_vulkan_context(void) {
 static mln_vulkan_surface_descriptor vulkan_surface_descriptor(void) {
   mln_vulkan_surface_descriptor value = mln_vulkan_surface_descriptor_default();
   value.context = fake_vulkan_context();
-  value.surface = fake_handle;
+  value.surface = fake_vulkan_handle;
   return value;
 }
 static void clear_vulkan_surface(mln_vulkan_surface_descriptor* descriptor) {
-  descriptor->surface = NULL;
+  descriptor->surface = MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL;
 }
 static void shrink_vulkan_surface(mln_vulkan_surface_descriptor* descriptor) {
   descriptor->context.size = sizeof(mln_vulkan_context_descriptor) - 1;
@@ -609,8 +611,8 @@ static void vulkan_borrowed_texture_rejects_unsafe_raw_descriptors(void) {
   mln_vulkan_borrowed_texture_descriptor descriptor =
     mln_vulkan_borrowed_texture_descriptor_default();
   descriptor.context = fake_vulkan_context();
-  descriptor.image = fake_handle;
-  descriptor.image_view = fake_handle;
+  descriptor.image = fake_vulkan_handle;
+  descriptor.image_view = fake_vulkan_handle;
   descriptor.format = 37;
   descriptor.initial_layout = 0;
   descriptor.final_layout = 5;
@@ -630,7 +632,7 @@ static void vulkan_borrowed_texture_rejects_unsafe_raw_descriptors(void) {
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
   invalid = descriptor;
-  invalid.image = NULL;
+  invalid.image = MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_vulkan_borrowed_texture_attach(map, &invalid, &session)

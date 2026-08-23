@@ -65,7 +65,8 @@ Requirements:
   language cannot hide raw declarations, they MUST live under a generated
   interop namespace and be excluded from the supported safe API surface.
 - Host FFI carrier types and raw entrypoints MUST stay outside the safe public
-  API. Public APIs expose backend addresses only through `NativePointer`.
+  API. Public APIs expose backend addresses through `NativePointer` and Vulkan
+  non-dispatchable handle bit patterns through `VulkanHandle`.
 - Public examples and tests MUST use the public binding layer, not raw C calls,
   except bindability and layout tests.
 - Raw C declarations MUST be generated or tool-imported from public headers.
@@ -467,6 +468,17 @@ lifetime and synchronization requirements.
 Backend pointers returned from acquired texture frames perform active-frame
 checks before exposing the pointer.
 
+### Vulkan handles
+
+`VulkanHandle` represents the 64-bit bit pattern of a borrowed Vulkan
+non-dispatchable handle. It transfers no ownership and grants no memory access.
+Public APIs use it for `VkSurfaceKHR`, `VkImage`, and `VkImageView`, because
+Vulkan defines these handle types as pointers on 64-bit targets and as
+`uint64_t` values on 32-bit targets. Zero represents `VK_NULL_HANDLE`.
+
+Vulkan handles returned from acquired texture frames perform active-frame checks
+before exposing the value.
+
 ---
 
 ## Data Ownership
@@ -866,7 +878,8 @@ Attach follows this operation:
 
 1. Materialize the backend-specific public descriptor into the matching C
    descriptor.
-2. Pass backend-native host resources as `NativePointer` values.
+2. Pass backend-native pointer resources as `NativePointer` values and Vulkan
+   non-dispatchable resources as `VulkanHandle` values.
 3. Call the matching C attach function on the thread that will drive the
    session, which for a host graphics API with a thread-current context is the
    thread where that context is current.

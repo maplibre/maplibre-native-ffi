@@ -3,6 +3,14 @@ const std = @import("std");
 const c = @import("../../c.zig").c;
 const types = @import("../../types.zig");
 
+pub fn nullHandle(comptime Handle: type) Handle {
+    return std.mem.zeroes(Handle);
+}
+
+pub fn isNullHandle(handle: anytype) bool {
+    return std.meta.eql(handle, nullHandle(@TypeOf(handle)));
+}
+
 pub fn expectVk(result: c.VkResult) !void {
     if (result != c.VK_SUCCESS) {
         std.debug.print("Vulkan call failed: {d}\n", .{result});

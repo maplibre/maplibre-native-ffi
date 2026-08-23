@@ -16,6 +16,7 @@
 #include "render/render_session_common.hpp"
 #include "render/texture_session.hpp"
 #include "render/vulkan/vulkan_dispatch.hpp"
+#include "render/vulkan/vulkan_handle.hpp"
 #include "render/vulkan/vulkan_texture_backend.hpp"
 
 namespace {
@@ -167,8 +168,8 @@ class VulkanTextureSessionBackend final
       .height = texture.physical_height,
       .scale_factor = texture.scale_factor,
       .frame_id = texture.texture.next_frame_id,
-      .image = resources.image,
-      .image_view = resources.image_view,
+      .image = mln::core::vulkan_handle_to_abi(resources.image),
+      .image_view = mln::core::vulkan_handle_to_abi(resources.image_view),
       .device = resources.device,
       .format = static_cast<uint32_t>(resources.format),
       .layout = static_cast<uint32_t>(vk::ImageLayout::eShaderReadOnlyOptimal),

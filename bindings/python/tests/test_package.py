@@ -2338,6 +2338,7 @@ def test_synthetic_batch_decodes_every_payload_and_preserves_unknown_domains() -
 def test_render_descriptors_are_public_python_values() -> None:
     extent = render.RenderTargetExtent(width=320, height=240, scale_factor=2.0)
     pointer = render.NativePointer(0x1234)
+    vulkan_handle = render.VulkanHandle(0x1234)
     metal = render.MetalOwnedTextureDescriptor(
         extent=extent,
         context=render.MetalContextDescriptor(device=pointer),
@@ -2351,8 +2352,8 @@ def test_render_descriptors_are_public_python_values() -> None:
             get_instance_proc_addr=render.NativePointer(0x1111),
             get_device_proc_addr=render.NativePointer(0x2222),
         ),
-        image=pointer,
-        image_view=render.NativePointer(0x5678),
+        image=vulkan_handle,
+        image_view=render.VulkanHandle(0x5678),
         format=44,
         initial_layout=1,
         final_layout=2,
@@ -2388,7 +2389,7 @@ def test_render_descriptors_are_public_python_values() -> None:
     assert vulkan.context.graphics_queue_family_index == 7
     assert vulkan.context.get_instance_proc_addr.address == 0x1111
     assert vulkan.context.get_device_proc_addr.address == 0x2222
-    assert vulkan.image_view.address == 0x5678
+    assert vulkan.image_view.bits == 0x5678
     assert vulkan.format == 44
     assert opengl_egl.context.display.address == 0x1234
     assert opengl_egl.context.config.address == 0x7777

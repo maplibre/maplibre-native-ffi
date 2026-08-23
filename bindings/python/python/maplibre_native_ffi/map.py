@@ -1659,7 +1659,7 @@ class MapHandle(NativeHandleMixin):
             descriptor.context.graphics_queue_family_index,
             descriptor.context.get_instance_proc_addr.address,
             descriptor.context.get_device_proc_addr.address,
-            descriptor.surface.address,
+            descriptor.surface.bits,
         )
 
     def attach_metal_owned_texture(
@@ -1716,8 +1716,8 @@ class MapHandle(NativeHandleMixin):
             descriptor.context.graphics_queue_family_index,
             descriptor.context.get_instance_proc_addr.address,
             descriptor.context.get_device_proc_addr.address,
-            descriptor.image.address,
-            descriptor.image_view.address,
+            descriptor.image.bits,
+            descriptor.image_view.bits,
             descriptor.format,
             descriptor.initial_layout,
             descriptor.final_layout,

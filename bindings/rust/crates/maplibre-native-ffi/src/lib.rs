@@ -61,14 +61,14 @@ pub use maplibre_native_ffi_core::handle::{NativeHandleLeak, set_leak_reporter};
 pub use projection::MapProjectionHandle;
 pub use render::{
     DetachedRenderSessionHandle, EglContextDescriptor, FeatureStateSelector, FrameNativePointer,
-    FrameOpenGLTextureName, MetalBorrowedTextureDescriptor, MetalContextDescriptor,
-    MetalOwnedTextureDescriptor, MetalOwnedTextureFrame, MetalOwnedTextureFrameHandle,
-    MetalSurfaceDescriptor, NativePointer, OpenGLBorrowedTextureDescriptor,
-    OpenGLContextDescriptor, OpenGLOwnedTextureDescriptor, OpenGLOwnedTextureFrame,
-    OpenGLOwnedTextureFrameHandle, OpenGLSurfaceDescriptor, PremultipliedRgba8Image,
-    QueriedFeature, RenderSessionHandle, RenderTargetExtent, RenderUpdate,
+    FrameOpenGLTextureName, FrameVulkanHandle, MetalBorrowedTextureDescriptor,
+    MetalContextDescriptor, MetalOwnedTextureDescriptor, MetalOwnedTextureFrame,
+    MetalOwnedTextureFrameHandle, MetalSurfaceDescriptor, NativePointer,
+    OpenGLBorrowedTextureDescriptor, OpenGLContextDescriptor, OpenGLOwnedTextureDescriptor,
+    OpenGLOwnedTextureFrame, OpenGLOwnedTextureFrameHandle, OpenGLSurfaceDescriptor,
+    PremultipliedRgba8Image, QueriedFeature, RenderSessionHandle, RenderTargetExtent, RenderUpdate,
     RenderedFeatureQueryOptions, RenderedQueryGeometry, SourceFeatureQueryOptions,
-    TextureImageInfo, VulkanBorrowedTextureDescriptor, VulkanContextDescriptor,
+    TextureImageInfo, VulkanBorrowedTextureDescriptor, VulkanContextDescriptor, VulkanHandle,
     VulkanOwnedTextureDescriptor, VulkanOwnedTextureFrame, VulkanOwnedTextureFrameHandle,
     VulkanSurfaceDescriptor, WebGlContextDescriptor, WebGpuBorrowedTextureDescriptor,
     WebGpuContextDescriptor, WebGpuOwnedTextureDescriptor, WebGpuOwnedTextureFrame,
@@ -287,6 +287,8 @@ mod tests {
     assert_impl_all!(MapProjectionHandle: Send, Sync);
     assert_not_impl_any!(NativePointer: Send, Sync);
     assert_not_impl_any!(FrameNativePointer<'static>: Send, Sync);
+    assert_not_impl_any!(VulkanHandle: Send, Sync);
+    assert_not_impl_any!(FrameVulkanHandle<'static>: Send, Sync);
     assert_not_impl_any!(RenderSessionHandle: Send, Sync);
     assert_not_impl_any!(DetachedRenderSessionHandle: Send, Sync);
     // The one map value that crosses threads: a copied handle id that lets a

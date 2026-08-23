@@ -299,12 +299,12 @@ public struct MetalSurfaceDescriptor: Equatable, Sendable {
 public struct VulkanSurfaceDescriptor: Equatable, Sendable {
   public var extent: RenderTargetExtent
   public var context: VulkanContextDescriptor
-  public var surface: NativePointer
+  public var surface: VulkanHandle
 
   public init(
     extent: RenderTargetExtent,
     context: VulkanContextDescriptor,
-    surface: NativePointer
+    surface: VulkanHandle
   ) {
     self.extent = extent
     self.context = context
@@ -315,7 +315,7 @@ public struct VulkanSurfaceDescriptor: Equatable, Sendable {
     NativeVulkanSurfaceDescriptorInput(
       extent: extent.nativeInput,
       context: context.nativeInput,
-      surfaceAddress: surface.addressBitPattern
+      surfaceBits: surface.bitPattern
     )
   }
 }
@@ -434,8 +434,8 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Sendable {
   public var physicalWidth: UInt32
   public var physicalHeight: UInt32
   public var context: VulkanContextDescriptor
-  public var image: NativePointer
-  public var imageView: NativePointer
+  public var image: VulkanHandle
+  public var imageView: VulkanHandle
   public var format: UInt32
   public var initialLayout: UInt32
   public var finalLayout: UInt32
@@ -445,8 +445,8 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Sendable {
     physicalWidth: UInt32,
     physicalHeight: UInt32,
     context: VulkanContextDescriptor,
-    image: NativePointer,
-    imageView: NativePointer,
+    image: VulkanHandle,
+    imageView: VulkanHandle,
     format: UInt32,
     initialLayout: UInt32,
     finalLayout: UInt32
@@ -468,8 +468,8 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Sendable {
       physicalWidth: physicalWidth,
       physicalHeight: physicalHeight,
       context: context.nativeInput,
-      imageAddress: image.addressBitPattern,
-      imageViewAddress: imageView.addressBitPattern,
+      imageBits: image.bitPattern,
+      imageViewBits: imageView.bitPattern,
       format: format,
       initialLayout: initialLayout,
       finalLayout: finalLayout
@@ -881,25 +881,25 @@ public final class MetalOwnedTextureFrameView {
 }
 
 public final class VulkanOwnedTextureFrameView {
-  private let imagePointer: FrameNativePointer
-  private let imageViewPointer: FrameNativePointer
+  private let imageHandle: FrameVulkanHandle
+  private let imageViewHandle: FrameVulkanHandle
 
-  fileprivate init(image: FrameNativePointer, imageView: FrameNativePointer) {
-    imagePointer = image
-    imageViewPointer = imageView
+  fileprivate init(image: FrameVulkanHandle, imageView: FrameVulkanHandle) {
+    imageHandle = image
+    imageViewHandle = imageView
   }
 
-  public var image: FrameNativePointer {
+  public var image: FrameVulkanHandle {
     get throws {
-      _ = try imagePointer.addressBitPattern
-      return imagePointer
+      _ = try imageHandle.bits
+      return imageHandle
     }
   }
 
-  public var imageView: FrameNativePointer {
+  public var imageView: FrameVulkanHandle {
     get throws {
-      _ = try imageViewPointer.addressBitPattern
-      return imageViewPointer
+      _ = try imageViewHandle.bits
+      return imageViewHandle
     }
   }
 }
@@ -1042,7 +1042,7 @@ public final class VulkanOwnedTextureFrameHandle {
         NativeHandleLeak(
           typeName: "VulkanOwnedTextureFrameHandle",
           handle: 0,
-          detail: "image 0x\(String(UInt(bitPattern: frame.raw.image), radix: 16))"
+          detail: "image 0x\(String(frame.raw.image, radix: 16))"
         )
       )
     }
@@ -1052,7 +1052,7 @@ public final class VulkanOwnedTextureFrameHandle {
     frame == nil
   }
 
-  public func withBackendPointers(_ body: (VulkanOwnedTextureFrameView) throws
+  public func withBackendHandles(_ body: (VulkanOwnedTextureFrameView) throws
     -> Void) throws
   {
     guard let frame else {
@@ -1066,13 +1066,13 @@ public final class VulkanOwnedTextureFrameHandle {
       self?.frame != nil
     })
     let view = VulkanOwnedTextureFrameView(
-      image: FrameNativePointer(
-        bitPattern: UInt(bitPattern: frame.raw.image),
+      image: FrameVulkanHandle(
+        bitPattern: frame.raw.image,
         scope: scope,
         diagnosticName: "Vulkan image"
       ),
-      imageView: FrameNativePointer(
-        bitPattern: UInt(bitPattern: frame.raw.image_view),
+      imageView: FrameVulkanHandle(
+        bitPattern: frame.raw.image_view,
         scope: scope,
         diagnosticName: "Vulkan image view"
       )

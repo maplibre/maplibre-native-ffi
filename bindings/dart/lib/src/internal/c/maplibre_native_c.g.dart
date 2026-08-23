@@ -2666,6 +2666,8 @@ const int MLN_ADAPTER_RESOURCE_KIND_ANY = 4294967295;
 
 const int MLN_HANDLE_NULL = 0;
 
+const int MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL = 0;
+
 final class UnnamedUnion extends ffi.Union {
   external mln_offline_tile_pyramid_region_definition tile_pyramid;
 
@@ -6547,9 +6549,11 @@ final class mln_vulkan_borrowed_texture_descriptor extends ffi.Struct {
 
   external mln_vulkan_context_descriptor context;
 
-  external ffi.Pointer<ffi.Void> image;
+  @mln_vulkan_non_dispatchable_handle()
+  external int image;
 
-  external ffi.Pointer<ffi.Void> image_view;
+  @mln_vulkan_non_dispatchable_handle()
+  external int image_view;
 
   @ffi.Uint32()
   external int format;
@@ -6601,6 +6605,9 @@ final class mln_vulkan_context_descriptor extends ffi.Struct {
     ..ref.get_device_proc_addr = get_device_proc_addr;
 }
 
+typedef mln_vulkan_non_dispatchable_handle = ffi.Uint64;
+typedef Dartmln_vulkan_non_dispatchable_handle = int;
+
 final class mln_vulkan_owned_texture_descriptor extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -6629,9 +6636,11 @@ final class mln_vulkan_owned_texture_frame extends ffi.Struct {
   @ffi.Uint64()
   external int frame_id;
 
-  external ffi.Pointer<ffi.Void> image;
+  @mln_vulkan_non_dispatchable_handle()
+  external int image;
 
-  external ffi.Pointer<ffi.Void> image_view;
+  @mln_vulkan_non_dispatchable_handle()
+  external int image_view;
 
   external ffi.Pointer<ffi.Void> device;
 
@@ -6649,8 +6658,8 @@ final class mln_vulkan_owned_texture_frame extends ffi.Struct {
     required int height,
     required double scale_factor,
     required int frame_id,
-    required ffi.Pointer<ffi.Void> image,
-    required ffi.Pointer<ffi.Void> image_view,
+    required int image,
+    required int image_view,
     required ffi.Pointer<ffi.Void> device,
     required int format,
     required int layout,
@@ -6676,7 +6685,8 @@ final class mln_vulkan_surface_descriptor extends ffi.Struct {
 
   external mln_vulkan_context_descriptor context;
 
-  external ffi.Pointer<ffi.Void> surface;
+  @mln_vulkan_non_dispatchable_handle()
+  external int surface;
 }
 
 typedef mln_wake_source = ffi.Uint64;
