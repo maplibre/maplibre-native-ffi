@@ -285,7 +285,7 @@ def verify_android(root: pathlib.Path) -> None:
     )
     with zipfile.ZipFile(core) as aar:
         names = set(aar.namelist())
-        for abi in ("arm64-v8a", "x86_64"):
+        for abi in ("armeabi-v7a", "arm64-v8a", "x86_64"):
             expected = f"jni/{abi}/libjniMaplibreNativeC.so"
             if expected not in names:
                 raise SystemExit(f"the core Android AAR is missing {expected}")
@@ -344,7 +344,10 @@ def verify_android(root: pathlib.Path) -> None:
                 )
                 if expected not in names:
                     raise SystemExit(f"{runtime} is missing {expected}")
-            for abi in ("arm64-v8a", "x86_64"):
+            abis = ("arm64-v8a", "x86_64")
+            if backend == "opengl":
+                abis = ("armeabi-v7a", *abis)
+            for abi in abis:
                 expected = f"jni/{abi}/libmaplibre-native-c.so"
                 if expected not in names:
                     raise SystemExit(f"{runtime} is missing {expected}")

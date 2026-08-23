@@ -10,8 +10,11 @@ plugins {
 }
 
 val androidTargets =
-  AndroidTarget.parseAbis(
-    providers.gradleProperty("maplibre.android.abis").getOrElse(AndroidTarget.DEFAULT_ABIS)
+  AndroidTarget.compatibleAbis(
+    providers
+      .gradleProperty("maplibre.android.abis")
+      .getOrElse(AndroidTarget.defaultAbis("vulkan")),
+    "vulkan",
   )
 val packagedAndroidRuntimeLibs =
   project(":bindings:kotlin").layout.buildDirectory.dir("generated/jniLibs/runtime")

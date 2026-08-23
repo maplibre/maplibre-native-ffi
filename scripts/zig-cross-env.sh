@@ -74,14 +74,18 @@ case "$1" in
     fi
 
     zig_target=$(sed -n 's/^[[:space:]]*"zigTarget":[[:space:]]*"\([^"]*\)".*/\1/p' "$descriptor")
-    if [[ ! "$zig_target" =~ ^(aarch64|x86_64)-linux-android\.([0-9]+)$ ]]; then
+    if [[ ! "$zig_target" =~ ^((aarch64|x86_64|arm)-linux-android)\.([0-9]+)$ ]]; then
       echo "The Android native artifact has an invalid Zig target: $zig_target" >&2
       exit 2
     fi
-    zig_target_triple="${BASH_REMATCH[1]}-linux-android"
-    zig_api_level=${BASH_REMATCH[2]}
-    zig_include_dir="$ndk_sysroot/usr/include/$zig_target_triple"
-    zig_crt_dir="$ndk_sysroot/usr/lib/$zig_target_triple/$zig_api_level"
+    zig_target_triple=${BASH_REMATCH[1]}
+    zig_api_level=${BASH_REMATCH[3]}
+    ndk_target_triple=$zig_target_triple
+    if [[ "$zig_target_triple" == arm-linux-android ]]; then
+      ndk_target_triple=arm-linux-androideabi
+    fi
+    zig_include_dir="$ndk_sysroot/usr/include/$ndk_target_triple"
+    zig_crt_dir="$ndk_sysroot/usr/lib/$ndk_target_triple/$zig_api_level"
     if [[ ! -d "$zig_include_dir" ]]; then
       echo "The Android Zig libc include directory does not exist: $zig_include_dir" >&2
       exit 2

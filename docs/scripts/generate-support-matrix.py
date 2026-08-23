@@ -47,6 +47,7 @@ ENVIRONMENT_ORDER = [
     "windows-x64",
     "windows-arm64",
     "emscripten-wasm32",
+    "android-arm",
     "android-arm64",
     "android-x64",
     "ios-arm64",

@@ -39,7 +39,7 @@ def platform(preset: str) -> str:
 
 def architecture(preset: str) -> str:
     parts = preset.split("-")
-    for candidate in ("x64", "arm64", "wasm32"):
+    for candidate in ("x64", "arm64", "arm", "wasm32"):
         if candidate in parts:
             return candidate
     raise SystemExit(f"error: cannot determine architecture from preset {preset!r}")
@@ -109,13 +109,19 @@ def android_commands(preset: str, abi: str, build_map: bool) -> list[str]:
         ]
         commands.append(f"mise run //bindings/python:test {preset}")
     else:
-        commands = [
-            f"mise run //bindings/kotlin:build {preset}",
-            f"mise run //bindings/kotlin:android-build {arguments} --prebuilt",
-            f"mise run //bindings/go:build {preset}",
-            f"mise run //bindings/rust:build {preset}",
-            f"mise run //bindings/zig:build {preset}",
-        ]
+        commands = []
+        # The OpenGL Android AAR supports ARM32. Kotlin/Native assumes 64-bit
+        # size_t throughout its handwritten C interop and has no ARM32 target.
+        if architecture(preset) != "arm":
+            commands.append(f"mise run //bindings/kotlin:build {preset}")
+        commands.extend(
+            [
+                f"mise run //bindings/kotlin:android-build {arguments} --prebuilt",
+                f"mise run //bindings/go:build {preset}",
+                f"mise run //bindings/rust:build {preset}",
+                f"mise run //bindings/zig:build {preset}",
+            ]
+        )
     if build_map:
         commands.append(f"mise run //examples/android-map:build {arguments} --prebuilt")
     commands.append(f"mise run //bindings/dart:build:mobile {preset}")
@@ -146,7 +152,11 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
     target_platform = platform(preset)
     commands = []
     if target_platform == "android":
-        abi = "arm64-v8a" if architecture(preset) == "arm64" else "x86_64"
+        abi = {
+            "arm": "armeabi-v7a",
+            "arm64": "arm64-v8a",
+            "x64": "x86_64",
+        }[architecture(preset)]
         commands.extend(android_commands(preset, abi, backend(preset) == "egl"))
     elif target_platform == "ohos":
         commands.extend(ohos_commands(preset))

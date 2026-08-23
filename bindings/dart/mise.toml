@@ -60,6 +60,7 @@ description = "Build the Dart binding in a Flutter mobile application."
 usage = '''
 arg "[preset]" {
   choices \
+    "android-arm-egl" \
     "android-arm64-egl" \
     "android-arm64-vulkan" \
     "android-x64-egl" \
@@ -87,6 +88,9 @@ cd "$app"
 flutter pub get
 
 case "$usage_preset" in
+  android-arm-*)
+    flutter build apk --release --target-platform android-arm
+    ;;
   android-arm64-*)
     flutter build apk --release --target-platform android-arm64
     ;;

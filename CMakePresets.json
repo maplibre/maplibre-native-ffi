@@ -79,6 +79,12 @@
       }
     },
     {
+      "name": "_android-arm",
+      "hidden": true,
+      "inherits": "_android",
+      "cacheVariables": { "ANDROID_ABI": "armeabi-v7a" }
+    },
+    {
       "name": "_android-arm64",
       "hidden": true,
       "inherits": "_android",
@@ -259,6 +265,11 @@
       "cacheVariables": { "CMAKE_OSX_SYSROOT": "appletvsimulator" }
     },
     {
+      "name": "android-arm-egl",
+      "displayName": "Android ARMv7 EGL",
+      "inherits": ["_android-arm", "_egl"]
+    },
+    {
       "name": "android-arm64-egl",
       "displayName": "Android ARM64 EGL",
       "inherits": ["_android-arm64", "_egl"]
@@ -400,6 +411,12 @@
       "configurePreset": "tvos-simulator-arm64-metal",
       "targets": ["install"],
       "configuration": "Release",
+      "jobs": 0
+    },
+    {
+      "name": "android-arm-egl",
+      "configurePreset": "android-arm-egl",
+      "targets": ["install"],
       "jobs": 0
     },
     {
@@ -647,6 +664,12 @@
       "configurations": ["Release"]
     },
     {
+      "name": "android-arm-egl",
+      "configurePreset": "android-arm-egl",
+      "generators": ["TGZ"],
+      "configurations": ["Release"]
+    },
+    {
       "name": "android-arm64-egl",
       "configurePreset": "android-arm64-egl",
       "generators": ["TGZ"],
@@ -809,6 +832,13 @@
       "steps": [
         { "type": "configure", "name": "tvos-simulator-arm64-metal" },
         { "type": "build", "name": "tvos-simulator-arm64-metal" }
+      ]
+    },
+    {
+      "name": "android-arm-egl",
+      "steps": [
+        { "type": "configure", "name": "android-arm-egl" },
+        { "type": "build", "name": "android-arm-egl" }
       ]
     },
     {

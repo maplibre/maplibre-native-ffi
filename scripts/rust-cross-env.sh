@@ -8,6 +8,7 @@
 cargo_target=
 
 case "$1" in
+  android-arm-*) cargo_target=armv7-linux-androideabi ;;
   android-arm64-*) cargo_target=aarch64-linux-android ;;
   android-x64-*) cargo_target=x86_64-linux-android ;;
   ohos-arm64-*) cargo_target=aarch64-unknown-linux-ohos ;;
@@ -15,15 +16,19 @@ case "$1" in
 esac
 
 case "$1" in
-  android-*64-*)
+  android-*)
     ndk_prebuilt="$ANDROID_HOME/ndk/$MLN_FFI_ANDROID_NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64"
+    compiler_target="$cargo_target"
+    if [[ "$cargo_target" == armv7-linux-androideabi ]]; then
+      compiler_target=armv7a-linux-androideabi
+    fi
     target_env="${cargo_target//-/_}"
     export "BINDGEN_EXTRA_CLANG_ARGS_$target_env=--target=$cargo_target --sysroot=$ndk_prebuilt/sysroot"
-    export "CC_$target_env=$ndk_prebuilt/bin/${cargo_target}24-clang"
-    export "CXX_$target_env=$ndk_prebuilt/bin/${cargo_target}24-clang++"
+    export "CC_$target_env=$ndk_prebuilt/bin/${compiler_target}24-clang"
+    export "CXX_$target_env=$ndk_prebuilt/bin/${compiler_target}24-clang++"
     # tr rather than ${var^^}: macOS tasks can run under Bash 3.2.
     target_env_upper="$(printf '%s' "$target_env" | tr '[:lower:]' '[:upper:]')"
-    export "CARGO_TARGET_${target_env_upper}_LINKER=$ndk_prebuilt/bin/${cargo_target}24-clang"
+    export "CARGO_TARGET_${target_env_upper}_LINKER=$ndk_prebuilt/bin/${compiler_target}24-clang"
     ;;
   ohos-*64-*)
     # The OHOS SDK clang target drops the `-unknown` vendor from the cargo target.
