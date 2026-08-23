@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <deque>
 #include <exception>
 #include <limits>
 #include <memory>
@@ -2972,6 +2973,57 @@ auto map_resize(
 
 namespace {
 auto discarded_completion() noexcept -> mln_completion;
+
+// Serializes blocking map destruction away from runtime executors. The worker
+// exists only while teardown is pending, so browser builds do not permanently
+// lose a worker from their fixed pthread pool.
+class MapTeardownLane {
+ public:
+  auto submit(std::function<void()> teardown) -> void {
+    auto start = false;
+    {
+      const std::scoped_lock lock(mutex_);
+      pending_.push_back(std::move(teardown));
+      if (!running_) {
+        running_ = true;
+        start = true;
+      }
+    }
+    if (start) {
+      std::thread([this]() noexcept -> void { run(); }).detach();
+    }
+  }
+
+ private:
+  auto run() noexcept -> void {
+    for (;;) {
+      auto teardown = std::function<void()>{};
+      {
+        const std::scoped_lock lock(mutex_);
+        if (pending_.empty()) {
+          running_ = false;
+          return;
+        }
+        teardown = std::move(pending_.front());
+        pending_.pop_front();
+      }
+      try {
+        teardown();
+      } catch (...) {
+      }
+    }
+  }
+
+  std::mutex mutex_;
+  std::deque<std::function<void()>> pending_;
+  bool running_ = false;
+};
+
+auto map_teardown_lane() -> MapTeardownLane& {
+  // Process lifetime avoids a static-destruction race with the retiring lane.
+  static auto* lane = new MapTeardownLane{};
+  return *lane;
+}
 }  // namespace
 
 auto release_map(mln_map map, const mln_completion* completion) -> mln_status {
@@ -3036,7 +3088,7 @@ auto release_map(mln_map map, const mln_completion* completion) -> mln_status {
     }
     if (!schedule) return;
     try {
-      close->owned_map->runtime_state->executor.invoke([close]() mutable {
+      map_teardown_lane().submit([close]() mutable {
         auto owned = std::move(close->owned_map);
         owned->callback_sources->detach();
         owned->frontend->close_renderer_observer();
