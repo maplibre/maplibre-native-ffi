@@ -59,6 +59,7 @@ import org.maplibre.nativeffi.internal.lifecycle.ownedBufferHandle
 import org.maplibre.nativeffi.internal.lifecycle.queriedFeatureListHandle
 import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
 import org.maplibre.nativeffi.internal.lifecycle.renderSessionHandle
+import org.maplibre.nativeffi.internal.memory.toCSize
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.struct.ByteStructs
 import org.maplibre.nativeffi.internal.struct.CoreStructs
@@ -269,7 +270,12 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
     activeFrame.ensureInactive("read texture data")
     val outInfo = mln_texture_image_info_default().getPointer(this)
     val status =
-      mln_texture_read_premultiplied_rgba8(state.requireLive().rawHandleValue, null, 0UL, outInfo)
+      mln_texture_read_premultiplied_rgba8(
+        state.requireLive().rawHandleValue,
+        null,
+        0.toCSize(),
+        outInfo,
+      )
     val info = RenderStructs.textureImageInfo(outInfo.pointed)
     if (status == 0 || (status == -1 && info.byteLength > 0L)) {
       info
@@ -287,7 +293,7 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
         mln_texture_read_premultiplied_rgba8(
           state.requireLive().rawHandleValue,
           pointer?.reinterpret<UByteVar>(),
-          capacity.toULong(),
+          capacity.toCSize(),
           outInfo,
         )
       )

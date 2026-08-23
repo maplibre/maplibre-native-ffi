@@ -22,6 +22,7 @@ val packagedAndroidRuntimeLibs =
 kotlin {
   jvm { compilerOptions { jvmTarget.set(JvmTarget.fromTarget(libs.versions.java.release.get())) } }
 
+  androidNativeArm32()
   androidNativeArm64()
   androidNativeX64()
   linuxArm64()

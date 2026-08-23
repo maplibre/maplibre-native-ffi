@@ -18,7 +18,7 @@ class CoreStructsTest : org.maplibre.nativeffi.NativeTestBase() {
       val native = alloc<mln_buffer_view>()
       CoreStructs.stringView("a\u0000b", this).place(native.ptr)
 
-      assertEquals(3UL, native.size)
+      assertEquals(3UL, native.size.toULong())
       assertEquals("a\u0000b", CoreStructs.stringView(native))
     }
   }
@@ -30,7 +30,7 @@ class CoreStructsTest : org.maplibre.nativeffi.NativeTestBase() {
 
       CoreStructs.setStringView(native, "a\u0000b", this)
 
-      assertEquals(3UL, native.size)
+      assertEquals(3UL, native.size.toULong())
       assertEquals("a\u0000b", CoreStructs.stringView(native))
     }
   }

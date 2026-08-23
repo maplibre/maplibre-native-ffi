@@ -1,6 +1,7 @@
 [
   "maplibre-native-ffi",
   "maplibre-native-ffi-android",
+  "maplibre-native-ffi-androidnativearm32",
   "maplibre-native-ffi-androidnativearm64",
   "maplibre-native-ffi-androidnativex64",
   "maplibre-native-ffi-iosarm64",
@@ -20,6 +21,7 @@
   "maplibre-native-ffi-runtime-metal-macosarm64",
   "maplibre-native-ffi-runtime-opengl",
   "maplibre-native-ffi-runtime-opengl-android",
+  "maplibre-native-ffi-runtime-opengl-androidnativearm32",
   "maplibre-native-ffi-runtime-opengl-androidnativearm64",
   "maplibre-native-ffi-runtime-opengl-androidnativex64",
   "maplibre-native-ffi-runtime-opengl-jvm",

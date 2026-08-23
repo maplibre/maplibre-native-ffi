@@ -2,7 +2,7 @@ package org.maplibre.nativeffi.gradle
 
 enum class AndroidTarget(
   val cargoTarget: String,
-  val kotlinNativeTarget: String?,
+  val kotlinNativeTarget: String,
   val targetPlatform: String,
   val cmakeArchitecture: String,
   val ndkAbi: String,
@@ -12,7 +12,7 @@ enum class AndroidTarget(
 ) {
   ARM(
     cargoTarget = "armv7-linux-androideabi",
-    kotlinNativeTarget = null,
+    kotlinNativeTarget = "androidNativeArm32",
     targetPlatform = "android-arm",
     cmakeArchitecture = "arm",
     ndkAbi = "armeabi-v7a",
