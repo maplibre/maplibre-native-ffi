@@ -1,5 +1,5 @@
-# Builds the Linux targets with `zig cc` / `zig c++` against an old glibc and
-# LLVM libc++, rather than the build host's GCC, glibc, and libstdc++.
+# Builds the Linux targets with `zig cc` / `zig c++` against the selected libc
+# and LLVM libc++, rather than the build host's GCC, libc, and libstdc++.
 #
 # This sets the glibc floor from the toolchain instead of from whichever image
 # the build runs on, and leaves the artifacts free of any libstdc++ ABI
@@ -7,9 +7,9 @@
 # it supplies glibc 2.19 and GCC 8.3, and it statically links its own libstdc++
 # into every consumer binary. See the Kotlin publishing doc.
 #
-# Host and target are the same machine for the presets that use this file, so
-# CMAKE_SYSTEM_NAME stays unset unless the architectures differ. That keeps
-# try_run, find_package, and running the test binaries working.
+# A same-architecture glibc preset is a native build, so CMAKE_SYSTEM_NAME stays
+# unset and try_run, find_package, and test binaries work on the host. Musl is
+# always a cross build and runs its test binaries inside Alpine.
 
 if(NOT CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
   message(FATAL_ERROR "cmake/toolchains/zig-linux.cmake targets Linux hosts")
@@ -17,9 +17,15 @@ endif()
 
 set(MLN_FFI_ZIG_GLIBC "2.17"
     CACHE STRING "Oldest glibc release the Linux artifacts may require")
+set(MLN_FFI_ZIG_LIBC "gnu"
+    CACHE STRING "Linux libc ABI to target (gnu or musl)")
+set_property(CACHE MLN_FFI_ZIG_LIBC PROPERTY STRINGS gnu musl)
+if(NOT MLN_FFI_ZIG_LIBC MATCHES "^(gnu|musl)$")
+  message(FATAL_ERROR "Unsupported Linux libc ABI: ${MLN_FFI_ZIG_LIBC}")
+endif()
 
 list(APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES MLN_FFI_TARGET_ARCHITECTURE
-     MLN_FFI_ZIG_GLIBC)
+     MLN_FFI_ZIG_GLIBC MLN_FFI_ZIG_LIBC)
 
 if(MLN_FFI_TARGET_ARCHITECTURE STREQUAL "arm64")
   set(MLN_FFI_ZIG_ARCH "aarch64")
@@ -27,9 +33,17 @@ else()
   set(MLN_FFI_ZIG_ARCH "x86_64")
 endif()
 
-set(MLN_FFI_ZIG_TRIPLE "${MLN_FFI_ZIG_ARCH}-linux-gnu.${MLN_FFI_ZIG_GLIBC}")
+if(MLN_FFI_ZIG_LIBC STREQUAL "musl")
+  set(MLN_FFI_ZIG_TRIPLE "${MLN_FFI_ZIG_ARCH}-linux-musl")
+else()
+  set(MLN_FFI_ZIG_TRIPLE "${MLN_FFI_ZIG_ARCH}-linux-gnu.${MLN_FFI_ZIG_GLIBC}")
+endif()
 
-if(NOT CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "${MLN_FFI_ZIG_ARCH}")
+# A musl target is a cross build even when its architecture matches a glibc
+# host. Marking it as one keeps configure-time probes from executing binaries
+# through the wrong dynamic loader.
+if(MLN_FFI_ZIG_LIBC STREQUAL "musl"
+   OR NOT CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "${MLN_FFI_ZIG_ARCH}")
   set(CMAKE_SYSTEM_NAME Linux)
   set(CMAKE_SYSTEM_PROCESSOR "${MLN_FFI_ZIG_ARCH}")
 endif()

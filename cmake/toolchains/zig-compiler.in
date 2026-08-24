@@ -3,7 +3,7 @@
 #
 # CMake and cc-rs both want one executable path for the compiler, and the zig
 # driver takes its mode in argv[1], so the driver is wrapped here. The pinned
-# target is what gives the Linux artifacts their glibc floor.
+# target is what selects the Linux artifact's libc ABI.
 #
 # cc-rs, through ring's build script, passes the four-component LLVM triple
 # x86_64-unknown-linux-gnu, which zig reads as os="unknown". The target below is

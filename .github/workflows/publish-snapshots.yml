@@ -196,10 +196,10 @@ jobs:
       matrix:
         include:
           - backend: vulkan
-            preset: linux-x64-vulkan
+            preset: linux-gnu-x64-vulkan
             runner: ubuntu-latest
           - backend: opengl
-            preset: linux-x64-egl
+            preset: linux-gnu-x64-egl
             runner: ubuntu-latest
           - backend: metal
             preset: macos-arm64-metal
@@ -325,13 +325,13 @@ jobs:
         with:
           github-token: ${{ github.token }}
           run-id: ${{ needs.plan.outputs.run_id }}
-          name: native-package-linux-x64-vulkan-${{ env.SNAPSHOT_SHA }}
+          name: native-package-linux-gnu-x64-vulkan-${{ env.SNAPSHOT_SHA }}
           path: build/packages/native/docs-input
       - name: Install packaged native artifact
         run: >-
           mise run install-native-package
-          linux-x64-vulkan
-          build/packages/native/docs-input/maplibre-native-c-linux-x64-vulkan.tar.gz
+          linux-gnu-x64-vulkan
+          build/packages/native/docs-input/maplibre-native-c-linux-gnu-x64-vulkan.tar.gz
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - run: mise run //docs:build
         env:

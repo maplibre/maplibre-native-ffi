@@ -46,10 +46,10 @@ case "$usage_preset" in
   android-arm64-vulkan) kotlin_target=androidNativeArm64; runtime_backend=vulkan ;;
   android-x64-egl) kotlin_target=androidNativeX64; runtime_backend=opengl ;;
   android-x64-vulkan) kotlin_target=androidNativeX64; runtime_backend=vulkan ;;
-  linux-x64-egl) kotlin_target=linuxX64; runtime_backend=opengl; tasks+=(:bindings:kotlin:jvmJar) ;;
-  linux-x64-vulkan) kotlin_target=linuxX64; runtime_backend=vulkan; tasks+=(:bindings:kotlin:jvmJar) ;;
-  linux-arm64-egl) kotlin_target=linuxArm64; runtime_backend=opengl; tasks+=(:bindings:kotlin:jvmJar) ;;
-  linux-arm64-vulkan) kotlin_target=linuxArm64; runtime_backend=vulkan; tasks+=(:bindings:kotlin:jvmJar) ;;
+  linux-gnu-x64-egl) kotlin_target=linuxX64; runtime_backend=opengl; tasks+=(:bindings:kotlin:jvmJar) ;;
+  linux-gnu-x64-vulkan) kotlin_target=linuxX64; runtime_backend=vulkan; tasks+=(:bindings:kotlin:jvmJar) ;;
+  linux-gnu-arm64-egl) kotlin_target=linuxArm64; runtime_backend=opengl; tasks+=(:bindings:kotlin:jvmJar) ;;
+  linux-gnu-arm64-vulkan) kotlin_target=linuxArm64; runtime_backend=vulkan; tasks+=(:bindings:kotlin:jvmJar) ;;
   macos-arm64-*) kotlin_target=macosArm64; tasks+=(:bindings:kotlin:jvmJar) ;;
   windows-*) kotlin_target=; tasks+=(:bindings:kotlin:jvmJar) ;;
   *)
@@ -86,8 +86,8 @@ extends = "ffi:preset"
 dir = "../.."
 run = '''
 case "$usage_preset" in
-  linux-x64-* | macos-arm64-*) runtimes=(jvm native) ;;
-  linux-arm64-* | windows-*) runtimes=(jvm) ;;
+  linux-gnu-x64-* | macos-arm64-*) runtimes=(jvm native) ;;
+  linux-gnu-arm64-* | windows-*) runtimes=(jvm) ;;
   android-*)
     exec "$MISE_MONOREPO_ROOT/scripts/test-kotlin-android-device.sh" "$usage_preset"
     ;;
@@ -134,7 +134,7 @@ run = '''
 gradle_args=()
 gradle_tasks=()
 case "$usage_preset" in
-  linux-x64-*) kotlin_target=linuxX64 ;;
+  linux-gnu-x64-*) kotlin_target=linuxX64 ;;
   macos-arm64-*) kotlin_target=macosArm64 ;;
   android-*)
     echo "The Kotlin/Native Android targets are build-only; use //bindings/kotlin:build with $usage_preset." >&2

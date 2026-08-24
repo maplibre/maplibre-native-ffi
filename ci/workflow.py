@@ -5,7 +5,7 @@ import pathlib
 import shlex
 import tomllib
 
-DESKTOP = {"linux", "macos", "windows"}
+DESKTOP = {"linux-gnu", "linux-musl", "macos", "windows"}
 
 # Targets whose suite runs on an emulator instead of through ctest, so CMake
 # registers no test preset for them.
@@ -31,6 +31,10 @@ def load_configuration(
 
 
 def platform(preset: str) -> str:
+    if preset.startswith("linux-gnu-"):
+        return "linux-gnu"
+    if preset.startswith("linux-musl-"):
+        return "linux-musl"
     if preset.startswith("ios-simulator-"):
         return "ios-simulator"
     if preset.startswith("tvos-simulator-"):
@@ -56,9 +60,9 @@ def backend(preset: str) -> str:
 def runner(preset: str) -> str:
     target_platform = platform(preset)
     target_architecture = architecture(preset)
-    if target_platform == "linux":
-        # The zig toolchain sets the glibc floor. These images stay pinned so
-        # the graphics loaders and drivers the tests use stay reproducible.
+    if target_platform in {"linux-gnu", "linux-musl"}:
+        # The Zig toolchain selects the libc. These images stay pinned so the
+        # graphics headers and loaders used at build time stay reproducible.
         return "ubuntu-24.04-arm" if target_architecture == "arm64" else "ubuntu-24.04"
     if target_platform in {"macos", "ios", "ios-simulator", "tvos", "tvos-simulator"}:
         return "macos-26"
@@ -139,8 +143,10 @@ def native_commands(preset: str, tested: set[str]) -> list[str]:
     commands = [
         f"mise run {'test' if runtime_tested(preset, tested) else 'build'} {preset}"
     ]
-    if target_platform == "linux":
+    if target_platform == "linux-gnu":
         commands.append(f"mise run check-glibc-floor {preset}")
+    elif target_platform == "linux-musl":
+        commands.append(f"mise run check-musl-abi {preset}")
     return commands
 
 

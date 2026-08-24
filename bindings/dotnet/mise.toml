@@ -48,6 +48,10 @@ MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
 extends = "ffi:preset"
 dir = "../.."
 run = '''
+if [[ "$usage_preset" == linux-musl-* ]]; then
+  exec python3 ci/dotnet_snapshot.py smoke-musl "$usage_preset"
+fi
+
 MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   dotnet test \
     --project bindings/dotnet/tests/Maplibre.NativeFfi.Tests/Maplibre.NativeFfi.Tests.csproj \

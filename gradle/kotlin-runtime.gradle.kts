@@ -37,8 +37,8 @@ data class JvmRuntimeInstall(
 
 val jvmTargetPlatforms =
   linkedMapOf(
-    "natives-linux-x64" to "linux-x64",
-    "natives-linux-arm64" to "linux-arm64",
+    "natives-linux-x64" to "linux-gnu-x64",
+    "natives-linux-arm64" to "linux-gnu-arm64",
     "natives-macos-arm64" to "macos-arm64",
     "natives-windows-x64" to "windows-x64",
     "natives-windows-arm64" to "windows-arm64",
@@ -70,7 +70,7 @@ fun nativeTargets(backend: MaplibreRuntimeBackend): Map<String, NativeTargetConf
           "linuxArm64",
           NativeTargetConfiguration(
             "linux-${backend.id}.def",
-            "linux-arm64",
+            "linux-gnu-arm64",
             listOf("libmaplibre-native-c.a", "libmln_ffi_platform.a"),
           ),
         )
@@ -78,7 +78,7 @@ fun nativeTargets(backend: MaplibreRuntimeBackend): Map<String, NativeTargetConf
           "linuxX64",
           NativeTargetConfiguration(
             "linux-${backend.id}.def",
-            "linux-x64",
+            "linux-gnu-x64",
             listOf("libmaplibre-native-c.a", "libmln_ffi_platform.a"),
           ),
         )

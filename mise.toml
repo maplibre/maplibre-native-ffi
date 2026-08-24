@@ -126,7 +126,7 @@ swiftformat = { version = "{{vars.swiftformat_version}}", backend = "github:nick
 # part of the repository-wide native toolchain. `rust-src` is for the Emscripten
 # target alone: rustup ships no `std` for `wasm32-unknown-emscripten` built with
 # atomics, so that target rebuilds `std` from source. See cmake/mln_ffi_rust.cmake.
-"core:rust" = { version = "{{vars.rust_version}}", profile = "minimal", components = "rustfmt,clippy,rust-src", targets = "armv7-linux-androideabi,aarch64-linux-android,x86_64-linux-android,aarch64-unknown-linux-ohos,x86_64-unknown-linux-ohos,x86_64-pc-windows-msvc,aarch64-pc-windows-msvc,wasm32-unknown-emscripten" }
+"core:rust" = { version = "{{vars.rust_version}}", profile = "minimal", components = "rustfmt,clippy,rust-src", targets = "armv7-linux-androideabi,aarch64-linux-android,x86_64-linux-android,aarch64-unknown-linux-musl,x86_64-unknown-linux-musl,aarch64-unknown-linux-ohos,x86_64-unknown-linux-ohos,x86_64-pc-windows-msvc,aarch64-pc-windows-msvc,wasm32-unknown-emscripten" }
 
 # The native CMake build compiles the Linux targets with `zig cc`, so Zig joins
 # the native toolchain there. See cmake/toolchains/zig-linux.cmake. The Zig
@@ -313,7 +313,9 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 # The Emscripten suite runs as a page in headless Chromium; see
 # scripts/run-browser-test.mjs for how a browser is located.
 run = '''
-if [[ "$usage_preset" == ios-simulator-* ]]; then
+if [[ "$usage_preset" == linux-musl-* ]]; then
+  exec "$MISE_MONOREPO_ROOT/scripts/run-musl-test.sh" "$usage_preset"
+elif [[ "$usage_preset" == ios-simulator-* ]]; then
   mise run //:apple-simulator:boot iOS
 elif [[ "$usage_preset" == tvos-simulator-* ]]; then
   mise run //:apple-simulator:boot tvOS

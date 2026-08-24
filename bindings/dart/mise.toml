@@ -26,7 +26,7 @@ dir = "../.."
 run = "dart format"
 
 [tasks.ffigen]
-run = "dart run tool/ffigen.dart"
+run = "dart --packages=.dart_tool/package_config.json tool/ffigen.dart"
 sources = [
   "tool/ffigen.dart",
   "hook/build.dart",
@@ -138,6 +138,7 @@ dart test
 
 [tasks."test:download"]
 description = "Test the build hook against a downloaded native snapshot archive."
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 # Runs one file rather than the suite, because the rest holds native handles
 # across isolate boundaries. Removing the pointer forces the download; it goes
 # back afterwards so a local prefix survives this task.
@@ -148,5 +149,8 @@ trap 'if [[ -s "$saved" ]]; then mv "$saved" "$pointer"; else rm -f "$saved"; fi
 if [[ -f "$pointer" ]]; then
   mv "$pointer" "$saved"
 fi
-dart test test/native_library_test.dart
+python3 "$MISE_MONOREPO_ROOT/ci/native_download_fixture.py" \
+  --dart-pointer .dart_tool/maplibre_native_test_snapshot_base_url \
+  "$MISE_MONOREPO_ROOT/build/packages/native/dist/maplibre-native-c-$usage_preset.tar.gz" \
+  -- dart test test/native_library_test.dart
 '''

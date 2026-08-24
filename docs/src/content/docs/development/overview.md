@@ -79,7 +79,7 @@ The default host preset uses Metal on macOS and Vulkan on Linux and Windows.
 Pass another preset to select a different native target or backend:
 
 ```bash
-mise run build linux-x64-egl
+mise run build linux-gnu-x64-egl
 ```
 
 ## Cross-Compilation SDKs

@@ -74,8 +74,8 @@ jobs:
           packages: platform-tools platforms;android-36
       - run: mise run //docs:build
 
-  target-linux-x64-egl:
-    name: target / linux-x64-egl
+  target-linux-gnu-x64-egl:
+    name: target / linux-gnu-x64-egl
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
@@ -90,63 +90,63 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
-          target: linux-x64-egl
+          target: linux-gnu-x64-egl
           zig: true
           save-toolchains: true
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
-      - run: mise run test linux-x64-egl
-      - run: mise run check-glibc-floor linux-x64-egl
+      - run: mise run test linux-gnu-x64-egl
+      - run: mise run check-glibc-floor linux-gnu-x64-egl
       - name: Archive native artifact
-        run: mise run archive-native linux-x64-egl
+        run: mise run archive-native linux-gnu-x64-egl
       - name: Install packaged native artifact
         run: >-
           mise run install-native-package
-          linux-x64-egl
-          build/packages/native/dist/maplibre-native-c-linux-x64-egl.tar.gz
-      - run: mise run //bindings/rust:test linux-x64-egl
+          linux-gnu-x64-egl
+          build/packages/native/dist/maplibre-native-c-linux-gnu-x64-egl.tar.gz
+      - run: mise run //bindings/rust:test linux-gnu-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //examples/rust-map:check linux-x64-egl
+      - run: mise run //examples/rust-map:check linux-gnu-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/zig:test linux-x64-egl
+      - run: mise run //bindings/zig:test linux-gnu-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //examples/zig-map:build linux-x64-egl
+      - run: mise run //examples/zig-map:build linux-gnu-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //examples/zig-readback:run linux-x64-egl
+      - run: mise run //examples/zig-readback:run linux-gnu-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/kotlin:test linux-x64-egl
+      - run: mise run //bindings/kotlin:test linux-gnu-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //examples/compose-map:build linux-x64-egl
+      - run: mise run //examples/compose-map:build linux-gnu-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //examples/lwjgl-map:build linux-x64-egl
+      - run: mise run //examples/lwjgl-map:build linux-gnu-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/swift:test linux-x64-egl
+      - run: mise run //bindings/swift:test linux-gnu-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/dotnet:test linux-x64-egl
+      - run: mise run //bindings/dotnet:test linux-gnu-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/go:test linux-x64-egl
+      - run: mise run //bindings/go:test linux-gnu-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //examples/go-map:check linux-x64-egl
+      - run: mise run //examples/go-map:check linux-gnu-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //examples/c-map:build linux-x64-egl
+      - run: mise run //examples/c-map:build linux-gnu-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/python:test linux-x64-egl
+      - run: mise run //bindings/python:test linux-gnu-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/dart:build linux-x64-egl
+      - run: mise run //bindings/dart:build linux-gnu-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
       - name: Save Zig packages
@@ -160,12 +160,12 @@ jobs:
       - name: Upload native artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: native-package-linux-x64-egl-${{ github.sha }}
-          path: build/packages/native/dist/maplibre-native-c-linux-x64-egl.tar.gz
+          name: native-package-linux-gnu-x64-egl-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-linux-gnu-x64-egl.tar.gz
           if-no-files-found: error
 
-  target-linux-x64-vulkan:
-    name: target / linux-x64-vulkan
+  target-linux-gnu-x64-vulkan:
+    name: target / linux-gnu-x64-vulkan
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
@@ -180,65 +180,65 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
-          target: linux-x64-vulkan
+          target: linux-gnu-x64-vulkan
           zig: true
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
-      - run: mise run test linux-x64-vulkan
-      - run: mise run check-glibc-floor linux-x64-vulkan
+      - run: mise run test linux-gnu-x64-vulkan
+      - run: mise run check-glibc-floor linux-gnu-x64-vulkan
       - name: Archive native artifact
-        run: mise run archive-native linux-x64-vulkan
+        run: mise run archive-native linux-gnu-x64-vulkan
       - name: Install packaged native artifact
         run: >-
           mise run install-native-package
-          linux-x64-vulkan
-          build/packages/native/dist/maplibre-native-c-linux-x64-vulkan.tar.gz
-      - run: mise run //bindings/rust:test linux-x64-vulkan release
+          linux-gnu-x64-vulkan
+          build/packages/native/dist/maplibre-native-c-linux-gnu-x64-vulkan.tar.gz
+      - run: mise run //bindings/rust:test linux-gnu-x64-vulkan release
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //examples/rust-map:check linux-x64-vulkan
+      - run: mise run //examples/rust-map:check linux-gnu-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/rust:test:download
+      - run: mise run //bindings/rust:test:download linux-gnu-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/dart:test:download
+      - run: mise run //bindings/dart:test:download linux-gnu-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/zig:test linux-x64-vulkan
+      - run: mise run //bindings/zig:test linux-gnu-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //examples/zig-map:build linux-x64-vulkan
+      - run: mise run //examples/zig-map:build linux-gnu-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //examples/zig-readback:run linux-x64-vulkan
+      - run: mise run //examples/zig-readback:run linux-gnu-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/kotlin:test linux-x64-vulkan
+      - run: mise run //bindings/kotlin:test linux-gnu-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //examples/compose-map:build linux-x64-vulkan
+      - run: mise run //examples/compose-map:build linux-gnu-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //examples/lwjgl-map:build linux-x64-vulkan
+      - run: mise run //examples/lwjgl-map:build linux-gnu-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/swift:test linux-x64-vulkan release
+      - run: mise run //bindings/swift:test linux-gnu-x64-vulkan release
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/dotnet:test linux-x64-vulkan
+      - run: mise run //bindings/dotnet:test linux-gnu-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/go:test linux-x64-vulkan
+      - run: mise run //bindings/go:test linux-gnu-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //examples/c-map:build linux-x64-vulkan
+      - run: mise run //examples/c-map:build linux-gnu-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/python:test linux-x64-vulkan
+      - run: mise run //bindings/python:test linux-gnu-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/dart:build linux-x64-vulkan
+      - run: mise run //bindings/dart:build linux-gnu-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
       - name: Save Zig packages
@@ -252,12 +252,12 @@ jobs:
       - name: Upload native artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: native-package-linux-x64-vulkan-${{ github.sha }}
-          path: build/packages/native/dist/maplibre-native-c-linux-x64-vulkan.tar.gz
+          name: native-package-linux-gnu-x64-vulkan-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-linux-gnu-x64-vulkan.tar.gz
           if-no-files-found: error
 
-  target-linux-arm64-egl:
-    name: target / linux-arm64-egl
+  target-linux-gnu-arm64-egl:
+    name: target / linux-gnu-arm64-egl
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
@@ -272,63 +272,63 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
-          target: linux-arm64-egl
+          target: linux-gnu-arm64-egl
           zig: true
           save-toolchains: true
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
-      - run: mise run test linux-arm64-egl
-      - run: mise run check-glibc-floor linux-arm64-egl
+      - run: mise run test linux-gnu-arm64-egl
+      - run: mise run check-glibc-floor linux-gnu-arm64-egl
       - name: Archive native artifact
-        run: mise run archive-native linux-arm64-egl
+        run: mise run archive-native linux-gnu-arm64-egl
       - name: Install packaged native artifact
         run: >-
           mise run install-native-package
-          linux-arm64-egl
-          build/packages/native/dist/maplibre-native-c-linux-arm64-egl.tar.gz
-      - run: mise run //bindings/rust:test linux-arm64-egl
+          linux-gnu-arm64-egl
+          build/packages/native/dist/maplibre-native-c-linux-gnu-arm64-egl.tar.gz
+      - run: mise run //bindings/rust:test linux-gnu-arm64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //examples/rust-map:check linux-arm64-egl
+      - run: mise run //examples/rust-map:check linux-gnu-arm64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/zig:test linux-arm64-egl
+      - run: mise run //bindings/zig:test linux-gnu-arm64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //examples/zig-map:build linux-arm64-egl
+      - run: mise run //examples/zig-map:build linux-gnu-arm64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //examples/zig-readback:run linux-arm64-egl
+      - run: mise run //examples/zig-readback:run linux-gnu-arm64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/kotlin:test linux-arm64-egl
+      - run: mise run //bindings/kotlin:test linux-gnu-arm64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //examples/compose-map:build linux-arm64-egl
+      - run: mise run //examples/compose-map:build linux-gnu-arm64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //examples/lwjgl-map:build linux-arm64-egl
+      - run: mise run //examples/lwjgl-map:build linux-gnu-arm64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/swift:test linux-arm64-egl
+      - run: mise run //bindings/swift:test linux-gnu-arm64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/dotnet:test linux-arm64-egl
+      - run: mise run //bindings/dotnet:test linux-gnu-arm64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/go:test linux-arm64-egl
+      - run: mise run //bindings/go:test linux-gnu-arm64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //examples/go-map:check linux-arm64-egl
+      - run: mise run //examples/go-map:check linux-gnu-arm64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //examples/c-map:build linux-arm64-egl
+      - run: mise run //examples/c-map:build linux-gnu-arm64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/python:test linux-arm64-egl
+      - run: mise run //bindings/python:test linux-gnu-arm64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/dart:build linux-arm64-egl
+      - run: mise run //bindings/dart:build linux-gnu-arm64-egl
         env:
           MISE_TASK_SKIP: "//:build"
       - name: Save Zig packages
@@ -342,12 +342,12 @@ jobs:
       - name: Upload native artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: native-package-linux-arm64-egl-${{ github.sha }}
-          path: build/packages/native/dist/maplibre-native-c-linux-arm64-egl.tar.gz
+          name: native-package-linux-gnu-arm64-egl-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-linux-gnu-arm64-egl.tar.gz
           if-no-files-found: error
 
-  target-linux-arm64-vulkan:
-    name: target / linux-arm64-vulkan
+  target-linux-gnu-arm64-vulkan:
+    name: target / linux-gnu-arm64-vulkan
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
@@ -362,59 +362,59 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
-          target: linux-arm64-vulkan
+          target: linux-gnu-arm64-vulkan
           zig: true
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
-      - run: mise run test linux-arm64-vulkan
-      - run: mise run check-glibc-floor linux-arm64-vulkan
+      - run: mise run test linux-gnu-arm64-vulkan
+      - run: mise run check-glibc-floor linux-gnu-arm64-vulkan
       - name: Archive native artifact
-        run: mise run archive-native linux-arm64-vulkan
+        run: mise run archive-native linux-gnu-arm64-vulkan
       - name: Install packaged native artifact
         run: >-
           mise run install-native-package
-          linux-arm64-vulkan
-          build/packages/native/dist/maplibre-native-c-linux-arm64-vulkan.tar.gz
-      - run: mise run //bindings/rust:test linux-arm64-vulkan
+          linux-gnu-arm64-vulkan
+          build/packages/native/dist/maplibre-native-c-linux-gnu-arm64-vulkan.tar.gz
+      - run: mise run //bindings/rust:test linux-gnu-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //examples/rust-map:check linux-arm64-vulkan
+      - run: mise run //examples/rust-map:check linux-gnu-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/zig:test linux-arm64-vulkan
+      - run: mise run //bindings/zig:test linux-gnu-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //examples/zig-map:build linux-arm64-vulkan
+      - run: mise run //examples/zig-map:build linux-gnu-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //examples/zig-readback:run linux-arm64-vulkan
+      - run: mise run //examples/zig-readback:run linux-gnu-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/kotlin:test linux-arm64-vulkan
+      - run: mise run //bindings/kotlin:test linux-gnu-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //examples/compose-map:build linux-arm64-vulkan
+      - run: mise run //examples/compose-map:build linux-gnu-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //examples/lwjgl-map:build linux-arm64-vulkan
+      - run: mise run //examples/lwjgl-map:build linux-gnu-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/swift:test linux-arm64-vulkan
+      - run: mise run //bindings/swift:test linux-gnu-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/dotnet:test linux-arm64-vulkan
+      - run: mise run //bindings/dotnet:test linux-gnu-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/go:test linux-arm64-vulkan
+      - run: mise run //bindings/go:test linux-gnu-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //examples/c-map:build linux-arm64-vulkan
+      - run: mise run //examples/c-map:build linux-gnu-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/python:test linux-arm64-vulkan
+      - run: mise run //bindings/python:test linux-gnu-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/dart:build linux-arm64-vulkan
+      - run: mise run //bindings/dart:build linux-gnu-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
       - name: Save Zig packages
@@ -428,8 +428,172 @@ jobs:
       - name: Upload native artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: native-package-linux-arm64-vulkan-${{ github.sha }}
-          path: build/packages/native/dist/maplibre-native-c-linux-arm64-vulkan.tar.gz
+          name: native-package-linux-gnu-arm64-vulkan-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-linux-gnu-arm64-vulkan.tar.gz
+          if-no-files-found: error
+
+  target-linux-musl-x64-egl:
+    name: target / linux-musl-x64-egl
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || github.base_ref == 'main'
+      || github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        with:
+          target: linux-musl-x64-egl
+          gradle: false
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run test linux-musl-x64-egl
+      - run: mise run check-musl-abi linux-musl-x64-egl
+      - name: Archive native artifact
+        run: mise run archive-native linux-musl-x64-egl
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package
+          linux-musl-x64-egl
+          build/packages/native/dist/maplibre-native-c-linux-musl-x64-egl.tar.gz
+      - run: mise run //bindings/rust:test linux-musl-x64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/dotnet:test linux-musl-x64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload native artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-package-linux-musl-x64-egl-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-linux-musl-x64-egl.tar.gz
+          if-no-files-found: error
+
+  target-linux-musl-x64-vulkan:
+    name: target / linux-musl-x64-vulkan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || github.base_ref == 'main'
+      || github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        with:
+          target: linux-musl-x64-vulkan
+          gradle: false
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run test linux-musl-x64-vulkan
+      - run: mise run check-musl-abi linux-musl-x64-vulkan
+      - name: Archive native artifact
+        run: mise run archive-native linux-musl-x64-vulkan
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package
+          linux-musl-x64-vulkan
+          build/packages/native/dist/maplibre-native-c-linux-musl-x64-vulkan.tar.gz
+      - run: mise run //bindings/rust:test linux-musl-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/dotnet:test linux-musl-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload native artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-package-linux-musl-x64-vulkan-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-linux-musl-x64-vulkan.tar.gz
+          if-no-files-found: error
+
+  target-linux-musl-arm64-egl:
+    name: target / linux-musl-arm64-egl
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || github.base_ref == 'main'
+      || github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        with:
+          target: linux-musl-arm64-egl
+          gradle: false
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run test linux-musl-arm64-egl
+      - run: mise run check-musl-abi linux-musl-arm64-egl
+      - name: Archive native artifact
+        run: mise run archive-native linux-musl-arm64-egl
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package
+          linux-musl-arm64-egl
+          build/packages/native/dist/maplibre-native-c-linux-musl-arm64-egl.tar.gz
+      - run: mise run //bindings/rust:test linux-musl-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/dotnet:test linux-musl-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload native artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-package-linux-musl-arm64-egl-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-linux-musl-arm64-egl.tar.gz
+          if-no-files-found: error
+
+  target-linux-musl-arm64-vulkan:
+    name: target / linux-musl-arm64-vulkan
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    if: >-
+      github.event_name != 'pull_request'
+      || github.base_ref == 'main'
+      || github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        with:
+          target: linux-musl-arm64-vulkan
+          gradle: false
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run test linux-musl-arm64-vulkan
+      - run: mise run check-musl-abi linux-musl-arm64-vulkan
+      - name: Archive native artifact
+        run: mise run archive-native linux-musl-arm64-vulkan
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package
+          linux-musl-arm64-vulkan
+          build/packages/native/dist/maplibre-native-c-linux-musl-arm64-vulkan.tar.gz
+      - run: mise run //bindings/rust:test linux-musl-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/dotnet:test linux-musl-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload native artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-package-linux-musl-arm64-vulkan-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-linux-musl-arm64-vulkan.tar.gz
           if-no-files-found: error
 
   target-emscripten-wasm32-webgl:
@@ -1736,10 +1900,10 @@ jobs:
       || github.base_ref == 'main'
       || github.event.pull_request.draft == false
     needs:
-      - target-linux-x64-egl
-      - target-linux-x64-vulkan
-      - target-linux-arm64-egl
-      - target-linux-arm64-vulkan
+      - target-linux-gnu-x64-egl
+      - target-linux-gnu-x64-vulkan
+      - target-linux-gnu-arm64-egl
+      - target-linux-gnu-arm64-vulkan
       - target-macos-arm64-metal
       - target-macos-arm64-vulkan
       - target-macos-arm64-egl
@@ -1777,10 +1941,14 @@ jobs:
     needs:
       - hygiene
       - docs
-      - target-linux-x64-egl
-      - target-linux-x64-vulkan
-      - target-linux-arm64-egl
-      - target-linux-arm64-vulkan
+      - target-linux-gnu-x64-egl
+      - target-linux-gnu-x64-vulkan
+      - target-linux-gnu-arm64-egl
+      - target-linux-gnu-arm64-vulkan
+      - target-linux-musl-x64-egl
+      - target-linux-musl-x64-vulkan
+      - target-linux-musl-arm64-egl
+      - target-linux-musl-arm64-vulkan
       - target-emscripten-wasm32-webgl
       - target-emscripten-wasm32-webgpu
       - target-macos-arm64-metal

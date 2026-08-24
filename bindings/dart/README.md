@@ -12,7 +12,7 @@ toolchain. From the repository root:
 
 ```bash
 mise run //bindings/dart:test
-mise run //bindings/dart:test linux-x64-vulkan
+mise run //bindings/dart:test linux-gnu-x64-vulkan
 mise run //bindings/dart:build:mobile android-arm64-egl
 mise run //bindings/dart:build:mobile ios-arm64-metal
 mise run //bindings/dart:build:mobile ios-simulator-arm64-metal

@@ -55,7 +55,7 @@ jobs:
         include:
           - partition: linux
             runner: ubuntu-latest
-            target: linux-x64-vulkan
+            target: linux-gnu-x64-vulkan
             native_pattern: native-package-android-*
           - partition: apple
             runner: macos-26
@@ -85,7 +85,7 @@ jobs:
         with:
           github-token: ${{ github.token }}
           run-id: ${{ inputs.run_id }}
-          pattern: native-package-linux-*-*-${{ env.PACKAGE_SHA }}
+          pattern: native-package-linux-gnu-*-*-${{ env.PACKAGE_SHA }}
           path: build/packages/native/maven-input
       - run: >-
           mise run //:kotlin:publish stage
