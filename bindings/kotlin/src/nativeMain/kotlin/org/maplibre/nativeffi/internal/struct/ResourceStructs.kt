@@ -11,6 +11,7 @@ import kotlinx.cinterop.toCValues
 import org.maplibre.nativeffi.internal.c.mln_resource_request
 import org.maplibre.nativeffi.internal.c.mln_resource_response
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
+import org.maplibre.nativeffi.internal.memory.toCSize
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.resource.ResourceKind
 import org.maplibre.nativeffi.resource.ResourceLoadingMethod
@@ -46,7 +47,7 @@ internal object ResourceStructs {
       if (value.has_prior_modified) value.prior_modified_unix_ms else null,
       if (value.has_prior_expires) value.prior_expires_unix_ms else null,
       optionalCString(value.prior_etag),
-      value.prior_data?.readBytes(checkedInt(value.prior_data_size, "prior data size"))
+      value.prior_data?.readBytes(checkedInt(value.prior_data_size.toULong(), "prior data size"))
         ?: ByteArray(0),
     )
   }
@@ -64,7 +65,7 @@ internal object ResourceStructs {
     native.error_reason = value.errorReason.nativeValue.toUInt()
     if (bytes.isNotEmpty()) {
       native.bytes = bytes.toUByteArray().toCValues().getPointer(scope)
-      native.byte_count = bytes.size.toULong()
+      native.byte_count = bytes.size.toCSize()
     }
     value.errorMessage?.let {
       native.error_message = resourceResponseCString(scope, it, "error message")

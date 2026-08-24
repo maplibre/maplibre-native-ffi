@@ -51,6 +51,7 @@ prepare_native_inputs() {
       # schedule cinterop tasks for the Android and Linux targets even though
       # the Linux partition publishes them; their install dirs must exist here.
       presets=(
+        android-arm-egl
         android-arm64-egl
         android-arm64-vulkan
         android-x64-egl
@@ -110,6 +111,7 @@ publish_linux_leaves() {
   # publications named on the command line, so each invocation configures
   # install dirs for all of them.
   local opengl=(
+    -Pmaplibre.runtime.opengl.androidNativeArm32.installDir="$install_root/android-arm-egl"
     -Pmaplibre.runtime.opengl.androidNativeArm64.installDir="$install_root/android-arm64-egl"
     -Pmaplibre.runtime.opengl.androidNativeX64.installDir="$install_root/android-x64-egl"
     -Pmaplibre.runtime.opengl.linuxArm64.installDir="$install_root/linux-arm64-egl"
@@ -125,7 +127,7 @@ publish_linux_leaves() {
   publish_tasks \
     :bindings:kotlin \
     "$repository" \
-    Android AndroidNativeArm64 AndroidNativeX64 -- \
+    Android AndroidNativeArm32 AndroidNativeArm64 AndroidNativeX64 -- \
     "$@" \
     "${common[@]}" \
     -Pmaplibre.android.abis=armeabi-v7a,arm64-v8a,x86_64
@@ -133,7 +135,7 @@ publish_linux_leaves() {
   publish_tasks \
     :bindings:kotlin:runtimes:opengl \
     "$repository" \
-    Android AndroidNativeArm64 AndroidNativeX64 -- \
+    Android AndroidNativeArm32 AndroidNativeArm64 AndroidNativeX64 -- \
     "$@" \
     "${common[@]}" \
     "${opengl[@]}" \
@@ -212,6 +214,7 @@ publish_apple_leaves() {
   # target of a runtime module, not just the publications named on the command
   # line, so each invocation configures install dirs for all of them.
   local opengl=(
+    -Pmaplibre.runtime.opengl.androidNativeArm32.installDir="$install_root/android-arm-egl"
     -Pmaplibre.runtime.opengl.androidNativeArm64.installDir="$install_root/android-arm64-egl"
     -Pmaplibre.runtime.opengl.androidNativeX64.installDir="$install_root/android-x64-egl"
     -Pmaplibre.runtime.opengl.linuxArm64.installDir="$install_root/linux-arm64-egl"
@@ -276,6 +279,7 @@ publish_apple_roots() {
   local repository="$1"
   shift
   local opengl=(
+    -Pmaplibre.runtime.opengl.androidNativeArm32.installDir="$install_root/android-arm-egl"
     -Pmaplibre.runtime.opengl.androidNativeArm64.installDir="$install_root/android-arm64-egl"
     -Pmaplibre.runtime.opengl.androidNativeX64.installDir="$install_root/android-x64-egl"
     -Pmaplibre.runtime.opengl.linuxArm64.installDir="$install_root/linux-arm64-egl"

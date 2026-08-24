@@ -40,6 +40,7 @@ run = '''
 runtime_backend=
 tasks=()
 case "$usage_preset" in
+  android-arm-egl) kotlin_target=androidNativeArm32; runtime_backend=opengl ;;
   android-arm64-egl) kotlin_target=androidNativeArm64; runtime_backend=opengl ;;
   android-arm64-vulkan) kotlin_target=androidNativeArm64; runtime_backend=vulkan ;;
   android-x64-egl) kotlin_target=androidNativeX64; runtime_backend=opengl ;;

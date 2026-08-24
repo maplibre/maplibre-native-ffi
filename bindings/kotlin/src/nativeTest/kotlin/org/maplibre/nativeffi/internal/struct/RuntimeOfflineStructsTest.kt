@@ -35,6 +35,8 @@ import org.maplibre.nativeffi.internal.c.mln_offline_tile_pyramid_region_definit
 import org.maplibre.nativeffi.internal.c.mln_runtime_event
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_payload
 import org.maplibre.nativeffi.internal.lifecycle.SyntheticHandles
+import org.maplibre.nativeffi.internal.memory.CSize
+import org.maplibre.nativeffi.internal.memory.toCSize
 import org.maplibre.nativeffi.map.TileOperation
 import org.maplibre.nativeffi.offline.OfflineRegionDefinition
 import org.maplibre.nativeffi.render.RenderMode
@@ -79,7 +81,7 @@ class RuntimeOfflineStructsTest : org.maplibre.nativeffi.NativeTestBase() {
           )
           .pointed
       assertEquals(MLN_OFFLINE_REGION_DEFINITION_GEOMETRY, geometry.type)
-      assertEquals(36UL, geometry.data.geometry.geometry.size)
+      assertEquals(36UL, geometry.data.geometry.geometry.size.toULong())
     }
   }
 
@@ -100,7 +102,7 @@ class RuntimeOfflineStructsTest : org.maplibre.nativeffi.NativeTestBase() {
       info.definition.size = sizeOf<mln_offline_region_definition>().toUInt()
       info.definition.type = 999U
       info.metadata = null
-      info.metadata_size = 0UL
+      info.metadata_size = 0.toCSize()
 
       val definition = RuntimeStructs.offlineRegionInfo(info).definition
 
@@ -134,7 +136,7 @@ class RuntimeOfflineStructsTest : org.maplibre.nativeffi.NativeTestBase() {
         RuntimeStructs.offlineRegionSnapshot(
           snapshot,
           getter = { _, outInfo ->
-            fillValidOfflineRegionInfo(outInfo.pointed, styleUrl, metadata, 2UL)
+            fillValidOfflineRegionInfo(outInfo.pointed, styleUrl, metadata, 2.toCSize())
             MaplibreStatus.OK.nativeCode
           },
           destroyer = { destroys++ },
@@ -182,11 +184,11 @@ class RuntimeOfflineStructsTest : org.maplibre.nativeffi.NativeTestBase() {
         RuntimeStructs.offlineRegionList(
           list,
           counter = { _, outCount ->
-            outCount[0] = 1UL
+            outCount[0] = 1.toCSize()
             MaplibreStatus.OK.nativeCode
           },
           getter = { _, _, outInfo ->
-            fillValidOfflineRegionInfo(outInfo.pointed, styleUrl, metadata, 1UL)
+            fillValidOfflineRegionInfo(outInfo.pointed, styleUrl, metadata, 1.toCSize())
             MaplibreStatus.OK.nativeCode
           },
           destroyer = { destroys++ },
@@ -211,7 +213,7 @@ class RuntimeOfflineStructsTest : org.maplibre.nativeffi.NativeTestBase() {
         RuntimeStructs.offlineRegionList(
           list,
           counter = { _, outCount ->
-            outCount[0] = 1UL
+            outCount[0] = 1.toCSize()
             MaplibreStatus.OK.nativeCode
           },
           getter = { _, _, outInfo ->
@@ -351,14 +353,14 @@ class RuntimeOfflineStructsTest : org.maplibre.nativeffi.NativeTestBase() {
     info.definition.data.tile_pyramid.size =
       sizeOf<mln_offline_tile_pyramid_region_definition>().toUInt()
     info.metadata = metadata
-    info.metadata_size = Int.MAX_VALUE.toULong() + 1UL
+    info.metadata_size = (Int.MAX_VALUE.toULong() + 1UL).toCSize()
   }
 
   private fun fillValidOfflineRegionInfo(
     info: mln_offline_region_info,
     styleUrl: CPointer<ByteVar>,
     metadata: CPointer<UByteVar>,
-    metadataSize: ULong,
+    metadataSize: CSize,
   ) {
     info.size = sizeOf<mln_offline_region_info>().toUInt()
     info.id = 7

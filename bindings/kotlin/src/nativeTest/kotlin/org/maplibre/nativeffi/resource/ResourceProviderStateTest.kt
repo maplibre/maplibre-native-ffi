@@ -33,6 +33,7 @@ import org.maplibre.nativeffi.internal.c.mln_runtime_destroy
 import org.maplibre.nativeffi.internal.callback.ResourceProviderState
 import org.maplibre.nativeffi.internal.lifecycle.SyntheticHandles
 import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
+import org.maplibre.nativeffi.internal.memory.toCSize
 import org.maplibre.nativeffi.internal.struct.ResourceStructs
 import platform.posix.pthread_create
 import platform.posix.pthread_join
@@ -76,7 +77,7 @@ class ResourceProviderStateTest : org.maplibre.nativeffi.NativeTestBase() {
         priorData[1] = 2U
         priorData[2] = 3U
         request.prior_data = priorData
-        request.prior_data_size = 3UL
+        request.prior_data_size = 3.toCSize()
         val fakeHandle = SyntheticHandles.resourceRequest()
         assertEquals(
           ResourceProviderDecision.PASS_THROUGH.nativeValue.toUInt(),
@@ -122,7 +123,7 @@ class ResourceProviderStateTest : org.maplibre.nativeffi.NativeTestBase() {
         }
       val native = ResourceStructs.resourceResponse(response, this).pointed
       assertEquals(ResourceResponseStatus.OK.nativeValue.toUInt(), native.status)
-      assertEquals(3UL, native.byte_count)
+      assertEquals(3UL, native.byte_count.toULong())
       assertEquals(true, native.must_revalidate)
       assertEquals(true, native.has_modified)
       assertEquals(true, native.has_expires)

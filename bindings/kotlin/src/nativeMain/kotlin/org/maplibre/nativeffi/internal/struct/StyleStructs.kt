@@ -4,7 +4,6 @@ import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CValue
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.MemScope
-import kotlinx.cinterop.ULongVar
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.allocArray
 import kotlinx.cinterop.cValue
@@ -74,6 +73,9 @@ import org.maplibre.nativeffi.internal.c.mln_style_transition_options_default
 import org.maplibre.nativeffi.internal.lifecycle.NativeStyleIdList
 import org.maplibre.nativeffi.internal.lifecycle.NativeStyleStringList
 import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
+import org.maplibre.nativeffi.internal.memory.CSize
+import org.maplibre.nativeffi.internal.memory.CSizeVar
+import org.maplibre.nativeffi.internal.memory.toCSize
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
@@ -116,7 +118,7 @@ internal object StyleStructs {
     native.height = value.height.toUInt()
     native.stride = value.stride.toUInt()
     native.pixels = value.pixels.toUByteArray().toCValues().getPointer(scope)
-    native.byte_length = value.pixels.size.toULong()
+    native.byte_length = value.pixels.size.toCSize()
     return native.ptr
   }
 
@@ -137,12 +139,12 @@ internal object StyleStructs {
     value?.stretchX?.let {
       native.fields = native.fields or MLN_STYLE_IMAGE_OPTION_STRETCH_X
       native.stretch_x = imageStretchArray(it, scope)
-      native.stretch_x_count = it.size.toULong()
+      native.stretch_x_count = it.size.toCSize()
     }
     value?.stretchY?.let {
       native.fields = native.fields or MLN_STYLE_IMAGE_OPTION_STRETCH_Y
       native.stretch_y = imageStretchArray(it, scope)
-      native.stretch_y_count = it.size.toULong()
+      native.stretch_y_count = it.size.toCSize()
     }
     value?.content?.let {
       native.fields = native.fields or MLN_STYLE_IMAGE_OPTION_CONTENT
@@ -213,11 +215,11 @@ internal object StyleStructs {
       checkedInt(value.width, "style image width"),
       checkedInt(value.height, "style image height"),
       checkedInt(value.stride, "style image stride"),
-      checkedLong(value.byte_length, "style image byte length"),
+      checkedLong(value.byte_length.toULong(), "style image byte length"),
       value.pixel_ratio,
       value.sdf,
-      checkedLong(value.stretch_x_count, "style image stretch x count"),
-      checkedLong(value.stretch_y_count, "style image stretch y count"),
+      checkedLong(value.stretch_x_count.toULong(), "style image stretch x count"),
+      checkedLong(value.stretch_y_count.toULong(), "style image stretch y count"),
       if (value.has_content)
         ImageContent(
           value.content.left,
@@ -365,17 +367,17 @@ internal object StyleStructs {
 
   fun styleIdList(
     list: ULong,
-    counter: (ULong, CPointer<ULongVar>) -> Int,
-    getter: (ULong, ULong, CPointer<mln_buffer_view>) -> Int,
+    counter: (ULong, CPointer<CSizeVar>) -> Int,
+    getter: (ULong, CSize, CPointer<mln_buffer_view>) -> Int,
     destroyer: (ULong) -> Unit,
   ): List<String> =
     try {
       memScoped {
-        val outCount = alloc<ULongVar>()
+        val outCount = alloc<CSizeVar>()
         Status.check(counter(list, outCount.ptr))
-        List(checkedInt(outCount.value, "style id count")) { index ->
+        List(checkedInt(outCount.value.toULong(), "style id count")) { index ->
           val outId = alloc<mln_buffer_view>()
-          Status.check(getter(list, index.toULong(), outId.ptr))
+          Status.check(getter(list, index.toCSize(), outId.ptr))
           CoreStructs.stringView(outId)
         }
       }
@@ -393,8 +395,8 @@ internal object StyleStructs {
 
   fun styleStringList(
     list: ULong,
-    counter: (ULong, CPointer<ULongVar>) -> Int,
-    getter: (ULong, ULong, CPointer<mln_buffer_view>) -> Int,
+    counter: (ULong, CPointer<CSizeVar>) -> Int,
+    getter: (ULong, CSize, CPointer<mln_buffer_view>) -> Int,
     destroyer: (ULong) -> Unit,
   ): List<String> = styleIdList(list, counter, getter, destroyer)
 

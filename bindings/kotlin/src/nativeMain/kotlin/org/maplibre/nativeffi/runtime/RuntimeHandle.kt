@@ -68,6 +68,7 @@ import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
 import org.maplibre.nativeffi.internal.lifecycle.runtimeHandle
 import org.maplibre.nativeffi.internal.lifecycle.wakeSourceHandle
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
+import org.maplibre.nativeffi.internal.memory.toCSize
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.struct.RuntimeStructs
 import org.maplibre.nativeffi.map.MapHandle
@@ -152,7 +153,7 @@ internal constructor(
         state.requireLive().rawHandleValue,
         RuntimeStructs.offlineRegionDefinition(definition, this),
         RuntimeStructs.metadata(metadata, this),
-        metadata.size.toULong(),
+        metadata.size.toCSize(),
         outOperationId.ptr,
       )
     )
@@ -225,7 +226,7 @@ internal constructor(
         state.requireLive().rawHandleValue,
         id,
         RuntimeStructs.metadata(metadata, this),
-        metadata.size.toULong(),
+        metadata.size.toCSize(),
         outOperationId.ptr,
       )
     )
@@ -611,12 +612,14 @@ internal constructor(
     Status.requireArgument(maxEvents >= 0) { "maxEvents must be non-negative" }
     val runtime = state.requireLive().rawHandleValue
     batch.size = sizeOf<mln_runtime_event_batch>().toUInt()
-    Status.check(mln_runtime_drain_events(runtime, maxEvents.toULong(), batch.ptr))
+    Status.check(mln_runtime_drain_events(runtime, maxEvents.toCSize(), batch.ptr))
     val eventCount = batch.event_count
-    require(eventCount <= Int.MAX_VALUE.toULong()) { "event count exceeds Int.MAX_VALUE" }
+    require(eventCount.toULong() <= Int.MAX_VALUE.toULong()) { "event count exceeds Int.MAX_VALUE" }
     val remainingCount = batch.remaining_count
-    require(remainingCount <= Long.MAX_VALUE.toULong()) { "remaining count exceeds Long.MAX_VALUE" }
-    if (eventCount == 0uL) {
+    require(remainingCount.toULong() <= Long.MAX_VALUE.toULong()) {
+      "remaining count exceeds Long.MAX_VALUE"
+    }
+    if (eventCount.toULong() == 0uL) {
       return RuntimeEventBatch(emptyList(), remainingCount.toLong())
     }
     // The stride the batch reports can exceed sizeOf<mln_runtime_event>(), so

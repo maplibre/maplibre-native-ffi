@@ -960,6 +960,9 @@ jobs:
           mise run install-native-package
           android-arm-egl
           build/packages/native/dist/maplibre-native-c-android-arm-egl.tar.gz
+      - run: mise run //bindings/kotlin:build android-arm-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/kotlin:android-build opengl armeabi-v7a --prebuilt
         env:
           MISE_TASK_SKIP: "//:build"

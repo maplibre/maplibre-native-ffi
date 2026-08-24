@@ -185,7 +185,10 @@ import org.maplibre.nativeffi.internal.lifecycle.ownedBufferHandle
 import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
 import org.maplibre.nativeffi.internal.lifecycle.styleIdListHandle
 import org.maplibre.nativeffi.internal.lifecycle.styleStringListHandle
+import org.maplibre.nativeffi.internal.memory.CSize
+import org.maplibre.nativeffi.internal.memory.CSizeVar
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
+import org.maplibre.nativeffi.internal.memory.toCSize
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.struct.ByteStructs
 import org.maplibre.nativeffi.internal.struct.CoreStructs
@@ -603,7 +606,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           StyleStructs.stringViewArray(tileSnapshot, this),
-          tileSnapshot.size.toULong(),
+          tileSnapshot.size.toCSize(),
           StyleStructs.tileSourceOptions(options, this),
         )
       )
@@ -635,7 +638,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           StyleStructs.stringViewArray(tileSnapshot, this),
-          tileSnapshot.size.toULong(),
+          tileSnapshot.size.toCSize(),
           StyleStructs.tileSourceOptions(options, this),
         )
       )
@@ -671,7 +674,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           StyleStructs.stringViewArray(tileSnapshot, this),
-          tileSnapshot.size.toULong(),
+          tileSnapshot.size.toCSize(),
           StyleStructs.tileSourceOptions(options, this),
         )
       )
@@ -737,26 +740,26 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     imageId: String
   ): Pair<List<ImageStretch>, List<ImageStretch>>? = memScoped {
     val handle = state.requireLive().rawHandleValue
-    val outXCount = alloc<ULongVar>()
-    val outYCount = alloc<ULongVar>()
+    val outXCount = alloc<CSizeVar>()
+    val outYCount = alloc<CSizeVar>()
     val outFound = alloc<BooleanVar>()
     Status.check(
       mln_map_copy_style_image_stretches(
         handle,
         CoreStructs.stringView(imageId, this),
         null,
-        0UL,
+        0.toCSize(),
         outXCount.ptr,
         null,
-        0UL,
+        0.toCSize(),
         outYCount.ptr,
         outFound.ptr,
       )
     )
     if (!outFound.value) return@memScoped null
 
-    val xCount = checkedInt(outXCount.value, "style image stretch x count")
-    val yCount = checkedInt(outYCount.value, "style image stretch y count")
+    val xCount = checkedInt(outXCount.value.toULong(), "style image stretch x count")
+    val yCount = checkedInt(outYCount.value.toULong(), "style image stretch y count")
     val rawX = if (xCount == 0) null else allocArray<mln_image_stretch>(xCount)
     val rawY = if (yCount == 0) null else allocArray<mln_image_stretch>(yCount)
     Status.check(
@@ -764,10 +767,10 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         handle,
         CoreStructs.stringView(imageId, this),
         rawX,
-        xCount.toULong(),
+        xCount.toCSize(),
         outXCount.ptr,
         rawY,
-        yCount.toULong(),
+        yCount.toCSize(),
         outYCount.ptr,
         outFound.ptr,
       )
@@ -782,14 +785,14 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     val info = styleImageInfo(imageId) ?: return@memScoped null
     val outPixels =
       allocArray<UByteVar>(checkedInt(info.byteLength.toULong(), "style image byte length"))
-    val outByteLength = alloc<ULongVar>()
+    val outByteLength = alloc<CSizeVar>()
     val outFound = alloc<BooleanVar>()
     Status.check(
       mln_map_copy_style_image_premultiplied_rgba8(
         state.requireLive().rawHandleValue,
         CoreStructs.stringView(imageId, this),
         outPixels,
-        info.byteLength.toULong(),
+        info.byteLength.toCSize(),
         outByteLength.ptr,
         outFound.ptr,
       )
@@ -802,7 +805,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         info.stride,
         outPixels
           .reinterpret<kotlinx.cinterop.ByteVar>()
-          .readBytes(checkedInt(outByteLength.value, "style image copied byte length")),
+          .readBytes(checkedInt(outByteLength.value.toULong(), "style image copied byte length")),
       ),
       info.pixelRatio,
       info.sdf,
@@ -817,7 +820,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           CoreStructs.latLngArray(coordinateSnapshot, this),
-          coordinateSnapshot.size.toULong(),
+          coordinateSnapshot.size.toCSize(),
           CoreStructs.stringView(url, this),
         )
       )
@@ -836,7 +839,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           CoreStructs.latLngArray(coordinateSnapshot, this),
-          coordinateSnapshot.size.toULong(),
+          coordinateSnapshot.size.toCSize(),
           StyleStructs.premultipliedRgba8Image(image, this),
         )
       )
@@ -875,7 +878,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
           state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           CoreStructs.latLngArray(coordinateSnapshot, this),
-          coordinateSnapshot.size.toULong(),
+          coordinateSnapshot.size.toCSize(),
         )
       )
     }
@@ -883,14 +886,14 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
 
   public actual fun imageSourceCoordinates(sourceId: String): List<LatLng>? = memScoped {
     val outCoordinates = allocArray<mln_lat_lng>(4)
-    val outCoordinateCount = alloc<ULongVar>()
+    val outCoordinateCount = alloc<CSizeVar>()
     val outFound = alloc<BooleanVar>()
     Status.check(
       mln_map_get_image_source_coordinates(
         state.requireLive().rawHandleValue,
         CoreStructs.stringView(sourceId, this),
         outCoordinates,
-        4UL,
+        4.toCSize(),
         outCoordinateCount.ptr,
         outFound.ptr,
       )
@@ -898,18 +901,20 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
     if (outFound.value)
       CoreStructs.latLngArray(
         outCoordinates,
-        checkedInt(outCoordinateCount.value, "image source coordinate count"),
+        checkedInt(outCoordinateCount.value.toULong(), "image source coordinate count"),
       )
     else null
   }
 
   private fun copyStyleSourceAttribution(sourceId: String, info: mln_style_source_info): String? {
     if (!info.has_attribution) return null
-    if (info.attribution_size == 0UL) return ""
+    if (info.attribution_size.toULong() == 0UL) return ""
     return memScoped {
       val outAttribution =
-        allocArray<ByteVar>(checkedInt(info.attribution_size, "style source attribution size"))
-      val outAttributionSize = alloc<ULongVar>()
+        allocArray<ByteVar>(
+          checkedInt(info.attribution_size.toULong(), "style source attribution size")
+        )
+      val outAttributionSize = alloc<CSizeVar>()
       val outFound = alloc<BooleanVar>()
       Status.check(
         mln_map_copy_style_source_attribution(
@@ -923,7 +928,9 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
       )
       if (outFound.value)
         outAttribution
-          .readBytes(checkedInt(outAttributionSize.value, "style source copied attribution size"))
+          .readBytes(
+            checkedInt(outAttributionSize.value.toULong(), "style source copied attribution size")
+          )
           .decodeToString()
       else null
     }
@@ -931,10 +938,10 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
 
   private fun copyStyleSourceUrl(sourceId: String, info: mln_style_source_info): String? {
     if (info.fields and MLN_STYLE_SOURCE_INFO_URL == 0u) return null
-    if (info.url_size == 0UL) return ""
+    if (info.url_size.toULong() == 0UL) return ""
     return memScoped {
-      val outUrl = allocArray<ByteVar>(checkedInt(info.url_size, "style source URL size"))
-      val outUrlSize = alloc<ULongVar>()
+      val outUrl = allocArray<ByteVar>(checkedInt(info.url_size.toULong(), "style source URL size"))
+      val outUrlSize = alloc<CSizeVar>()
       val outFound = alloc<BooleanVar>()
       Status.check(
         mln_map_copy_style_source_url(
@@ -948,7 +955,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
       )
       if (outFound.value)
         outUrl
-          .readBytes(checkedInt(outUrlSize.value, "style source copied URL size"))
+          .readBytes(checkedInt(outUrlSize.value.toULong(), "style source copied URL size"))
           .decodeToString()
       else null
     }
@@ -1321,51 +1328,57 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
    * API answers with OK.
    */
   private fun copyMapText(
-    copy: (ULong, CPointer<ByteVar>?, ULong, CPointer<ULongVar>) -> Int
+    copy: (ULong, CPointer<ByteVar>?, CSize, CPointer<CSizeVar>) -> Int
   ): String = memScoped {
     val handle = state.requireLive().rawHandleValue
-    val outSize = alloc<ULongVar>()
-    Status.check(copy(handle, null, 0UL, outSize.ptr))
-    val required = checkedInt(outSize.value, "map text size")
+    val outSize = alloc<CSizeVar>()
+    Status.check(copy(handle, null, 0.toCSize(), outSize.ptr))
+    val required = checkedInt(outSize.value.toULong(), "map text size")
     if (required == 0) return@memScoped ""
 
     val buffer = allocArray<ByteVar>(required)
-    val outCopied = alloc<ULongVar>()
-    Status.check(copy(handle, buffer, required.toULong(), outCopied.ptr))
-    buffer.readBytes(checkedInt(outCopied.value, "map copied text size")).decodeToString()
+    val outCopied = alloc<CSizeVar>()
+    Status.check(copy(handle, buffer, required.toCSize(), outCopied.ptr))
+    buffer.readBytes(checkedInt(outCopied.value.toULong(), "map copied text size")).decodeToString()
   }
 
   private fun copyMapBytes(
-    copy: (ULong, CPointer<UByteVar>?, ULong, CPointer<ULongVar>) -> Int
+    copy: (ULong, CPointer<UByteVar>?, CSize, CPointer<CSizeVar>) -> Int
   ): ByteArray = memScoped {
     val handle = state.requireLive().rawHandleValue
-    val outSize = alloc<ULongVar>()
-    Status.check(copy(handle, null, 0UL, outSize.ptr))
-    val required = checkedInt(outSize.value, "map byte size")
+    val outSize = alloc<CSizeVar>()
+    Status.check(copy(handle, null, 0.toCSize(), outSize.ptr))
+    val required = checkedInt(outSize.value.toULong(), "map byte size")
     if (required == 0) return@memScoped ByteArray(0)
 
     val buffer = allocArray<UByteVar>(required)
-    val outCopied = alloc<ULongVar>()
-    Status.check(copy(handle, buffer, required.toULong(), outCopied.ptr))
-    buffer.reinterpret<ByteVar>().readBytes(checkedInt(outCopied.value, "map copied byte size"))
+    val outCopied = alloc<CSizeVar>()
+    Status.check(copy(handle, buffer, required.toCSize(), outCopied.ptr))
+    buffer
+      .reinterpret<ByteVar>()
+      .readBytes(checkedInt(outCopied.value.toULong(), "map copied byte size"))
   }
 
   private fun copyLayerText(
     layerId: String,
-    copy: (ULong, CValue<mln_buffer_view>, CPointer<ByteVar>?, ULong, CPointer<ULongVar>) -> Int,
+    copy: (ULong, CValue<mln_buffer_view>, CPointer<ByteVar>?, CSize, CPointer<CSizeVar>) -> Int,
   ): String = memScoped {
     val handle = state.requireLive().rawHandleValue
-    val outSize = alloc<ULongVar>()
-    Status.check(copy(handle, CoreStructs.stringView(layerId, this), null, 0UL, outSize.ptr))
-    val required = checkedInt(outSize.value, "layer text size")
+    val outSize = alloc<CSizeVar>()
+    Status.check(
+      copy(handle, CoreStructs.stringView(layerId, this), null, 0.toCSize(), outSize.ptr)
+    )
+    val required = checkedInt(outSize.value.toULong(), "layer text size")
     if (required == 0) return@memScoped ""
 
     val buffer = allocArray<ByteVar>(required)
-    val outCopied = alloc<ULongVar>()
+    val outCopied = alloc<CSizeVar>()
     Status.check(
-      copy(handle, CoreStructs.stringView(layerId, this), buffer, required.toULong(), outCopied.ptr)
+      copy(handle, CoreStructs.stringView(layerId, this), buffer, required.toCSize(), outCopied.ptr)
     )
-    buffer.readBytes(checkedInt(outCopied.value, "layer copied text size")).decodeToString()
+    buffer
+      .readBytes(checkedInt(outCopied.value.toULong(), "layer copied text size"))
+      .decodeToString()
   }
 
   public actual fun setLayerMinZoom(layerId: String, minZoom: Double) {
@@ -1704,7 +1717,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
       mln_map_camera_for_lat_lngs(
         state.requireLive().rawHandleValue,
         CoreStructs.latLngArray(coordinateSnapshot, this),
-        coordinateSnapshot.size.toULong(),
+        coordinateSnapshot.size.toCSize(),
         fitOptions?.let { MapStructs.cameraFitOptions(it, this) },
         outCamera,
       )
@@ -1836,7 +1849,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
       mln_map_pixels_for_lat_lngs(
         state.requireLive().rawHandleValue,
         CoreStructs.latLngArray(coordinateSnapshot, this),
-        coordinateSnapshot.size.toULong(),
+        coordinateSnapshot.size.toCSize(),
         outPoints,
       )
     )
@@ -1851,7 +1864,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
       mln_map_lat_lngs_for_pixels(
         state.requireLive().rawHandleValue,
         CoreStructs.screenPointArray(pointSnapshot, this),
-        pointSnapshot.size.toULong(),
+        pointSnapshot.size.toCSize(),
         outCoordinates,
       )
     )

@@ -17,6 +17,7 @@ import org.maplibre.nativeffi.internal.c.mln_resource_transform
 import org.maplibre.nativeffi.internal.c.mln_resource_transform_response
 import org.maplibre.nativeffi.internal.c.mln_resource_transform_response_set_url
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
+import org.maplibre.nativeffi.internal.memory.toCSize
 import org.maplibre.nativeffi.resource.ResourceKind
 import org.maplibre.nativeffi.resource.ResourceTransformCallback
 import org.maplibre.nativeffi.resource.ResourceTransformRequest
@@ -85,7 +86,7 @@ internal class ResourceTransformState(private val callback: ResourceTransformCal
     return mln_resource_transform_response_set_url(
       outResponse,
       value,
-      value.encodeToByteArray().size.toULong(),
+      value.encodeToByteArray().size.toCSize(),
     )
   }
 }

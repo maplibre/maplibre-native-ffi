@@ -4,7 +4,6 @@ import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.MemScope
-import kotlinx.cinterop.ULongVar
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.plus
@@ -47,7 +46,10 @@ import org.maplibre.nativeffi.internal.c.mln_runtime_event_tile_action
 import org.maplibre.nativeffi.internal.lifecycle.NativeOfflineRegionList
 import org.maplibre.nativeffi.internal.lifecycle.NativeOfflineRegionSnapshot
 import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
+import org.maplibre.nativeffi.internal.memory.CSize
+import org.maplibre.nativeffi.internal.memory.CSizeVar
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
+import org.maplibre.nativeffi.internal.memory.toCSize
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.map.RenderingStats
 import org.maplibre.nativeffi.map.TileOperation
@@ -259,19 +261,19 @@ internal object RuntimeStructs {
 
   fun offlineRegionList(
     list: NativeOfflineRegionList,
-    counter: (ULong, CPointer<ULongVar>) -> Int = ::mln_offline_region_list_count,
-    getter: (ULong, ULong, CPointer<mln_offline_region_info>) -> Int =
+    counter: (ULong, CPointer<CSizeVar>) -> Int = ::mln_offline_region_list_count,
+    getter: (ULong, CSize, CPointer<mln_offline_region_info>) -> Int =
       ::mln_offline_region_list_get,
     destroyer: (ULong) -> Unit = ::mln_offline_region_list_destroy,
   ): List<OfflineRegionInfo> =
     try {
       memScoped {
-        val outCount = alloc<ULongVar>()
+        val outCount = alloc<CSizeVar>()
         Status.check(counter(list.rawHandleValue, outCount.ptr))
-        List(checkedInt(outCount.value, "offline region count")) { index ->
+        List(checkedInt(outCount.value.toULong(), "offline region count")) { index ->
           val info = alloc<mln_offline_region_info>()
           info.size = sizeOf<mln_offline_region_info>().toUInt()
-          Status.check(getter(list.rawHandleValue, index.toULong(), info.ptr))
+          Status.check(getter(list.rawHandleValue, index.toCSize(), info.ptr))
           offlineRegionInfo(info)
         }
       }
@@ -283,7 +285,7 @@ internal object RuntimeStructs {
     OfflineRegionInfo(
       value.id,
       offlineRegionDefinition(value.definition),
-      value.metadata?.readBytes(checkedInt(value.metadata_size, "offline metadata size"))
+      value.metadata?.readBytes(checkedInt(value.metadata_size.toULong(), "offline metadata size"))
         ?: ByteArray(0),
     )
 

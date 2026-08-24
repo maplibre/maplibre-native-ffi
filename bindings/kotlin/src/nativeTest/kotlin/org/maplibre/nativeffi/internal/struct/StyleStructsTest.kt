@@ -32,6 +32,8 @@ import org.maplibre.nativeffi.internal.c.mln_style_source_info
 import org.maplibre.nativeffi.internal.c.mln_style_tile_source_options
 import org.maplibre.nativeffi.internal.lifecycle.SyntheticHandles
 import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
+import org.maplibre.nativeffi.internal.memory.CSizeVar
+import org.maplibre.nativeffi.internal.memory.toCSize
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImageOptions
@@ -135,7 +137,7 @@ class StyleStructsTest : org.maplibre.nativeffi.NativeTestBase() {
       StyleStructs.styleIdList(
         list.rawHandleValue,
         counter = { _, outCount ->
-          outCount[0] = 1UL
+          outCount[0] = 1.toCSize()
           MaplibreStatus.OK.nativeCode
         },
         getter = { _, _, outId ->
@@ -160,7 +162,7 @@ class StyleStructsTest : org.maplibre.nativeffi.NativeTestBase() {
         StyleStructs.styleIdList(
           list.rawHandleValue,
           counter = { _, outCount ->
-            outCount[0] = Int.MAX_VALUE.toULong() + 1UL
+            outCount[0] = (Int.MAX_VALUE.toULong() + 1UL).toCSize()
             MaplibreStatus.OK.nativeCode
           },
           getter = { _, _, _ -> MaplibreStatus.OK.nativeCode },
@@ -180,7 +182,7 @@ class StyleStructsTest : org.maplibre.nativeffi.NativeTestBase() {
         StyleStructs.styleStringList(
           123UL,
           counter = { _, outCount ->
-            outCount[0] = 1UL
+            outCount[0] = 1.toCSize()
             MaplibreStatus.OK.nativeCode
           },
           getter = { _, _, outValue ->
@@ -196,7 +198,7 @@ class StyleStructsTest : org.maplibre.nativeffi.NativeTestBase() {
         StyleStructs.styleStringList(
           456UL,
           counter = { _, outCount ->
-            outCount[0] = Int.MAX_VALUE.toULong() + 1UL
+            outCount[0] = (Int.MAX_VALUE.toULong() + 1UL).toCSize()
             MaplibreStatus.OK.nativeCode
           },
           getter = { _, _, _ -> MaplibreStatus.OK.nativeCode },
@@ -230,7 +232,7 @@ class StyleStructsTest : org.maplibre.nativeffi.NativeTestBase() {
       native.width = 1U
       native.height = 2U
       native.stride = 8U
-      native.byte_length = 16UL
+      native.byte_length = 16.toCSize()
       native.pixel_ratio = 2.0f
       native.sdf = true
 
@@ -243,8 +245,10 @@ class StyleStructsTest : org.maplibre.nativeffi.NativeTestBase() {
       assertEquals(2.0f, info.pixelRatio)
       assertEquals(true, info.sdf)
 
-      native.byte_length = Long.MAX_VALUE.toULong() + 1UL
-      assertFailsWith<IllegalArgumentException> { StyleStructs.styleImageInfo(native) }
+      if (sizeOf<CSizeVar>() == 8L) {
+        native.byte_length = (Long.MAX_VALUE.toULong() + 1UL).toCSize()
+        assertFailsWith<IllegalArgumentException> { StyleStructs.styleImageInfo(native) }
+      }
     }
   }
 }

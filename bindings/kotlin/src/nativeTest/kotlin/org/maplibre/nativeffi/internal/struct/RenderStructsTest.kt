@@ -10,6 +10,8 @@ import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import org.maplibre.nativeffi.internal.c.mln_texture_image_info
+import org.maplibre.nativeffi.internal.memory.CSizeVar
+import org.maplibre.nativeffi.internal.memory.toCSize
 import org.maplibre.nativeffi.render.EglContextDescriptor
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalContextDescriptor
@@ -36,12 +38,14 @@ class RenderStructsTest : org.maplibre.nativeffi.NativeTestBase() {
       info.width = 2U
       info.height = 3U
       info.stride = 8U
-      info.byte_length = 24UL
+      info.byte_length = 24.toCSize()
 
       assertEquals(TextureImageInfo(2, 3, 8, 24), RenderStructs.textureImageInfo(info))
 
-      info.byte_length = Long.MAX_VALUE.toULong() + 1UL
-      assertFailsWith<IllegalArgumentException> { RenderStructs.textureImageInfo(info) }
+      if (kotlinx.cinterop.sizeOf<CSizeVar>() == 8L) {
+        info.byte_length = (Long.MAX_VALUE.toULong() + 1UL).toCSize()
+        assertFailsWith<IllegalArgumentException> { RenderStructs.textureImageInfo(info) }
+      }
     }
   }
 

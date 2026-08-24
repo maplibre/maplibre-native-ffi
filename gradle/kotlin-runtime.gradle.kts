@@ -54,17 +54,18 @@ fun nativeTargets(backend: MaplibreRuntimeBackend): Map<String, NativeTargetConf
     MaplibreRuntimeBackend.OPENGL,
     MaplibreRuntimeBackend.VULKAN ->
       buildMap {
-        AndroidTarget.entries.forEach { target ->
-          val kotlinNativeTarget = target.kotlinNativeTarget ?: return@forEach
-          put(
-            kotlinNativeTarget,
-            NativeTargetConfiguration(
-              "android-${backend.id}.def",
-              target.targetPlatform,
-              listOf("libmaplibre-native-c.a", "libmln_ffi_platform.a"),
-            ),
-          )
-        }
+        AndroidTarget.entries
+          .filter { it.supportsBackend(backend.id) }
+          .forEach { target ->
+            put(
+              target.kotlinNativeTarget,
+              NativeTargetConfiguration(
+                "android-${backend.id}.def",
+                target.targetPlatform,
+                listOf("libmaplibre-native-c.a", "libmln_ffi_platform.a"),
+              ),
+            )
+          }
         put(
           "linuxArm64",
           NativeTargetConfiguration(
@@ -443,15 +444,21 @@ canonicalizeKmpRootMetadata(
     when (backend) {
       MaplibreRuntimeBackend.OPENGL,
       MaplibreRuntimeBackend.VULKAN ->
-        mapOf(
-          "android" to "$mavenArtifact-android",
-          "androidNativeArm64" to "$mavenArtifact-androidnativearm64",
-          "androidNativeX64" to "$mavenArtifact-androidnativex64",
-          "jvm" to "$mavenArtifact-jvm",
-          "linuxArm64" to "$mavenArtifact-linuxarm64",
-          "linuxX64" to "$mavenArtifact-linuxx64",
-          "macosArm64" to "$mavenArtifact-macosarm64",
-        )
+        buildMap {
+          put("android", "$mavenArtifact-android")
+          AndroidTarget.entries
+            .filter { it.supportsBackend(backend.id) }
+            .forEach { target ->
+              put(
+                target.kotlinNativeTarget,
+                "$mavenArtifact-${target.kotlinNativeTarget.lowercase()}",
+              )
+            }
+          put("jvm", "$mavenArtifact-jvm")
+          put("linuxArm64", "$mavenArtifact-linuxarm64")
+          put("linuxX64", "$mavenArtifact-linuxx64")
+          put("macosArm64", "$mavenArtifact-macosarm64")
+        }
 
       MaplibreRuntimeBackend.METAL ->
         mapOf(

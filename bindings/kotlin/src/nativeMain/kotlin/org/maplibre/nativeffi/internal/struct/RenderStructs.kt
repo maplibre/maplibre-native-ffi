@@ -176,7 +176,7 @@ internal object RenderStructs {
       checkedInt(value.width, "texture width"),
       checkedInt(value.height, "texture height"),
       checkedInt(value.stride, "texture stride"),
-      checkedLong(value.byte_length, "texture byte length"),
+      checkedLong(value.byte_length.toULong(), "texture byte length"),
     )
 
   private fun checkedInt(value: UInt, name: String): Int {
