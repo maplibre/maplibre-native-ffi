@@ -112,7 +112,7 @@ CONSUMER_ENV = {"MISE_TASK_SKIP": '"//:build"'}
 # the absent native package.
 KOTLIN_MAVEN_PLATFORMS = {
     "android",
-    "linux",
+    "linux-gnu",
     "macos",
     "ios",
     "ios-simulator",

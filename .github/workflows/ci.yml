@@ -1888,6 +1888,10 @@ jobs:
       || github.base_ref == 'main'
       || github.event.pull_request.draft == false
     needs:
+      - target-linux-gnu-x64-egl
+      - target-linux-gnu-x64-vulkan
+      - target-linux-gnu-arm64-egl
+      - target-linux-gnu-arm64-vulkan
       - target-macos-arm64-metal
       - target-macos-arm64-vulkan
       - target-macos-arm64-egl
