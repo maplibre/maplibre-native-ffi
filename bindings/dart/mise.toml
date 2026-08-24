@@ -61,6 +61,7 @@ usage = '''
 arg "[preset]" {
   choices \
     "android-arm-egl" \
+    "android-arm-vulkan" \
     "android-arm64-egl" \
     "android-arm64-vulkan" \
     "android-x64-egl" \

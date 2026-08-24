@@ -101,8 +101,8 @@ internal object RenderStructs {
     native.physical_width = descriptor.physicalWidth.toUInt()
     native.physical_height = descriptor.physicalHeight.toUInt()
     fillVulkanContext(native.context, descriptor.context)
-    native.image = pointer(descriptor.image)
-    native.image_view = pointer(descriptor.imageView)
+    native.image = descriptor.image.bits.toULong()
+    native.image_view = descriptor.imageView.bits.toULong()
     native.format = descriptor.format.toUInt()
     native.initial_layout = descriptor.initialLayout.toUInt()
     descriptor.finalLayout?.let { native.final_layout = it.toUInt() }
@@ -155,7 +155,7 @@ internal object RenderStructs {
     mln_vulkan_surface_descriptor_default().place(native.ptr)
     fillExtent(native.extent, descriptor.extent)
     fillVulkanContext(native.context, descriptor.context)
-    native.surface = pointer(descriptor.surface)
+    native.surface = descriptor.surface.bits.toULong()
     return native.ptr
   }
 

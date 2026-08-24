@@ -12,6 +12,14 @@
 
 namespace {
 
+auto surface_bits(VkSurfaceKHR surface) -> uint64_t {
+#if VK_USE_64_BIT_PTR_DEFINES
+  return static_cast<uint64_t>(reinterpret_cast<uintptr_t>(surface));
+#else
+  return static_cast<uint64_t>(surface);
+#endif
+}
+
 constexpr auto kLogTag = "MapLibreAndroidMap";
 
 struct VulkanContext {
@@ -293,7 +301,9 @@ Java_org_maplibre_nativeffi_examples_androidmap_VulkanNativeBridge_surface(
   JNIEnv* env, jobject, jlong handle
 ) {
   try {
-    return reinterpret_cast<intptr_t>(context_from_handle(handle)->surface);
+    return static_cast<jlong>(
+      surface_bits(context_from_handle(handle)->surface)
+    );
   } catch (const std::exception& error) {
     throw_java_exception(env, error.what());
     return 0;

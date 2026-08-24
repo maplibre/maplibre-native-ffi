@@ -163,8 +163,7 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
             ),
         };
 
-    public NativePointer SurfacePointer() =>
-        NativePointer.FromBorrowedAddress((nint)surface.Handle);
+    public VulkanHandle SurfaceHandle() => new(surface.Handle);
 
     public Viewport ReadViewport() => window.ReadViewport();
 

@@ -442,6 +442,30 @@ fn fakeVulkanContext() maplibre.VulkanContextDescriptor {
     };
 }
 
+fn fakeVulkanHandle() maplibre.VulkanHandle {
+    return maplibre.VulkanHandle.fromBits(1);
+}
+
+fn vulkanHandleToBinding(handle: anytype) maplibre.VulkanHandle {
+    const Handle = @TypeOf(handle);
+    const bits: u64 = switch (@typeInfo(Handle)) {
+        .optional => if (handle) |value| @intFromPtr(value) else 0,
+        .pointer => @intFromPtr(handle),
+        .int => @intCast(handle),
+        .@"enum" => @intCast(@intFromEnum(handle)),
+        else => @compileError("unsupported Vulkan handle representation"),
+    };
+    return maplibre.VulkanHandle.fromBits(bits);
+}
+
+fn nullVulkanHandle(comptime Handle: type) Handle {
+    return std.mem.zeroes(Handle);
+}
+
+fn isNullVulkanHandle(handle: anytype) bool {
+    return std.meta.eql(handle, nullVulkanHandle(@TypeOf(handle)));
+}
+
 const supports_test_owned_texture = build_options.supports_metal or build_options.supports_vulkan or build_options.supports_opengl;
 
 const TestOwnedTextureContext = if (build_options.supports_vulkan) VulkanAttachContext else if (supports_wgl) WglAttachContext else if (supports_egl) EglAttachContext else if (build_options.supports_metal) struct {
@@ -962,8 +986,8 @@ fn setPlaceholderBorrowedTextureTarget(session: *maplibre.RenderSessionHandle) m
             .physical_width = extent.width,
             .physical_height = extent.height,
             .context = fakeVulkanContext(),
-            .image = fakeNativePointer(),
-            .image_view = fakeNativePointer(),
+            .image = fakeVulkanHandle(),
+            .image_view = fakeVulkanHandle(),
             .format = @as(u32, vk.VK_FORMAT_R8G8B8A8_UNORM),
             .initial_layout = @as(u32, vk.VK_IMAGE_LAYOUT_UNDEFINED),
             .final_layout = @as(u32, vk.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
@@ -1245,13 +1269,13 @@ const VulkanBorrowedImage = if (build_options.supports_vulkan) struct {
     }
 
     fn allocate(context: *const VulkanAttachContext, width: u32, height: u32) !Allocation {
-        var image: vk.VkImage = null;
-        var memory: vk.VkDeviceMemory = null;
-        var image_view: vk.VkImageView = null;
+        var image = nullVulkanHandle(vk.VkImage);
+        var memory = nullVulkanHandle(vk.VkDeviceMemory);
+        var image_view = nullVulkanHandle(vk.VkImageView);
         errdefer {
-            if (image_view != null) context.dispatch.destroy_image_view.?(context.device, image_view, null);
-            if (image != null) context.dispatch.destroy_image.?(context.device, image, null);
-            if (memory != null) context.dispatch.free_memory.?(context.device, memory, null);
+            if (!isNullVulkanHandle(image_view)) context.dispatch.destroy_image_view.?(context.device, image_view, null);
+            if (!isNullVulkanHandle(image)) context.dispatch.destroy_image.?(context.device, image, null);
+            if (!isNullVulkanHandle(memory)) context.dispatch.free_memory.?(context.device, memory, null);
         }
 
         var image_info = std.mem.zeroes(vk.VkImageCreateInfo);
@@ -1334,8 +1358,8 @@ const VulkanBorrowedImage = if (build_options.supports_vulkan) struct {
             .physical_width = width,
             .physical_height = height,
             .context = self.context.descriptor(),
-            .image = maplibre.NativePointer.fromPtr(@ptrCast(allocation.image.?)),
-            .image_view = maplibre.NativePointer.fromPtr(@ptrCast(allocation.image_view.?)),
+            .image = vulkanHandleToBinding(allocation.image),
+            .image_view = vulkanHandleToBinding(allocation.image_view),
             .format = @as(u32, vk.VK_FORMAT_R8G8B8A8_UNORM),
             .initial_layout = @as(u32, vk.VK_IMAGE_LAYOUT_UNDEFINED),
             .final_layout = @as(u32, vk.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
@@ -2425,7 +2449,7 @@ test "Metal borrowed texture set target renders into a replacement texture" {
     try expectPixelApprox(try metal_support.readTexturePixelRGBA8(replacement, 0, 0), .{ 0xd8, 0xf1, 0xff, 0xff }, 8);
 }
 
-test "Vulkan owned texture frame handle scopes native pointers" {
+test "Vulkan owned texture frame handle scopes native handles" {
     if (!build_options.supports_vulkan) return error.SkipZigTest;
 
     var context = try VulkanAttachContext.init();
@@ -2459,7 +2483,7 @@ test "Vulkan owned texture frame handle scopes native pointers" {
     try testing.expectEqual(@as(u32, 32), info.width);
     try testing.expectEqual(@as(u32, 32), info.height);
     try testing.expectEqual(@as(u64, 1), info.generation);
-    try testing.expect(info.image.toPtr() != info.device.toPtr());
+    try testing.expect(info.image.bits() != @intFromPtr(info.device.toPtr()));
     try expectVulkanFrameReleaseWrongThread(&frame);
 
     try testing.expectError(error.ActiveBorrow, session.resize(.{ .width = 16, .height = 16, .scale_factor = 1.0 }));
@@ -2548,7 +2572,7 @@ test "Vulkan borrowed texture set target renders into a replacement image" {
     try testing.expectError(error.Unsupported, session.setVulkanSurfaceTarget(.{
         .extent = .{ .width = 64, .height = 96 },
         .context = borrowed.context.descriptor(),
-        .surface = fakeNativePointer(),
+        .surface = fakeVulkanHandle(),
     }));
 
     // Replacing the target enqueues the new size for the map's owner thread,

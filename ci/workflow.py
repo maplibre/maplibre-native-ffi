@@ -153,7 +153,7 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
             "arm64": "arm64-v8a",
             "x64": "x86_64",
         }[architecture(preset)]
-        commands.extend(android_commands(preset, abi, backend(preset) == "egl"))
+        commands.extend(android_commands(preset, abi, True))
     elif target_platform == "ohos":
         commands.extend(ohos_commands(preset))
     elif target_platform == "ios":

@@ -7,6 +7,7 @@ import org.maplibre.nativeffi.render.RenderResult
 import org.maplibre.nativeffi.render.RenderSessionHandle
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanContextDescriptor
+import org.maplibre.nativeffi.render.VulkanHandle
 import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 
@@ -32,7 +33,7 @@ internal object VulkanRenderTarget {
       VulkanSurfaceDescriptor(
         RenderTarget.extent(viewport),
         descriptor(context),
-        NativePointer.ofAddress(context.surfaceAddress()),
+        VulkanHandle.ofBits(context.surfaceAddress()),
       )
     return Surface(map.attachVulkanSurface(descriptor))
   }
@@ -88,8 +89,8 @@ internal object VulkanRenderTarget {
         viewport.framebufferWidth(),
         viewport.framebufferHeight(),
         descriptor(context),
-        NativePointer.ofAddress(image.imageAddress()),
-        NativePointer.ofAddress(image.viewAddress()),
+        VulkanHandle.ofBits(image.imageAddress()),
+        VulkanHandle.ofBits(image.viewAddress()),
         VK10.VK_FORMAT_R8G8B8A8_UNORM,
         VK10.VK_IMAGE_LAYOUT_UNDEFINED,
       )
@@ -139,7 +140,7 @@ internal object VulkanRenderTarget {
         check(frame.layout() == VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
           "MapLibre owned texture frame is not shader-readable: layout=${frame.layout()}"
         }
-        compositor.drawImageView(frame.imageView().address)
+        compositor.drawImageView(frame.imageView().bits)
       }
     }
 

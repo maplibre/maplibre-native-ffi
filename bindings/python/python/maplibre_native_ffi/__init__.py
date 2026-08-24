@@ -27,6 +27,7 @@ from .render import (
     RenderBackend,
     RenderResult,
     RenderUpdate,
+    VulkanHandle,
 )
 from .runtime import (
     CameraChangeMode,
@@ -90,6 +91,7 @@ __all__ = [
     "UnknownRuntimeEventPayload",
     "UnknownStatusError",
     "UnsupportedFeatureError",
+    "VulkanHandle",
     "WakeSource",
     "WrongThreadError",
     "c_version",

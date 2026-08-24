@@ -30,6 +30,24 @@ public struct NativePointer: Sendable, Hashable, CustomStringConvertible {
   }
 }
 
+public struct VulkanHandle: Sendable, Hashable, CustomStringConvertible {
+  public static let null = VulkanHandle(bitPattern: 0)
+
+  public let bitPattern: UInt64
+
+  public init(bitPattern: UInt64) {
+    self.bitPattern = bitPattern
+  }
+
+  public var isNull: Bool {
+    bitPattern == 0
+  }
+
+  public var description: String {
+    "VulkanHandle(bits: 0x\(String(bitPattern, radix: 16)))"
+  }
+}
+
 final class NativeFrameScope: @unchecked Sendable {
   private let lock = NSLock()
   private let isFrameLive: () -> Bool
@@ -64,7 +82,7 @@ final class NativeFrameScope: @unchecked Sendable {
   }
 }
 
-public struct FrameNativePointer: Sendable, Hashable, CustomStringConvertible {
+public struct FrameNativePointer: Sendable {
   let bitPattern: UInt
   private let scope: NativeFrameScope
   private let diagnosticName: String
@@ -88,25 +106,35 @@ public struct FrameNativePointer: Sendable, Hashable, CustomStringConvertible {
       return bitPattern == 0
     }
   }
+}
 
-  public var description: String {
-    "FrameNativePointer(address: 0x\(String(bitPattern, radix: 16)))"
+public struct FrameVulkanHandle: Sendable {
+  private let bitPattern: UInt64
+  private let scope: NativeFrameScope
+  private let diagnosticName: String
+
+  init(bitPattern: UInt64, scope: NativeFrameScope, diagnosticName: String) {
+    self.bitPattern = bitPattern
+    self.scope = scope
+    self.diagnosticName = diagnosticName
   }
 
-  public static func == (lhs: FrameNativePointer,
-                         rhs: FrameNativePointer) -> Bool
-  {
-    lhs.bitPattern == rhs.bitPattern
+  public var bits: UInt64 {
+    get throws {
+      try scope.requireActive(diagnosticName)
+      return bitPattern
+    }
   }
 
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(bitPattern)
+  public var isNull: Bool {
+    get throws {
+      try scope.requireActive(diagnosticName)
+      return bitPattern == 0
+    }
   }
 }
 
-public struct FrameOpenGLTextureName: Sendable, Hashable,
-  CustomStringConvertible
-{
+public struct FrameOpenGLTextureName: Sendable {
   private let name: UInt32
   private let scope: NativeFrameScope
 
@@ -127,20 +155,5 @@ public struct FrameOpenGLTextureName: Sendable, Hashable,
       try scope.requireActive("OpenGL texture")
       return name == 0
     }
-  }
-
-  public var description: String {
-    "FrameOpenGLTextureName(\(name))"
-  }
-
-  public static func == (
-    lhs: FrameOpenGLTextureName,
-    rhs: FrameOpenGLTextureName
-  ) -> Bool {
-    lhs.name == rhs.name
-  }
-
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(name)
   }
 }

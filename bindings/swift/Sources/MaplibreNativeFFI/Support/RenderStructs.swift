@@ -193,7 +193,7 @@ struct NativeMetalSurfaceDescriptorInput: Equatable {
 struct NativeVulkanSurfaceDescriptorInput: Equatable {
   let extent: NativeRenderTargetExtent
   let context: NativeVulkanContextDescriptor
-  let surfaceAddress: UInt
+  let surfaceBits: UInt64
 
   func withNativeDescriptor<Result>(
     _ body: (UnsafePointer<mln_vulkan_surface_descriptor>) throws -> Result
@@ -201,7 +201,7 @@ struct NativeVulkanSurfaceDescriptorInput: Equatable {
     var descriptor = mln_vulkan_surface_descriptor_default()
     descriptor.extent = extent.native
     descriptor.context = context.native
-    descriptor.surface = UnsafeMutableRawPointer(bitPattern: surfaceAddress)
+    descriptor.surface = surfaceBits
     return try withUnsafePointer(to: &descriptor, body)
   }
 }
@@ -289,8 +289,8 @@ struct NativeVulkanBorrowedTextureDescriptorInput: Equatable {
   let physicalWidth: UInt32
   let physicalHeight: UInt32
   let context: NativeVulkanContextDescriptor
-  let imageAddress: UInt
-  let imageViewAddress: UInt
+  let imageBits: UInt64
+  let imageViewBits: UInt64
   let format: UInt32
   let initialLayout: UInt32
   let finalLayout: UInt32
@@ -304,9 +304,8 @@ struct NativeVulkanBorrowedTextureDescriptorInput: Equatable {
     descriptor.physical_width = physicalWidth
     descriptor.physical_height = physicalHeight
     descriptor.context = context.native
-    descriptor.image = UnsafeMutableRawPointer(bitPattern: imageAddress)
-    descriptor
-      .image_view = UnsafeMutableRawPointer(bitPattern: imageViewAddress)
+    descriptor.image = imageBits
+    descriptor.image_view = imageViewBits
     descriptor.format = format
     descriptor.initial_layout = initialLayout
     descriptor.final_layout = finalLayout

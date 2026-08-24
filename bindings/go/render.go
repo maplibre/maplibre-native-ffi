@@ -119,6 +119,11 @@ const (
 // memory access and transfers no ownership.
 type NativePointer uintptr
 
+// VulkanHandle is the 64-bit bit pattern of a borrowed Vulkan
+// non-dispatchable handle. It grants no memory access and transfers no
+// ownership. Zero represents VK_NULL_HANDLE.
+type VulkanHandle uint64
+
 // RenderTargetExtent is a logical render target extent in UI pixels.
 type RenderTargetExtent struct {
 	Width       uint32
@@ -165,7 +170,7 @@ type MetalSurfaceDescriptor struct {
 type VulkanSurfaceDescriptor struct {
 	Extent  RenderTargetExtent
 	Context VulkanContextDescriptor
-	Surface NativePointer
+	Surface VulkanHandle
 }
 
 // WGLContextDescriptor contains WGL context provider data for OpenGL render targets.
@@ -258,8 +263,8 @@ type VulkanBorrowedTextureDescriptor struct {
 	PhysicalWidth  uint32
 	PhysicalHeight uint32
 	Context        VulkanContextDescriptor
-	Image          NativePointer
-	ImageView      NativePointer
+	Image          VulkanHandle
+	ImageView      VulkanHandle
 	Format         uint32
 	InitialLayout  uint32
 	FinalLayout    uint32
@@ -359,8 +364,8 @@ type VulkanOwnedTextureFrameInfo struct {
 // reading back, detaching, closing the session, or acquiring another frame.
 type VulkanOwnedTextureFrame struct {
 	info      VulkanOwnedTextureFrameInfo
-	image     NativePointer
-	imageView NativePointer
+	image     VulkanHandle
+	imageView VulkanHandle
 	device    NativePointer
 	state     *vulkanOwnedTextureFrameState
 }
@@ -440,7 +445,7 @@ func (descriptor VulkanSurfaceDescriptor) toC() C.mln_vulkan_surface_descriptor 
 	raw := C.mln_vulkan_surface_descriptor_default()
 	raw.extent = descriptor.Extent.toC()
 	raw.context = descriptor.Context.toC()
-	raw.surface = cPointer(descriptor.Surface)
+	raw.surface = C.mln_vulkan_non_dispatchable_handle(descriptor.Surface)
 	return raw
 }
 
@@ -481,8 +486,8 @@ func (descriptor VulkanBorrowedTextureDescriptor) toC() C.mln_vulkan_borrowed_te
 	raw.physical_width = C.uint32_t(descriptor.PhysicalWidth)
 	raw.physical_height = C.uint32_t(descriptor.PhysicalHeight)
 	raw.context = descriptor.Context.toC()
-	raw.image = cPointer(descriptor.Image)
-	raw.image_view = cPointer(descriptor.ImageView)
+	raw.image = C.mln_vulkan_non_dispatchable_handle(descriptor.Image)
+	raw.image_view = C.mln_vulkan_non_dispatchable_handle(descriptor.ImageView)
 	raw.format = C.uint32_t(descriptor.Format)
 	raw.initial_layout = C.uint32_t(descriptor.InitialLayout)
 	raw.final_layout = C.uint32_t(descriptor.FinalLayout)
@@ -1196,8 +1201,8 @@ func (session *RenderSessionHandle) AcquireVulkanTextureFrame() (*VulkanOwnedTex
 			Format:      uint32(rawFrame.format),
 			Layout:      uint32(rawFrame.layout),
 		},
-		image:     NativePointer(uintptr(rawFrame.image)),
-		imageView: NativePointer(uintptr(rawFrame.image_view)),
+		image:     VulkanHandle(rawFrame.image),
+		imageView: VulkanHandle(rawFrame.image_view),
 		device:    NativePointer(uintptr(rawFrame.device)),
 		state:     &vulkanOwnedTextureFrameState{session: session, raw: rawFrame},
 	}, nil
@@ -1305,7 +1310,7 @@ func (frame *VulkanOwnedTextureFrame) WithInfo(fn func(VulkanOwnedTextureFrameIn
 }
 
 // Image returns the borrowed Vulkan image while the frame remains live.
-func (frame *VulkanOwnedTextureFrame) Image() (NativePointer, error) {
+func (frame *VulkanOwnedTextureFrame) Image() (VulkanHandle, error) {
 	if frame == nil || frame.state == nil {
 		return 0, newBindingError(ErrInvalidArgument, "VulkanOwnedTextureFrame is nil")
 	}
@@ -1318,7 +1323,7 @@ func (frame *VulkanOwnedTextureFrame) Image() (NativePointer, error) {
 }
 
 // ImageView returns the borrowed Vulkan image view while the frame remains live.
-func (frame *VulkanOwnedTextureFrame) ImageView() (NativePointer, error) {
+func (frame *VulkanOwnedTextureFrame) ImageView() (VulkanHandle, error) {
 	if frame == nil || frame.state == nil {
 		return 0, newBindingError(ErrInvalidArgument, "VulkanOwnedTextureFrame is nil")
 	}

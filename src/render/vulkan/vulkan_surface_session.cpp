@@ -23,6 +23,7 @@
 #include "render/render_session_common.hpp"
 #include "render/surface_session.hpp"
 #include "render/vulkan/vulkan_dispatch.hpp"
+#include "render/vulkan/vulkan_handle.hpp"
 
 namespace {
 
@@ -31,7 +32,8 @@ auto validate_vulkan_handles(const mln_vulkan_surface_descriptor& descriptor)
   auto* const instance = static_cast<VkInstance>(descriptor.context.instance);
   auto* const physical_device =
     static_cast<VkPhysicalDevice>(descriptor.context.physical_device);
-  auto* const surface = static_cast<VkSurfaceKHR>(descriptor.surface);
+  const auto surface =
+    mln::core::vulkan_handle_from_abi<VkSurfaceKHR>(descriptor.surface);
 
   auto dispatcher = mln::core::vulkan_dispatch_loader(descriptor.context);
   mln::core::vulkan_init_instance_dispatch(dispatcher, descriptor.context);
@@ -189,7 +191,7 @@ class VulkanSurfaceBackend final : public mln::vulkan::RendererBackend,
         return;
       }
       surface = vk::UniqueSurfaceKHR(
-        borrowed_surface,
+        vk::SurfaceKHR(borrowed_surface),
         mln::vulkan::ObjectDestroy<vk::Instance>(
           backend.getInstance().get(), nullptr, backend.getDispatcher()
         )
@@ -305,7 +307,7 @@ class VulkanSurfaceBackend final : public mln::vulkan::RendererBackend,
     }
 
    private:
-    VkSurfaceKHR borrowed_surface = nullptr;
+    VkSurfaceKHR borrowed_surface = VK_NULL_HANDLE;
   };
 
  public:
@@ -335,7 +337,8 @@ class VulkanSurfaceBackend final : public mln::vulkan::RendererBackend,
   auto getDefaultRenderable() -> mln::gfx::Renderable& override {
     if (!resource) {
       resource = std::make_unique<VulkanSurfaceRenderableResource>(
-        *this, static_cast<VkSurfaceKHR>(descriptor_.surface)
+        *this,
+        mln::core::vulkan_handle_from_abi<VkSurfaceKHR>(descriptor_.surface)
       );
     }
     return *this;
@@ -358,7 +361,7 @@ class VulkanSurfaceBackend final : public mln::vulkan::RendererBackend,
       return true;
     }
     return getResource<VulkanSurfaceRenderableResource>().matches_surface(
-      static_cast<VkSurfaceKHR>(descriptor.surface)
+      mln::core::vulkan_handle_from_abi<VkSurfaceKHR>(descriptor.surface)
     );
   }
 
@@ -382,7 +385,8 @@ class VulkanSurfaceBackend final : public mln::vulkan::RendererBackend,
     // a swapchain can throw, and recording the surface before that would leave
     // the backend naming a target it does not have.
     getResource<VulkanSurfaceRenderableResource>().set_surface(
-      static_cast<VkSurfaceKHR>(descriptor.surface), new_size
+      mln::core::vulkan_handle_from_abi<VkSurfaceKHR>(descriptor.surface),
+      new_size
     );
     descriptor_.surface = descriptor.surface;
     mln::vulkan::Renderable::setSize(new_size);

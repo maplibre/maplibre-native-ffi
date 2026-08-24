@@ -422,7 +422,7 @@ final class VulkanSurfaceDescriptor {
   final VulkanContextDescriptor context;
 
   /// Borrowed `VkSurfaceKHR`.
-  final NativePointer surface;
+  final VulkanHandle surface;
 }
 
 /// OpenGL native surface session attachment options.
@@ -525,10 +525,10 @@ final class VulkanBorrowedTextureDescriptor {
   final VulkanContextDescriptor context;
 
   /// Borrowed VkImage.
-  final NativePointer image;
+  final VulkanHandle image;
 
   /// Borrowed VkImageView.
-  final NativePointer imageView;
+  final VulkanHandle imageView;
 
   /// Backend-native VkFormat value.
   final int format;

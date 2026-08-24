@@ -555,7 +555,7 @@ class _RenderSessionHandle:
         graphics_queue_family_index: int,
         get_instance_proc_addr: int,
         get_device_proc_addr: int,
-        surface_address: int,
+        surface_bits: int,
     ) -> None: ...
     def set_opengl_surface_target(
         self,
@@ -594,8 +594,8 @@ class _RenderSessionHandle:
         graphics_queue_family_index: int,
         get_instance_proc_addr: int,
         get_device_proc_addr: int,
-        image_address: int,
-        image_view_address: int,
+        image_bits: int,
+        image_view_bits: int,
         format: int,
         initial_layout: int,
         final_layout: int,
@@ -668,8 +668,8 @@ class _VulkanOwnedTextureFrameHandle:
     def closed(self) -> bool: ...
     def close(self) -> None: ...
     def frame(self) -> _WireDict: ...
-    def image_address(self) -> int: ...
-    def image_view_address(self) -> int: ...
+    def image_bits(self) -> int: ...
+    def image_view_bits(self) -> int: ...
     def device_address(self) -> int: ...
 
 class _OpenGLOwnedTextureFrameHandle:
@@ -793,7 +793,7 @@ def attach_vulkan_surface(
     graphics_queue_family_index: int,
     get_instance_proc_addr: int,
     get_device_proc_addr: int,
-    surface_address: int,
+    surface_bits: int,
 ) -> _RenderSessionHandle: ...
 def attach_metal_owned_texture(
     map: _MapHandle, width: int, height: int, scale_factor: float, device_address: int
@@ -834,8 +834,8 @@ def attach_vulkan_borrowed_texture(
     graphics_queue_family_index: int,
     get_instance_proc_addr: int,
     get_device_proc_addr: int,
-    image_address: int,
-    image_view_address: int,
+    image_bits: int,
+    image_view_bits: int,
     format: int,
     initial_layout: int,
     final_layout: int,

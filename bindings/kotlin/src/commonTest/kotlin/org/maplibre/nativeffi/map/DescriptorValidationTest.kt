@@ -18,6 +18,7 @@ import org.maplibre.nativeffi.render.RenderBackend
 import org.maplibre.nativeffi.render.RenderTargetExtent
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanContextDescriptor
+import org.maplibre.nativeffi.render.VulkanHandle
 import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.WglContextDescriptor
 import org.maplibre.nativeffi.runtime.RuntimeHandle
@@ -155,8 +156,8 @@ class DescriptorValidationTest {
       1,
       1,
       vulkanContext(pointer),
-      pointer,
-      pointer,
+      VulkanHandle.ofBits(pointer.address),
+      VulkanHandle.ofBits(pointer.address),
       format,
       0,
     )

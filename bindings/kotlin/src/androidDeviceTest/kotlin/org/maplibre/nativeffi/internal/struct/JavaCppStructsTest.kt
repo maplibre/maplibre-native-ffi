@@ -33,6 +33,7 @@ import org.maplibre.nativeffi.render.RenderTargetExtent
 import org.maplibre.nativeffi.render.TextureImageInfo
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanContextDescriptor
+import org.maplibre.nativeffi.render.VulkanHandle
 import org.maplibre.nativeffi.resource.ResourceResponse
 import org.maplibre.nativeffi.resource.ResourceResponseStatus
 import org.maplibre.nativeffi.runtime.RuntimeEventPayload
@@ -208,15 +209,15 @@ class JavaCppStructsTest {
             65,
             33,
             context,
-            NativePointer.ofAddress(0x50),
-            NativePointer.ofAddress(0x60),
+            VulkanHandle.ofBits(Long.MIN_VALUE),
+            VulkanHandle.ofBits(-1L),
             44,
             1,
           )
           .apply { finalLayout = 2 }
       )
-    assertEquals(0x50, vulkan.firstPointer)
-    assertEquals(0x60, vulkan.secondPointer)
+    assertEquals(Long.MIN_VALUE, vulkan.firstPointer)
+    assertEquals(-1L, vulkan.secondPointer)
     assertEquals(2, vulkan.extra)
 
     val egl =

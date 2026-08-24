@@ -48,7 +48,7 @@ auto vulkan_surface_descriptor_default() noexcept
         .get_instance_proc_addr = nullptr,
         .get_device_proc_addr = nullptr,
       },
-    .surface = nullptr,
+    .surface = MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL,
   };
 }
 
@@ -104,7 +104,7 @@ auto validate_vulkan_surface_descriptor(
   if (context_status != MLN_STATUS_OK) {
     return context_status;
   }
-  if (descriptor->surface == nullptr) {
+  if (descriptor->surface == MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL) {
     set_thread_error("Vulkan surface handles must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }

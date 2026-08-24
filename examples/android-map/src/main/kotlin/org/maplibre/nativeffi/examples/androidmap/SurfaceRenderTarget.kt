@@ -49,7 +49,7 @@ internal class SurfaceRenderTarget private constructor(private val session: Rend
         }
         is VulkanGraphicsContext -> {
           val descriptor =
-            VulkanSurfaceDescriptor(viewport.extent, graphics.descriptor, graphics.surfacePointer)
+            VulkanSurfaceDescriptor(viewport.extent, graphics.descriptor, graphics.surfaceHandle)
           SurfaceRenderTarget(map.attachVulkanSurface(descriptor))
         }
         else -> error("Unsupported graphics context: ${graphics::class.java.name}")

@@ -18,7 +18,7 @@ import static java.lang.foreign.MemoryLayout.PathElement.*;
  *     uint32_t size;
  *     mln_render_target_extent extent;
  *     mln_vulkan_context_descriptor context;
- *     void *surface;
+ *     mln_vulkan_non_dispatchable_handle surface;
  * }
  * }
  */
@@ -33,7 +33,7 @@ public class mln_vulkan_surface_descriptor {
         MemoryLayout.paddingLayout(4),
         mln_render_target_extent.layout().withName("extent"),
         mln_vulkan_context_descriptor.layout().withName("context"),
-        MapLibreNativeC.C_POINTER.withName("surface")
+        MapLibreNativeC.C_LONG.withName("surface")
     ).withName("mln_vulkan_surface_descriptor");
 
     /**
@@ -175,15 +175,15 @@ public class mln_vulkan_surface_descriptor {
         MemorySegment.copy(fieldValue, 0L, struct, context$OFFSET, context$LAYOUT.byteSize());
     }
 
-    private static final AddressLayout surface$LAYOUT = (AddressLayout)$LAYOUT.select(groupElement("surface"));
+    private static final OfLong surface$LAYOUT = (OfLong)$LAYOUT.select(groupElement("surface"));
 
     /**
      * Layout for field:
      * {@snippet lang=c :
-     * void *surface
+     * mln_vulkan_non_dispatchable_handle surface
      * }
      */
-    public static final AddressLayout surface$layout() {
+    public static final OfLong surface$layout() {
         return surface$LAYOUT;
     }
 
@@ -192,7 +192,7 @@ public class mln_vulkan_surface_descriptor {
     /**
      * Offset for field:
      * {@snippet lang=c :
-     * void *surface
+     * mln_vulkan_non_dispatchable_handle surface
      * }
      */
     public static final long surface$offset() {
@@ -202,20 +202,20 @@ public class mln_vulkan_surface_descriptor {
     /**
      * Getter for field:
      * {@snippet lang=c :
-     * void *surface
+     * mln_vulkan_non_dispatchable_handle surface
      * }
      */
-    public static MemorySegment surface(MemorySegment struct) {
+    public static long surface(MemorySegment struct) {
         return struct.get(surface$LAYOUT, surface$OFFSET);
     }
 
     /**
      * Setter for field:
      * {@snippet lang=c :
-     * void *surface
+     * mln_vulkan_non_dispatchable_handle surface
      * }
      */
-    public static void surface(MemorySegment struct, MemorySegment fieldValue) {
+    public static void surface(MemorySegment struct, long fieldValue) {
         struct.set(surface$LAYOUT, surface$OFFSET, fieldValue);
     }
 

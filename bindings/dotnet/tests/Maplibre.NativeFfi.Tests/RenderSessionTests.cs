@@ -38,7 +38,7 @@ public sealed unsafe class RenderSessionTests
             new VulkanSurfaceDescriptor
             {
                 Extent = new RenderTargetExtent(640, 480, 1),
-                Surface = NativePointer.FromBorrowedAddress(111),
+                Surface = new VulkanHandle(111),
                 Context = new VulkanContextDescriptor
                 {
                     Instance = NativePointer.FromBorrowedAddress(222),
@@ -53,7 +53,7 @@ public sealed unsafe class RenderSessionTests
         );
         Assert.Equal(640u, vulkan.extent.width);
         Assert.Equal(480u, vulkan.extent.height);
-        Assert.Equal(111, (nint)vulkan.surface);
+        Assert.Equal(111ul, vulkan.surface);
         Assert.Equal(222, (nint)vulkan.context.instance);
         Assert.Equal(333, (nint)vulkan.context.physical_device);
         Assert.Equal(444, (nint)vulkan.context.device);
@@ -170,15 +170,15 @@ public sealed unsafe class RenderSessionTests
                 Extent = new RenderTargetExtent(256, 128, 1),
                 PhysicalWidth = 65,
                 PhysicalHeight = 33,
-                Image = NativePointer.FromBorrowedAddress(40),
-                ImageView = NativePointer.FromBorrowedAddress(45),
+                Image = new VulkanHandle(40),
+                ImageView = new VulkanHandle(45),
                 Format = 50,
                 InitialLayout = 55,
                 FinalLayout = 60,
             }
         );
-        Assert.Equal(40, (nint)vulkanBorrowed.image);
-        Assert.Equal(45, (nint)vulkanBorrowed.image_view);
+        Assert.Equal(40ul, vulkanBorrowed.image);
+        Assert.Equal(45ul, vulkanBorrowed.image_view);
         Assert.Equal(50u, vulkanBorrowed.format);
         Assert.Equal(55u, vulkanBorrowed.initial_layout);
         Assert.Equal(60u, vulkanBorrowed.final_layout);
@@ -252,8 +252,8 @@ public sealed unsafe class RenderSessionTests
                 Extent = new RenderTargetExtent(256, 256, 1.0),
                 PhysicalWidth = 65,
                 PhysicalHeight = 33,
-                Image = NativePointer.FromBorrowedAddress(2),
-                ImageView = NativePointer.FromBorrowedAddress(3),
+                Image = new VulkanHandle(2),
+                ImageView = new VulkanHandle(3),
             }
         );
         Assert.Equal((uint)sizeof(mln_render_target_extent), vulkanBorrowed.extent.size);
@@ -331,13 +331,13 @@ public sealed unsafe class RenderSessionTests
             3,
             4,
             5,
-            NativePointer.FromBorrowedAddress(6),
-            NativePointer.FromBorrowedAddress(7),
+            new VulkanHandle(6),
+            new VulkanHandle(7),
             NativePointer.FromBorrowedAddress(8),
             9,
             10
         );
-        Assert.Equal(7, vulkan.ImageView.Address);
+        Assert.Equal(7ul, vulkan.ImageView.Bits);
         vulkanScope.Dispose();
         Assert.Throws<InvalidStateException>(() => vulkan.ImageView);
 
@@ -481,6 +481,7 @@ public sealed unsafe class RenderSessionTests
             AssertActiveFrameError(() => session.Resize(64, 64, 1));
             var extent = new RenderTargetExtent(64, 64, 1);
             var handle = NativePointer.FromBorrowedAddress(1);
+            var vulkanHandle = new VulkanHandle(1);
             AssertActiveFrameError(() =>
                 session.SetMetalSurfaceTarget(
                     new MetalSurfaceDescriptor { Extent = extent, Layer = handle }
@@ -488,7 +489,7 @@ public sealed unsafe class RenderSessionTests
             );
             AssertActiveFrameError(() =>
                 session.SetVulkanSurfaceTarget(
-                    new VulkanSurfaceDescriptor { Extent = extent, Surface = handle }
+                    new VulkanSurfaceDescriptor { Extent = extent, Surface = vulkanHandle }
                 )
             );
             AssertActiveFrameError(() =>
@@ -514,8 +515,8 @@ public sealed unsafe class RenderSessionTests
                         Extent = extent,
                         PhysicalWidth = 64,
                         PhysicalHeight = 64,
-                        Image = handle,
-                        ImageView = handle,
+                        Image = vulkanHandle,
+                        ImageView = vulkanHandle,
                     }
                 )
             );

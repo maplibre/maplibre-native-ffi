@@ -46,6 +46,8 @@ use crate::{
 
 assert_not_impl_any!(NativePointer: Send, Sync);
 assert_not_impl_any!(FrameNativePointer<'static>: Send, Sync);
+assert_not_impl_any!(VulkanHandle: Send, Sync);
+assert_not_impl_any!(FrameVulkanHandle<'static>: Send, Sync);
 assert_not_impl_any!(FrameOpenGLTextureName<'static>: Send, Sync);
 assert_not_impl_any!(RenderSessionHandle: Send, Sync);
 assert_not_impl_any!(MetalOwnedTextureFrameHandle: Send, Sync);
@@ -287,13 +289,16 @@ impl OwnedTextureTestContext {
             }
             #[cfg(not(target_os = "emscripten"))]
             Self::Vulkan(context) => {
+                // SAFETY: The rejected setter never reaches Vulkan with these
+                // non-null placeholder handle values.
+                let placeholder_handle = unsafe { VulkanHandle::from_bits(1) };
                 session.set_vulkan_borrowed_texture_target(&VulkanBorrowedTextureDescriptor::new(
                     extent.clone(),
                     64,
                     64,
                     context.descriptor(),
-                    placeholder,
-                    placeholder,
+                    placeholder_handle,
+                    placeholder_handle,
                     1,
                     0,
                     1,
@@ -3079,7 +3084,7 @@ fn frame_native_pointer_round_trips_address_without_plain_native_pointer() {
 
 #[test]
 // Spec coverage: BND-167.
-fn frame_metadata_copies_values_without_exposing_backend_pointers() {
+fn frame_metadata_copies_values_without_exposing_backend_handles() {
     let mut metal = empty_metal_owned_texture_frame();
     metal.generation = 1;
     metal.width = 64;
@@ -3104,8 +3109,8 @@ fn frame_metadata_copies_values_without_exposing_backend_pointers() {
     vulkan.height = 96;
     vulkan.scale_factor = 1.5;
     vulkan.frame_id = 11;
-    vulkan.image = 0x3000usize as *mut _;
-    vulkan.image_view = 0x4000usize as *mut _;
+    vulkan.image = 0x3000;
+    vulkan.image_view = 0x4000;
     vulkan.device = 0x5000usize as *mut _;
     vulkan.format = 44;
     vulkan.layout = 55;
@@ -4223,7 +4228,7 @@ fn backend_specific_attach_calls_report_native_statuses() {
                 NativePointer::NULL,
                 0,
             ),
-            NativePointer::NULL,
+            VulkanHandle::NULL,
         ))
         .unwrap_err();
     assert!(matches!(

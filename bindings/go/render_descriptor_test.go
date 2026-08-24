@@ -181,8 +181,8 @@ func TestTextureFrameWithInfoRejectsClosedFrames(t *testing.T) {
 
 	vulkan := &VulkanOwnedTextureFrame{
 		info:      VulkanOwnedTextureFrameInfo{Generation: 8},
-		image:     NativePointer(0x111),
-		imageView: NativePointer(0x222),
+		image:     VulkanHandle(0x111),
+		imageView: VulkanHandle(0x222),
 		device:    NativePointer(0x333),
 		state:     &vulkanOwnedTextureFrameState{},
 	}
@@ -190,8 +190,8 @@ func TestTextureFrameWithInfoRejectsClosedFrames(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Vulkan Image(): %v", err)
 	}
-	if image != NativePointer(0x111) {
-		t.Fatalf("Vulkan Image() = %#x, want 0x111", uintptr(image))
+	if image != VulkanHandle(0x111) {
+		t.Fatalf("Vulkan Image() = %#x, want 0x111", uint64(image))
 	}
 	vulkan.state.closed = true
 	if err := vulkan.WithInfo(func(VulkanOwnedTextureFrameInfo) error { return nil }); !errors.Is(err, ErrInvalidState) {

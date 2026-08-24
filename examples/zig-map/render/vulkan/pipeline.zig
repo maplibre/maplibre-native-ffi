@@ -21,14 +21,14 @@ pub const Pipeline = struct {
     ) !Pipeline {
         var self = Pipeline{
             .allocator = allocator,
-            .render_pass = null,
-            .descriptor_set_layout = null,
-            .pipeline_layout = null,
-            .handle = null,
-            .sampler = null,
-            .descriptor_pool = null,
-            .descriptor_set = null,
-            .descriptor_image_view = null,
+            .render_pass = util.nullHandle(c.VkRenderPass),
+            .descriptor_set_layout = util.nullHandle(c.VkDescriptorSetLayout),
+            .pipeline_layout = util.nullHandle(c.VkPipelineLayout),
+            .handle = util.nullHandle(c.VkPipeline),
+            .sampler = util.nullHandle(c.VkSampler),
+            .descriptor_pool = util.nullHandle(c.VkDescriptorPool),
+            .descriptor_set = util.nullHandle(c.VkDescriptorSet),
+            .descriptor_image_view = util.nullHandle(c.VkImageView),
         };
         errdefer self.deinit(device);
 
@@ -39,26 +39,26 @@ pub const Pipeline = struct {
     }
 
     pub fn deinit(self: *Pipeline, device: c.VkDevice) void {
-        if (self.handle != null) c.vkDestroyPipeline(device, self.handle, null);
-        self.handle = null;
-        if (self.pipeline_layout != null) {
+        if (!util.isNullHandle(self.handle)) c.vkDestroyPipeline(device, self.handle, null);
+        self.handle = util.nullHandle(c.VkPipeline);
+        if (!util.isNullHandle(self.pipeline_layout)) {
             c.vkDestroyPipelineLayout(device, self.pipeline_layout, null);
         }
-        self.pipeline_layout = null;
-        if (self.descriptor_pool != null) {
+        self.pipeline_layout = util.nullHandle(c.VkPipelineLayout);
+        if (!util.isNullHandle(self.descriptor_pool)) {
             c.vkDestroyDescriptorPool(device, self.descriptor_pool, null);
         }
-        self.descriptor_pool = null;
-        if (self.sampler != null) c.vkDestroySampler(device, self.sampler, null);
-        self.sampler = null;
-        if (self.descriptor_set_layout != null) {
+        self.descriptor_pool = util.nullHandle(c.VkDescriptorPool);
+        if (!util.isNullHandle(self.sampler)) c.vkDestroySampler(device, self.sampler, null);
+        self.sampler = util.nullHandle(c.VkSampler);
+        if (!util.isNullHandle(self.descriptor_set_layout)) {
             c.vkDestroyDescriptorSetLayout(device, self.descriptor_set_layout, null);
         }
-        self.descriptor_set_layout = null;
-        if (self.render_pass != null) c.vkDestroyRenderPass(device, self.render_pass, null);
-        self.render_pass = null;
-        self.descriptor_set = null;
-        self.descriptor_image_view = null;
+        self.descriptor_set_layout = util.nullHandle(c.VkDescriptorSetLayout);
+        if (!util.isNullHandle(self.render_pass)) c.vkDestroyRenderPass(device, self.render_pass, null);
+        self.render_pass = util.nullHandle(c.VkRenderPass);
+        self.descriptor_set = util.nullHandle(c.VkDescriptorSet);
+        self.descriptor_image_view = util.nullHandle(c.VkImageView);
     }
 
     pub fn updateDescriptor(self: *Pipeline, device: c.VkDevice, image_view: c.VkImageView) void {
@@ -297,7 +297,7 @@ pub const Pipeline = struct {
             .layout = self.pipeline_layout,
             .renderPass = self.render_pass,
             .subpass = 0,
-            .basePipelineHandle = null,
+            .basePipelineHandle = util.nullHandle(c.VkPipeline),
             .basePipelineIndex = -1,
         };
         try util.expectVk(c.vkCreateGraphicsPipelines(
@@ -326,7 +326,7 @@ fn createShader(
         .codeSize = bytes.len,
         .pCode = code.ptr,
     };
-    var shader: c.VkShaderModule = null;
+    var shader = util.nullHandle(c.VkShaderModule);
     try util.expectVk(c.vkCreateShaderModule(device, &create_info, null, &shader));
     return shader;
 }

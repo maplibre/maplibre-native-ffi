@@ -925,8 +925,8 @@ final class VulkanOwnedTextureFrame implements Finalizable {
     _frameId = uint64FromNative(frame.frame_id);
     _format = frame.format;
     _layout = frame.layout;
-    _imageAddress = frame.image.address;
-    _imageViewAddress = frame.image_view.address;
+    _imageBits = uint64FromNative(frame.image);
+    _imageViewBits = uint64FromNative(frame.image_view);
     _deviceAddress = frame.device.address;
     _leakReporter = NativeLeakReporter(
       this,
@@ -960,8 +960,8 @@ final class VulkanOwnedTextureFrame implements Finalizable {
   late final BigInt _frameId;
   late final int _format;
   late final int _layout;
-  late final int _imageAddress;
-  late final int _imageViewAddress;
+  late final BigInt _imageBits;
+  late final BigInt _imageViewBits;
   late final int _deviceAddress;
   late final NativeLeakReporter _leakReporter;
   var _closed = false;
@@ -1008,17 +1008,23 @@ final class VulkanOwnedTextureFrame implements Finalizable {
     return _layout;
   }
 
-  /// Unsafe borrowed VkImage pointer.
+  /// Unsafe borrowed VkImage handle.
   ///
-  /// The pointer is valid only until [close] releases this frame.
-  ScopedNativePointer get unsafeImage =>
-      _borrowedPointer(_imageAddress, 'Vulkan image');
+  /// The handle is valid only until [close] releases this frame.
+  ScopedVulkanHandle get unsafeImage => ScopedVulkanHandle(
+    _imageBits,
+    checkValid: _checkOpen,
+    debugName: 'Vulkan image',
+  );
 
-  /// Unsafe borrowed VkImageView pointer.
+  /// Unsafe borrowed VkImageView handle.
   ///
-  /// The pointer is valid only until [close] releases this frame.
-  ScopedNativePointer get unsafeImageView =>
-      _borrowedPointer(_imageViewAddress, 'Vulkan image view');
+  /// The handle is valid only until [close] releases this frame.
+  ScopedVulkanHandle get unsafeImageView => ScopedVulkanHandle(
+    _imageViewBits,
+    checkValid: _checkOpen,
+    debugName: 'Vulkan image view',
+  );
 
   /// Unsafe borrowed VkDevice pointer.
   ///
@@ -1026,7 +1032,7 @@ final class VulkanOwnedTextureFrame implements Finalizable {
   ScopedNativePointer get unsafeDevice =>
       _borrowedPointer(_deviceAddress, 'Vulkan device');
 
-  /// Releases this frame. The unsafe backend pointers become invalid.
+  /// Releases this frame. The unsafe backend handles become invalid.
   void close() {
     if (_closed) {
       return;

@@ -106,13 +106,13 @@ typedef struct mln_vulkan_borrowed_texture_descriptor {
    * physical size: the session builds a framebuffer at that size, and Vulkan
    * leaves a framebuffer larger than its attachment undefined.
    */
-  void* image;
+  mln_vulkan_non_dispatchable_handle image;
   /**
    * Borrowed VkImageView for image. Required.
    *
    * The view must be a 2D color view that matches image and format.
    */
-  void* image_view;
+  mln_vulkan_non_dispatchable_handle image_view;
   /** Backend-native VkFormat value for image. VK_FORMAT_UNDEFINED is invalid.
    */
   uint32_t format;
@@ -140,10 +140,10 @@ typedef struct mln_vulkan_owned_texture_frame {
   double scale_factor;
   /** Opaque frame identity used to reject stale releases. */
   uint64_t frame_id;
-  /** Borrowed VkImage. Valid until frame release. */
-  void* image;
-  /** Borrowed VkImageView. Valid until frame release. */
-  void* image_view;
+  /** Borrowed VkImage bit pattern. Valid until frame release. */
+  mln_vulkan_non_dispatchable_handle image;
+  /** Borrowed VkImageView bit pattern. Valid until frame release. */
+  mln_vulkan_non_dispatchable_handle image_view;
   /** Borrowed VkDevice. Valid until frame release. */
   void* device;
   /** Backend-native VkFormat value. */
@@ -743,10 +743,10 @@ MLN_API mln_status mln_metal_owned_texture_release_frame(
  *
  * Use this function with sessions created by mln_vulkan_owned_texture_attach().
  *
- * The returned image, image view, and device pointers are borrowed and remain
- * valid only until mln_vulkan_owned_texture_release_frame() is called for the
- * same frame. While acquired, resize, render update, detach, destroy, and a
- * second acquire return MLN_STATUS_INVALID_STATE.
+ * The returned image and image view handles and device pointer are borrowed and
+ * remain valid only until mln_vulkan_owned_texture_release_frame() is called
+ * for the same frame. While acquired, resize, render update, detach, destroy,
+ * and a second acquire return MLN_STATUS_INVALID_STATE.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

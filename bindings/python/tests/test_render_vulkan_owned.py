@@ -355,11 +355,11 @@ def test_vulkan_frame_acquire_release_and_backend_handles(
     image = frame.image
     image_view = frame.image_view
     device = frame.device
-    assert isinstance(image, render.NativePointer)
-    assert isinstance(image_view, render.NativePointer)
+    assert isinstance(image, render.VulkanHandle)
+    assert isinstance(image_view, render.VulkanHandle)
     assert isinstance(device, render.NativePointer)
-    assert image.address != 0
-    assert image_view.address != 0
+    assert image.bits != 0
+    assert image_view.bits != 0
     assert device.address == vulkan_owned_session.context.descriptor().device.address
 
     frame.close()
@@ -388,14 +388,14 @@ def test_vulkan_frame_release_failure_leaves_frame_live_for_later_release() -> N
                 "layout": 55,
             }
 
-        def image_address(self) -> int:
+        def image_bits(self) -> int:
             if self.closed:
                 raise mln.InvalidStateError(
                     None, "VulkanOwnedTextureFrameHandle is closed"
                 )
             return 0x1000
 
-        def image_view_address(self) -> int:
+        def image_view_bits(self) -> int:
             if self.closed:
                 raise mln.InvalidStateError(
                     None, "VulkanOwnedTextureFrameHandle is closed"
@@ -418,12 +418,12 @@ def test_vulkan_frame_release_failure_leaves_frame_live_for_later_release() -> N
     native = FakeNativeFrame()
     frame = render.VulkanOwnedTextureFrameHandle._from_native(native)
 
-    assert frame.image.address == 0x1000
+    assert frame.image.bits == 0x1000
     with pytest.raises(mln.InvalidStateError, match="frame release failed"):
         frame.close()
 
     assert not frame.closed
-    assert frame.image.address == 0x1000
+    assert frame.image.bits == 0x1000
     assert native.close_calls == 1
 
     frame.close()
@@ -486,17 +486,19 @@ def test_stale_vulkan_frame_handles_cannot_expose_backend_handles_after_reuse(
     stale_device = stale_frame.device
     stale_frame.close()
 
-    for pointer in (stale_image, stale_image_view, stale_device):
-        assert_invalid_state(lambda pointer=pointer: pointer.address)
+    for handle in (stale_image, stale_image_view):
+        assert_invalid_state(lambda handle=handle: handle.bits)
+    assert_invalid_state(lambda: stale_device.address)
     assert_invalid_state(lambda: stale_frame.image)
     assert_invalid_state(lambda: stale_frame.image_view)
     assert_invalid_state(lambda: stale_frame.device)
 
     next_frame = vulkan_owned_session.session.acquire_vulkan_owned_texture_frame()
     try:
-        assert next_frame.image.address != 0
-        for pointer in (stale_image, stale_image_view, stale_device):
-            assert_invalid_state(lambda pointer=pointer: pointer.address)
+        assert next_frame.image.bits != 0
+        for handle in (stale_image, stale_image_view):
+            assert_invalid_state(lambda handle=handle: handle.bits)
+        assert_invalid_state(lambda: stale_device.address)
     finally:
         next_frame.close()
 

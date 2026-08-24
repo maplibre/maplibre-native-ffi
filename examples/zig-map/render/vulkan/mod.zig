@@ -331,7 +331,7 @@ const VulkanOwnedTextureBackend = struct {
         errdefer frame.release() catch |err| diagnostics.logError("Vulkan texture release failed", err, null);
 
         const info = try frame.info();
-        const image_view: c.VkImageView = @ptrCast(info.image_view.toPtr());
+        const image_view = vulkanHandleFromBits(c.VkImageView, info.image_view.bits());
         if (!try self.compositor.presentImageView(image_view)) {
             frame.release() catch |err| diagnostics.logError("Vulkan texture release failed", err, null);
             return false;
@@ -353,7 +353,11 @@ const BorrowedImage = struct {
     view: c.VkImageView,
 
     fn init(context: *const Context, viewport: types.Viewport) !BorrowedImage {
-        var self = BorrowedImage{ .image = null, .memory = null, .view = null };
+        var self = BorrowedImage{
+            .image = util.nullHandle(c.VkImage),
+            .memory = util.nullHandle(c.VkDeviceMemory),
+            .view = util.nullHandle(c.VkImageView),
+        };
         errdefer self.deinit(context.device);
 
         const image_info = c.VkImageCreateInfo{
@@ -421,10 +425,14 @@ const BorrowedImage = struct {
     }
 
     fn deinit(self: *BorrowedImage, device: c.VkDevice) void {
-        if (self.view != null) c.vkDestroyImageView(device, self.view, null);
-        if (self.image != null) c.vkDestroyImage(device, self.image, null);
-        if (self.memory != null) c.vkFreeMemory(device, self.memory, null);
-        self.* = .{ .image = null, .memory = null, .view = null };
+        if (!util.isNullHandle(self.view)) c.vkDestroyImageView(device, self.view, null);
+        if (!util.isNullHandle(self.image)) c.vkDestroyImage(device, self.image, null);
+        if (!util.isNullHandle(self.memory)) c.vkFreeMemory(device, self.memory, null);
+        self.* = .{
+            .image = util.nullHandle(c.VkImage),
+            .memory = util.nullHandle(c.VkDeviceMemory),
+            .view = util.nullHandle(c.VkImageView),
+        };
     }
 };
 
@@ -476,8 +484,8 @@ const VulkanBorrowedTextureBackend = struct {
             .physical_width = viewport.physical_width,
             .physical_height = viewport.physical_height,
             .context = vulkanContextDescriptor(&self.compositor.context),
-            .image = maplibre.NativePointer.fromPtr(@ptrCast(replacement.image.?)),
-            .image_view = maplibre.NativePointer.fromPtr(@ptrCast(replacement.view.?)),
+            .image = vulkanHandleToBinding(replacement.image),
+            .image_view = vulkanHandleToBinding(replacement.view),
             .format = c.VK_FORMAT_R8G8B8A8_UNORM,
             .initial_layout = c.VK_IMAGE_LAYOUT_UNDEFINED,
             .final_layout = c.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -507,8 +515,8 @@ const VulkanBorrowedTextureBackend = struct {
             .physical_width = viewport.physical_width,
             .physical_height = viewport.physical_height,
             .context = vulkanContextDescriptor(&self.compositor.context),
-            .image = maplibre.NativePointer.fromPtr(@ptrCast(self.borrowed_image.image.?)),
-            .image_view = maplibre.NativePointer.fromPtr(@ptrCast(self.borrowed_image.view.?)),
+            .image = vulkanHandleToBinding(self.borrowed_image.image),
+            .image_view = vulkanHandleToBinding(self.borrowed_image.view),
             .format = c.VK_FORMAT_R8G8B8A8_UNORM,
             .initial_layout = c.VK_IMAGE_LAYOUT_UNDEFINED,
             .final_layout = c.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -580,7 +588,7 @@ const VulkanSurfaceBackend = struct {
         const surface = maplibre.attachVulkanSurface(map, .{
             .extent = render_target.extent(viewport),
             .context = vulkanContextDescriptor(&self.context),
-            .surface = maplibre.NativePointer.fromPtr(@ptrCast(self.context.surface.?)),
+            .surface = vulkanHandleToBinding(self.context.surface),
         }) catch |err| {
             diagnostics.logError("Vulkan surface attach failed", err, null);
             return types.AppError.SurfaceAttachFailed;
@@ -603,6 +611,27 @@ fn vulkanContextDescriptor(context: *const Context) maplibre.VulkanContextDescri
 
 fn nativeFunctionPointer(comptime function: anytype) maplibre.NativePointer {
     return maplibre.NativePointer.fromPtr(@ptrFromInt(@intFromPtr(&function)));
+}
+
+fn vulkanHandleToBinding(handle: anytype) maplibre.VulkanHandle {
+    const Handle = @TypeOf(handle);
+    const bits: u64 = switch (@typeInfo(Handle)) {
+        .optional => if (handle) |value| @intFromPtr(value) else 0,
+        .pointer => @intFromPtr(handle),
+        .int => @intCast(handle),
+        .@"enum" => @intCast(@intFromEnum(handle)),
+        else => @compileError("unsupported Vulkan handle representation"),
+    };
+    return maplibre.VulkanHandle.fromBits(bits);
+}
+
+fn vulkanHandleFromBits(comptime Handle: type, bits: u64) Handle {
+    return switch (@typeInfo(Handle)) {
+        .optional, .pointer => @ptrFromInt(@as(usize, @intCast(bits))),
+        .int => @intCast(bits),
+        .@"enum" => @enumFromInt(bits),
+        else => @compileError("unsupported Vulkan handle representation"),
+    };
 }
 
 fn findMemoryType(

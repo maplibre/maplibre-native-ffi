@@ -118,6 +118,14 @@ def _pointer(value: Any, name: str) -> render.NativePointer:
     return render.NativePointer(_addr(value), _diagnostic_name=name)
 
 
+def _handle(value: Any, name: str) -> render.VulkanHandle:
+    try:
+        bits = int(value)
+    except TypeError:
+        bits = _addr(value)
+    return render.VulkanHandle(bits, _diagnostic_name=name)
+
+
 def _extension_name(extension: Any) -> str:
     raw = extension.extensionName
     if isinstance(raw, str):
@@ -400,8 +408,8 @@ class VulkanBorrowedImage:
             physical_width=self.width,
             physical_height=self.height,
             context=self.context.descriptor(),
-            image=_pointer(self.image, "VkImage"),
-            image_view=_pointer(self.image_view, "VkImageView"),
+            image=_handle(self.image, "VkImage"),
+            image_view=_handle(self.image_view, "VkImageView"),
             format=vk.VK_FORMAT_R8G8B8A8_UNORM,
             initial_layout=vk.VK_IMAGE_LAYOUT_UNDEFINED,
             final_layout=vk.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,

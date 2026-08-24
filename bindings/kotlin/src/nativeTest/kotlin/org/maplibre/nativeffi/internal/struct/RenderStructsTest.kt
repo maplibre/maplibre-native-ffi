@@ -27,6 +27,7 @@ import org.maplibre.nativeffi.render.RenderTargetExtent
 import org.maplibre.nativeffi.render.TextureImageInfo
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanContextDescriptor
+import org.maplibre.nativeffi.render.VulkanHandle
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 
 @OptIn(ExperimentalForeignApi::class)
@@ -115,8 +116,8 @@ class RenderStructsTest : org.maplibre.nativeffi.NativeTestBase() {
                 65,
                 33,
                 context,
-                NativePointer.ofAddress(0x50L),
-                NativePointer.ofAddress(0x60L),
+                VulkanHandle.ofBits(Long.MIN_VALUE),
+                VulkanHandle.ofBits(-1L),
                 44,
                 1,
               )
@@ -128,6 +129,8 @@ class RenderStructsTest : org.maplibre.nativeffi.NativeTestBase() {
       assertEquals(7U, borrowed.context.graphics_queue_family_index)
       assertFalse(borrowed.context.get_instance_proc_addr == null)
       assertFalse(borrowed.context.get_device_proc_addr == null)
+      assertEquals(Long.MIN_VALUE.toULong(), borrowed.image)
+      assertEquals(ULong.MAX_VALUE, borrowed.image_view)
       assertEquals(44U, borrowed.format)
       assertEquals(2U, borrowed.final_layout)
 
@@ -136,12 +139,12 @@ class RenderStructsTest : org.maplibre.nativeffi.NativeTestBase() {
             VulkanSurfaceDescriptor(
               RenderTargetExtent(256, 256, 1.0),
               context,
-              NativePointer.ofAddress(0x70L),
+              VulkanHandle.ofBits(0x70L),
             ),
             this,
           )
           .pointed
-      assertFalse(surface.surface == null)
+      assertEquals(0x70UL, surface.surface)
     }
   }
 

@@ -25,7 +25,7 @@ pub const Swapchain = struct {
     ) !Swapchain {
         var self = Swapchain{
             .allocator = allocator,
-            .handle = null,
+            .handle = util.nullHandle(c.VkSwapchainKHR),
             .format = c.VK_FORMAT_UNDEFINED,
             .extent = .{ .width = 0, .height = 0 },
             .images = &.{},
@@ -52,8 +52,8 @@ pub const Swapchain = struct {
         self.allocator.free(self.images);
         self.images = &.{};
 
-        if (self.handle != null) c.vkDestroySwapchainKHR(device, self.handle, null);
-        self.handle = null;
+        if (!util.isNullHandle(self.handle)) c.vkDestroySwapchainKHR(device, self.handle, null);
+        self.handle = util.nullHandle(c.VkSwapchainKHR);
     }
 
     pub fn createFramebuffers(
@@ -62,7 +62,7 @@ pub const Swapchain = struct {
         render_pass: c.VkRenderPass,
     ) !void {
         self.framebuffers = try self.allocator.alloc(c.VkFramebuffer, self.views.len);
-        @memset(self.framebuffers, null);
+        @memset(self.framebuffers, util.nullHandle(c.VkFramebuffer));
         for (self.views, 0..) |view, index| {
             const framebuffer_info = c.VkFramebufferCreateInfo{
                 .sType = c.VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
@@ -165,7 +165,7 @@ pub const Swapchain = struct {
             self.images.ptr,
         ));
         self.views = try self.allocator.alloc(c.VkImageView, actual_count);
-        @memset(self.views, null);
+        @memset(self.views, util.nullHandle(c.VkImageView));
         for (self.images, 0..) |image, index| {
             self.views[index] = try createImageView(context.device, image, self.format);
         }
@@ -223,7 +223,7 @@ fn createImageView(device: c.VkDevice, image: c.VkImage, format: c.VkFormat) !c.
             .layerCount = 1,
         },
     };
-    var image_view: c.VkImageView = null;
+    var image_view = util.nullHandle(c.VkImageView);
     try util.expectVk(c.vkCreateImageView(device, &create_info, null, &image_view));
     return image_view;
 }

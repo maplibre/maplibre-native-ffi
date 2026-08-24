@@ -79,8 +79,8 @@ impl RenderTarget {
                     viewport.physical_width,
                     viewport.physical_height,
                     context_descriptor(vulkan),
-                    replacement.image_pointer(),
-                    replacement.view_pointer(),
+                    replacement.image_handle(),
+                    replacement.view_handle(),
                     ash::vk::Format::R8G8B8A8_UNORM.as_raw() as u32,
                     ash::vk::ImageLayout::UNDEFINED.as_raw() as u32,
                     ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL.as_raw() as u32,
@@ -239,8 +239,8 @@ fn attach_borrowed_texture(
         viewport.physical_width,
         viewport.physical_height,
         context_descriptor(vulkan),
-        image.image_pointer(),
-        image.view_pointer(),
+        image.image_handle(),
+        image.view_handle(),
         ash::vk::Format::R8G8B8A8_UNORM.as_raw() as u32,
         ash::vk::ImageLayout::UNDEFINED.as_raw() as u32,
         ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL.as_raw() as u32,
@@ -271,7 +271,7 @@ fn attach_surface(
     let descriptor = VulkanSurfaceDescriptor::new(
         extent(viewport),
         context_descriptor(vulkan),
-        vulkan.surface_pointer(),
+        vulkan.surface_handle(),
     );
     Ok(RenderTarget::Surface {
         session: map.attach_vulkan_surface(&descriptor)?,

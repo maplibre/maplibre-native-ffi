@@ -8,8 +8,8 @@ public class VulkanBorrowedTextureDescriptor(
   physicalWidth: Int,
   physicalHeight: Int,
   context: VulkanContextDescriptor,
-  image: NativePointer,
-  imageView: NativePointer,
+  image: VulkanHandle,
+  imageView: VulkanHandle,
   format: Int,
   initialLayout: Int,
 ) {
@@ -31,9 +31,9 @@ public class VulkanBorrowedTextureDescriptor(
 
   public var context: VulkanContextDescriptor = context
 
-  public var image: NativePointer = image
+  public var image: VulkanHandle = image
 
-  public var imageView: NativePointer = imageView
+  public var imageView: VulkanHandle = imageView
 
   public var format: Int = format
     set(value) {

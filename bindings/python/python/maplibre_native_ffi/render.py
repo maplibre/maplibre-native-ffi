@@ -145,6 +145,60 @@ class NativePointer:
         return f"{type(self).__name__}(address={self.address!r})"
 
 
+class VulkanHandle:
+    """Borrowed 64-bit Vulkan non-dispatchable handle bit pattern."""
+
+    __slots__ = ("_bits", "_diagnostic_name", "_is_live")
+
+    def __init__(
+        self,
+        bits: int,
+        *,
+        _is_live: Callable[[], bool] | None = None,
+        _diagnostic_name: str = "Vulkan handle",
+    ) -> None:
+        if not 0 <= bits <= (1 << 64) - 1:
+            msg = "Vulkan handle bit pattern must fit uint64"
+            raise ValueError(msg)
+        self._bits = bits
+        self._is_live = _is_live
+        self._diagnostic_name = _diagnostic_name
+
+    @classmethod
+    def null(cls) -> VulkanHandle:
+        """Return a null Vulkan non-dispatchable handle."""
+        return cls(0)
+
+    @property
+    def bits(self) -> int:
+        """Return the bit pattern while its borrowed scope is still live."""
+        self._require_live()
+        return self._bits
+
+    @property
+    def is_null(self) -> bool:
+        """Return whether this value represents ``VK_NULL_HANDLE``."""
+        return self.bits == 0
+
+    def _require_live(self) -> None:
+        if self._is_live is None or self._is_live():
+            return
+        from .errors import InvalidStateError
+
+        raise InvalidStateError(None, f"{self._diagnostic_name} is no longer live")
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, VulkanHandle):
+            return NotImplemented
+        return self.bits == other.bits
+
+    def __hash__(self) -> int:
+        return hash(self.bits)
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}(bits={self.bits!r})"
+
+
 class FrameOpenGLTextureName:
     """Borrowed OpenGL texture name scoped to a live frame handle."""
 
@@ -273,7 +327,7 @@ class VulkanSurfaceDescriptor:
 
     extent: RenderTargetExtent = RenderTargetExtent()
     context: VulkanContextDescriptor = VulkanContextDescriptor()
-    surface: NativePointer = field(default_factory=NativePointer.null)
+    surface: VulkanHandle = field(default_factory=VulkanHandle.null)
 
 
 @dataclass(frozen=True, slots=True)
@@ -321,8 +375,8 @@ class VulkanBorrowedTextureDescriptor:
     physical_width: int
     physical_height: int
     context: VulkanContextDescriptor = VulkanContextDescriptor()
-    image: NativePointer = field(default_factory=NativePointer.null)
-    image_view: NativePointer = field(default_factory=NativePointer.null)
+    image: VulkanHandle = field(default_factory=VulkanHandle.null)
+    image_view: VulkanHandle = field(default_factory=VulkanHandle.null)
     format: int = 0
     initial_layout: int = 0
     final_layout: int = 0
@@ -564,7 +618,7 @@ class RenderSessionHandle(NativeHandleMixin):
             descriptor.context.graphics_queue_family_index,
             descriptor.context.get_instance_proc_addr.address,
             descriptor.context.get_device_proc_addr.address,
-            descriptor.surface.address,
+            descriptor.surface.bits,
         )
 
     def set_opengl_surface_target(self, descriptor: OpenGLSurfaceDescriptor) -> None:
@@ -634,8 +688,8 @@ class RenderSessionHandle(NativeHandleMixin):
             descriptor.context.graphics_queue_family_index,
             descriptor.context.get_instance_proc_addr.address,
             descriptor.context.get_device_proc_addr.address,
-            descriptor.image.address,
-            descriptor.image_view.address,
+            descriptor.image.bits,
+            descriptor.image_view.bits,
             descriptor.format,
             descriptor.initial_layout,
             descriptor.final_layout,
@@ -863,19 +917,19 @@ class VulkanOwnedTextureFrameHandle(NativeHandleMixin):
         return VulkanOwnedTextureFrame._from_native(self._native.frame())
 
     @property
-    def image(self) -> NativePointer:
-        """Return the borrowed Vulkan image pointer while the frame is open."""
-        return NativePointer(
-            self._native.image_address(),
+    def image(self) -> VulkanHandle:
+        """Return the borrowed Vulkan image handle while the frame is open."""
+        return VulkanHandle(
+            self._native.image_bits(),
             _is_live=lambda: not self.closed,
             _diagnostic_name="Vulkan image",
         )
 
     @property
-    def image_view(self) -> NativePointer:
-        """Return the borrowed Vulkan image-view pointer while the frame is open."""
-        return NativePointer(
-            self._native.image_view_address(),
+    def image_view(self) -> VulkanHandle:
+        """Return the borrowed Vulkan image-view handle while the frame is open."""
+        return VulkanHandle(
+            self._native.image_view_bits(),
             _is_live=lambda: not self.closed,
             _diagnostic_name="Vulkan image view",
         )
@@ -975,6 +1029,7 @@ __all__ = [
     "TextureImageInfo",
     "VulkanBorrowedTextureDescriptor",
     "VulkanContextDescriptor",
+    "VulkanHandle",
     "VulkanOwnedTextureDescriptor",
     "VulkanOwnedTextureFrame",
     "VulkanOwnedTextureFrameHandle",

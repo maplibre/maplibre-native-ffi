@@ -270,6 +270,11 @@
       "inherits": ["_android-arm", "_egl"]
     },
     {
+      "name": "android-arm-vulkan",
+      "displayName": "Android ARMv7 Vulkan",
+      "inherits": ["_android-arm", "_vulkan"]
+    },
+    {
       "name": "android-arm64-egl",
       "displayName": "Android ARM64 EGL",
       "inherits": ["_android-arm64", "_egl"]
@@ -416,6 +421,12 @@
     {
       "name": "android-arm-egl",
       "configurePreset": "android-arm-egl",
+      "targets": ["install"],
+      "jobs": 0
+    },
+    {
+      "name": "android-arm-vulkan",
+      "configurePreset": "android-arm-vulkan",
       "targets": ["install"],
       "jobs": 0
     },
@@ -670,6 +681,12 @@
       "configurations": ["Release"]
     },
     {
+      "name": "android-arm-vulkan",
+      "configurePreset": "android-arm-vulkan",
+      "generators": ["TGZ"],
+      "configurations": ["Release"]
+    },
+    {
       "name": "android-arm64-egl",
       "configurePreset": "android-arm64-egl",
       "generators": ["TGZ"],
@@ -839,6 +856,13 @@
       "steps": [
         { "type": "configure", "name": "android-arm-egl" },
         { "type": "build", "name": "android-arm-egl" }
+      ]
+    },
+    {
+      "name": "android-arm-vulkan",
+      "steps": [
+        { "type": "configure", "name": "android-arm-vulkan" },
+        { "type": "build", "name": "android-arm-vulkan" }
       ]
     },
     {
