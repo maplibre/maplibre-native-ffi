@@ -55,8 +55,9 @@ fun nativeTargets(backend: MaplibreRuntimeBackend): Map<String, NativeTargetConf
     MaplibreRuntimeBackend.VULKAN ->
       buildMap {
         AndroidTarget.entries.forEach { target ->
+          val kotlinNativeTarget = target.kotlinNativeTarget ?: return@forEach
           put(
-            target.kotlinNativeTarget,
+            kotlinNativeTarget,
             NativeTargetConfiguration(
               "android-${backend.id}.def",
               target.targetPlatform,
@@ -272,8 +273,11 @@ fun configureAndroidRuntimePublication(backend: MaplibreRuntimeBackend) {
   val verifyPublicationInputs =
     tasks.register("verifyAndroidRuntimePublicationInputs") { dependsOn(verifyBackend) }
   val androidTargets =
-    AndroidTarget.parseAbis(
-      providers.gradleProperty("maplibre.android.abis").getOrElse(AndroidTarget.DEFAULT_ABIS)
+    AndroidTarget.compatibleAbis(
+      providers
+        .gradleProperty("maplibre.android.abis")
+        .getOrElse(AndroidTarget.defaultAbis(backend.id)),
+      backend.id,
     )
   val selectedInstalls = mutableListOf<File>()
   androidTargets.forEach { target ->

@@ -90,8 +90,9 @@ var offline_operation_registry_lock = std.atomic.Value(bool).init(false);
 var offline_operation_registry: std.ArrayList(OfflineOperationRegistrySlot) = .empty;
 var offline_operation_free_list: std.ArrayList(usize) = .empty;
 
-var handle_generation_counter = std.atomic.Value(u64).init(0);
-var handle_generation_seed = std.atomic.Value(u64).init(0);
+var handle_generation_lock: std.atomic.Mutex = .unlocked;
+var handle_generation_counter: u64 = 0;
+var handle_generation_seed: u64 = 0;
 
 const OfflineRegionSnapshotDestroyFn = *const fn (c.mln_offline_region_snapshot) callconv(.c) void;
 const OfflineRegionListDestroyFn = *const fn (c.mln_offline_region_list) callconv(.c) void;
@@ -2272,24 +2273,29 @@ fn unlockOfflineOperationRegistry() void {
 }
 
 pub fn nextHandleGeneration() u64 {
+    while (!handle_generation_lock.tryLock()) {
+        std.Thread.yield() catch {};
+    }
+    defer handle_generation_lock.unlock();
+
     const seed = handleGenerationSeed();
-    const counter = handle_generation_counter.fetchAdd(1, .seq_cst) +% 1;
+    handle_generation_counter +%= 1;
+    const counter = handle_generation_counter;
     const generation = splitMix64(seed +% counter);
     if (generation == 0) return 1;
     return generation;
 }
 
 fn handleGenerationSeed() u64 {
-    const existing = handle_generation_seed.load(.seq_cst);
-    if (existing != 0) return existing;
+    if (handle_generation_seed != 0) return handle_generation_seed;
 
     const candidate = splitMix64(
-        @intFromPtr(&handle_generation_seed) ^ @intFromPtr(&handle_generation_counter) ^ 0x9e37_79b9_7f4a_7c15,
+        @as(u64, @intFromPtr(&handle_generation_seed)) ^
+            @as(u64, @intFromPtr(&handle_generation_counter)) ^
+            0x9e37_79b9_7f4a_7c15,
     );
     const seed = if (candidate == 0) 0x243f_6a88_85a3_08d3 else candidate;
-    if (handle_generation_seed.cmpxchgStrong(0, seed, .seq_cst, .seq_cst)) |installed| {
-        return installed;
-    }
+    handle_generation_seed = seed;
     return seed;
 }
 

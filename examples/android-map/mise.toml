@@ -7,16 +7,23 @@ usage = '''
 arg "[backend]" default="opengl" {
   choices "opengl" "vulkan"
 }
-arg "[abis]" default="arm64-v8a,x86_64" {
-  choices "arm64-v8a" "x86_64" "arm64-v8a,x86_64"
+arg "[abis]" default="auto" {
+  choices "auto" "armeabi-v7a" "arm64-v8a" "x86_64" "arm64-v8a,x86_64" "armeabi-v7a,arm64-v8a,x86_64"
 }
 flag "--prebuilt" help="Use native packages installed under build/"
 '''
 dir = "../.."
 run = '''
+abis="$usage_abis"
+if [[ "$abis" == auto ]]; then
+  abis=arm64-v8a,x86_64
+  if [[ "$usage_backend" == opengl ]]; then
+    abis=armeabi-v7a,arm64-v8a,x86_64
+  fi
+fi
 gradle_args=(
   -Pmaplibre.android.backend="$usage_backend"
-  -Pmaplibre.android.abis="$usage_abis"
+  -Pmaplibre.android.abis="$abis"
 )
 if [[ "$usage_prebuilt" == "true" ]]; then
   gradle_args+=(-Pmaplibre.android.prebuiltBuildRoot=build)
@@ -30,16 +37,23 @@ usage = '''
 arg "[backend]" default="opengl" {
   choices "opengl" "vulkan"
 }
-arg "[abis]" default="arm64-v8a,x86_64" {
-  choices "arm64-v8a" "x86_64" "arm64-v8a,x86_64"
+arg "[abis]" default="auto" {
+  choices "auto" "armeabi-v7a" "arm64-v8a" "x86_64" "arm64-v8a,x86_64" "armeabi-v7a,arm64-v8a,x86_64"
 }
 flag "--prebuilt" help="Use native packages installed under build/"
 '''
 dir = "../.."
 run = '''
+abis="$usage_abis"
+if [[ "$abis" == auto ]]; then
+  abis=arm64-v8a,x86_64
+  if [[ "$usage_backend" == opengl ]]; then
+    abis=armeabi-v7a,arm64-v8a,x86_64
+  fi
+fi
 gradle_args=(
   -Pmaplibre.android.backend="$usage_backend"
-  -Pmaplibre.android.abis="$usage_abis"
+  -Pmaplibre.android.abis="$abis"
 )
 if [[ "$usage_prebuilt" == "true" ]]; then
   gradle_args+=(-Pmaplibre.android.prebuiltBuildRoot=build)

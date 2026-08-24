@@ -30,7 +30,10 @@ val androidBackend =
   )
 val androidTargets =
   AndroidTarget.parseAbis(
-    providers.gradleProperty("maplibre.android.abis").getOrElse(AndroidTarget.DEFAULT_ABIS)
+    providers
+      .gradleProperty("maplibre.android.abis")
+      .getOrElse(AndroidTarget.defaultAbis(androidBackend)),
+    androidBackend,
   )
 val checkedInJextractSources = layout.projectDirectory.dir("src/jvmMain/generated")
 val packagedAndroidBindingLibs = layout.buildDirectory.dir("generated/jniLibs/androidMain")

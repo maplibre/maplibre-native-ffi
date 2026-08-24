@@ -29,6 +29,7 @@ BACKENDS = {
         "macos-arm64-egl": "osx-arm64",
         "windows-x64-wgl": "win-x64",
         "windows-arm64-wgl": "win-arm64",
+        "android-arm-egl": "android-arm",
         "android-arm64-egl": "android-arm64",
         "android-x64-egl": "android-x64",
     },

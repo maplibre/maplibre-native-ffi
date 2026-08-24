@@ -35,6 +35,7 @@ prepare_native_inputs() {
   case "$partition" in
     linux)
       presets=(
+        android-arm-egl
         android-arm64-egl
         android-arm64-vulkan
         android-x64-egl
@@ -103,7 +104,6 @@ publish_linux_leaves() {
   shift
   local common=(
     -Pmaplibre.android.prebuiltInstallRoot="$install_root"
-    "-Pmaplibre.android.abis=arm64-v8a,x86_64"
   )
   # Cinterop commonization can schedule cinterop tasks for every Kotlin/Native
   # target of a runtime module that the host supports, not just the
@@ -127,7 +127,8 @@ publish_linux_leaves() {
     "$repository" \
     Android AndroidNativeArm64 AndroidNativeX64 -- \
     "$@" \
-    "${common[@]}"
+    "${common[@]}" \
+    -Pmaplibre.android.abis=armeabi-v7a,arm64-v8a,x86_64
 
   publish_tasks \
     :bindings:kotlin:runtimes:opengl \
@@ -136,6 +137,7 @@ publish_linux_leaves() {
     "$@" \
     "${common[@]}" \
     "${opengl[@]}" \
+    -Pmaplibre.android.abis=armeabi-v7a,arm64-v8a,x86_64 \
     -Pmaplibre.android.backend=opengl
 
   publish_tasks \
@@ -145,6 +147,7 @@ publish_linux_leaves() {
     "$@" \
     "${common[@]}" \
     "${vulkan[@]}" \
+    -Pmaplibre.android.abis=arm64-v8a,x86_64 \
     -Pmaplibre.android.backend=vulkan
 
   publish_tasks \
@@ -409,7 +412,7 @@ case "$operation" in
       :examples:android-map:assembleDebug \
       -Pmaplibre.usePublishedKotlin=true \
       -Pmaplibre.android.backend=opengl \
-      -Pmaplibre.android.abis=arm64-v8a,x86_64 \
+      -Pmaplibre.android.abis=armeabi-v7a,arm64-v8a,x86_64 \
       "${release_version_args[@]}" \
       -Pmaplibre.maven.localRepository="$partition"
     ;;

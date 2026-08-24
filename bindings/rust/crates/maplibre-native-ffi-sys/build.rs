@@ -343,6 +343,14 @@ mod download {
         },
         PlatformTarget {
             os: "android",
+            arch: "arm",
+            env: "",
+            platform: "android-arm",
+            default_backend: "opengl",
+            backends: OPENGL_EGL,
+        },
+        PlatformTarget {
+            os: "android",
             arch: "aarch64",
             env: "",
             platform: "android-arm64",

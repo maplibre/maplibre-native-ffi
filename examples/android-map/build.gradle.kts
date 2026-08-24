@@ -10,7 +10,10 @@ val androidBackend =
   )
 val androidTargets =
   AndroidTarget.parseAbis(
-    providers.gradleProperty("maplibre.android.abis").getOrElse(AndroidTarget.DEFAULT_ABIS)
+    providers
+      .gradleProperty("maplibre.android.abis")
+      .getOrElse(AndroidTarget.defaultAbis(androidBackend)),
+    androidBackend,
   )
 val androidCmakeVersion = requiredEnvironmentVariable("MLN_FFI_ANDROID_CMAKE_VERSION")
 val androidNdkVersion = requiredEnvironmentVariable("MLN_FFI_ANDROID_NDK_VERSION")

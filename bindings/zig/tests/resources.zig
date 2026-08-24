@@ -658,8 +658,9 @@ const PmtilesRangeProviderState = struct {
     saw_style_absent_range: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
     recorded_pmtiles_request: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
     saw_source_kind: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
-    range_start: std.atomic.Value(u64) = std.atomic.Value(u64).init(0),
-    range_end: std.atomic.Value(u64) = std.atomic.Value(u64).init(0),
+    range_lock: std.atomic.Mutex = .unlocked,
+    range_start: u64 = 0,
+    range_end: u64 = 0,
 
     fn markStyle(self: *PmtilesRangeProviderState, request: maplibre.ResourceRequest) void {
         self.saw_style_absent_range.store(request.range == null, .seq_cst);
@@ -668,15 +669,23 @@ const PmtilesRangeProviderState = struct {
     fn markPmtilesRequest(self: *PmtilesRangeProviderState, request: maplibre.ResourceRequest) void {
         self.saw_source_kind.store(std.meta.eql(request.kind, maplibre.ResourceKind.source), .seq_cst);
         if (request.range) |range| {
-            self.range_start.store(range.start, .seq_cst);
-            self.range_end.store(range.end, .seq_cst);
+            while (!self.range_lock.tryLock()) {
+                std.Thread.yield() catch {};
+            }
+            defer self.range_lock.unlock();
+            self.range_start = range.start;
+            self.range_end = range.end;
         }
         self.recorded_pmtiles_request.store(true, .seq_cst);
     }
 
     fn expectObservedRequest(self: *PmtilesRangeProviderState) !void {
-        const start = self.range_start.load(.seq_cst);
-        const end = self.range_end.load(.seq_cst);
+        while (!self.range_lock.tryLock()) {
+            std.Thread.yield() catch {};
+        }
+        defer self.range_lock.unlock();
+        const start = self.range_start;
+        const end = self.range_end;
         try testing.expect(self.saw_style_absent_range.load(.seq_cst));
         try testing.expect(self.recorded_pmtiles_request.load(.seq_cst));
         try testing.expect(self.saw_source_kind.load(.seq_cst));
