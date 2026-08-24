@@ -147,7 +147,7 @@ function(mln_ffi_configure_platform_dependencies target)
     set(target_platform "linux-musl-${target_architecture}")
     set(zig_target "${zig_architecture}-linux-musl")
   else()
-    set(target_platform "linux-${target_architecture}")
+    set(target_platform "linux-gnu-${target_architecture}")
     set(zig_target "${zig_architecture}-linux-gnu")
   endif()
   set_target_properties(

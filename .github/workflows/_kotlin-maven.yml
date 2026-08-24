@@ -55,7 +55,7 @@ jobs:
         include:
           - partition: linux
             runner: ubuntu-latest
-            target: linux-x64-vulkan
+            target: linux-gnu-x64-vulkan
             native_pattern: native-package-android-*
           - partition: apple
             runner: macos-26

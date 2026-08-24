@@ -52,7 +52,7 @@ def create_archive(path: pathlib.Path, preset: str, sha: str) -> None:
                         "gitSha": sha,
                         "version": "0.1.0",
                         "renderBackend": "vulkan",
-                        "targetPlatform": "linux-x64",
+                        "targetPlatform": "linux-gnu-x64",
                         "zigTarget": "x86_64-linux-gnu",
                     },
                     indent=2,
@@ -130,7 +130,7 @@ class NativePackageReleaseTest(unittest.TestCase):
         self.repository = pathlib.Path(self.temporary_directory.name)
         self.release_dir = self.repository / "release"
         self.release_dir.mkdir()
-        self.preset = "linux-x64-vulkan"
+        self.preset = "linux-gnu-x64-vulkan"
         self.sha = "b" * 40
         self.version = "0.202608.0"
         self.write_presets(self.preset)
@@ -182,7 +182,7 @@ class NativePackageReleaseTest(unittest.TestCase):
         self.assertIn(f"/commit/{self.sha}", notes)
 
     def test_refuses_an_incomplete_native_release(self) -> None:
-        self.write_presets("linux-x64-egl", self.preset)
+        self.write_presets("linux-gnu-x64-egl", self.preset)
         self.archive()
 
         with self.assertRaisesRegex(SystemExit, "missing"):

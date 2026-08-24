@@ -208,23 +208,23 @@
       }
     },
     {
-      "name": "linux-x64-egl",
-      "displayName": "Linux x64 EGL",
+      "name": "linux-gnu-x64-egl",
+      "displayName": "Linux GNU x64 EGL",
       "inherits": ["_linux-x64", "_egl"]
     },
     {
-      "name": "linux-x64-vulkan",
-      "displayName": "Linux x64 Vulkan",
+      "name": "linux-gnu-x64-vulkan",
+      "displayName": "Linux GNU x64 Vulkan",
       "inherits": ["_linux-x64", "_vulkan"]
     },
     {
-      "name": "linux-arm64-egl",
-      "displayName": "Linux ARM64 EGL",
+      "name": "linux-gnu-arm64-egl",
+      "displayName": "Linux GNU ARM64 EGL",
       "inherits": ["_linux-arm64", "_egl"]
     },
     {
-      "name": "linux-arm64-vulkan",
-      "displayName": "Linux ARM64 Vulkan",
+      "name": "linux-gnu-arm64-vulkan",
+      "displayName": "Linux GNU ARM64 Vulkan",
       "inherits": ["_linux-arm64", "_vulkan"]
     },
     {
@@ -381,26 +381,26 @@
       "jobs": 0
     },
     {
-      "name": "linux-x64-egl",
-      "configurePreset": "linux-x64-egl",
+      "name": "linux-gnu-x64-egl",
+      "configurePreset": "linux-gnu-x64-egl",
       "targets": ["install"],
       "jobs": 0
     },
     {
-      "name": "linux-x64-vulkan",
-      "configurePreset": "linux-x64-vulkan",
+      "name": "linux-gnu-x64-vulkan",
+      "configurePreset": "linux-gnu-x64-vulkan",
       "targets": ["install"],
       "jobs": 0
     },
     {
-      "name": "linux-arm64-egl",
-      "configurePreset": "linux-arm64-egl",
+      "name": "linux-gnu-arm64-egl",
+      "configurePreset": "linux-gnu-arm64-egl",
       "targets": ["install"],
       "jobs": 0
     },
     {
-      "name": "linux-arm64-vulkan",
-      "configurePreset": "linux-arm64-vulkan",
+      "name": "linux-gnu-arm64-vulkan",
+      "configurePreset": "linux-gnu-arm64-vulkan",
       "targets": ["install"],
       "jobs": 0
     },
@@ -582,23 +582,23 @@
       "inherits": "_test-base"
     },
     {
-      "name": "linux-x64-egl",
-      "configurePreset": "linux-x64-egl",
+      "name": "linux-gnu-x64-egl",
+      "configurePreset": "linux-gnu-x64-egl",
       "inherits": "_test-base"
     },
     {
-      "name": "linux-x64-vulkan",
-      "configurePreset": "linux-x64-vulkan",
+      "name": "linux-gnu-x64-vulkan",
+      "configurePreset": "linux-gnu-x64-vulkan",
       "inherits": "_test-base"
     },
     {
-      "name": "linux-arm64-egl",
-      "configurePreset": "linux-arm64-egl",
+      "name": "linux-gnu-arm64-egl",
+      "configurePreset": "linux-gnu-arm64-egl",
       "inherits": "_test-base"
     },
     {
-      "name": "linux-arm64-vulkan",
-      "configurePreset": "linux-arm64-vulkan",
+      "name": "linux-gnu-arm64-vulkan",
+      "configurePreset": "linux-gnu-arm64-vulkan",
       "inherits": "_test-base"
     },
     {
@@ -685,26 +685,26 @@
       "configurations": ["Release"]
     },
     {
-      "name": "linux-x64-egl",
-      "configurePreset": "linux-x64-egl",
+      "name": "linux-gnu-x64-egl",
+      "configurePreset": "linux-gnu-x64-egl",
       "generators": ["TGZ"],
       "configurations": ["Release"]
     },
     {
-      "name": "linux-x64-vulkan",
-      "configurePreset": "linux-x64-vulkan",
+      "name": "linux-gnu-x64-vulkan",
+      "configurePreset": "linux-gnu-x64-vulkan",
       "generators": ["TGZ"],
       "configurations": ["Release"]
     },
     {
-      "name": "linux-arm64-egl",
-      "configurePreset": "linux-arm64-egl",
+      "name": "linux-gnu-arm64-egl",
+      "configurePreset": "linux-gnu-arm64-egl",
       "generators": ["TGZ"],
       "configurations": ["Release"]
     },
     {
-      "name": "linux-arm64-vulkan",
-      "configurePreset": "linux-arm64-vulkan",
+      "name": "linux-gnu-arm64-vulkan",
+      "configurePreset": "linux-gnu-arm64-vulkan",
       "generators": ["TGZ"],
       "configurations": ["Release"]
     },
@@ -875,31 +875,31 @@
       ]
     },
     {
-      "name": "linux-x64-egl",
+      "name": "linux-gnu-x64-egl",
       "steps": [
-        { "type": "configure", "name": "linux-x64-egl" },
-        { "type": "build", "name": "linux-x64-egl" }
+        { "type": "configure", "name": "linux-gnu-x64-egl" },
+        { "type": "build", "name": "linux-gnu-x64-egl" }
       ]
     },
     {
-      "name": "linux-x64-vulkan",
+      "name": "linux-gnu-x64-vulkan",
       "steps": [
-        { "type": "configure", "name": "linux-x64-vulkan" },
-        { "type": "build", "name": "linux-x64-vulkan" }
+        { "type": "configure", "name": "linux-gnu-x64-vulkan" },
+        { "type": "build", "name": "linux-gnu-x64-vulkan" }
       ]
     },
     {
-      "name": "linux-arm64-egl",
+      "name": "linux-gnu-arm64-egl",
       "steps": [
-        { "type": "configure", "name": "linux-arm64-egl" },
-        { "type": "build", "name": "linux-arm64-egl" }
+        { "type": "configure", "name": "linux-gnu-arm64-egl" },
+        { "type": "build", "name": "linux-gnu-arm64-egl" }
       ]
     },
     {
-      "name": "linux-arm64-vulkan",
+      "name": "linux-gnu-arm64-vulkan",
       "steps": [
-        { "type": "configure", "name": "linux-arm64-vulkan" },
-        { "type": "build", "name": "linux-arm64-vulkan" }
+        { "type": "configure", "name": "linux-gnu-arm64-vulkan" },
+        { "type": "build", "name": "linux-gnu-arm64-vulkan" }
       ]
     },
     {

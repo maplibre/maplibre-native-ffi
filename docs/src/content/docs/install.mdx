@@ -28,15 +28,20 @@ carries the same assets built from `main` under a fixed tag, so its download
 URLs stay stable.
 
 A preset name has the form `<platform>-<arch>-<backend>`, as in
-`macos-arm64-metal` or `linux-x64-vulkan`. OpenGL presets name their context
-provider in place of the backend: `egl`, `wgl`, or `webgl`.
-[Platforms](#platforms) gives the provider for each platform.
-Musl-based Linux uses the `linux-musl` platform, as in
-`linux-musl-x64-vulkan`.
+`macos-arm64-metal` or `linux-gnu-x64-vulkan`. OpenGL presets name their
+context provider in place of the backend: `egl`, `wgl`, or `webgl`.
+[Platforms](#platforms) gives the provider for each platform. Linux names its
+C library explicitly with the `linux-gnu` and `linux-musl` platforms.
 
 On Windows, add `<prefix>/bin` to `PATH` or copy `maplibre-native-c.dll` beside
 your executable, because a prefix carries no loader path there. Linux and macOS
 builds record an rpath into the prefix that they built against.
+
+Linux prefixes include the shared library, a complete static archive, and its
+companion platform archive. The archives can be linked into a static musl
+executable, but EGL and Vulkan still load system graphics drivers at run time.
+A fully static executable can therefore use non-rendering APIs, but rendering
+needs a dynamic loader and compatible driver libraries.
 
 Export `PKG_CONFIG_PATH` to build against the prefix:
 

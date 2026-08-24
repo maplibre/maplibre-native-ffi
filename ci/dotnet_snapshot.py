@@ -24,8 +24,8 @@ RUNTIME_PROJECT = (
 
 BACKENDS = {
     "OpenGL": {
-        "linux-x64-egl": "linux-x64",
-        "linux-arm64-egl": "linux-arm64",
+        "linux-gnu-x64-egl": "linux-x64",
+        "linux-gnu-arm64-egl": "linux-arm64",
         "linux-musl-x64-egl": "linux-musl-x64",
         "linux-musl-arm64-egl": "linux-musl-arm64",
         "macos-arm64-egl": "osx-arm64",
@@ -36,8 +36,8 @@ BACKENDS = {
         "android-x64-egl": "android-x64",
     },
     "Vulkan": {
-        "linux-x64-vulkan": "linux-x64",
-        "linux-arm64-vulkan": "linux-arm64",
+        "linux-gnu-x64-vulkan": "linux-x64",
+        "linux-gnu-arm64-vulkan": "linux-arm64",
         "linux-musl-x64-vulkan": "linux-musl-x64",
         "linux-musl-arm64-vulkan": "linux-musl-arm64",
         "macos-arm64-vulkan": "osx-arm64",

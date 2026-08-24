@@ -114,7 +114,7 @@ String _targetPlatform(CodeConfig code) {
     final other => other.toString(),
   };
   return switch (code.targetOS) {
-    OS.linux => 'linux-$architecture',
+    OS.linux => 'linux-gnu-$architecture',
     OS.macOS => 'macos-$architecture',
     OS.windows => 'windows-$architecture',
     OS.android => 'android-$architecture',
@@ -192,8 +192,8 @@ const Map<String, String> _appleMobile = {'metal': 'metal'};
 /// to arrive with.
 const Map<String, ({String defaultBackend, Map<String, String> backends})>
 _platformTargets = {
-  'linux-x64': (defaultBackend: 'vulkan', backends: _openglEgl),
-  'linux-arm64': (defaultBackend: 'vulkan', backends: _openglEgl),
+  'linux-gnu-x64': (defaultBackend: 'vulkan', backends: _openglEgl),
+  'linux-gnu-arm64': (defaultBackend: 'vulkan', backends: _openglEgl),
   'macos-arm64': (defaultBackend: 'metal', backends: _appleDesktop),
   'windows-x64': (defaultBackend: 'vulkan', backends: _openglWgl),
   'windows-arm64': (defaultBackend: 'vulkan', backends: _openglWgl),

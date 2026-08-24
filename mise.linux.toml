@@ -5,7 +5,7 @@
 swift.platform = "ubuntu24.04"
 
 [vars]
-host_native_preset = "linux-{{ arch() }}-vulkan"
+host_native_preset = "linux-gnu-{{ arch() }}-vulkan"
 # Highest glibc release our published Linux natives may require. The zig
 # toolchain sets this from MLN_FFI_ZIG_GLIBC rather than from the build host,
 # so change it together with cmake/toolchains/zig-linux.cmake.

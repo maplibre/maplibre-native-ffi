@@ -27,7 +27,7 @@ PLATFORM_LABELS = {
     "android": "Android",
     "emscripten": "Emscripten",
     "ios": "iOS",
-    "linux": "Linux",
+    "linux-gnu": "Linux GNU",
     "linux-musl": "Linux musl",
     "macos": "macOS",
     "ohos": "OpenHarmony",
@@ -42,8 +42,8 @@ BACKEND_LABELS = {
 }
 BACKEND_ORDER = ["vulkan", "opengl", "metal", "webgpu"]
 ENVIRONMENT_ORDER = [
-    "linux-x64",
-    "linux-arm64",
+    "linux-gnu-x64",
+    "linux-gnu-arm64",
     "linux-musl-x64",
     "linux-musl-arm64",
     "macos-arm64",
@@ -119,7 +119,7 @@ def command_support(command: str) -> list[tuple[str, str]]:
             # The test task runs the JVM suite on every host preset and adds
             # the Kotlin/Native suite where the binding declares a target.
             rows = [("bindings-kotlin-jvm", "tested")]
-            if preset.startswith(("linux-x64-", "macos-arm64-")):
+            if preset.startswith(("linux-gnu-x64-", "macos-arm64-")):
                 rows.append(("bindings-kotlin-native", "tested"))
             return rows
         return []

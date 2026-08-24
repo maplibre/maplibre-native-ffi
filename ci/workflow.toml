@@ -1,9 +1,9 @@
 # Desktop suites run in the matching native target job and reuse its build tree.
 [[suites]]
-platforms = ["linux", "macos", "windows"]
+platforms = ["linux-gnu", "macos", "windows"]
 commands = [
-  { task = "//bindings/rust:test", exclude = ["linux-x64-vulkan"] },
-  { task = "//bindings/rust:test", args = ["release"], include = ["linux-x64-vulkan"] },
+  { task = "//bindings/rust:test", exclude = ["linux-gnu-x64-vulkan"] },
+  { task = "//bindings/rust:test", args = ["release"], include = ["linux-gnu-x64-vulkan"] },
   { task = "//examples/rust-map:check", exclude = ["macos-arm64-egl"] },
 ]
 
@@ -18,15 +18,15 @@ commands = [{ task = "//bindings/rust:build" }]
 # download path differs only in which preset it resolves, so one platform is
 # enough.
 [[suites]]
-platforms = ["linux"]
+platforms = ["linux-gnu"]
 commands = [
-  { task = "//bindings/rust:test:download", include = ["linux-x64-vulkan"], preset = false },
-  { task = "//bindings/dart:test:download", include = ["linux-x64-vulkan"], preset = false },
+  { task = "//bindings/rust:test:download", include = ["linux-gnu-x64-vulkan"], preset = false },
+  { task = "//bindings/dart:test:download", include = ["linux-gnu-x64-vulkan"], preset = false },
 ]
 
 # Zig is unavailable on Windows ARM64; see the `core:zig` note in bindings/zig/mise.toml.
 [[suites]]
-platforms = ["linux", "macos", "windows"]
+platforms = ["linux-gnu", "macos", "windows"]
 exclude = ["windows-arm64-wgl", "windows-arm64-vulkan"]
 commands = [
   { task = "//bindings/zig:test" },
@@ -35,7 +35,7 @@ commands = [
 ]
 
 [[suites]]
-platforms = ["linux", "macos", "windows"]
+platforms = ["linux-gnu", "macos", "windows"]
 commands = [
   { task = "//bindings/kotlin:test" },
   { task = "//examples/compose-map:build" },
@@ -43,39 +43,39 @@ commands = [
 ]
 
 [[suites]]
-platforms = ["linux", "macos"]
+platforms = ["linux-gnu", "macos"]
 commands = [
-  { task = "//bindings/swift:test", exclude = ["linux-x64-vulkan"] },
-  { task = "//bindings/swift:test", args = ["release"], include = ["linux-x64-vulkan"] },
+  { task = "//bindings/swift:test", exclude = ["linux-gnu-x64-vulkan"] },
+  { task = "//bindings/swift:test", args = ["release"], include = ["linux-gnu-x64-vulkan"] },
   { task = "//examples/swift-map:build", include = ["macos-arm64-metal"] },
 ]
 
 [[suites]]
-platforms = ["linux", "macos", "windows"]
+platforms = ["linux-gnu", "macos", "windows"]
 commands = [{ task = "//bindings/dotnet:test" }]
 
 [[suites]]
-platforms = ["linux", "macos"]
+platforms = ["linux-gnu", "macos"]
 commands = [{ task = "//bindings/go:test" }]
 
 [[suites]]
-platforms = ["linux"]
+platforms = ["linux-gnu"]
 commands = [
-  { task = "//examples/go-map:check", include = ["linux-x64-egl", "linux-arm64-egl"] },
+  { task = "//examples/go-map:check", include = ["linux-gnu-x64-egl", "linux-gnu-arm64-egl"] },
 ]
 
 [[suites]]
-platforms = ["linux"]
+platforms = ["linux-gnu"]
 commands = [{ task = "//examples/c-map:build" }]
 
 [[suites]]
-platforms = ["linux", "macos", "windows"]
+platforms = ["linux-gnu", "macos", "windows"]
 commands = [{ task = "//bindings/python:test" }]
 
 # TODO(#412): Re-enable //bindings/dart:test once thread-affine ownership is
 # safe across isolate migration; test processes otherwise wedge until timeout.
 [[suites]]
-platforms = ["linux", "macos", "windows"]
+platforms = ["linux-gnu", "macos", "windows"]
 commands = [{ task = "//bindings/dart:build" }]
 
 # Run Rust browser tests against the Emscripten build.

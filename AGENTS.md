@@ -48,10 +48,10 @@ mise run //examples/zig-readback:run
 mise run //examples/zig-map:run
 
 # Build a different native target/backend
-mise run build linux-x64-egl
+mise run build linux-gnu-x64-egl
 
 # Package a native artifact with CPack
-mise run package-native linux-x64-egl
+mise run package-native linux-gnu-x64-egl
 
 # Build the Android binding for one ABI/backend
 mise run //bindings/kotlin:android-build opengl x86_64
