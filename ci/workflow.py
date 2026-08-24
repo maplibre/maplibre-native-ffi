@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import shlex
 import tomllib
 
 DESKTOP = {"linux", "macos", "windows"}
@@ -85,12 +86,13 @@ def suite_commands(source: dict[str, object], preset: str) -> list[str]:
                 continue
             if preset in command.get("exclude", []):
                 continue
+            arguments = [str(command["task"])]
             # A command with `preset = false` runs once for the job it lands in
             # rather than against the job's build tree.
             if command.get("preset", True):
-                commands.append(f"mise run {command['task']} {preset}")
-            else:
-                commands.append(f"mise run {command['task']}")
+                arguments.append(preset)
+            arguments.extend(str(argument) for argument in command.get("args", []))
+            commands.append(f"mise run {shlex.join(arguments)}")
     return commands
 
 

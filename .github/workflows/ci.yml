@@ -193,7 +193,7 @@ jobs:
           mise run install-native-package
           linux-x64-vulkan
           build/packages/native/dist/maplibre-native-c-linux-x64-vulkan.tar.gz
-      - run: mise run //bindings/rust:test linux-x64-vulkan
+      - run: mise run //bindings/rust:test linux-x64-vulkan release
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //examples/rust-map:check linux-x64-vulkan
@@ -223,7 +223,7 @@ jobs:
       - run: mise run //examples/lwjgl-map:build linux-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/swift:test linux-x64-vulkan
+      - run: mise run //bindings/swift:test linux-x64-vulkan release
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/dotnet:test linux-x64-vulkan

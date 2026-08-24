@@ -63,7 +63,13 @@ swift build --target MaplibreNativeFFI "${swift_args[@]}"
 
 [tasks.test]
 dir = "../.."
-extends = "ffi:preset"
+usage = '''
+arg "[preset]" default="{{vars.host_native_preset}}"
+arg "[configuration]" default="debug" {
+  choices "debug" "release"
+}
+'''
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 # The preset selects the runner: an iOS or tvOS simulator preset builds the test
 # bundle and spawns it on a simulator, and host presets run in process.
 run = '''
@@ -72,6 +78,10 @@ export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:$
 source "$MISE_MONOREPO_ROOT/.mise/bin/swift-libxml2-env.sh"
 case "$usage_preset" in
   ios-simulator-*)
+    if [[ "$usage_configuration" != "debug" ]]; then
+      echo "Swift release tests currently run on host presets only." >&2
+      exit 2
+    fi
     swift build \
       --product MaplibreNativeFFIIOSSimulatorTests \
       --scratch-path .build/ios-simulator \
@@ -88,6 +98,10 @@ case "$usage_preset" in
       120
     ;;
   tvos-simulator-*)
+    if [[ "$usage_configuration" != "debug" ]]; then
+      echo "Swift release tests currently run on host presets only." >&2
+      exit 2
+    fi
     swift build \
       --product MaplibreNativeFFIIOSSimulatorTests \
       --scratch-path .build/tvos-simulator \
@@ -109,9 +123,13 @@ case "$usage_preset" in
     exit 2
     ;;
 esac
-swift test \
-  --scratch-path ".build/$usage_preset" \
-  -Xlinker -rpath \
-  -Xlinker "$native_install_dir/lib"
+swift_args=(--scratch-path ".build/$usage_preset" -c "$usage_configuration")
+swift_args+=(-Xlinker -rpath -Xlinker "$native_install_dir/lib")
+if [[ "$usage_configuration" == "release" ]]; then
+  # The suite uses @testable import. Keep testing enabled while leaving the
+  # optimizer on so ARC lifetime behavior matches a release consumer.
+  swift_args+=(-Xswiftc -enable-testing)
+fi
+swift test "${swift_args[@]}"
 swift package describe --type json >/dev/null
 '''

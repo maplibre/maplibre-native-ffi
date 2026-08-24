@@ -31,4 +31,5 @@ exec ./gradlew \
   -Pmaplibre.android.backend="$backend" \
   -Pmaplibre.android.abis="$abi" \
   -Pmaplibre.android.prebuiltBuildRoot=build \
+  -Pmaplibre.android.testMinify=true \
   :bindings:kotlin:connectedAndroidDeviceTest
