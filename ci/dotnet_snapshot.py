@@ -1,9 +1,10 @@
-"""Build backend-specific NuGet packages and a static Sleet feed."""
+"""Build and validate backend-specific NuGet packages and a static Sleet feed."""
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import pathlib
 import shutil
 import subprocess
@@ -21,6 +22,12 @@ RUNTIME_PROJECT = (
     ROOT
     / "bindings/dotnet/src/Maplibre.NativeFfi.Runtime/Maplibre.NativeFfi.Runtime.csproj"
 )
+PACKAGE_SMOKE_PROJECT = (
+    ROOT
+    / "bindings/dotnet/tests/Maplibre.NativeFfi.PackageSmoke/Maplibre.NativeFfi.PackageSmoke.csproj"
+)
+MUSL_SMOKE_VERSION = "0.0.0-musl-ci"
+MUSL_RUNTIME_IMAGE = "mcr.microsoft.com/dotnet/runtime:10.0-alpine3.22"
 
 BACKENDS = {
     "OpenGL": {
@@ -51,8 +58,12 @@ BACKENDS = {
 }
 
 
-def run(*arguments: str, cwd: pathlib.Path = ROOT) -> None:
-    subprocess.run(arguments, cwd=cwd, check=True)
+def run(
+    *arguments: str,
+    cwd: pathlib.Path = ROOT,
+    environment: dict[str, str] | None = None,
+) -> None:
+    subprocess.run(arguments, cwd=cwd, env=environment, check=True)
 
 
 def sleet(*arguments: str) -> None:
@@ -75,18 +86,46 @@ def dynamic_libraries(directory: pathlib.Path) -> list[pathlib.Path]:
     ]
 
 
-def package(args: argparse.Namespace) -> None:
-    args.output.mkdir(parents=True, exist_ok=True)
+def copy_runtime_assets(
+    source: pathlib.Path, destination: pathlib.Path, preset: str
+) -> None:
+    libraries = dynamic_libraries(source)
+    if not libraries:
+        raise SystemExit(f"{preset} contains no dynamic libraries")
+    destination.mkdir(parents=True, exist_ok=True)
+    for library in libraries:
+        shutil.copy2(library, destination / library.name)
+
+    # The libraries bundle third-party code, so their license notices travel
+    # with them.
+    notices = next(source.glob("**/share/*/licenses"), None)
+    if notices is None:
+        raise SystemExit(f"{preset} carries no licenses")
+    shutil.copytree(notices, destination / "licenses", dirs_exist_ok=True)
+
+
+def pack(
+    project: pathlib.Path,
+    output: pathlib.Path,
+    version: str,
+    **properties: str | pathlib.Path,
+) -> None:
     run(
         "dotnet",
         "pack",
-        str(MANAGED_PROJECT),
+        str(project),
         "--configuration",
         "Release",
         "--output",
-        str(args.output),
-        f"-p:PackageVersion={args.version}",
+        str(output),
+        f"-p:PackageVersion={version}",
+        *(f"-p:{name}={value}" for name, value in properties.items()),
     )
+
+
+def package(args: argparse.Namespace) -> None:
+    args.output.mkdir(parents=True, exist_ok=True)
+    pack(MANAGED_PROJECT, args.output, args.version)
 
     with tempfile.TemporaryDirectory() as temporary:
         staging = pathlib.Path(temporary)
@@ -96,32 +135,75 @@ def package(args: argparse.Namespace) -> None:
                 extracted = staging / "extract" / preset
                 with tarfile.open(archive(args.input, preset)) as tar:
                     tar.extractall(extracted, filter="data")
-                libraries = dynamic_libraries(extracted)
-                if not libraries:
-                    raise SystemExit(f"{preset} archive contains no dynamic libraries")
-                destination = assets / rid / "native"
-                destination.mkdir(parents=True, exist_ok=True)
-                for library in libraries:
-                    shutil.copy2(library, destination / library.name)
-                # The libraries bundle third-party code, so the archive's
-                # license notices travel with them.
-                notices = next(extracted.glob("**/share/*/licenses"), None)
-                if notices is None:
-                    raise SystemExit(f"{preset} archive carries no licenses")
-                shutil.copytree(notices, destination / "licenses", dirs_exist_ok=True)
+                copy_runtime_assets(extracted, assets / rid / "native", preset)
 
-            run(
-                "dotnet",
-                "pack",
-                str(RUNTIME_PROJECT),
-                "--configuration",
-                "Release",
-                "--output",
-                str(args.output),
-                f"-p:PackageVersion={args.version}",
-                f"-p:RenderBackend={backend}",
-                f"-p:NativeAssetsDir={assets}",
+            pack(
+                RUNTIME_PROJECT,
+                args.output,
+                args.version,
+                RenderBackend=backend,
+                NativeAssetsDir=assets,
             )
+
+
+def runtime_target(preset: str) -> tuple[str, str]:
+    for backend, presets in BACKENDS.items():
+        if preset in presets:
+            return backend, presets[preset]
+    raise SystemExit(f"no .NET runtime mapping exists for {preset}")
+
+
+def smoke_musl(args: argparse.Namespace) -> None:
+    if not args.preset.startswith("linux-musl-"):
+        raise SystemExit(f"the musl package smoke cannot run {args.preset}")
+    backend, rid = runtime_target(args.preset)
+    work = ROOT / "build" / args.preset / "dotnet-musl-test"
+    install = ROOT / "build" / args.preset / "install"
+    packages = work / "packages"
+    assets = work / "assets"
+    publish = work / "publish"
+    if work.exists():
+        shutil.rmtree(work)
+    packages.mkdir(parents=True)
+
+    copy_runtime_assets(install, assets / rid / "native", args.preset)
+    pack(MANAGED_PROJECT, packages, MUSL_SMOKE_VERSION)
+    pack(
+        RUNTIME_PROJECT,
+        packages,
+        MUSL_SMOKE_VERSION,
+        RenderBackend=backend,
+        NativeAssetsDir=assets,
+    )
+    run(
+        "dotnet",
+        "publish",
+        str(PACKAGE_SMOKE_PROJECT),
+        "--configuration",
+        "Release",
+        "--runtime",
+        rid,
+        "--no-self-contained",
+        "--output",
+        str(publish),
+        "--source",
+        str(packages),
+        "--source",
+        "https://api.nuget.org/v3/index.json",
+        f"-p:MaplibreNativeFfiPackageVersion={MUSL_SMOKE_VERSION}",
+        f"-p:MaplibreNativeFfiRenderBackend={backend}",
+    )
+
+    environment = os.environ.copy()
+    environment["MISE_MONOREPO_ROOT"] = str(ROOT)
+    environment["MLN_FFI_MUSL_TEST_IMAGE"] = MUSL_RUNTIME_IMAGE
+    run(
+        str(ROOT / "scripts/run-musl-test.sh"),
+        args.preset,
+        "dotnet",
+        str(publish / "Maplibre.NativeFfi.PackageSmoke.dll"),
+        environment=environment,
+    )
 
 
 def config(path: pathlib.Path, output: pathlib.Path, base_uri: str) -> None:
@@ -232,6 +314,8 @@ def main() -> None:
     package_parser.add_argument("input", type=pathlib.Path)
     package_parser.add_argument("output", type=pathlib.Path)
     package_parser.add_argument("version")
+    smoke_parser = commands.add_parser("smoke-musl")
+    smoke_parser.add_argument("preset")
     feed_parser = commands.add_parser("feed")
     feed_parser.add_argument("packages", type=pathlib.Path)
     feed_parser.add_argument("output", type=pathlib.Path)
@@ -240,7 +324,12 @@ def main() -> None:
     mirror_parser.add_argument("source")
     mirror_parser.add_argument("output", type=pathlib.Path)
     args = parser.parse_args()
-    {"package": package, "feed": feed, "mirror": mirror}[args.command](args)
+    {
+        "package": package,
+        "smoke-musl": smoke_musl,
+        "feed": feed,
+        "mirror": mirror,
+    }[args.command](args)
 
 
 if __name__ == "__main__":

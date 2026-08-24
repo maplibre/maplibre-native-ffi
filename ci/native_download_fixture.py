@@ -53,14 +53,13 @@ def serve(
             environment[RELEASE_BASE_URL_ENV] = base_url
 
             previous_pointer = None
-            if dart_pointer is not None:
-                dart_pointer = dart_pointer.resolve()
-                if dart_pointer.exists():
-                    previous_pointer = dart_pointer.read_bytes()
-                dart_pointer.parent.mkdir(parents=True, exist_ok=True)
-                dart_pointer.write_text(f"{base_url}\n", encoding="utf-8")
-
             try:
+                if dart_pointer is not None:
+                    dart_pointer = dart_pointer.resolve()
+                    if dart_pointer.exists():
+                        previous_pointer = dart_pointer.read_bytes()
+                    dart_pointer.parent.mkdir(parents=True, exist_ok=True)
+                    dart_pointer.write_text(f"{base_url}\n", encoding="utf-8")
                 return subprocess.run(command, env=environment, check=False).returncode
             finally:
                 if dart_pointer is not None:

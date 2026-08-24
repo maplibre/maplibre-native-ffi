@@ -49,52 +49,7 @@ extends = "ffi:preset"
 dir = "../.."
 run = '''
 if [[ "$usage_preset" == linux-musl-* ]]; then
-  version=0.0.0-musl-ci
-  case "$usage_preset" in
-    linux-musl-x64-*) rid=linux-musl-x64 ;;
-    linux-musl-arm64-*) rid=linux-musl-arm64 ;;
-  esac
-  case "$usage_preset" in
-    *-egl) backend=OpenGL ;;
-    *-vulkan) backend=Vulkan ;;
-  esac
-
-  work_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/dotnet-musl-test"
-  packages_dir="$work_dir/packages"
-  assets_dir="$work_dir/assets/$rid/native"
-  publish_dir="$work_dir/publish"
-  rm -rf "$work_dir"
-  mkdir -p "$packages_dir" "$assets_dir"
-  cp "$MISE_MONOREPO_ROOT/build/$usage_preset/install/lib/"*.so* "$assets_dir/"
-  cp -R "$MISE_MONOREPO_ROOT/build/$usage_preset/install/share/maplibre-native-c/licenses" "$assets_dir/"
-
-  dotnet pack \
-    bindings/dotnet/src/Maplibre.NativeFfi/Maplibre.NativeFfi.csproj \
-    -c Release \
-    -o "$packages_dir" \
-    -p:PackageVersion="$version"
-  dotnet pack \
-    bindings/dotnet/src/Maplibre.NativeFfi.Runtime/Maplibre.NativeFfi.Runtime.csproj \
-    -c Release \
-    -o "$packages_dir" \
-    -p:PackageVersion="$version" \
-    -p:RenderBackend="$backend" \
-    -p:NativeAssetsDir="$work_dir/assets"
-  dotnet publish \
-    bindings/dotnet/tests/Maplibre.NativeFfi.PackageSmoke/Maplibre.NativeFfi.PackageSmoke.csproj \
-    -c Release \
-    -r "$rid" \
-    --no-self-contained \
-    -o "$publish_dir" \
-    --source "$packages_dir" \
-    --source https://api.nuget.org/v3/index.json \
-    -p:MaplibreNativeFfiPackageVersion="$version" \
-    -p:MaplibreNativeFfiRenderBackend="$backend"
-  MLN_FFI_MUSL_TEST_IMAGE=mcr.microsoft.com/dotnet/runtime:10.0-alpine3.22 \
-    exec "$MISE_MONOREPO_ROOT/scripts/run-musl-test.sh" \
-    "$usage_preset" \
-    dotnet \
-    "$publish_dir/Maplibre.NativeFfi.PackageSmoke.dll"
+  exec python3 ci/dotnet_snapshot.py smoke-musl "$usage_preset"
 fi
 
 MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
