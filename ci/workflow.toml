@@ -13,15 +13,14 @@ commands = [
 platforms = ["linux-musl"]
 commands = [{ task = "//bindings/rust:build" }]
 
-# Every other binding step is handed a local install prefix, so this is the only
-# coverage of acquiring the native library from the snapshot release. The
-# download path differs only in which preset it resolves, so one platform is
-# enough.
+# Every other binding step is handed a local install prefix. These commands
+# serve the package that this job built through the snapshot acquisition path.
+# The path differs only in which preset it resolves, so one platform is enough.
 [[suites]]
 platforms = ["linux-gnu"]
 commands = [
-  { task = "//bindings/rust:test:download", include = ["linux-gnu-x64-vulkan"], preset = false },
-  { task = "//bindings/dart:test:download", include = ["linux-gnu-x64-vulkan"], preset = false },
+  { task = "//bindings/rust:test:download", include = ["linux-gnu-x64-vulkan"] },
+  { task = "//bindings/dart:test:download", include = ["linux-gnu-x64-vulkan"] },
 ]
 
 # Zig is unavailable on Windows ARM64; see the `core:zig` note in bindings/zig/mise.toml.

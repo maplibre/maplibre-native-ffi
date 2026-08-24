@@ -15,6 +15,7 @@ const LIBRARY_NAME: &str = "maplibre-native-c";
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-env-changed=MAPLIBRE_NATIVE_C_INSTALL_DIR");
+    println!("cargo:rerun-if-env-changed=MAPLIBRE_NATIVE_C_TEST_SNAPSHOT_BASE_URL");
     println!("cargo:rerun-if-env-changed=CARGO_CFG_TARGET_OS");
     let install_dir = native_install_dir()?;
     let include_dir = install_dir.join("include");
@@ -259,6 +260,7 @@ mod download {
 
     const RELEASE_BASE_URL: &str =
         "https://github.com/maplibre/maplibre-native-ffi/releases/download";
+    const TEST_RELEASE_BASE_URL_ENV: &str = "MAPLIBRE_NATIVE_C_TEST_SNAPSHOT_BASE_URL";
     const SNAPSHOT_TAG: &str = "unstable-native-snapshot";
     const BACKENDS: [&str; 4] = ["metal", "opengl", "vulkan", "webgpu"];
 
@@ -425,6 +427,8 @@ mod download {
     pub(super) fn install_prefix(backend: Option<&'static str>) -> Result<PathBuf, Box<dyn Error>> {
         let preset = resolve_preset(backend)?;
         let cache_dir = cache_dir()?.join(&preset.name);
+        let release_base_url =
+            env::var(TEST_RELEASE_BASE_URL_ENV).unwrap_or_else(|_| RELEASE_BASE_URL.to_owned());
 
         // Only an unreachable release falls back to the cache; a checksum or
         // extraction failure stays fatal. A publish replaces `SHA256SUMS` and
@@ -433,9 +437,15 @@ mod download {
         // fresh checksum file, with every cached answer suppressed.
         let mut after_mismatch = false;
         let prefix = loop {
-            match fetch_checksums()
-                .and_then(|checksums| acquire(&preset, &cache_dir, &checksums, after_mismatch))
-            {
+            match fetch_checksums(&release_base_url).and_then(|checksums| {
+                acquire(
+                    &preset,
+                    &cache_dir,
+                    &checksums,
+                    &release_base_url,
+                    after_mismatch,
+                )
+            }) {
                 Ok(prefix) => break prefix,
                 Err(Unreachable(error)) if after_mismatch => return Err(error),
                 Err(Unreachable(error)) => {
@@ -480,6 +490,7 @@ mod download {
         preset: &Preset,
         cache_dir: &Path,
         checksums: &str,
+        release_base_url: &str,
         after_mismatch: bool,
     ) -> Result<PathBuf, Failure> {
         let prefix = cache_dir.join(hex(&Sha256::digest(checksums.as_bytes())));
@@ -489,7 +500,7 @@ mod download {
 
         let archive_name = format!("{LIBRARY_NAME}-{}.tar.gz", preset.name);
         let expected = checksum_for(checksums, &archive_name).map_err(Fatal)?;
-        let url = format!("{RELEASE_BASE_URL}/{SNAPSHOT_TAG}/{archive_name}");
+        let url = format!("{release_base_url}/{SNAPSHOT_TAG}/{archive_name}");
         println!("cargo:warning=downloading {url}");
         let response = agent()
             .get(&url)
@@ -589,8 +600,8 @@ mod download {
         }
     }
 
-    fn fetch_checksums() -> Result<String, Failure> {
-        let url = format!("{RELEASE_BASE_URL}/{SNAPSHOT_TAG}/SHA256SUMS");
+    fn fetch_checksums(release_base_url: &str) -> Result<String, Failure> {
+        let url = format!("{release_base_url}/{SNAPSHOT_TAG}/SHA256SUMS");
         let mut response = agent()
             .get(&url)
             .call()

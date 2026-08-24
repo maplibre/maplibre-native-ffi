@@ -154,7 +154,7 @@ Future<Uri> _installPrefix(BuildInput input, BuildOutputBuilder output) async {
   }
 
   final preset = _resolvePreset(input);
-  final prefix = await _downloadPrefix(input, preset);
+  final prefix = await _downloadPrefix(input, output, preset);
   _verifyDescriptor(prefix, preset);
   _warnOnHeaderSkew(input, output, prefix, preset);
   return prefix;
@@ -239,9 +239,11 @@ _Preset _resolvePreset(BuildInput input) {
 /// neither the offline fallback nor a cache hit.
 Future<Uri> _downloadPrefix(
   BuildInput input,
+  BuildOutputBuilder output,
   _Preset preset, {
   bool afterMismatch = false,
 }) async {
+  final releaseBaseUrl = _snapshotBaseUrl(input, output);
   final cacheDirectory = Directory.fromUri(
     input.outputDirectoryShared.resolve('${preset.name}/'),
   )..createSync(recursive: true);
@@ -249,7 +251,7 @@ Future<Uri> _downloadPrefix(
   final String checksums;
   try {
     checksums = utf8.decode(
-      await _fetch('$_releaseBaseUrl/$_snapshotTag/SHA256SUMS'),
+      await _fetch('$releaseBaseUrl/$_snapshotTag/SHA256SUMS'),
     );
   } on Object catch (error) {
     if (afterMismatch) {
@@ -270,7 +272,7 @@ Future<Uri> _downloadPrefix(
   stderr.writeln('Downloading $archiveName from the $_snapshotTag release.');
   final Uint8List archive;
   try {
-    archive = await _fetch('$_releaseBaseUrl/$_snapshotTag/$archiveName');
+    archive = await _fetch('$releaseBaseUrl/$_snapshotTag/$archiveName');
   } on Object catch (error) {
     // A publish race can list an archive in SHA256SUMS before uploading it.
     // Only the fetch falls back; the checksum check below stays fatal.
@@ -287,7 +289,7 @@ Future<Uri> _downloadPrefix(
         'Checksum mismatch for $archiveName; the $_snapshotTag release may '
         'have been republished mid-download. Retrying once.',
       );
-      return _downloadPrefix(input, preset, afterMismatch: true);
+      return _downloadPrefix(input, output, preset, afterMismatch: true);
     }
     throw StateError(
       'Checksum mismatch for $archiveName: expected $expected, got $actual.',
@@ -296,6 +298,19 @@ Future<Uri> _downloadPrefix(
 
   _extract(archive, cacheDirectory, prefix, preset, archiveName);
   return prefix.uri;
+}
+
+String _snapshotBaseUrl(BuildInput input, BuildOutputBuilder output) {
+  final pointer = input.userDefines.path('test_snapshot_base_url_file');
+  if (pointer == null) {
+    return _releaseBaseUrl;
+  }
+  output.dependencies.add(pointer);
+  final file = File.fromUri(pointer);
+  if (!file.existsSync()) {
+    return _releaseBaseUrl;
+  }
+  return file.readAsStringSync().trim();
 }
 
 /// Unpacks into a scratch directory and moves the result into place, so a

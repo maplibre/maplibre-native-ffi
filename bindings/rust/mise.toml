@@ -103,7 +103,12 @@ fi
 [tasks."test:download"]
 description = "Test the sys crate against a downloaded native snapshot archive."
 dir = "../.."
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 # Stops at maplibre-native-ffi-sys: only the build script's acquisition path is
 # under test, and the crates above it stop compiling whenever the snapshot
 # release lags a header change in this commit.
-run = 'env -u MAPLIBRE_NATIVE_C_INSTALL_DIR cargo test -p maplibre-native-ffi-sys'
+run = '''
+python3 ci/native_download_fixture.py \
+  "build/packages/native/dist/maplibre-native-c-$usage_preset.tar.gz" \
+  -- env -u MAPLIBRE_NATIVE_C_INSTALL_DIR cargo test -p maplibre-native-ffi-sys
+'''
