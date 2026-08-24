@@ -22,11 +22,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     let link_dir = native_library_dir(&install_dir);
     let target_os = env::var("CARGO_CFG_TARGET_OS")?;
     let target_env = env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
+    let out_path = PathBuf::from(env::var("OUT_DIR")?);
     let header = include_dir.join("maplibre_native_c.h");
 
     require_dir(&include_dir, "native include directory")?;
     require_dir(&link_dir, "native link directory")?;
 
+    if target_env == "musl" {
+        let aliases = musl_aliases(&out_path)?;
+        println!("cargo:rustc-link-search=native={}", aliases.display());
+    }
     println!("cargo:rustc-link-search=native={}", link_dir.display());
     print_rerun_if_changed(&link_dir);
     let descriptor_path = install_dir.join("share/maplibre-native-c/artifact.json");
@@ -117,10 +122,21 @@ fn main() -> Result<(), Box<dyn Error>> {
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         .generate()?;
 
-    let out_path = PathBuf::from(env::var("OUT_DIR")?);
     bindings.write_to_file(out_path.join("bindings.rs"))?;
 
     Ok(())
+}
+
+/// Supplies musl's traditional library names without a second implementation.
+/// The complete native archive provides the unified libc interfaces and the
+/// process-wide unwinder that its C++ frames and Rust frames share.
+fn musl_aliases(out_path: &Path) -> Result<PathBuf, io::Error> {
+    let directory = out_path.join("musl-aliases");
+    fs::create_dir_all(&directory)?;
+    for library in ["dl", "m", "pthread", "rt", "unwind"] {
+        fs::write(directory.join(format!("lib{library}.a")), b"!<arch>\n")?;
+    }
+    Ok(directory)
 }
 
 /// Locates the native install prefix, downloading a published snapshot archive

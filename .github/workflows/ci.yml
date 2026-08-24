@@ -460,7 +460,10 @@ jobs:
           mise run install-native-package
           linux-musl-x64-egl
           build/packages/native/dist/maplibre-native-c-linux-musl-x64-egl.tar.gz
-      - run: mise run //bindings/rust:build linux-musl-x64-egl
+      - run: mise run //bindings/rust:test linux-musl-x64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/dotnet:test linux-musl-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
       - name: Upload native artifact
@@ -498,7 +501,10 @@ jobs:
           mise run install-native-package
           linux-musl-x64-vulkan
           build/packages/native/dist/maplibre-native-c-linux-musl-x64-vulkan.tar.gz
-      - run: mise run //bindings/rust:build linux-musl-x64-vulkan
+      - run: mise run //bindings/rust:test linux-musl-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/dotnet:test linux-musl-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
       - name: Upload native artifact
@@ -536,7 +542,10 @@ jobs:
           mise run install-native-package
           linux-musl-arm64-egl
           build/packages/native/dist/maplibre-native-c-linux-musl-arm64-egl.tar.gz
-      - run: mise run //bindings/rust:build linux-musl-arm64-egl
+      - run: mise run //bindings/rust:test linux-musl-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/dotnet:test linux-musl-arm64-egl
         env:
           MISE_TASK_SKIP: "//:build"
       - name: Upload native artifact
@@ -574,7 +583,10 @@ jobs:
           mise run install-native-package
           linux-musl-arm64-vulkan
           build/packages/native/dist/maplibre-native-c-linux-musl-arm64-vulkan.tar.gz
-      - run: mise run //bindings/rust:build linux-musl-arm64-vulkan
+      - run: mise run //bindings/rust:test linux-musl-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/dotnet:test linux-musl-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
       - name: Upload native artifact

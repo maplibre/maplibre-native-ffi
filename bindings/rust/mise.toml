@@ -14,13 +14,6 @@ if [[ -n "$cargo_target" ]]; then
     -p maplibre-native-ffi-core \
     -p maplibre-native-ffi \
     --target "$cargo_target"
-  if [[ "$usage_preset" == linux-musl-* ]]; then
-    # Cross-builds cannot execute the test binary here, but linking it validates
-    # the packaged static archive and the target compiler configuration.
-    exec cargo test --no-run \
-      -p maplibre-native-ffi-sys \
-      --target "$cargo_target"
-  fi
   exit 0
 fi
 exec cargo build \
@@ -56,6 +49,20 @@ case "$usage_preset" in
 esac
 
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
+if [[ "$usage_preset" == linux-musl-* ]]; then
+  # Rendering loads Alpine's graphics implementation, so the test process uses
+  # musl's dynamic loader while the packaged native archive remains static.
+  export MLN_FFI_RUST_MUSL_DYNAMIC=1
+fi
+source "$MISE_MONOREPO_ROOT/scripts/rust-cross-env.sh" "$usage_preset"
+cargo_args=()
+if [[ -n "$cargo_target" ]]; then
+  cargo_args+=(--target "$cargo_target")
+fi
+if [[ "$usage_profile" == "release" ]]; then
+  cargo_args+=(--release)
+fi
 # The sys crate's rpath covers only its own link targets, so the core and
 # umbrella test binaries need the library located at run time. Resolving it here
 # rather than through RUSTFLAGS keeps the preset out of the compiler command
@@ -66,11 +73,6 @@ if [[ -n "${MLN_FFI_VULKAN_LOADER_DIR:-}" ]]; then
 fi
 export LD_LIBRARY_PATH="$lib_dirs${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export DYLD_LIBRARY_PATH="$lib_dirs${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
-export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
-cargo_args=()
-if [[ "$usage_profile" == "release" ]]; then
-  cargo_args+=(--release)
-fi
 cargo test "${cargo_args[@]}" \
   -p maplibre-native-ffi-sys \
   -p maplibre-native-ffi-core \
@@ -79,11 +81,15 @@ cargo test "${cargo_args[@]}" \
 # Clippy is profile-independent. Every other host preset runs it against the
 # dev graph, so the release variant avoids compiling that graph a second time.
 if [[ "$usage_profile" == "dev" ]]; then
+  clippy_args=()
+  if [[ -n "$cargo_target" ]]; then
+    clippy_args+=(--target "$cargo_target")
+  fi
   cargo clippy \
     -p maplibre-native-ffi-sys \
     -p maplibre-native-ffi-core \
     -p maplibre-native-ffi \
-    --all-targets -- -D warnings
+    "${clippy_args[@]}" --all-targets -- -D warnings
 fi
 '''
 run_windows = '''

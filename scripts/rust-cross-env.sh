@@ -36,10 +36,36 @@ case "$1" in
     fi
     rustflags_variable="CARGO_TARGET_${target_env_upper}_RUSTFLAGS"
     rustflags="${!rustflags_variable:-}"
+    rustflags="$rustflags -C linker-flavor=ld.lld"
+    if [[ "${MLN_FFI_RUST_MUSL_DYNAMIC:-}" == 1 ]]; then
+      dynamic_dir="$MISE_MONOREPO_ROOT/build/$1/zig-shim/rust-dynamic"
+      mkdir -p "$dynamic_dir"
+      if [[ ! -f "$dynamic_dir/libc.so" ]]; then
+        if command -v docker >/dev/null; then
+          container_engine=docker
+        elif command -v podman >/dev/null; then
+          container_engine=podman
+        else
+          echo "Dynamic musl Rust tests require Docker or Podman to prepare the linker sysroot." >&2
+          return 2
+        fi
+        "$container_engine" run --rm \
+          --volume "$dynamic_dir:/out" \
+          alpine:3.22 \
+          sh -euc 'cp -L /lib/ld-musl-*.so.1 /out/libc.so'
+      fi
+      ln -sf libc.so "$dynamic_dir/libgcc_s.so"
+      case "$cargo_target" in
+        aarch64-*) dynamic_loader=/lib/ld-musl-aarch64.so.1 ;;
+        x86_64-*) dynamic_loader=/lib/ld-musl-x86_64.so.1 ;;
+      esac
+      rustflags="$rustflags -C target-feature=-crt-static -C link-self-contained=yes -C link-arg=--dynamic-linker=$dynamic_loader -L native=$dynamic_dir"
+    fi
     export "CC_$target_env=$compiler"
     export "CXX_$target_env=$compiler_cxx"
     export "CARGO_TARGET_${target_env_upper}_LINKER=$linker"
-    export "$rustflags_variable=${rustflags:+$rustflags }-C linker-flavor=ld.lld"
+    export "CARGO_TARGET_${target_env_upper}_RUNNER=$MISE_MONOREPO_ROOT/scripts/run-musl-test.sh $1"
+    export "$rustflags_variable=${rustflags# }"
     ;;
   android-*)
     ndk_prebuilt="$ANDROID_HOME/ndk/$MLN_FFI_ANDROID_NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64"

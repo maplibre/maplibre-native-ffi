@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
-# Runs a musl C API suite inside Alpine, where the dynamic loader and graphics
-# implementation share the ABI that the test executable targets.
+# Runs a musl test executable inside Alpine, where the dynamic loader and
+# graphics implementation share the ABI that the executable targets.
 set -euo pipefail
 
-preset=${1:?usage: run-musl-test.sh <preset>}
-test_binary="$MISE_MONOREPO_ROOT/build/$preset/mln_ffi_c_api_tests"
+preset=${1:?usage: run-musl-test.sh <preset> [executable [arguments...]]}
+container_image=${MLN_FFI_MUSL_TEST_IMAGE:-alpine:3.22}
+shift
+if [[ $# -eq 0 ]]; then
+  set -- "$MISE_MONOREPO_ROOT/build/$preset/mln_ffi_c_api_tests"
+fi
 
-if [[ ! -x "$test_binary" ]]; then
-  echo "The musl C API test executable does not exist: $test_binary" >&2
+if [[ "$1" == */* && ! -x "$1" ]]; then
+  echo "The musl test executable does not exist: $1" >&2
   exit 2
 fi
 
@@ -34,7 +38,7 @@ esac
 "$container_engine" run --rm \
   --volume "$MISE_MONOREPO_ROOT:$MISE_MONOREPO_ROOT:ro" \
   --workdir "$MISE_MONOREPO_ROOT" \
-  alpine:3.22 \
+  "$container_image" \
   sh -euc '
     case "$1" in
       egl) apk add --no-cache mesa-dri-gallium mesa-egl mesa-gles ;;
@@ -42,5 +46,6 @@ esac
     esac
     export LIBGL_ALWAYS_SOFTWARE=true
     export MLN_FFI_TEST_FIXTURE_DIR="$2/third_party/maplibre-native/test/fixtures"
-    exec timeout 300 "$3"
-  ' sh "$backend" "$MISE_MONOREPO_ROOT" "$test_binary"
+    shift 2
+    exec timeout 300 "$@"
+  ' sh "$backend" "$MISE_MONOREPO_ROOT" "$@"

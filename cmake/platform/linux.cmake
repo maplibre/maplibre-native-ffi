@@ -63,18 +63,33 @@ function(mln_ffi_configure_linux_archive_contents target)
       "llvm-${component}.txt")
   endforeach()
 
-  # A consumer links this archive next to a C++ runtime of its own. Everything
-  # but the C API entry points becomes internal to the archive, and the one
-  # support symbol that has to keep a standard name is renamed, so the two
-  # cannot collide. The second rename is the compiler-generated reference to the
-  # first and has to move with it.
+  # A consumer links this archive next to a C++ runtime of its own. The C++ ABI
+  # stays internal, including its renamed personality function. A musl archive
+  # carries the complete unwinder and leaves its ABI global so mixed-language
+  # executables use one implementation for every frame. The second rename is
+  # the compiler-generated reference to the first and has to move with it.
+  set(archive_keep_global "mln_*;__mln_personality_v0")
+  set(bundle_complete_runtime FALSE)
+  if(MLN_FFI_ZIG_LIBC STREQUAL "musl")
+    list(
+      APPEND
+      archive_keep_global
+      "_Unwind_*"
+      __register_frame
+      __deregister_frame
+      "__unw_*"
+      "unw_*")
+    set(bundle_complete_runtime TRUE)
+  endif()
   set_target_properties(
     ${target}
     PROPERTIES
       MLN_FFI_ARCHIVE_BUNDLED_RUNTIME
       "${runtime_archives}"
       MLN_FFI_ARCHIVE_KEEP_GLOBAL
-      "mln_*;__mln_personality_v0"
+      "${archive_keep_global}"
+      MLN_FFI_ARCHIVE_BUNDLED_RUNTIME_WHOLE
+      "${bundle_complete_runtime}"
       MLN_FFI_ARCHIVE_RENAME_SYMBOLS
       "__gxx_personality_v0=__mln_personality_v0;DW.ref.__gxx_personality_v0=DW.ref.__mln_personality_v0"
       # The graphics loaders the test harness links come from the build host.

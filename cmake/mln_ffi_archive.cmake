@@ -140,8 +140,17 @@ function(mln_ffi_elf_archive_commands out_var object archive)
     endif()
   endforeach()
 
-  # The project's own archives come in whole. A bundled runtime resolves on
-  # demand, so only the parts the C API reaches come along.
+  get_target_property(bundle_complete_runtime mln_ffi_platform_dependencies
+                      MLN_FFI_ARCHIVE_BUNDLED_RUNTIME_WHOLE)
+  if(bundle_complete_runtime)
+    set(runtime_arguments ${bundled_runtime} --no-whole-archive)
+  else()
+    set(runtime_arguments --no-whole-archive ${bundled_runtime})
+  endif()
+
+  # The project's own archives come in whole. Most bundled runtimes resolve on
+  # demand, while musl carries every unwinder entry point for mixed-language
+  # consumers.
   set(commands
       COMMAND
       "${CMAKE_LINKER}"
@@ -150,8 +159,7 @@ function(mln_ffi_elf_archive_commands out_var object archive)
       "${object}"
       --whole-archive
       ${ARGN}
-      --no-whole-archive
-      ${bundled_runtime})
+      ${runtime_arguments})
 
   if(renamed_symbols)
     set(rename_arguments "")
