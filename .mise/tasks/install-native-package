@@ -40,6 +40,14 @@ if [[ "$preset" == macos-*-egl && -f "$install_dir/lib/libEGL.dylib" ]]; then
     "$loader_stash/include"
 fi
 
+# Rust cross-builds use the configured Zig wrappers after this task replaces the
+# native tree with its packaged install. Preserve them across that replacement.
+zig_shim_stash=""
+if [[ "$preset" == linux-musl-* && -d "$build_dir/zig-shim" ]]; then
+  zig_shim_stash="$(mktemp -d)"
+  mv "$build_dir/zig-shim" "$zig_shim_stash/"
+fi
+
 mise run //:clean "$preset"
 mkdir -p "$staging_dir"
 (
@@ -73,6 +81,11 @@ if [[ -n "$loader_stash" ]]; then
     "$loader_stash"/include/GLES3 "$loader_stash"/include/KHR \
     "$install_dir/include"
   rm -rf "$loader_stash"
+fi
+
+if [[ -n "$zig_shim_stash" ]]; then
+  mv "$zig_shim_stash/zig-shim" "$build_dir/"
+  rmdir "$zig_shim_stash"
 fi
 
 touch "$build_dir/.native-package-install"

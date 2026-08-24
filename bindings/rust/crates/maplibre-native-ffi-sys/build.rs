@@ -21,6 +21,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let include_dir = install_dir.join("include");
     let link_dir = native_library_dir(&install_dir);
     let target_os = env::var("CARGO_CFG_TARGET_OS")?;
+    let target_env = env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
     let header = include_dir.join("maplibre_native_c.h");
 
     require_dir(&include_dir, "native include directory")?;
@@ -40,6 +41,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         // The archive merges in every dependency it can. What is left is the
         // platform and render backend's system libraries, which CMake records.
         for library in descriptor.static_link_libraries() {
+            // Rust's self-contained musl sysroot includes these interfaces in
+            // libc and provides no separate alias archives for them.
+            if target_env == "musl" && matches!(library.as_str(), "m" | "dl" | "pthread" | "rt") {
+                continue;
+            }
             println!("cargo:rustc-link-lib={library}");
         }
         for framework in descriptor.static_link_frameworks() {

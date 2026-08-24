@@ -1,8 +1,8 @@
 # Sourced by the Rust binding's cross-compilation tasks with a native preset as
 # $1. Maps musl, Android, and OpenHarmony presets to their Cargo target. Exports
-# the cross-compilation environment (bindgen, CC/CXX, linker) from the native Zig
-# toolchain, Android NDK, or OpenHarmony SDK. Leaves `cargo_target` empty for
-# host presets, where Cargo picks its own target and toolchain.
+# the cross-compilation environment (bindgen, CC/CXX, linker) from the Zig and
+# Rust toolchains, Android NDK, or OpenHarmony SDK. Leaves `cargo_target` empty
+# for host presets, where Cargo picks its own target and toolchain.
 # shellcheck shell=bash
 
 cargo_target=
@@ -22,9 +22,24 @@ case "$1" in
     target_env="${cargo_target//-/_}"
     target_env_upper="$(printf '%s' "$target_env" | tr '[:lower:]' '[:upper:]')"
     compiler="$MISE_MONOREPO_ROOT/build/$1/zig-shim/zig-cc"
+    compiler_cxx="$MISE_MONOREPO_ROOT/build/$1/zig-shim/zig-c++"
+    if [[ ! -x "$compiler" || ! -x "$compiler_cxx" ]]; then
+      echo "The musl Zig compiler wrappers do not exist for $1; run mise run build $1 first." >&2
+      return 2
+    fi
+    rust_sysroot="$(rustc --print sysroot)"
+    rust_host="$(rustc --print host-tuple)"
+    linker="$rust_sysroot/lib/rustlib/$rust_host/bin/rust-lld"
+    if [[ ! -x "$linker" ]]; then
+      echo "The Rust linker does not exist: $linker" >&2
+      return 2
+    fi
+    rustflags_variable="CARGO_TARGET_${target_env_upper}_RUSTFLAGS"
+    rustflags="${!rustflags_variable:-}"
     export "CC_$target_env=$compiler"
-    export "CXX_$target_env=$MISE_MONOREPO_ROOT/build/$1/zig-shim/zig-c++"
-    export "CARGO_TARGET_${target_env_upper}_LINKER=$compiler"
+    export "CXX_$target_env=$compiler_cxx"
+    export "CARGO_TARGET_${target_env_upper}_LINKER=$linker"
+    export "$rustflags_variable=${rustflags:+$rustflags }-C linker-flavor=ld.lld"
     ;;
   android-*)
     ndk_prebuilt="$ANDROID_HOME/ndk/$MLN_FFI_ANDROID_NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64"

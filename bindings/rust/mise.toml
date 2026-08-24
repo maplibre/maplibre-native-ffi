@@ -9,11 +9,19 @@ export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
 # the target and point every tool that compiles or links at the platform SDK.
 source "$MISE_MONOREPO_ROOT/scripts/rust-cross-env.sh" "$usage_preset"
 if [[ -n "$cargo_target" ]]; then
-  exec cargo build \
+  cargo build \
     -p maplibre-native-ffi-sys \
     -p maplibre-native-ffi-core \
     -p maplibre-native-ffi \
     --target "$cargo_target"
+  if [[ "$usage_preset" == linux-musl-* ]]; then
+    # Cross-builds cannot execute the test binary here, but linking it validates
+    # the packaged static archive and the target compiler configuration.
+    exec cargo test --no-run \
+      -p maplibre-native-ffi-sys \
+      --target "$cargo_target"
+  fi
+  exit 0
 fi
 exec cargo build \
   -p maplibre-native-ffi-sys \

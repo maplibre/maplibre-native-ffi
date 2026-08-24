@@ -42,5 +42,5 @@ esac
     esac
     export LIBGL_ALWAYS_SOFTWARE=true
     export MLN_FFI_TEST_FIXTURE_DIR="$2/third_party/maplibre-native/test/fixtures"
-    exec "$3"
+    exec timeout 300 "$3"
   ' sh "$backend" "$MISE_MONOREPO_ROOT" "$test_binary"

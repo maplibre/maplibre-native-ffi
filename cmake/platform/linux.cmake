@@ -21,6 +21,7 @@ function(mln_ffi_configure_linux_archive_contents target)
     COMMAND
       "${CMAKE_CXX_COMPILER}"
       ${probe_flags}
+      -fPIC
       "${probe_source}"
       -o
       "${CMAKE_CURRENT_BINARY_DIR}/mln-cxx-runtime-probe"
